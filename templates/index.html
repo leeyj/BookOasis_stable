@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BookOasis - 도서 보관함</title>
+    <!-- Favicon (임시 용도) -->
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📚</text></svg>">
+    <!-- FontAwesome 아이콘 패키지 추가 (Local) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='lib/font-awesome/css/all.min.css') }}">
+    <script>
+        window.currentUser = {
+            username: "{{ session.get('username', '') }}",
+            role: "{{ session.get('role', '') }}"
+        };
+    </script>
+    <!-- 프리미엄 커스텀 CSS -->
+    <!-- 미디어 라이브러리 전용 CSS (tab_media_library.html에서 로드됨) -->
+    
+    <style>
+        :root {
+            --color-accent: {{ user_theme_color|default('#a855f7') }};
+            --color-accent-hover: {{ user_theme_color|default('#a855f7') }}cc;
+            --bg-glow-1: {{ user_theme_color|default('#a855f7') }}33;
+            --bg-glow-2: #3b82f633;
+        }
+
+        body {
+            background-image: radial-gradient(circle at 15% 50%, var(--bg-glow-1), transparent 25%),
+                radial-gradient(circle at 85% 30%, var(--bg-glow-2), transparent 25%);
+            background-attachment: fixed;
+            background-color: #0f172a; /* Fallback for style.css var(--color-bg) */
+            color: #f8fafc;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+    </style>
+    <script>
+        console.log("%c📚 Powered by BookOasis Engine v1.0", "color: #a855f7; font-size: 20px; font-weight: bold; text-shadow: 1px 1px 2px black; padding: 10px; border-radius: 5px; border: 2px solid #a855f7;");
+        console.log("Licensed under GNU AGPLv3. https://github.com/leeyj/BookOasis_stable");
+    </script>
+</head>
+<body>
+
+<div style="width: 100%; margin: 0 auto; background: rgba(30, 41, 59, 0.2); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px; backdrop-filter: blur(10px); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); min-height: calc(100vh - 40px); display: flex; flex-direction: column;">
+    {% include "components/tab_media_library.html" %}
+</div>
+
+</body>
+</html>

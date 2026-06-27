@@ -1,0 +1,28 @@
+<!-- 카테고리(라이브러리) 추가/수정 모달 -->
+<div id="library-form-modal" class="library-modal" style="display: none;">
+    <div class="library-modal-content">
+        <div class="library-modal-header">
+            <h3 id="library-modal-title">카테고리 추가</h3>
+            <span class="library-modal-close" onclick="closeLibraryModal()">&times;</span>
+        </div>
+        <form id="library-crud-form" onsubmit="submitLibraryForm(event)">
+            <input type="hidden" id="library-form-id" name="id">
+            <div class="library-form-group">
+                <label for="library-form-name">카테고리 이름</label>
+                <input type="text" id="library-form-name" name="name" required placeholder="예: 판타지 소설, 코믹스 등">
+            </div>
+            <div class="library-form-group">
+                <label for="library-form-path">서버 물리 경로 (엔터로 여러 개 입력 가능)</label>
+                <textarea id="library-form-path" name="physical_path" required rows="3" placeholder="예: C:\library\fantasy&#10;/home/user/manga"></textarea>
+            </div>
+            <div class="library-form-group-row">
+                <input type="checkbox" id="library-form-remote" name="is_remote">
+                <label for="library-form-remote">원격 드라이브 (VFS 마운트 / rclone 등)</label>
+            </div>
+            <div class="library-modal-footer">
+                <button type="button" class="btn-cancel" onclick="closeLibraryModal()">취소</button>
+                <button type="submit" class="btn-submit" id="library-form-submit-btn">저장</button>
+            </div>
+        </form>
+    </div>
+</div>

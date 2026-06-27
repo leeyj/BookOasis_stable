@@ -1,0 +1,30 @@
+<!-- 사용자 수동 등록 모달 -->
+<div id="user-form-modal" class="library-modal" style="display: none;">
+    <div class="library-modal-content" style="max-width: 400px;">
+        <div class="library-modal-header">
+            <h3>사용자 추가</h3>
+            <span class="library-modal-close" onclick="closeUserModal()">&times;</span>
+        </div>
+        <form id="user-crud-form" onsubmit="submitUserForm(event)">
+            <div class="library-form-group">
+                <label for="user-form-username">사용자 아이디 (로그인용)</label>
+                <input type="text" id="user-form-username" name="username" required placeholder="예: reading_fan">
+            </div>
+            <div class="library-form-group">
+                <label for="user-form-password">초기 비밀번호 (최소 4자)</label>
+                <input type="password" id="user-form-password" name="password" required placeholder="예: user1234">
+            </div>
+            <div class="library-form-group">
+                <label for="user-form-role">권한 역할 (Role)</label>
+                <select id="user-form-role" name="role" style="width: 100%; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; cursor: pointer; font-size: 0.9rem;">
+                    <option value="user">일반 사용자 (user)</option>
+                    <option value="admin">관리자 (admin)</option>
+                </select>
+            </div>
+            <div class="library-modal-footer">
+                <button type="button" class="btn-cancel" onclick="closeUserModal()">취소</button>
+                <button type="submit" class="btn-submit" id="user-form-submit-btn">등록</button>
+            </div>
+        </form>
+    </div>
+</div>

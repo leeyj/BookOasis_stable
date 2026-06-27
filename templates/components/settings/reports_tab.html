@@ -1,0 +1,43 @@
+<!-- 4. 스캔 에러 리포트 탭 -->
+<div id="settings-tab-reports" class="settings-tab-content" style="display: none; flex-direction: column; gap: 1.5rem;">
+    <div class="dashboard-section">
+        <div class="section-header" style="margin-bottom: 1.2rem; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 1rem;">
+            <div>
+                <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1.2rem; font-weight: 700;">
+                    <i class="fa-solid fa-triangle-exclamation" style="color: #ea580c; margin-right: 0.5rem;"></i> 도서 스캔 에러 리포트 뷰어
+                </h3>
+                <p style="font-size: 0.82rem; color: #94a3b8; margin: 0.4rem 0 0 0;">스캔 작업 도중 발생한 손상 압축파일 및 표지 추출 오류 등 비정상 도서 내역을 카테고리별로 모니터링합니다.</p>
+            </div>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <select id="report-library-select" onchange="loadReportList()" style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; padding: 0.5rem 0.8rem; border-radius: 6px; outline: none; cursor: pointer; font-size: 0.85rem;">
+                    <option value="">-- 카테고리 선택 --</option>
+                </select>
+                <select id="report-file-select" onchange="loadReportDetail()" style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; padding: 0.5rem 0.8rem; border-radius: 6px; outline: none; cursor: pointer; font-size: 0.85rem; min-width: 200px;">
+                    <option value="">-- 리포트 선택 --</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="settings-table-wrapper" style="background: rgba(30, 41, 59, 0.25); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; overflow: hidden; backdrop-filter: blur(10px);">
+            <table class="settings-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
+                <thead>
+                    <tr style="background: rgba(15, 23, 42, 0.4); border-bottom: 1px solid rgba(255,255,255,0.08); color: #94a3b8;">
+                        <th style="padding: 1rem; width: 35%;">도서 파일명</th>
+                        <th style="padding: 1rem; width: 15%; text-align: center;">오류 구분</th>
+                        <th style="padding: 1rem; width: 50%;">상세 사유 및 오류 경로</th>
+                    </tr>
+                </thead>
+                <tbody id="report-detail-table-body">
+                    <tr>
+                        <td colspan="3" style="padding: 2rem; text-align: center; color: #94a3b8;">
+                            <i class="fa-solid fa-info-circle" style="margin-right: 0.3rem;"></i> 카테고리와 리포트를 선택하여 상세 오류 내역을 확인하십시오.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <!-- 페이지네이션 컨테이너 -->
+        <div id="report-pagination-container" style="display: flex; justify-content: center; gap: 0.5rem; margin-top: 1rem;">
+        </div>
+    </div>
+</div>

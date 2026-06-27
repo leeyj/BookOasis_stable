@@ -1,0 +1,7 @@
+Flask==2.3.3
+gunicorn==21.2.0
+python-dotenv==1.0.0
+apscheduler==3.10.1
+PyMuPDF==1.22.5
+Pillow==10.0.0
+psutil==5.9.8

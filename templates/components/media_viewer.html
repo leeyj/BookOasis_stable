@@ -1,0 +1,143 @@
+<!-- 내장 미디어 통합 뷰어 모달 (뷰어는 전체화면이 필요하므로 유지) -->
+<div id="media-viewer-modal" class="viewer-modal">
+    <!-- 전체화면 탈출용 플로팅 닫기 버튼 -->
+    <button class="floating-close-btn" onclick="closeMediaViewer()" title="전체화면 닫기 (ESC)">
+        <i class="fa-solid fa-xmark"></i>
+    </button>
+
+    <div class="viewer-header">
+
+        <span class="viewer-title" id="viewer-title-text">독서 중...</span>
+        <div class="viewer-controls">
+            <!-- 텍스트 뷰어용 폰트 제어판 -->
+            <div id="txt-controls" class="txt-controls-panel" style="display:none;">
+                <button onclick="changeFontSize(-1)" class="btn-txt-ctrl">A-</button>
+                <button onclick="changeFontSize(1)" class="btn-txt-ctrl">A+</button>
+                <button onclick="toggleReaderTheme()" class="btn-txt-ctrl"><i class="fa-solid fa-circle-half-stroke"></i></button>
+            </div>
+            <!-- 만화 뷰어용 화면 맞추기 토글 -->
+            <div id="comic-fit-controls" class="comic-fit-panel" style="display:none;">
+                <button id="btn-fit-height" class="btn-fit active" onclick="setComicFitMode('height')" title="높이에 맞추기">
+                    <i class="fa-solid fa-arrows-up-down"></i> 높이
+                </button>
+                <button id="btn-fit-width" class="btn-fit" onclick="setComicFitMode('width')" title="너비에 맞추기">
+                    <i class="fa-solid fa-arrows-left-right"></i> 너비
+                </button>
+            </div>
+            <!-- 전체화면 토글 버튼 -->
+            <button id="btn-fullscreen-toggle" class="btn-fullscreen" onclick="toggleFullscreenViewer()" title="전체화면 (F)">
+                <i class="fa-solid fa-expand" id="fullscreen-icon"></i>
+            </button>
+            <span class="close-viewer-btn" onclick="closeMediaViewer()">&times;</span>
+        </div>
+
+    </div>
+    
+    <div class="viewer-body" id="viewer-body-container" style="position: relative;">
+        <!-- 공통 3분할 투명 핫스팟 터치 레이어 (뷰어 최상단 배치) -->
+        <div class="comic-hotspot-layer" id="common-viewer-hotspot" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10002; display: flex; pointer-events: auto;">
+            <div class="hotspot-zone left-zone" onclick="prevPage()" title="이전 페이지" style="width: 30%; height: 100%; cursor: pointer;"></div>
+            <div class="hotspot-zone center-zone" onclick="toggleComicOverlay()" title="메뉴 열기" style="width: 40%; height: 100%; cursor: pointer;"></div>
+            <div class="hotspot-zone right-zone" onclick="nextPage()" title="다음 페이지" style="width: 30%; height: 100%; cursor: pointer;"></div>
+        </div>
+
+        <!-- Kavita 스타일 플로팅 조작 오버레이 메뉴 (공용으로 변경) -->
+        <div id="comic-overlay-menu" class="comic-overlay-menu" style="display: none; z-index: 10003;">
+            <div class="overlay-header">
+                <span class="overlay-title" id="overlay-title-text">독서 중...</span>
+            </div>
+            <div class="overlay-controls-panel">
+                <button class="btn-overlay-action" onclick="jumpToFirstPage()"><i class="fa-solid fa-backward-step"></i> 처음부터</button>
+                <button class="btn-overlay-action" onclick="markAsCompleted()"><i class="fa-solid fa-circle-check"></i> 읽음 완료</button>
+                <div class="overlay-fit-group" id="overlay-comic-fit-group">
+                    <button id="btn-overlay-fit-height" class="btn-overlay-fit active" onclick="setComicFitMode('height')">높이맞춤</button>
+                    <button id="btn-overlay-fit-width" class="btn-overlay-fit" onclick="setComicFitMode('width')">너비맞춤</button>
+                </div>
+
+                <!-- 공용 스크롤 방식 선택 -->
+                <div class="overlay-scroll-group" id="overlay-scroll-mode-group" style="display: flex; background: rgba(0, 0, 0, 0.3); padding: 2px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05); gap: 1px;">
+                    <button id="btn-scroll-page" class="btn-overlay-fit active" onclick="setScrollMode('page')" title="책장처럼 넘기기" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; border: none; border-radius: 3px; cursor: pointer;">
+                        <i class="fa-solid fa-book-open"></i> 페이지
+                    </button>
+                    <button id="btn-scroll-continuous" class="btn-overlay-fit" onclick="setScrollMode('scroll')" title="아래로 스크롤" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; border: none; border-radius: 3px; cursor: pointer;">
+                        <i class="fa-solid fa-arrows-up-down"></i> 스크롤
+                    </button>
+                </div>
+
+                <div class="overlay-txt-group" id="overlay-txt-controls-group" style="display: none; display: flex; gap: 0.4rem; align-items: center;">
+                    <!-- 폰트 선택 드롭다운 -->
+                    <select id="viewer-font-select" onchange="onViewerFontChange(this.value)" style="background: #1e293b; color: #fff; border: 1px solid rgba(255,255,255,0.15); padding: 0.35rem 0.5rem; border-radius: 4px; font-size: 0.8rem; cursor: pointer; outline: none;">
+                        <option value="batang">KoPub 바탕</option>
+                        <option value="gothic">나눔고딕</option>
+                        <option value="pretendard">Pretendard</option>
+                    </select>
+                    <!-- 폰트 사이즈 조절 -->
+                    <button onclick="changeFontSize(-1)" class="btn-overlay-fit" style="border: 1px solid rgba(255,255,255,0.1); padding: 0.3rem 0.7rem; background: transparent; color: #fff; cursor: pointer; border-radius: 4px;" title="글자 작게">A-</button>
+                    <button onclick="changeFontSize(1)" class="btn-overlay-fit" style="border: 1px solid rgba(255,255,255,0.1); padding: 0.3rem 0.7rem; background: transparent; color: #fff; cursor: pointer; border-radius: 4px;" title="글자 크게">A+</button>
+                    <!-- 테마 토글 -->
+                    <button onclick="toggleTheme()" class="btn-overlay-fit" style="border: 1px solid rgba(255,255,255,0.1); padding: 0.3rem 0.7rem; background: transparent; color: #fff; cursor: pointer; border-radius: 4px;" title="배경 테마 전환"><i class="fa-solid fa-circle-half-stroke"></i></button>
+                </div>
+            </div>
+            <div class="overlay-footer">
+                <span id="comic-overlay-page-info">1 / 1</span>
+            </div>
+        </div>
+
+        <!-- 이미지(만화) 뷰어 -->
+        <div id="comic-viewer-container" class="viewer-pane" style="display:none; position: relative;">
+            <div class="comic-image-wrapper">
+                <img id="comic-page-img" src="" alt="Comic Page">
+            </div>
+        </div>
+
+        <!-- 공통 로딩/에러 오버레이 -->
+        <div id="viewer-common-overlay" class="comic-loading-overlay" style="display:none; z-index: 10006;">
+            <div class="comic-loading-content">
+                <div id="viewer-common-spinner" class="comic-loading-spinner"></div>
+                <p id="viewer-common-text" class="comic-loading-text">다운로드 중...</p>
+                <p id="viewer-common-sub" class="comic-loading-sub">Google Drive에서 파일을 가져오고 있습니다.<br>잠시만 기다려 주세요.</p>
+                <button id="viewer-common-close-btn" class="btn-overlay-fit" style="display: none; margin-top: 1rem; border: 1px solid rgba(255,255,255,0.2); padding: 0.5rem 1rem; background: rgba(255,255,255,0.1); color: #fff; cursor: pointer; border-radius: 4px;" onclick="closeMediaViewer()">닫기</button>
+            </div>
+        </div>
+
+        <!-- 다음 편 이어서 보기 확인 모달 -->
+        <div id="viewer-next-episode-modal" class="comic-loading-overlay" style="display:none; z-index: 10007;">
+            <div class="comic-loading-content">
+                <p class="comic-loading-text">현재 편을 다 읽었습니다.</p>
+                <p id="viewer-next-episode-title" class="comic-loading-sub" style="color: #a855f7; font-weight: bold; font-size: 1.05rem;">다음 편: ...</p>
+                <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                    <button id="viewer-next-episode-confirm-btn" class="btn-overlay-fit" style="border: 1px solid #a855f7; padding: 0.5rem 1.2rem; background: #a855f7; color: #fff; cursor: pointer; border-radius: 4px; font-weight: bold;">이어서 보기</button>
+                    <button id="viewer-next-episode-cancel-btn" class="btn-overlay-fit" style="border: 1px solid rgba(255,255,255,0.2); padding: 0.5rem 1.2rem; background: rgba(255,255,255,0.1); color: #fff; cursor: pointer; border-radius: 4px;">닫기</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- EPUB 뷰어 (epub.js) -->
+        <div id="epub-viewer-container" class="viewer-pane" style="display:none; position: relative;">
+            <div id="epub-render-area" class="epub-area"></div>
+            <div class="epub-nav-bar">
+                <button id="epub-prev" class="btn-nav">이전</button>
+                <button id="epub-next" class="btn-nav">다음</button>
+            </div>
+        </div>
+
+        <!-- TXT 텍스트 리더 -->
+        <div id="txt-viewer-container" class="viewer-pane txt-reader-theme-dark" style="display:none; position: relative;">
+            <div id="txt-scroll-wrapper" style="width: 100%; height: 100%; box-sizing: border-box;">
+                <div id="txt-content-area" class="txt-content"></div>
+            </div>
+        </div>
+
+        <!-- PDF 뷰어 (pdf.js) -->
+        <div id="pdf-viewer-container" class="viewer-pane" style="display:none; position: relative;">
+            <div id="pdf-render-area" class="pdf-area" style="overflow: hidden; height: 100%; text-align: center;">
+                <canvas id="pdf-canvas"></canvas>
+            </div>
+            <div class="pdf-nav-bar" style="z-index: 10005;">
+                <button onclick="prevPage()" class="btn-nav">이전</button>
+                <span id="pdf-page-info">1 / 1</span>
+                <button onclick="nextPage()" class="btn-nav">다음</button>
+            </div>
+        </div>
+    </div>
+</div>

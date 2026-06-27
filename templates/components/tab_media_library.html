@@ -1,0 +1,109 @@
+<!-- CSS 및 외부 라이브러리 로드 -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=1.2.0">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tab_media_library_viewer.css') }}?v=1.2.0">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.88/epub.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<script>
+    // pdfjs worker 설정
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+</script>
+
+<div class="media-library-container">
+    <!-- 좌측 카테고리 사이드바 -->
+    <div class="library-sidebar"
+        style="display: flex; flex-direction: column; justify-content: space-between; min-height: calc(100vh - 120px);">
+        <div>
+            <h3 class="sidebar-title"><i class="fa-solid fa-folder-open" style="color: #a855f7; margin-right: 0.5rem;"></i> 라이브러리</h3>
+            <ul class="sidebar-menu" id="sidebar-categories">
+                <li class="menu-item active" id="category-home" onclick="selectCategory('home')"><i
+                        class="fa-solid fa-house"></i> Home</li>
+                <li class="menu-item" id="category-history" onclick="selectCategory('history')"><i
+                        class="fa-solid fa-clock-rotate-left"></i> 최근 읽은 도서</li>
+                <li class="menu-item" id="category-favorite" onclick="selectCategory('favorite')"><i
+                        class="fa-solid fa-star" style="color: #eab308;"></i> 즐겨찾기</li>
+                <li class="menu-item" id="category-all" onclick="selectCategory('all')"><i
+                        class="fa-solid fa-layer-group"></i> 전체보기</li>
+            </ul>
+        </div>
+        <div class="sidebar-settings-wrap"
+            style="padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.05); margin-top: auto; display: flex; flex-direction: column; gap: 0.8rem;">
+            <ul class="sidebar-menu">
+                <li class="menu-item" id="category-settings" onclick="selectCategory('settings')"><i
+                        class="fa-solid fa-gear"></i> 환경설정</li>
+            </ul>
+            <!-- 사용자 프로필 및 로그아웃 단추 -->
+            <div class="user-profile-widget"
+                style="padding: 0.6rem 0.8rem; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; min-width: 0;">
+                    <i class="fa-solid fa-circle-user" style="color: #c084fc; font-size: 1.1rem; flex-shrink: 0;"></i>
+                    <span id="session-username-display"
+                        style="font-size: 0.82rem; color: #cbd5e1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">-</span>
+                </div>
+                <a href="/logout" title="로그아웃" style="color: #ef4444; font-size: 0.88rem; transition: color 0.2s;"
+                    onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='#ef4444'"><i
+                        class="fa-solid fa-power-off"></i></a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 우측 메인 콘텐츠 영역 -->
+    <div class="library-main-content">
+        <!-- 
+            [유지보수 지침]
+            향후 '메타데이터 상세 에디터'나 '도서 통계 분석 그래프 뷰' 등 추가적인 대형 UI 기능이 도입될 경우,
+            이 파일에 직접 마크업을 추가하지 마시고 'templates/components/' 디렉토리에 별도 서브 템플릿 파일로 분리한 후 
+            Jinja2 include 구문(예: include \"components/파일명.html\")을 사용하여 조립할 것
+        -->
+        <!-- 상단 헤더 및 필터 영역 -->
+        <div class="library-header">
+            <h2 class="library-title" style="display: flex; align-items: center;">
+                <span><i class="fa-solid fa-book-open" style="color: #a855f7; margin-right: 0.5rem;"></i> 도서 보관함</span>
+                <span id="library-total-count" style="font-size: 0.9rem; color: #94a3b8; margin-left: 0.8rem; font-weight: normal; white-space: nowrap;"></span>
+            </h2>
+            <div class="library-controls">
+                <button id="btn-lib-sort" class="btn-toggle"
+                    style="margin-right: 0.5rem; padding: 0.4rem 0.8rem; display: none; align-items: center; gap: 0.3rem;"
+                    onclick="toggleLibrarySort()" title="가나다 정렬 방향 변경">
+                    <i class="fa-solid fa-sort-alpha-down"></i> 오름차순
+                </button>
+                <input type="text" id="library-search" class="form-control input-sm" placeholder="제목, 시리즈, 작가 검색..."
+                    oninput="filterBooks()">
+                <div class="library-toggle-group">
+                    <button class="btn-toggle active" id="btn-lib-general" onclick="switchLibraryType('general')">일반
+                        도서</button>
+                    <button class="btn-toggle" id="btn-lib-adult" onclick="switchLibraryType('adult')">성인 도서</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== 대시보드 뷰 (Home 선택 시 Kavita 스타일로 표시) ===== -->
+        {% include "components/views/library_dashboard.html" %}
+
+        <!-- ===== 그리드 뷰 (기본 표시) ===== -->
+        {% include "components/views/library_grid.html" %}
+
+        <!-- ===== 도서 상세 뷰 (클릭 시 전환) ===== -->
+        {% include "components/views/library_detail.html" %}
+
+        <!-- ===== 환경설정 뷰 (설정 선택 시 표시) ===== -->
+        {% include "components/views/library_settings.html" %}
+    </div>
+
+    {% include "components/media_viewer.html" %}
+
+    <!-- 모달 컴포넌트 목록 -->
+    {% include "components/modals/user_modal.html" %}
+    {% include "components/context_menus.html" %}
+    {% include "components/modals/library_modal.html" %}
+    {% include "components/modals/metadata_search_modal.html" %}
+
+    <!-- 실시간 시스템 작업 뉴스 티커 푸터 바 -->
+    <div id="system-ticker-footer" class="system-ticker-footer" style="display: none;">
+        <div class="ticker-title"><i class="fa-solid fa-bullhorn"></i> 시스템 속보</div>
+        <div class="ticker-wrap">
+            <div id="system-ticker-content" class="ticker-content">현재 백그라운드 작업이 구동 중입니다.</div>
+        </div>
+    </div>
+
+    <script type="module" src="{{ url_for('static', filename='js/tab_media_library.js') }}?v=1.1.0"></script>

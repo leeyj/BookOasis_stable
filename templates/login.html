@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BookOasis - 로그인</title>
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📚</text></svg>">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="/static/lib/font-awesome/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/login.css">
+</head>
+<body>
+
+<div class="auth-container">
+    <!-- 1. 로그인 폼 카드 -->
+    <div id="login-card" class="auth-card">
+        <div class="auth-header">
+            <span class="auth-logo"><i class="fa-solid fa-gem icon-accent"></i></span>
+            <h2 class="auth-title">BookOasis</h2>
+            <p class="auth-subtitle">북오아시스 미디어 서재 로그인</p>
+        </div>
+
+        <div id="login-error" class="error-message">
+            <i class="fa-solid fa-circle-exclamation"></i> <span id="login-error-text">오류</span>
+        </div>
+
+        <form id="login-form" onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <input type="text" id="username" class="form-control" placeholder="아이디" required autocomplete="username">
+                <i class="fa-solid fa-user"></i>
+            </div>
+            <div class="form-group">
+                <input type="password" id="password" class="form-control" placeholder="비밀번호" required autocomplete="current-password">
+                <i class="fa-solid fa-lock"></i>
+            </div>
+            <button type="submit" class="btn-submit">
+                로그인 <i class="fa-solid fa-arrow-right"></i>
+            </button>
+        </form>
+    </div>
+
+    <!-- 2. 비밀번호 강제 변경 폼 카드 (초기 로그인용) -->
+    <div id="change-card" class="auth-card force-change-border hidden">
+        <div class="auth-header">
+            <span class="auth-logo"><i class="fa-solid fa-shield-halved icon-warning"></i></span>
+            <h2 class="auth-title title-warning">보안 변경 강제</h2>
+            <p class="auth-subtitle subtitle-warning">초기 비밀번호(admin)를 사용 중입니다.<br>안전한 새 비밀번호를 설정해 주세요.</p>
+        </div>
+
+        <div id="change-error" class="error-message">
+            <i class="fa-solid fa-circle-exclamation"></i> <span id="change-error-text">오류</span>
+        </div>
+
+        <form id="change-form" onsubmit="handleChangePassword(event)">
+            <div class="form-group">
+                <input type="password" id="new-password" class="form-control" placeholder="새 비밀번호 (4자리 이상)" required autocomplete="new-password">
+                <i class="fa-solid fa-lock"></i>
+            </div>
+            <div class="form-group">
+                <input type="password" id="confirm-password" class="form-control" placeholder="새 비밀번호 확인" required autocomplete="new-password">
+                <i class="fa-solid fa-lock"></i>
+            </div>
+            <button type="submit" class="btn-submit btn-warning">
+                비밀번호 변경 및 메인 이동 <i class="fa-solid fa-check"></i>
+            </button>
+        </form>
+    </div>
+</div>
+
+<script src="/static/js/login.js"></script>
+</body>
+</html>

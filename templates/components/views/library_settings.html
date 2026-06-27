@@ -1,0 +1,214 @@
+        <div id="library-settings-view" style="display: none; flex-direction: column; gap: 1rem;">
+            <!-- 탭 헤더 영역 -->
+            <div class="settings-tabs" style="display: flex; gap: 0.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.5rem; margin-bottom: 1rem;">
+                <button class="settings-tab-btn active" onclick="switchSettingsTab('schedule')">
+                    <i class="fa-solid fa-calendar-days"></i> 스캔 스케줄 설정
+                </button>
+                <button class="settings-tab-btn" onclick="switchSettingsTab('general')">
+                    <i class="fa-solid fa-sliders"></i> 일반 설정
+                </button>
+                <button class="settings-tab-btn" onclick="switchSettingsTab('plugins')">
+                    <i class="fa-solid fa-plug"></i> 플러그인 설정
+                </button>
+                <button class="settings-tab-btn" onclick="switchSettingsTab('reports')">
+                    <i class="fa-solid fa-triangle-exclamation"></i> 스캔 리포트
+                </button>
+                <button class="settings-tab-btn" id="settings-tab-btn-users" onclick="switchSettingsTab('users')" style="display: none;">
+                    <i class="fa-solid fa-users"></i> 사용자 관리
+                </button>
+            </div>
+
+            <!-- 1. 스캔 스케줄 설정 탭 -->
+            <div id="settings-tab-schedule" class="settings-tab-content active" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <div class="dashboard-section">
+                    <div class="section-header" style="margin-bottom: 1.2rem;">
+                        <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1.2rem; font-weight: 700;">
+                            <i class="fa-solid fa-gears" style="color: #a855f7; margin-right: 0.5rem;"></i> 라이브러리 자동 스캔 & 스케줄 설정
+                        </h3>
+                        <p style="font-size: 0.82rem; color: #94a3b8; margin: 0.4rem 0 0 0;">각 카테고리의 동기화 스캔 스케줄(Cron) 주기를 일괄 관리하고 즉시 실행할 수 있습니다.</p>
+                    </div>
+                    
+                    <div class="settings-table-wrapper" style="background: rgba(30, 41, 59, 0.25); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; overflow: hidden; backdrop-filter: blur(10px);">
+                        <table class="settings-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
+                            <thead>
+                                <tr style="background: rgba(15, 23, 42, 0.4); border-bottom: 1px solid rgba(255,255,255,0.08); color: #94a3b8;">
+                                    <th style="padding: 1rem;">카테고리명</th>
+                                    <th style="padding: 1rem;">서버 물리 경로</th>
+                                    <th style="padding: 1rem; width: 220px;">스케줄 주기 (Cron식)</th>
+                                    <th style="padding: 1rem; width: 180px;">최근 스캔 시각</th>
+                                    <th style="padding: 1rem; width: 100px; text-align: center;">상태</th>
+                                    <th style="padding: 1rem; width: 180px; text-align: center;">작업</th>
+                                </tr>
+                            </thead>
+                            <tbody id="settings-libraries-list">
+                                <!-- JS를 통해 동적 생성 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. 일반 설정 탭 -->
+            <div id="settings-tab-general" class="settings-tab-content" style="display: none; flex-direction: column; gap: 1.5rem;">
+                <div class="dashboard-section">
+                    <div class="section-header" style="margin-bottom: 1.2rem;">
+                        <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1.2rem; font-weight: 700;">
+                            <i class="fa-solid fa-screwdriver-wrench" style="color: #a855f7; margin-right: 0.5rem;"></i> 기본 시스템 설정
+                        </h3>
+                        <p style="font-size: 0.82rem; color: #94a3b8; margin: 0.4rem 0 0 0;">북오아시스 미디어 서버의 전반적인 환경설정을 직접 관리할 수 있습니다.</p>
+                    </div>
+                    <div style="background: rgba(30, 41, 59, 0.25); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 1.5rem; backdrop-filter: blur(10px); color: #cbd5e1;">
+                        <form id="settings-general-form" onsubmit="submitGeneralSettings(event)" style="display: flex; flex-direction: column; gap: 1.5rem;">
+
+                            <!-- 2. 책 썸네일 크기 설정 -->
+                            <div class="library-form-group" style="margin-bottom: 0.5rem;">
+                                <label for="setting-thumbnail-width" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                    <i class="fa-solid fa-image" style="color: #a855f7; margin-right: 0.3rem;"></i> 보관함 도서 카드 너비: <span id="setting-thumbnail-width-val" style="color: #c084fc;">160</span>px
+                                </label>
+                                <input type="range" id="setting-thumbnail-width" name="BOOK_THUMBNAIL_WIDTH" min="120" max="240" step="10" value="160" style="width: 100%; max-width: 480px; cursor: pointer; accent-color: #a855f7;" oninput="document.getElementById('setting-thumbnail-width-val').innerText = this.value">
+                                <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;">보관함의 도서 커버 크기를 120px ~ 240px 범위 내에서 본인 모니터 해상도에 최적화하여 슬라이더로 크기를 조절할 수 있습니다.</p>
+                            </div>
+
+                            <!-- 3. 페이지당 로드 수 제한 -->
+                            <div class="library-form-group" style="margin-bottom: 0.5rem;">
+                                <label for="setting-page-limit" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                    <i class="fa-solid fa-list-ol" style="color: #a855f7; margin-right: 0.3rem;"></i> 1회당 도서 로딩 수 (Limit)
+                                </label>
+                                <select id="setting-page-limit" name="PAGE_LIMIT" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; cursor: pointer;">
+                                    <option value="30">30개씩 불러오기</option>
+                                    <option value="60">60개씩 불러오기 (기본값)</option>
+                                    <option value="90">90개씩 불러오기</option>
+                                    <option value="120">120개씩 불러오기 (고해상도 권장)</option>
+                                </select>
+                                <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;">무한 스크롤 및 보관함 로딩 시 한 화면에 렌더링할 도서 카드의 단위 개수입니다.</p>
+                            </div>
+
+                            <!-- 4. 텍스트 뷰어 기본 글자 크기 및 글꼴 -->
+                            <div style="display: flex; gap: 1rem; max-width: 480px; flex-wrap: wrap;">
+                                <div class="library-form-group" style="flex: 1; min-width: 150px; margin-bottom: 0.5rem;">
+                                    <label for="setting-viewer-font-size" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                        <i class="fa-solid fa-font" style="color: #a855f7; margin-right: 0.3rem;"></i> 뷰어 기본 글자 크기 (px)
+                                    </label>
+                                    <input type="number" id="setting-viewer-font-size" name="VIEWER_FONT_SIZE" min="12" max="36" value="18" style="width: 100%; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
+                                </div>
+                                <div class="library-form-group" style="flex: 1; min-width: 200px; margin-bottom: 0.5rem;">
+                                    <label for="setting-viewer-font-family" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                        <i class="fa-solid fa-font-case" style="color: #a855f7; margin-right: 0.3rem;"></i> 뷰어 기본 글꼴
+                                    </label>
+                                    <select id="setting-viewer-font-family" name="VIEWER_FONT_FAMILY" style="width: 100%; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; cursor: pointer;">
+                                        <option value="sans-serif">기본 고딕체 (Sans-Serif)</option>
+                                        <option value="serif">기본 바탕체 (Serif)</option>
+                                        <option value="monospace">기본 고정폭 (Monospace)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <!-- 5. DB 커넥션 풀 크기 설정 -->
+                            <div class="library-form-group" style="margin-bottom: 0.5rem;">
+                                <label for="setting-db-pool-size" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                    <i class="fa-solid fa-database" style="color: #a855f7; margin-right: 0.3rem;"></i> DB 커넥션 풀 크기 (최대 20개 제한)
+                                </label>
+                                <input type="number" id="setting-db-pool-size" name="DB_POOL_SIZE" min="1" max="20" value="5" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;" required>
+                                <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;">동시 접속량이 증가할 때 DB 연결 자원을 재사용하는 크기입니다. SQLite 권장 설정은 5~10개이며, 최대 20개까지 제한됩니다.</p>
+                            </div>
+
+                            <!-- 6. 스캐너 로그 기록 설정 -->
+                            <div class="library-form-group" style="margin-bottom: 0.5rem;">
+                                <label for="setting-scanner-write-log" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                    <i class="fa-solid fa-terminal" style="color: #a855f7; margin-right: 0.3rem;"></i> 스캐너 실행 로그 저장 옵션 (media_server.log)
+                                </label>
+                                <select id="setting-scanner-write-log" name="SCANNER_WRITE_LOG" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; cursor: pointer;">
+                                    <option value="1">로그 실시간 출력 및 파일 기록 (개발 모드)</option>
+                                    <option value="0">로그 출력 감추기 (운영 권장 / 용량 절약 모드)</option>
+                                </select>
+                                <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;">스캐너 백그라운드 구동 시 생성되는 로그의 상세 출력 방식을 정의합니다. 비활성화 시 로그 생성 부하와 파일 크기가 극적으로 줄어듭니다.</p>
+                            </div>
+
+                            <!-- 7. 만화 뷰어 로딩 지연 시간 설정 (LocalStorage) -->
+                            <div class="library-form-group" style="margin-bottom: 0.5rem;">
+                                <label for="setting-comic-loading-delay" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                    <i class="fa-solid fa-hourglass-start" style="color: #a855f7; margin-right: 0.3rem;"></i> 만화 뷰어 로딩 지연 시간 (ms)
+                                </label>
+                                <input type="number" id="setting-comic-loading-delay" name="COMIC_LOADING_DELAY" min="0" max="5000" step="50" value="300" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
+                                <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;">이미지 로드 시작 후 로딩 오버레이가 나타날 때까지 대기할 지연 시간입니다. 외부 접속(클라우드플레어 등) 시 500ms 이상으로 지연을 설정하는 것을 권장합니다. (브라우저 로컬 저장)</p>
+                            </div>
+
+                            <!-- 8. Lazy 표지 스크립트 실행 크론 주기 설정 -->
+                            <div class="library-form-group" style="margin-bottom: 0.5rem;">
+                                <label for="setting-lazy-scan-cron" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                    <i class="fa-solid fa-clock" style="color: #a855f7; margin-right: 0.3rem;"></i> Lazy 표지 스캐너 백그라운드 구동 주기 (Cron식)
+                                </label>
+                                <div style="display: flex; gap: 0.5rem; align-items: center; max-width: 480px; width: 100%;">
+                                    <input type="text" id="setting-lazy-scan-cron" name="LAZY_SCAN_CRON" value="0 3 * * *" style="flex: 1; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;" required>
+                                    <button type="button" onclick="triggerLazyScanNow()" class="btn-toggle" style="background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%); color: #fff; border: none; padding: 0.6rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.3rem; height: 38px;">
+                                        <i class="fa-solid fa-play"></i> 지금 실행
+                                    </button>
+                                </div>
+                                <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;">표지가 유실되었거나 원격지 PDF 등 스캔 시 제외된 도서들의 표지를 1권씩 3초 간격으로 추출하는 독립 스캐너의 스케줄 주기입니다. (기본값: 매일 새벽 3시 `0 3 * * *` 권장)</p>
+                            </div>
+
+                            <!-- 9. 최근 읽은 도서 개수 설정 -->
+                            <div class="library-form-group" style="margin-bottom: 0.5rem;">
+                                <label for="setting-recent-books-limit" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                    <i class="fa-solid fa-clock-rotate-left" style="color: #a855f7; margin-right: 0.3rem;"></i> 최근 읽은 도서 노출 개수
+                                </label>
+                                <input type="number" id="setting-recent-books-limit" name="RECENT_BOOKS_LIMIT" min="10" max="100" value="30" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
+                                <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;">사이드바 '최근 읽은 도서' 메뉴에서 보여줄 최대 도서 개수입니다. (기본 30개)</p>
+                            </div>
+
+                            <!-- 9-2. 다 읽은 도서 최근 읽은 도서에서 숨김 설정 -->
+                            <div class="library-form-group-row" style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                                <input type="checkbox" id="setting-hide-completed-in-history" name="HIDE_COMPLETED_IN_HISTORY" style="cursor: pointer; accent-color: #a855f7; width: 1.1rem; height: 1.1rem; margin: 0;">
+                                <label for="setting-hide-completed-in-history" style="cursor: pointer; font-weight: 700; color: #fff; font-size: 0.9rem; margin: 0;">다 읽은 도서는 최근 읽은 도서에서 삭제</label>
+                            </div>
+
+                            <!-- 10. 스캐너 시스템 메모리 제한 -->
+                            <div class="library-form-group" style="margin-bottom: 0.5rem;">
+                                <label for="setting-system-mem-limit" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                    <i class="fa-solid fa-memory" style="color: #a855f7; margin-right: 0.3rem;"></i> 스캐너 시스템 여유 메모리 하한 (MB)
+                                </label>
+                                <input type="number" id="setting-system-mem-limit" name="SYSTEM_MEM_LIMIT" min="512" max="16384" step="256" value="1536" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
+                                <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;">스캐너 동작 중 시스템 전체 가용 메모리가 이 값(MB) 미만으로 떨어지면 스캔 작업을 일시 중단하여 시스템 뻗음을 방지합니다. (기본 1536MB)</p>
+                            </div>
+
+                            <!-- 11. 스캐너 프로세스 캐시메모리 제한 -->
+                            <div class="library-form-group" style="margin-bottom: 0.5rem;">
+                                <label for="setting-process-rss-limit" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                    <i class="fa-solid fa-microchip" style="color: #a855f7; margin-right: 0.3rem;"></i> 스캐너 프로세스 최대 메모리 사용량 (MB)
+                                </label>
+                                <input type="number" id="setting-process-rss-limit" name="PROCESS_RSS_LIMIT" min="512" max="16384" step="256" value="2048" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
+                                <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;">스캐너 자체 프로세스가 소모하는 메모리가 이 값(MB)을 초과할 경우 안전하게 스캔을 종료 및 재시작하여 메모리 누수를 방지합니다. (기본 2048MB)</p>
+                            </div>
+
+                            <div style="margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1rem;">
+                                <button type="submit" class="btn-submit" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.4rem;">
+                                    <i class="fa-regular fa-floppy-disk"></i> 설정 저장
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. 플러그인 설정 탭 -->
+            <div id="settings-tab-plugins" class="settings-tab-content" style="display: none; flex-direction: column; gap: 1.5rem;">
+                <div class="dashboard-section">
+                    <div class="section-header" style="margin-bottom: 1.2rem;">
+                        <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1.2rem; font-weight: 700;">
+                            <i class="fa-solid fa-plug" style="color: #a855f7; margin-right: 0.5rem;"></i> 확장 기능 및 플러그인 관리
+                        </h3>
+                        <p style="font-size: 0.82rem; color: #94a3b8; margin: 0.4rem 0 0 0;">서버에 로드된 동적 플러그인의 활성화 여부(ON/OFF) 및 상세 환경설정 값을 일괄 관리합니다.</p>
+                    </div>
+                    <div id="settings-plugins-container" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                        <!-- JS를 통해 동적 생성 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. 스캔 에러 리포트 탭 -->
+            {% include "components/settings/reports_tab.html" %}
+
+            <!-- 5. 사용자 관리 탭 -->
+            {% include "components/settings/users_tab.html" %}
+        </div>
+    </div>

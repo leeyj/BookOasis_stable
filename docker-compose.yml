@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  bookoasis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bookoasis
+    restart: unless-stopped
+    ports:
+      - "5930:5930"
+    volumes:
+      # 설정 및 데이터베이스 영구 소장용 바인딩
+      - ./db:/app/db
+      - ./covers:/app/covers
+      - ./cache:/app/cache
+      - ./plugins:/app/plugins
+      # 중요: 미디어 라이브러리 경로 마운트 (본인의 책 저장 경로로 우측 매핑 수정 가능)
+      - /path/to/your/comics:/data/comics:ro
+    env_file:
+      - .env
+    environment:
+      - PORT=5930

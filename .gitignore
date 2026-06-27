@@ -1,0 +1,32 @@
+# Python Cache
+__pycache__/
+*.pyc
+
+# Local Environment & Secrets
+.env
+.venv/
+venv/
+ENV/
+deploy.py
+
+# Project Specific Data (DB & Cache)
+db/*.db
+db/*.db-wal
+db/*.db-shm
+db/*.db-journal
+cache/*
+!cache/.gitkeep
+covers/*
+!covers/.gitkeep
+
+# IDEs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Exclude sensitive scratch and DB backups
+scratch/
+db/*.db.bak

@@ -1,0 +1,48 @@
+        <div id="library-dashboard-view" style="display: none; flex-direction: column; gap: 2.2rem;">
+            <!-- 1. 최근 읽은 도서 섹션 -->
+            <div class="dashboard-section">
+                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
+                    <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1.1rem; font-weight: 700;"><i class="fa-solid fa-clock-rotate-left" style="color: #a855f7; margin-right: 0.5rem;"></i> 최근 읽은 도서</h3>
+                    <div class="section-nav-btns" style="display: flex; gap: 0.5rem;">
+                        <button onclick="scrollDashboardRow('history', 'left')" class="btn-nav-arrow" title="이전"><i class="fa-solid fa-chevron-left"></i></button>
+                        <button onclick="scrollDashboardRow('history', 'right')" class="btn-nav-arrow" title="다음"><i class="fa-solid fa-chevron-right"></i></button>
+                    </div>
+                </div>
+                <div class="dashboard-row-container" id="dashboard-history-row">
+                    <!-- JS에 의해 채워짐 -->
+                </div>
+            </div>
+
+            <!-- 2. 신규 추가 도서 섹션 -->
+            <div class="dashboard-section">
+                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
+                    <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1.1rem; font-weight: 700;"><i class="fa-solid fa-square-plus" style="color: #a855f7; margin-right: 0.5rem;"></i> 신규 추가 도서</h3>
+                    <div class="section-nav-btns" style="display: flex; gap: 0.5rem;">
+                        <button onclick="scrollDashboardRow('new', 'left')" class="btn-nav-arrow" title="이전"><i class="fa-solid fa-chevron-left"></i></button>
+                        <button onclick="scrollDashboardRow('new', 'right')" class="btn-nav-arrow" title="다음"><i class="fa-solid fa-chevron-right"></i></button>
+                    </div>
+                </div>
+                <div class="dashboard-row-container" id="dashboard-new-row">
+                    <!-- JS에 의해 채워짐 -->
+                </div>
+            </div>
+
+            <!-- 3. 플러그인 전용 공간 -->
+            <div class="dashboard-section" style="margin-bottom: 1.5rem;">
+                <div class="section-header" style="margin-bottom: 0.8rem;">
+                    <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1.1rem; font-weight: 700;"><i class="fa-solid fa-puzzle-piece" style="color: #a855f7; margin-right: 0.5rem;"></i> 플러그인 데스크</h3>
+                </div>
+                <div class="plugins-container" style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+                    <!-- 알라딘 신간 플러그인 카드 -->
+                    <div class="plugin-card" id="plugin-aladin-new" style="width: 100%; max-width: 500px; background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 1rem;">
+                        <h4 style="margin: 0 0 1rem 0; color: #cbd5e1; font-size: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+                            <span><i class="fa-solid fa-book-open" style="color: #38bdf8; margin-right: 0.3rem;"></i> 알라딘 오늘의 신간</span>
+                            <span style="font-size: 0.75rem; color: #64748b; font-weight: normal;">제공: Aladin</span>
+                        </h4>
+                        <div id="aladin-new-content" style="display: flex; flex-direction: column; gap: 1rem; max-height: 400px; overflow-y: auto; padding-right: 0.5rem;">
+                            <div class="loading-spinner" style="padding: 1rem 0;"><i class="fa-solid fa-circle-notch fa-spin"></i> 신간 정보를 불러오는 중...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>

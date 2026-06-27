@@ -1,0 +1,29 @@
+        <div id="book-detail-view" style="display: none;">
+            <!-- 뒤로가기 버튼 -->
+            <button class="btn-back-to-list" onclick="goBackToList()">
+                <i class="fa-solid fa-arrow-left"></i> 목록으로 돌아가기
+            </button>
+
+            <div class="detail-layout">
+                <div class="detail-left">
+                    <img id="detail-cover" src="" alt="Cover" onerror="this.src='https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=300&auto=format&fit=crop&q=60';">
+                </div>
+                <div class="detail-right">
+                    <h3 id="detail-title" class="book-detail-title">책 제목</h3>
+                    <div class="detail-meta">
+                        <span id="detail-series" class="badge">시리즈명</span>
+                        <span id="detail-author" class="meta-item">작가: -</span>
+                        <span id="detail-publisher" class="meta-item">출판사: -</span>
+                    </div>
+                    <div class="detail-score" id="detail-score-stars">★★★★★</div>
+                    <p id="detail-summary" class="book-summary-text">작품 설명이 여기에 표시됩니다.</p>
+                    <a id="detail-link" href="#" target="_blank" class="ridi-link-btn" style="display:none;">리디북스 바로가기</a>
+                    
+                    <!-- 단행본 및 화별 리스트 -->
+                    <h4 style="margin-top:1.5rem; color:#fff; border-bottom:1px solid #334155; padding-bottom:0.5rem;">단행본 목록</h4>
+                    <div class="chapters-list" id="detail-chapters-container">
+                        <!-- 권수 카드가 동적 생성됨 -->
+                    </div>
+                </div>
+            </div>
+        </div>

@@ -1,0 +1,644 @@
+/* 🔄 도서 통합 뷰어 모달 스타일 */
+
+/* 뷰어 모달 닫기 버튼 */
+.close-viewer-btn {
+    color: #94a3b8;
+    font-size: 2rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.2s ease;
+    line-height: 1;
+    margin-left: 0.5rem;
+}
+
+.close-viewer-btn:hover {
+    color: #ef4444;
+}
+
+/* 통합 뷰어 헤더 & 레이아웃 */
+.viewer-modal {
+    display: none;
+    flex-direction: column;
+    /* 화면 전체를 완전히 차지하도록 fixed 고정 */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+    z-index: 1200;
+    background: rgba(9, 13, 22, 0.98);
+    backdrop-filter: blur(15px);
+}
+
+
+
+
+.viewer-header {
+    background: rgba(15, 23, 42, 0.95);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 60px;
+}
+
+.viewer-title {
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: 700;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-right: 1rem;
+}
+
+.viewer-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.viewer-modal .viewer-body {
+    flex: 1 1 0;
+    /* header를 완전히 없앰에 따라 100% 뷰포트 높이 사용 */
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+    background: #090d16;
+    display: flex;
+    flex-direction: column;
+}
+
+
+.viewer-modal .viewer-pane {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    /* justify-content: space-between 대신 내용이 위에서 채워지도록 */
+    justify-content: flex-start;
+    align-items: center;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+/* 만화 뷰어 이미지 조절 */
+.viewer-modal .comic-image-wrapper {
+    flex: 1 1 0;
+    position: relative; /* For absolute child */
+    display: block;
+    overflow: hidden; /* 기본: 스크롤바 숨김 */
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    background: #000;
+}
+
+/* 너비 맞추기(웹툰) 모드에서만 세로 스크롤 허용 */
+.viewer-modal .comic-image-wrapper.fit-width {
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+
+/* 기본 (화면에 모두 쏙 들어가게: Best Fit - 스크롤 절대 방지) */
+.comic-image-wrapper img {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    cursor: pointer;
+    display: block;
+}
+
+/* 너비에 맞추기 모드 (웹툰 등 세로 스크롤용) */
+.comic-image-wrapper.fit-width img {
+    position: relative; /* Override absolute */
+    top: 0;
+    left: 0;
+    transform: none;
+    width: 100%;
+    height: auto;
+    max-height: none;
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+/* 높이에 맞추기 모드 (명시적 - 화면 꽉 차게 높이 고정) */
+.comic-image-wrapper.fit-height img {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    max-height: 100%;
+    max-width: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+}
+
+/* 만화 세로 연속 스크롤 모드 전용 스타일 */
+.viewer-modal .comic-image-wrapper.scroll-mode {
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: block;
+    height: 100vh;
+}
+
+.viewer-modal .comic-image-wrapper.scroll-mode img.comic-scroll-img {
+    position: relative;
+    top: 0;
+    left: 0;
+    transform: none;
+    display: block;
+    margin: 0 auto;
+    width: auto;
+    height: auto;
+    max-height: none;
+}
+
+/* 스크롤 모드 + 너비맞춤 */
+.viewer-modal .comic-image-wrapper.scroll-mode.fit-width img.comic-scroll-img {
+    width: 100%;
+    max-width: 100%;
+}
+
+/* 스크롤 모드 + 높이맞춤 (단행본 비율의 스크롤 모드 대응) */
+.viewer-modal .comic-image-wrapper.scroll-mode.fit-height img.comic-scroll-img {
+    height: 100vh;
+    max-height: 100vh;
+    object-fit: contain;
+}
+
+
+/* 맞추기 토글 버튼 패널 */
+.comic-fit-panel {
+    display: flex;
+    gap: 0.3rem;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    padding: 2px;
+}
+
+.btn-fit {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    padding: 0.3rem 0.7rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.btn-fit.active {
+    background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(124, 58, 237, 0.4);
+}
+
+.btn-fit:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+/* 만화 뷰어인 경우 헤더와 네비게이션바는 항상 가림 (Kavita 방식) */
+#media-viewer-modal .viewer-header {
+    display: none;
+}
+#media-viewer-modal .comic-nav-bar {
+    display: none;
+}
+#media-viewer-modal .viewer-body {
+    height: 100vh;
+}
+#media-viewer-modal .viewer-pane {
+    height: 100vh;
+}
+#media-viewer-modal .comic-image-wrapper {
+    height: 100vh;
+    width: 100vw;
+}
+#media-viewer-modal .comic-image-wrapper img {
+    max-height: 100vh;
+    max-width: 100vw;
+    width: auto;
+    height: auto;
+}
+
+/* 전체화면 토글 버튼 */
+.btn-fullscreen {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #94a3b8;
+    padding: 0.3rem 0.7rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    margin-right: 0.5rem;
+}
+.btn-fullscreen:hover {
+    background: rgba(168, 85, 247, 0.2);
+    color: #fff;
+    border-color: #a855f7;
+}
+
+/* 전체화면용 플로팅 닫기 단추 (모든 모드에서 항시 노출) */
+.floating-close-btn {
+    display: flex;
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #fff;
+    font-size: 1.2rem;
+    padding: 0.5rem 0.8rem;
+    border-radius: 50%;
+    cursor: pointer;
+    z-index: 10005;
+    backdrop-filter: blur(8px);
+    transition: all 0.2s ease;
+    align-items: center;
+    justify-content: center;
+}
+
+
+.floating-close-btn:hover {
+    background: rgba(239, 68, 68, 0.9);
+    border-color: #ef4444;
+    transform: scale(1.1);
+}
+
+/* ────────────────────────────────────────────────────────
+   📌 3분할 투명 핫스팟 (Left 30%, Center 40%, Right 30%)
+   ──────────────────────────────────────────────────────── */
+.comic-hotspot-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10002; /* 이미지 위, 오버레이 메뉴 아래 */
+    display: flex;
+    pointer-events: auto;
+}
+
+.hotspot-zone {
+    height: 100%;
+    cursor: pointer;
+}
+
+.left-zone {
+    width: 30%;
+}
+
+.center-zone {
+    width: 40%;
+}
+
+.right-zone {
+    width: 30%;
+}
+
+/* ────────────────────────────────────────────────────────
+   📌 Kavita 스타일 플로팅 조작 오버레이 메뉴
+   ──────────────────────────────────────────────────────── */
+.comic-overlay-menu {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10003;
+    pointer-events: none; /* 뒷배경 이벤트 차단 방지 */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.comic-overlay-menu > * {
+    pointer-events: auto; /* 메뉴 요소 자체는 클릭 허용 */
+}
+
+.overlay-header {
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 0.8rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    animation: slideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.overlay-title {
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.overlay-close-btn {
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #fca5a5;
+    padding: 0.35rem 0.8rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.overlay-close-btn:hover {
+    background: #ef4444;
+    color: #fff;
+}
+
+.overlay-controls-panel {
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 0.8rem 1.2rem;
+    display: flex;
+    gap: 0.8rem;
+    align-self: center;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    animation: zoomIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-overlay-action {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #e2e8f0;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.btn-overlay-action:hover {
+    background: rgba(168, 85, 247, 0.2);
+    border-color: #a855f7;
+    color: #fff;
+}
+
+.overlay-fit-group {
+    display: flex;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 2px;
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.05);
+}
+
+.btn-overlay-fit {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.2s;
+}
+
+.btn-overlay-fit.active {
+    background: #a855f7;
+    color: #fff;
+}
+
+.overlay-footer {
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 0.6rem;
+    text-align: center;
+    color: #94a3b8;
+    font-size: 0.8rem;
+    font-weight: 600;
+    animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideDown {
+    from { transform: translateY(-100%); }
+    to { transform: translateY(0); }
+}
+
+@keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+}
+
+@keyframes zoomIn {
+    from { transform: scale(0.9); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+
+
+
+.comic-nav-bar, .pdf-nav-bar, .epub-nav-bar {
+    background: rgba(15, 23, 42, 0.9);
+    width: 100%;
+    padding: 0.8rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 2rem;
+    border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.btn-nav {
+    background: #1e293b;
+    border: 1px solid #475569;
+    color: #fff;
+    padding: 0.4rem 1.2rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.btn-nav:hover {
+    background: #a855f7;
+    border-color: #c084fc;
+}
+
+/* EPUB 영역 */
+.epub-area {
+    width: 100%;
+    flex-grow: 1;
+    background: #1e293b;
+}
+
+/* 텍스트 뷰어 테마 및 폰트조정 */
+.txt-controls-panel {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-txt-ctrl {
+    background: #334155;
+    border: 1px solid #475569;
+    color: #cbd5e1;
+    padding: 0.25rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.btn-txt-ctrl:hover {
+    background: #475569;
+    color: #fff;
+}
+
+.viewer-modal #txt-viewer-container {
+    overflow: hidden;
+    padding: 0;
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+}
+
+#txt-scroll-wrapper {
+    overflow-y: auto;
+    padding: 3rem 15%;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+}
+
+/* TXT 페이지 넘김 모드 */
+#media-viewer-modal #txt-scroll-wrapper.scroll-mode-page {
+    display: block;
+    width: 100%;
+    max-width: 880px;
+    column-width: calc(100% - 40px);
+    column-gap: 40px;
+    height: calc(100vh - 160px);
+    margin: 40px auto;
+    padding: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-behavior: smooth;
+    
+    /* 스크롤바 숨기기 */
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none;  /* IE and Edge */
+}
+
+#txt-scroll-wrapper.scroll-mode-page::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+}
+
+#txt-scroll-wrapper.scroll-mode-page .txt-content {
+    height: 100%;
+    column-fill: auto;
+    margin: 0;
+    box-sizing: border-box;
+}
+
+#media-viewer-modal .txt-reader-theme-light {
+    background: #e2e8f0;
+    color: #0f172a;
+    font-family: 'KoPub Batang', 'Nanum Myeongjo', serif;
+}
+
+#media-viewer-modal .txt-reader-theme-dark {
+    background: #0f172a;
+    color: #f1f5f9;
+    font-family: 'KoPub Batang', 'Nanum Myeongjo', serif;
+}
+
+.txt-content {
+    white-space: pre-wrap;
+    font-size: 1.15rem;
+    line-height: 2.0;
+    letter-spacing: 0.5px;
+}
+
+/* PDF 영역 */
+.pdf-area canvas {
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    margin: 1.5rem auto;
+    display: block;
+}
+
+/* ─── rclone/GDrive 다운로드 로딩 오버레이 ─────────────────────── */
+.comic-loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(9, 13, 22, 0.92);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+    backdrop-filter: blur(4px);
+}
+
+.comic-loading-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.2rem;
+}
+
+.comic-loading-spinner {
+    width: 56px;
+    height: 56px;
+    border: 4px solid rgba(168, 85, 247, 0.2);
+    border-top-color: #a855f7;
+    border-radius: 50%;
+    animation: comic-spin 0.9s linear infinite;
+}
+
+@keyframes comic-spin {
+    to { transform: rotate(360deg); }
+}
+
+.comic-loading-text {
+    color: #e2e8f0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: 0.5px;
+}
+
+.comic-loading-sub {
+    color: #64748b;
+    font-size: 0.85rem;
+    text-align: center;
+    line-height: 1.6;
+    margin: 0;
+}
