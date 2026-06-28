@@ -76,6 +76,23 @@ python api.py
 
 ---
 
+## 🛡️ Proxy Header Auth (SSO) Guide
+
+For overseas home-lab users and OIDC integration, we support **Proxy Header Auth (Reverse Proxy Auto Login)**.
+By trusting the HTTP headers (`Remote-User` or `X-Forwarded-User`) delivered after verification by an upstream reverse proxy authentication server (such as Authelia, Authentik, etc.), users can automatically log into BookOasis (SSO).
+
+> [!CAUTION]
+> **Critical Security Warning**
+> This feature MUST ONLY be enabled in a **closed network environment where a reverse proxy (like Nginx, Authelia) protects and sets the headers**!
+> If you enable this option while exposed directly to the public internet without a proxy, malicious users can spoof the headers (e.g., `Remote-User: admin`) to hijack administrator privileges. This is a critical vulnerability. Only use this if you fully understand the risks.
+
+**Configuration Method:**
+1. Log in with an admin account and navigate to the **General Settings** menu.
+2. Scroll down to find and toggle the **Proxy Header Auth (Reverse Proxy Auto Login)** option.
+3. Save the settings, and configure your upstream Nginx/Proxy server to pass the correct username header to BookOasis.
+
+---
+
 ## Nginx Configuration Guide
 
 1. Update global settings (nginx.conf)

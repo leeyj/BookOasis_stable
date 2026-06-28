@@ -180,6 +180,20 @@
                                 <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;">스캐너 자체 프로세스가 소모하는 메모리가 이 값(MB)을 초과할 경우 안전하게 스캔을 종료 및 재시작하여 메모리 누수를 방지합니다. (기본 2048MB)</p>
                             </div>
 
+                            <!-- 12. 프록시 헤더 인증 (SSO) 설정 -->
+                            <div class="library-form-group" style="margin-bottom: 0.5rem; background: rgba(239, 68, 68, 0.05); padding: 1rem; border-radius: 6px; border: 1px dashed rgba(239, 68, 68, 0.3);">
+                                <label for="setting-proxy-header-auth" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                    <i class="fa-solid fa-shield-halved" style="color: #ef4444; margin-right: 0.3rem;"></i> Proxy Header Auth (리버스 프록시 자동 로그인)
+                                </label>
+                                <select id="setting-proxy-header-auth" name="PROXY_HEADER_AUTH" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; cursor: pointer;">
+                                    <option value="0">비활성화 (기본값)</option>
+                                    <option value="1">활성화 (위험성 인지 후 사용)</option>
+                                </select>
+                                <p style="font-size: 0.78rem; color: #f87171; margin: 0.6rem 0 0 0; line-height: 1.4;">
+                                    <strong>[경고]</strong> 리버스 프록시(Authentik, Authelia 등)가 앞단에 구축된 홈랩 환경에서만 활성화하세요. 이 옵션을 켜면 `Remote-User` 등 HTTP 헤더의 유저명을 신뢰하여 비밀번호 없이 세션을 강제 생성합니다. 외부망에 직접 노출된 상태로 켤 경우 심각한 보안 취약점이 됩니다!
+                                </p>
+                            </div>
+
                             <div style="margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1rem;">
                                 <button type="submit" class="btn-submit" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.4rem;">
                                     <i class="fa-regular fa-floppy-disk"></i> 설정 저장

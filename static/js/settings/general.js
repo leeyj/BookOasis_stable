@@ -79,6 +79,10 @@ export async function loadGeneralSettings() {
       if (hideCompletedEl) {
         hideCompletedEl.checked = (s.HIDE_COMPLETED_IN_HISTORY === '1');
       }
+
+      // 프록시 헤더 인증 (SSO) 설정
+      const proxyAuthEl = document.getElementById('setting-proxy-header-auth');
+      if (proxyAuthEl) proxyAuthEl.value = s.PROXY_HEADER_AUTH || '0';
       
       // 만화 뷰어 로딩 지연 시간 (LocalStorage)
       const comicDelayEl = document.getElementById('setting-comic-loading-delay');
@@ -113,6 +117,7 @@ export async function submitGeneralSettings(event) {
   const procRss = document.getElementById('setting-process-rss-limit')?.value || '2048';
   const comicDelay = document.getElementById('setting-comic-loading-delay')?.value || '300';
   const hideCompleted = document.getElementById('setting-hide-completed-in-history')?.checked ? '1' : '0';
+  const proxyAuth = document.getElementById('setting-proxy-header-auth')?.value || '0';
   
   try {
     // 모든 설정을 병렬 업데이트
@@ -127,7 +132,8 @@ export async function submitGeneralSettings(event) {
       api.updateSystemSetting('RECENT_BOOKS_LIMIT', recentBooks),
       api.updateSystemSetting('SYSTEM_MEM_LIMIT', sysMem),
       api.updateSystemSetting('PROCESS_RSS_LIMIT', procRss),
-      api.updateSystemSetting('HIDE_COMPLETED_IN_HISTORY', hideCompleted)
+      api.updateSystemSetting('HIDE_COMPLETED_IN_HISTORY', hideCompleted),
+      api.updateSystemSetting('PROXY_HEADER_AUTH', proxyAuth)
     ];
     
     const results = await Promise.all(promises);

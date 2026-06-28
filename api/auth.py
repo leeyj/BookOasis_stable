@@ -3,6 +3,7 @@ from flask import Blueprint, request, jsonify, session, redirect, url_for, rende
 from functools import wraps
 import database
 from werkzeug.security import generate_password_hash, check_password_hash
+from services.settings_service import SettingsService
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -54,6 +55,22 @@ def check_authentication():
     # 예외 경로 검사
     if request.path in exempt_paths:
         return
+        
+    # [프록시 헤더 인증 처리]
+    if 'user_id' not in session:
+        if SettingsService.get('PROXY_HEADER_AUTH', '0') == '1':
+            remote_user = request.headers.get('Remote-User') or request.headers.get('X-Forwarded-User')
+            if remote_user:
+                conn = database.get_connection('general')
+                cursor = conn.cursor()
+                cursor.execute("SELECT id, username, role, is_default_password FROM users WHERE username = ?", (remote_user,))
+                user = cursor.fetchone()
+                conn.close()
+                if user:
+                    session['user_id'] = user['id']
+                    session['username'] = user['username']
+                    session['role'] = user['role']
+                    session['is_default_password'] = user['is_default_password']
         
     # 1. 미로그인 시 차단
     if 'user_id' not in session:
