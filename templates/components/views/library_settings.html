@@ -16,6 +16,9 @@
                 <button class="settings-tab-btn" id="settings-tab-btn-users" onclick="switchSettingsTab('users')" style="display: none;">
                     <i class="fa-solid fa-users"></i> 사용자 관리
                 </button>
+                <button class="settings-tab-btn" onclick="switchSettingsTab('about')">
+                    <i class="fa-solid fa-circle-info"></i> 이 S/W는...
+                </button>
             </div>
 
             <!-- 1. 스캔 스케줄 설정 탭 -->
@@ -303,5 +306,38 @@
 
             <!-- 5. 사용자 관리 탭 -->
             {% include "components/settings/users_tab.html" %}
+
+            <!-- 6. 이 S/W는... 탭 (About) -->
+            <div id="settings-tab-about" class="settings-tab-content" style="display: none; flex-direction: column; align-items: center; justify-content: center; padding: 3rem 1.5rem; text-align: center; color: #fff;">
+                <div style="margin-bottom: 1.5rem;">
+                    <i class="fa-solid fa-gem" style="font-size: 3.5rem; color: #c084fc; filter: drop-shadow(0 0 15px rgba(168,85,247,0.4));"></i>
+                </div>
+                <h2 style="font-size: 2.2rem; font-weight: 800; margin: 0; background: linear-gradient(135deg, #fff 30%, #a855f7 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">BookOasis</h2>
+                <p style="color: #94a3b8; font-size: 0.9rem; margin-top: 0.5rem; margin-bottom: 2rem;">북오아시스 미디어 서재 관리 도구</p>
+                
+                <div style="width: 100%; max-width: 500px; background: rgba(30, 41, 59, 0.25); border: 1px solid rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem; text-align: left;">
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.75rem; margin-bottom: 0.75rem; font-size: 0.88rem;">
+                        <span style="color: #94a3b8;">현재 대시보드 버전</span>
+                        <span style="color: #fff; font-weight: 600;" id="about-ver-dashboard">로드 중...</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.75rem; margin-bottom: 0.75rem; font-size: 0.88rem;">
+                        <span style="color: #94a3b8;">상태</span>
+                        <span style="color: #c084fc; font-weight: 600;" id="about-ver-state">로드 중...</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.88rem; align-items: center;">
+                        <span style="color: #94a3b8;">GitHub 배포처 (Stable)</span>
+                        <a href="https://github.com/leeyj/BookOasis_stable" target="_blank" style="color: #38bdf8; text-decoration: underline; font-weight: 600;">
+                            BookOasis_stable <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 0.75rem; margin-left: 0.2rem;"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div style="width: 100%; max-width: 500px; text-align: left; font-size: 0.8rem; color: #64748b; line-height: 1.5; padding: 0 0.5rem;">
+                    <h4 style="color: #94a3b8; font-size: 0.85rem; margin: 0 0 0.5rem 0; font-weight: 600;"><i class="fa-solid fa-scale-balanced" style="margin-right: 0.3rem;"></i> 오픈소스 라이선스 안내</h4>
+                    <p style="margin: 0;">
+                        이 소프트웨어는 <strong>GNU Affero General Public License v3 (AGPL-3.0)</strong>에 따라 라이선스가 부여됩니다. 누구나 소스 코드를 자유롭게 사용, 수정 및 배포할 수 있습니다. 단, 이 프로그램을 네트워크 서비스를 통해 이용자에게 제공하는 경우에도 변경된 전체 소스 코드를 공개해야 할 의무가 부여됩니다.
+                    </p>
+                </div>
+            </div>
         </div>
     </div>

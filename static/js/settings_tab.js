@@ -55,5 +55,30 @@ export function switchSettingsTab(tabId) {
     initReportsTab();
   } else if (tabId === 'users') {
     loadUsersList();
+  } else if (tabId === 'about') {
+    loadAboutInfo();
+  }
+}
+
+// 이 S/W는... 버전 정보 로딩 및 렌더링
+async function loadAboutInfo() {
+  const dashEl = document.getElementById('about-ver-dashboard');
+  const stateEl = document.getElementById('about-ver-state');
+  if (!dashEl || !stateEl) return;
+  
+  try {
+    const res = await fetch('/api/media/about');
+    const data = await res.json();
+    if (data.success) {
+      dashEl.textContent = `v${data.version.dashboard}`;
+      stateEl.textContent = data.version.state;
+    } else {
+      dashEl.textContent = '불러오기 실패';
+      stateEl.textContent = '오류';
+    }
+  } catch (e) {
+    console.error('About 정보 로딩 실패:', e);
+    dashEl.textContent = '연결 오류';
+    stateEl.textContent = '오류';
   }
 }

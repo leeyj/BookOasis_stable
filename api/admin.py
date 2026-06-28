@@ -462,4 +462,38 @@ def trigger_lazy_scan_api():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@admin_bp.route('/api/media/about', methods=['GET'])
+@admin_required
+def get_about_info():
+    """BookOasis 소프트웨어 정보 및 버전 데이터 리턴"""
+    import os
+    version_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'VERSION')
+    
+    dashboard_ver = '0.2.6'
+    state_ver = 'pre-alpha'
+    
+    if os.path.exists(version_path):
+        try:
+            with open(version_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    if line.startswith('"dashboard":'):
+                        dashboard_ver = line.replace('"dashboard":', '').replace('"', '').strip()
+                    elif line.startswith('"state":'):
+                        state_ver = line.replace('"state":', '').replace('"', '').strip()
+        except Exception as e:
+            pass
+            
+    return jsonify({
+        'success': True,
+        'version': {
+            'dashboard': dashboard_ver,
+            'state': state_ver
+        },
+        'github_url': 'https://github.com/leeyj/BookOasis_stable'
+    })
+
+
 

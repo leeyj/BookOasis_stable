@@ -161,3 +161,4 @@ tags: [workflow, history]
 | 2026-06-29 | `custom_rc_port` | 카테고리별 개별 Rclone RC 주소 지정 및 동적 VFS 갱신 기능 구현 | [Task](./history/20260629_002201_custom_rc_port_task.md) | [Walkthrough](./history/20260629_002201_custom_rc_port_walkthrough.md) |
 | 2026-06-29 | `custom_rc_port` | 카테고리별 개별 Rclone RC 주소 지정 및 동적 VFS 갱신 기능 구현 | [Task](./history/20260629_002605_custom_rc_port_task.md) | [Walkthrough](./history/20260629_002605_custom_rc_port_walkthrough.md) |
 | 2026-06-29 | `custom_rc_port` | 카테고리별 개별 Rclone RC 주소 지정 및 동적 VFS 갱신 기능 구현 (조회 API 누락 보완) | [Task](./history/20260629_002718_custom_rc_port_task.md) | [Walkthrough](./history/20260629_002718_custom_rc_port_walkthrough.md) |
+| 2026-06-29 | `about_tab` | 환경설정에 이 S/W는... (About) 정보 탭 추가 및 AGPL v3 고지사항 구현 | [Task](./history/20260629_004247_about_tab_task.md) | [Walkthrough](./history/20260629_004247_about_tab_walkthrough.md) |
