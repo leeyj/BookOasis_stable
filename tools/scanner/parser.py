@@ -88,6 +88,8 @@ def parse_kavita_yaml(folder_path, files=None):
         'summary': '',
         'score': 0,
         'link': '',
+        'genre': '',
+        'tags': '',
         'cover_b64_map': {},
         'has_yaml': False
     }
@@ -127,6 +129,13 @@ def parse_kavita_yaml(folder_path, files=None):
         with open(actual_yaml_path, 'r', encoding='utf-8') as f:
             data = yaml.load(f, Loader=SafeLoader) or {}
         
+        def _parse_list_or_str(val):
+            if not val:
+                return ''
+            if isinstance(val, list):
+                return ', '.join(str(v).strip() for v in val if v)
+            return str(val).strip()
+
         # 1) meta 노드가 명시되어 있지 않은 경우를 대비해 루트 레벨(data)도 탐색 범위에 포함
         if isinstance(data, dict):
             sources = [data.get('meta', {}), data]
@@ -136,6 +145,8 @@ def parse_kavita_yaml(folder_path, files=None):
                 meta['author'] = meta['author'] or src.get('Person Writers') or src.get('Writer') or src.get('author') or ''
                 meta['summary'] = meta['summary'] or src.get('Summary') or src.get('summary') or ''
                 meta['link'] = meta['link'] or src.get('Web Links') or src.get('link') or ''
+                meta['tags'] = meta['tags'] or _parse_list_or_str(src.get('Tags') or src.get('tags') or src.get('tag'))
+                meta['genre'] = meta['genre'] or _parse_list_or_str(src.get('Genres') or src.get('genre'))
                 
             # 2) 만약 search 노드가 존재하면 보강
             search_list = data.get('search', [])
@@ -147,6 +158,8 @@ def parse_kavita_yaml(folder_path, files=None):
                     meta['link'] = meta['link'] or search_item.get('link', '')
                     meta['summary'] = meta['summary'] or search_item.get('description', '')
                     meta['score'] = search_item.get('score', meta['score'])
+                    meta['tags'] = meta['tags'] or _parse_list_or_str(search_item.get('tag') or search_item.get('tags') or search_item.get('Tags'))
+                    meta['genre'] = meta['genre'] or _parse_list_or_str(search_item.get('genre') or search_item.get('genres') or search_item.get('Genres'))
                 
             # 각 파일별 커버 이미지
             files_node = data.get('files', {})

@@ -12,7 +12,9 @@ def update_book_metadata(cursor, full_path, cover_image, merged_meta):
             link         = COALESCE(NULLIF(?, ''), link),
             score        = CASE WHEN ? != 0 THEN ? ELSE score END,
             summary      = COALESCE(NULLIF(?, ''), summary),
-            release_date = COALESCE(NULLIF(?, ''), release_date)
+            release_date = COALESCE(NULLIF(?, ''), release_date),
+            genre        = COALESCE(NULLIF(?, ''), genre),
+            tags         = COALESCE(NULLIF(?, ''), tags)
         WHERE file_path = ?
     """, (
         cover_image,
@@ -23,6 +25,8 @@ def update_book_metadata(cursor, full_path, cover_image, merged_meta):
         merged_meta['score'], merged_meta['score'],
         merged_meta['summary'],
         merged_meta['release_date'],
+        merged_meta.get('genre', ''),
+        merged_meta.get('tags', ''),
         full_path
     ))
 
@@ -41,8 +45,8 @@ def insert_new_book_v2(cursor, library_id, full_path, filename, file_format, ser
     title, _ = os.path.splitext(filename)
     cursor.execute("""
         INSERT INTO books 
-        (library_id, title, series_name, author, file_path, file_format, total_pages, cover_image, publisher, link, score, summary, release_date) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (library_id, title, series_name, author, file_path, file_format, total_pages, cover_image, publisher, link, score, summary, release_date, genre, tags) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         library_id, 
         title, 
@@ -56,7 +60,9 @@ def insert_new_book_v2(cursor, library_id, full_path, filename, file_format, ser
         merged_meta['link'],
         merged_meta['score'],
         merged_meta['summary'],
-        merged_meta['release_date']
+        merged_meta['release_date'],
+        merged_meta.get('genre', ''),
+        merged_meta.get('tags', '')
     ))
     return cursor.lastrowid
 

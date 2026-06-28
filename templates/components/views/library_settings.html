@@ -199,8 +199,77 @@
                         </h3>
                         <p style="font-size: 0.82rem; color: #94a3b8; margin: 0.4rem 0 0 0;">서버에 로드된 동적 플러그인의 활성화 여부(ON/OFF) 및 상세 환경설정 값을 일괄 관리합니다.</p>
                     </div>
-                    <div id="settings-plugins-container" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                    <div id="settings-plugins-container" style="display: flex; flex-direction: column; gap: 1.5rem; margin-bottom: 2rem;">
                         <!-- JS를 통해 동적 생성 -->
+                    </div>
+
+                    <!-- 💡 공식/추천 플러그인 로드맵 (확장성 홍보 공간) -->
+                    <div style="border-top: 1px dashed rgba(255, 255, 255, 0.1); padding-top: 2rem; margin-top: 1.5rem;">
+                        <h4 style="margin: 0 0 1rem 0; color: #fff; font-size: 1.05rem; font-weight: 700;">
+                            <i class="fa-solid fa-lightbulb" style="color: #eab308; margin-right: 0.5rem;"></i> 공식/추천 플러그인 갤러리 (준비 중)
+                        </h4>
+                        <p style="font-size: 0.8rem; color: #94a3b8; margin: 0 0 1.2rem 0; line-height: 1.4;">
+                            BookOasis의 독자적인 <strong>동적 플러그인 아키텍처</strong>를 통해 자유롭게 추가할 수 있는 유용한 확장 기능 목록입니다. 플러그인 추가를 원하실 경우 개발 문서 또는 GitHub 저장소를 참조해 주세요.
+                        </p>
+                        
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.2rem;">
+                            <!-- 카드 1: Pixiv -->
+                            <div style="background: rgba(30, 41, 59, 0.2); border: 1px dashed rgba(168, 85, 247, 0.3); border-radius: 8px; padding: 1.2rem; display: flex; flex-direction: column; justify-content: space-between; gap: 1rem;">
+                                <div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
+                                        <h5 style="margin: 0; color: #fff; font-size: 0.95rem; font-weight: 700;">
+                                            <i class="fa-brands fa-pixiv" style="color: #0096ff; margin-right: 0.4rem;"></i> Pixiv 일러스트 스트리밍
+                                        </h5>
+                                        <span style="font-size: 0.7rem; color: #a855f7; background: rgba(168, 85, 247, 0.1); padding: 0.1rem 0.4rem; border-radius: 4px; border: 1px solid rgba(168, 85, 247, 0.2);">추천 기능</span>
+                                    </div>
+                                    <p style="font-size: 0.78rem; color: #94a3b8; margin: 0; line-height: 1.5;">
+                                        픽시브 계정을 토큰으로 연동하여 '북마크'나 '구독 작가 신작' 목록의 고화질 이미지 세트를 로컬 드롭 없이 BookOasis 뷰어에서 실시간 프록시로 다이렉트 감상합니다.
+                                    </p>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.03); padding-top: 0.6rem; font-size: 0.72rem; color: #64748b;">
+                                    <span>버전: v1.0.0 (대기)</span>
+                                    <span style="color: #94a3b8; cursor: pointer; text-decoration: underline;" onclick="alert('준비 중인 기여 항목입니다. GitHub 기여 가이드를 확인해 주세요!')">기여 가이드 보기</span>
+                                </div>
+                            </div>
+
+                            <!-- 카드 2: ComicInfo.xml -->
+                            <div style="background: rgba(30, 41, 59, 0.2); border: 1px dashed rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 1.2rem; display: flex; flex-direction: column; justify-content: space-between; gap: 1rem;">
+                                <div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
+                                        <h5 style="margin: 0; color: #fff; font-size: 0.95rem; font-weight: 700;">
+                                            <i class="fa-solid fa-file-code" style="color: #38bdf8; margin-right: 0.4rem;"></i> ComicInfo.xml 메타데이터
+                                        </h5>
+                                        <span style="font-size: 0.7rem; color: #64748b; background: rgba(255, 255, 255, 0.05); padding: 0.1rem 0.4rem; border-radius: 4px;">로드맵</span>
+                                    </div>
+                                    <p style="font-size: 0.78rem; color: #94a3b8; margin: 0; line-height: 1.5;">
+                                        만화책 압축 파일(ZIP/CBZ) 내부의 <code>ComicInfo.xml</code> 표준 태그를 분석하여, 작가/장르/줄거리/시리즈 정보를 별도 검색 없이 즉시 추출하고 동기화합니다.
+                                    </p>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.03); padding-top: 0.6rem; font-size: 0.72rem; color: #64748b;">
+                                    <span>버전: v0.9.0 (대기)</span>
+                                    <span style="color: #94a3b8; cursor: pointer; text-decoration: underline;" onclick="alert('준비 중인 기여 항목입니다. GitHub 기여 가이드를 확인해 주세요!')">기여 가이드 보기</span>
+                                </div>
+                            </div>
+                            
+                            <!-- 카드 3: 웹소설 메타데이터 -->
+                            <div style="background: rgba(30, 41, 59, 0.2); border: 1px dashed rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 1.2rem; display: flex; flex-direction: column; justify-content: space-between; gap: 1rem;">
+                                <div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
+                                        <h5 style="margin: 0; color: #fff; font-size: 0.95rem; font-weight: 700;">
+                                            <i class="fa-solid fa-book-open" style="color: #4ade80; margin-right: 0.4rem;"></i> 국내 웹소설 플랫폼 메타
+                                        </h5>
+                                        <span style="font-size: 0.7rem; color: #64748b; background: rgba(255, 255, 255, 0.05); padding: 0.1rem 0.4rem; border-radius: 4px;">로드맵</span>
+                                    </div>
+                                    <p style="font-size: 0.78rem; color: #94a3b8; margin: 0; line-height: 1.5;">
+                                        국내 주요 소설/웹소설 정보 사이트와 매핑하여 도서(TXT)에 알맞은 표지 일러스트, 작가 프로필, 연재 정보를 원클릭 매칭하고 보강해 줍니다.
+                                    </p>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.03); padding-top: 0.6rem; font-size: 0.72rem; color: #64748b;">
+                                    <span>버전: v0.8.0 (대기)</span>
+                                    <span style="color: #94a3b8; cursor: pointer; text-decoration: underline;" onclick="alert('준비 중인 기여 항목입니다. GitHub 기여 가이드를 확인해 주세요!')">기여 가이드 보기</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

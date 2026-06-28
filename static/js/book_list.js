@@ -15,6 +15,23 @@ function updateLibraryTotalCount(items) {
   countSpan.innerText = `(전체: ${seriesCount.toLocaleString()} 시리즈 / ${bookCount.toLocaleString()} 권)`;
 }
 
+function sortBooksList(filtered, sortDir) {
+  filtered.sort((a, b) => {
+    if (sortDir === 'asc' || sortDir === 'desc') {
+      const nameA = a.series_name || '';
+      const nameB = b.series_name || '';
+      return sortDir === 'asc' 
+        ? nameA.localeCompare(nameB, 'ko', { numeric: true, sensitivity: 'base' })
+        : nameB.localeCompare(nameA, 'ko', { numeric: true, sensitivity: 'base' });
+    } else {
+      // date_desc (최신순), date_asc (과거순)
+      const dateA = a.latest_added ? new Date(a.latest_added).getTime() : 0;
+      const dateB = b.latest_added ? new Date(b.latest_added).getTime() : 0;
+      return sortDir === 'date_desc' ? (dateB - dateA) : (dateA - dateB);
+    }
+  });
+}
+
 
 // 1. 도서 시리즈 목록 로드
 export async function loadBooksList(isAppend = false) {
@@ -61,17 +78,27 @@ export async function loadBooksList(isAppend = false) {
     );
   }
 
+  // 1-1) 장르 필터링
+  if (state.currentGenre) {
+    filtered = filtered.filter(item => {
+      if (!item.genre) return false;
+      const genres = item.genre.split(',').map(g => g.trim());
+      return genres.includes(state.currentGenre);
+    });
+  }
+
+  // 1-2) 태그 필터링
+  if (state.currentTag) {
+    filtered = filtered.filter(item => {
+      if (!item.tags) return false;
+      const tags = item.tags.split(',').map(t => t.trim());
+      return tags.includes(state.currentTag);
+    });
+  }
+
   // 2) 가나다(자연) 정렬 및 최신순 정렬 등
   const sortDir = state.currentSortDirection || 'asc';
-  
-  // 간단 자연식 정렬 로컬 구현 및 적용
-  filtered.sort((a, b) => {
-    const nameA = a.series_name || '';
-    const nameB = b.series_name || '';
-    return sortDir === 'asc' 
-      ? nameA.localeCompare(nameB, 'ko', { numeric: true, sensitivity: 'base' })
-      : nameB.localeCompare(nameA, 'ko', { numeric: true, sensitivity: 'base' });
-  });
+  sortBooksList(filtered, sortDir);
 
   updateLibraryTotalCount(filtered);
 
@@ -149,13 +176,7 @@ export function filterBooks() {
   }
 
   const sortDir = state.currentSortDirection || 'asc';
-  filtered.sort((a, b) => {
-    const nameA = a.series_name || '';
-    const nameB = b.series_name || '';
-    return sortDir === 'asc' 
-      ? nameA.localeCompare(nameB, 'ko', { numeric: true, sensitivity: 'base' })
-      : nameB.localeCompare(nameA, 'ko', { numeric: true, sensitivity: 'base' });
-  });
+  sortBooksList(filtered, sortDir);
 
   updateLibraryTotalCount(filtered);
 
@@ -173,18 +194,28 @@ export function filterBooks() {
   }
 }
 
-// 정렬 방향 변경 토글
 export function toggleLibrarySort() {
   const btn = document.getElementById('btn-lib-sort');
   if (!btn) return;
 
-  const newSort = state.currentSortDirection === 'asc' ? 'desc' : 'asc';
+  const cycle = {
+    'asc': 'desc',
+    'desc': 'date_desc',
+    'date_desc': 'date_asc',
+    'date_asc': 'asc'
+  };
+
+  const newSort = cycle[state.currentSortDirection] || 'asc';
   state.currentSortDirection = newSort;
 
   if (newSort === 'asc') {
-    btn.innerHTML = `<i class="fa-solid fa-sort-alpha-down"></i> 오름차순`;
-  } else {
-    btn.innerHTML = `<i class="fa-solid fa-sort-alpha-up"></i> 내림차순`;
+    btn.innerHTML = `<i class="fa-solid fa-sort-alpha-down"></i> 가나다 오름차순`;
+  } else if (newSort === 'desc') {
+    btn.innerHTML = `<i class="fa-solid fa-sort-alpha-up"></i> 가나다 내림차순`;
+  } else if (newSort === 'date_desc') {
+    btn.innerHTML = `<i class="fa-solid fa-sort-numeric-down-alt"></i> 최신 추가순`;
+  } else if (newSort === 'date_asc') {
+    btn.innerHTML = `<i class="fa-solid fa-sort-numeric-up"></i> 과거 추가순`;
   }
 
   // 서버 요청 없이 로컬 상태 정렬 후 리렌더링
@@ -194,17 +225,12 @@ export function toggleLibrarySort() {
   let filtered = [...state.allBooksData];
   if (state.searchQuery) {
     filtered = filtered.filter(item => 
-      (item.series_name && item.series_name.toLowerCase().includes(state.searchQuery))
+      (item.series_name && item.series_name.toLowerCase().includes(state.searchQuery)) ||
+      (item.author && item.author.toLowerCase().includes(state.searchQuery))
     );
   }
 
-  filtered.sort((a, b) => {
-    const nameA = a.series_name || '';
-    const nameB = b.series_name || '';
-    return newSort === 'asc' 
-      ? nameA.localeCompare(nameB, 'ko', { numeric: true, sensitivity: 'base' })
-      : nameB.localeCompare(nameA, 'ko', { numeric: true, sensitivity: 'base' });
-  });
+  sortBooksList(filtered, newSort);
 
   updateLibraryTotalCount(filtered);
 

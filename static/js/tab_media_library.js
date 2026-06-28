@@ -8,6 +8,7 @@ import { switchActiveView } from './view_manager.js';
 // category.js 신설 모듈로부터 CRUD 제어부 임포트
 import { loadLibraries, triggerAddLibrary, triggerEditLibrary, triggerDeleteLibrary, closeLibraryModal, submitLibraryForm, triggerScanLibrary, triggerScanLibraryCovers, triggerCancelScanLibrary } from './category.js';
 
+
 // scheduler.js 모듈로부터 스케줄 제어부 임포트
 import { loadLibrarySchedules, saveLibrarySchedule, runLibraryScanNow } from './scheduler.js';
 
@@ -104,6 +105,11 @@ export function switchLibraryType(type) {
 export function selectCategory(id) {
   window.scrollTo(0, 0);
   state.currentLibraryId = id;
+  
+  // 장르 및 태그 필터 초기화
+  state.currentGenre = null;
+  state.currentTag = null;
+
   document.querySelectorAll('#sidebar-categories .menu-item').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.sidebar-settings-wrap .menu-item').forEach(el => el.classList.remove('active'));
   

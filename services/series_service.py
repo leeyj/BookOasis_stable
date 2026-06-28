@@ -29,6 +29,8 @@ class SeriesService:
                            MAX(b.is_favorite)  AS is_favorite,
                            MAX(b.created_at)   AS latest_added,
                            MIN(b.id)           AS representative_book_id,
+                           MAX(b.genre)        AS genre,
+                           MAX(b.tags)         AS tags,
                            b.library_id        AS library_id
                     FROM books b
                     WHERE b.is_favorite = 1 AND (b.series_name LIKE ? OR b.author LIKE ?)
@@ -45,6 +47,8 @@ class SeriesService:
                            MAX(b.is_favorite)  AS is_favorite,
                            MAX(b.created_at)   AS latest_added,
                            MIN(b.id)           AS representative_book_id,
+                           MAX(b.genre)        AS genre,
+                           MAX(b.tags)         AS tags,
                            b.library_id        AS library_id
                     FROM books b
                     WHERE b.is_favorite = 1
@@ -62,6 +66,8 @@ class SeriesService:
                            MAX(b.is_favorite)  AS is_favorite,
                            MAX(b.created_at)   AS latest_added,
                            MIN(b.id)           AS representative_book_id,
+                           MAX(b.genre)        AS genre,
+                           MAX(b.tags)         AS tags,
                            b.library_id        AS library_id
                     FROM books b
                     WHERE b.library_id = ? AND (b.series_name LIKE ? OR b.author LIKE ?)
@@ -78,6 +84,8 @@ class SeriesService:
                            MAX(b.is_favorite)  AS is_favorite,
                            MAX(b.created_at)   AS latest_added,
                            MIN(b.id)           AS representative_book_id,
+                           MAX(b.genre)        AS genre,
+                           MAX(b.tags)         AS tags,
                            b.library_id        AS library_id
                     FROM books b
                     WHERE b.library_id = ?
@@ -95,6 +103,8 @@ class SeriesService:
                            MAX(b.is_favorite)  AS is_favorite,
                            MAX(b.created_at)   AS latest_added,
                            MIN(b.id)           AS representative_book_id,
+                           MAX(b.genre)        AS genre,
+                           MAX(b.tags)         AS tags,
                            b.library_id        AS library_id
                     FROM books b
                     WHERE b.series_name LIKE ? OR b.author LIKE ?
@@ -111,6 +121,8 @@ class SeriesService:
                            MAX(b.is_favorite)  AS is_favorite,
                            MAX(b.created_at)   AS latest_added,
                            MIN(b.id)           AS representative_book_id,
+                           MAX(b.genre)        AS genre,
+                           MAX(b.tags)         AS tags,
                            b.library_id        AS library_id
                     FROM books b
                     GROUP BY b.series_name, b.library_id
@@ -143,7 +155,9 @@ class SeriesService:
                 'cover_image' : get_cover_image_with_t(final_cover, r['cover_updated_at']),
                 'is_favorite' : r['is_favorite'] or 0,
                 'latest_added': r['latest_added'],
-                'representative_book_id': r['representative_book_id']
+                'representative_book_id': r['representative_book_id'],
+                'genre'       : r['genre'] or '',
+                'tags'        : r['tags'] or ''
             })
         conn.close()
         return series_list
@@ -171,6 +185,8 @@ class SeriesService:
                        MAX(b.is_favorite)  AS is_favorite,
                        MAX(b.created_at)   AS latest_added,
                        MIN(b.id)           AS representative_book_id,
+                       MAX(b.genre)        AS genre,
+                       MAX(b.tags)         AS tags,
                        b.library_id        AS library_id
                 FROM books b
                 WHERE b.is_favorite = 1
@@ -187,6 +203,8 @@ class SeriesService:
                        MAX(b.is_favorite)  AS is_favorite,
                        MAX(b.created_at)   AS latest_added,
                        MIN(b.id)           AS representative_book_id,
+                       MAX(b.genre)        AS genre,
+                       MAX(b.tags)         AS tags,
                        b.library_id        AS library_id
                 FROM books b
                 WHERE b.library_id = ?
@@ -203,6 +221,8 @@ class SeriesService:
                        MAX(b.is_favorite)  AS is_favorite,
                        MAX(b.created_at)   AS latest_added,
                        MIN(b.id)           AS representative_book_id,
+                       MAX(b.genre)        AS genre,
+                       MAX(b.tags)         AS tags,
                        b.library_id        AS library_id
                 FROM books b
                 GROUP BY b.series_name, b.library_id
@@ -235,7 +255,9 @@ class SeriesService:
                 'cover_image' : get_cover_image_with_t(final_cover, r['cover_updated_at']),
                 'is_favorite' : r['is_favorite'] or 0,
                 'latest_added': r['latest_added'],
-                'representative_book_id': r['representative_book_id']
+                'representative_book_id': r['representative_book_id'],
+                'genre'       : r['genre'] or '',
+                'tags'        : r['tags'] or ''
             })
         conn.close()
         return series_list

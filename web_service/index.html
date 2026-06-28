@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BookOasis - Zero-Build Home Media Server</title>
+  
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="No bloated databases. No heavy setups. Instantly scan, read, and organize your books and manga with pure speed on your home server.">
+  <link rel="icon" type="image/png" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏝️</text></svg>">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav class="nav-bar">
+    <div class="nav-container">
+      <a href="#" class="nav-logo">
+        <span class="logo-emoji">🏝️</span>
+        <span class="logo-text">BookOasis</span>
+      </a>
+      <div class="nav-links">
+        <a href="#features" class="nav-link">Features</a>
+        <a href="#demo" class="nav-link">Live Demo</a>
+        <a href="https://carls-dev.org/wiki" target="_blank" class="nav-link"><i class="fa-solid fa-book-open"></i> Docs</a>
+        <a href="https://github.com" target="_blank" class="nav-icon-link" title="GitHub Repository"><i class="fa-brands fa-github"></i></a>
+        <a href="http://app.carls-dev.org" class="btn-cta btn-launch" target="_blank">Launch App <i class="fa-solid fa-arrow-right"></i></a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <header class="hero-section">
+    <div class="hero-container">
+      <div class="badge-new">
+        <span class="badge-pill">New</span>
+        <span class="badge-text">Pure Vanilla Stack - No Build, No Framework</span>
+      </div>
+      
+      <h1 class="hero-title">
+        가장 가볍고 빠른<br>
+        <span class="gradient-text">홈 미디어 도서관 서버</span>
+      </h1>
+      
+      <p class="hero-subtitle">
+        무겁고 복잡한 설정 없이, 수천 권의 만화와 소설을 즉시 색인하고 웹 브라우저에서 매끄럽게 감상하세요. 오직 퍼포먼스만을 위해 다듬어진 초경량 웹 미디어 서버.
+      </p>
+      
+      <div class="hero-actions">
+        <a href="#demo" class="btn-primary">실시간 데모 보기 <i class="fa-solid fa-play"></i></a>
+        <a href="http://app.carls-dev.org" class="btn-secondary" target="_blank">웹 서버 로그인 <i class="fa-solid fa-right-to-bracket"></i></a>
+      </div>
+      
+      <!-- CSS Mockup representing Library Dashboard -->
+      <div class="hero-mockup-wrap fade-in-up">
+        <div class="browser-mockup">
+          <div class="browser-header">
+            <div class="dots">
+              <span class="dot red"></span>
+              <span class="dot yellow"></span>
+              <span class="dot green"></span>
+            </div>
+            <div class="address-bar">http://app.carls-dev.org</div>
+          </div>
+          <div class="mockup-content">
+            <!-- Sidebar -->
+            <div class="mockup-sidebar">
+              <div class="sidebar-section-title">LIBRARY</div>
+              <div class="sidebar-item active"><i class="fa-solid fa-house"></i> Home</div>
+              <div class="sidebar-item"><i class="fa-solid fa-star"></i> Favorites</div>
+              <div class="sidebar-item"><i class="fa-solid fa-layer-group"></i> All Series</div>
+              <div class="sidebar-section-title">GENRES</div>
+              <div class="sidebar-item"><i class="fa-solid fa-tag"></i> 만화 (Manga)</div>
+              <div class="sidebar-item"><i class="fa-solid fa-tag"></i> 판타지 (Fantasy)</div>
+              <div class="sidebar-item"><i class="fa-solid fa-tag"></i> SF / 소설</div>
+            </div>
+            <!-- Main Grid -->
+            <div class="mockup-main">
+              <div class="main-header">
+                <h2>도서 보관함 <span class="count-badge">(전체: 142 시리즈 / 2,450 권)</span></h2>
+                <div class="main-sort"><i class="fa-solid fa-arrow-down-a-z"></i> 가나다순</div>
+              </div>
+              <div class="mockup-grid">
+                <!-- Card 1 -->
+                <div class="mockup-card">
+                  <div class="card-cover bg-grad-1">
+                    <span class="card-tag-completed">완독</span>
+                  </div>
+                  <div class="card-info">
+                    <div class="card-title">장송의 프리렌</div>
+                    <div class="card-author">12권 (전체 완료)</div>
+                    <div class="mock-progress-bar"><div class="progress-fill" style="width: 100%"></div></div>
+                  </div>
+                </div>
+                <!-- Card 2 -->
+                <div class="mockup-card">
+                  <div class="card-cover bg-grad-2"></div>
+                  <div class="card-info">
+                    <div class="card-title">던전밥</div>
+                    <div class="card-author">14권 (6권 읽는 중)</div>
+                    <div class="mock-progress-bar"><div class="progress-fill" style="width: 42%"></div></div>
+                  </div>
+                </div>
+                <!-- Card 3 -->
+                <div class="mockup-card">
+                  <div class="card-cover bg-grad-3"></div>
+                  <div class="card-info">
+                    <div class="card-title">봇치 더 록!</div>
+                    <div class="card-author">6권 (미독)</div>
+                    <div class="mock-progress-bar"><div class="progress-fill" style="width: 0%"></div></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Features Section -->
+  <section id="features" class="features-section">
+    <div class="section-container">
+      <div class="section-header">
+        <h2 class="section-title">최고의 독서 환경을 위한 기능들</h2>
+        <p class="section-subtitle">과도한 프레임워크나 빌드 도구를 걷어내고, 오직 브라우저와 홈 서버 본연의 속도에 초점을 맞추었습니다.</p>
+      </div>
+      
+      <div class="features-grid">
+        <!-- Feature 1 -->
+        <div class="feature-card">
+          <div class="feature-icon bg-icon-violet"><i class="fa-solid fa-bolt"></i></div>
+          <h3 class="feature-title">초고속 로컬 스캐너</h3>
+          <p class="feature-description">
+            백그라운드에서 만화책 압축파일(CBZ, ZIP, PDF)의 볼륨 크기와 오프셋을 밀리초 단위로 스캔하여 최적의 스트리밍 상태를 준비합니다.
+          </p>
+        </div>
+        <!-- Feature 2 -->
+        <div class="feature-card">
+          <div class="feature-icon bg-icon-blue"><i class="fa-solid fa-filter"></i></div>
+          <h3 class="feature-title">장르 & 태그 클라이언트 필터링</h3>
+          <p class="feature-description">
+            서버 요청을 최소화하고, 클라이언트에 로드된 모든 시리즈 데이터를 기반으로 태그와 장르를 딜레이 없이 즉각 필터링합니다.
+          </p>
+        </div>
+        <!-- Feature 3 -->
+        <div class="feature-card">
+          <div class="feature-icon bg-icon-green"><i class="fa-solid fa-rss"></i></div>
+          <h3 class="feature-title">안전한 OPDS 서버 제공</h3>
+          <p class="feature-description">
+            Chunky Reader, Panels 등 외부 모바일 앱 런처와 로그인 세션 기반의 안전한 OPDS 연동을 지원하여 어디서든 서재를 연동할 수 있습니다.
+          </p>
+        </div>
+        <!-- Feature 4 -->
+        <div class="feature-card">
+          <div class="feature-icon bg-icon-pink"><i class="fa-solid fa-code"></i></div>
+          <h3 class="feature-title">Pure Vanilla JS & CSS</h3>
+          <p class="feature-description">
+            리액트, 뷰와 같은 무거운 라이브러리 빌드 단계 없이 순수한 HTML, CSS, JavaScript로 브라우저 자원을 100% 효율적으로 사용합니다.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Interactive Demo Section -->
+  <section id="demo" class="demo-section">
+    <div class="section-container">
+      <div class="section-header">
+        <h2 class="section-title">웹 뷰어 미리 체험하기</h2>
+        <p class="section-subtitle">실제 BookOasis가 제공하는 끊김 없는 플리커 프리(Flicker-free) 만화 뷰어를 웹 브라우저에서 바로 조작해 보세요.</p>
+      </div>
+      
+      <div class="demo-interactive-wrap">
+        <!-- Interactive Mockup -->
+        <div class="viewer-mockup">
+          <div class="viewer-screen">
+            <!-- Simulated Comic Images (using high quality stylized placeholders via SVG) -->
+            <div class="comic-page-container" id="comic-pages">
+              <div class="comic-page active" style="background: #1e293b;">
+                <div class="comic-art">
+                  <div class="comic-speech speech-left">"여기가 바로 BookOasis인가?"</div>
+                  <div class="comic-character char-left">🧙‍♂️</div>
+                </div>
+                <div class="page-footer">Page 1 / 4</div>
+              </div>
+              <div class="comic-page" style="background: #0f172a;">
+                <div class="comic-art">
+                  <div class="comic-speech speech-right">"빌드 과정도 없고, 너무 가볍고 빨라!"</div>
+                  <div class="comic-character char-right">🎸</div>
+                </div>
+                <div class="page-footer">Page 2 / 4</div>
+              </div>
+              <div class="comic-page" style="background: #1e1b4b;">
+                <div class="comic-art">
+                  <div class="comic-speech speech-left">"OPDS 피드로 내 태블릿에서도 바로 책을 열 수 있겠군!"</div>
+                  <div class="comic-character char-left">🧝‍♀️</div>
+                </div>
+                <div class="page-footer">Page 3 / 4</div>
+              </div>
+              <div class="comic-page" style="background: #020617;">
+                <div class="comic-art">
+                  <div class="comic-speech center-speech">"지금 홈 서버에 BookOasis를 띄워보세요!"</div>
+                  <div class="logo-badge">BookOasis 🏝️</div>
+                </div>
+                <div class="page-footer">Page 4 / 4</div>
+              </div>
+            </div>
+            
+            <!-- Viewer Navigation HUD -->
+            <div class="viewer-hud">
+              <button class="hud-btn" id="btn-prev-page"><i class="fa-solid fa-chevron-left"></i> 이전 페이지</button>
+              <span class="hud-pages" id="hud-page-indicator">1 / 4</span>
+              <button class="hud-btn" id="btn-next-page">다음 페이지 <i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA Section -->
+  <section class="cta-section">
+    <div class="section-container">
+      <h2 class="cta-title">지금 당신의 서재를 만들어보세요</h2>
+      <p class="cta-subtitle">독립적인 Python 마이크로엔진과 가벼운 SQLite 데이터베이스로 몇 초 안에 설치할 수 있습니다.</p>
+      <div class="cta-buttons">
+        <a href="http://app.carls-dev.org" class="btn-primary btn-lg" target="_blank">BookOasis 바로 시작하기 <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-container">
+      <div class="footer-left">
+        <p class="footer-brand">🏝️ BookOasis</p>
+        <p class="footer-copyright">&copy; 2026 BookOasis Project. Served under AGPLv3 License.</p>
+      </div>
+      <div class="footer-right">
+        <a href="https://github.com" target="_blank" class="footer-link">GitHub</a>
+        <a href="https://carls-dev.org/wiki" target="_blank" class="footer-link">Wiki Docs</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="app.js"></script>
+</body>
+</html>

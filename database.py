@@ -246,6 +246,8 @@ def init_databases():
         score INTEGER,
         release_date TEXT,
         summary TEXT,
+        genre TEXT,
+        tags TEXT,
         is_favorite INTEGER DEFAULT 0,
         cover_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP

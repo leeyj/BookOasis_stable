@@ -24,7 +24,7 @@ class BookDetailService:
         # 1. 시리즈 메타 정보 조회
         if use_lib_filter:
             cursor.execute("""
-                SELECT author, publisher, link, score, summary
+                SELECT author, publisher, link, score, summary, genre, tags
                 FROM books
                 WHERE series_name = ? AND library_id = ? AND (summary IS NOT NULL AND summary != '')
                 LIMIT 1
@@ -32,13 +32,13 @@ class BookDetailService:
             meta_row = cursor.fetchone()
             if not meta_row:
                 cursor.execute("""
-                    SELECT author, publisher, link, score, summary
+                    SELECT author, publisher, link, score, summary, genre, tags
                     FROM books WHERE series_name = ? AND library_id = ? LIMIT 1
                 """, (series_name, library_id))
                 meta_row = cursor.fetchone()
         else:
             cursor.execute("""
-                SELECT author, publisher, link, score, summary
+                SELECT author, publisher, link, score, summary, genre, tags
                 FROM books
                 WHERE series_name = ? AND (summary IS NOT NULL AND summary != '')
                 LIMIT 1
@@ -46,7 +46,7 @@ class BookDetailService:
             meta_row = cursor.fetchone()
             if not meta_row:
                 cursor.execute("""
-                    SELECT author, publisher, link, score, summary
+                    SELECT author, publisher, link, score, summary, genre, tags
                     FROM books WHERE series_name = ? LIMIT 1
                 """, (series_name,))
                 meta_row = cursor.fetchone()
@@ -108,6 +108,8 @@ class BookDetailService:
             'link'     : _val(meta_row, 'link',       ''),
             'score'    : _val(meta_row, 'score',       0),
             'summary'  : _val(meta_row, 'summary', '등록된 설명이 없습니다.'),
+            'genre'    : _val(meta_row, 'genre',      ''),
+            'tags'     : _val(meta_row, 'tags',       ''),
             'cover_image': get_cover_image_with_t(final_cover, latest_updated)
         }
 
@@ -142,7 +144,7 @@ class BookDetailService:
         return meta, books_list
 
     @staticmethod
-    def update_media_detail(db_type, series_name, author, publisher, summary, link, cover_file=None):
+    def update_media_detail(db_type, series_name, author, publisher, summary, link, genre='', tags='', cover_file=None):
         import hashlib
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
@@ -184,9 +186,11 @@ class BookDetailService:
                     publisher = ?,
                     summary = ?,
                     link = ?,
+                    genre = ?,
+                    tags = ?,
                     cover_updated_at = CURRENT_TIMESTAMP
                 WHERE series_name = ?
-            """, (author, publisher, summary, link, series_name))
+            """, (author, publisher, summary, link, genre, tags, series_name))
             
             conn.commit()
             conn.close()

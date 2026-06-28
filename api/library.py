@@ -89,6 +89,8 @@ def edit_media_detail():
     publisher   = request.form.get('publisher', '').strip()
     summary     = request.form.get('summary', '').strip()
     link        = request.form.get('link', '').strip()
+    genre       = request.form.get('genre', '').strip()
+    tags        = request.form.get('tags', '').strip()
     cover_file  = request.files.get('cover_image')
 
     if not series_name:
@@ -102,9 +104,77 @@ def edit_media_detail():
             publisher=publisher,
             summary=summary,
             link=link,
+            genre=genre,
+            tags=tags,
             cover_file=cover_file
         )
         return jsonify({'success': success, 'message': message if success else None, 'error': message if not success else None})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@library_bp.route('/api/media/tags', methods=['GET'])
+@login_required
+def get_media_tags():
+    """도서 보관함의 전체 유니크 태그 목록 조회"""
+    db_type = request.args.get('type', 'general')
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': '성인 도서관 접근 권한이 없습니다.'}), 403
+    library_id = request.args.get('library_id')
+    
+    try:
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        
+        if library_id and library_id not in ('all', 'favorite', 'history', 'home'):
+            cursor.execute("SELECT DISTINCT tags FROM books WHERE library_id = ? AND tags IS NOT NULL AND tags != ''", (library_id,))
+        else:
+            cursor.execute("SELECT DISTINCT tags FROM books WHERE tags IS NOT NULL AND tags != ''")
+            
+        rows = cursor.fetchall()
+        conn.close()
+        
+        unique_tags = set()
+        for r in rows:
+            if r[0]:
+                for t in r[0].split(','):
+                    t_clean = t.strip()
+                    if t_clean:
+                        unique_tags.add(t_clean)
+                        
+        return jsonify({'success': True, 'tags': sorted(list(unique_tags))})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@library_bp.route('/api/media/genres', methods=['GET'])
+@login_required
+def get_media_genres():
+    """도서 보관함의 전체 유니크 장르 목록 조회"""
+    db_type = request.args.get('type', 'general')
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': '성인 도서관 접근 권한이 없습니다.'}), 403
+    library_id = request.args.get('library_id')
+    
+    try:
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        
+        if library_id and library_id not in ('all', 'favorite', 'history', 'home'):
+            cursor.execute("SELECT DISTINCT genre FROM books WHERE library_id = ? AND genre IS NOT NULL AND genre != ''", (library_id,))
+        else:
+            cursor.execute("SELECT DISTINCT genre FROM books WHERE genre IS NOT NULL AND genre != ''")
+            
+        rows = cursor.fetchall()
+        conn.close()
+        
+        unique_genres = set()
+        for r in rows:
+            if r[0]:
+                for g in r[0].split(','):
+                    g_clean = g.strip()
+                    if g_clean:
+                        unique_genres.add(g_clean)
+                        
+        return jsonify({'success': True, 'genres': sorted(list(unique_genres))})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

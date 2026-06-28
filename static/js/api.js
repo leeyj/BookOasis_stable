@@ -253,5 +253,17 @@ export async function triggerLazyScan() {
   return res.json();
 }
 
+export async function fetchTags(type, libraryId) {
+  const libQuery = libraryId ? `&library_id=${libraryId}` : '';
+  const res = await fetch(`/api/media/tags?type=${type}${libQuery}`);
+  return res.json();
+}
+
+export async function fetchGenres(type, libraryId) {
+  const libQuery = libraryId ? `&library_id=${libraryId}` : '';
+  const res = await fetch(`/api/media/genres?type=${type}${libQuery}`);
+  return res.json();
+}
+
 
 

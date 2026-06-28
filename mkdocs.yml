@@ -27,10 +27,25 @@ theme:
 docs_dir: docs
 nav:
 - 위키 홈: index.md
-- API 명세서: api_endpoints.md
 - 개발 워크플로우: workflow.md
 - 작업 히스토리:
   - history/index.md
+  - history/20260628_102936_session_20260628_102936_walkthrough.md
+  - history/20260628_102936_session_20260628_102936_task.md
+  - history/20260628_013036_genre_tag_removal_walkthrough.md
+  - history/20260628_013036_genre_tag_removal_task.md
+  - history/20260628_012653_genre_tag_draggable_modal_walkthrough.md
+  - history/20260628_012653_genre_tag_draggable_modal_task.md
+  - history/20260628_012439_genre_tag_popup_overflow_fix_walkthrough.md
+  - history/20260628_012439_genre_tag_popup_overflow_fix_task.md
+  - history/20260628_012229_genre_tag_popup_rebinding_fix_walkthrough.md
+  - history/20260628_012229_genre_tag_popup_rebinding_fix_task.md
+  - history/20260628_012000_sidebar_scrolling_fix_walkthrough.md
+  - history/20260628_012000_sidebar_scrolling_fix_task.md
+  - history/20260628_011848_genre_tag_refactoring_walkthrough.md
+  - history/20260628_011848_genre_tag_refactoring_task.md
+  - history/20260628_003542_genre_tag_refactoring_walkthrough.md
+  - history/20260628_003542_genre_tag_refactoring_task.md
   - history/20260625_104855_scanner_offset_fix_walkthrough.md
   - history/20260625_104855_scanner_offset_fix_task.md
   - history/20260625_025530_opds_recently_read_title_corruption_fix_walkthrough.md
@@ -331,6 +346,7 @@ nav:
   - history/20260619_145226_init_docs_task.md
 - 버그 트러블슈팅:
   - bug/index.md
+  - bug/20260628_improvement_sort_by_date.md
   - bug/20260625_bugfix_scanner_offset_missing_recovery.md
   - bug/20260624_bugfix_warn_banner_condition.md
   - bug/20260624_bugfix_copy_metadata_cover.md

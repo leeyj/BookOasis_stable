@@ -27,10 +27,26 @@
     gap: 1rem;
     position: sticky;
     top: 20px;
-    height: fit-content;
+    height: calc(100vh - 40px);
+    overflow-y: auto;
     background: transparent;
     border-radius: 0;
     padding: 0 1.5rem 0 0;
+}
+
+/* 사이드바 전용 얇고 미려한 스크롤바 디자인 */
+.library-sidebar::-webkit-scrollbar {
+    width: 4px;
+}
+.library-sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+.library-sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+.library-sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
 }
 
 .sidebar-menu .menu-item[draggable="true"] {

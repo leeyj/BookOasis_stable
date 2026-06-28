@@ -113,6 +113,8 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, is_
         'link': yaml_meta['link'] or '',
         'score': yaml_meta['score'] or 0,
         'release_date': xml_meta['release_date'] or '',
+        'genre': xml_meta.get('genre', '') or yaml_meta.get('genre', '') or '',
+        'tags': xml_meta.get('tags', '') or yaml_meta.get('tags', '') or '',
         'cover_b64_map': yaml_meta['cover_b64_map'] or {}
     }
 
@@ -181,7 +183,7 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, is_
                 # [ComicInfo.xml 파싱] 로컬 파일이고 CBZ 포맷인 경우, 파일 내부에서 메타데이터 보완
                 # 원격 경로는 I/O 비용이 크므로 스킵 → Lazy 스캐너가 담당
                 if not is_remote and file_format in ('cbz', 'zip') and (
-                    not merged_meta['author'] or not merged_meta['summary']
+                    not merged_meta['author'] or not merged_meta['summary'] or not merged_meta.get('genre') or not merged_meta.get('tags')
                 ):
                     try:
                         comicinfo = parse_comicinfo_from_cbz(full_path)
@@ -194,6 +196,10 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, is_
                             merged_meta['summary'] = comicinfo['summary']
                         if comicinfo['release_date'] and not merged_meta['release_date']:
                             merged_meta['release_date'] = comicinfo['release_date']
+                        if comicinfo.get('genre') and not merged_meta.get('genre'):
+                            merged_meta['genre'] = comicinfo['genre']
+                        if comicinfo.get('tags') and not merged_meta.get('tags'):
+                            merged_meta['tags'] = comicinfo['tags']
                     except Exception as ce:
                         print(f"[Scanner-DEBUG-Task]     - ComicInfo.xml 파싱 스킵: {ce}")
 

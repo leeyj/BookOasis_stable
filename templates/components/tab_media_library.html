@@ -25,6 +25,7 @@
                 <li class="menu-item" id="category-all" onclick="selectCategory('all')"><i
                         class="fa-solid fa-layer-group"></i> 전체보기</li>
             </ul>
+
         </div>
         <div class="sidebar-settings-wrap"
             style="padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.05); margin-top: auto; display: flex; flex-direction: column; gap: 0.8rem;">
@@ -47,6 +48,8 @@
         </div>
     </div>
 
+
+
     <!-- 우측 메인 콘텐츠 영역 -->
     <div class="library-main-content">
         <!-- 
@@ -64,8 +67,8 @@
             <div class="library-controls">
                 <button id="btn-lib-sort" class="btn-toggle"
                     style="margin-right: 0.5rem; padding: 0.4rem 0.8rem; display: none; align-items: center; gap: 0.3rem;"
-                    onclick="toggleLibrarySort()" title="가나다 정렬 방향 변경">
-                    <i class="fa-solid fa-sort-alpha-down"></i> 오름차순
+                    onclick="toggleLibrarySort()" title="정렬 조건 변경">
+                    <i class="fa-solid fa-sort-alpha-down"></i> 가나다 오름차순
                 </button>
                 <input type="text" id="library-search" class="form-control input-sm" placeholder="제목, 시리즈, 작가 검색..."
                     oninput="filterBooks()">
