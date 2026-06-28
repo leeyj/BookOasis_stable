@@ -30,6 +30,8 @@ nav:
 - 개발 워크플로우: workflow.md
 - 작업 히스토리:
   - history/index.md
+  - history/20260628_201431_floating_filter_walkthrough.md
+  - history/20260628_201431_floating_filter_task.md
   - history/20260628_174032_scanner_timeout_walkthrough.md
   - history/20260628_174032_scanner_timeout_task.md
   - history/20260628_173818_scanner_timeout_walkthrough.md

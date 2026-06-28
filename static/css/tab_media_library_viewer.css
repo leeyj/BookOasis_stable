@@ -642,3 +642,239 @@
     line-height: 1.6;
     margin: 0;
 }
+
+/* 🏷️ 플로팅 상세 필터 모달 */
+.floating-filter-modal {
+    position: fixed;
+    top: 150px;
+    right: 50px;
+    width: 380px;
+    max-height: 520px;
+    background: rgba(15, 23, 42, 0.78);
+    backdrop-filter: blur(12px) saturate(160%);
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: filter-fade-in 0.25s ease-out;
+}
+
+@keyframes filter-fade-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.filter-modal-header {
+    padding: 0.8rem 1rem;
+    background: rgba(30, 41, 59, 0.5);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: move;
+    user-select: none;
+}
+
+.filter-modal-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #e2e8f0;
+}
+
+.filter-modal-header-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-filter-icon {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    font-size: 0.9rem;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.btn-filter-icon:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+#btn-filter-close:hover {
+    color: #f87171;
+    background: rgba(239, 68, 68, 0.15);
+}
+
+.filter-modal-body {
+    padding: 1rem;
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    min-height: 0;
+}
+
+.selected-chips-container {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px dashed rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 0.6rem;
+    max-height: 100px;
+    overflow-y: auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.filter-chip-selected {
+    font-size: 0.75rem;
+    background: rgba(168, 85, 247, 0.2);
+    border: 1px solid rgba(168, 85, 247, 0.4);
+    color: #e9d5ff;
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    transition: all 0.15s;
+}
+
+.filter-chip-selected:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #fca5a5;
+}
+
+.filter-search-wrap {
+    position: relative;
+    width: 100%;
+}
+
+.filter-search-wrap .search-icon {
+    position: absolute;
+    left: 0.8rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #64748b;
+    font-size: 0.85rem;
+}
+
+#filter-search-input {
+    width: 100%;
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 0.45rem 0.8rem 0.45rem 2rem;
+    color: #e2e8f0;
+    font-size: 0.85rem;
+    outline: none;
+    box-sizing: border-box;
+    transition: all 0.2s;
+}
+
+#filter-search-input:focus {
+    border-color: #a855f7;
+    background: rgba(15, 23, 42, 0.6);
+}
+
+.filter-tabs {
+    display: flex;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.filter-tab {
+    flex: 1;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #94a3b8;
+    padding: 0.5rem 0;
+    cursor: pointer;
+    font-size: 0.88rem;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.filter-tab:hover {
+    color: #cbd5e1;
+}
+
+.filter-tab.active {
+    color: #c084fc;
+    border-bottom-color: #a855f7;
+}
+
+.filter-chips-wrapper {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 0.2rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 0.45rem;
+    min-height: 120px;
+}
+
+.filter-chip-item {
+    font-size: 0.78rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: #94a3b8;
+    padding: 0.25rem 0.6rem;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.filter-chip-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #e2e8f0;
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.filter-chip-item.active {
+    background: #a855f7;
+    color: #ffffff;
+    border-color: #c084fc;
+    font-weight: 600;
+    box-shadow: 0 0 10px rgba(168, 85, 247, 0.4);
+}
+
+.filter-modal-footer {
+    padding: 0.8rem 1rem;
+    background: rgba(30, 41, 59, 0.3);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    justify-content: flex-end;
+}
+
+.btn-filter-apply {
+    width: 100%;
+    background: #a855f7;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem 0;
+    font-weight: 700;
+    font-size: 0.88rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-filter-apply:hover {
+    background: #c084fc;
+    box-shadow: 0 0 12px rgba(168, 85, 247, 0.5);
+}

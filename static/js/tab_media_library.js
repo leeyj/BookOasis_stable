@@ -24,6 +24,9 @@ import { loadBooksList, loadReadingHistory, filterBooks, toggleLibrarySort, resu
 // settings_tab.js 모듈로부터 환경설정 제어부 임포트
 import { switchSettingsTab, loadInitialSystemSettings, loadGeneralSettings, submitGeneralSettings, initReportsTab, loadReportList, loadReportDetail } from './settings_tab.js';
 
+// 장르 및 태그 플로팅 필터 모달 임포트
+import { initFloatingFilter, toggleFilterModal } from './genre_tag_filter.js';
+
 // 초기화
 document.addEventListener('DOMContentLoaded', () => {
   // 로그인 사용자 세션 연동
@@ -50,6 +53,9 @@ document.addEventListener('DOMContentLoaded', () => {
   state.currentLibraryId = 'home';
   loadLibraries();
   selectCategory('home');
+
+  // 플로팅 필터 모달 초기화
+  initFloatingFilter();
 
   // IntersectionObserver 기반 무한 스크롤 초기화
   initInfiniteScrollObserver();

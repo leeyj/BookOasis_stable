@@ -78,21 +78,21 @@ export async function loadBooksList(isAppend = false) {
     );
   }
 
-  // 1-1) 장르 필터링
-  if (state.currentGenre) {
+  // 1-1) 장르 다중 필터링 (AND 결합)
+  if (state.filterGenres && state.filterGenres.length > 0) {
     filtered = filtered.filter(item => {
       if (!item.genre) return false;
-      const genres = item.genre.split(',').map(g => g.trim());
-      return genres.includes(state.currentGenre);
+      const itemGenres = item.genre.split(',').map(g => g.trim());
+      return state.filterGenres.every(g => itemGenres.includes(g));
     });
   }
 
-  // 1-2) 태그 필터링
-  if (state.currentTag) {
+  // 1-2) 태그 다중 필터링 (AND 결합)
+  if (state.filterTags && state.filterTags.length > 0) {
     filtered = filtered.filter(item => {
       if (!item.tags) return false;
-      const tags = item.tags.split(',').map(t => t.trim());
-      return tags.includes(state.currentTag);
+      const itemTags = item.tags.split(',').map(t => t.trim());
+      return state.filterTags.every(t => itemTags.includes(t));
     });
   }
 
@@ -171,8 +171,27 @@ export function filterBooks() {
   let filtered = [...state.allBooksData];
   if (state.searchQuery) {
     filtered = filtered.filter(item => 
-      (item.series_name && item.series_name.toLowerCase().includes(state.searchQuery))
+      (item.series_name && item.series_name.toLowerCase().includes(state.searchQuery)) ||
+      (item.author && item.author.toLowerCase().includes(state.searchQuery))
     );
+  }
+
+  // 1-1) 장르 다중 필터링 (AND 결합)
+  if (state.filterGenres && state.filterGenres.length > 0) {
+    filtered = filtered.filter(item => {
+      if (!item.genre) return false;
+      const itemGenres = item.genre.split(',').map(g => g.trim());
+      return state.filterGenres.every(g => itemGenres.includes(g));
+    });
+  }
+
+  // 1-2) 태그 다중 필터링 (AND 결합)
+  if (state.filterTags && state.filterTags.length > 0) {
+    filtered = filtered.filter(item => {
+      if (!item.tags) return false;
+      const itemTags = item.tags.split(',').map(t => t.trim());
+      return state.filterTags.every(t => itemTags.includes(t));
+    });
   }
 
   const sortDir = state.currentSortDirection || 'asc';

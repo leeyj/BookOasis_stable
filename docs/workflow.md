@@ -157,3 +157,4 @@ tags: [workflow, history]
 | 2026-06-28 | `scanner_timeout` | 도서 스캔 중 쓰레드 행 및 Gunicorn 워커 타임아웃 오류 수정 | [Task](./history/20260628_173518_scanner_timeout_task.md) | [Walkthrough](./history/20260628_173518_scanner_timeout_walkthrough.md) |
 | 2026-06-28 | `scanner_timeout` | 도서 스캔 중 쓰레드 행 및 Gunicorn 워커 타임아웃 오류 수정 (대형 폴더 OOM 방지 보완) | [Task](./history/20260628_173818_scanner_timeout_task.md) | [Walkthrough](./history/20260628_173818_scanner_timeout_walkthrough.md) |
 | 2026-06-28 | `scanner_timeout` | 설치 가이드 문서에 SECRET_KEY 환경변수 설정 가이드 보완 | [Task](./history/20260628_174032_scanner_timeout_task.md) | [Walkthrough](./history/20260628_174032_scanner_timeout_walkthrough.md) |
+| 2026-06-28 | `floating_filter` | 드래그 가능하고 실시간 검색이 지원되는 반투명 플로팅 장르/태그 필터 모달 구현 | [Task](./history/20260628_201431_floating_filter_task.md) | [Walkthrough](./history/20260628_201431_floating_filter_walkthrough.md) |

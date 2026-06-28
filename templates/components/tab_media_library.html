@@ -65,6 +65,11 @@
                 <span id="library-total-count" style="font-size: 0.9rem; color: #94a3b8; margin-left: 0.8rem; font-weight: normal; white-space: nowrap;"></span>
             </h2>
             <div class="library-controls">
+                <button id="btn-open-filter" class="btn-toggle"
+                    style="margin-right: 0.5rem; padding: 0.4rem 0.8rem; display: flex; align-items: center; gap: 0.3rem;"
+                    onclick="toggleFilterModal()" title="장르/태그 필터 열기">
+                    <i class="fa-solid fa-filter"></i> 필터
+                </button>
                 <button id="btn-lib-sort" class="btn-toggle"
                     style="margin-right: 0.5rem; padding: 0.4rem 0.8rem; display: none; align-items: center; gap: 0.3rem;"
                     onclick="toggleLibrarySort()" title="정렬 조건 변경">
@@ -94,6 +99,43 @@
     </div>
 
     {% include "components/media_viewer.html" %}
+
+    <!-- 플로팅 장르/태그 필터 모달 -->
+    <div id="floating-filter-modal" class="floating-filter-modal" style="display: none;">
+        <div class="filter-modal-header" id="filter-modal-header">
+            <span class="filter-modal-title"><i class="fa-solid fa-filter" style="color: #c084fc;"></i> 상세 필터</span>
+            <div class="filter-modal-header-actions">
+                <button class="btn-filter-icon" id="btn-filter-reset" title="필터 전체 초기화"><i class="fa-solid fa-rotate-left"></i></button>
+                <button class="btn-filter-icon" id="btn-filter-close" title="닫기"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+        </div>
+        <div class="filter-modal-body">
+            <!-- 선택된 태그 목록 (Chips) -->
+            <div class="selected-chips-container" id="selected-chips-container" style="display: none;">
+                <!-- 동적 칩 렌더링 -->
+            </div>
+            
+            <!-- 실시간 검색 인풋창 -->
+            <div class="filter-search-wrap">
+                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                <input type="text" id="filter-search-input" placeholder="장르 또는 태그 검색...">
+            </div>
+
+            <!-- 장르/태그 탭 메뉴 -->
+            <div class="filter-tabs">
+                <button class="filter-tab active" id="tab-genres">장르</button>
+                <button class="filter-tab" id="tab-tags">태그</button>
+            </div>
+
+            <!-- 칩 목록 노출 영역 -->
+            <div class="filter-chips-wrapper" id="filter-chips-wrapper">
+                <!-- 동적 칩 생성 -->
+            </div>
+        </div>
+        <div class="filter-modal-footer">
+            <button class="btn-filter-apply" id="btn-filter-apply">필터 적용</button>
+        </div>
+    </div>
 
     <!-- 모달 컴포넌트 목록 -->
     {% include "components/modals/user_modal.html" %}
