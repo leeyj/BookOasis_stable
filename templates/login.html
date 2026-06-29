@@ -9,33 +9,38 @@
     <!-- FontAwesome -->
     <link rel="stylesheet" href="/static/lib/font-awesome/css/all.min.css">
     <link rel="stylesheet" href="/static/css/login.css">
+    <!-- i18n 다국어 지원 엔진 -->
+    <script src="/static/js/i18n.js"></script>
 </head>
 <body>
+
+<!-- 우측 상단 로그인 전 다국어 선택기 컨테이너 -->
+<div id="login-i18n-container" style="position: absolute; top: 1rem; right: 1rem; z-index: 10;"></div>
 
 <div class="auth-container">
     <!-- 1. 로그인 폼 카드 -->
     <div id="login-card" class="auth-card">
         <div class="auth-header">
             <span class="auth-logo"><img src="/static/images/logo.png" alt="BookOasis" style="width: 4rem; height: 4rem; object-fit: contain; border-radius: 8px;"></span>
-            <h2 class="auth-title">BookOasis</h2>
-            <p class="auth-subtitle">북오아시스 미디어 서재 로그인</p>
+            <h2 class="auth-title" data-i18n="login.title">BookOasis</h2>
+            <p class="auth-subtitle" data-i18n="login.subtitle">북오아시스 미디어 서재 로그인</p>
         </div>
 
         <div id="login-error" class="error-message">
-            <i class="fa-solid fa-circle-exclamation"></i> <span id="login-error-text">오류</span>
+            <i class="fa-solid fa-circle-exclamation"></i> <span id="login-error-text" data-i18n="common.error">오류</span>
         </div>
 
         <form id="login-form" onsubmit="handleLogin(event)">
             <div class="form-group">
-                <input type="text" id="username" class="form-control" placeholder="아이디" required autocomplete="username">
+                <input type="text" id="username" class="form-control" data-i18n-placeholder="login.username_placeholder" placeholder="아이디" required autocomplete="username">
                 <i class="fa-solid fa-user"></i>
             </div>
             <div class="form-group">
-                <input type="password" id="password" class="form-control" placeholder="비밀번호" required autocomplete="current-password">
+                <input type="password" id="password" class="form-control" data-i18n-placeholder="login.password_placeholder" placeholder="비밀번호" required autocomplete="current-password">
                 <i class="fa-solid fa-lock"></i>
             </div>
             <button type="submit" class="btn-submit">
-                로그인 <i class="fa-solid fa-arrow-right"></i>
+                <span data-i18n="login.submit_btn">로그인</span> <i class="fa-solid fa-arrow-right"></i>
             </button>
         </form>
     </div>
@@ -69,5 +74,13 @@
 </div>
 
 <script src="/static/js/login.js"></script>
+<script>
+    // 페이지 로드 시 다국어 초기화 및 렌더링
+    document.addEventListener('DOMContentLoaded', async () => {
+        await i18n.init();
+        i18n.translateDOM();
+        i18n.renderLanguageSelector('#login-i18n-container');
+    });
+</script>
 </body>
 </html>

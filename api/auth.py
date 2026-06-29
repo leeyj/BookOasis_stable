@@ -5,6 +5,8 @@ import database
 from werkzeug.security import generate_password_hash, check_password_hash
 from services.settings_service import SettingsService
 
+from utils.i18n_helper import get_available_languages
+
 auth_bp = Blueprint('auth', __name__)
 
 def login_required(f):
@@ -40,6 +42,10 @@ def check_adult_permission(db_type):
 
 @auth_bp.before_app_request
 def check_authentication():
+    # i18n 언어 스캔 API는 세션 예외
+    if request.path == '/api/i18n/languages':
+        return
+        
     # 예외 대상 경로 리스트
     exempt_paths = [
         url_for('media_api.auth.login'),
@@ -223,3 +229,11 @@ def delete_user(target_user_id):
         conn.close()
         
     return jsonify({'success': True, 'message': '사용자가 삭제되었습니다.'})
+
+@auth_bp.route('/api/i18n/languages', methods=['GET'])
+def get_languages():
+    try:
+        langs = get_available_languages()
+        return jsonify({'success': True, 'languages': langs})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500

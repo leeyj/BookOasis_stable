@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- BookOasis 미디어 서버 관리 스크립트 ---
-APP_DIR="/home/az001a/Script/media_server"
+APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PID_FILE="$APP_DIR/media_server.pid"
 LOG_FILE="$APP_DIR/logs/media_server_startup.log"
 

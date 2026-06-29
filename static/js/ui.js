@@ -62,15 +62,15 @@ export function createBookCard(item, options = {}) {
     const progressPercent = Math.round((item.pages_read / item.total_pages) * 100);
     badgeHtml = `<span class="book-badge-count" style="background-color: #a855f7;">${progressPercent}%</span>`;
   } else if (options.showVolumeCount && item.book_count !== undefined) {
-    badgeHtml = `<span class="book-badge-count">${item.book_count}권</span>`;
+    badgeHtml = `<span class="book-badge-count">${item.book_count}${i18n.t('dashboard.unit_books')}</span>`;
   }
 
   // 3. 서브 텍스트 메타정보 결정
   let subTextHtml = '';
   if (item.pages_read > 0 && options.showProgress) {
-    subTextHtml = `<p style="font-size:0.75rem; color:#94a3b8; margin:0.25rem 0 0 0;">이어읽기: ${item.pages_read}p</p>`;
+    subTextHtml = `<p style="font-size:0.75rem; color:#94a3b8; margin:0.25rem 0 0 0;">${i18n.t('dashboard.continue_reading', {pages: item.pages_read})}</p>`;
   } else if (options.isNew) {
-    subTextHtml = `<p style="font-size:0.75rem; color:#94a3b8; margin:0.25rem 0 0 0;">신규 추가</p>`;
+    subTextHtml = `<p style="font-size:0.75rem; color:#94a3b8; margin:0.25rem 0 0 0;">${i18n.t('dashboard.new_arrival')}</p>`;
   }
 
   // 4. 즐겨찾기 버튼 구성

@@ -8,6 +8,8 @@
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logo.png') }}">
     <!-- FontAwesome 아이콘 패키지 추가 (Local) -->
     <link rel="stylesheet" href="{{ url_for('static', filename='lib/font-awesome/css/all.min.css') }}">
+    <!-- i18n 다국어 지원 엔진 -->
+    <script src="{{ url_for('static', filename='js/i18n.js') }}"></script>
     <script>
         window.currentUser = {
             username: "{{ session.get('username', '') }}",
@@ -48,5 +50,13 @@
     {% include "components/tab_media_library.html" %}
 </div>
 
+<script>
+    // 페이지 로드 시 다국어 초기화 및 렌더링 실행
+    document.addEventListener('DOMContentLoaded', async () => {
+        await i18n.init();
+        i18n.translateDOM();
+        i18n.renderLanguageSelector('#settings-i18n-container');
+    });
+</script>
 </body>
 </html>

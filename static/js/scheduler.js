@@ -6,13 +6,13 @@ import * as api from './api.js';
 export async function loadLibrarySchedules() {
   const container = document.getElementById('settings-libraries-list');
   if (!container) return;
-  container.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:2rem; color:#a855f7;"><i class="fa-solid fa-circle-notch fa-spin fa-2x"></i><br><span style="display:inline-block; margin-top:0.5rem;">스케줄 목록을 불러오는 중...</span></td></tr>';
+  container.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:2rem; color:#a855f7;"><i class="fa-solid fa-circle-notch fa-spin fa-2x"></i><br><span style="display:inline-block; margin-top:0.5rem;">${i18n.t('settings.loading_schedules')}</span></td></tr>`;
   
   try {
     const data = await api.fetchLibrarySchedules(state.currentLibraryType);
     if (data.success) {
       if (data.libraries.length === 0) {
-        container.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:2rem; color:#94a3b8;">생성된 카테고리가 없습니다.</td></tr>';
+        container.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:2rem; color:#94a3b8;">${i18n.t('settings.no_categories')}</td></tr>`;
         return;
       }
       
@@ -20,11 +20,11 @@ export async function loadLibrarySchedules() {
       data.libraries.forEach(lib => {
         let statusBadge = '';
         if (lib.scan_status === 'scanning') {
-          statusBadge = '<span class="badge-scan-status scanning"><i class="fa-solid fa-circle-notch fa-spin"></i> 스캔 중</span>';
+          statusBadge = `<span class="badge-scan-status scanning"><i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('settings.status_scanning')}</span>`;
         } else if (lib.scan_status === 'failed') {
-          statusBadge = '<span class="badge-scan-status failed">실패</span>';
+          statusBadge = `<span class="badge-scan-status failed">${i18n.t('settings.status_failed')}</span>`;
         } else {
-          statusBadge = '<span class="badge-scan-status ready">대기</span>';
+          statusBadge = `<span class="badge-scan-status ready">${i18n.t('settings.status_ready')}</span>`;
         }
         
         let vfsCheckbox = '';
@@ -34,7 +34,7 @@ export async function loadLibrarySchedules() {
           vfsCheckbox = `
             <div style="margin-top: 0.35rem; display: flex; align-items: center; gap: 0.3rem; font-size: 0.78rem; color: #c084fc;">
               <input type="checkbox" id="vfs-refresh-${lib.id}" style="cursor: pointer; accent-color: #a855f7; width: auto;" ${checked}>
-              <label for="vfs-refresh-${lib.id}" style="cursor: pointer; margin: 0;">VFS 갱신 후 스캔</label>
+              <label for="vfs-refresh-${lib.id}" style="cursor: pointer; margin: 0;">${i18n.t('settings.vfs_refresh_before_scan')}</label>
             </div>
           `;
           rcloneRcInputHtml = `
@@ -43,11 +43,11 @@ export async function loadLibrarySchedules() {
         } else {
           vfsCheckbox = `
             <div style="margin-top: 0.35rem; font-size: 0.75rem; color: #64748b;">
-              <i class="fa-solid fa-hard-drive"></i> 로컬 스토리지
+              <i class="fa-solid fa-hard-drive"></i> ${i18n.t('settings.local_storage')}
             </div>
           `;
           rcloneRcInputHtml = `
-            <span style="font-size: 0.78rem; color: #64748b;"><i class="fa-solid fa-ban"></i> 불필요 (로컬)</span>
+            <span style="font-size: 0.78rem; color: #64748b;"><i class="fa-solid fa-ban"></i> ${i18n.t('settings.not_required_local')}</span>
           `;
         }
  
@@ -66,9 +66,9 @@ export async function loadLibrarySchedules() {
             <td style="padding: 1rem; text-align: center;">${statusBadge}</td>
             <td style="padding: 1rem; text-align: center;">
               <div style="display: flex; gap: 0.3rem; justify-content: center;">
-                <button class="btn-toggle active" style="white-space: nowrap; padding: 0.3rem 0.5rem; font-size: 0.75rem; border-radius: 4px;" onclick="saveLibrarySchedule(${lib.id}, '${lib.name.replace(/'/g, "\\'")}')" title="설정 저장"><i class="fa-regular fa-floppy-disk"></i> 저장</button>
-                <button class="btn-toggle" style="white-space: nowrap; padding: 0.3rem 0.5rem; font-size: 0.75rem; border-radius: 4px; background: #a855f7; border-color: #a855f7; color: #fff;" onclick="runLibraryScanNow(${lib.id}, '${lib.name.replace(/'/g, "\\'")}', false)" title="변경된 파일만 점진적 스캔"><i class="fa-solid fa-play"></i> 스캔</button>
-                <button class="btn-toggle" style="white-space: nowrap; padding: 0.3rem 0.5rem; font-size: 0.75rem; border-radius: 4px; background: #ea580c; border-color: #ea580c; color: #fff;" onclick="runLibraryScanNow(${lib.id}, '${lib.name.replace(/'/g, "\\'")}', true)" title="모든 파일의 메타데이터와 오프셋을 강제로 전체 재색인"><i class="fa-solid fa-arrows-rotate"></i> 강제스캔</button>
+                <button class="btn-toggle active" style="white-space: nowrap; padding: 0.3rem 0.5rem; font-size: 0.75rem; border-radius: 4px;" onclick="saveLibrarySchedule(${lib.id}, '${lib.name.replace(/'/g, "\\'")}')" title="설정 저장"><i class="fa-regular fa-floppy-disk"></i> ${i18n.t('common.save')}</button>
+                <button class="btn-toggle" style="white-space: nowrap; padding: 0.3rem 0.5rem; font-size: 0.75rem; border-radius: 4px; background: #a855f7; border-color: #a855f7; color: #fff;" onclick="runLibraryScanNow(${lib.id}, '${lib.name.replace(/'/g, "\\'")}', false)" title="변경된 파일만 점진적 스캔"><i class="fa-solid fa-play"></i> ${i18n.t('settings.btn_scan')}</button>
+                <button class="btn-toggle" style="white-space: nowrap; padding: 0.3rem 0.5rem; font-size: 0.75rem; border-radius: 4px; background: #ea580c; border-color: #ea580c; color: #fff;" onclick="runLibraryScanNow(${lib.id}, '${lib.name.replace(/'/g, "\\'")}', true)" title="모든 파일의 메타데이터와 오프셋을 강제로 전체 재색인"><i class="fa-solid fa-arrows-rotate"></i> ${i18n.t('settings.btn_force_scan')}</button>
               </div>
             </td>
           </tr>
@@ -76,11 +76,11 @@ export async function loadLibrarySchedules() {
       });
       container.innerHTML = html;
     } else {
-      container.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:2rem; color:#ef4444;">목록 조회 실패: ${data.error}</td></tr>`;
+      container.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:2rem; color:#ef4444;">${i18n.t('settings.fetch_failed')}: ${data.error}</td></tr>`;
     }
   } catch (e) {
     console.error('스케줄 조회 에러:', e);
-    container.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:2rem; color:#ef4444;">서버 연결 중 오류가 발생했습니다.</td></tr>';
+    container.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:2rem; color:#ef4444;">${i18n.t('settings.server_error')}</td></tr>`;
   }
 }
 

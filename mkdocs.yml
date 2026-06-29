@@ -30,6 +30,16 @@ nav:
 - 개발 워크플로우: workflow.md
 - 작업 히스토리:
   - history/index.md
+  - history/20260630_020345_i18n_dynamic_translation_system_walkthrough.md
+  - history/20260630_020345_i18n_dynamic_translation_system_task.md
+  - history/20260630_020159_i18n_dynamic_translation_system_walkthrough.md
+  - history/20260630_020159_i18n_dynamic_translation_system_task.md
+  - history/20260630_015936_i18n_dynamic_translation_system_walkthrough.md
+  - history/20260630_015936_i18n_dynamic_translation_system_task.md
+  - history/20260630_015713_i18n_dynamic_translation_system_walkthrough.md
+  - history/20260630_015713_i18n_dynamic_translation_system_task.md
+  - history/20260630_015359_i18n_dynamic_translation_system_walkthrough.md
+  - history/20260630_015359_i18n_dynamic_translation_system_task.md
   - history/20260630_000024_migrator_metadata_migration_walkthrough.md
   - history/20260630_000024_migrator_metadata_migration_task.md
   - history/20260629_210817_viewer_close_ui_refresh_walkthrough.md
