@@ -83,7 +83,7 @@ function triggerPreloadNextBook(bookId) {
  * 대기 중인 진척도 저장 예약 건이 있다면 즉시 동기 전송(Flush)하고 청소
  */
 export function flushProgress() {
-  if (!pendingProgress) return;
+  if (!pendingProgress) return Promise.resolve(null);
 
   const data = { ...pendingProgress };
   pendingProgress = null;
@@ -96,7 +96,7 @@ export function flushProgress() {
   console.log(`[Viewer-Progress] Flushing progress: book_id=${data.book_id}, page_idx=${data.page_idx}/${data.total_pages}`);
 
   // Fetch API를 사용해 백그라운드로 전송 (keepalive 사용으로 브라우저 닫혀도 전송 보장 시도)
-  fetch('/api/media/progress', {
+  return fetch('/api/media/progress', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -105,5 +105,6 @@ export function flushProgress() {
     keepalive: true
   }).catch(err => {
     console.error('[Viewer-Progress] Failed to save progress on flush:', err);
+    return null;
   });
 }

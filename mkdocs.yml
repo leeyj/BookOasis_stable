@@ -30,6 +30,8 @@ nav:
 - 개발 워크플로우: workflow.md
 - 작업 히스토리:
   - history/index.md
+  - history/20260629_210817_viewer_close_ui_refresh_walkthrough.md
+  - history/20260629_210817_viewer_close_ui_refresh_task.md
   - history/20260629_201834_viewer_mark_as_completed_sync_walkthrough.md
   - history/20260629_201834_viewer_mark_as_completed_sync_task.md
   - history/20260629_201649_all_formats_progress_completion_threshold_walkthrough.md
@@ -413,6 +415,7 @@ nav:
   - bug/20260629_improvement_identity_logo_replace.md
   - bug/20260629_bugfix_viewer_zero_page_and_context_menu_error.md
   - bug/20260629_bugfix_viewer_mark_as_completed_sync.md
+  - bug/20260629_bugfix_viewer_close_ui_refresh.md
   - bug/20260629_bugfix_temp_cache_file_eviction.md
   - bug/20260629_bugfix_stream_db_connection_leak.md
   - bug/20260629_bugfix_scheduler_rc_url_select_miss.md

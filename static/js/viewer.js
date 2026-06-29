@@ -131,10 +131,37 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false) {
   clearEpubViewer();
   clearPdfViewer();
 
-  // 대기 중인 진척도 저장 예약 건 즉시 동기화(Flush)
+  // 대기 중인 진척도 저장 예약 건 즉시 동기화(Flush) 및 메인 뷰 데이터 리로드
   import('./viewer_progress.js').then(m => {
-    m.flushProgress();
+    const flushPromise = m.flushProgress();
     if (m.resetPreloadState) m.resetPreloadState();
+
+    const reloadData = () => {
+      console.log("[Viewer-Core] DB Progress flush 완료. 화면 데이터 갱신을 실행합니다.");
+      if (state.currentLibraryId === 'home') {
+        import('./dashboard.js').then(d => d.loadDashboardData());
+      } else if (state.currentLibraryId === 'history') {
+        import('./book_list.js').then(b => b.loadReadingHistory());
+      }
+      
+      // 도서 상세 화면이 노출되어 있는 경우 상세 영역도 실시간 리렌더링
+      const detailView = document.getElementById('book-detail-view');
+      if (detailView && detailView.style.display !== 'none') {
+        const titleEl = detailView.querySelector('.book-detail-title');
+        if (titleEl) {
+          const seriesName = titleEl.textContent.replace('정보 수정', '').trim();
+          import('./modal.js').then(mod => {
+            mod.openBookDetail(null, seriesName, state.currentLibraryId);
+          });
+        }
+      }
+    };
+
+    if (flushPromise && typeof flushPromise.then === 'function') {
+      flushPromise.then(() => reloadData());
+    } else {
+      reloadData();
+    }
   });
 
   // 수동 닫기 버튼을 누른 경우에만 브라우저 히스토리 스택 원상복구
