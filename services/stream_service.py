@@ -127,7 +127,10 @@ class StreamService:
         row = cursor.fetchone()
 
         pages_read   = page_idx + 1
-        is_completed = 1 if pages_read >= total_pages else 0
+        is_completed = 0
+        if total_pages > 0:
+            if (pages_read / total_pages) >= 0.95 or pages_read >= total_pages:
+                is_completed = 1
         now_str      = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         if row:

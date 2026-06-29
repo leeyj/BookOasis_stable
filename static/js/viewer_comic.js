@@ -224,6 +224,13 @@ export function markAsCompleted() {
   if (comicTotalPages > 0) {
     comicCurrentPage = comicTotalPages - 1;
     loadComicPage();
+    
+    // 즉시 진척도 동기 전송 (Alert 블로킹으로 인한 누수 차단)
+    saveProgress(state.activeBookId, comicCurrentPage, comicTotalPages);
+    import('./viewer_progress.js').then(m => {
+      m.flushProgress();
+    });
+
     alert('완독 처리되었습니다.');
     toggleComicOverlay();
   }
