@@ -173,3 +173,5 @@ tags: [workflow, history]
 | 2026-06-29 | `opds_guide` | OPDS 모바일 리더 연동 안내 가이드 추가 및 readme.md 링크 보완 | [Task](./history/20260629_022104_opds_guide_task.md) | [Walkthrough](./history/20260629_022104_opds_guide_walkthrough.md) |
 | 2026-06-29 | `architecture_guides` | 레이어별 아키텍처 및 소스 구조 설명서(국/영문) 가이드 제작 및 연동 | [Task](./history/20260629_022713_architecture_guides_task.md) | [Walkthrough](./history/20260629_022713_architecture_guides_walkthrough.md) |
 | 2026-06-29 | `plugin_guides` | 메타데이터 플러그인 개발 가이드(국/영문) 제작 및 readme 연동 | [Task](./history/20260629_023229_plugin_guides_task.md) | [Walkthrough](./history/20260629_023229_plugin_guides_walkthrough.md) |
+| 2026-06-29 | `pyyaml_docker_entry` | pyyaml 의존성 누락 및 Docker 실행 엔트리포인트 오류 조치 | [Bugfix](./bug/20260629_bugfix_pyyaml_docker_entry.md) | - |
+| 2026-06-29 | `pyyaml_docker_entry` | pyyaml 의존성 누락 및 Docker 실행 엔트리포인트 오류 조치 | [Task](./history/20260629_110144_pyyaml_docker_entry_task.md) | [Walkthrough](./history/20260629_110144_pyyaml_docker_entry_walkthrough.md) |

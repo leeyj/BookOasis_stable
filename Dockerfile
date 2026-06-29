@@ -32,4 +32,4 @@ EXPOSE 5930
 VOLUME ["/app/db", "/app/covers", "/app/cache", "/app/plugins"]
 
 # 10. Startup Command
-CMD ["gunicorn", "--workers", "4", "--bind", "0.0.0.0:5930", "--timeout", "120", "api:app"]
+CMD ["gunicorn", "--workers", "4", "--bind", "0.0.0.0:5930", "--timeout", "120", "core:app"]
