@@ -30,3 +30,6 @@ covers/*
 # Exclude sensitive scratch and DB backups
 scratch/
 db/*.db.bak
+
+# Exclude local test database and sample assets
+test/
