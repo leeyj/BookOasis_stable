@@ -185,6 +185,7 @@ tags: [workflow, history]
 | 2026-06-29 | `viewer_zero_page_and_context_menu_error` | 스캔 중 0페이지 만화책 로드 오류 및 우클릭 컨텍스트 메뉴 미동작 수정 | [Bugfix](./bug/20260629_bugfix_viewer_zero_page_and_context_menu_error.md) | - |
 | 2026-06-29 | `stream_db_connection_leak` | 스트리밍 API 내 예외 발생 시 DB 커넥션 누수 버그 조치 | [Bugfix](./bug/20260629_bugfix_stream_db_connection_leak.md) | - |
 | 2026-06-29 | `temp_cache_file_eviction` | 디스크 캐시 LRU 정리 도중 임시 파일(.tmp) 오인 삭제 오류 조치 | [Bugfix](./bug/20260629_bugfix_temp_cache_file_eviction.md) | - |
+| 2026-06-29 | `scan_lock_web_starvation` | 스캔 구동 시 쓰기 독점 및 디스크 I/O 과다로 인한 웹 로드 마비 개선 | [Bugfix](./bug/20260629_bugfix_scan_lock_web_starvation.md) | - |
 | 2026-06-29 | `viewer_zero_page_and_context_menu_error` | 스캔 중 0페이지 만화책 로드 오류 및 우클릭 컨텍스트 메뉴 미동작 수정 | [Task](./history/20260629_181417_viewer_zero_page_and_context_menu_error_task.md) | [Walkthrough](./history/20260629_181417_viewer_zero_page_and_context_menu_error_walkthrough.md) |
 | 2026-06-29 | `stream_db_connection_leak` | 스트리밍 API 내 예외 발생 시 DB 커넥션 누수 버그 조치 | [Task](./history/20260629_184627_stream_db_connection_leak_task.md) | [Walkthrough](./history/20260629_184627_stream_db_connection_leak_walkthrough.md) |
 | 2026-06-29 | `temp_cache_file_eviction` | 디스크 캐시 LRU 정리 도중 임시 파일(.tmp) 오인 삭제 오류 조치 | [Task](./history/20260629_185853_temp_cache_file_eviction_task.md) | [Walkthrough](./history/20260629_185853_temp_cache_file_eviction_walkthrough.md) |

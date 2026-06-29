@@ -448,6 +448,10 @@ def scan_library(db_path, library_id, physical_path, force=False):
                                 conn.commit()
                                 uncommitted_count = 0
 
+                            # 스캔 중 웹 로드 병목 예외 틈새 마련 (Throttling)
+                            import time
+                            time.sleep(0.05)
+
                             # 50권 단위 강제 메모리 해제
                             if processed_books_count % 50 == 0:
                                 gc.collect()

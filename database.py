@@ -55,6 +55,7 @@ class SQLiteConnectionPool:
                 conn = sqlite3.connect(self.db_path, timeout=30.0, factory=PooledConnection, check_same_thread=False)
                 try:
                     conn.execute("PRAGMA journal_mode=WAL;")
+                    conn.execute("PRAGMA synchronous = NORMAL;")
                 except sqlite3.OperationalError:
                     pass
                 conn.row_factory = sqlite3.Row
