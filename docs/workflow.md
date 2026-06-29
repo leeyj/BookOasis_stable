@@ -189,6 +189,7 @@ tags: [workflow, history]
 | 2026-06-29 | `all_formats_progress_completion_threshold` | 모든 도서 포맷(ZIP, EPUB, TXT) 완독 판정 기준 오차 보정 조치 | [Bugfix](./bug/20260629_bugfix_all_formats_progress_completion_threshold.md) | - |
 | 2026-06-29 | `viewer_mark_as_completed_sync` | [읽음 완료] 처리 시 브라우저 블로킹 및 API 전송 누수 버그 조치 | [Bugfix](./bug/20260629_bugfix_viewer_mark_as_completed_sync.md) | - |
 | 2026-06-29 | `viewer_close_ui_refresh` | 뷰어 종료 시 화면 이력 및 진척도 정보 실시간 자동 리렌더링 조치 | [Bugfix](./bug/20260629_bugfix_viewer_close_ui_refresh.md) | - |
+| 2026-06-29 | `migrator_metadata_migration` | Kavita 마이그레이션 시 저자, 출판사, 발행일, 줄거리, 장르, 태그 정보 이관 고도화 | [Bugfix](./bug/20260629_bugfix_migrator_metadata_migration.md) | - |
 | 2026-06-29 | `viewer_zero_page_and_context_menu_error` | 스캔 중 0페이지 만화책 로드 오류 및 우클릭 컨텍스트 메뉴 미동작 수정 | [Task](./history/20260629_181417_viewer_zero_page_and_context_menu_error_task.md) | [Walkthrough](./history/20260629_181417_viewer_zero_page_and_context_menu_error_walkthrough.md) |
 | 2026-06-29 | `stream_db_connection_leak` | 스트리밍 API 내 예외 발생 시 DB 커넥션 누수 버그 조치 | [Task](./history/20260629_184627_stream_db_connection_leak_task.md) | [Walkthrough](./history/20260629_184627_stream_db_connection_leak_walkthrough.md) |
 | 2026-06-29 | `temp_cache_file_eviction` | 디스크 캐시 LRU 정리 도중 임시 파일(.tmp) 오인 삭제 오류 조치 | [Task](./history/20260629_185853_temp_cache_file_eviction_task.md) | [Walkthrough](./history/20260629_185853_temp_cache_file_eviction_walkthrough.md) |
@@ -196,3 +197,4 @@ tags: [workflow, history]
 | 2026-06-29 | `all_formats_progress_completion_threshold` | 모든 도서 포맷(ZIP, EPUB, TXT) 완독 판정 기준 오차 보정 조치 | [Task](./history/20260629_201649_all_formats_progress_completion_threshold_task.md) | [Walkthrough](./history/20260629_201649_all_formats_progress_completion_threshold_walkthrough.md) |
 | 2026-06-29 | `viewer_mark_as_completed_sync` | [읽음 완료] 처리 시 브라우저 블로킹 및 API 전송 누수 버그 조치 | [Task](./history/20260629_201834_viewer_mark_as_completed_sync_task.md) | [Walkthrough](./history/20260629_201834_viewer_mark_as_completed_sync_walkthrough.md) |
 | 2026-06-29 | `viewer_close_ui_refresh` | 뷰어 종료 시 화면 이력 및 진척도 정보 실시간 자동 리렌더링 조치 | [Task](./history/20260629_210817_viewer_close_ui_refresh_task.md) | [Walkthrough](./history/20260629_210817_viewer_close_ui_refresh_walkthrough.md) |
+| 2026-06-30 | `migrator_metadata_migration` | Kavita 마이그레이션 시 저자, 출판사, 발행일, 줄거리, 장르, 태그 정보 이관 고도화 | [Task](./history/20260630_000024_migrator_metadata_migration_task.md) | [Walkthrough](./history/20260630_000024_migrator_metadata_migration_walkthrough.md) |

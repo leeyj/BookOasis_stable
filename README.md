@@ -48,6 +48,7 @@
 상세한 환경 구성 및 설치 방법은 기술 문서를 참조하십시오.
 
 * 설치 안내: [설치 가이드 (docs/guide_installation.md)](./docs/guide_installation.md)
+* 카비타 이사하기: [마이그레이션 가이드 (docs/migration_guide.md)](./docs/migration_guide.md)
 * 관리 및 관리자 설정: [관리자 가이드 (docs/guide_admin.md)](./docs/guide_admin.md)
 * 모바일 뷰어 연동: [OPDS 연동 가이드 (docs/guide_opds.md)](./docs/guide_opds.md)
 * 아키텍처 및 소스 구조: [아키텍처 가이드 (docs/guide_architecture.md)](./docs/guide_architecture.md)

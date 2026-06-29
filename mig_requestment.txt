@@ -1,0 +1,7 @@
+# BookOasis Migrator 구동에 필요한 외부 라이브러리 명세서
+
+# 1. 이미지 변환용 (Kavita 커버를 WebP로 변환 처리할 때 사용)
+Pillow>=10.0.0
+
+# 2. API 이관용 (Komga 등의 REST API 마이그레이션에 사용)
+requests>=2.31.0

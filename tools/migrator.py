@@ -1,64 +1,108 @@
+# -*- coding: utf-8 -*-
 import sqlite3
 import os
 import shutil
 import sys
-import traceback
-import requests
+import hashlib
 from datetime import datetime
-
-# 환경 변수 및 경로 설정 (리눅스 서버 기준 동작)
-PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MEDIA_SERVER_DIR = os.path.join(PROJECT_DIR, 'media_server')
-DB_DIR = os.path.join(MEDIA_SERVER_DIR, 'db')
-
-DB_GENERAL_PATH = os.path.join(DB_DIR, 'media_general.db')
-DB_ADULT_PATH = os.path.join(DB_DIR, 'media_adult.db')
-
-KAVITA_DB_PATH = os.path.join(PROJECT_DIR, 'kavita_data', 'kavita.db')
-KAVITA_COVERS_DIR = "/home/az001a/Kavita/config/covers"
-
-COVERS_DIR = os.path.join(MEDIA_SERVER_DIR, 'covers')
-
-# 디렉토리 생성
-os.makedirs(DB_DIR, exist_ok=True)
-os.makedirs(COVERS_DIR, exist_ok=True)
+from PIL import Image
 
 def get_db_connection(db_path):
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
 
-def copy_kavita_cover(cover_image_name):
-    """Kavita의 원본 커버 폴더에서 파일을 찾아 복사 후, 복사된 파일명 반환"""
-    if not cover_image_name:
+def convert_and_copy_cover(source_cover_name, kavita_covers_dir, bookoasis_covers_dir, file_path, library_id=None):
+    """Kavita 커버를 가져와 BookOasis 표준 WebP 및 경로 해시 규격으로 변환하여 저장"""
+    if not source_cover_name:
         return None
         
-    source_path = os.path.join(KAVITA_COVERS_DIR, cover_image_name)
-    target_path = os.path.join(COVERS_DIR, cover_image_name)
+    source_path = os.path.join(kavita_covers_dir, source_cover_name)
+    if not os.path.exists(source_path):
+        return None
+        
+    # BookOasis 표준 파일 경로 기준 MD5 해시 파일명
+    book_hash = hashlib.md5(file_path.encode('utf-8')).hexdigest()
+    cover_filename = f"book_{book_hash}.webp"
     
-    # 원본 파일이 존재하는 경우만 복사 (이미 복사된 경우 제외)
-    if os.path.exists(source_path):
+    if library_id is not None:
+        dest_dir = os.path.join(bookoasis_covers_dir, str(library_id))
+        db_cover_path = f"{library_id}/{cover_filename}"
+    else:
+        dest_dir = bookoasis_covers_dir
+        db_cover_path = cover_filename
+        
+    os.makedirs(dest_dir, exist_ok=True)
+    target_path = os.path.join(dest_dir, cover_filename)
+    
+    try:
+        # Pillow를 활용하여 WebP 포맷 변환 저장
+        with Image.open(source_path) as img:
+            img.save(target_path, "WEBP", quality=80)
+        return db_cover_path
+    except Exception as e:
+        # 변환 실패 시 일반 바이너리 복사 Fallback
         try:
-            if not os.path.exists(target_path):
-                shutil.copy2(source_path, target_path)
-            return cover_image_name
-        except Exception as e:
-            pass # 권한 문제 등 예외 무시
-    return None
+            shutil.copy2(source_path, target_path)
+            return db_cover_path
+        except Exception:
+            return None
 
-def migrate_kavita():
-    """kavita.db에서 직접 메타데이터 및 커버 이미지를 이관"""
-    if not os.path.exists(KAVITA_DB_PATH):
-        print(f"[Kavita Migrator] kavita.db 파일이 없습니다: {KAVITA_DB_PATH}")
+def run_kavita_to_bookoasis():
+    print("\n==================================================")
+    print(" 🛠️  [Step 2] Kavita ➡️ BookOasis 이관 설정")
+    print("==================================================")
+    
+    # 1. Kavita DB 경로 획득
+    default_kavita_db = "C:/project/media_server/test/kavita.db"
+    if not os.path.exists(default_kavita_db):
+        default_kavita_db = "/home/az001a/Kavita/config/kavita.db"
+        
+    kavita_db_input = input(f"Kavita DB 경로와 DB파일명을 입력하세요 (기본값: {default_kavita_db})\n> ").strip()
+    kavita_db_path = kavita_db_input if kavita_db_input else default_kavita_db
+    
+    if not os.path.exists(kavita_db_path):
+        print(f"❌ 에러: 지정된 경로에 kavita.db 파일이 존재하지 않습니다: {kavita_db_path}")
         return
 
-    print("[Kavita Migrator] Kavita DB 데이터 추출 및 이관 시작 (초고속 모드)...")
-    kavita_conn = get_db_connection(KAVITA_DB_PATH)
-    general_conn = get_db_connection(DB_GENERAL_PATH)
+    # 2. Kavita Cover 경로 유추 및 획득
+    kavita_dir = os.path.dirname(kavita_db_path)
+    default_covers_dir = os.path.join(kavita_dir, "covers").replace('\\', '/')
+    
+    covers_input = input(f"Kavita cover 경로는 다음과 같습니다 : {default_covers_dir}\n맞으면 엔터, 수정하려면 경로 입력\n> ").strip()
+    kavita_covers_dir = covers_input if covers_input else default_covers_dir
+
+    print("\n==================================================")
+    print(" 🛠️  [Step 3] BookOasis 루트 설정")
+    print("==================================================")
+    
+    # 3. BookOasis 루트 경로 획득
+    default_oasis_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__))).replace('\\', '/')
+    oasis_root_input = input(f"BookOasis의 루트 경로를 입력하세요 ({default_oasis_root})\n맞으면 엔터, 수정하려면 1 입력\n> ").strip()
+    
+    oasis_root = default_oasis_root
+    if oasis_root_input == '1':
+        oasis_root = input("수정할 BookOasis 루트 경로를 입력하세요:\n> ").strip().replace('\\', '/')
+
+    db_dir = os.path.join(oasis_root, 'db')
+    db_general_path = os.path.join(db_dir, 'media_general.db')
+    covers_dir = os.path.join(oasis_root, 'covers')
+
+    if not os.path.exists(db_general_path):
+        print(f"❌ 에러: BookOasis 데이터베이스 파일이 존재하지 않습니다: {db_general_path}")
+        print("서버를 먼저 가동하여 DB 스키마가 초기화된 후에 마이그레이터를 실행해 주세요.")
+        return
+
+    print("\n==================================================")
+    print(" 🚀 [Step 4] Kavita ➡️ BookOasis 이관 작업 실행")
+    print("==================================================")
+    
+    kavita_conn = get_db_connection(kavita_db_path)
+    general_conn = get_db_connection(db_general_path)
     
     kavita_cursor = kavita_conn.cursor()
     general_cursor = general_conn.cursor()
-
+    
     query = """
     SELECT 
         l.Name AS LibraryName,
@@ -71,7 +115,33 @@ def migrate_kavita():
         p.LastModified AS ProgressLastModified,
         c.CoverImage AS ChapterCover,
         v.CoverImage AS VolumeCover,
-        s.CoverImage AS SeriesCover
+        s.CoverImage AS SeriesCover,
+        (SELECT GROUP_CONCAT(pe.Name, ', ') 
+         FROM PersonSeriesMetadata psm 
+         JOIN Person pe ON psm.PeopleId = pe.Id 
+         JOIN SeriesMetadata sm ON psm.SeriesMetadatasId = sm.Id 
+         WHERE sm.SeriesId = s.Id AND pe.Role = 1) AS Authors,
+        (SELECT GROUP_CONCAT(pe.Name, ', ') 
+         FROM PersonSeriesMetadata psm 
+         JOIN Person pe ON psm.PeopleId = pe.Id 
+         JOIN SeriesMetadata sm ON psm.SeriesMetadatasId = sm.Id 
+         WHERE sm.SeriesId = s.Id AND pe.Role = 10) AS Publisher,
+        (SELECT CASE WHEN sm.ReleaseYear > 0 THEN sm.ReleaseYear || '-01-01' ELSE NULL END 
+         FROM SeriesMetadata sm 
+         WHERE sm.SeriesId = s.Id LIMIT 1) AS ReleaseDate,
+        (SELECT sm.Summary 
+         FROM SeriesMetadata sm 
+         WHERE sm.SeriesId = s.Id LIMIT 1) AS Summary,
+        (SELECT GROUP_CONCAT(g.Title, ', ')
+         FROM GenreSeriesMetadata gsm 
+         JOIN Genre g ON gsm.GenresId = g.Id 
+         JOIN SeriesMetadata sm ON gsm.SeriesMetadatasId = sm.Id 
+         WHERE sm.SeriesId = s.Id) AS Genres,
+        (SELECT GROUP_CONCAT(t.Title, ', ') 
+         FROM SeriesMetadataTag smt 
+         JOIN Tag t ON smt.TagsId = t.Id 
+         JOIN SeriesMetadata sm ON smt.SeriesMetadatasId = sm.Id 
+         WHERE sm.SeriesId = s.Id) AS Tags
     FROM MangaFile m
     JOIN Chapter c ON m.ChapterId = c.Id
     JOIN Volume v ON c.VolumeId = v.Id
@@ -79,13 +149,14 @@ def migrate_kavita():
     JOIN Library l ON s.LibraryId = l.Id
     LEFT JOIN AppUserProgresses p ON c.Id = p.ChapterId
     """
-
+    
     try:
         kavita_cursor.execute(query)
         rows = kavita_cursor.fetchall()
-        print(f"[Kavita Migrator] 총 {len(rows)}개의 도서 행을 읽었습니다.")
-
-        # 1차: 각 라이브러리별로 모든 파일 경로를 수집하여 공통 부모(루트) 경로 계산
+        total_rows = len(rows)
+        print(f"[*] Kavita DB로부터 총 {total_rows}개의 도서 데이터를 로드했습니다.")
+        
+        # 1차: 라이브러리 목록 매핑 및 생성
         library_paths_map = {}
         for row in rows:
             lib_name = row['LibraryName']
@@ -95,30 +166,34 @@ def migrate_kavita():
             
         library_cache = {}
         for lib_name, paths in library_paths_map.items():
+            if not paths:
+                continue
             if '\\' in paths[0]:
-                common_path = os.path.dirname(os.path.commonprefix(paths))
+                common_path = os.path.dirname(os.path.commonprefix(paths)).replace('\\', '/')
             else:
                 common_path = os.path.commonpath(paths)
-            
+                
             general_cursor.execute("SELECT id FROM libraries WHERE name = ?", (lib_name,))
             db_lib_row = general_cursor.fetchone()
             if db_lib_row:
                 lib_id = db_lib_row[0]
-                # 기존에 잘못 들어간 physical_path를 정상적인 common_path로 교정
                 general_cursor.execute("UPDATE libraries SET physical_path = ? WHERE id = ?", (common_path, lib_id))
-                general_conn.commit()
             else:
                 general_cursor.execute(
                     "INSERT INTO libraries (name, physical_path) VALUES (?, ?)",
                     (lib_name, common_path)
                 )
-                general_conn.commit()
                 lib_id = general_cursor.lastrowid
             library_cache[lib_name] = lib_id
-
-        # 2차: 실제 도서 데이터 삽입
+            
+        general_conn.commit()
+        print("[+] 라이브러리 경로 매핑 및 설정 완료.")
+        
+        # 2차: 책 정보 이관 및 커버 이미지 변환
         migrated_books = 0
-        for row in rows:
+        success_covers = 0
+        
+        for idx, row in enumerate(rows):
             lib_name = row['LibraryName']
             file_path = row['FilePath']
             lib_id = library_cache[lib_name]
@@ -130,24 +205,46 @@ def migrate_kavita():
             series_name = row['SeriesName']
             total_pages = row['TotalPages'] or 0
             
-            # 커버 이미지 복사 (Chapter 커버 최우선 -> Volume 커버 -> Series 커버)
-            cover_image_name = row['ChapterCover'] or row['VolumeCover'] or row['SeriesCover']
-            saved_cover_name = copy_kavita_cover(cover_image_name)
+            # 물리적으로 실제 존재하는 파일만 우선순위별로 탐색 (Chapter -> Volume -> Series)
+            cover_image_name = None
+            for cov_name in [row['ChapterCover'], row['VolumeCover'], row['SeriesCover']]:
+                if cov_name:
+                    check_path = os.path.join(kavita_covers_dir, cov_name)
+                    if os.path.exists(check_path):
+                        cover_image_name = cov_name
+                        break
             
-            # 도서 저장 (중복 무시)
-            try:
-                general_cursor.execute(
-                    """
-                    INSERT OR IGNORE INTO books 
-                    (library_id, title, series_name, author, publisher, file_path, file_format, cover_image, total_pages) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (lib_id, title, series_name, "Kavita Author", "Kavita Publisher", file_path, file_format, saved_cover_name, total_pages)
-                )
-            except Exception as e:
-                print(f"[Insert Error] books 테이블 저장 실패: {e}")
+            saved_cover_name = convert_and_copy_cover(cover_image_name, kavita_covers_dir, covers_dir, file_path, lib_id)
+            if saved_cover_name:
+                success_covers += 1
+                
+            # 메타데이터 추출 및 매핑
+            authors = row['Authors'] or "Kavita Author"
+            publisher = row['Publisher'] or "Kavita Publisher"
+            genre = row['Genres']
+            tags = row['Tags']
+            summary = row['Summary']
             
-            # 진척도 저장
+            # 발매일 파싱 교정 (Kavita는 datetime 형식으로 올 수 있으므로 YYYY-MM-DD 포맷 파싱)
+            release_date = row['ReleaseDate']
+            if release_date:
+                try:
+                    dt = datetime.fromisoformat(release_date.split('T')[0])
+                    release_date = dt.strftime('%Y-%m-%d')
+                except Exception:
+                    pass
+
+            # 도서 정보 삽입 (중복 경로 무시)
+            general_cursor.execute(
+                """
+                INSERT OR IGNORE INTO books 
+                (library_id, title, series_name, author, publisher, file_path, file_format, cover_image, total_pages, genre, tags, summary, release_date) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (lib_id, title, series_name, authors, publisher, file_path, file_format, saved_cover_name, total_pages, genre, tags, summary, release_date)
+            )
+            
+            # 진척도 정보 동기화 이관
             pages_read = row['PagesRead']
             if pages_read and pages_read > 0:
                 general_cursor.execute("SELECT id FROM books WHERE file_path = ?", (file_path,))
@@ -157,143 +254,171 @@ def migrate_kavita():
                     is_completed = 1 if pages_read >= total_pages else 0
                     last_modified = row['ProgressLastModified'] or datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     
-                    try:
-                        general_cursor.execute(
-                            """
-                            INSERT OR REPLACE INTO user_progress 
-                            (book_id, user_id, pages_read, is_completed, last_read_at) 
-                            VALUES (?, 1, ?, ?, ?)
-                            """,
-                            (book_id, pages_read, is_completed, last_modified)
-                        )
-                    except Exception as e:
-                        pass
-            
+                    general_cursor.execute(
+                        """
+                        INSERT OR REPLACE INTO user_progress 
+                        (book_id, user_id, pages_read, is_completed, last_read_at) 
+                        VALUES (?, 1, ?, ?, ?)
+                        """,
+                        (book_id, pages_read, is_completed, last_modified)
+                    )
+                    
             migrated_books += 1
-            if migrated_books % 1000 == 0:
-                print(f"[Kavita Migrator] {migrated_books}권 처리 완료...")
+            if migrated_books % 500 == 0 or migrated_books == total_rows:
+                print(f"[*] 진행도: {migrated_books} / {total_rows} 권 처리 완료...")
                 general_conn.commit()
-
-        general_conn.commit()
-        print(f"[Kavita Migrator] 총 {migrated_books}권의 일반 도서 및 진척도 데이터, 커버 이관 완료.")
+                
+        print("\n==================================================")
+        print(" ✨ 이관 결과 리포트")
+        print("==================================================")
+        print(f"- 이관 성공 도서 권수: {migrated_books} 권")
+        print(f"- WebP 변환 성공 표지: {success_covers} 개")
+        print("이관 작업이 성공적으로 종료되었습니다.")
         
     except Exception as ex:
-        print(f"[Kavita Migrator] 이관 중 에러 발생: {ex}")
-        traceback.print_exc()
+        print(f"❌ 이관 중 예외 발생: {ex}")
     finally:
         kavita_conn.close()
         general_conn.close()
 
-def migrate_komga(komga_url="http://127.0.0.1:8082", username=None, password=None):
-    """Komga REST API를 모사하여 성인 도서 및 진척도를 media_adult.db로 이관"""
-    print("[Komga Migrator] 성인 도서 데이터 수집 시작...")
+def run_bookoasis_to_bookoasis():
+    print("\n==================================================")
+    print(" 🛠️  [Step 2] BookOasis ➡️ BookOasis 경로 교체 설정")
+    print("==================================================")
     
-    adult_conn = get_db_connection(DB_ADULT_PATH)
-    adult_cursor = adult_conn.cursor()
+    # 1. BookOasis 루트 경로 획득
+    default_oasis_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__))).replace('\\', '/')
+    oasis_root_input = input(f"BookOasis의 루트 경로를 입력하세요 ({default_oasis_root})\n맞으면 엔터, 수정하려면 경로 입력\n> ").strip()
+    oasis_root = oasis_root_input if oasis_root_input else default_oasis_root
+    
+    db_dir = os.path.join(oasis_root, 'db')
+    covers_dir = os.path.join(oasis_root, 'covers')
+    
+    target_dbs = []
+    for db_name in ['media_general.db', 'media_adult.db']:
+        db_path = os.path.join(db_dir, db_name)
+        if os.path.exists(db_path):
+            target_dbs.append(db_path)
+            
+    if not target_dbs:
+        print("❌ 에러: 변경할 BookOasis 데이터베이스 파일이 존재하지 않습니다.")
+        return
 
-    # 성인 도서 라이브러리 기본값 등록
-    adult_cursor.execute("SELECT id FROM libraries WHERE name = ?", ("성인 만화",))
-    db_lib_row = adult_cursor.fetchone()
-    if db_lib_row:
-        lib_id = db_lib_row[0]
-        print(f"[Komga Migrator DEBUG] 기존 라이브러리 발견 사용: 성인 만화 (ID: {lib_id})")
-    else:
-        adult_cursor.execute(
-            "INSERT INTO libraries (name, physical_path) VALUES (?, ?)",
-            ("성인 만화", "/GDRIVE/READING/성인/만화")
-        )
-        adult_conn.commit()
-        lib_id = adult_cursor.lastrowid
-        print(f"[Komga Migrator DEBUG] 신규 라이브러리 등록: 성인 만화 (ID: {lib_id})")
+    # 2. 경로 교체 규칙 획득
+    old_prefix = input("교체 대상 기존 경로 프리픽스(Old Prefix)를 입력하세요:\n예: /home/az001a/Script/media_server\n> ").strip()
+    new_prefix = input("신규 경로 프리픽스(New Prefix)를 입력하세요:\n예: C:/project/media_server\n> ").strip()
+    
+    if not old_prefix or not new_prefix:
+        print("❌ 에러: 교체할 이전/이후 경로는 비워둘 수 없습니다.")
+        return
 
-    # Komga REST API 호출 시도 (실제 접속 불가 시 모의 Mock 데이터 사용)
-    migrated_count = 0
-    try:
-        auth = (username, password) if username and password else None
+    print("\n==================================================")
+    print(" 🚀 [Step 3] 경로 교체 및 커버 해시 리네이밍 실행")
+    print("==================================================")
+    
+    for db_path in target_dbs:
+        db_name = os.path.basename(db_path)
+        print(f"\n[*] 데이터베이스 처리 중: {db_name}")
         
-        # 1. 시리즈 조회 시도
-        series_res = requests.get(f"{komga_url.rstrip('/')}/api/v1/series", auth=auth, timeout=5)
-        if series_res.ok:
-            series_list = series_res.json().get('content', [])
-            for s in series_list:
-                series_id = s.get('id')
-                series_name = s.get('metadata', {}).get('title')
+        conn = get_db_connection(db_path)
+        cursor = conn.cursor()
+        
+        try:
+            # 1. 라이브러리 물리 경로 갱신
+            cursor.execute("SELECT id, name, physical_path FROM libraries")
+            libraries = cursor.fetchall()
+            for lib in libraries:
+                if lib['physical_path'] and old_prefix in lib['physical_path']:
+                    updated_path = lib['physical_path'].replace(old_prefix, new_prefix)
+                    cursor.execute("UPDATE libraries SET physical_path = ? WHERE id = ?", (updated_path, lib['id']))
+                    print(f"  └ 라이브러리 [{lib['name']}] 경로 변경: {lib['physical_path']} -> {updated_path}")
+            conn.commit()
+            
+            # 2. 도서 목록 조회 및 리네임 작업
+            cursor.execute("SELECT id, file_path, cover_image, library_id FROM books")
+            books = cursor.fetchall()
+            
+            updated_books_count = 0
+            renamed_covers_count = 0
+            
+            for b in books:
+                file_path = b['file_path']
+                if not file_path or old_prefix not in file_path:
+                    continue
+                    
+                # 신규 파일 경로 구함
+                new_file_path = file_path.replace(old_prefix, new_prefix)
                 
-                # 시리즈에 속한 도서들 조회
-                books_res = requests.get(f"{komga_url.rstrip('/')}/api/v1/series/{series_id}/books", auth=auth, timeout=5)
-                if books_res.ok:
-                    books_list = books_res.json().get('content', [])
-                    for b in books_list:
-                        b_id = b.get('id')
-                        title = b.get('metadata', {}).get('title')
-                        file_path = b.get('url') # Komga는 파일 절대경로를 url 필드에 반환함
-                        total_pages = b.get('media', {}).get('pagesCount', 0)
+                # 커버 이미지 해시 리네임 연계 처리
+                cover_image = b['cover_image']
+                new_cover_image = cover_image
+                
+                if cover_image and not cover_image.startswith('series_'):
+                    # 기존 해시 파일명
+                    old_hash = hashlib.md5(file_path.encode('utf-8')).hexdigest()
+                    # 새 해시 파일명
+                    new_hash = hashlib.md5(new_file_path.encode('utf-8')).hexdigest()
+                    
+                    old_cover_filename = f"book_{old_hash}.webp"
+                    new_cover_filename = f"book_{new_hash}.webp"
+                    
+                    lib_id = b['library_id']
+                    if lib_id:
+                        old_phys_path = os.path.join(covers_dir, str(lib_id), old_cover_filename)
+                        new_phys_path = os.path.join(covers_dir, str(lib_id), new_cover_filename)
+                        new_cover_image = f"{lib_id}/{new_cover_filename}"
+                    else:
+                        old_phys_path = os.path.join(covers_dir, old_cover_filename)
+                        new_phys_path = os.path.join(covers_dir, new_cover_filename)
+                        new_cover_image = new_cover_filename
                         
-                        _, ext = os.path.splitext(file_path)
-                        file_format = ext.replace('.', '').lower() or 'zip'
-                        
-                        # 도서 삽입
-                        adult_cursor.execute("""
-                            INSERT OR IGNORE INTO books 
-                            (library_id, title, series_name, file_path, file_format, total_pages) 
-                            VALUES (?, ?, ?, ?, ?, ?)
-                        """, (lib_id, title, series_name, file_path, file_format, total_pages))
-                        
-                        adult_cursor.execute("SELECT id FROM books WHERE file_path = ?", (file_path,))
-                        book_id = adult_cursor.fetchone()[0]
-                        
-                        # 각 책의 읽기 진행도 조회
-                        progress_res = requests.get(f"{komga_url.rstrip('/')}/api/v1/books/{b_id}/read-progress", auth=auth, timeout=5)
-                        if progress_res.ok:
-                            p_info = progress_res.json()
-                            pages_read = p_info.get('page', 0)
-                            is_completed = 1 if p_info.get('completed', False) else 0
-                            last_read = p_info.get('lastModified', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                    # 실제 로컬 디스크 상 물리 표지 파일 리네임 수행
+                    if os.path.exists(old_phys_path):
+                        try:
+                            # 새 파일 경로에 폴더가 없을 경우 생성 방어
+                            os.makedirs(os.path.dirname(new_phys_path), exist_ok=True)
+                            os.rename(old_phys_path, new_phys_path)
+                            renamed_covers_count += 1
+                        except Exception as e:
+                            print(f"  └ [물리 커버 리네임 실패] {old_cover_filename} -> {new_cover_filename}: {e}")
                             
-                            adult_cursor.execute("""
-                                INSERT OR REPLACE INTO user_progress 
-                                (book_id, user_id, pages_read, is_completed, last_read_at) 
-                                VALUES (?, 1, ?, ?, ?)
-                            """, (book_id, pages_read, is_completed, last_read))
-                        
-                        migrated_count += 1
-            adult_conn.commit()
-            print(f"[Komga Migrator] API 통신을 통해 성인 도서 {migrated_count}개 이관 성공.")
-            return
-    except Exception as ex:
-        print(f"[Komga Migrator] Komga API 연결 실패 또는 자격증명 오류({ex}). 모의(Mock) 성인 데이터로 이관을 대체합니다.")
+                # DB 데이터 업데이트 쿼리 반영
+                cursor.execute(
+                    "UPDATE books SET file_path = ?, cover_image = ? WHERE id = ?",
+                    (new_file_path, new_cover_image, b['id'])
+                )
+                updated_books_count += 1
+                
+            conn.commit()
+            print(f"  [+] 완료: {updated_books_count}권의 도서 경로 수정 및 {renamed_covers_count}개의 표지 해시 파일 리네이밍 성공.")
+            
+        except Exception as e:
+            print(f"❌ {db_name} 처리 중 에러 발생: {e}")
+        finally:
+            conn.close()
+            
+    print("\n==================================================")
+    print(" ✨ 경로 및 커버 교체 작업이 성공적으로 종결되었습니다.")
+    print("==================================================")
 
-    # API 호출 실패 시 Mock 데이터로 이관 수행 (E2E 검증용)
-    mock_books = [
-        {"title": "성인 스페셜 만화 01", "series_name": "야화첩", "file_path": "/GDRIVE/READING/성인/만화/야화첩/야화첩_01.zip", "pages": 180, "read": 180},
-        {"title": "성인 스페셜 만화 02", "series_name": "야화첩", "file_path": "/GDRIVE/READING/성인/만화/야화첩/야화첩_02.zip", "pages": 195, "read": 50},
-        {"title": "비밀의 숲 성인 단행본", "series_name": "비밀의 숲", "file_path": "/GDRIVE/READING/성인/만화/단행본/비밀의숲.cbz", "pages": 240, "read": 0}
-    ]
+def main():
+    print("==================================================")
+    print(" 📊 BookOasis 데이터 이관 및 관리 시스템 (v1.0)")
+    print("==================================================")
+    print(" [Step 1] 마이그레이션 모드를 선택하세요:")
+    print("  1. Kavita ➡️ BookOasis 이관")
+    print("  2. BookOasis ➡️ BookOasis (서버 기기 이동/경로 교체)")
     
-    for mb in mock_books:
-        adult_cursor.execute("""
-            INSERT OR IGNORE INTO books 
-            (library_id, title, series_name, file_path, file_format, total_pages) 
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (lib_id, mb['title'], mb['series_name'], mb['file_path'], 'zip' if mb['file_path'].endswith('.zip') else 'cbz', mb['pages']))
+    choice = input("\n>> 원하는 메뉴 번호를 입력 후 엔터 (기본값: 1)\n> ").strip()
+    if not choice:
+        choice = '1'
         
-        adult_cursor.execute("SELECT id FROM books WHERE file_path = ?", (mb['file_path'],))
-        book_id = adult_cursor.fetchone()[0]
-        
-        is_completed = 1 if mb['read'] >= mb['pages'] else 0
-        adult_cursor.execute("""
-            INSERT OR REPLACE INTO user_progress 
-            (book_id, user_id, pages_read, is_completed) 
-            VALUES (?, 1, ?, ?)
-        """, (book_id, mb['read'], is_completed))
-        migrated_count += 1
-        
-    adult_conn.commit()
-    adult_conn.close()
-    print(f"[Komga Migrator] 모의(Mock) 성인 도서 {migrated_count}개 데이터 마이그레이션 완료.")
+    if choice == '1':
+        run_kavita_to_bookoasis()
+    elif choice == '2':
+        run_bookoasis_to_bookoasis()
+    else:
+        print("❌ 잘못된 메뉴 선택입니다. 종료합니다.")
 
 if __name__ == '__main__':
-    print("=== 미디어 서버 데이터 이관 시작 ===")
-    migrate_kavita()
-    migrate_komga()
-    print("=== 데이터 이관 완료 ===")
+    main()
