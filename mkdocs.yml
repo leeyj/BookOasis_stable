@@ -30,6 +30,8 @@ nav:
 - 개발 워크플로우: workflow.md
 - 작업 히스토리:
   - history/index.md
+  - history/20260629_131956_session_20260629_131956_walkthrough.md
+  - history/20260629_131956_session_20260629_131956_task.md
   - history/20260629_121804_has_offsets_column_missing_walkthrough.md
   - history/20260629_121804_has_offsets_column_missing_task.md
   - history/20260629_110144_pyyaml_docker_entry_walkthrough.md
@@ -397,6 +399,7 @@ nav:
   - bug/20260629_improvement_identity_logo_replace.md
   - bug/20260629_bugfix_scheduler_rc_url_select_miss.md
   - bug/20260629_bugfix_pyyaml_docker_entry.md
+  - bug/20260629_bugfix_proxy_auth_reference_error.md
   - bug/20260629_bugfix_metadata_targetbook_scope_error.md
   - bug/20260629_bugfix_metadata_series_apply_id_mismatch.md
   - bug/20260629_bugfix_metadata_rerender_id_loss.md

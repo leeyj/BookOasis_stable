@@ -120,6 +120,7 @@ export async function submitGeneralSettings(event) {
   const procRss = document.getElementById('setting-process-rss-limit')?.value || '2048';
   const comicDelay = document.getElementById('setting-comic-loading-delay')?.value || '300';
   const hideCompleted = document.getElementById('setting-hide-completed-in-history')?.checked ? '1' : '0';
+  const proxyAuth = document.getElementById('setting-proxy-header-auth')?.value || '0';
   const rcloneRcUrl = document.getElementById('setting-rclone-rc-url')?.value || 'http://localhost:5572';
   
   try {
