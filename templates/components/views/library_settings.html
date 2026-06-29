@@ -120,10 +120,10 @@
                             <!-- 5. DB 커넥션 풀 크기 설정 -->
                             <div class="library-form-group" style="margin-bottom: 0.5rem;">
                                 <label for="setting-db-pool-size" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
-                                    <i class="fa-solid fa-database" style="color: #a855f7; margin-right: 0.3rem;"></i> <span data-i18n="settings.db_pool_label">DB 커넥션 풀 크기 (최대 30개 제한)</span>
+                                    <i class="fa-solid fa-database" style="color: #a855f7; margin-right: 0.3rem;"></i> <span data-i18n="settings.db_pool_label">DB 커넥션 풀 크기 (최대 50개 제한)</span>
                                 </label>
-                                <input type="number" id="setting-db-pool-size" name="DB_POOL_SIZE" min="1" max="30" value="10" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;" required>
-                                <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;" data-i18n="settings.db_pool_desc">동시 접속량이 증가할 때 DB 연결 자원을 재사용하는 크기입니다. SQLite 권장 설정은 10~15개이며, 최대 30개까지 제한됩니다.</p>
+                                <input type="number" id="setting-db-pool-size" name="DB_POOL_SIZE" min="1" max="50" value="10" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;" required>
+                                <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;" data-i18n="settings.db_pool_desc">동시 접속량이 증가할 때 DB 연결 자원을 재사용하는 크기입니다. SQLite 권장 설정은 15~25개이며, 최대 50개까지 제한됩니다.</p>
                             </div>
 
                             <!-- 6. 스캐너 로그 기록 설정 -->
