@@ -347,7 +347,7 @@ def init_databases():
                 ('PAGE_LIMIT', '60'),
                 ('VIEWER_FONT_SIZE', '18'),
                 ('VIEWER_FONT_FAMILY', 'sans-serif'),
-                ('DB_POOL_SIZE', '10'),
+                ('DB_POOL_SIZE', '15'),
                 ('SCANNER_WRITE_LOG', '1'),
                 ('LAZY_SCAN_CRON', '0 3 * * *'),
                 ('SYSTEM_MEM_LIMIT', '1536.0'),

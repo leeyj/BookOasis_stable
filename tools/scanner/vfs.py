@@ -17,12 +17,22 @@ def trigger_vfs_refresh(db_path, library_id, physical_path):
     print(f"[Scanner-VFS] 원격 마운트 경로 감지: {remote_paths} - 캐시 상태 확인 중...")
     
     try:
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("SELECT vfs_refresh_before_scan, rclone_rc_url FROM libraries WHERE id = ?", (library_id,))
-        row = cursor.fetchone()
-        conn.close()
-        
+        conn = None
+        try:
+            conn = database.get_connection(db_type)
+            cursor = conn.cursor()
+            cursor.execute("SELECT vfs_refresh_before_scan, rclone_rc_url FROM libraries WHERE id = ?", (library_id,))
+            row = cursor.fetchone()
+        except Exception as e:
+            print(f"[Scanner-VFS Warning] 라이브러리 정보 조회 실패: {e}")
+            return
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+            
         if not row or row['vfs_refresh_before_scan'] != 1:
             return
             
@@ -30,6 +40,7 @@ def trigger_vfs_refresh(db_path, library_id, physical_path):
         if row['rclone_rc_url'] and row['rclone_rc_url'].strip():
             rc_urls = [u.strip().rstrip('/') for u in str(row['rclone_rc_url']).split(',') if u.strip()]
         else:
+            conn_s = None
             try:
                 conn_s = database.get_connection(db_type)
                 cursor_s = conn_s.cursor()
@@ -37,10 +48,15 @@ def trigger_vfs_refresh(db_path, library_id, physical_path):
                 row_s = cursor_s.fetchone()
                 if row_s and row_s['value']:
                     rc_urls = [u.strip().rstrip('/') for u in str(row_s['value']).split(',') if u.strip()]
-                conn_s.close()
             except Exception:
                 pass
-            
+            finally:
+                if conn_s:
+                    try:
+                        conn_s.close()
+                    except Exception:
+                        pass
+                
         for r_path in remote_paths:
             print(f"[Scanner-VFS] VFS 캐시 사전 새로고침을 시작합니다. 대상: {r_path}")
             rel_path = get_rclone_relative_path(r_path)

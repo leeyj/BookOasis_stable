@@ -202,4 +202,6 @@ tags: [workflow, history]
 | 2026-06-30 | `i18n_dynamic_translation_system` | i18n 환경설정 탭 다국어 마크업 매핑 및 영/일문 번역 사전 보완 완료 | [Task](./history/20260630_015713_i18n_dynamic_translation_system_task.md) | [Walkthrough](./history/20260630_015713_i18n_dynamic_translation_system_walkthrough.md) |
 | 2026-06-30 | `i18n_dynamic_translation_system` | 환경설정 내 모든 템플릿(리포트, 사용자 탭)에 대한 다국어 이식 완료 | [Task](./history/20260630_015936_i18n_dynamic_translation_system_task.md) | [Walkthrough](./history/20260630_015936_i18n_dynamic_translation_system_walkthrough.md) |
 | 2026-06-30 | `i18n_dynamic_translation_system` | 일반설정 탭 내 모든 필드/설명글 및 scheduler.js 동적 뱃지/버전 다국어 정밀 전환 | [Task](./history/20260630_020159_i18n_dynamic_translation_system_task.md) | [Walkthrough](./history/20260630_020159_i18n_dynamic_translation_system_walkthrough.md) |
-| 2026-06-30 | `i18n_dynamic_translation_system` | 대시보드(Home 탭) 내 섹션 제목 및 도서 카드(이어읽기, 신규 추가, 권수) 동적 다국어화 완료 | [Task](./history/20260630_020345_i18n_dynamic_translation_system_task.md) | [Walkthrough](./history/20260630_020345_i18n_dynamic_translation_system_walkthrough.md) |
+| 2026-06-30 | `db_connection_leak` | 도서 스캔 과정의 DB 커넥션 누수 및 풀 크기 조정 조치 | [Bugfix](./bug/20260630_bugfix_scanner_db_connection_leak.md) | - |
+
+| 2026-06-30 | `db_connection_leak` | 도서 스캔 과정의 DB 커넥션 누수 및 풀 크기 조정 조치 | [Task](./history/20260630_032308_db_connection_leak_task.md) | [Walkthrough](./history/20260630_032308_db_connection_leak_walkthrough.md) |

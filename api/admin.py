@@ -325,10 +325,10 @@ def update_system_setting():
     if key == 'DB_POOL_SIZE':
         try:
             val = int(value)
-            if val < 1 or val > 20:
+            if val < 1 or val > 30:
                 raise ValueError()
         except ValueError:
-            return jsonify({'success': False, 'error': 'DB 커넥션 풀 크기는 1에서 20 사이의 정수여야 합니다.'}), 400
+            return jsonify({'success': False, 'error': 'DB 커넥션 풀 크기는 1에서 30 사이의 정수여야 합니다.'}), 400
 
     try:
         SettingsService.set(key, value)

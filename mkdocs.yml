@@ -30,6 +30,8 @@ nav:
 - 개발 워크플로우: workflow.md
 - 작업 히스토리:
   - history/index.md
+  - history/20260630_032308_db_connection_leak_walkthrough.md
+  - history/20260630_032308_db_connection_leak_task.md
   - history/20260630_020345_i18n_dynamic_translation_system_walkthrough.md
   - history/20260630_020345_i18n_dynamic_translation_system_task.md
   - history/20260630_020159_i18n_dynamic_translation_system_walkthrough.md
@@ -422,6 +424,7 @@ nav:
   - history/20260619_145226_init_docs_task.md
 - 버그 트러블슈팅:
   - bug/index.md
+  - bug/20260630_bugfix_scanner_db_connection_leak.md
   - bug/20260629_improvement_metadata_debug_logs.md
   - bug/20260629_improvement_logo_neon_glow_remove.md
   - bug/20260629_improvement_identity_logo_replace.md

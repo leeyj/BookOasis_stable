@@ -23,19 +23,25 @@ from contextlib import contextmanager
 def scanner_print_control(db_path):
     original_print = builtins.print
     write_log = True
+    conn = None
     try:
         db_type = 'adult' if 'adult' in os.path.basename(db_path) else 'general'
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         cursor.execute("SELECT value FROM settings WHERE key = 'SCANNER_WRITE_LOG'")
         row = cursor.fetchone()
-        conn.close()
         if row:
             value = str(row['value']).strip()
             if value == '0':
                 write_log = False
     except Exception:
         pass
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     if not write_log:
         builtins.print = lambda *args, **kwargs: None
@@ -333,6 +339,30 @@ def scan_library(db_path, library_id, physical_path, force=False):
 
     db_type = 'adult' if 'adult' in os.path.basename(db_path) else 'general'
     conn = database.get_connection(db_type)
+    try:
+        _scan_library_internal(conn, db_path, library_id, physical_path, force, db_type, target_paths, is_remote, threads_to_use, library_errors)
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        gc.collect()
+
+    # 스캔 결과 에러 리포트 저장
+    if library_errors:
+        try:
+            from utils.report_helper import save_scan_report
+            save_scan_report(library_id, library_errors)
+        except Exception as report_err:
+            print(f"[Scanner ERROR] 스캔 리포트 저장 실패: {report_err}")
+
+    # 스캔 종료 후 데이터베이스 최적화 자동 튜닝 트리거
+    import threading
+    t = threading.Thread(target=database.optimize_database, args=(db_type,))
+    t.daemon = True
+    t.start()
+
+def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_type, target_paths, is_remote, threads_to_use, library_errors):
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -526,6 +556,15 @@ def scan_library_covers_only(db_path, library_id, physical_path):
 
     db_type = 'adult' if 'adult' in os.path.basename(db_path) else 'general'
     conn = database.get_connection(db_type)
+    try:
+        _scan_library_covers_only_internal(conn, db_path, library_id, physical_path, target_paths, db_type)
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+def _scan_library_covers_only_internal(conn, db_path, library_id, physical_path, target_paths, db_type):
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -536,7 +575,6 @@ def scan_library_covers_only(db_path, library_id, physical_path):
     
     if not rows:
         print(f"[Scanner-Covers] 스캔 대상 도서가 없습니다.")
-        conn.close()
         return
 
     is_remote = any(is_remote_path(p) for p in target_paths)
@@ -637,7 +675,6 @@ def scan_library_covers_only(db_path, library_id, physical_path):
             processed_count += 1
             
     conn.commit()
-    conn.close()
     print(f"[Scanner-Covers] 표지 전용 스캔 최종 완료! (총 {processed_count}권 표지 업데이트 완료)")
 
 def run_sync_scanner():

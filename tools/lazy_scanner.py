@@ -130,6 +130,7 @@ def run_lazy_cover_extraction(target_book_id=None):
             
         print("[Lazy-Scanner] 🚀 독립 백그라운드 표지 스캐너 기동 시작")
     
+    conn = None
     try:
         for db_type in ['general', 'adult']:
             db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
@@ -385,10 +386,19 @@ def run_lazy_cover_extraction(target_book_id=None):
             for lib_id, err_list in lib_errors.items():
                 if err_list:
                     save_scan_report(lib_id, err_list)
-                    
-            conn.close()
+            
+            try:
+                conn.close()
+            except Exception:
+                pass
+            conn = None
 
     finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
         lock.release()
     print("[Lazy-Scanner] ✅ 모든 DB의 Lazy 표지 스캔 작업 완료")
 
