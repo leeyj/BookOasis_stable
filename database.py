@@ -241,6 +241,7 @@ def init_databases():
         file_path TEXT NOT NULL UNIQUE,
         file_format TEXT NOT NULL,
         total_pages INTEGER NOT NULL,
+        has_offsets INTEGER DEFAULT 0,
         cover_image TEXT,
         publisher TEXT,
         link TEXT,

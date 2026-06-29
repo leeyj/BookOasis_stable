@@ -30,6 +30,8 @@ nav:
 - 개발 워크플로우: workflow.md
 - 작업 히스토리:
   - history/index.md
+  - history/20260629_121804_has_offsets_column_missing_walkthrough.md
+  - history/20260629_121804_has_offsets_column_missing_task.md
   - history/20260629_110144_pyyaml_docker_entry_walkthrough.md
   - history/20260629_110144_pyyaml_docker_entry_task.md
   - history/20260629_023229_plugin_guides_walkthrough.md
@@ -400,6 +402,7 @@ nav:
   - bug/20260629_bugfix_metadata_rerender_id_loss.md
   - bug/20260629_bugfix_metadata_close_modal_name_loss.md
   - bug/20260629_bugfix_metadata_apply_empty.md
+  - bug/20260629_bugfix_has_offsets_column_missing.md
   - bug/20260629_bugfix_aladin_cover_webp.md
   - bug/20260628_improvement_sort_by_date.md
   - bug/20260628_improvement_proxy_header_auth.md
