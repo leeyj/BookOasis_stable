@@ -232,44 +232,25 @@ function updatePageInfo() {
 
 let _seekbarInited = false; // 이벤트 중복 등록 방지 플래그
 
-/**
- * 시크바 초기화: 총 페이지 수를 슬라이더 max에 반영하고
- * input/change 이벤트를 1회만 등록합니다.
- */
-export function initSeekBar() {
-  const slider = document.getElementById('comic-page-slider');
-  const endLabel = document.getElementById('seekbar-end-label');
-  if (!slider) return;
+// 뷰어 라우터용 슬라이더 드래그 중(input) 이벤트
+export function comicSliderInput(slider, val) {
+  showSeekbarTooltip(slider, val);
+  const badge = document.getElementById('comic-overlay-page-info');
+  if (badge) badge.textContent = `${val} / ${comicTotalPages}`;
+}
 
-  // 총 페이지 수 반영
-  slider.max = comicTotalPages || 1;
-  slider.value = comicCurrentPage + 1;
-  if (endLabel) endLabel.textContent = comicTotalPages || '?';
-
-  if (_seekbarInited) return;
-  _seekbarInited = true;
-
-  // 드래그 중: 툴팁만 업데이트 (실제 이미지 로딩 없음)
-  slider.addEventListener('input', (e) => {
-    const val = parseInt(e.target.value, 10);
-    showSeekbarTooltip(slider, val);
-    const badge = document.getElementById('comic-overlay-page-info');
-    if (badge) badge.textContent = `${val} / ${comicTotalPages}`;
-  });
-
-  // 드래그 완료: 실제 페이지 로딩
-  slider.addEventListener('change', (e) => {
-    hideSeekbarTooltip();
-    comicCurrentPage = parseInt(e.target.value, 10) - 1;
-    loadComicPage();
-  });
+// 뷰어 라우터용 슬라이더 드래그 완료(change) 이벤트
+export function comicSliderChange(slider, val) {
+  hideSeekbarTooltip();
+  comicCurrentPage = val - 1;
+  loadComicPage();
 }
 
 /**
  * 현재 페이지에 맞게 슬라이더 thumb 위치를 동기화합니다.
  */
 function syncSeekBar() {
-  const slider = document.getElementById('comic-page-slider');
+  const slider = document.getElementById('viewer-page-slider');
   if (!slider) return;
   slider.max = comicTotalPages || 1;
   slider.value = comicCurrentPage + 1;
@@ -319,19 +300,17 @@ export function toggleComicOverlay() {
 }
 
 // 처음부터 보기
-export function jumpToFirstPage() {
+export function comicJumpToFirstPage() {
   comicCurrentPage = 0;
   loadComicPage();
   toggleComicOverlay();
 }
 
 // 마지막 페이지로 이동
-export function jumpToLastPage() {
-  if (comicTotalPages > 0) {
-    comicCurrentPage = comicTotalPages - 1;
-    loadComicPage();
-    toggleComicOverlay();
-  }
+export function comicJumpToLastPage() {
+  comicCurrentPage = Math.max(0, comicTotalPages - 1);
+  loadComicPage();
+  toggleComicOverlay();
 }
 
 // 읽음 완료 처리 (진척도를 마지막 페이지로 강제 세팅)

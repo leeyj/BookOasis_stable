@@ -82,7 +82,7 @@
                 <!-- 시크바 네비게이션 행 -->
                 <div class="seekbar-nav-row">
                     <!-- 첫 페이지 이동 버튼 -->
-                    <button class="seekbar-btn" id="seekbar-btn-first" onclick="jumpToFirstPage()" data-i18n-title="viewer.from_beginning" title="처음으로">
+                    <button class="seekbar-btn" id="seekbar-btn-first" onclick="viewerJumpToFirst()" data-i18n-title="viewer.from_beginning" title="처음으로">
                         <i class="fa-solid fa-backward-step"></i>
                     </button>
 
@@ -94,7 +94,7 @@
                             <div class="seekbar-tooltip" id="seekbar-tooltip">1</div>
                             <input
                                 type="range"
-                                id="comic-page-slider"
+                                id="viewer-page-slider"
                                 min="1"
                                 max="1"
                                 value="1"
@@ -105,7 +105,7 @@
                     </div>
 
                     <!-- 마지막 페이지 이동 버튼 -->
-                    <button class="seekbar-btn" id="seekbar-btn-last" onclick="jumpToLastPage()" data-i18n-title="viewer.to_last_page" title="마지막으로">
+                    <button class="seekbar-btn" id="seekbar-btn-last" onclick="viewerJumpToLast()" data-i18n-title="viewer.to_last_page" title="마지막으로">
                         <i class="fa-solid fa-forward-step"></i>
                     </button>
                 </div>

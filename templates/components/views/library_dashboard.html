@@ -28,21 +28,12 @@
             </div>
 
             <!-- 3. 플러그인 전용 공간 -->
-            <div class="dashboard-section" style="margin-bottom: 1.5rem;">
+            <div class="dashboard-section" id="dashboard-plugins-section" style="margin-bottom: 1.5rem; display: none;">
                 <div class="section-header" style="margin-bottom: 0.8rem;">
                     <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1.1rem; font-weight: 700;"><i class="fa-solid fa-puzzle-piece" style="color: #a855f7; margin-right: 0.5rem;"></i> <span data-i18n="dashboard.plugin_desk_title">플러그인 데스크</span></h3>
                 </div>
-                <div class="plugins-container" style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
-                    <!-- 알라딘 신간 플러그인 카드 -->
-                    <div class="plugin-card" id="plugin-aladin-new" style="width: 100%; max-width: 500px; background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 1rem;">
-                        <h4 style="margin: 0 0 1rem 0; color: #cbd5e1; font-size: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
-                            <span><i class="fa-solid fa-book-open" style="color: #38bdf8; margin-right: 0.3rem;"></i> <span data-i18n="dashboard.aladin_new_title">알라딘 오늘의 신간</span></span>
-                            <span style="font-size: 0.75rem; color: #64748b; font-weight: normal;"><span data-i18n="dashboard.aladin_provided">제공</span>: Aladin</span>
-                        </h4>
-                        <div id="aladin-new-content" style="display: flex; flex-direction: column; gap: 1rem; max-height: 400px; overflow-y: auto; padding-right: 0.5rem;">
-                            <div class="loading-spinner" style="padding: 1rem 0;"><i class="fa-solid fa-circle-notch fa-spin"></i> <span data-i18n="dashboard.aladin_loading">신간 정보를 불러오는 중...</span></div>
-                        </div>
-                    </div>
+                <div class="plugins-container" id="dashboard-plugins-container" style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+                    <!-- JS에 의해 동적으로 위젯이 채워짐 -->
                 </div>
             </div>
         </div>

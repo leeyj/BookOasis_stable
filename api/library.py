@@ -505,3 +505,20 @@ def get_aladin_new_releases_api():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@library_bp.route('/api/media/dashboard/widgets', methods=['GET'])
+def get_dashboard_widgets_api():
+    """대시보드에 표시할 활성화된 위젯(플러그인) 목록을 반환합니다."""
+    try:
+        from services.metadata_factory import MetadataFactory
+        providers = MetadataFactory.get_available_providers()
+        
+        # 현재는 aladin_new 플러그인만 대시보드 위젯을 지원함.
+        # 추후 다른 플러그인이 추가되면 리스트에 추가하거나 플러그인 메타데이터를 활용할 수 있음.
+        active_widgets = []
+        for p in providers:
+            if p.get('enabled') and p.get('id') == 'aladin_new':
+                active_widgets.append(p.get('id'))
+                
+        return jsonify({'success': True, 'widgets': active_widgets}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500

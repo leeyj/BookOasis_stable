@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v0.5.7
+### Changed
+- epub로드시 슬라이드 오류 수정 | epub load slide error fix
+
+---
+
 ## v0.5.6
 ### Changed
 - sortable.js 도입 | sortable.js introduced

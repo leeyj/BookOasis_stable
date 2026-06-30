@@ -96,10 +96,11 @@ export function openReader(bookId, format, title, pagesRead, totalPages) {
   }
 
   const fmt = format.toLowerCase();
+  state.currentViewerFormat = fmt;
   if (fmt === 'zip' || fmt === 'cbz') {
     if (overlayComicFit) overlayComicFit.style.display = 'flex';
     initComicViewer(bookId, pagesRead, totalPages).then(() => {
-      initSeekBar();
+      initViewerSeekBar();
     });
   } else if (fmt === 'txt') {
     if (overlayTxtControls) overlayTxtControls.style.display = 'flex';
@@ -111,6 +112,7 @@ export function openReader(bookId, format, title, pagesRead, totalPages) {
     if (overlayTxtControls) overlayTxtControls.style.display = 'flex';
     document.getElementById('comic-overlay-page-info').textContent = i18n.t('viewer.view_epub') || 'EPUB 보기';
     initEpubViewer(bookId, totalPages);
+    initViewerSeekBar();
   } else {
     alert(i18n.t('viewer.unsupported_format'));
     closeMediaViewer();
@@ -360,13 +362,67 @@ window.setScrollMode = function(mode) {
   changeEpubScrollMode(mode);
 };
 
+// ==========================================
+// 시크바 통합 이벤트 라우터
+// ==========================================
+let _viewerSeekbarInited = false;
+
+export function initViewerSeekBar() {
+  const slider = document.getElementById('viewer-page-slider');
+  if (!slider) return;
+
+  if (_viewerSeekbarInited) return;
+  _viewerSeekbarInited = true;
+
+  slider.addEventListener('input', (e) => {
+    const val = parseInt(e.target.value, 10);
+    const fmt = state.currentViewerFormat;
+    
+    if (fmt === 'zip' || fmt === 'cbz') {
+      import('./viewer_comic.js').then(m => m.comicSliderInput(slider, val));
+    } else if (fmt === 'epub') {
+      import('./viewer_epub.js').then(m => m.epubSliderInput(slider, val));
+    }
+  });
+
+  slider.addEventListener('change', (e) => {
+    const val = parseInt(e.target.value, 10);
+    const fmt = state.currentViewerFormat;
+    
+    if (fmt === 'zip' || fmt === 'cbz') {
+      import('./viewer_comic.js').then(m => m.comicSliderChange(slider, val));
+    } else if (fmt === 'epub') {
+      import('./viewer_epub.js').then(m => m.epubSliderChange(slider, val));
+    }
+  });
+}
+
+export function viewerJumpToFirst() {
+  const fmt = state.currentViewerFormat;
+  if (fmt === 'zip' || fmt === 'cbz') {
+    import('./viewer_comic.js').then(m => m.comicJumpToFirstPage());
+  } else if (fmt === 'epub') {
+    import('./viewer_epub.js').then(m => m.epubJumpToFirstPage());
+  }
+}
+
+export function viewerJumpToLast() {
+  const fmt = state.currentViewerFormat;
+  if (fmt === 'zip' || fmt === 'cbz') {
+    import('./viewer_comic.js').then(m => m.comicJumpToLastPage());
+  } else if (fmt === 'epub') {
+    import('./viewer_epub.js').then(m => m.epubJumpToLastPage());
+  }
+}
+
+window.viewerJumpToFirst = viewerJumpToFirst;
+window.viewerJumpToLast = viewerJumpToLast;
 window.prevPage = prevPage;
 window.nextPage = nextPage;
 window.toggleTheme = toggleReaderTheme;
-window.jumpToLastPage = jumpToLastPage;
 
 // 최초 로드 시 사용자 폰트 사전 로딩
 loadCustomFontsList();
 
 // 글로벌 핸들러 노출에 사용될 함수 재내보내기 (Re-export)
-export { toggleComicOverlay, jumpToFirstPage, jumpToLastPage, markAsCompleted, setComicFitMode, nextComicPage, prevComicPage, nextPdfPage, prevPdfPage, epubPrevPage, epubNextPage, prevTxtPage, nextTxtPage, initSeekBar };
+export { toggleComicOverlay, markAsCompleted, setComicFitMode, nextComicPage, prevComicPage, nextPdfPage, prevPdfPage, epubPrevPage, epubNextPage, prevTxtPage, nextTxtPage, initViewerSeekBar };

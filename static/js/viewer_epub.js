@@ -74,8 +74,13 @@ async function _doInitEpubViewer(bookId, totalPages) {
 
         epubBook.ready.then(() => {
           console.log("[Viewer-Epub] epubBook ready 완료 - 책 정보:", epubBook.package.metadata);
+          // 퍼센트 탐색을 위한 locations 사전 생성 (글자 수 기준 1600자)
+          return epubBook.locations.generate(1600);
+        }).then((locations) => {
+          console.log("[Viewer-Epub] Locations 생성 완료. 슬라이더 연동 준비 끝");
+          syncEpubSeekBar();
         }).catch(err => {
-          console.error("[Viewer-Epub] epubBook ready 실패:", err);
+          console.error("[Viewer-Epub] epubBook ready 또는 locations 생성 실패:", err);
         });
 
         // 1. 초기 렌더링 옵션 빌드
@@ -98,7 +103,7 @@ async function _doInitEpubViewer(bookId, totalPages) {
         // 3. 설정 반영
         applyEpubSettings();
 
-        // 4. 페이지 이동(relocated) 시 진행률 저장 연동
+        // 4. 페이지 이동(relocated) 시 진행률 저장 및 시크바 동기화 연동
         epubRendition.on('relocated', (location) => {
           console.log("[Viewer-Epub] Relocated to location:", location);
           
@@ -112,6 +117,7 @@ async function _doInitEpubViewer(bookId, totalPages) {
             }
           }
           saveProgress(state.activeBookId, pageIdx, totalPages);
+          syncEpubSeekBar(); // 뷰어 스크롤 이동 시 시크바 썸 위치 최신화
         });
 
         epubRendition.display().catch(err => {
@@ -272,4 +278,67 @@ export function clearEpubViewer() {
     epubBook = null;
     epubRendition = null;
   }
+}
+// ==========================================
+// 시크바 (슬라이더) 컨트롤 (EPUB용: % 기반)
+// ==========================================
+function getEpubPercentage() {
+  if (!epubBook || !epubRendition || !epubRendition.location) return 0;
+  const cfi = epubRendition.location.start?.cfi;
+  if (!cfi) return 0;
+  const p = epubBook.locations.percentageFromCfi(cfi);
+  return (p && p >= 0) ? Math.round(p * 100) : 0;
+}
+
+export function syncEpubSeekBar() {
+  const slider = document.getElementById('viewer-page-slider');
+  if (!slider) return;
+  slider.min = 0;
+  slider.max = 100;
+  slider.value = getEpubPercentage();
+  
+  const endLabel = document.getElementById('seekbar-end-label');
+  if (endLabel) endLabel.textContent = '100%';
+}
+
+export function epubSliderInput(slider, val) {
+  // 드래그 중: 툴팁에 % 표시
+  const tooltip = document.getElementById('seekbar-tooltip');
+  if (tooltip) {
+    tooltip.textContent = `${val}%`;
+    tooltip.style.display = 'block';
+    
+    // 툴팁 위치 계산 (viewer_comic과 유사)
+    const min = parseInt(slider.min, 10) || 0;
+    const max = parseInt(slider.max, 10) || 100;
+    const trackWidth = slider.offsetWidth;
+    const percent = (val - min) / (max - min);
+    const thumbOffset = percent * trackWidth;
+    tooltip.style.left = `calc(${thumbOffset}px - 14px)`;
+  }
+  
+  const badge = document.getElementById('comic-overlay-page-info');
+  if (badge) badge.textContent = `${val}% / 100%`;
+}
+
+export function epubSliderChange(slider, val) {
+  const tooltip = document.getElementById('seekbar-tooltip');
+  if (tooltip) tooltip.style.display = 'none';
+
+  if (!epubBook || !epubRendition) return;
+  const percentage = val / 100;
+  const cfi = epubBook.locations.cfiFromPercentage(percentage);
+  if (cfi) {
+    epubRendition.display(cfi);
+  }
+}
+
+export function epubJumpToFirstPage() {
+  if (epubRendition) epubRendition.display(0);
+}
+
+export function epubJumpToLastPage() {
+  if (!epubBook || !epubRendition) return;
+  const cfi = epubBook.locations.cfiFromPercentage(1.0);
+  if (cfi) epubRendition.display(cfi);
 }
