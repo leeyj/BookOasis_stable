@@ -57,7 +57,7 @@ export function switchActiveView(viewName) {
  * ────────────────────────────────────────────────────────
  */
 
-export function showViewerLoading(message = "다운로드 중...", subMessage = "Google Drive에서 파일을 가져오고 있습니다.<br>잠시만 기다려 주세요.") {
+export function showViewerLoading(message = i18n.t("viewer.loading_title_default"), subMessage = i18n.t("viewer.loading_sub_default")) {
   const overlay = document.getElementById('viewer-common-overlay');
   const spinner = document.getElementById('viewer-common-spinner');
   const textEl = document.getElementById('viewer-common-text');
@@ -83,7 +83,7 @@ export function hideViewerLoading() {
   }
 }
 
-export function showViewerError(message = "도서 파일을 불러오지 못했습니다.", subMessage = "네트워크 상태 및 파일 존재 여부를 확인해 주세요.") {
+export function showViewerError(message = i18n.t("viewer.error_title_default"), subMessage = i18n.t("viewer.error_sub_default")) {
   const overlay = document.getElementById('viewer-common-overlay');
   const spinner = document.getElementById('viewer-common-spinner');
   const textEl = document.getElementById('viewer-common-text');

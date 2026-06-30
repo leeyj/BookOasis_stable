@@ -16,6 +16,7 @@ from urllib.parse import quote
 
 from flask import Blueprint, Response, jsonify, request, send_file
 import database
+from utils.i18n import _t
 from werkzeug.security import check_password_hash
 
 opds_bp = Blueprint('media_opds', __name__)
@@ -400,8 +401,8 @@ def opds_download_book(db_type: str, book_id: int):
     row = cursor.fetchone()
     conn.close()
     if not row:
-        return jsonify({'error': 'Book not found'}), 404
+        return jsonify({'error': _t('api.err_book_not_found')}), 404
     file_path = row['file_path']
     if not os.path.exists(file_path):
-        return jsonify({'error': 'File not found'}), 404
+        return jsonify({'error': _t('api.err_file_not_found')}), 404
     return send_file(file_path, as_attachment=True)

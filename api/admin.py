@@ -13,6 +13,7 @@ from services.settings_service import SettingsService
 import database
 
 from api.auth import admin_required
+from utils.i18n import _t
 
 admin_bp = Blueprint('media_admin', __name__)
 
@@ -25,7 +26,7 @@ def add_media_library():
     physical_path = request.form.get('physical_path', '').strip()
     target_paths = [p.strip() for p in str(physical_path).replace('\r', '').split('\n') if p.strip()]
     if not target_paths:
-        return jsonify({'success': False, 'error': '물리 경로를 최소 1개 이상 입력해야 합니다.'}), 400
+        return jsonify({'success': False, 'error': _t('api.err_physical_path_required')}), 400
 
     is_remote_val = request.form.get('is_remote')
     if is_remote_val in ('1', 'true', 'on'):
@@ -37,18 +38,18 @@ def add_media_library():
         is_remote = 1 if any(is_remote_path(p) for p in target_paths) else 0
 
     if not name:
-        return jsonify({'success': False, 'error': '이름은 필수 입력 사항입니다.'}), 400
+        return jsonify({'success': False, 'error': _t('api.err_name_required')}), 400
 
     invalid_paths = [p for p in target_paths if not os.path.exists(p)]
     if invalid_paths:
-        error_msg = '다음 경로들이 서버에 존재하지 않거나 오타가 있습니다:\n' + '\n'.join(invalid_paths)
+        error_msg = _t('api.err_invalid_paths', paths='\n'.join(invalid_paths))
         return jsonify({'success': False, 'error': error_msg}), 400
 
     rclone_rc_url = request.form.get('rclone_rc_url', '').strip() or None
     try:
         library_id = CategoryService.add_library(db_type, name, physical_path, is_remote, rclone_rc_url)
     except sqlite3.IntegrityError:
-        return jsonify({'success': False, 'error': '이미 존재하는 라이브러리 이름입니다.'}), 400
+        return jsonify({'success': False, 'error': _t('api.err_library_name_exists')}), 400
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
     
@@ -62,9 +63,9 @@ def add_media_library():
         ).start()
         SchedulerService.reload_all_jobs()
     except Exception as e:
-        print(f"[API] 스캔 백그라운드 구동 실패: {e}")
+        print(f"[API] Background scan failed: {e}")
 
-    return jsonify({'success': True, 'message': '라이브러리가 추가되었으며 백그라운드 스캔을 시작합니다.'})
+    return jsonify({'success': True, 'message': _t('api.msg_library_added')})
 
 @admin_bp.route('/api/media/libraries/edit', methods=['POST'])
 @admin_required
@@ -76,7 +77,7 @@ def edit_media_library():
     physical_path = request.form.get('physical_path', '').strip()
     target_paths = [p.strip() for p in str(physical_path).replace('\r', '').split('\n') if p.strip()]
     if not target_paths:
-        return jsonify({'success': False, 'error': '물리 경로를 최소 1개 이상 입력해야 합니다.'}), 400
+        return jsonify({'success': False, 'error': _t('api.err_physical_path_required')}), 400
 
     is_remote_val = request.form.get('is_remote')
     if is_remote_val in ('1', 'true', 'on'):
@@ -92,14 +93,14 @@ def edit_media_library():
 
     invalid_paths = [p for p in target_paths if not os.path.exists(p)]
     if invalid_paths:
-        error_msg = '다음 경로들이 서버에 존재하지 않거나 오타가 있습니다:\n' + '\n'.join(invalid_paths)
+        error_msg = _t('api.err_invalid_paths', paths='\n'.join(invalid_paths))
         return jsonify({'success': False, 'error': error_msg}), 400
 
     rclone_rc_url = request.form.get('rclone_rc_url', '').strip() or None
     try:
         CategoryService.edit_library(db_type, int(library_id), name, physical_path, is_remote, rclone_rc_url)
     except sqlite3.IntegrityError:
-        return jsonify({'success': False, 'error': '이미 존재하는 라이브러리 이름입니다.'}), 400
+        return jsonify({'success': False, 'error': _t('api.err_library_name_exists')}), 400
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -113,9 +114,9 @@ def edit_media_library():
         ).start()
         SchedulerService.reload_all_jobs()
     except Exception as e:
-        print(f"[API] 수정 후 재스캔 구동 실패: {e}")
+        print(f"[API] Background scan failed after edit: {e}")
 
-    return jsonify({'success': True, 'message': '라이브러리 정보가 수정되었으며 스캔을 갱신합니다.'})
+    return jsonify({'success': True, 'message': _t('api.msg_library_edited')})
 
 @admin_bp.route('/api/media/libraries/delete', methods=['POST'])
 @admin_required
@@ -125,12 +126,12 @@ def delete_media_library():
     library_id = request.form.get('id')
 
     if not library_id:
-        return jsonify({'success': False, 'error': '라이브러리 ID가 필요합니다.'}), 400
+        return jsonify({'success': False, 'error': _t('api.err_library_id_required')}), 400
 
     try:
         CategoryService.delete_library(db_type, int(library_id))
         SchedulerService.remove_job(db_type, int(library_id))
-        return jsonify({'success': True, 'message': '라이브러리 및 하위 도서 정보가 정상적으로 연쇄 소거되었습니다.'})
+        return jsonify({'success': True, 'message': _t('api.msg_library_deleted')})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -192,7 +193,7 @@ def trigger_library_scan(library_id):
         conn.close()
         
         if not row:
-            return jsonify({'success': False, 'error': '존재하지 않는 라이브러리입니다.'}), 404
+            return jsonify({'success': False, 'error': _t('api.err_library_not_found')}), 404
             
         physical_path = row['physical_path']
         db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
@@ -204,7 +205,7 @@ def trigger_library_scan(library_id):
             daemon=True
         ).start()
         
-        return jsonify({'success': True, 'message': '즉시 스캔을 시작했습니다.'})
+        return jsonify({'success': True, 'message': _t('api.msg_scan_started')})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -219,7 +220,7 @@ def cancel_library_scan(library_id):
         cursor.execute("UPDATE libraries SET scan_status = 'cancelling' WHERE id = ?", (library_id,))
         conn.commit()
         conn.close()
-        return jsonify({'success': True, 'message': '스캔 중단 요청이 전달되었습니다. 곧 안전하게 멈춥니다.'})
+        return jsonify({'success': True, 'message': _t('api.msg_scan_cancelling')})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -236,7 +237,7 @@ def trigger_library_cover_scan(library_id):
         conn.close()
         
         if not row:
-            return jsonify({'success': False, 'error': '존재하지 않는 라이브러리입니다.'}), 404
+            return jsonify({'success': False, 'error': _t('api.err_library_not_found')}), 404
             
         physical_path = row['physical_path']
         db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
@@ -248,7 +249,7 @@ def trigger_library_cover_scan(library_id):
             daemon=True
         ).start()
         
-        return jsonify({'success': True, 'message': '표지 새로고침 스캔을 시작했습니다.'})
+        return jsonify({'success': True, 'message': _t('api.msg_cover_scan_started')})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -262,7 +263,7 @@ def update_library_schedule(library_id):
     rclone_rc_url = request.form.get('rclone_rc_url', '').strip() or None
     
     if len(cron_schedule) > 50:
-        return jsonify({'success': False, 'error': '크론 표현식은 50자를 초과할 수 없습니다.'}), 400
+        return jsonify({'success': False, 'error': _t('api.err_cron_too_long')}), 400
         
     cron_val = cron_schedule if cron_schedule else None
     
@@ -271,7 +272,7 @@ def update_library_schedule(library_id):
         try:
             CronTrigger.from_crontab(cron_val)
         except ValueError as e:
-            return jsonify({'success': False, 'error': f'잘못된 크론 형식입니다: {e}'}), 400
+            return jsonify({'success': False, 'error': _t('api.err_invalid_cron', error=str(e))}), 400
             
     vfs_refresh = 1 if vfs_refresh_val in ('1', 'true', 'on') else 0
     
@@ -286,18 +287,18 @@ def update_library_schedule(library_id):
         conn.close()
         
         if not row:
-            return jsonify({'success': False, 'error': '존재하지 않는 라이브러리입니다.'}), 404
+            return jsonify({'success': False, 'error': _t('api.err_library_not_found')}), 404
             
         db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
         
         if cron_val:
             success = SchedulerService.register_job(db_type, db_path, library_id, row['physical_path'], cron_val)
             if not success:
-                return jsonify({'success': False, 'error': '유효하지 않은 크론 표현식입니다.'}), 400
+                return jsonify({'success': False, 'error': _t('api.err_invalid_cron_general')}), 400
         else:
             SchedulerService.remove_job(db_type, library_id)
             
-        return jsonify({'success': True, 'message': '스케줄이 성공적으로 업데이트되었습니다.'})
+        return jsonify({'success': True, 'message': _t('api.msg_schedule_updated')})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -320,7 +321,7 @@ def update_system_setting():
     value = request.form.get('value', '').strip()
     
     if not key:
-        return jsonify({'success': False, 'error': '설정 키(key)는 필수 파라미터입니다.'}), 400
+        return jsonify({'success': False, 'error': _t('api.err_setting_key_required')}), 400
         
     if key == 'DB_POOL_SIZE':
         try:
@@ -328,17 +329,17 @@ def update_system_setting():
             if val < 1 or val > 50:
                 raise ValueError()
         except ValueError:
-            return jsonify({'success': False, 'error': 'DB 커넥션 풀 크기는 1에서 50 사이의 정수여야 합니다.'}), 400
+            return jsonify({'success': False, 'error': _t('api.err_db_pool_size_range')}), 400
 
     try:
         SettingsService.set(key, value)
         if key == 'LAZY_SCAN_CRON':
             try:
                 SchedulerService.reload_all_jobs()
-                print(f"[API] LAZY_SCAN_CRON 변경으로 스케줄러 리로드 완료: {value}")
+                print(f"[API] Scheduler reloaded due to LAZY_SCAN_CRON change: {value}")
             except Exception as e_sched:
-                print(f"[API WARNING] LAZY_SCAN_CRON 변경 시 스케줄러 갱신 실패: {e_sched}")
-        return jsonify({'success': True, 'message': f'"{key}" 설정이 성공적으로 저장되었습니다.'})
+                print(f"[API WARNING] Failed to reload scheduler on LAZY_SCAN_CRON change: {e_sched}")
+        return jsonify({'success': True, 'message': _t('api.msg_setting_saved', key=key)})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -426,7 +427,7 @@ def view_report_detail():
     """특정 리포트 파일의 에러 리스트 상세 조회"""
     filename = request.args.get('file', '').strip()
     if not filename:
-        return jsonify({'success': False, 'error': '파일명(file) 파라미터가 유효하지 않습니다.'}), 400
+        return jsonify({'success': False, 'error': _t('api.err_filename_param_invalid')}), 400
         
     filename = os.path.basename(filename)
     
@@ -436,7 +437,7 @@ def view_report_detail():
         reports_dir = get_reports_dir()
         filepath = os.path.join(reports_dir, filename)
         if not os.path.exists(filepath):
-            return jsonify({'success': False, 'error': '요청한 리포트 파일을 찾을 수 없습니다.'}), 404
+            return jsonify({'success': False, 'error': _t('api.err_report_not_found')}), 404
             
         with open(filepath, 'r', encoding='utf-8') as f:
             report_data = json.load(f)
@@ -457,7 +458,7 @@ def trigger_lazy_scan_api():
             target=run_lazy_scanner_job,
             daemon=True
         ).start()
-        return jsonify({'success': True, 'message': 'Lazy 표지 스캐너를 즉시 기동했습니다.'})
+        return jsonify({'success': True, 'message': _t('api.msg_lazy_scanner_triggered')})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

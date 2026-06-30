@@ -101,16 +101,16 @@ export function openReader(bookId, format, title, pagesRead, totalPages) {
     initComicViewer(bookId, pagesRead, totalPages);
   } else if (fmt === 'txt') {
     if (overlayTxtControls) overlayTxtControls.style.display = 'flex';
-    document.getElementById('comic-overlay-page-info').textContent = '텍스트 보기';
+    document.getElementById('comic-overlay-page-info').textContent = i18n.t('viewer.view_text') || '텍스트 보기';
     initTxtViewer(bookId);
   } else if (fmt === 'pdf') {
-    initPdfViewer(bookId, pagesRead);
+    initPdfViewer(bookId, pagesRead, totalPages);
   } else if (fmt === 'epub') {
     if (overlayTxtControls) overlayTxtControls.style.display = 'flex';
-    document.getElementById('comic-overlay-page-info').textContent = 'EPUB 보기';
-    initEpubViewer(bookId);
+    document.getElementById('comic-overlay-page-info').textContent = i18n.t('viewer.view_epub') || 'EPUB 보기';
+    initEpubViewer(bookId, totalPages);
   } else {
-    alert('지원되지 않는 파일 형식입니다.');
+    alert(i18n.t('viewer.unsupported_format'));
     closeMediaViewer();
   }
 }
@@ -149,7 +149,7 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false) {
       if (detailView && detailView.style.display !== 'none') {
         const titleEl = detailView.querySelector('.book-detail-title');
         if (titleEl) {
-          const seriesName = titleEl.textContent.replace('정보 수정', '').trim();
+          const seriesName = titleEl.textContent.replace(i18n.t('detail.edit_info'), '').trim();
           import('./modal.js').then(mod => {
             mod.openBookDetail(null, seriesName, state.currentLibraryId);
           });

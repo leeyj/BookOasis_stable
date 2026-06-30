@@ -56,6 +56,8 @@
         await i18n.init();
         i18n.translateDOM();
         i18n.renderLanguageSelector('#settings-i18n-container');
+        window.i18nReady = true;
+        document.dispatchEvent(new Event('i18nReady'));
     });
 </script>
 </body>

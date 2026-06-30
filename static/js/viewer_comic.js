@@ -10,7 +10,7 @@ let comicLoadingTimer = null;
 let observer = null;
 let isScrollingToTarget = false;
 
-export function initComicViewer(bookId, pagesRead, totalPages) {
+export async function initComicViewer(bookId, pagesRead, totalPages) {
   console.log(`[Viewer-Comic] initComicViewer - 읽은 페이지: ${pagesRead}, 전체 페이지: ${totalPages}`);
   document.getElementById('comic-viewer-container').style.display = 'flex';
   document.getElementById('comic-fit-controls').style.display = 'flex';
@@ -18,6 +18,24 @@ export function initComicViewer(bookId, pagesRead, totalPages) {
   comicCurrentPage = pagesRead > 0 ? pagesRead - 1 : 0;
   comicTotalPages = totalPages;
   
+  // 만약 뷰어 진입 시 totalPages가 0이면, 백엔드에 1권 단위를 강제 해석하도록 요청
+  if (comicTotalPages === 0) {
+    try {
+      showViewerLoading('로딩 중...');
+      const libType = state.currentLibraryType || 'general';
+      const res = await fetch(`/api/media/books/${bookId}/info?type=${libType}`);
+      const data = await res.json();
+      if (data.success && data.total_pages > 0) {
+        comicTotalPages = data.total_pages;
+        console.log(`[Viewer-Comic] 동적 페이지 계산 완료: ${comicTotalPages} pages`);
+      }
+      hideViewerLoading();
+    } catch (e) {
+      console.error('[Viewer-Comic] 동적 페이지 로딩 실패:', e);
+      hideViewerLoading();
+    }
+  }
+
   applyComicFitMode();
   loadComicPage();
 }
@@ -64,7 +82,7 @@ export function loadComicPage() {
 
   if (scrollMode === 'scroll') {
     console.log(`[Viewer-Comic] 스크롤 모드 로드 시작 - 현재 페이지: ${comicCurrentPage}`);
-    showViewerLoading("도서 준비 중...", "만화 이미지를 세로 연속 스크롤 모드로 로드하고 있습니다.");
+    showViewerLoading(i18n.t("viewer.loading_comic_scroll_title"), i18n.t("viewer.loading_comic_scroll_sub"));
 
     wrapper.innerHTML = '';
     const fragment = document.createDocumentFragment();
@@ -152,7 +170,7 @@ export function loadComicPage() {
 
     comicLoadingTimer = setTimeout(() => {
       imgEl.style.opacity = '0';
-      showViewerLoading("다운로드 중...", "Google Drive에서 만화 이미지를 가져오고 있습니다.<br>잠시만 기다려 주세요.");
+      showViewerLoading(i18n.t("viewer.loading_comic_title"), i18n.t("viewer.loading_comic_sub"));
     }, delay);
 
     imgEl.onload = () => {
@@ -182,7 +200,7 @@ export function loadComicPage() {
         clearTimeout(comicLoadingTimer);
         comicLoadingTimer = null;
       }
-      showViewerError("이미지 로드에 실패했습니다.", "서버 연결 및 인터넷 상태를 확인해 주세요.");
+      showViewerError(i18n.t("viewer.error_comic_title"), i18n.t("viewer.error_comic_sub"));
       imgEl.style.opacity = '1';
     };
 
@@ -231,7 +249,7 @@ export function markAsCompleted() {
       m.flushProgress();
     });
 
-    alert('완독 처리되었습니다.');
+    alert(i18n.t('viewer.read_completed'));
     toggleComicOverlay();
   }
 }

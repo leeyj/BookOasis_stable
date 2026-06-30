@@ -1,7 +1,7 @@
         <div id="book-detail-view" style="display: none;">
             <!-- 뒤로가기 버튼 -->
             <button class="btn-back-to-list" onclick="goBackToList()">
-                <i class="fa-solid fa-arrow-left"></i> 목록으로 돌아가기
+                <i class="fa-solid fa-arrow-left"></i> <span data-i18n="detail.back_to_list">목록으로 돌아가기</span>
             </button>
 
             <div class="detail-layout">
@@ -17,10 +17,10 @@
                     </div>
                     <div class="detail-score" id="detail-score-stars">★★★★★</div>
                     <p id="detail-summary" class="book-summary-text">작품 설명이 여기에 표시됩니다.</p>
-                    <a id="detail-link" href="#" target="_blank" class="ridi-link-btn" style="display:none;">리디북스 바로가기</a>
+                    <a id="detail-link" href="#" target="_blank" class="ridi-link-btn" style="display:none;" data-i18n="detail.ridi_link">리디북스 바로가기</a>
                     
                     <!-- 단행본 및 화별 리스트 -->
-                    <h4 style="margin-top:1.5rem; color:#fff; border-bottom:1px solid #334155; padding-bottom:0.5rem;">단행본 목록</h4>
+                    <h4 style="margin-top:1.5rem; color:#fff; border-bottom:1px solid #334155; padding-bottom:0.5rem;"><span data-i18n="detail.volume_list">단행본 목록</span></h4>
                     <div class="chapters-list" id="detail-chapters-container">
                         <!-- 권수 카드가 동적 생성됨 -->
                     </div>

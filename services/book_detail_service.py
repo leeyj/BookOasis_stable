@@ -123,14 +123,9 @@ class BookDetailService:
             total_pages = b['total_pages'] or 0
             file_format = (b['file_format'] or '').lower()
             if total_pages == 0 and file_format in ('zip', 'cbz') and b['file_path'] and os.path.exists(b['file_path']):
-                try:
-                    from utils.cache_helper import get_zip_file_hybrid
-                    zf = get_zip_file_hybrid(b['file_path'])
-                    if zf:
-                        img_ext = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp')
-                        total_pages = len([n for n in zf.namelist() if n.lower().endswith(img_ext)])
-                except Exception as e_page:
-                    print(f"[BookDetailService] total_pages Fallback 계산 실패: {e_page}")
+                # Removed synchronous fallback calculation of total_pages to prevent API timeouts,
+                # especially for remote files (e.g. Google Drive) where fetching the zip structure blocks the request.
+                pass
 
             books_list.append({
                 'id'          : b['id'],

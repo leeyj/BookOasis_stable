@@ -3,7 +3,7 @@ import os
 import sqlite3
 import argparse
 
-# 경로 설정
+# Path configuration
 TOOLS_DIR = os.path.dirname(os.path.abspath(__file__))
 MEDIA_SERVER_DIR = os.path.dirname(TOOLS_DIR)
 DB_DIR = os.path.join(MEDIA_SERVER_DIR, 'db')

@@ -14,8 +14,6 @@
 </head>
 <body>
 
-<!-- 우측 상단 로그인 전 다국어 선택기 컨테이너 -->
-<div id="login-i18n-container" style="position: absolute; top: 1rem; right: 1rem; z-index: 10;"></div>
 
 <div class="auth-container">
     <!-- 1. 로그인 폼 카드 -->
@@ -43,6 +41,8 @@
                 <span data-i18n="login.submit_btn">로그인</span> <i class="fa-solid fa-arrow-right"></i>
             </button>
         </form>
+        <!-- 다국어 선택기 (로그인 버튼 아래로 이동) -->
+        <div id="login-i18n-container" style="margin-top: 1.5rem; display: flex; justify-content: center;"></div>
     </div>
 
     <!-- 2. 비밀번호 강제 변경 폼 카드 (초기 로그인용) -->

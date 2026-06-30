@@ -24,12 +24,12 @@ export function handleNextEpisode(currentBookId) {
           showNextEpisodeModal(nextBook);
         }
       } else {
-        alert('마지막 페이지 및 마지막 편입니다.');
+        alert(i18n.t('viewer.last_page_episode'));
       }
     })
     .catch(err => {
       console.error('[Viewer-Next] Failed to fetch next book details:', err);
-      alert('마지막 페이지입니다.');
+      alert(i18n.t('viewer.last_page'));
     });
 }
 
@@ -58,7 +58,7 @@ function showNextEpisodeModal(nextBook) {
   if (!modal) return;
 
   if (titleEl) {
-    titleEl.textContent = `다음 편: ${nextBook.title}`;
+    titleEl.textContent = `${i18n.t('viewer.next_episode', {title: nextBook.title})}`;
   }
 
   // 모달 활성화

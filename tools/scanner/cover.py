@@ -14,10 +14,10 @@ COVERS_DIR = os.path.join(MEDIA_SERVER_DIR, 'covers')
 os.makedirs(COVERS_DIR, exist_ok=True)
 
 def extract_epub_cover_direct(epub_path, dest_path):
-    """EPUB 파일 내에서 표지 이미지를 탐색하여 dest_path에 WebP 포맷으로 변환하여 저장"""
+    """Search cover image in EPUB file, convert to WebP format and save to dest_path"""
     try:
         with zipfile.ZipFile(epub_path, 'r') as zf:
-            # 1) META-INF/container.xml 에서 rootfile path 획득
+            # 1) Get rootfile path from META-INF/container.xml
             container_xml = zf.read('META-INF/container.xml')
             root = ET.fromstring(container_xml)
             ns = {'ns': 'urn:oasis:names:tc:opendocument:xmlns:container'}
@@ -29,24 +29,24 @@ def extract_epub_cover_direct(epub_path, dest_path):
             if not opf_path:
                 return False
                 
-            # opf 디렉토리 확보
+            # Get opf directory
             opf_dir = os.path.dirname(opf_path)
             opf_content = zf.read(opf_path)
             opf_root = ET.fromstring(opf_content)
             
-            # XML 네임스페이스 정의
+            # Define XML namespaces
             ns_opf = {
                 'opf': 'http://www.idpf.org/2007/opf',
                 'dc': 'http://purl.org/dc/elements/1.1/'
             }
             
-            # 표지 이미지 ID 찾기 (meta tag cover 또는 manifest에서 cover 단어 수색)
+            # Find cover image ID (search cover in meta tag or manifest)
             cover_id = None
             meta_cover = opf_root.find(".//opf:meta[@name='cover']", ns_opf)
             if meta_cover is not None:
                 cover_id = meta_cover.attrib.get('content')
                 
-            # manifest 아이템 맵 빌드
+            # Build manifest item map
             manifest_items = {}
             for item in opf_root.findall(".//opf:manifest/opf:item", ns_opf):
                 iid = item.attrib.get('id')
@@ -59,7 +59,7 @@ def extract_epub_cover_direct(epub_path, dest_path):
             if cover_id in manifest_items:
                 cover_href = manifest_items[cover_id][0]
             else:
-                # Fallback: manifest 항목 중 파일명이나 id에 'cover', 'thumbnail'이 들어간 이미지 파일을 스캔
+                # Fallback: scan image files with 'cover', 'thumbnail' in filename or id in manifest
                 for iid, (href, media_type) in manifest_items.items():
                     if 'image' in media_type:
                         low_href = href.lower()
@@ -68,7 +68,7 @@ def extract_epub_cover_direct(epub_path, dest_path):
                             cover_href = href
                             break
                 
-                # Still None? manifest의 첫 번째 이미지 사용
+                # Still None? Use first image in manifest
                 if not cover_href:
                     for iid, (href, media_type) in manifest_items.items():
                         if 'image' in media_type:
@@ -77,10 +77,10 @@ def extract_epub_cover_direct(epub_path, dest_path):
                             
             if cover_href:
                 cover_href = urllib.parse.unquote(cover_href)
-                # 상대 경로 교정
+                # Correct relative path
                 actual_img_path = os.path.normpath(os.path.join(opf_dir, cover_href)).replace('\\', '/')
                 
-                # zip 리스트에 매칭되는 실제 파일 찾기
+                # Find actual file matching in zip list
                 zip_names = zf.namelist()
                 matched_name = None
                 for zname in zip_names:
@@ -89,7 +89,7 @@ def extract_epub_cover_direct(epub_path, dest_path):
                         break
                         
                 if not matched_name:
-                    # 한번 더 fallback: href 파일명 단독 매칭
+                    # One more fallback: href filename only match
                     base_img_name = os.path.basename(actual_img_path)
                     for zname in zip_names:
                         if os.path.basename(zname).lower() == base_img_name.lower():
@@ -98,29 +98,29 @@ def extract_epub_cover_direct(epub_path, dest_path):
                             
                 if matched_name:
                     img_data = zf.read(matched_name)
-                    # Pillow를 통한 WebP 인코딩 저장
+                    # Save via Pillow WebP encoding
                     try:
                         with Image.open(io.BytesIO(img_data)) as img:
                             img.save(dest_path, "WEBP", quality=80)
                     except Exception as e:
-                        print(f"[Scanner-EPUB-Cover] WebP 인코딩 실패, 원본 바이너리 저장: {e}")
+                        print(f"[Scanner-EPUB-Cover] WebP encoding failed, saving original binary: {e}")
                         with open(dest_path, 'wb') as out_f:
                             out_f.write(img_data)
                     del img_data
                     return True
     except Exception as e:
-        print(f"[Scanner-EPUB-Cover] EPUB 표지 추출 중 예외 발생 ({epub_path}): {e}")
+        print(f"[Scanner-EPUB-Cover] Exception during EPUB cover extraction ({epub_path}): {e}")
     return False
 
 def download_cover_from_url(file_path, image_url, force=False, library_id=None):
-    """온라인 URL에서 표지 이미지를 다운로드하여 WebP로 저장 (series.json의 image 필드 전용)"""
+    """Download cover image from URL and save as WebP (series.json image field only)"""
     if not image_url or not image_url.startswith('http'):
         return None
     
     import urllib.request
     import ssl
     
-    # 파일 전체 경로 기반 MD5 해시 파일명 생성
+    # Create MD5 hash filename based on full file path
     book_hash = hashlib.md5(file_path.encode('utf-8')).hexdigest()
     cover_filename = f"book_{book_hash}.webp"
     
@@ -134,12 +134,12 @@ def download_cover_from_url(file_path, image_url, force=False, library_id=None):
         
     cover_filepath = os.path.join(dest_dir, cover_filename)
     
-    # 이미 존재하면 재다운로드 스킵 (force가 아닐 때만)
+    # Skip re-download if already exists (only when force=False)
     if not force and os.path.exists(cover_filepath) and os.path.getsize(cover_filepath) > 0:
         return db_cover_path
 
     try:
-        # SSL 인증서 문제 방지용 컨텍스트
+        # Context to prevent SSL cert issues
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
@@ -152,19 +152,19 @@ def download_cover_from_url(file_path, image_url, force=False, library_id=None):
             img = Image.open(io.BytesIO(img_data))
             img.save(cover_filepath, "WEBP", quality=80)
         except Exception as e:
-            print(f"[Scanner-Cover] URL 이미지 WebP 인코딩 실패: {e}. 원본 저장 시도.")
+            print(f"[Scanner-Cover] URL image WebP encoding failed: {e}. Trying original save.")
             with open(cover_filepath, 'wb') as out_f:
                 out_f.write(img_data)
         
-        print(f"[Scanner-Cover] URL 표지 다운로드 완료: '{image_url}' -> '{db_cover_path}'")
+        print(f"[Scanner-Cover] URL cover download complete: '{image_url}' -> '{db_cover_path}'")
         return db_cover_path
     except Exception as e:
-        print(f"[Scanner-Cover] URL 표지 다운로드 실패 ({image_url}): {e}")
+        print(f"[Scanner-Cover] URL cover download failed ({image_url}): {e}")
         return None
 
 
 def extract_cover_from_b64(file_path, cover_b64, force=False, library_id=None):
-    """Base64 이미지를 디코딩하여 WebP 포맷으로 covers/{library_id} 폴더에 저장하고 상대 경로를 반환 (force=True인 경우 강제 재생성)"""
+    """Decode Base64 image and save as WebP format in covers/{library_id} folder and return relative path (force regenerate if force=True)"""
     try:
         import re
         # Remove data URI scheme prefix if exists (e.g. data:image/jpeg;base64,)
@@ -188,7 +188,7 @@ def extract_cover_from_b64(file_path, cover_b64, force=False, library_id=None):
             
         img_data = base64.b64decode(cover_b64)
         
-        # 파일 전체 경로 기반 MD5 해시 파일명 생성 (동일 파일명 충돌 원천 해결, webp 고정)
+        # Create MD5 hash filename based on full file path (동일 파일명 충돌 원천 해결, webp 고정)
         book_hash = hashlib.md5(file_path.encode('utf-8')).hexdigest()
         cover_filename = f"book_{book_hash}.webp"
         
@@ -202,36 +202,36 @@ def extract_cover_from_b64(file_path, cover_b64, force=False, library_id=None):
             
         cover_filepath = os.path.join(dest_dir, cover_filename)
         
-        # 이미 로컬 커버 디렉터리에 파일이 존재한다면 디코딩/쓰기 스킵 (force가 아닐 때만)
+        # Skip decode/write if file already exists in local cover directory (only when force=False)
         if not force and os.path.exists(cover_filepath) and os.path.getsize(cover_filepath) > 0:
             return db_cover_path
             
-        # Pillow를 통한 WebP 인코딩 저장
+        # Save via Pillow WebP encoding
         try:
             img = Image.open(io.BytesIO(img_data))
             img.save(cover_filepath, "WEBP", quality=80)
         except Exception as e:
-            print(f"[Scanner-Cover] Base64 이미지 식별/WebP 렌더링 실패 (바이너리 손상 의심): {e}. 원본 파일 내 표지 추출로 Fallback합니다.")
+            print(f"[Scanner-Cover] Base64 image identify/WebP render failed (binary corruption suspected): {e}. Fallback to cover extraction in original file.")
             return None
                 
-        print(f"[Scanner DEBUG] 커버 복원 완료 (WebP): '{file_path}' -> '{cover_filepath}' (바이너리 크기: {len(img_data)} bytes), Force={force}")
+        print(f"[Scanner DEBUG] Cover restore complete (WebP): '{file_path}' -> '{cover_filepath}' (Binary size: {len(img_data)} bytes), Force={force}")
         del img_data
         return db_cover_path
     except Exception as e:
         import traceback
-        print(f"[Scanner] 커버 복원 실패 ({file_path}): {e}")
+        print(f"[Scanner] Cover restore failed ({file_path}): {e}")
         traceback.print_exc()
         return None
 
 def get_series_cover_fallback(series_name, folder_path, force=False, is_remote=False, filename=None, file_path=None, library_id=None):
-    """시리즈 이름(혹은 개별 책 파일명)에 해당하는 캐시 커버가 존재하는지 검사하고,
-    작품 폴더 내에 cover.jpg/png 등이 있으면 이를 WebP로 인코딩하여 covers/{library_id} 디렉토리에 저장.
-    없다면 해당 폴더(혹은 지정된 압축파일)에서 첫 이미지를 WebP 표지로 강제 추출하여 생성 (force=True인 경우 덮어쓰기)
+    """Check if cache cover corresponding to series name (or individual book filename) exists,
+    If cover.jpg/png etc exists in folder, encode it to WebP and save to covers/{library_id} directory.
+    If not, force extract first image from folder (or specified archive) as WebP cover (overwrite if force=True)
     """
     if not series_name:
         return None
     
-    # 만약 전체 경로(file_path)가 제공되었다면 이를 사용하고, 없으면 folder_path + filename 결합 고유화
+    # If full path (file_path) provided, use it, else combine folder_path + filename to make unique
     target_path_seed = file_path
     if not target_path_seed and filename:
         target_path_seed = os.path.join(folder_path, filename)
@@ -256,7 +256,7 @@ def get_series_cover_fallback(series_name, folder_path, force=False, is_remote=F
     if not force and os.path.exists(local_cover_path) and os.path.getsize(local_cover_path) > 0:
         return db_cover_path
         
-    # ── [분기 1] 개별 책(filename) 전용 1:1 매핑 커버 파일 수색 ──
+    # -- [Branch 1] Search individual book (filename) 1:1 mapped cover file --
     if filename:
         base_name, _ = os.path.splitext(filename)
         for ext_candidate in ['.jpg', '.jpeg', '.png', '.webp']:
@@ -266,17 +266,17 @@ def get_series_cover_fallback(series_name, folder_path, force=False, is_remote=F
                 try:
                     with Image.open(cand_path) as img:
                         img.save(local_cover_path, "WEBP", quality=80)
-                    print(f"[Scanner-Cover] 개별 도서 1:1 매핑 커버 WebP 변환 복사 완료: {cand_path} -> {local_cover_path}, Force={force}")
+                    print(f"[Scanner-Cover] Individual book 1:1 mapped cover WebP convert copy complete: {cand_path} -> {local_cover_path}, Force={force}")
                     return db_cover_path
                 except Exception as e:
-                    print(f"[Scanner-Cover] 개별 도서 1:1 매핑 커버 WebP 변환 복사 실패: {e}. 일반 복사 시도.")
+                    print(f"[Scanner-Cover] Individual book 1:1 mapped cover WebP convert copy failed: {e}. Trying general copy.")
                     try:
                         shutil.copy2(cand_path, local_cover_path)
                         return db_cover_path
                     except Exception as e2:
-                        print(f"[Scanner-Cover] 개별 도서 복사 백업도 실패: {e2}")
+                        print(f"[Scanner-Cover] Individual book copy backup also failed: {e2}")
     else:
-        # ── [분기 2] 시리즈(filename 없음) 대표 공통 커버 수색 ──
+        # -- [Branch 2] Search series (no filename) representative common cover --
         candidates = ['cover.jpg', 'cover.png', 'folder.jpg', 'folder.png']
         for cand in candidates:
             cand_path = os.path.join(folder_path, cand)
@@ -284,25 +284,25 @@ def get_series_cover_fallback(series_name, folder_path, force=False, is_remote=F
                 try:
                     with Image.open(cand_path) as img:
                         img.save(local_cover_path, "WEBP", quality=80)
-                    print(f"[Scanner-Cover] 시리즈 대표 공통 커버 WebP 변환 복사 완료: {cand_path} -> {local_cover_path}, Force={force}")
+                    print(f"[Scanner-Cover] Series representative common cover WebP convert copy complete: {cand_path} -> {local_cover_path}, Force={force}")
                     return db_cover_path
                 except Exception as e:
-                    print(f"[Scanner-Cover] 시리즈 대표 공통 커버 WebP 변환 복사 실패: {e}. 일반 복사 시도.")
+                    print(f"[Scanner-Cover] Series representative common cover WebP convert copy failed: {e}. Trying general copy.")
                     try:
                         shutil.copy2(cand_path, local_cover_path)
                         return db_cover_path
                     except Exception as e2:
-                        print(f"[Scanner-Cover] 시리즈 대표 복사 백업도 실패: {e2}")
+                        print(f"[Scanner-Cover] Series representative copy backup also failed: {e2}")
 
-    # 원격지 경로(VFS)인 경우 대량 스캔 중 원격 압축 파일 I/O를 원천 차단하기 위해 분석을 스킵합니다.
+    # If remote path (VFS), skip analysis to block remote archive file I/O during mass scan.
     if is_remote:
-        print(f"[Scanner-Cover] 원격 경로 감지로 압축 파일/EPUB 내 표지 자동 추출 스킵: {folder_path}")
+        print(f"[Scanner-Cover] Skip automatic cover extraction in archive/EPUB due to remote path detection: {folder_path}")
         return None
 
     try:
         from utils.sort_helper import natural_sort_key
         
-        # filename이 지정되었다면 해당 파일만 타겟으로 하고, 없으면 폴더 내 첫 번째 파일을 타겟으로 함
+        # If filename specified, target only that file, else target first file in folder
         if filename:
             target_files = [filename]
         else:
@@ -317,11 +317,11 @@ def get_series_cover_fallback(series_name, folder_path, force=False, is_remote=F
             
             if target_file_path.lower().endswith('.epub'):
                 if extract_epub_cover_direct(target_file_path, local_cover_path):
-                    print(f"[Scanner-Cover-Auto] EPUB 표지 자동 추출 완료: '{target_file_path}' -> '{local_cover_path}'")
+                    print(f"[Scanner-Cover-Auto] EPUB cover auto extraction complete: '{target_file_path}' -> '{local_cover_path}'")
                     return db_cover_path
             elif target_file_path.lower().endswith('.pdf'):
-                # OOM 및 Worker Timeout 방지를 위해 PDF 대량 표지 추출을 임시 제외 처리합니다.
-                print(f"[Scanner-Cover-Auto] PDF 표지 자동 추출 임시 제외 처리 (Lazy 스캔 연동 대기): '{target_file_path}'")
+                # Temporarily exclude mass PDF cover extraction to prevent OOM and Worker Timeout.
+                print(f"[Scanner-Cover-Auto] PDF cover auto extraction temporarily excluded (waiting for Lazy Scan): '{target_file_path}'")
                 return None
             elif target_file_path.lower().endswith(('.zip', '.cbz')):
                 try:
@@ -336,25 +336,25 @@ def get_series_cover_fallback(series_name, folder_path, force=False, is_remote=F
                             first_img_name = img_infos[0].filename
                             img_data = zf.read(first_img_name)
                             
-                            # Pillow를 통한 WebP 인코딩 저장
+                            # Save via Pillow WebP encoding
                             try:
                                 with Image.open(io.BytesIO(img_data)) as img:
                                     img.save(local_cover_path, "WEBP", quality=80)
                             except Exception as e:
-                                print(f"[Scanner-Cover-Auto] WebP 인코딩 실패, 원본 바이너리 저장: {e}")
+                                print(f"[Scanner-Cover-Auto] WebP encoding failed, saving original binary: {e}")
                                 with open(local_cover_path, 'wb') as img_f:
                                     img_f.write(img_data)
                                     
-                            print(f"[Scanner-Cover-Auto] 압축 파일 첫 페이지 추출 및 표지 생성 완료: '{target_file_path}' ({first_img_name}) -> '{local_cover_path}', Force={force}")
+                            print(f"[Scanner-Cover-Auto] First page extraction and cover generation complete: '{target_file_path}' ({first_img_name}) -> '{local_cover_path}', Force={force}")
                             return db_cover_path
                         else:
-                            raise ValueError("압축파일 내에 이미지 파일이 존재하지 않습니다.")
+                            raise ValueError("No image files found in archive.")
                 except zipfile.BadZipFile as bzf:
-                    raise zipfile.BadZipFile(f"압축 파일이 손상되었거나 유효하지 않은 Zip 포맷입니다: {os.path.basename(target_file_path)}")
+                    raise zipfile.BadZipFile(f"Archive is corrupted or invalid Zip format: {os.path.basename(target_file_path)}")
                 except Exception as e:
                     raise e
     except Exception as e:
-        print(f"[Scanner-Cover-Auto] 파일 내 첫 이미지 추출 실패 ({series_name}): {e}")
+        print(f"[Scanner-Cover-Auto] Failed to extract first image in file ({series_name}): {e}")
         raise e
                 
     return None

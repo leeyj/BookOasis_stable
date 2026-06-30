@@ -199,7 +199,7 @@ def run_lazy_cover_extraction(target_book_id=None):
                     
             cover_missing_count = sum(1 for _, offset_only in targets if not offset_only)
             offset_only_count   = sum(1 for _, offset_only in targets if offset_only)
-            print(f"[Lazy-Scanner] DB={db_type} -> 처리 대상 도서 수: {len(targets)}권 (커버 재추출: {cover_missing_count}권 / 오프셋 전용: {offset_only_count}권)")
+            print(f"[Lazy-Scanner] DB={db_type} -> 처리 대상 도서 수: {len(targets)}권 (커버 재추출: {cover_missing_count}권 / 오프셋 전용: {offset_only_count} books)")
             
             # 폴더별 그룹핑: 같은 폴더의 kavita.yaml/series.json을 한 번만 파싱
             from collections import defaultdict
@@ -374,7 +374,7 @@ def run_lazy_cover_extraction(target_book_id=None):
                             'file_path': file_path,
                             'filename': filename,
                             'error_type': error_type,
-                            'message': f"Lazy 스캔 중 표지 복원 실패: {err_msg}"
+                            'message': f"ERR_LAZY_COVER_FAIL: {err_msg}"
                         })
                         
                     gc.collect()

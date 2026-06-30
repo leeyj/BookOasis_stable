@@ -147,9 +147,9 @@ class DiskCacheManager:
                         os.remove(done_file)
                     total_size -= fsize
                     total_count -= 1
-                    print(f"[DiskCache] LRU 퇴출 완료: {os.path.basename(oldest_file)}")
+                    print(f"[DiskCache] LRU eviction completed: {os.path.basename(oldest_file)}")
                 except Exception as e:
-                    print(f"[DiskCache] LRU 퇴출 중 오류: {e}")
+                    print(f"[DiskCache] LRU eviction error: {e}")
 
 disk_cache_manager = DiskCacheManager(DISK_CACHE_DIR, DISK_CACHE_MAX_BYTES, DISK_CACHE_MAX_FILES)
 

@@ -4,34 +4,52 @@ import { closeMediaViewer } from './viewer.js';
 
 export let epubBook = null;
 export let epubRendition = null;
+export let epubTotalPages = 0;
 
-export function initEpubViewer(bookId) {
+export function initEpubViewer(bookId, totalPages) {
   if (typeof ePub === 'undefined') {
     const script = document.createElement('script');
     script.src = 'https://unpkg.com/epubjs@0.3.88/dist/epub.min.js';
-    script.onload = () => _doInitEpubViewer(bookId);
+    script.onload = () => _doInitEpubViewer(bookId, totalPages);
     script.onerror = (error) => {
       console.error('EPUB 라이브러리 로드 실패 상세 원인:', error);
-      alert('EPUB 뷰어 라이브러리를 불러오지 못했습니다.\n네트워크 연결을 확인해 주세요.');
+      alert(i18n.t('viewer.epub_lib_fail'));
       closeMediaViewer();
     };
     document.head.appendChild(script);
     return;
   }
-  _doInitEpubViewer(bookId);
+  _doInitEpubViewer(bookId, totalPages);
 }
 
 import { showViewerLoading, hideViewerLoading, showViewerError } from './view_manager.js';
 import { saveProgress } from './viewer_progress.js';
 
-function _doInitEpubViewer(bookId) {
-  console.log(`[Viewer-Epub] _doInitEpubViewer - EPUB 뷰어 초기화 시작: bookId=${bookId}`);
+async function _doInitEpubViewer(bookId, totalPages) {
+  console.log(`[Viewer-Epub] _doInitEpubViewer - EPUB 뷰어 초기화 시작: bookId=${bookId}, totalPages=${totalPages}`);
   const container = document.getElementById('epub-viewer-container');
   container.style.display = 'flex';
   const renderArea = document.getElementById('epub-render-area');
   renderArea.innerHTML = '';
   
-  showViewerLoading("도서를 불러오는 중...", "EPUB 도서 파일을 읽어오고 있습니다.<br>잠시만 기다려 주세요.");
+  epubTotalPages = totalPages || 0;
+  
+  // 뷰어 진입 시 totalPages가 0이면 백엔드 API를 통해 동적 계산 시도 (DB 동기화용)
+  if (epubTotalPages === 0) {
+    try {
+      showViewerLoading('페이지 정보 동기화 중...');
+      const libType = state.currentLibraryType || 'general';
+      const res = await fetch(`/api/media/books/${bookId}/info?type=${libType}`);
+      const data = await res.json();
+      if (data.success && data.total_pages > 0) {
+        epubTotalPages = data.total_pages;
+      }
+    } catch (e) {
+      console.warn('[Viewer-Epub] 동적 페이지 로딩 실패:', e);
+    }
+  }
+
+  showViewerLoading(i18n.t("viewer.loading_epub_title") || "EPUB 준비 중", i18n.t("viewer.loading_epub_sub") || "잠시만 기다려 주세요...");
   
   const url = `/api/media/pdf?db_type=${state.currentLibraryType}&book_id=${bookId}&_cb=${new Date().getTime()}&ext=.epub`;
   console.log(`[Viewer-Epub] EPUB 바이너리 수동 Fetch 시도 url: ${url}`);
@@ -109,7 +127,7 @@ function _doInitEpubViewer(bookId) {
     .catch(err => {
       console.error("[Viewer-Epub] EPUB 파일 로드 실패:", err);
       hideViewerLoading();
-      showViewerError("도서 파일을 불러오지 못했습니다.", err.message);
+      showViewerError(i18n.t("viewer.error_epub_title"), err.message);
     });
 }
 

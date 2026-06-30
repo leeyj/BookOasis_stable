@@ -15,12 +15,12 @@ export async function initReportsTab() {
   
   if (!libSelect) return;
   
-  libSelect.innerHTML = '<option value="">-- 카테고리 선택 --</option>';
-  fileSelect.innerHTML = '<option value="">-- 리포트 선택 --</option>';
+  libSelect.innerHTML = `<option value="">${window.i18n ? window.i18n.t('settings.report_select_category') : '-- 카테고리 선택 --'}</option>`;
+  fileSelect.innerHTML = `<option value="">${window.i18n ? window.i18n.t('settings.report_select_report') : '-- 리포트 선택 --'}</option>`;
   tableBody.innerHTML = `
     <tr>
       <td colspan="3" style="padding: 2rem; text-align: center; color: #94a3b8;">
-        <i class="fa-solid fa-info-circle" style="margin-right: 0.3rem;"></i> 카테고리와 리포트를 선택하여 상세 오류 내역을 확인하십시오.
+        <i class="fa-solid fa-info-circle" style="margin-right: 0.3rem;"></i> ${window.i18n ? window.i18n.t('settings.report_empty_message') : '카테고리와 리포트를 선택하여 상세 오류 내역을 확인하십시오.'}
       </td>
     </tr>
   `;
@@ -49,11 +49,11 @@ export async function loadReportList() {
   if (!libSelect || !fileSelect) return;
   
   const libraryId = libSelect.value;
-  fileSelect.innerHTML = '<option value="">-- 리포트 선택 --</option>';
+  fileSelect.innerHTML = `<option value="">${window.i18n ? window.i18n.t('settings.report_select_report') : '-- 리포트 선택 --'}</option>`;
   tableBody.innerHTML = `
     <tr>
       <td colspan="3" style="padding: 2rem; text-align: center; color: #94a3b8;">
-        <i class="fa-solid fa-info-circle" style="margin-right: 0.3rem;"></i> 리포트를 선택하여 상세 오류 내역을 확인하십시오.
+        <i class="fa-solid fa-info-circle" style="margin-right: 0.3rem;"></i> ${window.i18n ? window.i18n.t('settings.report_empty_message') : '리포트를 선택하여 상세 오류 내역을 확인하십시오.'}
       </td>
     </tr>
   `;
@@ -194,6 +194,21 @@ function renderReportPage() {
       typeTextColor = '#60a5fa';
     }
     
+    let msg = err.message || '';
+    if (window.i18n) {
+      if (msg === 'ERR_NO_COVER' || msg === '도서 내 표지 이미지가 존재하지 않거나 추출 결과가 0바이트(빈 파일)입니다.') {
+        msg = window.i18n.t('scan_errors.ERR_NO_COVER') || msg;
+      } else if (msg.startsWith('ERR_OFFSET_FAIL: ')) {
+        msg = (window.i18n.t('scan_errors.ERR_OFFSET_FAIL') || 'Offset analysis failed') + ': ' + msg.substring(17);
+      } else if (msg.startsWith('오프셋 분석 실패: ')) {
+        msg = (window.i18n.t('scan_errors.ERR_OFFSET_FAIL') || 'Offset analysis failed') + ': ' + msg.substring(10);
+      } else if (msg.startsWith('ERR_LAZY_COVER_FAIL: ')) {
+        msg = (window.i18n.t('scan_errors.ERR_LAZY_COVER_FAIL') || 'Cover restore failed') + ': ' + msg.substring(21);
+      } else if (msg.startsWith('Lazy 스캔 중 표지 복원 실패: ')) {
+        msg = (window.i18n.t('scan_errors.ERR_LAZY_COVER_FAIL') || 'Cover restore failed') + ': ' + msg.substring(18);
+      }
+    }
+
     html += `
       <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.2s;">
         <td style="padding: 0.8rem 1rem; color: #f1f5f9; font-weight: 600; word-break: break-all;">${err.filename || ''}</td>
@@ -203,7 +218,7 @@ function renderReportPage() {
           </span>
         </td>
         <td style="padding: 0.8rem 1rem; color: #94a3b8; font-size: 0.82rem; line-height: 1.4; word-break: break-all;">
-          <div style="color: #cbd5e1; margin-bottom: 0.2rem; font-weight: 500;">${err.message || ''}</div>
+          <div style="color: #cbd5e1; margin-bottom: 0.2rem; font-weight: 500;">${msg}</div>
           <div style="font-size: 0.74rem; opacity: 0.6; color: #64748b;"><i class="fa-regular fa-folder" style="margin-right: 0.2rem;"></i>${err.file_path || ''}</div>
         </td>
       </tr>

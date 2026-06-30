@@ -6,6 +6,7 @@ from services.book_detail_service import BookDetailService
 from services.metadata_service import MetadataService
 from services.reading_history_service import ReadingHistoryService
 from api.auth import login_required, check_adult_permission, admin_required
+from utils.i18n import _t
 import database
 
 library_bp = Blueprint('media_library', __name__)
@@ -16,7 +17,7 @@ def get_media_libraries():
     """라이브러리 카테고리 목록 조회"""
     db_type = request.args.get('type', 'general')
     if not check_adult_permission(db_type):
-        return jsonify({'success': False, 'error': '성인 도서관 접근 권한이 없습니다.'}), 403
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
     try:
         libraries = CategoryService.get_libraries(db_type)
         return jsonify({'success': True, 'libraries': libraries})
@@ -29,7 +30,7 @@ def get_media_list():
     """도서 보관함 시리즈 목록 조회 (무한 스크롤 페이지네이션 + 서버 검색)"""
     db_type    = request.args.get('type', 'general')
     if not check_adult_permission(db_type):
-        return jsonify({'success': False, 'error': '성인 도서관 접근 권한이 없습니다.'}), 403
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
     library_id = request.args.get('library_id')
     search_query = request.args.get('search', '').strip()
     sort = request.args.get('sort', 'asc').strip().lower()
@@ -54,7 +55,7 @@ def get_media_all_list():
     """Kavita 방식의 선로드를 위해 특정 라이브러리의 전체 시리즈 목록을 페이징 없이 경량 조회"""
     db_type    = request.args.get('type', 'general')
     if not check_adult_permission(db_type):
-        return jsonify({'success': False, 'error': '성인 도서관 접근 권한이 없습니다.'}), 403
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
     library_id = request.args.get('library_id')
     try:
         series_list = SeriesService.get_all_books_list(db_type, library_id)
@@ -68,7 +69,7 @@ def get_media_detail():
     """특정 시리즈 상세 정보 및 단행본 목록 조회"""
     db_type     = request.args.get('type', 'general')
     if not check_adult_permission(db_type):
-        return jsonify({'success': False, 'error': '성인 도서관 접근 권한이 없습니다.'}), 403
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
     series_name = request.args.get('series', '')
     library_id  = request.args.get('library_id', 'all')
     user_id     = session.get('user_id', 1)
@@ -94,7 +95,7 @@ def edit_media_detail():
     cover_file  = request.files.get('cover_image')
 
     if not series_name:
-        return jsonify({'success': False, 'error': '시리즈 이름은 필수 값입니다.'}), 400
+        return jsonify({'success': False, 'error': _t('api.err_series_name_required')}), 400
 
     try:
         success, message = BookDetailService.update_media_detail(
@@ -118,7 +119,7 @@ def get_media_tags():
     """도서 보관함의 전체 유니크 태그 목록 조회"""
     db_type = request.args.get('type', 'general')
     if not check_adult_permission(db_type):
-        return jsonify({'success': False, 'error': '성인 도서관 접근 권한이 없습니다.'}), 403
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
     library_id = request.args.get('library_id')
     
     try:
@@ -151,7 +152,7 @@ def get_media_genres():
     """도서 보관함의 전체 유니크 장르 목록 조회"""
     db_type = request.args.get('type', 'general')
     if not check_adult_permission(db_type):
-        return jsonify({'success': False, 'error': '성인 도서관 접근 권한이 없습니다.'}), 403
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
     library_id = request.args.get('library_id')
     
     try:
@@ -184,7 +185,7 @@ def get_media_history():
     """최근 읽은 도서 히스토리 (최대 20건)"""
     db_type = request.args.get('type', 'general')
     if not check_adult_permission(db_type):
-        return jsonify({'success': False, 'error': '성인 도서관 접근 권한이 없습니다.'}), 403
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
     user_id = session.get('user_id', 1)
     try:
         history = ReadingHistoryService.get_history(db_type, user_id=user_id)
@@ -198,7 +199,7 @@ def get_media_recently_added():
     """신규 추가 도서 (최대 20건)"""
     db_type = request.args.get('type', 'general')
     if not check_adult_permission(db_type):
-        return jsonify({'success': False, 'error': '성인 도서관 접근 권한이 없습니다.'}), 403
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
     try:
         books = ReadingHistoryService.get_recently_added(db_type)
         return jsonify({'success': True, 'books': books})
@@ -213,11 +214,11 @@ def get_media_meta_recommend():
     """상세 설명이 비어있을 때, 유사한 시리즈 이름을 가진 메타데이터 추천"""
     db_type     = request.args.get('type', 'general')
     if not check_adult_permission(db_type):
-        return jsonify({'success': False, 'error': '성인 도서관 접근 권한이 없습니다.'}), 403
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
     series_name = request.args.get('series', '')
     
     if not series_name:
-        return jsonify({'success': False, 'error': '시리즈명이 누락되었습니다.'}), 400
+        return jsonify({'success': False, 'error': _t('api.err_series_name_missing')}), 400
         
     try:
         recommends = MetadataService.get_meta_recommend(db_type, series_name)
@@ -235,7 +236,7 @@ def copy_media_metadata():
     source_book_id = request.form.get('source_book_id', '').strip()
     
     if not target_series or not target_lib_id or not source_book_id:
-        return jsonify({'success': False, 'error': '필수 전송 매개변수가 누락되었습니다.'}), 400
+        return jsonify({'success': False, 'error': _t('api.err_missing_params')}), 400
         
     try:
         success, message = MetadataService.copy_metadata(db_type, target_series, target_lib_id, source_book_id)
@@ -252,16 +253,76 @@ def get_next_book_api():
     """시리즈 내 다음 도서 권 정보 조회 API"""
     db_type = request.args.get('type', 'general')
     if not check_adult_permission(db_type):
-        return jsonify({'success': False, 'error': '성인 도서관 접근 권한이 없습니다.'}), 403
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
     book_id = request.args.get('book_id')
     user_id = session.get('user_id', 1)
     
     if not book_id:
-        return jsonify({'success': False, 'error': 'book_id가 누락되었습니다.'}), 400
+        return jsonify({'success': False, 'error': _t('api.err_book_id_missing')}), 400
         
     try:
         next_book = BookService.get_next_book(db_type, book_id, user_id=user_id)
         return jsonify({'success': True, 'next_book': next_book})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@library_bp.route('/api/media/books/<int:book_id>/info', methods=['GET'])
+@login_required
+def get_book_info(book_id):
+    """단일 도서의 메타정보 조회 (Viewer에서 total_pages=0일 때 동적 계산용)"""
+    db_type = request.args.get('type', 'general')
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+    
+    try:
+        import os
+        from database import get_connection
+        conn = get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute("SELECT total_pages, file_path, file_format FROM books WHERE id = ?", (book_id,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row:
+            return jsonify({'success': False, 'error': 'Book not found'}), 404
+            
+        total_pages = row['total_pages'] or 0
+        file_format = (row['file_format'] or '').lower()
+        
+        # 실시간 페이지 계산 (Viewer 진입 시에만 1권 단위로 수행하여 병목 방지)
+        if total_pages == 0 and file_format in ('zip', 'cbz'):
+            file_path = row['file_path']
+            if file_path and os.path.exists(file_path):
+                from utils.cache_helper import get_zip_file_hybrid
+                zf = get_zip_file_hybrid(file_path)
+                if zf:
+                    img_ext = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp')
+                    total_pages = len([n for n in zf.namelist() if n.lower().endswith(img_ext)])
+                    
+                    # DB 갱신
+                    if total_pages > 0:
+                        conn2 = get_connection(db_type)
+                        conn2.execute("UPDATE books SET total_pages = ? WHERE id = ?", (total_pages, book_id))
+                        conn2.commit()
+                        conn2.close()
+        elif total_pages == 0 and file_format == 'pdf':
+            file_path = row['file_path']
+            if file_path and os.path.exists(file_path):
+                try:
+                    import fitz
+                    doc = fitz.open(file_path)
+                    total_pages = doc.page_count
+                    doc.close()
+                    
+                    if total_pages > 0:
+                        conn2 = get_connection(db_type)
+                        conn2.execute("UPDATE books SET total_pages = ? WHERE id = ?", (total_pages, book_id))
+                        conn2.commit()
+                        conn2.close()
+                except Exception as pdf_err:
+                    print(f"[BookInfo API] PDF 렌더링 실패: {pdf_err}")
+
+        return jsonify({'success': True, 'total_pages': total_pages})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -271,7 +332,7 @@ def toggle_book_favorite(book_id):
     """특정 도서의 즐겨찾기 상태 변경"""
     db_type = request.form.get('type', 'general')
     if not check_adult_permission(db_type):
-        return jsonify({'success': False, 'error': '성인 도서관 접근 권한이 없습니다.'}), 403
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
     try:
         is_favorite = int(request.form.get('is_favorite', 0))
     except ValueError:
@@ -279,7 +340,7 @@ def toggle_book_favorite(book_id):
 
     try:
         BookService.update_favorite(db_type, book_id, is_favorite)
-        return jsonify({'success': True, 'message': '즐겨찾기 상태가 변경되었습니다.'})
+        return jsonify({'success': True, 'message': _t('api.msg_favorite_updated')})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -290,7 +351,7 @@ def toggle_series_favorite_api():
     """특정 시리즈 전체의 즐겨찾기 상태 변경"""
     db_type = request.form.get('type', 'general')
     if not check_adult_permission(db_type):
-        return jsonify({'success': False, 'error': '성인 도서관 접근 권한이 없습니다.'}), 403
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
     series_name = request.form.get('series_name', '').strip()
     try:
         is_favorite = int(request.form.get('is_favorite', 0))
@@ -302,7 +363,7 @@ def toggle_series_favorite_api():
 
     try:
         BookService.update_series_favorite(db_type, series_name, is_favorite)
-        return jsonify({'success': True, 'message': '시리즈 즐겨찾기 상태가 갱신되었습니다.'})
+        return jsonify({'success': True, 'message': _t('api.msg_series_favorite_updated')})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -325,7 +386,7 @@ def search_book_metadata_api():
     source = request.args.get('source', '').strip() or None
     
     if not query:
-        return jsonify({'success': False, 'error': '검색어가 누락되었습니다.'}), 400
+        return jsonify({'success': False, 'error': _t('api.err_query_missing')}), 400
         
     try:
         results = MetadataService.search_metadata(db_type, query, source)
@@ -354,7 +415,7 @@ def apply_book_metadata_api(book_id):
             item_data.pop('source')
 
     if not item_data:
-        return jsonify({'success': False, 'error': '반영할 메타데이터가 누락되었습니다.'}), 400
+        return jsonify({'success': False, 'error': _t('api.err_metadata_missing')}), 400
         
     try:
         success, message = MetadataService.apply_metadata(db_type, book_id, item_data, source)
@@ -374,7 +435,7 @@ def toggle_metadata_plugin_api():
     enabled_val = request.form.get('enabled', '1').strip()
     
     if not plugin_id:
-        return jsonify({'success': False, 'error': 'plugin_id가 누락되었습니다.'}), 400
+        return jsonify({'success': False, 'error': _t('api.err_plugin_id_missing')}), 400
         
     try:
         conn = database.get_connection(db_type)
@@ -384,8 +445,8 @@ def toggle_metadata_plugin_api():
         conn.commit()
         conn.close()
         
-        status_txt = "활성화" if enabled_val == '1' else "비활성화"
-        return jsonify({'success': True, 'message': f'"{plugin_id}" 플러그인이 {status_txt} 되었습니다.'})
+        status_txt = _t('api.status_enabled') if enabled_val == '1' else _t('api.status_disabled')
+        return jsonify({'success': True, 'message': _t('api.msg_plugin_status_updated', plugin_id=plugin_id, status_txt=status_txt)})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -398,10 +459,10 @@ def save_metadata_plugin_config_api():
     config_data = request.json.get('config') if request.is_json else request.form.get('config')
     
     if not plugin_id:
-        return jsonify({'success': False, 'error': 'plugin_id가 누락되었습니다.'}), 400
+        return jsonify({'success': False, 'error': _t('api.err_plugin_id_missing')}), 400
         
     if config_data is None:
-        return jsonify({'success': False, 'error': '저장할 설정 데이터가 누락되었습니다.'}), 400
+        return jsonify({'success': False, 'error': _t('api.err_config_data_missing')}), 400
         
     try:
         import json
@@ -419,7 +480,7 @@ def save_metadata_plugin_config_api():
         conn.commit()
         conn.close()
         
-        return jsonify({'success': True, 'message': f'"{plugin_id}" 플러그인 설정이 성공적으로 저장되었습니다.'})
+        return jsonify({'success': True, 'message': _t('api.msg_plugin_config_saved', plugin_id=plugin_id)})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

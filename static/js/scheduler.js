@@ -100,17 +100,17 @@ export async function saveLibrarySchedule(libraryId, name) {
     const data = await api.updateLibrarySchedule(state.currentLibraryType, libraryId, cronVal, vfsRefresh, rcloneRcVal);
     if (data.success) {
       if (typeof window.showToast === 'function') {
-        window.showToast(`"${name}" 설정이 성공적으로 저장되었습니다.`, 'success');
+        window.showToast(i18n.t('scheduler.save_success', {name: name}), 'success');
       } else {
-        alert('저장 완료');
+        alert(i18n.t('scheduler.save_done'));
       }
       loadLibrarySchedules();
     } else {
-      alert(`스케줄 변경 실패: ${data.error}`);
+      alert(i18n.t('scheduler.save_fail', {error: data.error}));
     }
   } catch (e) {
     console.error('스케줄 변경 API 요청 에러:', e);
-    alert('서버 연결 중 오류가 발생했습니다.');
+    alert(i18n.t('scheduler.server_error'));
   }
 }
 
@@ -119,18 +119,18 @@ export async function runLibraryScanNow(libraryId, name, force = false) {
   try {
     const data = await api.triggerLibraryScan(state.currentLibraryType, libraryId, force);
     if (data.success) {
-      const modeText = force ? '강제 전체 재색인' : '점진적 즉시 스캔';
+      const modeText = force ? i18n.t('scheduler.scan_force') : i18n.t('scheduler.scan_incremental');
       if (typeof window.showToast === 'function') {
-        window.showToast(`"${name}" ${modeText}을 요청했습니다.`, 'success');
+        window.showToast(i18n.t('scheduler.scan_req_success', {name: name, modeText: modeText}), 'success');
       } else {
-        alert(`${modeText}을 실행했습니다.`);
+        alert(i18n.t('scheduler.scan_req_done', {modeText: modeText}));
       }
       loadLibrarySchedules();
     } else {
-      alert(`스캔 요청 실패: ${data.error}`);
+      alert(i18n.t('scheduler.scan_fail', {error: data.error}));
     }
   } catch (e) {
     console.error('즉시 스캔 API 요청 에러:', e);
-    alert('서버 연결 중 오류가 발생했습니다.');
+    alert(i18n.t('scheduler.server_error'));
   }
 }

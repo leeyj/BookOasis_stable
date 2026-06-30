@@ -9,6 +9,7 @@ from flask import Blueprint, request, Response, jsonify, send_file, session
 from services.stream_service import StreamService, get_img_files
 from utils.cache_helper import get_zip_file_hybrid
 from api.auth import login_required, check_adult_permission, admin_required
+from utils.i18n import _t
 
 stream_bp = Blueprint('media_stream', __name__)
 
@@ -21,21 +22,21 @@ def stream_comic_page():
     """만화책 ZIP/CBZ 실시간 이미지 추출 (RAM 캐시 + Prefetch 적용)"""
     db_type  = request.args.get('db_type', 'general')
     if not check_adult_permission(db_type):
-        return jsonify({'success': False, 'error': '성인 도서관 접근 권한이 없습니다.'}), 403
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
     book_id  = request.args.get('book_id')
     page_idx = int(request.args.get('page_idx', 0))
     user_id  = session.get('user_id', 1)
 
     if not book_id:
-        return jsonify({'error': 'book_id is required'}), 400
+        return jsonify({'error': _t('api.err_book_id_required')}), 400
 
     file_path = StreamService.get_file_path(db_type, book_id)
     if not file_path:
-        return jsonify({'error': 'Book not found'}), 404
+        return jsonify({'error': _t('api.err_book_not_found')}), 404
 
     result = StreamService.extract_page(file_path, page_idx, db_type=db_type, book_id=book_id)
     if result is None:
-        return jsonify({'error': 'Cannot extract page'}), 400
+        return jsonify({'error': _t('api.err_extract_page')}), 400
 
     img_data, mime_type = result
 
@@ -57,14 +58,14 @@ def get_txt_content():
     """소설·TXT 파일 UTF-8 서빙 (CP949/EUC-KR 자동 변환)"""
     db_type = request.args.get('db_type', 'general')
     if not check_adult_permission(db_type):
-        return jsonify({'success': False, 'error': '성인 도서관 접근 권한이 없습니다.'}), 403
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
     book_id = request.args.get('book_id')
     if not book_id:
-        return jsonify({'error': 'book_id is required'}), 400
+        return jsonify({'error': _t('api.err_book_id_required')}), 400
 
     file_path = StreamService.get_file_path(db_type, book_id)
     if not file_path:
-        return jsonify({'error': 'Book not found'}), 404
+        return jsonify({'error': _t('api.err_book_not_found')}), 404
 
     content, error = StreamService.get_txt_content(file_path)
     if error:
@@ -78,17 +79,17 @@ def get_pdf_range():
     """대용량 PDF HTTP Range Requests 지원"""
     db_type = request.args.get('db_type', 'general')
     if not check_adult_permission(db_type):
-        return jsonify({'success': False, 'error': '성인 도서관 접근 권한이 없습니다.'}), 403
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
     book_id = request.args.get('book_id')
     if not book_id:
-        return jsonify({'error': 'book_id is required'}), 400
+        return jsonify({'error': _t('api.err_book_id_required')}), 400
 
     file_path = StreamService.get_file_path(db_type, book_id)
     if not file_path:
-        return jsonify({'error': 'Book not found'}), 404
+        return jsonify({'error': _t('api.err_book_not_found')}), 404
 
     if not os.path.exists(file_path):
-        return jsonify({'error': 'File not found'}), 404
+        return jsonify({'error': _t('api.err_file_not_found')}), 404
 
     # 파일 확장자에 맞는 mime-type 결정 (OS별 mimetypes 모듈 누락 대비 하드코딩 매핑 우선 적용)
     _, ext = os.path.splitext(file_path)
@@ -141,7 +142,7 @@ def get_cover_image(filename):
         path_fallback = os.path.join(COVERS_DIR, filename)
         if os.path.exists(path_fallback):
             return send_file(path_fallback, mimetype='image/png')
-        return jsonify({'error': 'Cover not found'}), 404
+        return jsonify({'error': _t('api.err_cover_not_found')}), 404
     return send_file(path, mimetype='image/png')
 
 @stream_bp.route('/api/media/cache/stats', methods=['GET'])
@@ -165,7 +166,7 @@ def list_custom_fonts():
         try:
             os.makedirs(custom_fonts_dir, exist_ok=True)
         except Exception as e:
-            print(f"[Fonts API] 디렉터리 생성 실패: {e}")
+            print(f"[Fonts API] Failed to create directory: {e}")
     
     fonts = []
     allowed_exts = {'.woff2', '.woff', '.ttf', '.otf'}
@@ -191,14 +192,14 @@ def save_viewer_progress():
         data = request.json or {}
         db_type = data.get('db_type', 'general')
         if not check_adult_permission(db_type):
-            return jsonify({'success': False, 'error': '성인 도서관 접근 권한이 없습니다.'}), 403
+            return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
         book_id = data.get('book_id')
         page_idx = data.get('page_idx') # 0-indexed로 처리
         total_pages = data.get('total_pages')
         user_id = session.get('user_id', 1)
 
         if book_id is None or page_idx is None:
-            return jsonify({'success': False, 'error': 'book_id and page_idx are required'}), 400
+            return jsonify({'success': False, 'error': _t('api.err_book_id_page_idx_required')}), 400
 
         # total_pages가 제공되지 않은 경우 기본값으로 1을 지정하거나 처리
         if total_pages is None:
@@ -218,12 +219,12 @@ def preload_next_book_api():
         data = request.json or {}
         db_type = data.get('db_type', 'general')
         if not check_adult_permission(db_type):
-            return jsonify({'success': False, 'error': '성인 도서관 접근 권한이 없습니다.'}), 403
+            return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
         book_id = data.get('book_id')
         user_id = session.get('user_id', 1)
 
         if not book_id:
-            return jsonify({'success': False, 'error': 'book_id is required'}), 400
+            return jsonify({'success': False, 'error': _t('api.err_book_id_required')}), 400
 
         from services.book_service import BookService
         from utils.cache_helper import start_background_copy
@@ -231,7 +232,7 @@ def preload_next_book_api():
         # 1. 다음 권 조회
         next_book = BookService.get_next_book(db_type, book_id, user_id=user_id)
         if not next_book or not next_book.get('file_path'):
-            return jsonify({'success': True, 'message': 'No next book to preload'})
+            return jsonify({'success': True, 'message': _t('api.msg_no_next_book')})
 
         # 2. 백그라운드 복사 태스크 기동
         next_file_path = next_book['file_path']
@@ -240,7 +241,7 @@ def preload_next_book_api():
             print(f"[Viewer-Preload] Preloading next book successfully: {next_book['title']}")
             return jsonify({'success': True, 'preloaded_book_id': next_book['id']})
         else:
-            return jsonify({'success': False, 'error': 'Next book file path does not exist'}), 404
+            return jsonify({'success': False, 'error': _t('api.err_next_book_not_exist')}), 404
 
     except Exception as e:
         print(f"[Preload API Error] {e}")

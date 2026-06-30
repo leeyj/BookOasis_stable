@@ -27,8 +27,8 @@ import { switchSettingsTab, loadInitialSystemSettings, loadGeneralSettings, subm
 // 장르 및 태그 플로팅 필터 모달 임포트
 import { initFloatingFilter, toggleFilterModal } from './genre_tag_filter.js';
 
-// 초기화
-document.addEventListener('DOMContentLoaded', () => {
+// 초기화 함수 분리
+function initTabMediaLibrary() {
   // 로그인 사용자 세션 연동
   if (window.currentUser) {
     state.currentUser = window.currentUser;
@@ -85,7 +85,13 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
   });
-});
+}
+
+if (window.i18nReady) {
+  initTabMediaLibrary();
+} else {
+  document.addEventListener('i18nReady', initTabMediaLibrary);
+}
 
 // 라이브러리 타입 스위칭 (일반/성인)
 export function switchLibraryType(type) {

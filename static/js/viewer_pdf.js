@@ -8,12 +8,28 @@ export let pdfCurrentPage = 1;
 export let pdfTotalPages = 0;
 let currentRenderTask = null;
 
-export function initPdfViewer(bookId, pagesRead) {
-  console.log(`[Viewer-Pdf] initPdfViewer - PDF 렌더링 요청: bookId=${bookId}, pagesRead=${pagesRead}`);
+export async function initPdfViewer(bookId, pagesRead, totalPages) {
+  console.log(`[Viewer-Pdf] initPdfViewer - PDF 렌더링 요청: bookId=${bookId}, pagesRead=${pagesRead}, totalPages=${totalPages}`);
   document.getElementById('pdf-viewer-container').style.display = 'flex';
   pdfCurrentPage = pagesRead > 0 ? pagesRead : 1;
+  pdfTotalPages = totalPages || 0;
   
-  showViewerLoading("PDF 로드 중...", "PDF 도서 파일을 읽어오고 있습니다.<br>잠시만 기다려 주세요.");
+  // 뷰어 진입 시 totalPages가 0이면 백엔드 API를 통해 동적 계산 시도 (DB 동기화용)
+  if (pdfTotalPages === 0) {
+    try {
+      showViewerLoading('페이지 정보 동기화 중...');
+      const libType = state.currentLibraryType || 'general';
+      const res = await fetch(`/api/media/books/${bookId}/info?type=${libType}`);
+      const data = await res.json();
+      if (data.success && data.total_pages > 0) {
+        pdfTotalPages = data.total_pages;
+      }
+    } catch (e) {
+      console.warn('[Viewer-Pdf] 동적 페이지 로딩 실패:', e);
+    }
+  }
+
+  showViewerLoading(i18n.t("viewer.loading_pdf_title") || "PDF 준비 중", i18n.t("viewer.loading_pdf_sub") || "잠시만 기다려 주세요...");
   
   const url = `/api/media/pdf?db_type=${state.currentLibraryType}&book_id=${bookId}`;
   pdfjsLib.getDocument({
@@ -29,7 +45,7 @@ export function initPdfViewer(bookId, pagesRead) {
     })
     .catch(err => { 
       hideViewerLoading();
-      showViewerError("PDF 로드 실패", err.message);
+      showViewerError(i18n.t("viewer.error_pdf_title"), err.message);
     });
 }
 

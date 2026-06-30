@@ -2,7 +2,7 @@
 import os
 import sys
 
-# 프로젝트 루트 경로를 sys.path에 추가하여 패키지 임포트 오류 방지
+# Add project root path to sys.path to prevent package import errors
 MEDIA_SERVER_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if MEDIA_SERVER_DIR not in sys.path:
     sys.path.append(MEDIA_SERVER_DIR)

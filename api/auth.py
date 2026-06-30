@@ -6,6 +6,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from services.settings_service import SettingsService
 
 from utils.i18n_helper import get_available_languages
+from utils.i18n import _t
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -14,14 +15,14 @@ def login_required(f):
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
             if request.path.startswith('/api/'):
-                return jsonify({'success': False, 'error': '로그인이 필요합니다.'}), 401
+                return jsonify({'success': False, 'error': _t('api.login_required')}), 401
             return redirect(url_for('media_api.auth.login'))
         
         # 기본 비밀번호 상태인데 비밀번호 변경 요청이 아닌 경우 차단
         if session.get('is_default_password') == 1 and request.endpoint != 'auth.change_password':
             # index 페이지(SPA 로더)는 허용하되, 데이터 조회용 API는 차단
             if request.path.startswith('/api/'):
-                return jsonify({'success': False, 'error': '기본 비밀번호를 변경해야 합니다.'}), 403
+                return jsonify({'success': False, 'error': _t('api.default_pw_change_required')}), 403
             
         return f(*args, **kwargs)
     return decorated_function
@@ -31,7 +32,7 @@ def admin_required(f):
     @login_required
     def decorated_function(*args, **kwargs):
         if session.get('role') != 'admin':
-            return jsonify({'success': False, 'error': '관리자 권한이 필요합니다.'}), 403
+            return jsonify({'success': False, 'error': _t('api.admin_required')}), 403
         return f(*args, **kwargs)
     return decorated_function
 
@@ -81,7 +82,7 @@ def check_authentication():
     # 1. 미로그인 시 차단
     if 'user_id' not in session:
         if request.path.startswith('/api/'):
-            return jsonify({'success': False, 'error': '로그인이 필요합니다.'}), 401
+            return jsonify({'success': False, 'error': _t('api.login_required')}), 401
         return redirect(url_for('media_api.auth.login'))
         
     # 2. 기본 비밀번호 상태 시 일반 API 조회 차단
@@ -90,7 +91,7 @@ def check_authentication():
         if request.path in ['/', '/media-library']:
             return
         if request.path.startswith('/api/'):
-            return jsonify({'success': False, 'is_default': True, 'error': '기본 비밀번호를 변경해야 합니다.'}), 403
+            return jsonify({'success': False, 'is_default': True, 'error': _t('api.default_pw_change_required')}), 403
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -105,7 +106,7 @@ def login():
             password = request.form.get('password')
             
         if not username or not password:
-            return jsonify({'success': False, 'error': '사용자명과 비밀번호를 모두 입력하세요.'}), 400
+            return jsonify({'success': False, 'error': _t('api.username_password_required')}), 400
             
         conn = database.get_connection('general')
         cursor = conn.cursor()
@@ -125,7 +126,7 @@ def login():
                 'is_default_password': user['is_default_password']
             })
         else:
-            return jsonify({'success': False, 'error': '아이디 또는 비밀번호가 올바르지 않습니다.'}), 401
+            return jsonify({'success': False, 'error': _t('api.invalid_credentials')}), 401
             
     # GET 요청 시 로그인 템플릿 반환
     if 'user_id' in session:
@@ -144,7 +145,7 @@ def change_password():
     new_password = data.get('new_password')
     
     if not new_password or len(new_password.strip()) < 4:
-        return jsonify({'success': False, 'error': '새 비밀번호는 공백 제외 최소 4자리 이상이어야 합니다.'}), 400
+        return jsonify({'success': False, 'error': _t('api.new_password_length_error')}), 400
         
     user_id = session['user_id']
     new_hash = generate_password_hash(new_password.strip())
@@ -158,7 +159,7 @@ def change_password():
         conn.close()
         
     session['is_default_password'] = 0
-    return jsonify({'success': True, 'message': '비밀번호가 정상 변경되었습니다.'})
+    return jsonify({'success': True, 'message': _t('api.password_changed_success')})
 
 # --- 어드민 전용 사용자 관리 API ---
 
@@ -166,7 +167,7 @@ def change_password():
 @login_required
 def get_users():
     if session.get('role') != 'admin':
-        return jsonify({'success': False, 'error': '권한이 없습니다.'}), 403
+        return jsonify({'success': False, 'error': _t('api.admin_required')}), 403
         
     conn = database.get_connection('general')
     cursor = conn.cursor()
@@ -180,7 +181,7 @@ def get_users():
 @login_required
 def add_user():
     if session.get('role') != 'admin':
-        return jsonify({'success': False, 'error': '권한이 없습니다.'}), 403
+        return jsonify({'success': False, 'error': _t('api.admin_required')}), 403
         
     data = request.get_json() or {}
     username = data.get('username', '').strip()
@@ -188,10 +189,10 @@ def add_user():
     role = data.get('role', 'user').strip()
     
     if not username or not password:
-        return jsonify({'success': False, 'error': '아이디와 초기 비밀번호를 입력해 주세요.'}), 400
+        return jsonify({'success': False, 'error': _t('api.username_password_initial_required')}), 400
         
     if len(password) < 4:
-        return jsonify({'success': False, 'error': '비밀번호는 최소 4자리 이상이어야 합니다.'}), 400
+        return jsonify({'success': False, 'error': _t('api.password_length_error')}), 400
         
     password_hash = generate_password_hash(password)
     
@@ -206,19 +207,19 @@ def add_user():
             conn.close()
     except Exception as e:
         if 'UNIQUE' in str(e):
-            return jsonify({'success': False, 'error': '이미 존재하는 사용자 아이디입니다.'}), 409
-        return jsonify({'success': False, 'error': f'사용자 추가 실패: {str(e)}'}), 500
+            return jsonify({'success': False, 'error': _t('api.username_exists')}), 409
+        return jsonify({'success': False, 'error': _t('api.add_user_failed', error=str(e))}), 500
         
-    return jsonify({'success': True, 'message': '사용자가 등록되었습니다.'})
+    return jsonify({'success': True, 'message': _t('api.user_added_success')})
 
 @auth_bp.route('/api/admin/users/<int:target_user_id>', methods=['DELETE'])
 @login_required
 def delete_user(target_user_id):
     if session.get('role') != 'admin':
-        return jsonify({'success': False, 'error': '권한이 없습니다.'}), 403
+        return jsonify({'success': False, 'error': _t('api.admin_required')}), 403
         
     if session.get('user_id') == target_user_id:
-        return jsonify({'success': False, 'error': '자기 자신은 삭제할 수 없습니다.'}), 400
+        return jsonify({'success': False, 'error': _t('api.delete_self_error')}), 400
         
     # 두 데이터베이스 모두에서 삭제
     for db_type in ['general', 'adult']:
@@ -228,7 +229,7 @@ def delete_user(target_user_id):
         conn.commit()
         conn.close()
         
-    return jsonify({'success': True, 'message': '사용자가 삭제되었습니다.'})
+    return jsonify({'success': True, 'message': _t('api.user_deleted_success')})
 
 @auth_bp.route('/api/i18n/languages', methods=['GET'])
 def get_languages():

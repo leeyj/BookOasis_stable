@@ -77,11 +77,11 @@ class StreamService:
                                 img_data = None
                                 if compress_type == 0:  # ZIP_STORED (압축 해제 불필요)
                                     img_data = raw_bytes
-                                    # print(f"[Offset-SpeedRun] STORED 서빙: {target_filename} ({compress_size} bytes)")
+                                    # print(f"[Offset-SpeedRun] STORED Serving: {target_filename} ({compress_size} bytes)")
                                 elif compress_type == 8:  # ZIP_DEFLATED (압축 적용)
                                     import zlib
                                     img_data = zlib.decompress(raw_bytes, -zlib.MAX_WBITS)
-                                    # print(f"[Offset-SpeedRun] DEFLATED 서빙: {target_filename} (원문: {file_size} bytes)")
+                                    # print(f"[Offset-SpeedRun] DEFLATED Serving: {target_filename} (Original: {file_size} bytes)")
 
                                 if img_data is not None:
                                     mime, _ = mimetypes.guess_type(target_filename)
@@ -90,13 +90,13 @@ class StreamService:
                                     image_cache.put(cache_key, result, len(img_data))
                                     return result
                 except Exception as ex_offset:
-                    print(f"[Offset-SpeedRun FAIL] {os.path.basename(file_path)} [{page_idx}]: {ex_offset} (Fallback 구동)")
+                    print(f"[Offset-SpeedRun FAIL] {os.path.basename(file_path)} [{page_idx}]: {ex_offset} (Fallback executed)")
                 finally:
                     if conn:
                         conn.close()
 
             # ── [Fallback Path] 오프셋 조회 불가 또는 실패 시 기존 전체 복사/Seek 캐시 엔진 사용 ──
-            # print(f"[Offset-Fallback] 기존 로더 구동: {os.path.basename(file_path)}")
+            # print(f"[Offset-Fallback] Legacy loader executed: {os.path.basename(file_path)}")
             zf = get_zip_file_hybrid(file_path)
             if zf is None:
                 return None

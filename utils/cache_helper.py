@@ -46,7 +46,7 @@ def start_background_copy(original_path):
         try:
             disk_cache_manager.clean_up_if_needed()
             temp_path = local_path + '.tmp'
-            print(f"[DiskCacheHelper] 백그라운드 복사 시작: {os.path.basename(original_path)} -> {os.path.basename(local_path)}")
+            print(f"[DiskCacheHelper] Background copy started: {os.path.basename(original_path)} -> {os.path.basename(local_path)}")
             
             with open(original_path, 'rb') as src, open(temp_path, 'wb') as dst:
                 while True:
@@ -63,9 +63,9 @@ def start_background_copy(original_path):
                 f.write('done')
                 
             disk_cache_manager.update_access(local_path)
-            print(f"[DiskCacheHelper] 백그라운드 복사 완료: {os.path.basename(original_path)}")
+            print(f"[DiskCacheHelper] Background copy completed: {os.path.basename(original_path)}")
         except Exception as e:
-            print(f"[DiskCacheHelper] 백그라운드 복사 실패 ({os.path.basename(original_path)}): {e}")
+            print(f"[DiskCacheHelper] Background copy failed ({os.path.basename(original_path)}): {e}")
             if os.path.exists(local_path + '.tmp'):
                 try: os.remove(local_path + '.tmp')
                 except: pass
@@ -104,14 +104,14 @@ def get_zip_file_hybrid(file_path):
             if is_cached:
                 ram_zf = zipfile.ZipFile(target_path, 'r')
                 disk_cache_manager.update_access(local_path)
-                print(f"[DiskCacheHelper] 로컬 캐시 사용: {os.path.basename(file_path)}")
+                print(f"[DiskCacheHelper] Local cache hit: {os.path.basename(file_path)}")
             else:
                 start_background_copy(file_path)
                 ram_zf = zipfile.ZipFile(target_path, 'r')
-                print(f"[DiskCacheHelper] 구글 드라이브 원본 Seek 모드 가동: {os.path.basename(file_path)}")
+                print(f"[DiskCacheHelper] Google Drive remote Seek mode activated: {os.path.basename(file_path)}")
                 
             zip_cache.put(target_path, ram_zf)
             return ram_zf
         except Exception as e:
-            print(f"[DiskCacheHelper] ZIP 객체 생성 실패: {e}")
+            print(f"[DiskCacheHelper] Failed to create ZIP object: {e}")
             return None

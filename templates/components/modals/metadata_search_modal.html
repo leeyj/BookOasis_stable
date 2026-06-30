@@ -2,7 +2,7 @@
 <div id="metadata-search-modal" class="library-modal" style="display: none;">
     <div class="library-modal-content" style="max-width: 800px; width: 90%;">
         <div class="library-modal-header">
-            <h3 id="metadata-search-modal-title">도서 메타데이터 검색</h3>
+            <h3 id="metadata-search-modal-title" data-i18n="modal.meta_search_title">도서 메타데이터 검색</h3>
             <span class="library-modal-close" onclick="closeMetadataSearchModal()">&times;</span>
         </div>
         <div style="padding: 1rem; display: flex; flex-direction: column; gap: 1rem; color: #cbd5e1; max-height: calc(80vh - 120px); overflow-y: auto;">
@@ -11,17 +11,17 @@
                 <select id="metadata-search-source" style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; cursor: pointer;">
                     <!-- 백엔드에서 플러그인 목록을 조회해 동적으로 채워짐 -->
                 </select>
-                <input type="text" id="metadata-search-input" placeholder="검색할 책 제목이나 작가명을 입력하세요" style="flex: 1; min-width: 200px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
-                <button type="button" class="btn-submit" id="metadata-search-btn" onclick="performMetadataSearch()" style="padding: 0.6rem 1.4rem;">검색</button>
+                <input type="text" id="metadata-search-input" data-i18n-placeholder="modal.meta_search_placeholder" placeholder="검색할 책 제목이나 작가명을 입력하세요" style="flex: 1; min-width: 200px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
+                <button type="button" class="btn-submit" id="metadata-search-btn" onclick="performMetadataSearch()" style="padding: 0.6rem 1.4rem;" data-i18n="modal.meta_search_btn">검색</button>
             </div>
             
             <!-- 검색 결과 리스트 그리드 -->
             <div id="metadata-results-container" style="display: grid; grid-template-columns: 1fr; gap: 1rem; margin-top: 0.5rem;">
-                <div style="text-align: center; padding: 2rem; color: #94a3b8;">검색 소스를 선택하고 검색어를 입력하신 후 검색해 주세요.</div>
+                <div style="text-align: center; padding: 2rem; color: #94a3b8;"><span data-i18n="modal.meta_search_init_msg">검색 소스를 선택하고 검색어를 입력하신 후 검색해 주세요.</span></div>
             </div>
         </div>
         <div class="library-modal-footer">
-            <button type="button" class="btn-cancel" onclick="closeMetadataSearchModal()">닫기</button>
+            <button type="button" class="btn-cancel" onclick="closeMetadataSearchModal()" data-i18n="common.close">닫기</button>
         </div>
     </div>
 </div>

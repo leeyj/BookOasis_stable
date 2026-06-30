@@ -14,7 +14,7 @@ class SettingsService:
             if row:
                 return row['value']
         except Exception as e:
-            print(f"[SettingsService ERROR] get '{key}' 실패: {e}")
+            print(f"[SettingsService ERROR] get '{key}' failed: {e}")
         return default
 
     @staticmethod
@@ -31,7 +31,7 @@ class SettingsService:
                 conn.commit()
                 conn.close()
             except Exception as e:
-                print(f"[SettingsService ERROR] set '{key}' (DB: {db_type}) 실패: {e}")
+                print(f"[SettingsService ERROR] set '{key}' (DB: {db_type}) failed: {e}")
         return True
 
     @staticmethod
@@ -47,5 +47,5 @@ class SettingsService:
             for row in rows:
                 settings_dict[row['key']] = row['value']
         except Exception as e:
-            print(f"[SettingsService ERROR] get_all 실패: {e}")
+            print(f"[SettingsService ERROR] get_all failed: {e}")
         return settings_dict

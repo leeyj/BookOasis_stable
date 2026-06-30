@@ -68,7 +68,7 @@ class MetadataService:
             from services.metadata_factory import MetadataFactory
             return MetadataFactory.get_all_searchable_providers()
         except Exception as e:
-            print(f"[MetadataService] 플러그인 목록 조회 실패: {e}")
+            print(f"[MetadataService] Plugin list retrieval failed: {e}")
             return []
 
     @staticmethod
@@ -79,7 +79,7 @@ class MetadataService:
             provider = MetadataFactory.get_provider_by_id(source)
             return provider.search(db_type, query)
         except Exception as e:
-            print(f"[MetadataService] 플러그인 search_metadata 에러 (source: {source}): {e}")
+            print(f"[MetadataService] Plugin search_metadata error (source: {source}): {e}")
             return []
 
     @staticmethod
@@ -90,7 +90,7 @@ class MetadataService:
             provider = MetadataFactory.get_provider_by_id(source)
             return provider.apply(db_type, book_id, item_data)
         except Exception as e:
-            print(f"[MetadataService] 플러그인 apply_metadata 에러 (source: {source}): {e}")
+            print(f"[MetadataService] Plugin apply_metadata error (source: {source}): {e}")
             return False, f"메타데이터 반영 실패: {str(e)}"
 
     @staticmethod

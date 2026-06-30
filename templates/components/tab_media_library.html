@@ -102,10 +102,10 @@
     <!-- 플로팅 장르/태그 필터 모달 -->
     <div id="floating-filter-modal" class="floating-filter-modal" style="display: none;">
         <div class="filter-modal-header" id="filter-modal-header">
-            <span class="filter-modal-title"><i class="fa-solid fa-filter" style="color: #c084fc;"></i> 상세 필터</span>
+            <span class="filter-modal-title"><i class="fa-solid fa-filter" style="color: #c084fc;"></i> <span data-i18n="filter.modal_title">상세 필터</span></span>
             <div class="filter-modal-header-actions">
-                <button class="btn-filter-icon" id="btn-filter-reset" title="필터 전체 초기화"><i class="fa-solid fa-rotate-left"></i></button>
-                <button class="btn-filter-icon" id="btn-filter-close" title="닫기"><i class="fa-solid fa-xmark"></i></button>
+                <button class="btn-filter-icon" id="btn-filter-reset" data-i18n-title="filter.reset_all" title="필터 전체 초기화"><i class="fa-solid fa-rotate-left"></i></button>
+                <button class="btn-filter-icon" id="btn-filter-close" data-i18n-title="common.close" title="닫기"><i class="fa-solid fa-xmark"></i></button>
             </div>
         </div>
         <div class="filter-modal-body">
@@ -117,13 +117,13 @@
             <!-- 실시간 검색 인풋창 -->
             <div class="filter-search-wrap">
                 <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                <input type="text" id="filter-search-input" placeholder="장르 또는 태그 검색...">
+                <input type="text" id="filter-search-input" data-i18n-placeholder="filter.search_placeholder" placeholder="장르 또는 태그 검색...">
             </div>
 
             <!-- 장르/태그 탭 메뉴 -->
             <div class="filter-tabs">
-                <button class="filter-tab active" id="tab-genres">장르</button>
-                <button class="filter-tab" id="tab-tags">태그</button>
+                <button class="filter-tab active" id="tab-genres" data-i18n="filter.tab_genres">장르</button>
+                <button class="filter-tab" id="tab-tags" data-i18n="filter.tab_tags">태그</button>
             </div>
 
             <!-- 칩 목록 노출 영역 -->
@@ -132,7 +132,7 @@
             </div>
         </div>
         <div class="filter-modal-footer">
-            <button class="btn-filter-apply" id="btn-filter-apply">필터 적용</button>
+            <button class="btn-filter-apply" id="btn-filter-apply" data-i18n="filter.apply_btn">필터 적용</button>
         </div>
     </div>
 
@@ -144,9 +144,9 @@
 
     <!-- 실시간 시스템 작업 뉴스 티커 푸터 바 -->
     <div id="system-ticker-footer" class="system-ticker-footer" style="display: none;">
-        <div class="ticker-title"><i class="fa-solid fa-bullhorn"></i> 시스템 속보</div>
+        <div class="ticker-title"><i class="fa-solid fa-bullhorn"></i> <span data-i18n="system.ticker_title">시스템 속보</span></div>
         <div class="ticker-wrap">
-            <div id="system-ticker-content" class="ticker-content">현재 백그라운드 작업이 구동 중입니다.</div>
+            <div id="system-ticker-content" class="ticker-content" data-i18n="system.ticker_default_msg">현재 백그라운드 작업이 구동 중입니다.</div>
         </div>
     </div>
 

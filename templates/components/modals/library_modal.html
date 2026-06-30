@@ -2,30 +2,30 @@
 <div id="library-form-modal" class="library-modal" style="display: none;">
     <div class="library-modal-content">
         <div class="library-modal-header">
-            <h3 id="library-modal-title">카테고리 추가</h3>
+            <h3 id="library-modal-title" data-i18n="modal.add_category">카테고리 추가</h3>
             <span class="library-modal-close" onclick="closeLibraryModal()">&times;</span>
         </div>
         <form id="library-crud-form" onsubmit="submitLibraryForm(event)">
             <input type="hidden" id="library-form-id" name="id">
             <div class="library-form-group">
-                <label for="library-form-name">카테고리 이름</label>
-                <input type="text" id="library-form-name" name="name" required placeholder="예: 판타지 소설, 코믹스 등">
+                <label for="library-form-name" data-i18n="modal.category_name_label">카테고리 이름</label>
+                <input type="text" id="library-form-name" name="name" required data-i18n-placeholder="modal.category_name_placeholder" placeholder="예: 판타지 소설, 코믹스 등">
             </div>
             <div class="library-form-group">
-                <label for="library-form-path">서버 물리 경로 (엔터로 여러 개 입력 가능)</label>
-                <textarea id="library-form-path" name="physical_path" required rows="3" placeholder="예: C:\library\fantasy&#10;/home/user/manga"></textarea>
+                <label for="library-form-path" data-i18n="modal.category_path_label">서버 물리 경로 (엔터로 여러 개 입력 가능)</label>
+                <textarea id="library-form-path" name="physical_path" required rows="3" data-i18n-placeholder="modal.category_path_placeholder" placeholder="예: C:\library\fantasy&#10;/home/user/manga"></textarea>
             </div>
             <div class="library-form-group-row">
                 <input type="checkbox" id="library-form-remote" name="is_remote">
-                <label for="library-form-remote">원격 드라이브 (VFS 마운트 / rclone 등)</label>
+                <label for="library-form-remote" data-i18n="modal.remote_drive_label">원격 드라이브 (VFS 마운트 / rclone 등)</label>
             </div>
             <div class="library-form-group" id="library-form-rclone-url-group" style="display: none; margin-top: 0.5rem;">
-                <label for="library-form-rclone-url">Rclone RC API 주소 (VFS 캐시 갱신용)</label>
-                <input type="text" id="library-form-rclone-url" name="rclone_rc_url" placeholder="예: http://localhost:5572">
+                <label for="library-form-rclone-url" data-i18n="modal.rclone_url_label">Rclone RC API 주소 (VFS 캐시 갱신용)</label>
+                <input type="text" id="library-form-rclone-url" name="rclone_rc_url" data-i18n-placeholder="modal.rclone_url_placeholder" placeholder="예: http://localhost:5572">
             </div>
             <div class="library-modal-footer">
-                <button type="button" class="btn-cancel" onclick="closeLibraryModal()">취소</button>
-                <button type="submit" class="btn-submit" id="library-form-submit-btn">저장</button>
+                <button type="button" class="btn-cancel" onclick="closeLibraryModal()" data-i18n="common.cancel">취소</button>
+                <button type="submit" class="btn-submit" id="library-form-submit-btn" data-i18n="common.save">저장</button>
             </div>
         </form>
     </div>

@@ -149,9 +149,9 @@ export async function submitGeneralSettings(event) {
       localStorage.setItem('comic_loading_delay', comicDelay);
 
       if (typeof window.showToast === 'function') {
-        window.showToast('환경설정이 성공적으로 저장 및 반영되었습니다.', 'success');
+        window.showToast(i18n.t('settings.general_save_success'), 'success');
       } else {
-        alert('설정 저장 완료');
+        alert(i18n.t('settings.general_save_done'));
       }
       
       // UI 실시간 갱신 적용
@@ -162,18 +162,18 @@ export async function submitGeneralSettings(event) {
       });
       loadGeneralSettings();
     } else {
-      alert(`일부 설정 저장 실패: ${failed.error}`);
+      alert(i18n.t('settings.general_save_fail', {error: failed.error}));
     }
   } catch (err) {
     console.error('설정 저장 에러:', err);
-    alert('서버 연결 중 오류가 발생했습니다.');
+    alert(i18n.t('settings.general_server_error'));
   }
 }
 
 export async function triggerLazyScanNow() {
   try {
     if (typeof window.showToast === 'function') {
-      window.showToast('Lazy 표지 스캐너를 기동하는 중...', 'info');
+      window.showToast(i18n.t('settings.general_scanner_start'), 'info');
     }
     const res = await api.triggerLazyScan();
     if (res.success) {
@@ -183,11 +183,11 @@ export async function triggerLazyScanNow() {
         alert(res.message);
       }
     } else {
-      alert(`스캐너 기동 실패: ${res.error}`);
+      alert(i18n.t('settings.general_scanner_fail', {error: res.error}));
     }
   } catch (err) {
     console.error('Lazy 스캔 즉시 실행 중 에러:', err);
-    alert('서버 연결 중 오류가 발생했습니다.');
+    alert(i18n.t('settings.general_server_error'));
   }
 }
 

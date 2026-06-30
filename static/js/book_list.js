@@ -12,7 +12,7 @@ function updateLibraryTotalCount(items) {
   items.forEach(item => {
     bookCount += (parseInt(item.book_count) || 1);
   });
-  countSpan.innerText = `(전체: ${seriesCount.toLocaleString()} 시리즈 / ${bookCount.toLocaleString()} 권)`;
+  countSpan.innerText = i18n.t('book_list.total_count', {seriesCount: seriesCount.toLocaleString(), bookCount: bookCount.toLocaleString()});
 }
 
 function sortBooksList(filtered, sortDir) {
@@ -46,19 +46,19 @@ export async function loadBooksList(isAppend = false) {
     state.isLoading = true;
     state.currentPage = 1;
     state.hasMore = true;
-    container.innerHTML = '<div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> 도서 목록을 불러오는 중...</div>';
+    container.innerHTML = `<div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('book_list.loading')}</div>`;
     
     try {
       const data = await api.fetchAllBooksList(state.currentLibraryType, state.currentLibraryId);
       if (data.success) {
         state.allBooksData = data.series || [];
       } else {
-        container.innerHTML = `<div class="loading-spinner">목록 로드 실패: ${data.error || '알 수 없는 오류'}</div>`;
+        container.innerHTML = `<div class="loading-spinner">${i18n.t('book_list.load_fail', {error: data.error || ''})}</div>`;
         state.isLoading = false;
         return;
       }
     } catch (e) {
-      container.innerHTML = '<div class="loading-spinner">서버 연결 오류가 발생했습니다.</div>';
+      container.innerHTML = `<div class="loading-spinner">${i18n.t('book_list.server_error')}</div>`;
       console.error('도서 목록 로드 오류:', e);
       state.isLoading = false;
       return;
@@ -134,7 +134,7 @@ export async function loadReadingHistory() {
   if (spinner) spinner.style.display = 'none';
   const container = document.getElementById('books-list-container');
   if (!container) { state.isLoading = false; return; }
-  container.innerHTML = '<div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> 최근 읽은 도서를 불러오는 중...</div>';
+  container.innerHTML = `<div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('book_list.history_loading')}</div>`;
   try {
     const data = await api.fetchReadingHistory(state.currentLibraryType);
     if (data.success) {
@@ -144,10 +144,10 @@ export async function loadReadingHistory() {
       }
       renderHistoryGrid(books);
     } else {
-      container.innerHTML = `<div class="loading-spinner">히스토리 로드 실패: ${data.error || '알 수 없는 오류'}</div>`;
+      container.innerHTML = `<div class="loading-spinner">${i18n.t('book_list.history_fail', {error: data.error || ''})}</div>`;
     }
   } catch (e) {
-    container.innerHTML = '<div class="loading-spinner">서버 연결 오류가 발생했습니다.</div>';
+    container.innerHTML = `<div class="loading-spinner">${i18n.t('book_list.server_error')}</div>`;
     console.error('히스토리 로드 오류:', e);
   } finally {
     state.isLoading = false;
@@ -228,13 +228,13 @@ export function toggleLibrarySort() {
   state.currentSortDirection = newSort;
 
   if (newSort === 'asc') {
-    btn.innerHTML = `<i class="fa-solid fa-sort-alpha-down"></i> 가나다 오름차순`;
+    btn.innerHTML = `<i class="fa-solid fa-sort-alpha-down"></i> ${i18n.t('book_list.sort_asc')}`;
   } else if (newSort === 'desc') {
-    btn.innerHTML = `<i class="fa-solid fa-sort-alpha-up"></i> 가나다 내림차순`;
+    btn.innerHTML = `<i class="fa-solid fa-sort-alpha-up"></i> ${i18n.t('book_list.sort_desc')}`;
   } else if (newSort === 'date_desc') {
-    btn.innerHTML = `<i class="fa-solid fa-sort-numeric-down-alt"></i> 최신 추가순`;
+    btn.innerHTML = `<i class="fa-solid fa-sort-numeric-down-alt"></i> ${i18n.t('book_list.sort_date_desc')}`;
   } else if (newSort === 'date_asc') {
-    btn.innerHTML = `<i class="fa-solid fa-sort-numeric-up"></i> 과거 추가순`;
+    btn.innerHTML = `<i class="fa-solid fa-sort-numeric-up"></i> ${i18n.t('book_list.sort_date_asc')}`;
   }
 
   // 서버 요청 없이 로컬 상태 정렬 후 리렌더링
@@ -297,10 +297,10 @@ export async function resumeSeries(e, seriesName, libraryId) {
       console.log(`[Resume-Series] 이어보기 도서 선정 성공: ${targetBook.title} (ID: ${targetBook.id}, p.${targetBook.pages_read})`);
       openReader(targetBook.id, targetBook.file_format, targetBook.title, targetBook.pages_read, targetBook.total_pages);
     } else {
-      alert('도서 목록을 불러오는 데 실패했습니다.');
+      alert(i18n.t('book_list.resume_fail_list'));
     }
   } catch (err) {
     console.error('[Resume-Series] 이어보기 로직 에러:', err);
-    alert('이어보기 중 오류가 발생했습니다.');
+    alert(i18n.t('book_list.resume_fail_error'));
   }
 }

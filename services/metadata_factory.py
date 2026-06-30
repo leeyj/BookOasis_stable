@@ -17,11 +17,11 @@ class MetadataFactory:
         # 1. 설정값 읽기
         provider_name = cls._get_provider_name_from_env()
         
-        # 2. 캐시된 프로바이더가 있고, 프로바이더 설정이 바뀌지 않았다면 캐시 반환
+        # 2. 캐시된 Provider가 있고, Provider 설정이 바뀌지 않았다면 캐시 반환
         if cls._cached_provider and cls._loaded_provider_name == provider_name:
             return cls._cached_provider
 
-        print(f"[MetadataFactory] 메타데이터 프로바이더 로드 시도: '{provider_name}'")
+        print(f"[MetadataFactory] Attempting to load metadata provider: '{provider_name}'")
         
         try:
             # 3. plugins.metadata.{provider_name} 모듈 임포트
@@ -52,21 +52,21 @@ class MetadataFactory:
             # 5. 인스턴스 생성 및 캐시
             cls._cached_provider = target_class()
             cls._loaded_provider_name = provider_name
-            print(f"[MetadataFactory] 프로바이더 로드 완료: {target_class.__name__}")
+            print(f"[MetadataFactory] Provider loaded: {target_class.__name__}")
             return cls._cached_provider
 
         except Exception as e:
-            print(f"[MetadataFactory ERROR] 프로바이더 '{provider_name}' 로드 실패: {e}")
-            # 폴백(Fallback): 기본 알라딘 프로바이더 로드 시도
+            print(f"[MetadataFactory ERROR] Provider '{provider_name}' load failed: {e}")
+            # 폴백(Fallback): 기본 알라딘 Provider 로드 시도
             if provider_name != "aladin":
-                print("[MetadataFactory] 알라딘 프로바이더로 폴백을 시도합니다.")
+                print("[MetadataFactory] 알라딘 Provider로 폴백을 시도합니다.")
                 try:
                     from plugins.metadata.aladin import AladinMetadataProvider
                     cls._cached_provider = AladinMetadataProvider()
                     cls._loaded_provider_name = "aladin"
                     return cls._cached_provider
                 except Exception as ex:
-                    print(f"[MetadataFactory FATAL ERROR] 알라딘 폴백 실패: {ex}")
+                    print(f"[MetadataFactory FATAL ERROR] Aladin fallback failed: {ex}")
             
             raise e
 
@@ -86,7 +86,7 @@ class MetadataFactory:
                                 provider_name = val
                                 break
         except Exception as e:
-            print(f"[MetadataFactory] .env 읽기 실패, 기본값 사용: {e}")
+            print(f"[MetadataFactory] Failed to read .env, using default: {e}")
         return provider_name.lower()
 
     @classmethod
@@ -114,7 +114,7 @@ class MetadataFactory:
             db_settings = {row['key']: row['value'] for row in cursor.fetchall()}
             conn.close()
         except Exception as e:
-            print(f"[MetadataFactory] DB 설정 사전 로드 실패: {e}")
+            print(f"[MetadataFactory] DB 설정 사전 load failed: {e}")
             
         for file in os.listdir(plugins_dir):
             if file.endswith('.py') and not file.startswith('__') and file != 'base.py':
@@ -158,13 +158,13 @@ class MetadataFactory:
                                 'config': config_data
                             })
                 except Exception as e:
-                    print(f"[MetadataFactory] 플러그인 로드 실패 ({provider_name}): {e}")
+                    print(f"[MetadataFactory] Plugin load failed ({provider_name}): {e}")
         return providers
 
     @classmethod
     def get_provider_by_id(cls, provider_id) -> BaseMetadataProvider:
         """
-        특정 provider_id (예: 'aladin')에 부합하는 메타데이터 프로바이더 인스턴스를 동적으로 로드하여 반환합니다.
+        특정 provider_id (예: 'aladin')에 부합하는 메타데이터 Provider 인스턴스를 동적으로 로드하여 반환합니다.
         단, 해당 플러그인이 비활성화(PLUGIN_ENABLED_{provider_id} == '0')된 경우 예외를 발생시킵니다.
         """
         if not provider_id:
@@ -185,7 +185,7 @@ class MetadataFactory:
             pass
             
         if not is_enabled:
-            print(f"[MetadataFactory] 경고: 요청된 플러그인 '{provider_id}'이(가) 비활성화 상태입니다.")
+            print(f"[MetadataFactory] Warning: Requested plugin '{provider_id}'is disabled.")
             raise ValueError(f"'{provider_id}' 플러그인이 비활성화 상태입니다. 환경설정에서 먼저 활성화해 주세요.")
             
         try:
@@ -202,6 +202,6 @@ class MetadataFactory:
             if target_class:
                 return target_class()
         except Exception as e:
-            print(f"[MetadataFactory] provider_id '{provider_id}' 로드 실패: {e}")
+            print(f"[MetadataFactory] provider_id '{provider_id}' load failed: {e}")
             
         return cls.get_provider()

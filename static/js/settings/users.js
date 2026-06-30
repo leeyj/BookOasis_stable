@@ -13,18 +13,18 @@ export async function loadUsersList() {
 
     if (data.success) {
       if (data.users.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:2rem; color:#94a3b8;">등록된 사용자가 없습니다.</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:2rem; color:#94a3b8;">${window.i18n ? window.i18n.t('settings.user_no_users') : '등록된 사용자가 없습니다.'}</td></tr>`;
         return;
       }
 
       tbody.innerHTML = data.users.map(user => {
         const isDefault = user.is_default_password === 1 
-          ? '<span style="color:#f97316; font-weight:700;"><i class="fa-solid fa-triangle-exclamation"></i> 미변경</span>' 
-          : '<span style="color:#22c55e;"><i class="fa-solid fa-circle-check"></i> 변경완료</span>';
+          ? `<span style="color:#f97316; font-weight:700;"><i class="fa-solid fa-triangle-exclamation"></i> ${window.i18n ? window.i18n.t('settings.user_pwd_not_changed') : '미변경'}</span>` 
+          : `<span style="color:#22c55e;"><i class="fa-solid fa-circle-check"></i> ${window.i18n ? window.i18n.t('settings.user_pwd_changed') : '변경완료'}</span>`;
 
         const deleteBtn = user.username === 'admin' 
-          ? '<span style="color:#64748b; font-size:0.8rem;">삭제불가</span>'
-          : `<button onclick="deleteUser(${user.id}, '${user.username}')" class="btn-settings-action" style="background:#ef4444; color:#fff; border:none; padding:0.25rem 0.6rem; border-radius:4px; cursor:pointer;"><i class="fa-solid fa-trash-can"></i> 삭제</button>`;
+          ? `<span style="color:#64748b; font-size:0.8rem;">${window.i18n ? window.i18n.t('settings.user_cannot_delete') : '삭제불가'}</span>`
+          : `<button onclick="deleteUser(${user.id}, '${user.username}')" class="btn-settings-action" style="background:#ef4444; color:#fff; border:none; padding:0.25rem 0.6rem; border-radius:4px; cursor:pointer;"><i class="fa-solid fa-trash-can"></i> ${window.i18n ? window.i18n.t('settings.user_delete') : '삭제'}</button>`;
 
         return `
           <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
@@ -37,10 +37,10 @@ export async function loadUsersList() {
         `;
       }).join('');
     } else {
-      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:2rem; color:#ef4444;">조회 실패: ${data.error}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:2rem; color:#ef4444;">${window.i18n ? window.i18n.t('settings.user_fetch_failed') : '조회 실패: '} ${data.error}</td></tr>`;
     }
   } catch (err) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:2rem; color:#ef4444;">서버 연결 오류</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:2rem; color:#ef4444;">${window.i18n ? window.i18n.t('settings.users_server_error') : '서버 요청 중 오류가 발생했습니다.'}</td></tr>`;
     console.error(err);
   }
 }
@@ -80,16 +80,16 @@ export async function submitUserForm(e) {
       closeUserModal();
       loadUsersList();
     } else {
-      alert(data.error || '사용자 등록 실패');
+      alert(data.error ? i18n.t('settings.users_add_fail', {error: data.error}) : i18n.t('settings.users_add_fail', {error: ''}));
     }
   } catch (err) {
-    alert('서버 요청 중 오류가 발생했습니다.');
+    alert(i18n.t('settings.users_server_error'));
     console.error(err);
   }
 }
 
 export async function deleteUser(userId, username) {
-  if (!confirm(`사용자 "${username}" 계정을 정말로 삭제하시겠습니까?`)) return;
+  if (!confirm(i18n.t('settings.users_del_confirm', {username: username}))) return;
 
   try {
     const res = await fetch(`/api/admin/users/${userId}?type=${state.currentLibraryType}`, {
@@ -100,10 +100,10 @@ export async function deleteUser(userId, username) {
     if (data.success) {
       loadUsersList();
     } else {
-      alert(data.error || '사용자 삭제 실패');
+      alert(data.error ? i18n.t('settings.users_del_fail', {error: data.error}) : i18n.t('settings.users_del_fail', {error: ''}));
     }
   } catch (err) {
-    alert('서버 요청 중 오류가 발생했습니다.');
+    alert(i18n.t('settings.users_server_error'));
     console.error(err);
   }
 }

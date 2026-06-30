@@ -136,7 +136,7 @@ function bindPluginEvents() {
             window.showToast(res.message, 'success');
           }
         } else {
-          alert(`토글 실패: ${res.error}`);
+          alert(i18n.t('settings.plugins_toggle_fail', {error: res.error}));
         }
       } catch (err) {
         console.error('플러그인 활성 토글 에러:', err);
@@ -174,11 +174,11 @@ function bindPluginEvents() {
             alert(res.message);
           }
         } else {
-          alert(`저장 실패: ${res.error}`);
+          alert(i18n.t('settings.plugins_save_fail', {error: res.error}));
         }
       } catch (err) {
         console.error('플러그인 설정 저장 에러:', err);
-        alert('서버 연결 중 오류가 발생했습니다.');
+        alert(i18n.t('settings.plugins_server_error'));
       } finally {
         const submitBtn = form.querySelector('button[type="submit"]');
         if (submitBtn) {

@@ -23,7 +23,7 @@ export async function openMetadataSearchModal(bookId, defaultQuery, seriesMode =
   
   // 1. 활성화된 플러그인 드롭다운 목록 동적 로드 (최초 1회 캐시)
   if (!cachedPlugins) {
-    sourceSelect.innerHTML = '<option value="">로딩 중...</option>';
+    sourceSelect.innerHTML = `<option value="">${i18n.t('metadata_search.loading')}</option>`;
     try {
       const data = await api.fetchMetadataPlugins();
       if (data.success && data.plugins && data.plugins.length > 0) {
@@ -38,7 +38,7 @@ export async function openMetadataSearchModal(bookId, defaultQuery, seriesMode =
   if (cachedPlugins && cachedPlugins.length > 0) {
     sourceSelect.innerHTML = cachedPlugins.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
   } else {
-    sourceSelect.innerHTML = '<option value="aladin">알라딘 도서 검색 (기본)</option>';
+    sourceSelect.innerHTML = `<option value="aladin">${i18n.t('metadata_search.default_plugin')}</option>`;
   }
   
   // 2. 검색어 정제 (괄호나 대괄호에 든 불필요한 메타단어 제거로 검색 성공률 상승)
@@ -46,7 +46,7 @@ export async function openMetadataSearchModal(bookId, defaultQuery, seriesMode =
   cleanQuery = cleanQuery.replace(/\[.*?\]|\(.*?\)/g, '').trim();
   
   input.value = cleanQuery;
-  container.innerHTML = '<div style="text-align: center; padding: 2rem; color: #94a3b8;">검색 소스를 선택하고 검색 버튼을 누르면 수색을 시작합니다.</div>';
+  container.innerHTML = `<div style="text-align: center; padding: 2rem; color: #94a3b8;">${i18n.t('metadata_search.init_message')}</div>`;
   
   modal.style.display = 'flex';
   
@@ -80,23 +80,23 @@ export async function performMetadataSearch() {
   const source = sourceSelect.value;
   
   if (!query) {
-    alert('검색어를 입력해 주세요.');
+    alert(i18n.t('metadata_search.empty_query'));
     return;
   }
   
-  const selectedSourceName = sourceSelect.options[sourceSelect.selectedIndex]?.text || '도서 정보';
-  container.innerHTML = `<div style="text-align: center; padding: 2rem; color: #a855f7;"><i class="fa-solid fa-circle-notch fa-spin fa-2x"></i><br><br>${selectedSourceName} 수색 중...</div>`;
+  const selectedSourceName = sourceSelect.options[sourceSelect.selectedIndex]?.text || i18n.t('metadata_search.default_source');
+  container.innerHTML = `<div style="text-align: center; padding: 2rem; color: #a855f7;"><i class="fa-solid fa-circle-notch fa-spin fa-2x"></i><br><br>${i18n.t('metadata_search.searching', {source: selectedSourceName})}</div>`;
   
   try {
     const data = await api.searchMetadata(state.currentLibraryType, query, source);
     if (data.success && data.results && data.results.length > 0) {
       renderMetadataResults(data.results, source);
     } else {
-      container.innerHTML = `<div style="text-align: center; padding: 2rem; color: #f43f5e;">검색 결과가 없거나 오류가 발생했습니다: ${data.error || '검색어와 일치하는 도서가 존재하지 않습니다.'}</div>`;
+      container.innerHTML = `<div style="text-align: center; padding: 2rem; color: #f43f5e;">${i18n.t('metadata_search.search_fail', {error: data.error || i18n.t('metadata_search.no_result')})}</div>`;
     }
   } catch (err) {
     console.error('메타데이터 검색 API 에러:', err);
-    container.innerHTML = '<div style="text-align: center; padding: 2rem; color: #f43f5e;">서버와 통신 중 오류가 발생했습니다.</div>';
+    container.innerHTML = `<div style="text-align: center; padding: 2rem; color: #f43f5e;">${i18n.t('metadata_search.server_error')}</div>`;
   }
 }
 
@@ -109,7 +109,7 @@ function renderMetadataResults(books, source) {
   
   let html = '';
   books.forEach((book, idx) => {
-    let desc = book.description || '책 설명이 존재하지 않습니다.';
+    let desc = book.description || i18n.t('metadata_search.no_description');
     if (desc.length > 150) {
       desc = desc.substring(0, 150) + '...';
     }
@@ -122,7 +122,7 @@ function renderMetadataResults(books, source) {
         <div style="flex: 1; display: flex; flex-direction: column; gap: 0.3rem;">
           <h4 style="margin: 0; color: #fff; font-size: 0.95rem; font-weight: 700;">${book.title}</h4>
           <div style="font-size: 0.8rem; color: #94a3b8;">
-            <span>저자: ${book.author}</span> | <span>출판사: ${book.publisher}</span> | <span>출간일: ${book.pubDate}</span>
+            <span>${i18n.t('metadata_search.book_meta', {author: book.author, publisher: book.publisher, pubDate: book.pubDate})}</span>
           </div>
           <p style="margin: 0.3rem 0 0 0; font-size: 0.78rem; color: #cbd5e1; line-height: 1.4;">${desc}</p>
         </div>
@@ -157,14 +157,14 @@ async function selectMetadataBook(book, source) {
   if (!currentTargetBookId) return;
   
   const confirmMsg = isSeriesMode
-    ? `▶ 선택한 도서 정보로 시리즈 전체 메타데이터를 덮어쓰시겠습니까?\n\n- 제목: ${book.title}\n- 저자: ${book.author}\n- 출판사: ${book.publisher}\n\n※ 적용 시 기존의 시리즈 표지와 작품 설명 정보가 대체됩니다.`
-    : `▶ 선택한 도서 정보로 덮어쓰시겠습니까?\n\n- 제목: ${book.title}\n- 저자: ${book.author}\n- 출판사: ${book.publisher}\n\n※ 적용 시 기존의 표지와 책 상세 설명 정보가 대체됩니다.`;
+    ? i18n.t('metadata_search.confirm_series', {title: book.title, author: book.author, publisher: book.publisher})
+    : i18n.t('metadata_search.confirm_single', {title: book.title, author: book.author, publisher: book.publisher});
     
   const confirmApply = confirm(confirmMsg);
   if (!confirmApply) return;
   
   import('./view_manager.js').then(async (vm) => {
-    vm.showToast('도서 정보 적용 중...', 'info');
+    vm.showToast(i18n.t('metadata_search.applying'), 'info');
     console.log('[MetadataApply-DEBUG] 1단계 시작: applyMetadata 호출 준비', {
       libraryType: state.currentLibraryType,
       bookId: currentTargetBookId,
@@ -228,7 +228,7 @@ async function selectMetadataBook(book, source) {
           // closeMetadataSearchModal() 실행 시 전역변수 currentSeriesName이 null로 비워지기 때문에 임시 로컬 변수에 백업해 둡니다.
           const seriesNameToRefresh = currentSeriesName;
           
-          vm.showToast('시리즈 메타데이터가 일괄 적용되었습니다.', 'success');
+          vm.showToast(i18n.t('metadata_search.apply_series_success'), 'success');
           closeMetadataSearchModal();
           
           const activeLibId = (targetBook && targetBook.library_id) ? targetBook.library_id : state.currentLibraryId;
@@ -266,7 +266,7 @@ async function selectMetadataBook(book, source) {
         }
       } else {
         console.error('[MetadataApply-DEBUG] [에러] res.success가 false입니다.', res.error);
-        vm.showToast(`적용 실패: ${res.error}`, 'error');
+        vm.showToast(i18n.t('metadata_search.apply_fail', {error: res.error}), 'error');
       }
     } catch (err) {
       console.error('[MetadataApply-DEBUG] [예외 발생] 메타데이터 적용 API 에러:', err);

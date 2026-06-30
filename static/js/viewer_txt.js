@@ -17,10 +17,10 @@ export function initTxtViewer(bookId) {
   const txtCtrl = document.getElementById('txt-controls');
   if (txtCtrl) txtCtrl.style.display = 'none';
   
-  showViewerLoading("텍스트 로드 중...", "텍스트 파일의 내용을 읽어오고 있습니다.<br>잠시만 기다려 주세요.");
+  showViewerLoading(i18n.t("viewer.loading_txt_title"), i18n.t("viewer.loading_txt_sub"));
   
   fetch(`/api/media/txt?db_type=${state.currentLibraryType}&book_id=${bookId}`)
-    .then(res => res.ok ? res.text() : Promise.reject('로드 실패'))
+    .then(res => res.ok ? res.text() : Promise.reject(i18n.t('viewer.error_txt_load')))
     .then(txt => {
       hideViewerLoading();
       // 대용량 텍스트 브라우저 렌더링 랙 방지를 위한 청크(페이지) 분할
@@ -31,7 +31,7 @@ export function initTxtViewer(bookId) {
     })
     .catch(() => {
       hideViewerLoading();
-      showViewerError("텍스트 로드 실패", "텍스트 파일을 정상적으로 디코딩하여 읽어오지 못했습니다.");
+      showViewerError(i18n.t("viewer.error_txt_title"), i18n.t("viewer.error_txt_sub"));
     });
 }
 
@@ -61,7 +61,7 @@ function renderCurrentChunk() {
   if (!contentArea) return;
   
   if (txtChunks.length === 0) {
-    contentArea.textContent = '텍스트 내용이 비어있습니다.';
+    contentArea.textContent = i18n.t('viewer.txt_empty');
     return;
   }
   
@@ -70,7 +70,7 @@ function renderCurrentChunk() {
   // 공용 오버레이에 진행률 표시 업데이트
   const pageInfo = document.getElementById('comic-overlay-page-info');
   if (pageInfo) {
-    pageInfo.textContent = `${currentChunkIdx + 1} / ${txtChunks.length} (청크)`;
+    pageInfo.textContent = i18n.t('viewer.txt_chunk_info', {current: currentChunkIdx + 1, total: txtChunks.length});
   }
 
   // 진척도 전송 예약

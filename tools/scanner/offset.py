@@ -4,7 +4,7 @@ import zipfile
 from utils.sort_helper import natural_sort_key
 
 def collect_zip_offsets(cursor, book_id, file_path):
-    """ZIP 파일의 이미지 엔트리들을 분석하여 바이트 오프셋 메타데이터 수집 (활성 커서 재사용)"""
+    """Analyze image entries of ZIP file and collect byte offset metadata (reuse active cursor)"""
     if not os.path.exists(file_path):
         return
 
@@ -43,12 +43,12 @@ def collect_zip_offsets(cursor, book_id, file_path):
                     WHERE id = ?
                 """, (len(bulk_data), book_id))
                 
-        print(f"[Scanner-Offset] '{os.path.basename(file_path)}' 오프셋 색인 완료 (총 {len(bulk_data)} 페이지)")
+        print(f"[Scanner-Offset] '{os.path.basename(file_path)}' offset index complete (total {len(bulk_data)} pages)")
     except Exception as e:
-        print(f"[Scanner-Offset] '{os.path.basename(file_path)}' 오프셋 색인 실패: {e}")
+        print(f"[Scanner-Offset] '{os.path.basename(file_path)}' offset index failed: {e}")
 
 def collect_zip_offsets_data(file_path):
-    """ZIP 파일의 이미지 엔트리들을 분석하여 바이트 오프셋 메타데이터 수집 (순수 메모리 파싱)"""
+    """Analyze image entries of ZIP file and collect byte offset metadata (pure memory parsing)"""
     if not os.path.exists(file_path):
         return []
 
@@ -71,5 +71,5 @@ def collect_zip_offsets_data(file_path):
                 ))
             return bulk_data
     except Exception as e:
-        print(f"[Scanner-Offset] '{os.path.basename(file_path)}' 오프셋 파싱 실패: {e}")
+        print(f"[Scanner-Offset] '{os.path.basename(file_path)}' offset parsing failed: {e}")
         return []

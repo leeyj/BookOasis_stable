@@ -14,7 +14,7 @@ class SchedulerService:
         """서버 기동 시 스케줄러를 시작하고 DB에서 기존 스케줄 로드"""
         if not scheduler.running:
             scheduler.start()
-            print("[Scheduler] APScheduler 가동 성공!")
+            print("[Scheduler] APScheduler started successfully!")
         SchedulerService.reload_all_jobs()
 
     @staticmethod
@@ -24,9 +24,9 @@ class SchedulerService:
         try:
             for job in list(scheduler.get_jobs()):
                 scheduler.remove_job(job.id)
-            print("[Scheduler] 기존 모든 스캔 Job 제거 완료.")
+            print("[Scheduler] All existing scan jobs removed.")
         except Exception as e:
-            print(f"[Scheduler] Job 제거 중 오류: {e}")
+            print(f"[Scheduler] Error removing job: {e}")
 
         for db_type in ['general', 'adult']:
             db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
@@ -53,16 +53,16 @@ class SchedulerService:
                                 id="lazy_scan_covers_job",
                                 replace_existing=True
                             )
-                            print(f"[Scheduler] Lazy 표지 스캐너 Job 등록 완료: Schedule={lazy_cron}")
+                            print(f"[Scheduler] Lazy cover scanner job registered: Schedule={lazy_cron}")
                         except ValueError as cron_err:
-                            print(f"[Scheduler] 잘못된 Lazy 스크립트 크론 주기 패스 ({lazy_cron}): {cron_err}")
+                            print(f"[Scheduler] Invalid lazy script cron passed ({lazy_cron}): {cron_err}")
                 
                 conn.close()
                 
                 for lib in libs:
                     SchedulerService.register_job(db_type, db_path, lib['id'], lib['physical_path'], lib['cron_schedule'])
             except Exception as e:
-                print(f"[Scheduler] {db_type} 라이브러리 로드 중 에러: {e}")
+                print(f"[Scheduler] {db_type} Error loading library: {e}")
 
     @staticmethod
     def register_job(db_type, db_path, library_id, physical_path, cron_expression):
@@ -73,7 +73,7 @@ class SchedulerService:
         try:
             trigger = CronTrigger.from_crontab(cron_expression)
         except ValueError as e:
-            print(f"[Scheduler] 잘못된 크론 표현식 패스 ({cron_expression}): {e}")
+            print(f"[Scheduler] Invalid cron expression passed ({cron_expression}): {e}")
             return False
 
         # 기존 같은 ID의 job이 있으면 제거
@@ -91,7 +91,7 @@ class SchedulerService:
             args=[db_type, db_path, library_id, physical_path],
             replace_existing=True
         )
-        print(f"[Scheduler] Job 등록 완료: ID={job_id}, Schedule={cron_expression}")
+        print(f"[Scheduler] Job registered: ID={job_id}, Schedule={cron_expression}")
         return True
 
     @staticmethod
@@ -101,9 +101,9 @@ class SchedulerService:
         try:
             if scheduler.get_job(job_id):
                 scheduler.remove_job(job_id)
-                print(f"[Scheduler] Job 제거 완료: ID={job_id}")
+                print(f"[Scheduler] Job removed: ID={job_id}")
         except Exception as e:
-            print(f"[Scheduler] Job 제거 실패: ID={job_id}, 에러: {e}")
+            print(f"[Scheduler] Job removal failed: ID={job_id}, Error: {e}")
 
 
 def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
@@ -125,9 +125,9 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
             with open(log_file_path, 'a', encoding='utf-8') as f_log:
                 f_log.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}\n")
         except Exception as ex_log:
-            print(f"[Logger ERROR] 로그 파일 쓰기 실패: {ex_log}")
+            print(f"[Logger ERROR] Failed to write log file: {ex_log}")
 
-    print(f"[Scanner-Trigger] 🚀 스캔 즉시 기동 시작: DB={db_type}, ID={library_id}, Path={physical_path}, Force={force}")
+    print(f"[Scanner-Trigger] 🚀 Immediate scan started: DB={db_type}, ID={library_id}, Path={physical_path}, Force={force}")
     write_scan_log(f"스캔 기동 시작 - DB={db_type}, LibraryID={library_id}, Path='{physical_path}', Force={force}")
     
     # VFS 캐시 사전 갱신 옵션 확인 및 수행
@@ -139,7 +139,7 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
         conn_chk.close()
         
         if row_chk and row_chk['vfs_refresh_before_scan'] == 1:
-            print(f"[Scanner-Trigger] VFS 사전 새로고침 활성화 감지. rclone 캐시 갱신을 시도합니다.")
+            print(f"[Scanner-Trigger] VFS pre-refresh active. Attempting rclone cache update.")
             write_scan_log("VFS 사전 새로고침 시도 (rclone API)")
             
             import urllib.request
@@ -165,7 +165,7 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
                 
                 for r_path in remote_paths:
                     rel_path = get_rclone_relative_path(r_path)
-                    print(f"[Scanner-Trigger] VFS 캐시 갱신 대상 폴더: '{rel_path}'")
+                    print(f"[Scanner-Trigger] VFS cache update target folder: '{rel_path}'")
                     
                     full_url = f"{rc_url}/vfs/refresh"
                     req_data = json.dumps({"dir": rel_path}).encode('utf-8')
@@ -177,16 +177,16 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
                     try:
                         with urllib.request.urlopen(req, timeout=30) as resp:
                             res_text = resp.read().decode('utf-8')
-                            print(f"[Scanner-Trigger] VFS 갱신 결과 ({rel_path}): {res_text}")
+                            print(f"[Scanner-Trigger] VFS update result ({rel_path}): {res_text}")
                             write_scan_log(f"VFS 갱신 완료 ({rel_path}): {res_text}")
                     except Exception as http_ex:
-                        print(f"[Scanner-Trigger ERROR] VFS 갱신 요청 실패 ({rel_path}): {http_ex}")
-                        write_scan_log(f"VFS 갱신 요청 실패 ({rel_path}): {http_ex}")
+                        print(f"[Scanner-Trigger ERROR] VFS update request failed ({rel_path}): {http_ex}")
+                        write_scan_log(f"VFS update request failed ({rel_path}): {http_ex}")
             except Exception as e_vfs:
-                print(f"[Scanner-Trigger ERROR] VFS 새로고침 중 오류: {e_vfs}")
+                print(f"[Scanner-Trigger ERROR] Error during VFS refresh: {e_vfs}")
                 write_scan_log(f"VFS 새로고침 오류: {e_vfs}")
     except Exception as db_err:
-        print(f"[Scanner-Trigger] VFS 옵션 DB 조회 에러: {db_err}")
+        print(f"[Scanner-Trigger] VFS 옵션 DB 조회 Error: {db_err}")
     
     # 1. 상태를 'scanning'으로 업데이트
     try:
@@ -196,7 +196,7 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
         conn.commit()
         conn.close()
     except Exception as e:
-        print(f"[Scheduler] 스캔 중 상태 업데이트 오류: {e}")
+        print(f"[Scheduler] Scan state update error: {e}")
     
     try:
         scan_library(db_path, library_id, physical_path, force=force)
@@ -245,7 +245,7 @@ def run_lazy_scanner_job():
     
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     script_path = os.path.join(BASE_DIR, 'tools', 'lazy_scanner.py')
-    print(f"[Scheduler] Lazy 표지 스캐너 독립 프로세스 기동 트리거: {script_path}")
+    print(f"[Scheduler] Lazy cover scanner standalone process triggered: {script_path}")
     try:
         subprocess.Popen(
             [sys.executable, script_path],
@@ -254,5 +254,5 @@ def run_lazy_scanner_job():
             cwd=BASE_DIR
         )
     except Exception as e:
-        print(f"[Scheduler ERROR] Lazy 표지 스크립트 실행 실패: {e}")
+        print(f"[Scheduler ERROR] Lazy cover script execution failed: {e}")
 

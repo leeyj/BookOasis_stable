@@ -6,7 +6,7 @@ import database
 from utils.drive_helper import is_remote_path, get_rclone_relative_path
 
 def trigger_vfs_refresh(db_path, library_id, physical_path):
-    """원격 마운트 경로(VFS)인 경우 스캔 시작 전 rclone 캐시를 갱신합니다."""
+    """Refresh rclone cache before starting scan if remote mount path (VFS)."""
     target_paths = [p.strip() for p in str(physical_path).replace('\r', '').split('\n') if p.strip()]
     remote_paths = [p for p in target_paths if is_remote_path(p)]
     
@@ -14,7 +14,7 @@ def trigger_vfs_refresh(db_path, library_id, physical_path):
         return
         
     db_type = 'adult' if 'adult' in os.path.basename(db_path) else 'general'
-    print(f"[Scanner-VFS] 원격 마운트 경로 감지: {remote_paths} - 캐시 상태 확인 중...")
+    print(f"[Scanner-VFS] Remote mount path detected: {remote_paths} - Checking cache status...")
     
     try:
         conn = None
@@ -24,7 +24,7 @@ def trigger_vfs_refresh(db_path, library_id, physical_path):
             cursor.execute("SELECT vfs_refresh_before_scan, rclone_rc_url FROM libraries WHERE id = ?", (library_id,))
             row = cursor.fetchone()
         except Exception as e:
-            print(f"[Scanner-VFS Warning] 라이브러리 정보 조회 실패: {e}")
+            print(f"[Scanner-VFS Warning] Failed to fetch library info: {e}")
             return
         finally:
             if conn:
@@ -58,7 +58,7 @@ def trigger_vfs_refresh(db_path, library_id, physical_path):
                         pass
                 
         for r_path in remote_paths:
-            print(f"[Scanner-VFS] VFS 캐시 사전 새로고침을 시작합니다. 대상: {r_path}")
+            print(f"[Scanner-VFS] Starting VFS cache pre-refresh. Target: {r_path}")
             rel_path = get_rclone_relative_path(r_path)
             
             for rc_url in rc_urls:
@@ -71,10 +71,10 @@ def trigger_vfs_refresh(db_path, library_id, physical_path):
                 )
                 try:
                     with urllib.request.urlopen(req, timeout=5) as resp:
-                        print(f"[Scanner-VFS] VFS 캐시 갱신 성공 - 서버: '{rc_url}', 대상: '{rel_path}', 결과: {resp.read().decode('utf-8')}")
+                        print(f"[Scanner-VFS] VFS cache refresh success - Server: '{rc_url}', Target: '{rel_path}', Result: {resp.read().decode('utf-8')}")
                 except Exception as e:
-                    print(f"[Scanner-VFS Warning] 서버 '{rc_url}' 경로 '{rel_path}' 갱신 시도 무시됨 또는 실패: {e}")
+                    print(f"[Scanner-VFS Warning] Server '{rc_url}' path '{rel_path}' refresh attempt ignored or failed: {e}")
     except Exception as e:
-        print(f"[Scanner-VFS Warning] VFS 캐시 새로고침 프로세스 실패: {e}")
+        print(f"[Scanner-VFS Warning] VFS cache refresh process failed: {e}")
 
-    print("=== 스캐너 작업 완료 ===")
+    print("=== Scanner Task Complete ===")

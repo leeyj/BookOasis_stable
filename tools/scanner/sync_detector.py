@@ -2,7 +2,7 @@
 import os
 
 def detect_and_handle_book_movement(cursor, db_books, found_file_paths, db_meta_full, db_offsets_cached):
-    """사라진 경로와 신규 발견 경로 간 Basename 비교를 통해 도서 이동(Rename)을 자동 감지하고 보존 처리"""
+    """Auto-detect book movement (Rename) through Basename comparison between disappeared path and newly discovered path and preserve"""
     deleted_paths = set(db_books.keys()) - found_file_paths
     new_paths = found_file_paths - set(db_books.keys())
 
@@ -17,9 +17,9 @@ def detect_and_handle_book_movement(cursor, db_books, found_file_paths, db_meta_
             if basename in del_basename_map:
                 old_path, book_id = del_basename_map[basename]
                 cursor.execute("UPDATE books SET file_path = ? WHERE id = ?", (np, book_id))
-                print(f"[Scanner-Move] 🚚 도서 이동 감지 완료: '{old_path}' -> '{np}' (기존 ID {book_id} 및 독서 기록 유지)")
+                print(f"[Scanner-Move] 🚚 Book movement detection complete: '{old_path}' -> '{np}' (Existing ID {book_id} and reading history maintained)")
                 
-                # 메모리 상의 캐시 정보 갱신
+                # Update cache info in memory
                 db_books[np] = book_id
                 if old_path in db_meta_full:
                     db_meta_full.add(np)
@@ -35,13 +35,13 @@ def detect_and_handle_book_movement(cursor, db_books, found_file_paths, db_meta_
     return deleted_paths
 
 def handle_deleted_books(cursor, db_books, deleted_paths, target_paths, found_file_paths):
-    """더 이상 탐색되지 않는 도서를 DB 및 사용자 히스토리에서 트랜잭션 안전하게 삭제"""
+    """Transaction-safely delete books no longer found from DB and user history"""
     if not deleted_paths:
         return True
         
-    # 0개 비상 브레이크 안전장치
+    # 0 files emergency brake safety device
     if not found_file_paths and len(db_books) > 0:
-        print(f"[Scanner] ⚠️ 치명적 경고: 다중 경로 {target_paths}에서 읽어들인 파일이 0개입니다. 마운트가 해제되었거나 경로 문제가 의심되므로 파일 삭제 로직을 취소합니다.")
+        print(f"[Scanner] ⚠️ Fatal Warning: 0 files read from multiple paths {target_paths}. Mount unmounted or path issue suspected, aborting file deletion logic.")
         return False
 
     for dp in deleted_paths:
@@ -50,6 +50,6 @@ def handle_deleted_books(cursor, db_books, deleted_paths, target_paths, found_fi
             cursor.execute("DELETE FROM user_progress WHERE book_id = ?", (book_id,))
             cursor.execute("DELETE FROM user_reading_log WHERE book_id = ?", (book_id,))
             cursor.execute("DELETE FROM books WHERE id = ?", (book_id,))
-            print(f"[Scanner] 파일 삭제 감지되어 DB에서 제거: {dp}")
+            print(f"[Scanner] File deletion detected, removed from DB: {dp}")
             
     return True

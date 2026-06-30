@@ -183,3 +183,6 @@ const i18n = {
         container.appendChild(wrapper);
     }
 };
+
+window.i18n = i18n;
+

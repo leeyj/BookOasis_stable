@@ -25,9 +25,9 @@ export async function openBookDetail(event, seriesName, libraryId) {
   // 로딩 표시
   detailView.innerHTML = `
     <button class="btn-back-to-list" onclick="goBackToList()">
-      <i class="fa-solid fa-arrow-left"></i> 목록으로 돌아가기
+      <i class="fa-solid fa-arrow-left"></i> ${i18n.t('modal.go_back')}
     </button>
-    <div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> 도서 정보를 불러오는 중...</div>
+    <div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('modal.loading_detail')}</div>
   `;
   switchActiveView('detail');
 
@@ -45,7 +45,7 @@ export async function openBookDetail(event, seriesName, libraryId) {
 
       detailView.innerHTML = `
         <button class="btn-back-to-list" onclick="goBackToList()">
-          <i class="fa-solid fa-arrow-left"></i> 목록으로 돌아가기
+          <i class="fa-solid fa-arrow-left"></i> ${i18n.t('modal.go_back')}
         </button>
         ${headerHtml}
         ${volumesSectionHtml}
@@ -66,11 +66,11 @@ export async function openBookDetail(event, seriesName, libraryId) {
               recList.querySelectorAll('.btn-apply-meta').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                   const sourceBookId = e.target.dataset.sourceId;
-                  const confirmApply = confirm(`💡 선택한 ["${seriesName}"]의 정보를 이 라이브러리에 영구 복사하시겠습니까?`);
+                  const confirmApply = confirm(i18n.t('modal.copy_confirm', {seriesName: seriesName}));
                   if (!confirmApply) return;
 
                   e.target.disabled = true;
-                  e.target.innerText = '적용 중...';
+                  e.target.innerText = i18n.t('modal.applying');
 
                   const formData = new FormData();
                   formData.append('type', state.currentLibraryType);
@@ -84,24 +84,24 @@ export async function openBookDetail(event, seriesName, libraryId) {
                       alert(copyRes.message);
                       openBookDetail(null, safeSeriesName, actualLibraryId);
                     } else {
-                      alert(`적용 실패: ${copyRes.error}`);
+                      alert(i18n.t('modal.apply_fail', {error: copyRes.error}));
                       e.target.disabled = false;
                       e.target.innerText = '이 정보로 채우기';
                     }
                   } catch (err) {
                     console.error('메타데이터 복사 오류:', err);
-                    alert('서버 통신 중 오류가 발생했습니다.');
+                    alert(i18n.t('modal.server_error'));
                     e.target.disabled = false;
                     e.target.innerText = '이 정보로 채우기';
                   }
                 });
               });
             } else {
-              recList.innerHTML = `<div style="font-size:0.75rem; color:#64748b;">유사한 추천 메타데이터 후보를 찾지 못했습니다.</div>`;
+              recList.innerHTML = `<div style="font-size:0.75rem; color:#64748b;">${i18n.t('modal.no_recommend')}</div>`;
             }
           }).catch(err => {
             console.error('추천 데이터 로드 실패:', err);
-            recList.innerHTML = `<div style="font-size:0.75rem; color:#ef4444;">추천 정보를 로드하는 데 실패했습니다.</div>`;
+            recList.innerHTML = `<div style="font-size:0.75rem; color:#ef4444;">${i18n.t('modal.recommend_fail')}</div>`;
           });
         }
       };
@@ -130,18 +130,18 @@ export async function openBookDetail(event, seriesName, libraryId) {
     } else {
       detailView.innerHTML = `
         <button class="btn-back-to-list" onclick="goBackToList()">
-          <i class="fa-solid fa-arrow-left"></i> 목록으로 돌아가기
+          <i class="fa-solid fa-arrow-left"></i> ${i18n.t('modal.go_back')}
         </button>
-        <div class="loading-spinner">도서 정보를 불러올 수 없습니다: ${data.error || '알 수 없는 오류'}</div>
+        <div class="loading-spinner">${i18n.t('modal.load_detail_fail', {error: data.error || ''})}</div>
       `;
     }
   } catch (e) {
     console.error('[detail] openBookDetail 에러:', e);
     detailView.innerHTML = `
       <button class="btn-back-to-list" onclick="goBackToList()">
-        <i class="fa-solid fa-arrow-left"></i> 목록으로 돌아가기
+        <i class="fa-solid fa-arrow-left"></i> ${i18n.t('modal.go_back')}
       </button>
-      <div class="loading-spinner">도서 상세 정보를 가져오는 데 실패했습니다.</div>
+      <div class="loading-spinner">${i18n.t('modal.load_detail_error')}</div>
     `;
   }
 }
@@ -178,16 +178,16 @@ window.toggleBookFavorite = async (event, bookId, nextStatus, seriesName, librar
   if (event) event.stopPropagation();
   const res = await window.toggleFavoriteAction(bookId, nextStatus);
   if (res && res.success) {
-    const statusText = nextStatus === 1 ? '등록' : '해제';
+    const statusText = nextStatus === 1 ? i18n.t('modal.fav_added') : i18n.t('modal.fav_removed');
     if (typeof window.showToast === 'function') {
-      window.showToast(`즐겨찾기가 ${statusText}되었습니다.`, 'success');
+      window.showToast(i18n.t('modal.fav_status', {statusText: statusText}), 'success');
     }
     openBookDetail(null, seriesName, libraryId);
   } else {
     if (typeof window.showToast === 'function') {
-      window.showToast('즐겨찾기 갱신에 실패했습니다.', 'error');
+      window.showToast(i18n.t('modal.fav_fail'), 'error');
     } else {
-      alert('즐겨찾기 갱신에 실패했습니다.');
+      alert(i18n.t('modal.fav_fail'));
     }
   }
 };
@@ -200,18 +200,18 @@ window.toggleSeriesFavorite = async (event, seriesName, currentStatus, libraryId
       const nextStatus = currentStatus === 1 ? 0 : 1;
       const promises = data.books.map(b => window.toggleFavoriteAction(b.id, nextStatus));
       await Promise.all(promises);
-      const statusText = nextStatus === 1 ? '등록' : '해제';
+      const statusText = nextStatus === 1 ? i18n.t('modal.fav_added') : i18n.t('modal.fav_removed');
       if (typeof window.showToast === 'function') {
-        window.showToast(`"${seriesName}" 시리즈 전체 즐겨찾기가 ${statusText}되었습니다.`, 'success');
+        window.showToast(i18n.t('modal.series_fav_status', {seriesName: seriesName, statusText: statusText}), 'success');
       }
       openBookDetail(null, seriesName, libraryId);
     }
   } catch (err) {
     console.error('시리즈 즐겨찾기 토글 실패:', err);
     if (typeof window.showToast === 'function') {
-      window.showToast('시리즈 즐겨찾기 갱신에 실패했습니다.', 'error');
+      window.showToast(i18n.t('modal.series_fav_fail'), 'error');
     } else {
-      alert('시리즈 즐겨찾기 갱신에 실패했습니다.');
+      alert(i18n.t('modal.series_fav_fail'));
     }
   }
 };
@@ -291,7 +291,7 @@ window.handleCoverDrop = (event) => {
         console.log('[CoverDrop] 드래그 앤 드롭 표지 파일 바인딩 완료:', file.name);
       }
     } else {
-      alert('이미지 파일만 표지로 등록할 수 있습니다.');
+      alert(i18n.t('modal.only_image'));
     }
   }
 };
@@ -323,17 +323,17 @@ window.saveManualMetadata = async (seriesName) => {
     const res = await api.editMediaDetail(formData);
     if (res.success) {
       if (typeof window.showToast === 'function') {
-        window.showToast(res.message || '정보가 수정되었습니다.', 'success');
+        window.showToast(res.message || i18n.t('modal.meta_updated'), 'success');
       } else {
-        alert(res.message || '정보가 수정되었습니다.');
+        alert(res.message || i18n.t('modal.meta_updated'));
       }
       openBookDetail(null, seriesName);
     } else {
-      alert(`수정 실패: ${res.error}`);
+      alert(i18n.t('modal.update_fail', {error: res.error}));
     }
   } catch (err) {
     console.error('수동 메타 수정 오류:', err);
-    alert('서버 통신 중 오류가 발생했습니다.');
+    alert(i18n.t('modal.server_error'));
   }
 };
 
@@ -347,7 +347,7 @@ window.rescanBook = async (event, bookId, seriesName, libraryId) => {
   const btn = event.currentTarget;
   const originalHtml = btn.innerHTML;
   btn.disabled = true;
-  btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> 스캔 중...';
+  btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('modal.scanning')}`;
 
   try {
     const formData = new FormData();
@@ -361,7 +361,7 @@ window.rescanBook = async (event, bookId, seriesName, libraryId) => {
 
     if (data.success) {
       if (typeof window.showToast === 'function') {
-        window.showToast('스캔이 완료되었습니다. 화면을 새로 고칩니다.', 'success');
+        window.showToast(i18n.t('modal.scan_done'), 'success');
       }
       // 1초 후 상세 화면 새로고침 (토스트 메시지 표시 시간 확보)
       setTimeout(() => openBookDetail(null, seriesName, libraryId), 1000);
@@ -369,9 +369,9 @@ window.rescanBook = async (event, bookId, seriesName, libraryId) => {
       btn.disabled = false;
       btn.innerHTML = originalHtml;
       if (typeof window.showToast === 'function') {
-        window.showToast(`스캔 실패: ${data.error || '알 수 없는 오류'}`, 'error');
+        window.showToast(i18n.t('modal.scan_fail', {error: data.error || ''}), 'error');
       } else {
-        alert(`스캔 실패: ${data.error || '알 수 없는 오류'}`);
+        alert(i18n.t('modal.scan_fail', {error: data.error || ''}));
       }
     }
   } catch (err) {

@@ -57,7 +57,7 @@ class CategoryService:
             from utils.report_helper import delete_all_reports
             delete_all_reports(library_id)
         except Exception as e:
-            print(f"[CategoryService ERROR] 리포트 파일 일괄 제거 실패: {e}")
+            print(f"[CategoryService ERROR] Bulk report file removal failed: {e}")
 
         conn = database.get_connection(db_type)
         cursor = conn.cursor()

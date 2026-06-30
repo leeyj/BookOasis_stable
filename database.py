@@ -96,7 +96,7 @@ class SQLiteConnectionPool:
         with self.lock:
             if new_size == self.max_size:
                 return
-            print(f"[SQLiteConnectionPool] 풀 리사이징: {self.max_size} -> {new_size} (대상: {self.db_path})")
+            print(f"[SQLiteConnectionPool] Pool resizing: {self.max_size} -> {new_size} (Target: {self.db_path})")
             self.max_size = new_size
             new_pool = queue.Queue(maxsize=new_size)
             
@@ -198,7 +198,7 @@ def auto_migrate_schema(conn, schema_text):
             cursor.execute(f"PRAGMA table_info({table_name})")
             existing_cols = {row['name'].lower() for row in cursor.fetchall()}
         except Exception as e:
-            print(f"[DB-Migration Warning] 테이블 {table_name} 정보 조회 실패 (신규 테이블 생성 전일 수 있음): {e}")
+            print(f"[DB-Migration Warning] Failed to get info for table {table_name} (may be before table creation): {e}")
             continue
             
         if not existing_cols:
@@ -214,9 +214,9 @@ def auto_migrate_schema(conn, schema_text):
                 try:
                     cursor.execute(alter_query)
                     conn.commit()
-                    print(f"[DB-Migration] 동적 스키마 컬럼 추가 완료: {table_name}.{col_name} ({col_def_clean.strip()})")
+                    print(f"[DB-Migration] Dynamic schema column added: {table_name}.{col_name} ({col_def_clean.strip()})")
                 except Exception as e:
-                    print(f"[DB-Migration ERROR] 동적 컬럼 추가 실패 ({alter_query}): {e}")
+                    print(f"[DB-Migration ERROR] Failed to add dynamic column ({alter_query}): {e}")
 
 def init_databases():
     """두 데이터베이스(일반, 성인)의 테이블 스키마 초기화"""
@@ -336,11 +336,11 @@ def init_databases():
                                         aladin_val = line.split('=', 1)[1].strip()
                                         break
                     except Exception as env_err:
-                        print(f"[DB-Migration] .env 로드 에러: {env_err}")
+                        print(f"[DB-Migration] .env load error: {env_err}")
                 
                 cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('ALADIN', ?)", (aladin_val,))
                 conn.commit()
-                print(f"[DB-Migration] {db_type} DB - ALADIN 설정 초기 이식 완료: {aladin_val}")
+                print(f"[DB-Migration] {db_type} DB - Initial ALADIN setting migrated: {aladin_val}")
             
             default_settings = [
                 ('BOOK_THUMBNAIL_WIDTH', '160'),
@@ -368,14 +368,14 @@ def init_databases():
                 admin_hash = generate_password_hash('admin')
                 cursor.execute("INSERT INTO users (username, password_hash, role, is_default_password) VALUES ('admin', ?, 'admin', 1)", (admin_hash,))
                 conn.commit()
-                print(f"[DB-Migration] {db_type} DB - admin/admin 초기 계정 생성 완료")
+                print(f"[DB-Migration] {db_type} DB - admin/admin initial account created")
         except Exception as e:
-            print(f"[DB-Migration ERROR] settings/users 초기 이식 실패: {e}")
+            print(f"[DB-Migration ERROR] Initial settings/users migration failed: {e}")
         # 동적 스키마 자동 마이그레이터 구동 (테이블에 신규 필드가 추가되면 런타임에 동적으로 감지하여 ALTER TABLE 자동 수행)
         try:
             auto_migrate_schema(conn, schema)
         except Exception as migrate_err:
-            print(f"[DB-Migration ERROR] 동적 스키마 자동 마이그레이션 도중 예외 발생: {migrate_err}")
+            print(f"[DB-Migration ERROR] Exception during dynamic schema auto-migration: {migrate_err}")
         # 기존 라이브러리에 대한 원격 드라이브 자동 판별 보정
         try:
             cursor.execute("SELECT id, physical_path, is_remote FROM libraries")
@@ -387,14 +387,14 @@ def init_databases():
                         cursor.execute("UPDATE libraries SET is_remote = 1 WHERE id = ?", (lib['id'],))
             conn.commit()
         except Exception as migration_err:
-            print(f"[DB-Migration ERROR] libraries is_remote 자동 판별 보정 실패: {migration_err}")
+            print(f"[DB-Migration ERROR] libraries is_remote auto-detection fallback failed: {migration_err}")
 
         # 서버 재시작 시 고착된(Stuck) 스캔 상태 초기화 방어코드
         try:
             cursor.execute("UPDATE libraries SET scan_status = 'ready' WHERE scan_status = 'scanning'")
             conn.commit()
         except Exception as reset_err:
-            print(f"[DB-Migration ERROR] 스캔 상태 초기화 실패: {reset_err}")
+            print(f"[DB-Migration ERROR] Scan status reset failed: {reset_err}")
 
         conn.close()
 
@@ -417,11 +417,11 @@ def optimize_database(db_type='general'):
     """
     global _tuning_status
     if _tuning_status.get(db_type, False):
-        print(f"[optimize_database] 이미 {db_type} 데이터베이스 최적화가 진행 중입니다.")
+        print(f"[optimize_database] {db_type} database optimization is already in progress.")
         return False, "이미 최적화 작업이 진행 중입니다."
         
     _tuning_status[db_type] = True
-    print(f"[*] [{db_type}] 데이터베이스 최적화 엔진 기동 시작...")
+    print(f"[*] [{db_type}] Starting database optimization engine...")
     
     try:
         # 1. ANALYZE & REINDEX는 풀 커넥션을 통해 안전하게 실행
@@ -440,10 +440,10 @@ def optimize_database(db_type='general'):
         conn_vacuum.execute("VACUUM;")
         conn_vacuum.close()
         
-        print(f"[+] [{db_type}] 데이터베이스 파편화 회수 및 최적화 튜닝 최종 성공!")
+        print(f"[+] [{db_type}] Database defragmentation and optimization tuning successful!")
         return True, "최적화 완료"
     except Exception as e:
-        print(f"[!] [{db_type}] 데이터베이스 최적화 작업 중 오류: {e}")
+        print(f"[!] [{db_type}] Error during database optimization: {e}")
         return False, str(e)
     finally:
         _tuning_status[db_type] = False

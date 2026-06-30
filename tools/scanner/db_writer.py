@@ -2,7 +2,7 @@
 import os
 
 def update_book_metadata(cursor, full_path, cover_image, merged_meta):
-    """기존 도서 정보 및 로컬 메타데이터 병합 업데이트 실행"""
+    """Execute merge update for existing book info and local metadata"""
     cursor.execute("""
         UPDATE books SET 
             cover_image  = COALESCE(NULLIF(?, ''), cover_image),
@@ -31,17 +31,17 @@ def update_book_metadata(cursor, full_path, cover_image, merged_meta):
     ))
 
 def insert_new_book(cursor, library_id, filename, series_name, cover_image, merged_meta):
-    """신규 도서 정보 DB 인서트 및 도서 ID(book_id) 반환"""
+    """Insert new book info to DB and return book_id"""
     title, _ = os.path.splitext(filename)
     file_format = os.path.splitext(filename)[1].replace('.', '').lower()
-    full_path = os.path.join(os.path.dirname(cover_image) if cover_image and '/' in cover_image else '', filename) # 실제 경로는 외부에서 오버라이드되거나 전달받음.
+    full_path = os.path.join(os.path.dirname(cover_image) if cover_image and '/' in cover_image else '', filename) # Actual path overridden or passed from outside.
     
-    # 주의: full_path는 외부에서 정확히 넘겨받는 편이 좋으므로 함수의 인수로 직접 전달하게 수정하는 것이 안전함.
-    # 함수 정의를 아래와 같이 보완하자.
+    # Caution: Safer to pass full_path exactly from outside as function argument.
+    # Enhance function definition as follows.
     pass
 
 def insert_new_book_v2(cursor, library_id, full_path, filename, file_format, series_name, cover_image, merged_meta):
-    """신규 도서 정보 DB 인서트 및 도서 ID(book_id) 반환"""
+    """Insert new book info to DB and return book_id"""
     title, _ = os.path.splitext(filename)
     cursor.execute("""
         INSERT INTO books 
@@ -67,7 +67,7 @@ def insert_new_book_v2(cursor, library_id, full_path, filename, file_format, ser
     return cursor.lastrowid
 
 def save_book_offsets(cursor, book_id, filename, offsets_data):
-    """오프셋 정보 DB 일괄 벌크 저장 및 books 테이블 요약 갱신"""
+    """Bulk save offset info to DB and update books table summary"""
     if not offsets_data:
         return
         
@@ -82,4 +82,4 @@ def save_book_offsets(cursor, book_id, filename, offsets_data):
     cursor.execute("""
         UPDATE books SET total_pages = ?, has_offsets = 1 WHERE id = ?
     """, (len(bulk_data), book_id))
-    print(f"[Scanner-Offset] '{filename}' 오프셋 DB 색인 완료 ({len(bulk_data)} 페이지)")
+    print(f"[Scanner-Offset] '{filename}' offset DB index complete ({len(bulk_data)} pages)")

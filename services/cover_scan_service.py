@@ -21,9 +21,9 @@ class CoverScanService:
                 with open(log_file_path, 'a', encoding='utf-8') as f_log:
                     f_log.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}\n")
             except Exception as ex_log:
-                print(f"[CoverLogger ERROR] 로그 파일 쓰기 실패: {ex_log}")
+                print(f"[CoverLogger ERROR] Failed to write log file: {ex_log}")
 
-        print(f"[CoverScanner-Trigger] 🚀 표지 전용 스캔 즉시 기동 시작: DB={db_type}, ID={library_id}, Path={physical_path}")
+        print(f"[CoverScanner-Trigger] 🚀 Immediate cover-only scan started: DB={db_type}, ID={library_id}, Path={physical_path}")
         write_log(f"표지 전용 스캔 기동 시작 - DB={db_type}, LibraryID={library_id}, Path='{physical_path}'")
         
         # 1. 상태를 'scanning'으로 업데이트
@@ -34,7 +34,7 @@ class CoverScanService:
             conn.commit()
             conn.close()
         except Exception as e:
-            print(f"[CoverScanner] 스캔 중 상태 업데이트 오류: {e}")
+            print(f"[CoverScanner] Scan state update error: {e}")
         
         try:
             # 표지 전용 고속 스캔 실행
