@@ -289,6 +289,7 @@ def init_databases():
     CREATE INDEX IF NOT EXISTS idx_books_library_id ON books(library_id);
     CREATE INDEX IF NOT EXISTS idx_books_is_favorite ON books(is_favorite);
     CREATE INDEX IF NOT EXISTS idx_books_created_at ON books(created_at);
+    CREATE INDEX IF NOT EXISTS idx_books_series_lib_title ON books(series_name, library_id, title);
     CREATE INDEX IF NOT EXISTS idx_user_progress_book_user ON user_progress(book_id, user_id);
     CREATE INDEX IF NOT EXISTS idx_user_reading_log_user_date ON user_reading_log(user_id, read_date);
 

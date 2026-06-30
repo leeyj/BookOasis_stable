@@ -124,9 +124,9 @@ def get_pdf_range():
             f.seek(byte1)
             data = f.read(length)
         rv = Response(data, 206, mimetype=mime, direct_passthrough=True)
-        rv.headers.add('Content-Range',  f'bytes {byte1}-{byte2}/{size}')
-        rv.headers.add('Accept-Ranges',  'bytes')
-        rv.headers.add('Content-Length', str(length))
+        rv.headers['Content-Range'] = f'bytes {byte1}-{byte2}/{size}'
+        rv.headers['Accept-Ranges'] = 'bytes'
+        rv.headers['Content-Length'] = str(length)
         return rv
     except Exception as e:
         return jsonify({'error': str(e)}), 500

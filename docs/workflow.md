@@ -205,3 +205,4 @@ tags: [workflow, history]
 | 2026-06-30 | `db_connection_leak` | 도서 스캔 과정의 DB 커넥션 누수 및 풀 크기 조정 조치 | [Bugfix](./bug/20260630_bugfix_scanner_db_connection_leak.md) | - |
 
 | 2026-06-30 | `db_connection_leak` | 도서 스캔 과정의 DB 커넥션 누수 및 풀 크기 조정 조치 | [Task](./history/20260630_032308_db_connection_leak_task.md) | [Walkthrough](./history/20260630_032308_db_connection_leak_walkthrough.md) |
+| 2026-06-30 | `series_index_opt` | 시리즈 커버 쿼리 최적화를 위한 복합 인덱스 추가 | [Task](./history/20260630_173642_series_index_opt_task.md) | [Walkthrough](./history/20260630_173642_series_index_opt_walkthrough.md) |

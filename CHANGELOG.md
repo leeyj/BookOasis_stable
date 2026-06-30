@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## v0.5.4
+### Changed
+- 단일인덱스를 복합 인덱스 변경 적용 | Apply complex index instead of single index
+
+---
+
+
 ## v0.5.3
 ### Changed
 - DockerFile 내 워커수 1개로 고정 | DockerFile workers 1 fixed
