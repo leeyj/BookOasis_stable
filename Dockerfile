@@ -12,6 +12,7 @@ WORKDIR /app
 # 4. Install System Dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # 5. Install Python Dependencies
@@ -19,8 +20,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# 6. Copy Source Code
+# 6. Copy Source Code and Entrypoint
 COPY . .
+RUN chmod +x /app/entrypoint.sh
 
 # 7. Create volumes and directories
 RUN mkdir -p db covers cache plugins
@@ -32,4 +34,5 @@ EXPOSE 5930
 VOLUME ["/app/db", "/app/covers", "/app/cache", "/app/plugins"]
 
 # 10. Startup Command
+ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["gunicorn", "--workers", "1", "--threads", "12", "--bind", "0.0.0.0:5930", "--timeout", "300", "core:app"]

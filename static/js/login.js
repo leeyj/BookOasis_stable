@@ -2,6 +2,7 @@ async function handleLogin(e) {
     e.preventDefault();
     const usernameInput = document.getElementById('username').value.trim();
     const passwordInput = document.getElementById('password').value;
+    const rememberMeInput = document.getElementById('remember-me') ? document.getElementById('remember-me').checked : false;
     const errDiv = document.getElementById('login-error');
     const errText = document.getElementById('login-error-text');
 
@@ -11,7 +12,11 @@ async function handleLogin(e) {
         const res = await fetch('/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: usernameInput, password: passwordInput })
+            body: JSON.stringify({ 
+                username: usernameInput, 
+                password: passwordInput,
+                remember_me: rememberMeInput
+            })
         });
         const data = await res.json();
 

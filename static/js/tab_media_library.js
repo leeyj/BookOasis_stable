@@ -237,9 +237,8 @@ window.closeLibraryModal = closeLibraryModal;
 window.submitLibraryForm = submitLibraryForm;
 
 // 신규 뷰어 오버레이 함수 매핑 (viewer_comic.js에 위임)
-import { toggleComicOverlay, jumpToFirstPage, markAsCompleted } from './viewer_comic.js';
+import { toggleComicOverlay, markAsCompleted } from './viewer_comic.js';
 window.toggleComicOverlay = toggleComicOverlay;
-window.jumpToFirstPage = jumpToFirstPage;
 window.markAsCompleted = markAsCompleted;
 
 // 갱신 시 무한 스크롤 옵저버 다시 바인딩 헬퍼용 노출

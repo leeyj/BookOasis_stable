@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v0.5.8
+### Changed
+- 로그인시 자동로그인 기능 추가 | added remember me functionality in login
+- 도커실행시 유저권한으로 실행가능하도록 수정 | docker run with custom user permission
+
 ## v0.5.7
 ### Changed
 - epub로드시 슬라이드 오류 수정 | epub load slide error fix

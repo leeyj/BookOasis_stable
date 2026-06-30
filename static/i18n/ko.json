@@ -39,7 +39,8 @@
     "username_placeholder": "아이디",
     "password_placeholder": "비밀번호",
     "submit_btn": "로그인",
-    "failed_msg": "로그인에 실패했습니다. 아이디와 비밀번호를 확인하세요."
+    "failed_msg": "로그인에 실패했습니다. 아이디와 비밀번호를 확인하세요.",
+    "remember_me": "자동 로그인"
   },
   "settings": {
     "title": "설정",

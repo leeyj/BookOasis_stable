@@ -97,13 +97,16 @@ def check_authentication():
 def login():
     if request.method == 'POST':
         # JSON 요청과 일반 Form 요청 모두 대응
+        remember_me = False
         if request.is_json:
             data = request.get_json()
             username = data.get('username')
             password = data.get('password')
+            remember_me = data.get('remember_me', False)
         else:
             username = request.form.get('username')
             password = request.form.get('password')
+            remember_me = request.form.get('remember_me') == 'on'
             
         if not username or not password:
             return jsonify({'success': False, 'error': _t('api.username_password_required')}), 400
@@ -115,6 +118,12 @@ def login():
         conn.close()
         
         if user and check_password_hash(user['password_hash'], password):
+            session.clear() # 세션 고정 취약점 방지
+            
+            # 자동 로그인이 체크된 경우 세션 만료기간을 연장 (기본적으로 Flask에서는 app.permanent_session_lifetime 에 따름, 보통 31일)
+            if remember_me:
+                session.permanent = True
+                
             session['user_id'] = user['id']
             session['username'] = user['username']
             session['role'] = user['role']

@@ -39,7 +39,8 @@
     "username_placeholder": "Username",
     "password_placeholder": "Password",
     "submit_btn": "Log In",
-    "failed_msg": "Login failed. Please check your username and password."
+    "failed_msg": "Login failed. Please check your username and password.",
+    "remember_me": "Remember Me"
   },
   "settings": {
     "title": "Settings",

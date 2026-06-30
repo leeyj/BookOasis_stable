@@ -1,6 +1,6 @@
 // viewer.js – 미디어 뷰어 라이프사이클 및 단축키 코어 조율기
 import { state } from './state.js';
-import { initComicViewer, nextComicPage, prevComicPage, setComicFitMode, toggleComicOverlay, jumpToFirstPage, jumpToLastPage, markAsCompleted, initSeekBar } from './viewer_comic.js';
+import { initComicViewer, nextComicPage, prevComicPage, setComicFitMode, toggleComicOverlay, markAsCompleted } from './viewer_comic.js';
 import { initTxtViewer, prevTxtPage, nextTxtPage, applyTxtSettings } from './viewer_txt.js';
 import { initPdfViewer, nextPdfPage, prevPdfPage, clearPdfViewer } from './viewer_pdf.js';
 import { initEpubViewer, clearEpubViewer, epubPrevPage, epubNextPage, applyEpubSettings, changeEpubScrollMode } from './viewer_epub.js';
@@ -367,7 +367,7 @@ window.setScrollMode = function(mode) {
 // ==========================================
 let _viewerSeekbarInited = false;
 
-export function initViewerSeekBar() {
+function initViewerSeekBar() {
   const slider = document.getElementById('viewer-page-slider');
   if (!slider) return;
 
