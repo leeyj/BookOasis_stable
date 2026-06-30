@@ -12,6 +12,8 @@
     <script src="{{ url_for('static', filename='js/i18n.js') }}"></script>
     <!-- Marked.js (Markdown 파서) -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- 외부 라이브러리 (로컬 다운로드 버전) -->
+    <script src="/static/lib/Sortable.min.js"></script>
     <script>
         window.currentUser = {
             username: "{{ session.get('username', '') }}",

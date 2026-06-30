@@ -92,41 +92,34 @@ window.toggleCategoryOrderPin = () => {
 
 function bindDragAndDropEvents(isEnabled) {
   const sidebar = document.getElementById('sidebar-categories');
-  if (!sidebar || !isEnabled) return;
+  if (!sidebar) return;
 
-  const items = sidebar.querySelectorAll('li[data-type="custom"]');
-  let dragSrcEl = null;
+  // 기존 인스턴스 정리
+  if (sidebar._sortable) {
+    sidebar._sortable.destroy();
+    sidebar._sortable = null;
+  }
 
-  items.forEach(item => {
-    item.addEventListener('dragstart', (e) => {
-      dragSrcEl = item;
-      e.dataTransfer.effectAllowed = 'move';
-      item.classList.add('dragging');
-    });
+  if (!isEnabled) return;
 
-    item.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      
-      const target = e.target.closest('li[data-type="custom"]');
-      if (target && target !== dragSrcEl) {
-        const rect = target.getBoundingClientRect();
-        const next = (e.clientY - rect.top) / (rect.bottom - rect.top) > 0.5;
-        sidebar.insertBefore(dragSrcEl, next ? target.nextElementSibling : target);
+  if (typeof Sortable !== 'undefined') {
+    sidebar._sortable = new Sortable(sidebar, {
+      animation: 150,
+      draggable: 'li[data-type="custom"]', // 커스텀 카테고리만 드래그 가능
+      filter: 'li[data-type="system"]',    // 시스템 카테고리는 필터링
+      preventOnFilter: false,
+      onEnd: function (evt) {
+        saveNewOrder();
       }
     });
-
-    item.addEventListener('dragend', () => {
-      item.classList.remove('dragging');
-      saveNewOrder();
-    });
-  });
-
-  function saveNewOrder() {
-    const customItems = sidebar.querySelectorAll('li[data-type="custom"]');
-    const order = Array.from(customItems).map(el => String(el.dataset.id));
-    localStorage.setItem(`libraries_order_${state.currentLibraryType}`, JSON.stringify(order));
   }
+}
+function saveNewOrder() {
+  const sidebar = document.getElementById('sidebar-categories');
+  if (!sidebar) return;
+  const customItems = sidebar.querySelectorAll('li[data-type="custom"]');
+  const order = Array.from(customItems).map(el => String(el.dataset.id));
+  localStorage.setItem(`libraries_order_${state.currentLibraryType}`, JSON.stringify(order));
 }
 
 // 사이드바 및 외부 우클릭 바인딩

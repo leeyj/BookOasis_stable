@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v0.5.6
+### Changed
+- sortable.js 도입 | sortable.js introduced
+
+---
 ## v0.5.5
 ### Changed
 - 만화뷰어에 페이지 이동용 슬라이드 추가 | Add slide bar for page navigation in comic viewer
