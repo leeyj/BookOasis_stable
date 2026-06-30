@@ -57,12 +57,15 @@ export function switchSettingsTab(tabId) {
     loadUsersList();
   } else if (tabId === 'about') {
     loadAboutInfo();
+  } else if (tabId === 'changelog') {
+    loadChangelog();
   }
 }
 
 // 이 S/W는... 버전 정보 로딩 및 렌더링
 async function loadAboutInfo() {
   const dashEl = document.getElementById('about-ver-dashboard');
+  const latestEl = document.getElementById('about-ver-latest');
   const stateEl = document.getElementById('about-ver-state');
   if (!dashEl || !stateEl) return;
   
@@ -80,5 +83,59 @@ async function loadAboutInfo() {
     console.error('About 정보 로딩 실패:', e);
     dashEl.textContent = '연결 오류';
     stateEl.textContent = '오류';
+  }
+
+  if (latestEl) {
+    try {
+      const gitRes = await fetch('https://raw.githubusercontent.com/leeyj/BookOasis_stable/main/VERSION');
+      if (gitRes.ok) {
+        const text = await gitRes.text();
+        const match = text.match(/"dashboard":\s*([0-9\.]+)/);
+        if (match && match[1]) {
+          latestEl.textContent = `v${match[1]}`;
+        } else {
+          latestEl.textContent = '버전 파싱 실패';
+        }
+      } else {
+        latestEl.textContent = '불러오기 실패';
+      }
+    } catch (e) {
+      console.error('GitHub 최신 버전 로딩 실패:', e);
+      latestEl.textContent = '연결 오류';
+    }
+  }
+}
+
+// 업데이트 내역 (Changelog) 탭 로딩
+async function loadChangelog() {
+  const contentEl = document.getElementById('changelog-content');
+  const loadingEl = document.getElementById('changelog-loading');
+  if (!contentEl || !loadingEl) return;
+  
+  if (contentEl.innerHTML.trim() !== '') return; // 이미 로딩됨
+
+  loadingEl.style.display = 'block';
+  contentEl.style.display = 'none';
+
+  try {
+    const res = await fetch('https://raw.githubusercontent.com/leeyj/BookOasis_stable/main/CHANGELOG.md');
+    if (res.ok) {
+      const text = await res.text();
+      // marked.js를 통해 렌더링
+      if (typeof marked !== 'undefined') {
+        contentEl.innerHTML = marked.parse(text);
+      } else {
+        // Fallback for raw text
+        contentEl.innerHTML = `<pre style="white-space: pre-wrap; font-family: inherit;">${text}</pre>`;
+      }
+    } else {
+      contentEl.innerHTML = `<p style="color: #ef4444;">${i18n.t('settings.changelog_error') || '패치 노트를 불러오지 못했습니다. (서버 응답 오류)'}</p>`;
+    }
+  } catch (e) {
+    console.error('Changelog 로딩 실패:', e);
+    contentEl.innerHTML = `<p style="color: #ef4444;">${i18n.t('settings.changelog_error') || '패치 노트를 불러오지 못했습니다. (네트워크 오류)'}</p>`;
+  } finally {
+    loadingEl.style.display = 'none';
+    contentEl.style.display = 'block';
   }
 }

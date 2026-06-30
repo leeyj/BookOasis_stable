@@ -10,6 +10,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='lib/font-awesome/css/all.min.css') }}">
     <!-- i18n 다국어 지원 엔진 -->
     <script src="{{ url_for('static', filename='js/i18n.js') }}"></script>
+    <!-- Marked.js (Markdown 파서) -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
         window.currentUser = {
             username: "{{ session.get('username', '') }}",

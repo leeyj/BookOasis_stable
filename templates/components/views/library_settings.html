@@ -19,6 +19,9 @@
                 <button class="settings-tab-btn" onclick="switchSettingsTab('about')">
                     <i class="fa-solid fa-circle-info"></i> <span data-i18n="settings.tab_about">이 S/W는...</span>
                 </button>
+                <button class="settings-tab-btn" onclick="switchSettingsTab('changelog')">
+                    <i class="fa-solid fa-clock-rotate-left"></i> <span data-i18n="settings.tab_changelog">업데이트 내역</span>
+                </button>
             </div>
 
             <!-- 1. 스캔 스케줄 설정 탭 -->
@@ -331,6 +334,10 @@
                         <span style="color: #fff; font-weight: 600;" id="about-ver-dashboard" data-i18n="common.loading">로드 중...</span>
                     </div>
                     <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.75rem; margin-bottom: 0.75rem; font-size: 0.88rem;">
+                        <span style="color: #94a3b8;" data-i18n="settings.about_col_latest_ver">최신 배포 버전</span>
+                        <span style="color: #10b981; font-weight: 600;" id="about-ver-latest" data-i18n="common.loading">로드 중...</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.75rem; margin-bottom: 0.75rem; font-size: 0.88rem;">
                         <span style="color: #94a3b8;" data-i18n="settings.about_col_status">상태</span>
                         <span style="color: #c084fc; font-weight: 600;" id="about-ver-state" data-i18n="common.loading">로드 중...</span>
                     </div>
@@ -379,3 +386,49 @@
             </div>
         </div>
     </div>
+
+    <!-- 7. 업데이트 내역 (Changelog) 탭 -->
+    <div id="settings-tab-changelog" class="settings-tab-content" style="display: none; flex-direction: column; gap: 1rem;">
+        <h3 style="margin-top: 0; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; font-size: 1.1rem; color: #f8fafc;">
+            <i class="fa-solid fa-clock-rotate-left" style="color: #60a5fa;"></i> <span data-i18n="settings.tab_changelog">업데이트 내역</span>
+        </h3>
+        <p style="color: #94a3b8; font-size: 0.85rem; margin-top: 0; margin-bottom: 1rem;" data-i18n="settings.changelog_desc">BookOasis의 최근 업데이트 및 패치 노트를 확인합니다.</p>
+        
+        <div id="changelog-container" style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 1.5rem; color: #e2e8f0; font-size: 0.9rem; line-height: 1.6; max-height: 60vh; overflow-y: auto;">
+            <div id="changelog-loading" style="text-align: center; padding: 2rem; color: #94a3b8;">
+                <i class="fa-solid fa-circle-notch fa-spin fa-2x" style="margin-bottom: 1rem;"></i>
+                <div data-i18n="settings.changelog_loading">패치 노트를 불러오는 중입니다...</div>
+            </div>
+            <div id="changelog-content" class="markdown-body" style="display: none;"></div>
+        </div>
+    </div>
+    
+    <style>
+        /* Markdown 렌더링을 위한 기본 스타일 */
+        #changelog-content.markdown-body h1,
+        #changelog-content.markdown-body h2,
+        #changelog-content.markdown-body h3 {
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 0.3em;
+            margin-top: 1.5em;
+            margin-bottom: 1em;
+            color: #f8fafc;
+        }
+        #changelog-content.markdown-body h1 { font-size: 1.5em; }
+        #changelog-content.markdown-body h2 { font-size: 1.25em; }
+        #changelog-content.markdown-body h3 { font-size: 1.1em; }
+        #changelog-content.markdown-body ul {
+            padding-left: 1.5em;
+            margin-bottom: 1em;
+        }
+        #changelog-content.markdown-body li {
+            margin-bottom: 0.25em;
+        }
+        #changelog-content.markdown-body code {
+            background-color: rgba(255,255,255,0.1);
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+    </style>
