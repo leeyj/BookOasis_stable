@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## v0.6.1
+### fix
+- 페이지 넘김시 2장씩 넘어가는 이슈 해결(by 세안파파) | fix page change issue
+- 즐겨찾기 토글 안되는 이슈 해결(by 세안파파) | fix favorite toggle issue
+- 타치요미용 OPDS Endpoint 추가(/app-opds) | tachiyomi opds endpoint added(/app-opds)
+- 스캐너 로그 저장위치 수정/분리(by 젤리씨) | Scanner log save location modified/separated
+- epub 파일 페이지 구성로직 변경(페이지->퍼센테이지) | epub file page composition logic change(page -> percentage)
+
+### added
+- 스캐너 큐 로직 도입(환경설정->스캔예약조회) | scanner queue logic introduction(Environment setting->Scan queue view)
+
+---
+
 ## v0.6.0
 ### Changed
 - 웹툰(세로 스크롤형)뷰어시 너비 조절 기능 추가(by freebird81) | Added width adjustment feature for webtoon (vertical scroll type) viewer

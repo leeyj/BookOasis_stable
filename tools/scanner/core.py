@@ -45,6 +45,26 @@ def scanner_print_control(db_path):
 
     if not write_log:
         builtins.print = lambda *args, **kwargs: None
+    else:
+        import datetime
+        BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        log_dir = os.path.join(BASE_DIR, 'logs')
+        os.makedirs(log_dir, exist_ok=True)
+        log_file_path = os.path.join(log_dir, 'scanner.log')
+        
+        def custom_print(*args, **kwargs):
+            try:
+                sep = kwargs.get('sep', ' ')
+                end = kwargs.get('end', '\n')
+                message = sep.join(map(str, args)) + end
+                timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                formatted_message = f"[{timestamp}] {message}"
+                with open(log_file_path, 'a', encoding='utf-8') as f:
+                    f.write(formatted_message)
+            except Exception:
+                pass
+        builtins.print = custom_print
+        
     try:
         yield
     finally:

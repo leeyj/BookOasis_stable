@@ -2,10 +2,13 @@
             <!-- 탭 헤더 영역 -->
             <div class="settings-tabs" style="display: flex; gap: 0.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.5rem; margin-bottom: 1rem;">
                 <button class="settings-tab-btn active" onclick="switchSettingsTab('schedule')">
-                    <i class="fa-solid fa-calendar-days"></i> 스캔 스케줄 설정
+                    <i class="fa-solid fa-calendar-days"></i> <span data-i18n="settings.tab_schedule">스캔 스케줄 설정</span>
+                </button>
+                <button class="settings-tab-btn" onclick="switchSettingsTab('queue')">
+                    <i class="fa-solid fa-list-ul"></i> <span data-i18n="settings.tab_queue">스캔 예약 조회</span>
                 </button>
                 <button class="settings-tab-btn" onclick="switchSettingsTab('general')">
-                    <i class="fa-solid fa-sliders"></i> 일반 설정
+                    <i class="fa-solid fa-sliders"></i> <span data-i18n="settings.tab_general">일반 설정</span>
                 </button>
                 <button class="settings-tab-btn" onclick="switchSettingsTab('plugins')">
                     <i class="fa-solid fa-plug"></i> 플러그인 설정
@@ -26,6 +29,9 @@
 
             <!-- 1. 스캔 스케줄 설정 탭 -->
             {% include "components/settings/schedule_tab.html" %}
+
+            <!-- 1.5 큐 조회 탭 -->
+            {% include "components/settings/queue_tab.html" %}
 
             <!-- 2. 일반 설정 탭 -->
             {% include "components/settings/general_tab.html" %}

@@ -176,7 +176,8 @@
     "general_save_fail": "Failed to save some settings: {error}",
     "general_server_error": "A server connection error occurred.",
     "general_scanner_start": "Starting Lazy Cover Scanner...",
-    "general_scanner_fail": "Scanner start failed: {error}"
+    "general_scanner_fail": "Scanner start failed: {error}",
+    "tab_queue": "Scan Queue Status"
   },
   "sidebar": {
     "library": "Library",
@@ -493,5 +494,28 @@
     "applying": "Applying book info...",
     "apply_series_success": "Series metadata applied successfully.",
     "apply_fail": "Apply failed: {error}"
+  },
+  "queue": {
+    "title": "Scan Queue Status",
+    "desc": "Displays real-time status of all running or queued scanner tasks.",
+    "btn_clear": "Clear Queue",
+    "btn_refresh": "Refresh",
+    "col_index": "No.",
+    "col_status": "Status",
+    "col_type": "Task Type",
+    "col_target": "Target Library",
+    "col_time": "Time",
+    "loading": "Loading data...",
+    "empty": "No queued or running scan tasks at the moment.",
+    "load_error": "Failed to load queue information.",
+    "status_running": "Running",
+    "status_pending": "Pending",
+    "type_lib": "Library Scan",
+    "type_cover": "Cover Scan",
+    "type_lazy": "Lazy Scan",
+    "system": "System",
+    "clear_confirm": "Are you sure you want to clear all pending scan tasks?\\n(Currently running tasks will not be interrupted.)",
+    "clear_fail": "Failed to clear: ",
+    "clear_error": "An error occurred during clear request."
   }
 }

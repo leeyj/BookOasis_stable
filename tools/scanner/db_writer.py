@@ -54,7 +54,7 @@ def insert_new_book_v2(cursor, library_id, full_path, filename, file_format, ser
         merged_meta['author'], 
         full_path, 
         file_format, 
-        0, 
+        100 if file_format == 'epub' else 0, 
         cover_image,
         merged_meta['publisher'],
         merged_meta['link'],

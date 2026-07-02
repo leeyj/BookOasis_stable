@@ -120,9 +120,17 @@ class StreamService:
 
     @staticmethod
     def record_progress(db_type: str, book_id, page_idx: int, total_pages: int, user_id=1):
-        """독서 진행률 및 활동 로그 기록"""
+        """독서 진행률 및 활동 로그 기록 (EPUB 등 페이지 수가 없는 도서의 자동 동기화 포함)"""
         conn   = database.get_connection(db_type)
         cursor = conn.cursor()
+        
+        # ── [동적 페이지 수집] DB의 total_pages가 0일 경우 뷰어가 전달한 값으로 갱신 (EPUB 대응) ──
+        if total_pages > 0:
+            cursor.execute("SELECT total_pages FROM books WHERE id = ?", (book_id,))
+            book_row = cursor.fetchone()
+            if book_row and book_row['total_pages'] == 0:
+                cursor.execute("UPDATE books SET total_pages = ? WHERE id = ?", (total_pages, book_id))
+                
         cursor.execute("SELECT pages_read FROM user_progress WHERE book_id = ? AND user_id = ?", (book_id, user_id))
         row = cursor.fetchone()
 

@@ -1,0 +1,166 @@
+<div id="settings-tab-queue" class="settings-tab-content" style="display: none; flex-direction: column; gap: 1.5rem;">
+    <div class="dashboard-section">
+        <div class="section-header" style="margin-bottom: 1.2rem; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1.2rem; font-weight: 700;">
+                    <i class="fa-solid fa-list-ul" style="color: #3b82f6; margin-right: 0.5rem;"></i> <span data-i18n="queue.title">스캔 예약(Queue) 대기열 조회</span>
+                </h3>
+                <p data-i18n="queue.desc" style="font-size: 0.82rem; color: #94a3b8; margin: 0.4rem 0 0 0;">현재 시스템에서 실행 중이거나 대기 중인 모든 스캐너 작업의 순서와 상태를 실시간으로 보여줍니다.</p>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="action-btn" onclick="clearQueue()" style="padding: 0.4rem 1rem; background-color: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 6px; color: #fca5a5; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+                    <i class="fa-solid fa-trash-can"></i> <span data-i18n="queue.btn_clear">큐 일괄 삭제</span>
+                </button>
+                <button class="action-btn" onclick="loadQueueStatus()" style="padding: 0.4rem 1rem; background-color: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 6px; color: #93c5fd; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+                    <i class="fa-solid fa-rotate-right"></i> <span data-i18n="queue.btn_refresh">새로고침</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="settings-table-wrapper" style="background: rgba(30, 41, 59, 0.25); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; overflow: hidden; backdrop-filter: blur(10px);">
+            <table class="settings-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
+                <thead>
+                    <tr style="background: rgba(15, 23, 42, 0.4); border-bottom: 1px solid rgba(255,255,255,0.08); color: #94a3b8;">
+                        <th data-i18n="queue.col_index" style="padding: 1rem; width: 60px;">순번</th>
+                        <th data-i18n="queue.col_status" style="padding: 1rem; width: 120px;">상태</th>
+                        <th data-i18n="queue.col_type" style="padding: 1rem; width: 150px;">작업 종류</th>
+                        <th data-i18n="queue.col_target" style="padding: 1rem;">대상 라이브러리</th>
+                        <th data-i18n="queue.col_time" style="padding: 1rem; width: 180px;">시작/대기 시각</th>
+                    </tr>
+                </thead>
+                <tbody id="queue-table-body">
+                    <tr>
+                        <td colspan="5" style="padding: 2rem; text-align: center; color: #94a3b8;"><span data-i18n="queue.loading">데이터를 불러오는 중입니다...</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    let queueRefreshInterval = null;
+
+    // 탭이 전환될 때 불리는 함수 재정의 로직 (switchSettingsTab은 전역 함수)
+    const originalSwitchSettingsTab = window.switchSettingsTab;
+    window.switchSettingsTab = function(tabId) {
+        if (originalSwitchSettingsTab) {
+            originalSwitchSettingsTab(tabId);
+        }
+        
+        if (tabId === 'queue') {
+            loadQueueStatus();
+            // 5초마다 자동 갱신
+            if (!queueRefreshInterval) {
+                queueRefreshInterval = setInterval(loadQueueStatus, 5000);
+            }
+        } else {
+            // 다른 탭으로 이동하면 갱신 중지
+            if (queueRefreshInterval) {
+                clearInterval(queueRefreshInterval);
+                queueRefreshInterval = null;
+            }
+        }
+    };
+
+    async function loadQueueStatus() {
+        try {
+            const response = await fetch('/api/media/system/queue');
+            if (!response.ok) throw new Error('API Response Error');
+            const data = await response.json();
+            
+            if (data.success && data.queue) {
+                renderQueueTable(data.queue);
+            } else {
+                console.error("Queue data load failed:", data.error);
+            }
+        } catch (error) {
+            console.error("Failed to fetch queue status", error);
+            const tbody = document.getElementById('queue-table-body');
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="5" style="padding: 2rem; text-align: center; color: #ef4444;"><i class="fa-solid fa-triangle-exclamation"></i> ${window.i18n ? window.i18n.t('queue.load_error') : '대기열 정보를 불러오지 못했습니다.'}</td></tr>`;
+            }
+        }
+    }
+
+    function renderQueueTable(queueData) {
+        const tbody = document.getElementById('queue-table-body');
+        if (!tbody) return;
+
+        const t = window.i18n ? window.i18n.t.bind(window.i18n) : (key) => key;
+
+        let html = '';
+        let index = 1;
+
+        const getTaskTypeName = (type) => {
+            if (type === 'library_scan') return `<span style="color: #60a5fa;"><i class="fa-solid fa-folder-tree"></i> ${t('queue.type_lib')}</span>`;
+            if (type === 'cover_scan') return `<span style="color: #4ade80;"><i class="fa-solid fa-image"></i> ${t('queue.type_cover')}</span>`;
+            if (type === 'lazy_scan') return `<span style="color: #c084fc;"><i class="fa-solid fa-moon"></i> ${t('queue.type_lazy')}</span>`;
+            return type;
+        };
+
+        // 1. 현재 실행 중인 작업 렌더링
+        if (queueData.running) {
+            const r = queueData.running;
+            html += `
+                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); background-color: rgba(59, 130, 246, 0.05);">
+                    <td style="padding: 1rem; color: #e2e8f0;">${index++}</td>
+                    <td style="padding: 1rem;">
+                        <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 4px; background-color: rgba(59, 130, 246, 0.15); color: #60a5fa; font-size: 0.85rem; font-weight: 500;">
+                            <i class="fa-solid fa-spinner fa-spin"></i> ${t('queue.status_running')}
+                        </span>
+                    </td>
+                    <td style="padding: 1rem; color: #e2e8f0;">${getTaskTypeName(r.type)}</td>
+                    <td style="padding: 1rem; color: #f8fafc; font-weight: 500;">${r.library_name || t('queue.system')}</td>
+                    <td style="padding: 1rem; color: #94a3b8; font-size: 0.85rem;">시작: ${r.started_at || '-'}</td>
+                </tr>
+            `;
+        }
+
+        // 2. 대기 중인 작업들 렌더링
+        if (queueData.pending && queueData.pending.length > 0) {
+            queueData.pending.forEach(p => {
+                html += `
+                    <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                        <td style="padding: 1rem; color: #94a3b8;">${index++}</td>
+                        <td style="padding: 1rem;">
+                            <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 4px; background-color: rgba(255, 255, 255, 0.1); color: #cbd5e1; font-size: 0.85rem;">
+                                <i class="fa-solid fa-hourglass-half"></i> ${t('queue.status_pending')}
+                            </span>
+                        </td>
+                        <td style="padding: 1rem; color: #e2e8f0;">${getTaskTypeName(p.type)}</td>
+                        <td style="padding: 1rem; color: #e2e8f0;">${p.library_name || t('queue.system')}</td>
+                        <td style="padding: 1rem; color: #94a3b8; font-size: 0.85rem;">등록: ${p.enqueued_at || '-'}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        if (html === '') {
+            html = `<tr><td colspan="5" style="padding: 3rem; text-align: center; color: #94a3b8;"><i class="fa-solid fa-check-circle" style="font-size: 2rem; margin-bottom: 1rem; display: block; color: #22c55e;"></i>${t('queue.empty')}</td></tr>`;
+        }
+
+        tbody.innerHTML = html;
+    }
+
+    async function clearQueue() {
+        const t = window.i18n ? window.i18n.t.bind(window.i18n) : (key) => "확인";
+        const msg = window.i18n ? window.i18n.t('queue.clear_confirm') : "대기 중인 모든 스캔 작업을 삭제하시겠습니까?\\n(현재 실행 중인 작업은 중단되지 않습니다.)";
+        
+        if (!confirm(msg)) return;
+        
+        try {
+            const response = await fetch('/api/media/system/queue/clear', { method: 'POST' });
+            const data = await response.json();
+            if (data.success) {
+                alert(data.message);
+                loadQueueStatus();
+            } else {
+                alert((window.i18n ? window.i18n.t('queue.clear_fail') : "삭제 실패: ") + data.error);
+            }
+        } catch (error) {
+            console.error("Queue clear error", error);
+            alert(window.i18n ? window.i18n.t('queue.clear_error') : "삭제 요청 중 오류가 발생했습니다.");
+        }
+    }
+</script>

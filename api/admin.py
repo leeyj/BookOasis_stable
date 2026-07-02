@@ -198,12 +198,8 @@ def trigger_library_scan(library_id):
         physical_path = row['physical_path']
         db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
         
-        threading.Thread(
-            target=run_scan_job,
-            args=(db_type, db_path, library_id, physical_path),
-            kwargs={'force': force},
-            daemon=True
-        ).start()
+        from services.scanner_queue import scanner_queue
+        scanner_queue.enqueue('library_scan', db_type=db_type, db_path=db_path, library_id=library_id, physical_path=physical_path, force=force)
         
         return jsonify({'success': True, 'message': _t('api.msg_scan_started')})
     except Exception as e:
@@ -242,12 +238,8 @@ def trigger_library_cover_scan(library_id):
         physical_path = row['physical_path']
         db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
         
-        from services.cover_scan_service import CoverScanService
-        threading.Thread(
-            target=CoverScanService.run_cover_scan_job,
-            args=(db_type, db_path, library_id, physical_path),
-            daemon=True
-        ).start()
+        from services.scanner_queue import scanner_queue
+        scanner_queue.enqueue('cover_scan', db_type=db_type, db_path=db_path, library_id=library_id, physical_path=physical_path)
         
         return jsonify({'success': True, 'message': _t('api.msg_cover_scan_started')})
     except Exception as e:
@@ -497,4 +489,57 @@ def get_about_info():
     })
 
 
+@admin_bp.route('/api/media/system/queue', methods=['GET'])
+@admin_required
+def get_system_queue_status():
+    """현재 스캐너 대기열의 상태를 조회합니다."""
+    try:
+        from services.scanner_queue import scanner_queue
+        import database
+        status = scanner_queue.get_queue_status()
+        
+        # 라이브러리 ID를 이름으로 변환 (보기 좋게 하기 위함)
+        def _enhance_task(task):
+            if not task:
+                return task
+            if task['type'] in ('library_scan', 'cover_scan'):
+                db_type = task['kwargs'].get('db_type', 'general')
+                lib_id = task['kwargs'].get('library_id')
+                task['library_name'] = f"Library {lib_id}"
+                if lib_id:
+                    try:
+                        conn = database.get_connection(db_type)
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT name FROM libraries WHERE id = ?", (lib_id,))
+                        row = cursor.fetchone()
+                        if row:
+                            task['library_name'] = f"{row['name']} ({db_type})"
+                        conn.close()
+                    except Exception:
+                        pass
+            elif task['type'] == 'lazy_scan':
+                task['library_name'] = "전체 시스템 (Lazy Scanner)"
+            return task
+            
+        if status['running']:
+            status['running'] = _enhance_task(status['running'])
+        
+        enhanced_pending = []
+        for t in status['pending']:
+            enhanced_pending.append(_enhance_task(t))
+        status['pending'] = enhanced_pending
+        
+        return jsonify({'success': True, 'queue': status})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
+@admin_bp.route('/api/media/system/queue/clear', methods=['POST'])
+@admin_required
+def clear_system_queue():
+    """스캐너 대기열을 일괄 삭제합니다."""
+    try:
+        from services.scanner_queue import scanner_queue
+        count = scanner_queue.clear_queue()
+        return jsonify({'success': True, 'message': f'대기열 {count}건이 삭제되었습니다.'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500

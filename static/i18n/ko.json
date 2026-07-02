@@ -176,7 +176,8 @@
     "general_save_fail": "일부 설정 저장 실패: {error}",
     "general_server_error": "서버 연결 중 오류가 발생했습니다.",
     "general_scanner_start": "Lazy 표지 스캐너를 기동하는 중...",
-    "general_scanner_fail": "스캐너 기동 실패: {error}"
+    "general_scanner_fail": "스캐너 기동 실패: {error}",
+    "tab_queue": "스캔 예약 조회"
   },
   "sidebar": {
     "library": "라이브러리",
@@ -493,5 +494,28 @@
     "applying": "도서 정보 적용 중...",
     "apply_series_success": "시리즈 메타데이터가 일괄 적용되었습니다.",
     "apply_fail": "적용 실패: {error}"
+  },
+  "queue": {
+    "title": "스캔 예약(Queue) 대기열 조회",
+    "desc": "현재 시스템에서 실행 중이거나 대기 중인 모든 스캐너 작업의 순서와 상태를 실시간으로 보여줍니다.",
+    "btn_clear": "큐 일괄 삭제",
+    "btn_refresh": "새로고침",
+    "col_index": "순번",
+    "col_status": "상태",
+    "col_type": "작업 종류",
+    "col_target": "대상 라이브러리",
+    "col_time": "시작/대기 시각",
+    "loading": "데이터를 불러오는 중입니다...",
+    "empty": "현재 대기 중이거나 실행 중인 스캔 작업이 없습니다.",
+    "load_error": "대기열 정보를 불러오지 못했습니다.",
+    "status_running": "실행 중",
+    "status_pending": "대기 중",
+    "type_lib": "전체 스캔",
+    "type_cover": "표지 스캔",
+    "type_lazy": "Lazy 스캔",
+    "system": "시스템",
+    "clear_confirm": "대기 중인 모든 스캔 작업을 삭제하시겠습니까?\\n(현재 실행 중인 작업은 중단되지 않습니다.)",
+    "clear_fail": "삭제 실패: ",
+    "clear_error": "삭제 요청 중 오류가 발생했습니다."
   }
 }

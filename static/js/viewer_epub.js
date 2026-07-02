@@ -6,11 +6,11 @@ export let epubBook = null;
 export let epubRendition = null;
 export let epubTotalPages = 0;
 
-export function initEpubViewer(bookId, totalPages) {
+export function initEpubViewer(bookId, pagesRead, totalPages) {
   if (typeof ePub === 'undefined') {
     const script = document.createElement('script');
     script.src = 'https://unpkg.com/epubjs@0.3.88/dist/epub.min.js';
-    script.onload = () => _doInitEpubViewer(bookId, totalPages);
+    script.onload = () => _doInitEpubViewer(bookId, pagesRead, totalPages);
     script.onerror = (error) => {
       console.error('EPUB 라이브러리 로드 실패 상세 원인:', error);
       alert(i18n.t('viewer.epub_lib_fail'));
@@ -19,13 +19,13 @@ export function initEpubViewer(bookId, totalPages) {
     document.head.appendChild(script);
     return;
   }
-  _doInitEpubViewer(bookId, totalPages);
+  _doInitEpubViewer(bookId, pagesRead, totalPages);
 }
 
 import { showViewerLoading, hideViewerLoading, showViewerError } from './view_manager.js';
 import { saveProgress } from './viewer_progress.js';
 
-async function _doInitEpubViewer(bookId, totalPages) {
+async function _doInitEpubViewer(bookId, pagesRead, totalPages) {
   console.log(`[Viewer-Epub] _doInitEpubViewer - EPUB 뷰어 초기화 시작: bookId=${bookId}, totalPages=${totalPages}`);
   const container = document.getElementById('epub-viewer-container');
   container.style.display = 'flex';
@@ -79,8 +79,19 @@ async function _doInitEpubViewer(bookId, totalPages) {
         }).then((locations) => {
           console.log("[Viewer-Epub] Locations 생성 완료. 슬라이더 연동 준비 끝");
           syncEpubSeekBar();
+          
+          if (pagesRead > 0 && pagesRead <= 100) {
+            const percentage = pagesRead / 100;
+            const cfi = epubBook.locations.cfiFromPercentage(percentage);
+            if (cfi) {
+              console.log(`[Viewer-Epub] Jumping to saved location: ${pagesRead}%`);
+              return epubRendition.display(cfi);
+            }
+          }
+          return epubRendition.display();
         }).catch(err => {
-          console.error("[Viewer-Epub] epubBook ready 또는 locations 생성 실패:", err);
+          console.error("[Viewer-Epub] epubBook ready 또는 locations 생성/렌더링 실패:", err);
+          epubRendition.display().catch(e => console.error("[Viewer-Epub] Fallback display 실패:", e));
         });
 
         // 1. 초기 렌더링 옵션 빌드
@@ -120,9 +131,6 @@ async function _doInitEpubViewer(bookId, totalPages) {
           syncEpubSeekBar(); // 뷰어 스크롤 이동 시 시크바 썸 위치 최신화
         });
 
-        epubRendition.display().catch(err => {
-          console.error("[Viewer-Epub] display 렌더링 실패:", err);
-        });
 
         document.getElementById('epub-prev').onclick = epubPrevPage;
         document.getElementById('epub-next').onclick = epubNextPage;
@@ -295,10 +303,14 @@ export function syncEpubSeekBar() {
   if (!slider) return;
   slider.min = 0;
   slider.max = 100;
-  slider.value = getEpubPercentage();
+  const val = getEpubPercentage();
+  slider.value = val;
   
   const endLabel = document.getElementById('seekbar-end-label');
   if (endLabel) endLabel.textContent = '100%';
+  
+  const badge = document.getElementById('comic-overlay-page-info');
+  if (badge) badge.textContent = `${val}%`;
 }
 
 export function epubSliderInput(slider, val) {
@@ -318,7 +330,7 @@ export function epubSliderInput(slider, val) {
   }
   
   const badge = document.getElementById('comic-overlay-page-info');
-  if (badge) badge.textContent = `${val}% / 100%`;
+  if (badge) badge.textContent = `${val}%`;
 }
 
 export function epubSliderChange(slider, val) {

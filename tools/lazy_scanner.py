@@ -47,12 +47,15 @@ def setup_lazy_scanner_logging():
     original_print = builtins.print
 
     if write_log:
-        log_file_path = os.path.join(MEDIA_SERVER_DIR, 'media_server.log')
+        log_dir = os.path.join(MEDIA_SERVER_DIR, 'logs')
+        os.makedirs(log_dir, exist_ok=True)
+        log_file_path = os.path.join(log_dir, 'lazy_scanner.log')
+        
         def custom_print(*args, **kwargs):
-            # 원래 print 실행 (sys.stdout/stderr용)
+            # 터미널용 출력 (콘솔 실행 시 확인용)
             original_print(*args, **kwargs)
             
-            # media_server.log 파일 기록
+            # lazy_scanner.log 파일 기록
             try:
                 sep = kwargs.get('sep', ' ')
                 end = kwargs.get('end', '\n')
@@ -70,64 +73,11 @@ def setup_lazy_scanner_logging():
         builtins.print = lambda *args, **kwargs: None
 
 
-# 중복 실행 방지를 위한 파일 락 클래스
-class ProcessLock:
-    def __init__(self, lock_file_path):
-        self.lock_file_path = lock_file_path
-        self.lock_file = None
-
-    def acquire(self):
-        try:
-            # POSIX 기반 fcntl 락 시도 (리눅스 운영 서버)
-            import fcntl
-            self.lock_file = open(self.lock_file_path, 'w')
-            fcntl.flock(self.lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            return True
-        except ImportError:
-            # Windows 호환 msvcrt 락 시도 (로컬 개발 환경)
-            try:
-                import msvcrt
-                self.lock_file = open(self.lock_file_path, 'w')
-                msvcrt.locking(self.lock_file.fileno(), msvcrt.LK_NBLCK, 1)
-                return True
-            except (ImportError, OSError):
-                pass
-        except OSError:
-            # 리눅스에서 락이 이미 잡혀있는 경우
-            pass
-        return False
-
-    def release(self):
-        if self.lock_file:
-            try:
-                self.lock_file.close()
-                if os.path.exists(self.lock_file_path):
-                    os.remove(self.lock_file_path)
-            except Exception:
-                pass
-
 def run_lazy_cover_extraction(target_book_id=None):
     setup_lazy_scanner_logging()
     if target_book_id is not None:
-        global_lock_path = os.path.join(MEDIA_SERVER_DIR, 'lazy_scanner.lock')
-        if os.path.exists(global_lock_path):
-            print(f"[Lazy-Scanner] ⚠️ 백그라운드 전역 스캔이 이미 구동 중입니다. 단일 도서({target_book_id}) 스캔을 스킵합니다.")
-            sys.exit(0)
-            
-        lock_path = os.path.join(MEDIA_SERVER_DIR, f'lazy_single_{target_book_id}.lock')
-        lock = ProcessLock(lock_path)
-        if not lock.acquire():
-            print(f"[Lazy-Scanner] ⚠️ 해당 도서({target_book_id}) 단독 스캔이 이미 실행 중입니다.")
-            sys.exit(0)
-            
-        print(f"[Lazy-Scanner] 🚀 단일 도서 즉시 스캔 격리 프로세스 기동 시작 (Book ID: {target_book_id})")
+        print(f"[Lazy-Scanner] 🚀 단일 도서 즉시 스캔 기동 시작 (Book ID: {target_book_id})")
     else:
-        lock_path = os.path.join(MEDIA_SERVER_DIR, 'lazy_scanner.lock')
-        lock = ProcessLock(lock_path)
-        if not lock.acquire():
-            print("[Lazy-Scanner] ⚠️ 이미 또 다른 Lazy 표지 스캐너 프로세스가 실행 중입니다. 중복 기동을 방지하기 위해 강제 종료합니다.")
-            sys.exit(0)
-            
         print("[Lazy-Scanner] 🚀 독립 백그라운드 표지 스캐너 기동 시작")
     
     conn = None
@@ -399,7 +349,6 @@ def run_lazy_cover_extraction(target_book_id=None):
                 conn.close()
             except Exception:
                 pass
-        lock.release()
     print("[Lazy-Scanner] ✅ 모든 DB의 Lazy 표지 스캔 작업 완료")
 
 def get_series_cover_fallback_single(series_name, parent_dir, filename, file_path, library_id,

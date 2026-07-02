@@ -123,7 +123,7 @@ export function openReader(bookId, format, title, pagesRead, totalPages) {
   } else if (fmt === 'epub') {
     if (overlayTxtControls) overlayTxtControls.style.display = 'flex';
     document.getElementById('comic-overlay-page-info').textContent = i18n.t('viewer.view_epub') || 'EPUB 보기';
-    initEpubViewer(bookId, totalPages);
+    initEpubViewer(bookId, pagesRead, totalPages);
     initViewerSeekBar();
   } else {
     alert(i18n.t('viewer.unsupported_format'));
@@ -233,8 +233,12 @@ export function nextPage() {
   }
 }
 
+let keyboardListenerInitialized = false;
+
 // 키보드 단축키 초기화 (F, ESC, ArrowLeft/Right, Space)
 export function initKeyboardListener() {
+  if (keyboardListenerInitialized) return;
+  keyboardListenerInitialized = true;
   document.addEventListener('keydown', e => {
     const viewerModal = document.getElementById('media-viewer-modal');
     if (!viewerModal || viewerModal.style.display !== 'flex') return;

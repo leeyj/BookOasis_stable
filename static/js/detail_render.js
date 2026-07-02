@@ -143,7 +143,7 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId) {
     const favIconClass = isFav ? 'fa-solid fa-star' : 'fa-regular fa-star';
     const favIconColor = isFav ? '#eab308' : '#64748b';
     const favBtnHtml = `
-      <button class="btn-fav-toggle" onclick="toggleBookFavorite(event, ${b.id}, ${isFav ? 0 : 1}, '${safeSeriesName.replace(/'/g, "\\'")}',' ${actualLibraryId}')" style="background:none; border:none; color:${favIconColor}; cursor:pointer; font-size:1.1rem; padding:0 0.5rem; display:inline-flex; align-items:center;" title="${i18n.t('detail.toggle_fav_book')}">
+      <button class="btn-fav-toggle" onclick="toggleBookFavorite(event, ${b.id}, ${isFav ? 0 : 1}, '${safeSeriesName.replace(/'/g, "\\'")}', '${actualLibraryId}')" style="background:none; border:none; color:${favIconColor}; cursor:pointer; font-size:1.1rem; padding:0 0.5rem; display:inline-flex; align-items:center;" title="${i18n.t('detail.toggle_fav_book')}">
         <i class="${favIconClass}"></i>
       </button>
     `;

@@ -134,9 +134,9 @@ class SchedulerService:
         except Exception:
             pass
 
-        from services.scheduler_service import run_scan_job
+        from services.scheduler_service import enqueue_scan_job
         scheduler.add_job(
-            run_scan_job,
+            enqueue_scan_job,
             trigger,
             id=job_id,
             args=[db_type, db_path, library_id, physical_path],
@@ -289,21 +289,13 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
         write_scan_log(msg)
 
 
+def enqueue_scan_job(db_type, db_path, library_id, physical_path, force=False):
+    from services.scanner_queue import scanner_queue
+    scanner_queue.enqueue('library_scan', db_type=db_type, db_path=db_path, library_id=library_id, physical_path=physical_path, force=force)
+
 def run_lazy_scanner_job():
-    """백그라운드에서 python tools/lazy_scanner.py를 서브프로세스로 안전하게 실행"""
-    import subprocess
-    import sys
-    
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    script_path = os.path.join(BASE_DIR, 'tools', 'lazy_scanner.py')
-    print(f"[Scheduler] Lazy cover scanner standalone process triggered: {script_path}")
-    try:
-        subprocess.Popen(
-            [sys.executable, script_path],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            cwd=BASE_DIR
-        )
-    except Exception as e:
-        print(f"[Scheduler ERROR] Lazy cover script execution failed: {e}")
+    """백그라운드 스캐너 작업을 큐에 적재"""
+    from services.scanner_queue import scanner_queue
+    print("[Scheduler] Lazy cover scanner job scheduled -> Enqueuing...")
+    scanner_queue.enqueue('lazy_scan')
 

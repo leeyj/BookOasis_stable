@@ -207,3 +207,9 @@ tags: [workflow, history]
 | 2026-06-30 | `db_connection_leak` | 도서 스캔 과정의 DB 커넥션 누수 및 풀 크기 조정 조치 | [Task](./history/20260630_032308_db_connection_leak_task.md) | [Walkthrough](./history/20260630_032308_db_connection_leak_walkthrough.md) |
 | 2026-06-30 | `series_index_opt` | 시리즈 커버 쿼리 최적화를 위한 복합 인덱스 추가 | [Task](./history/20260630_173642_series_index_opt_task.md) | [Walkthrough](./history/20260630_173642_series_index_opt_walkthrough.md) |
 | 2026-07-02 | `fitwidth_scrollwidth` | 만화 뷰어 fit-width CSS 충돌 수정 및 웹툰 너비 조절 슬라이더 추가 | [Bugfix](./bug/20260702_bugfix_fitwidth_scrollwidth.md) | - |
+
+| 2026-07-02 | `session_20260702_184615` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260702_184615_session_20260702_184615_task.md) | [Walkthrough](./history/20260702_184615_session_20260702_184615_walkthrough.md) |
+| 2026-07-02 | epub_dynamic_pages_sync | EPUB 뷰어의 동적 페이지 생성 후 진행률 API 통해 서버 DB 페이지 자동 동기화 | - | - |
+| 2026-07-02 | epub_state_restore | EPUB 페이지 북마크 복원 실패 및 페이지 번호 표기 버그 수정 | [Bugfix](./bug/20260702_bugfix_epub_state_restore.md) |
+| 2026-07-02 | `session_20260702_192253` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260702_192253_session_20260702_192253_task.md) | [Walkthrough](./history/20260702_192253_session_20260702_192253_walkthrough.md) |
+| 2026-07-02 | `session_20260702_193433` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260702_193433_session_20260702_193433_task.md) | [Walkthrough](./history/20260702_193433_session_20260702_193433_walkthrough.md) |
