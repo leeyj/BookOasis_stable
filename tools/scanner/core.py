@@ -89,7 +89,7 @@ SUPPORTED_FORMATS = ('.zip', '.cbz', '.epub', '.pdf', '.txt')
 MAX_SCANNER_THREADS = 4
 
 from tools.scanner.memory_helper import check_memory_exceeded
-from tools.scanner.db_writer import update_book_metadata, insert_new_book_v2, save_book_offsets
+from tools.scanner.db_writer import update_book_metadata, insert_new_book_v2, save_book_offsets, bulk_update_books, bulk_insert_books, bulk_save_book_offsets
 from tools.scanner.sync_detector import detect_and_handle_book_movement, handle_deleted_books
 
 def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, is_remote=False, library_id=None):
@@ -265,12 +265,15 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, is_
                 
                 # Log to error list if Zip/EPUB format but no cover acquired
                 if not cover_image and file_format in ('zip', 'cbz', 'epub'):
-                    errors.append({
-                        'file_path': full_path,
-                        'filename': filename,
-                        'error_type': 'NoCover',
-                        'message': 'ERR_NO_COVER'
-                    })
+                    if is_remote:
+                        print(f"[Scanner-DEBUG-Task] ⚠️ No cover for remote archive (deferred to lazy scanner): '{filename}'")
+                    else:
+                        errors.append({
+                            'file_path': full_path,
+                            'filename': filename,
+                            'error_type': 'NoCover',
+                            'message': 'ERR_NO_COVER'
+                        })
             except zipfile.BadZipFile as bzf:
                 print(f"[Scanner-DEBUG-Task] ❌ BadZipFile detected: '{filename}' - {bzf}")
                 errors.append({
@@ -437,8 +440,142 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
     print(f"[Scanner] Multithread scan pool created (threads: {threads_to_use})")
     
     processed_folders_count = 0
-    uncommitted_count = 0
-    processed_books_count = 0
+    import json
+    import threading
+    import datetime
+    import re
+    from dotenv import load_dotenv
+
+    cursor.execute("SELECT name FROM libraries WHERE id = ?", (library_id,))
+    lib_row = cursor.fetchone()
+    library_name = lib_row['name'] if lib_row else f"Lib_{library_id}"
+    safe_lib_name = re.sub(r'[\\/*?:"<>|]', "", library_name)
+    scan_time_str = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    
+    scan_temp_file = os.path.join(DB_DIR, f'{safe_lib_name}_{scan_time_str}.jsonl')
+    
+    # ── [Orphan File Cleanup] ──
+    try:
+        for f in os.listdir(DB_DIR):
+            if f.endswith('.jsonl') and f != os.path.basename(scan_temp_file):
+                try:
+                    os.remove(os.path.join(DB_DIR, f))
+                    print(f"[Scanner] Orphan JSONL removed: {f}")
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    if os.path.exists(scan_temp_file):
+        os.remove(scan_temp_file)
+    file_lock = threading.Lock()
+
+    def process_batch(cur, ins_list, upd_list):
+        if upd_list:
+            update_data = []
+            for d in upd_list:
+                if d.get('is_offset_only'):
+                    continue
+                meta = d['merged_meta']
+                score = meta.get('score', 0)
+                update_data.append((
+                    d['cover_image'], d['cover_image'], d['cover_image'],
+                    meta.get('author',''), meta.get('publisher',''), meta.get('link',''),
+                    score, score, meta.get('summary',''), meta.get('release_date',''),
+                    meta.get('genre',''), meta.get('tags',''), d['full_path']
+                ))
+            if update_data:
+                bulk_update_books(cur, update_data)
+            
+        if ins_list:
+            insert_data = []
+            for d in ins_list:
+                meta = d['merged_meta']
+                title, _ = os.path.splitext(d['filename'])
+                insert_data.append((
+                    d['library_id'], title, d['series_name'], meta.get('author',''),
+                    d['full_path'], d['file_format'], 100 if d['file_format'] == 'epub' else 0,
+                    d['cover_image'], meta.get('publisher',''), meta.get('link',''),
+                    meta.get('score',0), meta.get('summary',''), meta.get('release_date',''),
+                    meta.get('genre',''), meta.get('tags','')
+                ))
+            bulk_insert_books(cur, insert_data)
+
+        all_paths = [d['full_path'] for d in ins_list] + [d['full_path'] for d in upd_list if d.get('offsets_data')]
+        if all_paths:
+            path_to_id = {}
+            for i in range(0, len(all_paths), 900):
+                chunk = all_paths[i:i+900]
+                placeholders = ','.join(['?']*len(chunk))
+                cur.execute(f"SELECT id, file_path FROM books WHERE file_path IN ({placeholders})", chunk)
+                for row in cur.fetchall():
+                    path_to_id[row['file_path']] = row['id']
+            
+            offsets_to_save = []
+            for d in upd_list + ins_list:
+                if d.get('offsets_data'):
+                    bid = path_to_id.get(d['full_path'])
+                    if bid:
+                        for off in d['offsets_data']:
+                            offsets_to_save.append((bid, *off))
+                            
+            if offsets_to_save:
+                bulk_save_book_offsets(cur, offsets_to_save)
+
+    pending_inserts = []
+    pending_updates = []
+    pending_folders = []
+
+    def flush_pending_data():
+        if not pending_inserts and not pending_updates and not pending_folders:
+            return
+        
+        try:
+            # 1. DB Bulk Update
+            if pending_inserts or pending_updates:
+                process_batch(cursor, pending_inserts, pending_updates)
+            
+            # 2. Scanner Progress Update
+            for pf in pending_folders:
+                cursor.execute("INSERT OR IGNORE INTO scanner_progress (library_id, folder_path) VALUES (?, ?)", (str(library_id), pf))
+            
+            # 3. Commit ALL at once (Atomic Transaction)
+            conn.commit()
+
+            # 4. Append to JSONL log
+            if pending_inserts or pending_updates:
+                with file_lock:
+                    with open(scan_temp_file, 'a', encoding='utf-8') as f:
+                        for item in pending_inserts:
+                            f.write(json.dumps(item, ensure_ascii=False) + '\n')
+                        for item in pending_updates:
+                            f.write(json.dumps(item, ensure_ascii=False) + '\n')
+
+        except Exception as e:
+            print(f"[Scanner ERROR] Flush failed: {e}")
+        finally:
+            pending_inserts.clear()
+            pending_updates.clear()
+            pending_folders.clear()
+
+    def cleanup_jsonl_file():
+        load_dotenv()
+        if str(os.getenv('SCAN_JSONL_REMOVE', 'true')).strip().lower() == 'false':
+            try:
+                log_jsonl_dir = os.path.join(MEDIA_SERVER_DIR, 'logs', 'jsonl')
+                os.makedirs(log_jsonl_dir, exist_ok=True)
+                import shutil
+                if os.path.exists(scan_temp_file):
+                    shutil.move(scan_temp_file, os.path.join(log_jsonl_dir, os.path.basename(scan_temp_file)))
+                    print(f"[Scanner] JSONL debug file saved to: {os.path.join(log_jsonl_dir, os.path.basename(scan_temp_file))}")
+            except Exception as e:
+                print(f"[Scanner ERROR] Failed to move JSONL file: {e}")
+        else:
+            try:
+                if os.path.exists(scan_temp_file):
+                    os.remove(scan_temp_file)
+            except Exception:
+                pass
 
     with ThreadPoolExecutor(max_workers=threads_to_use) as executor:
         futures = {
@@ -454,6 +591,8 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     merged_meta = res['merged_meta']
                     if 'errors' in res and res['errors']:
                         library_errors.extend(res['errors'])
+                    
+                    batch_item_count = 0
                     for item in res['results']:
                         full_path = item['full_path']
                         if item['skip']:
@@ -466,55 +605,36 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                         offsets_data = item['offsets_data']
                         is_offset_only = item.get('offset_only', False)
 
-                        db_action_taken = False
                         if full_path in db_books:
-                            book_id = db_books[full_path]
-                            if is_offset_only:
-                                # Offset-only path: Save offset without touching cover/meta
-                                if offsets_data:
-                                    save_book_offsets(cursor, book_id, filename, offsets_data)
-                                    db_action_taken = True
-                            else:
-                                # General path: Update cover/meta + Save offset
-                                print(f"[Scanner-Process] Book check progress: {filename} (Force={force})")
-                                update_book_metadata(cursor, full_path, cover_image, merged_meta)
-                                db_action_taken = True
-                                if offsets_data:
-                                    save_book_offsets(cursor, book_id, filename, offsets_data)
+                            pending_updates.append({
+                                "action": "update", "is_offset_only": is_offset_only, "full_path": full_path, 
+                                "cover_image": cover_image, "merged_meta": merged_meta, "offsets_data": offsets_data, 
+                                "filename": filename
+                            })
                         else:
-                            # Register new book (cannot be offset_only case)
-                            book_id = insert_new_book_v2(cursor, library_id, full_path, filename, file_format, series_name, cover_image, merged_meta)
-                            print(f"[Scanner] New book registered: {filename} (Series: {series_name})")
-                            db_action_taken = True
-                            if offsets_data:
-                                save_book_offsets(cursor, book_id, filename, offsets_data)
-
-                        if db_action_taken:
-                            uncommitted_count += 1
-                            processed_books_count += 1
-                            
-                            # Intermediate commit per 30 books (Prevent SQLite memory bloat and long lock holds)
-                            if uncommitted_count >= 30:
-                                conn.commit()
-                                uncommitted_count = 0
-
-                            # Provide gap for web load bottleneck during scan (Throttling) (Throttling)
-                            import time
-                            time.sleep(0.05)
-
-                            # Force memory release per 50 books
-                            if processed_books_count % 50 == 0:
-                                gc.collect()
-
-                    # Release memory and save checkpoint immediately
+                            pending_inserts.append({
+                                "action": "insert", "library_id": library_id, "full_path": full_path, 
+                                "filename": filename, "file_format": file_format, "series_name": series_name, 
+                                "cover_image": cover_image, "merged_meta": merged_meta, "offsets_data": offsets_data
+                            })
+                            print(f"[Scanner-Process] Found new book: {filename} (Series: {series_name})")
+                        batch_item_count += 1
+                    
+                    if batch_item_count > 0:
+                        # ── [GIL Throttling] ──
+                        import time
+                        time.sleep(0.01 * min(batch_item_count, 5))
+                        
                     del res
                 
-                cursor.execute("INSERT OR IGNORE INTO scanner_progress (library_id, folder_path) VALUES (?, ?)", (str(library_id), root_folder))
-                conn.commit()
-                uncommitted_count = 0
-                
+                pending_folders.append(root_folder)
                 processed_folders_count += 1
-                if processed_folders_count % 10 == 0:
+                
+                # Hybrid Flush Trigger
+                if (len(pending_inserts) + len(pending_updates) >= 100) or len(pending_folders) >= 50:
+                    flush_pending_data()
+
+                if processed_folders_count % 50 == 0:
                     gc.collect()
 
                 # Detect manual cancel (abort) request and exit
@@ -522,22 +642,31 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                 status_row = cursor.fetchone()
                 if status_row and status_row['scan_status'] == 'cancelling':
                     print(f"[Scanner-Cancel] 🛑 Safely aborting scan due to user request. (Completed folders: {processed_folders_count} folders)")
+                    flush_pending_data()
                     cursor.execute("UPDATE libraries SET scan_status = 'ready' WHERE id = ?", (library_id,))
                     conn.commit()
                     conn.close()
+                    cleanup_jsonl_file()
                     return
 
                 # Self-exit for real-time OOM prevention
                 if check_memory_exceeded():
                     print(f"[Scanner-Memory] 🛑 Emergency pause due to memory limit. (Progress: {processed_folders_count} folders applied)")
+                    flush_pending_data()
                     try:
                         conn.close()
                     except Exception:
                         pass
+                    cleanup_jsonl_file()
                     os._exit(0)
 
             except Exception as e:
                 print(f"[Scanner-DEBUG-Pool] ❌ Folder '{root_folder}' processing exception: {e}")
+
+        # Final flush for any remaining data at the end of the loop
+        flush_pending_data()
+        cleanup_jsonl_file()
+
 
     # 3. Real-time deletion monitoring: Remove book info disappeared from file system
     if not handle_deleted_books(cursor, db_books, deleted_paths, target_paths, found_file_paths):

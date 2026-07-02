@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## v0.6.2
+### fix
+- scanner 동작방식 변경
+- as is: yaml스캔->정보 취득->DB 저장 -> commit 
+- to be :yaml스캔->정보 취득->jsonl 저장 -> bulk insert(update)
+* 개선효과 : 스캔시 대시보드 병목현상 개선(bottleneck fix) | scan dashboard bottleneck fix
+* 개선효과 : 스캔시 DB lock 현상 해소 | scan db lock fix
+
+---
+
+
 ## v0.6.1
 ### fix
 - 페이지 넘김시 2장씩 넘어가는 이슈 해결(by 세안파파) | fix page change issue

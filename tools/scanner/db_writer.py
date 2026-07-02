@@ -83,3 +83,51 @@ def save_book_offsets(cursor, book_id, filename, offsets_data):
         UPDATE books SET total_pages = ?, has_offsets = 1 WHERE id = ?
     """, (len(bulk_data), book_id))
     print(f"[Scanner-Offset] '{filename}' offset DB index complete ({len(bulk_data)} pages)")
+
+def bulk_update_books(cursor, update_data_list):
+    """Bulk update existing books"""
+    if not update_data_list: return
+    cursor.executemany("""
+        UPDATE books SET 
+            cover_image  = COALESCE(NULLIF(?, ''), cover_image),
+            cover_updated_at = CASE WHEN ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
+            author       = COALESCE(NULLIF(?, ''), author),
+            publisher    = COALESCE(NULLIF(?, ''), publisher),
+            link         = COALESCE(NULLIF(?, ''), link),
+            score        = CASE WHEN ? != 0 THEN ? ELSE score END,
+            summary      = COALESCE(NULLIF(?, ''), summary),
+            release_date = COALESCE(NULLIF(?, ''), release_date),
+            genre        = COALESCE(NULLIF(?, ''), genre),
+            tags         = COALESCE(NULLIF(?, ''), tags)
+        WHERE file_path = ?
+    """, update_data_list)
+
+def bulk_insert_books(cursor, insert_data_list):
+    """Bulk insert new books"""
+    if not insert_data_list: return
+    cursor.executemany("""
+        INSERT OR IGNORE INTO books 
+        (library_id, title, series_name, author, file_path, file_format, total_pages, cover_image, publisher, link, score, summary, release_date, genre, tags) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, insert_data_list)
+
+def bulk_save_book_offsets(cursor, offsets_data_list):
+    """Bulk save book offsets"""
+    if not offsets_data_list: return
+    
+    # First delete existing offsets for these books
+    book_ids = list(set([o[0] for o in offsets_data_list]))
+    cursor.executemany("DELETE FROM book_offsets WHERE book_id = ?", [(bid,) for bid in book_ids])
+    
+    cursor.executemany("""
+        INSERT INTO book_offsets 
+        (book_id, page_idx, filename, local_header_offset, compress_size, file_size, compress_type)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, offsets_data_list)
+    
+    # Update total_pages and has_offsets for books
+    from collections import Counter
+    counts = Counter([o[0] for o in offsets_data_list])
+    cursor.executemany("""
+        UPDATE books SET total_pages = ?, has_offsets = 1 WHERE id = ?
+    """, [(count, bid) for bid, count in counts.items()])
