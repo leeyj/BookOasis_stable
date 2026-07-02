@@ -37,18 +37,20 @@ from werkzeug.security import check_password_hash
 app_opds_bp = Blueprint('media_app_opds', __name__)
 
 
+import threading
+
 # ─── Basic Auth + TTL 캐시 인증 ─────────────────────────────
 
 # { sha256(username:password): (expires_at: float, user: dict) }
 _auth_cache: dict = {}
+_auth_lock = threading.Lock()
 _CACHE_TTL = 300  # 5분 (초 단위)
 
 
 def _check_auth_cached(is_adult: bool = False) -> bool:
     """
     Basic Auth 검증 결과를 TTL 캐시로 보관.
-    최초 1회만 DB 조회 + check_password_hash() 실행,
-    이후 5분간 캐시 히트로 즉시 통과 (타치요미 반복 요청 최적화).
+    Double-Checked Locking 패턴을 사용하여 타치요미 병렬 요청 시의 Thundering Herd 현상 방지.
     """
     auth = request.authorization
     if not auth or not auth.username or not auth.password:
@@ -57,32 +59,48 @@ def _check_auth_cached(is_adult: bool = False) -> bool:
     key = hashlib.sha256(f"{auth.username}:{auth.password}".encode()).hexdigest()
     now = time.time()
 
+    # 1. 락 없는 빠른 읽기 (Fast Path)
     if key in _auth_cache:
         expires, user = _auth_cache[key]
         if now < expires:
             if is_adult and user.get('role') != 'admin':
                 return False
             return True
-        del _auth_cache[key]
 
-    conn = database.get_connection('general')
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT password_hash, role FROM users WHERE username = ?",
-        (auth.username,)
-    )
-    row = cursor.fetchone()
-    conn.close()
+    # 2. 캐시 미스 또는 만료된 경우 락 획득 (Slow Path)
+    with _auth_lock:
+        # 락 획득 후 이미 갱신되었는지 다시 한 번 확인 (Double Check)
+        if key in _auth_cache:
+            expires, user = _auth_cache[key]
+            if now < expires:
+                if is_adult and user.get('role') != 'admin':
+                    return False
+                return True
+            # 만료된 경우 쓰레드 안전하게 삭제 (pop 사용으로 KeyError 예방)
+            _auth_cache.pop(key, None)
 
-    if not row:
-        return False
-    if not check_password_hash(row['password_hash'], auth.password):
-        return False
-    if is_adult and row['role'] != 'admin':
-        return False
+        # 3. 무거운 작업 (DB 접근 및 bcrypt 검증) 수행 (오직 하나의 스레드만 진입)
+        conn = database.get_connection('general')
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT password_hash, role FROM users WHERE username = ?",
+            (auth.username,)
+        )
+        row = cursor.fetchone()
+        conn.close()
 
-    _auth_cache[key] = (now + _CACHE_TTL, dict(row))
-    return True
+        if not row:
+            return False
+        if not check_password_hash(row['password_hash'], auth.password):
+            return False
+            
+        # 4. 검증이 완료되면 캐시에 업데이트
+        _auth_cache[key] = (time.time() + _CACHE_TTL, dict(row))
+        
+        if is_adult and row['role'] != 'admin':
+            return False
+            
+        return True
 
 
 def _unauthorized():

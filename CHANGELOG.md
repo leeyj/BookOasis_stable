@@ -5,6 +5,7 @@
 - 페이지 넘김시 2장씩 넘어가는 이슈 해결(by 세안파파) | fix page change issue
 - 즐겨찾기 토글 안되는 이슈 해결(by 세안파파) | fix favorite toggle issue
 - 타치요미용 OPDS Endpoint 추가(/app-opds) | tachiyomi opds endpoint added(/app-opds)
+- 타치요미용 OPDS 연동 시 Auth 캐시 동시성 병목(속도 저하) 및 500 에러 현상 수정 | fix tachiyomi app-opds cache stampede bottleneck and 500 error
 - 스캐너 로그 저장위치 수정/분리(by 젤리씨) | Scanner log save location modified/separated
 - epub 파일 페이지 구성로직 변경(페이지->퍼센테이지) | epub file page composition logic change(page -> percentage)
 

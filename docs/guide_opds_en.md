@@ -28,6 +28,11 @@ When attempting to connect, Basic Authentication using the **ID and password use
 * **Access Permission**: Access and authentication are only permitted with accounts having **Administrator (Admin) privileges**.
 * **Provided Categories**: Provides the catalog of series and books in the adult library database.
 
+### 📖 Dedicated Address for Tachiyomi / Mihon
+> General: `http://<SERVER_IP_OR_DOMAIN>:5930/app-opds`
+> Adult: `http://<SERVER_IP_OR_DOMAIN>:5930/app-opds-adult`
+* This is a dedicated endpoint for special apps like Tachiyomi or Mihon. It is optimized to be parsed smoothly by these apps following the standard OPDS format.
+
 ---
 
 ## 3. How to Connect in Popular Mobile Reader Apps
@@ -49,6 +54,12 @@ Here are the configuration methods for popular external viewer apps that support
   3. Enter a name for the catalog (e.g., `BookOasis`) and fill in the URL field with `http://<SERVER_IP>:5930/opds`.
   4. Input your web login account credentials (username, password) and save it.
   5. Enter the registered bookcase to freely download and enjoy your books.
+
+* **Tachiyomi / Mihon**
+  1. In the **Extensions** tab, install an OPDS extension (e.g., `Kavita` or the generic `OPDS` extension).
+  2. Open the settings of the added OPDS extension from the **Sources** tab.
+  3. In the server address field, make sure to enter the dedicated endpoint: `http://<SERVER_IP>:5930/app-opds` (or `/app-opds-adult` for adults).
+  4. Set your username and password, save, and start browsing.
 
 ---
 
