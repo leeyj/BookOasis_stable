@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v0.6.3
+### fix
+- vfs 리프레시 오류수정(reculsive 추가) 및 미 변동사항 건너뛰기로직 개선 | vfs update error fix and skip no change items
+
+---
+
 ## v0.6.2
 ### fix
 - scanner 동작방식 변경

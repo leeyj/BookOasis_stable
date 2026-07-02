@@ -219,17 +219,21 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
                     print(f"[Scanner-Trigger] VFS cache update target folder: '{rel_path}'")
                     
                     full_url = f"{rc_url}/vfs/refresh"
-                    req_data = json.dumps({"dir": rel_path}).encode('utf-8')
+                    req_data = json.dumps({"dir": rel_path, "recursive": "true"}).encode('utf-8')
                     req = urllib.request.Request(
                         full_url, 
                         data=req_data,
                         headers={'Content-Type': 'application/json'}
                     )
                     try:
-                        with urllib.request.urlopen(req, timeout=30) as resp:
+                        with urllib.request.urlopen(req, timeout=3600) as resp:
                             res_text = resp.read().decode('utf-8')
                             print(f"[Scanner-Trigger] VFS update result ({rel_path}): {res_text}")
                             write_scan_log(f"VFS 갱신 완료 ({rel_path}): {res_text}")
+                    except urllib.error.HTTPError as http_ex:
+                        err_body = http_ex.read().decode('utf-8') if hasattr(http_ex, 'read') else str(http_ex)
+                        print(f"[Scanner-Trigger ERROR] VFS update request failed ({rel_path}): {http_ex.code} - {err_body}")
+                        write_scan_log(f"VFS update request failed ({rel_path}): {http_ex.code} - {err_body}")
                     except Exception as http_ex:
                         print(f"[Scanner-Trigger ERROR] VFS update request failed ({rel_path}): {http_ex}")
                         write_scan_log(f"VFS update request failed ({rel_path}): {http_ex}")
