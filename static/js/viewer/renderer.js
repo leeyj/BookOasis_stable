@@ -216,49 +216,57 @@ export function loadComicPage() {
     wrapper.innerHTML = '';
     const fragment = document.createDocumentFragment();
     const imgElements = [];
+    let firstLoaded = false;
+
+    const loadScrollImage = (img) => {
+      if (!img || img.dataset.loaded === '1' || !img.dataset.src) return;
+      const url = img.dataset.src;
+      img.dataset.loaded = '1';
+
+      const handleImgLoad = () => {
+        img.style.opacity = '1';
+        img.style.minHeight = '0';
+        if (!firstLoaded) {
+          firstLoaded = true;
+          hideViewerLoading();
+        }
+      };
+
+      img.onload = handleImgLoad;
+      img.onerror = () => {
+        console.error(`[Viewer-Comic] Scroll image load failed: page_idx=${img.dataset.index}`);
+        img.style.opacity = '1';
+        img.style.minHeight = '0';
+        if (!firstLoaded) {
+          firstLoaded = true;
+          hideViewerLoading();
+        }
+        showViewerError('Error', 'Failed to load image');
+      };
+
+      img.src = url;
+    };
 
     for (let i = 0; i < comicTotalPages; i++) {
       const img = document.createElement('img');
       img.className = 'comic-scroll-img';
       img.dataset.index = i;
+      img.dataset.src = FileLoader.getPageStreamUrl(i);
       img.alt = `Page ${i + 1}`;
       img.loading = 'lazy';
+      img.dataset.loaded = '0';
       
       // 초기 로딩 시 깨진 이미지(엑박) 안 보이게 처리 (투명화 & 최소 높이)
       img.style.opacity = '0';
       img.style.transition = 'opacity 0.3s ease';
       img.style.minHeight = '60vh';
 
-      const handleImgLoad = () => {
-        img.style.opacity = '1';
-        img.style.minHeight = '0'; // 실제 이미지 로드 후에는 원본 비율에 맞게
-      };
-
-      // Use worker to fetch image data if available to offload network+decoding
-      if (typeof Worker !== 'undefined') {
-        const url = FileLoader.getPageStreamUrl(i);
-        fetchImageWithWorker(url).then(({ objectUrl }) => {
-          img.src = objectUrl;
-          img.addEventListener('load', () => {
-            handleImgLoad();
-            URL.revokeObjectURL(objectUrl);
-          }, { once: true });
-        }).catch(() => {
-          img.src = url;
-          img.onload = handleImgLoad;
-        });
-      } else {
-        img.src = FileLoader.getPageStreamUrl(i);
-        img.onload = handleImgLoad;
-      }
-
       fragment.appendChild(img);
       imgElements.push(img);
     }
 
     wrapper.appendChild(fragment);
-    hideViewerLoading();
-
+    
     const observerOptions = {
       root: wrapper,
       rootMargin: '0px',
@@ -272,9 +280,12 @@ export function loadComicPage() {
       let maxRatio = 0;
 
       entries.forEach(entry => {
-        if (entry.isIntersecting && entry.intersectionRatio > maxRatio) {
-          maxRatio = entry.intersectionRatio;
-          bestEntry = entry;
+        if (entry.isIntersecting) {
+          loadScrollImage(entry.target);
+          if (entry.intersectionRatio > maxRatio) {
+            maxRatio = entry.intersectionRatio;
+            bestEntry = entry;
+          }
         }
       });
 
@@ -288,12 +299,15 @@ export function loadComicPage() {
       }
     }, observerOptions);
 
-    imgElements.forEach(img => observer.observe(img));
+    imgElements.forEach(img => {
+      observer.observe(img);
+    });
 
     isScrollingToTarget = true;
     setTimeout(() => {
       const targetImg = imgElements[comicCurrentPage];
       if (targetImg) {
+        loadScrollImage(targetImg);
         targetImg.scrollIntoView({ block: 'start' });
       }
       setTimeout(() => {
@@ -382,20 +396,8 @@ export function loadComicPage() {
         imgEl.style.opacity = '1';
       };
 
-      // Worker를 통해 fetch → ObjectURL로 img.src 설정 (세션 쿠키 포함은 image_worker.js 참조)
-      // Worker 실패 시 직접 URL fallback 시도
       const url = FileLoader.getPageStreamUrl(pageIndex);
-      if (typeof Worker !== 'undefined') {
-        fetchImageWithWorker(url).then(({ objectUrl }) => {
-          imgEl.src = objectUrl;
-          imgEl.addEventListener('load', () => URL.revokeObjectURL(objectUrl), { once: true });
-        }).catch((err) => {
-          console.warn(`[Viewer-Comic] Worker fetch failed for page_idx=${pageIndex}, falling back to direct URL:`, err);
-          imgEl.src = url;
-        });
-      } else {
-        imgEl.src = url;
-      }
+      imgEl.src = url;
     });
 
     updatePageInfo();

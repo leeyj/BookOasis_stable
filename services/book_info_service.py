@@ -28,11 +28,8 @@ class BookInfoService:
                         total_pages = len([n for n in zf.namelist() if n.lower().endswith(img_ext)])
                     except Exception:
                         total_pages = 0
-                    finally:
-                        try:
-                            zf.close()
-                        except Exception:
-                            pass
+                    # `get_zip_file_hybrid` returns a cached ZipFile object.
+                    # Closing it here can invalidate the shared cache and break later stream extraction.
 
             elif file_format == 'pdf':
                 try:

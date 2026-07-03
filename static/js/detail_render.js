@@ -24,6 +24,18 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId)
     .map(t => `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center;" onclick="goBackToList(); window.selectTagFilter('${t.replace(/'/g, "\\'")}')"><i class="fa-solid fa-hashtag" style="font-size: 0.7rem; margin-right: 0.2rem;"></i>${t}</span>`)
     .join('');
 
+  const missingPageBooks = books.filter(b => ['zip', 'cbz'].includes((b.file_format || '').toLowerCase()) && (b.total_pages === 0 || b.has_offsets === 0));
+  const missingPageCount = missingPageBooks.length;
+  const missingPageBannerHtml = missingPageCount > 0 ? `
+      <div class="vol-warn-banner" style="margin-top: 1rem;">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span>${i18n.t('detail.warn_series_missing_pages', {count: missingPageCount})}</span>
+        <button class="btn-rescan-book" onclick="rescanMissingBooks(event, '${safeSeriesName.replace(/'/g, "\\'")}', '${actualLibraryId}')">
+          <i class="fa-solid fa-rotate"></i> ${i18n.t('detail.btn_rescan_all')}
+        </button>
+      </div>
+    ` : '';
+
   const isSeriesFav = books.some(b => b.is_favorite === 1);
   const seriesFavIconClass = isSeriesFav ? 'fa-solid fa-star' : 'fa-regular fa-star';
   const seriesFavIconColor = isSeriesFav ? '#eab308' : '#64748b';
@@ -65,6 +77,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId)
           ${genresHtml}
           ${tagsHtml}
         </div>
+        ${missingPageBannerHtml}
         <div class="detail-score">${stars}</div>
         <p class="book-summary-text">${meta.summary || i18n.t('detail.no_description')}</p>
         ${linkHtml}
@@ -150,7 +163,7 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId) {
 
     const noCover = !b.cover_image;
     const isZipFormat = ['zip', 'cbz'].includes((b.file_format || '').toLowerCase());
-    const noOffsets = isZipFormat && (b.total_pages === 0);
+    const noOffsets = isZipFormat && (b.total_pages === 0 || b.has_offsets === 0);
     const needsWarn = noCover || noOffsets;
 
     let warnTexts = [];
@@ -167,7 +180,7 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId) {
     ` : '';
 
     volumesHtml += `
-      <div class="volume-card" oncontextmenu="event.preventDefault(); event.stopPropagation(); if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(event.clientX, event.clientY, ${b.id}, '${(b.title || '').replace(/'/g, "\\'")}', true);">
+      <div class="volume-card" data-book-id="${b.id}" data-page-missing="${noOffsets ? 1 : 0}" oncontextmenu="event.preventDefault(); event.stopPropagation(); if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(event.clientX, event.clientY, ${b.id}, '${(b.title || '').replace(/'/g, "\\'")}', true);">
         <img class="volume-thumb" src="${volCoverSrc}" alt="cover"
              onerror="this.onerror=null; this.src='/static/images/default_cover.jpg';">
         <div class="volume-info">

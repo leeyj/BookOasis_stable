@@ -383,3 +383,62 @@ window.rescanBook = async (event, bookId, seriesName, libraryId) => {
     }
   }
 };
+window.rescanMissingBooks = async (event, seriesName, libraryId) => {
+  if (event) event.stopPropagation();
+
+  const btn = event.currentTarget;
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('modal.scanning')}`;
+
+  try {
+    const missingCards = Array.from(document.querySelectorAll('.volume-card[data-page-missing="1"]'));
+    const bookIds = missingCards
+      .map(card => parseInt(card.dataset.bookId, 10))
+      .filter(id => !Number.isNaN(id));
+
+    if (bookIds.length === 0) {
+      if (typeof window.showToast === 'function') {
+        window.showToast(i18n.t('detail.no_missing_page_books'), 'info');
+      }
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+      return;
+    }
+
+    const errors = [];
+    for (const bookId of bookIds) {
+      try {
+        const res = await api.scanSingleBook(state.currentLibraryType, bookId);
+        if (!res.success) {
+          errors.push(`ID:${bookId} ${res.error || 'unknown error'}`);
+        }
+      } catch (scanErr) {
+        errors.push(`ID:${bookId} ${scanErr.message || scanErr}`);
+      }
+    }
+
+    if (errors.length === 0) {
+      if (typeof window.showToast === 'function') {
+        window.showToast(i18n.t('modal.scan_done'), 'success');
+      }
+      setTimeout(() => openBookDetail(null, seriesName, libraryId), 1000);
+    } else {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+      const message = i18n.t('modal.scan_fail', {error: errors.join('; ')});
+      if (typeof window.showToast === 'function') {
+        window.showToast(message, 'error');
+      } else {
+        alert(message);
+      }
+    }
+  } catch (err) {
+    console.error('[rescanMissingBooks] 오류:', err);
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+    if (typeof window.showToast === 'function') {
+      window.showToast('서버 통신 중 오류가 발생했습니다.', 'error');
+    }
+  }
+};

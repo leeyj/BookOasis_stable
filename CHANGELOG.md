@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## v0.6.5
+### fix
+- 책 스캔정보가 부족할 때 시리즈 별 스캔 기능 추가 | Added a series-based scanning feature when book scan data is insufficient.
+- 도서 보기중 에러 및 xbox 발생 오류 수정 | Fixed errors occurring during book viewing and X-box errors
+---
+
+
 ## v0.6.4
 ### fix
 - vfs 리프레시 오류수정(reculsive 추가) 및 미 변동사항 건너뛰기 로직 개선 | vfs update error fix and skip no change items

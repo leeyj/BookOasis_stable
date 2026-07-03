@@ -3,7 +3,7 @@ import os
 import re
 import mimetypes
 from datetime import datetime
-from api.cache import namelist_cache, image_cache, PREFETCH_AHEAD
+from api.cache import namelist_cache, image_cache
 from utils.cache_helper import get_zip_file_hybrid, get_zip_read_lock
 import database
 
