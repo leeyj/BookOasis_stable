@@ -223,18 +223,33 @@ export function loadComicPage() {
       img.dataset.index = i;
       img.alt = `Page ${i + 1}`;
       img.loading = 'lazy';
+      
+      // 초기 로딩 시 깨진 이미지(엑박) 안 보이게 처리 (투명화 & 최소 높이)
+      img.style.opacity = '0';
+      img.style.transition = 'opacity 0.3s ease';
+      img.style.minHeight = '60vh';
+
+      const handleImgLoad = () => {
+        img.style.opacity = '1';
+        img.style.minHeight = '0'; // 실제 이미지 로드 후에는 원본 비율에 맞게
+      };
 
       // Use worker to fetch image data if available to offload network+decoding
       if (typeof Worker !== 'undefined') {
         const url = FileLoader.getPageStreamUrl(i);
         fetchImageWithWorker(url).then(({ objectUrl }) => {
           img.src = objectUrl;
-          img.addEventListener('load', () => URL.revokeObjectURL(objectUrl), { once: true });
+          img.addEventListener('load', () => {
+            handleImgLoad();
+            URL.revokeObjectURL(objectUrl);
+          }, { once: true });
         }).catch(() => {
           img.src = url;
+          img.onload = handleImgLoad;
         });
       } else {
         img.src = FileLoader.getPageStreamUrl(i);
+        img.onload = handleImgLoad;
       }
 
       fragment.appendChild(img);

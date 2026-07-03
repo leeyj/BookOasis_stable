@@ -39,31 +39,9 @@
 </div>
 
 <script>
-    let queueRefreshInterval = null;
+    window.queueRefreshInterval = null;
 
-    // 탭이 전환될 때 불리는 함수 재정의 로직 (switchSettingsTab은 전역 함수)
-    const originalSwitchSettingsTab = window.switchSettingsTab;
-    window.switchSettingsTab = function(tabId) {
-        if (originalSwitchSettingsTab) {
-            originalSwitchSettingsTab(tabId);
-        }
-        
-        if (tabId === 'queue') {
-            loadQueueStatus();
-            // 5초마다 자동 갱신
-            if (!queueRefreshInterval) {
-                queueRefreshInterval = setInterval(loadQueueStatus, 5000);
-            }
-        } else {
-            // 다른 탭으로 이동하면 갱신 중지
-            if (queueRefreshInterval) {
-                clearInterval(queueRefreshInterval);
-                queueRefreshInterval = null;
-            }
-        }
-    };
-
-    async function loadQueueStatus() {
+    window.loadQueueStatus = async function() {
         try {
             const response = await fetch('/api/media/system/queue');
             if (!response.ok) throw new Error('API Response Error');

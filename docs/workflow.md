@@ -213,3 +213,8 @@ tags: [workflow, history]
 | 2026-07-02 | epub_state_restore | EPUB 페이지 북마크 복원 실패 및 페이지 번호 표기 버그 수정 | [Bugfix](./bug/20260702_bugfix_epub_state_restore.md) |
 | 2026-07-02 | `session_20260702_192253` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260702_192253_session_20260702_192253_task.md) | [Walkthrough](./history/20260702_192253_session_20260702_192253_walkthrough.md) |
 | 2026-07-02 | `session_20260702_193433` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260702_193433_session_20260702_193433_task.md) | [Walkthrough](./history/20260702_193433_session_20260702_193433_walkthrough.md) |
+| 2026-07-03 | scanner_opt | 스캐너 VFS 갱신 오류 및 병목 현상 개선 | [Bugfix](./bug/20260703_bugfix_scanner_vfs_and_bottleneck.md) | [Walkthrough](./bug/20260703_bugfix_scanner_vfs_and_bottleneck.md) |
+| 2026-07-03 | `scanner_opt` | 스캐너 VFS 갱신 오류 및 병목 현상 개선 | [Task](./history/20260703_032251_scanner_opt_task.md) | [Walkthrough](./history/20260703_032251_scanner_opt_walkthrough.md) |
+| 2026-07-03 | `unbound_error` | 스캐너 UnboundLocalError 버그 수정 및 DB 초기화 | [Task](./history/20260703_093420_unbound_error_task.md) | [Walkthrough](./history/20260703_093420_unbound_error_walkthrough.md) |
+| 2026-07-03 | `vfs_timeout` | 클라우드 VFS 파일 읽기 타임아웃 10초 회피 로직 도입 | [Task](./history/20260703_101930_vfs_timeout_task.md) | [Walkthrough](./history/20260703_101930_vfs_timeout_walkthrough.md) |
+| 2026-07-03 | `core_modularize` | core.py 비대화 해소를 위한 모듈화 및 아키텍처 리팩토링 | [Task](./history/20260703_102624_core_modularize_task.md) | [Walkthrough](./history/20260703_102624_core_modularize_walkthrough.md) |

@@ -30,6 +30,14 @@ nav:
 - 개발 워크플로우: workflow.md
 - 작업 히스토리:
   - history/index.md
+  - history/20260703_102624_core_modularize_walkthrough.md
+  - history/20260703_102624_core_modularize_task.md
+  - history/20260703_101930_vfs_timeout_walkthrough.md
+  - history/20260703_101930_vfs_timeout_task.md
+  - history/20260703_093420_unbound_error_walkthrough.md
+  - history/20260703_093420_unbound_error_task.md
+  - history/20260703_032251_scanner_opt_walkthrough.md
+  - history/20260703_032251_scanner_opt_task.md
   - history/20260702_193433_session_20260702_193433_walkthrough.md
   - history/20260702_193433_session_20260702_193433_task.md
   - history/20260702_192253_session_20260702_192253_walkthrough.md
@@ -432,6 +440,8 @@ nav:
   - history/20260619_145226_init_docs_task.md
 - 버그 트러블슈팅:
   - bug/index.md
+  - bug/20260703_bugfix_scanner_vfs_and_bottleneck.md
+  - bug/20260703_bugfix_scanner_unbound_res.md
   - bug/20260702_bugfix_fitwidth_scrollwidth.md
   - bug/20260702_bugfix_epub_state_restore.md
   - bug/20260702_bugfix_comic_viewer_image_load_400.md

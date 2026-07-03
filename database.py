@@ -304,6 +304,12 @@ def init_databases():
         folder_path TEXT PRIMARY KEY
     );
 
+    CREATE TABLE IF NOT EXISTS folder_mtimes (
+        folder_path TEXT PRIMARY KEY,
+        dir_mtime REAL,
+        meta_mtime REAL
+    );
+
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT NOT NULL UNIQUE,

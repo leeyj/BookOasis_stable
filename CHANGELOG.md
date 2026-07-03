@@ -1,9 +1,13 @@
 # CHANGELOG
 
-## v0.6.3
+## v0.6.4
 ### fix
-- vfs 리프레시 오류수정(reculsive 추가) 및 미 변동사항 건너뛰기로직 개선 | vfs update error fix and skip no change items
-
+- vfs 리프레시 오류수정(reculsive 추가) 및 미 변동사항 건너뛰기 로직 개선 | vfs update error fix and skip no change items
+- DB 구조 변경(mtime 추가) 및 스캔로직 변경 | DB structure change(add mtime) and scan logic change
+- 스캔시 디렉토리의 mtime 및 메타파일(yaml,xml등)의 mtime도 동시에 확인하여 변경 여부 판단 로직 개선 | scan directory mtime and metadata file mtime check logic improvement
+---
+## v0.6.3
+- 버그로 인한 폐기 | remove this version
 ---
 
 ## v0.6.2

@@ -3,7 +3,40 @@ import os
 import re
 import html
 import yaml
+import time
+import threading
 import xml.etree.ElementTree as ET
+
+class NetworkCircuitBreaker:
+    def __init__(self, max_failures=3, reset_timeout=60):
+        self.failures = 0
+        self.max_failures = max_failures
+        self.reset_timeout = reset_timeout
+        self.last_failure_time = 0
+        self._lock = threading.Lock()
+        
+    def is_tripped(self):
+        with self._lock:
+            if self.failures >= self.max_failures:
+                if time.time() - self.last_failure_time > self.reset_timeout:
+                    self.failures = 0
+                    return False
+                return True
+            return False
+            
+    def record_failure(self):
+        with self._lock:
+            self.failures += 1
+            self.last_failure_time = time.time()
+            if self.failures == self.max_failures:
+                print(f"[Scanner-CircuitBreaker] 🚨 VFS read timeouts exceeded {self.max_failures} times. Circuit tripped! Skipping all VFS reads for {self.reset_timeout}s.")
+            
+    def record_success(self):
+        with self._lock:
+            if self.failures > 0:
+                self.failures = 0
+
+_circuit_breaker = NetworkCircuitBreaker(max_failures=3, reset_timeout=60)
 
 HTML_TAG_RE = re.compile(r'<[^>]*>')
 
@@ -18,6 +51,52 @@ def clean_html_tags(text):
     cleaned = HTML_TAG_RE.sub('', text)
     return html.unescape(cleaned).strip()
 
+def read_file_with_timeout(file_path, is_remote, timeout=10):
+    """
+    Reads a file with a strict timeout using a daemon thread if is_remote is True.
+    Returns the file content as a string, or None if it times out or errors.
+    """
+    if not is_remote:
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                return f.read()
+        except Exception:
+            return None
+
+    if _circuit_breaker.is_tripped():
+        return None
+
+    result = []
+    
+    def _read():
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                result.append(f.read())
+        except Exception as e:
+            result.append(e)
+            
+    t = threading.Thread(target=_read)
+    t.daemon = True
+    t.start()
+    t.join(timeout)
+    
+    if t.is_alive():
+        print(f"[Scanner-Timeout] ⚠️ VFS file read timed out ({timeout}s): {file_path}")
+        _circuit_breaker.record_failure()
+        return None
+        
+    if not result:
+        _circuit_breaker.record_failure()
+        return None
+        
+    res = result[0]
+    if isinstance(res, Exception):
+        # File not found or permission error, not a timeout/network hang. Don't trip breaker for normal IO errors.
+        return None
+        
+    _circuit_breaker.record_success()
+    return res
+
 def is_consonant_folder(foldername):
     """Determine if folder name is initial consonant index folder"""
     foldername = foldername.strip()
@@ -27,7 +106,7 @@ def is_consonant_folder(foldername):
         return True
     return False
 
-def parse_info_xml(folder_path, files=None):
+def parse_info_xml(folder_path, files=None, is_remote=False):
     """Read info.xml in folder and parse metadata"""
     xml_path = os.path.join(folder_path, 'info.xml')
     meta = {
@@ -51,8 +130,11 @@ def parse_info_xml(folder_path, files=None):
         return meta
 
     try:
-        tree = ET.parse(xml_path)
-        root = tree.getroot()
+        content = read_file_with_timeout(xml_path, is_remote)
+        if content is None:
+            return meta
+            
+        root = ET.fromstring(content)
         
         def _get_text(tag):
             elem = root.find(tag)
@@ -79,7 +161,7 @@ def parse_info_xml(folder_path, files=None):
     meta['summary'] = clean_html_tags(meta['summary'])
     return meta
 
-def parse_kavita_yaml(folder_path, files=None):
+def parse_kavita_yaml(folder_path, files=None, is_remote=False):
     """Read kavita.yaml in folder and parse metadata"""
     yaml_path = os.path.join(folder_path, 'kavita.yaml')
     meta = {
@@ -126,8 +208,11 @@ def parse_kavita_yaml(folder_path, files=None):
         from yaml import SafeLoader
         
     try:
-        with open(actual_yaml_path, 'r', encoding='utf-8') as f:
-            data = yaml.load(f, Loader=SafeLoader) or {}
+        content = read_file_with_timeout(actual_yaml_path, is_remote)
+        if content is None:
+            return meta
+            
+        data = yaml.load(content, Loader=SafeLoader) or {}
         
         def _parse_list_or_str(val):
             if not val:
@@ -189,7 +274,7 @@ def parse_kavita_yaml(folder_path, files=None):
     meta['summary'] = clean_html_tags(meta['summary'])
     return meta
 
-def parse_series_json(folder_path, files=None):
+def parse_series_json(folder_path, files=None, is_remote=False):
     """Read series.json in folder and parse metadata (for webtoon)"""
     import json
     json_path = os.path.join(folder_path, 'series.json')
@@ -212,8 +297,9 @@ def parse_series_json(folder_path, files=None):
     meta['is_webtoon'] = True
 
     try:
-        with open(json_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+        content = read_file_with_timeout(json_path, is_remote)
+        if content is not None:
+            data = json.loads(content)
             if isinstance(data, dict):
                 meta['author'] = data.get('author', '')
                 meta['summary'] = clean_html_tags(data.get('desc', ''))

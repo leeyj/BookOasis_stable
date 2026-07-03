@@ -59,6 +59,21 @@ export function switchSettingsTab(tabId) {
     loadAboutInfo();
   } else if (tabId === 'changelog') {
     loadChangelog();
+  } else if (tabId === 'queue') {
+    if (window.loadQueueStatus) {
+      window.loadQueueStatus();
+    }
+    if (!window.queueRefreshInterval && window.loadQueueStatus) {
+      window.queueRefreshInterval = setInterval(window.loadQueueStatus, 5000);
+    }
+  }
+
+  // Handle queue refresh interval clearing if leaving queue tab
+  if (tabId !== 'queue') {
+    if (window.queueRefreshInterval) {
+      clearInterval(window.queueRefreshInterval);
+      window.queueRefreshInterval = null;
+    }
   }
 }
 

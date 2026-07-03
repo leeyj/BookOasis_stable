@@ -159,6 +159,19 @@
 - **기능**: 알라딘 플러그인을 통해 최신 신간 도서 목록을 반환합니다.
 - **함수명**: `get_aladin_new_releases_api`
 
+## stream.py
+### `[GET]` `/api/media/stream`
+- **기능**: 만화책 ZIP/CBZ 실시간 이미지 추출 및 EPUB 스트리밍 (RAM 캐시 + Prefetch 적용)
+- **함수명**: `stream_comic_page`
+
+### `[POST]` `/api/media/progress`
+- **기능**: 도서 열람 진행률 저장 및 캐시 정리
+- **함수명**: `record_progress_api`
+
+### `[POST]` `/api/media/preload-next-book`
+- **기능**: 다음 권 도서 백그라운드 선제 다운로드 및 캐싱 (Web UI 및 타치요미 연동)
+- **함수명**: `preload_next_book_api`
+
 ## opds.py
 ### `[GET]` `/opds`
 - **기능**: 일반 OPDS 최상위 피드
