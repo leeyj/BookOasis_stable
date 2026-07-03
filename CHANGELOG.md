@@ -1,9 +1,26 @@
 # CHANGELOG
 
+## v0.6.6
+### added
+- 카테고리 등록시 경로 선택 기능 추가 (로컬 및 rclone 원격 드라이브 지원) | Added directory path browser when adding categories (supports local and rclone remote drives)
+- 백엔드 경로 탐색 API (`/api/media/browse-paths`) | Backend path browsing API for seamless directory navigation
+- RC URL 아래 원격 경로 필수 입력 경고 메시지 추가 | Added mandatory remote path warning message below RC URL input field
+- 스캔 시 원격 경로 자동 감지 및 VFS 강제 갱신 기능 추가 | Added automatic remote path detection and forced VFS refresh during scans to ensure data integrity
+
+### improved
+- 카테고리 모달에 "찾아보기" 버튼 추가로 UX 개선 | Improved UX by adding browse button to category modal
+- VFS 설정 무시 시 발생하는 데이터 미감지 현상 개선 | Enhanced VFS refresh logic to force refresh when remote paths exist, preventing file detection failures
+
+### fix
+- 카테고리 내 원격 경로가 있어도 VFS 갱신이 무시되는 버그 수정 | Fixed bug where VFS refresh was ignored when remote paths existed in category (now forces refresh for data consistency)
+
+---
+
 ## v0.6.5
 ### fix
 - 책 스캔정보가 부족할 때 시리즈 별 스캔 기능 추가 | Added a series-based scanning feature when book scan data is insufficient.
 - 도서 보기중 에러 및 xbox 발생 오류 수정 | Fixed errors occurring during book viewing and X-box errors
+- 도서 보기중 페이지보기 ->스크롤보기->페이지보기 전환시 에러 수정 | - Fixed an error when switching from Page View -> Scroll View -> Page View while viewing a book
 ---
 
 

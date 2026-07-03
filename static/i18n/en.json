@@ -342,6 +342,7 @@
     "remote_drive_label": "Remote Drive (VFS / Rclone)",
     "rclone_url_label": "Rclone RC API URL",
     "rclone_url_placeholder": "e.g. http://localhost:5572",
+    "remote_path_warning": "If you have any remote directories (rclone etc), please enter VFS refresh and RC URL",
     "meta_search_title": "Search Book Metadata",
     "meta_search_placeholder": "Enter book title or author...",
     "meta_search_btn": "Search",

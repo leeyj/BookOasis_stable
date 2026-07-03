@@ -342,6 +342,7 @@
     "remote_drive_label": "원격 드라이브 (VFS 마운트 / rclone 등)",
     "rclone_url_label": "Rclone RC API 주소 (VFS 캐시 갱신용)",
     "rclone_url_placeholder": "예: http://localhost:5572",
+    "remote_path_warning": "원격 디렉토리(rclone등)가 하나라도 있다면 VFS 및 RC 주소를 꼭 입력하세요",
     "meta_search_title": "도서 메타데이터 검색",
     "meta_search_placeholder": "검색할 책 제목이나 작가명을 입력하세요",
     "meta_search_btn": "검색",

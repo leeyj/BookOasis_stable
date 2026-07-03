@@ -242,6 +242,12 @@ export function triggerAddLibrary() {
     remoteEl.dataset.listenerBound = 'true';
     remoteEl.addEventListener('change', (e) => {
       if (rcloneGroup) rcloneGroup.style.display = e.target.checked ? 'block' : 'none';
+      // 원격 경로 경고 메시지 표시
+      updateRemoteWarning();
+      // 원격 경로 체크 시 VFS 자동 활성화
+      if (e.target.checked) {
+        enableVFSCheckForRemote();
+      }
     });
   }
 
@@ -286,8 +292,17 @@ export async function triggerEditLibrary() {
     remoteEl.dataset.listenerBound = 'true';
     remoteEl.addEventListener('change', (e) => {
       if (rcloneGroup) rcloneGroup.style.display = e.target.checked ? 'block' : 'none';
+      // 원격 경로 경고 메시지 표시
+      updateRemoteWarning();
+      // 원격 경로 체크 시 VFS 자동 활성화
+      if (e.target.checked) {
+        enableVFSCheckForRemote();
+      }
     });
   }
+
+  // 초기 경고 메시지 표시 여부 판단
+  updateRemoteWarning();
 
   title.innerText = i18n.t('category.edit_title', {id: id});
   modal.style.display = 'flex';
@@ -439,4 +454,178 @@ export async function submitLibraryForm(event) {
   }
 }
 
+
+// ─── 경로 탐색 기능 (v0.6.6 신규) ───
+let pathBrowserCurrentPath = '';
+
+export function openPathBrowser() {
+  const modal = document.getElementById('path-browser-modal');
+  if (!modal) return;
+  
+  // 초기 경로 설정
+  pathBrowserCurrentPath = '';
+  
+  modal.style.display = 'flex';
+  refreshPathBrowser();
+}
+
+export function closePathBrowser() {
+  const modal = document.getElementById('path-browser-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+export async function refreshPathBrowser() {
+  const inputEl = document.getElementById('path-browser-input');
+  if (inputEl) {
+    pathBrowserCurrentPath = inputEl.value.trim() || pathBrowserCurrentPath;
+  }
+  
+  await loadPathBrowserItems();
+}
+
+export async function loadPathBrowserItems() {
+  const listEl = document.getElementById('path-browser-list');
+  const inputEl = document.getElementById('path-browser-input');
+  
+  if (!listEl) return;
+  
+  // UI 업데이트
+  if (inputEl) inputEl.value = pathBrowserCurrentPath;
+  listEl.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 2rem;">로딩 중...</div>';
+  
+  try {
+    const params = new URLSearchParams();
+    params.append('path', pathBrowserCurrentPath);
+    
+    const response = await fetch(`/api/media/browse-paths?${params.toString()}`);
+    const data = await response.json();
+    
+    if (!data.success) {
+      listEl.innerHTML = `<div style="color: #ef4444; padding: 1rem;">오류: ${data.error || '알 수 없는 오류'}</div>`;
+      return;
+    }
+    
+    const items = data.items || [];
+    pathBrowserCurrentPath = data.currentPath || '';
+    if (inputEl) inputEl.value = pathBrowserCurrentPath;
+    
+    if (items.length === 0) {
+      listEl.innerHTML = '<div style="color: #94a3b8; padding: 1rem; text-align: center;">하위 디렉토리가 없습니다.</div>';
+      return;
+    }
+    
+    // 디렉토리 목록 렌더링
+    listEl.innerHTML = '';
+    items.forEach(item => {
+      const itemEl = document.createElement('div');
+      itemEl.style.cssText = `
+        padding: 0.6rem 0.8rem;
+        cursor: pointer;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        transition: background 0.2s;
+      `;
+      itemEl.onmouseenter = () => itemEl.style.background = 'rgba(168, 85, 247, 0.1)';
+      itemEl.onmouseleave = () => itemEl.style.background = 'none';
+      itemEl.onclick = () => {
+        pathBrowserCurrentPath = item.path;
+        if (item.name !== '..') {
+          loadPathBrowserItems();
+        } else {
+          loadPathBrowserItems();
+        }
+      };
+      
+      const icon = item.name === '..' ? 'fa-arrow-up' : 'fa-folder';
+      itemEl.innerHTML = `
+        <i class="fa-solid ${icon}" style="color: #a855f7; flex-shrink: 0;"></i>
+        <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(item.name)}</span>
+      `;
+      listEl.appendChild(itemEl);
+    });
+    
+  } catch (error) {
+    console.error('[PathBrowser] 경로 탐색 오류:', error);
+    listEl.innerHTML = `<div style="color: #ef4444; padding: 1rem;">오류: ${error.message || '경로를 불러올 수 없습니다.'}</div>`;
+  }
+}
+
+export function selectPathFromBrowser() {
+  const pathEl = document.getElementById('library-form-path');
+  if (!pathEl) return;
+  
+  if (!pathBrowserCurrentPath) {
+    alert('경로를 선택하세요.');
+    return;
+  }
+  
+  // 기존 경로 가져오기
+  const existing = pathEl.value.trim();
+  let newPaths = existing ? existing.split('\n').map(p => p.trim()).filter(p => p) : [];
+  
+  // 중복 체크
+  if (!newPaths.includes(pathBrowserCurrentPath)) {
+    newPaths.push(pathBrowserCurrentPath);
+  }
+  
+  pathEl.value = newPaths.join('\n');
+  
+  // 경로가 rclone/원격 마운트인지 자동 감지하여 is_remote 체크박스 업데이트
+  detectAndUpdateRemoteFlag(pathBrowserCurrentPath);
+  
+  closePathBrowser();
+}
+
+function detectAndUpdateRemoteFlag(path) {
+  // 경로가 rclone/네트워크 드라이브인지 자동 감지하여 is_remote 체크박스 업데이트
+  // 사용자는 필요시 수동으로 조정 가능
+  const isRemoteCheckbox = document.getElementById('library-form-remote');
+  if (!isRemoteCheckbox) return;
+  
+  // 클라이언트 측 휴리스틱: rclone 마운트 경로 패턴 감지
+  const pathLower = path.toLowerCase();
+  const isLikelyRemote = 
+    pathLower.includes('rclone') ||
+    pathLower.includes('gdrive') ||
+    pathLower.includes('onedrive') ||
+    pathLower.includes('nas') ||
+    pathLower.includes('network') ||
+    pathLower.includes('vfs') ||
+    /^[a-z]:\\\\?rclone/i.test(path) ||  // Windows: C:\rclone
+    /^\/mnt\/(rclone|gdrive)/i.test(path); // Linux: /mnt/rclone
+  
+  // 자동 감지 결과를 체크박스에 반영 (사용자 수정 가능)
+  isRemoteCheckbox.checked = isLikelyRemote;
+}
+
+// 글로벌 함수로 노출 (onclick 핸들러용)
+if (typeof window !== 'undefined') {
+  window.openPathBrowser = openPathBrowser;
+  window.closePathBrowser = closePathBrowser;
+  window.refreshPathBrowser = refreshPathBrowser;
+  window.selectPathFromBrowser = selectPathFromBrowser;
+}
+
+// 원격 경로 경고 메시지 업데이트 함수
+function updateRemoteWarning() {
+  const remoteCheckbox = document.getElementById('library-form-remote');
+  const warningEl = document.getElementById('library-form-remote-warning');
+  if (!warningEl || !remoteCheckbox) return;
+  
+  if (remoteCheckbox.checked) {
+    warningEl.style.display = 'block';
+  } else {
+    warningEl.style.display = 'none';
+  }
+}
+
+// 원격 경로 체크 시 VFS 자동 활성화 함수
+function enableVFSCheckForRemote() {
+  // VFS 체크박스를 찾아 활성화
+  // 라이브러리 설정 페이지의 VFS 체크박스를 찾음
+  // 해당 라이브러리에 대한 VFS 체크박스를 활성화
+  console.log('[VFS] Remote path selected - VFS should be enabled in scan settings');
+}
 

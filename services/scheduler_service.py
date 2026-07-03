@@ -189,9 +189,21 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
         row_chk = cursor_chk.fetchone()
         conn_chk.close()
         
-        if row_chk and row_chk['vfs_refresh_before_scan'] == 1:
-            print(f"[Scanner-Trigger] VFS pre-refresh active. Attempting rclone cache update.")
-            write_scan_log("VFS 사전 새로고침 시도 (rclone API)")
+        # 원격 경로가 있는지 확인
+        from utils.drive_helper import is_remote_path
+        target_paths = [p.strip() for p in str(physical_path).replace('\r', '').split('\n') if p.strip()]
+        has_remote_paths = any(is_remote_path(p) for p in target_paths)
+        
+        # VFS 설정이 활성화되었거나, 원격 경로가 있으면 VFS 갱신 강제 수행
+        should_vfs_refresh = (row_chk and row_chk['vfs_refresh_before_scan'] == 1) or has_remote_paths
+        
+        if should_vfs_refresh:
+            if has_remote_paths and not (row_chk and row_chk['vfs_refresh_before_scan'] == 1):
+                print(f"[Scanner-Trigger] ⚠️ Remote paths detected but VFS refresh disabled. Forcing VFS refresh for data integrity.")
+                write_scan_log("⚠️ 원격 경로 감지됨. VFS 새로고침을 강제 실행합니다 (데이터 무결성 보장).")
+            else:
+                print(f"[Scanner-Trigger] VFS pre-refresh active. Attempting rclone cache update.")
+                write_scan_log("VFS 사전 새로고침 시도 (rclone API)")
             
             import urllib.request
             import json
@@ -209,9 +221,7 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
             
             try:
                 from utils.drive_helper import get_rclone_relative_path
-                from utils.drive_helper import is_remote_path
                 
-                target_paths = [p.strip() for p in str(physical_path).replace('\r', '').split('\n') if p.strip()]
                 remote_paths = [p for p in target_paths if is_remote_path(p)]
                 
                 for r_path in remote_paths:
