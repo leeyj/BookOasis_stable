@@ -7,7 +7,7 @@
 ### improved
 - 로그 아카이빙 대상 확대 | log file zip archiving 대상 확대(scanner.log,lazy_scanner.log 추가)
 - 대시보드 신규 추가 도서 목록에서 시리즈 단위로 묶어 보여주는 기능 개선 | dashboard new added book list series grouping
-
+- 타임존 설정 추가(환경설정->일반설정->타임존 설정) | system timezone setting added(Environment setting->General setting->Timezone setting)
 
 
 

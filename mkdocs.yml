@@ -30,6 +30,10 @@ nav:
 - 개발 워크플로우: workflow.md
 - 작업 히스토리:
   - history/index.md
+  - history/20260704_124002_scheduler_dynamic_timezone_walkthrough.md
+  - history/20260704_124002_scheduler_dynamic_timezone_task.md
+  - history/20260704_123739_scheduler_timezone_kst_walkthrough.md
+  - history/20260704_123739_scheduler_timezone_kst_task.md
   - history/20260704_122801_logs_archiving_walkthrough.md
   - history/20260704_122801_logs_archiving_task.md
   - history/20260704_121943_context_menu_unread_0_walkthrough.md
@@ -480,6 +484,7 @@ nav:
   - bug/index.md
   - bug/20260704_feature_logs_archiving.md
   - bug/20260704_feature_context_menu_unread_0.md
+  - bug/20260704_bugfix_scheduler_timezone_kst.md
   - bug/20260704_bugfix_dashboard_recently_added_grouped.md
   - bug/20260704_bugfix_comic_viewer_ghosting.md
   - bug/20260704_bugfix_comic_touch_scroll.md

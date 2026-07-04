@@ -54,7 +54,7 @@ def normalize_cron_expression(cron_expression):
 
     return f"{minute} {hour} {day} {month} {converted}"
 
-# 싱글톤 백그라운드 스케줄러 인스턴스
+# 싱글톤 백그라운드 스케줄러 인스턴스 (동적으로 타임존을 재설정하여 가동)
 scheduler = BackgroundScheduler()
 
 class SchedulerService:
@@ -69,6 +69,20 @@ class SchedulerService:
     @staticmethod
     def reload_all_jobs():
         """모든 DB의 크론 스케줄링 Job 갱신"""
+        # DB settings 테이블에서 TIMEZONE 설정을 가져와 스케줄러 타임존 동적 구성
+        from services.settings_service import SettingsService
+        from zoneinfo import ZoneInfo
+        tz_str = SettingsService.get('TIMEZONE', 'UTC')
+        try:
+            scheduler.configure(timezone=ZoneInfo(tz_str))
+            print(f"[Scheduler] Timezone configured successfully to: {tz_str}")
+        except Exception as tz_err:
+            print(f"[Scheduler ERROR] Failed to configure scheduler timezone ({tz_str}): {tz_err}")
+            try:
+                scheduler.configure(timezone=ZoneInfo('UTC'))
+            except:
+                pass
+
         # 기존 모든 job 제거
         try:
             for job in list(scheduler.get_jobs()):

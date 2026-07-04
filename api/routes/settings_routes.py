@@ -41,12 +41,12 @@ def update_system_setting():
     
     try:
         SettingsService.set(key, value)
-        if key == 'LAZY_SCAN_CRON':
+        if key in ('LAZY_SCAN_CRON', 'TIMEZONE'):
             try:
                 SchedulerService.reload_all_jobs()
-                print(f"[API] Scheduler reloaded due to LAZY_SCAN_CRON change: {value}")
+                print(f"[API] Scheduler reloaded due to {key} change: {value}")
             except Exception as e_sched:
-                print(f"[API WARNING] Failed to reload scheduler on LAZY_SCAN_CRON change: {e_sched}")
+                print(f"[API WARNING] Failed to reload scheduler on {key} change: {e_sched}")
         return jsonify({'success': True, 'message': _t('api.msg_setting_saved', key=key)})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

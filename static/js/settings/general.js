@@ -65,6 +65,9 @@ export async function loadGeneralSettings() {
       const lazyCronEl = document.getElementById('setting-lazy-scan-cron');
       if (lazyCronEl) lazyCronEl.value = s.LAZY_SCAN_CRON || '0 3 * * *';
       
+      const timezoneEl = document.getElementById('setting-timezone');
+      if (timezoneEl) timezoneEl.value = s.TIMEZONE || 'UTC';
+      
       const recentBooksEl = document.getElementById('setting-recent-books-limit');
       if (recentBooksEl) recentBooksEl.value = s.RECENT_BOOKS_LIMIT || '30';
 
@@ -122,6 +125,7 @@ export async function submitGeneralSettings(event) {
   const hideCompleted = document.getElementById('setting-hide-completed-in-history')?.checked ? '1' : '0';
   const proxyAuth = document.getElementById('setting-proxy-header-auth')?.value || '0';
   const rcloneRcUrl = document.getElementById('setting-rclone-rc-url')?.value || 'http://localhost:5572';
+  const timezone = document.getElementById('setting-timezone')?.value || 'UTC';
   
   try {
     // 모든 설정을 병렬 업데이트
@@ -133,6 +137,7 @@ export async function submitGeneralSettings(event) {
       api.updateSystemSetting('DB_POOL_SIZE', dbPoolSize),
       api.updateSystemSetting('SCANNER_WRITE_LOG', scannerLog),
       api.updateSystemSetting('LAZY_SCAN_CRON', lazyCron),
+      api.updateSystemSetting('TIMEZONE', timezone),
       api.updateSystemSetting('RECENT_BOOKS_LIMIT', recentBooks),
       api.updateSystemSetting('SYSTEM_MEM_LIMIT', sysMem),
       api.updateSystemSetting('PROCESS_RSS_LIMIT', procRss),
