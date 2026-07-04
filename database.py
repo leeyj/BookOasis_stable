@@ -285,13 +285,19 @@ def init_databases():
         compress_type INTEGER
     );
     CREATE INDEX IF NOT EXISTS idx_book_offsets_book_id ON book_offsets(book_id);
+    CREATE INDEX IF NOT EXISTS idx_book_offsets_book_page ON book_offsets(book_id, page_idx);
+    
     CREATE INDEX IF NOT EXISTS idx_books_series_name ON books(series_name);
     CREATE INDEX IF NOT EXISTS idx_books_library_id ON books(library_id);
     CREATE INDEX IF NOT EXISTS idx_books_is_favorite ON books(is_favorite);
     CREATE INDEX IF NOT EXISTS idx_books_created_at ON books(created_at);
+    
     CREATE INDEX IF NOT EXISTS idx_books_series_lib_title ON books(series_name, library_id, title);
     CREATE INDEX IF NOT EXISTS idx_user_progress_book_user ON user_progress(book_id, user_id);
+    CREATE INDEX IF NOT EXISTS idx_user_progress_last_read ON user_progress(user_id, last_read_at DESC);
+    
     CREATE INDEX IF NOT EXISTS idx_user_reading_log_user_date ON user_reading_log(user_id, read_date);
+    CREATE INDEX IF NOT EXISTS idx_user_category_permissions_lookup ON user_category_permissions(user_id, library_id, has_access);
 
     CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
@@ -431,55 +437,8 @@ def init_databases():
 
         conn.close()
 
-# DB 튜닝 진행 중 전역 상태 딕셔너리
-_tuning_status = {
-    'general': False,
-    'adult': False
-}
-
-def is_db_tuning(db_type='general'):
-    """현재 데이터베이스가 튜닝(VACUUM 등) 작업 중인지 반환"""
-    return _tuning_status.get(db_type, False)
-
-def optimize_database(db_type='general'):
-    """
-    데이터베이스 최적화를 수행합니다:
-    1. ANALYZE를 실행해 질의 최적화 통계 갱신
-    2. REINDEX를 실행해 인덱스 트리 재정렬
-    3. 별도 커넥션 세션으로 VACUUM을 구동하여 삭제된 빈 물리 공간 파편화 회수
-    """
-    global _tuning_status
-    if _tuning_status.get(db_type, False):
-        print(f"[optimize_database] {db_type} database optimization is already in progress.")
-        return False, "이미 최적화 작업이 진행 중입니다."
-        
-    _tuning_status[db_type] = True
-    print(f"[*] [{db_type}] Starting database optimization engine...")
-    
-    try:
-        # 1. ANALYZE & REINDEX는 풀 커넥션을 통해 안전하게 실행
-        conn = get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("ANALYZE;")
-        cursor.execute("REINDEX;")
-        conn.commit()
-        conn.close()
-        
-        # 2. VACUUM은 트랜잭션 외부(autocommit) 모드에서 수행해야 하므로 
-        # 커넥션 풀을 타지 않는 독립 물리 커넥션으로 수행
-        db_path = DB_ADULT_PATH if db_type == 'adult' else DB_GENERAL_PATH
-        conn_vacuum = sqlite3.connect(db_path, timeout=60.0)
-        conn_vacuum.isolation_level = None  # autocommit 설정
-        conn_vacuum.execute("VACUUM;")
-        conn_vacuum.close()
-        
-        print(f"[+] [{db_type}] Database defragmentation and optimization tuning successful!")
-        return True, "최적화 완료"
-    except Exception as e:
-        print(f"[!] [{db_type}] Error during database optimization: {e}")
-        return False, str(e)
-    finally:
-        _tuning_status[db_type] = False
+# DB 튜닝 레이어 서비스 위임 (하위 호환성 유지)
+from services.db_tuning_service import is_db_tuning, optimize_database
 
 if __name__ == '__main__':
     init_databases()

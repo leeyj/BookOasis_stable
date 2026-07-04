@@ -1,24 +1,15 @@
 # -*- coding: utf-8 -*-
 import database
+from repositories.category_repository import CategoryRepository
 
 class CategoryService:
     @staticmethod
     def get_libraries(db_type, user_id=None, role=None):
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
         if user_id and role != 'admin':
-            # 일반 유저는 권한 테이블 조인하여 has_access = 1 인 카테고리만 필터
-            cursor.execute("""
-                SELECT l.id, l.name, l.physical_path, l.is_remote, l.vfs_refresh_before_scan, l.rclone_rc_url 
-                FROM libraries l
-                JOIN user_category_permissions p ON l.id = p.library_id
-                WHERE p.user_id = ? AND p.has_access = 1
-                ORDER BY l.name ASC
-            """, (user_id,))
+            rows = CategoryRepository.get_libraries_by_user_permissions(db_type, user_id)
         else:
-            cursor.execute("SELECT id, name, physical_path, is_remote, vfs_refresh_before_scan, rclone_rc_url FROM libraries ORDER BY name ASC")
-        rows = cursor.fetchall()
-        conn.close()
+            rows = CategoryRepository.get_all_libraries(db_type)
+            
         return [{
             'id': r['id'], 
             'name': r['name'], 
@@ -43,16 +34,7 @@ class CategoryService:
         if len(name) > 25:
             raise ValueError('카테고리 이름은 25자를 초과할 수 없습니다.')
         physical_path = CategoryService._clean_physical_path(physical_path)
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO libraries (name, physical_path, is_remote, rclone_rc_url) VALUES (?, ?, ?, ?)",
-            (name, physical_path, is_remote, rclone_rc_url)
-        )
-        library_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-        return library_id
+        return CategoryRepository.add_library(db_type, name, physical_path, is_remote, rclone_rc_url)
 
     @staticmethod
     def edit_library(db_type, library_id, name, physical_path, is_remote=0, rclone_rc_url=None):
@@ -63,14 +45,7 @@ class CategoryService:
         if len(name) > 25:
             raise ValueError('카테고리 이름은 25자를 초과할 수 없습니다.')
         physical_path = CategoryService._clean_physical_path(physical_path)
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE libraries SET name = ?, physical_path = ?, is_remote = ?, rclone_rc_url = ? WHERE id = ?",
-            (name, physical_path, is_remote, rclone_rc_url, library_id)
-        )
-        conn.commit()
-        conn.close()
+        CategoryRepository.edit_library(db_type, library_id, name, physical_path, is_remote, rclone_rc_url)
 
     @staticmethod
     def delete_library(db_type, library_id):
@@ -81,20 +56,7 @@ class CategoryService:
         except Exception as e:
             print(f"[CategoryService ERROR] Bulk report file removal failed: {e}")
 
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("SELECT id FROM books WHERE library_id = ?", (library_id,))
-        book_ids = [r['id'] for r in cursor.fetchall()]
-
-        if book_ids:
-            placeholders = ','.join('?' for _ in book_ids)
-            cursor.execute(f"DELETE FROM user_progress WHERE book_id IN ({placeholders})", book_ids)
-            cursor.execute(f"DELETE FROM user_reading_log WHERE book_id IN ({placeholders})", book_ids)
-            cursor.execute(f"DELETE FROM books WHERE library_id = ?", (library_id,))
-
-        cursor.execute("DELETE FROM libraries WHERE id = ?", (library_id,))
-        conn.commit()
-        conn.close()
+        CategoryRepository.delete_library(db_type, library_id)
 
         # 대량 삭제(Delete) 완료 후 물리 공간 회수 및 DB 성능 향상을 위해 백그라운드로 튜닝 구동
         import threading

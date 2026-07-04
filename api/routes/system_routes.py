@@ -4,10 +4,25 @@ system_routes.py – 시스템 상태, 큐, 정보 조회 라우터
 """
 import os
 from flask import Blueprint, request, jsonify, session
-from api.auth import admin_required
+from api.auth import admin_required, login_required
+from flask import render_template
 import database
 
 system_bp = Blueprint('system', __name__)
+
+@system_bp.route('/health', methods=['GET'])
+def health():
+    return jsonify({
+        'status': 'healthy',
+        'service': 'BookOasis'
+    })
+
+@system_bp.route('/', methods=['GET'])
+@system_bp.route('/media-library', methods=['GET'])
+@login_required
+def index():
+    settings = {}
+    return render_template('index.html', active_page='media_library', settings=settings)
 
 @system_bp.route('/api/system/status', methods=['GET'])
 def get_system_status():

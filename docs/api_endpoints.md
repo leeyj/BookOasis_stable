@@ -1,252 +1,213 @@
-# BookOasis API 엔드포인트 명세서
+# 📖 BookOasis API Endpoints Specification (OpenAPI / Swagger Style)
 
-## admin.py
+이 문서는 BookOasis 미디어 서버 백엔드가 노출하는 모든 API 엔드포인트의 입력 파라미터, 요청 바디(Request Body), 응답 스키마(Response JSON) 및 권한 요구사항을 Swagger/OpenAPI 스타일로 정밀하게 명세한 개발자 참조서입니다.
+
+---
+
+## 🔐 전역 인증 및 공통 응답 규격
+
+### 1. 인증 헤더 및 세션
+* **Web API**: 쿠키 기반 Flask Session을 사용합니다. (`session['user_id']` 존재 여부 검사)
+* **OPDS API**: HTTP Basic Authentication (`Authorization: Basic <base64>`)을 준수합니다.
+
+### 2. 표준 에러 응답 규격 (JSON)
+요청 처리 실패 시 HTTP 상태 코드와 함께 아래의 공통 JSON 객체를 반환합니다.
+```json
+{
+  "success": false,
+  "error": "에러 이유에 대한 다국어 설명문구"
+}
+```
+
+---
+
+## 📂 1. 라이브러리 및 카테고리 관리 API (`media_admin` / `library_routes`)
+
 ### `[POST]` `/api/media/libraries/add`
-- **기능**: 신규 라이브러리 카테고리 추가 및 즉시 스캔
-- **함수명**: `add_media_library`
+* **설명**: 새로운 미디어 라이브러리 카테고리를 시스템에 등록하고 백그라운드 큐에 비동기 스캔 작업을 스케줄링합니다.
+* **권한**: `@admin_required` (관리자 전용)
+* **Content-Type**: `application/x-www-form-urlencoded`
+* **요청 파라미터**:
+  | 파라미터명 | 타입 | 필수여부 | 설명 |
+  | :--- | :--- | :--- | :--- |
+  | `type` | string | 필수 | DB 스코프 (`general` 또는 `adult`) |
+  | `name` | string | 필수 | 카테고리 이름 (양끝 공백 제외 최대 25자, 고유값) |
+  | `physical_path` | string | 필수 | 파일시스템 절대경로 (멀티경로 시 줄바꿈으로 구분) |
+  | `is_remote` | string | 선택 | 원격 마운트 여부 (`1` / `0`) |
+  | `rclone_rc_url` | string | 선택 | Rclone Remote Control 주소 (예: `http://localhost:5572`) |
+
+* **응답 예시 (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "message": "보관함이 생성되었으며 스캔이 대기열에 등록되었습니다."
+  }
+  ```
+
+---
 
 ### `[POST]` `/api/media/libraries/edit`
-- **기능**: 라이브러리 카테고리 정보 수정 및 재스캔
-- **함수명**: `edit_media_library`
+* **설명**: 기존 카테고리의 이름, 경로 및 원격 연결 주소를 수정하고 재스캔을 트리거합니다.
+* **권한**: `@admin_required` (관리자 전용)
+* **Content-Type**: `application/x-www-form-urlencoded`
+* **요청 파라미터**:
+  | 파라미터명 | 타입 | 필수여부 | 설명 |
+  | :--- | :--- | :--- | :--- |
+  | `id` | integer | 필수 | 수정 대상 라이브러리 ID |
+  | `type` | string | 필수 | DB 스코프 (`general` 또는 `adult`) |
+  | `name` | string | 필수 | 변경할 새 카테고리 명 |
+  | `physical_path` | string | 필수 | 변경할 파일 시스템 절대 경로 |
+  | `is_remote` | string | 선택 | 원격 연결 사용 플래그 |
+  | `rclone_rc_url` | string | 선택 | Rclone 원격 API 서버 Endpoint 주소 |
+
+---
 
 ### `[POST]` `/api/media/libraries/delete`
-- **기능**: 라이브러리 카테고리 및 도서 연쇄 삭제
-- **함수명**: `delete_media_library`
+* **설명**: 카테고리를 소거하며 하위 도서 메타데이터 및 독서 이력, 에러 보고서 파일을 연쇄 삭제(Cascade Delete)합니다.
+* **권한**: `@admin_required`
 
-### `[POST]` `/api/media/books/<int:book_id>/scan`
-- **기능**: 특정 개별 도서 즉시 부분 재스캔 실행
-- **함수명**: `scan_single_book_api`
+---
 
 ### `[GET]` `/api/media/libraries/schedules`
-- **기능**: 모든 카테고리의 스케줄 및 상태 목록 조회
-- **함수명**: `get_libraries_schedules`
+* **설명**: 전체 카테고리의 백그라운드 스캔 크론 스케줄 주기와 스캔 상태(Status) 목록을 가져옵니다.
+* **권한**: `@admin_required`
+* **쿼리 스트링**:
+  * `type` (string, 필수): 조회 스코프 (`general` / `adult`)
+* **응답 예시 (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "libraries": [
+      {
+        "id": 1,
+        "name": "일반 만화",
+        "physical_path": "/data/comics",
+        "cron_schedule": "0 3 * * *",
+        "last_scanned_at": "2026-07-04 18:27:11",
+        "scan_status": "ready",
+        "is_remote": 0,
+        "vfs_refresh_before_scan": 0,
+        "rclone_rc_url": ""
+      }
+    ]
+  }
+  ```
 
-### `[POST]` `/api/media/libraries/<int:library_id>/scan`
-- **기능**: 지정된 라이브러리 카테고리 즉시 비동기 스캔 실행
-- **함수명**: `trigger_library_scan`
+---
 
-### `[POST]` `/api/media/libraries/<int:library_id>/cancel-scan`
-- **기능**: 지정된 라이브러리 카테고리의 진행 중인 스캔을 중단하도록 플래그 갱신
-- **함수명**: `cancel_library_scan`
+## 🔑 2. 인증 및 사용자 계정 API (`auth`)
 
-### `[POST]` `/api/media/libraries/<int:library_id>/scan-covers`
-- **기능**: 지정된 라이브러리 카테고리 표지 전용 즉시 비동기 스캔 실행
-- **함수명**: `trigger_library_cover_scan`
+### `[POST]` `/login`
+* **설명**: 사용자의 신원을 인증하여 세션을 생성합니다.
+* **Content-Type**: `application/json` 또는 `application/x-www-form-urlencoded`
+* **요청 바디 / 파라미터**:
+  | 파라미터명 | 타입 | 필수여부 | 설명 |
+  | :--- | :--- | :--- | :--- |
+  | `username` | string | 필수 | 로그인 계정 아이디 |
+  | `password` | string | 필수 | 계정 비밀번호 |
+  | `remember_me` | boolean | 선택 | 자동로그인 설정 여부 |
 
-### `[POST]` `/api/media/libraries/<int:library_id>/schedule`
-- **기능**: 지정된 라이브러리 카테고리의 크론 스케줄 주기 업데이트
-- **함수명**: `update_library_schedule`
+* **응답 예시 (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "role": "admin",
+    "is_default_password": 0
+  }
+  ```
 
-### `[GET]` `/api/media/settings`
-- **기능**: 모든 시스템 설정값 조회
-- **함수명**: `get_system_settings`
-
-### `[POST]` `/api/media/settings`
-- **기능**: 시스템 설정값 추가 및 업데이트
-- **함수명**: `update_system_setting`
-
-### `[GET]` `/api/system/status`
-- **기능**: 현재 백그라운드 스캔 상태 및 DB 최적화 튜닝 작업 상태 조회
-- **함수명**: `get_system_status`
-
-### `[GET]` `/api/media/libraries/<int:library_id>/reports`
-- **기능**: 특정 라이브러리 카테고리의 스캔 에러 리포트 목록 조회
-- **함수명**: `get_library_reports`
-
-### `[GET]` `/api/media/libraries/reports/view`
-- **기능**: 특정 리포트 파일의 에러 리스트 상세 조회
-- **함수명**: `view_report_detail`
-
-### `[POST]` `/api/media/settings/trigger-lazy-scan`
-- **기능**: Lazy 표지 스캔 강제 즉시 실행 API
-- **함수명**: `trigger_lazy_scan_api`
-
-## auth.py
-### `[GET, POST]` `/login`
-- **기능**: 설명 없음
-- **함수명**: `login`
-
-### `[GET]` `/logout`
-- **기능**: 설명 없음
-- **함수명**: `logout`
+---
 
 ### `[POST]` `/change-password`
-- **기능**: 설명 없음
-- **함수명**: `change_password`
+* **설명**: 로그인된 세션의 사용자 비밀번호를 갱신합니다.
+* **요청 바디 (JSON)**:
+  ```json
+  {
+    "new_password": "NewSecretPassword12!"
+  }
+  ```
 
-### `[GET]` `/api/admin/users`
-- **기능**: 설명 없음
-- **함수명**: `get_users`
+---
 
-### `[POST]` `/api/admin/users`
-- **기능**: 설명 없음
-- **함수명**: `add_user`
+## 📚 3. 도서 탐색 및 메타데이터 서비스 API (`media_library` / `library`)
 
-### `[DELETE]` `/api/admin/users/<int:target_user_id>`
-- **기능**: 설명 없음
-- **함수명**: `delete_user`
-
-## library.py
 ### `[GET]` `/api/media/libraries`
-- **기능**: 라이브러리 카테고리 목록 조회
-- **함수명**: `get_media_libraries`
+* **설명**: 현재 로그인된 사용자의 권한 등급 및 성인 인증 권한에 조인 필터링된 카테고리 탭 목록을 반환합니다.
+* **쿼리 스트링**:
+  * `type` (string, 필수): `general` / `adult`
+* **응답 예시 (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "libraries": [
+      { "id": "home", "name": "전체보기", "physical_path": "" },
+      { "id": 1, "name": "판타지 소설", "physical_path": "/data/novel" }
+    ]
+  }
+  ```
+
+---
 
 ### `[GET]` `/api/media/list`
-- **기능**: 도서 보관함 시리즈 목록 조회 (무한 스크롤 페이지네이션 + 서버 검색)
-- **함수명**: `get_media_list`
+* **설명**: 보관함 내의 시리즈(도서 묶음) 리스트를 무한 스크롤 및 검색 조건에 맞게 페이지네이션하여 반환합니다.
+* **쿼리 스트링**:
+  * `type` (string, 필수): `general` / `adult`
+  * `library_id` (string, 선택): 특정 보관함 ID (전체일 경우 `home`)
+  * `search` (string, 선택): 서칭 키워드
+  * `page` (integer, 선택): 조회 페이지 번호 (기본: `1`)
+  * `limit` (integer, 선택): 1회당 조회 목록 크기 (기본: 시스템 설정값)
+  * `sort` (string, 선택): 정렬 기준 (`title_asc`, `title_desc`, `date_desc`, `date_asc`)
+* **응답 예시 (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "series": [
+      {
+        "series_name": "나 혼자만 레벨업",
+        "library_id": 1,
+        "author": "추공",
+        "publisher": "디앤씨미디어",
+        "created_at": "2026-06-01 12:00:00",
+        "has_books_count": 8,
+        "is_favorite": 1,
+        "cover_image": "/covers/1/cover_l1.jpg"
+      }
+    ],
+    "has_more": true
+  }
+  ```
 
-### `[GET]` `/api/media/all-list`
-- **기능**: Kavita 방식의 선로드를 위해 특정 라이브러리의 전체 시리즈 목록을 페이징 없이 경량 조회
-- **함수명**: `get_media_all_list`
+---
 
 ### `[GET]` `/api/media/detail`
-- **기능**: 특정 시리즈 상세 정보 및 단행본 목록 조회
-- **함수명**: `get_media_detail`
+* **설명**: 특정 시리즈의 메타 정보 및 속해 있는 단행본 권차 목록을 순서대로 조회합니다.
+* **쿼리 스트링**:
+  * `type` (string, 필수): `general` / `adult`
+  * `series` (string, 필수): 시리즈 명
+  * `library_id` (integer, 필수): 카테고리 ID
 
-### `[POST]` `/api/media/detail/edit`
-- **기능**: 시리즈 메타정보 수동 수정 및 표지 업로드
-- **함수명**: `edit_media_detail`
+---
 
-### `[GET]` `/api/media/history`
-- **기능**: 최근 읽은 도서 히스토리 (최대 20건)
-- **함수명**: `get_media_history`
+## ⚡ 4. 실시간 미디어 스트리밍 및 진행률 API (`media_stream` / `stream`)
 
-### `[GET]` `/api/media/recently-added`
-- **기능**: 신규 추가 도서 (최대 20건)
-- **함수명**: `get_media_recently_added`
-
-### `[GET]` `/api/media/meta/recommend`
-- **기능**: 상세 설명이 비어있을 때, 유사한 시리즈 이름을 가진 메타데이터 추천
-- **함수명**: `get_media_meta_recommend`
-
-### `[POST]` `/api/media/meta/copy`
-- **기능**: 추천받은 메타데이터(저자, 출판사, 줄거리 등)를 지정 도서 시리즈에 수동으로 복사 복원
-- **함수명**: `copy_media_metadata`
-
-### `[GET]` `/api/media/next-book`
-- **기능**: 시리즈 내 다음 도서 권 정보 조회 API
-- **함수명**: `get_next_book_api`
-
-### `[POST, PATCH]` `/api/media/books/<int:book_id>/favorite`
-- **기능**: 특정 도서의 즐겨찾기 상태 변경
-- **함수명**: `toggle_book_favorite`
-
-### `[POST, PATCH]` `/api/media/series/favorite`
-- **기능**: 특정 시리즈 전체의 즐겨찾기 상태 변경
-- **함수명**: `toggle_series_favorite_api`
-
-### `[GET]` `/api/media/metadata/plugins`
-- **기능**: 수동 검색 모달에 사용 가능한 메타데이터 플러그인 목록 조회
-- **함수명**: `get_metadata_plugins_api`
-
-### `[GET]` `/api/media/books/search-metadata`
-- **기능**: 지정된 메타데이터 플러그인을 활용하여 도서 메타데이터 후보군 검색
-- **함수명**: `search_book_metadata_api`
-
-### `[POST]` `/api/media/books/<int:book_id>/apply-metadata`
-- **기능**: 사용자가 선택한 메타데이터 정보를 도서 정보에 최종 반영
-- **함수명**: `apply_book_metadata_api`
-
-### `[POST]` `/api/media/metadata/plugins/toggle`
-- **기능**: 특정 플러그인의 ON/OFF 활성화 상태를 업데이트합니다.
-- **함수명**: `toggle_metadata_plugin_api`
-
-### `[POST]` `/api/media/metadata/plugins/save-config`
-- **기능**: 특정 플러그인의 JSON 설정 데이터를 DB에 저장합니다.
-- **함수명**: `save_metadata_plugin_config_api`
-
-### `[GET]` `/api/media/metadata/plugins/aladin/new-releases`
-- **기능**: 알라딘 플러그인을 통해 최신 신간 도서 목록을 반환합니다.
-- **함수명**: `get_aladin_new_releases_api`
-
-## stream.py
 ### `[GET]` `/api/media/stream`
-- **기능**: 만화책 ZIP/CBZ 실시간 이미지 추출 및 EPUB 스트리밍 (RAM 캐시 + Prefetch 적용)
-- **함수명**: `stream_comic_page`
+* **설명**: 압축 해제 없이 ZIP/CBZ 압축 파일 내 특정 페이지 파일을 실시간으로 추출 및 트랜스코딩 서빙합니다.
+* **쿼리 스트링**:
+  * `book_id` (integer, 필수): 도서 고유 번호
+  * `page` (integer, 필수): 0-indexed 열람 대상 페이지 번호
+  * `type` (string, 선택): DB 종류 스코프
+* **헤더 응답**: `Content-Type: image/webp` 또는 `image/jpeg` (동적 이미지 바이너리)
+
+---
 
 ### `[POST]` `/api/media/progress`
-- **기능**: 도서 열람 진행률 저장 및 캐시 정리
-- **함수명**: `record_progress_api`
-
-### `[POST]` `/api/media/preload-next-book`
-- **기능**: 다음 권 도서 백그라운드 선제 다운로드 및 캐싱 (Web UI 및 타치요미 연동)
-- **함수명**: `preload_next_book_api`
-
-## opds.py
-### `[GET]` `/opds`
-- **기능**: 일반 OPDS 최상위 피드
-- **함수명**: `opds_root`
-
-### `[GET]` `/opds-adult`
-- **기능**: 성인 전용 OPDS 최상위 피드
-- **함수명**: `opds_adult_root`
-
-### `[GET]` `/opds/library/<int:lib_id>`
-- **기능**: 설명 없음
-- **함수명**: `opds_library`
-
-### `[GET]` `/opds/adult/library/<int:lib_id>`
-- **기능**: 설명 없음
-- **함수명**: `opds_adult_library`
-
-### `[GET]` `/opds/series/<int:lib_id>/<string:series_name>`
-- **기능**: 설명 없음
-- **함수명**: `opds_series_books`
-
-### `[GET]` `/opds/adult/series/<int:lib_id>/<string:series_name>`
-- **기능**: 설명 없음
-- **함수명**: `opds_adult_series_books`
-
-### `[GET]` `/opds/recently-added`
-- **기능**: 신규 추가 도서 목록 (일반)
-- **함수명**: `opds_recently_added`
-
-### `[GET]` `/opds/recently-read`
-- **기능**: 최근 읽은 도서 목록 (일반)
-- **함수명**: `opds_recently_read`
-
-### `[GET]` `/opds/adult/recently-added`
-- **기능**: 신규 추가 도서 목록 (성인)
-- **함수명**: `opds_adult_recently_added`
-
-### `[GET]` `/opds/adult/recently-read`
-- **기능**: 최근 읽은 도서 목록 (성인)
-- **함수명**: `opds_adult_recently_read`
-
-### `[GET]` `/opds/download/<string:db_type>/<int:book_id>`
-- **기능**: 외부 뷰어 앱이 직접 파일을 다운로드하는 엔드포인트
-- **함수명**: `opds_download_book`
-
-## stream.py
-### `[GET]` `/api/media/stream`
-- **기능**: 만화책 ZIP/CBZ 실시간 이미지 추출 (RAM 캐시 + Prefetch 적용)
-- **함수명**: `stream_comic_page`
-
-### `[GET]` `/api/media/txt`
-- **기능**: 소설·TXT 파일 UTF-8 서빙 (CP949/EUC-KR 자동 변환)
-- **함수명**: `get_txt_content`
-
-### `[GET]` `/api/media/pdf`
-- **기능**: 대용량 PDF HTTP Range Requests 지원
-- **함수명**: `get_pdf_range`
-
-### `[GET]` `/covers/<path:filename>`
-- **기능**: 복원된 정적 표지 이미지 서빙 (더블 인코딩 방어용 unquote 적용, 하위 디렉토리 지원)
-- **함수명**: `get_cover_image`
-
-### `[GET]` `/api/media/cache/stats`
-- **기능**: RAM 캐시 사용량 모니터링
-- **함수명**: `cache_stats`
-
-### `[GET]` `/api/media/fonts`
-- **기능**: 사용자 정의 폰트 디렉터리 스캔 및 목록 조회
-- **함수명**: `list_custom_fonts`
-
-### `[POST]` `/api/media/progress`
-- **기능**: 만화, TXT, EPUB, PDF 공통 독서 진행률 API 기록 엔드포인트
-- **함수명**: `save_viewer_progress`
-
-### `[POST]` `/api/media/preload-next-book`
-- **기능**: 다음 권 도서 백그라운드 선제 다운로드 및 캐싱 API
-- **함수명**: `preload_next_book_api`
-
+* **설명**: 사용자의 독서 페이지 진행 현황을 실시간으로 추적/기록하여 메인 뷰어 재진입 시 복원할 수 있도록 저장합니다.
+* **요청 바디 (JSON)**:
+  ```json
+  {
+    "book_id": 105,
+    "type": "general",
+    "pages_read": 45,
+    "is_completed": 0
+  }
+  ```

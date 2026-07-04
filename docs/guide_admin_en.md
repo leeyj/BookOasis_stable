@@ -38,6 +38,11 @@ Administrators can control system access privileges via the **[Settings Icon ⚙
 * You can instantly revoke privileges by clicking the 'Delete' button on the right side of the registered user list.
 * Self-deletion (for the currently logged-in admin account) is prohibited to prevent accidental loss of system management privileges.
 
+### ③ Category-specific Permission Control (Permissions Tab)
+* Administrators can individually control the library categories that specific users can access through the **[Settings Icon ⚙️] -> [Permissions Management]** tab.
+* A grid-style table displays all users mapped against the available categories. Toggling the switches on or off instantly grants or revokes access to the corresponding library.
+* Regular users (User role) will only see series and books from categories for which they have been granted access (`has_access = 1`) on the main dashboard, sidebar, and OPDS clients.
+
 ---
 
 ## 3. Library (Category) Setup

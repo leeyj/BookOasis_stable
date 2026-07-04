@@ -65,7 +65,15 @@ SECRET_KEY=yoursupersecretfixedkey12345!
 
 ## 3. 웹 서비스 실행
 
-### 1) 로컬 개발 모드
+### 1) 로컬 개발 및 Windows 원클릭 실행 (Windows / macOS / Linux)
+
+#### 🪟 Windows 환경
+윈도우 환경에서는 번잡한 가상환경 생성이나 패키지 수동 설치 과정 없이, 마우스 더블클릭 한 번으로 구동에 필요한 모든 폴더(`db`, `covers`, `cache`, `logs`) 생성 및 라이브러리(`waitress` 포함) 설치, 프로덕션 기동까지 처리해 주는 배치 파일을 제공합니다.
+
+1. 프로젝트 루트의 **`run_windows.bat`** 파일을 마우스 더블클릭하여 실행합니다.
+2. 기동이 성공하면 자동으로 `http://localhost:5930` 웹 주소로 서빙이 시작됩니다.
+
+#### 🐧 Linux / macOS 환경
 디버그 환경 및 로컬 테스트를 위해 내장 Werkzeug 웹 서버로 실행합니다.
 ```bash
 # 기본 실행 (포트 5930)
@@ -76,7 +84,7 @@ python core.py -p 8080
 ```
 * 기본 구동 포트: `http://localhost:5930` (파라미터로 변경 가능)
 
-### 2) 운영 서버 배포 모드 (Gunicorn)
+### 2) 운영 서버 배포 모드 (Linux - Gunicorn)
 Linux 서버 환경에서는 락 현상을 예방하고 멀티 워커 처리를 위해 Gunicorn을 이용하여 안정적으로 서비스를 구동합니다.
 
 ```bash

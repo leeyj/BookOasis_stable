@@ -65,7 +65,15 @@ SECRET_KEY=yoursupersecretfixedkey12345!
 
 ## 3. Running the Web Service
 
-### 1) Local Development Mode
+### 1) Local Development & Windows One-Click Execution (Windows / macOS / Linux)
+
+#### 🪟 Windows Environment
+On Windows, we provide a batch file that automatically creates required directories (`db`, `covers`, `cache`, `logs`), installs dependencies (including `waitress`), and spins up a production-ready server without manual setup.
+
+1. Double-click the **`run_windows.bat`** file in the project root directory.
+2. Once launched successfully, the server will start serving at `http://localhost:5930`.
+
+#### 🐧 Linux / macOS Environment
 Run the built-in Werkzeug web server for debugging and local testing.
 ```bash
 # Default run (Port 5930)
@@ -76,7 +84,7 @@ python core.py -p 8080
 ```
 * Default running port: `http://localhost:5930` (Can be changed via parameter)
 
-### 2) Production Server Deployment Mode (Gunicorn)
+### 2) Production Server Deployment Mode (Linux - Gunicorn)
 In Linux server environments, use Gunicorn to run the service stably, preventing lock phenomena and utilizing multi-worker processing.
 
 ```bash

@@ -4,6 +4,7 @@ from functools import wraps
 import database
 from werkzeug.security import generate_password_hash, check_password_hash
 from services.settings_service import SettingsService
+from repositories.user_repository import UserRepository
 
 from utils.i18n_helper import get_available_languages
 from utils.i18n import _t
@@ -77,11 +78,7 @@ def check_authentication():
         if SettingsService.get('PROXY_HEADER_AUTH', '0') == '1':
             remote_user = request.headers.get('Remote-User') or request.headers.get('X-Forwarded-User')
             if remote_user:
-                conn = database.get_connection('general')
-                cursor = conn.cursor()
-                cursor.execute("SELECT id, username, role, is_default_password FROM users WHERE username = ?", (remote_user,))
-                user = cursor.fetchone()
-                conn.close()
+                user = UserRepository.find_by_username('general', remote_user)
                 if user:
                     session['user_id'] = user['id']
                     session['username'] = user['username']
@@ -120,11 +117,7 @@ def login():
         if not username or not password:
             return jsonify({'success': False, 'error': _t('api.username_password_required')}), 400
             
-        conn = database.get_connection('general')
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, username, password_hash, role, is_default_password, has_adult_access FROM users WHERE username = ?", (username,))
-        user = cursor.fetchone()
-        conn.close()
+        user = UserRepository.find_by_username('general', username)
         
         if user and check_password_hash(user['password_hash'], password):
             session.clear() # 세션 고정 취약점 방지
@@ -149,7 +142,7 @@ def login():
             
     # GET 요청 시 로그인 템플릿 반환
     if 'user_id' in session:
-        return redirect(url_for('index'))
+        return redirect(url_for('media_api.media_admin.system.index'))
     return render_template('login.html')
 
 @auth_bp.route('/logout', methods=['GET'])
@@ -171,11 +164,7 @@ def change_password():
     
     # 두 DB 모두 계정을 동기화하여 비밀번호 변경 반영 (세션 일치)
     for db_type in ['general', 'adult']:
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("UPDATE users SET password_hash = ?, is_default_password = 0 WHERE id = ?", (new_hash, user_id))
-        conn.commit()
-        conn.close()
+        UserRepository.update_password(db_type, user_id, new_hash)
         
     session['is_default_password'] = 0
     return jsonify({'success': True, 'message': _t('api.password_changed_success')})
@@ -188,12 +177,7 @@ def get_users():
     if session.get('role') != 'admin':
         return jsonify({'success': False, 'error': _t('api.admin_required')}), 403
         
-    conn = database.get_connection('general')
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, username, role, is_default_password, has_adult_access, created_at FROM users ORDER BY id ASC")
-    users = [dict(row) for row in cursor.fetchall()]
-    conn.close()
-    
+    users = UserRepository.get_all_users('general')
     return jsonify({'success': True, 'users': users})
 
 @auth_bp.route('/api/admin/users', methods=['POST'])
@@ -219,20 +203,7 @@ def add_user():
     try:
         # 동기화를 위해 두 데이터베이스에 모두 사용자 추가
         for db_type in ['general', 'adult']:
-            conn = database.get_connection(db_type)
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO users (username, password_hash, role, is_default_password, has_adult_access) VALUES (?, ?, ?, 1, ?)", 
-                           (username, password_hash, role, has_adult_access))
-            user_id = cursor.lastrowid
-            
-            # 신규 생성 시 모든 카테고리 권한 기본 선택 (1) 시딩
-            cursor.execute("SELECT id FROM libraries")
-            lib_ids = [row['id'] for row in cursor.fetchall()]
-            for lid in lib_ids:
-                cursor.execute("INSERT OR IGNORE INTO user_category_permissions (user_id, library_id, has_access) VALUES (?, ?, 1)", (user_id, lid))
-            
-            conn.commit()
-            conn.close()
+            UserRepository.add_user(db_type, username, password_hash, role, has_adult_access)
     except Exception as e:
         if 'UNIQUE' in str(e):
             return jsonify({'success': False, 'error': _t('api.username_exists')}), 409
@@ -251,11 +222,7 @@ def delete_user(target_user_id):
         
     # 두 데이터베이스 모두에서 삭제
     for db_type in ['general', 'adult']:
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM users WHERE id = ?", (target_user_id,))
-        conn.commit()
-        conn.close()
+        UserRepository.delete_user(db_type, target_user_id)
         
     return jsonify({'success': True, 'message': _t('api.user_deleted_success')})
 

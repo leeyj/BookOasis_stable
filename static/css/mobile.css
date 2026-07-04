@@ -248,3 +248,20 @@ body {
     height: auto !important;
     overflow-y: visible !important;
 }
+
+/* 10. 모바일 삼성 브라우저 및 Safari 상단 주소창 노치 영역 여백(Safe Area) 대응 패치 */
+@media screen and (max-width: 768px) {
+    /* 뷰어 최상단 헤더에 기기 노치 여백(env(safe-area-inset-top))을 더하여 콘텐츠 겹침 방지 */
+    .viewer-modal {
+        padding-top: env(safe-area-inset-top, 0px);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        padding-left: env(safe-area-inset-left, 0px);
+        padding-right: env(safe-area-inset-right, 0px);
+        height: 100% !important; /* dynamic viewport 대안 */
+    }
+    
+    .comic-overlay-menu {
+        padding-top: env(safe-area-inset-top, 0px);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+}

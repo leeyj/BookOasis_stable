@@ -11,6 +11,7 @@ from services.scheduler_service import run_scan_job, SchedulerService
 from api.auth import admin_required
 from utils.i18n import _t
 from api.helpers.validation import validate_library_paths, parse_remote_flag, normalize_rclone_url
+from repositories.category_repository import CategoryRepository
 import database
 
 library_bp = Blueprint('library', __name__)
@@ -115,12 +116,7 @@ def get_libraries_schedules():
     """모든 카테고리의 스케줄 및 상태 목록 조회"""
     db_type = request.args.get('type', 'general')
     try:
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, name, physical_path, cron_schedule, last_scanned_at, scan_status, is_remote, vfs_refresh_before_scan, rclone_rc_url FROM libraries ORDER BY name ASC")
-        rows = cursor.fetchall()
-        conn.close()
-        
+        rows = CategoryRepository.get_all_libraries(db_type)
         libraries = [_format_library_row(r) for r in rows]
         return jsonify({'success': True, 'libraries': libraries})
     except Exception as e:
@@ -149,18 +145,13 @@ def update_library_schedule(library_id):
     vfs_refresh = 1 if vfs_refresh_val in ('1', 'true', 'on') else 0
     
     try:
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("UPDATE libraries SET cron_schedule = ?, vfs_refresh_before_scan = ?, rclone_rc_url = ? WHERE id = ?", 
-                      (cron_val, vfs_refresh, rclone_rc_url, library_id))
-        cursor.execute("SELECT physical_path FROM libraries WHERE id = ?", (library_id,))
-        row = cursor.fetchone()
-        conn.commit()
-        conn.close()
+        CategoryRepository.update_schedule(db_type, library_id, cron_val, vfs_refresh, rclone_rc_url)
+        row = CategoryRepository.get_library_by_id(db_type, library_id)
         
         if not row:
             return jsonify({'success': False, 'error': _t('api.err_library_not_found')}), 404
         
+        import database
         db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
         
         if cron_val:

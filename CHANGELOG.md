@@ -1,4 +1,12 @@
 # CHANGELOG
+## v0.7.0
+### improved
+- /docs 내 문서 보강 및 최신화 | /docs documents reinforcement and update
+- 소스코드 정리 및 모듈화, DB 쿼리 느슨한 연결 구조 변경 | source code cleanup, modularization, DB query loose connection structure change
+- 윈도우 서버 사용자를 위한 배치파일 추가 | added batch file for windows server users
+- 스캔 일괄 추가 버튼  추가 | added batch add scan button
+### fix
+- 삼성 브라우저(모바일)에서 상단 여백 오류 수정 | samsung browser (mobile) top margin error fix
 
 ## v0.6.9
 ### fix

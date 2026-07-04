@@ -26,6 +26,7 @@ import { switchSettingsTab, loadInitialSystemSettings, loadGeneralSettings, subm
 
 // 장르 및 태그 플로팅 필터 모달 임포트
 import { initFloatingFilter, toggleFilterModal } from './genre_tag_filter.js';
+import { initSidebarAutoClose, restoreDesktopSidebarState } from './sidebar_manager.js';
 
 // 초기화 함수 분리
 function initTabMediaLibrary() {
@@ -67,6 +68,10 @@ function initTabMediaLibrary() {
 
   // 최초 시스템 설정 로드하여 화면 썸네일 크기 및 Limit 적용
   loadInitialSystemSettings();
+
+  // 사이드바 상태 복원 및 리스너 등록
+  restoreDesktopSidebarState();
+  initSidebarAutoClose();
 
   state.currentLibraryId = 'home';
   loadLibraries();

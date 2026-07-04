@@ -5,10 +5,9 @@ load_dotenv()
 from utils.logger import setup_rotating_logger
 setup_rotating_logger()
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, request
 from database import init_databases
 from api import api_bp
-from api.auth import login_required
 
 # Set template and static folders relative to this script
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -45,21 +44,6 @@ init_databases()
 # 백그라운드 스케줄러 기동
 from services.scheduler_service import SchedulerService
 SchedulerService.start_scheduler()
-
-@app.route('/health', methods=['GET'])
-def health():
-    return jsonify({
-        'status': 'healthy',
-        'service': 'BookOasis'
-    })
-
-@app.route('/', methods=['GET'])
-@app.route('/media-library', methods=['GET'])
-@login_required
-def index():
-    # Pass an empty dict or required settings for the template if needed
-    settings = {}
-    return render_template('index.html', active_page='media_library', settings=settings)
 
 if __name__ == '__main__':
     import argparse

@@ -89,6 +89,7 @@ For detailed environment configuration and installation methods, please refer to
 
 ### Direct Operation (Native Python)
 
+#### 🐧 Linux / macOS
 ```bash
 # Activate the virtual environment and install dependencies
 python -m venv venv
@@ -96,15 +97,20 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # Configure the settings file
-cp .env.example .env
-# Enter essential settings such as Aladin TTBKey in the .env file
-nano SECRET_KEY=yoursupersecretfixedkey12345!
-#Secret key is used to maintain user sessions. The default value is specified, but you must change it to your own random key.
 
+# Set your own random long string to SECRET_KEY in the .env file to lock down session encryption.
+# Locking this key ensures users remain logged in even if the server application process restarts.
 
 # Start the server
 python api.py
 ```
+
+#### 🪟 Windows
+For Windows environments, we provide a batch file that automatically handles directory creation, packages installation, and runs a production-ready web server (`waitress`) with a single click.
+
+1. Copy `.env.example` to `.env` and fill in your settings. (SECURITY_KEY)
+2. Double-click the **`run_windows.bat`** file in the project root directory.
+
 * Local Port: `http://localhost:5930`
 
 ---

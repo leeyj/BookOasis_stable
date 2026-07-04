@@ -91,6 +91,7 @@ BookOasis가 대용량(10만 권 이상) 환경에서도 버벅임 없이 초광
 
 ### 직접 구동 (Native Python)
 
+#### 🐧 Linux / macOS 환경
 ```bash
 # 가상환경 활성화 및 종속성 설치
 python -m venv venv
@@ -98,14 +99,19 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # 설정 파일 구성
-cp .env.example .env
-# .env 파일 내 알라딘 TTBKey 등 필수 설정 입력
-nano SECRET_KEY=yoursupersecretfixedkey12345!
-#사용자 세션을 유지하기 위한 키 입니다. 기본값은 지정되어 있지만, 반드시 자신이 생성한 임의의 키로 변경하여 주시기 바랍니다.
+# .env 내 SECRET_KEY 항목에 자신만의 임의의 긴 문자열을 입력하여 보안 고정 키를 생성합니다.
+# 이 키를 고정해 주시면 서버 기동 프로세스가 재시작되더라도 사용자 세션(로그인 상태)이 풀리지 않고 안전하게 유지됩니다.
 
 # 서버 기동
 python api.py
 ```
+
+#### 🪟 Windows 환경
+윈도우 환경에서는 마우스 더블클릭 한 번으로 구동 디렉토리 생성 및 패키지 설치부터 프로덕션 수준의 웹 서버(`waitress`) 실행까지 자동으로 원클릭 셋업해 주는 배치 파일을 제공합니다.
+
+1. `.env.example` 파일을 복사하여 `.env` 파일로 이름 변경 후 필요한 설정 입력.(SECURITY_KEY)
+2. 프로젝트 루트의 **`run_windows.bat`** 파일을 마우스 더블클릭하여 기동.
+
 * 로컬 포트: `http://localhost:5930`
 
 ---
