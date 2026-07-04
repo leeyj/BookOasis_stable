@@ -521,6 +521,12 @@
     "system": "System",
     "clear_confirm": "Are you sure you want to clear all pending scan tasks?\\n(Currently running tasks will not be interrupted.)",
     "clear_fail": "Failed to clear: ",
-    "clear_error": "An error occurred during clear request."
+    "clear_error": "An error occurred during clear request.",
+    "btn_cancel": "Cancel",
+    "cancel_confirm": "Are you sure you want to abort the running scan task?",
+    "cancel_fail": "Failed to cancel: ",
+    "cancel_error": "An error occurred during cancel request.",
+    "status_vfs": "VFS Refresh",
+    "status_books": "Book Scan"
   }
 }

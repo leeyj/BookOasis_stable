@@ -34,3 +34,6 @@ db/*.db.bak
 
 # Exclude local test database and sample assets
 test/
+
+# User local docker-compose override
+docker-compose.override.yml

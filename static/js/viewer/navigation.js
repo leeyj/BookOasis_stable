@@ -17,10 +17,21 @@ export function comicSliderChange(slider, val) {
 }
 
 export function toggleComicOverlay() {
+  console.log('[Viewer-Nav] toggleComicOverlay() called');
   const menu = document.getElementById('comic-overlay-menu');
   if (!menu) return;
   const isOpening = (menu.style.display === 'none');
   menu.style.display = isOpening ? 'flex' : 'none';
+
+  const pdfNavBar = document.querySelector('.pdf-nav-bar');
+  if (pdfNavBar) {
+    pdfNavBar.style.display = isOpening ? 'flex' : 'none';
+  }
+  const epubNavBar = document.querySelector('.epub-nav-bar');
+  if (epubNavBar) {
+    epubNavBar.style.display = isOpening ? 'flex' : 'none';
+  }
+
   if (isOpening) {
     Renderer.updatePageInfo();
     // 현재 스크롤 모드에 따라 너비 슬라이더 행 가시성 동기화

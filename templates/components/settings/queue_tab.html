@@ -22,10 +22,10 @@
                 <thead>
                     <tr style="background: rgba(15, 23, 42, 0.4); border-bottom: 1px solid rgba(255,255,255,0.08); color: #94a3b8;">
                         <th data-i18n="queue.col_index" style="padding: 1rem; width: 60px;">순번</th>
-                        <th data-i18n="queue.col_status" style="padding: 1rem; width: 120px;">상태</th>
+                        <th data-i18n="queue.col_status" style="padding: 1rem; width: 150px;">상태</th>
                         <th data-i18n="queue.col_type" style="padding: 1rem; width: 150px;">작업 종류</th>
                         <th data-i18n="queue.col_target" style="padding: 1rem;">대상 라이브러리</th>
-                        <th data-i18n="queue.col_time" style="padding: 1rem; width: 180px;">시작/대기 시각</th>
+                        <th data-i18n="queue.col_time" style="padding: 1rem; width: 220px;">시작/대기 시각</th>
                     </tr>
                 </thead>
                 <tbody id="queue-table-body">
@@ -80,17 +80,50 @@
         // 1. 현재 실행 중인 작업 렌더링
         if (queueData.running) {
             const r = queueData.running;
+            let cancelBtn = '';
+            if (r.type === 'library_scan' && r.kwargs && r.kwargs.library_id) {
+                const libId = r.kwargs.library_id;
+                const dbType = r.kwargs.db_type || 'general';
+                cancelBtn = `
+                    <button class="action-btn" onclick="cancelRunningScan(${libId}, '${dbType}')" style="margin-left: 8px; padding: 2px 6px; background-color: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 4px; color: #fca5a5; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;">
+                        <i class="fa-solid fa-circle-stop"></i> ${t('queue.btn_cancel') || '취소'}
+                    </button>
+                `;
+            }
+            let stageBadgeHtml = '';
+            if (r.stage === 'vfs_refresh') {
+                stageBadgeHtml = `
+                    <span style="display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 6px 12px; border-radius: 6px; background-color: rgba(59, 130, 246, 0.15); color: #60a5fa; font-size: 0.82rem; font-weight: 600; line-height: 1.3; text-align: center; width: 100%; box-sizing: border-box;">
+                        <span><i class="fa-solid fa-spinner fa-spin"></i> ${t('queue.status_running')}</span>
+                        <span style="font-size: 0.72rem; opacity: 0.85;">(${t('queue.status_vfs') || 'VFS 갱신'})</span>
+                    </span>
+                `;
+            } else if (r.stage === 'book_scan') {
+                stageBadgeHtml = `
+                    <span style="display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 6px 12px; border-radius: 6px; background-color: rgba(59, 130, 246, 0.15); color: #60a5fa; font-size: 0.82rem; font-weight: 600; line-height: 1.3; text-align: center; width: 100%; box-sizing: border-box;">
+                        <span><i class="fa-solid fa-spinner fa-spin"></i> ${t('queue.status_running')}</span>
+                        <span style="font-size: 0.72rem; opacity: 0.85;">(${t('queue.status_books') || '도서 스캔'})</span>
+                    </span>
+                `;
+            } else {
+                stageBadgeHtml = `
+                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; background-color: rgba(59, 130, 246, 0.15); color: #60a5fa; font-size: 0.82rem; font-weight: 600; justify-content: center; width: 100%; box-sizing: border-box;">
+                        <i class="fa-solid fa-spinner fa-spin"></i> ${t('queue.status_running')}
+                    </span>
+                `;
+            }
             html += `
                 <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); background-color: rgba(59, 130, 246, 0.05);">
                     <td style="padding: 1rem; color: #e2e8f0;">${index++}</td>
                     <td style="padding: 1rem;">
-                        <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 4px; background-color: rgba(59, 130, 246, 0.15); color: #60a5fa; font-size: 0.85rem; font-weight: 500;">
-                            <i class="fa-solid fa-spinner fa-spin"></i> ${t('queue.status_running')}
-                        </span>
+                        ${stageBadgeHtml}
                     </td>
                     <td style="padding: 1rem; color: #e2e8f0;">${getTaskTypeName(r.type)}</td>
                     <td style="padding: 1rem; color: #f8fafc; font-weight: 500;">${r.library_name || t('queue.system')}</td>
-                    <td style="padding: 1rem; color: #94a3b8; font-size: 0.85rem;">시작: ${r.started_at || '-'}</td>
+                    <td style="padding: 1rem; color: #94a3b8; font-size: 0.85rem; display: flex; align-items: center; justify-content: space-between;">
+                        <span>시작: ${r.started_at || '-'}</span>
+                        ${cancelBtn}
+                    </td>
                 </tr>
             `;
         }
@@ -119,6 +152,31 @@
         }
 
         tbody.innerHTML = html;
+    }
+
+    async function cancelRunningScan(libraryId, dbType) {
+        const confirmMsg = window.i18n ? window.i18n.t('queue.cancel_confirm') : "진행 중인 스캔 작업을 강제 중단하시겠습니까?";
+        if (!confirm(confirmMsg)) return;
+
+        try {
+            const formData = new FormData();
+            formData.append('type', dbType);
+            
+            const response = await fetch(`/api/media/libraries/${libraryId}/cancel-scan`, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            if (data.success) {
+                alert(data.message);
+                loadQueueStatus();
+            } else {
+                alert((window.i18n ? window.i18n.t('queue.cancel_fail') : "취소 실패: ") + data.error);
+            }
+        } catch (error) {
+            console.error("Scan cancel error", error);
+            alert(window.i18n ? window.i18n.t('queue.cancel_error') : "취소 요청 중 오류가 발생했습니다.");
+        }
     }
 
     async function clearQueue() {

@@ -180,7 +180,7 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId) {
     ` : '';
 
     volumesHtml += `
-      <div class="volume-card" data-book-id="${b.id}" data-page-missing="${noOffsets ? 1 : 0}" oncontextmenu="event.preventDefault(); event.stopPropagation(); if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(event.clientX, event.clientY, ${b.id}, '${(b.title || '').replace(/'/g, "\\'")}', true);">
+      <div class="volume-card" data-book-id="${b.id}" data-page-missing="${noOffsets ? 1 : 0}" oncontextmenu="event.preventDefault(); event.stopPropagation(); if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(event.clientX, event.clientY, ${b.id}, '${(b.title || '').replace(/'/g, "\\'")}', true);" ontouchstart="window.handleLongPressTouchStart(event, (x, y) => { if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(x, y, ${b.id}, '${(b.title || '').replace(/'/g, "\\\\'")}', true); })" ontouchmove="window.handleLongPressTouchMove(event)" ontouchend="window.handleLongPressTouchEnd(event)" ontouchcancel="window.handleLongPressTouchEnd(event)">
         <img class="volume-thumb" src="${volCoverSrc}" alt="cover"
              onerror="this.onerror=null; this.src='/static/images/default_cover.jpg';">
         <div class="volume-info">

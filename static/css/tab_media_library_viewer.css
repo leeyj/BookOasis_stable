@@ -87,6 +87,7 @@
     align-items: center;
     box-sizing: border-box;
     overflow: hidden;
+    z-index: 1;
 }
 
 /* 만화 뷰어 이미지 조절 */
@@ -288,7 +289,9 @@
 #media-viewer-modal .viewer-header {
     display: none;
 }
-#media-viewer-modal .comic-nav-bar {
+#media-viewer-modal .comic-nav-bar,
+#media-viewer-modal .pdf-nav-bar,
+#media-viewer-modal .epub-nav-bar {
     display: none;
 }
 #media-viewer-modal .viewer-body {

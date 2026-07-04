@@ -66,10 +66,26 @@ For detailed environment configuration and installation methods, please refer to
 
 ### Easy Operation (Docker)
 
-```bash
-# Run after modifying the volume path in docker-compose.yml
-docker compose up -d --build
-```
+1. **Copy configuration template**
+   Copy the provided override template file for your local environment configuration.
+   ```bash
+   cp docker-compose.override.example.yml docker-compose.override.yml
+   ```
+
+2. **Modify volume path**
+   Open the generated `docker-compose.override.yml` and modify the host path to point to your actual book/comic library directory.
+   ```yaml
+   services:
+     bookoasis:
+       volumes:
+         - /path/to/your/comics:/data/comics:ro
+   ```
+
+3. **Run container**
+   ```bash
+   docker compose up -d --build
+   ```
+> **Tip:** Since `docker-compose.override.yml` is listed in `.gitignore`, your local path configuration won't be overwritten or cause conflicts when you pull updates from the remote repository.
 
 ### Direct Operation (Native Python)
 

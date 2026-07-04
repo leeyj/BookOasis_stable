@@ -44,11 +44,9 @@ def add_media_library():
     # 즉시 스캔 비동기 수행
     try:
         db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
-        threading.Thread(
-            target=run_scan_job,
-            args=(db_type, db_path, library_id, physical_path),
-            daemon=True
-        ).start()
+        from services.scanner_queue import scanner_queue
+        scanner_queue.enqueue('library_scan', db_type=db_type, db_path=db_path, 
+                             library_id=library_id, physical_path=physical_path, force=False)
         SchedulerService.reload_all_jobs()
     except Exception as e:
         print(f"[API] Background scan failed: {e}")
@@ -85,11 +83,9 @@ def edit_media_library():
     # 즉시 스캔 비동기 수행
     try:
         db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
-        threading.Thread(
-            target=run_scan_job,
-            args=(db_type, db_path, int(library_id), physical_path),
-            daemon=True
-        ).start()
+        from services.scanner_queue import scanner_queue
+        scanner_queue.enqueue('library_scan', db_type=db_type, db_path=db_path, 
+                             library_id=int(library_id), physical_path=physical_path, force=False)
         SchedulerService.reload_all_jobs()
     except Exception as e:
         print(f"[API] Background scan failed after edit: {e}")

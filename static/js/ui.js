@@ -136,6 +136,36 @@ export function createBookCard(item, options = {}) {
     }
   });
 
+  // 모바일 터치 대응 (롱 프레스 감지)
+  card.addEventListener('touchstart', (e) => {
+    const targetBookId = item.id || item.representative_book_id || null;
+    if (typeof window.handleLongPressTouchStart === 'function') {
+      window.handleLongPressTouchStart(e, (x, y) => {
+        if (typeof window.showBookContextMenu === 'function') {
+          window.showBookContextMenu(x, y, targetBookId, displayTitle);
+        }
+      });
+    }
+  }, { passive: true });
+
+  card.addEventListener('touchmove', (e) => {
+    if (typeof window.handleLongPressTouchMove === 'function') {
+      window.handleLongPressTouchMove(e);
+    }
+  }, { passive: true });
+
+  card.addEventListener('touchend', (e) => {
+    if (typeof window.handleLongPressTouchEnd === 'function') {
+      window.handleLongPressTouchEnd(e);
+    }
+  });
+
+  card.addEventListener('touchcancel', (e) => {
+    if (typeof window.handleLongPressTouchEnd === 'function') {
+      window.handleLongPressTouchEnd(e);
+    }
+  });
+
   return card;
 }
 

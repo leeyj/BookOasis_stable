@@ -36,9 +36,9 @@
     <div class="viewer-body" id="viewer-body-container" style="position: relative;">
         <!-- 공통 3분할 투명 핫스팟 터치 레이어 (뷰어 최상단 배치) -->
         <div class="comic-hotspot-layer" id="common-viewer-hotspot" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10002; display: flex; pointer-events: auto;">
-            <div class="hotspot-zone left-zone" onclick="prevPage()" data-i18n-title="viewer.prev_page" title="이전 페이지" style="width: 30%; height: 100%; cursor: pointer;"></div>
-            <div class="hotspot-zone center-zone" onclick="toggleComicOverlay()" data-i18n-title="viewer.open_menu" title="메뉴 열기" style="width: 40%; height: 100%; cursor: pointer;"></div>
-            <div class="hotspot-zone right-zone" onclick="nextPage()" data-i18n-title="viewer.next_page" title="다음 페이지" style="width: 30%; height: 100%; cursor: pointer;"></div>
+            <div class="hotspot-zone left-zone" onclick="event.stopPropagation(); console.log('[Hotspot] Click Left Zone'); prevPage()" data-i18n-title="viewer.prev_page" title="이전 페이지" style="width: 30%; height: 100%; cursor: pointer;"></div>
+            <div class="hotspot-zone center-zone" onclick="event.stopPropagation(); console.log('[Hotspot] Click Center Zone'); toggleComicOverlay()" data-i18n-title="viewer.open_menu" title="메뉴 열기" style="width: 40%; height: 100%; cursor: pointer;"></div>
+            <div class="hotspot-zone right-zone" onclick="event.stopPropagation(); console.log('[Hotspot] Click Right Zone'); nextPage()" data-i18n-title="viewer.next_page" title="다음 페이지" style="width: 30%; height: 100%; cursor: pointer;"></div>
         </div>
 
         <!-- Kavita 스타일 플로팅 조작 오버레이 메뉴 (공용으로 변경) -->
@@ -191,10 +191,10 @@
 
         <!-- PDF 뷰어 (pdf.js) -->
         <div id="pdf-viewer-container" class="viewer-pane" style="display:none; position: relative;">
-            <div id="pdf-render-area" class="pdf-area" style="overflow: hidden; height: 100%; text-align: center;">
-                <canvas id="pdf-canvas"></canvas>
+            <div id="pdf-render-area" class="pdf-area" style="overflow: hidden; height: 100%; width: 100%; display: flex; justify-content: center; align-items: center; gap: 10px; box-sizing: border-box; padding: 10px;">
+                <!-- 동적 캔버스 삽입 -->
             </div>
-            <div class="pdf-nav-bar" style="z-index: 10005;">
+            <div class="pdf-nav-bar" style="z-index: 10005; display: none;">
                 <button onclick="prevPage()" class="btn-nav" data-i18n="common.prev">이전</button>
                 <span id="pdf-page-info">1 / 1</span>
                 <button onclick="nextPage()" class="btn-nav" data-i18n="common.next">다음</button>

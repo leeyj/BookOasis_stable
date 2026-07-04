@@ -90,10 +90,22 @@ gunicorn --workers 4 --bind 0.0.0.0:5930 --timeout 120 api:app --daemon
 ### 3) Easy Run via Docker
 If Docker is installed, you can quickly boot up the environment containerized without building from source.
 
-**① Modify Volume Binding Paths in docker-compose.yml**
-Ensure your actual book (comic) directory is mounted by modifying the `/path/to/your/comics` area in the `docker-compose.yml` file to a local absolute path.
+**① Copy configuration template**
+Copy the provided override template file for your local environment configuration.
+```bash
+cp docker-compose.override.example.yml docker-compose.override.yml
+```
 
-**② Build and Run Service**
+**② Modify volume binding path**
+Open the generated `docker-compose.override.yml` and modify the host path to point to your actual book/comic library directory.
+```yaml
+services:
+  bookoasis:
+    volumes:
+      - /path/to/your/comics:/data/comics:ro
+```
+
+**③ Build and Run Service**
 ```bash
 # Build and run the docker container in the background
 docker compose up -d --build
@@ -101,6 +113,7 @@ docker compose up -d --build
 * The container's internal port `5930` is bound to the host's `5930` port. If you wish to change the host port, modify the left-side port number in `docker-compose.yml` like `ports: - "8080:5930"`.
 * The database (`db/`), cover cache (`covers/`), temp upload folder (`cache/`), and custom plugins (`plugins/`) are automatically mapped as persistent volumes in the project root directory.
 * 💡 Thanks to the `plugins/` volume mapping, you can instantly add external metadata plugins simply by dropping a new python file into the host's `plugins/metadata/` folder without needing to rebuild the docker container.
+* 💡 Since `docker-compose.override.yml` is listed in `.gitignore`, your local path configuration won't be overwritten or cause conflicts when you pull updates (`git pull`) from the remote repository.
 
 ---
 

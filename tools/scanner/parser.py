@@ -134,7 +134,7 @@ def parse_info_xml(folder_path, files=None, is_remote=False):
         if content is None:
             return meta
             
-        root = ET.fromstring(content)
+        root = ET.fromstring(content.encode('utf-8'))
         
         def _get_text(tag):
             elem = root.find(tag)

@@ -1,0 +1,8 @@
+version: "3.8"
+
+services:
+  bookoasis:
+    volumes:
+      # 중요: 본인의 미디어 라이브러리(책/만화) 실제 저장 경로를 왼쪽에 입력하세요.
+      # 예시: - /mnt/nas/comics:/data/comics:ro
+      - /path/to/your/comics:/data/comics:ro

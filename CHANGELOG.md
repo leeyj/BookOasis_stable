@@ -1,9 +1,19 @@
 # CHANGELOG
 
+## v0.6.8
+### fix
+- pdf 뷰어에서 스크롤 동작 오류 수정(전체 뷰포트 사용으로 변경) | pdf viewer scroll error fix(use full viewport)
+- 모바일 뷰에서 꾸욱클릭(롱 프레스)시 컨텍스트 메뉴 호출 | mobile view long press context menu call
+
+### improved
+- 도커 오버라이드 추가 (readme.md 참조) | docker override added (readme.md reference)
+- 스캔시 VFS 갱신중일때도 예약조회에 노출됨 | during scan, vfs refresh is displayed in the reservation query
+
 ## v0.6.7
 ### added
 - 모바일 해상도 지원(beta) | Mobile resolution support (beta)
 - 왼쪽 사이드 메뉴 접기/펼치기 추가 | Left side menu expand/collapse added
+- 읽지 않는 상태 변경 컨텍스트 메뉴 추가 | unread status change context menu added(booklist,dashboard)
 ### improved
 - 로그 아카이빙 대상 확대 | log file zip archiving 대상 확대(scanner.log,lazy_scanner.log 추가)
 - 대시보드 신규 추가 도서 목록에서 시리즈 단위로 묶어 보여주는 기능 개선 | dashboard new added book list series grouping

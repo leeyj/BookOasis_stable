@@ -521,6 +521,12 @@
     "system": "시스템",
     "clear_confirm": "대기 중인 모든 스캔 작업을 삭제하시겠습니까?\\n(현재 실행 중인 작업은 중단되지 않습니다.)",
     "clear_fail": "삭제 실패: ",
-    "clear_error": "삭제 요청 중 오류가 발생했습니다."
+    "clear_error": "삭제 요청 중 오류가 발생했습니다.",
+    "btn_cancel": "취소",
+    "cancel_confirm": "진행 중인 스캔 작업을 강제 중단하시겠습니까?",
+    "cancel_fail": "취소 실패: ",
+    "cancel_error": "취소 요청 중 오류가 발생했습니다.",
+    "status_vfs": "VFS 갱신",
+    "status_books": "도서 스캔"
   }
 }

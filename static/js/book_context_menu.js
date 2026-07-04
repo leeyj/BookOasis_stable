@@ -137,3 +137,47 @@ document.addEventListener('click', () => {
   const bookMenu = document.getElementById('book-context-menu');
   if (bookMenu) bookMenu.style.display = 'none';
 });
+
+// 모바일 터치 기기용 롱 프레스 감지 헬퍼 함수
+let longPressTimer = null;
+let touchStartX = 0;
+let touchStartY = 0;
+const touchMoveThreshold = 10;
+
+window.handleLongPressTouchStart = function(event, callback) {
+  if (event.touches.length > 1) return;
+  const touch = event.touches[0];
+  touchStartX = touch.clientX;
+  touchStartY = touch.clientY;
+  
+  if (longPressTimer) clearTimeout(longPressTimer);
+  
+  longPressTimer = setTimeout(() => {
+    if (typeof callback === 'function') {
+      // 기본 터치 홀드 효과 방지 (돋보기, 텍스트 선택 등 방어)
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+      callback(touch.clientX, touch.clientY);
+    }
+    longPressTimer = null;
+  }, 600); // 600ms 길게 누름 감지
+};
+
+window.handleLongPressTouchMove = function(event) {
+  if (!longPressTimer) return;
+  const touch = event.touches[0];
+  const diffX = Math.abs(touch.clientX - touchStartX);
+  const diffY = Math.abs(touch.clientY - touchStartY);
+  if (diffX > touchMoveThreshold || diffY > touchMoveThreshold) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+};
+
+window.handleLongPressTouchEnd = function(event) {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+};

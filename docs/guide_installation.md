@@ -90,10 +90,22 @@ gunicorn --workers 4 --bind 0.0.0.0:5930 --timeout 120 api:app --daemon
 ### 3) Docker 기반 간편 실행
 도커 환경이 설치되어 있다면, 환경 구성을 빌드 없이 컨테이너 기반으로 빠르게 기동할 수 있습니다.
 
-**① docker-compose.yml 내 볼륨 바인딩 경로 수정**
-사용자의 실제 도서(만화책) 디렉터리가 마운트되도록 `docker-compose.yml` 파일 내 `/path/to/your/comics` 영역을 로컬 절대 경로로 수정해 줍니다.
+**① 설정 템플릿 복사**
+로컬 환경 고유 설정을 위해 제공되는 오버라이드 템플릿 파일을 복사합니다.
+```bash
+cp docker-compose.override.example.yml docker-compose.override.yml
+```
 
-**② 서비스 빌드 및 기동**
+**② 볼륨 바인딩 경로 수정**
+생성된 `docker-compose.override.yml` 파일을 열어 본인의 실제 책/만화책 라이브러리 디렉토리 경로로 수정합니다.
+```yaml
+services:
+  bookoasis:
+    volumes:
+      - /실제/책/저장/경로:/data/comics:ro
+```
+
+**③ 서비스 빌드 및 기동**
 ```bash
 # 백그라운드로 도커 컨테이너 빌드 및 실행
 docker compose up -d --build
@@ -101,6 +113,7 @@ docker compose up -d --build
 * 컨테이너 내부 포트 `5930`이 호스트의 `5930` 포트로 바인딩됩니다. 호스트 포트를 변경하고 싶다면 `docker-compose.yml` 파일에서 `ports: - "8080:5930"`과 같이 좌측 포트 번호를 수정하십시오.
 * 데이터베이스(`db/`), 표지 캐시(`covers/`), 임시 업로드 폴더(`cache/`), 커스텀 플러그인(`plugins/`)이 프로젝트 루트 디렉터리에 영구 보존용 볼륨으로 자동 매핑됩니다.
 * 💡 `plugins/` 볼륨 매핑 덕분에 도커 컨테이너를 다시 빌드할 필요 없이 호스트의 `plugins/metadata/` 폴더에 새 파이썬 파일을 넣기만 하면 외부 메타데이터 플러그인을 즉시 추가할 수 있습니다.
+* 💡 `docker-compose.override.yml`은 `.gitignore`에 등록되어 있으므로 향후 업데이트(`git pull`) 시 사용자의 개인 설정이 충돌하거나 초기화되지 않습니다.
 
 ---
 

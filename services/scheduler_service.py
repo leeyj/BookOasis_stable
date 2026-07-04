@@ -195,6 +195,11 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
     print(f"[Scanner-Trigger] 🚀 Immediate scan started: DB={db_type}, ID={library_id}, Path={physical_path}, Force={force}")
     write_scan_log(f"스캔 기동 시작 - DB={db_type}, LibraryID={library_id}, Path='{physical_path}', Force={force}")
     
+    # 큐 세부 진행 단계를 VFS 갱신 중으로 기록
+    from services.scanner_queue import scanner_queue
+    if scanner_queue.current_task and scanner_queue.current_task.get('key') == f"library_scan_{db_type}_{library_id}":
+        scanner_queue.current_task['stage'] = 'vfs_refresh'
+    
     # VFS 캐시 사전 갱신 옵션 확인 및 수행
     try:
         conn_chk = database.get_connection(db_type)
@@ -239,6 +244,20 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
                 remote_paths = [p for p in target_paths if is_remote_path(p)]
                 
                 for r_path in remote_paths:
+                    # 중간에 스캔 취소가 요청되었는지 확인
+                    try:
+                        conn_chk = database.get_connection(db_type)
+                        cursor_chk = conn_chk.cursor()
+                        cursor_chk.execute("SELECT scan_status FROM libraries WHERE id = ?", (library_id,))
+                        row_status = cursor_chk.fetchone()
+                        conn_chk.close()
+                        if row_status and row_status['scan_status'] == 'cancelling':
+                            print(f"[Scanner-Trigger] Scan cancellation detected during VFS refresh loop. Aborting VFS updates.")
+                            write_scan_log("스캔 취소 감지됨. VFS 갱신을 중단합니다.")
+                            break
+                    except Exception as e_status:
+                        print(f"[Scanner-Trigger WARNING] Failed to check status: {e_status}")
+
                     rel_path = get_rclone_relative_path(r_path)
                     print(f"[Scanner-Trigger] VFS cache update target folder: '{rel_path}'")
                     
@@ -250,7 +269,7 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
                         headers={'Content-Type': 'application/json'}
                     )
                     try:
-                        with urllib.request.urlopen(req, timeout=3600) as resp:
+                        with urllib.request.urlopen(req, timeout=1200) as resp:
                             res_text = resp.read().decode('utf-8')
                             print(f"[Scanner-Trigger] VFS update result ({rel_path}): {res_text}")
                             write_scan_log(f"VFS 갱신 완료 ({rel_path}): {res_text}")
@@ -267,6 +286,11 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
     except Exception as db_err:
         print(f"[Scanner-Trigger] VFS 옵션 DB 조회 Error: {db_err}")
     
+    # 큐 세부 진행 단계를 도서 스캔 중으로 기록
+    from services.scanner_queue import scanner_queue
+    if scanner_queue.current_task and scanner_queue.current_task.get('key') == f"library_scan_{db_type}_{library_id}":
+        scanner_queue.current_task['stage'] = 'book_scan'
+
     # 1. 상태를 'scanning'으로 업데이트
     try:
         conn = database.get_connection(db_type)

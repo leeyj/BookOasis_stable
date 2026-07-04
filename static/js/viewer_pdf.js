@@ -2,11 +2,12 @@
 import { state } from './state.js';
 import { showViewerLoading, hideViewerLoading, showViewerError } from './view_manager.js';
 import { saveProgress } from './viewer_progress.js';
+import { getComicPageStep, getComicReadingDirection } from './viewer_comic.js';
 
 export let pdfDoc = null;
 export let pdfCurrentPage = 1;
 export let pdfTotalPages = 0;
-let currentRenderTask = null;
+let currentRenderTasks = [];
 
 export async function initPdfViewer(bookId, pagesRead, totalPages) {
   console.log(`[Viewer-Pdf] initPdfViewer - PDF 렌더링 요청: bookId=${bookId}, pagesRead=${pagesRead}, totalPages=${totalPages}`);
@@ -49,66 +50,123 @@ export async function initPdfViewer(bookId, pagesRead, totalPages) {
     });
 }
 
+// 2장 보기 상태 전환을 실시간 적용하기 위해 글로벌 바인딩 지원
+window.applyPdfFitMode = function() {
+  renderPdfPage();
+};
+
 export function renderPdfPage() {
   if (!pdfDoc) return;
 
-  // 기존에 진행 중인 드로잉 작업이 있다면 취소하여 페이지 연타 시 씹힘 방지
-  if (currentRenderTask) {
-    currentRenderTask.cancel();
-    currentRenderTask = null;
+  // 기존 진행 중인 모든 렌더링 태스크 강제 취소
+  currentRenderTasks.forEach(task => {
+    if (task) {
+      try { task.cancel(); } catch (e) {}
+    }
+  });
+  currentRenderTasks = [];
+
+  const renderArea = document.getElementById('pdf-render-area');
+  if (!renderArea) return;
+  renderArea.innerHTML = ''; // 캔버스 영역 소거
+
+  // 리더 설정으로부터 보기 모드(1장/2장)와 정렬 방향(LTR/RTL) 획득
+  const step = (typeof getComicPageStep === 'function') ? getComicPageStep() : 1;
+  const direction = (typeof getComicReadingDirection === 'function') ? getComicReadingDirection() : 'ltr';
+
+  let pagesToRender = [];
+  if (step === 2) {
+    let p1 = pdfCurrentPage;
+    let p2 = pdfCurrentPage + 1;
+    if (p2 <= pdfTotalPages) {
+      if (direction === 'rtl') {
+        pagesToRender = [p2, p1];
+      } else {
+        pagesToRender = [p1, p2];
+      }
+    } else {
+      pagesToRender = [p1];
+    }
+  } else {
+    pagesToRender = [pdfCurrentPage];
   }
 
-  pdfDoc.getPage(pdfCurrentPage).then(page => {
-    const canvas = document.getElementById('pdf-canvas');
-    const ctx = canvas.getContext('2d');
-    
-    // 렌더링 영역 크기 기반 가변 스케일 계산 (마진 40px 차감)
-    const container = document.getElementById('pdf-render-area') || document.getElementById('pdf-viewer-container');
-    
-    // 모달이 막 열린 시점이거나 display:none 해제 직후에 clientWidth/clientHeight가 0으로 반환되는 경우가 있으므로,
-    // window 창 크기 및 뷰어 바디 컨테이너 크기를 병렬 비교하여 실질적인 측정값을 도출함.
-    const bodyContainer = document.getElementById('viewer-body-container');
-    const containerWidth = Math.max(container.clientWidth || 0, (bodyContainer ? bodyContainer.clientWidth : 0) || 0, window.innerWidth || 0);
-    const containerHeight = Math.max(container.clientHeight || 0, (bodyContainer ? bodyContainer.clientHeight : 0) || 0, window.innerHeight || 0);
+  // 가용 가능한 최적의 가로/세로 뷰포트 크기 측정
+  const container = document.getElementById('pdf-render-area') || document.getElementById('pdf-viewer-container');
+  const bodyContainer = document.getElementById('viewer-body-container');
+  const containerWidth = Math.max(container.clientWidth || 0, (bodyContainer ? bodyContainer.clientWidth : 0) || 0, window.innerWidth || 0);
+  const containerHeight = Math.max(container.clientHeight || 0, (bodyContainer ? bodyContainer.clientHeight : 0) || 0, window.innerHeight || 0);
 
-    const unscaledViewport = page.getViewport({ scale: 1.0 });
-    
-    // PDF 상하단 네비바 및 헤더 컨트롤 영역(약 120px)과 캔버스 여백(Margin)을 반영하여
-    // 스크롤바가 생기지 않는 완벽한 뷰포트 크기를 계산함
-    const scaleX = (containerWidth - 40) / unscaledViewport.width;
-    const scaleY = (containerHeight - 120) / unscaledViewport.height;
-    const scale = Math.min(scaleX, scaleY); // 화면 비율 내에 온전히 안착하도록 최소 비율 선택
+  // 2장 보기 상태인 경우 개별 가용 가로 길이를 절반으로 배분
+  const availableWidth = pagesToRender.length === 2 ? (containerWidth - 60) / 2 : (containerWidth - 40);
+  const availableHeight = containerHeight - 40;
 
-    const viewport = page.getViewport({ scale: scale });
-    canvas.height = viewport.height;
-    canvas.width = viewport.width;
+  // 페이지 배열 순회하며 캔버스 생성 및 순차 비동기 렌더링 개시
+  pagesToRender.forEach(pageNum => {
+    const canvas = document.createElement('canvas');
+    canvas.className = 'pdf-canvas-element';
+    canvas.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
+    canvas.style.display = 'block';
+    renderArea.appendChild(canvas);
 
-    const renderCtx = { canvasContext: ctx, viewport };
-    
-    currentRenderTask = page.render(renderCtx);
-    currentRenderTask.promise.then(() => {
-      currentRenderTask = null;
-      const pageText = `${pdfCurrentPage} / ${pdfTotalPages}`;
-      document.getElementById('pdf-page-info').textContent = pageText;
-      const overlayInfo = document.getElementById('comic-overlay-page-info');
-      if (overlayInfo) overlayInfo.textContent = pageText;
+    pdfDoc.getPage(pageNum).then(page => {
+      const ctx = canvas.getContext('2d');
+      const unscaledViewport = page.getViewport({ scale: 1.0 });
 
-      // 공통 진척도 저장 연동 (0-indexed를 위해 pdfCurrentPage - 1 전달)
-      saveProgress(state.activeBookId, pdfCurrentPage - 1, pdfTotalPages);
-    }).catch(err => {
-      // 렌더 태스크 취소 시 발생하는 에러는 정상적인 동작이므로 로그만 남기고 차단
-      if (err.name === 'RenderingCancelledException' || err.name === 'RenderingCancelled') {
-        console.log(`[Viewer-Pdf] 이전 페이지 렌더링 취소 완료: page_idx=${pdfCurrentPage}`);
-      } else {
-        console.error(`[Viewer-Pdf] 렌더링 중 오류 발생:`, err);
-      }
+      const scaleX = availableWidth / unscaledViewport.width;
+      const scaleY = availableHeight / unscaledViewport.height;
+      const scale = Math.min(scaleX, scaleY);
+
+      // DPR 오버샘플링 적용 (Retina 및 고해상도 모니터 대응, 최소 1.5배 보장)
+      const dpr = Math.max(window.devicePixelRatio || 1, 1.5);
+      const viewport = page.getViewport({ scale: scale * dpr });
+      
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      canvas.style.width = `${viewport.width / dpr}px`;
+      canvas.style.height = `${viewport.height / dpr}px`;
+
+      const renderCtx = { canvasContext: ctx, viewport };
+      const renderTask = page.render(renderCtx);
+      currentRenderTasks.push(renderTask);
+
+      renderTask.promise.then(() => {
+        // 태스크 목록에서 완료된 것 자원 정리
+        currentRenderTasks = currentRenderTasks.filter(t => t !== renderTask);
+      }).catch(err => {
+        if (err.name !== 'RenderingCancelledException' && err.name !== 'RenderingCancelled') {
+          console.error(`[Viewer-Pdf] Page ${pageNum} rendering error:`, err);
+        }
+      });
     });
   });
+
+  // 하단 페이지 바 레이블 및 시크바 동기화 처리
+  const pageText = `${pdfCurrentPage} / ${pdfTotalPages}`;
+  const pdfInfo = document.getElementById('pdf-page-info');
+  if (pdfInfo) pdfInfo.textContent = pageText;
+  const overlayInfo = document.getElementById('comic-overlay-page-info');
+  if (overlayInfo) overlayInfo.textContent = pageText;
+
+  // 공통 시크바 슬라이더 동기화
+  const slider = document.getElementById('viewer-page-slider');
+  if (slider) {
+    slider.max = pdfTotalPages;
+    slider.value = pdfCurrentPage;
+    const startLbl = document.getElementById('seekbar-start-label');
+    const endLbl = document.getElementById('seekbar-end-label');
+    if (startLbl) startLbl.textContent = '1';
+    if (endLbl) endLbl.textContent = String(pdfTotalPages);
+  }
+
+  // 진척도 저장 연동
+  saveProgress(state.activeBookId, pdfCurrentPage - 1, pdfTotalPages);
 }
 
 export function nextPdfPage() {
+  const step = (typeof getComicPageStep === 'function') ? getComicPageStep() : 1;
   if (pdfCurrentPage < pdfTotalPages) {
-    pdfCurrentPage++;
+    pdfCurrentPage = Math.min(pdfCurrentPage + step, pdfTotalPages);
     renderPdfPage();
   } else {
     import('./viewer_next_episode.js').then(m => {
@@ -118,16 +176,19 @@ export function nextPdfPage() {
 }
 
 export function prevPdfPage() {
+  const step = (typeof getComicPageStep === 'function') ? getComicPageStep() : 1;
   if (pdfCurrentPage > 1) {
-    pdfCurrentPage--;
+    pdfCurrentPage = Math.max(pdfCurrentPage - step, 1);
     renderPdfPage();
   }
 }
 
 export function clearPdfViewer() {
-  if (currentRenderTask) {
-    currentRenderTask.cancel();
-    currentRenderTask = null;
-  }
+  currentRenderTasks.forEach(task => {
+    if (task) {
+      try { task.cancel(); } catch (e) {}
+    }
+  });
+  currentRenderTasks = [];
   pdfDoc = null;
 }

@@ -86,6 +86,10 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
     if not series_name and len(path_parts) > 0:
         series_name = path_parts[-1]
 
+    if series_name:
+        import re
+        series_name = re.sub(r'^\[(?:단행|연재|소설|만화|웹툰|일반)\]\s*', '', series_name).strip()
+
     print(f"[Scanner-DEBUG-Task]   - Metadata YAML/XML/JSON load started")
     yaml_meta = parse_kavita_yaml(root, files=files, is_remote=is_remote)
     xml_meta = parse_info_xml(root, files=files, is_remote=is_remote)

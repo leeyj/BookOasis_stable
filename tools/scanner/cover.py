@@ -259,7 +259,7 @@ def get_series_cover_fallback(series_name, folder_path, force=False, is_remote=F
     # -- [Branch 1] Search individual book (filename) 1:1 mapped cover file --
     if filename:
         base_name, _ = os.path.splitext(filename)
-        for ext_candidate in ['.jpg', '.jpeg', '.png', '.webp']:
+        for ext_candidate in ['.jpg', '.jpeg', '.png', '.webp', '.JPG', '.JPEG', '.PNG', '.WEBP']:
             cand_filename = base_name + ext_candidate
             cand_path = os.path.join(folder_path, cand_filename)
             if os.path.exists(cand_path) and os.path.getsize(cand_path) > 0:
@@ -275,24 +275,28 @@ def get_series_cover_fallback(series_name, folder_path, force=False, is_remote=F
                         return db_cover_path
                     except Exception as e2:
                         print(f"[Scanner-Cover] Individual book copy backup also failed: {e2}")
-    else:
-        # -- [Branch 2] Search series (no filename) representative common cover --
-        candidates = ['cover.jpg', 'cover.png', 'folder.jpg', 'folder.png']
-        for cand in candidates:
-            cand_path = os.path.join(folder_path, cand)
-            if os.path.exists(cand_path) and os.path.getsize(cand_path) > 0:
+
+    # -- [Branch 2] Search series representative common cover (also fallback for individual books) --
+    candidates = [
+        'cover.jpg', 'cover.png', 'covers.jpg', 'covers.png', 'folder.jpg', 'folder.png',
+        'cover.JPG', 'cover.PNG', 'covers.JPG', 'covers.PNG', 'folder.JPG', 'folder.PNG',
+        'cover.jpeg', 'covers.jpeg', 'folder.jpeg', 'cover.JPEG', 'covers.JPEG', 'folder.JPEG'
+    ]
+    for cand in candidates:
+        cand_path = os.path.join(folder_path, cand)
+        if os.path.exists(cand_path) and os.path.getsize(cand_path) > 0:
+            try:
+                with Image.open(cand_path) as img:
+                    img.save(local_cover_path, "WEBP", quality=80)
+                print(f"[Scanner-Cover] Series representative common cover WebP convert copy complete: {cand_path} -> {local_cover_path}, Force={force}")
+                return db_cover_path
+            except Exception as e:
+                print(f"[Scanner-Cover] Series representative common cover WebP convert copy failed: {e}. Trying general copy.")
                 try:
-                    with Image.open(cand_path) as img:
-                        img.save(local_cover_path, "WEBP", quality=80)
-                    print(f"[Scanner-Cover] Series representative common cover WebP convert copy complete: {cand_path} -> {local_cover_path}, Force={force}")
+                    shutil.copy2(cand_path, local_cover_path)
                     return db_cover_path
-                except Exception as e:
-                    print(f"[Scanner-Cover] Series representative common cover WebP convert copy failed: {e}. Trying general copy.")
-                    try:
-                        shutil.copy2(cand_path, local_cover_path)
-                        return db_cover_path
-                    except Exception as e2:
-                        print(f"[Scanner-Cover] Series representative copy backup also failed: {e2}")
+                except Exception as e2:
+                    print(f"[Scanner-Cover] Series representative copy backup also failed: {e2}")
 
     # If remote path (VFS), skip analysis to block remote archive file I/O during mass scan.
     if is_remote:

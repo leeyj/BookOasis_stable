@@ -30,6 +30,38 @@ nav:
 - 개발 워크플로우: workflow.md
 - 작업 히스토리:
   - history/index.md
+  - history/20260704_190636_pdf_navbar_hide_fix_walkthrough.md
+  - history/20260704_190636_pdf_navbar_hide_fix_task.md
+  - history/20260704_185928_pdf_hotspot_fix_walkthrough.md
+  - history/20260704_185928_pdf_hotspot_fix_task.md
+  - history/20260704_184912_txt_epub_wheel_fix_walkthrough.md
+  - history/20260704_184912_txt_epub_wheel_fix_task.md
+  - history/20260704_184818_pdf_viewer_events_fix_walkthrough.md
+  - history/20260704_184818_pdf_viewer_events_fix_task.md
+  - history/20260704_182339_series_prefix_normalization_walkthrough.md
+  - history/20260704_182339_series_prefix_normalization_task.md
+  - history/20260704_181305_comicinfo_and_covers_fallback_walkthrough.md
+  - history/20260704_181305_comicinfo_and_covers_fallback_task.md
+  - history/20260704_174236_mobile_long_press_walkthrough.md
+  - history/20260704_174236_mobile_long_press_task.md
+  - history/20260704_173758_cancel_button_style_fix_walkthrough.md
+  - history/20260704_173758_cancel_button_style_fix_task.md
+  - history/20260704_173617_i18n_and_badge_style_walkthrough.md
+  - history/20260704_173617_i18n_and_badge_style_task.md
+  - history/20260704_173311_scan_stage_tracking_walkthrough.md
+  - history/20260704_173311_scan_stage_tracking_task.md
+  - history/20260704_173034_queue_cancel_and_vfs_timeout_walkthrough.md
+  - history/20260704_173034_queue_cancel_and_vfs_timeout_task.md
+  - history/20260704_171448_scanner_import_fix_walkthrough.md
+  - history/20260704_171448_scanner_import_fix_task.md
+  - history/20260704_170719_unify_scan_trigger_walkthrough.md
+  - history/20260704_170719_unify_scan_trigger_task.md
+  - history/20260704_170429_docker_override_config_walkthrough.md
+  - history/20260704_170429_docker_override_config_task.md
+  - history/20260704_170325_docker_override_config_walkthrough.md
+  - history/20260704_170325_docker_override_config_task.md
+  - history/20260704_170230_docker_override_config_walkthrough.md
+  - history/20260704_170230_docker_override_config_task.md
   - history/20260704_124002_scheduler_dynamic_timezone_walkthrough.md
   - history/20260704_124002_scheduler_dynamic_timezone_task.md
   - history/20260704_123739_scheduler_timezone_kst_walkthrough.md
@@ -485,6 +517,7 @@ nav:
   - bug/20260704_feature_logs_archiving.md
   - bug/20260704_feature_context_menu_unread_0.md
   - bug/20260704_bugfix_scheduler_timezone_kst.md
+  - bug/20260704_bugfix_scanner_import_error.md
   - bug/20260704_bugfix_dashboard_recently_added_grouped.md
   - bug/20260704_bugfix_comic_viewer_ghosting.md
   - bug/20260704_bugfix_comic_touch_scroll.md

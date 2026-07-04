@@ -184,6 +184,69 @@ export function bindSidebarContextMenu() {
 
       showContextMenu(e.clientX, e.clientY);
     });
+
+    // 모바일 터치 대응 (롱 프레스 감지)
+    sidebar.addEventListener('touchstart', (e) => {
+      const menuItem = e.target.closest('.menu-item');
+      if (menuItem) {
+        const type = menuItem.dataset.type;
+        const id = menuItem.dataset.id;
+        const name = menuItem.dataset.name;
+        
+        if (typeof window.handleLongPressTouchStart === 'function') {
+          window.handleLongPressTouchStart(e, (x, y) => {
+            currentTargetLibrary = { id, name, type };
+
+            if (type === 'system') {
+              document.getElementById('ctx-edit-category').style.display = 'none';
+              document.getElementById('ctx-delete-category').style.display = 'none';
+              document.getElementById('ctx-scan-category').style.display = 'none';
+              if (document.getElementById('ctx-force-scan-category')) {
+                document.getElementById('ctx-force-scan-category').style.display = 'none';
+              }
+              if (document.getElementById('ctx-scan-covers-category')) {
+                document.getElementById('ctx-scan-covers-category').style.display = 'none';
+              }
+              if (document.getElementById('ctx-cancel-scan-category')) {
+                document.getElementById('ctx-cancel-scan-category').style.display = 'none';
+              }
+            } else {
+              document.getElementById('ctx-edit-category').style.display = 'block';
+              document.getElementById('ctx-delete-category').style.display = 'block';
+              document.getElementById('ctx-scan-category').style.display = 'block';
+              if (document.getElementById('ctx-force-scan-category')) {
+                document.getElementById('ctx-force-scan-category').style.display = 'block';
+              }
+              if (document.getElementById('ctx-scan-covers-category')) {
+                document.getElementById('ctx-scan-covers-category').style.display = 'block';
+              }
+              if (document.getElementById('ctx-cancel-scan-category')) {
+                document.getElementById('ctx-cancel-scan-category').style.display = 'block';
+              }
+            }
+            showContextMenu(x, y);
+          });
+        }
+      }
+    }, { passive: true });
+
+    sidebar.addEventListener('touchmove', (e) => {
+      if (typeof window.handleLongPressTouchMove === 'function') {
+        window.handleLongPressTouchMove(e);
+      }
+    }, { passive: true });
+
+    sidebar.addEventListener('touchend', (e) => {
+      if (typeof window.handleLongPressTouchEnd === 'function') {
+        window.handleLongPressTouchEnd(e);
+      }
+    });
+
+    sidebar.addEventListener('touchcancel', (e) => {
+      if (typeof window.handleLongPressTouchEnd === 'function') {
+        window.handleLongPressTouchEnd(e);
+      }
+    });
   }
 
   // 문서 클릭 시 컨텍스트 메뉴 닫기

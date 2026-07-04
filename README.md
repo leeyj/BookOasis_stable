@@ -68,10 +68,26 @@ BookOasis가 대용량(10만 권 이상) 환경에서도 버벅임 없이 초광
 
 ### 간편 구동 (Docker)
 
-```bash
-# docker-compose.yml 내 볼륨 경로 수정 후 실행
-docker compose up -d --build
-```
+1. **설정 템플릿 복사**
+   로컬 환경 고유 설정을 위해 제공되는 오버라이드 템플릿 파일을 복사합니다.
+   ```bash
+   cp docker-compose.override.example.yml docker-compose.override.yml
+   ```
+
+2. **볼륨 경로 수정**
+   생성된 `docker-compose.override.yml` 파일을 열어 본인의 실제 책/만화책 라이브러리 디렉토리 경로로 수정합니다.
+   ```yaml
+   services:
+     bookoasis:
+       volumes:
+         - /실제/책/저장/경로:/data/comics:ro
+   ```
+
+3. **컨테이너 실행**
+   ```bash
+   docker compose up -d --build
+   ```
+> **Tip:** `docker-compose.override.yml`은 `.gitignore`에 등록되어 있으므로 향후 프로젝트 소스가 업데이트되어 `git pull`을 받아도 사용자의 개인 경로 설정 파일이 충돌을 일으키거나 유실되지 않습니다.
 
 ### 직접 구동 (Native Python)
 

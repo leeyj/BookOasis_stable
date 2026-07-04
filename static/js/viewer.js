@@ -203,6 +203,7 @@ export function toggleFullscreenViewer() {
 
 // 이전 페이지 통합 조율
 export function prevPage() {
+  console.log('[Viewer-Core] prevPage() called');
   if (document.getElementById('comic-viewer-container').style.display !== 'none') {
     if (getComicReadingDirection() === 'rtl') {
       nextComicPage();
@@ -220,6 +221,7 @@ export function prevPage() {
 
 // 다음 페이지 통합 조율
 export function nextPage() {
+  console.log('[Viewer-Core] nextPage() called');
   if (document.getElementById('comic-viewer-container').style.display !== 'none') {
     if (getComicReadingDirection() === 'rtl') {
       prevComicPage();
@@ -295,7 +297,7 @@ export function initWheelListener() {
     const isEpub = document.getElementById('epub-viewer-container').style.display !== 'none';
 
     // 1. 만화 뷰어 스크롤/웹툰 모드, PDF 뷰어, 텍스트 뷰어 세로 스크롤 모드일 경우 -> 휠 스크롤 직접 위임 전달
-    if (isComicScroll || isComicWidth || isPdf || (isTxt && scrollMode === 'scroll')) {
+    if (isComicScroll || isComicWidth || (isTxt && scrollMode === 'scroll')) {
       let targetScrollEl = null;
       if (isComicScroll || isComicWidth) {
         targetScrollEl = document.querySelector('.comic-image-wrapper');
@@ -326,7 +328,7 @@ export function initWheelListener() {
     }
 
     // 3. 페이지 전환 모드 (만화 height 맞춤, TXT 가로 페이지, EPUB 가로 페이지 등)
-    if (scrollMode === 'page' || (isComic && !isComicWidth)) {
+    if (scrollMode === 'page' || (isComic && !isComicWidth) || isPdf || isTxt || isEpub) {
       e.preventDefault();
       if (wheelLock) return;
 
@@ -480,8 +482,33 @@ window.viewerJumpToLast = viewerJumpToLast;
 window.prevPage = prevPage;
 window.nextPage = nextPage;
 window.toggleTheme = toggleReaderTheme;
-window.toggleComicReadingDirection = toggleComicReadingDirection;
-window.toggleComicPageStep = toggleComicPageStep;
+window.toggleComicReadingDirection = function() {
+  toggleComicReadingDirection();
+  if (document.getElementById('pdf-viewer-container').style.display !== 'none') {
+    if (typeof window.applyPdfFitMode === 'function') {
+      window.applyPdfFitMode();
+    }
+  } else if (document.getElementById('comic-viewer-container').style.display !== 'none') {
+    import('./viewer_comic.js').then(m => {
+      const load = m.loadComicPage;
+      if (typeof load === 'function') load();
+    });
+  }
+};
+
+window.toggleComicPageStep = function() {
+  toggleComicPageStep();
+  if (document.getElementById('pdf-viewer-container').style.display !== 'none') {
+    if (typeof window.applyPdfFitMode === 'function') {
+      window.applyPdfFitMode();
+    }
+  } else if (document.getElementById('comic-viewer-container').style.display !== 'none') {
+    import('./viewer_comic.js').then(m => {
+      const load = m.loadComicPage;
+      if (typeof load === 'function') load();
+    });
+  }
+};
 
 // 최초 로드 시 사용자 폰트 사전 로딩
 loadCustomFontsList();
@@ -503,7 +530,7 @@ export function syncHotspotPointerEvents() {
   const isTxt = (fmt === 'txt');
   const isPdf = (fmt === 'pdf');
 
-  const isScrollActive = scrollMode === 'scroll' && (isComic || isTxt || isPdf);
+  const isScrollActive = scrollMode === 'scroll' && (isComic || isTxt);
 
   if (viewerModal) {
     viewerModal.classList.toggle('scroll-mode-active', isScrollActive);

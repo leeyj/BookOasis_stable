@@ -98,6 +98,9 @@
     display: flex;
     align-items: center;
     gap: 0.6rem;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 .sidebar-menu .menu-item:hover {
@@ -556,6 +559,9 @@
     flex-direction: column;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 .book-card:hover {
@@ -1054,6 +1060,9 @@
     border-radius: 8px;
     padding: 0.7rem 1rem;
     transition: all 0.2s ease;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 .volume-card:hover {
