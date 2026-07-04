@@ -12,6 +12,29 @@ def get_db_connection(db_path):
     conn.row_factory = sqlite3.Row
     return conn
 
+def table_exists(conn, table_name):
+    row = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+        (table_name,)
+    ).fetchone()
+    return row is not None
+
+def build_people_subquery(conn, role, alias):
+    if table_exists(conn, "SeriesMetadataPeople"):
+        return f"""
+        (SELECT GROUP_CONCAT(pe.Name, ', ')
+         FROM SeriesMetadataPeople smp
+         JOIN Person pe ON smp.PersonId = pe.Id
+         JOIN SeriesMetadata sm ON smp.SeriesMetadataId = sm.Id
+         WHERE sm.SeriesId = s.Id AND smp.Role = {role}) AS {alias}"""
+
+    return f"""
+        (SELECT GROUP_CONCAT(pe.Name, ', ')
+         FROM PersonSeriesMetadata psm
+         JOIN Person pe ON psm.PeopleId = pe.Id
+         JOIN SeriesMetadata sm ON psm.SeriesMetadatasId = sm.Id
+         WHERE sm.SeriesId = s.Id AND pe.Role = {role}) AS {alias}"""
+
 def convert_and_copy_cover(source_cover_name, kavita_covers_dir, bookoasis_covers_dir, file_path, library_id=None):
     """Kavita 커버를 가져와 BookOasis 표준 WebP 및 경로 해시 규격으로 변환하여 저장"""
     if not source_cover_name:
@@ -102,8 +125,11 @@ def run_kavita_to_bookoasis():
     
     kavita_cursor = kavita_conn.cursor()
     general_cursor = general_conn.cursor()
+
+    authors_subquery = build_people_subquery(kavita_conn, 3, "Authors")
+    publisher_subquery = build_people_subquery(kavita_conn, 10, "Publisher")
     
-    query = """
+    query = f"""
     SELECT 
         l.Name AS LibraryName,
         s.Name AS SeriesName,
@@ -116,16 +142,8 @@ def run_kavita_to_bookoasis():
         c.CoverImage AS ChapterCover,
         v.CoverImage AS VolumeCover,
         s.CoverImage AS SeriesCover,
-        (SELECT GROUP_CONCAT(pe.Name, ', ') 
-         FROM PersonSeriesMetadata psm 
-         JOIN Person pe ON psm.PeopleId = pe.Id 
-         JOIN SeriesMetadata sm ON psm.SeriesMetadatasId = sm.Id 
-         WHERE sm.SeriesId = s.Id AND pe.Role = 1) AS Authors,
-        (SELECT GROUP_CONCAT(pe.Name, ', ') 
-         FROM PersonSeriesMetadata psm 
-         JOIN Person pe ON psm.PeopleId = pe.Id 
-         JOIN SeriesMetadata sm ON psm.SeriesMetadatasId = sm.Id 
-         WHERE sm.SeriesId = s.Id AND pe.Role = 10) AS Publisher,
+        {authors_subquery},
+        {publisher_subquery},
         (SELECT CASE WHEN sm.ReleaseYear > 0 THEN sm.ReleaseYear || '-01-01' ELSE NULL END 
          FROM SeriesMetadata sm 
          WHERE sm.SeriesId = s.Id LIMIT 1) AS ReleaseDate,

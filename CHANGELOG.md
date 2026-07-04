@@ -4,11 +4,12 @@
 ### fix
 - pdf 뷰어에서 스크롤 동작 오류 수정(전체 뷰포트 사용으로 변경) | pdf viewer scroll error fix(use full viewport)
 - 모바일 뷰에서 꾸욱클릭(롱 프레스)시 컨텍스트 메뉴 호출 | mobile view long press context menu call
+- info.xml 분석시 특수문자로 인한 정보누락 수정(by 아쿠니스) | info.xml analyze special character info missing fix(by Acunis)
 
 ### improved
 - 도커 오버라이드 추가 (readme.md 참조) | docker override added (readme.md reference)
 - 스캔시 VFS 갱신중일때도 예약조회에 노출됨 | during scan, vfs refresh is displayed in the reservation query
-
+- kavtia 마이그레이션 툴 개선(메타데이터 연동, made by 짜파구리) | kavtia migration tool improvement(meta data interworking, made by Chapaguri)
 ## v0.6.7
 ### added
 - 모바일 해상도 지원(beta) | Mobile resolution support (beta)
