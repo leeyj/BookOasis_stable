@@ -88,10 +88,46 @@ export function triggerSearchMetadataAction() {
     console.error('[Global Trigger ERROR] window.openMetadataSearchModal 함수가 바인딩되지 않았습니다.');
   }
 }
-
 window.triggerSearchMetadataAction = triggerSearchMetadataAction;
 window.triggerSearchAladinMetadataAction = triggerSearchMetadataAction;
 
+export async function triggerMarkAsUnreadAction() {
+  if (!currentTargetBook || !currentTargetBook.id) return;
+  const { id, title } = currentTargetBook;
+
+  import('./view_manager.js').then(async (vm) => {
+    try {
+      const res = await api.markBookAsUnread(state.currentLibraryType, id);
+      if (res.success) {
+        vm.showToast(`"${title}" 도서가 읽지 않은 상태(0%)로 변경되었습니다.`, 'success');
+        
+        // 화면 리프레시: 현재 위치한 탭/뷰에 맞추어 라이브 리로드 실행
+        if (state.currentLibraryId === 'home') {
+          loadDashboardData();
+        } else if (state.currentLibraryId === 'history') {
+          loadReadingHistory();
+        } else {
+          // 상세 뷰 혹은 일반 도서 목록 새로고침
+          const detailModal = document.getElementById('book-detail-modal');
+          if (detailModal && detailModal.style.display === 'flex') {
+            const seriesName = document.querySelector('.detail-title-text')?.textContent || '';
+            if (seriesName) {
+              openBookDetail(null, seriesName, state.currentLibraryId);
+            }
+          }
+          loadBooksList();
+        }
+      } else {
+        vm.showToast(`변경 실패: ${res.error}`, 'error');
+      }
+    } catch (err) {
+      console.error('도서 읽지않음 처리 API 에러:', err);
+      vm.showToast('서버 통신 중 오류가 발생했습니다.', 'error');
+    }
+  });
+}
+
+window.triggerMarkAsUnreadAction = triggerMarkAsUnreadAction;
 export { triggerSearchMetadataAction as triggerSearchAladinMetadataAction };
 
 window.showBookContextMenu = showBookContextMenu;

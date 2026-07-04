@@ -257,7 +257,8 @@
     "edit_category": "Edit Category",
     "delete_category": "Delete Category",
     "scan_book_now": "Scan This Book Now (Cover/Meta)",
-    "search_metadata": "Search Metadata"
+    "search_metadata": "Search Metadata",
+    "mark_as_unread": "Mark as Unread (0%)"
   },
   "viewer": {
     "close_fullscreen": "Close Fullscreen (ESC)",

@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## v0.6.7
+### added
+- 모바일 해상도 지원(beta) | Mobile resolution support (beta)
+- 왼쪽 사이드 메뉴 접기/펼치기 추가 | Left side menu expand/collapse added
+### improved
+- 로그 아카이빙 대상 확대 | log file zip archiving 대상 확대(scanner.log,lazy_scanner.log 추가)
+- 대시보드 신규 추가 도서 목록에서 시리즈 단위로 묶어 보여주는 기능 개선 | dashboard new added book list series grouping
+
+
+
+
 ## v0.6.6
 ### added
 - 카테고리 등록시 경로 선택 기능 추가 (로컬 및 rclone 원격 드라이브 지원) | Added directory path browser when adding categories (supports local and rclone remote drives)

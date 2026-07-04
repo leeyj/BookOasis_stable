@@ -219,6 +219,7 @@
     overflow-x: hidden;
     display: block;
     height: 100vh;
+    -webkit-overflow-scrolling: touch; /* iOS Safari 관성 스크롤 복원 */
 }
 
 /* 스크롤 모드 이미지: ID 선택자로 특이성 확보 (#media-viewer-modal > .viewer-modal 보다 높음) */
@@ -234,6 +235,12 @@
     max-width: 100%;
     height: auto;
     max-height: none;
+    
+    /* iOS Safari 이미지 드래그 선택 및 스크롤 묵살 현상 해결 패치 */
+    pointer-events: auto !important; /* 터치 이벤트 시작점 확보를 위해 복원 */
+    -webkit-user-drag: none;
+    -webkit-touch-callout: none; /* Safari 이미지 길게 누름 메뉴 차단 */
+    user-select: none;
 }
 
 /* 스크롤 모드 + 너비맞춤: 위 규칙으로 통합 (별도 오버라이드 불필요) */

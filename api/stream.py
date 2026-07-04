@@ -10,6 +10,7 @@ from services.stream_service import StreamService, get_img_files
 from utils.cache_helper import get_zip_file_hybrid
 from api.auth import login_required, check_adult_permission, admin_required
 from utils.i18n import _t
+import database
 
 stream_bp = Blueprint('media_stream', __name__)
 
@@ -214,6 +215,35 @@ def save_viewer_progress():
         return jsonify({'success': True})
     except Exception as e:
         print(f"[Progress API Error] {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@stream_bp.route('/api/media/unread', methods=['POST'])
+@login_required
+def mark_book_as_unread():
+    """도서를 읽지 않은 상태로 변경 (user_progress 및 user_reading_log 기록 제거)"""
+    try:
+        data = request.json or {}
+        db_type = data.get('db_type', 'general')
+        if not check_adult_permission(db_type):
+            return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+        book_id = data.get('book_id')
+        user_id = session.get('user_id', 1)
+
+        if book_id is None:
+            return jsonify({'success': False, 'error': 'book_id가 누락되었습니다.'}), 400
+
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        
+        # user_progress 및 user_reading_log 내역 삭제
+        cursor.execute("DELETE FROM user_progress WHERE book_id = ? AND user_id = ?", (book_id, user_id))
+        cursor.execute("DELETE FROM user_reading_log WHERE book_id = ? AND user_id = ?", (book_id, user_id))
+        
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"[Unread API Error] {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @stream_bp.route('/api/media/preload-next-book', methods=['POST'])

@@ -15,7 +15,7 @@ import { loadLibrarySchedules, saveLibrarySchedule, runLibraryScanNow } from './
 // 신규 리팩토링 분리 서브 모듈 임포트
 import { loadDashboardData, scrollDashboardRow } from './dashboard.js';
 import { initInfiniteScrollObserver } from './infinite_scroll.js';
-import { showBookContextMenu, triggerScanSingleBookAction, triggerSearchAladinMetadataAction } from './book_context_menu.js';
+import { showBookContextMenu, triggerScanSingleBookAction, triggerSearchAladinMetadataAction, triggerMarkAsUnreadAction } from './book_context_menu.js';
 import { openMetadataSearchModal, closeMetadataSearchModal, performMetadataSearch } from './metadata_search.js';
 
 // book_list.js 모듈로부터 도서 목록 제어부 임포트
@@ -194,6 +194,14 @@ window.triggerSearchAladinMetadata = async () => {
     await window.triggerSearchAladinMetadataAction();
   } else {
     console.error('[Global Trigger ERROR] window.triggerSearchAladinMetadataAction 함수가 바인딩되지 않았습니다.');
+  }
+};
+
+window.triggerMarkAsUnread = async () => {
+  if (typeof window.triggerMarkAsUnreadAction === 'function') {
+    await window.triggerMarkAsUnreadAction();
+  } else {
+    console.error('[Global Trigger ERROR] window.triggerMarkAsUnreadAction 함수가 바인딩되지 않았습니다.');
   }
 };
 window.openAladinSearchModal = openMetadataSearchModal;

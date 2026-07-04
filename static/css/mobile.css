@@ -1,0 +1,250 @@
+/* ======================================================== */
+/* 📱 모바일 및 태블릿 반응형 전용 스타일시트 (mobile.css)    */
+/* ======================================================== */
+
+/* 1. 기본 전체 레이아웃 조정 (Flex 방향 변경) */
+.media-library-container {
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 1rem;
+}
+
+/* 2. 좌측 사이드바 -> 상단 네비게이션 형태로 전환 및 햄버거 토글 */
+/* (HTML 인라인 style 오버라이드를 위해 일부 속성 !important 필수 유지) */
+.library-sidebar {
+    width: 100% !important;
+    min-width: 100% !important;
+    height: auto !important;
+    position: relative !important;
+    top: 0 !important;
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 0.8rem 1rem !important;
+    overflow-y: visible;
+    background: rgba(30, 41, 59, 0.15);
+    border-radius: 8px;
+    box-sizing: border-box;
+}
+
+/* 데스크톱 접힘 상태(.collapsed)가 모바일 뷰로 변환 시 사이드바를 숨기지 않도록 오버라이드 초기화 */
+.library-sidebar.collapsed {
+    width: 100% !important;
+    min-width: 100% !important;
+    padding: 0.8rem 1rem !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    overflow: visible;
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* 햄버거 토글 버튼 노출 및 데스크톱 버튼 숨김 */
+.btn-sidebar-toggle {
+    display: block !important; /* HTML 인라인 display: none 오버라이드 */
+}
+.btn-sidebar-toggle-desktop {
+    display: none !important; /* HTML 인라인 display: flex 오버라이드 */
+}
+
+/* 기본 접힌 상태 */
+.sidebar-collapsible-content {
+    display: none !important; /* HTML 인라인 display: flex 오버라이드 */
+    width: 100%;
+    transition: all 0.3s ease;
+}
+
+/* 펼침 상태 */
+.sidebar-collapsible-content.show {
+    display: flex !important; /* HTML 인라인 display: none 오버라이드 */
+}
+
+/* 사이드바 메뉴는 세로 나열 유지하여 가독성 개선 */
+.sidebar-menu {
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.sidebar-menu .menu-item {
+    padding: 0.6rem 0.8rem;
+    font-size: 0.9rem;
+    justify-content: flex-start;
+}
+
+/* 프로필 및 로그아웃 영역 재배치 */
+.sidebar-settings-wrap {
+    margin-top: 1rem !important; /* HTML 인라인 margin-top 오버라이드 */
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding-top: 1rem;
+}
+
+/* 3. 우측 메인 콘텐츠 영역 조정 */
+.library-main-content {
+    width: 100%;
+}
+
+/* 4. 도서 보관함 헤더 영역 */
+.library-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+}
+
+.library-controls {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.library-controls input[type="text"] {
+    width: 100%;
+    order: 3; /* 검색창을 맨 뒤로 보냄 */
+}
+
+/* 5. 카드 그리드 및 기타 패딩 미세 조정 */
+body {
+    padding: 10px;
+}
+
+/* 팝업 모달 크기 조정 */
+.floating-filter-modal {
+    width: 90%;
+    left: 5%;
+    right: 5%;
+}
+
+/* 6. 환경설정 탭 가로 스크롤 및 테이블 반응형 튜닝 */
+.settings-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.6rem;
+    gap: 0.6rem;
+    width: 100%;
+}
+
+/* 탭 바 얇고 깔끔한 스크롤바 커스텀 */
+.settings-tabs::-webkit-scrollbar {
+    height: 4px;
+}
+.settings-tabs::-webkit-scrollbar-thumb {
+    background: rgba(168, 85, 247, 0.3);
+    border-radius: 10px;
+}
+
+.settings-tab-btn {
+    flex-shrink: 0;
+    padding: 0.5rem 0.9rem;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+/* 환경설정 테이블 모바일 스크롤 처리 */
+.settings-table-wrapper {
+    width: 100%;
+    overflow-x: auto !important; /* HTML 인라인 overflow: hidden 오버라이드 */
+    -webkit-overflow-scrolling: touch;
+}
+
+.settings-table {
+    width: 100%;
+    min-width: 800px; /* 모바일에서 내용이 구겨지지 않게 함 */
+}
+
+.settings-table th, 
+.settings-table td {
+    padding: 0.6rem 0.5rem !important; /* HTML 인라인 padding: 1rem 오버라이드 */
+    font-size: 0.82rem;
+    white-space: nowrap;
+}
+
+/* 7. 도서 상세 뷰 반응형 레이아웃 튜닝 */
+.detail-header-panel {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 1.2rem;
+    padding: 1.2rem;
+}
+
+.detail-cover-container {
+    margin: 0 auto;
+    display: flex;
+    justify-content: center;
+}
+
+.detail-header-meta {
+    width: 100%;
+    align-items: center;
+}
+
+.detail-meta {
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+}
+
+/* 도서 상세 하단 2열 레이아웃 대응 */
+.detail-layout {
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.detail-left, 
+.detail-right {
+    width: 100%;
+}
+
+/* 8. 볼륨(단행본) 리스트 카드 반응형 튜닝 */
+.volume-card {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 1.2rem;
+    gap: 1.2rem;
+    text-align: center;
+}
+
+.volume-thumb {
+    align-self: center;
+}
+
+.volume-info {
+    width: 100%;
+    align-items: center;
+}
+
+.volume-title-row {
+    justify-content: center;
+}
+
+/* 모바일에서 디렉토리 경로 감춤 */
+.volume-path {
+    display: none !important; /* JS/HTML 인라인 display 제어 오버라이드 */
+}
+
+.volume-meta-row {
+    justify-content: center;
+}
+
+/* 읽기/이어보기 버튼 전체 폭 지정 및 중앙 정렬 */
+.btn-read {
+    width: 100%;
+    margin-top: 0.5rem;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+/* 9. iOS Safari 세로 스크롤 모드 전용 뷰어 오버플로우 릴리즈 (모달 자체 스크롤 활성화) */
+.viewer-modal.scroll-mode-active {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important; /* 모달 컨테이너 자체에 순정 관성 스크롤 부여 */
+}
+.viewer-modal.scroll-mode-active .viewer-body {
+    overflow: visible !important;
+    height: auto !important;
+}
+.viewer-modal.scroll-mode-active .comic-image-wrapper.scroll-mode {
+    height: auto !important;
+    overflow-y: visible !important;
+}

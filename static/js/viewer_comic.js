@@ -23,6 +23,7 @@ export function getComicPageStep(...args) { return Settings.getComicPageStep.app
 export function toggleComicPageStep(...args) { return Settings.toggleComicPageStep.apply(null, args); }
 export function setComicPageStep(...args) { return Settings.setComicPageStep.apply(null, args); }
 export function setComicScrollWidth(px) { return Settings.setScrollWidth(px); }
+export function clearComicViewer(...args) { return Renderer.clearComicViewer.apply(null, args); }
 
 // Expose legacy globals on window as live bindings
 if (typeof window !== 'undefined') {
@@ -49,6 +50,7 @@ if (typeof window !== 'undefined') {
 
   // Also expose functions globally for legacy callers
   window.initComicViewer = initComicViewer;
+  window.clearComicViewer = clearComicViewer;
   window.nextComicPage = nextComicPage;
   window.prevComicPage = prevComicPage;
   window.setComicFitMode = setComicFitMode;

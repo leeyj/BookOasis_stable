@@ -30,6 +30,44 @@ nav:
 - 개발 워크플로우: workflow.md
 - 작업 히스토리:
   - history/index.md
+  - history/20260704_122801_logs_archiving_walkthrough.md
+  - history/20260704_122801_logs_archiving_task.md
+  - history/20260704_121943_context_menu_unread_0_walkthrough.md
+  - history/20260704_121943_context_menu_unread_0_task.md
+  - history/20260704_121225_mobile_css_integration_walkthrough.md
+  - history/20260704_121225_mobile_css_integration_task.md
+  - history/20260704_114255_mobile_css_integration_walkthrough.md
+  - history/20260704_114255_mobile_css_integration_task.md
+  - history/20260704_114045_mobile_css_integration_walkthrough.md
+  - history/20260704_114045_mobile_css_integration_task.md
+  - history/20260704_113743_mobile_css_integration_walkthrough.md
+  - history/20260704_113743_mobile_css_integration_task.md
+  - history/20260704_113308_mobile_css_integration_walkthrough.md
+  - history/20260704_113308_mobile_css_integration_task.md
+  - history/20260704_112836_mobile_css_integration_walkthrough.md
+  - history/20260704_112836_mobile_css_integration_task.md
+  - history/20260704_112534_mobile_css_integration_walkthrough.md
+  - history/20260704_112534_mobile_css_integration_task.md
+  - history/20260704_111939_mobile_css_integration_walkthrough.md
+  - history/20260704_111939_mobile_css_integration_task.md
+  - history/20260704_111720_mobile_css_integration_walkthrough.md
+  - history/20260704_111720_mobile_css_integration_task.md
+  - history/20260704_111240_mobile_css_integration_walkthrough.md
+  - history/20260704_111240_mobile_css_integration_task.md
+  - history/20260704_110454_mobile_css_integration_walkthrough.md
+  - history/20260704_110454_mobile_css_integration_task.md
+  - history/20260704_110235_mobile_css_integration_walkthrough.md
+  - history/20260704_110235_mobile_css_integration_task.md
+  - history/20260704_105937_mobile_css_integration_walkthrough.md
+  - history/20260704_105937_mobile_css_integration_task.md
+  - history/20260704_105540_mobile_css_integration_walkthrough.md
+  - history/20260704_105540_mobile_css_integration_task.md
+  - history/20260704_105250_mobile_css_integration_walkthrough.md
+  - history/20260704_105250_mobile_css_integration_task.md
+  - history/20260704_105048_mobile_css_integration_walkthrough.md
+  - history/20260704_105048_mobile_css_integration_task.md
+  - history/20260704_104819_mobile_css_integration_walkthrough.md
+  - history/20260704_104819_mobile_css_integration_task.md
   - history/20260703_102624_core_modularize_walkthrough.md
   - history/20260703_102624_core_modularize_task.md
   - history/20260703_101930_vfs_timeout_walkthrough.md
@@ -440,6 +478,11 @@ nav:
   - history/20260619_145226_init_docs_task.md
 - 버그 트러블슈팅:
   - bug/index.md
+  - bug/20260704_feature_logs_archiving.md
+  - bug/20260704_feature_context_menu_unread_0.md
+  - bug/20260704_bugfix_dashboard_recently_added_grouped.md
+  - bug/20260704_bugfix_comic_viewer_ghosting.md
+  - bug/20260704_bugfix_comic_touch_scroll.md
   - bug/20260703_bugfix_scanner_vfs_and_bottleneck.md
   - bug/20260703_bugfix_scanner_unbound_res.md
   - bug/20260702_bugfix_fitwidth_scrollwidth.md

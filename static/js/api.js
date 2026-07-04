@@ -103,6 +103,17 @@ export async function scanSingleBook(type, bookId) {
   return res.json();
 }
 
+export async function markBookAsUnread(type, bookId) {
+  const res = await fetch('/api/media/unread', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ db_type: type, book_id: bookId })
+  });
+  return res.json();
+}
+
 export async function fetchLibrarySchedules(type) {
   const res = await fetch(`/api/media/libraries/schedules?type=${type}`);
   return res.json();

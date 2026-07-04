@@ -9,6 +9,7 @@ class ZipRotatingLogger:
         self.filepath = filepath
         self.max_bytes = max_bytes
         self.log_dir = os.path.dirname(filepath)
+        self.filename = os.path.basename(filepath)
         os.makedirs(self.log_dir, exist_ok=True)
         self._current_size = 0
         if os.path.exists(filepath):
@@ -19,14 +20,14 @@ class ZipRotatingLogger:
             return
         
         now_str = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-        archive_name = f"media_server.log_{now_str}.zip"
+        archive_name = f"{self.filename}_{now_str}.zip"
         archive_path = os.path.join(self.log_dir, archive_name)
         
         temp_log = self.filepath + ".tmp"
         try:
             os.rename(self.filepath, temp_log)
             with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-                zf.write(temp_log, os.path.basename(self.filepath))
+                zf.write(temp_log, self.filename)
             os.remove(temp_log)
         except Exception as e:
             pass

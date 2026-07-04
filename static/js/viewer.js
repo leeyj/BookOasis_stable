@@ -1,6 +1,6 @@
 // viewer.js – 미디어 뷰어 라이프사이클 및 단축키 코어 조율기
 import { state } from './state.js';
-import { initComicViewer, nextComicPage, prevComicPage, setComicFitMode, toggleComicOverlay, markAsCompleted, getComicReadingDirection, toggleComicReadingDirection, getComicPageStep, toggleComicPageStep, setComicPageStep } from './viewer_comic.js';
+import { initComicViewer, clearComicViewer, nextComicPage, prevComicPage, setComicFitMode, toggleComicOverlay, markAsCompleted, getComicReadingDirection, toggleComicReadingDirection, getComicPageStep, toggleComicPageStep, setComicPageStep } from './viewer_comic.js';
 import { initTxtViewer, prevTxtPage, nextTxtPage, applyTxtSettings } from './viewer_txt.js';
 import { initPdfViewer, nextPdfPage, prevPdfPage, clearPdfViewer } from './viewer_pdf.js';
 import { initEpubViewer, clearEpubViewer, epubPrevPage, epubNextPage, applyEpubSettings, changeEpubScrollMode } from './viewer_epub.js';
@@ -129,6 +129,7 @@ export function openReader(bookId, format, title, pagesRead, totalPages) {
     alert(i18n.t('viewer.unsupported_format'));
     closeMediaViewer();
   }
+  syncHotspotPointerEvents();
 }
 
 export function closeMediaViewer(triggerBack = true, isTransitioning = false) {
@@ -144,6 +145,7 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false) {
   }
 
   // 포맷별 정리 함수 위임 호출
+  clearComicViewer();
   clearEpubViewer();
   clearPdfViewer();
 
@@ -267,8 +269,10 @@ export function initKeyboardListener() {
     }
   });
 
-  // 마우스 휠 리스너 함께 초기화
+  // 마우스 휠 및 모바일 터치 스크롤 리스너 함께 초기화
   initWheelListener();
+  initViewerClickToggle();
+  syncHotspotPointerEvents();
 }
 
 let wheelLock = false;
@@ -397,6 +401,7 @@ window.setScrollMode = function(mode) {
   
   applyTxtSettings();
   changeEpubScrollMode(mode);
+  syncHotspotPointerEvents();
 };
 
 // ==========================================
@@ -480,6 +485,68 @@ window.toggleComicPageStep = toggleComicPageStep;
 
 // 최초 로드 시 사용자 폰트 사전 로딩
 loadCustomFontsList();
+
+// 모바일 해상도(window.innerWidth <= 1200)이면서 만화/텍스트 스크롤 모드인 경우 핫스팟 레이어 감춤 처리하여 브라우저 순정 터치 스크롤 허용 (특히 iOS Safari 대응)
+export function syncHotspotPointerEvents() {
+  const hotspot = document.getElementById('common-viewer-hotspot');
+  const viewerModal = document.getElementById('media-viewer-modal');
+  if (!hotspot || !viewerModal) return;
+
+  // 뷰어 모달이 실제로 열려 있는 상태가 아니라면 바디 스크롤을 건드리지 않고 즉각 탈출
+  if (viewerModal.style.display !== 'flex') {
+    return;
+  }
+
+  const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
+  const fmt = (state.currentViewerFormat || '').toLowerCase();
+  const isComic = (fmt === 'zip' || fmt === 'cbz');
+  const isTxt = (fmt === 'txt');
+  const isPdf = (fmt === 'pdf');
+
+  const isScrollActive = scrollMode === 'scroll' && (isComic || isTxt || isPdf);
+
+  if (viewerModal) {
+    viewerModal.classList.toggle('scroll-mode-active', isScrollActive);
+    // iOS Safari 대응: 세로 스크롤 모드일 때는 body의 overflow: hidden을 풀어주어야 터치 스크롤 버블링이 락 걸리지 않음
+    if (isScrollActive) {
+      document.body.style.overflow = 'auto';
+    } else {
+      document.body.style.overflow = 'hidden';
+    }
+  }
+
+  if (window.innerWidth <= 1200 && isScrollActive) {
+    hotspot.style.display = 'none';
+  } else {
+    hotspot.style.display = 'flex';
+  }
+}
+
+// 핫스팟 포인터 이벤트가 비활성화(none)되었을 때 오버레이를 켜고 끌 수 있도록 백그라운드 클릭 이벤트 중계
+let _viewerClickToggleInited = false;
+export function initViewerClickToggle() {
+  const viewerBody = document.getElementById('viewer-body-container');
+  if (!viewerBody || _viewerClickToggleInited) return;
+  _viewerClickToggleInited = true;
+
+  viewerBody.addEventListener('click', e => {
+    // 이미 오버레이 메뉴나 컨트롤 패널, 닫기 버튼 등을 직접 탭한 경우 무시
+    if (e.target.closest('#comic-overlay-menu') || 
+        e.target.closest('.viewer-controls') || 
+        e.target.closest('.floating-close-btn') || 
+        e.target.closest('button') || 
+        e.target.closest('input') || 
+        e.target.closest('select')) {
+      return;
+    }
+
+    const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
+    // 핫스팟이 꺼진(pointer-events: none) 스크롤 모드 상태일 때만 본체 클릭을 오버레이 토글로 매핑
+    if (scrollMode === 'scroll') {
+      toggleComicOverlay();
+    }
+  });
+}
 
 // 글로벌 핸들러 노출에 사용될 함수 재내보내기 (Re-export)
 export { toggleComicOverlay, markAsCompleted, setComicFitMode, nextComicPage, prevComicPage, nextPdfPage, prevPdfPage, epubPrevPage, epubNextPage, prevTxtPage, nextTxtPage, initViewerSeekBar };

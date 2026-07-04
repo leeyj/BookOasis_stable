@@ -257,7 +257,8 @@
     "edit_category": "카테고리 수정",
     "delete_category": "카테고리 삭제",
     "scan_book_now": "이 책 즉시 스캔 (표지/메타)",
-    "search_metadata": "메타정보 검색"
+    "search_metadata": "메타정보 검색",
+    "mark_as_unread": "읽지 않은 상태로 변경 (0%)"
   },
   "viewer": {
     "close_fullscreen": "전체화면 닫기 (ESC)",

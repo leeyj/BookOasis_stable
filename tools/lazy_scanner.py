@@ -50,6 +50,9 @@ def setup_lazy_scanner_logging():
         log_dir = os.path.join(MEDIA_SERVER_DIR, 'logs')
         os.makedirs(log_dir, exist_ok=True)
         log_file_path = os.path.join(log_dir, 'lazy_scanner.log')
+        from utils.logger import ZipRotatingLogger
+        # 10MB 기준 자동 zip 회전 아카이빙 로거 생성
+        zip_logger = ZipRotatingLogger(log_file_path, 10 * 1024 * 1024)
         
         def custom_print(*args, **kwargs):
             # 터미널용 출력 (콘솔 실행 시 확인용)
@@ -64,8 +67,7 @@ def setup_lazy_scanner_logging():
                 timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 formatted_message = f"[{timestamp}] {message}"
                 
-                with open(log_file_path, 'a', encoding='utf-8') as f:
-                    f.write(formatted_message)
+                zip_logger.write(formatted_message)
             except Exception:
                 pass
         builtins.print = custom_print

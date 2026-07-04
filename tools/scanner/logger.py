@@ -36,6 +36,9 @@ def scanner_print_control(db_path):
         log_dir = os.path.join(BASE_DIR, 'logs')
         os.makedirs(log_dir, exist_ok=True)
         log_file_path = os.path.join(log_dir, 'scanner.log')
+        from utils.logger import ZipRotatingLogger
+        # 10MB 기준 자동 zip 회전 아카이빙 로거 생성
+        zip_logger = ZipRotatingLogger(log_file_path, 10 * 1024 * 1024)
         
         def custom_print(*args, **kwargs):
             try:
@@ -44,8 +47,7 @@ def scanner_print_control(db_path):
                 message = sep.join(map(str, args)) + end
                 timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 formatted_message = f"[{timestamp}] {message}"
-                with open(log_file_path, 'a', encoding='utf-8') as f:
-                    f.write(formatted_message)
+                zip_logger.write(formatted_message)
             except Exception:
                 pass
         builtins.print = custom_print

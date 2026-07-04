@@ -446,3 +446,18 @@ function preloadNextPages() {
     }
   }
 }
+
+export function clearComicViewer() {
+  const wrapper = document.querySelector('.comic-image-wrapper');
+  if (wrapper) {
+    wrapper.innerHTML = '';
+  }
+  if (observer) {
+    observer.disconnect();
+    observer = null;
+  }
+  if (comicLoadingTimer) {
+    clearTimeout(comicLoadingTimer);
+    comicLoadingTimer = null;
+  }
+}

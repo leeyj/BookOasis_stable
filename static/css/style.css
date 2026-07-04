@@ -32,6 +32,18 @@
     background: transparent;
     border-radius: 0;
     padding: 0 1.5rem 0 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 데스크톱 사이드바 접힌 상태 */
+.library-sidebar.collapsed {
+    width: 0 !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    border-right: none !important;
+    overflow: hidden !important;
+    opacity: 0;
+    pointer-events: none;
 }
 
 /* 사이드바 전용 얇고 미려한 스크롤바 디자인 */
@@ -108,6 +120,11 @@
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-sidebar-toggle-desktop:hover {
+    color: #a855f7 !important;
 }
 
 /* 상단 헤더 및 컨트롤 */

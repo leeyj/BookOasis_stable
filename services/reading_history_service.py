@@ -48,9 +48,14 @@ class ReadingHistoryService:
         conn.row_factory = database.sqlite3.Row
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT id, library_id, title, series_name, cover_image, cover_updated_at, file_format, total_pages, created_at, is_favorite
-            FROM books
-            ORDER BY created_at DESC, id DESC
+            SELECT b.id, b.library_id, b.title, b.series_name, b.cover_image, b.cover_updated_at, b.file_format, b.total_pages, b.created_at, b.is_favorite
+            FROM books b
+            INNER JOIN (
+                SELECT MAX(id) as max_id
+                FROM books
+                GROUP BY CASE WHEN series_name IS NOT NULL AND series_name != '' THEN series_name ELSE CAST(id AS TEXT) END
+            ) g ON b.id = g.max_id
+            ORDER BY b.created_at DESC, b.id DESC
             LIMIT 20
         """)
         rows = cursor.fetchall()
