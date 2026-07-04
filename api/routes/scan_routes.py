@@ -92,3 +92,34 @@ def trigger_library_cover_scan(library_id):
         return jsonify({'success': True, 'message': _t('api.msg_cover_scan_started')})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@scan_bp.route('/api/media/libraries/scan-all', methods=['POST'])
+@admin_required
+def trigger_all_libraries_scan():
+    """모든 라이브러리 카테고리를 순차적으로 대기열(큐)에 적재하여 전체 스캔 실행"""
+    db_type = request.form.get('type', 'general')
+    force_val = request.form.get('force', 'false').lower()
+    force = force_val in ('true', '1')
+    try:
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name, physical_path FROM libraries ORDER BY name ASC")
+        rows = cursor.fetchall()
+        conn.close()
+        
+        if not rows:
+            return jsonify({'success': False, 'error': '스캔할 라이브러리 카테고리가 없습니다.'}), 400
+        
+        db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
+        from services.scanner_queue import scanner_queue
+        
+        enqueued_count = 0
+        for row in rows:
+            scanner_queue.enqueue('library_scan', db_type=db_type, db_path=db_path, 
+                                 library_id=row['id'], physical_path=row['physical_path'], force=force)
+            enqueued_count += 1
+            
+        return jsonify({'success': True, 'message': f'{enqueued_count}개의 카테고리가 순차 스캔 대기열에 추가되었습니다.'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+

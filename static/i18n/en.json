@@ -186,6 +186,7 @@
     "general_server_error": "A server connection error occurred.",
     "general_scanner_start": "Starting Lazy Cover Scanner...",
     "general_scanner_fail": "Scanner start failed: {error}",
+    "btn_scan_all": "Scan All",
     "tab_queue": "Scan Queue Status"
   },
   "sidebar": {

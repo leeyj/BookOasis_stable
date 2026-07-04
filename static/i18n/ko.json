@@ -186,6 +186,7 @@
     "general_server_error": "서버 연결 중 오류가 발생했습니다.",
     "general_scanner_start": "Lazy 표지 스캐너를 기동하는 중...",
     "general_scanner_fail": "스캐너 기동 실패: {error}",
+    "btn_scan_all": "일괄 스캔",
     "tab_queue": "스캔 예약 조회"
   },
   "sidebar": {

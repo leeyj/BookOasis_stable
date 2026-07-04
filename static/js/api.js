@@ -130,6 +130,17 @@ export async function triggerLibraryScan(type, libraryId, force = false) {
   return res.json();
 }
 
+export async function triggerAllLibrariesScan(type, force = false) {
+  const formData = new FormData();
+  formData.append('type', type);
+  formData.append('force', force ? 'true' : 'false');
+  const res = await fetch(`/api/media/libraries/scan-all`, {
+    method: 'POST',
+    body: formData
+  });
+  return res.json();
+}
+
 export async function triggerLibraryCoversScan(type, libraryId) {
   const formData = new FormData();
   formData.append('type', type);

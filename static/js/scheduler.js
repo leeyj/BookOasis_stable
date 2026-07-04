@@ -134,3 +134,26 @@ export async function runLibraryScanNow(libraryId, name, force = false) {
     alert(i18n.t('scheduler.server_error'));
   }
 }
+
+// 일괄 스캔 즉시 실행
+export async function runAllLibrariesScanNow(force = false) {
+  try {
+    const data = await api.triggerAllLibrariesScan(state.currentLibraryType, force);
+    if (data.success) {
+      if (typeof window.showToast === 'function') {
+        window.showToast(data.message, 'success');
+      } else {
+        alert(data.message);
+      }
+      loadLibrarySchedules();
+    } else {
+      alert(i18n.t('scheduler.scan_fail', {error: data.error}));
+    }
+  } catch (e) {
+    console.error('일괄 스캔 API 요청 에러:', e);
+    alert(i18n.t('scheduler.server_error'));
+  }
+}
+
+// HTML 인라인 리스너와의 연동을 위해 글로벌 바인딩
+window.runAllLibrariesScanNow = runAllLibrariesScanNow;
