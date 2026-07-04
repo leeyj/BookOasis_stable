@@ -101,11 +101,17 @@ const i18n = {
      * data-i18n 속성이 매핑된 모든 DOM 요소를 일괄 자동 번역 적용
      */
     translateDOM(root = document) {
-        // 1. 일반 텍스트 콘텐츠 번역
+        // 1. 일반 콘텐츠 번역 (HTML 태그 포함 여부에 따라 분기)
         root.querySelectorAll('[data-i18n]').forEach(el => {
             const key = el.getAttribute('data-i18n');
             if (key) {
-                el.textContent = this.t(key);
+                const translated = this.t(key);
+                // 번역문에 HTML 태그가 포함되어 있다면 innerHTML로 안전하게 삽입
+                if (translated.includes('<') && translated.includes('>')) {
+                    el.innerHTML = translated;
+                } else {
+                    el.textContent = translated;
+                }
             }
         });
 

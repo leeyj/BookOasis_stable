@@ -1,24 +1,23 @@
-            <!-- 1. 스캔 스케줄 설정 탭 -->
             <div id="settings-tab-schedule" class="settings-tab-content active" style="display: flex; flex-direction: column; gap: 1.5rem;">
                 <div class="dashboard-section">
                     <div class="section-header" style="margin-bottom: 1.2rem;">
                         <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1.2rem; font-weight: 700;">
-                            <i class="fa-solid fa-gears" style="color: #a855f7; margin-right: 0.5rem;"></i> 라이브러리 자동 스캔 &amp; 스케줄 설정
+                            <i class="fa-solid fa-gears" style="color: #a855f7; margin-right: 0.5rem;"></i> <span data-i18n="settings.schedule_title">라이브러리 자동 스캔 &amp; 스케줄 설정</span>
                         </h3>
-                        <p style="font-size: 0.82rem; color: #94a3b8; margin: 0.4rem 0 0 0;">각 카테고리의 동기화 스캔 스케줄(Cron) 주기를 일괄 관리하고 즉시 실행할 수 있습니다.</p>
+                        <p style="font-size: 0.82rem; color: #94a3b8; margin: 0.4rem 0 0 0;" data-i18n="settings.schedule_subtitle">각 카테고리의 동기화 스캔 스케줄(Cron) 주기를 일괄 관리하고 즉시 실행할 수 있습니다.</p>
                     </div>
                     
                     <div class="settings-table-wrapper" style="background: rgba(30, 41, 59, 0.25); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; overflow: hidden; backdrop-filter: blur(10px);">
                         <table class="settings-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
                             <thead>
                                 <tr style="background: rgba(15, 23, 42, 0.4); border-bottom: 1px solid rgba(255,255,255,0.08); color: #94a3b8;">
-                                    <th style="padding: 1rem;">카테고리명</th>
-                                    <th style="padding: 1rem;">서버 물리 경로</th>
-                                    <th style="padding: 1rem; width: 230px;">Rclone RC 주소</th>
-                                    <th style="padding: 1rem; width: 220px;">스케줄 주기 (Cron식)</th>
-                                    <th style="padding: 1rem; width: 180px;">최근 스캔 시각</th>
-                                    <th style="padding: 1rem; width: 100px; text-align: center;">상태</th>
-                                    <th style="padding: 1rem; width: 180px; text-align: center;">작업</th>
+                                    <th style="padding: 1rem;" data-i18n="settings.col_category">카테고리명</th>
+                                    <th style="padding: 1rem;" data-i18n="settings.col_path">서버 물리 경로</th>
+                                    <th style="padding: 1rem; width: 230px;" data-i18n="settings.col_rclone">Rclone RC 주소</th>
+                                    <th style="padding: 1rem; width: 220px;" data-i18n="settings.col_cron">스케줄 주기 (Cron식)</th>
+                                    <th style="padding: 1rem; width: 180px;" data-i18n="settings.col_last_scan">최근 스캔 시각</th>
+                                    <th style="padding: 1rem; width: 100px; text-align: center;" data-i18n="settings.col_status">상태</th>
+                                    <th style="padding: 1rem; width: 180px; text-align: center;" data-i18n="settings.col_action">작업</th>
                                 </tr>
                             </thead>
                             <tbody id="settings-libraries-list">

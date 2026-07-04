@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## v0.6.9
+### fix
+- 환경설정의 tab 순서 변경(general, plugins, reports, users, queue, changelog, about) | Environment setting tab order changed(general, plugins, reports, users, queue, changelog, about)
+- 영문 사용시 환경설정의 탭이 모두 한글로 나오는 오류 수정 | Fix error that all tabs in environment settings appear in Korean when using English
+
+### improved
+- 사용자 카테고리 접근 권한 관리 탭 추가(by 뿌아씨) | user category access permission management tab added
+
 ## v0.6.8
 ### fix
 - pdf 뷰어에서 스크롤 동작 오류 수정(전체 뷰포트 사용으로 변경) | pdf viewer scroll error fix(use full viewport)
@@ -10,6 +18,7 @@
 - 도커 오버라이드 추가 (readme.md 참조) | docker override added (readme.md reference)
 - 스캔시 VFS 갱신중일때도 예약조회에 노출됨 | during scan, vfs refresh is displayed in the reservation query
 - kavtia 마이그레이션 툴 개선(메타데이터 연동, made by 짜파구리) | kavtia migration tool improvement(meta data interworking, made by Chapaguri)
+
 ## v0.6.7
 ### added
 - 모바일 해상도 지원(beta) | Mobile resolution support (beta)

@@ -21,6 +21,10 @@
                     <option value="admin" data-i18n="modal.role_admin">관리자 (admin)</option>
                 </select>
             </div>
+            <div class="library-form-group" style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
+                <input type="checkbox" id="user-form-adult-access" name="has_adult_access" checked style="width: auto; cursor: pointer; accent-color: #a855f7;">
+                <label for="user-form-adult-access" style="cursor: pointer; margin: 0; font-size: 0.9rem;">성인 도서 접근 허용</label>
+            </div>
             <div class="library-modal-footer">
                 <button type="button" class="btn-cancel" onclick="closeUserModal()" data-i18n="common.cancel">취소</button>
                 <button type="submit" class="btn-submit" id="user-form-submit-btn" data-i18n="common.save">등록</button>

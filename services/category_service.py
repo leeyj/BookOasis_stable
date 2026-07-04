@@ -3,10 +3,20 @@ import database
 
 class CategoryService:
     @staticmethod
-    def get_libraries(db_type):
+    def get_libraries(db_type, user_id=None, role=None):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
-        cursor.execute("SELECT id, name, physical_path, is_remote, vfs_refresh_before_scan, rclone_rc_url FROM libraries ORDER BY name ASC")
+        if user_id and role != 'admin':
+            # 일반 유저는 권한 테이블 조인하여 has_access = 1 인 카테고리만 필터
+            cursor.execute("""
+                SELECT l.id, l.name, l.physical_path, l.is_remote, l.vfs_refresh_before_scan, l.rclone_rc_url 
+                FROM libraries l
+                JOIN user_category_permissions p ON l.id = p.library_id
+                WHERE p.user_id = ? AND p.has_access = 1
+                ORDER BY l.name ASC
+            """, (user_id,))
+        else:
+            cursor.execute("SELECT id, name, physical_path, is_remote, vfs_refresh_before_scan, rclone_rc_url FROM libraries ORDER BY name ASC")
         rows = cursor.fetchall()
         conn.close()
         return [{

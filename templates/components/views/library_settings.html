@@ -11,13 +11,16 @@
                     <i class="fa-solid fa-sliders"></i> <span data-i18n="settings.tab_general">일반 설정</span>
                 </button>
                 <button class="settings-tab-btn" onclick="switchSettingsTab('plugins')">
-                    <i class="fa-solid fa-plug"></i> 플러그인 설정
+                    <i class="fa-solid fa-plug"></i> <span data-i18n="settings.tab_plugins">플러그인 설정</span>
                 </button>
                 <button class="settings-tab-btn" onclick="switchSettingsTab('reports')">
-                    <i class="fa-solid fa-triangle-exclamation"></i> 스캔 리포트
+                    <i class="fa-solid fa-triangle-exclamation"></i> <span data-i18n="settings.tab_reports">스캔 리포트</span>
                 </button>
-                <button class="settings-tab-btn" id="settings-tab-btn-users" onclick="switchSettingsTab('users')" style="display: none;">
-                    <i class="fa-solid fa-users"></i> 사용자 관리
+                 <button class="settings-tab-btn" id="settings-tab-btn-users" onclick="switchSettingsTab('users')" style="display: none;">
+                    <i class="fa-solid fa-users"></i> <span data-i18n="settings.tab_users">사용자 관리</span>
+                </button>
+                <button class="settings-tab-btn" id="settings-tab-btn-permissions" onclick="switchSettingsTab('permissions')" style="display: none;">
+                    <i class="fa-solid fa-user-shield"></i> <span data-i18n="settings.tab_permissions">권한 관리</span>
                 </button>
                 <button class="settings-tab-btn" onclick="switchSettingsTab('about')">
                     <i class="fa-solid fa-circle-info"></i> <span data-i18n="settings.tab_about">이 S/W는...</span>
@@ -44,6 +47,9 @@
 
             <!-- 5. 사용자 관리 탭 -->
             {% include "components/settings/users_tab.html" %}
+
+            <!-- 5.5 권한 관리 탭 -->
+            {% include "components/settings/permissions_tab.html" %}
 
             <!-- 6. 이 S/W는... 탭 (About) -->
             {% include "components/settings/about_tab.html" %}

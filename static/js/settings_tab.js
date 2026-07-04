@@ -3,6 +3,7 @@ import { applySettingsToUI, loadInitialSystemSettings, loadGeneralSettings, subm
 import { loadPluginsSettings } from './settings/plugins.js';
 import { initReportsTab, loadReportList, loadReportDetail } from './settings/reports.js';
 import { loadUsersList } from './settings/users.js';
+import { loadPermissionsMatrix } from './settings/permissions.js';
 
 export {
   applySettingsToUI,
@@ -13,11 +14,22 @@ export {
   initReportsTab,
   loadReportList,
   loadReportDetail,
-  loadUsersList
+  loadUsersList,
+  loadPermissionsMatrix
 };
 
 // 환경설정 내부 탭 전환 함수
 export function switchSettingsTab(tabId) {
+  // 일반 사용자는 어드민 전용 탭에 접근하지 못하도록 차단 및 'about'으로 우회
+  const isAdmin = window.currentUser && window.currentUser.role === 'admin';
+  const adminOnlyTabs = ['schedule', 'queue', 'general', 'plugins', 'reports', 'users', 'permissions'];
+  
+  if (!isAdmin && adminOnlyTabs.includes(tabId)) {
+    console.warn(`[Settings-Tab] Access denied for tab '${tabId}'. Redirecting to 'about'...`);
+    switchSettingsTab('about');
+    return;
+  }
+
   console.log(`[Settings-Tab] Switching to settings tab: ${tabId}`);
   
   // 1. 모든 탭 버튼 active 클래스 해제
@@ -55,6 +67,8 @@ export function switchSettingsTab(tabId) {
     initReportsTab();
   } else if (tabId === 'users') {
     loadUsersList();
+  } else if (tabId === 'permissions') {
+    loadPermissionsMatrix();
   } else if (tabId === 'about') {
     loadAboutInfo();
   } else if (tabId === 'changelog') {

@@ -43,21 +43,37 @@ class ReadingHistoryService:
         ]
 
     @staticmethod
-    def get_recently_added(db_type):
+    def get_recently_added(db_type, user_id=None, role=None):
         conn = database.get_connection(db_type)
         conn.row_factory = database.sqlite3.Row
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT b.id, b.library_id, b.title, b.series_name, b.cover_image, b.cover_updated_at, b.file_format, b.total_pages, b.created_at, b.is_favorite
-            FROM books b
-            INNER JOIN (
-                SELECT MAX(id) as max_id
-                FROM books
-                GROUP BY CASE WHEN series_name IS NOT NULL AND series_name != '' THEN series_name ELSE CAST(id AS TEXT) END
-            ) g ON b.id = g.max_id
-            ORDER BY b.created_at DESC, b.id DESC
-            LIMIT 20
-        """)
+        if user_id and role != 'admin':
+            # 권한이 설정된 카테고리(libraries)의 도서만 필터링
+            cursor.execute("""
+                SELECT b.id, b.library_id, b.title, b.series_name, b.cover_image, b.cover_updated_at, b.file_format, b.total_pages, b.created_at, b.is_favorite
+                FROM books b
+                INNER JOIN (
+                    SELECT MAX(id) as max_id
+                    FROM books
+                    GROUP BY CASE WHEN series_name IS NOT NULL AND series_name != '' THEN series_name ELSE CAST(id AS TEXT) END
+                ) g ON b.id = g.max_id
+                JOIN user_category_permissions p ON b.library_id = p.library_id
+                WHERE p.user_id = ? AND p.has_access = 1
+                ORDER BY b.created_at DESC, b.id DESC
+                LIMIT 20
+            """, (user_id,))
+        else:
+            cursor.execute("""
+                SELECT b.id, b.library_id, b.title, b.series_name, b.cover_image, b.cover_updated_at, b.file_format, b.total_pages, b.created_at, b.is_favorite
+                FROM books b
+                INNER JOIN (
+                    SELECT MAX(id) as max_id
+                    FROM books
+                    GROUP BY CASE WHEN series_name IS NOT NULL AND series_name != '' THEN series_name ELSE CAST(id AS TEXT) END
+                ) g ON b.id = g.max_id
+                ORDER BY b.created_at DESC, b.id DESC
+                LIMIT 20
+            """)
         rows = cursor.fetchall()
         conn.close()
         return [

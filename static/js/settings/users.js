@@ -67,12 +67,13 @@ export async function submitUserForm(e) {
   const username = document.getElementById('user-form-username').value.trim();
   const password = document.getElementById('user-form-password').value.trim();
   const role = document.getElementById('user-form-role').value;
+  const has_adult_access = document.getElementById('user-form-adult-access').checked;
 
   try {
     const res = await fetch(`/api/admin/users?type=${state.currentLibraryType}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password, role })
+      body: JSON.stringify({ username, password, role, has_adult_access })
     });
     const data = await res.json();
 

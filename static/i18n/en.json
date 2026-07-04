@@ -12,6 +12,8 @@
     "confirm": "Confirm",
     "prev": "Previous",
     "next": "Next",
+    "no_history_books": "No recently read books history.",
+    "no_library_books": "No registered books in library.",
     "loading_books": "Loading book list..."
   },
   "dashboard": {
@@ -54,6 +56,13 @@
     "tab_plugins": "Plugin Settings",
     "tab_reports": "Scan Reports",
     "tab_users": "Users Manager",
+    "tab_permissions": "Permissions",
+    "perm_title": "User Category Access Control",
+    "perm_subtitle": "Manage category access permissions for each user with matrix checkboxes, including adult DB access control.",
+    "perm_col_category": "Category Name (DB)",
+    "perm_adult_allow": "Adult Access Allowed",
+    "perm_badge_adult": "Adult",
+    "perm_badge_general": "General",
     "tab_about": "About...",
     "schedule_title": "Library Auto Scan & Schedule Settings",
     "schedule_subtitle": "Manage synchronization scan schedules (Cron) for each category and run immediately.",

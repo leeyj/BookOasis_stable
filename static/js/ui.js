@@ -175,7 +175,8 @@ export function renderHistoryGrid(booksList) {
   if (!container) return;
 
   if (booksList.length === 0) {
-    container.innerHTML = '<div class="loading-spinner">최근에 읽은 도서 내역이 없습니다.</div>';
+    const tNoHistory = window.i18n ? window.i18n.t('common.no_history_books') : '최근에 읽은 도서 내역이 없습니다.';
+    container.innerHTML = `<div class="loading-spinner">${tNoHistory}</div>`;
     return;
   }
 
@@ -199,7 +200,8 @@ export function renderBooksGrid(seriesList) {
   if (!container) return;
 
   if (seriesList.length === 0) {
-    container.innerHTML = '<div class="loading-spinner">보관함에 등록된 도서가 없습니다.</div>';
+    const tNoBooks = window.i18n ? window.i18n.t('common.no_library_books') : '보관함에 등록된 도서가 없습니다.';
+    container.innerHTML = `<div class="loading-spinner">${tNoBooks}</div>`;
     return;
   }
 
@@ -235,7 +237,8 @@ export function renderDashboardHistory(booksList) {
   if (!container) return;
 
   if (booksList.length === 0) {
-    container.innerHTML = '<div class="loading-spinner" style="grid-column:1/-1; padding:2rem;">최근에 읽은 도서 내역이 없습니다.</div>';
+    const tNoHistory = window.i18n ? window.i18n.t('common.no_history_books') : '최근에 읽은 도서 내역이 없습니다.';
+    container.innerHTML = `<div class="loading-spinner" style="grid-column:1/-1; padding:2rem;">${tNoHistory}</div>`;
     return;
   }
 

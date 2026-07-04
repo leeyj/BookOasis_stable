@@ -17,6 +17,7 @@ from api.routes.browse_routes import browse_bp
 from api.routes.settings_routes import settings_bp
 from api.routes.report_routes import report_bp
 from api.routes.system_routes import system_bp
+from api.routes.permission_routes import permission_bp
 
 # 통합 Blueprint (api/__init__.py에서 register_blueprint하기 위한 컨테이너)
 admin_bp = Blueprint('media_admin', __name__)
@@ -28,3 +29,4 @@ admin_bp.register_blueprint(browse_bp)
 admin_bp.register_blueprint(settings_bp)
 admin_bp.register_blueprint(report_bp)
 admin_bp.register_blueprint(system_bp)
+admin_bp.register_blueprint(permission_bp)

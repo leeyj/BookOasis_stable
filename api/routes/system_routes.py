@@ -3,7 +3,7 @@
 system_routes.py – 시스템 상태, 큐, 정보 조회 라우터
 """
 import os
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session
 from api.auth import admin_required
 import database
 
@@ -99,8 +99,9 @@ def clear_system_queue():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @system_bp.route('/api/media/about', methods=['GET'])
-@admin_required
 def get_about_info():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'Login required'}), 401
     """BookOasis 소프트웨어 정보 및 버전 데이터 리턴"""
     version_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '..', 'VERSION')
     

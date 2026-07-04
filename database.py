@@ -316,7 +316,16 @@ def init_databases():
         password_hash TEXT NOT NULL,
         role TEXT DEFAULT 'user',
         is_default_password INTEGER DEFAULT 1,
+        has_adult_access INTEGER DEFAULT 1,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS user_category_permissions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        library_id INTEGER NOT NULL,
+        has_access INTEGER DEFAULT 1,
+        UNIQUE(user_id, library_id)
     );
     """
     
@@ -373,7 +382,7 @@ def init_databases():
             if cursor.fetchone()[0] == 0:
                 from werkzeug.security import generate_password_hash
                 admin_hash = generate_password_hash('admin')
-                cursor.execute("INSERT INTO users (username, password_hash, role, is_default_password) VALUES ('admin', ?, 'admin', 1)", (admin_hash,))
+                cursor.execute("INSERT INTO users (username, password_hash, role, is_default_password, has_adult_access) VALUES ('admin', ?, 'admin', 1, 1)", (admin_hash,))
                 conn.commit()
                 print(f"[DB-Migration] {db_type} DB - admin/admin initial account created")
         except Exception as e:
@@ -383,6 +392,23 @@ def init_databases():
             auto_migrate_schema(conn, schema)
         except Exception as migrate_err:
             print(f"[DB-Migration ERROR] Exception during dynamic schema auto-migration: {migrate_err}")
+
+        # 권한 테이블 초기 데이터 시딩 (기존 사용자 및 라이브러리가 있을 때 권한 일괄 1로 주입)
+        try:
+            cursor.execute("SELECT id FROM users")
+            u_ids = [r['id'] for r in cursor.fetchall()]
+            cursor.execute("SELECT id FROM libraries")
+            l_ids = [r['id'] for r in cursor.fetchall()]
+            
+            for uid in u_ids:
+                for lid in l_ids:
+                    cursor.execute("""
+                        INSERT OR IGNORE INTO user_category_permissions (user_id, library_id, has_access)
+                        VALUES (?, ?, 1)
+                    """, (uid, lid))
+            conn.commit()
+        except Exception as seed_err:
+            print(f"[DB-Migration ERROR] user_category_permissions seeding failed: {seed_err}")
         # 기존 라이브러리에 대한 원격 드라이브 자동 판별 보정
         try:
             cursor.execute("SELECT id, physical_path, is_remote FROM libraries")

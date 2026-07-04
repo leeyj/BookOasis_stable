@@ -12,6 +12,8 @@
     "confirm": "확인",
     "prev": "이전",
     "next": "다음",
+    "no_history_books": "최근에 읽은 도서 내역이 없습니다.",
+    "no_library_books": "보관함에 등록된 도서가 없습니다.",
     "loading_books": "도서 목록을 불러오는 중..."
   },
   "dashboard": {
@@ -54,6 +56,13 @@
     "tab_plugins": "플러그인 설정",
     "tab_reports": "스캔 리포트",
     "tab_users": "사용자 관리",
+    "tab_permissions": "권한 관리",
+    "perm_title": "사용자별 카테고리 접근 권한 관리",
+    "perm_subtitle": "각 사용자별로 접근 가능한 도서 카테고리를 체크박스로 구성하며, 성인도서(adult) DB의 전체 접근 제어 권한도 함께 관리합니다.",
+    "perm_col_category": "카테고리 이름 (DB 구분)",
+    "perm_adult_allow": "성인도서 접근 허용",
+    "perm_badge_adult": "성인",
+    "perm_badge_general": "일반",
     "tab_about": "이 S/W는...",
     "schedule_title": "라이브러리 자동 스캔 & 스케줄 설정",
     "schedule_subtitle": "각 카테고리의 동기화 스캔 스케줄(Cron) 주기를 일괄 관리하고 즉시 실행할 수 있습니다.",

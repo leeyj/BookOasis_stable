@@ -21,7 +21,9 @@ def get_media_libraries():
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
     try:
-        libraries = CategoryService.get_libraries(db_type)
+        user_id = session.get('user_id')
+        role = session.get('role')
+        libraries = CategoryService.get_libraries(db_type, user_id=user_id, role=role)
         return jsonify({'success': True, 'libraries': libraries})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -167,7 +169,9 @@ def get_media_recently_added():
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
     try:
-        books = ReadingHistoryService.get_recently_added(db_type)
+        user_id = session.get('user_id')
+        role = session.get('role')
+        books = ReadingHistoryService.get_recently_added(db_type, user_id=user_id, role=role)
         return jsonify({'success': True, 'books': books})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

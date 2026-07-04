@@ -1,0 +1,26 @@
+<!-- 5.5 권한 관리 탭 -->
+<div id="settings-tab-permissions" class="settings-tab-content" style="display: none; flex-direction: column; gap: 1.5rem;">
+    <div class="dashboard-section">
+        <div class="section-header" style="margin-bottom: 1.2rem;">
+            <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1.2rem; font-weight: 700;">
+                <i class="fa-solid fa-user-shield" style="color: #a855f7; margin-right: 0.5rem;"></i> <span data-i18n="settings.perm_title">사용자별 카테고리 접근 권한 관리</span>
+            </h3>
+            <p style="font-size: 0.82rem; color: #94a3b8; margin: 0.4rem 0 0 0;" data-i18n="settings.perm_subtitle">
+                각 사용자별로 접근 가능한 도서 카테고리를 체크박스로 구성하며, 성인도서(adult) DB의 전체 접근 제어 권한도 함께 관리합니다.
+            </p>
+        </div>
+
+        <div class="settings-table-wrapper" style="background: rgba(30, 41, 59, 0.25); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; overflow-x: auto; backdrop-filter: blur(10px);">
+            <table class="settings-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; min-width: 600px;">
+                <thead>
+                    <tr style="background: rgba(15, 23, 42, 0.4); border-bottom: 1px solid rgba(255,255,255,0.08); color: #94a3b8;" id="permissions-table-header">
+                        <!-- 동적으로 로드되는 Header: 사용자 계정명 나열 -->
+                    </tr>
+                </thead>
+                <tbody id="permissions-table-body">
+                    <!-- 동적으로 로드되는 Body: 카테고리별로 각 사용자 체크박스 매핑 -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

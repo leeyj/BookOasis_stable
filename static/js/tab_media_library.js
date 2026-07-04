@@ -35,10 +35,28 @@ function initTabMediaLibrary() {
     const usernameEl = document.getElementById('session-username-display');
     if (usernameEl) usernameEl.innerText = state.currentUser.username;
     
-    // 어드민 전용 사용자 관리 탭 버튼 노출
+    // 어드민 전용 사용자 관리 및 권한 관리 탭 버튼 노출
     if (state.currentUser.role === 'admin') {
       const usersTabBtn = document.getElementById('settings-tab-btn-users');
       if (usersTabBtn) usersTabBtn.style.display = 'block';
+      const permissionsTabBtn = document.getElementById('settings-tab-btn-permissions');
+      if (permissionsTabBtn) permissionsTabBtn.style.display = 'block';
+      
+      // 어드민용 탭 노출
+      document.querySelectorAll('.settings-tab-btn').forEach(btn => {
+        const onclickAttr = btn.getAttribute('onclick') || '';
+        if (onclickAttr.includes("'schedule'") || onclickAttr.includes("'queue'") || onclickAttr.includes("'general'") || onclickAttr.includes("'plugins'") || onclickAttr.includes("'reports'")) {
+          btn.style.display = 'block';
+        }
+      });
+    } else {
+      // 일반 사용자는 어드민 전용 탭 숨김 처리
+      document.querySelectorAll('.settings-tab-btn').forEach(btn => {
+        const onclickAttr = btn.getAttribute('onclick') || '';
+        if (onclickAttr.includes("'schedule'") || onclickAttr.includes("'queue'") || onclickAttr.includes("'general'") || onclickAttr.includes("'plugins'") || onclickAttr.includes("'reports'")) {
+          btn.style.display = 'none';
+        }
+      });
     }
   }
 
@@ -138,7 +156,12 @@ export function selectCategory(id) {
     loadDashboardData();
   } else if (id === 'settings') {
     switchActiveView('settings');
-    loadLibrarySchedules();
+    if (state.currentUser && state.currentUser.role === 'admin') {
+      loadLibrarySchedules();
+      switchSettingsTab('schedule');
+    } else {
+      switchSettingsTab('about');
+    }
   } else {
     switchActiveView('grid');
     if (id === 'history') {

@@ -37,7 +37,12 @@ def admin_required(f):
     return decorated_function
 
 def check_adult_permission(db_type):
-    if db_type == 'adult' and session.get('role') != 'admin':
+    if db_type == 'adult':
+        # 어드민은 패스, 일반 유저는 세션의 has_adult_access 권한으로 판별
+        if session.get('role') == 'admin':
+            return True
+        if session.get('has_adult_access') == 1:
+            return True
         return False
     return True
 
@@ -117,7 +122,7 @@ def login():
             
         conn = database.get_connection('general')
         cursor = conn.cursor()
-        cursor.execute("SELECT id, username, password_hash, role, is_default_password FROM users WHERE username = ?", (username,))
+        cursor.execute("SELECT id, username, password_hash, role, is_default_password, has_adult_access FROM users WHERE username = ?", (username,))
         user = cursor.fetchone()
         conn.close()
         
@@ -132,6 +137,7 @@ def login():
             session['username'] = user['username']
             session['role'] = user['role']
             session['is_default_password'] = user['is_default_password']
+            session['has_adult_access'] = user['has_adult_access']
             
             return jsonify({
                 'success': True,
@@ -184,7 +190,7 @@ def get_users():
         
     conn = database.get_connection('general')
     cursor = conn.cursor()
-    cursor.execute("SELECT id, username, role, is_default_password, created_at FROM users ORDER BY id ASC")
+    cursor.execute("SELECT id, username, role, is_default_password, has_adult_access, created_at FROM users ORDER BY id ASC")
     users = [dict(row) for row in cursor.fetchall()]
     conn.close()
     
@@ -200,6 +206,7 @@ def add_user():
     username = data.get('username', '').strip()
     password = data.get('password', '').strip()
     role = data.get('role', 'user').strip()
+    has_adult_access = 1 if data.get('has_adult_access', True) else 0
     
     if not username or not password:
         return jsonify({'success': False, 'error': _t('api.username_password_initial_required')}), 400
@@ -214,8 +221,16 @@ def add_user():
         for db_type in ['general', 'adult']:
             conn = database.get_connection(db_type)
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO users (username, password_hash, role, is_default_password) VALUES (?, ?, ?, 1)", 
-                           (username, password_hash, role))
+            cursor.execute("INSERT INTO users (username, password_hash, role, is_default_password, has_adult_access) VALUES (?, ?, ?, 1, ?)", 
+                           (username, password_hash, role, has_adult_access))
+            user_id = cursor.lastrowid
+            
+            # 신규 생성 시 모든 카테고리 권한 기본 선택 (1) 시딩
+            cursor.execute("SELECT id FROM libraries")
+            lib_ids = [row['id'] for row in cursor.fetchall()]
+            for lid in lib_ids:
+                cursor.execute("INSERT OR IGNORE INTO user_category_permissions (user_id, library_id, has_access) VALUES (?, ?, 1)", (user_id, lid))
+            
             conn.commit()
             conn.close()
     except Exception as e:
