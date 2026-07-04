@@ -24,7 +24,13 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId)
     .map(t => `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center;" onclick="goBackToList(); window.selectTagFilter('${t.replace(/'/g, "\\'")}')"><i class="fa-solid fa-hashtag" style="font-size: 0.7rem; margin-right: 0.2rem;"></i>${t}</span>`)
     .join('');
 
-  const missingPageBooks = books.filter(b => ['zip', 'cbz'].includes((b.file_format || '').toLowerCase()) && (b.total_pages === 0 || b.has_offsets === 0));
+  const missingPageBooks = books.filter(b => {
+    const isZip = ['zip', 'cbz'].includes((b.file_format || '').toLowerCase());
+    const filePathLower = (b.file_path || '').toLowerCase();
+    const remoteKeywords = ['gdrive', 'rclone', 'vfs', 'google_drive', 'onedrive', 'sharepoint', 'nas_share', 'webdav'];
+    const isRemote = remoteKeywords.some(keyword => filePathLower.includes(keyword));
+    return isZip && !isRemote && (b.total_pages === 0 || b.has_offsets === 0);
+  });
   const missingPageCount = missingPageBooks.length;
   const missingPageBannerHtml = missingPageCount > 0 ? `
       <div class="vol-warn-banner" style="margin-top: 1rem;">
@@ -163,7 +169,14 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId) {
 
     const noCover = !b.cover_image;
     const isZipFormat = ['zip', 'cbz'].includes((b.file_format || '').toLowerCase());
-    const noOffsets = isZipFormat && (b.total_pages === 0 || b.has_offsets === 0);
+    
+    // 원격 경로 여부 판단 (gdrive, rclone, vfs, google_drive, onedrive, sharepoint, nas_share, webdav 등)
+    const filePathLower = (b.file_path || '').toLowerCase();
+    const remoteKeywords = ['gdrive', 'rclone', 'vfs', 'google_drive', 'onedrive', 'sharepoint', 'nas_share', 'webdav'];
+    const isRemoteFile = remoteKeywords.some(keyword => filePathLower.includes(keyword));
+    
+    // 원격 파일은 백그라운드 오프셋 조회를 하지 않으므로 warn_no_offset 경고창 노출 대상에서 제외합니다.
+    const noOffsets = isZipFormat && !isRemoteFile && (b.total_pages === 0 || b.has_offsets === 0);
     const needsWarn = noCover || noOffsets;
 
     let warnTexts = [];

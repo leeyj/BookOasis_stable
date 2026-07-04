@@ -1,4 +1,11 @@
 # CHANGELOG
+## v0.7.1
+### fixed
+- lazy 스캐너 오작동(offset 정보 채우려는 시도 및 건너뜀 현상) 해소 | lazy scanner incorrect operation(offset information and skipping)
+- 대시보드내 오프셋 정보 없을시 경고창 제거 | dashboard offset information warning removal
+- lazy 스캐너의 역활은 커버 미검출시 추출하도록 용도 축소(오프셋 검출 제거). 단 zip 파일내 comicinfo.xml 추출은 여전히 포함되어 있음. | lazy scanner role is reduced to extracting only when cover is not detected (offset detection removed). However, extraction of comicinfo.xml within zip files is still included.
+
+
 ## v0.7.0
 ### improved
 - /docs 내 문서 보강 및 최신화 | /docs documents reinforcement and update

@@ -140,12 +140,21 @@ def run_lazy_cover_extraction(target_book_id=None):
                 # ── offset_only 플래그: 커버는 정상이고 오프셋만 없는 경우 ──
                 # 커버 재추출 없이 오프셋 수집만 수행하여 불필요한 I/O를 방지
                 offset_only = (not cover_missing and offset_missing)
+                
+                from utils.drive_helper import is_remote_path
+                _is_remote = is_remote_path(file_path)
+                
+                # [원격 경로 최적화] 커버는 정상이고 오프셋만 없는 원격지(GDRIVE 등) 도서는
+                # 백그라운드 대량 스캔 부하 차단을 위해 Lazy 스캔 수집 대상에서 원천 배제합니다.
+                # (뷰어에서 열릴 때 실시간으로 파싱되므로 성능에 문제 없음)
+                if offset_only and _is_remote:
+                    continue
+                    
                 if offset_only:
                     print(f"[Lazy-Scanner] 오프셋 전용 재수집 대상: {os.path.basename(file_path)}")
 
                 # 원격 경로(GDRIVE 등)는 os.path.exists가 느리거나 실패할 수 있으므로 무조건 포함
-                from utils.drive_helper import is_remote_path
-                if is_remote_path(file_path) or os.path.exists(file_path):
+                if _is_remote or os.path.exists(file_path):
                     targets.append((book, offset_only))
 
                     
@@ -214,12 +223,32 @@ def run_lazy_cover_extraction(target_book_id=None):
                             file_fmt = (book['file_format'] or '').lower()
                             from utils.drive_helper import is_remote_path
                             _is_remote = is_remote_path(file_path)
-                            if _is_remote:
-                                # 원격 경로(rclone/GDrive): zipfile.ZipFile이 Central Directory 읽기 위해
-                                # Google Drive API 호출 발생 → 과부하 위험이 있어 스킵
-                                print(f"[Lazy-Scanner] 원격 경로 오프셋 수집 스킵: {filename}")
-                            elif file_fmt in ('zip', 'cbz'):
-                                offsets = _collect_zip_offsets_safe(file_path)
+                            if file_fmt in ('zip', 'cbz'):
+                                if _is_remote:
+                                    try:
+                                        import zipfile
+                                        from utils.sort_helper import natural_sort_key
+                                        img_ext = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp')
+                                        with zipfile.ZipFile(file_path, 'r') as zf:
+                                            infolist = zf.infolist()
+                                            img_infos = [info for info in infolist if info.filename.lower().endswith(img_ext)]
+                                            img_infos.sort(key=lambda x: natural_sort_key(x.filename))
+                                            offsets = []
+                                            for page_idx, info in enumerate(img_infos):
+                                                offsets.append((
+                                                    page_idx,
+                                                    info.filename,
+                                                    info.header_offset,
+                                                    info.compress_size,
+                                                    info.file_size,
+                                                    info.compress_type
+                                                ))
+                                    except Exception as re_err:
+                                        print(f"[Lazy-Scanner] 원격 오프셋 직접 수집 실패: {re_err}")
+                                        offsets = []
+                                else:
+                                    offsets = _collect_zip_offsets_safe(file_path)
+
                                 if offsets:
                                     from tools.scanner.db_writer import save_book_offsets
                                     save_book_offsets(cursor, book_id, filename, offsets)
@@ -228,9 +257,9 @@ def run_lazy_cover_extraction(target_book_id=None):
                                 else:
                                     print(f"[Lazy-Scanner] 오프셋 수집 결과 없음 (이미지 없는 ZIP?): {filename}")
                             if target_book_id is None:
-                                # 로컬 파일: ZIP Central Directory만 읽으므로 0.5초로 충분
-                                # 원격 파일: 스킵했으므로 대기 불필요
-                                if not _is_remote:
+                                if _is_remote:
+                                    time.sleep(3.0)
+                                else:
                                     time.sleep(0.5)
                             continue
 
