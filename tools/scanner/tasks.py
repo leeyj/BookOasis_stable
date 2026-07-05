@@ -7,7 +7,7 @@ if MEDIA_SERVER_DIR not in sys.path:
     sys.path.append(MEDIA_SERVER_DIR)
 
 import gc
-from tools.scanner.parser import parse_info_xml, parse_kavita_yaml, parse_series_json, parse_comicinfo_from_cbz, is_consonant_folder
+from tools.scanner.metadata import parse_info_xml, parse_kavita_yaml, parse_series_json, parse_comicinfo_from_cbz, merge_local_metadata, is_consonant_folder
 from tools.scanner.cover import get_series_cover_fallback, extract_cover_from_b64, download_cover_from_url
 from tools.scanner.offset import collect_zip_offsets_data
 
@@ -91,22 +91,8 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
         series_name = re.sub(r'^\[(?:단행|연재|소설|만화|웹툰|일반)\]\s*', '', series_name).strip()
 
     print(f"[Scanner-DEBUG-Task]   - Metadata YAML/XML/JSON load started")
-    yaml_meta = parse_kavita_yaml(root, files=files, is_remote=is_remote)
-    xml_meta = parse_info_xml(root, files=files, is_remote=is_remote)
-    json_meta = parse_series_json(root, files=files, is_remote=is_remote)
+    merged_meta = merge_local_metadata(root, files=files, is_remote=is_remote)
     print(f"[Scanner-DEBUG-Task]   - Metadata load completed")
-
-    merged_meta = {
-        'author': xml_meta['author'] or yaml_meta['author'] or json_meta['author'] or '',
-        'publisher': xml_meta['publisher'] or yaml_meta['publisher'] or '',
-        'summary': xml_meta['summary'] or yaml_meta['summary'] or json_meta['summary'] or '',
-        'link': yaml_meta['link'] or '',
-        'score': yaml_meta['score'] or 0,
-        'release_date': xml_meta['release_date'] or '',
-        'genre': xml_meta.get('genre', '') or yaml_meta.get('genre', '') or '',
-        'tags': xml_meta.get('tags', '') or yaml_meta.get('tags', '') or '',
-        'cover_b64_map': yaml_meta['cover_b64_map'] or {}
-    }
 
     meta_has_data = bool(
         merged_meta['author'] or merged_meta['publisher'] or
@@ -114,9 +100,9 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
         merged_meta['cover_b64_map']
     )
 
-    is_series_folder = bool(yaml_meta.get('has_yaml') and json_meta.get('is_webtoon'))
-    is_json_only_webtoon = bool(not yaml_meta.get('has_yaml') and json_meta.get('is_webtoon'))
-    series_cover_url = json_meta.get('cover_image_url', '') if is_json_only_webtoon else ''
+    is_series_folder = bool(merged_meta.get('has_yaml') and merged_meta.get('is_webtoon'))
+    is_json_only_webtoon = bool(not merged_meta.get('has_yaml') and merged_meta.get('is_webtoon'))
+    series_cover_url = merged_meta.get('cover_image_url', '') if is_json_only_webtoon else ''
     shared_cover_image = None
 
     import zipfile
@@ -308,13 +294,12 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
 
 def process_folder_covers(parent_dir, folder_rows, is_remote, library_id):
     """Extract covers by folder. Share to rest if first book succeeds."""
-    yaml_meta = parse_kavita_yaml(parent_dir, is_remote=is_remote)
-    json_meta = parse_series_json(parent_dir, is_remote=is_remote)
+    merged_meta = merge_local_metadata(parent_dir, is_remote=is_remote)
     
-    is_series = bool(yaml_meta.get('has_yaml') and json_meta.get('is_webtoon'))
-    is_json_only = bool(not yaml_meta.get('has_yaml') and json_meta.get('is_webtoon'))
-    series_cover_url = json_meta.get('cover_image_url', '') if is_json_only else ''
-    b64_keys_lower = {k.lower(): v for k, v in yaml_meta.get('cover_b64_map', {}).items()}
+    is_series = bool(merged_meta.get('has_yaml') and merged_meta.get('is_webtoon'))
+    is_json_only = bool(not merged_meta.get('has_yaml') and merged_meta.get('is_webtoon'))
+    series_cover_url = merged_meta.get('cover_image_url', '') if is_json_only else ''
+    b64_keys_lower = {k.lower(): v for k, v in merged_meta.get('cover_b64_map', {}).items()}
     
     shared_cover = None
     results = []

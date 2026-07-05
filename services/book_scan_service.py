@@ -3,8 +3,7 @@ import os
 import sqlite3
 import database
 from tools.scanner import (
-    parse_kavita_yaml,
-    parse_info_xml,
+    merge_local_metadata,
     extract_cover_from_b64,
     get_series_cover_fallback,
     collect_zip_offsets_data
@@ -77,18 +76,7 @@ class BookScanService:
             print(f"[BookScanService] 부모 폴더 디렉토리 수색: '{parent_dir}'")
             
             # 2. 로컬 메타데이터 파일 탐색
-            yaml_meta = parse_kavita_yaml(parent_dir)
-            xml_meta = parse_info_xml(parent_dir)
-            
-            merged_meta = {
-                'author': xml_meta['author'] or yaml_meta['author'] or '',
-                'publisher': xml_meta['publisher'] or yaml_meta['publisher'] or '',
-                'summary': xml_meta['summary'] or yaml_meta['summary'] or '',
-                'link': yaml_meta['link'] or '',
-                'score': yaml_meta['score'] or 0,
-                'release_date': xml_meta['release_date'] or '',
-                'cover_b64_map': yaml_meta['cover_b64_map'] or {}
-            }
+            merged_meta = merge_local_metadata(parent_dir)
             print(f"[BookScanService] 파싱된 로컬 메타데이터: {merged_meta}")
             
             # 3. 커버 이미지 결정 (Force 재추출 강제 지정)

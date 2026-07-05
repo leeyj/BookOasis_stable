@@ -4,7 +4,20 @@
 - lazy 스캐너 오작동(offset 정보 채우려는 시도 및 건너뜀 현상) 해소 | lazy scanner incorrect operation(offset information and skipping)
 - 대시보드내 오프셋 정보 없을시 경고창 제거 | dashboard offset information warning removal
 - lazy 스캐너의 역활은 커버 미검출시 추출하도록 용도 축소(오프셋 검출 제거). 단 zip 파일내 comicinfo.xml 추출은 여전히 포함되어 있음. | lazy scanner role is reduced to extracting only when cover is not detected (offset detection removed). However, extraction of comicinfo.xml within zip files is still included.
+- 스캐너 로직을 분리하여 파서를 독립적으로 호출하게 변경 | scanner logic separation and parser independent calling
+KR:
+* .\tools\scanner\metadata 에 각각의 파서가 존재함.
+  (kavita_ymal,info_xml)등
+* 추후 새로운 포맷 추가시 해당 폴더에 파서만 추가하면 됨.
+* 또는 기존 파서에서 지원하지 않는 포맷 추가시 해당 파서를 수정하여 추가하면 됨.
+* 파서 개발 및 수정을 원하시는 경우 **.\docs\guide_scanner_parser.md** 참조.
 
+EN:
+* Each parser exists in .\tools\scanner\metadata.
+  (kavita_ymal, info_xml), etc.
+* When adding new formats in the future, simply add the parser to the corresponding folder.
+* Alternatively, if you need to add a format not supported by the existing parser, you can modify the parser to add it.
+* Please refer to **./docs/guide_scanner_parser.md** for parser development and modification.
 
 ## v0.7.0
 ### improved

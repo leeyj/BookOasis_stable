@@ -89,8 +89,8 @@ graph TD
 표지 이미지는 서버 자원 소모를 최소화하기 위해 아래 순서의 폴백(Fallback) 구조로 처리됩니다:
 
 1. **YAML Base64 매핑**: `kavita.yaml` 내 `files` 노드에 개별 도서 파일명으로 맵핑된 Base64 데이터가 있다면, 이를 직접 디코딩하여 `covers/{library_id}` 디렉터리에 고유 MD5 해시 파일명으로 저장합니다.
-2. **개별 도서 1:1 이미지 매칭**: 도서 파일과 동일 폴더 내에 확장자만 다른 파일(예: `[도서명].jpg`, `[도서명].png`, `[도서명].webp`)이 존재하는지 스캔하여 복사합니다.
-3. **시리즈 대표 공통 커버 매칭**: 폴더 내에 대표 커버 파일(`cover.jpg`, `cover.png`, `folder.jpg`, `folder.png`)이 존재하는 경우 이를 시리즈 대표 표지로 복사해 사용합니다.
+2. **개별 도서 1:1 이미지 매칭**: 도서 파일과 동일 폴더 내에 확장자만 다른 파일(예: `[도서명].jpg`, `[도서명].png`, `[도서명].webp`)이 존재하는지 확인하고, 해당 판단 로직은 [tools/scanner/folder_image.py](../tools/scanner/folder_image.py)에 독립적으로 분리되어 있습니다.
+3. **시리즈 대표 공통 커버 매칭**: 폴더 내에 대표 커버 파일(`cover.jpg`, `cover.png`, `folder.jpg`, `folder.png`)이 존재하는 경우 이를 시리즈 대표 표지로 복사해 사용하며, 파일명 검색 책임은 [tools/scanner/folder_image.py](../tools/scanner/folder_image.py)가 담당합니다.
 4. **파일 내부 첫 페이지 자동 추출 (원격 경로 아님 및 강제 스캔 시)**:
    - **EPUB**: `META-INF/container.xml` 및 Manifest의 cover 항목을 수색하여 원본 이미지를 다이렉트 추출합니다.
    - **ZIP / CBZ**: 압축 파일 내의 이미지 엔트리들을 자연 정렬(`natural_sort_key`)하여 가장 첫 번째 이미지 파일을 표지로 자동 압축 해제해 사용합니다.

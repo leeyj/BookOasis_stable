@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+"""Legacy scanner parser compatibility module.
+
+New scanner parser modules must be self-contained under tools/scanner/metadata/
+and must not import this module for shared helpers.
+"""
 import os
 import re
 import html

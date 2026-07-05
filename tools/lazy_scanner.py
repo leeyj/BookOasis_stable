@@ -182,14 +182,13 @@ def run_lazy_cover_extraction(target_book_id=None):
             for parent_dir, folder_books in folder_groups.items():
                 # 폴더당 1회만 메타데이터 파싱 (커버 재추출이 필요한 도서가 있을 때만)
                 has_cover_extraction = any(not oo for _, oo in folder_books)
-                from tools.scanner.parser import parse_kavita_yaml, parse_series_json
                 if has_cover_extraction:
-                    yaml_meta = parse_kavita_yaml(parent_dir)
-                    json_meta = parse_series_json(parent_dir)
-                    b64_keys_lower = {k.lower(): v for k, v in yaml_meta.get('cover_b64_map', {}).items()}
-                    is_json_only = bool(not yaml_meta.get('has_yaml') and json_meta.get('is_webtoon'))
-                    is_series = bool(yaml_meta.get('has_yaml') and json_meta.get('is_webtoon'))
-                    series_cover_url = json_meta.get('cover_image_url', '') if (is_json_only or is_series) else ''
+                    from tools.scanner.metadata import merge_local_metadata
+                    merged_meta = merge_local_metadata(parent_dir)
+                    b64_keys_lower = {k.lower(): v for k, v in merged_meta.get('cover_b64_map', {}).items()}
+                    is_json_only = bool(not merged_meta.get('has_yaml') and merged_meta.get('is_webtoon'))
+                    is_series = bool(merged_meta.get('has_yaml') and merged_meta.get('is_webtoon'))
+                    series_cover_url = merged_meta.get('cover_image_url', '') if (is_json_only or is_series) else ''
                 else:
                     b64_keys_lower = {}
                     is_json_only = is_series = False
@@ -403,14 +402,13 @@ def get_series_cover_fallback_single(series_name, parent_dir, filename, file_pat
     
     # 미리 파싱된 메타데이터가 없으면 여기서 직접 파싱 (단독 호출 시 하위 호환)
     if b64_keys_lower is None:
-        from tools.scanner.parser import parse_kavita_yaml, parse_series_json
-        yaml_meta = parse_kavita_yaml(parent_dir)
-        json_meta = parse_series_json(parent_dir)
+        from tools.scanner.metadata import merge_local_metadata
+        merged_meta = merge_local_metadata(parent_dir)
         filename_lower = filename.lower()
-        b64_keys_lower = {k.lower(): v for k, v in yaml_meta.get('cover_b64_map', {}).items()}
-        is_json_only = bool(not yaml_meta.get('has_yaml') and json_meta.get('is_webtoon'))
-        is_series = bool(yaml_meta.get('has_yaml') and json_meta.get('is_webtoon'))
-        series_cover_url = json_meta.get('cover_image_url', '') if (is_json_only or is_series) else ''
+        b64_keys_lower = {k.lower(): v for k, v in merged_meta.get('cover_b64_map', {}).items()}
+        is_json_only = bool(not merged_meta.get('has_yaml') and merged_meta.get('is_webtoon'))
+        is_series = bool(merged_meta.get('has_yaml') and merged_meta.get('is_webtoon'))
+        series_cover_url = merged_meta.get('cover_image_url', '') if (is_json_only or is_series) else ''
     
     filename_lower = filename.lower()
     
@@ -447,7 +445,7 @@ def get_series_cover_fallback_single(series_name, parent_dir, filename, file_pat
     comicinfo_meta = None
     if file_path.lower().endswith(('.zip', '.cbz')):
         try:
-            from tools.scanner.parser import parse_comicinfo_from_cbz
+            from tools.scanner.metadata import parse_comicinfo_from_cbz
             comicinfo_meta = parse_comicinfo_from_cbz(file_path)
             if any(comicinfo_meta.get(k) for k in ('author', 'summary', 'publisher')):
                 print(f"[Lazy-Scanner] ComicInfo.xml 메타데이터 추출 성공: {filename}")

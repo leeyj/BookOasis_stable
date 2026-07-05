@@ -17,6 +17,7 @@ This is the central technical documentation and task history archive portal for 
   - [OPDS 연동 가이드 (guide_opds.md)](./guide_opds.md) / [English (guide_opds_en.md)](./guide_opds_en.md): 모바일 앱 연동 및 Basic Auth 셋업 / Mobile reader sync and Basic Auth configs.
   - [아키텍처 가이드 (guide_architecture.md)](./guide_architecture.md) / [English (guide_architecture_en.md)](./guide_architecture_en.md): 4계층 아키텍처 구조 설계 및 시퀀스 / 4-tier clean architecture design.
   - [플러그인 개발 가이드 (guide_plugins.md)](./guide_plugins.md) / [English (guide_plugins_en.md)](./guide_plugins_en.md): 메타데이터 확장 플러그인 인터페이스 스펙 / Extensible metadata plugin developer guide.
+  - [스캐너 파서 개발 가이드 (guide_scanner_parser.md)](./guide_scanner_parser.md): 스캐너용 로컬 파서 모듈 작성 규칙, 직접 호출 금지, 자급형 helper 분리 기준 / Scanner parser module rules and self-contained helper boundaries.
 
 * **기술 사양서 (Specifications)**:
   - [API 엔드포인트 명세서 (api_endpoints.md)](./api_endpoints.md): OpenAPI/Swagger 스타일 백엔드 API 명세 / OpenAPI/Swagger style backend API specifications.
