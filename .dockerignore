@@ -1,0 +1,26 @@
+# Git & IDEs
+.git
+.gitignore
+.vscode/
+.idea/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+
+# Local Environments
+.env
+.venv/
+venv/
+
+
+# Local Data (DB, Covers, Cache & Logs)
+db/*.db*
+covers/*
+!covers/.gitkeep
+cache/*
+!cache/.gitkeep
+logs/*
+!logs/.gitkeep
+
+
