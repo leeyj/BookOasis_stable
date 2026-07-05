@@ -22,6 +22,7 @@ from services.opds_service import (
     get_recently_added_entries,
     get_recently_read_entries,
     get_series_entries,
+    search_books_entries,
 )
 from utils.i18n import _t
 from werkzeug.security import check_password_hash  # type: ignore[reportMissingImports]
@@ -119,6 +120,10 @@ def _opds_xml(db_type: str, title: str, entries: list, is_adult: bool = False, n
         f'  <link rel="self" href="{_escape_xml(request.url)}" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>',
         f'  <link rel="start" href="{_escape_xml(base_url + "/opds")}" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>',
     ]
+    search_href = "/opds/search" if not is_adult else "/opds-adult/search"
+    lines.append(
+        f'  <link rel="search" href="{_escape_xml(base_url + search_href)}" type="application/opensearchdescription+xml" title="Search Books"/>'
+    )
     if next_link:
         lines.append(
             f'  <link rel="next" href="{_escape_xml(next_link)}" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>'
@@ -376,3 +381,62 @@ def opds_download_book(db_type: str, book_id: int):
     if not os.path.exists(file_path):
         return jsonify({'error': _t('api.err_file_not_found')}), 404
     return send_file(file_path, as_attachment=True)
+
+
+@opds_bp.route('/opds/search', methods=['GET'])
+def opds_search():
+    if not _check_auth(is_adult=False):
+        return _unauthorized()
+    
+    query = request.args.get('q') or request.args.get('query') or ''
+    if not query:
+        base_url = request.url_root.rstrip('/')
+        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
+  <ShortName>BookOasis</ShortName>
+  <Description>Search BookOasis Catalog</Description>
+  <InputEncoding>UTF-8</InputEncoding>
+  <OutputEncoding>UTF-8</OutputEncoding>
+  <Url type="application/atom+xml" template="{base_url}/opds/search?q={{searchTerms}}"/>
+</OpenSearchDescription>"""
+        return Response(xml, mimetype='application/opensearchdescription+xml; charset=utf-8')
+        
+    page, page_size, offset = _get_page_params()
+    entries, total = search_books_entries('general', query, '/opds/download/general', 'general', limit=page_size, offset=offset)
+    
+    next_link = None
+    if offset + page_size < total:
+        next_link = f"{request.base_url}?q={query}&page={page+1}&page_size={page_size}"
+        
+    xml = _opds_xml('general', f"검색 결과: {query}", entries, next_link=next_link)
+    return _atom_response(xml)
+
+
+@opds_bp.route('/opds-adult/search', methods=['GET'])
+def opds_adult_search():
+    if not _check_auth(is_adult=True):
+        return _unauthorized()
+        
+    query = request.args.get('q') or request.args.get('query') or ''
+    if not query:
+        base_url = request.url_root.rstrip('/')
+        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
+  <ShortName>BookOasis Adult</ShortName>
+  <Description>Search BookOasis Adult Catalog</Description>
+  <InputEncoding>UTF-8</InputEncoding>
+  <OutputEncoding>UTF-8</OutputEncoding>
+  <Url type="application/atom+xml" template="{base_url}/opds-adult/search?q={{searchTerms}}"/>
+</OpenSearchDescription>"""
+        return Response(xml, mimetype='application/opensearchdescription+xml; charset=utf-8')
+        
+    page, page_size, offset = _get_page_params()
+    entries, total = search_books_entries('adult', query, '/opds/download/adult', 'adult', limit=page_size, offset=offset)
+    
+    next_link = None
+    if offset + page_size < total:
+        next_link = f"{request.base_url}?q={query}&page={page+1}&page_size={page_size}"
+        
+    xml = _opds_xml('adult', f"성인 검색 결과: {query}", entries, is_adult=True, next_link=next_link)
+    return _atom_response(xml)
+

@@ -283,3 +283,4 @@ tags: [workflow, history]
 | 2026-07-05 | `category_migration` | 일반 ↔ 성인 데이터베이스 간 안전한 카테고리 데이터 마이그레이션 기능 구현 | [Task](./history/20260705_231206_category_migration_task.md) | [Walkthrough](./history/20260705_231206_category_migration_walkthrough.md) |
 | 2026-07-05 | `category_migration` | 창 이탈 방지 및 일반/성인 카테고리 경로 중복 감지 속보 구현 | [Task](./history/20260705_233820_category_migration_task.md) | [Walkthrough](./history/20260705_233820_category_migration_walkthrough.md) |
 | 2026-07-06 | `category_migration` | 마이그레이션 커넥션 누수 결함 최종 보완 및 빌드 | [Task](./history/20260706_004600_category_migration_task.md) | [Walkthrough](./history/20260706_004600_category_migration_walkthrough.md) |
+| 2026-07-06 | `opds_search` | OPDS/App-OPDS 검색 기능 추가 및 관련 가이드/API 문서 업데이트 | [Task](./history/20260706_014328_opds_search_task.md) | [Walkthrough](./history/20260706_014328_opds_search_walkthrough.md) |

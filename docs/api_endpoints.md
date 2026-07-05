@@ -211,3 +211,37 @@
     "is_completed": 0
   }
   ```
+
+---
+
+## 📱 5. OPDS 및 모바일 외부 앱 연동 API (OPDS)
+
+모든 OPDS API는 HTTP Basic Authentication (`Authorization: Basic <base64>`) 인증을 공통적으로 적용받습니다.
+
+### `[GET]` `/opds`
+* **설명**: 일반 도서 전용 OPDS 카탈로그의 네비게이션 최상위 피드(Atom XML)를 가져옵니다.
+
+### `[GET]` `/opds-adult`
+* **설명**: 성인 도서 전용 OPDS 카탈로그의 네비게이션 최상위 피드(Atom XML)를 가져옵니다. (관리자 권한 필수)
+
+### `[GET]` `/opds/search`
+* **설명**: 일반 OPDS 피드 내의 책 검색을 지원합니다.
+* **쿼리 스트링**:
+  * `q` 또는 `query` (string, 선택): 검색할 책 제목, 시리즈명, 저자 키워드.
+* **응답 규격**:
+  * 키워드(`q`)가 비어 있을 경우: OpenSearch Description XML 문서 (`application/opensearchdescription+xml`)
+  * 키워드(`q`)가 존재할 경우: 검색 결과 매칭 도서 목록 Atom XML 피드 (`application/atom+xml`)
+
+---
+
+### `[GET]` `/app-opds` / `/app-opds-adult`
+* **설명**: 타치요미/미혼(Tachiyomi/Mihon) 등 비표준 OPDS 클라이언트를 위한 전용 엔드포인트입니다. 내부 성능 캐시를 탑재하고 있습니다.
+
+### `[GET]` `/app-opds/search` / `/app-opds-adult/search`
+* **설명**: 타치요미/미혼 전용 캐시 기능이 결합된 검색 엔드포인트입니다.
+* **쿼리 스트링**:
+  * `q` 또는 `query` (string, 선택): 검색할 책 제목, 시리즈명, 저자 키워드.
+* **응답 규격**:
+  * 키워드(`q`)가 비어 있을 경우: OpenSearch Description XML 문서
+  * 키워드(`q`)가 존재할 경우: 검색 결과 매칭 도서 목록 Atom XML 피드
+

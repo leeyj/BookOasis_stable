@@ -169,3 +169,53 @@ def get_recently_read_entries(db_type: str, download_prefix: str, urn_prefix: st
             'cover': b['cover_image'],
         })
     return entries
+
+def search_books_entries(db_type: str, query: str, download_prefix: str, urn_prefix: str, limit: int = 100, offset: int = 0):
+    conn = database.get_connection(db_type)
+    cursor = conn.cursor()
+    
+    like_query = f"%{query}%"
+    cursor.execute(
+        """
+        SELECT COUNT(*) AS total FROM books
+        WHERE title LIKE ? OR series_name LIKE ? OR author LIKE ?
+        """,
+        (like_query, like_query, like_query)
+    )
+    total = cursor.fetchone()['total']
+    
+    cursor.execute(
+        """
+        SELECT id, title, series_name, author, file_path, cover_image, summary
+        FROM books
+        WHERE title LIKE ? OR series_name LIKE ? OR author LIKE ?
+        ORDER BY title ASC, id ASC
+        LIMIT ? OFFSET ?
+        """,
+        (like_query, like_query, like_query, limit, offset)
+    )
+    books = cursor.fetchall()
+    conn.close()
+    
+    entries = []
+    for b in books:
+        desc = b['summary'] or ""
+        if not desc:
+            meta = []
+            if b['series_name']:
+                meta.append(f"시리즈: {b['series_name']}")
+            if b['author']:
+                meta.append(f"저자: {b['author']}")
+            desc = " / ".join(meta) if meta else "상세 설명 없음"
+            
+        entries.append({
+            'id': f"urn:{urn_prefix}:search:{b['id']}",
+            'title': b['title'],
+            'summary': desc,
+            'type': 'acquisition',
+            'href': f"{download_prefix}/{b['id']}",
+            'mime': _guess_mime_type(b['file_path']),
+            'cover': b['cover_image'],
+        })
+    return entries, total
+

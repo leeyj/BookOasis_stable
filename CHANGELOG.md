@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## v0.7.6
+### added
+- opds 검색 기능 추가 | opds search feature added
+* 일반 / 성인 / 타치요미 일반 / 타치요미 성인  각각의 검색 지원 | general / adult / tachiyomi general / tachiyomi adult each search support
+* 검색 키워드는 제목, 시리즈명, 저자명 매칭 | search keyword title, series name, author name matching
+* 자세한 사항은 /docs/guide_opds.md 참조 | see /docs/guide_opds.md for details
+### fixed
+- 카테고리 이관시 db pool 고갈로 인한 api 동작 오류 수정 | category move db pool exhaustion api error fix
+
+---
+
 ## v0.7.5
 ### added
 - 카테고리 이동기능 추가(일반<->성인) - beta | category move feature added(general <-> adult) - beta

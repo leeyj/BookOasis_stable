@@ -30,6 +30,8 @@ nav:
 - 개발 워크플로우: workflow.md
 - 작업 히스토리:
   - history/index.md
+  - history/20260706_014328_opds_search_walkthrough.md
+  - history/20260706_014328_opds_search_task.md
   - history/20260706_004600_category_migration_walkthrough.md
   - history/20260706_004600_category_migration_task.md
   - history/20260705_scanner_upgrade_roadmap.md

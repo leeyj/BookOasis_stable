@@ -22,16 +22,26 @@ When attempting to connect, Basic Authentication using the **ID and password use
   * Browse series by library
   * Recently Added books
   * Recently Read books
+  * Integrated search features (supports title, series, author search)
 
 ### 🔞 Adult OPDS Catalog Address
 > `http://<SERVER_IP_OR_DOMAIN>:5930/opds-adult`
 * **Access Permission**: Access and authentication are only permitted with accounts having **Administrator (Admin) privileges**.
-* **Provided Categories**: Provides the catalog of series and books in the adult library database.
+* **Provided Categories**: Provides the catalog of series, books and integrated search features in the adult library database.
 
 ### 📖 Dedicated Address for Tachiyomi / Mihon
 > General: `http://<SERVER_IP_OR_DOMAIN>:5930/app-opds`
 > Adult: `http://<SERVER_IP_OR_DOMAIN>:5930/app-opds-adult`
-* This is a dedicated endpoint for special apps like Tachiyomi or Mihon. It is optimized to be parsed smoothly by these apps following the standard OPDS format.
+* This is a dedicated endpoint for special apps like Tachiyomi or Mihon. It is optimized to be parsed smoothly by these apps following the standard OPDS format, and also provides integrated search features.
+
+### 🔍 OPDS Search Endpoints (OpenSearch Support)
+BookOasis OPDS feeds support the OpenSearch specification, enabling keyword searches (matching title, series, or author) directly from compatible external reader apps.
+* **General Search URL**: `http://<SERVER_IP_OR_DOMAIN>:5930/opds/search?q={searchTerms}`
+* **Adult Search URL**: `http://<SERVER_IP_OR_DOMAIN>:5930/opds-adult/search?q={searchTerms}`
+* **Tachiyomi General Search URL**: `http://<SERVER_IP_OR_DOMAIN>:5930/app-opds/search?q={searchTerms}`
+* **Tachiyomi Adult Search URL**: `http://<SERVER_IP_OR_DOMAIN>:5930/app-opds-adult/search?q={searchTerms}`
+> Note: Most modern OPDS apps (such as Moon+ Reader, KyBook, etc.) will automatically detect the search API URL if you simply register the root catalog URL.
+
 
 ---
 
