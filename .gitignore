@@ -37,3 +37,8 @@ test/
 
 # User local docker-compose override
 docker-compose.override.yml
+
+# Logs
+logs/*
+!logs/.gitkeep
+

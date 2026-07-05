@@ -176,7 +176,6 @@ tags: [workflow, history]
 | 2026-06-29 | `pyyaml_docker_entry` | pyyaml 의존성 누락 및 Docker 실행 엔트리포인트 오류 조치 | [Bugfix](./bug/20260629_bugfix_pyyaml_docker_entry.md) | - |
 | 2026-06-29 | `pyyaml_docker_entry` | pyyaml 의존성 누락 및 Docker 실행 엔트리포인트 오류 조치 | [Task](./history/20260629_110144_pyyaml_docker_entry_task.md) | [Walkthrough](./history/20260629_110144_pyyaml_docker_entry_walkthrough.md) |
 | 2026-06-29 | `has_offsets_column_missing` | books 테이블 스키마 내 has_offsets 컬럼 누락으로 인한 스캔 실패 조치 | [Bugfix](./bug/20260629_bugfix_has_offsets_column_missing.md) | - |
-
 | 2026-06-29 | `has_offsets_column_missing` | books 테이블 스키마 내 has_offsets 컬럼 누락으로 인한 스캔 실패 조치 | [Task](./history/20260629_121804_has_offsets_column_missing_task.md) | [Walkthrough](./history/20260629_121804_has_offsets_column_missing_walkthrough.md) |
 | 2026-06-29 | `general_settings_proxy_auth_ref_error` | 일반 환경설정 저장 시 proxyAuth 정의 누락으로 인한 ReferenceError 버그 수정 | [Bugfix](./bug/20260629_bugfix_proxy_auth_reference_error.md) | - |
 | 2026-06-29 | `session_20260629_131956` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260629_131956_session_20260629_131956_task.md) | [Walkthrough](./history/20260629_131956_session_20260629_131956_walkthrough.md) |
@@ -203,11 +202,9 @@ tags: [workflow, history]
 | 2026-06-30 | `i18n_dynamic_translation_system` | 환경설정 내 모든 템플릿(리포트, 사용자 탭)에 대한 다국어 이식 완료 | [Task](./history/20260630_015936_i18n_dynamic_translation_system_task.md) | [Walkthrough](./history/20260630_015936_i18n_dynamic_translation_system_walkthrough.md) |
 | 2026-06-30 | `i18n_dynamic_translation_system` | 일반설정 탭 내 모든 필드/설명글 및 scheduler.js 동적 뱃지/버전 다국어 정밀 전환 | [Task](./history/20260630_020159_i18n_dynamic_translation_system_task.md) | [Walkthrough](./history/20260630_020159_i18n_dynamic_translation_system_walkthrough.md) |
 | 2026-06-30 | `db_connection_leak` | 도서 스캔 과정의 DB 커넥션 누수 및 풀 크기 조정 조치 | [Bugfix](./bug/20260630_bugfix_scanner_db_connection_leak.md) | - |
-
 | 2026-06-30 | `db_connection_leak` | 도서 스캔 과정의 DB 커넥션 누수 및 풀 크기 조정 조치 | [Task](./history/20260630_032308_db_connection_leak_task.md) | [Walkthrough](./history/20260630_032308_db_connection_leak_walkthrough.md) |
 | 2026-06-30 | `series_index_opt` | 시리즈 커버 쿼리 최적화를 위한 복합 인덱스 추가 | [Task](./history/20260630_173642_series_index_opt_task.md) | [Walkthrough](./history/20260630_173642_series_index_opt_walkthrough.md) |
 | 2026-07-02 | `fitwidth_scrollwidth` | 만화 뷰어 fit-width CSS 충돌 수정 및 웹툰 너비 조절 슬라이더 추가 | [Bugfix](./bug/20260702_bugfix_fitwidth_scrollwidth.md) | - |
-
 | 2026-07-02 | `session_20260702_184615` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260702_184615_session_20260702_184615_task.md) | [Walkthrough](./history/20260702_184615_session_20260702_184615_walkthrough.md) |
 | 2026-07-02 | epub_dynamic_pages_sync | EPUB 뷰어의 동적 페이지 생성 후 진행률 API 통해 서버 DB 페이지 자동 동기화 | - | - |
 | 2026-07-02 | epub_state_restore | EPUB 페이지 북마크 복원 실패 및 페이지 번호 표기 버그 수정 | [Bugfix](./bug/20260702_bugfix_epub_state_restore.md) |
@@ -256,12 +253,12 @@ tags: [workflow, history]
 | 2026-07-04 | `pdf_hotspot_fix` | PDF 뷰어 스크롤 모드 락 대상 제외 처리 및 핫스팟 상시 활성화 패치 | [Task](./history/20260704_185928_pdf_hotspot_fix_task.md) | [Walkthrough](./history/20260704_185928_pdf_hotspot_fix_walkthrough.md) |
 | 2026-07-04 | `pdf_navbar_hide_fix` | PDF 뷰어 하단 네비게이션바 상시 노출 방지 및 조작 오버레이 연동 제어 패치 | [Task](./history/20260704_190636_pdf_navbar_hide_fix_task.md) | [Walkthrough](./history/20260704_190636_pdf_navbar_hide_fix_walkthrough.md) |
 | 2026-07-05 | `sqlite_schema_order_bugfix` | SQLite user_category_permissions 테이블 및 인덱스 생성 순서 꼬임으로 인한 OperationalError 수정 | [Bugfix](./bug/20260705_bugfix_user_category_permissions_schema.md) | - |
-| 2026-07-05 | `epub_lineheight_spacing` | EPUB 및 TXT 뷰어에 행간 및 단락 간격 조절 기능 추가 | - | - |
-
-
 | 2026-07-05 | `sqlite_schema_order_bugfix` | SQLite user_category_permissions 테이블 및 인덱스 생성 순서 꼬임으로 인한 OperationalError 수정 | [Task](./history/20260705_105653_sqlite_schema_order_bugfix_task.md) | [Walkthrough](./history/20260705_105653_sqlite_schema_order_bugfix_walkthrough.md) |
 | 2026-07-05 | `epub_lineheight_spacing` | EPUB 및 TXT 뷰어에 행간 및 단락 간격 조절 기능 추가 | [Task](./history/20260705_111335_epub_lineheight_spacing_task.md) | [Walkthrough](./history/20260705_111335_epub_lineheight_spacing_walkthrough.md) |
-| 2026-07-05 | `viewer_close_button_toggle` | 뷰어 플로팅 닫기 버튼을 평소에 숨기고 설정 오버레이와 연동하여 토글 노출 | - | - |
 | 2026-07-05 | `viewer_close_button_toggle` | 뷰어 플로팅 닫기 버튼을 평소에 숨기고 설정 오버레이와 연동하여 토글 노출 | [Task](./history/20260705_111523_viewer_close_button_toggle_task.md) | [Walkthrough](./history/20260705_111523_viewer_close_button_toggle_walkthrough.md) |
-| 2026-07-05 | `viewer_overlay_two_lines` | 뷰어 오버레이 조작 패널을 가독성 개선을 위해 2행(두 줄) 배치 레이아웃으로 분리 | - | - |
 | 2026-07-05 | `viewer_overlay_two_lines` | 뷰어 오버레이 조작 패널을 가독성 개선을 위해 2행(두 줄) 배치 레이아웃으로 분리 | [Task](./history/20260705_111907_viewer_overlay_two_lines_task.md) | [Walkthrough](./history/20260705_111907_viewer_overlay_two_lines_walkthrough.md) |
+| 2026-07-05 | `category_auth_block` | 일반 사용자 권한일 때 사이드바 내 카테고리 추가/관리/우클릭 및 순서 드래그 정렬 권한 차단 | [Task](./history/20260705_122901_category_auth_block_task.md) | [Walkthrough](./history/20260705_122901_category_auth_block_walkthrough.md) |
+| 2026-07-05 | `export_stable_logs_bugfix` | 배포본 소스 추출 시 개발자 로컬 로그 유출 결함 조치 | [Task](./history/20260705_123340_export_stable_logs_bugfix_task.md) | [Walkthrough](./history/20260705_123340_export_stable_logs_bugfix_walkthrough.md) |
+| 2026-07-05 | `scan_tuning_lock_bugfix` | 스캔 완료 후 비동기 DB 최적화 튜닝 시 스캔 큐 락 경합 조치 | [Bugfix](./bug/20260705_bugfix_scan_tuning_lock.md) | - |
+
+| 2026-07-05 | `scan_tuning_lock_bugfix` | 스캔 완료 후 비동기 DB 최적화 튜닝 시 스캔 큐 락 경합 조치 | [Task](./history/20260705_134319_scan_tuning_lock_bugfix_task.md) | [Walkthrough](./history/20260705_134319_scan_tuning_lock_bugfix_walkthrough.md) |

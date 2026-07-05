@@ -192,6 +192,21 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
         except Exception as ex_log:
             print(f"[Logger ERROR] Failed to write log file: {ex_log}")
 
+    # DB가 현재 최적화(VACUUM 등) 튜닝 진행 중인 경우, 완료될 때까지 안전하게 대기
+    from services.db_tuning_service import is_db_tuning
+    import time
+    
+    wait_count = 0
+    while is_db_tuning(db_type):
+        print(f"[Scanner-Trigger] ⚠️ DB Tuning ({db_type}) in progress. Waiting 3 seconds... (elapsed: {wait_count * 3}s)")
+        write_scan_log("⚠️ 데이터베이스 최적화(튜닝) 작업이 진행 중입니다. 완료 시까지 일시 대기합니다.")
+        time.sleep(3.0)
+        wait_count += 1
+        if wait_count > 40:  # 최대 2분 대기
+            print(f"[Scanner-Trigger WARNING] DB Tuning wait timeout. Proceeding with scan anyway.")
+            write_scan_log("⚠️ 튜닝 대기 시간을 초과하여 스캔을 강제 진행합니다.")
+            break
+
     print(f"[Scanner-Trigger] 🚀 Immediate scan started: DB={db_type}, ID={library_id}, Path={physical_path}, Force={force}")
     write_scan_log(f"스캔 기동 시작 - DB={db_type}, LibraryID={library_id}, Path='{physical_path}', Force={force}")
     

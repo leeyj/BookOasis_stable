@@ -31,15 +31,20 @@ export async function loadLibraries() {
         : "color: #94a3b8; transform: rotate(45deg);";
       const pinTitle = isPinned ? i18n.t('category.pin_pinned') : i18n.t('category.pin_unpinned');
       
+      const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+      const addBtnHtml = isAdmin 
+        ? `<button onclick="event.stopPropagation(); triggerAddLibrary();" style="background: none; border: none; color: #a855f7; cursor: pointer; padding: 0.2rem 0.4rem; font-size: 0.9rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; transition: background 0.2s;" onmouseenter="this.style.background='rgba(168, 85, 247, 0.15)'" onmouseleave="this.style.background='none'" title="${i18n.t('category.add_new_tooltip')}">
+            <i class="fa-solid fa-plus"></i>
+          </button>`
+        : '';
+      
       let html = `<li class="menu-item ${state.currentLibraryId === 'home' ? 'active' : ''}" data-type="system" id="category-home" data-id="home" onclick="selectCategory('home')" style="display: flex; justify-content: space-between; align-items: center; box-sizing: border-box;">
         <span style="display: inline-flex; align-items: center; gap: 0.6rem;"><i class="fa-solid fa-house"></i> ${i18n.t('category.home')}</span>
         <div style="display: inline-flex; align-items: center; gap: 0.4rem;">
           <button id="btn-pin-categories" onclick="event.stopPropagation(); window.toggleCategoryOrderPin();" style="background: none; border: none; cursor: pointer; padding: 0.2rem 0.4rem; font-size: 0.9rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; transition: all 0.2s; ${pinBtnStyle}" title="${pinTitle}">
             <i class="fa-solid fa-thumbtack"></i>
           </button>
-          <button onclick="event.stopPropagation(); triggerAddLibrary();" style="background: none; border: none; color: #a855f7; cursor: pointer; padding: 0.2rem 0.4rem; font-size: 0.9rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; transition: background 0.2s;" onmouseenter="this.style.background='rgba(168, 85, 247, 0.15)'" onmouseleave="this.style.background='none'" title="${i18n.t('category.add_new_tooltip')}">
-            <i class="fa-solid fa-plus"></i>
-          </button>
+          ${addBtnHtml}
         </div>
       </li>`;
 
@@ -91,6 +96,10 @@ window.toggleCategoryOrderPin = () => {
 };
 
 function bindDragAndDropEvents(isEnabled) {
+  const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+  if (!isAdmin) {
+    isEnabled = false;
+  }
   const sidebar = document.getElementById('sidebar-categories');
   if (!sidebar) return;
 
@@ -129,6 +138,9 @@ export function bindSidebarContextMenu() {
 
   if (sidebar) {
     sidebar.addEventListener('contextmenu', (e) => {
+      const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+      if (!isAdmin) return;
+      
       e.preventDefault();
       
       const menuItem = e.target.closest('.menu-item');
@@ -185,8 +197,10 @@ export function bindSidebarContextMenu() {
       showContextMenu(e.clientX, e.clientY);
     });
 
-    // 모바일 터치 대응 (롱 프레스 감지)
     sidebar.addEventListener('touchstart', (e) => {
+      const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+      if (!isAdmin) return;
+
       const menuItem = e.target.closest('.menu-item');
       if (menuItem) {
         const type = menuItem.dataset.type;
