@@ -122,6 +122,7 @@ function selectColorOption(element) {
             
             <div class="library-modal-footer">
                 <button type="button" class="btn-cancel" onclick="closeLibraryModal()" data-i18n="common.cancel">취소</button>
+                <button type="button" class="btn-move" id="library-form-move-btn" style="display: none; background: rgba(245, 158, 11, 0.2); border: 1px solid rgba(245, 158, 11, 0.5); color: #f59e0b; padding: 0.5rem 1rem; border-radius: 4px; font-weight: 600; cursor: pointer; transition: all 0.2s;" onmouseenter="this.style.background='rgba(245, 158, 11, 0.3)'" onmouseleave="this.style.background='rgba(245, 158, 11, 0.2)'" onclick="triggerMoveLibrary()">이동</button>
                 <button type="submit" class="btn-submit" id="library-form-submit-btn" data-i18n="common.save">저장</button>
             </div>
         </form>

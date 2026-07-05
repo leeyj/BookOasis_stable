@@ -200,3 +200,30 @@ def _format_library_row(r):
         'vfs_refresh_before_scan': r['vfs_refresh_before_scan'] or 0,
         'rclone_rc_url': r['rclone_rc_url'] or ''
     }
+
+@library_bp.route('/api/media/libraries/move', methods=['POST'])
+@admin_required
+def move_media_library():
+    """라이브러리 카테고리를 다른 타입의 DB(일반 <-> 성인)로 완전히 이동시킵니다."""
+    library_id = request.form.get('id')
+    from_type = request.form.get('from_type', 'general')
+    to_type = request.form.get('to_type', 'adult')
+    
+    if not library_id:
+        return jsonify({'success': False, 'error': '필수 매개변수(id)가 누락되었습니다.'}), 400
+        
+    try:
+        # 스케줄러에서 해당 카테고리 스캔 작업 제거
+        SchedulerService.remove_job(from_type, int(library_id))
+        
+        # 카테고리 이전 수행 (동시성 락 & 트랜잭션 보장)
+        CategoryService.move_library(from_type, to_type, int(library_id))
+        
+        # 스케줄러 리로드
+        SchedulerService.reload_all_jobs()
+        
+        return jsonify({'success': True, 'message': '카테고리가 안전하게 이동되었습니다.'})
+    except Exception as e:
+        print(f"[API ERROR] 카테고리 이관 실패: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+

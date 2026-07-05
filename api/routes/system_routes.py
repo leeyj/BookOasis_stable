@@ -26,7 +26,7 @@ def index():
 
 @system_bp.route('/api/system/status', methods=['GET'])
 def get_system_status():
-    """현재 백그라운드 스캔 상태 및 DB 최적화 튜닝 작업 상태 조회"""
+    """현재 백그라운드 스캔 상태, DB 최적화 튜닝 및 중복 경로 카테고리 경고 조회"""
     db_type = request.args.get('type', 'general')
     try:
         # 1. DB 튜닝 중 여부 파악
@@ -50,6 +50,13 @@ def get_system_status():
         if tuning_active:
             is_active = True
             running_tasks.append("데이터베이스 파일 물리 파편화 압축 정리 및 인덱스 정밀 튜닝 실행 중...")
+            
+        # 3. 일반/성인 카테고리 간 중복 경로 경고 추가
+        from services.category_service import CategoryService
+        warnings = CategoryService.check_duplicate_path_warnings()
+        if warnings:
+            is_active = True
+            running_tasks.extend(warnings)
         
         return jsonify({
             'success': True,

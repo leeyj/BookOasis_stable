@@ -264,9 +264,9 @@ your-domain.com { # <== 본인의 도메인으로 변경하세요.
 
 변경 완료 후 `sudo systemctl reload caddy` 명령을 통해 Caddy 설정을 갱신합니다.
 
-## 라이선스
+## 라이선스 및 상표권 정보
 
-본 프로젝트는 [GNU AGPLv3 (Affero General Public License v3.0)](./LICENSE) 규격을 따릅니다.
-누구나 소스 코드를 열람, 수정, 배포할 수 있으며, 이 소프트웨어를 기반으로 한 서비스(네트워크를 통한 서비스 포함)를 제공할 경우 반드시 수정된 소스 코드를 동일한 AGPLv3 라이선스로 공개해야 합니다. 자세한 약관은 LICENSE 파일을 참조하십시오.
+* **오픈소스 라이선스**: 본 프로젝트는 [GNU AGPLv3 (Affero General Public License v3.0)](./LICENSE) 규격을 따릅니다. 누구나 소스 코드를 열람, 수정, 배포할 수 있으며, 이 소프트웨어를 기반으로 한 서비스(네트워크를 통한 서비스 포함)를 제공할 경우 반드시 수정된 소스 코드를 동일한 AGPLv3 라이선스로 공개해야 합니다. 자세한 약관은 LICENSE 파일을 참조하십시오.
+* **상표권 보호 가이드라인**: "BookOasis" 명칭 및 관련 공식 로고 이미지는 원작자의 고유 식별 상표(Trademark)로 보호됩니다. 본 프로그램을 포크(Fork) 및 변경하여 재배포 시 원본 소스코드의 저작권 표기는 성실히 준수하되, 동일한 명칭("BookOasis")과 공식 로고를 제품명에 사용하여 재배포할 수 없으며 반드시 이름을 다르게 변경하여 식별되도록 해야 합니다.
 
-
+Copyright &copy; 2026 leeyj (Carls, leeyj78@gmail.com). All rights reserved.

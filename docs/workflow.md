@@ -260,7 +260,6 @@ tags: [workflow, history]
 | 2026-07-05 | `category_auth_block` | 일반 사용자 권한일 때 사이드바 내 카테고리 추가/관리/우클릭 및 순서 드래그 정렬 권한 차단 | [Task](./history/20260705_122901_category_auth_block_task.md) | [Walkthrough](./history/20260705_122901_category_auth_block_walkthrough.md) |
 | 2026-07-05 | `export_stable_logs_bugfix` | 배포본 소스 추출 시 개발자 로컬 로그 유출 결함 조치 | [Task](./history/20260705_123340_export_stable_logs_bugfix_task.md) | [Walkthrough](./history/20260705_123340_export_stable_logs_bugfix_walkthrough.md) |
 | 2026-07-05 | `scan_tuning_lock_bugfix` | 스캔 완료 후 비동기 DB 최적화 튜닝 시 스캔 큐 락 경합 조치 | [Bugfix](./bug/20260705_bugfix_scan_tuning_lock.md) | - |
-
 | 2026-07-05 | `rclone_rc_basic_auth_bugfix` | Rclone RC 통신 시 ID/패스워드 인증(Basic Auth) 미지원 결함 조치 | [Bugfix](./bug/20260705_bugfix_rclone_rc_basic_auth.md) | - |
 | 2026-07-05 | `scan_tuning_lock_bugfix` | 스캔 완료 후 비동기 DB 최적화 튜닝 시 스캔 큐 락 경합 조치 | [Task](./history/20260705_134319_scan_tuning_lock_bugfix_task.md) | [Walkthrough](./history/20260705_134319_scan_tuning_lock_bugfix_walkthrough.md) |
 | 2026-07-05 | `sqlite_schema_order_bugfix` | SQLite user_category_permissions 테이블 및 인덱스 생성 순서 꼬임으로 인한 OperationalError 수정 | [Task](./history/20260705_151223_sqlite_schema_order_bugfix_task.md) | [Walkthrough](./history/20260705_151223_sqlite_schema_order_bugfix_walkthrough.md) |
@@ -272,7 +271,14 @@ tags: [workflow, history]
 | 2026-07-05 | `rclone_rc_basic_auth` | 카테고리 수정 시 실제 경로 변경 시에만 스캔하도록 조건부 트리거링 구현 완료 | [Task](./history/20260705_191733_rclone_rc_basic_auth_task.md) | [Walkthrough](./history/20260705_191733_rclone_rc_basic_auth_walkthrough.md) |
 | 2026-07-05 | `rclone_rc_basic_auth` | 카테고리 수정 시 스캔 구동 여부에 따른 팝업 안내 메시지 분기 처리 완료 | [Task](./history/20260705_191906_rclone_rc_basic_auth_task.md) | [Walkthrough](./history/20260705_191906_rclone_rc_basic_auth_walkthrough.md) |
 | 2026-07-05 | `library_switch_to_home_bugfix` | 일반/성인 도서 전환 시 오른쪽 도서 목록 미갱신 결함 수정 | [Bugfix](./bug/20260705_bugfix_library_switch_to_home.md) | - |
-
 | 2026-07-05 | `library_switch_to_home_bugfix` | 일반/성인 도서 전환 시 오른쪽 도서 목록 미갱신 결함 수정 | [Task](./history/20260705_211152_library_switch_to_home_bugfix_task.md) | [Walkthrough](./history/20260705_211152_library_switch_to_home_bugfix_walkthrough.md) |
 | 2026-07-05 | `caddy_guide_addition` | Caddy 리버스 프록시 설정 가이드 추가 | [Task](./history/20260705_213840_caddy_guide_addition_task.md) | [Walkthrough](./history/20260705_213840_caddy_guide_addition_walkthrough.md) |
 | 2026-07-05 | `infinite_scroll_category_transition_bugfix` | 카테고리 전환 시 무한 스크롤(옵저버) 오작동 결함 수정 | [Task](./history/20260705_215456_infinite_scroll_category_transition_bugfix_task.md) | [Walkthrough](./history/20260705_215456_infinite_scroll_category_transition_bugfix_walkthrough.md) |
+| 2026-07-05 | `about_tab_trademark_copyright_addition` | 정보 탭에 상표권 및 저작권 명시 추가 | [Task](./history/20260705_223333_about_tab_trademark_copyright_addition_task.md) | [Walkthrough](./history/20260705_223333_about_tab_trademark_copyright_addition_walkthrough.md) |
+| 2026-07-05 | `readmes_trademark_copyright_addition` | README.md 및 README_EN.md에 상표권 및 저작권 명시 추가 | [Task](./history/20260705_223603_readmes_trademark_copyright_addition_task.md) | [Walkthrough](./history/20260705_223603_readmes_trademark_copyright_addition_walkthrough.md) |
+| 2026-07-05 | `category_migration` | 일반 ↔ 성인 데이터베이스 간 안전한 카테고리 데이터 마이그레이션 기능 구현 | [Improvement](./bug/20260705_improvement_category_migration.md) | - |
+
+
+| 2026-07-05 | `category_migration` | 이관 중 브라우저 창 닫기/이탈 방지 및 일반/성인 카테고리 간 중복 경로 감지 시스템 속보 바 알림 구현 | [Improvement](./bug/20260705_improvement_category_migration.md) | - |
+| 2026-07-05 | `category_migration` | 일반 ↔ 성인 데이터베이스 간 안전한 카테고리 데이터 마이그레이션 기능 구현 | [Task](./history/20260705_231206_category_migration_task.md) | [Walkthrough](./history/20260705_231206_category_migration_walkthrough.md) |
+| 2026-07-05 | `category_migration` | 창 이탈 방지 및 일반/성인 카테고리 경로 중복 감지 속보 구현 | [Task](./history/20260705_233820_category_migration_task.md) | [Walkthrough](./history/20260705_233820_category_migration_walkthrough.md) |

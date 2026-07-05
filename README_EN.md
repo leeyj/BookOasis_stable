@@ -264,7 +264,9 @@ your-domain.com { # <== Change this to your own domain
 
 After updating Caddyfile, reload the settings by running `sudo systemctl reload caddy`.
 
-## License
+## License and Trademark Info
 
-This project is licensed under the [GNU AGPLv3 (Affero General Public License v3.0)](./LICENSE).
-Anyone is free to view, modify, and distribute the source code. If you provide a service (including over a network) based on this software, you must publicly disclose the modified source code under the same AGPLv3 license. For detailed terms, please refer to the LICENSE file.
+* **Open Source License**: This project is licensed under the [GNU AGPLv3 (Affero General Public License v3.0)](./LICENSE). Anyone is free to view, modify, and distribute the source code. If you provide a service (including over a network) based on this software, you must publicly disclose the modified source code under the same AGPLv3 license. For detailed terms, please refer to the LICENSE file.
+* **Trademark Guidelines**: The name "BookOasis" and its official logos are protected trademarks of the original author. If you fork and redistribute this software, you must respect the copyrights, but you may not use the same name ("BookOasis") or official logo for your derivative works. You must rename it to avoid brand confusion.
+
+Copyright &copy; 2026 leeyj (Carls, leeyj78@gmail.com). All rights reserved.

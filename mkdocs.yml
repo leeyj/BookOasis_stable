@@ -31,6 +31,14 @@ nav:
 - 작업 히스토리:
   - history/index.md
   - history/20260705_scanner_upgrade_roadmap.md
+  - history/20260705_233820_category_migration_walkthrough.md
+  - history/20260705_233820_category_migration_task.md
+  - history/20260705_231206_category_migration_walkthrough.md
+  - history/20260705_231206_category_migration_task.md
+  - history/20260705_223603_readmes_trademark_copyright_addition_walkthrough.md
+  - history/20260705_223603_readmes_trademark_copyright_addition_task.md
+  - history/20260705_223333_about_tab_trademark_copyright_addition_walkthrough.md
+  - history/20260705_223333_about_tab_trademark_copyright_addition_task.md
   - history/20260705_215456_infinite_scroll_category_transition_bugfix_walkthrough.md
   - history/20260705_215456_infinite_scroll_category_transition_bugfix_task.md
   - history/20260705_213840_caddy_guide_addition_walkthrough.md
@@ -551,6 +559,7 @@ nav:
   - history/20260619_145226_init_docs_task.md
 - 버그 트러블슈팅:
   - bug/index.md
+  - bug/20260705_improvement_category_migration.md
   - bug/20260705_bugfix_user_category_permissions_schema.md
   - bug/20260705_bugfix_scan_tuning_lock.md
   - bug/20260705_bugfix_rclone_rc_basic_auth.md

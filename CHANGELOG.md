@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## v0.7.5
+### added
+- 카테고리 이동기능 추가(일반<->성인) - beta | category move feature added(general <-> adult) - beta
+* 제약조건 : 스캔중이면 동작 불가. | constraint : if scan in progress, it doesn't work.
+*          이관중에는 대시보드 사용불가 | during migration, dashboard is not available
+*          카테고리중복시 속보바(toast)로 경고문구 표시 (일반/성인간 중복경로 존재시) | Duplicate path warning toast displayed after move
+
 ## v0.7.4
 ### added
 - 카테고리 아이콘 수정 및 색 변경 기능 추가 | category icon and color change feature added

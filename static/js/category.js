@@ -311,6 +311,10 @@ export function triggerAddLibrary() {
   const remoteEl = document.getElementById('library-form-remote');
   if (remoteEl) remoteEl.checked = false;
 
+  // 이동 버튼 숨김
+  const moveBtn = document.getElementById('library-form-move-btn');
+  if (moveBtn) moveBtn.style.display = 'none';
+
   // Rclone RC URL 초기화 및 숨김
   const rcloneUrlEl = document.getElementById('library-form-rclone-url');
   if (rcloneUrlEl) rcloneUrlEl.value = '';
@@ -357,6 +361,17 @@ export async function triggerEditLibrary() {
   const form = document.getElementById('library-crud-form');
   
   if (!modal || !form) return;
+
+  // 이동 버튼 노출 및 텍스트 갱신
+  const moveBtn = document.getElementById('library-form-move-btn');
+  if (moveBtn) {
+    moveBtn.style.display = 'block';
+    if (state.currentLibraryType === 'general') {
+      moveBtn.innerText = '성인도서로 이동';
+    } else {
+      moveBtn.innerText = '일반도서로 이동';
+    }
+  }
   
   const id = currentTargetLibrary.id;
   const name = currentTargetLibrary.name;
@@ -740,4 +755,78 @@ function enableVFSCheckForRemote() {
   // 해당 라이브러리에 대한 VFS 체크박스를 활성화
   console.log('[VFS] Remote path selected - VFS should be enabled in scan settings');
 }
+
+export async function triggerMoveLibrary() {
+  if (!currentTargetLibrary || currentTargetLibrary.type === 'system') return;
+  
+  const fromType = state.currentLibraryType;
+  const toType = (fromType === 'general') ? 'adult' : 'general';
+  
+  const targetLabel = (toType === 'general') ? '일반도서' : '성인도서';
+  const confirmMsg = `정말로 이 카테고리를 [${targetLabel}] 보관함으로 이동하시겠습니까?\n이동하는 동안 데이터베이스 정밀 이전 작업을 위해 전체 화면이 잠시 잠깁니다.`;
+  if (!confirm(confirmMsg)) return;
+  
+  // 1. 모달창 닫기
+  const modal = document.getElementById('library-form-modal');
+  if (modal) modal.style.display = 'none';
+  
+  // 2. 전체 화면 잠금 오버레이 켜기
+  const dimmer = document.getElementById('migration-dimmer-modal');
+  if (dimmer) dimmer.style.display = 'flex';
+  
+  const formData = new FormData();
+  formData.append('id', currentTargetLibrary.id);
+  formData.append('from_type', fromType);
+  formData.append('to_type', toType);
+  
+  // 창 닫기 및 이탈 방지 핸들러 등록
+  const preventClose = (e) => {
+    e.preventDefault();
+    e.returnValue = ''; // 표준 브라우저 경고 팝업 활성화
+  };
+  window.addEventListener('beforeunload', preventClose);
+  
+  try {
+    const response = await fetch('/api/media/libraries/move', {
+      method: 'POST',
+      body: formData
+    });
+    const data = await response.json();
+    
+    if (data.success) {
+      alert(data.message || '카테고리가 성공적으로 이동되었습니다.');
+      
+      // 3. 목적지 탭으로 타입 변경
+      state.currentLibraryType = toType;
+      
+      // 4. 일반 <-> 성인 토글 버튼 active 클래스 갱신
+      document.querySelectorAll('.btn-toggle').forEach(btn => btn.classList.remove('active'));
+      if (toType === 'general') {
+        const btnGen = document.getElementById('btn-lib-general');
+        if (btnGen) btnGen.classList.add('active');
+      } else {
+        const btnAd = document.getElementById('btn-lib-adult');
+        if (btnAd) btnAd.classList.add('active');
+      }
+      
+      // 5. 사이드바 및 화면 리셋
+      await loadLibraries();
+      selectCategory('home');
+    } else {
+      alert('이동 실패: ' + (data.error || '알 수 없는 오류'));
+    }
+  } catch (e) {
+    console.error('이관 API 오류:', e);
+    alert('서버 통신 실패 또는 타임아웃이 발생했습니다.');
+  } finally {
+    // 창 닫기 방지 핸들러 해제 및 딤 모달 끄기
+    window.removeEventListener('beforeunload', preventClose);
+    if (dimmer) dimmer.style.display = 'none';
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.triggerMoveLibrary = triggerMoveLibrary;
+}
+
 

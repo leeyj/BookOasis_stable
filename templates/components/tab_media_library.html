@@ -154,6 +154,20 @@
     {% include "components/modals/library_modal.html" %}
     {% include "components/modals/metadata_search_modal.html" %}
 
+    <!-- 카테고리 이관(이동) 중 전체 화면 잠금 로딩 모달 -->
+    <div id="migration-dimmer-modal" class="library-modal" style="display: none; z-index: 10005; background: rgba(9, 13, 22, 0.7); backdrop-filter: blur(8px); align-items: center; justify-content: center; flex-direction: column;">
+        <div style="background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(255, 255, 255, 0.08); padding: 2.5rem 3rem; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); text-align: center; color: #fff; max-width: 450px; width: 90%;">
+            <div style="font-size: 2.5rem; color: #f59e0b; margin-bottom: 1.5rem;">
+                <i class="fa-solid fa-circle-notch fa-spin"></i>
+            </div>
+            <h3 style="margin: 0 0 0.8rem 0; font-size: 1.25rem; font-weight: 700;">카테고리 데이터 이동 중</h3>
+            <p style="margin: 0; color: #94a3b8; font-size: 0.9rem; line-height: 1.5; word-break: keep-all;">
+                보관함 간 데이터를 안전하게 이동하고 있습니다.<br>
+                데이터 용량에 따라 수초에서 수십초가 걸릴 수 있으니, 완료될 때까지 브라우저 창을 닫지 마십시오.
+            </p>
+        </div>
+    </div>
+
     <!-- 실시간 시스템 작업 뉴스 티커 푸터 바 -->
     <div id="system-ticker-footer" class="system-ticker-footer" style="display: none;">
         <div class="ticker-title"><i class="fa-solid fa-bullhorn"></i> <span data-i18n="system.ticker_title">시스템 속보</span></div>
