@@ -279,6 +279,7 @@ tags: [workflow, history]
 | 2026-07-05 | `category_migration` | 일반 ↔ 성인 데이터베이스 간 안전한 카테고리 데이터 마이그레이션 기능 구현 | [Improvement](./bug/20260705_improvement_category_migration.md) | - |
 
 
-| 2026-07-05 | `category_migration` | 이관 중 브라우저 창 닫기/이탈 방지 및 일반/성인 카테고리 간 중복 경로 감지 시스템 속보 바 알림 구현 | [Improvement](./bug/20260705_improvement_category_migration.md) | - |
+| 2026-07-05 | `category_migration` | 이관 중 브라우저 창 닫기/이탈 방지, 중복 경로 감지 속보 및 DB 커넥션 풀 누수 결함 최종 수정 | [Improvement](./bug/20260705_improvement_category_migration.md) | - |
 | 2026-07-05 | `category_migration` | 일반 ↔ 성인 데이터베이스 간 안전한 카테고리 데이터 마이그레이션 기능 구현 | [Task](./history/20260705_231206_category_migration_task.md) | [Walkthrough](./history/20260705_231206_category_migration_walkthrough.md) |
 | 2026-07-05 | `category_migration` | 창 이탈 방지 및 일반/성인 카테고리 경로 중복 감지 속보 구현 | [Task](./history/20260705_233820_category_migration_task.md) | [Walkthrough](./history/20260705_233820_category_migration_walkthrough.md) |
+| 2026-07-06 | `category_migration` | 마이그레이션 커넥션 누수 결함 최종 보완 및 빌드 | [Task](./history/20260706_004600_category_migration_task.md) | [Walkthrough](./history/20260706_004600_category_migration_walkthrough.md) |

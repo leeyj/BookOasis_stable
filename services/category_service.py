@@ -202,11 +202,18 @@ class CategoryService:
             conn_dst.rollback()
             conn_src.rollback()
             raise e
+        finally:
+            try: conn_src.close()
+            except: pass
+            try: conn_dst.close()
+            except: pass
 
     @staticmethod
     def check_duplicate_path_warnings():
         """일반도서와 성인도서의 카테고리 경로들을 전수 조사하여 중복된 물리 경로가 존재하는 경우 경고 문자열 목록을 반환합니다."""
         warnings = []
+        conn_gen = None
+        conn_ad = None
         try:
             import database
             conn_gen = database.get_connection('general')
@@ -244,6 +251,13 @@ class CategoryService:
                         )
         except Exception as e:
             print(f"[Warning Check ERROR] Failed to check duplicate paths: {e}")
+        finally:
+            if conn_gen:
+                try: conn_gen.close()
+                except: pass
+            if conn_ad:
+                try: conn_ad.close()
+                except: pass
             
         return warnings
 
