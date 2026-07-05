@@ -31,6 +31,12 @@ nav:
 - 작업 히스토리:
   - history/index.md
   - history/20260705_scanner_upgrade_roadmap.md
+  - history/20260705_111907_viewer_overlay_two_lines_walkthrough.md
+  - history/20260705_111907_viewer_overlay_two_lines_task.md
+  - history/20260705_111523_viewer_close_button_toggle_walkthrough.md
+  - history/20260705_111523_viewer_close_button_toggle_task.md
+  - history/20260705_111335_epub_lineheight_spacing_walkthrough.md
+  - history/20260705_111335_epub_lineheight_spacing_task.md
   - history/20260705_105653_sqlite_schema_order_bugfix_walkthrough.md
   - history/20260705_105653_sqlite_schema_order_bugfix_task.md
   - history/20260704_190636_pdf_navbar_hide_fix_walkthrough.md

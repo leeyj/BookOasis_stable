@@ -34,12 +34,16 @@ export function getViewerSettings() {
   const fontSize = parseFloat(localStorage.getItem('viewer_font_size') || defaultSizeRem);
   const fontFamily = localStorage.getItem('viewer_font_family') || fontMap;
   const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
+  const lineHeight = parseFloat(localStorage.getItem('viewer_line_height') || '1.8');
+  const paragraphSpacing = parseFloat(localStorage.getItem('viewer_paragraph_spacing') || '1.0');
 
   return {
     theme: THEMES[themeKey] || THEMES.dark,
     fontSize,
     fontFamily,
-    scrollMode
+    scrollMode,
+    lineHeight,
+    paragraphSpacing
   };
 }
 
@@ -58,6 +62,16 @@ export function toggleTheme() {
   const next = current === 'dark' ? 'light' : 'dark';
   localStorage.setItem('viewer_theme', next);
   return THEMES[next];
+}
+
+// 4. 행간 설정 저장
+export function updateLineHeight(val) {
+  localStorage.setItem('viewer_line_height', val);
+}
+
+// 5. 단락 간격 설정 저장
+export function updateParagraphSpacing(val) {
+  localStorage.setItem('viewer_paragraph_spacing', val);
 }
 
 // 📌 뷰어 공통 사용 가능 폰트 메타데이터 정의

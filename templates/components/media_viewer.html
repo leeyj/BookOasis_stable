@@ -1,7 +1,7 @@
 <!-- 내장 미디어 통합 뷰어 모달 (뷰어는 전체화면이 필요하므로 유지) -->
 <div id="media-viewer-modal" class="viewer-modal">
     <!-- 전체화면 탈출용 플로팅 닫기 버튼 -->
-    <button class="floating-close-btn" onclick="closeMediaViewer()" data-i18n-title="viewer.close_fullscreen" title="전체화면 닫기 (ESC)">
+    <button class="floating-close-btn" onclick="closeMediaViewer()" data-i18n-title="viewer.close_fullscreen" title="전체화면 닫기 (ESC)" style="display: none;">
         <i class="fa-solid fa-xmark"></i>
     </button>
 
@@ -73,13 +73,32 @@
                             <i class="fa-solid fa-arrows-up-down"></i> <span data-i18n="viewer.scroll">스크롤</span>
                         </button>
                     </div>
+                </div>
 
-                    <div class="overlay-txt-group" id="overlay-txt-controls-group" style="display: none; display: flex; gap: 0.4rem; align-items: center;">
+                <!-- 2행: 텍스트 및 EPUB 뷰어 스타일 옵션 -->
+                <div class="overlay-controls-row" id="overlay-txt-controls-row" style="display: none; margin-top: 0.5rem;">
+                    <div class="overlay-txt-group" id="overlay-txt-controls-group" style="display: flex; gap: 0.4rem; align-items: center;">
                         <!-- 폰트 선택 드롭다운 -->
                         <select id="viewer-font-select" onchange="onViewerFontChange(this.value)" style="background: #1e293b; color: #fff; border: 1px solid rgba(255,255,255,0.15); padding: 0.35rem 0.5rem; border-radius: 4px; font-size: 0.8rem; cursor: pointer; outline: none;">
                             <option value="batang">KoPub 바탕</option>
                             <option value="gothic">나눔고딕</option>
                             <option value="pretendard">Pretendard</option>
+                        </select>
+                        <!-- 행간 선택 드롭다운 -->
+                        <select id="viewer-line-height-select" onchange="onViewerLineHeightChange(this.value)" style="background: #1e293b; color: #fff; border: 1px solid rgba(255,255,255,0.15); padding: 0.35rem 0.5rem; border-radius: 4px; font-size: 0.8rem; cursor: pointer; outline: none;" title="행간 조절">
+                            <option value="1.4">행간 1.4</option>
+                            <option value="1.6">행간 1.6</option>
+                            <option value="1.8">행간 1.8 (기본)</option>
+                            <option value="2.0">행간 2.0</option>
+                            <option value="2.2">행간 2.2</option>
+                        </select>
+                        <!-- 단락 간격 선택 드롭다운 -->
+                        <select id="viewer-paragraph-spacing-select" onchange="onViewerParagraphSpacingChange(this.value)" style="background: #1e293b; color: #fff; border: 1px solid rgba(255,255,255,0.15); padding: 0.35rem 0.5rem; border-radius: 4px; font-size: 0.8rem; cursor: pointer; outline: none;" title="단락 간격 조절">
+                            <option value="0.5">단락 0.5em</option>
+                            <option value="1.0">단락 1.0em (기본)</option>
+                            <option value="1.5">단락 1.5em</option>
+                            <option value="2.0">단락 2.0em</option>
+                            <option value="2.5">단락 2.5em</option>
                         </select>
                         <!-- 폰트 사이즈 조절 -->
                         <button onclick="changeFontSize(-1)" class="btn-overlay-fit" style="border: 1px solid rgba(255,255,255,0.1); padding: 0.3rem 0.7rem; background: transparent; color: #fff; cursor: pointer; border-radius: 4px;" data-i18n-title="viewer.font_smaller" title="글자 작게">A-</button>

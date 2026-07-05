@@ -19,6 +19,11 @@ EN:
 * Alternatively, if you need to add a format not supported by the existing parser, you can modify the parser to add it.
 * Please refer to **./docs/guide_scanner_parser.md** for parser development and modification.
 
+### improved
+- epub 보기시 행간,단락 조절기능 추가 | epub viewing line spacing, paragraph spacing adjustment
+- epub 보기시 닫기 버튼 플로팅 추가 | epub viewing close button floating
+- 뷰어 설정 오버레이, 닫기 버튼 위치 재배치 | viewer setting overlay, close button position rearrangement
+
 ## v0.7.0
 ### improved
 - /docs 내 문서 보강 및 최신화 | /docs documents reinforcement and update

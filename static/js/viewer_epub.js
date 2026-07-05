@@ -174,7 +174,7 @@ export function registerEpubHooks() {
 export function applyEpubSettings() {
   if (!epubRendition) return;
 
-  const { theme, fontSize, fontFamily } = getViewerSettings();
+  const { theme, fontSize, fontFamily, lineHeight, paragraphSpacing } = getViewerSettings();
 
   // 폰트 정의
   let fontCSS = "'KoPub Batang', 'Nanum Myeongjo', serif";
@@ -198,11 +198,14 @@ export function applyEpubSettings() {
       'color': `${theme.text} !important`, 
       'background-color': `${theme.background} !important`,
       'font-family': `${fontCSS} !important`,
-      'font-size': `${fontSize}rem !important`
+      'font-size': `${fontSize}rem !important`,
+      'line-height': `${lineHeight} !important`
     },
     'p': { 
       'color': `${theme.text} !important`, 
-      'line-height': '1.8 !important',
+      'line-height': `${lineHeight} !important`,
+      'margin-top': `${paragraphSpacing}em !important`,
+      'margin-bottom': `${paragraphSpacing}em !important`,
       'font-family': `${fontCSS} !important`
     },
     'span': { 

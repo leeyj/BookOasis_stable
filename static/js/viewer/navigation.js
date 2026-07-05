@@ -31,6 +31,10 @@ export function toggleComicOverlay() {
   if (epubNavBar) {
     epubNavBar.style.display = isOpening ? 'flex' : 'none';
   }
+  const floatingCloseBtn = document.querySelector('.floating-close-btn');
+  if (floatingCloseBtn) {
+    floatingCloseBtn.style.display = isOpening ? 'flex' : 'none';
+  }
 
   if (isOpening) {
     Renderer.updatePageInfo();

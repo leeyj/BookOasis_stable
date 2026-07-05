@@ -4,7 +4,7 @@ import { initComicViewer, clearComicViewer, nextComicPage, prevComicPage, setCom
 import { initTxtViewer, prevTxtPage, nextTxtPage, applyTxtSettings } from './viewer_txt.js';
 import { initPdfViewer, nextPdfPage, prevPdfPage, clearPdfViewer } from './viewer_pdf.js';
 import { initEpubViewer, clearEpubViewer, epubPrevPage, epubNextPage, applyEpubSettings, changeEpubScrollMode } from './viewer_epub.js';
-import { updateFontSize, toggleTheme } from './viewer_settings.js';
+import { updateFontSize, toggleTheme, updateLineHeight, updateParagraphSpacing } from './viewer_settings.js';
 
 // 사용자 정의 폰트 목록 로드 및 드롭다운 바인딩
 export function loadCustomFontsList() {
@@ -66,6 +66,10 @@ export function openReader(bookId, format, title, pagesRead, totalPages) {
   const overlayMenu = document.getElementById('comic-overlay-menu');
   if (overlayMenu) overlayMenu.style.display = 'none';
 
+  // 플로팅 닫기 버튼도 초기에는 숨김 처리 (오버레이가 닫힌 채 시작되므로)
+  const floatingCloseBtn = document.querySelector('.floating-close-btn');
+  if (floatingCloseBtn) floatingCloseBtn.style.display = 'none';
+
   // 모든 뷰어 영역 및 컨트롤 숨김
   document.querySelectorAll('.viewer-pane').forEach(p => p.style.display = 'none');
   document.getElementById('txt-controls').style.display = 'none';
@@ -73,7 +77,7 @@ export function openReader(bookId, format, title, pagesRead, totalPages) {
 
   // 공용 오버레이 조작 패널 분기 제어
   const overlayComicFit = document.getElementById('overlay-comic-fit-group');
-  const overlayTxtControls = document.getElementById('overlay-txt-controls-group');
+  const overlayTxtControls = document.getElementById('overlay-txt-controls-row');
   if (overlayComicFit) overlayComicFit.style.display = 'none';
   if (overlayTxtControls) overlayTxtControls.style.display = 'none';
 
@@ -83,6 +87,14 @@ export function openReader(bookId, format, title, pagesRead, totalPages) {
   const savedFont = localStorage.getItem('viewer_font_family') || 'batang';
   const select = document.getElementById('viewer-font-select');
   if (select) select.value = savedFont;
+
+  const savedLineHeight = localStorage.getItem('viewer_line_height') || '1.8';
+  const selectLineHeight = document.getElementById('viewer-line-height-select');
+  if (selectLineHeight) selectLineHeight.value = savedLineHeight;
+
+  const savedParagraphSpacing = localStorage.getItem('viewer_paragraph_spacing') || '1.0';
+  const selectParagraphSpacing = document.getElementById('viewer-paragraph-spacing-select');
+  if (selectParagraphSpacing) selectParagraphSpacing.value = savedParagraphSpacing;
   
   const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
   const btnPage = document.getElementById('btn-scroll-page');
@@ -362,6 +374,20 @@ export function toggleReaderTheme() {
 window.onViewerFontChange = function(value) {
   console.log(`[Viewer-Core] Font family changed to: ${value}`);
   localStorage.setItem('viewer_font_family', value);
+  applyTxtSettings();
+  applyEpubSettings();
+};
+
+window.onViewerLineHeightChange = function(value) {
+  console.log(`[Viewer-Core] Line height changed to: ${value}`);
+  updateLineHeight(value);
+  applyTxtSettings();
+  applyEpubSettings();
+};
+
+window.onViewerParagraphSpacingChange = function(value) {
+  console.log(`[Viewer-Core] Paragraph spacing changed to: ${value}`);
+  updateParagraphSpacing(value);
   applyTxtSettings();
   applyEpubSettings();
 };

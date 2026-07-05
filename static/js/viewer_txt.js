@@ -85,13 +85,14 @@ export function applyTxtSettings() {
   const contentArea = document.getElementById('txt-content-area');
   if (!container || !scrollWrapper || !contentArea) return;
 
-  const { theme, fontSize, fontFamily, scrollMode } = getViewerSettings();
+  const { theme, fontSize, fontFamily, scrollMode, lineHeight } = getViewerSettings();
 
   // 1. 테마 클래스 교체
   container.className = `viewer-pane ${theme.className}`;
 
-  // 2. 폰트 크기 적용 (rem)
+  // 2. 폰트 크기 및 행간 적용 (rem)
   contentArea.style.fontSize = `${fontSize}rem`;
+  contentArea.style.lineHeight = lineHeight;
 
   // 3. 스크롤 모드 적용
   if (scrollMode === 'page') {

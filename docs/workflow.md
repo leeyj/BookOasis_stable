@@ -256,5 +256,12 @@ tags: [workflow, history]
 | 2026-07-04 | `pdf_hotspot_fix` | PDF 뷰어 스크롤 모드 락 대상 제외 처리 및 핫스팟 상시 활성화 패치 | [Task](./history/20260704_185928_pdf_hotspot_fix_task.md) | [Walkthrough](./history/20260704_185928_pdf_hotspot_fix_walkthrough.md) |
 | 2026-07-04 | `pdf_navbar_hide_fix` | PDF 뷰어 하단 네비게이션바 상시 노출 방지 및 조작 오버레이 연동 제어 패치 | [Task](./history/20260704_190636_pdf_navbar_hide_fix_task.md) | [Walkthrough](./history/20260704_190636_pdf_navbar_hide_fix_walkthrough.md) |
 | 2026-07-05 | `sqlite_schema_order_bugfix` | SQLite user_category_permissions 테이블 및 인덱스 생성 순서 꼬임으로 인한 OperationalError 수정 | [Bugfix](./bug/20260705_bugfix_user_category_permissions_schema.md) | - |
+| 2026-07-05 | `epub_lineheight_spacing` | EPUB 및 TXT 뷰어에 행간 및 단락 간격 조절 기능 추가 | - | - |
+
 
 | 2026-07-05 | `sqlite_schema_order_bugfix` | SQLite user_category_permissions 테이블 및 인덱스 생성 순서 꼬임으로 인한 OperationalError 수정 | [Task](./history/20260705_105653_sqlite_schema_order_bugfix_task.md) | [Walkthrough](./history/20260705_105653_sqlite_schema_order_bugfix_walkthrough.md) |
+| 2026-07-05 | `epub_lineheight_spacing` | EPUB 및 TXT 뷰어에 행간 및 단락 간격 조절 기능 추가 | [Task](./history/20260705_111335_epub_lineheight_spacing_task.md) | [Walkthrough](./history/20260705_111335_epub_lineheight_spacing_walkthrough.md) |
+| 2026-07-05 | `viewer_close_button_toggle` | 뷰어 플로팅 닫기 버튼을 평소에 숨기고 설정 오버레이와 연동하여 토글 노출 | - | - |
+| 2026-07-05 | `viewer_close_button_toggle` | 뷰어 플로팅 닫기 버튼을 평소에 숨기고 설정 오버레이와 연동하여 토글 노출 | [Task](./history/20260705_111523_viewer_close_button_toggle_task.md) | [Walkthrough](./history/20260705_111523_viewer_close_button_toggle_walkthrough.md) |
+| 2026-07-05 | `viewer_overlay_two_lines` | 뷰어 오버레이 조작 패널을 가독성 개선을 위해 2행(두 줄) 배치 레이아웃으로 분리 | - | - |
+| 2026-07-05 | `viewer_overlay_two_lines` | 뷰어 오버레이 조작 패널을 가독성 개선을 위해 2행(두 줄) 배치 레이아웃으로 분리 | [Task](./history/20260705_111907_viewer_overlay_two_lines_task.md) | [Walkthrough](./history/20260705_111907_viewer_overlay_two_lines_walkthrough.md) |
