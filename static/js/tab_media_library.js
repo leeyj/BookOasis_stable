@@ -128,13 +128,7 @@ export function switchLibraryType(type) {
     document.getElementById('btn-lib-adult').classList.add('active');
   }
   loadLibraries();
-  if (state.currentLibraryId === 'home') {
-    loadDashboardData();
-  } else if (state.currentLibraryId === 'history') {
-    loadReadingHistory();
-  } else {
-    loadBooksList(false);
-  }
+  selectCategory('home');
 }
 
 // 카테고리 선택 처리

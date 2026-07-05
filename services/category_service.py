@@ -16,7 +16,9 @@ class CategoryService:
             'physical_path': r['physical_path'],
             'is_remote': r['is_remote'] or 0,
             'vfs_refresh_before_scan': r['vfs_refresh_before_scan'] or 0,
-            'rclone_rc_url': r['rclone_rc_url'] or ''
+            'rclone_rc_url': r['rclone_rc_url'] or '',
+            'icon': r['icon'] or 'fa-book',
+            'color': r['color'] or '#94a3b8'
         } for r in rows]
 
     @staticmethod
@@ -26,7 +28,7 @@ class CategoryService:
         return '\n'.join([line for line in lines if line])
 
     @staticmethod
-    def add_library(db_type, name, physical_path, is_remote=0, rclone_rc_url=None):
+    def add_library(db_type, name, physical_path, is_remote=0, rclone_rc_url=None, icon='fa-book', color='#94a3b8'):
         # 이름 방어 로직: 양끝 공백 제거, 빈 이름 거부, 최대 100자 제한
         name = str(name or '').strip()
         if not name:
@@ -34,10 +36,10 @@ class CategoryService:
         if len(name) > 25:
             raise ValueError('카테고리 이름은 25자를 초과할 수 없습니다.')
         physical_path = CategoryService._clean_physical_path(physical_path)
-        return CategoryRepository.add_library(db_type, name, physical_path, is_remote, rclone_rc_url)
+        return CategoryRepository.add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color)
 
     @staticmethod
-    def edit_library(db_type, library_id, name, physical_path, is_remote=0, rclone_rc_url=None):
+    def edit_library(db_type, library_id, name, physical_path, is_remote=0, rclone_rc_url=None, icon='fa-book', color='#94a3b8'):
         # 이름 방어 로직: 양끝 공백 제거, 빈 이름 거부, 최대 25자 제한
         name = str(name or '').strip()
         if not name:
@@ -45,7 +47,7 @@ class CategoryService:
         if len(name) > 25:
             raise ValueError('카테고리 이름은 25자를 초과할 수 없습니다.')
         physical_path = CategoryService._clean_physical_path(physical_path)
-        CategoryRepository.edit_library(db_type, library_id, name, physical_path, is_remote, rclone_rc_url)
+        CategoryRepository.edit_library(db_type, library_id, name, physical_path, is_remote, rclone_rc_url, icon, color)
 
     @staticmethod
     def delete_library(db_type, library_id):

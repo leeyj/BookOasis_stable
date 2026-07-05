@@ -230,7 +230,9 @@ def init_databases():
         scan_status TEXT DEFAULT 'ready',
         is_remote INTEGER DEFAULT 0,
         vfs_refresh_before_scan INTEGER DEFAULT 0,
-        rclone_rc_url TEXT DEFAULT NULL
+        rclone_rc_url TEXT DEFAULT NULL,
+        icon TEXT DEFAULT 'fa-book',
+        color TEXT DEFAULT '#94a3b8'
     );
 
     CREATE TABLE IF NOT EXISTS books (

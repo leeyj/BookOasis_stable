@@ -78,7 +78,9 @@ export async function loadLibraries() {
           const safeName    = escapeHtml(lib.name || '');
           const safePath    = escapeHtml(lib.physical_path || '');
           const safeRclone  = escapeHtml(lib.rclone_rc_url || '');
-          html += `<li class="menu-item ${isActive}" data-type="custom" data-id="${lib.id}" data-name="${safeName}" data-path="${safePath}" data-remote="${lib.is_remote || 0}" data-rclone-url="${safeRclone}" ${draggableAttr} onclick="selectCategory('${lib.id}')"><i class="fa-solid fa-book"></i> ${safeName}</li>`;
+          const safeIcon    = escapeHtml(lib.icon || 'fa-book');
+          const safeColor   = escapeHtml(lib.color || '#94a3b8');
+          html += `<li class="menu-item ${isActive}" data-type="custom" data-id="${lib.id}" data-name="${safeName}" data-path="${safePath}" data-remote="${lib.is_remote || 0}" data-rclone-url="${safeRclone}" data-icon="${safeIcon}" data-color="${safeColor}" ${draggableAttr} onclick="selectCategory('${lib.id}')"><i class="fa-solid ${safeIcon}" style="color: ${safeColor};"></i> ${safeName}</li>`;
         });
       }
       sidebar.innerHTML = html;
@@ -315,6 +317,20 @@ export function triggerAddLibrary() {
   const rcloneGroup = document.getElementById('library-form-rclone-url-group');
   if (rcloneGroup) rcloneGroup.style.display = 'none';
 
+  // 아이콘 및 컬러 칩 초기화
+  const iconInput = document.getElementById('library-form-icon');
+  if (iconInput) iconInput.value = 'fa-book';
+  document.querySelectorAll('.category-icon-selector .icon-option').forEach(el => {
+    if (el.dataset.icon === 'fa-book') el.classList.add('active');
+    else el.classList.remove('active');
+  });
+  const colorInput = document.getElementById('library-form-color');
+  if (colorInput) colorInput.value = '#94a3b8';
+  document.querySelectorAll('.category-color-selector .color-option').forEach(el => {
+    if (el.dataset.color === '#94a3b8') el.classList.add('active');
+    else el.classList.remove('active');
+  });
+
   // 체크박스 변경 감지 바인딩 (최초 1회)
   if (remoteEl && !remoteEl.dataset.listenerBound) {
     remoteEl.dataset.listenerBound = 'true';
@@ -364,6 +380,24 @@ export async function triggerEditLibrary() {
   if (rcloneGroup) {
     rcloneGroup.style.display = (isRemoteVal === '1') ? 'block' : 'none';
   }
+
+  // 아이콘 및 컬러 칩 데이터 바인딩
+  const iconVal = document.querySelector(`[data-id="${id}"]`).dataset.icon || 'fa-book';
+  const colorVal = document.querySelector(`[data-id="${id}"]`).dataset.color || '#94a3b8';
+  
+  const iconInput = document.getElementById('library-form-icon');
+  if (iconInput) iconInput.value = iconVal;
+  document.querySelectorAll('.category-icon-selector .icon-option').forEach(el => {
+    if (el.dataset.icon === iconVal) el.classList.add('active');
+    else el.classList.remove('active');
+  });
+
+  const colorInput = document.getElementById('library-form-color');
+  if (colorInput) colorInput.value = colorVal;
+  document.querySelectorAll('.category-color-selector .color-option').forEach(el => {
+    if (el.dataset.color === colorVal) el.classList.add('active');
+    else el.classList.remove('active');
+  });
 
   // 체크박스 변경 감지 바인딩 (최초 1회)
   if (remoteEl && !remoteEl.dataset.listenerBound) {

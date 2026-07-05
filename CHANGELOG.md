@@ -1,4 +1,14 @@
 # CHANGELOG
+
+## v0.7.4
+### added
+- 카테고리 아이콘 수정 및 색 변경 기능 추가 | category icon and color change feature added
+- 카테고리 정보 수정시 스캔 적용 로직 변경(경로 변경시만 스캔 실행) | category edit scan logic change(scan only when path changes)
+
+### fixed
+- 일반도서<->성인도서 전환시 홈 화면 로딩되도록 수정 | general book <-> adult book tab switch fix
+
+
 ## v0.7.3
 ### fixed
 - rclone 실행시 ID/패스워드 미사용시 발생하던 오류 조치(basic auth 적용) | rclone id/password not using error fix(basic auth applied)
@@ -13,6 +23,7 @@
 - 대시보드내 오프셋 정보 없을시 경고창 제거 | dashboard offset information warning removal
 - lazy 스캐너의 역활은 커버 미검출시 추출하도록 용도 축소(오프셋 검출 제거). 단 zip 파일내 comicinfo.xml 추출은 여전히 포함되어 있음. | lazy scanner role is reduced to extracting only when cover is not detected (offset detection removed). However, extraction of comicinfo.xml within zip files is still included.
 - 스캐너 로직을 분리하여 파서를 독립적으로 호출하게 변경 | scanner logic separation and parser independent calling
+
 KR:
 * .\tools\scanner\metadata 에 각각의 파서가 존재함.
   (kavita_ymal,info_xml)등

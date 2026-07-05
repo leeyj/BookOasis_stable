@@ -11,7 +11,7 @@ class CategoryRepository:
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, name, physical_path, cron_schedule, last_scanned_at, scan_status, is_remote, vfs_refresh_before_scan, rclone_rc_url "
+            "SELECT id, name, physical_path, cron_schedule, last_scanned_at, scan_status, is_remote, vfs_refresh_before_scan, rclone_rc_url, icon, color "
             "FROM libraries ORDER BY name ASC"
         )
         rows = cursor.fetchall()
@@ -24,7 +24,7 @@ class CategoryRepository:
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, name, physical_path, cron_schedule, last_scanned_at, scan_status, is_remote, vfs_refresh_before_scan, rclone_rc_url "
+            "SELECT id, name, physical_path, cron_schedule, last_scanned_at, scan_status, is_remote, vfs_refresh_before_scan, rclone_rc_url, icon, color "
             "FROM libraries WHERE id = ?", (library_id,)
         )
         row = cursor.fetchone()
@@ -37,7 +37,7 @@ class CategoryRepository:
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT l.id, l.name, l.physical_path, l.is_remote, l.vfs_refresh_before_scan, l.rclone_rc_url 
+            SELECT l.id, l.name, l.physical_path, l.is_remote, l.vfs_refresh_before_scan, l.rclone_rc_url, l.icon, l.color 
             FROM libraries l
             JOIN user_category_permissions p ON l.id = p.library_id
             WHERE p.user_id = ? AND p.has_access = 1
@@ -48,14 +48,14 @@ class CategoryRepository:
         return [dict(row) for row in rows]
 
     @staticmethod
-    def add_library(db_type, name, physical_path, is_remote, rclone_rc_url):
+    def add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon='fa-book', color='#94a3b8'):
         """신규 카테고리 추가"""
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
             cursor.execute(
-                "INSERT INTO libraries (name, physical_path, is_remote, rclone_rc_url) VALUES (?, ?, ?, ?)",
-                (name, physical_path, is_remote, rclone_rc_url)
+                "INSERT INTO libraries (name, physical_path, is_remote, rclone_rc_url, icon, color) VALUES (?, ?, ?, ?, ?, ?)",
+                (name, physical_path, is_remote, rclone_rc_url, icon, color)
             )
             library_id = cursor.lastrowid
             conn.commit()
@@ -67,14 +67,14 @@ class CategoryRepository:
             conn.close()
 
     @staticmethod
-    def edit_library(db_type, library_id, name, physical_path, is_remote, rclone_rc_url):
+    def edit_library(db_type, library_id, name, physical_path, is_remote, rclone_rc_url, icon='fa-book', color='#94a3b8'):
         """카테고리 메타 정보 수정"""
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
             cursor.execute(
-                "UPDATE libraries SET name = ?, physical_path = ?, is_remote = ?, rclone_rc_url = ? WHERE id = ?",
-                (name, physical_path, is_remote, rclone_rc_url, library_id)
+                "UPDATE libraries SET name = ?, physical_path = ?, is_remote = ?, rclone_rc_url = ?, icon = ?, color = ? WHERE id = ?",
+                (name, physical_path, is_remote, rclone_rc_url, icon, color, library_id)
             )
             conn.commit()
             return True

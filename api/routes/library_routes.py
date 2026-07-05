@@ -34,9 +34,11 @@ def add_media_library():
     is_remote_val = request.form.get('is_remote')
     is_remote = parse_remote_flag(is_remote_val, target_paths)
     rclone_rc_url = normalize_rclone_url(request.form.get('rclone_rc_url'))
+    icon = request.form.get('icon', 'fa-book').strip() or 'fa-book'
+    color = request.form.get('color', '#94a3b8').strip() or '#94a3b8'
     
     try:
-        library_id = CategoryService.add_library(db_type, name, physical_path, is_remote, rclone_rc_url)
+        library_id = CategoryService.add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color)
     except sqlite3.IntegrityError:
         return jsonify({'success': False, 'error': _t('api.err_library_name_exists')}), 400
     except Exception as e:
@@ -73,25 +75,45 @@ def edit_media_library():
     is_remote_val = request.form.get('is_remote')
     is_remote = parse_remote_flag(is_remote_val, target_paths)
     rclone_rc_url = normalize_rclone_url(request.form.get('rclone_rc_url'))
+    icon = request.form.get('icon', 'fa-book').strip() or 'fa-book'
+    color = request.form.get('color', '#94a3b8').strip() or '#94a3b8'
     
+    # 기존 라이브러리 정보 가져오기 (경로 변경 여부 판단용)
     try:
-        CategoryService.edit_library(db_type, int(library_id), name, physical_path, is_remote, rclone_rc_url)
+        old_library = CategoryRepository.get_library_by_id(db_type, int(library_id))
+    except Exception as e:
+        old_library = None
+        print(f"[API Warning] Failed to fetch old library: {e}")
+        
+    try:
+        CategoryService.edit_library(db_type, int(library_id), name, physical_path, is_remote, rclone_rc_url, icon, color)
     except sqlite3.IntegrityError:
         return jsonify({'success': False, 'error': _t('api.err_library_name_exists')}), 400
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
     
-    # 즉시 스캔 비동기 수행
+    # 즉시 스캔 비동기 수행 (경로가 변경된 경우에만)
+    is_path_changed = False
     try:
-        db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
-        from services.scanner_queue import scanner_queue
-        scanner_queue.enqueue('library_scan', db_type=db_type, db_path=db_path, 
-                             library_id=int(library_id), physical_path=physical_path, force=False)
+        old_path = CategoryService._clean_physical_path(old_library['physical_path']) if old_library else ""
+        new_path = CategoryService._clean_physical_path(physical_path)
+        is_path_changed = (old_path != new_path)
+        
+        if is_path_changed:
+            db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
+            from services.scanner_queue import scanner_queue
+            scanner_queue.enqueue('library_scan', db_type=db_type, db_path=db_path, 
+                                 library_id=int(library_id), physical_path=physical_path, force=False)
+            print(f"[API] Category {library_id} path changed. Enqueued scan job.")
+        else:
+            print(f"[API] Category {library_id} meta updated (no path change). Scan skipped.")
+            
         SchedulerService.reload_all_jobs()
     except Exception as e:
-        print(f"[API] Background scan failed after edit: {e}")
+        print(f"[API Warning] Conditional background scan triggering failed: {e}")
     
-    return jsonify({'success': True, 'message': _t('api.msg_library_edited')})
+    msg_key = 'api.msg_library_edited_with_scan' if is_path_changed else 'api.msg_library_edited_meta_only'
+    return jsonify({'success': True, 'message': _t(msg_key)})
 
 @library_bp.route('/api/media/libraries/delete', methods=['POST'])
 @admin_required

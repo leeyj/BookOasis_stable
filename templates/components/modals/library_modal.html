@@ -24,11 +24,102 @@
                 <input type="checkbox" id="library-form-remote" name="is_remote">
                 <label for="library-form-remote" data-i18n="modal.remote_drive_label">원격 드라이브 (VFS 마운트 / rclone 등)</label>
             </div>
+<style>
+.icon-option {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 38px;
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    color: #94a3b8;
+    cursor: pointer;
+    font-size: 1.1rem;
+    transition: all 0.2s;
+}
+.icon-option:hover {
+    background: rgba(168, 85, 247, 0.15);
+    border-color: rgba(168, 85, 247, 0.4);
+    color: #a855f7;
+}
+.icon-option.active {
+    background: rgba(168, 85, 247, 0.25);
+    border-color: #a855f7;
+    color: #fff;
+    box-shadow: 0 0 8px rgba(168, 85, 247, 0.3);
+}
+.color-option {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.2s;
+    box-sizing: border-box;
+}
+.color-option:hover {
+    transform: scale(1.15);
+}
+.color-option.active {
+    border-color: #fff;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
+    transform: scale(1.1);
+}
+</style>
+<script>
+function selectIconOption(element) {
+    document.querySelectorAll('.category-icon-selector .icon-option').forEach(el => el.classList.remove('active'));
+    element.classList.add('active');
+    document.getElementById('library-form-icon').value = element.dataset.icon;
+}
+function selectColorOption(element) {
+    document.querySelectorAll('.category-color-selector .color-option').forEach(el => el.classList.remove('active'));
+    element.classList.add('active');
+    document.getElementById('library-form-color').value = element.dataset.color;
+}
+</script>
             <div class="library-form-group" id="library-form-rclone-url-group" style="display: none; margin-top: 0.5rem;">
                 <label for="library-form-rclone-url" data-i18n="modal.rclone_url_label">Rclone RC API 주소 (VFS 캐시 갱신용)</label>
                 <input type="text" id="library-form-rclone-url" name="rclone_rc_url" data-i18n-placeholder="modal.rclone_url_placeholder" placeholder="예: http://localhost:5572">
                 <div id="library-form-remote-warning" style="margin-top: 0.5rem; padding: 0.7rem; background: rgba(239, 68, 68, 0.1); border-left: 3px solid #ef4444; color: #ef4444; font-weight: 600; font-size: 10pt; display: none;" data-i18n="modal.remote_path_warning">원격 디렉토리(rclone등)가 하나라도 있다면 VFS 및 RC 주소를 꼭 입력하세요</div>
             </div>
+            
+            <!-- 아이콘 및 색상 선택 -->
+            <div class="library-form-group" style="margin-top: 1rem;">
+                <label data-i18n="modal.category_icon_label">카테고리 아이콘</label>
+                <div class="category-icon-selector" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem; margin-top: 0.4rem;">
+                    <div class="icon-option active" data-icon="fa-book" onclick="selectIconOption(this)"><i class="fa-solid fa-book"></i></div>
+                    <div class="icon-option" data-icon="fa-book-open" onclick="selectIconOption(this)"><i class="fa-solid fa-book-open"></i></div>
+                    <div class="icon-option" data-icon="fa-bookmark" onclick="selectIconOption(this)"><i class="fa-solid fa-bookmark"></i></div>
+                    <div class="icon-option" data-icon="fa-images" onclick="selectIconOption(this)"><i class="fa-solid fa-images"></i></div>
+                    <div class="icon-option" data-icon="fa-masks-theater" onclick="selectIconOption(this)"><i class="fa-solid fa-masks-theater"></i></div>
+                    <div class="icon-option" data-icon="fa-newspaper" onclick="selectIconOption(this)"><i class="fa-solid fa-newspaper"></i></div>
+                    <div class="icon-option" data-icon="fa-file-lines" onclick="selectIconOption(this)"><i class="fa-solid fa-file-lines"></i></div>
+                    <div class="icon-option" data-icon="fa-pen-nib" onclick="selectIconOption(this)"><i class="fa-solid fa-pen-nib"></i></div>
+                    <div class="icon-option" data-icon="fa-compass" onclick="selectIconOption(this)"><i class="fa-solid fa-compass"></i></div>
+                    <div class="icon-option" data-icon="fa-music" onclick="selectIconOption(this)"><i class="fa-solid fa-music"></i></div>
+                    <div class="icon-option" data-icon="fa-film" onclick="selectIconOption(this)"><i class="fa-solid fa-film"></i></div>
+                    <div class="icon-option" data-icon="fa-star" onclick="selectIconOption(this)"><i class="fa-solid fa-star"></i></div>
+                </div>
+                <input type="hidden" id="library-form-icon" name="icon" value="fa-book">
+            </div>
+
+            <div class="library-form-group" style="margin-top: 1rem;">
+                <label data-i18n="modal.category_color_label">카테고리 색상</label>
+                <div class="category-color-selector" style="display: flex; gap: 0.6rem; margin-top: 0.4rem; flex-wrap: wrap;">
+                    <div class="color-option active" data-color="#94a3b8" style="background-color: #94a3b8;" onclick="selectColorOption(this)"></div>
+                    <div class="color-option" data-color="#a855f7" style="background-color: #a855f7;" onclick="selectColorOption(this)"></div>
+                    <div class="color-option" data-color="#3b82f6" style="background-color: #3b82f6;" onclick="selectColorOption(this)"></div>
+                    <div class="color-option" data-color="#10b981" style="background-color: #10b981;" onclick="selectColorOption(this)"></div>
+                    <div class="color-option" data-color="#f59e0b" style="background-color: #f59e0b;" onclick="selectColorOption(this)"></div>
+                    <div class="color-option" data-color="#ef4444" style="background-color: #ef4444;" onclick="selectColorOption(this)"></div>
+                    <div class="color-option" data-color="#ec4899" style="background-color: #ec4899;" onclick="selectColorOption(this)"></div>
+                    <div class="color-option" data-color="#06b6d4" style="background-color: #06b6d4;" onclick="selectColorOption(this)"></div>
+                </div>
+                <input type="hidden" id="library-form-color" name="color" value="#94a3b8">
+            </div>
+            
             <div class="library-modal-footer">
                 <button type="button" class="btn-cancel" onclick="closeLibraryModal()" data-i18n="common.cancel">취소</button>
                 <button type="submit" class="btn-submit" id="library-form-submit-btn" data-i18n="common.save">저장</button>

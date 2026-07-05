@@ -268,3 +268,9 @@ tags: [workflow, history]
 | 2026-07-05 | `rclone_rc_basic_auth` | Rclone RC 통신 시 ID/패스워드 인증(Basic Auth) 사양서 문서 보강 | [Task](./history/20260705_175024_rclone_rc_basic_auth_task.md) | [Walkthrough](./history/20260705_175024_rclone_rc_basic_auth_walkthrough.md) |
 | 2026-07-05 | `rclone_rc_basic_auth` | 스케줄 설정 탭 내 Rclone RC Basic Auth 팁 문구 추가 및 i18n 반영 | [Task](./history/20260705_181050_rclone_rc_basic_auth_task.md) | [Walkthrough](./history/20260705_181050_rclone_rc_basic_auth_walkthrough.md) |
 | 2026-07-05 | `rclone_rc_basic_auth` | 스케줄러 탭 내 카테고리 정보 저장 시 사이드바 및 카테고리 정보 동기화 버그 조치 | [Task](./history/20260705_185619_rclone_rc_basic_auth_task.md) | [Walkthrough](./history/20260705_185619_rclone_rc_basic_auth_walkthrough.md) |
+| 2026-07-05 | `rclone_rc_basic_auth` | 카테고리별 고유 아이콘 및 테마 색상 선택 기능 구현 완료 | [Task](./history/20260705_191011_rclone_rc_basic_auth_task.md) | [Walkthrough](./history/20260705_191011_rclone_rc_basic_auth_walkthrough.md) |
+| 2026-07-05 | `rclone_rc_basic_auth` | 카테고리 수정 시 실제 경로 변경 시에만 스캔하도록 조건부 트리거링 구현 완료 | [Task](./history/20260705_191733_rclone_rc_basic_auth_task.md) | [Walkthrough](./history/20260705_191733_rclone_rc_basic_auth_walkthrough.md) |
+| 2026-07-05 | `rclone_rc_basic_auth` | 카테고리 수정 시 스캔 구동 여부에 따른 팝업 안내 메시지 분기 처리 완료 | [Task](./history/20260705_191906_rclone_rc_basic_auth_task.md) | [Walkthrough](./history/20260705_191906_rclone_rc_basic_auth_walkthrough.md) |
+| 2026-07-05 | `library_switch_to_home_bugfix` | 일반/성인 도서 전환 시 오른쪽 도서 목록 미갱신 결함 수정 | [Bugfix](./bug/20260705_bugfix_library_switch_to_home.md) | - |
+
+| 2026-07-05 | `library_switch_to_home_bugfix` | 일반/성인 도서 전환 시 오른쪽 도서 목록 미갱신 결함 수정 | [Task](./history/20260705_211152_library_switch_to_home_bugfix_task.md) | [Walkthrough](./history/20260705_211152_library_switch_to_home_bugfix_walkthrough.md) |
