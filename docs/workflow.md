@@ -255,3 +255,6 @@ tags: [workflow, history]
 | 2026-07-04 | `txt_epub_wheel_fix` | EPUB 및 TXT 뷰어 페이지 모드 휠 스크롤 페이지 이동 결함 추가 보완 | [Task](./history/20260704_184912_txt_epub_wheel_fix_task.md) | [Walkthrough](./history/20260704_184912_txt_epub_wheel_fix_walkthrough.md) |
 | 2026-07-04 | `pdf_hotspot_fix` | PDF 뷰어 스크롤 모드 락 대상 제외 처리 및 핫스팟 상시 활성화 패치 | [Task](./history/20260704_185928_pdf_hotspot_fix_task.md) | [Walkthrough](./history/20260704_185928_pdf_hotspot_fix_walkthrough.md) |
 | 2026-07-04 | `pdf_navbar_hide_fix` | PDF 뷰어 하단 네비게이션바 상시 노출 방지 및 조작 오버레이 연동 제어 패치 | [Task](./history/20260704_190636_pdf_navbar_hide_fix_task.md) | [Walkthrough](./history/20260704_190636_pdf_navbar_hide_fix_walkthrough.md) |
+| 2026-07-05 | `sqlite_schema_order_bugfix` | SQLite user_category_permissions 테이블 및 인덱스 생성 순서 꼬임으로 인한 OperationalError 수정 | [Bugfix](./bug/20260705_bugfix_user_category_permissions_schema.md) | - |
+
+| 2026-07-05 | `sqlite_schema_order_bugfix` | SQLite user_category_permissions 테이블 및 인덱스 생성 순서 꼬임으로 인한 OperationalError 수정 | [Task](./history/20260705_105653_sqlite_schema_order_bugfix_task.md) | [Walkthrough](./history/20260705_105653_sqlite_schema_order_bugfix_walkthrough.md) |

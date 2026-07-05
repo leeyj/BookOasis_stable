@@ -297,7 +297,6 @@ def init_databases():
     CREATE INDEX IF NOT EXISTS idx_user_progress_last_read ON user_progress(user_id, last_read_at DESC);
     
     CREATE INDEX IF NOT EXISTS idx_user_reading_log_user_date ON user_reading_log(user_id, read_date);
-    CREATE INDEX IF NOT EXISTS idx_user_category_permissions_lookup ON user_category_permissions(user_id, library_id, has_access);
 
     CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
@@ -333,6 +332,8 @@ def init_databases():
         has_access INTEGER DEFAULT 1,
         UNIQUE(user_id, library_id)
     );
+
+    CREATE INDEX IF NOT EXISTS idx_user_category_permissions_lookup ON user_category_permissions(user_id, library_id, has_access);
     """
     
     for db_type in ['general', 'adult']:
