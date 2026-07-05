@@ -66,6 +66,7 @@
     "tab_about": "About...",
     "schedule_title": "Library Auto Scan & Schedule Settings",
     "schedule_subtitle": "Manage synchronization scan schedules (Cron) for each category and run immediately.",
+    "schedule_rclone_tip": "💡 Tip!: If Rclone RC communication requires an ID/password, you can register it in the format of http://id:password@localhost:5572.",
     "col_category": "Category",
     "col_path": "Physical Path",
     "col_rclone": "Rclone RC URL",

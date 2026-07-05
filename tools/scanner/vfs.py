@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 import os
 import urllib.request
+import urllib.parse
 import json
+import base64
 import database
 from utils.drive_helper import is_remote_path, get_rclone_relative_path
 
@@ -62,18 +64,41 @@ def trigger_vfs_refresh(db_path, library_id, physical_path):
             rel_path = get_rclone_relative_path(r_path)
             
             for rc_url in rc_urls:
-                full_url = f"{rc_url}/vfs/refresh"
-                req_data = json.dumps({"dir": rel_path}).encode('utf-8')
-                req = urllib.request.Request(
-                    full_url, 
-                    data=req_data,
-                    headers={'Content-Type': 'application/json'}
-                )
                 try:
+                    parsed = urllib.parse.urlparse(rc_url)
+                    headers = {'Content-Type': 'application/json'}
+                    
+                    if parsed.username and parsed.password:
+                        auth_str = f"{parsed.username}:{parsed.password}"
+                        auth_b64 = base64.b64encode(auth_str.encode('utf-8')).decode('utf-8')
+                        headers['Authorization'] = f"Basic {auth_b64}"
+                        
+                        # Remove user info from netloc to form clean URL
+                        netloc = parsed.netloc.split('@')[-1]
+                        clean_rc_url = f"{parsed.scheme}://{netloc}"
+                    else:
+                        clean_rc_url = rc_url
+                    
+                    full_url = f"{clean_rc_url.rstrip('/')}/vfs/refresh"
+                    req_data = json.dumps({"dir": rel_path}).encode('utf-8')
+                    req = urllib.request.Request(
+                        full_url, 
+                        data=req_data,
+                        headers=headers
+                    )
+                    
                     with urllib.request.urlopen(req, timeout=5) as resp:
-                        print(f"[Scanner-VFS] VFS cache refresh success - Server: '{rc_url}', Target: '{rel_path}', Result: {resp.read().decode('utf-8')}")
+                        print(f"[Scanner-VFS] VFS cache refresh success - Server: '{clean_rc_url}', Target: '{rel_path}', Result: {resp.read().decode('utf-8')}")
                 except Exception as e:
-                    print(f"[Scanner-VFS Warning] Server '{rc_url}' path '{rel_path}' refresh attempt ignored or failed: {e}")
+                    # Obfuscate credentials in logs if present
+                    safe_url = rc_url
+                    if '@' in rc_url:
+                        try:
+                            p = urllib.parse.urlparse(rc_url)
+                            safe_url = f"{p.scheme}://****:****@{p.netloc.split('@')[-1]}"
+                        except Exception:
+                            safe_url = "[Protected URL]"
+                    print(f"[Scanner-VFS Warning] Server '{safe_url}' path '{rel_path}' refresh attempt ignored or failed: {e}")
     except Exception as e:
         print(f"[Scanner-VFS Warning] VFS cache refresh process failed: {e}")
 

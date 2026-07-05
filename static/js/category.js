@@ -20,6 +20,7 @@ let currentTargetLibrary = null; // 우클릭 대상 저장
 
 // 0. 라이브러리(카테고리) 목록 로드 및 사이드바 렌더링
 export async function loadLibraries() {
+  window.loadLibraries = loadLibraries;
   const sidebar = document.getElementById('sidebar-categories');
   if (!sidebar) return;
   try {

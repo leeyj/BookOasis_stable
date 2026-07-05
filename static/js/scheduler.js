@@ -105,6 +105,9 @@ export async function saveLibrarySchedule(libraryId, name) {
         alert(i18n.t('scheduler.save_done'));
       }
       loadLibrarySchedules();
+      if (typeof window.loadLibraries === 'function') {
+        window.loadLibraries();
+      }
     } else {
       alert(i18n.t('scheduler.save_fail', {error: data.error}));
     }

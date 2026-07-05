@@ -261,5 +261,10 @@ tags: [workflow, history]
 | 2026-07-05 | `export_stable_logs_bugfix` | 배포본 소스 추출 시 개발자 로컬 로그 유출 결함 조치 | [Task](./history/20260705_123340_export_stable_logs_bugfix_task.md) | [Walkthrough](./history/20260705_123340_export_stable_logs_bugfix_walkthrough.md) |
 | 2026-07-05 | `scan_tuning_lock_bugfix` | 스캔 완료 후 비동기 DB 최적화 튜닝 시 스캔 큐 락 경합 조치 | [Bugfix](./bug/20260705_bugfix_scan_tuning_lock.md) | - |
 
+| 2026-07-05 | `rclone_rc_basic_auth_bugfix` | Rclone RC 통신 시 ID/패스워드 인증(Basic Auth) 미지원 결함 조치 | [Bugfix](./bug/20260705_bugfix_rclone_rc_basic_auth.md) | - |
 | 2026-07-05 | `scan_tuning_lock_bugfix` | 스캔 완료 후 비동기 DB 최적화 튜닝 시 스캔 큐 락 경합 조치 | [Task](./history/20260705_134319_scan_tuning_lock_bugfix_task.md) | [Walkthrough](./history/20260705_134319_scan_tuning_lock_bugfix_walkthrough.md) |
 | 2026-07-05 | `sqlite_schema_order_bugfix` | SQLite user_category_permissions 테이블 및 인덱스 생성 순서 꼬임으로 인한 OperationalError 수정 | [Task](./history/20260705_151223_sqlite_schema_order_bugfix_task.md) | [Walkthrough](./history/20260705_151223_sqlite_schema_order_bugfix_walkthrough.md) |
+| 2026-07-05 | `rclone_rc_basic_auth` | Rclone RC 통신 시 ID/패스워드 인증(Basic Auth) 지원 보강 | [Task](./history/20260705_173430_rclone_rc_basic_auth_task.md) | [Walkthrough](./history/20260705_173430_rclone_rc_basic_auth_walkthrough.md) |
+| 2026-07-05 | `rclone_rc_basic_auth` | Rclone RC 통신 시 ID/패스워드 인증(Basic Auth) 사양서 문서 보강 | [Task](./history/20260705_175024_rclone_rc_basic_auth_task.md) | [Walkthrough](./history/20260705_175024_rclone_rc_basic_auth_walkthrough.md) |
+| 2026-07-05 | `rclone_rc_basic_auth` | 스케줄 설정 탭 내 Rclone RC Basic Auth 팁 문구 추가 및 i18n 반영 | [Task](./history/20260705_181050_rclone_rc_basic_auth_task.md) | [Walkthrough](./history/20260705_181050_rclone_rc_basic_auth_walkthrough.md) |
+| 2026-07-05 | `rclone_rc_basic_auth` | 스케줄러 탭 내 카테고리 정보 저장 시 사이드바 및 카테고리 정보 동기화 버그 조치 | [Task](./history/20260705_185619_rclone_rc_basic_auth_task.md) | [Walkthrough](./history/20260705_185619_rclone_rc_basic_auth_walkthrough.md) |

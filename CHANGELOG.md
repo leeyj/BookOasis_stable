@@ -1,4 +1,12 @@
 # CHANGELOG
+## v0.7.3
+### fixed
+- rclone 실행시 ID/패스워드 미사용시 발생하던 오류 조치(basic auth 적용) | rclone id/password not using error fix(basic auth applied)
+
+## v0.7.2
+### fixed
+- 스캔시 DB 최적화 튜닝시 스캔 큐 락 경합 조치 | scan tune db lock contention fix
+
 ## v0.7.1
 ### fixed
 - lazy 스캐너 오작동(offset 정보 채우려는 시도 및 건너뜀 현상) 해소 | lazy scanner incorrect operation(offset information and skipping)

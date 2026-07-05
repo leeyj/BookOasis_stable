@@ -31,6 +31,14 @@ nav:
 - 작업 히스토리:
   - history/index.md
   - history/20260705_scanner_upgrade_roadmap.md
+  - history/20260705_185619_rclone_rc_basic_auth_walkthrough.md
+  - history/20260705_185619_rclone_rc_basic_auth_task.md
+  - history/20260705_181050_rclone_rc_basic_auth_walkthrough.md
+  - history/20260705_181050_rclone_rc_basic_auth_task.md
+  - history/20260705_175024_rclone_rc_basic_auth_walkthrough.md
+  - history/20260705_175024_rclone_rc_basic_auth_task.md
+  - history/20260705_173430_rclone_rc_basic_auth_walkthrough.md
+  - history/20260705_173430_rclone_rc_basic_auth_task.md
   - history/20260705_151223_sqlite_schema_order_bugfix_walkthrough.md
   - history/20260705_151223_sqlite_schema_order_bugfix_task.md
   - history/20260705_134319_scan_tuning_lock_bugfix_walkthrough.md
@@ -533,6 +541,7 @@ nav:
   - bug/index.md
   - bug/20260705_bugfix_user_category_permissions_schema.md
   - bug/20260705_bugfix_scan_tuning_lock.md
+  - bug/20260705_bugfix_rclone_rc_basic_auth.md
   - bug/20260705_bugfix_export_stable_logs.md
   - bug/20260704_feature_logs_archiving.md
   - bug/20260704_feature_context_menu_unread_0.md

@@ -66,5 +66,13 @@ graph TD
 ### ⑨ Unused Cover File Cleanup
 * **Action**: Post-scan cleanup walks through the `covers/{library_id}` directories and matches them against the active book list. Abandoned cover files are purged to reclaim disk space.
 
+### ⑩ Support for ID/Password Authentication (Basic Auth) in Rclone RC
+* **Issue Solved**: Prevents Rclone VFS cache refresh failures (HTTP 401 Unauthorized errors) when the Rclone RC API server requires credentials (`--rc-user` and `--rc-pass`).
+* **Mechanism**:
+  - Dynamically extracts the `username` and `password` from the configured `RCLONE_RC_URL` (formatted as `http://user:pass@host:port`) using `urllib.parse`.
+  - Automatically compiles and appends an HTTP Basic Authentication header (`Authorization: Basic {base64_encoded}`) to the outgoing HTTP request.
+  - Reconstructs the target URL by stripping user credentials to prevent parsing anomalies within the standard Python `urllib.request` library.
+  - Ensures password security by masking credential segments as `****:****` in console warnings and scanner logs during exception handling.
+
 ---
 *Last Updated: 2026-07-05*
