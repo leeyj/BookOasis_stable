@@ -220,6 +220,30 @@ server {
 
 Nginx 설정 변경 후에는 `sudo nginx -t`로 검증하고 `sudo systemctl reload nginx`를 통해 설정을 적용하십시오.
 
+### Caddy 설정 예시 (`/etc/caddy/Caddyfile`)
+
+Caddy를 리버스 프록시로 채택할 경우 아래와 같이 간결하게 구성할 수 있습니다. Caddy는 자체적으로 Let's Encrypt를 통한 HTTPS 인증서 자동 갱신 및 WebSocket 프록시 처리를 완벽하게 대행합니다.
+
+```caddy
+your-domain.com { # <== 본인의 도메인으로 설정하세요
+    # Gzip 및 Zstd 텍스트 압축 설정
+    encode gzip zstd
+
+    # 최대 업로드 바디 제한 (Cloudflare 100MB 업로드 제한 규격 대응)
+    request_body {
+        max_size 100mb
+    }
+
+    # 백엔드 프록시 경로 매핑
+    reverse_proxy 127.0.0.1:5930 {
+        # [CRITICAL] 대용량 만화책 전송을 위한 중간 프록시 버퍼링 완전 해제
+        flush_interval -1
+    }
+}
+```
+
+Caddyfile 편집을 마친 후 `sudo systemctl reload caddy` 명령으로 리로드하여 반영하십시오.
+
 ---
 
 ## 5. 운영 환경 보안 권장 사항 (Security Best Practices)

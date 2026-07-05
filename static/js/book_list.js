@@ -3,6 +3,8 @@ import * as api from './api.js';
 import { renderHistoryGrid, renderBooksGrid, appendBooksGrid } from './ui.js';
 import { openReader } from './viewer.js';
 import { loadLibraries } from './category.js';
+import { initInfiniteScrollObserver } from './infinite_scroll.js';
+
 
 function updateLibraryTotalCount(items) {
   const countSpan = document.getElementById('library-total-count');
@@ -124,6 +126,9 @@ export async function loadBooksList(isAppend = false) {
   if (spinner) {
     spinner.style.display = state.hasMore ? 'block' : 'none';
   }
+
+  // 렌더링 및 스피너 상태 결정 완료 후 무한 스크롤 옵저버 재바인딩
+  initInfiniteScrollObserver();
 }
 
 // 최근 읽은 도서 히스토리 목록 로드

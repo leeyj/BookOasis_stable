@@ -229,6 +229,41 @@ server {
 
 ---
 
+## Caddy Configuration Guide
+
+If you use Caddy as your reverse proxy instead of Nginx, you can configure your Caddyfile as follows to optimize and connect. Caddy automatically issues and manages SSL certificates (HTTPS) and natively supports WebSockets and reverse proxy header passing.
+
+Map your domain in the `/etc/caddy/Caddyfile` and configure it like this:
+
+```caddy
+your-domain.com { # <== Change this to your own domain
+    # ------------------------------------------------------------------
+    # Gzip and Zstd Text Compression Settings (Speed up UI and JSON API)
+    # ------------------------------------------------------------------
+    encode gzip zstd
+
+    # ------------------------------------------------------------------
+    # Maximum Request Body Size Limit (Corresponds to Nginx's client_max_body_size 100M)
+    # Limits file uploads, considering cover image uploads from the Aladin metadata plugin, etc.
+    # ------------------------------------------------------------------
+    request_body {
+        max_size 100mb
+    }
+
+    # ------------------------------------------------------------------
+    # Main Application Proxy Routing
+    # ------------------------------------------------------------------
+    reverse_proxy 127.0.0.1:5930 {
+        # [CRITICAL] Large File Transfer Optimization (Disable Proxy Buffering)
+        # Configures the server to send data immediately without buffering, preventing
+        # BookOasis's core 'offset-based real-time streaming' from being delayed.
+        flush_interval -1
+    }
+}
+```
+
+After updating Caddyfile, reload the settings by running `sudo systemctl reload caddy`.
+
 ## License
 
 This project is licensed under the [GNU AGPLv3 (Affero General Public License v3.0)](./LICENSE).

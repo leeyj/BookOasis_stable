@@ -7,7 +7,7 @@
 
 ### fixed
 - 일반도서<->성인도서 전환시 홈 화면 로딩되도록 수정 | general book <-> adult book tab switch fix
-
+- 카테고리 로딩중 다른 카테고리 전환시 무한로딩 오류 수정 | category loading other category tab infinite loading error fix
 
 ## v0.7.3
 ### fixed

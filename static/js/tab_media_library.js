@@ -169,9 +169,6 @@ export function selectCategory(id) {
       loadBooksList(false);
     }
   }
-
-  // 카테고리 갱신 시 무한 스크롤 옵저버 다시 바인딩
-  initInfiniteScrollObserver();
 }
 
 // 글로벌 함수 노출 (HTML 인라인 핸들러용)

@@ -220,6 +220,30 @@ server {
 
 After changing the Nginx configuration, verify it with `sudo nginx -t` and apply the settings using `sudo systemctl reload nginx`.
 
+### Caddy Setup Example (`/etc/caddy/Caddyfile`)
+
+If you adopt Caddy as your reverse proxy, it can be configured concisely as follows. Caddy perfectly handles automatic HTTPS certificate renewal via Let's Encrypt and WebSocket proxying out of the box.
+
+```caddy
+your-domain.com { # <== Change this to your own domain
+    # Gzip and Zstd text compression settings
+    encode gzip zstd
+
+    # Maximum request body size limit (Corresponds to Cloudflare's 100MB upload limit)
+    request_body {
+        max_size 100mb
+    }
+
+    # Backend proxy path mapping
+    reverse_proxy 127.0.0.1:5930 {
+        # [CRITICAL] Disable intermediate proxy buffering completely for large comic streaming
+        flush_interval -1
+    }
+}
+```
+
+After editing Caddyfile, reload the Caddy service by running `sudo systemctl reload caddy`.
+
 ---
 
 ## 5. Production Environment Security Best Practices

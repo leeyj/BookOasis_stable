@@ -274,3 +274,5 @@ tags: [workflow, history]
 | 2026-07-05 | `library_switch_to_home_bugfix` | 일반/성인 도서 전환 시 오른쪽 도서 목록 미갱신 결함 수정 | [Bugfix](./bug/20260705_bugfix_library_switch_to_home.md) | - |
 
 | 2026-07-05 | `library_switch_to_home_bugfix` | 일반/성인 도서 전환 시 오른쪽 도서 목록 미갱신 결함 수정 | [Task](./history/20260705_211152_library_switch_to_home_bugfix_task.md) | [Walkthrough](./history/20260705_211152_library_switch_to_home_bugfix_walkthrough.md) |
+| 2026-07-05 | `caddy_guide_addition` | Caddy 리버스 프록시 설정 가이드 추가 | [Task](./history/20260705_213840_caddy_guide_addition_task.md) | [Walkthrough](./history/20260705_213840_caddy_guide_addition_walkthrough.md) |
+| 2026-07-05 | `infinite_scroll_category_transition_bugfix` | 카테고리 전환 시 무한 스크롤(옵저버) 오작동 결함 수정 | [Task](./history/20260705_215456_infinite_scroll_category_transition_bugfix_task.md) | [Walkthrough](./history/20260705_215456_infinite_scroll_category_transition_bugfix_walkthrough.md) |
