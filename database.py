@@ -284,19 +284,6 @@ def init_databases():
         file_size INTEGER,
         compress_type INTEGER
     );
-    CREATE INDEX IF NOT EXISTS idx_book_offsets_book_id ON book_offsets(book_id);
-    CREATE INDEX IF NOT EXISTS idx_book_offsets_book_page ON book_offsets(book_id, page_idx);
-    
-    CREATE INDEX IF NOT EXISTS idx_books_series_name ON books(series_name);
-    CREATE INDEX IF NOT EXISTS idx_books_library_id ON books(library_id);
-    CREATE INDEX IF NOT EXISTS idx_books_is_favorite ON books(is_favorite);
-    CREATE INDEX IF NOT EXISTS idx_books_created_at ON books(created_at);
-    
-    CREATE INDEX IF NOT EXISTS idx_books_series_lib_title ON books(series_name, library_id, title);
-    CREATE INDEX IF NOT EXISTS idx_user_progress_book_user ON user_progress(book_id, user_id);
-    CREATE INDEX IF NOT EXISTS idx_user_progress_last_read ON user_progress(user_id, last_read_at DESC);
-    
-    CREATE INDEX IF NOT EXISTS idx_user_reading_log_user_date ON user_reading_log(user_id, read_date);
 
     CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
@@ -332,7 +319,19 @@ def init_databases():
         has_access INTEGER DEFAULT 1,
         UNIQUE(user_id, library_id)
     );
+    """
 
+    indexes_schema = """
+    CREATE INDEX IF NOT EXISTS idx_book_offsets_book_id ON book_offsets(book_id);
+    CREATE INDEX IF NOT EXISTS idx_book_offsets_book_page ON book_offsets(book_id, page_idx);
+    CREATE INDEX IF NOT EXISTS idx_books_series_name ON books(series_name);
+    CREATE INDEX IF NOT EXISTS idx_books_library_id ON books(library_id);
+    CREATE INDEX IF NOT EXISTS idx_books_is_favorite ON books(is_favorite);
+    CREATE INDEX IF NOT EXISTS idx_books_created_at ON books(created_at);
+    CREATE INDEX IF NOT EXISTS idx_books_series_lib_title ON books(series_name, library_id, title);
+    CREATE INDEX IF NOT EXISTS idx_user_progress_book_user ON user_progress(book_id, user_id);
+    CREATE INDEX IF NOT EXISTS idx_user_progress_last_read ON user_progress(user_id, last_read_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_user_reading_log_user_date ON user_reading_log(user_id, read_date);
     CREATE INDEX IF NOT EXISTS idx_user_category_permissions_lookup ON user_category_permissions(user_id, library_id, has_access);
     """
     
@@ -340,6 +339,10 @@ def init_databases():
         conn = get_connection(db_type)
         cursor = conn.cursor()
         cursor.executescript(schema)
+        conn.commit()
+        
+        # 테이블 생성 완료 후 별도 트랜잭션으로 인덱스 일괄 생성하여 SQLite OperationalError 예방
+        cursor.executescript(indexes_schema)
         conn.commit()
         
         # settings 테이블 초기값 주입 (ALADIN TTBKey)

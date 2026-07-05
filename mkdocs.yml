@@ -31,6 +31,8 @@ nav:
 - 작업 히스토리:
   - history/index.md
   - history/20260705_scanner_upgrade_roadmap.md
+  - history/20260705_151223_sqlite_schema_order_bugfix_walkthrough.md
+  - history/20260705_151223_sqlite_schema_order_bugfix_task.md
   - history/20260705_134319_scan_tuning_lock_bugfix_walkthrough.md
   - history/20260705_134319_scan_tuning_lock_bugfix_task.md
   - history/20260705_123340_export_stable_logs_bugfix_walkthrough.md
