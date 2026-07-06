@@ -119,40 +119,108 @@ class StreamService:
                 return None
 
     @staticmethod
-    def record_progress(db_type: str, book_id, page_idx: int, total_pages: int, user_id=1):
+    def record_progress(db_type: str, book_id, page_idx: int, total_pages: int, user_id=1, epub_session=None):
         """독서 진행률 및 활동 로그 기록 (EPUB 등 페이지 수가 없는 도서의 자동 동기화 포함)"""
         conn   = database.get_connection(db_type)
         cursor = conn.cursor()
+
+        cursor.execute("SELECT file_format, total_pages FROM books WHERE id = ?", (book_id,))
+        book_row = cursor.fetchone()
+        file_format = (book_row['file_format'] or '').lower() if book_row else ''
+        is_epub = file_format == 'epub'
+
+        try:
+            page_idx = int(page_idx)
+        except Exception:
+            page_idx = 0
+
+        try:
+            total_pages = int(total_pages)
+        except Exception:
+            total_pages = 0
         
-        # ── [동적 페이지 수집] DB의 total_pages가 0일 경우 뷰어가 전달한 값으로 갱신 (EPUB 대응) ──
-        if total_pages > 0:
-            cursor.execute("SELECT total_pages FROM books WHERE id = ?", (book_id,))
-            book_row = cursor.fetchone()
-            if book_row and book_row['total_pages'] == 0:
-                cursor.execute("UPDATE books SET total_pages = ? WHERE id = ?", (total_pages, book_id))
+        # EPUB은 항상 퍼센트(0~100) 체계로 강제 정규화
+        if is_epub:
+            total_pages = 100
+            if not book_row or book_row['total_pages'] != 100:
+                cursor.execute("UPDATE books SET total_pages = 100 WHERE id = ?", (book_id,))
+        # 비-EPUB에 대해서만 기존 동적 total_pages 반영
+        elif total_pages > 0 and book_row and book_row['total_pages'] == 0:
+            cursor.execute("UPDATE books SET total_pages = ? WHERE id = ?", (total_pages, book_id))
                 
-        cursor.execute("SELECT pages_read FROM user_progress WHERE book_id = ? AND user_id = ?", (book_id, user_id))
+        cursor.execute("SELECT pages_read, is_completed FROM user_progress WHERE book_id = ? AND user_id = ?", (book_id, user_id))
         row = cursor.fetchone()
 
-        pages_read   = page_idx + 1
+        pages_read   = max(0, min(100, page_idx)) if is_epub else (page_idx + 1)
         is_completed = 0
         if total_pages > 0:
             if (pages_read / total_pages) >= 0.95 or pages_read >= total_pages:
                 is_completed = 1
+
+        # [완독 리셋 방지 방어 코드] 이미 이전에 완독한 기록(is_completed = 1)이 있다면 완독 상태를 강제 보존합니다.
+        if row and row['is_completed'] == 1:
+            is_completed = 1
+        
         now_str      = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        epub_session = epub_session or {}
+        last_epub_cfi = epub_session.get('cfi')
+        last_epub_href = epub_session.get('href')
+        last_epub_spine_index = epub_session.get('index')
+        last_epub_percent = epub_session.get('percent')
+        last_epub_updated_at = now_str if (last_epub_cfi or last_epub_href) else None
 
         if row:
             old_pages = row['pages_read']
             delta     = max(0, pages_read - old_pages)
-            cursor.execute(
-                "UPDATE user_progress SET pages_read=?, is_completed=?, last_read_at=? WHERE book_id=? AND user_id=?",
-                (pages_read, is_completed, now_str, book_id, user_id)
-            )
+            if last_epub_cfi or last_epub_href:
+                cursor.execute(
+                    """
+                    UPDATE user_progress
+                    SET pages_read=?, is_completed=?, last_read_at=?,
+                        last_epub_cfi=?, last_epub_href=?, last_epub_spine_index=?,
+                        last_epub_percent=?, last_epub_updated_at=?
+                    WHERE book_id=? AND user_id=?
+                    """,
+                    (
+                        pages_read,
+                        is_completed,
+                        now_str,
+                        last_epub_cfi,
+                        last_epub_href,
+                        last_epub_spine_index,
+                        last_epub_percent,
+                        last_epub_updated_at,
+                        book_id,
+                        user_id,
+                    )
+                )
+            else:
+                cursor.execute(
+                    "UPDATE user_progress SET pages_read=?, is_completed=?, last_read_at=? WHERE book_id=? AND user_id=?",
+                    (pages_read, is_completed, now_str, book_id, user_id)
+                )
         else:
             delta = pages_read
             cursor.execute(
-                "INSERT INTO user_progress (book_id, user_id, pages_read, is_completed, last_read_at) VALUES (?,?,?,?,?)",
-                (book_id, user_id, pages_read, is_completed, now_str)
+                """
+                INSERT INTO user_progress (
+                    book_id, user_id, pages_read, is_completed, last_read_at,
+                    last_epub_cfi, last_epub_href, last_epub_spine_index,
+                    last_epub_percent, last_epub_updated_at
+                ) VALUES (?,?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    book_id,
+                    user_id,
+                    pages_read,
+                    is_completed,
+                    now_str,
+                    last_epub_cfi,
+                    last_epub_href,
+                    last_epub_spine_index,
+                    last_epub_percent,
+                    last_epub_updated_at,
+                )
             )
 
         if delta > 0:
@@ -171,20 +239,105 @@ class StreamService:
         conn.close()
 
     @staticmethod
+    def get_progress_state(db_type: str, book_id, user_id=1):
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT
+                b.file_format,
+                b.total_pages,
+                p.pages_read,
+                p.last_read_at,
+                p.last_epub_cfi,
+                p.last_epub_href,
+                p.last_epub_spine_index,
+                p.last_epub_percent,
+                p.last_epub_updated_at
+            FROM books b
+            LEFT JOIN user_progress p ON b.id = p.book_id AND p.user_id = ?
+            WHERE b.id = ?
+            """,
+            (user_id, book_id)
+        )
+        row = cursor.fetchone()
+
+        if not row:
+            conn.close()
+            return None
+
+        file_format = (row['file_format'] or '').lower()
+        total_pages = row['total_pages'] if row['total_pages'] is not None else 0
+        pages_read = row['pages_read'] if row['pages_read'] is not None else 0
+        last_epub_percent = row['last_epub_percent'] if row['last_epub_percent'] is not None else 0
+
+        # 로드 시점에는 DB를 변경하지 않고, 응답 값만 비파괴 정규화합니다.
+        # 운영 중 대규모 데이터 보정은 별도 마이그레이션 도구로 수행합니다.
+        if file_format == 'epub':
+            normalized_total = 100
+            normalized_pages = pages_read
+
+            if last_epub_percent:
+                normalized_pages = last_epub_percent
+
+            try:
+                normalized_pages = int(normalized_pages)
+            except Exception:
+                normalized_pages = 0
+
+            normalized_pages = max(0, min(100, normalized_pages))
+
+            total_pages = normalized_total
+            pages_read = normalized_pages
+
+        conn.close()
+
+        return {
+            'total_pages': total_pages,
+            'pages_read': pages_read,
+            'last_read_at': row['last_read_at'],
+            'epub_session': {
+                'cfi': row['last_epub_cfi'],
+                'href': row['last_epub_href'],
+                'index': row['last_epub_spine_index'],
+                'percent': last_epub_percent,
+                'updatedAt': row['last_epub_updated_at']
+            }
+        }
+
+    @staticmethod
     def get_txt_content(file_path):
-        """TXT 소설 파일의 자동 인코딩 디코딩 처리"""
+        """TXT 소설 파일의 자동 인코딩 디코딩 처리 (CP949/EUC-KR 깨진 바이트 자비 허용)"""
         if not os.path.exists(file_path):
             return None, 'File not found'
 
-        content = ""
-        for enc in ('utf-8', 'cp949', 'euc-kr', 'latin-1'):
+        # 1. UTF-8 인코딩은 엄격하게 검증하여 시도
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            return content, None
+        except UnicodeDecodeError:
+            pass
+
+        # 2. UTF-8이 아닌 경우 한글 완성형 인코딩인 CP949/EUC-KR strict 모드 시도
+        for enc in ('cp949', 'euc-kr'):
             try:
                 with open(file_path, 'r', encoding=enc) as f:
                     content = f.read()
                 return content, None
             except UnicodeDecodeError:
                 continue
-        
+
+        # 3. 완벽한 디코딩에 실패한 경우, 일부 깨진 바이트를 보정(replace)하며 cp949 강제 로딩
+        try:
+            with open(file_path, 'r', encoding='cp949', errors='replace') as f:
+                content = f.read()
+            return content, None
+        except Exception:
+            pass
+
+        # 4. 최종 Fallback
         try:
             with open(file_path, 'rb') as f:
                 content = f.read().decode('utf-8', errors='ignore')

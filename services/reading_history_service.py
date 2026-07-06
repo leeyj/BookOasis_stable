@@ -20,7 +20,7 @@ class ReadingHistoryService:
                    p.pages_read, b.total_pages, p.last_read_at, b.is_favorite
             FROM user_progress p
             JOIN books b ON p.book_id = b.id
-            WHERE p.user_id = ?
+            WHERE COALESCE(b.is_deleted, 0) = 0 AND p.user_id = ?
             ORDER BY p.last_read_at DESC
             LIMIT ?
         """, (user_id, limit))
@@ -55,10 +55,11 @@ class ReadingHistoryService:
                 INNER JOIN (
                     SELECT MAX(id) as max_id
                     FROM books
+                    WHERE COALESCE(is_deleted, 0) = 0
                     GROUP BY CASE WHEN series_name IS NOT NULL AND series_name != '' THEN series_name ELSE CAST(id AS TEXT) END
                 ) g ON b.id = g.max_id
                 JOIN user_category_permissions p ON b.library_id = p.library_id
-                WHERE p.user_id = ? AND p.has_access = 1
+                WHERE COALESCE(b.is_deleted, 0) = 0 AND p.user_id = ? AND p.has_access = 1
                 ORDER BY b.created_at DESC, b.id DESC
                 LIMIT 20
             """, (user_id,))
@@ -69,8 +70,10 @@ class ReadingHistoryService:
                 INNER JOIN (
                     SELECT MAX(id) as max_id
                     FROM books
+                    WHERE COALESCE(is_deleted, 0) = 0
                     GROUP BY CASE WHEN series_name IS NOT NULL AND series_name != '' THEN series_name ELSE CAST(id AS TEXT) END
                 ) g ON b.id = g.max_id
+                WHERE COALESCE(b.is_deleted, 0) = 0
                 ORDER BY b.created_at DESC, b.id DESC
                 LIMIT 20
             """)

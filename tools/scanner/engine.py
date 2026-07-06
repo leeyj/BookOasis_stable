@@ -24,15 +24,17 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
 
     cursor.execute("""
         SELECT id, file_path, has_offsets,
-               cover_image, author, publisher, summary
+               cover_image, author, publisher, summary, file_mtime, file_size
         FROM books WHERE library_id = ?
     """, (library_id,))
     all_rows = cursor.fetchall()
     db_books = {}          
     db_meta_full = set()   
     db_offsets_cached = set() 
+    db_files_cache = {}
     for row in all_rows:
         db_books[row['file_path']] = row['id']
+        db_files_cache[row['file_path']] = (row['file_mtime'] or 0.0, row['file_size'] or 0)
         if row['has_offsets'] == 1:
             db_offsets_cached.add(row['file_path'])
         if (row['cover_image'] and not row['cover_image'].startswith('series_') and
@@ -119,7 +121,9 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     d['cover_image'], d['cover_image'], d['cover_image'],
                     meta.get('author',''), meta.get('publisher',''), meta.get('link',''),
                     score, score, meta.get('summary',''), meta.get('release_date',''),
-                    meta.get('genre',''), meta.get('tags',''), d['full_path']
+                    meta.get('genre',''), meta.get('tags',''),
+                    d.get('file_mtime', 0.0), d.get('file_size', 0),
+                    d['full_path']
                 ))
             if update_data:
                 bulk_update_books(cur, update_data)
@@ -134,7 +138,8 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     d['full_path'], d['file_format'], 100 if d['file_format'] == 'epub' else 0,
                     d['cover_image'], meta.get('publisher',''), meta.get('link',''),
                     meta.get('score',0), meta.get('summary',''), meta.get('release_date',''),
-                    meta.get('genre',''), meta.get('tags','')
+                    meta.get('genre',''), meta.get('tags',''),
+                    d.get('file_mtime', 0.0), d.get('file_size', 0)
                 ))
             bulk_insert_books(cur, insert_data)
 
@@ -218,7 +223,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
 
     with ThreadPoolExecutor(max_workers=threads_to_use) as executor:
         futures = {
-            executor.submit(process_folder_task, root, files, force, db_meta_full, db_offsets_cached, db_folder_mtimes, is_remote, library_id): root
+            executor.submit(process_folder_task, root, files, force, db_meta_full, db_offsets_cached, db_folder_mtimes, is_remote, library_id, db_files_cache): root
             for root, files in tasks
         }
         
@@ -252,13 +257,14 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                             pending_updates.append({
                                 "action": "update", "is_offset_only": is_offset_only, "full_path": full_path, 
                                 "cover_image": cover_image, "merged_meta": merged_meta, "offsets_data": offsets_data, 
-                                "filename": filename
+                                "filename": filename, "file_mtime": item.get('file_mtime', 0.0), "file_size": item.get('file_size', 0)
                             })
                         else:
                             pending_inserts.append({
                                 "action": "insert", "library_id": library_id, "full_path": full_path, 
                                 "filename": filename, "file_format": file_format, "series_name": series_name, 
-                                "cover_image": cover_image, "merged_meta": merged_meta, "offsets_data": offsets_data
+                                "cover_image": cover_image, "merged_meta": merged_meta, "offsets_data": offsets_data,
+                                "file_mtime": item.get('file_mtime', 0.0), "file_size": item.get('file_size', 0)
                             })
                             print(f"[Scanner-Process] Found new book: {filename} (Series: {series_name})")
                         batch_item_count += 1

@@ -17,13 +17,20 @@ export function resetPreloadState() {
  * @param {number} pageIdx - 현재 보고 있는 페이지 인덱스 (0-indexed)
  * @param {number} totalPages - 전체 페이지 수
  */
-export function saveProgress(bookId, pageIdx, totalPages) {
+export function saveProgress(bookId, pageIdx, totalPages, extraData = null) {
   pendingProgress = {
     db_type: state.currentLibraryType,
     book_id: bookId,
     page_idx: pageIdx,
     total_pages: totalPages
   };
+
+  if (extraData && typeof extraData === 'object') {
+    pendingProgress = {
+      ...pendingProgress,
+      ...extraData
+    };
+  }
 
   // 90% 이상 도달 시 다음 편 백그라운드 사전 캐싱 트리거 (1페이지짜리 단독 도서 예외 방지: totalPages > 1)
   if (totalPages > 1) {

@@ -202,6 +202,7 @@ def save_viewer_progress():
         book_id = data.get('book_id')
         page_idx = data.get('page_idx') # 0-indexed로 처리
         total_pages = data.get('total_pages')
+        epub_session = data.get('epub_session') or None
         user_id = session.get('user_id', 1)
 
         if book_id is None or page_idx is None:
@@ -211,10 +212,40 @@ def save_viewer_progress():
         if total_pages is None:
             total_pages = 1
 
-        StreamService.record_progress(db_type, book_id, page_idx, total_pages, user_id=user_id)
+        StreamService.record_progress(
+            db_type,
+            book_id,
+            page_idx,
+            total_pages,
+            user_id=user_id,
+            epub_session=epub_session
+        )
         return jsonify({'success': True})
     except Exception as e:
         print(f"[Progress API Error] {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@stream_bp.route('/api/media/progress-state', methods=['GET'])
+@login_required
+def get_viewer_progress_state():
+    """도서별 진행률/세션 포인터 조회 (크로스 디바이스 이어읽기 복원용)"""
+    try:
+        db_type = request.args.get('db_type', 'general')
+        if not check_adult_permission(db_type):
+            return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+
+        book_id = request.args.get('book_id')
+        if not book_id:
+            return jsonify({'success': False, 'error': _t('api.err_book_id_required')}), 400
+
+        user_id = session.get('user_id', 1)
+        state = StreamService.get_progress_state(db_type, book_id, user_id=user_id)
+        if not state:
+            return jsonify({'success': False, 'error': 'book not found'}), 404
+
+        return jsonify({'success': True, 'state': state})
+    except Exception as e:
+        print(f"[Progress State API Error] {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @stream_bp.route('/api/media/unread', methods=['POST'])

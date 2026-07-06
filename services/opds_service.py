@@ -8,6 +8,19 @@ import database
 
 
 def _guess_mime_type(file_path: str) -> str:
+    if not file_path:
+        return 'application/octet-stream'
+    ext = os.path.splitext(file_path)[1].lower()
+    custom_mimes = {
+        '.epub': 'application/epub+zip',
+        '.cbz': 'application/x-cbz',
+        '.cbr': 'application/x-cbr',
+        '.pdf': 'application/pdf',
+        '.txt': 'text/plain',
+        '.zip': 'application/zip',
+    }
+    if ext in custom_mimes:
+        return custom_mimes[ext]
     return mimetypes.guess_type(file_path)[0] or 'application/octet-stream'
 
 
@@ -47,7 +60,7 @@ def get_series_entries(db_type: str, lib_id: int, prefix: str, urn_prefix: str):
         SELECT COALESCE(series_name, '') AS series_name,
                MAX(NULLIF(cover_image, '')) AS cover_image
         FROM books
-        WHERE library_id = ?
+        WHERE library_id = ? AND COALESCE(is_deleted, 0) = 0
         GROUP BY COALESCE(series_name, '')
         ORDER BY COALESCE(series_name, '')
         """,
@@ -71,12 +84,12 @@ def get_series_entries(db_type: str, lib_id: int, prefix: str, urn_prefix: str):
 def get_book_entries(db_type: str, lib_id: int, series_name: str, download_prefix: str, urn_prefix: str, limit: int = None, offset: int = 0):
     conn = database.get_connection(db_type)
     cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) AS total FROM books WHERE library_id=? AND series_name=?", (lib_id, series_name))
+    cursor.execute("SELECT COUNT(*) AS total FROM books WHERE library_id=? AND series_name=? AND COALESCE(is_deleted, 0) = 0", (lib_id, series_name))
     total = cursor.fetchone()['total']
 
     query = (
         "SELECT id, title, file_path, cover_image, summary FROM books "
-        "WHERE library_id=? AND series_name=? "
+        "WHERE library_id=? AND series_name=? AND COALESCE(is_deleted, 0) = 0 "
         "ORDER BY title ASC, id ASC "
     )
     params = [lib_id, series_name]
@@ -109,6 +122,7 @@ def get_recently_added_entries(db_type: str, download_prefix: str, urn_prefix: s
         """
         SELECT id, title, file_path, cover_image
         FROM books
+        WHERE COALESCE(is_deleted, 0) = 0
         ORDER BY created_at DESC, id DESC
         LIMIT 20
         """
@@ -145,7 +159,7 @@ def get_recently_read_entries(db_type: str, download_prefix: str, urn_prefix: st
         SELECT b.id, b.title, b.file_path, b.cover_image, p.last_read_at
         FROM user_progress p
         JOIN books b ON p.book_id = b.id
-        WHERE b.title IS NOT NULL AND b.title != ''
+        WHERE b.title IS NOT NULL AND b.title != '' AND COALESCE(b.is_deleted, 0) = 0
         ORDER BY p.last_read_at DESC
         LIMIT ?
         """,
@@ -178,7 +192,7 @@ def search_books_entries(db_type: str, query: str, download_prefix: str, urn_pre
     cursor.execute(
         """
         SELECT COUNT(*) AS total FROM books
-        WHERE title LIKE ? OR series_name LIKE ? OR author LIKE ?
+        WHERE (title LIKE ? OR series_name LIKE ? OR author LIKE ?) AND COALESCE(is_deleted, 0) = 0
         """,
         (like_query, like_query, like_query)
     )
@@ -188,7 +202,7 @@ def search_books_entries(db_type: str, query: str, download_prefix: str, urn_pre
         """
         SELECT id, title, series_name, author, file_path, cover_image, summary
         FROM books
-        WHERE title LIKE ? OR series_name LIKE ? OR author LIKE ?
+        WHERE (title LIKE ? OR series_name LIKE ? OR author LIKE ?) AND COALESCE(is_deleted, 0) = 0
         ORDER BY title ASC, id ASC
         LIMIT ? OFFSET ?
         """,

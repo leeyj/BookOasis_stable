@@ -46,6 +46,83 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId)
   const seriesFavIconClass = isSeriesFav ? 'fa-solid fa-star' : 'fa-regular fa-star';
   const seriesFavIconColor = isSeriesFav ? '#eab308' : '#64748b';
 
+  // ── [이어서 읽기 책 탐색 알고리즘] ──
+  let continueTarget = null;
+  let continueReason = 'first'; // 'in-progress', 'recent', 'first'
+  
+  if (books && books.length > 0) {
+    // 1순위: 읽는 중인 책 ( pages_read > 0 이며 is_completed = 0 )
+    // 그 중 가장 최근 읽은 시간(last_read_at)이 최신인 책
+    const inProgressBooks = books.filter(b => b.pages_read > 0 && b.is_completed === 0);
+    if (inProgressBooks.length > 0) {
+      inProgressBooks.sort((a, b) => new Date(b.last_read_at || 0) - new Date(a.last_read_at || 0));
+      continueTarget = inProgressBooks[0];
+      continueReason = 'in-progress';
+    }
+    
+    // 2순위: 완료 상태를 포함하여 최근 읽은 기록(last_read_at)이 존재하는 최신 도서
+    if (!continueTarget) {
+      const readBooks = books.filter(b => b.last_read_at);
+      if (readBooks.length > 0) {
+        readBooks.sort((a, b) => new Date(b.last_read_at || 0) - new Date(a.last_read_at || 0));
+        continueTarget = readBooks[0];
+        continueReason = 'recent';
+      }
+    }
+    
+    // 3순위: 아무 기록도 없으면 리스트의 첫 번째 도서
+    if (!continueTarget) {
+      continueTarget = books[0];
+      continueReason = 'first';
+    }
+  }
+
+  let continueBtnHtml = '';
+  if (continueTarget) {
+    let btnLabel = '';
+    let btnColor = '#7c3aed';
+    let btnBorder = '#a855f7';
+    let iconClass = 'fa-solid fa-play';
+    
+    // 진행도 퍼센트 구하기
+    let progressPercent = 0;
+    if (continueTarget.pages_read > 0) {
+      const fmt = (continueTarget.file_format || '').toLowerCase();
+      if (fmt === 'epub') {
+        progressPercent = continueTarget.pages_read;
+      } else if (continueTarget.total_pages > 0) {
+        progressPercent = Math.round((continueTarget.pages_read / continueTarget.total_pages) * 100);
+      }
+    }
+    
+    let tooltipTitle = '';
+    if (continueReason === 'in-progress') {
+      btnLabel = i18n.t('detail.continue_reading') || '이어서 읽기';
+      tooltipTitle = `${continueTarget.title} (${progressPercent}%)`;
+      btnColor = '#8b5cf6';
+      btnBorder = '#a78bfa';
+    } else if (continueReason === 'recent') {
+      btnLabel = i18n.t('detail.continue_reading') || '이어서 읽기';
+      tooltipTitle = continueTarget.title;
+      btnColor = '#6d28d9';
+      btnBorder = '#8b5cf6';
+    } else {
+      btnLabel = i18n.t('detail.start_reading') || '첫 권부터 읽기';
+      tooltipTitle = continueTarget.title;
+      btnColor = '#10b981';
+      btnBorder = '#34d399';
+      iconClass = 'fa-solid fa-book-open-reader';
+    }
+    
+    continueBtnHtml = `
+      <button class="ridi-link-btn" style="margin: 0; background: ${btnColor}; border-color: ${btnBorder}; font-weight: bold; color: #fff; display: inline-flex; align-items: center; gap: 0.3rem;" 
+              title="${tooltipTitle.replace(/"/g, '&quot;')}"
+              onclick="window.openReader(${continueTarget.id}, '${continueTarget.file_format}', '${continueTarget.title.replace(/'/g, "\\'")}', ${continueTarget.pages_read || 0}, ${continueTarget.total_pages || 0})">
+        <i class="${iconClass}"></i> ${btnLabel}
+      </button>
+    `;
+  }
+
   return `
     <!-- 상단 헤더: 커버(작게) + 메타정보 -->
     <div class="detail-header-panel">
@@ -88,8 +165,9 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId)
         <p class="book-summary-text">${meta.summary || i18n.t('detail.no_description')}</p>
         ${linkHtml}
         
-        <!-- 버튼: 메타정보 찾기 (이미 메타데이터가 있을 때 수동 실행용) -->
+        <!-- 버튼: 이어서 읽기 및 메타정보 찾기 -->
         <div style="display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; align-items: center;">
+          ${continueBtnHtml}
           <button id="btn-manual-meta-search" class="ridi-link-btn" style="display:none; margin: 0; background: #7c3aed; border-color: #a855f7;"><i class="fa-solid fa-wand-magic-sparkles"></i> ${i18n.t('detail.btn_recommend_match')}</button>
           <button id="btn-plugin-meta-search" class="ridi-link-btn" onclick="openMetadataSearchModal(${firstBookId}, '${safeSeriesName.replace(/'/g, "\\'")}', true)" style="margin: 0; background: #2563eb; border-color: #3b82f6;"><i class="fa-solid fa-magnifying-glass"></i> ${i18n.t('detail.btn_search_meta')}</button>
         </div>

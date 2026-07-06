@@ -55,6 +55,7 @@
     "tab_general": "General Settings",
     "tab_plugins": "Plugin Settings",
     "tab_reports": "Scan Reports",
+    "tab_trash": "Delete Management",
     "tab_users": "Users Manager",
     "tab_permissions": "Permissions",
     "perm_title": "User Category Access Control",
@@ -212,6 +213,8 @@
   "detail": {
     "back_to_list": "Back to List",
     "volume_list": "Volume List",
+    "continue_reading": "Continue Reading",
+    "start_reading": "Start Reading",
     "ridi_link": "Go to Ridibooks",
     "change_cover": "Change Cover",
     "toggle_fav_series": "Toggle Favorite Series",

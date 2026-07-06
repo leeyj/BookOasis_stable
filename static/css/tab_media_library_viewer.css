@@ -790,8 +790,10 @@
 /* EPUB 영역 */
 .epub-area {
     width: 100%;
+    height: auto;
     flex-grow: 1;
     background: #1e293b;
+    overflow: visible;
 }
 
 /* 텍스트 뷰어 테마 및 폰트조정 */
@@ -1174,4 +1176,44 @@
 .btn-filter-apply:hover {
     background: #c084fc;
     box-shadow: 0 0 12px rgba(168, 85, 247, 0.5);
+}
+
+/* 뷰어 전용 얇고 세련된 커스텀 스크롤바 디자인 */
+#media-viewer-modal #epub-viewer-container::-webkit-scrollbar,
+#media-viewer-modal #txt-scroll-wrapper::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+#media-viewer-modal #epub-viewer-container::-webkit-scrollbar-track,
+#media-viewer-modal #txt-scroll-wrapper::-webkit-scrollbar-track {
+    background: rgba(15, 23, 42, 0.3);
+}
+
+#media-viewer-modal #epub-viewer-container::-webkit-scrollbar-thumb,
+#media-viewer-modal #txt-scroll-wrapper::-webkit-scrollbar-thumb {
+    background: rgba(168, 85, 247, 0.4);
+    border-radius: 3px;
+    transition: background 0.2s ease;
+}
+
+#media-viewer-modal #epub-viewer-container::-webkit-scrollbar-thumb:hover,
+#media-viewer-modal #txt-scroll-wrapper::-webkit-scrollbar-thumb:hover {
+    background: rgba(168, 85, 247, 0.8);
+}
+
+/* Firefox 대응 */
+#media-viewer-modal #epub-viewer-container,
+#media-viewer-modal #txt-scroll-wrapper {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(168, 85, 247, 0.4) rgba(15, 23, 42, 0.3);
+}
+
+/* 모바일 및 터치 디바이스 가독성 최적화 (가로폭 768px 이하) */
+@media (max-width: 768px) {
+    #media-viewer-modal #epub-viewer-container::-webkit-scrollbar,
+    #media-viewer-modal #txt-scroll-wrapper::-webkit-scrollbar {
+        width: 3px;
+        height: 3px;
+    }
 }

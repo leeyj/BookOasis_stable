@@ -5,6 +5,26 @@ from utils.cache_helper import get_zip_file_hybrid
 
 class BookInfoService:
     @staticmethod
+    def get_viewer_info(db_type, book_id):
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, cover_image FROM books WHERE id = ?", (book_id,))
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            return None
+
+        total_pages = BookInfoService.get_total_pages(db_type, book_id)
+        if total_pages is None:
+            return None
+
+        return {
+            'total_pages': total_pages,
+            'cover_image': row['cover_image']
+        }
+
+    @staticmethod
     def get_total_pages(db_type, book_id):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()

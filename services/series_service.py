@@ -24,8 +24,8 @@ class SeriesService:
                 cursor.execute(f"""
                     SELECT b.series_name,
                            COUNT(b.id)         AS book_count,
-                           (SELECT b2.cover_image FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_image,
-                           (SELECT b2.cover_updated_at FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_updated_at,
+                           (SELECT b2.cover_image FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND COALESCE(b2.is_deleted, 0) = 0 AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_image,
+                           (SELECT b2.cover_updated_at FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND COALESCE(b2.is_deleted, 0) = 0 AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_updated_at,
                            MAX(b.is_favorite)  AS is_favorite,
                            MAX(b.created_at)   AS latest_added,
                            MIN(b.id)           AS representative_book_id,
@@ -33,7 +33,7 @@ class SeriesService:
                            MAX(b.tags)         AS tags,
                            b.library_id        AS library_id
                     FROM books b
-                    WHERE b.is_favorite = 1 AND (b.series_name LIKE ? OR b.author LIKE ?)
+                    WHERE COALESCE(b.is_deleted, 0) = 0 AND b.is_favorite = 1 AND (b.series_name LIKE ? OR b.author LIKE ?)
                     GROUP BY b.series_name, b.library_id
                     ORDER BY b.series_name {sort_dir}
                     LIMIT ? OFFSET ?
@@ -42,8 +42,8 @@ class SeriesService:
                 cursor.execute(f"""
                     SELECT b.series_name,
                            COUNT(b.id)         AS book_count,
-                           (SELECT b2.cover_image FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_image,
-                           (SELECT b2.cover_updated_at FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_updated_at,
+                           (SELECT b2.cover_image FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND COALESCE(b2.is_deleted, 0) = 0 AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_image,
+                           (SELECT b2.cover_updated_at FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND COALESCE(b2.is_deleted, 0) = 0 AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_updated_at,
                            MAX(b.is_favorite)  AS is_favorite,
                            MAX(b.created_at)   AS latest_added,
                            MIN(b.id)           AS representative_book_id,
@@ -51,7 +51,7 @@ class SeriesService:
                            MAX(b.tags)         AS tags,
                            b.library_id        AS library_id
                     FROM books b
-                    WHERE b.is_favorite = 1
+                    WHERE COALESCE(b.is_deleted, 0) = 0 AND b.is_favorite = 1
                     GROUP BY b.series_name, b.library_id
                     ORDER BY b.series_name {sort_dir}
                     LIMIT ? OFFSET ?
@@ -61,8 +61,8 @@ class SeriesService:
                 cursor.execute(f"""
                     SELECT b.series_name,
                            COUNT(b.id)         AS book_count,
-                           (SELECT b2.cover_image FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_image,
-                           (SELECT b2.cover_updated_at FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_updated_at,
+                           (SELECT b2.cover_image FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND COALESCE(b2.is_deleted, 0) = 0 AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_image,
+                           (SELECT b2.cover_updated_at FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND COALESCE(b2.is_deleted, 0) = 0 AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_updated_at,
                            MAX(b.is_favorite)  AS is_favorite,
                            MAX(b.created_at)   AS latest_added,
                            MIN(b.id)           AS representative_book_id,
@@ -70,7 +70,7 @@ class SeriesService:
                            MAX(b.tags)         AS tags,
                            b.library_id        AS library_id
                     FROM books b
-                    WHERE b.library_id = ? AND (b.series_name LIKE ? OR b.author LIKE ?)
+                    WHERE COALESCE(b.is_deleted, 0) = 0 AND b.library_id = ? AND (b.series_name LIKE ? OR b.author LIKE ?)
                     GROUP BY b.series_name, b.library_id
                     ORDER BY b.series_name {sort_dir}
                     LIMIT ? OFFSET ?
@@ -79,8 +79,8 @@ class SeriesService:
                 cursor.execute(f"""
                     SELECT b.series_name,
                            COUNT(b.id)         AS book_count,
-                           (SELECT b2.cover_image FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_image,
-                           (SELECT b2.cover_updated_at FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_updated_at,
+                           (SELECT b2.cover_image FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND COALESCE(b2.is_deleted, 0) = 0 AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_image,
+                           (SELECT b2.cover_updated_at FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND COALESCE(b2.is_deleted, 0) = 0 AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_updated_at,
                            MAX(b.is_favorite)  AS is_favorite,
                            MAX(b.created_at)   AS latest_added,
                            MIN(b.id)           AS representative_book_id,
@@ -88,7 +88,7 @@ class SeriesService:
                            MAX(b.tags)         AS tags,
                            b.library_id        AS library_id
                     FROM books b
-                    WHERE b.library_id = ?
+                    WHERE COALESCE(b.is_deleted, 0) = 0 AND b.library_id = ?
                     GROUP BY b.series_name, b.library_id
                     ORDER BY b.series_name {sort_dir}
                     LIMIT ? OFFSET ?
@@ -98,22 +98,6 @@ class SeriesService:
                 cursor.execute(f"""
                     SELECT b.series_name,
                            COUNT(b.id)         AS book_count,
-                           (SELECT b2.cover_image FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_image,
-                           (SELECT b2.cover_updated_at FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_updated_at,
-                           MAX(b.is_favorite)  AS is_favorite,
-                           MAX(b.created_at)   AS latest_added,
-                           MIN(b.id)           AS representative_book_id,
-                           MAX(b.genre)        AS genre,
-                           MAX(b.tags)         AS tags,
-                           b.library_id        AS library_id
-                    FROM books b
-                    WHERE b.series_name LIKE ? OR b.author LIKE ?
-                    GROUP BY b.series_name, b.library_id
-                    ORDER BY b.series_name {sort_dir}
-                    LIMIT ? OFFSET ?
-                """, (f"%{search_query}%", f"%{search_query}%", limit + 1, offset))
-            else:
-                cursor.execute(f"""
                     SELECT b.series_name,
                            COUNT(b.id)         AS book_count,
                            (SELECT b2.cover_image FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_image,
@@ -180,8 +164,8 @@ class SeriesService:
                 SELECT b.series_name,
                        MAX(b.author)       AS author,
                        COUNT(b.id)         AS book_count,
-                       (SELECT b2.cover_image FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_image,
-                       (SELECT b2.cover_updated_at FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_updated_at,
+                       (SELECT b2.cover_image FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND COALESCE(b2.is_deleted, 0) = 0 AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_image,
+                       (SELECT b2.cover_updated_at FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND COALESCE(b2.is_deleted, 0) = 0 AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_updated_at,
                        MAX(b.is_favorite)  AS is_favorite,
                        MAX(b.created_at)   AS latest_added,
                        MIN(b.id)           AS representative_book_id,
@@ -189,7 +173,7 @@ class SeriesService:
                        MAX(b.tags)         AS tags,
                        b.library_id        AS library_id
                 FROM books b
-                WHERE b.is_favorite = 1
+                WHERE COALESCE(b.is_deleted, 0) = 0 AND b.is_favorite = 1
                 GROUP BY b.series_name, b.library_id
                 ORDER BY b.series_name ASC
             """)
@@ -198,8 +182,8 @@ class SeriesService:
                 SELECT b.series_name,
                        MAX(b.author)       AS author,
                        COUNT(b.id)         AS book_count,
-                       (SELECT b2.cover_image FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_image,
-                       (SELECT b2.cover_updated_at FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_updated_at,
+                       (SELECT b2.cover_image FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND COALESCE(b2.is_deleted, 0) = 0 AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_image,
+                       (SELECT b2.cover_updated_at FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND COALESCE(b2.is_deleted, 0) = 0 AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_updated_at,
                        MAX(b.is_favorite)  AS is_favorite,
                        MAX(b.created_at)   AS latest_added,
                        MIN(b.id)           AS representative_book_id,
@@ -207,7 +191,7 @@ class SeriesService:
                        MAX(b.tags)         AS tags,
                        b.library_id        AS library_id
                 FROM books b
-                WHERE b.library_id = ?
+                WHERE COALESCE(b.is_deleted, 0) = 0 AND b.library_id = ?
                 GROUP BY b.series_name, b.library_id
                 ORDER BY b.series_name ASC
             """, (library_id,))
@@ -216,8 +200,8 @@ class SeriesService:
                 SELECT b.series_name,
                        MAX(b.author)       AS author,
                        COUNT(b.id)         AS book_count,
-                       (SELECT b2.cover_image FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_image,
-                       (SELECT b2.cover_updated_at FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_updated_at,
+                       (SELECT b2.cover_image FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND COALESCE(b2.is_deleted, 0) = 0 AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_image,
+                       (SELECT b2.cover_updated_at FROM books b2 WHERE b2.series_name = b.series_name AND b2.library_id = b.library_id AND COALESCE(b2.is_deleted, 0) = 0 AND b2.cover_image IS NOT NULL AND b2.cover_image != '' ORDER BY b2.title ASC LIMIT 1) AS cover_updated_at,
                        MAX(b.is_favorite)  AS is_favorite,
                        MAX(b.created_at)   AS latest_added,
                        MIN(b.id)           AS representative_book_id,
@@ -225,6 +209,7 @@ class SeriesService:
                        MAX(b.tags)         AS tags,
                        b.library_id        AS library_id
                 FROM books b
+                WHERE COALESCE(b.is_deleted, 0) = 0
                 GROUP BY b.series_name, b.library_id
                 ORDER BY b.series_name ASC
             """)

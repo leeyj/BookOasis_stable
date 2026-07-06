@@ -22,7 +22,7 @@ export {
 export function switchSettingsTab(tabId) {
   // 일반 사용자는 어드민 전용 탭에 접근하지 못하도록 차단 및 'about'으로 우회
   const isAdmin = window.currentUser && window.currentUser.role === 'admin';
-  const adminOnlyTabs = ['schedule', 'queue', 'general', 'plugins', 'reports', 'users', 'permissions'];
+  const adminOnlyTabs = ['schedule', 'queue', 'general', 'plugins', 'reports', 'users', 'permissions', 'trash'];
   
   if (!isAdmin && adminOnlyTabs.includes(tabId)) {
     console.warn(`[Settings-Tab] Access denied for tab '${tabId}'. Redirecting to 'about'...`);
@@ -69,6 +69,10 @@ export function switchSettingsTab(tabId) {
     loadUsersList();
   } else if (tabId === 'permissions') {
     loadPermissionsMatrix();
+  } else if (tabId === 'trash') {
+    if (window.loadTrashList) {
+      window.loadTrashList();
+    }
   } else if (tabId === 'about') {
     loadAboutInfo();
   } else if (tabId === 'changelog') {

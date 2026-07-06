@@ -40,13 +40,13 @@ def insert_new_book(cursor, library_id, filename, series_name, cover_image, merg
     # Enhance function definition as follows.
     pass
 
-def insert_new_book_v2(cursor, library_id, full_path, filename, file_format, series_name, cover_image, merged_meta):
+def insert_new_book_v2(cursor, library_id, full_path, filename, file_format, series_name, cover_image, merged_meta, file_mtime=0.0, file_size=0):
     """Insert new book info to DB and return book_id"""
     title, _ = os.path.splitext(filename)
     cursor.execute("""
         INSERT INTO books 
-        (library_id, title, series_name, author, file_path, file_format, total_pages, cover_image, publisher, link, score, summary, release_date, genre, tags) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (library_id, title, series_name, author, file_path, file_format, total_pages, cover_image, publisher, link, score, summary, release_date, genre, tags, file_mtime, file_size) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         library_id, 
         title, 
@@ -62,7 +62,9 @@ def insert_new_book_v2(cursor, library_id, full_path, filename, file_format, ser
         merged_meta['summary'],
         merged_meta['release_date'],
         merged_meta.get('genre', ''),
-        merged_meta.get('tags', '')
+        merged_meta.get('tags', ''),
+        file_mtime,
+        file_size
     ))
     return cursor.lastrowid
 
@@ -98,7 +100,9 @@ def bulk_update_books(cursor, update_data_list):
             summary      = COALESCE(NULLIF(?, ''), summary),
             release_date = COALESCE(NULLIF(?, ''), release_date),
             genre        = COALESCE(NULLIF(?, ''), genre),
-            tags         = COALESCE(NULLIF(?, ''), tags)
+            tags         = COALESCE(NULLIF(?, ''), tags),
+            file_mtime   = ?,
+            file_size    = ?
         WHERE file_path = ?
     """, update_data_list)
 
@@ -107,8 +111,8 @@ def bulk_insert_books(cursor, insert_data_list):
     if not insert_data_list: return
     cursor.executemany("""
         INSERT OR IGNORE INTO books 
-        (library_id, title, series_name, author, file_path, file_format, total_pages, cover_image, publisher, link, score, summary, release_date, genre, tags) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (library_id, title, series_name, author, file_path, file_format, total_pages, cover_image, publisher, link, score, summary, release_date, genre, tags, file_mtime, file_size) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, insert_data_list)
 
 def bulk_save_book_offsets(cursor, offsets_data_list):

@@ -57,7 +57,11 @@ export function toggleComicPageStep() {
   if (scrollMode === 'scroll') {
     return setComicPageStep(1);
   }
-  return setComicPageStep(comicPageStep === 2 ? 1 : 2);
+
+  // Use persisted value as source of truth because this module can be loaded
+  // before EPUB initializes page-step state, causing first-click no-op.
+  const currentStep = getStoredComicPageStep();
+  return setComicPageStep(currentStep === 2 ? 1 : 2);
 }
 
 function syncComicReadingDirectionUI() {

@@ -55,6 +55,7 @@
     "tab_general": "일반 설정",
     "tab_plugins": "플러그인 설정",
     "tab_reports": "스캔 리포트",
+    "tab_trash": "삭제 관리",
     "tab_users": "사용자 관리",
     "tab_permissions": "권한 관리",
     "perm_title": "사용자별 카테고리 접근 권한 관리",
@@ -212,6 +213,8 @@
   "detail": {
     "back_to_list": "목록으로 돌아가기",
     "volume_list": "단행본 목록",
+    "continue_reading": "이어서 읽기",
+    "start_reading": "첫 권부터 읽기",
     "ridi_link": "리디북스 바로가기",
     "change_cover": "표지 변경",
     "toggle_fav_series": "시리즈 전체 즐겨찾기 토글",

@@ -121,9 +121,12 @@ export async function openBookDetail(event, seriesName, libraryId) {
         }
       }
 
-      // 히스토리 해시가 #detail이 아닌 경우 상태 푸시
-      if (window.location.hash !== '#detail') {
-        history.pushState({ view: 'detail', series: safeSeriesName, libraryId: actualLibraryId }, '', '#detail');
+      // 히스토리 해시가 #detail이 아닌 경우 상태 푸시, 이미 #detail인데 상태가 유실된 경우 상태 보정 (URL에 상세 정보 쿼리파라미터 포함)
+      const detailHash = `#detail?series=${encodeURIComponent(safeSeriesName)}&libraryId=${actualLibraryId}`;
+      if (!window.location.hash.startsWith('#detail')) {
+        history.pushState({ view: 'detail', series: safeSeriesName, libraryId: actualLibraryId }, '', detailHash);
+      } else {
+        history.replaceState({ view: 'detail', series: safeSeriesName, libraryId: actualLibraryId }, '', detailHash);
       }
 
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -169,7 +172,7 @@ export function goBackToList(triggerBack = true) {
     console.warn('[goBackToList] failed to restore scroll', e);
   }
   // 수동 목록으로 돌아가기 버튼을 누른 경우에만 브라우저 히스토리 스택 원상복구
-  if (triggerBack && window.location.hash === '#detail') {
+  if (triggerBack && window.location.hash.startsWith('#detail')) {
     history.back();
   }
 }

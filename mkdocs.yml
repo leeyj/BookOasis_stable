@@ -30,6 +30,78 @@ nav:
 - 개발 워크플로우: workflow.md
 - 작업 히스토리:
   - history/index.md
+  - history/20260706_184833_session_20260706_184833_walkthrough.md
+  - history/20260706_184833_session_20260706_184833_task.md
+  - history/20260706_184603_session_20260706_184603_walkthrough.md
+  - history/20260706_184603_session_20260706_184603_task.md
+  - history/20260706_183731_session_20260706_183731_walkthrough.md
+  - history/20260706_183731_session_20260706_183731_task.md
+  - history/20260706_183534_session_20260706_183534_walkthrough.md
+  - history/20260706_183534_session_20260706_183534_task.md
+  - history/20260706_183230_session_20260706_183230_walkthrough.md
+  - history/20260706_183230_session_20260706_183230_task.md
+  - history/20260706_183033_session_20260706_183033_walkthrough.md
+  - history/20260706_183033_session_20260706_183033_task.md
+  - history/20260706_182323_session_20260706_182323_walkthrough.md
+  - history/20260706_182323_session_20260706_182323_task.md
+  - history/20260706_181747_session_20260706_181747_walkthrough.md
+  - history/20260706_181747_session_20260706_181747_task.md
+  - history/20260706_181527_session_20260706_181527_walkthrough.md
+  - history/20260706_181527_session_20260706_181527_task.md
+  - history/20260706_181437_session_20260706_181437_walkthrough.md
+  - history/20260706_181437_session_20260706_181437_task.md
+  - history/20260706_181319_session_20260706_181319_walkthrough.md
+  - history/20260706_181319_session_20260706_181319_task.md
+  - history/20260706_180710_session_20260706_180710_walkthrough.md
+  - history/20260706_180710_session_20260706_180710_task.md
+  - history/20260706_180141_session_20260706_180141_walkthrough.md
+  - history/20260706_180141_session_20260706_180141_task.md
+  - history/20260706_175924_session_20260706_175924_walkthrough.md
+  - history/20260706_175924_session_20260706_175924_task.md
+  - history/20260706_175459_session_20260706_175459_walkthrough.md
+  - history/20260706_175459_session_20260706_175459_task.md
+  - history/20260706_175337_session_20260706_175337_walkthrough.md
+  - history/20260706_175337_session_20260706_175337_task.md
+  - history/20260706_175003_session_20260706_175003_walkthrough.md
+  - history/20260706_175003_session_20260706_175003_task.md
+  - history/20260706_174628_session_20260706_174628_walkthrough.md
+  - history/20260706_174628_session_20260706_174628_task.md
+  - history/20260706_174417_session_20260706_174417_walkthrough.md
+  - history/20260706_174417_session_20260706_174417_task.md
+  - history/20260706_174056_session_20260706_174056_walkthrough.md
+  - history/20260706_174056_session_20260706_174056_task.md
+  - history/20260706_143654_session_20260706_143654_walkthrough.md
+  - history/20260706_143654_session_20260706_143654_task.md
+  - history/20260706_143321_session_20260706_143321_walkthrough.md
+  - history/20260706_143321_session_20260706_143321_task.md
+  - history/20260706_142608_session_20260706_142608_walkthrough.md
+  - history/20260706_142608_session_20260706_142608_task.md
+  - history/20260706_142140_session_20260706_142140_walkthrough.md
+  - history/20260706_142140_session_20260706_142140_task.md
+  - history/20260706_141942_session_20260706_141942_walkthrough.md
+  - history/20260706_141942_session_20260706_141942_task.md
+  - history/20260706_141015_session_20260706_141015_walkthrough.md
+  - history/20260706_141015_session_20260706_141015_task.md
+  - history/20260706_140853_session_20260706_140853_walkthrough.md
+  - history/20260706_140853_session_20260706_140853_task.md
+  - history/20260706_135739_session_20260706_135739_walkthrough.md
+  - history/20260706_135739_session_20260706_135739_task.md
+  - history/20260706_113418_session_20260706_113418_walkthrough.md
+  - history/20260706_113418_session_20260706_113418_task.md
+  - history/20260706_112511_session_20260706_112511_walkthrough.md
+  - history/20260706_112511_session_20260706_112511_task.md
+  - history/20260706_112302_session_20260706_112302_walkthrough.md
+  - history/20260706_112302_session_20260706_112302_task.md
+  - history/20260706_112111_session_20260706_112111_walkthrough.md
+  - history/20260706_112111_session_20260706_112111_task.md
+  - history/20260706_104927_vfs_timeout_fallback_walkthrough.md
+  - history/20260706_104927_vfs_timeout_fallback_task.md
+  - history/20260706_104611_vfs_timeout_fallback_walkthrough.md
+  - history/20260706_104611_vfs_timeout_fallback_task.md
+  - history/20260706_104310_auto_resume_scan_walkthrough.md
+  - history/20260706_104310_auto_resume_scan_task.md
+  - history/20260706_101236_category_vfs_toggle_walkthrough.md
+  - history/20260706_101236_category_vfs_toggle_task.md
   - history/20260706_014328_opds_search_walkthrough.md
   - history/20260706_014328_opds_search_task.md
   - history/20260706_004600_category_migration_walkthrough.md
@@ -563,6 +635,27 @@ nav:
   - history/20260619_145226_init_docs_task.md
 - 버그 트러블슈팅:
   - bug/index.md
+  - bug/20260706_improvement_viewer_scrollbar_customization.md
+  - bug/20260706_improvement_vfs_timeout_fallback.md
+  - bug/20260706_improvement_trash_delete_manager.md
+  - bug/20260706_improvement_scan_mtime_caching.md
+  - bug/20260706_improvement_detail_refresh_restore.md
+  - bug/20260706_improvement_auto_resume_scan.md
+  - bug/20260706_bugfix_txt_encoding_cp949_corrupted.md
+  - bug/20260706_bugfix_pdf_page_info_unknown.md
+  - bug/20260706_bugfix_opds_download_mime_mismatch.md
+  - bug/20260706_bugfix_mark_as_completed_broken_on_non_comics.md
+  - bug/20260706_bugfix_is_completed_auto_reset.md
+  - bug/20260706_bugfix_epub_scroll_y_mismatch_rebound.md
+  - bug/20260706_bugfix_epub_scroll_mode_rendering_break.md
+  - bug/20260706_bugfix_epub_scroll_lock.md
+  - bug/20260706_bugfix_epub_scroll_hotspot_blocker.md
+  - bug/20260706_bugfix_epub_resize_rebound.md
+  - bug/20260706_bugfix_epub_refactoring_core.md
+  - bug/20260706_bugfix_epub_location_restore_ratio.md
+  - bug/20260706_bugfix_epub_iframe_hotspot_event_hijack.md
+  - bug/20260706_bugfix_epub_double_scrollbar.md
+  - bug/20260706_bugfix_category_vfs_toggle.md
   - bug/20260705_improvement_category_migration.md
   - bug/20260705_bugfix_user_category_permissions_schema.md
   - bug/20260705_bugfix_scan_tuning_lock.md

@@ -245,10 +245,14 @@ def get_book_info(book_id):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
     
     try:
-        total_pages = BookInfoService.get_total_pages(db_type, book_id)
-        if total_pages is None:
+        info = BookInfoService.get_viewer_info(db_type, book_id)
+        if info is None:
             return jsonify({'success': False, 'error': 'Book not found'}), 404
-        return jsonify({'success': True, 'total_pages': total_pages})
+        return jsonify({
+            'success': True,
+            'total_pages': info.get('total_pages', 0),
+            'cover_image': info.get('cover_image')
+        })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

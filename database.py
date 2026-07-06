@@ -255,7 +255,11 @@ def init_databases():
         tags TEXT,
         is_favorite INTEGER DEFAULT 0,
         cover_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0,
+        deleted_at DATETIME DEFAULT NULL,
+        file_mtime REAL DEFAULT 0.0,
+        file_size INTEGER DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS user_progress (
@@ -264,7 +268,12 @@ def init_databases():
         user_id INTEGER NOT NULL,
         pages_read INTEGER DEFAULT 0,
         is_completed INTEGER DEFAULT 0,
-        last_read_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        last_read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        last_epub_cfi TEXT,
+        last_epub_href TEXT,
+        last_epub_spine_index INTEGER,
+        last_epub_percent INTEGER DEFAULT 0,
+        last_epub_updated_at DATETIME
     );
 
     CREATE TABLE IF NOT EXISTS user_reading_log (
@@ -436,7 +445,7 @@ def init_databases():
 
         # 서버 재시작 시 고착된(Stuck) 스캔 상태 초기화 방어코드
         try:
-            cursor.execute("UPDATE libraries SET scan_status = 'ready' WHERE scan_status = 'scanning'")
+            cursor.execute("UPDATE libraries SET scan_status = 'interrupted' WHERE scan_status = 'scanning'")
             conn.commit()
         except Exception as reset_err:
             print(f"[DB-Migration ERROR] Scan status reset failed: {reset_err}")

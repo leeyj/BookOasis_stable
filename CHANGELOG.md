@@ -1,5 +1,29 @@
 # CHANGELOG
 
+** 알려진 버그
+ - epub 읽기시 가끔 먹통 현상(백화현상)
+ - 스캔이 완료되었는데도 커버를 제대로 채우지 못하는 현상
+
+## v0.7.7
+### fixed
+- 카테고리 원격 드라이브(VFS) 토글 시 RC 주소 입력창 미노출 버그 수정 | category remote drive (VFS) toggle RC address input window not displayed error fix
+- 스캔 중 타임아웃으로 인한 비정상 종료시 자동 이어하기(Auto-Resume) 기능 추가 | scan timeout abnormal termination auto resume feature added
+- EPUB 스크롤 보기 상태에서 다음 책 이동 시 화면 락 오류 수정 | EPUB scroll mode next book switch screen lock error fix
+- OPDS 파일 다운로드 시 EPUB 및 ZIP(CBZ) MIME Type 매칭 및 응답 헤더 누락 수정 | OPDS file download EPUB/ZIP MIME Type mismatch and missing response headers fix
+- PDF 뷰어 로드 시 페이지 번호가 물음표(?)로 뜨는 현상 수정 | PDF viewer page count display as question mark (?) error fix
+- TXT 소설 파일 로드 시 CP949 인코딩 깨짐 현상 수정 | TXT novel file CP949 encoding corruption on load fix
+- 도서 감상 완료(is_completed) 플래그 강제 리셋 버그 수정 | Book completion (is_completed) flag forced auto-reset error fix
+- 비-만화책(PDF, EPUB, TXT) 뷰어 내 수동 읽음 완료 오작동 수정 | Non-comics (PDF, EPUB, TXT) viewer manual read completed error fix
+- EPUB 보기 모드(페이지/스크롤) 간 전환 오류 및 휠 스크롤/중앙 클릭 오버레이 먹통 현상 수정 (Iframe 핫스팟 이벤트 간섭 방지) | EPUB page/scroll mode swap layout, location restore, mouse wheel blocking and click overlay toggle error fix (iframe hotspot interaction resolved)
+
+
+### improved
+- 스캔 엔진에서 개별 도서 파일 속성(mtime/size) 캐싱을 도입하여 무변경 파일 파싱을 대폭 스킵 (스캔 속도 비약적 향상) | Scan engine introduced per-book file attribute (mtime/size) caching to skip unchanged files (scan speed improvement)
+- 휴지통(Trash) 기능 추가 및 프론트엔드 통합: 삭제된 도서를 즉시 물리 삭제하지 않고 DB상 '삭제됨' 상태로 유보한 후, 별도 관리 탭에서 사용자가 직접 복구하거나 영구 삭제(물리 커버 동시 소거 포함)할 수 있도록 구현 | Added trash functionality and frontend integration: deleted books are temporarily stored in the DB as 'deleted' instead of being physically deleted immediately, and users can restore or permanently delete them (including simultaneous cover file removal) from a separate management tab.
+- 도서 상세 모달 내에서 최근 독서 기록을 기반으로 즉시 뷰어를 열어주는 '이어서 읽기' 단축 버튼 구현 | Implement 'Continue Reading' quick button in book detail modal based on recent reading progress
+- 뷰어 내 스크롤바 디자인 슬림화(6px) 및 브랜드 보라색 다크 테마 커스터마이징 적용 | Slimmed viewer scrollbar (6px) and applied brand purple dark theme customization
+---
+
 ## v0.7.6
 ### added
 - opds 검색 기능 추가 | opds search feature added

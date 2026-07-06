@@ -16,6 +16,9 @@
                 <button class="settings-tab-btn" onclick="switchSettingsTab('reports')">
                     <i class="fa-solid fa-triangle-exclamation"></i> <span data-i18n="settings.tab_reports">스캔 리포트</span>
                 </button>
+                <button class="settings-tab-btn" onclick="switchSettingsTab('trash')">
+                    <i class="fa-solid fa-trash-can"></i> <span data-i18n="settings.tab_trash">삭제 관리</span>
+                </button>
                  <button class="settings-tab-btn" id="settings-tab-btn-users" onclick="switchSettingsTab('users')" style="display: none;">
                     <i class="fa-solid fa-users"></i> <span data-i18n="settings.tab_users">사용자 관리</span>
                 </button>
@@ -44,6 +47,9 @@
 
             <!-- 4. 스캔 에러 리포트 탭 -->
             {% include "components/settings/reports_tab.html" %}
+
+            <!-- 4.5 삭제 관리 (휴지통) 탭 -->
+            {% include "components/settings/trash_tab.html" %}
 
             <!-- 5. 사용자 관리 탭 -->
             {% include "components/settings/users_tab.html" %}

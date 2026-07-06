@@ -158,6 +158,16 @@ export function updatePageInfo() {
     return;
   }
 
+  if (state.currentViewerFormat === 'pdf') {
+    const pdfInfo = document.getElementById('pdf-page-info');
+    if (pdfInfo && overlayInfoEl) {
+      overlayInfoEl.textContent = pdfInfo.textContent;
+    }
+    const overlayTitleEl = document.getElementById('overlay-title-text');
+    if (overlayTitleEl) overlayTitleEl.textContent = document.getElementById('viewer-title-text').textContent;
+    return;
+  }
+
   const indices = getComicPageIndices();
   const totalPages = comicTotalPages || '?';
   const startPage = indices[0] + 1;

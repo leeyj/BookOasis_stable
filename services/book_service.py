@@ -11,7 +11,7 @@ class BookService:
         cursor = conn.cursor()
         
         # 1. 대상 책의 series_name, library_id, file_path 조회
-        cursor.execute("SELECT series_name, library_id, file_path FROM books WHERE id = ?", (book_id,))
+        cursor.execute("SELECT series_name, library_id, file_path FROM books WHERE id = ? AND COALESCE(is_deleted, 0) = 0", (book_id,))
         current_book = cursor.fetchone()
         if not current_book:
             conn.close()
@@ -26,7 +26,7 @@ class BookService:
             SELECT b.id, b.title, b.file_format, b.total_pages, b.cover_image, b.cover_updated_at, b.file_path, p.pages_read
             FROM books b
             LEFT JOIN user_progress p ON b.id = p.book_id AND p.user_id = ?
-            WHERE b.series_name = ? AND b.library_id = ?
+            WHERE COALESCE(b.is_deleted, 0) = 0 AND b.series_name = ? AND b.library_id = ?
         """, (user_id, series_name, library_id))
         rows = cursor.fetchall()
         conn.close()

@@ -65,6 +65,46 @@ class SchedulerService:
             scheduler.start()
             print("[Scheduler] APScheduler started successfully!")
         SchedulerService.reload_all_jobs()
+        try:
+            SchedulerService.auto_resume_interrupted_jobs()
+        except Exception as e:
+            print(f"[Scheduler ERROR] Auto-resume failed: {e}")
+
+    @staticmethod
+    def auto_resume_interrupted_jobs():
+        """이전 실행 중 비정상 종료(interrupted)된 카테고리를 찾아 자동으로 재인큐"""
+        import database
+        from services.scheduler_service import enqueue_scan_job
+        
+        print("[Scheduler] Checking for interrupted scan jobs to auto-resume...")
+        for db_type in ['general', 'adult']:
+            db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
+            if not os.path.exists(db_path):
+                continue
+                
+            try:
+                conn = database.get_connection(db_type)
+                cursor = conn.cursor()
+                cursor.execute("SELECT id, name, physical_path FROM libraries WHERE scan_status = 'interrupted'")
+                interrupted_libs = cursor.fetchall()
+                
+                for lib in interrupted_libs:
+                    lib_id = lib['id']
+                    lib_name = lib['name']
+                    phys_path = lib['physical_path']
+                    
+                    print(f"[Scheduler] 🔄 Auto-resuming interrupted scan: DB={db_type}, Name={lib_name}, ID={lib_id}")
+                    
+                    # 1. 큐에 적재 전 중복 인큐 방지를 위해 상태를 일단 ready로 업데이트
+                    cursor.execute("UPDATE libraries SET scan_status = 'ready' WHERE id = ?", (lib_id,))
+                    conn.commit()
+                    
+                    # 2. 스캔 큐에 인큐
+                    enqueue_scan_job(db_type, db_path, lib_id, phys_path, force=False)
+                    
+                conn.close()
+            except Exception as e:
+                print(f"[Scheduler ERROR] Failed to auto-resume interrupted jobs for {db_type}: {e}")
 
     @staticmethod
     def reload_all_jobs():

@@ -35,7 +35,20 @@ def detect_and_handle_book_movement(cursor, db_books, found_file_paths, db_meta_
     return deleted_paths
 
 def handle_deleted_books(cursor, db_books, deleted_paths, target_paths, found_file_paths):
-    """Transaction-safely delete books no longer found from DB and user history"""
+    """Transaction-safely soft delete books no longer found, and restore previously soft deleted books if found again"""
+    # 0. 복구 처리 (기존에 is_deleted=1 상태였으나 물리적으로 다시 발견된 책 복구)
+    if found_file_paths:
+        restore_paths = [p for p in found_file_paths if p in db_books]
+        if restore_paths:
+            for i in range(0, len(restore_paths), 900):
+                chunk = restore_paths[i:i+900]
+                placeholders = ','.join(['?'] * len(chunk))
+                cursor.execute(f"""
+                    UPDATE books 
+                    SET is_deleted = 0, deleted_at = NULL 
+                    WHERE file_path IN ({placeholders}) AND is_deleted = 1
+                """, chunk)
+
     if not deleted_paths:
         return True
         
@@ -44,12 +57,15 @@ def handle_deleted_books(cursor, db_books, deleted_paths, target_paths, found_fi
         print(f"[Scanner] ⚠️ Fatal Warning: 0 files read from multiple paths {target_paths}. Mount unmounted or path issue suspected, aborting file deletion logic.")
         return False
 
+    # 1. 소프트 딜리트 처리
     for dp in deleted_paths:
         if dp in db_books:
             book_id = db_books[dp]
-            cursor.execute("DELETE FROM user_progress WHERE book_id = ?", (book_id,))
-            cursor.execute("DELETE FROM user_reading_log WHERE book_id = ?", (book_id,))
-            cursor.execute("DELETE FROM books WHERE id = ?", (book_id,))
-            print(f"[Scanner] File deletion detected, removed from DB: {dp}")
+            cursor.execute("""
+                UPDATE books 
+                SET is_deleted = 1, deleted_at = datetime('now', 'localtime') 
+                WHERE id = ?
+            """, (book_id,))
+            print(f"[Scanner] File disappearance detected, set to trash: {dp}")
             
     return True

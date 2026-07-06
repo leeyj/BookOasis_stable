@@ -284,3 +284,79 @@ tags: [workflow, history]
 | 2026-07-05 | `category_migration` | 창 이탈 방지 및 일반/성인 카테고리 경로 중복 감지 속보 구현 | [Task](./history/20260705_233820_category_migration_task.md) | [Walkthrough](./history/20260705_233820_category_migration_walkthrough.md) |
 | 2026-07-06 | `category_migration` | 마이그레이션 커넥션 누수 결함 최종 보완 및 빌드 | [Task](./history/20260706_004600_category_migration_task.md) | [Walkthrough](./history/20260706_004600_category_migration_walkthrough.md) |
 | 2026-07-06 | `opds_search` | OPDS/App-OPDS 검색 기능 추가 및 관련 가이드/API 문서 업데이트 | [Task](./history/20260706_014328_opds_search_task.md) | [Walkthrough](./history/20260706_014328_opds_search_walkthrough.md) |
+| 2026-07-06 | `category_vfs_toggle` | 카테고리 원격 드라이브(VFS) 토글 시 RC 주소 입력창 미노출 버그 수정 | [Bugfix](./bug/20260706_bugfix_category_vfs_toggle.md) | - |
+
+| 2026-07-06 | `category_vfs_toggle` | 카테고리 원격 드라이브(VFS) 토글 시 RC 주소 입력창 미노출 버그 수정 | [Task](./history/20260706_101236_category_vfs_toggle_task.md) | [Walkthrough](./history/20260706_101236_category_vfs_toggle_walkthrough.md) |
+| 2026-07-06 | `auto_resume_scan` | 스캐너 비정상 종료 시 자동 이어하기(Auto-Resume) 기능 구현 | [Improvement](./bug/20260706_improvement_auto_resume_scan.md) | - |
+| 2026-07-06 | `auto_resume_scan` | 스캐너 비정상 종료 시 자동 이어하기(Auto-Resume) 기능 구현 | [Task](./history/20260706_104310_auto_resume_scan_task.md) | [Walkthrough](./history/20260706_104310_auto_resume_scan_walkthrough.md) |
+| 2026-07-06 | `vfs_timeout_fallback` | VFS 캐시 새로고침 API 호출 타임아웃 20분(1200초) 유지 및 의사결정 | [Improvement](./bug/20260706_improvement_vfs_timeout_fallback.md) | - |
+| 2026-07-06 | `vfs_timeout_fallback` | VFS 캐시 새로고침 API 호출 타임아웃 단축 및 Fallback 강화 | [Task](./history/20260706_104611_vfs_timeout_fallback_task.md) | [Walkthrough](./history/20260706_104611_vfs_timeout_fallback_walkthrough.md) |
+| 2026-07-06 | `vfs_timeout_fallback` | VFS 캐시 새로고침 API 호출 타임아웃 20분(1200초) 유지 및 의사결정 | [Task](./history/20260706_104927_vfs_timeout_fallback_task.md) | [Walkthrough](./history/20260706_104927_vfs_timeout_fallback_walkthrough.md) |
+| 2026-07-06 | `trash_delete_manager` | 스캔 중 파일 유실 방지를 위한 삭제 관리(휴지통) 기능 개발 | [Improvement](./bug/20260706_improvement_trash_delete_manager.md) | - |
+| 2026-07-06 | `scan_mtime_caching` | 개별 도서 파일 속성(mtime/size) 캐싱을 통한 스캔 성능 최적화 | [Improvement](./bug/20260706_improvement_scan_mtime_caching.md) | - |
+| 2026-07-06 | `epub_scroll_lock` | EPUB 스크롤 보기 상태에서 다음 책 이동 시 화면 락 오류 수정 | [BugFix](./bug/20260706_bugfix_epub_scroll_lock.md) | - |
+| 2026-07-06 | `detail_refresh_restore` | 도서 상세 뷰 새로고침 시 기존 상태(히스토리) 복구 로직 구현 | [Improvement](./bug/20260706_improvement_detail_refresh_restore.md) | - |
+| 2026-07-06 | `opds_download_mime_mismatch` | OPDS 다운로드 시 EPUB/ZIP 파일 형식 다운로드 오류 수정 | [BugFix](./bug/20260706_bugfix_opds_download_mime_mismatch.md) | - |
+| 2026-07-06 | `pdf_page_info_unknown` | PDF 뷰어 로드 시 페이지 번호가 물음표(?)로 뜨는 현상 수정 | [BugFix](./bug/20260706_bugfix_pdf_page_info_unknown.md) | - |
+| 2026-07-06 | `txt_encoding_cp949_corrupted` | TXT 소설 파일 로드 시 CP949 인코딩 깨짐 현상 수정 | [BugFix](./bug/20260706_bugfix_txt_encoding_cp949_corrupted.md) | - |
+| 2026-07-06 | `is_completed_auto_reset` | 도서 감상 완료(is_completed) 플래그 강제 리셋 버그 수정 | [BugFix](./bug/20260706_bugfix_is_completed_auto_reset.md) | - |
+| 2026-07-06 | `mark_as_completed_broken_on_non_comics` | 비-만화책(PDF, EPUB, TXT) 뷰어 내 수동 읽음 완료 오작동 수정 | [BugFix](./bug/20260706_bugfix_mark_as_completed_broken_on_non_comics.md) | - |
+| 2026-07-06 | `epub_scroll_mode_rendering_break` | EPUB 보기 모드(스크롤/페이지) 전환 시 오작동 및 첫 장 이동 오류 수정 | [BugFix](./bug/20260706_bugfix_epub_scroll_mode_rendering_break.md) | - |
+| 2026-07-06 | `epub_scroll_hotspot_blocker` | EPUB 스크롤 보기 시 휠 스크롤 불가 및 터치 락 오류 수정 | [BugFix](./bug/20260706_bugfix_epub_scroll_hotspot_blocker.md) | - |
+| 2026-07-06 | `epub_iframe_hotspot_event_hijack` | EPUB 뷰어 전체 모드에서 휠 스크롤 및 중앙 클릭 오버레이 먹통 오류 수정 | [BugFix](./bug/20260706_bugfix_epub_iframe_hotspot_event_hijack.md) | - |
+| 2026-07-06 | `epub_scroll_y_mismatch_rebound` | EPUB 연속 스크롤 모드 시 첫 페이지 바운딩 튕김 오류 수정 | [BugFix](./bug/20260706_bugfix_epub_scroll_y_mismatch_rebound.md) | - |
+| 2026-07-06 | `epub_double_scrollbar` | EPUB 연속 스크롤 모드 시 이중 스크롤바 노출 오류 수정 | [BugFix](./bug/20260706_bugfix_epub_double_scrollbar.md) | - |
+| 2026-07-06 | `viewer_scrollbar_customization` | 뷰어 내 스크롤바 디자인 슬림화 및 보라색 다크 테마 커스터마이징 | [Improvement](./bug/20260706_improvement_viewer_scrollbar_customization.md) | - |
+| 2026-07-06 | `epub_location_restore_ratio` | EPUB 뷰어 진입 시 이어보기 위치 복원 비율 공식 오류 수정 | [BugFix](./bug/20260706_bugfix_epub_location_restore_ratio.md) | - |
+| 2026-07-06 | `epub_refactoring_core` | EPUB 뷰어 페이지/스크롤 모드 정밀 제어 및 끊김 없는 책 전체 로딩 구현 | [BugFix](./bug/20260706_bugfix_epub_refactoring_core.md) | - |
+| 2026-07-06 | `epub_resize_rebound` | F12 개발자 도구 활성화 및 창 리사이즈 시 EPUB 첫 페이지 튕김 오류 수정 | [BugFix](./bug/20260706_bugfix_epub_resize_rebound.md) | - |
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+| 2026-07-06 | `session_20260706_112111` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_112111_session_20260706_112111_task.md) | [Walkthrough](./history/20260706_112111_session_20260706_112111_walkthrough.md) |
+| 2026-07-06 | `session_20260706_112302` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_112302_session_20260706_112302_task.md) | [Walkthrough](./history/20260706_112302_session_20260706_112302_walkthrough.md) |
+| 2026-07-06 | `session_20260706_112511` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_112511_session_20260706_112511_task.md) | [Walkthrough](./history/20260706_112511_session_20260706_112511_walkthrough.md) |
+| 2026-07-06 | `session_20260706_113418` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_113418_session_20260706_113418_task.md) | [Walkthrough](./history/20260706_113418_session_20260706_113418_walkthrough.md) |
+| 2026-07-06 | `session_20260706_135739` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_135739_session_20260706_135739_task.md) | [Walkthrough](./history/20260706_135739_session_20260706_135739_walkthrough.md) |
+| 2026-07-06 | `session_20260706_140853` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_140853_session_20260706_140853_task.md) | [Walkthrough](./history/20260706_140853_session_20260706_140853_walkthrough.md) |
+| 2026-07-06 | `session_20260706_141015` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_141015_session_20260706_141015_task.md) | [Walkthrough](./history/20260706_141015_session_20260706_141015_walkthrough.md) |
+| 2026-07-06 | `session_20260706_141942` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_141942_session_20260706_141942_task.md) | [Walkthrough](./history/20260706_141942_session_20260706_141942_walkthrough.md) |
+| 2026-07-06 | `session_20260706_142140` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_142140_session_20260706_142140_task.md) | [Walkthrough](./history/20260706_142140_session_20260706_142140_walkthrough.md) |
+| 2026-07-06 | `session_20260706_142608` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_142608_session_20260706_142608_task.md) | [Walkthrough](./history/20260706_142608_session_20260706_142608_walkthrough.md) |
+| 2026-07-06 | `session_20260706_143321` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_143321_session_20260706_143321_task.md) | [Walkthrough](./history/20260706_143321_session_20260706_143321_walkthrough.md) |
+| 2026-07-06 | `session_20260706_143654` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_143654_session_20260706_143654_task.md) | [Walkthrough](./history/20260706_143654_session_20260706_143654_walkthrough.md) |
+| 2026-07-06 | `session_20260706_174056` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_174056_session_20260706_174056_task.md) | [Walkthrough](./history/20260706_174056_session_20260706_174056_walkthrough.md) |
+| 2026-07-06 | `session_20260706_174417` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_174417_session_20260706_174417_task.md) | [Walkthrough](./history/20260706_174417_session_20260706_174417_walkthrough.md) |
+| 2026-07-06 | `session_20260706_174628` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_174628_session_20260706_174628_task.md) | [Walkthrough](./history/20260706_174628_session_20260706_174628_walkthrough.md) |
+| 2026-07-06 | `session_20260706_175003` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_175003_session_20260706_175003_task.md) | [Walkthrough](./history/20260706_175003_session_20260706_175003_walkthrough.md) |
+| 2026-07-06 | `session_20260706_175337` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_175337_session_20260706_175337_task.md) | [Walkthrough](./history/20260706_175337_session_20260706_175337_walkthrough.md) |
+| 2026-07-06 | `session_20260706_175459` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_175459_session_20260706_175459_task.md) | [Walkthrough](./history/20260706_175459_session_20260706_175459_walkthrough.md) |
+| 2026-07-06 | `session_20260706_175924` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_175924_session_20260706_175924_task.md) | [Walkthrough](./history/20260706_175924_session_20260706_175924_walkthrough.md) |
+| 2026-07-06 | `session_20260706_180141` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_180141_session_20260706_180141_task.md) | [Walkthrough](./history/20260706_180141_session_20260706_180141_walkthrough.md) |
+| 2026-07-06 | `session_20260706_180710` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_180710_session_20260706_180710_task.md) | [Walkthrough](./history/20260706_180710_session_20260706_180710_walkthrough.md) |
+| 2026-07-06 | `session_20260706_181319` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_181319_session_20260706_181319_task.md) | [Walkthrough](./history/20260706_181319_session_20260706_181319_walkthrough.md) |
+| 2026-07-06 | `session_20260706_181437` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_181437_session_20260706_181437_task.md) | [Walkthrough](./history/20260706_181437_session_20260706_181437_walkthrough.md) |
+| 2026-07-06 | `session_20260706_181527` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_181527_session_20260706_181527_task.md) | [Walkthrough](./history/20260706_181527_session_20260706_181527_walkthrough.md) |
+| 2026-07-06 | `session_20260706_181747` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_181747_session_20260706_181747_task.md) | [Walkthrough](./history/20260706_181747_session_20260706_181747_walkthrough.md) |
+| 2026-07-06 | `session_20260706_182323` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_182323_session_20260706_182323_task.md) | [Walkthrough](./history/20260706_182323_session_20260706_182323_walkthrough.md) |
+| 2026-07-06 | `session_20260706_183033` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_183033_session_20260706_183033_task.md) | [Walkthrough](./history/20260706_183033_session_20260706_183033_walkthrough.md) |
+| 2026-07-06 | `session_20260706_183230` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_183230_session_20260706_183230_task.md) | [Walkthrough](./history/20260706_183230_session_20260706_183230_walkthrough.md) |
+| 2026-07-06 | `session_20260706_183534` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_183534_session_20260706_183534_task.md) | [Walkthrough](./history/20260706_183534_session_20260706_183534_walkthrough.md) |
+| 2026-07-06 | `session_20260706_183731` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_183731_session_20260706_183731_task.md) | [Walkthrough](./history/20260706_183731_session_20260706_183731_walkthrough.md) |
+| 2026-07-06 | `session_20260706_184603` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_184603_session_20260706_184603_task.md) | [Walkthrough](./history/20260706_184603_session_20260706_184603_walkthrough.md) |
+| 2026-07-06 | `session_20260706_184833` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_184833_session_20260706_184833_task.md) | [Walkthrough](./history/20260706_184833_session_20260706_184833_walkthrough.md) |

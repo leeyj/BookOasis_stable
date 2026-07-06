@@ -14,7 +14,7 @@ class BookDetailService:
         # 만약 library_id가 시스템 성격(all, history, favorite, home)이거나 없을 때
         # series_name이 중복 등록된 경우를 대비하여 해당 시리즈의 실제 library_id를 역추출합니다.
         if not library_id or library_id in ('all', 'history', 'favorite', 'home'):
-            cursor.execute("SELECT library_id FROM books WHERE series_name = ? LIMIT 1", (series_name,))
+            cursor.execute("SELECT library_id FROM books WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0 LIMIT 1", (series_name,))
             resolved_row = cursor.fetchone()
             if resolved_row and resolved_row['library_id']:
                 library_id = resolved_row['library_id']
@@ -26,28 +26,28 @@ class BookDetailService:
             cursor.execute("""
                 SELECT author, publisher, link, score, summary, genre, tags
                 FROM books
-                WHERE series_name = ? AND library_id = ? AND (summary IS NOT NULL AND summary != '')
+                WHERE series_name = ? AND library_id = ? AND COALESCE(is_deleted, 0) = 0 AND (summary IS NOT NULL AND summary != '')
                 LIMIT 1
             """, (series_name, library_id))
             meta_row = cursor.fetchone()
             if not meta_row:
                 cursor.execute("""
                     SELECT author, publisher, link, score, summary, genre, tags
-                    FROM books WHERE series_name = ? AND library_id = ? LIMIT 1
+                    FROM books WHERE series_name = ? AND library_id = ? AND COALESCE(is_deleted, 0) = 0 LIMIT 1
                 """, (series_name, library_id))
                 meta_row = cursor.fetchone()
         else:
             cursor.execute("""
                 SELECT author, publisher, link, score, summary, genre, tags
                 FROM books
-                WHERE series_name = ? AND (summary IS NOT NULL AND summary != '')
+                WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0 AND (summary IS NOT NULL AND summary != '')
                 LIMIT 1
             """, (series_name,))
             meta_row = cursor.fetchone()
             if not meta_row:
                 cursor.execute("""
                     SELECT author, publisher, link, score, summary, genre, tags
-                    FROM books WHERE series_name = ? LIMIT 1
+                    FROM books WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0 LIMIT 1
                 """, (series_name,))
                 meta_row = cursor.fetchone()
 
@@ -55,23 +55,23 @@ class BookDetailService:
         if use_lib_filter:
             cursor.execute("""
                 SELECT b.id, b.title, b.file_format, b.total_pages, b.has_offsets, b.cover_image, b.cover_updated_at,
-                       b.file_path, p.pages_read, p.is_completed, b.is_favorite, b.library_id
+                       b.file_path, p.pages_read, p.is_completed, b.is_favorite, b.library_id, p.last_read_at
                 FROM books b
                 LEFT JOIN user_progress p ON b.id = p.book_id AND p.user_id = ?
-                WHERE b.series_name = ? AND b.library_id = ?
+                WHERE COALESCE(b.is_deleted, 0) = 0 AND b.series_name = ? AND b.library_id = ?
             """, (user_id, series_name, library_id))
         else:
             cursor.execute("""
                 SELECT b.id, b.title, b.file_format, b.total_pages, b.has_offsets, b.cover_image, b.cover_updated_at,
-                       b.file_path, p.pages_read, p.is_completed, b.is_favorite, b.library_id
+                       b.file_path, p.pages_read, p.is_completed, b.is_favorite, b.library_id, p.last_read_at
                 FROM books b
                 LEFT JOIN user_progress p ON b.id = p.book_id AND p.user_id = ?
-                WHERE b.series_name = ?
+                WHERE COALESCE(b.is_deleted, 0) = 0 AND b.series_name = ?
             """, (user_id, series_name))
         books_rows = cursor.fetchall()
 
         # 실제 covers 폴더 내 시리즈 이미지 갱신 타임스탬프 쿼리
-        cursor.execute("SELECT MAX(cover_updated_at) AS latest_updated FROM books WHERE series_name = ?", (series_name,))
+        cursor.execute("SELECT MAX(cover_updated_at) AS latest_updated FROM books WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0", (series_name,))
         time_row = cursor.fetchone()
         latest_updated = time_row['latest_updated'] if time_row else None
         conn.close()
@@ -138,6 +138,7 @@ class BookDetailService:
                 'pages_read'  : b['pages_read']  or 0,
                 'is_completed': b['is_completed'] or 0,
                 'is_favorite' : b['is_favorite'] or 0,
+                'last_read_at': b['last_read_at'] or '',
             })
         
         # 부모 디렉토리 기반 단행본 격리 필터

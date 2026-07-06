@@ -380,7 +380,14 @@ def opds_download_book(db_type: str, book_id: int):
     file_path = row['file_path']
     if not os.path.exists(file_path):
         return jsonify({'error': _t('api.err_file_not_found')}), 404
-    return send_file(file_path, as_attachment=True)
+
+    from services.opds_service import _guess_mime_type
+    mime_type = _guess_mime_type(file_path)
+    filename = os.path.basename(file_path)
+
+    response = send_file(file_path, as_attachment=True, download_name=filename, mimetype=mime_type)
+    response.headers['Content-Type'] = f"{mime_type}; charset=utf-8" if mime_type.startswith('text/') else mime_type
+    return response
 
 
 @opds_bp.route('/opds/search', methods=['GET'])

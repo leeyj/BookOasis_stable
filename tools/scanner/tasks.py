@@ -13,7 +13,7 @@ from tools.scanner.offset import collect_zip_offsets_data
 
 SUPPORTED_FORMATS = ('.zip', '.cbz', '.epub', '.pdf', '.txt')
 
-def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_folder_mtimes, is_remote=False, library_id=None):
+def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_folder_mtimes, is_remote=False, library_id=None, db_files_cache=None):
     """Independent I/O scan task per folder (DB independent, pure FS/I/O scaling)"""
     print(f"[Scanner-DEBUG-Task] 📂 entering process_folder_task - folder: '{root}'")
     
@@ -47,32 +47,37 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
         print(f"[Scanner-DEBUG-Task] ⚠️ Failed to get mtime for folder '{root}': {e}")
         dir_mtime = None
 
-    # 2. Early skip if fully cached and no metadata file exists (non-force scan)
-    if not force:
-        all_cached = True
+    # 2. Early skip if files are unchanged (mtime & size match DB cache)
+    skipped_files = set()
+    if not force and db_files_cache:
         for filename in media_files:
             full_path = os.path.join(root, filename)
-            if full_path not in db_meta_full:
-                all_cached = False
-                break
-                
-            file_ext = os.path.splitext(filename)[1].lower()
-            if file_ext in ('.zip', '.cbz') and not is_remote:
-                if full_path not in db_offsets_cached:
-                    all_cached = False
-                    break
-        if all_cached:
+            if full_path in db_files_cache:
+                try:
+                    p_mtime = os.path.getmtime(full_path)
+                    p_size = os.path.getsize(full_path)
+                    c_mtime, c_size = db_files_cache[full_path]
+                    
+                    if int(c_mtime) == int(p_mtime) and c_size == p_size:
+                        file_ext = os.path.splitext(filename)[1].lower()
+                        if file_ext in ('.zip', '.cbz') and not is_remote and full_path not in db_offsets_cached:
+                            continue
+                        skipped_files.add(filename)
+                except Exception:
+                    pass
+
+        all_files_skipped = len(skipped_files) == len(media_files)
+        if all_files_skipped:
             if not has_yaml and not has_xml:
-                print(f"[Scanner-DEBUG-Task] ⚡ [Ultra-fast skip] All files cached and metadata irrelevant - folder: '{root}'")
+                print(f"[Scanner-DEBUG-Task] ⚡ [Ultra-fast skip] All files unchanged (mtime/size match) - folder: '{root}'")
                 return None
             else:
                 if dir_mtime is not None:
                     cached_mtimes = db_folder_mtimes.get(root)
                     if cached_mtimes:
                         c_dir_mtime, c_meta_mtime = cached_mtimes
-                        # 부동소수점 오차 방지를 위해 정수로 변환하여 비교 (1초 단위 정밀도)
                         if int(c_dir_mtime) == int(dir_mtime) and int(c_meta_mtime) == int(meta_mtime):
-                            print(f"[Scanner-DEBUG-Task] ⚡ [Ultra-fast skip] All files cached and metadata mtime unchanged - folder: '{root}'")
+                            print(f"[Scanner-DEBUG-Task] ⚡ [Ultra-fast skip] All files unchanged and meta mtime unchanged - folder: '{root}'")
                             return None
                         else:
                             print(f"[Scanner-DEBUG-Task] ⚠️ [Ultra-fast skip failed] mtime changed (dir: {int(c_dir_mtime)}->{int(dir_mtime)}, meta: {int(c_meta_mtime)}->{int(meta_mtime)}) - folder: '{root}'")
@@ -115,6 +120,8 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
 
         skip = False
         if not force and not meta_has_data and full_path in db_meta_full and full_path in db_offsets_cached:
+            skip = True
+        elif filename in skipped_files:
             skip = True
 
         cover_image = None
@@ -267,6 +274,14 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
                     })
             print(f"[Scanner-DEBUG-Task]   - File processing completed: '{filename}'")
 
+        f_mtime = 0.0
+        f_size = 0
+        try:
+            f_mtime = os.path.getmtime(full_path)
+            f_size = os.path.getsize(full_path)
+        except Exception:
+            pass
+
         results.append({
             'full_path': full_path,
             'filename': filename,
@@ -276,6 +291,8 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
             'offsets_data': offsets_data,
             'skip': skip,
             'offset_only': offset_only,  # Whether it's offset-only fast path
+            'file_mtime': f_mtime,
+            'file_size': f_size,
         })
 
     # Clear references to large base64 maps used to free memory

@@ -84,8 +84,34 @@ function initTabMediaLibrary() {
   // IntersectionObserver 기반 무한 스크롤 초기화
   initInfiniteScrollObserver();
 
+  // URL 해시 파라미터 파싱 헬퍼
+  function getHashParams() {
+    const hash = window.location.hash;
+    if (!hash || !hash.includes('?')) return {};
+    const queryString = hash.split('?')[1];
+    const params = {};
+    const pairs = queryString.split('&');
+    for (const pair of pairs) {
+      const [key, val] = pair.split('=');
+      if (key) params[key] = decodeURIComponent(val || '');
+    }
+    return params;
+  }
+
+  // 새로고침 시 URL 해시 기반 상세 화면 자동 재진입
+  const hashParams = getHashParams();
+  if (window.location.hash.startsWith('#detail') && hashParams.series) {
+    const restoreSeries = hashParams.series;
+    const restoreLibraryId = hashParams.libraryId || 'all';
+    console.log('[History] 해시 주소 기반 복원 감지 - 상세 뷰 복구:', restoreSeries);
+    setTimeout(() => {
+      openBookDetail(null, restoreSeries, restoreLibraryId);
+    }, 150);
+  }
+
   // 키보드 단축키
   initKeyboardListener();
+
 
   // 브라우저 뒤로가기(Back) 버튼 감지하여 뷰어 또는 상세 화면 닫기 처리
   window.addEventListener('popstate', (event) => {

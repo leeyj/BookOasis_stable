@@ -309,7 +309,10 @@ export function triggerAddLibrary() {
   form.reset();
   document.getElementById('library-form-id').value = '';
   const remoteEl = document.getElementById('library-form-remote');
-  if (remoteEl) remoteEl.checked = false;
+  if (remoteEl) {
+    remoteEl.checked = false;
+    remoteEl.dispatchEvent(new Event('change'));
+  }
 
   // 이동 버튼 숨김
   const moveBtn = document.getElementById('library-form-move-btn');
@@ -725,6 +728,7 @@ function detectAndUpdateRemoteFlag(path) {
   
   // 자동 감지 결과를 체크박스에 반영 (사용자 수정 가능)
   isRemoteCheckbox.checked = isLikelyRemote;
+  isRemoteCheckbox.dispatchEvent(new Event('change'));
 }
 
 // 글로벌 함수로 노출 (onclick 핸들러용)
