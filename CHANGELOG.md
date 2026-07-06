@@ -4,7 +4,8 @@
 - zip,epub,txt,pdf 뷰어에서 오동작 하는 부분들 전면 수정 | epub, txt, pdf viewer malfunction fix
 - epub 로직 리펙토링 | epub logic refactoring
 - txt 뷰어 리펙토링 | txt viewer refactoring
-
+- 스캐너 건너뛰기 로직 보강 | scanner skip logic reinforcement
+* VFS 캐시갱신이 실패하더라도 mtime 및 커버정보가 있다면 건너뜀 | if vfs cache refresh fails, skip if mtime and cover information exist.
 * 아직 뷰어 부분 잠재적인 버그가 있을 수 있습니다. | there may be potential bugs in the viewer part.
 * 브라우저 리사이즈시 위치 소실등... | browser resize position loss...
 

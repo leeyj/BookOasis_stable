@@ -66,7 +66,11 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
                             continue
                         skipped_files.add(filename)
                 except Exception:
-                    pass
+                    # 원격 드라이브이고 이미 DB 캐시(mtime, 메타데이터, 커버)가 있는 경우 예외가 나더라도 스킵 처리
+                    if is_remote and full_path in db_meta_full:
+                        c_mtime, c_size = db_files_cache[full_path]
+                        if c_mtime > 0.0:
+                            skipped_files.add(filename)
 
         all_files_skipped = len(skipped_files) == len(media_files)
         if all_files_skipped:
