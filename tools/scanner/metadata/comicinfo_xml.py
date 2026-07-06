@@ -47,6 +47,9 @@ _circuit_breaker = NetworkCircuitBreaker(max_failures=3, reset_timeout=60)
 def clean_html_tags(text):
     if not text:
         return ''
+    text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'</p\s*>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'<p\s*>', '', text, flags=re.IGNORECASE)
     cleaned = HTML_TAG_RE.sub('', text)
     return html.unescape(cleaned).strip()
 

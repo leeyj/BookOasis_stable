@@ -53,6 +53,9 @@ def clean_html_tags(text):
     """Remove HTML tags and restore special entities"""
     if not text:
         return ''
+    text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'</p\s*>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'<p\s*>', '', text, flags=re.IGNORECASE)
     cleaned = HTML_TAG_RE.sub('', text)
     return html.unescape(cleaned).strip()
 

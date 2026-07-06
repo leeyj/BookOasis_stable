@@ -41,6 +41,9 @@ HANGUL_CONSONANTS = set(['ㄱ','ㄴ','ㄷ','ㄹ','ㅁ','ㅂ','ㅅ','ㅇ','ㅈ','
 def clean_html_tags(text):
     if not text:
         return ''
+    text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'</p\s*>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'<p\s*>', '', text, flags=re.IGNORECASE)
     cleaned = HTML_TAG_RE.sub('', text)
     return html.unescape(cleaned).strip()
 
@@ -153,9 +156,12 @@ def merge_local_metadata(folder_path, files=None, is_remote=False):
             continue
 
         try:
-            source = parser_fn(folder_path, is_remote=is_remote)
+            source = parser_fn(folder_path, files=files, is_remote=is_remote)
         except TypeError:
-            source = parser_fn(folder_path)
+            try:
+                source = parser_fn(folder_path, is_remote=is_remote)
+            except TypeError:
+                source = parser_fn(folder_path)
         except Exception as e:
             print(f"[Scanner-Metadata] Parser '{getattr(parser_module, '__name__', 'unknown')}' failed: {e}", file=sys.stderr)
             continue

@@ -897,6 +897,7 @@
     background: rgba(15, 23, 42, 0.3);
     padding: 0.8rem 1rem;
     border-radius: 6px;
+    white-space: pre-wrap;
 }
 
 /* 표지 수동 업로드 컨테이너 및 오버레이 */

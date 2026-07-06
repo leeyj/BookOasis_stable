@@ -19,6 +19,10 @@ HTML_TAG_RE = re.compile(r'<[^>]*>')
 def clean_html_tags(text):
     if not text:
         return ''
+    # <br> 이나 <p> 태그를 줄바꿈(\n)으로 미리 치환
+    text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'</p\s*>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'<p\s*>', '', text, flags=re.IGNORECASE)
     # HTML 태그 제거
     cleaned = HTML_TAG_RE.sub('', text)
     # HTML 엔티티 복원 (&nbsp; -> 공백 등)

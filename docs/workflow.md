@@ -277,15 +277,12 @@ tags: [workflow, history]
 | 2026-07-05 | `about_tab_trademark_copyright_addition` | 정보 탭에 상표권 및 저작권 명시 추가 | [Task](./history/20260705_223333_about_tab_trademark_copyright_addition_task.md) | [Walkthrough](./history/20260705_223333_about_tab_trademark_copyright_addition_walkthrough.md) |
 | 2026-07-05 | `readmes_trademark_copyright_addition` | README.md 및 README_EN.md에 상표권 및 저작권 명시 추가 | [Task](./history/20260705_223603_readmes_trademark_copyright_addition_task.md) | [Walkthrough](./history/20260705_223603_readmes_trademark_copyright_addition_walkthrough.md) |
 | 2026-07-05 | `category_migration` | 일반 ↔ 성인 데이터베이스 간 안전한 카테고리 데이터 마이그레이션 기능 구현 | [Improvement](./bug/20260705_improvement_category_migration.md) | - |
-
-
 | 2026-07-05 | `category_migration` | 이관 중 브라우저 창 닫기/이탈 방지, 중복 경로 감지 속보 및 DB 커넥션 풀 누수 결함 최종 수정 | [Improvement](./bug/20260705_improvement_category_migration.md) | - |
 | 2026-07-05 | `category_migration` | 일반 ↔ 성인 데이터베이스 간 안전한 카테고리 데이터 마이그레이션 기능 구현 | [Task](./history/20260705_231206_category_migration_task.md) | [Walkthrough](./history/20260705_231206_category_migration_walkthrough.md) |
 | 2026-07-05 | `category_migration` | 창 이탈 방지 및 일반/성인 카테고리 경로 중복 감지 속보 구현 | [Task](./history/20260705_233820_category_migration_task.md) | [Walkthrough](./history/20260705_233820_category_migration_walkthrough.md) |
 | 2026-07-06 | `category_migration` | 마이그레이션 커넥션 누수 결함 최종 보완 및 빌드 | [Task](./history/20260706_004600_category_migration_task.md) | [Walkthrough](./history/20260706_004600_category_migration_walkthrough.md) |
 | 2026-07-06 | `opds_search` | OPDS/App-OPDS 검색 기능 추가 및 관련 가이드/API 문서 업데이트 | [Task](./history/20260706_014328_opds_search_task.md) | [Walkthrough](./history/20260706_014328_opds_search_walkthrough.md) |
 | 2026-07-06 | `category_vfs_toggle` | 카테고리 원격 드라이브(VFS) 토글 시 RC 주소 입력창 미노출 버그 수정 | [Bugfix](./bug/20260706_bugfix_category_vfs_toggle.md) | - |
-
 | 2026-07-06 | `category_vfs_toggle` | 카테고리 원격 드라이브(VFS) 토글 시 RC 주소 입력창 미노출 버그 수정 | [Task](./history/20260706_101236_category_vfs_toggle_task.md) | [Walkthrough](./history/20260706_101236_category_vfs_toggle_walkthrough.md) |
 | 2026-07-06 | `auto_resume_scan` | 스캐너 비정상 종료 시 자동 이어하기(Auto-Resume) 기능 구현 | [Improvement](./bug/20260706_improvement_auto_resume_scan.md) | - |
 | 2026-07-06 | `auto_resume_scan` | 스캐너 비정상 종료 시 자동 이어하기(Auto-Resume) 기능 구현 | [Task](./history/20260706_104310_auto_resume_scan_task.md) | [Walkthrough](./history/20260706_104310_auto_resume_scan_walkthrough.md) |
@@ -318,3 +315,5 @@ tags: [workflow, history]
 | 2026-07-07 | `scanner_vfs_offline_skip` | 원격 드라이브 VFS 오프라인 시 이미 캐싱 완료된 도서의 조기 스킵 예외처리 적용 | [BugFix](./bug/20260707_bugfix_scanner_vfs_offline_skip_failure.md) | - |
 | 2026-07-07 | `session_20260707_020026` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260707_020026_session_20260707_020026_task.md) | [Walkthrough](./history/20260707_020026_session_20260707_020026_walkthrough.md) |
 | 2026-07-07 | `scanner_vfs_offline_skip` | 원격 드라이브 VFS 오프라인 시 이미 캐싱 완료된 도서의 조기 스킵 예외처리 적용 | [Task](./history/20260707_023516_scanner_vfs_offline_skip_task.md) | [Walkthrough](./history/20260707_023516_scanner_vfs_offline_skip_walkthrough.md) |
+| 2026-07-07 | `session_20260707_044018` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260707_044018_session_20260707_044018_task.md) | [Walkthrough](./history/20260707_044018_session_20260707_044018_walkthrough.md) |
+| 2026-07-07 | `session_20260707_044136` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260707_044136_session_20260707_044136_task.md) | [Walkthrough](./history/20260707_044136_session_20260707_044136_walkthrough.md) |

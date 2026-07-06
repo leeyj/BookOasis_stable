@@ -1,4 +1,9 @@
 # CHANGELOG
+## v0.7.9
+### fixed
+- 도서 상세 서머리 줄바꿈 유지 수정 | book detail summary newline retention fix
+- 스캔시 도서등록하면서 커버 추출도 수행 | scan during book registration and cover extraction
+
 ## v0.7.8
 ### fixed
 - zip,epub,txt,pdf 뷰어에서 오동작 하는 부분들 전면 수정 | epub, txt, pdf viewer malfunction fix

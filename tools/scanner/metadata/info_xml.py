@@ -47,6 +47,9 @@ _circuit_breaker = NetworkCircuitBreaker(max_failures=3, reset_timeout=60)
 def clean_html_tags(text):
     if not text:
         return ''
+    text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'</p\s*>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'<p\s*>', '', text, flags=re.IGNORECASE)
     cleaned = HTML_TAG_RE.sub('', text)
     return html.unescape(cleaned).strip()
 
@@ -92,8 +95,8 @@ def read_file_with_timeout(file_path, is_remote, timeout=10):
     return res
 
 
-def parse(target_path, is_remote=False):
-    return parse_info_xml(target_path, is_remote=is_remote)
+def parse(target_path, files=None, is_remote=False):
+    return parse_info_xml(target_path, files=files, is_remote=is_remote)
 
 
 def parse_info_xml(folder_path, files=None, is_remote=False):
