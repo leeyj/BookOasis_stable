@@ -364,3 +364,6 @@ tags: [workflow, history]
 | 2026-07-07 | `viewer_refactoring` | 뷰어 아키텍처 리팩토링 및 스크롤 모드 오클릭 메뉴 방지 패치 | [Task](./history/20260707_003207_viewer_refactoring_task.md) | [Walkthrough](./history/20260707_003207_viewer_refactoring_walkthrough.md) |
 | 2026-07-07 | `viewer_refactoring` | 뷰어 아키텍처 리팩토링 및 EPUB 스크롤 로더 병목 버그 수정 | [Task](./history/20260707_003901_viewer_refactoring_task.md) | [Walkthrough](./history/20260707_003901_viewer_refactoring_walkthrough.md) |
 | 2026-07-07 | `viewer_refactoring` | 뷰어 아키텍처 리팩토링 및 EPUB 스크롤 로더 병목 및 내부 링크 500 에러 수정 | [Task](./history/20260707_004244_viewer_refactoring_task.md) | [Walkthrough](./history/20260707_004244_viewer_refactoring_walkthrough.md) |
+| 2026-07-07 | `scanner_early_skip_fix` | 스캔 중 중단 도서의 표지/메타데이터 유실 방지 조기 스킵 가드 패치 | [Task](./history/20260707_015855_scanner_early_skip_fix_task.md) | [Walkthrough](./history/20260707_015855_scanner_early_skip_fix_walkthrough.md) |
+
+| 2026-07-07 | `session_20260707_020026` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260707_020026_session_20260707_020026_task.md) | [Walkthrough](./history/20260707_020026_session_20260707_020026_walkthrough.md) |

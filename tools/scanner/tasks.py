@@ -62,6 +62,8 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
                         file_ext = os.path.splitext(filename)[1].lower()
                         if file_ext in ('.zip', '.cbz') and not is_remote and full_path not in db_offsets_cached:
                             continue
+                        if full_path not in db_meta_full:
+                            continue
                         skipped_files.add(filename)
                 except Exception:
                     pass
