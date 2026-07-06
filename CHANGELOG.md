@@ -1,8 +1,13 @@
 # CHANGELOG
+## v0.7.8
+### fixed
+- zip,epub,txt,pdf 뷰어에서 오동작 하는 부분들 전면 수정 | epub, txt, pdf viewer malfunction fix
+- epub 로직 리펙토링 | epub logic refactoring
+- txt 뷰어 리펙토링 | txt viewer refactoring
 
-** 알려진 버그
- - epub 읽기시 가끔 먹통 현상(백화현상)
- - 스캔이 완료되었는데도 커버를 제대로 채우지 못하는 현상
+* 아직 뷰어 부분 잠재적인 버그가 있을 수 있습니다. | there may be potential bugs in the viewer part.
+* 브라우저 리사이즈시 위치 소실등... | browser resize position loss...
+
 
 ## v0.7.7
 ### fixed

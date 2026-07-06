@@ -158,6 +158,18 @@ export function updatePageInfo() {
     return;
   }
 
+  if (state.currentViewerFormat === 'txt') {
+    const slider = document.getElementById('viewer-page-slider');
+    if (slider && overlayInfoEl) {
+      const maxVal = slider.max || '1';
+      const curVal = slider.value || '1';
+      overlayInfoEl.textContent = `${curVal} / ${maxVal}`;
+    }
+    const overlayTitleEl = document.getElementById('overlay-title-text');
+    if (overlayTitleEl) overlayTitleEl.textContent = document.getElementById('viewer-title-text').textContent;
+    return;
+  }
+
   if (state.currentViewerFormat === 'pdf') {
     const pdfInfo = document.getElementById('pdf-page-info');
     if (pdfInfo && overlayInfoEl) {

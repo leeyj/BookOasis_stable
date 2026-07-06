@@ -48,13 +48,11 @@ export function toggleComicOverlay() {
 export function comicJumpToFirstPage() {
   Renderer.setComicCurrentPage(0);
   Renderer.loadComicPage();
-  toggleComicOverlay();
 }
 
 export function comicJumpToLastPage() {
   Renderer.setComicCurrentPage(Math.max(0, Renderer.getComicTotalPages() - 1));
   Renderer.loadComicPage();
-  toggleComicOverlay();
 }
 
 export function markAsCompleted() {

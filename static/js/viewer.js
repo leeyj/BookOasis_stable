@@ -1,8 +1,11 @@
 // viewer.js – 미디어 뷰어 라이프사이클 및 단축키 코어 조율기
 import { state } from './state.js';
-import { initComicViewer, clearComicViewer, nextComicPage, prevComicPage, setComicFitMode, toggleComicOverlay, markAsCompleted as markComicAsCompleted, getComicReadingDirection, toggleComicReadingDirection, getComicPageStep, toggleComicPageStep, setComicPageStep } from './viewer_comic.js';
-import { initTxtViewer, prevTxtPage, nextTxtPage, applyTxtSettings } from './viewer_txt.js';
-import { initPdfViewer, nextPdfPage, prevPdfPage, clearPdfViewer } from './viewer_pdf.js';
+import { ComicViewer, initComicViewer, clearComicViewer, nextComicPage, prevComicPage, setComicFitMode, toggleComicOverlay, markAsCompleted as markComicAsCompleted, getComicReadingDirection, toggleComicReadingDirection, getComicPageStep, toggleComicPageStep, setComicPageStep, comicJumpToFirstPage, comicJumpToLastPage } from './viewer_comic.js';
+import { TxtViewer, initTxtViewer, prevTxtPage, nextTxtPage, applyTxtSettings, txtJumpToFirstPage, txtJumpToLastPage } from './viewer_txt.js';
+import { PdfViewer, initPdfViewer, nextPdfPage, prevPdfPage, clearPdfViewer, pdfJumpToFirstPage, pdfJumpToLastPage } from './viewer_pdf.js';
+
+export let activeViewerInstance = null;
+
 let epubModule = null;
 async function getEpubModule() {
   if (!epubModule) {
@@ -96,7 +99,8 @@ export function openReader(bookId, format, title, pagesRead, totalPages) {
   }
   
   // 브라우저 자체의 스크롤바 완전 격리 (이중 스크롤 방지)
-  document.body.style.overflow = 'hidden';
+  document.body.style.setProperty('overflow', 'hidden', 'important');
+  document.documentElement.style.setProperty('overflow', 'hidden', 'important');
 
   // 새 만화 로드 시 오버레이 메뉴를 숨김 상태로 초기화
   const overlayMenu = document.getElementById('comic-overlay-menu');
@@ -157,22 +161,42 @@ export function openReader(bookId, format, title, pagesRead, totalPages) {
 
   const fmt = format.toLowerCase();
   state.currentViewerFormat = fmt;
+
+  // 기존 활성화된 뷰어가 있다면 명시적으로 정리(destroy)
+  if (activeViewerInstance && typeof activeViewerInstance.destroy === 'function') {
+    try {
+      console.log(`[Viewer-Core] 기존 활성 뷰어 정리: ${state.currentViewerFormat}`);
+      activeViewerInstance.destroy();
+    } catch (e) {
+      console.warn('[Viewer-Core] Failed to destroy active viewer:', e);
+    }
+  }
+  activeViewerInstance = null;
+
   if (fmt === 'zip' || fmt === 'cbz') {
     if (overlayComicFit) overlayComicFit.style.display = 'flex';
-    initComicViewer(bookId, pagesRead, totalPages).then(() => {
+    activeViewerInstance = ComicViewer;
+    activeViewerInstance.init(bookId, pagesRead, totalPages).then(() => {
       initViewerSeekBar();
     });
   } else if (fmt === 'txt') {
     if (overlayTxtControls) overlayTxtControls.style.display = 'flex';
     document.getElementById('comic-overlay-page-info').textContent = i18n.t('viewer.view_text') || '텍스트 보기';
-    initTxtViewer(bookId);
+    activeViewerInstance = TxtViewer;
+    activeViewerInstance.init(bookId, pagesRead);
+    initViewerSeekBar();
   } else if (fmt === 'pdf') {
-    initPdfViewer(bookId, pagesRead, totalPages);
+    activeViewerInstance = PdfViewer;
+    activeViewerInstance.init(bookId, pagesRead, totalPages);
+    initViewerSeekBar();
   } else if (fmt === 'epub') {
     if (overlayTxtControls) overlayTxtControls.style.display = 'flex';
     document.getElementById('comic-overlay-page-info').textContent = i18n.t('viewer.view_epub') || 'EPUB 보기';
-    initEpubViewer(bookId, pagesRead, totalPages);
-    initViewerSeekBar();
+    getEpubModule().then(m => {
+      activeViewerInstance = m.EpubViewer;
+      activeViewerInstance.init(bookId, pagesRead, totalPages);
+      initViewerSeekBar();
+    });
   } else {
     alert(i18n.t('viewer.unsupported_format'));
     closeMediaViewer();
@@ -190,12 +214,23 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false) {
     document.getElementById('fullscreen-icon').className = 'fa-solid fa-expand';
     // 브라우저 스크롤 복원
     document.body.style.overflow = '';
+    document.documentElement.style.overflow = '';
   }
 
   // 포맷별 정리 함수 위임 호출
-  clearComicViewer();
-  clearEpubViewer();
-  clearPdfViewer();
+  if (activeViewerInstance && typeof activeViewerInstance.destroy === 'function') {
+    try {
+      console.log(`[Viewer-Core] activeViewerInstance.destroy() 실행`);
+      activeViewerInstance.destroy();
+    } catch (e) {
+      console.warn('[Viewer-Core] Error destroying viewer instance:', e);
+    }
+    activeViewerInstance = null;
+  } else {
+    clearComicViewer();
+    clearEpubViewer();
+    clearPdfViewer();
+  }
 
   // 대기 중인 진척도 저장 예약 건 즉시 동기화(Flush) 및 메인 뷰 데이터 리로드
   import('./viewer_progress.js').then(m => {
@@ -252,6 +287,10 @@ export function toggleFullscreenViewer() {
 // 이전 페이지 통합 조율
 export function prevPage() {
   console.log('[Viewer-Core] prevPage() called');
+  if (activeViewerInstance && typeof activeViewerInstance.prevPage === 'function') {
+    activeViewerInstance.prevPage();
+    return;
+  }
   const isRtl = localStorage.getItem('comic_reading_direction') === 'rtl';
   if (document.getElementById('comic-viewer-container').style.display !== 'none') {
     if (getComicReadingDirection() === 'rtl') {
@@ -275,6 +314,10 @@ export function prevPage() {
 // 다음 페이지 통합 조율
 export function nextPage() {
   console.log('[Viewer-Core] nextPage() called');
+  if (activeViewerInstance && typeof activeViewerInstance.nextPage === 'function') {
+    activeViewerInstance.nextPage();
+    return;
+  }
   const isRtl = localStorage.getItem('comic_reading_direction') === 'rtl';
   if (document.getElementById('comic-viewer-container').style.display !== 'none') {
     if (getComicReadingDirection() === 'rtl') {
@@ -418,36 +461,56 @@ export function initWheelListener() {
 // 공통 환경 설정 트리거 함수
 export function changeFontSize(dir) {
   updateFontSize(dir);
-  applyTxtSettings();
-  applyEpubSettings();
+  if (activeViewerInstance && typeof activeViewerInstance.applySettings === 'function') {
+    activeViewerInstance.applySettings();
+  } else {
+    applyTxtSettings();
+    applyEpubSettings();
+  }
 }
 
 export function toggleReaderTheme() {
   toggleTheme();
-  applyTxtSettings();
-  applyEpubSettings();
+  if (activeViewerInstance && typeof activeViewerInstance.applySettings === 'function') {
+    activeViewerInstance.applySettings();
+  } else {
+    applyTxtSettings();
+    applyEpubSettings();
+  }
 }
 
 // HTML 인라인 이벤트 연동을 위해 글로벌 윈도우 객체에 바인딩
 window.onViewerFontChange = function(value) {
   console.log(`[Viewer-Core] Font family changed to: ${value}`);
   localStorage.setItem('viewer_font_family', value);
-  applyTxtSettings();
-  applyEpubSettings();
+  if (activeViewerInstance && typeof activeViewerInstance.applySettings === 'function') {
+    activeViewerInstance.applySettings();
+  } else {
+    applyTxtSettings();
+    applyEpubSettings();
+  }
 };
 
 window.onViewerLineHeightChange = function(value) {
   console.log(`[Viewer-Core] Line height changed to: ${value}`);
   updateLineHeight(value);
-  applyTxtSettings();
-  applyEpubSettings();
+  if (activeViewerInstance && typeof activeViewerInstance.applySettings === 'function') {
+    activeViewerInstance.applySettings();
+  } else {
+    applyTxtSettings();
+    applyEpubSettings();
+  }
 };
 
 window.onViewerParagraphSpacingChange = function(value) {
   console.log(`[Viewer-Core] Paragraph spacing changed to: ${value}`);
   updateParagraphSpacing(value);
-  applyTxtSettings();
-  applyEpubSettings();
+  if (activeViewerInstance && typeof activeViewerInstance.applySettings === 'function') {
+    activeViewerInstance.applySettings();
+  } else {
+    applyTxtSettings();
+    applyEpubSettings();
+  }
 };
 
 window.setScrollMode = function(mode) {
@@ -516,6 +579,21 @@ function initViewerSeekBar() {
         const fn = m.epubSliderInput || (window && window.epubSliderInput);
         if (typeof fn === 'function') fn(slider, val); else console.warn('[Viewer-Core] epubSliderInput not available');
       }).catch(err => console.warn('[Viewer-Core] Failed to import viewer_epub:', err));
+    } else if (fmt === 'txt') {
+      import('./viewer_txt.js').then(m => {
+        const fn = m.txtSliderInput;
+        if (typeof fn === 'function') fn(slider, val);
+      }).catch(err => console.warn('[Viewer-Core] Failed to import viewer_txt:', err));
+    } else if (fmt === 'pdf') {
+      const tooltip = document.getElementById('seekbar-tooltip');
+      if (tooltip) {
+        tooltip.textContent = val;
+        tooltip.style.display = 'block';
+      }
+      const pageInfo = document.getElementById('comic-overlay-page-info');
+      if (pageInfo) {
+        pageInfo.textContent = `${val} / ${slider.max}`;
+      }
     }
   });
 
@@ -533,6 +611,17 @@ function initViewerSeekBar() {
         const fn = m.epubSliderChange || (window && window.epubSliderChange);
         if (typeof fn === 'function') fn(slider, val); else console.warn('[Viewer-Core] epubSliderChange not available');
       }).catch(err => console.warn('[Viewer-Core] Failed to import viewer_epub:', err));
+    } else if (fmt === 'txt') {
+      import('./viewer_txt.js').then(m => {
+        const fn = m.txtSliderChange;
+        if (typeof fn === 'function') fn(slider, val);
+      }).catch(err => console.warn('[Viewer-Core] Failed to import viewer_txt:', err));
+    } else if (fmt === 'pdf') {
+      import('./viewer_pdf.js').then(m => {
+        if (typeof m.pdfJumpToPage === 'function') {
+          m.pdfJumpToPage(val);
+        }
+      }).catch(err => console.warn('[Viewer-Core] Failed to import viewer_pdf:', err));
     }
   });
 }
@@ -540,25 +629,29 @@ function initViewerSeekBar() {
 export function viewerJumpToFirst() {
   const fmt = state.currentViewerFormat;
   if (fmt === 'zip' || fmt === 'cbz') {
-    import('./viewer_comic.js').then(m => {
-      const fn = m.comicJumpToFirstPage || (window && window.comicJumpToFirstPage);
-      if (typeof fn === 'function') fn(); else console.warn('[Viewer-Core] comicJumpToFirstPage not available');
-    }).catch(err => console.warn('[Viewer-Core] Failed to import viewer_comic:', err));
+    if (typeof comicJumpToFirstPage === 'function') comicJumpToFirstPage();
   } else if (fmt === 'epub') {
-    import('./viewer_epub.js').then(m => m.epubJumpToFirstPage());
+    getEpubModule().then(m => m.epubJumpToFirstPage());
+  } else if (fmt === 'pdf') {
+    if (typeof pdfJumpToFirstPage === 'function') pdfJumpToFirstPage();
+  } else if (fmt === 'txt') {
+    if (typeof txtJumpToFirstPage === 'function') txtJumpToFirstPage();
   }
+  toggleComicOverlay();
 }
 
 export function viewerJumpToLast() {
   const fmt = state.currentViewerFormat;
   if (fmt === 'zip' || fmt === 'cbz') {
-    import('./viewer_comic.js').then(m => {
-      const fn = m.comicJumpToLastPage || (window && window.comicJumpToLastPage);
-      if (typeof fn === 'function') fn(); else console.warn('[Viewer-Core] comicJumpToLastPage not available');
-    }).catch(err => console.warn('[Viewer-Core] Failed to import viewer_comic:', err));
+    if (typeof comicJumpToLastPage === 'function') comicJumpToLastPage();
   } else if (fmt === 'epub') {
-    import('./viewer_epub.js').then(m => m.epubJumpToLastPage());
+    getEpubModule().then(m => m.epubJumpToLastPage());
+  } else if (fmt === 'pdf') {
+    if (typeof pdfJumpToLastPage === 'function') pdfJumpToLastPage();
+  } else if (fmt === 'txt') {
+    if (typeof txtJumpToLastPage === 'function') txtJumpToLastPage();
   }
+  toggleComicOverlay();
 }
 
 window.viewerJumpToFirst = viewerJumpToFirst;
@@ -593,6 +686,8 @@ window.toggleComicPageStep = function() {
       const load = m.loadComicPage;
       if (typeof load === 'function') load();
     });
+  } else if (document.getElementById('txt-viewer-container').style.display !== 'none') {
+    applyTxtSettings();
   } else if (document.getElementById('epub-viewer-container').style.display !== 'none') {
     applyEpubSettings({ preservePagePosition: true });
   }
@@ -645,9 +740,10 @@ export function syncHotspotPointerEvents() {
 
   // EPUB은 scroll 모드에서만 iframe 내부 네이티브 스크롤을 위해 핫스팟을 숨기고,
   // page 모드에서는 핫스팟(30/40/30)을 사용해 안정적인 클릭 네비게이션을 보장합니다.
-  const shouldHideHotspotForEpub = isEpub && scrollMode === 'scroll';
+  // 또한 만화/TXT/PDF 등 모든 포맷에서 세로 스크롤 모드가 켜진 경우에는 휠/네이티브 스크롤 보증을 위해 핫스팟을 숨깁니다.
+  const shouldHideHotspot = (isEpub && scrollMode === 'scroll') || isScrollActive;
 
-  if (shouldHideHotspotForEpub || (isScrollActive && window.innerWidth <= 1200)) {
+  if (shouldHideHotspot) {
     hotspot.style.display = 'none';
     console.log('[syncHotspotPointerEvents] 핫스팟 비활성화(none) 적용됨.');
   } else {
@@ -664,20 +760,36 @@ export function initViewerClickToggle() {
   _viewerClickToggleInited = true;
 
   viewerBody.addEventListener('click', e => {
-    // 이미 오버레이 메뉴나 컨트롤 패널, 닫기 버튼 등을 직접 탭한 경우 무시
+    console.log('[Viewer-Click-Toggle] Body click detected. Target:', e.target);
+
+    // 이미 오버레이 메뉴나 컨트롤 패널, 닫기 버튼, 또는 핫스팟 레이어 자체를 탭한 경우 무시 (이중 토글 방지)
     if (e.target.closest('#comic-overlay-menu') || 
         e.target.closest('.viewer-controls') || 
         e.target.closest('.floating-close-btn') || 
+        e.target.closest('#common-viewer-hotspot') || 
         e.target.closest('button') || 
         e.target.closest('input') || 
         e.target.closest('select')) {
+      console.log('[Viewer-Click-Toggle] Click ignored (interactive element or hotspot clicked)');
       return;
     }
 
     const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
+    console.log('[Viewer-Click-Toggle] scrollMode:', scrollMode);
+
     // 핫스팟이 꺼진(pointer-events: none) 스크롤 모드 상태일 때만 본체 클릭을 오버레이 토글로 매핑
     if (scrollMode === 'scroll') {
-      toggleComicOverlay();
+      const clickX = e.clientX;
+      const width = window.innerWidth;
+      console.log(`[Viewer-Click-Toggle] clickX: ${clickX}, width: ${width}, ratio: ${clickX / width}`);
+
+      // 화면 가로폭 기준 30% ~ 70% 사이의 중앙 영역 클릭 시에만 오버레이 토글 작동
+      if (clickX >= width * 0.3 && clickX <= width * 0.7) {
+        console.log('[Viewer-Click-Toggle] Triggering toggleComicOverlay() from body listener');
+        toggleComicOverlay();
+      } else {
+        console.log('[Viewer-Click-Toggle] Click is outside 30%-70% center zone');
+      }
     }
   });
 }

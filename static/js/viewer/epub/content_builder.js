@@ -363,9 +363,13 @@ export async function buildMergedContent(book, options = {}) {
 
   const spineItems = book.spine.spineItems;
 
-  const chapters = (await Promise.all(spineItems.map(async (item, idx) => {
+  const chapters = [];
+  // Promise.all 병렬 로딩은 대량의 JSZip 비동기 해제 경합으로 인한 OOM/누락을 유발하므로 순차 로드로 안정성 확보
+  for (let idx = 0; idx < spineItems.length; idx++) {
+    const item = spineItems[idx];
     try {
-      const raw = await item.load(book.load.bind(book));
+      // item.load()는 내부 컨텍스트 유실로 서버에 직접 GET을 날려 404를 내므로 book.load() 직접 기동
+      const raw = await book.load(item.href, 'text');
       let doc = null;
 
       if (raw && (raw instanceof Document || raw.nodeType === 9 || typeof raw.getElementsByTagName === 'function')) {
@@ -376,12 +380,11 @@ export async function buildMergedContent(book, options = {}) {
         doc = raw;
       }
 
-      return { href: item.href, cfi: item.cfi, doc, idx };
+      chapters.push({ href: item.href, cfi: item.cfi, doc, idx });
     } catch (err) {
       console.warn('[Viewer-Epub] spine load skip:', item.href, err);
-      return null;
     }
-  }))).filter(Boolean);
+  }
 
   const chapterNodes = await Promise.all(chapters.map(async chapter => {
     const chapterDiv = document.createElement('div');

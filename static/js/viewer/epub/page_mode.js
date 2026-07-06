@@ -74,9 +74,23 @@ export async function activateRenditionPageMode({
     setRenditionAtEnd(!!(location && location.atEnd));
 
     try {
-      await ensureLocations(book, locationsChars);
-      const ratioFromCfi = cfi ? book.locations.percentageFromCfi(cfi) : 0;
-      updateProgressPercent((Number.isFinite(ratioFromCfi) ? ratioFromCfi : 0) * 100);
+      // locations가 완전히 생성되기 전까지는 강제로 0%로 초기화되는 것을 막아 기존 세션 복원율을 온존시킵니다.
+      if (cfi && book.locations && book.locations.length) {
+        const ratioFromCfi = book.locations.percentageFromCfi(cfi);
+        if (Number.isFinite(ratioFromCfi) && ratioFromCfi >= 0) {
+          updateProgressPercent(ratioFromCfi * 100);
+          return;
+        }
+      }
+
+      ensureLocations(book, locationsChars).then(() => {
+        if (cfi && book.locations && book.locations.length) {
+          const ratioFromCfi = book.locations.percentageFromCfi(cfi);
+          if (Number.isFinite(ratioFromCfi) && ratioFromCfi >= 0) {
+            updateProgressPercent(ratioFromCfi * 100);
+          }
+        }
+      }).catch(() => {});
     } catch (_) {
       // ignore
     }
@@ -92,7 +106,11 @@ export async function activateRenditionPageMode({
 
   if (!isRunCurrent()) return rendition;
 
-  if (ratio !== null && ratio !== undefined) {
+  if (currentLocationCfi) {
+    await safeRenditionDisplay(rendition, currentLocationCfi);
+  } else if (currentLocationHref) {
+    await safeRenditionDisplay(rendition, currentLocationHref);
+  } else if (ratio !== null && ratio !== undefined) {
     const safeRatio = Math.min(0.999, Math.max(0, ratio));
     let cfi = null;
     try {
@@ -103,10 +121,6 @@ export async function activateRenditionPageMode({
       console.warn('[Viewer-Epub] cfiFromPercentage failed:', err);
     }
     await safeRenditionDisplay(rendition, cfi);
-  } else if (currentLocationCfi) {
-    await safeRenditionDisplay(rendition, currentLocationCfi);
-  } else if (currentLocationHref) {
-    await safeRenditionDisplay(rendition, currentLocationHref);
   } else {
     await safeRenditionDisplay(rendition, null);
   }

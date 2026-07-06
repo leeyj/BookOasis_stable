@@ -20,7 +20,8 @@ export async function renderScrollMode({
   applyMergedThemeStyles,
   themeSettings,
   updateProgressPercent,
-  isRunCurrent
+  isRunCurrent,
+  currentLocationHref
 }) {
   container.style.overflowY = 'auto';
   container.style.overflowX = 'hidden';
@@ -49,11 +50,35 @@ export async function renderScrollMode({
 
   renderArea.appendChild(contentEl);
 
-  requestAnimationFrame(() => {
-    const totalScroll = container.scrollHeight - container.clientHeight;
-    container.scrollTop = Math.max(0, totalScroll * ratio);
-    updateProgressPercent(ratio * 100);
-  });
+  // 돔 결합 직후 뷰포트 높이 왜곡(0으로 계산됨)으로 인한 스크롤 리셋을 방지하기 위해 100ms 대기 후 복원
+  setTimeout(() => {
+    if (!isRunCurrent()) return;
+
+    let restored = false;
+    if (currentLocationHref) {
+      const cleanHref = currentLocationHref.split('#')[0].split('?')[0].split('/').pop();
+      if (cleanHref) {
+        const targetEl = renderArea.querySelector(`[data-href$="${cleanHref}"]`);
+        if (targetEl) {
+          targetEl.scrollIntoView({ behavior: 'auto', block: 'start' });
+          restored = true;
+          console.log('[Viewer-Epub-Scroll] Position restored via scrollIntoView:', cleanHref);
+          // 복원된 실제 위치의 비율을 계산하여 시크바와 동기화
+          const totalScroll = container.scrollHeight - container.clientHeight;
+          if (totalScroll > 0) {
+            updateProgressPercent((container.scrollTop / totalScroll) * 100);
+          }
+        }
+      }
+    }
+
+    if (!restored) {
+      const totalScroll = container.scrollHeight - container.clientHeight;
+      container.scrollTop = Math.max(0, totalScroll * ratio);
+      updateProgressPercent(ratio * 100);
+      console.log('[Viewer-Epub-Scroll] Position restored via fallback ratio:', ratio);
+    }
+  }, 100);
 
   return contentEl;
 }

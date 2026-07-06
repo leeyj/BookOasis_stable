@@ -360,3 +360,7 @@ tags: [workflow, history]
 | 2026-07-06 | `session_20260706_183731` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_183731_session_20260706_183731_task.md) | [Walkthrough](./history/20260706_183731_session_20260706_183731_walkthrough.md) |
 | 2026-07-06 | `session_20260706_184603` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_184603_session_20260706_184603_task.md) | [Walkthrough](./history/20260706_184603_session_20260706_184603_walkthrough.md) |
 | 2026-07-06 | `session_20260706_184833` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260706_184833_session_20260706_184833_task.md) | [Walkthrough](./history/20260706_184833_session_20260706_184833_walkthrough.md) |
+| 2026-07-07 | `viewer_refactoring` | 뷰어 생명주기 및 이벤트 클린업 시스템 표준화 | [Task](./history/20260707_002900_viewer_refactoring_task.md) | [Walkthrough](./history/20260707_002900_viewer_refactoring_walkthrough.md) |
+| 2026-07-07 | `viewer_refactoring` | 뷰어 아키텍처 리팩토링 및 스크롤 모드 오클릭 메뉴 방지 패치 | [Task](./history/20260707_003207_viewer_refactoring_task.md) | [Walkthrough](./history/20260707_003207_viewer_refactoring_walkthrough.md) |
+| 2026-07-07 | `viewer_refactoring` | 뷰어 아키텍처 리팩토링 및 EPUB 스크롤 로더 병목 버그 수정 | [Task](./history/20260707_003901_viewer_refactoring_task.md) | [Walkthrough](./history/20260707_003901_viewer_refactoring_walkthrough.md) |
+| 2026-07-07 | `viewer_refactoring` | 뷰어 아키텍처 리팩토링 및 EPUB 스크롤 로더 병목 및 내부 링크 500 에러 수정 | [Task](./history/20260707_004244_viewer_refactoring_task.md) | [Walkthrough](./history/20260707_004244_viewer_refactoring_walkthrough.md) |

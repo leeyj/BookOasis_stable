@@ -59,6 +59,56 @@ export function bindRenderAreaClick({ renderArea, getScrollMode, goBackward, goF
 
   // Capture phase helps when EPUB content scripts stop bubbling.
   renderArea.addEventListener('click', e => {
+    // <a> 링크 이동으로 인한 백엔드 500 에러 차단 및 내부 스크롤 이동 연동 (Link Hijack)
+    const anchor = e.target.closest('a');
+    if (anchor) {
+      const href = anchor.getAttribute('href');
+      if (href && !href.startsWith('mailto:') && !href.startsWith('tel:')) {
+        // 외부 웹링크(http://, https://)가 아닌 내부 상대 경로 링크인 경우 가로채기
+        if (!/^(https?:|\/\/)/i.test(href)) {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('[Viewer-Epub-Link] Hijacking link click:', href);
+
+          if (href.startsWith('#')) {
+            try {
+              const targetEl = renderArea.querySelector(href);
+              if (targetEl) {
+                targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+            } catch (err) {
+              console.warn('[Viewer-Epub-Link] querySelector failed for ID:', href, err);
+            }
+          } else {
+            const hashIdx = href.indexOf('#');
+            const targetId = hashIdx !== -1 ? href.substring(hashIdx) : null;
+            let found = false;
+
+            if (targetId) {
+              try {
+                const targetEl = renderArea.querySelector(targetId);
+                if (targetEl) {
+                  targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  found = true;
+                }
+              } catch (_) {}
+            }
+
+            if (!found) {
+              const cleanHref = href.split('#')[0].split('?')[0].split('/').pop();
+              if (cleanHref) {
+                const targetEl = renderArea.querySelector(`[data-href$="${cleanHref}"]`);
+                if (targetEl) {
+                  targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }
+            }
+          }
+          return;
+        }
+      }
+    }
+
     if (Date.now() - lastPointerHandledTs < 350) return;
     handleRenderAreaTap(e);
   }, true);

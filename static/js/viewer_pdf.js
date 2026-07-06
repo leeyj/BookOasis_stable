@@ -192,3 +192,58 @@ export function clearPdfViewer() {
   currentRenderTasks = [];
   pdfDoc = null;
 }
+
+export function pdfJumpToFirstPage() {
+  if (pdfDoc && pdfCurrentPage !== 1) {
+    pdfCurrentPage = 1;
+    renderPdfPage();
+  }
+}
+
+export function pdfJumpToLastPage() {
+  if (pdfDoc && pdfCurrentPage !== pdfTotalPages) {
+    pdfCurrentPage = pdfTotalPages;
+    renderPdfPage();
+  }
+}
+
+export function pdfJumpToPage(pageNum) {
+  if (pdfDoc) {
+    const targetPage = Math.max(1, Math.min(pdfTotalPages, pageNum));
+    if (pdfCurrentPage !== targetPage) {
+      pdfCurrentPage = targetPage;
+      renderPdfPage();
+    }
+  }
+}
+
+export const PdfViewer = {
+  async init(bookId, pagesRead, totalPages) {
+    return initPdfViewer(bookId, pagesRead, totalPages);
+  },
+  destroy() {
+    clearPdfViewer();
+    const renderArea = document.getElementById('pdf-render-area');
+    if (renderArea) renderArea.innerHTML = '';
+    const pane = document.getElementById('pdf-viewer-container');
+    if (pane) pane.style.display = 'none';
+  },
+  prevPage() {
+    prevPdfPage();
+  },
+  nextPage() {
+    nextPdfPage();
+  },
+  jumpTo(target) {
+    if (target === 'first') {
+      pdfJumpToFirstPage();
+    } else if (target === 'last') {
+      pdfJumpToLastPage();
+    }
+  },
+  applySettings(options) {
+    if (typeof window.applyPdfFitMode === 'function') {
+      window.applyPdfFitMode();
+    }
+  }
+};

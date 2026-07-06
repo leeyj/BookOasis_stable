@@ -59,3 +59,41 @@ if (typeof window !== 'undefined') {
   window.setComicScrollWidth = setComicScrollWidth; // 스크롤 너비 조절 (600~900px)
 }
 
+export const ComicViewer = {
+  async init(bookId, pagesRead, totalPages) {
+    return initComicViewer(bookId, pagesRead, totalPages);
+  },
+  destroy() {
+    clearComicViewer();
+  },
+  prevPage() {
+    const isRtl = localStorage.getItem('comic_reading_direction') === 'rtl';
+    if (isRtl) {
+      nextComicPage();
+    } else {
+      prevComicPage();
+    }
+  },
+  nextPage() {
+    const isRtl = localStorage.getItem('comic_reading_direction') === 'rtl';
+    if (isRtl) {
+      prevComicPage();
+    } else {
+      nextComicPage();
+    }
+  },
+  jumpTo(target) {
+    if (target === 'first') {
+      comicJumpToFirstPage();
+    } else if (target === 'last') {
+      comicJumpToLastPage();
+    }
+  },
+  applySettings(options) {
+    if (options && options.fitMode) {
+      setComicFitMode(options.fitMode);
+    }
+    applyComicFitMode();
+  }
+};
+

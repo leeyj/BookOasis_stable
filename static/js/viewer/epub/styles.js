@@ -5,6 +5,7 @@ export function applyMergedThemeStyles(merged, theme, fontCSS, fontSize, lineHei
 
   const pList = merged.querySelectorAll('p, span, div');
   pList.forEach(p => {
+    p.style.fontFamily = fontCSS; // 자식 요소에도 선택한 폰트를 강제 적용하여 EPUB 고유 폰트 스타일 덮어쓰기
     p.style.lineHeight = lineHeight;
     if (p.tagName === 'P') {
       p.style.marginTop = `${paragraphSpacing}em`;
@@ -25,6 +26,9 @@ export function applyRenditionTheme(rendition, theme, fontCSS, fontSize, lineHei
       'font-family': fontCSS,
       'font-size': `${fontSize}rem`,
       'line-height': lineHeight
+    },
+    'p, span, div, a, li': {
+      'font-family': `${fontCSS} !important`
     },
     p: {
       'margin-top': `${paragraphSpacing}em`,

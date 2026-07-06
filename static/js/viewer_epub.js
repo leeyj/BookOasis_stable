@@ -12,5 +12,6 @@ export {
   epubSliderInput,
   epubSliderChange,
   epubJumpToFirstPage,
-  epubJumpToLastPage
+  epubJumpToLastPage,
+  EpubViewer
 } from './viewer/epub/runtime.js';
