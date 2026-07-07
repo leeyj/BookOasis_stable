@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## v0.8.1
+### fixed
+- 카테고리 신규등록->자동 스캔시 rc통신을 기본값(http://localhost:5572)로 시도하는 버그 수정 | category new registration->scan time rc communication default value(http://localhost:5572) try bug fix
+- rclone rc통신시 패스워드(token)를 사용하지 않는 문제 해결 | rclone rc communication password(token) not using bug fix
+- 도서 관련 컨텍스트 메뉴시 좌표를 화면 안에 뜨게 수정 | book related context menu display position fix
+---
+
 ## v0.8.0
 ### fixed
 - epub,txt 뷰어 버그 수정(+ 모바일 뷰 버그) | epub,txt viewer bug fix(+ mobile view bug)

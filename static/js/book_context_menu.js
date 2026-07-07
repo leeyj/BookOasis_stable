@@ -13,9 +13,28 @@ export function showBookContextMenu(x, y, bookId, bookTitle, isVolumeDetail = fa
   
   currentTargetBook = { id: bookId, title: bookTitle, isVolumeDetail };
   
-  bookMenu.style.left = `${x + window.scrollX}px`;
-  bookMenu.style.top = `${y + window.scrollY}px`;
+  // 임시 표시하여 실제 메뉴 크기 측정
   bookMenu.style.display = 'block';
+  const menuHeight = bookMenu.offsetHeight || 180;
+  const menuWidth = bookMenu.offsetWidth || 160;
+  
+  // 뷰포트 경계 검사 및 위치 보정
+  let targetX = x + window.scrollX;
+  let targetY = y + window.scrollY;
+  
+  if (y + menuHeight > window.innerHeight) {
+    targetY = (y - menuHeight) + window.scrollY;
+    // 음수가 되지 않도록 최소 한계 보정
+    if (targetY < window.scrollY) targetY = window.scrollY;
+  }
+  
+  if (x + menuWidth > window.innerWidth) {
+    targetX = (x - menuWidth) + window.scrollX;
+    if (targetX < window.scrollX) targetX = window.scrollX;
+  }
+  
+  bookMenu.style.left = `${targetX}px`;
+  bookMenu.style.top = `${targetY}px`;
   
   // 다른 메뉴 닫기
   const libMenu = document.getElementById('library-context-menu');

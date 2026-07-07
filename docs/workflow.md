@@ -317,3 +317,5 @@ tags: [workflow, history]
 | 2026-07-07 | `scanner_vfs_offline_skip` | 원격 드라이브 VFS 오프라인 시 이미 캐싱 완료된 도서의 조기 스킵 예외처리 적용 | [Task](./history/20260707_023516_scanner_vfs_offline_skip_task.md) | [Walkthrough](./history/20260707_023516_scanner_vfs_offline_skip_walkthrough.md) |
 | 2026-07-07 | `session_20260707_044018` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260707_044018_session_20260707_044018_task.md) | [Walkthrough](./history/20260707_044018_session_20260707_044018_walkthrough.md) |
 | 2026-07-07 | `session_20260707_044136` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260707_044136_session_20260707_044136_task.md) | [Walkthrough](./history/20260707_044136_session_20260707_044136_walkthrough.md) |
+| 2026-07-07 | `book_context_menu_overflow` | 도서 리스트 우클릭 컨텍스트 메뉴 뷰포트 경계 벗어남 버그 수정 | [BugFix](./bug/20260707_bugfix_book_context_menu_overflow.md) | - |
+| 2026-07-07 | `scheduler_vfs_rc_url_mismatch` | 스케줄러 VFS RC URL 조회 로직 불일치로 인한 DNS 해석 실패 버그 수정 | [BugFix](./bug/20260707_bugfix_scheduler_vfs_rc_url_mismatch.md) | - |
