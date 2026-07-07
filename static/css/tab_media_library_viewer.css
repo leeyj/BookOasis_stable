@@ -391,11 +391,18 @@
    📌 Kavita 스타일 플로팅 조작 오버레이 메뉴
    ──────────────────────────────────────────────────────── */
 .comic-overlay-menu {
-    position: absolute;
+    /* [버그수정] 스크롤 모드에서 scroll-mode-active 클래스가 viewer-modal에 붙으면
+       viewer-body의 height: auto / overflow: visible 로 인해 absolute 기준점이
+       문서 최상단(스크롤 위치 0)으로 밀려 현재 뷰 밖에 렌더링되는 문제 수정.
+       fixed 로 변경하여 항상 현재 뷰포트 기준으로 오버레이를 표시.
+       [버그수정2] iOS Safari에서 100vh는 URL bar를 포함한 정적 높이라 실제 뷰포트와 불일치.
+       dvh(Dynamic Viewport Height) 사용으로 URL bar 수축/확장을 반영한 정확한 크기를 보장. */
+    position: fixed;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
+    width: 100vw;
+    height: 100vh;       /* dvh 미지원 브라우저 fallback */
+    height: 100dvh;      /* iOS Safari 17+, Chrome 108+: URL bar 포함 동적 뷰포트 */
     z-index: 10003;
     pointer-events: none; /* 뒷배경 이벤트 차단 방지 */
     display: flex;
@@ -795,6 +802,17 @@
     background: #1e293b;
     overflow: visible;
 }
+
+/* Mobile margin tweak */
+@media (max-width: 768px) {
+    .epub-area {
+        padding: 5px;
+    }
+    #txt-scroll-wrapper {
+        padding: 5px !important;
+    }
+}
+
 
 /* 텍스트 뷰어 테마 및 폰트조정 */
 .txt-controls-panel {

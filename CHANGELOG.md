@@ -1,4 +1,10 @@
 # CHANGELOG
+
+## v0.8.0
+### fixed
+- epub,txt 뷰어 버그 수정(+ 모바일 뷰 버그) | epub,txt viewer bug fix(+ mobile view bug)
+- 스캔 취소시 취소 명령이 전달되지 않는 오류 수정(단, 스캔 단위는 디렉토리기준으로 바로 취소되지 않을 수 있음) | scan cancel command not transmitted error fix(however, scan unit may not be cancelled immediately based on directory criteria)  
+---
 ## v0.7.9
 ### fixed
 - 도서 상세 서머리 줄바꿈 유지 수정 | book detail summary newline retention fix

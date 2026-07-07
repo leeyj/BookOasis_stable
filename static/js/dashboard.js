@@ -19,6 +19,7 @@ export async function loadDashboardData() {
         books = books.filter(b => !(b.is_completed === 1 || (b.total_pages > 0 && b.pages_read >= b.total_pages)));
       }
       renderDashboardHistory(books);
+
     } else {
       if (historyRow) historyRow.innerHTML = `<div class="loading-spinner">히스토리 로드 실패: ${historyData.error || '오류'}</div>`;
     }

@@ -29,7 +29,7 @@ import { initFloatingFilter, toggleFilterModal } from './genre_tag_filter.js';
 import { initSidebarAutoClose, restoreDesktopSidebarState } from './sidebar_manager.js';
 
 // 초기화 함수 분리
-function initTabMediaLibrary() {
+async function initTabMediaLibrary() {
   // 로그인 사용자 세션 연동
   if (window.currentUser) {
     state.currentUser = window.currentUser;
@@ -67,7 +67,9 @@ function initTabMediaLibrary() {
   });
 
   // 최초 시스템 설정 로드하여 화면 썸네일 크기 및 Limit 적용
-  loadInitialSystemSettings();
+  // [버그수정] await 없이 호출하면 설정 로드 전에 대시보드가 렌더링되어
+  //           state.hideCompletedInHistory = false 상태로 100% 완독 도서가 노출됨
+  await loadInitialSystemSettings();
 
   // 사이드바 상태 복원 및 리스너 등록
   restoreDesktopSidebarState();

@@ -291,8 +291,17 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     gc.collect()
 
                 # Detect manual cancel (abort) request and exit
-                cursor.execute("SELECT scan_status FROM libraries WHERE id = ?", (library_id,))
-                status_row = cursor.fetchone()
+                # [버그수정] 장기 conn은 WAL 스냅샷 격리로 인해 다른 세션의 COMMIT을 읽지 못함.
+                # 취소 상태 확인만 독립 커넥션으로 조회하여 항상 최신 상태를 반영한다.
+                status_row = None
+                try:
+                    _cancel_conn = database.get_connection(db_type)
+                    _cancel_cur = _cancel_conn.cursor()
+                    _cancel_cur.execute("SELECT scan_status FROM libraries WHERE id = ?", (library_id,))
+                    status_row = _cancel_cur.fetchone()
+                    _cancel_conn.close()
+                except Exception as _e:
+                    print(f"[Scanner-Cancel] ⚠️ 취소 상태 확인 중 오류 (무시하고 계속 진행): {_e}")
                 if status_row and status_row['scan_status'] == 'cancelling':
                     print(f"[Scanner-Cancel] 🛑 Safely aborting scan due to user request. (Completed folders: {processed_folders_count} folders)")
                     flush_pending_data()

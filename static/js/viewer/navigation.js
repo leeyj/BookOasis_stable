@@ -36,14 +36,85 @@ export function toggleComicOverlay() {
     floatingCloseBtn.style.display = isOpening ? 'flex' : 'none';
   }
 
+  // ── iOS Safari 스크롤 락 패턴 (조건부) ────────────────────────────────────
+  // TXT/EPUB 스크롤 모드에서 실제 스크롤은 body가 아닌 내부 컨테이너
+  // (#txt-scroll-wrapper 등)에서 발생하므로 window.scrollY = 0이 대부분.
+  // body가 스크롤되지 않은 상태에서 body { position:fixed }를 적용하면
+  // iOS Safari가 내부 컨테이너의 scrollTop을 리셋시키는 부작용이 생긴다.
+  //
+  // 규칙:
+  //   window.scrollY > 0 → body가 실제로 스크롤됨 → iOS body-lock 적용
+  //   window.scrollY = 0 → 내부 컨테이너가 스크롤됨 → body-lock 생략
+  //                          내부 컨테이너 scrollTop은 별도로 보존
+  const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
+  const isScrollMode = scrollMode === 'scroll';
+
   if (isOpening) {
+    if (isScrollMode) {
+      const bodyScrollY = window.scrollY || window.pageYOffset || 0;
+
+      if (bodyScrollY > 0) {
+        // body가 실제로 스크롤된 경우에만 iOS body-lock 적용
+        document.body.style.overflow = 'hidden';
+        document.body.style.position = 'fixed';
+        document.body.style.top = `-${bodyScrollY}px`;
+        document.body.style.width = '100%';
+        menu.dataset.savedBodyScrollY = String(bodyScrollY);
+        menu.dataset.iosBodyLock = 'true';
+        console.log(`[Viewer-Nav] iOS body-lock applied. bodyScrollY=${bodyScrollY}`);
+      } else {
+        // 내부 컨테이너가 스크롤된 경우 — scrollTop만 기록해둠 (body-lock 없음)
+        menu.dataset.iosBodyLock = 'false';
+        const innerScrollers = [
+          'txt-scroll-wrapper',
+          'comic-scroll-container',
+          'epub-viewer-container',
+        ];
+        const scrollData = {};
+        innerScrollers.forEach(id => {
+          const el = document.getElementById(id);
+          if (el && el.scrollTop > 0) scrollData[id] = el.scrollTop;
+        });
+        menu.dataset.savedInnerScroll = JSON.stringify(scrollData);
+        console.log(`[Viewer-Nav] Inner scroll saved:`, scrollData);
+      }
+    }
+
     Renderer.updatePageInfo();
     // 현재 스크롤 모드에 따라 너비 슬라이더 행 가시성 동기화
-    const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
     const widthRow = document.getElementById('overlay-width-row');
-    if (widthRow) widthRow.classList.toggle('visible', scrollMode === 'scroll');
+    if (widthRow) widthRow.classList.toggle('visible', isScrollMode);
+
+  } else {
+    if (isScrollMode) {
+      if (menu.dataset.iosBodyLock === 'true') {
+        // body-lock 해제 및 body 스크롤 위치 복원
+        const savedScrollY = parseInt(menu.dataset.savedBodyScrollY || '0', 10);
+        document.body.style.overflow = 'auto';
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        window.scrollTo(0, savedScrollY);
+        console.log(`[Viewer-Nav] iOS body-lock released. bodyScrollY restored=${savedScrollY}`);
+      } else {
+        // 내부 컨테이너 scrollTop 복원
+        try {
+          const scrollData = JSON.parse(menu.dataset.savedInnerScroll || '{}');
+          Object.entries(scrollData).forEach(([id, top]) => {
+            const el = document.getElementById(id);
+            if (el) el.scrollTop = top;
+          });
+        } catch (e) { /* ignore */ }
+      }
+      delete menu.dataset.savedBodyScrollY;
+      delete menu.dataset.savedInnerScroll;
+      delete menu.dataset.iosBodyLock;
+    }
   }
+
+  // ────────────────────────────────────────────────────────────────────────
 }
+
 
 export function comicJumpToFirstPage() {
   Renderer.setComicCurrentPage(0);
