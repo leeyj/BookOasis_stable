@@ -108,7 +108,7 @@ export function loadAndApplyCustomFont(fontName, fontUrl, element) {
   }
   
   console.log(`[Viewer-Settings] Loading custom font: ${fontFaceName} from ${fontUrl}`);
-  const fontFace = new FontFace(fontFaceName, `url(${fontUrl})`);
+  const fontFace = new FontFace(fontFaceName, `url("${fontUrl}")`);
   return fontFace.load().then(loadedFace => {
     document.fonts.add(loadedFace);
     if (element) {

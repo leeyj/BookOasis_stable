@@ -58,6 +58,20 @@ export async function activateRenditionPageMode({
     minSpreadWidth: pageStep === 2 ? 0 : 99999
   });
 
+  rendition.hooks.content.register(function(contents) {
+    const customFonts = window.customFonts || [];
+    let styleContent = '';
+    customFonts.forEach(f => {
+      const fontFaceName = `CustomFont_${f.name.replace(/\s+/g, '_')}`;
+      styleContent += `@font-face { font-family: '${fontFaceName}'; src: url("${f.url}"); }\n`;
+    });
+    if (styleContent) {
+      const style = contents.document.createElement('style');
+      style.innerHTML = styleContent;
+      contents.document.head.appendChild(style);
+    }
+  });
+
   bindRenditionInteractionHandlers({
     rendition,
     getScrollMode,

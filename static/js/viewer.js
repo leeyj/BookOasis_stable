@@ -54,6 +54,21 @@ export function loadCustomFontsList() {
         window.customFonts = data.fonts;
         console.log("[Viewer-Fonts] Custom fonts loaded: ", window.customFonts);
 
+        let styleContent = '';
+        data.fonts.forEach(f => {
+            const fontFaceName = `CustomFont_${f.name.replace(/\s+/g, '_')}`;
+            styleContent += `@font-face { font-family: '${fontFaceName}'; src: url("${f.url}"); }\n`;
+        });
+        if (styleContent) {
+            let styleEl = document.getElementById('viewer-custom-fonts-style');
+            if (!styleEl) {
+                styleEl = document.createElement('style');
+                styleEl.id = 'viewer-custom-fonts-style';
+                document.head.appendChild(styleEl);
+            }
+            styleEl.innerHTML = styleContent;
+        }
+
         const select = document.getElementById('viewer-font-select');
         if (select) {
           // 기존 기본 옵션만 남기고 초기화
