@@ -209,7 +209,7 @@
     "filter_title": "장르/태그 필터 열기",
     "sort_title": "정렬 조건 변경",
     "sort_asc": "가나다 오름차순",
-    "search_placeholder": "제목, 시리즈, 작가 검색...",
+    "search_placeholder": "제목,시리즈,작가 검색...... 검색 단축키는 Alt+`(퀘이크스타일)",
     "general_books": "일반 도서",
     "adult_books": "성인 도서"
   },

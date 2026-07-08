@@ -209,7 +209,7 @@
     "filter_title": "Open Genre/Tag Filter",
     "sort_title": "Change Sort Criteria",
     "sort_asc": "Alphabetical Ascending",
-    "search_placeholder": "Search title, series, author...",
+    "search_placeholder": "Search title, series, author...... Shortcut: Alt+` (Quake style)",
     "general_books": "General Books",
     "adult_books": "Adult Books"
   },

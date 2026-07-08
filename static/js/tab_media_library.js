@@ -28,6 +28,29 @@ import { switchSettingsTab, loadInitialSystemSettings, loadGeneralSettings, subm
 import { initFloatingFilter, toggleFilterModal } from './genre_tag_filter.js';
 import { initSidebarAutoClose, restoreDesktopSidebarState } from './sidebar_manager.js';
 
+function focusLibrarySearchInput() {
+  const searchInput = document.getElementById('library-search');
+  if (!searchInput) return;
+  searchInput.focus();
+  searchInput.select();
+}
+
+function initLibrarySearchShortcut() {
+  if (window.__librarySearchShortcutBound) return;
+
+  document.addEventListener('keydown', (e) => {
+    const key = String(e.key || '').toLowerCase();
+    const isBackquote = key === '`' || e.code === 'Backquote';
+
+    if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || !isBackquote) return;
+
+    e.preventDefault();
+    focusLibrarySearchInput();
+  });
+
+  window.__librarySearchShortcutBound = true;
+}
+
 // 초기화 함수 분리
 async function initTabMediaLibrary() {
   // 로그인 사용자 세션 연동
@@ -113,6 +136,7 @@ async function initTabMediaLibrary() {
 
   // 키보드 단축키
   initKeyboardListener();
+  initLibrarySearchShortcut();
 
 
   // 브라우저 뒤로가기(Back) 버튼 감지하여 뷰어 또는 상세 화면 닫기 처리

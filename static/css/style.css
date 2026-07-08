@@ -132,13 +132,18 @@
 
 /* 상단 헤더 및 컨트롤 */
 .library-header {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: auto minmax(420px, 1fr) auto;
     align-items: center;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     padding-bottom: 1rem;
-    flex-wrap: wrap;
     gap: 1rem;
+}
+
+.library-title-wrap {
+    display: flex;
+    align-items: center;
+    min-width: 0;
 }
 
 .library-title {
@@ -156,11 +161,13 @@
     display: flex;
     gap: 1rem;
     align-items: center;
-    flex-wrap: wrap;
+    justify-self: end;
+    flex-wrap: nowrap;
     max-width: 100%;
 }
 
-.library-controls .form-control {
+.library-controls .form-control,
+.library-search-center .form-control {
     background: rgba(15, 23, 42, 0.6);
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: #fff;
@@ -172,9 +179,21 @@
     min-width: 150px;
 }
 
-.library-controls .form-control:focus {
+.library-controls .form-control:focus,
+.library-search-center .form-control:focus {
     border-color: #a855f7;
     box-shadow: 0 0 8px rgba(168, 85, 247, 0.4);
+}
+
+.library-search-center {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+.library-search-center .form-control {
+    width: clamp(420px, 56vw, 760px);
+    min-width: 300px;
 }
 
 /* 일반/성인 토글 버튼 */

@@ -43,6 +43,29 @@ class ScannerQueue:
             return f"{task_type}_{db_type}_{library_id}"
         return str(task_type)
 
+    def _append_task_before_lazy(self, task_item):
+        """일반 스캔 작업은 대기 중인 lazy_scan 앞에 들어가도록 보장합니다."""
+        lazy_index = None
+
+        with self.q.mutex:
+            queue_items = list(self.q.queue)
+            for idx, item in enumerate(queue_items):
+                if item.get('type') == 'lazy_scan':
+                    lazy_index = idx
+                    break
+
+            if lazy_index is None:
+                # Keep queue internals consistent and wake any blocked consumer.
+                self.q.queue.append(task_item)
+                self.q.unfinished_tasks += 1
+                self.q.not_empty.notify()
+                return
+
+            # Insert before first lazy task while preserving existing order.
+            self.q.queue.insert(lazy_index, task_item)
+            self.q.unfinished_tasks += 1
+            self.q.not_empty.notify()
+
     def enqueue(self, task_type, **kwargs):
         task_key = self._get_task_key(task_type, kwargs)
         
@@ -52,12 +75,18 @@ class ScannerQueue:
                 return False
                 
             self.enqueued_items.add(task_key)
-            self.q.put({
+            task_item = {
                 'type': task_type, 
                 'key': task_key, 
                 'kwargs': kwargs,
                 'enqueued_at': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            })
+            }
+
+            if task_type in ('library_scan', 'cover_scan'):
+                self._append_task_before_lazy(task_item)
+            else:
+                self.q.put(task_item)
+
             self.log(f"Task '{task_key}' enqueued successfully. Queue size: {self.q.qsize()}")
             return True
 
@@ -84,6 +113,7 @@ class ScannerQueue:
 
     def _worker_loop(self):
         while True:
+            task_key = None
             try:
                 task = self.q.get()
                 self.current_task = task
@@ -113,8 +143,9 @@ class ScannerQueue:
                 self.log(f"Error processing task: {e}")
             finally:
                 self.current_task = None
-                self.q.task_done()
-                self.log(f"Finished task: {task_key}. Remaining queue size: {self.q.qsize()}")
+                if task_key is not None:
+                    self.q.task_done()
+                    self.log(f"Finished task: {task_key}. Remaining queue size: {self.q.qsize()}")
 
     def _process_lazy_scan(self):
         BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

@@ -7,15 +7,15 @@ opds.py – OPDS (외부 뷰어 앱 연동) 라우터
   - /opds/series/…      : 시리즈 단행본 다운로드 링크
   - /opds/download/…    : 개별 도서 파일 전송
 """
-import html
 import mimetypes
 import os
 import time
-from datetime import datetime
 
 from flask import Blueprint, Response, jsonify, request, send_file  # type: ignore[reportMissingImports]
 import database
 from api.cache import LRUCache
+from api.opds_common.auth import unauthorized_response, verify_basic_auth_credentials
+from api.opds_common.xml import atom_response, build_opds_xml, get_page_params
 from services.opds_service import (
     get_book_entries,
     get_library_list,
@@ -25,7 +25,6 @@ from services.opds_service import (
     search_books_entries,
 )
 from utils.i18n import _t
-from werkzeug.security import check_password_hash  # type: ignore[reportMissingImports]
 
 opds_bp = Blueprint('media_opds', __name__)
 
@@ -37,38 +36,14 @@ def _check_auth(is_adult: bool = False) -> bool:
     auth = request.authorization
     if not auth or not auth.username or not auth.password:
         return False
-        
-    conn = database.get_connection('general')
-    cursor = conn.cursor()
-    cursor.execute("SELECT password_hash, role FROM users WHERE username = ?", (auth.username,))
-    row = cursor.fetchone()
-    conn.close()
-    
-    if not row:
-        return False
-        
-    if not check_password_hash(row['password_hash'], auth.password):
-        return False
-        
-    # 성인 OPDS의 경우 admin 역할 권한만 허용
-    if is_adult and row['role'] != 'admin':
-        return False
-        
-    return True
+    return verify_basic_auth_credentials(auth.username, auth.password, require_admin=is_adult)
 
 
 def _unauthorized():
-    return Response(
-        "Unauthorized", status=401,
-        headers={'WWW-Authenticate': 'Basic realm="BookOasis OPDS Catalog"'}
-    )
+    return unauthorized_response('BookOasis OPDS Catalog')
 
 
 # ─── Atom XML 생성 ────────────────────────────────────────────
-
-def _escape_xml(text: str) -> str:
-    return html.escape(str(text), quote=True)
-
 
 OPDS_CACHE_TTL = 60  # seconds
 OPDS_DEFAULT_PAGE_SIZE = 100
@@ -91,83 +66,23 @@ def _set_cached_opds_response(key: str, xml: str):
 
 
 def _get_page_params():
-    try:
-        page = int(request.args.get('page', '1'))
-    except ValueError:
-        page = 1
-    try:
-        page_size = int(request.args.get('page_size', str(OPDS_DEFAULT_PAGE_SIZE)))
-    except ValueError:
-        page_size = OPDS_DEFAULT_PAGE_SIZE
-
-    page = max(page, 1)
-    page_size = min(max(page_size, 1), OPDS_MAX_PAGE_SIZE)
-    offset = (page - 1) * page_size
-    return page, page_size, offset
+    return get_page_params(request.args, OPDS_DEFAULT_PAGE_SIZE, OPDS_MAX_PAGE_SIZE)
 
 
 def _opds_xml(db_type: str, title: str, entries: list, is_adult: bool = False, next_link: str = None) -> str:
-    """Atom XML 규격의 OPDS 피드 문자열 생성"""
-    base_url   = request.url_root.rstrip('/')
-    now        = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    lines = [
-        '<?xml version="1.0" encoding="utf-8"?>',
-        '<feed xmlns="http://www.w3.org/2005/Atom" xmlns:opds="http://opds-spec.org/2010/catalog">',
-        f'  <id>{_escape_xml(request.url)}</id>',
-        f'  <title>{_escape_xml(title)}</title>',
-        f'  <updated>{now}</updated>',
-        f'  <link rel="self" href="{_escape_xml(request.url)}" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>',
-        f'  <link rel="start" href="{_escape_xml(base_url + "/opds")}" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>',
-    ]
-    search_href = "/opds/search" if not is_adult else "/opds-adult/search"
-    lines.append(
-        f'  <link rel="search" href="{_escape_xml(base_url + search_href)}" type="application/opensearchdescription+xml" title="Search Books"/>'
+    search_href = '/opds/search' if not is_adult else '/opds-adult/search'
+    return build_opds_xml(
+        request,
+        title=title,
+        entries=entries,
+        start_path='/opds',
+        search_path=search_href,
+        next_link=next_link,
     )
-    if next_link:
-        lines.append(
-            f'  <link rel="next" href="{_escape_xml(next_link)}" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>'
-        )
-
-    for e in entries:
-        lines += [
-            '  <entry>',
-            f'    <title>{_escape_xml(e["title"])}</title>',
-            f'    <id>{_escape_xml(e["id"])}</id>',
-            f'    <updated>{now}</updated>',
-        ]
-        if e.get('summary'):
-            lines.append(f'    <summary>{_escape_xml(e["summary"])}</summary>')
-
-        href = f"{base_url}{e['href']}"
-        if e['type'] == 'navigation':
-            lines.append(
-                f'    <link rel="subsection" href="{_escape_xml(href)}" '
-                f'type="application/atom+xml;profile=opds-catalog;kind=navigation"/>'
-            )
-            if e.get('cover'):
-                cover_url = f"{base_url}/covers/{_escape_xml(e['cover'])}"
-                cover_mime = mimetypes.guess_type(e['cover'])[0] or 'image/png'
-                lines.append(f'    <link rel="http://opds-spec.org/image" href="{_escape_xml(cover_url)}" type="{_escape_xml(cover_mime)}"/>')
-                lines.append(f'    <link rel="http://opds-spec.org/image/thumbnail" href="{_escape_xml(cover_url)}" type="{_escape_xml(cover_mime)}"/>')
-        elif e['type'] == 'acquisition':
-            lines.append(
-                f'    <link rel="http://opds-spec.org/acquisition" '
-                f'href="{_escape_xml(href)}" type="{_escape_xml(e["mime"]) }"/>'
-            )
-            if e.get('cover'):
-                cover_url = f"{base_url}/covers/{_escape_xml(e['cover'])}"
-                cover_mime = mimetypes.guess_type(e['cover'])[0] or 'image/png'
-                lines.append(f'    <link rel="http://opds-spec.org/image" href="{_escape_xml(cover_url)}" type="{_escape_xml(cover_mime)}"/>')
-                lines.append(f'    <link rel="http://opds-spec.org/image/thumbnail" href="{_escape_xml(cover_url)}" type="{_escape_xml(cover_mime)}"/>')
-        lines.append('  </entry>')
-
-    lines.append('</feed>')
-    return '\n'.join(lines)
 
 
 def _atom_response(xml: str):
-    return Response(xml, mimetype='application/atom+xml; charset=utf-8')
+    return atom_response(xml)
 
 
 # ─── 라우터 ──────────────────────────────────────────────────

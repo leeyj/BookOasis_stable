@@ -67,15 +67,23 @@
             Jinja2 include 구문(예: include \"components/파일명.html\")을 사용하여 조립할 것
         -->
         <!-- 상단 헤더 및 필터 영역 -->
-        <div class="library-header" style="display: flex; align-items: center; gap: 0.8rem;">
-            <!-- 데스크톱 전용 사이드바 토글 버튼 -->
-            <button id="btn-sidebar-toggle-desktop" class="btn-sidebar-toggle-desktop" onclick="toggleDesktopSidebar()" title="사이드바 접기/펼치기" style="background: transparent; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer; padding: 0.4rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; outline: none; margin-right: 0.2rem;">
-                <i class="fa-solid fa-bars"></i>
-            </button>
-            <h2 class="library-title" style="display: flex; align-items: center; margin: 0; flex: 1;">
-                <span><i class="fa-solid fa-book-open" style="color: #a855f7; margin-right: 0.5rem;"></i> <span data-i18n="header.title">도서 보관함</span></span>
-                <span id="library-total-count" style="font-size: 0.9rem; color: #94a3b8; margin-left: 0.8rem; font-weight: normal; white-space: nowrap;"></span>
-            </h2>
+        <div class="library-header">
+            <div class="library-title-wrap">
+                <!-- 데스크톱 전용 사이드바 토글 버튼 -->
+                <button id="btn-sidebar-toggle-desktop" class="btn-sidebar-toggle-desktop" onclick="toggleDesktopSidebar()" title="사이드바 접기/펼치기" style="background: transparent; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer; padding: 0.4rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; outline: none; margin-right: 0.2rem;">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <h2 class="library-title" style="display: flex; align-items: center; margin: 0;">
+                    <span><i class="fa-solid fa-book-open" style="color: #a855f7; margin-right: 0.5rem;"></i> <span data-i18n="header.title">도서 보관함</span></span>
+                    <span id="library-total-count" style="font-size: 0.9rem; color: #94a3b8; margin-left: 0.8rem; font-weight: normal; white-space: nowrap;"></span>
+                </h2>
+            </div>
+
+            <div class="library-search-center">
+                <input type="text" id="library-search" class="form-control input-sm" data-i18n-placeholder="header.search_placeholder" placeholder="제목, 시리즈, 작가 검색..." title="검색 단축키: Alt+`"
+                    oninput="filterBooks()">
+            </div>
+
             <div class="library-controls">
                 <button id="btn-open-filter" class="btn-toggle"
                     style="margin-right: 0.5rem; padding: 0.4rem 0.8rem; display: flex; align-items: center; gap: 0.3rem;"
@@ -87,8 +95,6 @@
                     onclick="toggleLibrarySort()" data-i18n-title="header.sort_title" title="정렬 조건 변경">
                     <i class="fa-solid fa-sort-alpha-down"></i> <span data-i18n="header.sort_asc">가나다 오름차순</span>
                 </button>
-                <input type="text" id="library-search" class="form-control input-sm" data-i18n-placeholder="header.search_placeholder" placeholder="제목, 시리즈, 작가 검색..."
-                    oninput="filterBooks()">
                 <div class="library-toggle-group">
                     <button class="btn-toggle active" id="btn-lib-general" onclick="switchLibraryType('general')" data-i18n="header.general_books">일반 도서</button>
                     <button class="btn-toggle" id="btn-lib-adult" onclick="switchLibraryType('adult')" data-i18n="header.adult_books">성인 도서</button>

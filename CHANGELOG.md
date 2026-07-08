@@ -1,9 +1,19 @@
 # CHANGELOG
+## v0.8.3
+### fixed
+- 만화책 뷰어(스크롤)일때 다음편 넘어가지 않는 이슈 해결 | Fixed an issue where the comic viewer (webtoon/scroll mode) failed to navigate to the next chapter.
+- 타치미요 익스텐션 추가 배포(Developed by hejerd) | Released additional Tachiyomi extensions (Developed by hejerd).
+ .\tools\tachiyomi-all.bookoasis-v1.4.23-debug.apk
+### modified
+- 검색 창 중앙 상단으로 이동 및 단축키 배정(alt + \`) | Moved the search bar to the top-center and assigned a shortcut key (alt + `).
+---
+
 ## v0.8.2
 ### fixed
 - 카테고리 등록/수정시 원격드라이브 체크->VFS갱신과 호환 | Remote drive check when registering/modifying categories -> Compatible with VFS updates
 - txt 파일 스캔시 건너뛰기로직 보강 | Enhanced skip logic when scanning txt files
 - kavita 마이그레이션시 제목 오류 보정(by 짜파구리) | Correcting title errors during Kavita migration
+
 ### improved
 - 이미지폴더를 하나의 책으로 인식 및 스캔 기능 추가 | Added scanning function to recognize image folders as a single book
 *제약 사항(Limitations):

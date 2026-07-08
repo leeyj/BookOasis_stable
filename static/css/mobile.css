@@ -99,6 +99,11 @@
     order: 3; /* 검색창을 맨 뒤로 보냄 */
 }
 
+.library-search-center .form-control {
+    width: 100%;
+    min-width: 0;
+}
+
 /* 5. 카드 그리드 및 기타 패딩 미세 조정 */
 body {
     padding: 10px;

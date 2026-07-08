@@ -31,6 +31,7 @@ let currentLocationHref = null;
 let currentLocationIndex = null;
 let renditionAtEnd = false;
 let isScrollListenerBound = false;
+let epubScrollNextEpisodeTriggered = false;
 let activeCoverFallbackUrl = '/static/images/default_cover.jpg';
 
 const RENDITION_LOCATIONS_CHARS = 1600;
@@ -173,6 +174,12 @@ function bindContainerScroll() {
     if (getScrollMode() !== 'scroll') return;
     const ratio = getCurrentRatioFromScroll(container);
     updateProgressPercent(ratio * 100);
+
+    const isAtEnd = container.scrollTop + container.clientHeight >= container.scrollHeight - 12;
+    if (isAtEnd && !epubScrollNextEpisodeTriggered) {
+      epubScrollNextEpisodeTriggered = true;
+      import('../../viewer_next_episode.js').then(m => m.handleNextEpisode(state.activeBookId));
+    }
   }, { passive: true });
 
   isScrollListenerBound = true;
@@ -458,6 +465,7 @@ export function clearEpubViewer() {
     currentLocationIndex = null;
     renditionAtEnd = false;
     currentScrollPercent = 0;
+    epubScrollNextEpisodeTriggered = false;
     navigation.resetNavigationState();
   });
 }

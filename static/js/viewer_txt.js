@@ -7,6 +7,8 @@ let loadedChunks = { min: 0, max: 0 };
 let fullText = '';
 let resizeTimeout = null;
 let activeResizeHandler = null;
+let txtScrollPreloadTriggered = false;
+let txtScrollNextEpisodeTriggered = false;
 
 import { showViewerLoading, hideViewerLoading, showViewerError } from './view_manager.js';
 import { saveProgress } from './viewer_progress.js';
@@ -29,6 +31,8 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
     .then(txt => {
       hideViewerLoading();
       fullText = txt;
+      txtScrollPreloadTriggered = false;
+      txtScrollNextEpisodeTriggered = false;
       // 대용량 텍스트 브라우저 렌더링 랙 방지를 위한 청크(페이지) 분할
       txtChunks = chunkText(txt, 4000);
       currentChunkIdx = initialPageIdx;
@@ -64,6 +68,11 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
           const ratio = scrollWrapper.scrollTop / scrollHeight;
           const newIdx = Math.min(txtChunks.length - 1, Math.max(0, Math.floor(ratio * txtChunks.length)));
 
+          if (!txtScrollPreloadTriggered && ratio >= 0.9 && txtChunks.length > 1) {
+            txtScrollPreloadTriggered = true;
+            saveProgress(state.activeBookId, Math.min(txtChunks.length - 1, newIdx), txtChunks.length);
+          }
+
           if (newIdx !== currentChunkIdx) {
             currentChunkIdx = newIdx;
             const pageInfo = document.getElementById('comic-overlay-page-info');
@@ -75,8 +84,9 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
 
           // 마지막 바닥 도달 시 다음 화 이동
           const isAtAbsoluteEnd = scrollWrapper.scrollTop + scrollWrapper.clientHeight >= scrollWrapper.scrollHeight - 15;
-          if (isAtAbsoluteEnd && !isTransitioning) {
+          if (isAtAbsoluteEnd && !isTransitioning && !txtScrollNextEpisodeTriggered) {
             isTransitioning = true;
+            txtScrollNextEpisodeTriggered = true;
             import('./viewer_next_episode.js').then(m => {
               m.handleNextEpisode(state.activeBookId);
               setTimeout(() => { isTransitioning = false; }, 300);
@@ -352,6 +362,8 @@ export function nextTxtPage() {
 export function txtJumpToFirstPage() {
   if (txtChunks.length > 0 && currentChunkIdx !== 0) {
     currentChunkIdx = 0;
+    txtScrollPreloadTriggered = false;
+    txtScrollNextEpisodeTriggered = false;
     renderCurrentChunk();
     const scrollWrapper = document.getElementById('txt-scroll-wrapper');
     if (scrollWrapper) {
@@ -365,6 +377,7 @@ export function txtJumpToLastPage() {
   const lastIdx = Math.max(0, txtChunks.length - 1);
   if (txtChunks.length > 0 && currentChunkIdx !== lastIdx) {
     currentChunkIdx = lastIdx;
+    txtScrollPreloadTriggered = true;
     renderCurrentChunk();
     const scrollWrapper = document.getElementById('txt-scroll-wrapper');
     if (scrollWrapper) {
