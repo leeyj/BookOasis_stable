@@ -5,6 +5,14 @@ import { openReader } from './viewer.js';
 import { loadLibraries } from './category.js';
 import { initInfiniteScrollObserver } from './infinite_scroll.js';
 
+function normalizeMetadataToken(token) {
+  if (!token) return '';
+  return String(token)
+    .replace(/^[\s'"\[\],]+|[\s'"\[\],]+$/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 
 function updateLibraryTotalCount(items) {
   const countSpan = document.getElementById('library-total-count');
@@ -84,8 +92,9 @@ export async function loadBooksList(isAppend = false) {
   if (state.filterGenres && state.filterGenres.length > 0) {
     filtered = filtered.filter(item => {
       if (!item.genre) return false;
-      const itemGenres = item.genre.split(',').map(g => g.trim());
-      return state.filterGenres.every(g => itemGenres.includes(g));
+      const itemGenres = item.genre.split(',').map(normalizeMetadataToken).filter(Boolean);
+      const selectedGenres = state.filterGenres.map(normalizeMetadataToken).filter(Boolean);
+      return selectedGenres.every(g => itemGenres.includes(g));
     });
   }
 
@@ -93,8 +102,9 @@ export async function loadBooksList(isAppend = false) {
   if (state.filterTags && state.filterTags.length > 0) {
     filtered = filtered.filter(item => {
       if (!item.tags) return false;
-      const itemTags = item.tags.split(',').map(t => t.trim());
-      return state.filterTags.every(t => itemTags.includes(t));
+      const itemTags = item.tags.split(',').map(normalizeMetadataToken).filter(Boolean);
+      const selectedTags = state.filterTags.map(normalizeMetadataToken).filter(Boolean);
+      return selectedTags.every(t => itemTags.includes(t));
     });
   }
 
@@ -185,8 +195,9 @@ export function filterBooks() {
   if (state.filterGenres && state.filterGenres.length > 0) {
     filtered = filtered.filter(item => {
       if (!item.genre) return false;
-      const itemGenres = item.genre.split(',').map(g => g.trim());
-      return state.filterGenres.every(g => itemGenres.includes(g));
+      const itemGenres = item.genre.split(',').map(normalizeMetadataToken).filter(Boolean);
+      const selectedGenres = state.filterGenres.map(normalizeMetadataToken).filter(Boolean);
+      return selectedGenres.every(g => itemGenres.includes(g));
     });
   }
 
@@ -194,8 +205,9 @@ export function filterBooks() {
   if (state.filterTags && state.filterTags.length > 0) {
     filtered = filtered.filter(item => {
       if (!item.tags) return false;
-      const itemTags = item.tags.split(',').map(t => t.trim());
-      return state.filterTags.every(t => itemTags.includes(t));
+      const itemTags = item.tags.split(',').map(normalizeMetadataToken).filter(Boolean);
+      const selectedTags = state.filterTags.map(normalizeMetadataToken).filter(Boolean);
+      return selectedTags.every(t => itemTags.includes(t));
     });
   }
 

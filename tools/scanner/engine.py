@@ -13,7 +13,7 @@ from tools.scanner.vfs import trigger_vfs_refresh
 from utils.drive_helper import is_remote_path
 from tools.scanner.memory_helper import check_memory_exceeded
 from tools.scanner.db_writer import update_book_metadata, insert_new_book_v2, save_book_offsets, bulk_update_books, bulk_insert_books, bulk_save_book_offsets
-from tools.scanner.tasks import process_folder_task, process_folder_covers, SUPPORTED_FORMATS
+from tools.scanner.tasks import process_folder_task, process_folder_covers, SUPPORTED_FORMATS, SUPPORTED_IMAGE_FORMATS, IMGDIR_VIRTUAL_FILENAME
 from tools.scanner.sync_detector import detect_and_handle_book_movement, handle_deleted_books
 
 MAX_SCANNER_THREADS = 4
@@ -61,10 +61,14 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
             continue
         for root, dirs, files in os.walk(t_path):
             media_files = [f for f in files if f.lower().endswith(SUPPORTED_FORMATS)]
-            if not media_files:
+            image_files = [f for f in files if f.lower().endswith(SUPPORTED_IMAGE_FORMATS)]
+            has_imgdir_candidate = bool(image_files) and not media_files
+            if not media_files and not has_imgdir_candidate:
                 continue
             for f in media_files:
                 found_file_paths.add(os.path.join(root, f))
+            if has_imgdir_candidate:
+                found_file_paths.add(os.path.join(root, IMGDIR_VIRTUAL_FILENAME))
             
             if root in scanned_folders:
                 continue
@@ -132,7 +136,9 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
             insert_data = []
             for d in ins_list:
                 meta = d['merged_meta']
-                title, _ = os.path.splitext(d['filename'])
+                title = d.get('title')
+                if not title:
+                    title, _ = os.path.splitext(d['filename'])
                 insert_data.append((
                     d['library_id'], title, d['series_name'], meta.get('author',''),
                     d['full_path'], d['file_format'], 100 if d['file_format'] == 'epub' else 0,
@@ -249,6 +255,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                         filename = item['filename']
                         file_format = item['file_format']
                         series_name = item['series_name']
+                        title = item.get('title')
                         cover_image = item['cover_image']
                         offsets_data = item['offsets_data']
                         is_offset_only = item.get('offset_only', False)
@@ -263,6 +270,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                             pending_inserts.append({
                                 "action": "insert", "library_id": library_id, "full_path": full_path, 
                                 "filename": filename, "file_format": file_format, "series_name": series_name, 
+                                "title": title,
                                 "cover_image": cover_image, "merged_meta": merged_meta, "offsets_data": offsets_data,
                                 "file_mtime": item.get('file_mtime', 0.0), "file_size": item.get('file_size', 0)
                             })

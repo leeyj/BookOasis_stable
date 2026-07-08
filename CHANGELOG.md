@@ -1,4 +1,19 @@
 # CHANGELOG
+## v0.8.2
+### fixed
+- 카테고리 등록/수정시 원격드라이브 체크->VFS갱신과 호환 | Remote drive check when registering/modifying categories -> Compatible with VFS updates
+- txt 파일 스캔시 건너뛰기로직 보강 | Enhanced skip logic when scanning txt files
+- kavita 마이그레이션시 제목 오류 보정(by 짜파구리) | Correcting title errors during Kavita migration
+### improved
+- 이미지폴더를 하나의 책으로 인식 및 스캔 기능 추가 | Added scanning function to recognize image folders as a single book
+*제약 사항(Limitations):
+  하나의 폴더에 이미지+ zip 같이 있는 경우 zip만 인식함. | If images and zip files are in the same folder, only the zip file is recognized.
+- 태그 클릭시 검색으로 이어지게 변경 | Changed so that clicking a tag leads to a search
+
+# Rclone 마운트시 --fast-list 옵션 권장합니다 |  The --fast-list option is recommended when mounting with Rclone.
+
+---
+
 
 ## v0.8.1
 ### fixed

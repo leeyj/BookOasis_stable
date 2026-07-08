@@ -384,12 +384,13 @@ def init_databases():
                 ('PAGE_LIMIT', '60'),
                 ('VIEWER_FONT_SIZE', '18'),
                 ('VIEWER_FONT_FAMILY', 'sans-serif'),
-                ('DB_POOL_SIZE', '25'),
+                ('DB_POOL_SIZE', '49'),
                 ('SCANNER_WRITE_LOG', '1'),
                 ('LAZY_SCAN_CRON', '0 3 * * *'),
                 ('SYSTEM_MEM_LIMIT', '1536.0'),
                 ('PROCESS_RSS_LIMIT', '2048.0'),
                 ('RECENT_BOOKS_LIMIT', '30'),
+                ('TAG_FILTER_SEARCH_SCOPE_ALL', '0'),
                 ('RCLONE_RC_URL', 'http://localhost:5572')
             ]
             for k, v in default_settings:

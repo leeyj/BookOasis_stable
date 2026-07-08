@@ -2,6 +2,7 @@
 import os
 import database
 from utils.cache_helper import get_zip_file_hybrid
+from services.stream_service import get_imgdir_files
 
 class BookInfoService:
     @staticmethod
@@ -39,7 +40,8 @@ class BookInfoService:
         file_format = (row['file_format'] or '').lower()
         file_path = row['file_path']
 
-        if total_pages == 0 and file_path and os.path.exists(file_path):
+        imgdir_exists = file_format == 'imgdir' and file_path and os.path.isdir(os.path.dirname(file_path))
+        if total_pages == 0 and file_path and (os.path.exists(file_path) or imgdir_exists):
             if file_format in ('zip', 'cbz'):
                 zf = get_zip_file_hybrid(file_path)
                 if zf:
@@ -50,6 +52,12 @@ class BookInfoService:
                         total_pages = 0
                     # `get_zip_file_hybrid` returns a cached ZipFile object.
                     # Closing it here can invalidate the shared cache and break later stream extraction.
+
+            elif file_format == 'imgdir':
+                try:
+                    total_pages = len(get_imgdir_files(os.path.dirname(file_path)))
+                except Exception:
+                    total_pages = 0
 
             elif file_format == 'pdf':
                 try:

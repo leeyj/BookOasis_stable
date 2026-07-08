@@ -14,6 +14,14 @@ let initialY = 0;
 let xOffset = 0;
 let yOffset = 0;
 
+function normalizeMetadataToken(token) {
+    if (!token) return '';
+    return String(token)
+        .replace(/^[\s'"\[\],]+|[\s'"\[\],]+$/g, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+}
+
 export async function initFloatingFilter() {
     const modal = document.getElementById('floating-filter-modal');
     const header = document.getElementById('filter-modal-header');
@@ -42,6 +50,111 @@ export async function initFloatingFilter() {
 
     // 전역 함수 바인딩 (HTML onclick 바인딩 호환용)
     window.toggleFilterModal = toggleFilterModal;
+    window.selectGenreFilter = selectGenreFilter;
+    window.selectTagFilter = selectTagFilter;
+    window.quickFilterByGenre = quickFilterByGenre;
+    window.quickFilterByTag = quickFilterByTag;
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function ensureBooksReady(timeoutMs = 5000) {
+    const started = Date.now();
+    while (Date.now() - started < timeoutMs) {
+        if (!state.isLoading) {
+            return;
+        }
+        await sleep(60);
+    }
+}
+
+async function ensureFilterDataLoaded() {
+    if (genresData.length === 0 || tagsData.length === 0) {
+        await loadGenresAndTagsData();
+    }
+}
+
+function getScopedLibraryIdForTagFilter() {
+    if (state.tagFilterSearchInAll) {
+        return 'all';
+    }
+
+    const currentId = state.currentLibraryId;
+    if (currentId === 'home' || currentId === 'history' || currentId === 'favorite' || currentId === 'settings') {
+        return state.detailLibraryId || 'all';
+    }
+
+    return currentId || 'all';
+}
+
+async function prepareTargetCategoryForQuickFilter() {
+    const targetCategoryId = getScopedLibraryIdForTagFilter();
+    const shouldSwitchCategory = String(state.currentLibraryId) !== String(targetCategoryId);
+    if (shouldSwitchCategory && typeof window.selectCategory === 'function') {
+        window.selectCategory(targetCategoryId);
+        await ensureBooksReady();
+        return;
+    }
+
+    // 이미 그리드 카테고리라면 로딩이 완료될 때까지 대기
+    await ensureBooksReady();
+}
+
+async function applySingleFilter(type, value) {
+    const normalizedValue = normalizeMetadataToken(value);
+    if (!normalizedValue) return;
+
+    await prepareTargetCategoryForQuickFilter();
+
+    selectedGenres.clear();
+    selectedTags.clear();
+
+    if (type === 'genre') {
+        selectedGenres.add(normalizedValue);
+        state.filterGenres = [normalizedValue];
+        state.filterTags = [];
+    } else {
+        selectedTags.add(normalizedValue);
+        state.filterGenres = [];
+        state.filterTags = [normalizedValue];
+    }
+
+    await ensureFilterDataLoaded();
+
+    // 현재 탭을 맞춰 두면 사용자가 필터 모달을 열 때 선택 상태를 직관적으로 확인 가능
+    currentTab = type === 'genre' ? 'genres' : 'tags';
+
+    renderChips();
+    renderSelectedChips();
+
+    if (typeof window.filterBooks === 'function') {
+        window.filterBooks();
+    }
+}
+
+export async function selectGenreFilter(genreName) {
+    await applySingleFilter('genre', genreName);
+}
+
+export async function selectTagFilter(tagName) {
+    await applySingleFilter('tag', tagName);
+}
+
+export async function quickFilterByGenre(genreName) {
+    if (typeof window.goBackToList === 'function') {
+        // 해시 히스토리 popstate 사이드이펙트를 줄이기 위해 back 트리거 없이 목록 전환
+        window.goBackToList(false);
+    }
+    await selectGenreFilter(genreName);
+}
+
+export async function quickFilterByTag(tagName) {
+    if (typeof window.goBackToList === 'function') {
+        window.goBackToList(false);
+    }
+    await selectTagFilter(tagName);
 }
 
 // 모달 토글
@@ -62,7 +175,7 @@ export function toggleFilterModal() {
 
 // 장르 및 태그 데이터 로드
 export async function loadGenresAndTagsData() {
-    const libraryId = state.currentLibraryId === 'all' || state.currentLibraryId === 'home' || state.currentLibraryId === 'history' || state.currentLibraryId === 'favorite' ? 'all' : state.currentLibraryId;
+    const libraryId = getScopedLibraryIdForTagFilter();
     const dbType = state.currentLibraryType || 'general';
 
     try {
@@ -71,8 +184,12 @@ export async function loadGenresAndTagsData() {
             fetch(`/api/media/tags?type=${dbType}&library_id=${libraryId}`).then(res => res.json())
         ]);
 
-        if (genresRes.success) genresData = genresRes.genres || [];
-        if (tagsRes.success) tagsData = tagsRes.tags || [];
+        if (genresRes.success) {
+            genresData = Array.from(new Set((genresRes.genres || []).map(normalizeMetadataToken).filter(Boolean)));
+        }
+        if (tagsRes.success) {
+            tagsData = Array.from(new Set((tagsRes.tags || []).map(normalizeMetadataToken).filter(Boolean)));
+        }
 
         renderChips();
         renderSelectedChips();
@@ -138,11 +255,14 @@ function renderChips() {
 
 // 칩 선택/해제 토글
 function toggleChipSelection(item) {
+    const normalizedItem = normalizeMetadataToken(item);
+    if (!normalizedItem) return;
+
     const selectedSet = currentTab === 'genres' ? selectedGenres : selectedTags;
-    if (selectedSet.has(item)) {
-        selectedSet.delete(item);
+    if (selectedSet.has(normalizedItem)) {
+        selectedSet.delete(normalizedItem);
     } else {
-        selectedSet.add(item);
+        selectedSet.add(normalizedItem);
     }
     renderChips();
     renderSelectedChips();
@@ -176,6 +296,7 @@ function renderSelectedChips() {
 function createSelectedChipElement(type, value) {
     const chip = document.createElement('div');
     chip.className = 'filter-chip-selected';
+    chip.title = `[${type === 'genres' ? '장르' : '태그'}] ${value}`;
     chip.innerHTML = `<span>[${type === 'genres' ? '장르' : '태그'}] ${value}</span> <i class="fa-solid fa-xmark" style="font-size: 0.7rem;"></i>`;
     chip.addEventListener('click', () => {
         if (type === 'genres') {
@@ -190,10 +311,12 @@ function createSelectedChipElement(type, value) {
 }
 
 // 필터 적용
-export function applyFilters() {
+export async function applyFilters() {
     // 선택된 필터 값을 state 객체에 보관하여 도서 검색과 결합할 수 있도록 전달
     state.filterGenres = Array.from(selectedGenres);
     state.filterTags = Array.from(selectedTags);
+
+    await prepareTargetCategoryForQuickFilter();
 
     // 필터링 적용을 위해 기존의 도서 검색/렌더링 호출
     if (typeof window.filterBooks === 'function') {
@@ -260,3 +383,9 @@ function setTranslate(xPos, yPos, el) {
 
 // 기존 사이드바 필터 토글 호환용 스텁 함수
 export function updateSidebarFilterActiveStates() {}
+
+// 모듈이 직접 import되는 경로에서도 전역 함수가 필요하므로 안전 바인딩
+window.selectGenreFilter = selectGenreFilter;
+window.selectTagFilter = selectTagFilter;
+window.quickFilterByGenre = quickFilterByGenre;
+window.quickFilterByTag = quickFilterByTag;

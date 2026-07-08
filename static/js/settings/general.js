@@ -16,6 +16,9 @@ export function applySettingsToUI(settings) {
   if (settings.HIDE_COMPLETED_IN_HISTORY !== undefined) {
     state.hideCompletedInHistory = (settings.HIDE_COMPLETED_IN_HISTORY === '1');
   }
+  if (settings.TAG_FILTER_SEARCH_SCOPE_ALL !== undefined) {
+    state.tagFilterSearchInAll = (settings.TAG_FILTER_SEARCH_SCOPE_ALL === '1');
+  }
 }
 
 // 최초 로드 시 설정 일괄 호출 적용
@@ -88,6 +91,11 @@ export async function loadGeneralSettings() {
         hideCompletedEl.checked = (s.HIDE_COMPLETED_IN_HISTORY === '1');
       }
 
+      const tagScopeAllEl = document.getElementById('setting-tag-filter-scope-all');
+      if (tagScopeAllEl) {
+        tagScopeAllEl.checked = (s.TAG_FILTER_SEARCH_SCOPE_ALL === '1');
+      }
+
       // 프록시 헤더 인증 (SSO) 설정
       const proxyAuthEl = document.getElementById('setting-proxy-header-auth');
       if (proxyAuthEl) proxyAuthEl.value = s.PROXY_HEADER_AUTH || '0';
@@ -125,6 +133,7 @@ export async function submitGeneralSettings(event) {
   const procRss = document.getElementById('setting-process-rss-limit')?.value || '2048';
   const comicDelay = document.getElementById('setting-comic-loading-delay')?.value || '300';
   const hideCompleted = document.getElementById('setting-hide-completed-in-history')?.checked ? '1' : '0';
+  const tagFilterScopeAll = document.getElementById('setting-tag-filter-scope-all')?.checked ? '1' : '0';
   const proxyAuth = document.getElementById('setting-proxy-header-auth')?.value || '0';
   const rcloneRcUrl = document.getElementById('setting-rclone-rc-url')?.value || 'http://localhost:5572';
   const timezone = document.getElementById('setting-timezone')?.value || 'UTC';
@@ -144,6 +153,7 @@ export async function submitGeneralSettings(event) {
       api.updateSystemSetting('SYSTEM_MEM_LIMIT', sysMem),
       api.updateSystemSetting('PROCESS_RSS_LIMIT', procRss),
       api.updateSystemSetting('HIDE_COMPLETED_IN_HISTORY', hideCompleted),
+      api.updateSystemSetting('TAG_FILTER_SEARCH_SCOPE_ALL', tagFilterScopeAll),
       api.updateSystemSetting('PROXY_HEADER_AUTH', proxyAuth),
       api.updateSystemSetting('RCLONE_RC_URL', rcloneRcUrl)
     ];
@@ -165,7 +175,8 @@ export async function submitGeneralSettings(event) {
       applySettingsToUI({
         BOOK_THUMBNAIL_WIDTH: thumbWidth,
         PAGE_LIMIT: pageLimit,
-        HIDE_COMPLETED_IN_HISTORY: hideCompleted
+        HIDE_COMPLETED_IN_HISTORY: hideCompleted,
+        TAG_FILTER_SEARCH_SCOPE_ALL: tagFilterScopeAll
       });
       loadGeneralSettings();
     } else {

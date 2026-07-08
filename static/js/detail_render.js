@@ -1,5 +1,13 @@
 // detail_render.js – 도서 상세 화면의 HTML 템플릿 생성기
 
+function normalizeMetadataToken(token) {
+  if (!token) return '';
+  return String(token)
+    .replace(/^[\s'"\[\],]+|[\s'"\[\],]+$/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId) {
   const firstBookId = books.length > 0 ? books[0].id : null;
   const coverSrc = meta.cover_image
@@ -12,16 +20,18 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId)
 
   const genresHtml = (meta.genre || '')
     .split(',')
-    .map(g => g.trim())
+    .map(g => normalizeMetadataToken(g))
     .filter(g => g)
-    .map(g => `<span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center;" onclick="goBackToList(); window.selectGenreFilter('${g.replace(/'/g, "\\'")}')"><i class="fa-solid fa-tag" style="font-size: 0.7rem; margin-right: 0.2rem;"></i>${g}</span>`)
+    .filter((g, idx, arr) => arr.indexOf(g) === idx)
+    .map(g => `<span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center;" onclick="window.quickFilterByGenre('${g.replace(/'/g, "\\'")}')"><i class="fa-solid fa-tag" style="font-size: 0.7rem; margin-right: 0.2rem;"></i>${g}</span>`)
     .join('');
 
   const tagsHtml = (meta.tags || '')
     .split(',')
-    .map(t => t.trim())
+    .map(t => normalizeMetadataToken(t))
     .filter(t => t)
-    .map(t => `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center;" onclick="goBackToList(); window.selectTagFilter('${t.replace(/'/g, "\\'")}')"><i class="fa-solid fa-hashtag" style="font-size: 0.7rem; margin-right: 0.2rem;"></i>${t}</span>`)
+    .filter((t, idx, arr) => arr.indexOf(t) === idx)
+    .map(t => `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center;" onclick="window.quickFilterByTag('${t.replace(/'/g, "\\'")}')"><i class="fa-solid fa-hashtag" style="font-size: 0.7rem; margin-right: 0.2rem;"></i>${t}</span>`)
     .join('');
 
   const missingPageBooks = books.filter(b => {
@@ -222,6 +232,19 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId)
 export function renderVolumesList(books, safeSeriesName, actualLibraryId) {
   let volumesHtml = '';
   books.forEach(b => {
+    const fmt = (b.file_format || '').toLowerCase();
+    const pathText = b.file_path || '';
+    const imgdirPathDisplay = pathText.replace(/[\\/]__folder__\.imgdir$/i, '');
+    const pathDisplay = fmt === 'imgdir' ? imgdirPathDisplay : pathText;
+    let displayTitle = b.title || '';
+    if (fmt === 'imgdir' && (!displayTitle || displayTitle === '__folder__')) {
+      const normalized = (pathDisplay || '').replace(/\\/g, '/').replace(/\/+$/, '');
+      const segments = normalized.split('/').filter(Boolean);
+      if (segments.length > 0) {
+        displayTitle = segments[segments.length - 1];
+      }
+    }
+
     const progressPercent = b.total_pages > 0 ? Math.round((b.pages_read / b.total_pages) * 100) : 0;
     const progressText = b.pages_read > 0
       ? `${b.pages_read}p / ${b.total_pages}p (${progressPercent}%)`
@@ -277,11 +300,11 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId) {
         <div class="volume-info">
           ${warnBannerHtml}
           <div class="volume-title-row" style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
-            <span class="volume-title">${b.title || ''}</span>
+            <span class="volume-title">${displayTitle}</span>
             ${isCompleted}
             ${favBtnHtml}
           </div>
-          <span class="volume-path" style="font-size: 0.72rem; color: #64748b; word-break: break-all; margin-top: 0.15rem; display: block;">(${b.file_path})</span>
+          <span class="volume-path" style="font-size: 0.72rem; color: #64748b; word-break: break-all; margin-top: 0.15rem; display: block;">(${pathDisplay})</span>
           <div class="volume-meta-row">
             <span class="vol-meta"><i class="fa-regular fa-file"></i> ${b.total_pages}p</span>
             <span class="vol-meta"><i class="fa-regular fa-clock"></i> ${i18n.t('detail.time_est', {minutes: Math.max(1, Math.ceil(b.total_pages / 40))})}</span>
@@ -291,7 +314,7 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId) {
           </div>
           <div class="chapter-progress-text">${progressText}</div>
         </div>
-        <button class="btn-read" onclick="openReader(${b.id}, '${(b.file_format || '').replace(/'/g, "\\'")}', '${(b.title || '').replace(/'/g, "\\'")}', ${b.pages_read}, ${b.total_pages})">${readBtnText}</button>
+        <button class="btn-read" onclick="openReader(${b.id}, '${(b.file_format || '').replace(/'/g, "\\'")}', '${(displayTitle || '').replace(/'/g, "\\'")}', ${b.pages_read}, ${b.total_pages})">${readBtnText}</button>
       </div>
     `;
   });

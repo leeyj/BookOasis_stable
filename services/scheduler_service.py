@@ -256,6 +256,7 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
         scanner_queue.current_task['stage'] = 'vfs_refresh'
     
     # VFS 캐시 사전 갱신 옵션 확인 및 수행
+    vfs_refreshed_in_wrapper = False
     try:
         conn_chk = database.get_connection(db_type)
         cursor_chk = conn_chk.cursor()
@@ -265,13 +266,15 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
         
         # 원격 경로가 있는지 확인
         from utils.drive_helper import is_remote_path
-        target_paths = [p.strip() for p in str(physical_path).replace('\r', '').split('\n') if p.strip()]
+        target_paths_raw = [p.strip() for p in str(physical_path).replace('\r', '').split('\n') if p.strip()]
+        target_paths = list(dict.fromkeys(target_paths_raw))
         has_remote_paths = any(is_remote_path(p) for p in target_paths)
         
         # VFS 설정이 활성화되었거나, 원격 경로가 있으면 VFS 갱신 강제 수행
         should_vfs_refresh = (row_chk and row_chk['vfs_refresh_before_scan'] == 1) or has_remote_paths
         
         if should_vfs_refresh:
+            vfs_refreshed_in_wrapper = True
             if has_remote_paths and not (row_chk and row_chk['vfs_refresh_before_scan'] == 1):
                 print(f"[Scanner-Trigger] ⚠️ Remote paths detected but VFS refresh disabled. Forcing VFS refresh for data integrity.")
                 write_scan_log("⚠️ 원격 경로 감지됨. VFS 새로고침을 강제 실행합니다 (데이터 무결성 보장).")
@@ -316,11 +319,14 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
                                 pass
             except Exception:
                 pass
+
+            # 중복 RC URL 제거 (순서 보존)
+            rc_urls = list(dict.fromkeys(rc_urls))
             
             try:
                 from utils.drive_helper import get_rclone_relative_path
                 
-                remote_paths = [p for p in target_paths if is_remote_path(p)]
+                remote_paths = list(dict.fromkeys([p for p in target_paths if is_remote_path(p)]))
                 
                 for r_path in remote_paths:
                     # 중간에 스캔 취소가 요청되었는지 확인
@@ -340,6 +346,7 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
                     rel_path = get_rclone_relative_path(r_path)
                     print(f"[Scanner-Trigger] VFS cache update target folder: '{rel_path}'")
                     
+                    refreshed = False
                     for rc_url in rc_urls:
                         try:
                             parsed = urllib.parse.urlparse(rc_url)
@@ -367,8 +374,10 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
                             try:
                                 with urllib.request.urlopen(req, timeout=1200) as resp:
                                     res_text = resp.read().decode('utf-8')
-                                    print(f"[Scanner-Trigger] VFS update result ({rel_path}): {res_text}")
-                                    write_scan_log(f"VFS 갱신 완료 ({rel_path}): {res_text}")
+                                    print(f"[Scanner-Trigger] VFS update result (server={clean_rc_url}, path={rel_path}): {res_text}")
+                                    write_scan_log(f"VFS 갱신 완료 (server={clean_rc_url}, path={rel_path}): {res_text}")
+                                    refreshed = True
+                                    break
                             except urllib.error.HTTPError as http_ex:
                                 err_body = http_ex.read().decode('utf-8') if hasattr(http_ex, 'read') else str(http_ex)
                                 print(f"[Scanner-Trigger ERROR] VFS update request failed ({rel_path}): {http_ex.code} - {err_body}")
@@ -387,6 +396,9 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
                         except Exception as e_rc:
                             print(f"[Scanner-Trigger ERROR] VFS RC URL processing error: {e_rc}")
                             write_scan_log(f"VFS RC URL 처리 오류: {e_rc}")
+
+                    if refreshed:
+                        continue
             except Exception as e_vfs:
                 print(f"[Scanner-Trigger ERROR] Error during VFS refresh: {e_vfs}")
                 write_scan_log(f"VFS 새로고침 오류: {e_vfs}")
@@ -409,7 +421,7 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
         print(f"[Scheduler] Scan state update error: {e}")
     
     try:
-        scan_library(db_path, library_id, physical_path, force=force)
+        scan_library(db_path, library_id, physical_path, force=force, skip_vfs_refresh=vfs_refreshed_in_wrapper)
         
         # 2. 성공 시 'ready' 및 last_scanned_at 기록
         end_time = datetime.now()

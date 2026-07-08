@@ -116,12 +116,15 @@ class BookDetailService:
         books_list = []
         for b in books_rows:
             clean_title = b['title']
-            if b['file_path']:
+            file_format = (b['file_format'] or '').lower()
+            if file_format == 'imgdir' and b['file_path']:
+                # IMGDIR books use a virtual filename (__folder__.imgdir), so display folder name instead.
+                clean_title = os.path.basename(os.path.dirname(b['file_path'])) or clean_title
+            elif b['file_path']:
                 filename_with_ext = os.path.basename(b['file_path'])
                 clean_title, _ = os.path.splitext(filename_with_ext)
                 
             total_pages = b['total_pages'] or 0
-            file_format = (b['file_format'] or '').lower()
             if total_pages == 0 and file_format in ('zip', 'cbz') and b['file_path'] and os.path.exists(b['file_path']):
                 # Removed synchronous fallback calculation of total_pages to prevent API timeouts,
                 # especially for remote files (e.g. Google Drive) where fetching the zip structure blocks the request.

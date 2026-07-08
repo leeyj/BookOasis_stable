@@ -54,6 +54,31 @@ def clean_html_tags(text):
     return html.unescape(cleaned).strip()
 
 
+def normalize_metadata_token(token):
+    if token is None:
+        return ''
+    return re.sub(r'\s{2,}', ' ', str(token).strip(" \t\r\n'\"[](),")).strip()
+
+
+def normalize_metadata_list_field(value):
+    if not value:
+        return ''
+
+    tokens = [normalize_metadata_token(part) for part in str(value).split(',')]
+    tokens = [t for t in tokens if t]
+
+    normalized = []
+    seen = set()
+    for token in tokens:
+        key = token.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized.append(token)
+
+    return ', '.join(normalized)
+
+
 def parse(target_path, is_remote=False):
     return parse_comicinfo_from_cbz(target_path)
 
@@ -91,8 +116,8 @@ def parse_comicinfo_from_cbz(file_path):
             meta['author'] = author
             meta['publisher'] = _get('Publisher')
             meta['summary'] = clean_html_tags(_get('Summary'))
-            meta['genre'] = _get('Genre')
-            meta['tags'] = _get('Tags')
+            meta['genre'] = normalize_metadata_list_field(_get('Genre'))
+            meta['tags'] = normalize_metadata_list_field(_get('Tags'))
 
             year = _get('Year')
             month = _get('Month').zfill(2) if _get('Month') else ''
@@ -104,5 +129,8 @@ def parse_comicinfo_from_cbz(file_path):
         pass
     except Exception as e:
         print(f"[Scanner] ComicInfo.xml parsing error ({file_path}): {e}")
+
+    meta['genre'] = normalize_metadata_list_field(meta.get('genre', ''))
+    meta['tags'] = normalize_metadata_list_field(meta.get('tags', ''))
 
     return meta

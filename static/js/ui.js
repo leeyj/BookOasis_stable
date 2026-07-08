@@ -23,6 +23,27 @@ const lazyImageObserver = ('IntersectionObserver' in window)
     })
   : null;
 
+function normalizeBookTitle(item) {
+  let title = item.title || '';
+  const fmt = (item.file_format || '').toLowerCase();
+  const filePath = item.file_path || '';
+
+  if (fmt === 'imgdir') {
+    if (!title || title === '__folder__') {
+      const normalized = filePath
+        .replace(/\\/g, '/')
+        .replace(/\/+$/, '')
+        .replace(/\/__folder__\.imgdir$/i, '');
+      const segments = normalized.split('/').filter(Boolean);
+      if (segments.length > 0) {
+        title = segments[segments.length - 1];
+      }
+    }
+  }
+
+  return title;
+}
+
 
 /**
  * ────────────────────────────────────────────────────────
@@ -42,8 +63,11 @@ export function createBookCard(item, options = {}) {
   const card = document.createElement('div');
   card.className = 'book-card';
   card.dataset.bookId = item.id || item.representative_book_id || '';
-  
-  const displayTitle = item.series_name || item.title;
+
+  const normalizedTitle = normalizeBookTitle(item);
+  const displayTitle = options.showVolumeCount
+    ? (item.series_name || normalizedTitle)
+    : normalizedTitle;
   const coverSrc = item.cover_image ? `/covers/${item.cover_image}` : '/static/images/default_cover.jpg';
   
   // 1. 공통 카드 클릭 핸들러 (아이콘 및 별 클릭 분기)
@@ -183,11 +207,12 @@ export function renderHistoryGrid(booksList) {
   container.innerHTML = '';
   const fragment = document.createDocumentFragment();
   booksList.forEach(item => {
+    const normalizedTitle = normalizeBookTitle(item);
     const card = createBookCard(item, {
       showProgress: true,
       actionTitle: '이어읽기',
-      onPrimaryClick: (e) => openBookDetail(e, item.series_name || item.title, item.library_id),
-      onActionClick: () => openReader(item.id, item.file_format, item.title, item.pages_read, item.total_pages)
+      onPrimaryClick: (e) => openBookDetail(e, item.series_name || normalizedTitle, item.library_id),
+      onActionClick: () => openReader(item.id, item.file_format, normalizedTitle, item.pages_read, item.total_pages)
     });
     fragment.appendChild(card);
   });
@@ -245,11 +270,12 @@ export function renderDashboardHistory(booksList) {
   container.innerHTML = '';
   const fragment = document.createDocumentFragment();
   booksList.forEach(item => {
+    const normalizedTitle = normalizeBookTitle(item);
     const card = createBookCard(item, {
       showProgress: true,
       actionTitle: '이어읽기',
-      onPrimaryClick: (e) => openBookDetail(e, item.series_name || item.title, item.library_id),
-      onActionClick: () => openReader(item.id, item.file_format, item.title, item.pages_read, item.total_pages)
+      onPrimaryClick: (e) => openBookDetail(e, item.series_name || normalizedTitle, item.library_id),
+      onActionClick: () => openReader(item.id, item.file_format, normalizedTitle, item.pages_read, item.total_pages)
     });
     fragment.appendChild(card);
   });
@@ -269,11 +295,12 @@ export function renderDashboardRecentlyAdded(booksList) {
   container.innerHTML = '';
   const fragment = document.createDocumentFragment();
   booksList.forEach(item => {
+    const normalizedTitle = normalizeBookTitle(item);
     const card = createBookCard(item, {
       isNew: true,
       actionTitle: '바로읽기',
-      onPrimaryClick: (e) => openBookDetail(e, item.series_name || item.title, item.library_id),
-      onActionClick: () => openReader(item.id, item.file_format, item.title, 0, item.total_pages)
+      onPrimaryClick: (e) => openBookDetail(e, item.series_name || normalizedTitle, item.library_id),
+      onActionClick: () => openReader(item.id, item.file_format, normalizedTitle, 0, item.total_pages)
     });
     fragment.appendChild(card);
   });

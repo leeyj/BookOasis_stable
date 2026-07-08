@@ -35,6 +35,30 @@ def build_people_subquery(conn, role, alias):
          JOIN SeriesMetadata sm ON psm.SeriesMetadatasId = sm.Id
          WHERE sm.SeriesId = s.Id AND pe.Role = {role}) AS {alias}"""
 
+def is_kavita_placeholder_volume(value):
+    text = str(value or "").strip()
+    if not text:
+        return True
+    try:
+        return float(text) <= -100000
+    except ValueError:
+        return False
+
+def build_book_title(row):
+    volume_name = str(row["VolumeName"] or "").strip()
+    chapter_title = str(row["ChapterTitle"] or "").strip()
+
+    if is_kavita_placeholder_volume(volume_name):
+        title = chapter_title
+    elif chapter_title and chapter_title != volume_name:
+        title = f"{volume_name} - {chapter_title}"
+    else:
+        title = chapter_title or volume_name
+
+    if not title:
+        title = os.path.splitext(os.path.basename(row["FilePath"]))[0]
+    return title
+
 def convert_and_copy_cover(source_cover_name, kavita_covers_dir, bookoasis_covers_dir, file_path, library_id=None):
     """Kavita 커버를 가져와 BookOasis 표준 WebP 및 경로 해시 규격으로 변환하여 저장"""
     if not source_cover_name:
@@ -219,7 +243,7 @@ def run_kavita_to_bookoasis():
             _, ext = os.path.splitext(file_path)
             file_format = ext.replace('.', '').lower() or 'zip'
             
-            title = f"{row['VolumeName']} - {row['ChapterTitle']}" if row['VolumeName'] else row['ChapterTitle']
+            title = build_book_title(row)
             series_name = row['SeriesName']
             total_pages = row['TotalPages'] or 0
             

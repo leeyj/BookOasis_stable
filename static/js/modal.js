@@ -38,6 +38,7 @@ export async function openBookDetail(event, seriesName, libraryId) {
       const meta = data.meta;
       const books = data.books || [];
       const actualLibraryId = (books.length > 0 && books[0].library_id) ? books[0].library_id : activeLibId;
+      state.detailLibraryId = actualLibraryId;
 
       // 컴포넌트 렌더러 모듈 호출
       const headerHtml = renderDetailHeader(meta, books, safeSeriesName, actualLibraryId);

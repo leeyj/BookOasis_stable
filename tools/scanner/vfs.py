@@ -9,8 +9,9 @@ from utils.drive_helper import is_remote_path, get_rclone_relative_path
 
 def trigger_vfs_refresh(db_path, library_id, physical_path):
     """Refresh rclone cache before starting scan if remote mount path (VFS)."""
-    target_paths = [p.strip() for p in str(physical_path).replace('\r', '').split('\n') if p.strip()]
-    remote_paths = [p for p in target_paths if is_remote_path(p)]
+    target_paths_raw = [p.strip() for p in str(physical_path).replace('\r', '').split('\n') if p.strip()]
+    target_paths = list(dict.fromkeys(target_paths_raw))
+    remote_paths = list(dict.fromkeys([p for p in target_paths if is_remote_path(p)]))
     
     if not remote_paths:
         return
@@ -58,11 +59,15 @@ def trigger_vfs_refresh(db_path, library_id, physical_path):
                         conn_s.close()
                     except Exception:
                         pass
+
+        # Deduplicate RC URLs while preserving order
+        rc_urls = list(dict.fromkeys(rc_urls))
                 
         for r_path in remote_paths:
             print(f"[Scanner-VFS] Starting VFS cache pre-refresh. Target: {r_path}")
             rel_path = get_rclone_relative_path(r_path)
-            
+
+            refreshed = False
             for rc_url in rc_urls:
                 try:
                     parsed = urllib.parse.urlparse(rc_url)
@@ -89,6 +94,8 @@ def trigger_vfs_refresh(db_path, library_id, physical_path):
                     
                     with urllib.request.urlopen(req, timeout=5) as resp:
                         print(f"[Scanner-VFS] VFS cache refresh success - Server: '{clean_rc_url}', Target: '{rel_path}', Result: {resp.read().decode('utf-8')}")
+                        refreshed = True
+                        break
                 except Exception as e:
                     # Obfuscate credentials in logs if present
                     safe_url = rc_url
@@ -99,6 +106,9 @@ def trigger_vfs_refresh(db_path, library_id, physical_path):
                         except Exception:
                             safe_url = "[Protected URL]"
                     print(f"[Scanner-VFS Warning] Server '{safe_url}' path '{rel_path}' refresh attempt ignored or failed: {e}")
+
+            if refreshed:
+                continue
     except Exception as e:
         print(f"[Scanner-VFS Warning] VFS cache refresh process failed: {e}")
 

@@ -23,6 +23,8 @@ export const state = {
   // 시스템 전역 설정
   systemSettings: {},
   hideCompletedInHistory: false,
+  tagFilterSearchInAll: false,
+  detailLibraryId: null,
   
   // 로그인 사용자 세션 정보
   currentUser: {

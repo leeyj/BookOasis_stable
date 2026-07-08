@@ -8,17 +8,21 @@ if MEDIA_SERVER_DIR not in sys.path:
 
 import gc
 from tools.scanner.metadata import parse_info_xml, parse_kavita_yaml, parse_series_json, parse_comicinfo_from_cbz, merge_local_metadata, is_consonant_folder
-from tools.scanner.cover import get_series_cover_fallback, extract_cover_from_b64, download_cover_from_url
+from tools.scanner.cover import get_series_cover_fallback, get_imgdir_cover, extract_cover_from_b64, download_cover_from_url
 from tools.scanner.offset import collect_zip_offsets_data
 
 SUPPORTED_FORMATS = ('.zip', '.cbz', '.epub', '.pdf', '.txt')
+SUPPORTED_IMAGE_FORMATS = ('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif')
+IMGDIR_VIRTUAL_FILENAME = '__folder__.imgdir'
 
 def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_folder_mtimes, is_remote=False, library_id=None, db_files_cache=None):
     """Independent I/O scan task per folder (DB independent, pure FS/I/O scaling)"""
     print(f"[Scanner-DEBUG-Task] 📂 entering process_folder_task - folder: '{root}'")
     
     media_files = [f for f in files if f.lower().endswith(SUPPORTED_FORMATS)]
-    if not media_files:
+    image_files = [f for f in files if f.lower().endswith(SUPPORTED_IMAGE_FORMATS)]
+    has_imgdir_candidate = bool(image_files) and not media_files
+    if not media_files and not has_imgdir_candidate:
         print(f"[Scanner-DEBUG-Task] 📁 Unsupported folder (skip) - folder: '{root}'")
         return None
 
@@ -49,6 +53,8 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
 
     # 2. Early skip if files are unchanged (mtime & size match DB cache)
     skipped_files = set()
+    imgdir_skip = False
+    imgdir_virtual_path = os.path.join(root, IMGDIR_VIRTUAL_FILENAME)
     if not force and db_files_cache:
         for filename in media_files:
             full_path = os.path.join(root, filename)
@@ -62,6 +68,10 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
                         file_ext = os.path.splitext(filename)[1].lower()
                         if file_ext in ('.zip', '.cbz') and not is_remote and full_path not in db_offsets_cached:
                             continue
+                        # TXT는 오프셋/표지 강제 재시도가 필요 없으므로 mtime/size 동일 시 바로 스킵
+                        if file_ext == '.txt':
+                            skipped_files.add(filename)
+                            continue
                         if full_path not in db_meta_full:
                             continue
                         skipped_files.add(filename)
@@ -72,7 +82,24 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
                         if c_mtime > 0.0:
                             skipped_files.add(filename)
 
-        all_files_skipped = len(skipped_files) == len(media_files)
+        if has_imgdir_candidate and imgdir_virtual_path in db_files_cache:
+            try:
+                p_mtime = os.path.getmtime(root)
+                p_size = sum(
+                    os.path.getsize(os.path.join(root, f))
+                    for f in image_files
+                    if os.path.exists(os.path.join(root, f))
+                )
+                c_mtime, c_size = db_files_cache[imgdir_virtual_path]
+                if int(c_mtime) == int(p_mtime) and int(c_size) == int(p_size):
+                    imgdir_skip = True
+            except Exception:
+                imgdir_skip = False
+
+        all_files_skipped = (
+            len(skipped_files) == len(media_files)
+            and (not has_imgdir_candidate or imgdir_skip)
+        )
         if all_files_skipped:
             if not has_yaml and not has_xml:
                 print(f"[Scanner-DEBUG-Task] ⚡ [Ultra-fast skip] All files unchanged (mtime/size match) - folder: '{root}'")
@@ -293,10 +320,57 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
             'filename': filename,
             'file_format': file_format,
             'series_name': series_name,
+            'title': None,
             'cover_image': cover_image,
             'offsets_data': offsets_data,
             'skip': skip,
             'offset_only': offset_only,  # Whether it's offset-only fast path
+            'file_mtime': f_mtime,
+            'file_size': f_size,
+        })
+
+    if has_imgdir_candidate:
+        imgdir_series_name = os.path.basename(os.path.dirname(root)) or series_name
+        if imgdir_series_name:
+            import re
+            imgdir_series_name = re.sub(r'^\[(?:단행|연재|소설|만화|웹툰|일반)\]\s*', '', imgdir_series_name).strip()
+
+        imgdir_title = os.path.basename(root)
+        imgdir_cover = None
+        if not imgdir_skip:
+            try:
+                imgdir_cover = get_imgdir_cover(root, imgdir_virtual_path, force=force, library_id=library_id)
+            except Exception as e:
+                print(f"[Scanner-DEBUG-Task] ❌ IMGDIR cover extraction failed: '{root}' - {e}")
+                errors.append({
+                    'file_path': imgdir_virtual_path,
+                    'filename': IMGDIR_VIRTUAL_FILENAME,
+                    'error_type': 'NoCover',
+                    'message': f"IMGDIR cover extraction failed: {str(e)}"
+                })
+
+        f_mtime = 0.0
+        f_size = 0
+        try:
+            f_mtime = os.path.getmtime(root)
+            f_size = sum(
+                os.path.getsize(os.path.join(root, f))
+                for f in image_files
+                if os.path.exists(os.path.join(root, f))
+            )
+        except Exception:
+            pass
+
+        results.append({
+            'full_path': imgdir_virtual_path,
+            'filename': IMGDIR_VIRTUAL_FILENAME,
+            'file_format': 'imgdir',
+            'series_name': imgdir_series_name,
+            'title': imgdir_title,
+            'cover_image': imgdir_cover,
+            'offsets_data': [],
+            'skip': imgdir_skip,
+            'offset_only': False,
             'file_mtime': f_mtime,
             'file_size': f_size,
         })
@@ -332,6 +406,9 @@ def process_folder_covers(parent_dir, folder_rows, is_remote, library_id):
         file_path = row['file_path']
         filename = os.path.basename(file_path)
         series_name = row['series_name']
+        file_format = (row['file_format'] or '').lower() if 'file_format' in row.keys() else ''
+        is_imgdir = (file_format == 'imgdir') or file_path.lower().endswith('.imgdir')
+        imgdir_folder_path = os.path.dirname(file_path) if is_imgdir else None
         
         file_exists = os.path.exists(file_path)
         
@@ -353,7 +430,9 @@ def process_folder_covers(parent_dir, folder_rows, is_remote, library_id):
         
         # 4) Fallback: first image in archive - requires file access, skip if none -> delegate to Lazy Scanner
         if not cover_image:
-            if not file_exists:
+            if is_imgdir and imgdir_folder_path and os.path.isdir(imgdir_folder_path):
+                cover_image = get_imgdir_cover(imgdir_folder_path, file_path, force=True, library_id=library_id)
+            elif not file_exists:
                 print(f"[Scanner-Covers] Remote file unreachable -> Delegated to Lazy scanner: '{filename}'")
             else:
                 cover_image = get_series_cover_fallback(

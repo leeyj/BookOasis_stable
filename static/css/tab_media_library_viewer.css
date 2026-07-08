@@ -981,7 +981,7 @@
     top: 150px;
     right: 50px;
     width: 380px;
-    max-height: 520px;
+    max-height: 70vh;
     background: rgba(15, 23, 42, 0.78);
     backdrop-filter: blur(12px) saturate(160%);
     -webkit-backdrop-filter: blur(12px) saturate(160%);
@@ -1062,11 +1062,14 @@
     border: 1px dashed rgba(255, 255, 255, 0.08);
     border-radius: 8px;
     padding: 0.6rem;
-    max-height: 100px;
+    max-height: 160px;
+    min-height: 42px;
     overflow-y: auto;
+    overflow-x: hidden;
     display: flex;
     flex-wrap: wrap;
     gap: 0.4rem;
+    transition: max-height 0.25s ease;
 }
 
 .filter-chip-selected {
@@ -1080,7 +1083,18 @@
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
+    max-width: 100%;
     transition: all 0.15s;
+}
+
+.filter-chip-selected span {
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.25;
+}
+
+.filter-chip-selected i {
+    flex-shrink: 0;
 }
 
 .filter-chip-selected:hover {

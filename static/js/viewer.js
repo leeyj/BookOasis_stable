@@ -189,7 +189,7 @@ export function openReader(bookId, format, title, pagesRead, totalPages) {
   activeViewerInstance = null;
 
 
-  if (fmt === 'zip' || fmt === 'cbz') {
+  if (fmt === 'zip' || fmt === 'cbz' || fmt === 'imgdir') {
     if (overlayComicFit) overlayComicFit.style.display = 'flex';
     activeViewerInstance = ComicViewer;
     activeViewerInstance.init(bookId, pagesRead, totalPages).then(() => {

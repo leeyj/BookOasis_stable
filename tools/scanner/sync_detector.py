@@ -1,10 +1,20 @@
 # -*- coding: utf-8 -*-
 import os
 
+
+def _is_imgdir_virtual_path(path):
+    return bool(path and path.lower().endswith('__folder__.imgdir'))
+
 def detect_and_handle_book_movement(cursor, db_books, found_file_paths, db_meta_full, db_offsets_cached):
     """Auto-detect book movement (Rename) through Basename comparison between disappeared path and newly discovered path and preserve"""
     deleted_paths = set(db_books.keys()) - found_file_paths
     new_paths = found_file_paths - set(db_books.keys())
+
+    # IMGDIR virtual records intentionally skip basename-based move matching.
+    deleted_imgdir_paths = {p for p in deleted_paths if _is_imgdir_virtual_path(p)}
+    new_imgdir_paths = {p for p in new_paths if _is_imgdir_virtual_path(p)}
+    deleted_paths = deleted_paths - deleted_imgdir_paths
+    new_paths = new_paths - new_imgdir_paths
 
     if deleted_paths and new_paths:
         del_basename_map = {}
@@ -31,8 +41,8 @@ def detect_and_handle_book_movement(cursor, db_books, found_file_paths, db_meta_
                 deleted_paths.remove(old_path)
                 new_paths.remove(np)
                 del_basename_map.pop(basename)
-                
-    return deleted_paths
+
+    return deleted_paths | deleted_imgdir_paths
 
 def handle_deleted_books(cursor, db_books, deleted_paths, target_paths, found_file_paths):
     """Transaction-safely soft delete books no longer found, and restore previously soft deleted books if found again"""

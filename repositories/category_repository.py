@@ -54,8 +54,8 @@ class CategoryRepository:
         cursor = conn.cursor()
         try:
             cursor.execute(
-                "INSERT INTO libraries (name, physical_path, is_remote, rclone_rc_url, icon, color) VALUES (?, ?, ?, ?, ?, ?)",
-                (name, physical_path, is_remote, rclone_rc_url, icon, color)
+                "INSERT INTO libraries (name, physical_path, is_remote, vfs_refresh_before_scan, rclone_rc_url, icon, color) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (name, physical_path, is_remote, is_remote, rclone_rc_url, icon, color)
             )
             library_id = cursor.lastrowid
             conn.commit()
@@ -73,8 +73,8 @@ class CategoryRepository:
         cursor = conn.cursor()
         try:
             cursor.execute(
-                "UPDATE libraries SET name = ?, physical_path = ?, is_remote = ?, rclone_rc_url = ?, icon = ?, color = ? WHERE id = ?",
-                (name, physical_path, is_remote, rclone_rc_url, icon, color, library_id)
+                "UPDATE libraries SET name = ?, physical_path = ?, is_remote = ?, vfs_refresh_before_scan = ?, rclone_rc_url = ?, icon = ?, color = ? WHERE id = ?",
+                (name, physical_path, is_remote, is_remote, rclone_rc_url, icon, color, library_id)
             )
             conn.commit()
             return True

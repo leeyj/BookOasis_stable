@@ -7,6 +7,8 @@ from api.cache import namelist_cache, image_cache
 from utils.cache_helper import get_zip_file_hybrid, get_zip_read_lock
 import database
 
+IMG_EXT = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp')
+
 def get_img_files(file_path: str, zf) -> list:
     """ZIP 내 이미지 목록을 캐시에서 가져오거나 계산하여 캐시 저장"""
     from api.cache import disk_cache_manager
@@ -18,16 +20,73 @@ def get_img_files(file_path: str, zf) -> list:
     cached = namelist_cache.get(lookup_key)
     if cached is not None:
         return cached
-    img_ext = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp')
     from utils.sort_helper import natural_sort_key
     img_files = sorted(
-        [n for n in zf.namelist() if n.lower().endswith(img_ext)],
+        [n for n in zf.namelist() if n.lower().endswith(IMG_EXT)],
         key=natural_sort_key
     )
     namelist_cache.put(lookup_key, img_files)
     return img_files
 
+
+def get_imgdir_files(folder_path: str) -> list:
+    """이미지 폴더(imgdir) 내 정렬된 이미지 파일 절대경로 목록 반환"""
+    if not folder_path or not os.path.isdir(folder_path):
+        return []
+
+    cache_key = f"imgdir:{folder_path}"
+    cached = namelist_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    from utils.sort_helper import natural_sort_key
+    files = sorted(
+        [
+            os.path.join(folder_path, n)
+            for n in os.listdir(folder_path)
+            if n.lower().endswith(IMG_EXT)
+        ],
+        key=natural_sort_key
+    )
+    namelist_cache.put(cache_key, files)
+    return files
+
 class StreamService:
+    @staticmethod
+    def get_book_file_info(db_type, book_id):
+        conn = None
+        try:
+            conn = database.get_connection(db_type)
+            cursor = conn.cursor()
+            cursor.execute("SELECT file_path, file_format FROM books WHERE id=?", (book_id,))
+            row = cursor.fetchone()
+            if not row:
+                return None, None
+            return row['file_path'], (row['file_format'] or '').lower()
+        finally:
+            if conn:
+                conn.close()
+
+    @staticmethod
+    def get_total_pages_for_book(db_type, book_id, file_path=None, file_format=None):
+        if file_path is None or file_format is None:
+            file_path, file_format = StreamService.get_book_file_info(db_type, book_id)
+        if not file_path:
+            return 0
+
+        try:
+            if file_format in ('zip', 'cbz'):
+                zf = get_zip_file_hybrid(file_path)
+                if zf:
+                    return len(get_img_files(file_path, zf))
+            elif file_format == 'imgdir' or file_path.lower().endswith('.imgdir'):
+                folder_path = os.path.dirname(file_path)
+                return len(get_imgdir_files(folder_path))
+        except Exception as e:
+            print(f"[StreamService] total_pages calculation failed ({book_id}): {e}")
+
+        return 0
+
     @staticmethod
     def extract_page(file_path: str, page_idx: int, db_type: str = 'general', book_id = None):
         """단일 페이지를 (img_data, mime_type)으로 반환 (Zip 오프셋 최적화 및 Fallback 지원)"""
@@ -40,6 +99,26 @@ class StreamService:
             cached = image_cache.get(cache_key)
             if cached is not None:
                 return cached
+
+            # ── [IMGDIR Path] 폴더 이미지 직접 스트리밍 ──
+            if file_path.lower().endswith('.imgdir'):
+                folder_path = os.path.dirname(file_path)
+                img_files = get_imgdir_files(folder_path)
+                if page_idx < 0 or page_idx >= len(img_files):
+                    return None
+
+                target = img_files[page_idx]
+                try:
+                    with open(target, 'rb') as f:
+                        data = f.read()
+                    mime, _ = mimetypes.guess_type(target)
+                    mime = mime or 'image/jpeg'
+                    result = (data, mime)
+                    image_cache.put(cache_key, result, len(data))
+                    return result
+                except Exception as e:
+                    print(f"[StreamService] IMGDIR page extract fail [{target}]: {e}")
+                    return None
 
             # ── [Fast Path] Zip 오프셋 기반 부분 스트리밍 가속 기동 ──
             if book_id is not None:

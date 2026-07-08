@@ -35,7 +35,10 @@ class BookService:
         books_list = []
         for r in rows:
             clean_title = r['title']
-            if r['file_path']:
+            file_format = (r['file_format'] or '').lower()
+            if file_format == 'imgdir' and r['file_path']:
+                clean_title = os.path.basename(os.path.dirname(r['file_path'])) or clean_title
+            elif r['file_path']:
                 filename_with_ext = os.path.basename(r['file_path'])
                 clean_title, _ = os.path.splitext(filename_with_ext)
             books_list.append({

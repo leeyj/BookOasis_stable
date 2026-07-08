@@ -19,7 +19,7 @@ DB_GENERAL_PATH = os.path.join(DB_DIR, 'media_general.db')
 DB_ADULT_PATH = os.path.join(DB_DIR, 'media_adult.db')
 
 @scanner_print_control_decorator
-def scan_library(db_path, library_id, physical_path, force=False):
+def scan_library(db_path, library_id, physical_path, force=False, skip_vfs_refresh=False):
     """Scan library path and sync DB with file system (force full reindex if force=True)"""
     print(f"[Scanner] Scan started: Library ID={library_id}, Path='{physical_path}', Force={force}")
     
@@ -30,7 +30,8 @@ def scan_library(db_path, library_id, physical_path, force=False):
         print(f"[Scanner] Warning: Scan path does not exist: {physical_path}")
         return
 
-    trigger_vfs_refresh(db_path, library_id, physical_path)
+    if not skip_vfs_refresh:
+        trigger_vfs_refresh(db_path, library_id, physical_path)
     
     is_remote = any(is_remote_path(p) for p in target_paths)
     threads_to_use = 1 if is_remote else MAX_SCANNER_THREADS

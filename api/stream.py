@@ -6,8 +6,7 @@ import os
 import re
 import mimetypes
 from flask import Blueprint, request, Response, jsonify, send_file, session
-from services.stream_service import StreamService, get_img_files
-from utils.cache_helper import get_zip_file_hybrid
+from services.stream_service import StreamService
 from api.auth import login_required, check_adult_permission, admin_required
 from utils.i18n import _t
 import database
@@ -36,7 +35,7 @@ def stream_comic_page():
     except (ValueError, TypeError):
         return jsonify({'error': _t('api.err_book_id_required')}), 400
 
-    file_path = StreamService.get_file_path(db_type, book_id)
+    file_path, file_format = StreamService.get_book_file_info(db_type, book_id)
     if not file_path:
         return jsonify({'error': _t('api.err_book_not_found')}), 404
 
@@ -48,9 +47,14 @@ def stream_comic_page():
 
     # 진행도 기록
     try:
-        zf = get_zip_file_hybrid(file_path)
-        if zf:
-            StreamService.record_progress(db_type, book_id, page_idx, len(get_img_files(file_path, zf)), user_id=user_id)
+        total_pages = StreamService.get_total_pages_for_book(
+            db_type,
+            book_id,
+            file_path=file_path,
+            file_format=file_format
+        )
+        if total_pages > 0:
+            StreamService.record_progress(db_type, book_id, page_idx, total_pages, user_id=user_id)
     except Exception as e:
         print(f"[Progress Recorder] Fail: {e}")
 

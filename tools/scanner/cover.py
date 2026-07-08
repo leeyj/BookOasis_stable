@@ -14,6 +14,8 @@ MEDIA_SERVER_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 COVERS_DIR = os.path.join(MEDIA_SERVER_DIR, 'covers')
 os.makedirs(COVERS_DIR, exist_ok=True)
 
+SUPPORTED_IMAGE_FORMATS = ('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif')
+
 def extract_epub_cover_direct(epub_path, dest_path):
     """Search cover image in EPUB file, convert to WebP format and save to dest_path"""
     try:
@@ -353,3 +355,46 @@ def get_series_cover_fallback(series_name, folder_path, force=False, is_remote=F
         raise e
                 
     return None
+
+
+def get_imgdir_cover(folder_path, virtual_file_path, force=False, library_id=None):
+    """Extract cover for image-directory books and save as WebP."""
+    if not folder_path or not virtual_file_path:
+        return None
+
+    cover_hash = hashlib.md5(virtual_file_path.encode('utf-8')).hexdigest()
+    cover_filename = f"book_{cover_hash}.webp"
+
+    if library_id is not None:
+        dest_dir = os.path.join(COVERS_DIR, str(library_id))
+        os.makedirs(dest_dir, exist_ok=True)
+        db_cover_path = f"{library_id}/{cover_filename}"
+    else:
+        dest_dir = COVERS_DIR
+        db_cover_path = cover_filename
+
+    local_cover_path = os.path.join(dest_dir, cover_filename)
+    if not force and os.path.exists(local_cover_path) and os.path.getsize(local_cover_path) > 0:
+        return db_cover_path
+
+    candidate = find_common_cover(folder_path)
+    if not candidate:
+        from utils.sort_helper import natural_sort_key
+        image_files = sorted(
+            [f for f in os.listdir(folder_path) if f.lower().endswith(SUPPORTED_IMAGE_FORMATS)],
+            key=natural_sort_key
+        )
+        if image_files:
+            candidate = os.path.join(folder_path, image_files[0])
+
+    if not candidate or not os.path.exists(candidate):
+        return None
+
+    try:
+        with Image.open(candidate) as img:
+            img.save(local_cover_path, "WEBP", quality=80)
+        print(f"[Scanner-Cover-IMGDIR] Cover generated: '{candidate}' -> '{local_cover_path}'")
+        return db_cover_path
+    except Exception as e:
+        print(f"[Scanner-Cover-IMGDIR] Cover extraction failed ({candidate}): {e}")
+        return None

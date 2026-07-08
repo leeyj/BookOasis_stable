@@ -48,6 +48,33 @@ def clean_html_tags(text):
     return html.unescape(cleaned).strip()
 
 
+def normalize_metadata_token(token):
+    """Normalize malformed genre/tag token (strip junk quote/bracket/comma marks)."""
+    if token is None:
+        return ''
+    return re.sub(r'\s{2,}', ' ', str(token).strip(" \t\r\n'\"[](),")).strip()
+
+
+def normalize_metadata_list_field(value):
+    """Normalize comma-separated metadata list text and deduplicate while preserving order."""
+    if not value:
+        return ''
+
+    tokens = [normalize_metadata_token(part) for part in str(value).split(',')]
+    tokens = [t for t in tokens if t]
+
+    normalized = []
+    seen = set()
+    for token in tokens:
+        key = token.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized.append(token)
+
+    return ', '.join(normalized)
+
+
 def is_consonant_folder(foldername):
     foldername = foldername.strip()
     if foldername in HANGUL_CONSONANTS:
@@ -58,6 +85,9 @@ def is_consonant_folder(foldername):
 
 
 def _merge_value(target, key, value):
+    if key in ('genre', 'tags'):
+        value = normalize_metadata_list_field(value)
+
     if key == 'cover_b64_map':
         if isinstance(value, dict) and value:
             target[key].update(value)
@@ -171,6 +201,9 @@ def merge_local_metadata(folder_path, files=None, is_remote=False):
 
         for key, value in source.items():
             _merge_value(merged, key, value)
+
+    merged['genre'] = normalize_metadata_list_field(merged.get('genre', ''))
+    merged['tags'] = normalize_metadata_list_field(merged.get('tags', ''))
 
     return merged
 
