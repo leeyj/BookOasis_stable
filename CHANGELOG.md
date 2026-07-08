@@ -1,4 +1,12 @@
 # CHANGELOG
+## v0.8.4
+### fixed
+- zip,cbz : 모바일 뷰-스크롤 모드일때 하단 이미지 추가 로딩 구현 | zip,cbz: mobile view - scroll mode when bottom image added loading implementation
+- epub : 스크롤 모드일때 중앙 클릭시 뷰어 오버레이 메뉴 토글 안되는 이슈 해결 | epub: scroll mode-center click viewer overlay menu toggle not working issue fix
+- pdf,epub : 모바일 뷰-스크롤 모드일때 중앙 클릭시 뷰어 오버레이 메뉴 토글시 위치 소실 현상 해결 | pdf,epub: mobile view - scroll mode-center click viewer overlay menu toggle position loss issue fix
+- txt 모바일 뷰-스크롤 모드일때 중앙 클릭시 뷰어 오버레이 메뉴 토글시 위치 소실 현상 해결 | mobile view - scroll mode-center click viewer overlay menu toggle position loss issue fix
+
+
 ## v0.8.3
 ### fixed
 - 만화책 뷰어(스크롤)일때 다음편 넘어가지 않는 이슈 해결 | Fixed an issue where the comic viewer (webtoon/scroll mode) failed to navigate to the next chapter.

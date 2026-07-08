@@ -4,6 +4,7 @@ import os
 import shutil
 import sys
 import hashlib
+import re
 from datetime import datetime
 from PIL import Image
 
@@ -35,7 +36,7 @@ def build_people_subquery(conn, role, alias):
          JOIN SeriesMetadata sm ON psm.SeriesMetadatasId = sm.Id
          WHERE sm.SeriesId = s.Id AND pe.Role = {role}) AS {alias}"""
 
-def is_kavita_placeholder_volume(value):
+def is_kavita_placeholder_value(value):
     text = str(value or "").strip()
     if not text:
         return True
@@ -44,19 +45,37 @@ def is_kavita_placeholder_volume(value):
     except ValueError:
         return False
 
-def build_book_title(row):
-    volume_name = str(row["VolumeName"] or "").strip()
-    chapter_title = str(row["ChapterTitle"] or "").strip()
+def clean_kavita_title_part(value):
+    text = str(value or "").strip()
+    if is_kavita_placeholder_value(text):
+        return ""
+    return text
 
-    if is_kavita_placeholder_volume(volume_name):
-        title = chapter_title
-    elif chapter_title and chapter_title != volume_name:
-        title = f"{volume_name} - {chapter_title}"
+def build_file_title(file_path):
+    title = os.path.splitext(os.path.basename(file_path or ""))[0].strip()
+    title = re.sub(r"#\d+$", "", title).strip()
+    title = re.sub(r"^(?:\[[^\]]+\]\s*)+", "", title).strip()
+    return title
+
+def build_book_title(row):
+    volume_name = clean_kavita_title_part(row["VolumeName"])
+    chapter_title = clean_kavita_title_part(row["ChapterTitle"])
+    file_title = build_file_title(row["FilePath"])
+
+    if chapter_title:
+        if volume_name and chapter_title != volume_name:
+            title = f"{volume_name} - {chapter_title}"
+        else:
+            title = chapter_title
+    elif volume_name:
+        title = file_title or volume_name
     else:
-        title = chapter_title or volume_name
+        title = file_title
 
     if not title:
-        title = os.path.splitext(os.path.basename(row["FilePath"]))[0]
+        title = str(row["SeriesName"] or "").strip()
+    if not title:
+        title = os.path.splitext(os.path.basename(row["FilePath"] or ""))[0]
     return title
 
 def convert_and_copy_cover(source_cover_name, kavita_covers_dir, bookoasis_covers_dir, file_path, library_id=None):
@@ -276,34 +295,48 @@ def run_kavita_to_bookoasis():
                 except Exception:
                     pass
 
-            # 도서 정보 삽입 (중복 경로 무시)
-            general_cursor.execute(
-                """
-                INSERT OR IGNORE INTO books 
-                (library_id, title, series_name, author, publisher, file_path, file_format, cover_image, total_pages, genre, tags, summary, release_date) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (lib_id, title, series_name, authors, publisher, file_path, file_format, saved_cover_name, total_pages, genre, tags, summary, release_date)
-            )
+            # 도서 정보 삽입 또는 갱신. 재마이그레이션 시 기존 제목/메타데이터도 교정한다.
+            general_cursor.execute("SELECT id, cover_image FROM books WHERE file_path = ?", (file_path,))
+            existing_book = general_cursor.fetchone()
+            if existing_book:
+                book_id = existing_book["id"]
+                cover_to_save = saved_cover_name or existing_book["cover_image"]
+                general_cursor.execute(
+                    """
+                    UPDATE books
+                    SET library_id = ?, title = ?, series_name = ?, author = ?, publisher = ?,
+                        file_format = ?, cover_image = ?, total_pages = ?, genre = ?, tags = ?,
+                        summary = ?, release_date = ?
+                    WHERE id = ?
+                    """,
+                    (lib_id, title, series_name, authors, publisher, file_format, cover_to_save,
+                     total_pages, genre, tags, summary, release_date, book_id)
+                )
+            else:
+                general_cursor.execute(
+                    """
+                    INSERT INTO books
+                    (library_id, title, series_name, author, publisher, file_path, file_format, cover_image, total_pages, genre, tags, summary, release_date)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (lib_id, title, series_name, authors, publisher, file_path, file_format, saved_cover_name, total_pages, genre, tags, summary, release_date)
+                )
+                book_id = general_cursor.lastrowid
             
             # 진척도 정보 동기화 이관
             pages_read = row['PagesRead']
             if pages_read and pages_read > 0:
-                general_cursor.execute("SELECT id FROM books WHERE file_path = ?", (file_path,))
-                book_row = general_cursor.fetchone()
-                if book_row:
-                    book_id = book_row[0]
-                    is_completed = 1 if pages_read >= total_pages else 0
-                    last_modified = row['ProgressLastModified'] or datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    
-                    general_cursor.execute(
-                        """
-                        INSERT OR REPLACE INTO user_progress 
-                        (book_id, user_id, pages_read, is_completed, last_read_at) 
-                        VALUES (?, 1, ?, ?, ?)
-                        """,
-                        (book_id, pages_read, is_completed, last_modified)
-                    )
+                is_completed = 1 if pages_read >= total_pages else 0
+                last_modified = row['ProgressLastModified'] or datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+                general_cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO user_progress
+                    (book_id, user_id, pages_read, is_completed, last_read_at)
+                    VALUES (?, 1, ?, ?, ?)
+                    """,
+                    (book_id, pages_read, is_completed, last_modified)
+                )
                     
             migrated_books += 1
             if migrated_books % 500 == 0 or migrated_books == total_rows:

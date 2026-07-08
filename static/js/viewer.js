@@ -804,7 +804,11 @@ export function initViewerClickToggle() {
     }
   }, { passive: true });
 
-  document.addEventListener('touchend', e => {
+  // 마우스(데스크톱) click 이벤트는 별도로 유지 (touch 환경에서는 중복 방지 필요 없음 — touchend가 먼저 처리)
+  let _lastTouchEndTime = 0;
+  
+  // touchend 이벤트 리스너의 끝부분을 수정하여 _lastTouchEndTime 기록
+  const originalTouchEnd = document.addEventListener('touchend', e => {
     if (_touchStartX === null) return; // 스크롤로 판정된 경우 무시
 
     const endX = _touchStartClientX;
@@ -838,17 +842,18 @@ export function initViewerClickToggle() {
     // 화면 가로폭 기준 30% ~ 70% 사이의 중앙 영역 탭 시에만 오버레이 토글
     if (endX >= width * 0.3 && endX <= width * 0.7) {
       console.log('[Viewer-Touch-Toggle] Triggering toggleComicOverlay() from touchend');
+      _lastTouchEndTime = Date.now(); // 터치 토글 시간 기록
       toggleComicOverlay();
     }
   }, { passive: true });
-  // ─────────────────────────────────────────────────────────────────────────
 
-  // 마우스(데스크톱) click 이벤트는 별도로 유지 (touch 환경에서는 중복 방지 필요 없음 — touchend가 먼저 처리)
   viewerBody.addEventListener('click', e => {
     // 터치 디바이스에서는 touchend가 이미 처리하므로 click 이벤트는 건너뜀
     if (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) return;
     // PointerEvent로 터치 유입 감지 (일부 브라우저 대응)
     if (e.pointerType === 'touch') return;
+    // iOS Safari 대응: 최근 500ms 이내에 touchend로 토글이 일어난 경우 click 무시
+    if (Date.now() - _lastTouchEndTime < 500) return;
 
     console.log('[Viewer-Click-Toggle] Mouse click detected. Target:', e.target);
 

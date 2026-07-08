@@ -21,20 +21,49 @@ export function toggleComicOverlay() {
   const menu = document.getElementById('comic-overlay-menu');
   if (!menu) return;
   const isOpening = (menu.style.display === 'none');
-  menu.style.display = isOpening ? 'flex' : 'none';
 
   const pdfNavBar = document.querySelector('.pdf-nav-bar');
-  if (pdfNavBar) {
-    pdfNavBar.style.display = isOpening ? 'flex' : 'none';
-  }
   const epubNavBar = document.querySelector('.epub-nav-bar');
-  if (epubNavBar) {
-    epubNavBar.style.display = isOpening ? 'flex' : 'none';
-  }
   const floatingCloseBtn = document.querySelector('.floating-close-btn');
-  if (floatingCloseBtn) {
-    floatingCloseBtn.style.display = isOpening ? 'flex' : 'none';
+
+  // ── 스크롤 모드에서 오버레이 위치 보정 ────────────────────────────────
+  // scroll-mode-active 클래스가 붙으면 viewer-modal이 직접 스크롤되므로
+  // position:fixed 엘리먼트가 문서 최상단에 고정되어 버린다.
+  // viewerModal.scrollTop을 오버레이 top에 더해 현재 뷰포트 기준으로 보정한다.
+  if (isOpening) {
+    const viewerModal = document.getElementById('media-viewer-modal');
+    const isScrollActive = viewerModal && viewerModal.classList.contains('scroll-mode-active');
+    const offset = isScrollActive ? viewerModal.scrollTop : 0;
+
+    menu.style.top = offset + 'px';
+
+    if (floatingCloseBtn) {
+      floatingCloseBtn.style.top = (offset + 15) + 'px';
+    }
+
+    const clientHeight = isScrollActive ? viewerModal.clientHeight : window.innerHeight;
+    const bottomOffset = offset + clientHeight;
+
+    if (pdfNavBar) {
+      pdfNavBar.style.top = (bottomOffset - 60) + 'px';
+      pdfNavBar.style.bottom = 'auto';
+    }
+    if (epubNavBar) {
+      epubNavBar.style.top = (bottomOffset - 60) + 'px';
+      epubNavBar.style.bottom = 'auto';
+    }
+  } else {
+    // 닫을 때 스타일 초기화 (다른 모드 전환 대비)
+    menu.style.top = '';
+    if (pdfNavBar) { pdfNavBar.style.top = ''; pdfNavBar.style.bottom = ''; }
+    if (epubNavBar) { epubNavBar.style.top = ''; epubNavBar.style.bottom = ''; }
+    if (floatingCloseBtn) { floatingCloseBtn.style.top = ''; }
   }
+
+  menu.style.display = isOpening ? 'flex' : 'none';
+  if (pdfNavBar) pdfNavBar.style.display = isOpening ? 'flex' : 'none';
+  if (epubNavBar) epubNavBar.style.display = isOpening ? 'flex' : 'none';
+  if (floatingCloseBtn) floatingCloseBtn.style.display = isOpening ? 'flex' : 'none';
 
   // ── iOS Safari 스크롤 락 패턴 (조건부) ────────────────────────────────────
   // TXT/EPUB 스크롤 모드에서 실제 스크롤은 body가 아닌 내부 컨테이너

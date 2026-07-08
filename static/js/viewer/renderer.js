@@ -11,6 +11,8 @@ let comicLoadingTimer = null;
 let observer = null;
 let isScrollingToTarget = false;
 let scrollProgressHandler = null;
+let scrollTouchEndHandler = null;
+let scrollEndCheckTimer = null;
 let scrollPreloadTriggered = false;
 let scrollNextEpisodeTriggered = false;
 let imageWorker = null;
@@ -115,6 +117,29 @@ export async function initRenderer(bookId, pagesRead, totalPages) {
   Settings.initScrollWidth(); // 저장된 스크롤 너비 복원
   applyComicFitMode();
   loadComicPage();
+}
+
+function triggerScrollModeNextEpisodeIfNeeded(wrapper) {
+  if (scrollNextEpisodeTriggered || !state.activeBookId || comicTotalPages <= 0) return;
+
+  const maxScrollTop = Math.max(1, wrapper.scrollHeight - wrapper.clientHeight);
+  const scrollRatio = wrapper.scrollTop / maxScrollTop;
+  const isAtAbsoluteEnd = wrapper.scrollTop + wrapper.clientHeight >= wrapper.scrollHeight - 16;
+  const isNearEndByScroll = scrollRatio >= 0.995;
+  if (!isAtAbsoluteEnd && !isNearEndByScroll) return;
+
+  scrollNextEpisodeTriggered = true;
+  import('../viewer_next_episode.js').then(m => m.handleNextEpisode(state.activeBookId));
+}
+
+function scheduleScrollModeNextEpisodeCheck(wrapper) {
+  if (scrollEndCheckTimer) {
+    clearTimeout(scrollEndCheckTimer);
+  }
+  scrollEndCheckTimer = setTimeout(() => {
+    scrollEndCheckTimer = null;
+    triggerScrollModeNextEpisodeIfNeeded(wrapper);
+  }, 140);
 }
 
 // Accessors for module state to allow safe updates from other modules
@@ -282,6 +307,15 @@ export function loadComicPage() {
       img.src = url;
     };
 
+    const preloadScrollImagesAround = (baseIndex, leadCount = 5) => {
+      for (let offset = 1; offset <= leadCount; offset++) {
+        const nextImg = imgElements[baseIndex + offset];
+        if (nextImg) {
+          loadScrollImage(nextImg);
+        }
+      }
+    };
+
     for (let i = 0; i < comicTotalPages; i++) {
       const img = document.createElement('img');
       img.className = 'comic-scroll-img';
@@ -331,6 +365,7 @@ export function loadComicPage() {
           updatePageInfo();
           saveProgress(state.activeBookId, comicCurrentPage, comicTotalPages);
         }
+        preloadScrollImagesAround(pageIdx, 5);
       }
     }, observerOptions);
 
@@ -352,26 +387,30 @@ export function loadComicPage() {
     };
 
     const nextEpisodeHandler = () => {
-      if (scrollNextEpisodeTriggered || !state.activeBookId || comicTotalPages <= 0) return;
+      triggerScrollModeNextEpisodeIfNeeded(wrapper);
+    };
 
-      const maxScrollTop = Math.max(1, wrapper.scrollHeight - wrapper.clientHeight);
-      const scrollRatio = wrapper.scrollTop / maxScrollTop;
-      const isAtAbsoluteEnd = wrapper.scrollTop + wrapper.clientHeight >= wrapper.scrollHeight - 16;
-      const isNearEndByScroll = scrollRatio >= 0.995;
-      const isNearLastPage = comicCurrentPage >= Math.max(0, comicTotalPages - 2);
-      if ((!isAtAbsoluteEnd && !isNearEndByScroll) || !isNearLastPage) return;
-
-      scrollNextEpisodeTriggered = true;
-      import('../viewer_next_episode.js').then(m => m.handleNextEpisode(state.activeBookId));
+    const touchEndHandler = () => {
+      triggerScrollModeNextEpisodeIfNeeded(wrapper);
+      scheduleScrollModeNextEpisodeCheck(wrapper);
     };
 
     const combinedScrollHandler = () => {
       progressHandler();
       nextEpisodeHandler();
+      scheduleScrollModeNextEpisodeCheck(wrapper);
     };
 
     scrollProgressHandler = combinedScrollHandler;
     wrapper.addEventListener('scroll', scrollProgressHandler, { passive: true });
+
+    if (scrollTouchEndHandler) {
+      wrapper.removeEventListener('touchend', scrollTouchEndHandler);
+      wrapper.removeEventListener('touchcancel', scrollTouchEndHandler);
+    }
+    scrollTouchEndHandler = touchEndHandler;
+    wrapper.addEventListener('touchend', scrollTouchEndHandler, { passive: true });
+    wrapper.addEventListener('touchcancel', scrollTouchEndHandler, { passive: true });
 
     isScrollingToTarget = true;
     setTimeout(() => {
@@ -379,6 +418,7 @@ export function loadComicPage() {
       if (targetImg) {
         loadScrollImage(targetImg);
         targetImg.scrollIntoView({ block: 'start' });
+        preloadScrollImagesAround(comicCurrentPage, 5);
       }
       setTimeout(() => {
         isScrollingToTarget = false;
@@ -524,7 +564,16 @@ export function clearComicViewer() {
       wrapper.removeEventListener('scroll', scrollProgressHandler);
       scrollProgressHandler = null;
     }
+    if (scrollTouchEndHandler) {
+      wrapper.removeEventListener('touchend', scrollTouchEndHandler);
+      wrapper.removeEventListener('touchcancel', scrollTouchEndHandler);
+      scrollTouchEndHandler = null;
+    }
     wrapper.innerHTML = '';
+  }
+  if (scrollEndCheckTimer) {
+    clearTimeout(scrollEndCheckTimer);
+    scrollEndCheckTimer = null;
   }
   scrollPreloadTriggered = false;
   scrollNextEpisodeTriggered = false;

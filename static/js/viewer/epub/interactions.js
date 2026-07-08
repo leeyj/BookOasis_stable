@@ -45,10 +45,12 @@ export function bindRenderAreaClick({ renderArea, getScrollMode, goBackward, goF
         toggleOverlay();
       }
       return;
+    } else {
+      // In scroll mode, allow center tap to toggle overlay
+      if (zone === 'center' && !isInteractiveTarget(e.target) && typeof toggleOverlay === 'function') {
+        toggleOverlay();
+      }
     }
-
-    // In scroll mode, do not hijack native click/contextmenu behavior here.
-    // Overlay toggle is already handled by viewer-body click bridge.
   };
 
   renderArea.addEventListener('pointerup', e => {
@@ -127,19 +129,26 @@ export function bindRenditionInteractionHandlers({ rendition, getScrollMode, goB
     let lastPointerHandledTs = 0;
 
     const handleContentTap = e => {
-      if (getScrollMode() !== 'page') return;
       if (typeof e.button === 'number' && e.button !== 0) return;
 
       const viewWidth = (win && win.innerWidth) ? win.innerWidth : window.innerWidth;
       const zone = resolveHotZone(e.clientX, 0, viewWidth);
+      const scrollMode = getScrollMode();
 
-      // In page mode, edge taps should always navigate even when content has links.
-      if (zone === 'left') {
-        goBackward();
-      } else if (zone === 'right') {
-        goForward();
-      } else if (!isInteractiveTarget(e.target) && typeof toggleOverlay === 'function') {
-        toggleOverlay();
+      if (scrollMode === 'page') {
+        // In page mode, edge taps should always navigate even when content has links.
+        if (zone === 'left') {
+          goBackward();
+        } else if (zone === 'right') {
+          goForward();
+        } else if (!isInteractiveTarget(e.target) && typeof toggleOverlay === 'function') {
+          toggleOverlay();
+        }
+      } else {
+        // In scroll mode, allow center tap to toggle overlay
+        if (zone === 'center' && !isInteractiveTarget(e.target) && typeof toggleOverlay === 'function') {
+          toggleOverlay();
+        }
       }
     };
 

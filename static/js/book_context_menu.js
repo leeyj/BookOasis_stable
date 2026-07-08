@@ -6,10 +6,49 @@ import { loadBooksList, loadReadingHistory } from './book_list.js';
 import { loadDashboardData } from './dashboard.js';
 
 let currentTargetBook = null;
+let contextMenuSuppressUntil = 0;
+let dismissPointerGuardUntil = 0;
+let longPressTimer = null;
+let touchStartX = 0;
+let touchStartY = 0;
+const touchMoveThreshold = 10;
+
+function clearLongPressTimer() {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+}
+
+function isBookContextMenuOpen() {
+  const bookMenu = document.getElementById('book-context-menu');
+  return !!bookMenu && bookMenu.style.display !== 'none';
+}
+
+function hideBookContextMenu({ suppressMs = 0, clearTarget = true } = {}) {
+  const bookMenu = document.getElementById('book-context-menu');
+  if (bookMenu) bookMenu.style.display = 'none';
+  if (clearTarget) currentTargetBook = null;
+  clearLongPressTimer();
+  if (suppressMs > 0) {
+    contextMenuSuppressUntil = Date.now() + suppressMs;
+    dismissPointerGuardUntil = Date.now() + suppressMs;
+  }
+}
+
+// iOS Safari: 메뉴가 보이는 동안 마지막으로 표시된 시각을 기록
+let menuLastShownAt = 0;
+
+function closeBookContextMenu() {
+  hideBookContextMenu({ suppressMs: 0, clearTarget: true });
+}
 
 export function showBookContextMenu(x, y, bookId, bookTitle, isVolumeDetail = false) {
   const bookMenu = document.getElementById('book-context-menu');
   if (!bookMenu) return;
+
+  if (Date.now() < contextMenuSuppressUntil) return;
+  menuLastShownAt = Date.now();
   
   currentTargetBook = { id: bookId, title: bookTitle, isVolumeDetail };
   
@@ -150,28 +189,95 @@ window.triggerMarkAsUnreadAction = triggerMarkAsUnreadAction;
 export { triggerSearchMetadataAction as triggerSearchAladinMetadataAction };
 
 window.showBookContextMenu = showBookContextMenu;
+window.closeBookContextMenu = closeBookContextMenu;
 
 // 도서 우클릭 메뉴 클릭 이외 시 닫기 핸들러 추가
-document.addEventListener('click', () => {
+function shouldIgnoreBookMenuDismiss(event) {
   const bookMenu = document.getElementById('book-context-menu');
-  if (bookMenu) bookMenu.style.display = 'none';
-});
+  if (!bookMenu || !event || !event.target) return false;
+  return bookMenu.contains(event.target);
+}
+
+function dismissBookMenuOutside(event, suppressMs = 350) {
+  if (shouldIgnoreBookMenuDismiss(event)) return;
+  const bookMenu = document.getElementById('book-context-menu');
+  if (bookMenu && bookMenu.style.display !== 'none') {
+    hideBookContextMenu({ suppressMs });
+  }
+}
+
+function blockUnderlyingBookCardInteraction(event) {
+  if (Date.now() < dismissPointerGuardUntil) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (typeof event.stopImmediatePropagation === 'function') {
+        event.stopImmediatePropagation();
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
+document.addEventListener('pointerdown', (event) => {
+  if (blockUnderlyingBookCardInteraction(event)) return;
+  if (event.pointerType === 'mouse' && event.button !== 0) return;
+  dismissBookMenuOutside(event, 500);
+}, true);
+
+// iOS Safari: touchstart 단계에서도 메뉴 외부 터치 시 suppress 설정
+// (touchend보다 먼저 발생하므로 롱프레스 타이머 등록 전에 suppress 가드를 세울 수 있음)
+document.addEventListener('touchstart', (event) => {
+  if (!isBookContextMenuOpen()) return;
+  if (shouldIgnoreBookMenuDismiss(event)) return;
+  // 메뉴가 열린 상태에서 외부 터치 → 즉시 suppress 시작
+  contextMenuSuppressUntil = Date.now() + 600;
+  dismissPointerGuardUntil = Date.now() + 600;
+}, { passive: true });
+
+document.addEventListener('touchend', (event) => {
+  if (blockUnderlyingBookCardInteraction(event)) return;
+  dismissBookMenuOutside(event, 600);
+  // iOS Safari: touchend 이후 지연 click 이벤트 방지
+}, { passive: false });
+
+document.addEventListener('click', (event) => {
+  if (blockUnderlyingBookCardInteraction(event)) return;
+  dismissBookMenuOutside(event, 500);
+}, true);
 
 // 모바일 터치 기기용 롱 프레스 감지 헬퍼 함수
-let longPressTimer = null;
-let touchStartX = 0;
-let touchStartY = 0;
-const touchMoveThreshold = 10;
-
 window.handleLongPressTouchStart = function(event, callback) {
   if (event.touches.length > 1) return;
+  
+  // iOS Safari: 메뉴가 열려 있거나 suppress 기간이면 롱프레스 타이머 등록 금지
+  if (isBookContextMenuOpen()) {
+    clearLongPressTimer();
+    return;
+  }
+  if (Date.now() < contextMenuSuppressUntil) {
+    clearLongPressTimer();
+    return;
+  }
+  // iOS Safari: 메뉴가 최근 표시됐던 직후에도 추가 suppress (동일 터치 이벤트 여파 방지)
+  if (Date.now() - menuLastShownAt < 700) {
+    clearLongPressTimer();
+    return;
+  }
+  
   const touch = event.touches[0];
   touchStartX = touch.clientX;
   touchStartY = touch.clientY;
   
-  if (longPressTimer) clearTimeout(longPressTimer);
+  clearLongPressTimer();
   
   longPressTimer = setTimeout(() => {
+    // 타이머 발화 시점에도 suppress 재확인 (iOS의 비동기 이벤트 딜레이 방어)
+    if (Date.now() < contextMenuSuppressUntil) {
+      longPressTimer = null;
+      return;
+    }
     if (typeof callback === 'function') {
       // 기본 터치 홀드 효과 방지 (돋보기, 텍스트 선택 등 방어)
       if (event.cancelable) {
@@ -180,11 +286,11 @@ window.handleLongPressTouchStart = function(event, callback) {
       callback(touch.clientX, touch.clientY);
     }
     longPressTimer = null;
-  }, 600); // 600ms 길게 누름 감지
+  }, 650); // 650ms 길게 누름 감지
 };
 
 window.handleLongPressTouchMove = function(event) {
-  if (!longPressTimer) return;
+  if (!longPressTimer || isBookContextMenuOpen()) return;
   const touch = event.touches[0];
   const diffX = Math.abs(touch.clientX - touchStartX);
   const diffY = Math.abs(touch.clientY - touchStartY);
@@ -195,8 +301,29 @@ window.handleLongPressTouchMove = function(event) {
 };
 
 window.handleLongPressTouchEnd = function(event) {
-  if (longPressTimer) {
-    clearTimeout(longPressTimer);
-    longPressTimer = null;
-  }
+  clearLongPressTimer();
 };
+
+const bookMenuEl = document.getElementById('book-context-menu');
+if (bookMenuEl) {
+  // iOS Safari: passive:false 로 전파 차단 가능하게 설정
+  bookMenuEl.addEventListener('touchstart', (event) => {
+    event.stopPropagation();
+  }, { passive: false });
+  bookMenuEl.addEventListener('touchend', (event) => {
+    event.stopPropagation();
+  }, { passive: false });
+  bookMenuEl.addEventListener('pointerdown', (event) => {
+    blockUnderlyingBookCardInteraction(event);
+    event.stopPropagation();
+  }, true);
+  bookMenuEl.addEventListener('click', (event) => {
+    blockUnderlyingBookCardInteraction(event);
+    event.stopPropagation();
+    const item = event.target.closest('.context-menu-item');
+    if (item) {
+      // 메뉴 항목 클릭 시 suppress를 충분히 길게 설정 (iOS 지연 이벤트 방어)
+      hideBookContextMenu({ suppressMs: 700, clearTarget: false });
+    }
+  }, true);
+}

@@ -82,11 +82,53 @@
     width: 100%;
 }
 
+/* 컨텍스트 메뉴 닫기 버튼 모바일 가독성 강화 */
+.context-menu {
+    min-width: 220px;
+    max-width: calc(100vw - 24px);
+}
+
+.context-menu-header {
+    padding: 0.35rem 0.85rem 0.55rem 0.85rem;
+}
+
+.context-menu-title {
+    font-size: 0.9rem;
+}
+
+.context-menu-close-btn {
+    height: 2rem;
+    padding: 0 0.7rem;
+    font-size: 0.82rem;
+}
+
+.context-menu-close-text {
+    display: inline;
+}
+
 /* 4. 도서 보관함 헤더 영역 */
 .library-header {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-areas:
+        "title"
+        "search"
+        "controls";
     align-items: stretch;
     gap: 1rem;
+}
+
+.library-title-wrap {
+    grid-area: title;
+}
+
+.library-search-center {
+    grid-area: search;
+}
+
+.library-controls {
+    grid-area: controls;
+    width: 100%;
 }
 
 .library-controls {
@@ -102,6 +144,64 @@
 .library-search-center .form-control {
     width: 100%;
     min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    display: block;
+    font-size: 16px;
+    line-height: 1.2;
+    padding: 0.45rem 0.7rem;
+    height: auto;
+    min-height: 2.35rem;
+}
+
+.library-search-center {
+    width: 100%;
+    display: block;
+    padding: 0;
+}
+
+.library-header .library-search-center {
+    margin: 0.25rem 0 0;
+}
+
+.library-search-center .form-control::placeholder {
+    font-size: 16px;
+}
+
+/* 메타데이터 추천/정보 섹션 모바일 정렬 */
+#meta-recommend-section {
+    box-sizing: border-box;
+    padding: 0.8rem !important;
+}
+
+#meta-recommend-section h5 {
+    word-break: keep-all;
+}
+
+#recommend-candidates-list .recommend-card {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+#recommend-candidates-list .recommend-card > div:first-child {
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+#recommend-candidates-list .recommend-card strong {
+    white-space: normal;
+    word-break: break-word;
+}
+
+#recommend-candidates-list .recommend-card .btn-apply-meta {
+    width: 100%;
+    justify-content: center;
+}
+
+#recommend-candidates-list .recommend-card p,
+#recommend-candidates-list .recommend-card div {
+    min-width: 0;
+    word-break: break-word;
 }
 
 /* 5. 카드 그리드 및 기타 패딩 미세 조정 */

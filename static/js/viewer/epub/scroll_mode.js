@@ -45,6 +45,7 @@ export async function renderScrollMode({
   contentEl.style.maxWidth = '800px';
   contentEl.style.margin = '0 auto';
   contentEl.style.padding = '40px 20px';
+  contentEl.style.boxSizing = 'border-box';
 
   applyMergedThemeStyles(contentEl, theme, fontCSS, fontSize, lineHeight, paragraphSpacing);
 

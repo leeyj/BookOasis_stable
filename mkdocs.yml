@@ -30,6 +30,8 @@ nav:
 - 개발 워크플로우: workflow.md
 - 작업 히스토리:
   - history/index.md
+  - history/20260709_020210_session_20260709_020210_walkthrough.md
+  - history/20260709_020210_session_20260709_020210_task.md
   - history/20260707_044136_session_20260707_044136_walkthrough.md
   - history/20260707_044136_session_20260707_044136_task.md
   - history/20260707_044018_session_20260707_044018_walkthrough.md
@@ -651,12 +653,18 @@ nav:
   - history/20260619_145226_init_docs_task.md
 - 버그 트러블슈팅:
   - bug/index.md
+  - bug/20260709_bugfix_viewer_scroll_mode_double_toggle.md
   - bug/20260707_bugfix_viewer_scroll_mode_click_mistrigger.md
+  - bug/20260707_bugfix_summary_newline_preservation.md
+  - bug/20260707_bugfix_scheduler_vfs_rc_url_mismatch.md
   - bug/20260707_bugfix_scanner_vfs_offline_skip_failure.md
   - bug/20260707_bugfix_scanner_early_skip_incomplete_meta.md
+  - bug/20260707_bugfix_scanner_cancel_wal_isolation.md
   - bug/20260707_bugfix_remote_scanner_metadata_skip.md
+  - bug/20260707_bugfix_overlay_scroll_position.md
   - bug/20260707_bugfix_epub_scroll_mode_spine_load_skip.md
   - bug/20260707_bugfix_epub_internal_link_navigation_500.md
+  - bug/20260707_bugfix_book_context_menu_overflow.md
   - bug/20260706_improvement_viewer_scrollbar_customization.md
   - bug/20260706_improvement_vfs_timeout_fallback.md
   - bug/20260706_improvement_trash_delete_manager.md

@@ -46,6 +46,30 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
         if (scrollWrapper.__txtScrollHandler) {
           scrollWrapper.removeEventListener('scroll', scrollWrapper.__txtScrollHandler);
         }
+        if (scrollWrapper.__txtTouchHandler) {
+          scrollWrapper.removeEventListener('touchend', scrollWrapper.__txtTouchHandler);
+          scrollWrapper.removeEventListener('touchcancel', scrollWrapper.__txtTouchHandler);
+        }
+
+        const triggerNextEpisodeIfNeeded = () => {
+          const mode = localStorage.getItem('viewer_scroll_mode') || 'page';
+          if (mode !== 'scroll') return;
+
+          const scrollHeight = scrollWrapper.scrollHeight - scrollWrapper.clientHeight;
+          if (scrollHeight <= 0) return;
+
+          const ratio = scrollWrapper.scrollTop / scrollHeight;
+          const newIdx = Math.min(txtChunks.length - 1, Math.max(0, Math.floor(ratio * txtChunks.length)));
+          const isAtAbsoluteEnd = scrollWrapper.scrollTop + scrollWrapper.clientHeight >= scrollWrapper.scrollHeight - 15;
+          if (!isAtAbsoluteEnd || isTransitioning || txtScrollNextEpisodeTriggered || newIdx < txtChunks.length - 1) return;
+
+          isTransitioning = true;
+          txtScrollNextEpisodeTriggered = true;
+          import('./viewer_next_episode.js').then(m => {
+            m.handleNextEpisode(state.activeBookId);
+            setTimeout(() => { isTransitioning = false; }, 300);
+          });
+        };
 
         // 스크롤 모드 시 이전 진척도 스크롤 위치 복구
         const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
@@ -83,18 +107,17 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
           }
 
           // 마지막 바닥 도달 시 다음 화 이동
-          const isAtAbsoluteEnd = scrollWrapper.scrollTop + scrollWrapper.clientHeight >= scrollWrapper.scrollHeight - 15;
-          if (isAtAbsoluteEnd && !isTransitioning && !txtScrollNextEpisodeTriggered) {
-            isTransitioning = true;
-            txtScrollNextEpisodeTriggered = true;
-            import('./viewer_next_episode.js').then(m => {
-              m.handleNextEpisode(state.activeBookId);
-              setTimeout(() => { isTransitioning = false; }, 300);
-            });
-          }
+          triggerNextEpisodeIfNeeded();
         };
         scrollWrapper.addEventListener('scroll', scrollHandler, { passive: true });
         scrollWrapper.__txtScrollHandler = scrollHandler;
+
+        const touchHandler = () => {
+          triggerNextEpisodeIfNeeded();
+        };
+        scrollWrapper.__txtTouchHandler = touchHandler;
+        scrollWrapper.addEventListener('touchend', touchHandler, { passive: true });
+        scrollWrapper.addEventListener('touchcancel', touchHandler, { passive: true });
       }
 
       // 윈도우 리사이즈 시 읽기 진행 위치 자동 계산 및 레이아웃 보정
@@ -454,6 +477,11 @@ export const TxtViewer = {
     if (scrollWrapper && scrollWrapper.__txtScrollHandler) {
       scrollWrapper.removeEventListener('scroll', scrollWrapper.__txtScrollHandler);
       delete scrollWrapper.__txtScrollHandler;
+    }
+    if (scrollWrapper && scrollWrapper.__txtTouchHandler) {
+      scrollWrapper.removeEventListener('touchend', scrollWrapper.__txtTouchHandler);
+      scrollWrapper.removeEventListener('touchcancel', scrollWrapper.__txtTouchHandler);
+      delete scrollWrapper.__txtTouchHandler;
     }
 
     if (activeResizeHandler) {

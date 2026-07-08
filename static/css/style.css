@@ -133,7 +133,10 @@
 /* 상단 헤더 및 컨트롤 */
 .library-header {
     display: grid;
-    grid-template-columns: auto minmax(420px, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+        "title controls"
+        "search search";
     align-items: center;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     padding-bottom: 1rem;
@@ -144,6 +147,7 @@
     display: flex;
     align-items: center;
     min-width: 0;
+    grid-area: title;
 }
 
 .library-title {
@@ -164,6 +168,7 @@
     justify-self: end;
     flex-wrap: nowrap;
     max-width: 100%;
+    grid-area: controls;
 }
 
 .library-controls .form-control,
@@ -189,6 +194,7 @@
     width: 100%;
     display: flex;
     justify-content: center;
+    grid-area: search;
 }
 
 .library-search-center .form-control {
@@ -238,6 +244,57 @@
     animation: ctxFadeIn 0.15s ease-out;
 }
 
+.context-menu-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.15rem 0.75rem 0.45rem 0.75rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    margin-bottom: 0.25rem;
+}
+
+.context-menu-title {
+    color: #cbd5e1;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.context-menu-close-btn {
+    width: auto;
+    height: 1.6rem;
+    padding: 0 0.55rem;
+    border: none;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #e2e8f0;
+    font-size: 0.78rem;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+    gap: 0.35rem;
+}
+
+.context-menu-close-icon {
+    font-size: 1rem;
+    line-height: 1;
+}
+
+.context-menu-close-text {
+    font-weight: 700;
+}
+
+.context-menu-close-btn:hover {
+    background: rgba(239, 68, 68, 0.2);
+    color: #fff;
+    transform: scale(1.04);
+}
+
 @keyframes ctxFadeIn {
     from { opacity: 0; transform: scale(0.95); }
     to { opacity: 1; transform: scale(1); }
@@ -272,6 +329,22 @@
 
 .context-menu-item:hover i {
     color: #c084fc;
+}
+
+.context-menu-close-item {
+    margin-top: 0.25rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    color: #f8fafc;
+    font-weight: 700;
+}
+
+.context-menu-close-item:hover {
+    background: rgba(248, 113, 113, 0.16);
+    color: #fff;
+}
+
+.context-menu-close-item i {
+    color: #f87171;
 }
 
 /* 모달 스타일 */

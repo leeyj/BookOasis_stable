@@ -4,6 +4,7 @@ import { closeMediaViewer } from './viewer.js';
 
 let nextEpisodeBusy = false;
 let nextEpisodeModalOpen = false;
+let noNextEpisodeAlertTimer = null;
 
 /**
  * 다음 편 조회를 요청하고 설정된 액션 옵션에 따라 처리합니다.
@@ -15,6 +16,10 @@ export function handleNextEpisode(currentBookId) {
   }
 
   nextEpisodeBusy = true;
+  if (noNextEpisodeAlertTimer) {
+    clearTimeout(noNextEpisodeAlertTimer);
+    noNextEpisodeAlertTimer = null;
+  }
   const url = `/api/media/next-book?type=${state.currentLibraryType}&book_id=${currentBookId}`;
 
   fetch(url)
@@ -27,6 +32,10 @@ export function handleNextEpisode(currentBookId) {
     .then(data => {
       if (data.success && data.next_book) {
         const nextBook = data.next_book;
+        if (noNextEpisodeAlertTimer) {
+          clearTimeout(noNextEpisodeAlertTimer);
+          noNextEpisodeAlertTimer = null;
+        }
         const action = localStorage.getItem('viewer_next_episode_action') || 'direct';
 
         if (action === 'direct') {
@@ -37,13 +46,19 @@ export function handleNextEpisode(currentBookId) {
           return null;
         }
       } else {
-        alert(i18n.t('viewer.last_page_episode'));
+        noNextEpisodeAlertTimer = setTimeout(() => {
+          noNextEpisodeAlertTimer = null;
+          alert(i18n.t('viewer.last_page_episode'));
+        }, 350);
         return null;
       }
     })
     .catch(err => {
       console.error('[Viewer-Next] Failed to fetch next book details:', err);
-      alert(i18n.t('viewer.last_page'));
+      noNextEpisodeAlertTimer = setTimeout(() => {
+        noNextEpisodeAlertTimer = null;
+        alert(i18n.t('viewer.last_page'));
+      }, 350);
     })
     .finally(() => {
       // For prompt mode, lock is released on confirm/cancel handlers.
@@ -76,6 +91,10 @@ function triggerOpenNextBook(nextBook) {
     })
     .catch(err => {
       console.error('[Viewer-Next] Failed to open next book:', err);
+      if (noNextEpisodeAlertTimer) {
+        clearTimeout(noNextEpisodeAlertTimer);
+        noNextEpisodeAlertTimer = null;
+      }
     })
     .finally(() => {
       nextEpisodeBusy = false;

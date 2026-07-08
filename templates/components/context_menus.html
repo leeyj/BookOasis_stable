@@ -13,9 +13,14 @@
 
 <!-- 개별 도서 우클릭 커스텀 컨텍스트 메뉴 -->
 <div id="book-context-menu" class="context-menu" style="display: none;">
+    <div class="context-menu-header">
+        <span class="context-menu-title">도서 메뉴</span>
+        <button type="button" class="context-menu-close-btn" onclick="event.stopPropagation(); if (window.closeBookContextMenu) window.closeBookContextMenu();" aria-label="닫기"><span class="context-menu-close-icon">&times;</span><span class="context-menu-close-text">닫기</span></button>
+    </div>
     <ul class="context-menu-list">
         <li class="context-menu-item" id="ctx-scan-book" onclick="triggerScanSingleBook()"><i class="fa-solid fa-barcode" style="color: #a855f7;"></i> <span data-i18n="context_menu.scan_book_now">이 책 즉시 스캔 (표지/메타)</span></li>
         <li class="context-menu-item" id="ctx-search-meta-book" onclick="triggerSearchAladinMetadata()"><i class="fa-solid fa-magnifying-glass" style="color: #3b82f6;"></i> <span data-i18n="context_menu.search_metadata">메타정보 검색</span></li>
         <li class="context-menu-item" id="ctx-unread-book" onclick="triggerMarkAsUnread()"><i class="fa-solid fa-eye-slash" style="color: #ef4444;"></i> <span data-i18n="context_menu.mark_as_unread">읽지 않은 상태로 변경 (0%)</span></li>
+        <li class="context-menu-item context-menu-close-item" onclick="if (window.closeBookContextMenu) window.closeBookContextMenu();"><i class="fa-solid fa-xmark" style="color: #f87171;"></i> <span>닫기</span></li>
     </ul>
 </div>

@@ -34,7 +34,10 @@ export function applyRenditionTheme(rendition, theme, fontCSS, fontSize, lineHei
       color: theme.text,
       'font-family': fontCSS,
       'font-size': `${fontSize}rem`,
-      'line-height': lineHeight
+      'line-height': lineHeight,
+      'margin': '0 !important',
+      'padding': '0 !important',
+      'box-sizing': 'border-box'
     },
     'p, span, div, a, li': {
       'font-family': `${fontCSS} !important`,

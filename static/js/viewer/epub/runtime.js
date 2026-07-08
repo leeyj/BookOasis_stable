@@ -31,6 +31,8 @@ let currentLocationHref = null;
 let currentLocationIndex = null;
 let renditionAtEnd = false;
 let isScrollListenerBound = false;
+let epubScrollHandler = null;
+let epubScrollTouchHandler = null;
 let epubScrollNextEpisodeTriggered = false;
 let activeCoverFallbackUrl = '/static/images/default_cover.jpg';
 
@@ -170,17 +172,28 @@ function bindContainerScroll() {
   const container = document.getElementById('epub-viewer-container');
   if (!container) return;
 
-  container.addEventListener('scroll', () => {
+  const triggerNextEpisodeIfNeeded = () => {
     if (getScrollMode() !== 'scroll') return;
-    const ratio = getCurrentRatioFromScroll(container);
-    updateProgressPercent(ratio * 100);
-
     const isAtEnd = container.scrollTop + container.clientHeight >= container.scrollHeight - 12;
     if (isAtEnd && !epubScrollNextEpisodeTriggered) {
       epubScrollNextEpisodeTriggered = true;
       import('../../viewer_next_episode.js').then(m => m.handleNextEpisode(state.activeBookId));
     }
-  }, { passive: true });
+  };
+
+  epubScrollHandler = () => {
+    if (getScrollMode() !== 'scroll') return;
+    const ratio = getCurrentRatioFromScroll(container);
+    updateProgressPercent(ratio * 100);
+    triggerNextEpisodeIfNeeded();
+  };
+  container.addEventListener('scroll', epubScrollHandler, { passive: true });
+
+  epubScrollTouchHandler = () => {
+    triggerNextEpisodeIfNeeded();
+  };
+  container.addEventListener('touchend', epubScrollTouchHandler, { passive: true });
+  container.addEventListener('touchcancel', epubScrollTouchHandler, { passive: true });
 
   isScrollListenerBound = true;
 }
@@ -454,6 +467,17 @@ export function clearEpubViewer() {
   settings.unbindViewportListeners();
 
   destroyRendition().finally(() => {
+    const container = document.getElementById('epub-viewer-container');
+    if (container) {
+      if (epubScrollHandler) {
+        container.removeEventListener('scroll', epubScrollHandler);
+      }
+      if (epubScrollTouchHandler) {
+        container.removeEventListener('touchend', epubScrollTouchHandler);
+        container.removeEventListener('touchcancel', epubScrollTouchHandler);
+      }
+    }
+
     if (epubBook) {
       epubBook.destroy();
       epubBook = null;
@@ -466,6 +490,9 @@ export function clearEpubViewer() {
     renditionAtEnd = false;
     currentScrollPercent = 0;
     epubScrollNextEpisodeTriggered = false;
+    epubScrollHandler = null;
+    epubScrollTouchHandler = null;
+    isScrollListenerBound = false;
     navigation.resetNavigationState();
   });
 }
