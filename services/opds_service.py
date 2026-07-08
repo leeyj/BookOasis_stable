@@ -7,6 +7,9 @@ from urllib.parse import quote
 import database
 
 
+EMPTY_SERIES_TOKEN = '__empty_series__'
+
+
 def _guess_mime_type(file_path: str) -> str:
     if not file_path:
         return 'application/octet-stream'
@@ -25,7 +28,7 @@ def _guess_mime_type(file_path: str) -> str:
 
 
 def _encode_url_segment(value: str) -> str:
-    return quote(str(value), safe='/')
+    return quote(str(value), safe='')
 
 
 def _extract_title_from_path(file_path: str) -> str:
@@ -74,7 +77,7 @@ def get_series_entries(db_type: str, lib_id: int, prefix: str, urn_prefix: str):
             'id': f"urn:{urn_prefix}:series:{lib_id}:{i}",
             'title': s['series_name'] or '기타',
             'type': 'navigation',
-            'href': f"{prefix}/{lib_id}/{_encode_url_segment(s['series_name'] or '기타')}",
+            'href': f"{prefix}/{lib_id}/{_encode_url_segment(s['series_name'] if s['series_name'] else EMPTY_SERIES_TOKEN)}",
             'cover': s['cover_image'],
         }
         for i, s in enumerate(rows)

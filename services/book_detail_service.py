@@ -6,7 +6,7 @@ from utils.cover_helper import get_cover_image_with_t, resolve_series_cover
 
 class BookDetailService:
     @staticmethod
-    def get_media_detail(db_type, series_name, library_id='all', user_id=1):
+    def get_media_detail(db_type, series_name, library_id='all', user_id=1, restrict_same_directory=True):
         conn = database.get_connection(db_type)
         conn.row_factory = database.sqlite3.Row
         cursor = conn.cursor()
@@ -144,8 +144,8 @@ class BookDetailService:
                 'last_read_at': b['last_read_at'] or '',
             })
         
-        # 부모 디렉토리 기반 단행본 격리 필터
-        if books_list:
+        # 부모 디렉토리 기반 단행본 격리 필터 (필요 시 비활성화 가능)
+        if restrict_same_directory and books_list:
             first_file_path = books_list[0]['file_path']
             if first_file_path:
                 target_dir = os.path.dirname(first_file_path)

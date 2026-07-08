@@ -18,13 +18,16 @@ import hashlib
 import html
 import mimetypes
 import os
+import re
 import time
+import urllib.parse
 from datetime import datetime
 
-from flask import Blueprint, Response, jsonify, request, send_file
+from flask import Blueprint, Response, jsonify, redirect, request, send_file, session
 import database
 from api.cache import LRUCache
 from services.opds_service import (
+    EMPTY_SERIES_TOKEN,
     get_book_entries,
     get_library_list,
     get_recently_added_entries,
@@ -32,6 +35,11 @@ from services.opds_service import (
     get_series_entries,
     search_books_entries,
 )
+from services.book_detail_service import BookDetailService
+from services.book_info_service import BookInfoService
+from services.category_service import CategoryService
+from services.series_service import SeriesService
+from services.stream_service import StreamService
 from utils.i18n import _t
 from werkzeug.security import check_password_hash
 
@@ -55,6 +63,11 @@ def _check_auth_cached(is_adult: bool = False) -> bool:
     """
     auth = request.authorization
     if not auth or not auth.username or not auth.password:
+        # Browser-based compat clients may rely on existing web session auth instead of Basic Auth.
+        if session.get('user_id'):
+            if is_adult and session.get('role') != 'admin':
+                return False
+            return True
         return False
 
     key = hashlib.sha256(f"{auth.username}:{auth.password}".encode()).hexdigest()
@@ -121,6 +134,7 @@ APP_OPDS_CACHE_TTL = 60
 APP_OPDS_DEFAULT_PAGE_SIZE = 100
 APP_OPDS_MAX_PAGE_SIZE = 200
 app_opds_response_cache = LRUCache(capacity=50)
+APP_OPDS_SUPPORTED_FORMATS = {'zip', 'cbz'}
 
 
 def _get_cached_response(key: str):
@@ -218,6 +232,95 @@ def _atom_response(xml: str):
     return Response(xml, mimetype='application/atom+xml; charset=utf-8')
 
 
+def _parse_paging_args(default_limit: int = 30):
+    try:
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', default_limit))
+    except ValueError:
+        page, limit = 1, default_limit
+    return max(page, 1), max(limit, 1)
+
+def _redirect_cover_compat(filename: str):
+    encoded_filename = urllib.parse.quote(filename, safe='/')
+    target_path = f"/covers/{encoded_filename}"
+    query = request.query_string.decode('utf-8')
+    if query:
+        target_path = f"{target_path}?{query}"
+    return redirect(target_path, code=307)
+
+
+def _require_app_opds_auth(db_type: str = None):
+    is_adult_prefix = request.path.startswith('/app-opds-adult/')
+    if not _check_auth_cached(is_adult=is_adult_prefix):
+        return _unauthorized()
+    if db_type and str(db_type).strip().lower() == 'adult' and not _check_auth_cached(is_adult=True):
+        return _unauthorized()
+    return None
+
+
+def _enrich_books_for_app_opds(books_list, db_type: str, is_adult_prefix: bool):
+    prefix = '/app-opds-adult' if is_adult_prefix else '/app-opds'
+    enriched = []
+    for b in books_list or []:
+        item = dict(b)
+        fmt = (item.get('file_format') or '').lower()
+        item['file_format'] = fmt
+        item['format'] = fmt
+
+        book_id = item.get('id')
+        if fmt in ('zip', 'cbz', 'imgdir'):
+            item['read_url'] = f"{prefix}/api/media/stream?db_type={db_type}&book_id={book_id}&page_idx=0"
+            item['reader_type'] = 'comic'
+        elif fmt == 'txt':
+            item['read_url'] = f"{prefix}/api/media/txt?db_type={db_type}&book_id={book_id}"
+            item['reader_type'] = 'txt'
+        elif fmt in ('epub', 'pdf'):
+            item['read_url'] = f"{prefix}/api/media/pdf?db_type={db_type}&book_id={book_id}"
+            item['reader_type'] = fmt
+        else:
+            item['read_url'] = ''
+            item['reader_type'] = fmt or 'unknown'
+
+        enriched.append(item)
+    return enriched
+
+
+def _get_supported_series_names(db_type: str, series_names):
+    clean_names = [s for s in (series_names or []) if s]
+    if not clean_names:
+        return set()
+
+    conn = database.get_connection(db_type)
+    try:
+        cursor = conn.cursor()
+        placeholders = ','.join(['?'] * len(clean_names))
+        query = f"""
+            SELECT DISTINCT series_name
+            FROM books
+            WHERE COALESCE(is_deleted, 0) = 0
+              AND lower(COALESCE(file_format, '')) IN ('zip', 'cbz')
+              AND series_name IN ({placeholders})
+        """
+        cursor.execute(query, tuple(clean_names))
+        return {row['series_name'] for row in cursor.fetchall()}
+    finally:
+        conn.close()
+
+
+def _filter_supported_series_for_app_opds(db_type: str, series_list):
+    names = [s.get('series_name', '') for s in (series_list or []) if isinstance(s, dict)]
+    allowed_names = _get_supported_series_names(db_type, names)
+    return [s for s in (series_list or []) if s.get('series_name', '') in allowed_names]
+
+
+def _filter_supported_books_for_app_opds(books_list):
+    filtered = []
+    for b in books_list or []:
+        fmt = str((b or {}).get('file_format') or '').lower()
+        if fmt in APP_OPDS_SUPPORTED_FORMATS:
+            filtered.append(b)
+    return filtered
+
 # ─── 라우터 ──────────────────────────────────────────────────
 
 @app_opds_bp.route('/app-opds', methods=['GET'])
@@ -248,6 +351,359 @@ def app_opds_root():
     return _atom_response(xml)
 
 
+@app_opds_bp.route('/app-opds/api/media/list', methods=['GET'])
+@app_opds_bp.route('/app-opds/api/media/all-list', methods=['GET'])
+def app_opds_media_api_compat():
+    if not _check_auth_cached(is_adult=False):
+        return _unauthorized()
+
+    db_type = request.args.get('type', 'general')
+    library_id = request.args.get('library_id', 'all')
+    search_query = request.args.get('search', '').strip()
+    sort = request.args.get('sort', 'asc').strip().lower()
+
+    try:
+        if request.path.endswith('/all-list'):
+            series_list = SeriesService.get_all_books_list(db_type, library_id)
+            series_list = _filter_supported_series_for_app_opds(db_type, series_list)
+            return jsonify({'success': True, 'series': series_list})
+
+        page, limit = _parse_paging_args(default_limit=30)
+        series_list = SeriesService.get_books_list(db_type, library_id, page, limit, search_query, sort)
+        series_list = _filter_supported_series_for_app_opds(db_type, series_list)
+        has_more = len(series_list) > limit
+        if has_more:
+            series_list = series_list[:limit]
+        return jsonify({'success': True, 'series': series_list, 'has_more': has_more})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app_opds_bp.route('/app-opds/api/media/libraries', methods=['GET'])
+def app_opds_media_libraries_compat():
+    if not _check_auth_cached(is_adult=False):
+        return _unauthorized()
+
+    db_type = request.args.get('type', 'general')
+    if db_type == 'adult' and not _check_auth_cached(is_adult=True):
+        return _unauthorized()
+
+    try:
+        libraries = CategoryService.get_libraries(db_type, user_id=None, role='admin')
+        return jsonify({'success': True, 'libraries': libraries})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app_opds_bp.route('/app-opds/api/media/detail', methods=['GET'])
+def app_opds_media_detail_compat():
+    if not _check_auth_cached(is_adult=False):
+        return _unauthorized()
+
+    db_type = request.args.get('type', 'general')
+    if db_type == 'adult' and not _check_auth_cached(is_adult=True):
+        return _unauthorized()
+
+    series_name = request.args.get('series', '')
+    library_id = request.args.get('library_id', 'all')
+
+    try:
+        meta, books_list = BookDetailService.get_media_detail(
+            db_type,
+            series_name,
+            library_id,
+            user_id=1,
+            restrict_same_directory=False,
+        )
+        books_list = _filter_supported_books_for_app_opds(books_list)
+        books_list = _enrich_books_for_app_opds(books_list, db_type, is_adult_prefix=False)
+        return jsonify({'success': True, 'meta': meta, 'books': books_list})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app_opds_bp.route('/app-opds/api/media/books/<int:book_id>/info', methods=['GET'])
+def app_opds_book_info_compat(book_id: int):
+    if not _check_auth_cached(is_adult=False):
+        return _unauthorized()
+
+    db_type = request.args.get('type', 'general')
+    if db_type == 'adult' and not _check_auth_cached(is_adult=True):
+        return _unauthorized()
+
+    try:
+        info = BookInfoService.get_viewer_info(db_type, book_id)
+        if info is None:
+            return jsonify({'success': False, 'error': 'Book not found'}), 404
+        return jsonify({
+            'success': True,
+            'total_pages': info.get('total_pages', 0),
+            'cover_image': info.get('cover_image')
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app_opds_bp.route('/app-opds/api/media/stream', methods=['GET'])
+@app_opds_bp.route('/app-opds-adult/api/media/stream', methods=['GET'])
+def app_opds_stream_compat():
+    default_db_type = 'adult' if request.path.startswith('/app-opds-adult/') else 'general'
+    db_type = request.args.get('db_type', default_db_type)
+    auth_error = _require_app_opds_auth(db_type)
+    if auth_error:
+        return auth_error
+
+    book_id = request.args.get('book_id')
+    try:
+        page_idx = int(request.args.get('page_idx', 0))
+    except (ValueError, TypeError):
+        page_idx = 0
+    user_id = 1
+
+    if not book_id:
+        return jsonify({'error': _t('api.err_book_id_required')}), 400
+    try:
+        book_id = int(book_id)
+    except (ValueError, TypeError):
+        return jsonify({'error': _t('api.err_book_id_required')}), 400
+
+    file_path, file_format = StreamService.get_book_file_info(db_type, book_id)
+    if not file_path:
+        return jsonify({'error': _t('api.err_book_not_found')}), 404
+
+    result = StreamService.extract_page(file_path, page_idx, db_type=db_type, book_id=book_id)
+    if result is None:
+        return jsonify({'error': _t('api.err_extract_page')}), 400
+
+    img_data, mime_type = result
+    try:
+        total_pages = StreamService.get_total_pages_for_book(
+            db_type,
+            book_id,
+            file_path=file_path,
+            file_format=file_format
+        )
+        if total_pages > 0:
+            StreamService.record_progress(db_type, book_id, page_idx, total_pages, user_id=user_id)
+    except Exception as e:
+        print(f"[App-OPDS Progress Recorder] Fail: {e}")
+
+    res = Response(img_data, mimetype=mime_type)
+    res.headers['Cache-Control'] = 'public, max-age=31536000'
+    return res
+
+
+@app_opds_bp.route('/app-opds/api/media/txt', methods=['GET'])
+@app_opds_bp.route('/app-opds-adult/api/media/txt', methods=['GET'])
+def app_opds_txt_compat():
+    default_db_type = 'adult' if request.path.startswith('/app-opds-adult/') else 'general'
+    db_type = request.args.get('db_type', default_db_type)
+    auth_error = _require_app_opds_auth(db_type)
+    if auth_error:
+        return auth_error
+
+    book_id = request.args.get('book_id')
+    if not book_id:
+        return jsonify({'error': _t('api.err_book_id_required')}), 400
+
+    file_path = StreamService.get_file_path(db_type, book_id)
+    if not file_path:
+        return jsonify({'error': _t('api.err_book_not_found')}), 404
+
+    content, error = StreamService.get_txt_content(file_path)
+    if error:
+        return jsonify({'error': error}), 404 if error == 'File not found' else 500
+    return Response(content, mimetype='text/plain; charset=utf-8')
+
+
+@app_opds_bp.route('/app-opds/api/media/pdf', methods=['GET'])
+@app_opds_bp.route('/app-opds-adult/api/media/pdf', methods=['GET'])
+def app_opds_pdf_compat():
+    default_db_type = 'adult' if request.path.startswith('/app-opds-adult/') else 'general'
+    db_type = request.args.get('db_type', default_db_type)
+    auth_error = _require_app_opds_auth(db_type)
+    if auth_error:
+        return auth_error
+
+    book_id = request.args.get('book_id')
+    if not book_id:
+        return jsonify({'error': _t('api.err_book_id_required')}), 400
+
+    file_path = StreamService.get_file_path(db_type, book_id)
+    if not file_path:
+        return jsonify({'error': _t('api.err_book_not_found')}), 404
+    if not os.path.exists(file_path):
+        return jsonify({'error': _t('api.err_file_not_found')}), 404
+
+    _, ext = os.path.splitext(file_path)
+    ext = ext.lower()
+    if ext == '.epub':
+        mime = 'application/epub+zip'
+    elif ext == '.pdf':
+        mime = 'application/pdf'
+    elif ext == '.txt':
+        mime = 'text/plain'
+    else:
+        mime, _ = mimetypes.guess_type(file_path)
+        mime = mime or 'application/octet-stream'
+
+    range_header = request.headers.get('Range')
+    if not range_header:
+        return send_file(file_path, mimetype=mime)
+
+    size = os.path.getsize(file_path)
+    byte1, byte2 = 0, None
+    m = re.search(r'bytes=(\d+)-(\d*)', range_header)
+    if m:
+        byte1 = int(m.group(1))
+        if m.group(2):
+            byte2 = int(m.group(2))
+    if byte2 is None:
+        byte2 = size - 1
+    length = byte2 - byte1 + 1
+
+    try:
+        with open(file_path, 'rb') as f:
+            f.seek(byte1)
+            data = f.read(length)
+        rv = Response(data, 206, mimetype=mime, direct_passthrough=True)
+        rv.headers['Content-Range'] = f'bytes {byte1}-{byte2}/{size}'
+        rv.headers['Accept-Ranges'] = 'bytes'
+        rv.headers['Content-Length'] = str(length)
+        return rv
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app_opds_bp.route('/app-opds/api/media/progress-state', methods=['GET'])
+@app_opds_bp.route('/app-opds-adult/api/media/progress-state', methods=['GET'])
+def app_opds_progress_state_compat():
+    default_db_type = 'adult' if request.path.startswith('/app-opds-adult/') else 'general'
+    db_type = request.args.get('db_type', default_db_type)
+    auth_error = _require_app_opds_auth(db_type)
+    if auth_error:
+        return auth_error
+
+    book_id = request.args.get('book_id')
+    if not book_id:
+        return jsonify({'success': False, 'error': _t('api.err_book_id_required')}), 400
+
+    try:
+        state = StreamService.get_progress_state(db_type, book_id, user_id=1)
+        if not state:
+            return jsonify({'success': False, 'error': 'book not found'}), 404
+        return jsonify({'success': True, 'state': state})
+    except Exception as e:
+        print(f"[App-OPDS Progress State API Error] {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app_opds_bp.route('/app-opds/api/media/progress', methods=['POST'])
+@app_opds_bp.route('/app-opds-adult/api/media/progress', methods=['POST'])
+def app_opds_progress_compat():
+    data = request.json or {}
+    default_db_type = 'adult' if request.path.startswith('/app-opds-adult/') else 'general'
+    db_type = data.get('db_type', default_db_type)
+    auth_error = _require_app_opds_auth(db_type)
+    if auth_error:
+        return auth_error
+
+    try:
+        book_id = data.get('book_id')
+        page_idx = data.get('page_idx')
+        total_pages = data.get('total_pages')
+        epub_session = data.get('epub_session') or None
+
+        if book_id is None or page_idx is None:
+            return jsonify({'success': False, 'error': _t('api.err_book_id_page_idx_required')}), 400
+
+        if total_pages is None:
+            total_pages = 1
+
+        StreamService.record_progress(
+            db_type,
+            book_id,
+            page_idx,
+            total_pages,
+            user_id=1,
+            epub_session=epub_session
+        )
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"[App-OPDS Progress API Error] {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app_opds_bp.route('/app-opds/api/media/unread', methods=['POST'])
+@app_opds_bp.route('/app-opds-adult/api/media/unread', methods=['POST'])
+def app_opds_unread_compat():
+    data = request.json or {}
+    default_db_type = 'adult' if request.path.startswith('/app-opds-adult/') else 'general'
+    db_type = data.get('db_type', default_db_type)
+    auth_error = _require_app_opds_auth(db_type)
+    if auth_error:
+        return auth_error
+
+    try:
+        book_id = data.get('book_id')
+        if book_id is None:
+            return jsonify({'success': False, 'error': 'book_id가 누락되었습니다.'}), 400
+
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM user_progress WHERE book_id = ? AND user_id = ?", (book_id, 1))
+        cursor.execute("DELETE FROM user_reading_log WHERE book_id = ? AND user_id = ?", (book_id, 1))
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"[App-OPDS Unread API Error] {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app_opds_bp.route('/app-opds/api/media/preload-next-book', methods=['POST'])
+@app_opds_bp.route('/app-opds-adult/api/media/preload-next-book', methods=['POST'])
+def app_opds_preload_next_book_compat():
+    data = request.json or {}
+    default_db_type = 'adult' if request.path.startswith('/app-opds-adult/') else 'general'
+    db_type = data.get('db_type', default_db_type)
+    auth_error = _require_app_opds_auth(db_type)
+    if auth_error:
+        return auth_error
+
+    try:
+        book_id = data.get('book_id')
+        if not book_id:
+            return jsonify({'success': False, 'error': _t('api.err_book_id_required')}), 400
+
+        from services.book_service import BookService
+        from utils.cache_helper import start_background_copy
+
+        next_book = BookService.get_next_book(db_type, book_id, user_id=1)
+        if not next_book or not next_book.get('file_path'):
+            return jsonify({'success': True, 'message': _t('api.msg_no_next_book')})
+
+        next_file_path = next_book['file_path']
+        if os.path.exists(next_file_path):
+            start_background_copy(next_file_path)
+            print(f"[App-OPDS Viewer-Preload] Preloading next book successfully: {next_book['title']}")
+            return jsonify({'success': True, 'preloaded_book_id': next_book['id']})
+        return jsonify({'success': False, 'error': _t('api.err_next_book_not_exist')}), 404
+    except Exception as e:
+        print(f"[App-OPDS Preload API Error] {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app_opds_bp.route('/app-opds/login', methods=['POST', 'GET'])
+def app_opds_login_compat():
+    if not _check_auth_cached(is_adult=False):
+        return _unauthorized()
+    return jsonify({'success': True})
+
+@app_opds_bp.route('/app-opds/covers/<path:filename>', methods=['GET'])
+def app_opds_cover_compat(filename: str):
+    return _redirect_cover_compat(filename)
+
 @app_opds_bp.route('/app-opds-adult', methods=['GET'])
 def app_opds_adult_root():
     """타치요미용 성인 전용 OPDS 최상위 피드"""
@@ -275,6 +731,100 @@ def app_opds_adult_root():
     _set_cached_response(cache_key, xml)
     return _atom_response(xml)
 
+
+@app_opds_bp.route('/app-opds-adult/api/media/list', methods=['GET'])
+@app_opds_bp.route('/app-opds-adult/api/media/all-list', methods=['GET'])
+def app_opds_adult_media_api_compat():
+    if not _check_auth_cached(is_adult=True):
+        return _unauthorized()
+
+    db_type = request.args.get('type', 'adult')
+    library_id = request.args.get('library_id', 'all')
+    search_query = request.args.get('search', '').strip()
+    sort = request.args.get('sort', 'asc').strip().lower()
+
+    try:
+        if request.path.endswith('/all-list'):
+            series_list = SeriesService.get_all_books_list(db_type, library_id)
+            series_list = _filter_supported_series_for_app_opds(db_type, series_list)
+            return jsonify({'success': True, 'series': series_list})
+
+        page, limit = _parse_paging_args(default_limit=30)
+        series_list = SeriesService.get_books_list(db_type, library_id, page, limit, search_query, sort)
+        series_list = _filter_supported_series_for_app_opds(db_type, series_list)
+        has_more = len(series_list) > limit
+        if has_more:
+            series_list = series_list[:limit]
+        return jsonify({'success': True, 'series': series_list, 'has_more': has_more})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app_opds_bp.route('/app-opds-adult/api/media/libraries', methods=['GET'])
+def app_opds_adult_media_libraries_compat():
+    if not _check_auth_cached(is_adult=True):
+        return _unauthorized()
+
+    db_type = request.args.get('type', 'adult')
+    try:
+        libraries = CategoryService.get_libraries(db_type, user_id=None, role='admin')
+        return jsonify({'success': True, 'libraries': libraries})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app_opds_bp.route('/app-opds-adult/api/media/detail', methods=['GET'])
+def app_opds_adult_media_detail_compat():
+    if not _check_auth_cached(is_adult=True):
+        return _unauthorized()
+
+    db_type = request.args.get('type', 'adult')
+    series_name = request.args.get('series', '')
+    library_id = request.args.get('library_id', 'all')
+
+    try:
+        meta, books_list = BookDetailService.get_media_detail(
+            db_type,
+            series_name,
+            library_id,
+            user_id=1,
+            restrict_same_directory=False,
+        )
+        books_list = _filter_supported_books_for_app_opds(books_list)
+        books_list = _enrich_books_for_app_opds(books_list, db_type, is_adult_prefix=True)
+        return jsonify({'success': True, 'meta': meta, 'books': books_list})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app_opds_bp.route('/app-opds-adult/api/media/books/<int:book_id>/info', methods=['GET'])
+def app_opds_adult_book_info_compat(book_id: int):
+    if not _check_auth_cached(is_adult=True):
+        return _unauthorized()
+
+    db_type = request.args.get('type', 'adult')
+    try:
+        info = BookInfoService.get_viewer_info(db_type, book_id)
+        if info is None:
+            return jsonify({'success': False, 'error': 'Book not found'}), 404
+        return jsonify({
+            'success': True,
+            'total_pages': info.get('total_pages', 0),
+            'cover_image': info.get('cover_image')
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app_opds_bp.route('/app-opds-adult/login', methods=['POST', 'GET'])
+def app_opds_adult_login_compat():
+    if not _check_auth_cached(is_adult=True):
+        return _unauthorized()
+    return jsonify({'success': True})
+
+@app_opds_bp.route('/app-opds-adult/covers/<path:filename>', methods=['GET'])
+def app_opds_adult_cover_compat(filename: str):
+    return _redirect_cover_compat(filename)
 
 @app_opds_bp.route('/app-opds/library/<int:lib_id>', methods=['GET'])
 def app_opds_library(lib_id: int):
@@ -306,7 +856,7 @@ def app_opds_adult_library(lib_id: int):
     return _atom_response(xml)
 
 
-@app_opds_bp.route('/app-opds/series/<int:lib_id>/<string:series_name>', methods=['GET'])
+@app_opds_bp.route('/app-opds/series/<int:lib_id>/<path:series_name>', methods=['GET'])
 def app_opds_series_books(lib_id: int, series_name: str):
     if not _check_auth_cached(is_adult=False):
         return _unauthorized()
@@ -316,6 +866,8 @@ def app_opds_series_books(lib_id: int, series_name: str):
     cached_xml = _get_cached_response(cache_key)
     if cached_xml is not None:
         return _atom_response(cached_xml)
+
+    series_name = '' if series_name == EMPTY_SERIES_TOKEN else series_name
 
     entries, total = get_book_entries(
         'general', lib_id, series_name,
@@ -330,7 +882,7 @@ def app_opds_series_books(lib_id: int, series_name: str):
     return _atom_response(xml)
 
 
-@app_opds_bp.route('/app-opds/adult/series/<int:lib_id>/<string:series_name>', methods=['GET'])
+@app_opds_bp.route('/app-opds/adult/series/<int:lib_id>/<path:series_name>', methods=['GET'])
 def app_opds_adult_series_books(lib_id: int, series_name: str):
     if not _check_auth_cached(is_adult=True):
         return _unauthorized()
@@ -340,6 +892,8 @@ def app_opds_adult_series_books(lib_id: int, series_name: str):
     cached_xml = _get_cached_response(cache_key)
     if cached_xml is not None:
         return _atom_response(cached_xml)
+
+    series_name = '' if series_name == EMPTY_SERIES_TOKEN else series_name
 
     entries, total = get_book_entries(
         'adult', lib_id, series_name,

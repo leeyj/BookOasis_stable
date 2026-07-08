@@ -6,6 +6,12 @@ from utils.cover_helper import get_cover_image_with_t, resolve_series_cover
 class SeriesService:
     @staticmethod
     def get_books_list(db_type, library_id, page, limit, search_query, sort='asc'):
+        if isinstance(library_id, str):
+            library_id = library_id.strip()
+            token = library_id.lower()
+            if token in ('all', 'favorite', 'history', 'home'):
+                library_id = token
+
         try:
             if library_id is not None and library_id not in ('all', 'favorite', 'history', 'home'):
                 library_id = int(library_id)
@@ -166,6 +172,12 @@ class SeriesService:
     @staticmethod
     def get_all_books_list(db_type, library_id):
         """Kavita 방식의 선로드를 위해 특정 라이브러리의 전체 시리즈 목록을 페이징 없이 경량 조회"""
+        if isinstance(library_id, str):
+            library_id = library_id.strip()
+            token = library_id.lower()
+            if token in ('all', 'favorite', 'history', 'home'):
+                library_id = token
+
         try:
             if library_id is not None and library_id not in ('all', 'favorite', 'history', 'home'):
                 library_id = int(library_id)
