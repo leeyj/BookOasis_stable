@@ -96,6 +96,15 @@ export function loadCustomFontsList() {
 // openReader: 포맷별 뷰어 디스패치 초기화
 export function openReader(bookId, format, title, pagesRead, totalPages) {
   console.log(`[Viewer-Core] openReader 시작 - Book ID: ${bookId}, Format: ${format}, Title: ${title}`);
+  
+  // 다음권 조작 검증용 Arming 상태 초기화
+  import('./viewer_next_episode.js').then(m => {
+    if (m.clearNextEpisodeArm) {
+      console.log('[Viewer-Core] Resetting next episode arming state for new reader session');
+      m.clearNextEpisodeArm();
+    }
+  }).catch(() => {});
+
   state.activeBookId = bookId;
   const viewerModal = document.getElementById('media-viewer-modal');
   if (!viewerModal) return;
@@ -228,8 +237,17 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false) {
     viewerModal.classList.remove('fullscreen-mode');
     viewerModal.style.display = 'none';
     document.getElementById('fullscreen-icon').className = 'fa-solid fa-expand';
-    // 브라우저 스크롤 복원
+    // 브라우저 스크롤 및 iOS body-lock 스타일 완벽히 복원
+    document.body.style.removeProperty('overflow');
+    document.body.style.removeProperty('position');
+    document.body.style.removeProperty('top');
+    document.body.style.removeProperty('width');
+    document.documentElement.style.removeProperty('overflow');
+    
     document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
     document.documentElement.style.overflow = '';
   }
 

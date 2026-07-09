@@ -170,7 +170,7 @@ export function nextPdfPage() {
     renderPdfPage();
   } else {
     import('./viewer_next_episode.js').then(m => {
-      m.handleNextEpisode(state.activeBookId);
+      m.handleNextEpisodeDirect(state.activeBookId);
     });
   }
 }

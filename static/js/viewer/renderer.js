@@ -119,28 +119,7 @@ export async function initRenderer(bookId, pagesRead, totalPages) {
   loadComicPage();
 }
 
-function triggerScrollModeNextEpisodeIfNeeded(wrapper) {
-  if (scrollNextEpisodeTriggered || !state.activeBookId || comicTotalPages <= 0) return;
 
-  const maxScrollTop = Math.max(1, wrapper.scrollHeight - wrapper.clientHeight);
-  const scrollRatio = wrapper.scrollTop / maxScrollTop;
-  const isAtAbsoluteEnd = wrapper.scrollTop + wrapper.clientHeight >= wrapper.scrollHeight - 16;
-  const isNearEndByScroll = scrollRatio >= 0.995;
-  if (!isAtAbsoluteEnd && !isNearEndByScroll) return;
-
-  scrollNextEpisodeTriggered = true;
-  import('../viewer_next_episode.js').then(m => m.handleNextEpisode(state.activeBookId));
-}
-
-function scheduleScrollModeNextEpisodeCheck(wrapper) {
-  if (scrollEndCheckTimer) {
-    clearTimeout(scrollEndCheckTimer);
-  }
-  scrollEndCheckTimer = setTimeout(() => {
-    scrollEndCheckTimer = null;
-    triggerScrollModeNextEpisodeIfNeeded(wrapper);
-  }, 140);
-}
 
 // Accessors for module state to allow safe updates from other modules
 export function getComicCurrentPage() { return comicCurrentPage; }
@@ -386,29 +365,94 @@ export function loadComicPage() {
       return;
     };
 
-    const nextEpisodeHandler = () => {
-      triggerScrollModeNextEpisodeIfNeeded(wrapper);
+    // 스크롤 모드에서의 명시적인 최하단 오버 스크롤 감지 로직 (휠 & 드래그)
+    let touchStartY = 0;
+    let bottomReachedTime = 0;
+
+    const handleScrollWheelNextEpisode = (e) => {
+      if (scrollNextEpisodeTriggered || !state.activeBookId || comicTotalPages <= 0) return;
+      if (comicCurrentPage < comicTotalPages - 1) return;
+
+      const maxScrollTop = Math.max(1, wrapper.scrollHeight - wrapper.clientHeight);
+      const isAtBottom = wrapper.scrollTop >= maxScrollTop - 16;
+
+      if (!isAtBottom) {
+        bottomReachedTime = 0;
+        return;
+      }
+
+      // 최초 바닥 감지 시점 기록
+      if (bottomReachedTime === 0) {
+        bottomReachedTime = Date.now();
+      }
+
+      // 바닥 도달 후 최소 250ms가 경과하기 전에 연속으로 들어온 휠은 무시 (관성 휠 휩쓸림 방지)
+      if (Date.now() - bottomReachedTime < 250) {
+        return;
+      }
+
+      // 최하단이고, 휠을 아래로(deltaY > 0) 굴릴 때만
+      if (e.deltaY > 0) {
+        console.log("[Viewer-Comic] Bottom reached & wheel down. Triggering next episode modal.");
+        scrollNextEpisodeTriggered = true;
+        setTimeout(() => { scrollNextEpisodeTriggered = false; }, 2000);
+        // 만화책 스크롤 모드에서는 휠 오버로 인한 불시 이동을 막기 위해 무조건 모달 확인을 거치도록 forceModal=true 인자를 지원하게끔 handleNextEpisodeDirect를 호출합니다.
+        import('../viewer_next_episode.js').then(m => m.handleNextEpisodeDirect(state.activeBookId, true));
+      }
     };
 
-    const touchEndHandler = () => {
-      triggerScrollModeNextEpisodeIfNeeded(wrapper);
-      scheduleScrollModeNextEpisodeCheck(wrapper);
+    const handleScrollTouchStart = (e) => {
+      if (e.touches && e.touches[0]) {
+        touchStartY = e.touches[0].clientY;
+      }
     };
 
-    const combinedScrollHandler = () => {
-      progressHandler();
-      nextEpisodeHandler();
-      scheduleScrollModeNextEpisodeCheck(wrapper);
+    const handleScrollTouchEnd = (e) => {
+      if (scrollNextEpisodeTriggered || !state.activeBookId || comicTotalPages <= 0) return;
+      if (comicCurrentPage < comicTotalPages - 1) return;
+      if (!e.changedTouches || !e.changedTouches[0]) return;
+
+      const touchEndY = e.changedTouches[0].clientY;
+      const diffY = touchStartY - touchEndY; // 양수이면 화면을 위로 쓸어올림 (아래로 더 보려 함)
+
+      const maxScrollTop = Math.max(1, wrapper.scrollHeight - wrapper.clientHeight);
+      const isAtBottom = wrapper.scrollTop >= maxScrollTop - 25; // 터치는 오차범위 25px 확보
+
+      if (!isAtBottom) {
+        bottomReachedTime = 0;
+        return;
+      }
+
+      // 최초 바닥 감지 시점 기록
+      if (bottomReachedTime === 0) {
+        bottomReachedTime = Date.now();
+      }
+
+      // 바닥 도달 후 최소 250ms가 경과하기 전에 연속으로 들어온 터치는 무시
+      if (Date.now() - bottomReachedTime < 250) {
+        return;
+      }
+
+      // 최하단이고, 드래그하여 올린 거리가 40px 이상일 때
+      if (diffY > 40) {
+        console.log("[Viewer-Comic] Bottom reached & touch drag up. Triggering next episode modal.");
+        scrollNextEpisodeTriggered = true;
+        setTimeout(() => { scrollNextEpisodeTriggered = false; }, 2000);
+        import('../viewer_next_episode.js').then(m => m.handleNextEpisodeDirect(state.activeBookId, true));
+      }
     };
 
-    scrollProgressHandler = combinedScrollHandler;
+    scrollProgressHandler = progressHandler;
     wrapper.addEventListener('scroll', scrollProgressHandler, { passive: true });
+    wrapper.addEventListener('wheel', handleScrollWheelNextEpisode, { passive: true });
 
+    wrapper.addEventListener('touchstart', handleScrollTouchStart, { passive: true });
+    
     if (scrollTouchEndHandler) {
       wrapper.removeEventListener('touchend', scrollTouchEndHandler);
       wrapper.removeEventListener('touchcancel', scrollTouchEndHandler);
     }
-    scrollTouchEndHandler = touchEndHandler;
+    scrollTouchEndHandler = handleScrollTouchEnd;
     wrapper.addEventListener('touchend', scrollTouchEndHandler, { passive: true });
     wrapper.addEventListener('touchcancel', scrollTouchEndHandler, { passive: true });
 

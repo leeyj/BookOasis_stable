@@ -94,11 +94,12 @@ export function toggleComicOverlay() {
       } else {
         // 내부 컨테이너가 스크롤된 경우 — scrollTop만 기록해둠 (body-lock 없음)
         menu.dataset.iosBodyLock = 'false';
-        const innerScrollers = [
-          'txt-scroll-wrapper',
-          'comic-scroll-container',
-          'epub-viewer-container',
-        ];
+        // EPUB은 슬라이더/CFI 이동 이후 위치 관리를 런타임이 담당하므로
+        // 오버레이 닫힘 시 과거 scrollTop 복원을 적용하지 않습니다.
+        const isEpub = (state.currentViewerFormat || '').toLowerCase() === 'epub';
+        const innerScrollers = isEpub
+          ? ['txt-scroll-wrapper', 'comic-scroll-container']
+          : ['txt-scroll-wrapper', 'comic-scroll-container', 'epub-viewer-container'];
         const scrollData = {};
         innerScrollers.forEach(id => {
           const el = document.getElementById(id);
@@ -130,6 +131,9 @@ export function toggleComicOverlay() {
         try {
           const scrollData = JSON.parse(menu.dataset.savedInnerScroll || '{}');
           Object.entries(scrollData).forEach(([id, top]) => {
+            if ((state.currentViewerFormat || '').toLowerCase() === 'epub' && id === 'epub-viewer-container') {
+              return;
+            }
             const el = document.getElementById(id);
             if (el) el.scrollTop = top;
           });
@@ -183,9 +187,9 @@ export function nextComicPage() {
       import('../viewer_next_episode.js').then(m => m.handleNextEpisode(state.activeBookId));
     }
   } else {
-  const step = Settings.getComicPageStep ? Settings.getComicPageStep() : 1;
+    const step = Settings.getComicPageStep ? Settings.getComicPageStep() : 1;
     const nextPage = Math.min(Renderer.getComicCurrentPage() + step, Renderer.getComicTotalPages() - 1);
-    if (nextPage !== Renderer.getComicCurrentPage()) {
+    if (Renderer.getComicCurrentPage() < Renderer.getComicTotalPages() - 1 && nextPage !== Renderer.getComicCurrentPage()) {
       Renderer.setComicCurrentPage(nextPage);
       Renderer.loadComicPage();
     } else {

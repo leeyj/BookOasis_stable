@@ -13,6 +13,7 @@ let touchStartX = 0;
 let touchStartY = 0;
 const touchMoveThreshold = 10;
 let contextMenuLoadSeq = 0;
+let menuOpenedByTouchUntil = 0;
 
 function getPluginAccentColor(pluginId) {
   const text = String(pluginId || 'plugin');
@@ -158,6 +159,7 @@ function hideBookContextMenu({ suppressMs = 0, clearTarget = true } = {}) {
   const bookMenu = document.getElementById('book-context-menu');
   if (bookMenu) bookMenu.style.display = 'none';
   if (clearTarget) currentTargetBook = null;
+  menuOpenedByTouchUntil = 0;
   contextMenuLoadSeq += 1;
   clearPluginContextMenuItems();
   clearLongPressTimer();
@@ -390,6 +392,10 @@ function shouldIgnoreBookMenuDismiss(event) {
 }
 
 function dismissBookMenuOutside(event, suppressMs = 350) {
+  // 롱터치로 메뉴를 연 직후의 동일 터치 종료/지연 클릭 이벤트는 무시합니다.
+  if (Date.now() < menuOpenedByTouchUntil && event && (event.type === 'touchend' || event.type === 'click')) {
+    return;
+  }
   if (shouldIgnoreBookMenuDismiss(event)) return;
   const bookMenu = document.getElementById('book-context-menu');
   if (bookMenu && bookMenu.style.display !== 'none') {
@@ -470,6 +476,8 @@ window.handleLongPressTouchStart = function(event, callback) {
       return;
     }
     if (typeof callback === 'function') {
+      // 동일 롱터치의 touchend/click에 의한 즉시 닫힘 방지
+      menuOpenedByTouchUntil = Date.now() + 900;
       // 기본 터치 홀드 효과 방지 (돋보기, 텍스트 선택 등 방어)
       if (event.cancelable) {
         event.preventDefault();

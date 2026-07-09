@@ -1,4 +1,10 @@
 # CHANGELOG
+* 알려진 버그: 대규모 도서 이동시 없어진 도서의 정보가 제대로 삭제되지 않음.
+
+## v0.8.6
+### fixed
+- 만화책,도서등 뷰어(스크롤) 페이지 이동 및 다음권 이동시 명시적 조건 추가(모달창) | comic,epub and order viewer scroll mode page move and next book move explicit condition added (modal)
+- 모바일-대시보드에서 롱프레스시 컨텍스트 메뉴 닫히는 현상 수정 | mobile dashboard long press context menu close issue fix
 
 ## v0.8.5
 ### fixed

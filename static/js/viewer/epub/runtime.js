@@ -111,6 +111,69 @@ function isAtAbsoluteEndInPageMode() {
   return !!renditionAtEnd || atLastSpineByHref;
 }
 
+function isAtAbsoluteEndInScrollMode(container) {
+  if (!container) return false;
+
+  const nearBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 2;
+  if (!nearBottom) return false;
+
+  // 모바일/브라우저 반올림 오차로 인한 조기 종료를 막기 위해 비율 기준을 함께 확인합니다.
+  const ratio = getCurrentRatioFromScroll(container);
+  if (!Number.isFinite(ratio) || ratio < 0.999) {
+    console.log('[EPUB-EndCheck] blocked by ratio threshold', {
+      activeBookId: state.activeBookId,
+      scrollTop: container.scrollTop,
+      clientHeight: container.clientHeight,
+      scrollHeight: container.scrollHeight,
+      ratio,
+      threshold: 0.999,
+      scrollMode: getScrollMode(),
+    });
+    return false;
+  }
+
+  if (!epubRendition) {
+    console.log('[EPUB-EndCheck] no rendition, treat as end', {
+      activeBookId: state.activeBookId,
+      scrollTop: container.scrollTop,
+      clientHeight: container.clientHeight,
+      scrollHeight: container.scrollHeight,
+      ratio,
+      scrollMode: getScrollMode(),
+    });
+    return true;
+  }
+
+  const loc = epubRendition.currentLocation && epubRendition.currentLocation();
+  const items = getReadableSpineItems();
+  const normalizeHref = href => (href ? String(href).split('#')[0] : '');
+
+  const currentHref = normalizeHref(
+    loc && loc.end ? loc.end.href : (loc && loc.start ? loc.start.href : null)
+  );
+  const lastHref = items.length > 0 ? normalizeHref(items[items.length - 1].href) : '';
+  const atLastSpineByHref = !!currentHref && !!lastHref && currentHref === lastHref;
+  const atEndFlag = !!(loc && loc.atEnd);
+  const result = atEndFlag || !!renditionAtEnd || atLastSpineByHref;
+
+  console.log('[EPUB-EndCheck] near bottom evaluation', {
+    activeBookId: state.activeBookId,
+    scrollTop: container.scrollTop,
+    clientHeight: container.clientHeight,
+    scrollHeight: container.scrollHeight,
+    ratio,
+    atEndFlag,
+    renditionAtEnd,
+    currentHref,
+    lastHref,
+    atLastSpineByHref,
+    result,
+    scrollMode: getScrollMode(),
+  });
+
+  return result;
+}
+
 function normalizeHrefForCompare(href) {
   return href ? String(href).split('#')[0] : '';
 }
@@ -174,10 +237,19 @@ function bindContainerScroll() {
 
   const triggerNextEpisodeIfNeeded = () => {
     if (getScrollMode() !== 'scroll') return;
-    const isAtEnd = container.scrollTop + container.clientHeight >= container.scrollHeight - 12;
+    const isAtEnd = isAtAbsoluteEndInScrollMode(container);
+    console.log('[EPUB-EndCheck] triggerNextEpisodeIfNeeded', {
+      activeBookId: state.activeBookId,
+      isAtEnd,
+      alreadyTriggered: epubScrollNextEpisodeTriggered,
+      scrollMode: getScrollMode(),
+    });
     if (isAtEnd && !epubScrollNextEpisodeTriggered) {
       epubScrollNextEpisodeTriggered = true;
-      import('../../viewer_next_episode.js').then(m => m.handleNextEpisode(state.activeBookId));
+      console.log('[EPUB-EndCheck] trigger next episode from scroll listener', {
+        activeBookId: state.activeBookId,
+      });
+      import('../../viewer_next_episode.js').then(m => m.handleNextEpisodeDirect(state.activeBookId));
     }
   };
 
@@ -399,9 +471,21 @@ export function epubNextPage() {
   if (!container) return;
 
   if (scrollMode === 'scroll') {
-    const isAtEnd = container.scrollTop + container.clientHeight >= container.scrollHeight - 5;
+    const isAtEnd = isAtAbsoluteEndInScrollMode(container);
+    console.log('[EPUB-EndCheck] epubNextPage(scroll mode)', {
+      activeBookId: state.activeBookId,
+      isAtEnd,
+      alreadyTriggered: epubScrollNextEpisodeTriggered,
+      scrollTop: container.scrollTop,
+      clientHeight: container.clientHeight,
+      scrollHeight: container.scrollHeight,
+    });
     if (isAtEnd) {
-      import('../../viewer_next_episode.js').then(m => m.handleNextEpisode(state.activeBookId));
+      epubScrollNextEpisodeTriggered = true;
+      console.log('[EPUB-EndCheck] trigger next episode from epubNextPage', {
+        activeBookId: state.activeBookId,
+      });
+      import('../../viewer_next_episode.js').then(m => m.handleNextEpisodeDirect(state.activeBookId));
     } else {
       container.scrollBy({ top: window.innerHeight * 0.8, behavior: 'smooth' });
     }
@@ -416,7 +500,7 @@ export function epubNextPage() {
   }
 
   if (isAtAbsoluteEndInPageMode()) {
-    import('../../viewer_next_episode.js').then(m => m.handleNextEpisode(state.activeBookId));
+    import('../../viewer_next_episode.js').then(m => m.handleNextEpisodeDirect(state.activeBookId));
     return;
   }
 
@@ -448,7 +532,7 @@ export function epubNextPage() {
             return;
           }
 
-          import('../../viewer_next_episode.js').then(m => m.handleNextEpisode(state.activeBookId));
+          import('../../viewer_next_episode.js').then(m => m.handleNextEpisodeDirect(state.activeBookId));
         });
         return;
       }

@@ -66,7 +66,7 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
           isTransitioning = true;
           txtScrollNextEpisodeTriggered = true;
           import('./viewer_next_episode.js').then(m => {
-            m.handleNextEpisode(state.activeBookId);
+            m.handleNextEpisodeDirect(state.activeBookId);
             setTimeout(() => { isTransitioning = false; }, 300);
           });
         };
@@ -352,7 +352,7 @@ export function nextTxtPage() {
         }, 50);
       } else {
         import('./viewer_next_episode.js').then(m => {
-          m.handleNextEpisode(state.activeBookId);
+          m.handleNextEpisodeDirect(state.activeBookId);
         });
       }
     } else {
@@ -373,7 +373,7 @@ export function nextTxtPage() {
         }, 50);
       } else {
         import('./viewer_next_episode.js').then(m => {
-          m.handleNextEpisode(state.activeBookId);
+          m.handleNextEpisodeDirect(state.activeBookId);
         });
       }
     } else {
