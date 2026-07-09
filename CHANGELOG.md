@@ -1,4 +1,15 @@
 # CHANGELOG
+
+## v0.8.5
+### fixed
+- 플러그인 구조 개편 
+*- guide_plugins.md,spec_db_schema.md,plugins\metadata\plugin_README.md 참조.
+* 불필요한 플러그인은 환경설정->플러그인 관리에서 Off 할 수 있습니다.
+
+### added
+- 개별 이미지 폴더를 1개의 도서로 인식 기능 추가
+
+
 ## v0.8.4
 ### fixed
 - zip,cbz : 모바일 뷰-스크롤 모드일때 하단 이미지 추가 로딩 구현 | zip,cbz: mobile view - scroll mode when bottom image added loading implementation

@@ -184,6 +184,11 @@ export async function fetchMetadataPlugins() {
   return res.json();
 }
 
+export async function fetchMetadataPluginsForManagement() {
+  const res = await fetch('/api/media/metadata/plugins/manage');
+  return res.json();
+}
+
 export async function searchMetadata(type, query, source) {
   const sourceParam = source ? `&source=${encodeURIComponent(source)}` : '';
   const res = await fetch(`/api/media/books/search-metadata?type=${type}&query=${encodeURIComponent(query)}${sourceParam}`);
@@ -285,6 +290,36 @@ export async function fetchTags(type, libraryId) {
 export async function fetchGenres(type, libraryId) {
   const libQuery = libraryId ? `&library_id=${libraryId}` : '';
   const res = await fetch(`/api/media/genres?type=${type}${libQuery}`);
+  return res.json();
+}
+
+export async function fetchBookContextMenuPluginItems(type, context) {
+  const res = await fetch('/api/media/context-menu/book/plugins', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      type,
+      context: context || {}
+    })
+  });
+  return res.json();
+}
+
+export async function runBookContextMenuPluginAction(type, pluginId, actionId, context) {
+  const res = await fetch('/api/media/context-menu/book/plugins/action', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      type,
+      plugin_id: pluginId,
+      action_id: actionId,
+      context: context || {}
+    })
+  });
   return res.json();
 }
 

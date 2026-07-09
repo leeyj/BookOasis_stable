@@ -307,6 +307,19 @@ def get_metadata_plugins_api():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+
+@library_bp.route('/api/media/metadata/plugins/manage', methods=['GET'])
+@admin_required
+def get_metadata_plugins_manage_api():
+    """환경설정 > 플러그인 관리에 표시할 전체 메타데이터 플러그인 목록 조회"""
+    try:
+        from services.metadata_factory import MetadataFactory
+
+        plugins = MetadataFactory.get_available_providers()
+        return jsonify({'success': True, 'plugins': plugins})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @library_bp.route('/api/media/books/search-metadata', methods=['GET'])
 @admin_required
 def search_book_metadata_api():
@@ -398,41 +411,158 @@ def save_metadata_plugin_config_api():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@library_bp.route('/api/media/metadata/plugins/aladin/new-releases', methods=['GET'])
-def get_aladin_new_releases_api():
-    """알라딘 플러그인을 통해 최신 신간 도서 목록을 반환합니다."""
-    db_type = request.args.get('type', 'general')
-    limit = int(request.args.get('limit', 10))
-    
-    try:
-        from services.metadata_factory import MetadataFactory
-        try:
-            # MetadataFactory를 통해 활성화 여부 검증 (비활성화 시 ValueError 발생)
-            provider = MetadataFactory.get_provider_by_id('aladin_new')
-        except ValueError as ve:
-            return jsonify({'success': False, 'error': str(ve)}), 400
-
-        result = provider.get_new_releases(db_type, limit=limit)
-        
-        status_code = 200 if result.get('success') else 400
-        return jsonify(result), status_code
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
 @library_bp.route('/api/media/dashboard/widgets', methods=['GET'])
 def get_dashboard_widgets_api():
     """대시보드에 표시할 활성화된 위젯(플러그인) 목록을 반환합니다."""
     try:
         from services.metadata_factory import MetadataFactory
         providers = MetadataFactory.get_available_providers()
-        
-        # 현재는 aladin_new 플러그인만 대시보드 위젯을 지원함.
-        # 추후 다른 플러그인이 추가되면 리스트에 추가하거나 플러그인 메타데이터를 활용할 수 있음.
+
         active_widgets = []
         for p in providers:
-            if p.get('enabled') and p.get('id') == 'aladin_new':
-                active_widgets.append(p.get('id'))
-                
+            if not p.get('enabled'):
+                continue
+            widget = p.get('dashboard_widget')
+            if not isinstance(widget, dict):
+                continue
+
+            active_widgets.append({
+                'id': p.get('id'),
+                'name': p.get('name'),
+                'title': widget.get('title') or p.get('name'),
+                'subtitle': widget.get('subtitle') or '',
+                'provider': widget.get('provider') or p.get('name'),
+                'icon': widget.get('icon') or 'fa-solid fa-puzzle-piece',
+                'limit': int(widget.get('limit') or 10),
+            })
+
         return jsonify({'success': True, 'widgets': active_widgets}), 200
     except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@library_bp.route('/api/media/dashboard/widgets/<plugin_id>/data', methods=['GET'])
+def get_dashboard_widget_data_api(plugin_id):
+    """대시보드 위젯 데이터 조회 (플러그인 동적 로딩)."""
+    db_type = request.args.get('type', 'general')
+    limit = int(request.args.get('limit', 10))
+
+    try:
+        from services.metadata_factory import MetadataFactory
+        provider = MetadataFactory.get_provider_by_id(plugin_id)
+
+        result = provider.get_dashboard_data(db_type, limit=limit)
+
+        status_code = 200 if result.get('success') else 400
+        return jsonify(result), status_code
+    except ValueError as ve:
+        return jsonify({'success': False, 'error': str(ve)}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@library_bp.route('/api/media/context-menu/book/plugins', methods=['POST'])
+@login_required
+def get_book_context_menu_plugin_items_api():
+    """활성화된 플러그인의 도서 컨텍스트 메뉴 항목을 동적으로 조회합니다."""
+    payload = request.get_json(silent=True) or {}
+    db_type = payload.get('type', 'general')
+    print(f"[ContextMenuAPI] items request db_type={db_type!r} payload={payload!r}")
+
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+
+    context = payload.get('context') or {}
+
+    try:
+        from services.metadata_factory import MetadataFactory
+
+        providers = MetadataFactory.get_available_providers()
+        print(f"[ContextMenuAPI] discovered providers={[p.get('id') for p in providers]!r}")
+        merged_items = []
+
+        for provider_meta in providers:
+            if not provider_meta.get('enabled'):
+                continue
+
+            provider_id = provider_meta.get('id')
+            if not provider_id:
+                continue
+
+            try:
+                provider = MetadataFactory.get_provider_by_id(provider_id)
+                print(f"[ContextMenuAPI] loading provider_id={provider_id!r} class={provider.__class__.__name__!r}")
+                items = provider.get_context_menu_items(db_type, context) or []
+                print(f"[ContextMenuAPI] provider_id={provider_id!r} returned items={items!r}")
+            except Exception:
+                import traceback
+                print(f"[ContextMenuAPI] provider_id={provider_id!r} item load failed:\n{traceback.format_exc()}")
+                items = []
+
+            if not isinstance(items, list):
+                continue
+
+            for raw_item in items:
+                if not isinstance(raw_item, dict):
+                    continue
+
+                action_id = str(raw_item.get('id') or '').strip()
+                label = str(raw_item.get('label') or '').strip()
+                if not action_id or not label:
+                    continue
+
+                merged_items.append({
+                    'plugin_id': provider_id,
+                    'plugin_name': provider_meta.get('name') or provider_id,
+                    'id': action_id,
+                    'label': label,
+                    'icon': raw_item.get('icon') or 'fa-solid fa-puzzle-piece',
+                })
+
+        print(f"[ContextMenuAPI] merged items count={len(merged_items)}")
+        return jsonify({'success': True, 'items': merged_items}), 200
+    except Exception as e:
+        import traceback
+        print(f"[ContextMenuAPI] items fatal error:\n{traceback.format_exc()}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@library_bp.route('/api/media/context-menu/book/plugins/action', methods=['POST'])
+@login_required
+def run_book_context_menu_plugin_action_api():
+    """도서 컨텍스트 메뉴에서 선택된 플러그인 액션을 실행합니다."""
+    payload = request.get_json(silent=True) or {}
+    db_type = payload.get('type', 'general')
+    print(f"[ContextMenuAPI] action request db_type={db_type!r} payload={payload!r}")
+
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+
+    plugin_id = (payload.get('plugin_id') or '').strip()
+    action_id = (payload.get('action_id') or '').strip()
+    context = payload.get('context') or {}
+
+    if not plugin_id:
+        return jsonify({'success': False, 'error': 'plugin_id가 누락되었습니다.'}), 400
+    if not action_id:
+        return jsonify({'success': False, 'error': 'action_id가 누락되었습니다.'}), 400
+
+    try:
+        from services.metadata_factory import MetadataFactory
+
+        provider = MetadataFactory.get_provider_by_id(plugin_id)
+        print(f"[ContextMenuAPI] action provider_id={plugin_id!r} class={provider.__class__.__name__!r} action_id={action_id!r}")
+        result = provider.run_context_menu_action(db_type, action_id, context)
+        print(f"[ContextMenuAPI] action result={result!r}")
+        if not isinstance(result, dict):
+            result = {'success': False, 'error': '플러그인 액션 반환값 형식이 올바르지 않습니다.'}
+
+        status_code = 200 if result.get('success') else 400
+        return jsonify(result), status_code
+    except ValueError as ve:
+        print(f"[ContextMenuAPI] value error: {ve}")
+        return jsonify({'success': False, 'error': str(ve)}), 400
+    except Exception as e:
+        import traceback
+        print(f"[ContextMenuAPI] action fatal error:\n{traceback.format_exc()}")
         return jsonify({'success': False, 'error': str(e)}), 500

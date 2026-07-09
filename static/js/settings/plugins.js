@@ -15,14 +15,15 @@ export async function loadPluginsSettings() {
   container.innerHTML = '<div style="text-align: center; padding: 2rem; color: #a855f7;"><i class="fa-solid fa-circle-notch fa-spin fa-2x"></i><br><br>플러그인 목록 로드 중...</div>';
 
   try {
-    console.log('[Plugins-Settings] api.fetchMetadataPlugins() API 호출 시작');
-    const data = await api.fetchMetadataPlugins();
+    console.log('[Plugins-Settings] api.fetchMetadataPluginsForManagement() API 호출 시작');
+    const data = await api.fetchMetadataPluginsForManagement();
     console.log('[Plugins-Settings] API 응답 데이터 수신 완료:', data);
     if (data.success && data.plugins && data.plugins.length > 0) {
       let html = '';
       data.plugins.forEach(p => {
         const schema = p.config_schema || [];
         const config = p.config || {};
+        const hasCustomUi = !!(p.ui && p.ui.html);
         
         // 플러그인별 카드 및 폼 템플릿 구성
         html += `
@@ -46,20 +47,16 @@ export async function loadPluginsSettings() {
               
               <!-- 설정값 동적 폼 -->
               <form class="plugin-config-form" data-plugin-id="${p.id}" style="display: flex; flex-direction: column; gap: 1.2rem;">
-                  ${schema.map(f => {
-                      const curVal = config[f.key] || '';
-                      return `
-                      <div class="library-form-group" style="margin: 0;">
-                          <label style="font-weight: 700; color: #fff; font-size: 0.88rem; margin-bottom: 0.4rem; display: block;">
-                              ${f.label} ${f.required ? '<span style="color:#f43f5e;">*</span>' : ''}
-                          </label>
-                          <input type="${f.type === 'text' ? 'text' : f.type}" name="${f.key}" value="${curVal}" ${f.required ? 'required' : ''} style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; transition: border-color 0.2s;">
-                          ${f.description ? `<p style="font-size: 0.76rem; color: #94a3b8; margin: 0.4rem 0 0 0;">${f.description}</p>` : ''}
-                      </div>
-                      `;
+                  ${hasCustomUi ? `
+                  <div class="plugin-ui-root" data-plugin-ui-root="${p.id}" data-plugin-config='${escapeHtmlAttr(JSON.stringify(config))}'>
+                    ${p.ui.html}
+                  </div>
+                  ` : schema.map(f => {
+                    const curVal = config[f.key];
+                    return renderSchemaField(f, curVal);
                   }).join('')}
-                  
-                  ${schema.length > 0 ? `
+
+                  ${(hasCustomUi || schema.length > 0) ? `
                   <div style="margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1rem;">
                       <button type="submit" class="btn-submit" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1.2rem; font-size: 0.82rem;">
                           <i class="fa-regular fa-floppy-disk"></i> 설정 저장
@@ -71,6 +68,11 @@ export async function loadPluginsSettings() {
         `;
       });
       container.innerHTML = html;
+
+            // 폴더 기반 커스텀 UI/style/script 지원
+            injectPluginCustomStyles(data.plugins);
+            applyConfigValues(container, data.plugins);
+            initPluginCustomScripts(container, data.plugins);
       
       // 토글 스위치 스타일링을 위한 CSS 헤드 인젝트 (최초 1회)
       injectToggleSwitchCSS();
@@ -84,6 +86,127 @@ export async function loadPluginsSettings() {
     console.error('플러그인 목록 조회 에러:', err);
     container.innerHTML = '<div style="text-align: center; padding: 2rem; color: #f43f5e;">서버와 통신 중 오류가 발생했습니다.</div>';
   }
+}
+
+function escapeHtmlAttr(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function escapeHtmlText(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function renderSchemaField(f, curVal) {
+  const label = f.label || f.key;
+  const required = !!f.required;
+  const descHtml = f.description ? `<p style="font-size: 0.76rem; color: #94a3b8; margin: 0.4rem 0 0 0;">${f.description}</p>` : '';
+  const key = f.key || '';
+  const type = (f.type || 'text').toLowerCase();
+
+  if (type === 'checkbox') {
+    const checked = curVal === true || curVal === '1' || curVal === 1 || curVal === 'true';
+    return `
+      <div class="library-form-group" style="margin: 0;">
+        <label style="font-weight: 700; color: #fff; font-size: 0.88rem; margin-bottom: 0.4rem; display: block;">
+          ${label} ${required ? '<span style="color:#f43f5e;">*</span>' : ''}
+        </label>
+        <label style="display:flex; align-items:center; gap:0.5rem; color:#cbd5e1;">
+          <input type="checkbox" name="${key}" ${checked ? 'checked' : ''}>
+          <span>사용</span>
+        </label>
+        ${descHtml}
+      </div>
+    `;
+  }
+
+  if (type === 'select') {
+    const options = Array.isArray(f.options) ? f.options : [];
+    const cur = curVal ?? f.default ?? '';
+    return `
+      <div class="library-form-group" style="margin: 0;">
+        <label style="font-weight: 700; color: #fff; font-size: 0.88rem; margin-bottom: 0.4rem; display: block;">
+          ${label} ${required ? '<span style="color:#f43f5e;">*</span>' : ''}
+        </label>
+        <select name="${key}" ${required ? 'required' : ''} style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; transition: border-color 0.2s;">
+          ${options.map(opt => {
+            const val = typeof opt === 'object' ? opt.value : opt;
+            const text = typeof opt === 'object' ? (opt.label || opt.value) : opt;
+            const selected = String(cur) === String(val) ? 'selected' : '';
+            return `<option value="${escapeHtmlAttr(val)}" ${selected}>${escapeHtmlText(text)}</option>`;
+          }).join('')}
+        </select>
+        ${descHtml}
+      </div>
+    `;
+  }
+
+  const inputType = (type === 'number' || type === 'password' || type === 'text') ? type : 'text';
+  const value = curVal ?? f.default ?? '';
+  return `
+    <div class="library-form-group" style="margin: 0;">
+      <label style="font-weight: 700; color: #fff; font-size: 0.88rem; margin-bottom: 0.4rem; display: block;">
+        ${label} ${required ? '<span style="color:#f43f5e;">*</span>' : ''}
+      </label>
+      <input type="${inputType}" name="${key}" value="${escapeHtmlAttr(value)}" ${required ? 'required' : ''} style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; transition: border-color 0.2s;">
+      ${descHtml}
+    </div>
+  `;
+}
+
+function injectPluginCustomStyles(plugins) {
+  plugins.forEach((p) => {
+    if (!p.ui || !p.ui.css) return;
+    const styleId = `plugin-custom-style-${p.id}`;
+    const existing = document.getElementById(styleId);
+    if (existing) {
+      existing.textContent = p.ui.css;
+      return;
+    }
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = p.ui.css;
+    document.head.appendChild(style);
+  });
+}
+
+function applyConfigValues(container, plugins) {
+  plugins.forEach((p) => {
+    const form = container.querySelector(`form.plugin-config-form[data-plugin-id="${p.id}"]`);
+    if (!form) return;
+    const config = p.config || {};
+    Object.keys(config).forEach((key) => {
+      const el = form.querySelector(`[name="${CSS.escape(key)}"]`);
+      if (!el) return;
+      if (el.type === 'checkbox') {
+        el.checked = config[key] === true || config[key] === '1' || config[key] === 1 || config[key] === 'true';
+      } else {
+        el.value = config[key] ?? '';
+      }
+    });
+  });
+}
+
+function initPluginCustomScripts(container, plugins) {
+  plugins.forEach((p) => {
+    if (!p.ui || !p.ui.js) return;
+    const root = container.querySelector(`[data-plugin-ui-root="${p.id}"]`);
+    if (!root || root.dataset.pluginScriptInited === '1') return;
+    try {
+      const fn = new Function('window', 'pluginId', 'root', 'config', p.ui.js);
+      fn(window, p.id, root, p.config || {});
+      root.dataset.pluginScriptInited = '1';
+    } catch (e) {
+      console.error(`[Plugins-Settings] custom script init failed (${p.id}):`, e);
+    }
+  });
 }
 
 // 토글 버튼 디자인용 CSS 동적 생성
@@ -155,7 +278,11 @@ function bindPluginEvents() {
       const inputs = form.querySelectorAll('input, select');
       inputs.forEach(inp => {
         if (inp.name) {
-          configData[inp.name] = inp.value.trim();
+          if (inp.type === 'checkbox') {
+            configData[inp.name] = !!inp.checked;
+          } else {
+            configData[inp.name] = String(inp.value ?? '').trim();
+          }
         }
       });
 

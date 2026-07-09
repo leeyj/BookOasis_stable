@@ -12,6 +12,135 @@ let longPressTimer = null;
 let touchStartX = 0;
 let touchStartY = 0;
 const touchMoveThreshold = 10;
+let contextMenuLoadSeq = 0;
+
+function getPluginAccentColor(pluginId) {
+  const text = String(pluginId || 'plugin');
+  let hash = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    hash = ((hash << 5) - hash) + text.charCodeAt(i);
+    hash |= 0;
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue} 72% 60%)`;
+}
+
+function buildCurrentContextPayload() {
+  if (!currentTargetBook) return {};
+  return {
+    book_id: currentTargetBook.id,
+    book_title: currentTargetBook.title,
+    is_volume_detail: !!currentTargetBook.isVolumeDetail,
+    library_id: state.currentLibraryId,
+  };
+}
+
+function clearPluginContextMenuItems() {
+  const bookMenu = document.getElementById('book-context-menu');
+  const listEl = bookMenu ? bookMenu.querySelector('.context-menu-list') : null;
+  if (!listEl) return;
+  listEl.querySelectorAll('.plugin-context-menu-item, .plugin-context-menu-group-title, .plugin-context-menu-separator').forEach((el) => el.remove());
+}
+
+function renderPluginContextMenuItems(items) {
+  const bookMenu = document.getElementById('book-context-menu');
+  const listEl = bookMenu ? bookMenu.querySelector('.context-menu-list') : null;
+  if (!listEl) return;
+
+  clearPluginContextMenuItems();
+
+  if (!Array.isArray(items) || items.length === 0) return;
+
+  const closeItem = listEl.querySelector('.context-menu-close-item');
+  const groups = new Map();
+  items.forEach((item) => {
+    const pluginId = String(item.plugin_id || '').trim();
+    if (!pluginId) return;
+    const pluginName = String(item.plugin_name || pluginId).trim();
+    if (!groups.has(pluginId)) {
+      groups.set(pluginId, { pluginId, pluginName, items: [] });
+    }
+    groups.get(pluginId).items.push(item);
+  });
+
+  const groupList = Array.from(groups.values());
+  groupList.forEach((group, groupIdx) => {
+    const accentColor = getPluginAccentColor(group.pluginId);
+
+    if (groupIdx > 0) {
+      const sep = document.createElement('li');
+      sep.className = 'plugin-context-menu-separator';
+      if (closeItem) listEl.insertBefore(sep, closeItem);
+      else listEl.appendChild(sep);
+    }
+
+    const titleEl = document.createElement('li');
+    titleEl.className = 'plugin-context-menu-group-title';
+    titleEl.style.setProperty('--plugin-accent', accentColor);
+    titleEl.textContent = group.pluginName;
+    if (closeItem) listEl.insertBefore(titleEl, closeItem);
+    else listEl.appendChild(titleEl);
+
+    group.items.forEach((item) => {
+      const pluginId = String(item.plugin_id || '').trim();
+      const actionId = String(item.id || '').trim();
+      const label = String(item.label || '').trim();
+      const iconClass = String(item.icon || 'fa-solid fa-puzzle-piece').trim();
+      if (!pluginId || !actionId || !label) return;
+
+      const li = document.createElement('li');
+      li.className = 'context-menu-item plugin-context-menu-item';
+      li.dataset.pluginId = pluginId;
+      li.dataset.actionId = actionId;
+      li.style.setProperty('--plugin-accent', accentColor);
+      li.innerHTML = `<i class="${iconClass} plugin-context-menu-icon"></i> <span class="plugin-context-menu-label">${label}</span>`;
+      li.addEventListener('click', () => {
+        triggerBookContextPluginAction(pluginId, actionId);
+      });
+
+      if (closeItem) {
+        listEl.insertBefore(li, closeItem);
+      } else {
+        listEl.appendChild(li);
+      }
+    });
+  });
+}
+
+async function loadPluginContextMenuItems() {
+  if (!currentTargetBook || !currentTargetBook.id) {
+    clearPluginContextMenuItems();
+    return;
+  }
+
+  const seq = ++contextMenuLoadSeq;
+  console.log('[BookContextMenu] loading plugin items', {
+    seq,
+    bookId: currentTargetBook.id,
+    title: currentTargetBook.title,
+    isVolumeDetail: currentTargetBook.isVolumeDetail,
+    libraryId: state.currentLibraryId,
+  });
+  try {
+    const payload = buildCurrentContextPayload();
+    console.log('[BookContextMenu] request payload', payload);
+    const res = await api.fetchBookContextMenuPluginItems(state.currentLibraryType, payload);
+    if (seq !== contextMenuLoadSeq) return;
+
+    console.log('[BookContextMenu] response', res);
+    if (res && res.success) {
+      renderPluginContextMenuItems(res.items || []);
+      return;
+    }
+
+    clearPluginContextMenuItems();
+  } catch (err) {
+    console.error('컨텍스트 메뉴 플러그인 항목 조회 실패:', err);
+    if (seq === contextMenuLoadSeq) {
+      clearPluginContextMenuItems();
+    }
+  }
+}
 
 function clearLongPressTimer() {
   if (longPressTimer) {
@@ -29,6 +158,8 @@ function hideBookContextMenu({ suppressMs = 0, clearTarget = true } = {}) {
   const bookMenu = document.getElementById('book-context-menu');
   if (bookMenu) bookMenu.style.display = 'none';
   if (clearTarget) currentTargetBook = null;
+  contextMenuLoadSeq += 1;
+  clearPluginContextMenuItems();
   clearLongPressTimer();
   if (suppressMs > 0) {
     contextMenuSuppressUntil = Date.now() + suppressMs;
@@ -78,6 +209,65 @@ export function showBookContextMenu(x, y, bookId, bookTitle, isVolumeDetail = fa
   // 다른 메뉴 닫기
   const libMenu = document.getElementById('library-context-menu');
   if (libMenu) libMenu.style.display = 'none';
+
+  loadPluginContextMenuItems();
+}
+
+export async function triggerBookContextPluginAction(pluginId, actionId) {
+  if (!pluginId || !actionId) return;
+  if (!currentTargetBook || !currentTargetBook.id) return;
+
+  let pendingPopup = null;
+  try {
+    pendingPopup = window.open('', '_blank');
+    if (pendingPopup) {
+      pendingPopup.document.write('<!doctype html><title>네이버 도서 검색 중...</title><p>검색 페이지를 여는 중입니다.</p>');
+      pendingPopup.document.close();
+    }
+
+    const payload = buildCurrentContextPayload();
+    console.log('[BookContextMenu] run plugin action', {
+      pluginId,
+      actionId,
+      payload,
+    });
+    const res = await api.runBookContextMenuPluginAction(
+      state.currentLibraryType,
+      pluginId,
+      actionId,
+      payload
+    );
+
+    console.log('[BookContextMenu] action response', res);
+
+    const vm = await import('./view_manager.js');
+    if (!res || !res.success) {
+      if (pendingPopup) {
+        pendingPopup.close();
+      }
+      vm.showToast(res && res.error ? res.error : '플러그인 작업 실행에 실패했습니다.', 'error');
+      return;
+    }
+
+    if (res.open_url) {
+      if (pendingPopup) {
+        pendingPopup.location.href = res.open_url;
+      } else {
+        window.open(res.open_url, '_blank');
+      }
+    }
+
+    if (res.message) {
+      vm.showToast(res.message, 'success');
+    }
+  } catch (err) {
+    if (pendingPopup) {
+      pendingPopup.close();
+    }
+    console.error('플러그인 컨텍스트 메뉴 액션 실행 실패:', err);
+    const vm = await import('./view_manager.js');
+    vm.showToast('플러그인 작업 실행 중 오류가 발생했습니다.', 'error');
+  }
 }
 
 export async function triggerScanSingleBookAction() {
@@ -186,6 +376,7 @@ export async function triggerMarkAsUnreadAction() {
 }
 
 window.triggerMarkAsUnreadAction = triggerMarkAsUnreadAction;
+window.triggerBookContextPluginAction = triggerBookContextPluginAction;
 export { triggerSearchMetadataAction as triggerSearchAladinMetadataAction };
 
 window.showBookContextMenu = showBookContextMenu;
@@ -319,11 +510,12 @@ if (bookMenuEl) {
   }, true);
   bookMenuEl.addEventListener('click', (event) => {
     blockUnderlyingBookCardInteraction(event);
-    event.stopPropagation();
     const item = event.target.closest('.context-menu-item');
     if (item) {
       // 메뉴 항목 클릭 시 suppress를 충분히 길게 설정 (iOS 지연 이벤트 방어)
-      hideBookContextMenu({ suppressMs: 700, clearTarget: false });
+      setTimeout(() => {
+        hideBookContextMenu({ suppressMs: 700, clearTarget: false });
+      }, 0);
     }
   }, true);
 }

@@ -10,6 +10,35 @@ class BaseMetadataProvider(ABC):
     is_searchable = True
     config_schema = []
     enabled = True
+    dashboard_widget = None
+
+    def get_db_gateway(self, db_type):
+        """Return a cached DB gateway instance for the requested db_type."""
+        if not hasattr(self, "_db_gateways"):
+            self._db_gateways = {}
+
+        target = db_type or "general"
+        if target not in self._db_gateways:
+            from services.plugin_db_gateway import PluginDatabaseGateway
+
+            self._db_gateways[target] = PluginDatabaseGateway(target)
+        return self._db_gateways[target]
+
+    def get_plugin_config(self, db_type, default=None):
+        gateway = self.get_db_gateway(db_type)
+        return gateway.get_plugin_config(self.id, default=default)
+
+    def get_context_menu_items(self, db_type, context):
+        """도서 컨텍스트 메뉴 확장 항목 계약 (선택 구현)."""
+        return []
+
+    def run_context_menu_action(self, db_type, action_id, context):
+        """컨텍스트 메뉴 액션 실행 계약 (선택 구현)."""
+        return {'success': False, 'error': 'context menu action not implemented'}
+
+    def get_dashboard_data(self, db_type, limit=10):
+        """대시보드 위젯 데이터 공통 계약 (위젯을 쓰는 플러그인에서 override)."""
+        return {'success': False, 'error': 'dashboard widget not implemented'}
 
     @abstractmethod
     def search(self, db_type, query):

@@ -347,6 +347,55 @@
     color: #f87171;
 }
 
+.plugin-context-menu-separator {
+    height: 1px;
+    margin: 0.3rem 0.75rem;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.plugin-context-menu-group-title {
+    padding: 0.45rem 1rem 0.35rem 1rem;
+    color: #94a3b8;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-weight: 700;
+    cursor: default;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.plugin-context-menu-group-title::before {
+    content: "";
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 999px;
+    background: var(--plugin-accent, #22c55e);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.07);
+}
+
+.context-menu-item.plugin-context-menu-item {
+    align-items: center;
+    gap: 0.65rem;
+    box-shadow: inset 2px 0 0 transparent;
+}
+
+.context-menu-item.plugin-context-menu-item:hover {
+    box-shadow: inset 2px 0 0 var(--plugin-accent, #22c55e);
+}
+
+.plugin-context-menu-icon {
+    width: 14px;
+    text-align: center;
+    color: var(--plugin-accent, #22c55e);
+}
+
+.plugin-context-menu-label {
+    flex: 1;
+}
+
 /* 모달 스타일 */
 .library-modal {
     position: fixed;

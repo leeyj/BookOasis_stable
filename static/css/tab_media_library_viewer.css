@@ -1,5 +1,11 @@
 /* 🔄 도서 통합 뷰어 모달 스타일 */
 
+/* 모바일 터치 하이라이트(번쩍임)를 거의 보이지 않게 완화 */
+.viewer-modal,
+.viewer-modal * {
+    -webkit-tap-highlight-color: rgba(255, 255, 255, 0.02);
+}
+
 /* 뷰어 모달 닫기 버튼 */
 .close-viewer-btn {
     color: #94a3b8;

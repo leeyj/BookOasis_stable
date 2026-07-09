@@ -1,0 +1,47 @@
+.aladin-new-plugin-panel {
+    background: rgba(15, 23, 42, 0.35);
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 10px;
+    padding: 1rem;
+}
+
+.aladin-new-plugin-title {
+    color: #f8fafc;
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin-bottom: 0.35rem;
+}
+
+.aladin-new-plugin-desc {
+    color: #94a3b8;
+    font-size: 0.8rem;
+    margin-bottom: 0.9rem;
+}
+
+.aladin-new-plugin-field label {
+    display: block;
+    color: #e2e8f0;
+    font-weight: 700;
+    font-size: 0.86rem;
+    margin-bottom: 0.35rem;
+}
+
+.aladin-new-plugin-field .req {
+    color: #f43f5e;
+}
+
+.aladin-new-plugin-field input {
+    width: 100%;
+    max-width: 520px;
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #fff;
+    padding: 0.6rem 0.8rem;
+    border-radius: 6px;
+    outline: none;
+}
+
+.aladin-new-plugin-field input:focus {
+    border-color: #a855f7;
+    box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.2);
+}

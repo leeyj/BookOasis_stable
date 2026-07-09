@@ -8,19 +8,28 @@ This directory is designed for pluggable metadata providers. You can create a ne
 
 ## How to Create a New Plugin (새 플러그인 추가 방법)
 
-### 1. Create a provider file (프로바이더 파일 생성)
-Create a new Python file in this directory. The filename will be used as the provider's internal module name.
-For example, if you create `google.py`, the provider module will be `google`.
+### 1. Create a provider module (프로바이더 모듈 생성)
+You can use either legacy single-file style or folder-based style.
 
-이 디렉토리에 새로운 파이썬 파일을 생성하십시오.
-예를 들어 `google.py` 파일을 생성하면 모듈 이름은 `google`이 됩니다.
+다음 2가지 방식 중 하나를 사용할 수 있습니다.
+
+- Legacy single-file: `plugins/metadata/google.py`
+- Folder-based (recommended): `plugins/metadata/google/google.py`
+
+For folder-based plugins, this loader also supports optional UI assets:
+
+- `plugins/metadata/google/index.html` (custom settings UI)
+- `plugins/metadata/google/style.css` (plugin-specific styles)
+- `plugins/metadata/google/script.js` (optional initializer script)
 
 ### 2. Implement the provider class (프로바이더 클래스 구현)
 Your class must inherit from `BaseMetadataProvider` defined in [base.py](base.py).
 The class name must follow this pattern: `{CamelCaseFileName}MetadataProvider`.
 
 작성할 클래스는 반드시 `plugins/metadata/base.py`에 정의된 `BaseMetadataProvider`를 상속받아야 합니다.
-클래스 이름은 `{파일명의CamelCase}MetadataProvider` 형태여야 합니다. (예: `GoogleMetadataProvider`)
+클래스 이름은 `{파일명의CamelCase}MetadataProvider` 형태를 권장합니다. (예: `GoogleMetadataProvider`)
+
+하위 호환을 위해 기존 방식(`Aladin_newMetadataProvider`)도 여전히 로드됩니다.
 
 ### 3. Define UI & Configuration Properties (UI 및 설정 속성 정의)
 To make your plugin configurable from the Web UI (Settings > Plugin Settings), define the following class attributes:
@@ -61,6 +70,29 @@ If defined as above, the frontend automatically renders the composite form, and 
 You need to implement the following two methods:
 - `search(self, db_type, query)`: Search external API and return a list of dictionaries.
 - `apply(self, db_type, book_id, item_data)`: Download covers and update the database.
+
+### 5. Dashboard Widget Contract (대시보드 위젯 계약)
+If you want to expose a plugin widget on the main dashboard, implement the contract below.
+
+메인 대시보드에 플러그인 위젯을 표시하려면 아래 계약을 구현하세요.
+
+- Class attribute `dashboard_widget` (dict)
+    - Example keys: `title`, `subtitle`, `provider`, `icon`, `limit`
+- Method `get_dashboard_data(self, db_type, limit=10)`
+    - Must return JSON-like dict in this shape:
+        - Success: `{'success': True, 'items': [...]}`
+        - Failure: `{'success': False, 'error': '...'}`
+
+Important:
+- The core dashboard no longer knows plugin-specific names or routes.
+- The core only discovers `dashboard_widget` metadata and calls `get_dashboard_data`.
+- Therefore, plugin-specific helper names (e.g. `_fetch_new_releases`) should remain internal/private.
+
+Quick start template:
+- Copy `plugins/metadata/__template_dashboard_plugin.py`
+- Rename to your plugin file/folder module (for example `plugins/metadata/my_widget/my_widget.py`)
+- Update class name, `id`, `name`, `config_schema`, `dashboard_widget`, and `_fetch_items()`
+- Restart server and enable plugin in Settings > Plugin Settings
 
 ---
 
@@ -186,4 +218,49 @@ In the past, you had to modify `METADATA_PROVIDER` in the `.env` file, but in th
 2. Restart the media server. (미디어 서버를 재시작합니다.)
 3. Access the **Settings > Plugin Settings** tab in the Web UI, and your written plugin will be automatically displayed. (웹 UI의 **환경설정 > 플러그인 설정** 탭에 접속하면 작성하신 플러그인이 자동으로 표시됩니다.)
 4. **Enable (ON)** the plugin in that tab, enter configuration values like API Keys, and save. (해당 탭에서 플러그인을 **활성화(ON)**하고 API Key 등의 설정값을 입력한 뒤 저장합니다.)
+
+If your plugin provides `index.html` and `style.css`, the plugin settings tab will render that custom UI automatically. (`index.html`, `style.css`가 있으면 설정 탭에서 플러그인 전용 UI가 자동 렌더링됩니다.)
 5. Plugins with `is_searchable = True` will automatically be added as a dropdown option in the "Manual Metadata Matching" search modal on the book details page. (`is_searchable = True`인 플러그인들은 도서 상세 보기의 "수동 메타데이터 매칭" 검색 모달에 드롭다운 옵션으로 자동 추가됩니다.)
+
+### Sample: Naver Book Search Context Menu (샘플: 네이버 도서 검색 컨텍스트 메뉴)
+
+If you only want to add a quick external search action for the current book, use the context menu contract. This is a good starter example for community plugins because it does not require any external API key.
+
+현재 도서에 대해 외부 검색만 빠르게 열고 싶다면 컨텍스트 메뉴 계약을 사용하세요. 이 방식은 API 키가 필요 없어서 커뮤니티 샘플로 적합합니다.
+
+Example file:
+
+- `plugins/metadata/naver_book/naver_book.py`
+
+Key behavior:
+
+- Reads `book_id` and `book_title` from the context payload
+- Optionally loads the latest `title` and `author` from DB via `self.get_db_gateway(db_type)`
+- Returns `open_url` to open `https://book.naver.com/search/search.naver?query=...`
+
+핵심 동작:
+
+- 컨텍스트 payload의 `book_id`, `book_title`을 읽습니다.
+- 필요하면 `self.get_db_gateway(db_type)`로 DB에서 최신 `title`/`author`를 다시 읽습니다.
+- `open_url`을 반환하여 `https://book.naver.com/search/search.naver?query=...`를 새 탭으로 엽니다.
+
+Recommended pattern:
+
+```python
+class NaverBookMetadataProvider(BaseMetadataProvider):
+    id = "naver_book"
+    name = "네이버 도서 검색"
+    is_searchable = False
+
+    def search(self, db_type, query):
+        return []
+
+    def apply(self, db_type, book_id, item_data):
+        return False, "..."
+
+    def get_context_menu_items(self, db_type, context):
+        return [{"id": "open_naver_book_search", "label": "네이버 도서에서 검색", "icon": "fa-solid fa-book-open"}]
+
+    def run_context_menu_action(self, db_type, action_id, context):
+        ...
+```

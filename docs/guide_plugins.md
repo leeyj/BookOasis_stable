@@ -1,137 +1,300 @@
 # 🧩 메타데이터 플러그인 개발 가이드 (Metadata Plugin Guide)
 
-이 문서는 BookOasis 미디어 서버의 코어 소스코드를 수정하지 않고 외부 API(예: Google Books, Amazon 등)를 연동하는 새로운 메타데이터 검색 플러그인을 개발하여 추가하는 방법을 다룹니다.
+이 문서는 BookOasis 미디어 서버에서 코어 수정 없이 메타데이터/대시보드 플러그인을 추가하는 최신 규격을 설명합니다.
 
-> 주의: 이 문서는 `plugins/metadata/` 아래의 외부 검색 플러그인 가이드입니다. 스캐너 내부에서 파일을 읽고 파싱하는 로컬 파서 개발은 [스캐너 파서 개발 가이드](./guide_scanner_parser.md)를 따르십시오.
-
----
-
-## 1. 신규 플러그인 생성 방법
-
-### 1) 프로바이더 파일 생성
-`plugins/metadata/` 디렉토리에 새로운 파이썬 파일(예: `google.py`)을 생성하십시오. 파일명은 플러그인의 고유 ID 모듈명으로 사용됩니다.
-
-### 2) 프로바이더 클래스 작성
-작성할 클래스는 반드시 [plugins/metadata/base.py](../plugins/metadata/base.py)의 `BaseMetadataProvider` 인터페이스 클래스를 상속받아야 합니다.
-클래스명은 파일명을 카멜케이스(CamelCase)로 조합하여 `{파일명}MetadataProvider` 형태여야 합니다.
-* 예: `google.py` -> `GoogleMetadataProvider`
+> 주의: 이 문서는 `plugins/metadata/` 외부 연동 플러그인 가이드입니다. 스캐너 로컬 파서 개발은 [스캐너 파서 개발 가이드](./guide_scanner_parser.md)를 따르십시오.
 
 ---
 
-## 2. UI 및 설정 스키마 정의 (config_schema)
+## 1. 핵심 원칙 (중요)
 
-플러그인이 브라우저의 **환경설정 > 플러그인 설정** 화면에 자동으로 노출되고 설정을 입력받으려면 아래 클래스 필드들을 정의해 주어야 합니다.
+- 코어는 플러그인 고유 이름, 고유 라우트, 내부 함수명을 알지 않습니다.
+- 코어는 공통 계약만 사용합니다.
+- 플러그인 확장은 플러그인 디렉토리 내부 코드/리소스만으로 끝나야 합니다.
 
-* `id` (str): 고유 식별자 (보통 파일명과 동일 설정)
-* `name` (str): 사용자 화면에 표시될 한글/영문 플러그인 이름
-* `is_searchable` (bool): 도서 상세 정보 팝업 내 메타데이터 수동 매칭 검색기에서 드롭다운 옵션으로 자동 제공할지 여부
-* `config_schema` (list): UI 폼에서 입력받을 필드들의 상세 스펙 정의
+즉, "메인은 이제 플러그인에 관여하지 않는다"가 설계 목표입니다.
 
-### 💡 복합 JSON 설정 값 로직
-입력 폼에 설정된 데이터는 하나의 JSON 문자열로 자동 직렬화(Serialize)되어 데이터베이스 `settings` 테이블에 키(`PLUGIN_CONFIG_{id}`)로 매핑 저장됩니다. 따라서 임의의 복잡한 입력 형태도 데이터 소실 없이 직관적으로 보관 및 복구할 수 있습니다.
+---
 
-**지원 폼 종류:**
-* `text` / `password` / `number`: 텍스트 및 패스워드, 숫자 폼
-* `checkbox`: 불리언 (True / False) 토글 스위치 폼
-* `select`: 드롭다운 목록 선택 폼 (`options` 배열 정의 필수)
+## 2. 디렉토리 구조 규격
 
-**config_schema 예시:**
+권장 방식은 폴더 기반입니다.
+
+```text
+plugins/metadata/
+  my_widget/
+    __init__.py
+    my_widget.py
+    index.html      # 선택: 설정 화면 커스텀 UI
+    style.css       # 선택: 설정 화면 커스텀 스타일
+    script.js       # 선택: 설정 화면 커스텀 스크립트
+```
+
+구 방식(단일 파일)도 하위 호환으로 로드되지만, 신규 개발은 폴더 기반을 권장합니다.
+
+빠른 시작 템플릿:
+
+- `plugins/metadata/__template_dashboard_plugin.py`를 복사해 시작
+- 파일/폴더명, 클래스명, `id`를 실제 플러그인 이름으로 변경
+
+---
+
+## 3. 플러그인 클래스 기본 계약
+
+모든 플러그인 클래스는 [plugins/metadata/base.py](../plugins/metadata/base.py)를 상속해야 합니다.
+
+필수/권장 필드:
+
+- `id` (str): 고유 식별자
+- `name` (str): UI 표시명
+- `is_searchable` (bool): 수동 메타데이터 검색 모달 노출 여부
+- `config_schema` (list): 설정 폼 스키마
+- `dashboard_widget` (dict 또는 None): 대시보드 위젯 메타
+
+필수 메서드:
+
+- `search(self, db_type, query)`
+- `apply(self, db_type, book_id, item_data)`
+
+대시보드 위젯용 공통 메서드:
+
+- `get_dashboard_data(self, db_type, limit=10)`
+
+반환 규격:
+
+- 성공: `{'success': True, 'items': [...]}`
+- 실패: `{'success': False, 'error': '...'}`
+
+---
+
+## 4. 설정 UI 및 config_schema
+
+플러그인 설정값은 `settings` 테이블의 `PLUGIN_CONFIG_{id}`에 JSON 문자열로 저장됩니다.
+
+지원 필드 타입:
+
+- `text`, `password`, `number`
+- `checkbox`
+- `select` (`options` 필요)
+
+예시:
+
 ```python
 config_schema = [
     {"key": "API_KEY", "label": "API Key", "type": "password", "required": True},
-    {"key": "MAX_RETRIES", "label": "최대 재시도 횟수", "type": "number", "default": 3},
-    {"key": "SERVER_REGION", "label": "지역", "type": "select", "options": [
-        {"value": "us", "label": "미국 (US)"},
-        {"value": "kr", "label": "한국 (KR)"}
+    {"key": "ENABLE_PROXY", "label": "프록시 사용", "type": "checkbox", "default": False},
+    {"key": "REGION", "label": "지역", "type": "select", "options": [
+        {"value": "kr", "label": "한국"},
+        {"value": "us", "label": "미국"}
     ]}
 ]
 ```
 
----
+### 커스텀 설정 UI (선택)
 
-## 3. 필수 인터페이스 메서드 구현
+폴더 기반 플러그인에 아래 파일을 추가하면 설정 탭에서 자동 반영됩니다.
 
-플러그인 클래스 내부에 다음 두 가지 핵심 메서드를 반드시 오버라이드하여 구현해야 합니다.
-
-### 1) `search(self, db_type, query)`
-* **역할**: 외부 API 등을 질의하여 검색에 매칭되는 책 후보군 리스트를 조회합니다.
-* **인자**: 
-  * `db_type` (str): `'prod'` (운영) 또는 `'dev'` (개발)
-  * `query` (str): 검색어 (도서 제목 등)
-* **리턴값**: `list[dict]` (아래 규격을 만족하는 도서 딕셔너리 목록)
-  ```python
-  results = [
-      {
-          'title': '도서 제목',
-          'author': '저자명',
-          'publisher': '출판사명',
-          'pubDate': '출간일(YYYY-MM-DD)',
-          'cover': '표지 이미지 원본 URL',
-          'description': '책 소개 상세글 내용',
-          'link': '해당 도서의 외부 상세정보 연결 URL'
-      }
-  ]
-  ```
-
-### 2) `apply(self, db_type, book_id, item_data)`
-* **역할**: 사용자가 수동 매칭 목록에서 특정 도서를 골라 "적용"을 눌렀을 때 실행되며, 책의 표지 이미지를 로컬에 다운로드하고 DB 레코드를 최종 업데이트합니다.
-* **인자**:
-  * `db_type` (str): DB 환경 구분자
-  * `book_id` (int): 변경 대상 도서 레코드 고유 ID
-  * `item_data` (dict): 사용자가 고른 `search` 결과 단일 딕셔너리 객체
-* **리턴값**: `tuple[bool, str]` - `(성공여부, 반환 메시지)`
+- `index.html`: 플러그인 전용 설정 마크업
+- `style.css`: 플러그인 전용 스타일
+- `script.js`: 플러그인 전용 초기화 로직
 
 ---
 
-## 4. 플러그인 템플릿 코드 예시
+## 5. 대시보드 위젯 계약
+
+대시보드 카드 노출을 원하면 `dashboard_widget`를 정의하고 `get_dashboard_data()`를 구현하십시오.
+
+예시:
 
 ```python
-# -*- coding: utf-8 -*-
-import json
-import database
-from plugins.metadata.base import BaseMetadataProvider
+dashboard_widget = {
+    'title': '신간 위젯',
+    'subtitle': '외부 API 신간 목록',
+    'provider': 'Example',
+    'icon': 'fa-solid fa-book-open',
+    'limit': 10,
+}
 
-class GoogleMetadataProvider(BaseMetadataProvider):
-    id = "google"
-    name = "Google Books"
-    is_searchable = True
-    config_schema = [
-        {"key": "GOOGLE_API_KEY", "label": "Google API Key", "type": "text", "required": True}
+def get_dashboard_data(self, db_type, limit=10):
+    # 내부 fetch 헬퍼 호출
+    return {'success': True, 'items': []}
+```
+
+권장 사항:
+
+- 외부 공개 메서드는 `get_dashboard_data()`만 유지
+- 플러그인 내부 구현은 private helper(`_fetch_items`)로 분리
+
+---
+
+## 6. 도서 컨텍스트 메뉴 확장 계약
+
+도서 카드(대시보드/목록/상세 공통)의 컨텍스트 메뉴에 플러그인 항목을 동적으로 노출할 수 있습니다.
+
+플러그인 선택 구현 메서드:
+
+- `get_context_menu_items(self, db_type, context)`
+- `run_context_menu_action(self, db_type, action_id, context)`
+
+`get_context_menu_items()` 반환 예시:
+
+```python
+def get_context_menu_items(self, db_type, context):
+    return [
+        {
+            'id': 'open_vendor_search',
+            'label': '벤더 사이트에서 제목 검색',
+            'icon': 'fa-solid fa-up-right-from-square',
+        }
     ]
+```
 
-    def _get_api_key(self, db_type):
-        """DB에 저장된 플러그인 JSON 설정에서 API 키 복원 추출"""
-        try:
-            conn = database.get_connection(db_type)
-            cursor = conn.cursor()
-            cursor.execute("SELECT value FROM settings WHERE key = 'PLUGIN_CONFIG_google'")
-            row = cursor.fetchone()
-            conn.close()
-            if row and row['value']:
-                return json.loads(row['value']).get('GOOGLE_API_KEY')
-        except Exception:
-            pass
-        return None
+`run_context_menu_action()` 반환 규격:
 
-    def search(self, db_type, query):
-        api_key = self._get_api_key(db_type)
-        if not api_key or not query:
-            return []
-        
-        # 외부 API 연동 수행...
-        return []
+- 성공: `{'success': True, 'message': '...', 'open_url': 'https://...'}`
+- 실패: `{'success': False, 'error': '...'}`
 
-    def apply(self, db_type, book_id, item_data):
-        # 다운로드 및 books 테이블 UPDATE문 수행...
-        return True, "적용 성공"
+프런트 렌더링 메모:
+
+- 컨텍스트 메뉴는 `plugin_name` 기준으로 자동 그룹화되어 섹션/구분선 UI로 출력됩니다.
+- 같은 플러그인이 여러 항목을 반환하면 한 그룹 아래로 묶여 표시됩니다.
+
+`context` 기본 필드:
+
+- `book_id`
+- `book_title`
+- `is_volume_detail`
+- `library_id`
+
+코어 관점:
+
+- 코어는 공통 엔드포인트/공통 스키마만 처리
+- 실제 메뉴 항목 정의/동작은 플러그인 내부에서만 구현
+
+`stats_dashboard` 컨텍스트 메뉴 예시:
+
+- 항목: `독서 통계 요약 보기`
+- 액션: 현재 라이브러리 통계를 조회하여 토스트 메시지로 반환
+
+### 샘플: 네이버 도서 검색 컨텍스트 메뉴
+
+네이버 도서 검색처럼 "현재 책 제목으로 외부 검색 페이지를 여는" 플러그인은 가장 만들기 쉬운 예시입니다. API 키가 필요 없고, 컨텍스트 메뉴 계약만으로 동작합니다.
+
+샘플 파일:
+
+- [plugins/metadata/naver_book/naver_book.py](../plugins/metadata/naver_book/naver_book.py)
+
+핵심 동작:
+
+- `book_id`, `book_title`을 컨텍스트에서 읽습니다.
+- 필요하면 `self.get_db_gateway(db_type)`로 `books` 테이블의 최신 `title`, `author`를 다시 조회합니다.
+- `run_context_menu_action()`에서 `open_url`을 반환하여 네이버 도서 검색을 새 탭으로 엽니다.
+
+예시 반환값:
+
+```python
+{
+    'success': True,
+    'message': '네이버 도서 검색 페이지를 새 탭으로 엽니다.',
+    'open_url': 'https://book.naver.com/search/search.naver?query=...'
+}
 ```
 
 ---
 
-## 5. 플러그인 등록 및 활성화 프로세스
+## 7. 구현 예시 (간단)
 
-1. 작성한 파이썬 파일을 `plugins/metadata/` 폴더에 복사합니다.
-2. BookOasis 미디어 서버 서비스를 재시작합니다.
-3. 웹 브라우저로 접속한 뒤 **환경설정 > 플러그인 설정** 탭에 이동하면 목록에 신규 플러그인이 나타납니다.
-4. 토글 스위치로 플러그인을 **활성화(ON)** 상태로 변경하고, 요청된 API Key 등 필수 정보를 입력한 후 저장 버튼을 클릭합니다.
-5. `is_searchable = True` 인 경우, 도서 상세 정보 보기 화면 내 "수동 메타데이터 매칭" 검색 모달 드롭다운 목록에서 바로 사용할 수 있습니다.
+```python
+# -*- coding: utf-8 -*-
+import json
+from plugins.metadata.base import BaseMetadataProvider
+
+
+class MyWidgetMetadataProvider(BaseMetadataProvider):
+    id = "my_widget"
+    name = "My Widget"
+    is_searchable = False
+    config_schema = [{"key": "API_KEY", "label": "API Key", "type": "text", "required": True}]
+    dashboard_widget = {
+        "title": "My Widget",
+        "subtitle": "Demo",
+        "provider": "My API",
+        "icon": "fa-solid fa-puzzle-piece",
+        "limit": 10,
+    }
+
+    def search(self, db_type, query):
+        return []
+
+    def apply(self, db_type, book_id, item_data):
+        return False, "대시보드 전용 플러그인입니다."
+
+    def _fetch_items(self, db_type, limit=10):
+        return {'success': True, 'items': []}
+
+    def get_dashboard_data(self, db_type, limit=10):
+        return self._fetch_items(db_type, limit=limit)
+```
+
+### 플러그인 DB 게이트웨이 (권장)
+
+플러그인에서 `import database`로 직접 연결하지 말고, 베이스 헬퍼를 사용하십시오.
+
+- `self.get_db_gateway(db_type)`
+- `self.get_plugin_config(db_type, default={})`
+
+게이트웨이 주요 메서드:
+
+- `fetch_one(query, params=())`
+- `fetch_all(query, params=())`
+- `execute(query, params=())`
+- `execute_many(query, seq_of_params)`
+- `transaction()`
+- `get_setting(key, default=None)` / `set_setting(key, value)`
+
+예시:
+
+```python
+def _get_api_key(self, db_type):
+    cfg = self.get_plugin_config(db_type, default={})
+    return cfg.get("API_KEY")
+
+def _count_books(self, db_type):
+    gateway = self.get_db_gateway(db_type)
+    row = gateway.fetch_one("SELECT COUNT(*) AS cnt FROM books WHERE COALESCE(is_deleted, 0) = 0")
+    return int((row["cnt"] if row else 0) or 0)
+```
+
+---
+
+## 8. 등록 및 활성화
+
+1. 플러그인 폴더/파일을 `plugins/metadata/` 아래에 추가합니다.
+2. 서버를 재시작합니다.
+3. 웹 UI의 환경설정 > 플러그인 설정에서 플러그인을 활성화합니다.
+4. 설정값 입력 후 저장합니다.
+5. `is_searchable=True`이면 수동 메타데이터 검색 모달에 노출됩니다.
+6. `dashboard_widget` + `get_dashboard_data()`를 구현하면 대시보드에 자동 노출됩니다.
+
+---
+
+## 9. 통계 플러그인 예시 (동일 요구사항)
+
+예시 플러그인: `plugins/metadata/stats_dashboard/stats_dashboard.py`
+
+대시보드 노출 항목:
+
+1. 총계: 시리즈 수/도서수
+2. 읽은 도서 수(100% 완독 기준): 이번주 00권 / 이번달 00권
+3. 신규 추가 수: 이번주 00권 / 이번달 00권
+
+구현 포인트:
+
+- `dashboard_widget`를 정의하여 위젯 카드를 노출
+- `get_dashboard_data()`가 위 3개 통계를 `items`로 반환 (주간/월간 동시 집계)
+- 코어 수정 없이 플러그인 내부 SQL/로직만으로 확장
+
+참고:
+
+- 이 통계 항목(총계/주간/월간)은 플러그인에서 정의하는 영역입니다.
+- 코어는 공통 계약(`dashboard_widget`, `get_dashboard_data`)만 사용하므로, 항목 변경 시 코어 수정이 필요하지 않습니다.

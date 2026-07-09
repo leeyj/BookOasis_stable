@@ -1,135 +1,303 @@
-# 🧩 Metadata Provider Plugin Development Guide (Plugin Guide)
+# 🧩 Metadata Plugin Development Guide (New Standard)
 
-This document describes how to develop and add a new metadata search plugin to integrate external APIs (e.g., Google Books, Amazon, etc.) without modifying the core system of BookOasis.
+This document describes the current plugin standard for BookOasis metadata/dashboard plugins.
 
----
-
-## 1. Creating a New Plugin
-
-### 1) Create a Provider File
-Create a new Python file (e.g., `google.py`) in the `plugins/metadata/` directory. The filename will be used as the provider's internal module name.
-
-### 2) Write the Provider Class
-Your class must inherit from `BaseMetadataProvider` defined in [plugins/metadata/base.py](../plugins/metadata/base.py).
-The class name must follow this camel-case pattern: `{CamelCaseFileName}MetadataProvider`.
-* Example: `google.py` -> `GoogleMetadataProvider`
+> Scope: external provider plugins under `plugins/metadata/`.
+> For scanner parser modules, use [guide_scanner_parser.md](./guide_scanner_parser.md).
 
 ---
 
-## 2. Defining UI & Configuration Schema (config_schema)
+## 1. Core Principle
 
-To expose your plugin in the Web UI (**Settings > Plugin Settings**) and accept configuration inputs, define the following class attributes:
+- The core must not know plugin-specific names, routes, or internal helper methods.
+- The core only relies on shared contracts.
+- Plugin extension should be completed inside `plugins/metadata/` without core code forks.
 
-* `id` (str): Unique identifier (usually the same as the filename).
-* `name` (str): The plugin name displayed on the user interface screen.
-* `is_searchable` (bool): Whether to show this plugin in the manual metadata matching search modal on the book details page.
-* `config_schema` (list): Defines the input fields specs automatically rendered by the UI.
+---
 
-### 💡 JSON Serialization for Plugin Config
-Form data inputted by users is serialized into a single JSON string and stored in the `value` column of the `settings` table with the key `PLUGIN_CONFIG_{id}`. This handles complex data properties without structural loss.
+## 2. Directory Structure
 
-**Supported Input Types:**
-* `text` / `password` / `number`: Basic input elements.
-* `checkbox`: Boolean toggle switches (True/False).
-* `select`: Dropdown selection menus (requires configuring the `options` array).
+Folder-based layout is recommended.
 
-**config_schema Example:**
+```text
+plugins/metadata/
+  my_widget/
+    __init__.py
+    my_widget.py
+    index.html      # optional: custom settings UI
+    style.css       # optional: custom settings styles
+    script.js       # optional: custom settings initializer
+```
+
+Legacy single-file modules are still loadable, but new development should use folder-based modules.
+
+Quick start template:
+
+- Copy `plugins/metadata/__template_dashboard_plugin.py`
+- Rename module/class/id to your plugin identity
+
+---
+
+## 3. Provider Contract
+
+All providers must inherit [plugins/metadata/base.py](../plugins/metadata/base.py).
+
+Recommended class attributes:
+
+- `id` (str): plugin identifier
+- `name` (str): display name
+- `is_searchable` (bool): show in manual metadata search modal
+- `config_schema` (list): settings form schema
+- `dashboard_widget` (dict or None): dashboard widget metadata
+
+Required methods:
+
+- `search(self, db_type, query)`
+- `apply(self, db_type, book_id, item_data)`
+
+Dashboard method (for widget plugins):
+
+- `get_dashboard_data(self, db_type, limit=10)`
+
+Return shape:
+
+- Success: `{'success': True, 'items': [...]}`
+- Failure: `{'success': False, 'error': '...'}`
+
+---
+
+## 4. Settings Schema & UI Assets
+
+Plugin config values are serialized into JSON and stored in:
+
+- `settings.key = PLUGIN_CONFIG_{id}`
+
+Supported field types:
+
+- `text`, `password`, `number`
+- `checkbox`
+- `select` (requires `options`)
+
+Example:
+
 ```python
 config_schema = [
-    {"key": "API_KEY", "label": "API Token Key", "type": "password", "required": True},
-    {"key": "MAX_RETRIES", "label": "Max Retries Count", "type": "number", "default": 3},
-    {"key": "SERVER_REGION", "label": "Server Area", "type": "select", "options": [
-        {"value": "us", "label": "United States (US)"},
-        {"value": "kr", "label": "South Korea (KR)"}
+    {"key": "API_KEY", "label": "API Key", "type": "password", "required": True},
+    {"key": "ENABLE_PROXY", "label": "Enable Proxy", "type": "checkbox", "default": False},
+    {"key": "REGION", "label": "Region", "type": "select", "options": [
+        {"value": "kr", "label": "Korea"},
+        {"value": "us", "label": "United States"}
     ]}
 ]
 ```
 
----
+Optional custom settings UI files:
 
-## 3. Implementing Interface Methods
+- `index.html`
+- `style.css`
+- `script.js`
 
-You must override and implement the following two core abstract methods in your plugin class.
-
-### 1) `search(self, db_type, query)`
-* **Role**: Queries external APIs and returns matching candidate lists.
-* **Arguments**:
-  * `db_type` (str): `'prod'` (Production) or `'dev'` (Development)
-  * `query` (str): Searching text query (e.g., book title).
-* **Return Value**: `list[dict]` (A list of book dictionaries matching the format below):
-  ```python
-  results = [
-      {
-          'title': 'Book Title String',
-          'author': 'Author String',
-          'publisher': 'Publisher Name',
-          'pubDate': 'Publication Date (YYYY-MM-DD)',
-          'cover': 'Raw image source cover URL',
-          'description': 'Brief or detailed description text',
-          'link': 'External detailed link URL connection'
-      }
-  ]
-  ```
-
-### 2) `apply(self, db_type, book_id, item_data)`
-* **Role**: Triggered when a user clicks the "Apply" button. Downloads the cover image to the local cache and updates the database records.
-* **Arguments**:
-  * `db_type` (str): Database target environment indicator.
-  * `book_id` (int): Target primary key record ID in the `books` table.
-  * `item_data` (dict): Selected single dictionary item among `search` results.
-* **Return Value**: `tuple[bool, str]` - `(success_boolean, feedback_message_string)`
+If present, they are automatically loaded in Settings > Plugin Settings.
 
 ---
 
-## 4. Plugin Code Template Example
+## 5. Dashboard Widget Contract
+
+To render a plugin card on the main dashboard:
+
+1. Define `dashboard_widget` metadata.
+2. Implement `get_dashboard_data()`.
+
+Example:
 
 ```python
-# -*- coding: utf-8 -*-
-import json
-import database
-from plugins.metadata.base import BaseMetadataProvider
+dashboard_widget = {
+    'title': 'New Releases',
+    'subtitle': 'External provider feed',
+    'provider': 'Example API',
+    'icon': 'fa-solid fa-book-open',
+    'limit': 10,
+}
 
-class GoogleMetadataProvider(BaseMetadataProvider):
-    id = "google"
-    name = "Google Books"
-    is_searchable = True
-    config_schema = [
-        {"key": "GOOGLE_API_KEY", "label": "Google API Key", "type": "text", "required": True}
+def get_dashboard_data(self, db_type, limit=10):
+    return {'success': True, 'items': []}
+```
+
+Recommendation:
+
+- Keep `get_dashboard_data()` as the only public dashboard entrypoint.
+- Keep provider-specific fetch logic in private helpers (e.g. `_fetch_items`).
+
+---
+
+## 6. Book Context Menu Extension Contract
+
+You can dynamically expose plugin items in the shared book context menu (dashboard/list/detail views).
+
+Optional provider methods:
+
+- `get_context_menu_items(self, db_type, context)`
+- `run_context_menu_action(self, db_type, action_id, context)`
+
+`get_context_menu_items()` example:
+
+```python
+def get_context_menu_items(self, db_type, context):
+    return [
+        {
+            'id': 'open_vendor_search',
+            'label': 'Search Title on Vendor Site',
+            'icon': 'fa-solid fa-up-right-from-square',
+        }
     ]
+```
 
-    def _get_api_key(self, db_type):
-        """Restores and retrieves the API key stored in the DB configuration"""
-        try:
-            conn = database.get_connection(db_type)
-            cursor = conn.cursor()
-            cursor.execute("SELECT value FROM settings WHERE key = 'PLUGIN_CONFIG_google'")
-            row = cursor.fetchone()
-            conn.close()
-            if row and row['value']:
-                return json.loads(row['value']).get('GOOGLE_API_KEY')
-        except Exception:
-            pass
-        return None
+`run_context_menu_action()` return shape:
 
-    def search(self, db_type, query):
-        api_key = self._get_api_key(db_type)
-        if not api_key or not query:
-            return []
-        
-        # Implement external network search API call here...
-        return []
+- Success: `{'success': True, 'message': '...', 'open_url': 'https://...'}`
+- Failure: `{'success': False, 'error': '...'}`
 
-    def apply(self, db_type, book_id, item_data):
-        # Implement cover image download and database UPDATE queries...
-        return True, "Metadata applied successfully"
+Frontend rendering notes:
+
+- Context menu items are automatically grouped by `plugin_name` with section headers/separators.
+- If a plugin returns multiple actions, they are shown under the same plugin section.
+
+Default `context` fields:
+
+- `book_id`
+- `book_title`
+- `is_volume_detail`
+- `library_id`
+
+Core boundary:
+
+- Core only handles shared endpoints/schema.
+- Real menu definitions and behaviors stay inside plugins.
+
+`stats_dashboard` context menu example:
+
+- Item: `Show Reading Stats Summary`
+- Action: reads current library stats and returns a toast message payload
+
+### Sample: Naver Book Search Context Menu
+
+A simple and useful starter plugin is one that opens an external search page from the current book title. It does not need an API key and works entirely through the context menu contract.
+
+Sample file:
+
+- [plugins/metadata/naver_book/naver_book.py](../plugins/metadata/naver_book/naver_book.py)
+
+Core behavior:
+
+- Read `book_id` and `book_title` from the context payload.
+- Optionally re-fetch the latest `title` and `author` from `books` using `self.get_db_gateway(db_type)`.
+- Return `open_url` from `run_context_menu_action()` to open Naver Book search in a new tab.
+
+Example return payload:
+
+```python
+{
+    'success': True,
+    'message': 'Naver Book search page opens in a new tab.',
+    'open_url': 'https://book.naver.com/search/search.naver?query=...'
+}
 ```
 
 ---
 
-## 5. Registration and Activation Process
+## 7. Minimal Example
 
-1. Save your completed Python code script inside the `plugins/metadata/` directory.
-2. Restart your BookOasis media server process.
-3. Access the web interface dashboard, go to the **Settings > Plugin Settings** tab.
-4. Toggle your new plugin **ON** to enable it, fill in any required variables, and click save.
-5. If `is_searchable = True` was declared, it will automatically populate as a search option in the "Manual Metadata Match" modal.
+```python
+# -*- coding: utf-8 -*-
+from plugins.metadata.base import BaseMetadataProvider
+
+
+class MyWidgetMetadataProvider(BaseMetadataProvider):
+    id = "my_widget"
+    name = "My Widget"
+    is_searchable = False
+    config_schema = []
+    dashboard_widget = {
+        "title": "My Widget",
+        "subtitle": "Demo",
+        "provider": "My API",
+        "icon": "fa-solid fa-puzzle-piece",
+        "limit": 10,
+    }
+
+    def search(self, db_type, query):
+        return []
+
+    def apply(self, db_type, book_id, item_data):
+        return False, "Dashboard-only plugin"
+
+    def _fetch_items(self, db_type, limit=10):
+        return {'success': True, 'items': []}
+
+    def get_dashboard_data(self, db_type, limit=10):
+        return self._fetch_items(db_type, limit=limit)
+```
+
+### Plugin DB Gateway (Recommended)
+
+Do not open DB connections with direct `import database` in plugins.
+Use provider helpers instead:
+
+- `self.get_db_gateway(db_type)`
+- `self.get_plugin_config(db_type, default={})`
+
+Gateway methods:
+
+- `fetch_one(query, params=())`
+- `fetch_all(query, params=())`
+- `execute(query, params=())`
+- `execute_many(query, seq_of_params)`
+- `transaction()`
+- `get_setting(key, default=None)` / `set_setting(key, value)`
+
+Example:
+
+```python
+def _get_api_key(self, db_type):
+    cfg = self.get_plugin_config(db_type, default={})
+    return cfg.get("API_KEY")
+
+def _count_books(self, db_type):
+    gateway = self.get_db_gateway(db_type)
+    row = gateway.fetch_one("SELECT COUNT(*) AS cnt FROM books WHERE COALESCE(is_deleted, 0) = 0")
+    return int((row["cnt"] if row else 0) or 0)
+```
+
+---
+
+## 8. Activation Flow
+
+1. Add plugin files under `plugins/metadata/`.
+2. Restart the server.
+3. Go to Settings > Plugin Settings.
+4. Enable the plugin and save config values.
+5. If `is_searchable=True`, it appears in manual metadata search modal.
+6. If `dashboard_widget` + `get_dashboard_data()` are implemented, it appears in dashboard widgets automatically.
+
+---
+
+## 9. Statistics Plugin Example (Same Requirements)
+
+Example plugin: `plugins/metadata/stats_dashboard/stats_dashboard.py`
+
+Dashboard items:
+
+1. Total: series count / book count
+2. Books read (100% completed): this week 00 books / this month 00 books
+3. Newly added books: this week 00 books / this month 00 books
+
+Implementation points:
+
+- Define `dashboard_widget` to expose the widget card
+- Return the three metrics in `items` from `get_dashboard_data()` (with weekly/monthly aggregation)
+- Extend behavior inside plugin SQL/logic only, without core modifications
+
+Note:
+
+- These statistics items (total/weekly/monthly) are defined in the plugin.
+- The core only consumes shared contracts (`dashboard_widget`, `get_dashboard_data`), so changing items does not require core changes.
