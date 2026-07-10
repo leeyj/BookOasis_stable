@@ -124,6 +124,8 @@
     "user_pwd_not_changed": "미변경",
     "user_cannot_delete": "삭제불가",
     "user_delete": "삭제",
+    "user_reset_pwd": "비번 재설정",
+    "admin_change_pwd": "비번 변경",
     "user_fetch_failed": "조회 실패: ",
     "thumb_width_label": "보관함 도서 카드 너비",
     "thumb_width_desc": "보관함의 도서 커버 크기를 120px ~ 240px 범위 내에서 본인 모니터 해상도에 최적화하여 슬라이더로 크기를 조절할 수 있습니다.",
@@ -352,6 +354,12 @@
     "role_label": "권한 역할 (Role)",
     "role_user": "일반 사용자 (user)",
     "role_admin": "관리자 (admin)",
+    "reset_pwd_title": "비밀번호 강제 재설정",
+    "change_pwd_title": "관리자 비밀번호 변경",
+    "new_password_label": "새 비밀번호 (최소 4자)",
+    "new_password_placeholder": "새 비밀번호 입력",
+    "current_password_label": "현재 비밀번호",
+    "current_password_placeholder": "해당 관리자 계정의 현재 비밀번호 입력",
     "add_category": "카테고리 추가",
     "category_name_label": "카테고리 이름",
     "category_name_placeholder": "예: 판타지 소설, 코믹스 등",
@@ -489,7 +497,8 @@
     "sort_date_desc": "최신 추가순",
     "sort_date_asc": "과거 추가순",
     "resume_fail_list": "도서 목록을 불러오는 데 실패했습니다.",
-    "resume_fail_error": "이어보기 중 오류가 발생했습니다."
+    "resume_fail_error": "이어보기 중 오류가 발생했습니다.",
+    "sort_required": "초성 퀵 이동은 이름(가나다) 정렬 상태일 때만 사용할 수 있습니다."
   },
   "scheduler": {
     "save_success": "\"{name}\" 설정이 성공적으로 저장되었습니다.",

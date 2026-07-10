@@ -48,7 +48,7 @@ function ensureImageWorker() {
   if (imageWorker && !_workerCleanupAdded) {
     _workerCleanupAdded = true;
     window.addEventListener('unload', () => {
-      try { imageWorker && imageWorker.terminate(); } catch (e) {}
+      try { imageWorker && imageWorker.terminate(); } catch (e) { }
     });
   }
 }
@@ -154,7 +154,7 @@ export function applyComicFitMode() {
 export function updatePageInfo() {
   const infoEl = document.getElementById('comic-page-info');
   const overlayInfoEl = document.getElementById('comic-overlay-page-info');
-  
+
   if (state.currentViewerFormat === 'epub') {
     const slider = document.getElementById('viewer-page-slider');
     if (slider && overlayInfoEl) {
@@ -286,7 +286,7 @@ export function loadComicPage() {
       img.src = url;
     };
 
-    const preloadScrollImagesAround = (baseIndex, leadCount = 5) => {
+    const preloadScrollImagesAround = (baseIndex, leadCount = 20) => {
       for (let offset = 1; offset <= leadCount; offset++) {
         const nextImg = imgElements[baseIndex + offset];
         if (nextImg) {
@@ -303,7 +303,7 @@ export function loadComicPage() {
       img.alt = `Page ${i + 1}`;
       img.loading = 'lazy';
       img.dataset.loaded = '0';
-      
+
       // 초기 로딩 시 깨진 이미지(엑박) 안 보이게 처리 (투명화 & 최소 높이)
       img.style.opacity = '0';
       img.style.transition = 'opacity 0.3s ease';
@@ -314,7 +314,7 @@ export function loadComicPage() {
     }
 
     wrapper.appendChild(fragment);
-    
+
     const observerOptions = {
       root: wrapper,
       rootMargin: '0px',
@@ -344,7 +344,7 @@ export function loadComicPage() {
           updatePageInfo();
           saveProgress(state.activeBookId, comicCurrentPage, comicTotalPages);
         }
-        preloadScrollImagesAround(pageIdx, 5);
+        preloadScrollImagesAround(pageIdx, 15);
       }
     }, observerOptions);
 
@@ -447,7 +447,7 @@ export function loadComicPage() {
     wrapper.addEventListener('wheel', handleScrollWheelNextEpisode, { passive: true });
 
     wrapper.addEventListener('touchstart', handleScrollTouchStart, { passive: true });
-    
+
     if (scrollTouchEndHandler) {
       wrapper.removeEventListener('touchend', scrollTouchEndHandler);
       wrapper.removeEventListener('touchcancel', scrollTouchEndHandler);
@@ -462,7 +462,7 @@ export function loadComicPage() {
       if (targetImg) {
         loadScrollImage(targetImg);
         targetImg.scrollIntoView({ block: 'start' });
-        preloadScrollImagesAround(comicCurrentPage, 5);
+        preloadScrollImagesAround(comicCurrentPage, 15);
       }
       setTimeout(() => {
         isScrollingToTarget = false;
@@ -590,7 +590,7 @@ export function hideSeekbarTooltip() {
 }
 
 function preloadNextPages() {
-  const preloadCount = 2;
+  const preloadCount = 10;
   const basePage = getComicDisplayPageIndex(comicCurrentPage);
   for (let i = 1; i <= preloadCount; i++) {
     const nextIdx = basePage + i;

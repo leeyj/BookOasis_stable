@@ -54,7 +54,7 @@ export async function loadLibrarySchedules() {
         html += `
           <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); hover: background: rgba(255,255,255,0.02);">
             <td style="padding: 1rem; font-weight: 600; color: #fff;">${lib.name}</td>
-            <td style="padding: 1rem; color: #94a3b8; font-family: monospace; font-size: 0.8rem;">${lib.physical_path}</td>
+            <td style="padding: 1rem; color: #94a3b8; font-family: monospace; font-size: 0.8rem; white-space: pre-line;">${lib.physical_path}</td>
             <td style="padding: 1rem; text-align: left;">
               ${rcloneRcInputHtml}
             </td>

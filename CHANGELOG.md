@@ -1,5 +1,13 @@
 # CHANGELOG
-* 알려진 버그: 대규모 도서 이동시 없어진 도서의 정보가 제대로 삭제되지 않음.
+* 알려진 버그: 대규모 도서 이동시 DB상에 없어진 도서의 정보가 제대로 삭제되지 않는 현상이 있음. (UI에는 표시 안됨. DB에 제대로 지워지지 않음. 원인 파악중)
+* 최근 읽은 도서에 가끔씩 2개의 동일 도서가 표시되는 현상->일시적인 통신 오류시 발생하는 현상으로 수정중
+
+
+## v0.8.7
+### fixed
+- 만화책 뷰어-스크롤 모드일때 다음 권 이동시 다음 권의 마지막 페이지로 이동하는 현상 수정 | Fixed an issue where the comic viewer's scroll mode moved to the last page of the next volume.
+- 패스워드 초기화 기능 추가 | Password reset function added
+- 이미지 뷰어 로딩 최적화 및 이미지 로드 실패시 화면에 빈공간만 표시되는 현상 수정 | Image viewer loading optimization and empty space display on image load failure
 
 ## v0.8.6
 ### fixed
@@ -9,7 +17,7 @@
 ## v0.8.5
 ### fixed
 - 플러그인 구조 개편 
-*- guide_plugins.md,spec_db_schema.md,plugins\metadata\plugin_README.md 참조.
+*- guide_plugins.md,spec_db_schema.md,plugins\metadata\plugin_README.md 참조.|
 * 불필요한 플러그인은 환경설정->플러그인 관리에서 Off 할 수 있습니다.
 
 ### added

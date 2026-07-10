@@ -1,5 +1,6 @@
 // view_manager.js – 화면(뷰) 상태 제어 및 렌더링 영역 전환 매니저
 import { state } from './state.js';
+import { mountIndexScrollbar, unmountIndexScrollbar } from './index_scrollbar.js';
 
 /**
  * ────────────────────────────────────────────────────────
@@ -21,6 +22,8 @@ export function switchActiveView(viewName) {
   if (gridView) gridView.style.display = 'none';
   if (detailView) detailView.style.display = 'none';
   if (settingsView) settingsView.style.display = 'none';
+  
+  unmountIndexScrollbar();
 
   // 2. 요청한 뷰 영역만 선택 활성화 및 정렬 버튼 조율
   switch (viewName) {
@@ -34,6 +37,9 @@ export function switchActiveView(viewName) {
       if (btnSort) {
         // 'history'(최근 읽은 도서) 카테고리에서는 정렬 버튼을 노출하지 않고 그 외 보관함에서는 노출
         btnSort.style.display = (state.currentLibraryId === 'history') ? 'none' : 'inline-flex';
+      }
+      if (state.currentLibraryId !== 'history') {
+        mountIndexScrollbar();
       }
       break;
       

@@ -1446,3 +1446,61 @@
     cursor: not-allowed;
     pointer-events: none;
 }
+
+/* --------------------------------------------------------
+   42. ALPHABET INDEX SCROLLBAR
+   -------------------------------------------------------- */
+.alphabet-scrollbar {
+    position: fixed;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    z-index: 100;
+    background: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 10px 5px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+/* 스크롤바 자체 스크롤바 숨기기 */
+.alphabet-scrollbar::-webkit-scrollbar {
+    width: 0px;
+}
+
+.alphabet-item {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #94a3b8;
+    cursor: pointer;
+    text-align: center;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.alphabet-item:hover {
+    color: #fff;
+    background: rgba(168, 85, 247, 0.8);
+    transform: scale(1.2);
+}
+
+.library-main-content.has-index-scrollbar {
+    padding-right: 40px;
+}
+
+/* 모바일 숨김 처리 */
+@media (max-width: 768px) {
+    .alphabet-scrollbar {
+        display: none !important;
+    }
+    .library-main-content.has-index-scrollbar {
+        padding-right: 0 !important;
+    }
+}

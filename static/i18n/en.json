@@ -124,6 +124,8 @@
     "user_pwd_not_changed": "Not Changed",
     "user_cannot_delete": "Cannot Delete",
     "user_delete": "Delete",
+    "user_reset_pwd": "Reset Password",
+    "admin_change_pwd": "Change Password",
     "user_fetch_failed": "Fetch Failed: ",
     "thumb_width_label": "Library Book Card Width",
     "thumb_width_desc": "Adjust the cover image size of the books in the library from 120px to 240px using the slider to optimize for your monitor resolution.",
@@ -352,6 +354,12 @@
     "role_label": "Role",
     "role_user": "User",
     "role_admin": "Admin",
+    "reset_pwd_title": "Force Reset Password",
+    "change_pwd_title": "Change Admin Password",
+    "new_password_label": "New Password (min 4 chars)",
+    "new_password_placeholder": "Enter new password",
+    "current_password_label": "Current Password",
+    "current_password_placeholder": "Enter current admin password",
     "add_category": "Add Category",
     "category_name_label": "Category Name",
     "category_name_placeholder": "e.g. Fantasy Novel, Comics",
@@ -489,7 +497,8 @@
     "sort_date_desc": "Newest Added",
     "sort_date_asc": "Oldest Added",
     "resume_fail_list": "Failed to load the book list.",
-    "resume_fail_error": "An error occurred while resuming."
+    "resume_fail_error": "An error occurred while resuming.",
+    "sort_required": "Alphabetical quick jump is only available when sorted A-Z/Z-A."
   },
   "scheduler": {
     "save_success": "\"{name}\" settings saved successfully.",

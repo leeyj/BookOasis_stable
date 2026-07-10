@@ -19,6 +19,19 @@ class UserRepository:
         return dict(row) if row else None
 
     @staticmethod
+    def find_by_id(db_type, user_id):
+        """사용자 ID 기반 계정 정보 조회"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, username, password_hash, role, is_default_password, has_adult_access FROM users WHERE id = ?", 
+            (user_id,)
+        )
+        row = cursor.fetchone()
+        conn.close()
+        return dict(row) if row else None
+
+    @staticmethod
     def get_all_users(db_type):
         """전체 사용자 목록 조회"""
         conn = database.get_connection(db_type)
@@ -83,6 +96,24 @@ class UserRepository:
             cursor.execute(
                 "UPDATE users SET password_hash = ?, is_default_password = 0 WHERE id = ?", 
                 (new_password_hash, user_id)
+            )
+            conn.commit()
+            return True
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    @staticmethod
+    def admin_reset_password(db_type, user_id, new_password_hash, set_default=1):
+        """관리자에 의한 비밀번호 강제 재설정 (기본값: is_default_password = 1)"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "UPDATE users SET password_hash = ?, is_default_password = ? WHERE id = ?", 
+                (new_password_hash, set_default, user_id)
             )
             conn.commit()
             return True

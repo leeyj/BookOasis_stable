@@ -7,6 +7,7 @@ export const state = {
   // 도서 데이터
   currentBooksData: [],
   allBooksData: [], // 카테고리 내 전체 도서 목록 선로드 메모리 캐시
+  filteredBooksData: [], // 검색 및 정렬이 완료된 데이터 (인덱스 점프용)
   activeBookId: null,
 
   // 저장된 스크롤 위치 (라이브러리별)

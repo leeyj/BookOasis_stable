@@ -226,6 +226,38 @@ def delete_user(target_user_id):
         
     return jsonify({'success': True, 'message': _t('api.user_deleted_success')})
 
+@auth_bp.route('/api/admin/users/<int:target_user_id>/password', methods=['PUT'])
+@login_required
+def reset_user_password(target_user_id):
+    if session.get('role') != 'admin':
+        return jsonify({'success': False, 'error': _t('api.admin_required')}), 403
+        
+    data = request.get_json() or {}
+    new_password = data.get('new_password', '').strip()
+    current_password = data.get('current_password', '').strip()
+    
+    if len(new_password) < 4:
+        return jsonify({'success': False, 'error': _t('api.new_password_length_error')}), 400
+        
+    target_user = UserRepository.find_by_id('general', target_user_id)
+    if not target_user:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+        
+    set_default = 1
+    if target_user['role'] == 'admin':
+        if not current_password:
+            return jsonify({'success': False, 'error': _t('api.current_password_required', default='현재 비밀번호를 입력해주세요.')}), 400
+        if not check_password_hash(target_user['password_hash'], current_password):
+            return jsonify({'success': False, 'error': _t('api.invalid_current_password', default='현재 비밀번호가 일치하지 않습니다.')}), 401
+        set_default = 0
+        
+    new_hash = generate_password_hash(new_password)
+    
+    for db_type in ['general', 'adult']:
+        UserRepository.admin_reset_password(db_type, target_user_id, new_hash, set_default)
+        
+    return jsonify({'success': True, 'message': _t('api.password_changed_success')})
+
 @auth_bp.route('/api/i18n/languages', methods=['GET'])
 def get_languages():
     try:

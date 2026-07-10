@@ -111,6 +111,8 @@ export async function loadBooksList(isAppend = false) {
   // 2) 가나다(자연) 정렬 및 최신순 정렬 등
   const sortDir = state.currentSortDirection || 'asc';
   sortBooksList(filtered, sortDir);
+  
+  state.filteredBooksData = filtered;
 
   updateLibraryTotalCount(filtered);
 
@@ -213,6 +215,8 @@ export function filterBooks() {
 
   const sortDir = state.currentSortDirection || 'asc';
   sortBooksList(filtered, sortDir);
+  
+  state.filteredBooksData = filtered;
 
   updateLibraryTotalCount(filtered);
 
@@ -328,4 +332,51 @@ export async function resumeSeries(e, seriesName, libraryId) {
     console.error('[Resume-Series] 이어보기 로직 에러:', err);
     alert(i18n.t('book_list.resume_fail_error'));
   }
+}
+
+/**
+ * 특정 데이터 인덱스(순서)가 렌더링되도록 페이지를 강제 확장하고 해당 엘리먼트로 스크롤합니다.
+ * @param {number} targetIndex - state.filteredBooksData 기준의 인덱스
+ */
+export function jumpToIndex(targetIndex) {
+  if (targetIndex < 0 || targetIndex >= state.filteredBooksData.length) return;
+
+  const targetPage = Math.floor(targetIndex / state.LIMIT) + 1;
+
+  // 만약 대상 인덱스가 현재 렌더링된 페이지 범위를 벗어난 경우 (스크롤을 안 내린 상태)
+  // 해당 페이지까지 한 번에 렌더링하도록 갱신합니다.
+  if (targetPage > state.currentPage - 1) {
+    state.currentPage = targetPage + 1; // hasMore를 위해 +1
+    const limit = targetPage * state.LIMIT;
+    const pageItems = state.filteredBooksData.slice(0, limit);
+    state.hasMore = limit < state.filteredBooksData.length;
+    
+    state.currentBooksData = pageItems;
+    renderBooksGrid(pageItems);
+
+    const spinner = document.getElementById('infinite-scroll-spinner');
+    if (spinner) {
+      spinner.style.display = state.hasMore ? 'block' : 'none';
+    }
+    
+    // 무한 스크롤 옵저버 재바인딩
+    initInfiniteScrollObserver();
+  }
+
+  // 렌더링이 완료된 후 약간의 지연을 주고 DOM을 찾아 스크롤 이동
+  setTimeout(() => {
+    const cards = document.querySelectorAll('#books-list-container .book-card');
+    if (cards[targetIndex]) {
+      // 상단 헤더 높이를 고려하여 여유있게 스크롤
+      const y = cards[targetIndex].getBoundingClientRect().top + window.scrollY - 80;
+      window.scrollTo({ top: y, behavior: 'smooth' });
+      
+      // 사용자에게 시각적 피드백 제공 (깜빡임 효과)
+      cards[targetIndex].style.transition = 'box-shadow 0.3s ease';
+      cards[targetIndex].style.boxShadow = '0 0 15px rgba(168, 85, 247, 0.8)';
+      setTimeout(() => {
+        cards[targetIndex].style.boxShadow = '';
+      }, 1500);
+    }
+  }, 50);
 }

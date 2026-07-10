@@ -32,3 +32,51 @@
         </form>
     </div>
 </div>
+
+<!-- 사용자 비밀번호 강제 재설정 모달 (일반 사용자용) -->
+<div id="user-reset-pwd-modal" class="library-modal" style="display: none;">
+    <div class="library-modal-content" style="max-width: 400px;">
+        <div class="library-modal-header">
+            <h3><span data-i18n="modal.reset_pwd_title">비밀번호 강제 재설정</span></h3>
+            <span class="library-modal-close" onclick="closeResetPwdModal()">&times;</span>
+        </div>
+        <form id="user-reset-pwd-form" onsubmit="submitResetPwdForm(event)">
+            <input type="hidden" id="reset-pwd-user-id" name="user_id">
+            <input type="hidden" id="reset-pwd-role" name="role" value="user">
+            <div class="library-form-group">
+                <label for="reset-pwd-new" data-i18n="modal.new_password_label">새 비밀번호 (최소 4자)</label>
+                <input type="password" id="reset-pwd-new" name="new_password" required data-i18n-placeholder="modal.new_password_placeholder" placeholder="새 비밀번호 입력">
+            </div>
+            <div class="library-modal-footer">
+                <button type="button" class="btn-cancel" onclick="closeResetPwdModal()" data-i18n="common.cancel">취소</button>
+                <button type="submit" class="btn-submit" data-i18n="common.save">저장</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 관리자 비밀번호 변경 모달 (관리자용) -->
+<div id="admin-change-pwd-modal" class="library-modal" style="display: none;">
+    <div class="library-modal-content" style="max-width: 400px;">
+        <div class="library-modal-header">
+            <h3><span data-i18n="modal.change_pwd_title">관리자 비밀번호 변경</span></h3>
+            <span class="library-modal-close" onclick="closeAdminChangePwdModal()">&times;</span>
+        </div>
+        <form id="admin-change-pwd-form" onsubmit="submitAdminChangePwdForm(event)">
+            <input type="hidden" id="change-pwd-admin-id" name="user_id">
+            <input type="hidden" id="change-pwd-role" name="role" value="admin">
+            <div class="library-form-group">
+                <label for="change-pwd-current" data-i18n="modal.current_password_label">현재 비밀번호</label>
+                <input type="password" id="change-pwd-current" name="current_password" required data-i18n-placeholder="modal.current_password_placeholder" placeholder="해당 관리자 계정의 현재 비밀번호 입력">
+            </div>
+            <div class="library-form-group">
+                <label for="change-pwd-new" data-i18n="modal.new_password_label">새 비밀번호 (최소 4자)</label>
+                <input type="password" id="change-pwd-new" name="new_password" required data-i18n-placeholder="modal.new_password_placeholder" placeholder="새 비밀번호 입력">
+            </div>
+            <div class="library-modal-footer">
+                <button type="button" class="btn-cancel" onclick="closeAdminChangePwdModal()" data-i18n="common.cancel">취소</button>
+                <button type="submit" class="btn-submit" data-i18n="common.save">저장</button>
+            </div>
+        </form>
+    </div>
+</div>
