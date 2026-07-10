@@ -102,7 +102,7 @@ pip install -r requirements.txt
 # Locking this key ensures users remain logged in even if the server application process restarts.
 
 # Start the server
-python api.py
+python core.py
 ```
 
 #### 🪟 Windows
@@ -114,6 +114,15 @@ For Windows environments, we provide a batch file that automatically handles dir
 * Local Port: `http://localhost:5930`
 
 ---
+
+## 🔑 Initial Login Credentials
+- When logging in for the first time after server startup, use the following default administrator account:
+  - **Username (ID)**: `admin`
+  - **Password**: `admin`
+- **Security Recommendation**: Please change the default admin password immediately after logging in by navigating to [Settings] > [Account Management].
+
+---
+
 
 ## 🛡️ Proxy Header Auth (SSO) Guide
 

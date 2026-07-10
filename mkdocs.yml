@@ -30,6 +30,12 @@ nav:
 - 개발 워크플로우: workflow.md
 - 작업 히스토리:
   - history/index.md
+  - history/20260711_065937_orphaned_books_cleanup_walkthrough.md
+  - history/20260711_065937_orphaned_books_cleanup_task.md
+  - history/20260711_065102_user_progress_duplicate_walkthrough.md
+  - history/20260711_065102_user_progress_duplicate_task.md
+  - history/20260711_065000_user_progress_duplicate_walkthrough.md
+  - history/20260711_065000_user_progress_duplicate_task.md
   - history/20260709_020210_session_20260709_020210_walkthrough.md
   - history/20260709_020210_session_20260709_020210_task.md
   - history/20260707_044136_session_20260707_044136_walkthrough.md
@@ -653,7 +659,12 @@ nav:
   - history/20260619_145226_init_docs_task.md
 - 버그 트러블슈팅:
   - bug/index.md
+  - bug/20260711_bugfix_user_progress_duplicate.md
+  - bug/20260711_bugfix_orphaned_books_cleanup.md
   - bug/20260709_bugfix_viewer_scroll_mode_double_toggle.md
+  - bug/20260709_bugfix_txt_overlay_menu_position.md
+  - bug/20260709_bugfix_epub_scroll_mode_overlay_toggle.md
+  - bug/20260709_bugfix_epub_right_margin_cutoff.md
   - bug/20260707_bugfix_viewer_scroll_mode_click_mistrigger.md
   - bug/20260707_bugfix_summary_newline_preservation.md
   - bug/20260707_bugfix_scheduler_vfs_rc_url_mismatch.md

@@ -340,7 +340,7 @@ def init_databases():
     CREATE INDEX IF NOT EXISTS idx_books_is_favorite ON books(is_favorite);
     CREATE INDEX IF NOT EXISTS idx_books_created_at ON books(created_at);
     CREATE INDEX IF NOT EXISTS idx_books_series_lib_title ON books(series_name, library_id, title);
-    CREATE INDEX IF NOT EXISTS idx_user_progress_book_user ON user_progress(book_id, user_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_user_progress_book_user ON user_progress(book_id, user_id);
     CREATE INDEX IF NOT EXISTS idx_user_progress_last_read ON user_progress(user_id, last_read_at DESC);
     CREATE INDEX IF NOT EXISTS idx_user_reading_log_user_date ON user_reading_log(user_id, read_date);
     CREATE INDEX IF NOT EXISTS idx_user_category_permissions_lookup ON user_category_permissions(user_id, library_id, has_access);
@@ -351,6 +351,37 @@ def init_databases():
         cursor = conn.cursor()
         cursor.executescript(schema)
         conn.commit()
+        
+        # [마이그레이션] user_progress 중복 레코드 정리 및 고유 인덱스 설정 준비
+        try:
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user_progress'")
+            if cursor.fetchone():
+                # 1. 중복 레코드 삭제 (가장 최근 것 1개만 남김)
+                cursor.execute("""
+                    DELETE FROM user_progress
+                    WHERE id NOT IN (
+                        SELECT MAX(id)
+                        FROM user_progress
+                        GROUP BY book_id, user_id
+                    )
+                """)
+                conn.commit()
+
+                # 2. 기존 일반 인덱스가 있다면 삭제하여 UNIQUE로 변경 가능하도록 준비
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_user_progress_book_user'")
+                if cursor.fetchone():
+                    cursor.execute("PRAGMA index_list('user_progress')")
+                    is_unique = False
+                    for idx in cursor.fetchall():
+                        if idx['name'] == 'idx_user_progress_book_user' and idx['unique'] == 1:
+                            is_unique = True
+                            break
+                    if not is_unique:
+                        cursor.execute("DROP INDEX idx_user_progress_book_user")
+                        conn.commit()
+                        print(f"[DB-Migration] {db_type} DB - Dropped non-unique index idx_user_progress_book_user")
+        except Exception as dup_err:
+            print(f"[DB-Migration ERROR] user_progress duplicates cleanup failed: {dup_err}")
         
         # 테이블 생성 완료 후 별도 트랜잭션으로 인덱스 일괄 생성하여 SQLite OperationalError 예방
         cursor.executescript(indexes_schema)

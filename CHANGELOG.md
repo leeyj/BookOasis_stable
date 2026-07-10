@@ -1,7 +1,9 @@
 # CHANGELOG
 * 알려진 버그: 대규모 도서 이동시 DB상에 없어진 도서의 정보가 제대로 삭제되지 않는 현상이 있음. (UI에는 표시 안됨. DB에 제대로 지워지지 않음. 원인 파악중)
-* 최근 읽은 도서에 가끔씩 2개의 동일 도서가 표시되는 현상->일시적인 통신 오류시 발생하는 현상으로 수정중
 
+## v0.8.8
+### fixed
+- 최근 읽은 도서에 진척도 중복 노출 결함 조치 및 DB UNIQUE 제약 반영 | Fix for duplicate progress display in recently read books and reflection of DB UNIQUE constraint
 
 ## v0.8.7
 ### fixed

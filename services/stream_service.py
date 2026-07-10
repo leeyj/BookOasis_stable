@@ -248,41 +248,11 @@ class StreamService:
         last_epub_percent = epub_session.get('percent')
         last_epub_updated_at = now_str if (last_epub_cfi or last_epub_href) else None
 
-        if row:
-            old_pages = row['pages_read']
-            delta     = max(0, pages_read - old_pages)
-            if last_epub_cfi or last_epub_href:
-                cursor.execute(
-                    """
-                    UPDATE user_progress
-                    SET pages_read=?, is_completed=?, last_read_at=?,
-                        last_epub_cfi=?, last_epub_href=?, last_epub_spine_index=?,
-                        last_epub_percent=?, last_epub_updated_at=?
-                    WHERE book_id=? AND user_id=?
-                    """,
-                    (
-                        pages_read,
-                        is_completed,
-                        now_str,
-                        last_epub_cfi,
-                        last_epub_href,
-                        last_epub_spine_index,
-                        last_epub_percent,
-                        last_epub_updated_at,
-                        book_id,
-                        user_id,
-                    )
-                )
-            else:
-                cursor.execute(
-                    "UPDATE user_progress SET pages_read=?, is_completed=?, last_read_at=? WHERE book_id=? AND user_id=?",
-                    (pages_read, is_completed, now_str, book_id, user_id)
-                )
-        else:
-            delta = pages_read
+        if not row:
+            # 1. 경쟁 상태 대비: INSERT OR IGNORE 로 레코드 선삽입
             cursor.execute(
                 """
-                INSERT INTO user_progress (
+                INSERT OR IGNORE INTO user_progress (
                     book_id, user_id, pages_read, is_completed, last_read_at,
                     last_epub_cfi, last_epub_href, last_epub_spine_index,
                     last_epub_percent, last_epub_updated_at
@@ -291,6 +261,32 @@ class StreamService:
                 (
                     book_id,
                     user_id,
+                    0,
+                    0,
+                    now_str,
+                    None,
+                    None,
+                    None,
+                    0,
+                    None
+                )
+            )
+            delta = pages_read
+        else:
+            old_pages = row['pages_read']
+            delta     = max(0, pages_read - old_pages)
+
+        # 2. 레코드가 확실히 존재하므로 일괄 UPDATE 수행하여 최종 상태 저장
+        if last_epub_cfi or last_epub_href:
+            cursor.execute(
+                """
+                UPDATE user_progress
+                SET pages_read=?, is_completed=?, last_read_at=?,
+                    last_epub_cfi=?, last_epub_href=?, last_epub_spine_index=?,
+                    last_epub_percent=?, last_epub_updated_at=?
+                WHERE book_id=? AND user_id=?
+                """,
+                (
                     pages_read,
                     is_completed,
                     now_str,
@@ -299,7 +295,14 @@ class StreamService:
                     last_epub_spine_index,
                     last_epub_percent,
                     last_epub_updated_at,
+                    book_id,
+                    user_id,
                 )
+            )
+        else:
+            cursor.execute(
+                "UPDATE user_progress SET pages_read=?, is_completed=?, last_read_at=? WHERE book_id=? AND user_id=?",
+                (pages_read, is_completed, now_str, book_id, user_id)
             )
 
         if delta > 0:

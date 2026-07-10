@@ -19,6 +19,12 @@ export function applySettingsToUI(settings) {
   if (settings.TAG_FILTER_SEARCH_SCOPE_ALL !== undefined) {
     state.tagFilterSearchInAll = (settings.TAG_FILTER_SEARCH_SCOPE_ALL === '1');
   }
+  if (settings.TTS_ENABLED !== undefined) {
+    state.ttsEnabled = (settings.TTS_ENABLED === '1');
+  }
+  if (settings.TTS_WAKE_LOCK !== undefined) {
+    state.ttsWakeLock = (settings.TTS_WAKE_LOCK === '1');
+  }
 }
 
 // 최초 로드 시 설정 일괄 호출 적용
@@ -107,6 +113,16 @@ export async function loadGeneralSettings() {
         comicDelayEl.value = (delayStr !== null) ? parseInt(delayStr, 10) : '300';
       }
       
+      const ttsEnabledEl = document.getElementById('setting-tts-enabled');
+      if (ttsEnabledEl) {
+        ttsEnabledEl.checked = (s.TTS_ENABLED === '1');
+      }
+      
+      const ttsWakeLockEl = document.getElementById('setting-tts-wake-lock');
+      if (ttsWakeLockEl) {
+        ttsWakeLockEl.checked = (s.TTS_WAKE_LOCK === '1');
+      }
+      
       // UI 즉시 갱신
       applySettingsToUI(s);
     }
@@ -137,6 +153,8 @@ export async function submitGeneralSettings(event) {
   const proxyAuth = document.getElementById('setting-proxy-header-auth')?.value || '0';
   const rcloneRcUrl = document.getElementById('setting-rclone-rc-url')?.value || 'http://localhost:5572';
   const timezone = document.getElementById('setting-timezone')?.value || 'UTC';
+  const ttsEnabled = document.getElementById('setting-tts-enabled')?.checked ? '1' : '0';
+  const ttsWakeLock = document.getElementById('setting-tts-wake-lock')?.checked ? '1' : '0';
   
   try {
     // 모든 설정을 병렬 업데이트
@@ -155,7 +173,9 @@ export async function submitGeneralSettings(event) {
       api.updateSystemSetting('HIDE_COMPLETED_IN_HISTORY', hideCompleted),
       api.updateSystemSetting('TAG_FILTER_SEARCH_SCOPE_ALL', tagFilterScopeAll),
       api.updateSystemSetting('PROXY_HEADER_AUTH', proxyAuth),
-      api.updateSystemSetting('RCLONE_RC_URL', rcloneRcUrl)
+      api.updateSystemSetting('RCLONE_RC_URL', rcloneRcUrl),
+      api.updateSystemSetting('TTS_ENABLED', ttsEnabled),
+      api.updateSystemSetting('TTS_WAKE_LOCK', ttsWakeLock)
     ];
     
     const results = await Promise.all(promises);
@@ -176,7 +196,9 @@ export async function submitGeneralSettings(event) {
         BOOK_THUMBNAIL_WIDTH: thumbWidth,
         PAGE_LIMIT: pageLimit,
         HIDE_COMPLETED_IN_HISTORY: hideCompleted,
-        TAG_FILTER_SEARCH_SCOPE_ALL: tagFilterScopeAll
+        TAG_FILTER_SEARCH_SCOPE_ALL: tagFilterScopeAll,
+        TTS_ENABLED: ttsEnabled,
+        TTS_WAKE_LOCK: ttsWakeLock
       });
       loadGeneralSettings();
     } else {
