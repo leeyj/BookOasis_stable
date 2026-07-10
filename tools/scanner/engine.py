@@ -191,6 +191,8 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
             
             # 3. Commit ALL at once (Atomic Transaction)
             conn.commit()
+            import time
+            time.sleep(0.05)  # 대시보드 측 DB 락 선점을 돕기 위해 미세 양보(micro-yield)
 
             # 4. Append to JSONL log
             if pending_inserts or pending_updates:

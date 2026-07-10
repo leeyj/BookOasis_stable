@@ -301,7 +301,6 @@ export function loadComicPage() {
       img.dataset.index = i;
       img.dataset.src = FileLoader.getPageStreamUrl(i);
       img.alt = `Page ${i + 1}`;
-      img.loading = 'lazy';
       img.dataset.loaded = '0';
 
       // 초기 로딩 시 깨진 이미지(엑박) 안 보이게 처리 (투명화 & 최소 높이)
@@ -317,8 +316,8 @@ export function loadComicPage() {
 
     const observerOptions = {
       root: wrapper,
-      rootMargin: '0px',
-      threshold: 0.3
+      rootMargin: '2000px',
+      threshold: 0.1
     };
 
     observer = new IntersectionObserver((entries) => {

@@ -321,3 +321,7 @@ tags: [workflow, history]
 | 2026-07-11 | `user_progress_duplicate` | 최근 읽은 도서 진척도 중복 노출 결함 조치 및 DB UNIQUE 제약 반영 | [Task](./history/20260711_065102_user_progress_duplicate_task.md) | [Walkthrough](./history/20260711_065102_user_progress_duplicate_walkthrough.md) |
 | 2026-07-11 | `orphaned_books_cleanup` | 스캔 시 물리 이동/삭제 도서의 찌꺼기 데이터 정화 조치 및 자동 비우기 반영 | [BugFix](./bug/20260711_bugfix_orphaned_books_cleanup.md) | -
 | 2026-07-11 | `orphaned_books_cleanup` | 스캔 시 물리 이동/삭제 도서의 찌꺼기 데이터 정화 조치 및 자동 비우기 반영 | [Task](./history/20260711_065937_orphaned_books_cleanup_task.md) | [Walkthrough](./history/20260711_065937_orphaned_books_cleanup_walkthrough.md) |
+| 2026-07-11 | `scanner_db_lock_concurrency` | 로컬 스캔 중 웹 대시보드 SQLite 락 경합 완화 및 Micro-Yield 적용 | [BugFix](./bug/20260711_bugfix_scanner_db_lock_concurrency.md) | -
+| 2026-07-11 | `scanner_db_lock_concurrency` | 로컬 스캔 중 웹 대시보드 SQLite 락 경합 완화 및 Micro-Yield 적용 | [Task](./history/20260711_071713_scanner_db_lock_concurrency_task.md) | [Walkthrough](./history/20260711_071713_scanner_db_lock_concurrency_walkthrough.md) |
+| 2026-07-11 | `viewer_scroll_preload` | 만화 뷰어 스크롤 모드 프리로드 기능 차단 버그 개선 및 감지 마진 조정 | [BugFix](./bug/20260711_bugfix_viewer_scroll_preload.md) | -
+| 2026-07-11 | `viewer_scroll_preload` | 만화 뷰어 스크롤 모드 프리로드 기능 차단 버그 개선 및 감지 마진 조정 | [Task](./history/20260711_075412_viewer_scroll_preload_task.md) | [Walkthrough](./history/20260711_075412_viewer_scroll_preload_walkthrough.md) |
