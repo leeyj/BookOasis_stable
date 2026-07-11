@@ -588,6 +588,36 @@ window.setScrollMode = function (mode) {
 // 시크바 통합 이벤트 라우터
 // ==========================================
 let _viewerSeekbarInited = false;
+const _viewerModules = {
+  comic: null,
+  epub: null,
+  txt: null,
+  pdf: null
+};
+
+async function _getViewerModule(fmt) {
+  try {
+    if (fmt === 'zip' || fmt === 'cbz' || fmt === 'imgdir') {
+      if (!_viewerModules.comic) _viewerModules.comic = await import('./viewer_comic.js');
+      return _viewerModules.comic;
+    }
+    if (fmt === 'epub') {
+      if (!_viewerModules.epub) _viewerModules.epub = await import('./viewer_epub.js');
+      return _viewerModules.epub;
+    }
+    if (fmt === 'txt') {
+      if (!_viewerModules.txt) _viewerModules.txt = await import('./viewer_txt.js');
+      return _viewerModules.txt;
+    }
+    if (fmt === 'pdf') {
+      if (!_viewerModules.pdf) _viewerModules.pdf = await import('./viewer_pdf.js');
+      return _viewerModules.pdf;
+    }
+  } catch (err) {
+    console.error(`[Viewer-Core] Failed to import module for format ${fmt}:`, err);
+  }
+  return null;
+}
 
 function initViewerSeekBar() {
   const slider = document.getElementById('viewer-page-slider');
@@ -596,25 +626,34 @@ function initViewerSeekBar() {
   if (_viewerSeekbarInited) return;
   _viewerSeekbarInited = true;
 
-  slider.addEventListener('input', (e) => {
+  // 뷰어 기동 시 현재 포맷 모듈을 백그라운드에서 미리 로드(Pre-warm)
+  const initialFmt = state.currentViewerFormat;
+  if (initialFmt) {
+    _getViewerModule(initialFmt).catch(() => {});
+  }
+
+  slider.addEventListener('input', async (e) => {
     const val = parseInt(e.target.value, 10);
     const fmt = state.currentViewerFormat;
 
-    if (fmt === 'zip' || fmt === 'cbz') {
-      import('./viewer_comic.js').then(m => {
-        const fn = m.comicSliderInput || m.comicSliderInput || (window && window.comicSliderInput);
-        if (typeof fn === 'function') fn(slider, val); else console.warn('[Viewer-Core] comicSliderInput not available');
-      }).catch(err => console.warn('[Viewer-Core] Failed to import viewer_comic:', err));
+    if (fmt === 'zip' || fmt === 'cbz' || fmt === 'imgdir') {
+      const m = await _getViewerModule(fmt);
+      if (m) {
+        const fn = m.comicSliderInput || (window && window.comicSliderInput);
+        if (typeof fn === 'function') fn(slider, val);
+      }
     } else if (fmt === 'epub') {
-      import('./viewer_epub.js').then(m => {
+      const m = await _getViewerModule(fmt);
+      if (m) {
         const fn = m.epubSliderInput || (window && window.epubSliderInput);
-        if (typeof fn === 'function') fn(slider, val); else console.warn('[Viewer-Core] epubSliderInput not available');
-      }).catch(err => console.warn('[Viewer-Core] Failed to import viewer_epub:', err));
+        if (typeof fn === 'function') fn(slider, val);
+      }
     } else if (fmt === 'txt') {
-      import('./viewer_txt.js').then(m => {
+      const m = await _getViewerModule(fmt);
+      if (m) {
         const fn = m.txtSliderInput;
         if (typeof fn === 'function') fn(slider, val);
-      }).catch(err => console.warn('[Viewer-Core] Failed to import viewer_txt:', err));
+      }
     } else if (fmt === 'pdf') {
       const tooltip = document.getElementById('seekbar-tooltip');
       if (tooltip) {
@@ -628,31 +667,34 @@ function initViewerSeekBar() {
     }
   });
 
-  slider.addEventListener('change', (e) => {
+  slider.addEventListener('change', async (e) => {
     const val = parseInt(e.target.value, 10);
     const fmt = state.currentViewerFormat;
 
-    if (fmt === 'zip' || fmt === 'cbz') {
-      import('./viewer_comic.js').then(m => {
+    if (fmt === 'zip' || fmt === 'cbz' || fmt === 'imgdir') {
+      const m = await _getViewerModule(fmt);
+      if (m) {
         const fn = m.comicSliderChange || (window && window.comicSliderChange);
-        if (typeof fn === 'function') fn(slider, val); else console.warn('[Viewer-Core] comicSliderChange not available');
-      }).catch(err => console.warn('[Viewer-Core] Failed to import viewer_comic:', err));
+        if (typeof fn === 'function') fn(slider, val);
+      }
     } else if (fmt === 'epub') {
-      import('./viewer_epub.js').then(m => {
+      const m = await _getViewerModule(fmt);
+      if (m) {
         const fn = m.epubSliderChange || (window && window.epubSliderChange);
-        if (typeof fn === 'function') fn(slider, val); else console.warn('[Viewer-Core] epubSliderChange not available');
-      }).catch(err => console.warn('[Viewer-Core] Failed to import viewer_epub:', err));
+        if (typeof fn === 'function') fn(slider, val);
+      }
     } else if (fmt === 'txt') {
-      import('./viewer_txt.js').then(m => {
+      const m = await _getViewerModule(fmt);
+      if (m) {
         const fn = m.txtSliderChange;
         if (typeof fn === 'function') fn(slider, val);
-      }).catch(err => console.warn('[Viewer-Core] Failed to import viewer_txt:', err));
+      }
     } else if (fmt === 'pdf') {
-      import('./viewer_pdf.js').then(m => {
-        if (typeof m.pdfJumpToPage === 'function') {
-          m.pdfJumpToPage(val);
-        }
-      }).catch(err => console.warn('[Viewer-Core] Failed to import viewer_pdf:', err));
+      const m = await _getViewerModule(fmt);
+      if (m) {
+        const fn = m.pdfSliderChange || m.pdfJumpToPage || (window && window.pdfJumpToPage);
+        if (typeof fn === 'function') fn(slider, val);
+      }
     }
   });
 }

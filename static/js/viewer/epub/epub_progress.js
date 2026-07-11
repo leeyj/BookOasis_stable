@@ -102,7 +102,11 @@ export async function restoreEpubProgress({
   updateState,
   applyEpubSettings
 }) {
+  console.log('[EPUB-Progress] restoreEpubProgress input parameters:', { pagesRead, totalPages, context });
+  
   const serverState = await fetchServerProgressState(state.activeBookId);
+  console.log('[EPUB-Progress] fetchServerProgressState response:', serverState);
+
   const sourcePagesRead = serverState && Number.isFinite(Number(serverState.pages_read))
     ? Number(serverState.pages_read)
     : pagesRead;
@@ -110,12 +114,24 @@ export async function restoreEpubProgress({
     ? Number(serverState.total_pages)
     : totalPages;
 
+  console.log('[EPUB-Progress] Resolved raw pages:', { sourcePagesRead, sourceTotalPages });
+
   const normalized = normalizeInitialEpubProgress(sourcePagesRead, sourceTotalPages);
+  console.log('[EPUB-Progress] Normalized initial progress:', normalized);
+
   const localSession = storage.loadPersistedResumeSession(state.activeBookId);
   const serverSession = serverState && serverState.epub_session ? serverState.epub_session : null;
   const localUpdatedAt = normalizeSessionUpdatedAtMs(localSession);
   const serverUpdatedAt = normalizeSessionUpdatedAtMs(serverSession);
   const preferredSession = (serverUpdatedAt > localUpdatedAt) ? serverSession : (localSession || serverSession);
+
+  console.log('[EPUB-Progress] Session comparison:', {
+    localSession,
+    serverSession,
+    localUpdatedAt,
+    serverUpdatedAt,
+    preferredSession
+  });
 
   let cfi = context.currentLocationCfi;
   let href = context.currentLocationHref;
@@ -140,6 +156,8 @@ export async function restoreEpubProgress({
     scrollPercent = Math.min(100, Math.max(0, Math.round(Number(preferredSession.percent))));
   }
 
+  console.log('[EPUB-Progress] Final resolved layout progress data:', { cfi, href, index, scrollPercent });
+
   updateState({
     currentLocationCfi: cfi,
     currentLocationHref: href,
@@ -147,13 +165,23 @@ export async function restoreEpubProgress({
     currentScrollPercent: scrollPercent
   });
 
-  applyEpubSettings(
-    (cfi || href)
-      ? { preferResumeStart: true }
-      : { targetRatio: normalized.ratio }
-  );
+  const settingsParams = (cfi || href)
+    ? { preferResumeStart: true }
+    : { targetRatio: normalized.ratio };
+  console.log('[EPUB-Progress] applyEpubSettings trigger parameters:', settingsParams);
+
+  applyEpubSettings(settingsParams);
+
+  // locations 계산 완료 대기 전이라도, 복원한 scrollPercent로 시크바를 즉각 0~100% 셋으로 갱신
+  import('./runtime.js').then(m => {
+    if (m.syncEpubSeekBar) {
+      console.log('[EPUB-Progress] Pre-warm sync seekbar with percent:', scrollPercent);
+      m.syncEpubSeekBar();
+    }
+  }).catch(err => console.warn('[EPUB-Progress] Pre-warm sync seekbar failed:', err));
 
   if (preferredSession && (cfi || href)) {
+    console.log('[EPUB-Progress] Saving active session into localstorage...');
     storage.persistResumeSession({
       cfi: cfi || null,
       href: href || null,
@@ -168,6 +196,7 @@ export async function restoreEpubProgress({
   }
 
   if (normalized.shouldNormalizePersist && state.activeBookId) {
+    console.log('[EPUB-Progress] Auto-normalizing progress percent to server: percent =', scrollPercent);
     saveProgress(state.activeBookId, scrollPercent, 100);
   }
 }

@@ -217,6 +217,12 @@ export function pdfJumpToPage(pageNum) {
   }
 }
 
+export function pdfSliderChange(slider, val) {
+  const tooltip = document.getElementById('seekbar-tooltip');
+  if (tooltip) tooltip.style.display = 'none';
+  pdfJumpToPage(val);
+}
+
 export const PdfViewer = {
   async init(bookId, pagesRead, totalPages) {
     return initPdfViewer(bookId, pagesRead, totalPages);

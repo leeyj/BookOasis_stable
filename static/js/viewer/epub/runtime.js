@@ -401,9 +401,98 @@ export function applyEpubSettings(options = {}) {
   });
 }
 
+function extractVisibleAnchorText() {
+  let anchorText = '';
+  try {
+    const renderArea = document.getElementById('epub-render-area');
+    if (!renderArea) return '';
+    
+    const isPageModeRendered = renderArea.querySelector('iframe') !== null;
+    let targetDoc = document;
+    let containerEl = renderArea;
+    let minTop = 50; // 스크롤 모드 상단 여백 고려
+
+    if (isPageModeRendered && epubRendition) {
+      const contents = epubRendition.getContents();
+      if (contents && contents.length > 0) {
+        targetDoc = contents[0].document;
+        containerEl = targetDoc.body;
+        minTop = 0; // iframe 내부는 바로 시작
+      } else {
+        return '';
+      }
+    }
+
+    const viewportWidth = targetDoc.documentElement.clientWidth || window.innerWidth;
+    const xPositions = [viewportWidth / 2, viewportWidth * 0.25, viewportWidth * 0.75];
+    const yOffsets = [minTop + 20, minTop + 50, minTop + 100, minTop + 150];
+
+    // TreeWalker 대신 화면 좌표에 광선을 쏘는 elementsFromPoint(s) 사용
+    // epub.js가 보이지 않는 DOM 찌꺼기를 남겨두어 BoundingClientRect가 꼬이는 버그 완벽 회피
+    for (let y of yOffsets) {
+      for (let x of xPositions) {
+        const elements = targetDoc.elementsFromPoint(x, y);
+        for (let el of elements) {
+          // 투명 오버레이를 뚫고, 자신이 직접 텍스트 노드를 품고 있는 가장 깊은 본문 요소를 찾음
+          let hasDirectText = false;
+          for (let child of el.childNodes) {
+            if (child.nodeType === Node.TEXT_NODE && child.nodeValue.trim().length >= 5) {
+              hasDirectText = true;
+              break;
+            }
+          }
+          
+          if (hasDirectText) {
+            const text = el.textContent.replace(/\s+/g, ' ').trim();
+            if (text.length >= 10) {
+              anchorText = text.substring(0, 100);
+              console.log(`[Viewer-Epub] Anchor extracted via elementsFromPoint (x:${x}, y:${y}):`, anchorText);
+              return anchorText;
+            }
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[Viewer-Epub] Failed to extract anchor text:', e);
+  }
+  return anchorText;
+}
+
 export function changeEpubScrollMode() {
   if (!epubBook) return;
-  applyEpubSettings({ preservePagePosition: true });
+
+  const context = getContext();
+  const currentScrollPercent = context.currentScrollPercent;
+  
+  const anchorText = extractVisibleAnchorText();
+  if (anchorText) {
+    sessionStorage.setItem('viewer_epub_transition_anchor', anchorText);
+    console.log('[Viewer-Epub] Extracted anchor text:', anchorText);
+  } else {
+    sessionStorage.removeItem('viewer_epub_transition_anchor');
+  }
+
+  // 모드 전환 전 현재 위치를 스토리지에 명시적 강제 플러시 저장
+  import('./epub_storage.js').then(storage => {
+    storage.persistResumeSession(
+      { percent: currentScrollPercent },
+      context.activeBookId,
+      {
+        currentLocationCfi: context.currentLocationCfi,
+        currentLocationHref: context.currentLocationHref,
+        currentLocationIndex: context.currentLocationIndex,
+        currentScrollPercent
+      }
+    );
+    console.log('[Viewer-Epub] Explicit storage flush completed for mode transition');
+
+    // 메모리 파라미터가 아닌, 처음 켜는 것처럼 스토리지에서 복구(preferResumeStart) 지시
+    applyEpubSettings({ preferResumeStart: true });
+  }).catch(err => {
+    console.warn('[Viewer-Epub] flush before transition failed:', err);
+    applyEpubSettings({ preferResumeStart: true });
+  });
 }
 
 export function epubPrevPage() {
@@ -646,9 +735,17 @@ export function epubSliderChange(slider, val) {
   }).then(async () => {
     let cfi = null;
     try {
-      cfi = epubBook.locations && epubBook.locations.length
-        ? epubBook.locations.cfiFromPercentage(Math.min(0.999, ratio))
-        : null;
+      if (epubBook.locations && epubBook.locations.length > 0) {
+        cfi = epubBook.locations.cfiFromPercentage(Math.min(0.999, ratio));
+      } else {
+        // 위치 정보(locations)가 아직 준비되지 않은 경우, 전체 스파인(Spine) 개수 대비 비율 인덱스로 폴백 매핑
+        const items = getReadableSpineItems();
+        if (items.length > 0) {
+          const targetIndex = Math.min(items.length - 1, Math.floor(items.length * ratio));
+          cfi = items[targetIndex].href;
+          console.log(`[Viewer-Epub] Locations not ready, fallback to spine index: ${targetIndex}/${items.length}`);
+        }
+      }
     } catch (err) {
       console.warn('[Viewer-Epub] slider cfiFromPercentage failed:', err);
     }

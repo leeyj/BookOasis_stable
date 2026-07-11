@@ -325,3 +325,18 @@ tags: [workflow, history]
 | 2026-07-11 | `scanner_db_lock_concurrency` | 로컬 스캔 중 웹 대시보드 SQLite 락 경합 완화 및 Micro-Yield 적용 | [Task](./history/20260711_071713_scanner_db_lock_concurrency_task.md) | [Walkthrough](./history/20260711_071713_scanner_db_lock_concurrency_walkthrough.md) |
 | 2026-07-11 | `viewer_scroll_preload` | 만화 뷰어 스크롤 모드 프리로드 기능 차단 버그 개선 및 감지 마진 조정 | [BugFix](./bug/20260711_bugfix_viewer_scroll_preload.md) | -
 | 2026-07-11 | `viewer_scroll_preload` | 만화 뷰어 스크롤 모드 프리로드 기능 차단 버그 개선 및 감지 마진 조정 | [Task](./history/20260711_075412_viewer_scroll_preload_task.md) | [Walkthrough](./history/20260711_075412_viewer_scroll_preload_walkthrough.md) |
+| 2026-07-11 | `viewer_slider_imgdir` | 이미지 폴더(imgdir) 도서 하단 슬라이더 먹통 결함 조치 | [BugFix](./bug/20260711_bugfix_viewer_slider_imgdir.md) | -
+| 2026-07-11 | `viewer_slider_imgdir` | 이미지 폴더(imgdir) 도서 하단 슬라이더 먹통 결함 조치 | [Task](./history/20260711_094425_viewer_slider_imgdir_task.md) | [Walkthrough](./history/20260711_094425_viewer_slider_imgdir_walkthrough.md) |
+| 2026-07-11 | `epub_slider_fallback` | EPUB 뷰어 하단 슬라이더 위치정보 연산 전 먹통 결함 조치 | [BugFix](./bug/20260711_bugfix_epub_slider_fallback.md) | -
+| 2026-07-11 | `epub_slider_fallback` | EPUB 뷰어 하단 슬라이더 위치정보 연산 전 먹통 결함 조치 | [Task](./history/20260711_094511_epub_slider_fallback_task.md) | [Walkthrough](./history/20260711_094511_epub_slider_fallback_walkthrough.md) |
+| 2026-07-11 | `pdf_slider_not_available` | PDF 뷰어 하단 슬라이더 핸들러 누락 먹통 결함 조치 | [BugFix](./bug/20260711_bugfix_pdf_slider_not_available.md) | -
+| 2026-07-11 | `pdf_slider_not_available` | PDF 뷰어 하단 슬라이더 핸들러 누락 먹통 결함 조치 | [Task](./history/20260711_094613_pdf_slider_not_available_task.md) | [Walkthrough](./history/20260711_094613_pdf_slider_not_available_walkthrough.md) |
+| 2026-07-11 | `viewer_slider_import_performance` | 동적 임포트 병목으로 인한 하단 슬라이더 프리징 결함 조치 | [BugFix](./bug/20260711_bugfix_viewer_slider_import_performance.md) | -
+| 2026-07-11 | `viewer_slider_import_performance` | 동적 임포트 병목으로 인한 하단 슬라이더 프리징 결함 조치 | [Task](./history/20260711_094819_viewer_slider_import_performance_task.md) | [Walkthrough](./history/20260711_094819_viewer_slider_import_performance_walkthrough.md) |
+| 2026-07-11 | `epub_blocking_locations_reset` | EPUB 뷰어 진척도 복원 누락 및 locations 대기 블로킹 결함 조치 | [BugFix](./bug/20260711_bugfix_epub_blocking_locations_reset.md) | -
+| 2026-07-11 | `epub_blocking_locations_reset` | EPUB 뷰어 진척도 복원 누락 및 locations 대기 블로킹 결함 조치 | [Task](./history/20260711_095149_epub_blocking_locations_reset_task.md) | [Walkthrough](./history/20260711_095149_epub_blocking_locations_reset_walkthrough.md) |
+| 2026-07-11 | `epub_seekbar_prewarm_sync` | EPUB 뷰어 시크바 잠김 및 백그라운드 런타임 예외 결함 조치 | [BugFix](./bug/20260711_bugfix_epub_seekbar_prewarm_sync.md) | -
+| 2026-07-11 | `epub_seekbar_prewarm_sync` | EPUB 뷰어 시크바 잠김 및 백그라운드 런타임 예외 결함 조치 | [Task](./history/20260711_095451_epub_seekbar_prewarm_sync_task.md) | [Walkthrough](./history/20260711_095451_epub_seekbar_prewarm_sync_walkthrough.md) |
+| 2026-07-11 | `epub_mode_transition_seekbar_sync` | EPUB 페이지-스크롤 모드 전환 시 슬라이더 프리징 결함 조치 | [BugFix](./bug/20260711_bugfix_epub_mode_transition_seekbar_sync.md) | -
+| 2026-07-11 | `epub_mode_transition_seekbar_sync` | EPUB 페이지-스크롤 모드 전환 시 슬라이더 프리징 결함 조치 | [Task](./history/20260711_095813_epub_mode_transition_seekbar_sync_task.md) | [Walkthrough](./history/20260711_095813_epub_mode_transition_seekbar_sync_walkthrough.md) |
+| 2026-07-11 | `epub_anchor_text_fix` | EPUB 모드 전환 시 DOM 찌꺼기에 의한 앵커 텍스트 추출 오류 완벽 수정 | [BugFix](./bug/20260711_bugfix_epub_anchor.md) | - |

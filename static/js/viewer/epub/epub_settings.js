@@ -132,8 +132,7 @@ export async function applyEpubSettingsInternal({
     const contextUpdated = getContext();
     const preservePagePosition = !!options.preservePagePosition;
     const preferResumeStart = (
-      (scrollMode === 'page' && preservePagePosition && !!(contextUpdated.currentLocationCfi || contextUpdated.currentLocationHref)) ||
-      (!!options.preferResumeStart && scrollMode === 'page' && !!(contextUpdated.currentLocationCfi || contextUpdated.currentLocationHref))
+      !!options.preferResumeStart && !!(contextUpdated.currentLocationCfi || contextUpdated.currentLocationHref || contextUpdated.currentScrollPercent)
     );
     const explicitRatio = Number.isFinite(options.targetRatio) ? options.targetRatio : null;
     const fallbackRatio = contextUpdated.currentScrollPercent / 100;
@@ -148,13 +147,13 @@ export async function applyEpubSettingsInternal({
         ? explicitRatio
         : (preservePagePosition
           ? await getCurrentRatio({
-            container,
-            scrollMode: ratioSourceMode,
-            book: epubBook,
-            rendition: epubRendition,
-            fallbackPercent: contextUpdated.currentScrollPercent,
-            charsPerLocation: RENDITION_LOCATIONS_CHARS
-          })
+              container,
+              scrollMode: ratioSourceMode,
+              book: epubBook,
+              rendition: epubRendition,
+              fallbackPercent: contextUpdated.currentScrollPercent,
+              charsPerLocation: RENDITION_LOCATIONS_CHARS
+            })
           : fallbackRatio);
     const ratio = baseRatio === null ? null : Math.min(1, Math.max(0, baseRatio));
 
@@ -258,6 +257,9 @@ export async function applyEpubSettingsInternal({
 
     if (ratio !== null) {
       updateProgressPercent(ratio * 100);
+    } else {
+      // ratio가 null이더라도 (모드 전환 등의 상황), 현재 스크롤 백분율로 슬라이더 범위 및 값을 0~100% 규격으로 확실히 리셋 동기화
+      updateProgressPercent(contextUpdated.currentScrollPercent);
     }
   } finally {
     if (runId === applySettingsRunId) {
