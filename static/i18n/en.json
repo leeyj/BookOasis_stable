@@ -558,5 +558,14 @@
     "cancel_error": "An error occurred during cancel request.",
     "status_vfs": "VFS Refresh",
     "status_books": "Book Scan"
+  },
+  "filter": {
+    "active_filters": "Active Filters:",
+    "reset_all": "Reset All",
+    "modal_title": "Genre / Tag Filter",
+    "search_placeholder": "Search...",
+    "tab_genres": "Genres",
+    "tab_tags": "Tags",
+    "apply_btn": "Apply Filters"
   }
 }

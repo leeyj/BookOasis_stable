@@ -558,5 +558,14 @@
     "cancel_error": "취소 요청 중 오류가 발생했습니다.",
     "status_vfs": "VFS 갱신",
     "status_books": "도서 스캔"
+  },
+  "filter": {
+    "active_filters": "필터 적용 중:",
+    "reset_all": "전체 해제",
+    "modal_title": "장르 / 태그 필터",
+    "search_placeholder": "검색어 입력...",
+    "tab_genres": "장르",
+    "tab_tags": "태그",
+    "apply_btn": "필터 적용"
   }
 }

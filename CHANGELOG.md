@@ -3,6 +3,11 @@
 * 모바일에서는 전용 OPDS 사용을 권장합니다. epub의 경우 epub.js 성능 한계가 명확하기 때문에 opds를 따라 갈 수 없습니다. | Recommend using dedicated OPDS on mobile. Due to the clear performance limitations of epub.js, it cannot keep up with OPDS.
 
 
+## v0.9.0
+### fixed
+- 태그 클릭시 가시성 효과 추가 및 뒤로가기 복원 로직 강화 | tag click visibility effect added and back button restore logic reinforced
+
+
 ## v0.8.9
 ### fixed
 - 모드 전환시 슬라이드 미동작 해결 및 위치 소실 현상 일부 해결 | epub slide-mode transition and position loss fix

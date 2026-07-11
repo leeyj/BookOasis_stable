@@ -139,26 +139,37 @@ async function initTabMediaLibrary() {
   initLibrarySearchShortcut();
 
 
-  // 브라우저 뒤로가기(Back) 버튼 감지하여 뷰어 또는 상세 화면 닫기 처리
+  // 브라우저 뒤로가기/앞으로가기 버튼 감지하여 뷰 라우팅 복원 처리
   window.addEventListener('popstate', (event) => {
-    console.log('[History] popstate 이벤트 감지:', window.location.hash);
+    console.log('[History] popstate 이벤트 감지:', window.location.hash, event.state);
     
+    // 1. 현재 뷰어가 열려있다면 무조건 닫기 (목적지가 뷰어가 아닐 때만)
     const viewerModal = document.getElementById('media-viewer-modal');
     if (viewerModal && viewerModal.style.display === 'flex') {
-      closeMediaViewer(false); 
+      if (!event.state || event.state.view !== 'viewer') {
+        closeMediaViewer(false); 
+      }
       return;
     }
     
+    // 2. 목적지 상태가 상세 뷰(detail)인 경우
+    if (event.state && event.state.view === 'detail') {
+      openBookDetail(null, event.state.series, event.state.libraryId);
+      return;
+    }
+    
+    // 3. 목적지가 목록(카테고리) 뷰인 경우 (현재 상세 뷰가 떠 있다면 먼저 닫음)
     const detailView = document.getElementById('book-detail-view');
     if (detailView && detailView.style.display !== 'none') {
-      // popstate에 의해 뒤로가기가 일어났을 때, 이전 뷰가 상세 뷰가 아닌 리스트 뷰라면 goBackToList(false)를 태워 닫아줍니다.
-      if (!event.state || event.state.view !== 'detail') {
-        goBackToList(false);
-      } else {
-        // 만약 이전 상세 뷰 정보가 상태값에 존재한다면 복원 갱신 호출
-        openBookDetail(null, event.state.series, event.state.libraryId);
-      }
-      return;
+      goBackToList(false);
+    }
+    
+    if (event.state && event.state.view === 'category' && event.state.libraryId) {
+        // 히스토리에 저장된 이전 카테고리로 복원 (히스토리 스택 중복 방지를 위해 skipHistory = true 전달)
+        selectCategory(event.state.libraryId, true);
+    } else if (!event.state && (window.location.hash === '' || window.location.hash.startsWith('#library='))) {
+        // 해시가 비어있거나 library 진입인 경우 상태가 없어도 home으로 복원
+        selectCategory('home', true);
     }
   });
 }
@@ -184,9 +195,14 @@ export function switchLibraryType(type) {
 }
 
 // 카테고리 선택 처리
-export function selectCategory(id) {
+export function selectCategory(id, skipHistory = false) {
   window.scrollTo(0, 0);
   state.currentLibraryId = id;
+  
+  // 브라우저 히스토리에 카테고리 이동 기록 남기기 (SPA 뒤로가기 지원)
+  if (!skipHistory) {
+    history.pushState({ view: 'category', libraryId: id }, '', `#library=${id}`);
+  }
   
   // 장르 및 태그 필터 초기화
   state.currentGenre = null;

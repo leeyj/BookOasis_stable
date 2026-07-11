@@ -102,6 +102,19 @@
             </div>
         </div>
 
+        <!-- 필터 활성 알림 바 (초기 숨김) -->
+        <div id="active-filter-bar" class="active-filter-bar" style="display: none;">
+            <div class="active-filter-info">
+                <i class="fa-solid fa-filter" style="color: #ffffff;"></i> <span data-i18n="filter.active_filters" style="font-size: 0.85rem; color: #ffffff; font-weight: 700;">필터 적용 중:</span>
+            </div>
+            <div id="active-filter-badges" class="active-filter-badges">
+                <!-- JS에서 동적으로 뱃지 렌더링 -->
+            </div>
+            <button id="btn-active-filter-reset" class="btn-active-filter-reset" onclick="resetAllFilters()" title="모든 필터 해제">
+                <i class="fa-solid fa-rotate-left"></i> <span data-i18n="filter.reset_all">전체 해제</span>
+            </button>
+        </div>
+
         <!-- ===== 대시보드 뷰 (Home 선택 시 Kavita 스타일로 표시) ===== -->
         {% include "components/views/library_dashboard.html" %}
 

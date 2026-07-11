@@ -54,6 +54,8 @@ export async function initFloatingFilter() {
     window.selectTagFilter = selectTagFilter;
     window.quickFilterByGenre = quickFilterByGenre;
     window.quickFilterByTag = quickFilterByTag;
+    window.removeActiveFilterItem = removeActiveFilterItem;
+    window.resetAllFilters = resetAllFilters;
 }
 
 function sleep(ms) {
@@ -108,17 +110,13 @@ async function applySingleFilter(type, value) {
 
     await prepareTargetCategoryForQuickFilter();
 
-    selectedGenres.clear();
-    selectedTags.clear();
-
+    // 기존 필터를 초기화하지 않고 누적(Accumulate) 방식으로 추가
     if (type === 'genre') {
         selectedGenres.add(normalizedValue);
-        state.filterGenres = [normalizedValue];
-        state.filterTags = [];
+        state.filterGenres = Array.from(selectedGenres);
     } else {
         selectedTags.add(normalizedValue);
-        state.filterGenres = [];
-        state.filterTags = [normalizedValue];
+        state.filterTags = Array.from(selectedTags);
     }
 
     await ensureFilterDataLoaded();
@@ -132,6 +130,8 @@ async function applySingleFilter(type, value) {
     if (typeof window.filterBooks === 'function') {
         window.filterBooks();
     }
+    
+    updateActiveFilterBar();
 }
 
 export async function selectGenreFilter(genreName) {
@@ -323,6 +323,9 @@ export async function applyFilters() {
         window.filterBooks();
     }
     
+    // 알림 바 UI 업데이트
+    updateActiveFilterBar();
+
     // 모달 닫기
     toggleFilterModal();
 }
@@ -342,6 +345,9 @@ export function resetAllFilters() {
     if (typeof window.filterBooks === 'function') {
         window.filterBooks();
     }
+    
+    // 알림 바 UI 업데이트 (숨김 처리)
+    updateActiveFilterBar();
 }
 
 // 드래그 앤 드롭 자유 이동
@@ -389,3 +395,46 @@ window.selectGenreFilter = selectGenreFilter;
 window.selectTagFilter = selectTagFilter;
 window.quickFilterByGenre = quickFilterByGenre;
 window.quickFilterByTag = quickFilterByTag;
+
+// 필터 활성 알림 바 동적 렌더링
+export function updateActiveFilterBar() {
+    const bar = document.getElementById('active-filter-bar');
+    const badgeContainer = document.getElementById('active-filter-badges');
+    if (!bar || !badgeContainer) return;
+
+    const totalFilters = selectedGenres.size + selectedTags.size;
+    if (totalFilters === 0) {
+        bar.style.display = 'none';
+        badgeContainer.innerHTML = '';
+        return;
+    }
+
+    let html = '';
+    selectedGenres.forEach(genre => {
+        html += `<span class="active-filter-item">
+            <i class="fa-solid fa-list-ul"></i> ${genre}
+            <span class="filter-remove-btn" onclick="removeActiveFilterItem('genre', '${genre}')"><i class="fa-solid fa-xmark"></i></span>
+        </span>`;
+    });
+    selectedTags.forEach(tag => {
+        html += `<span class="active-filter-item">
+            <i class="fa-solid fa-tag"></i> ${tag}
+            <span class="filter-remove-btn" onclick="removeActiveFilterItem('tag', '${tag}')"><i class="fa-solid fa-xmark"></i></span>
+        </span>`;
+    });
+
+    badgeContainer.innerHTML = html;
+    bar.style.display = 'flex';
+}
+
+export function removeActiveFilterItem(type, value) {
+    if (type === 'genre') {
+        selectedGenres.delete(value);
+    } else if (type === 'tag') {
+        selectedTags.delete(value);
+    }
+    renderChips();
+    renderSelectedChips();
+    applyFilters();
+}
+window.removeActiveFilterItem = removeActiveFilterItem;
