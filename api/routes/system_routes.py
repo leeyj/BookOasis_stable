@@ -137,10 +137,11 @@ def get_about_info():
                     line = line.strip()
                     if not line:
                         continue
-                    if line.startswith('"dashboard":'):
-                        dashboard_ver = line.replace('"dashboard":', '').replace('"', '').strip()
-                    elif line.startswith('"state":'):
-                        state_ver = line.replace('"state":', '').replace('"', '').strip()
+                    line_clean = line.strip().replace('"', '')
+                    if line_clean.startswith('dashboard:'):
+                        dashboard_ver = line_clean.split(':', 1)[1].strip()
+                    elif line_clean.startswith('state:'):
+                        state_ver = line_clean.split(':', 1)[1].strip()
         except Exception as e:
             pass
     

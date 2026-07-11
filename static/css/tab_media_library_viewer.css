@@ -810,7 +810,7 @@
     .epub-area {
         padding: 5px;
     }
-    #txt-scroll-wrapper {
+    #txt-scroll-wrapper:not(.scroll-mode-page) {
         padding: 5px !important;
     }
 }
@@ -859,8 +859,8 @@
     display: block;
     width: 100%;
     max-width: 880px;
-    column-width: calc(100% - 40px);
-    column-gap: 40px;
+    column-count: auto;
+    column-gap: 0;
     height: calc(100vh - 160px);
     margin: 40px auto;
     padding: 0;
@@ -868,8 +868,8 @@
     overflow-y: hidden;
     box-sizing: border-box;
     
-    /* 가로 페이지 스냅 강제 활성화 */
-    scroll-snap-type: x mandatory;
+    /* 페이지 넘김은 JS 스냅으로 통일한다. */
+    scroll-snap-type: none;
     
     /* 스크롤바 숨기기 */
     -webkit-overflow-scrolling: touch;
@@ -883,7 +883,6 @@
 
 #txt-scroll-wrapper.scroll-mode-page .txt-content {
     height: 100%;
-    column-fill: auto;
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -891,10 +890,7 @@
 
 /* 개별 청크 단위 및 브라우저 가로 열에도 스냅 장착 */
 #txt-scroll-wrapper.scroll-mode-page .txt-chunk {
-    height: 100% !important;
     box-sizing: border-box;
-    scroll-snap-align: start;
-    scroll-snap-stop: always;
 }
 
 #media-viewer-modal .txt-reader-theme-light {

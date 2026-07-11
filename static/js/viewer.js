@@ -521,6 +521,7 @@ window.onViewerParagraphSpacingChange = function (value) {
 
 window.setScrollMode = function (mode) {
   console.log(`[Viewer-Core] Scroll mode changed to: ${mode}`);
+  const previousMode = localStorage.getItem('viewer_scroll_mode') || 'page';
   localStorage.setItem('viewer_scroll_mode', mode);
 
   const btnPage = document.getElementById('btn-scroll-page');
@@ -554,7 +555,7 @@ window.setScrollMode = function (mode) {
     }).catch(err => console.warn('[Viewer-Core] Failed to import viewer_comic:', err));
   }
 
-  applyTxtSettings();
+  applyTxtSettings({ previousMode });
   changeEpubScrollMode(mode);
   syncHotspotPointerEvents();
 };

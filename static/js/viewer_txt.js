@@ -9,8 +9,12 @@ let resizeTimeout = null;
 let activeResizeHandler = null;
 let txtScrollPreloadTriggered = false;
 let txtScrollNextEpisodeTriggered = false;
+let txtPageSnapTimeout = null;
+let txtPageSnapInProgress = false;
+let txtPendingRestoreTimer = null;
+let txtRestoreToastAt = 0;
 
-import { showViewerLoading, hideViewerLoading, showViewerError } from './view_manager.js';
+import { showViewerLoading, hideViewerLoading, showViewerError, showToast } from './view_manager.js';
 import { saveProgress } from './viewer_progress.js';
 import { initPageStep, initReadingDirection } from './viewer/reader_settings.js';
 
@@ -77,8 +81,7 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
       }
 
       currentChunkIdx = startIdx;
-      
-      initPageStep();
+
       initReadingDirection();
       renderCurrentChunk(true);
       applyTxtSettings();
@@ -125,6 +128,19 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
         let isTransitioning = false;
         const scrollHandler = () => {
           const mode = localStorage.getItem('viewer_scroll_mode') || 'page';
+          if (mode === 'page') {
+            if (txtPageSnapInProgress) return;
+            clearTimeout(txtPageSnapTimeout);
+            txtPageSnapTimeout = setTimeout(() => {
+              txtPageSnapInProgress = true;
+              snapTxtPageScrollLeft(scrollWrapper);
+              txtPageSnapInProgress = false;
+              logActiveViewportText();
+              saveDetailPosition();
+            }, 90);
+            return;
+          }
+
           if (mode !== 'scroll') return;
 
           const scrollHeight = scrollWrapper.scrollHeight - scrollWrapper.clientHeight;
@@ -181,9 +197,11 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
         const mode = localStorage.getItem('viewer_scroll_mode') || 'page';
 
         if (mode === 'page') {
-          const currentColumnIdx = Math.round(wrapper.scrollLeft / (wrapper.clientWidth + 40));
+          const prevStepWidth = getTxtPageAdvanceWidth(wrapper);
+          const currentColumnIdx = Math.round(wrapper.scrollLeft / prevStepWidth);
           applyTxtSettings();
-          wrapper.scrollLeft = currentColumnIdx * (wrapper.clientWidth + 40);
+          const newStepWidth = getTxtPageAdvanceWidth(wrapper);
+          wrapper.scrollLeft = currentColumnIdx * newStepWidth;
           logActiveViewportText();
         } else {
           const beforeHeight = wrapper.scrollHeight - wrapper.clientHeight;
@@ -240,6 +258,46 @@ function escapeHtml(text) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+function getTxtPageGapPx(scrollWrapper) {
+  if (!scrollWrapper) return 0;
+  const styles = window.getComputedStyle(scrollWrapper);
+  const columnCount = parseInt(styles.columnCount, 10);
+  if (!Number.isFinite(columnCount) || columnCount <= 1) return 0;
+  const gap = parseFloat(styles.columnGap);
+  return Number.isFinite(gap) ? gap : 0;
+}
+
+function getTxtPageAdvanceWidth(scrollWrapper) {
+  if (!scrollWrapper) return 0;
+  const base = Math.max(1, Math.floor(scrollWrapper.clientWidth));
+  return base + getTxtPageGapPx(scrollWrapper);
+}
+
+function snapTxtPageScrollLeft(scrollWrapper) {
+  if (!scrollWrapper) return;
+  const stepWidth = getTxtPageAdvanceWidth(scrollWrapper);
+  const maxScroll = Math.max(0, scrollWrapper.scrollWidth - scrollWrapper.clientWidth);
+  const snapped = Math.min(maxScroll, Math.max(0, Math.round(scrollWrapper.scrollLeft / stepWidth) * stepWidth));
+  scrollWrapper.scrollLeft = snapped;
+}
+
+function cancelPendingTxtRestore() {
+  if (txtPendingRestoreTimer) {
+    clearTimeout(txtPendingRestoreTimer);
+    txtPendingRestoreTimer = null;
+  }
+}
+
+function showTxtRestoreLoadingToast() {
+  const now = Date.now();
+  // 지연 복원이 연달아 예약될 때 토스트가 과도하게 반복되지 않도록 완충한다.
+  if (now - txtRestoreToastAt < 700) return;
+  txtRestoreToastAt = now;
+  if (typeof showToast === 'function') {
+    showToast('로딩중입니다', 'info');
+  }
 }
 
 function renderCurrentChunk(initMode = false) {
@@ -346,12 +404,12 @@ function stripHtml(html) {
   return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
 }
 
-export function getTxtAnchorInfo() {
+export function getTxtAnchorInfo(forcedMode = null) {
   const scrollWrapper = document.getElementById('txt-scroll-wrapper');
   const contentArea = document.getElementById('txt-content-area');
   if (!scrollWrapper || !contentArea) return null;
   
-  const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
+  const scrollMode = forcedMode || localStorage.getItem('viewer_scroll_mode') || 'page';
   const isEpub = (state.currentViewerFormat === 'epub');
 
   if (scrollMode === 'scroll') {
@@ -432,7 +490,7 @@ export function restoreTxtAnchorInfo(anchorInfo) {
       console.log(`[Viewer-Txt] DOM 매칭 앵커 복원 성공 (세로 scrollTop = ${scrollWrapper.scrollTop})`);
       return true;
     } else {
-      const colWidth = scrollWrapper.clientWidth + 40;
+      const colWidth = getTxtPageAdvanceWidth(scrollWrapper);
       const pageIndex = Math.floor(matchedElem.offsetTop / scrollWrapper.clientHeight);
       scrollWrapper.scrollLeft = pageIndex * colWidth;
       console.log(`[Viewer-Txt] DOM 매칭 앵커 복원 성공 (가로 scrollLeft = ${scrollWrapper.scrollLeft})`);
@@ -464,7 +522,7 @@ export function restoreTxtAnchorInfo(anchorInfo) {
     const matchIndex = cleanText.indexOf(query);
     if (matchIndex !== -1) {
       const ratio = matchIndex / cleanText.length;
-      const colWidth = scrollWrapper.clientWidth + 40;
+      const colWidth = getTxtPageAdvanceWidth(scrollWrapper);
       const maxScroll = scrollWrapper.scrollWidth - scrollWrapper.clientWidth;
       scrollWrapper.scrollLeft = Math.round((maxScroll * ratio) / colWidth) * colWidth;
       console.log(`[Viewer-Txt] Fallback 문자열 매핑 복원 성공 (가로 ratio=${ratio})`);
@@ -486,13 +544,18 @@ export function saveDetailPosition() {
   }
 }
 
-export function applyTxtSettings() {
+export function applyTxtSettings(options = {}) {
   const container = document.getElementById('txt-viewer-container');
   const scrollWrapper = document.getElementById('txt-scroll-wrapper');
   const contentArea = document.getElementById('txt-content-area');
   if (!container || !scrollWrapper || !contentArea) return;
 
+  clearTimeout(txtPageSnapTimeout);
+  txtPageSnapInProgress = false;
+  cancelPendingTxtRestore();
+
   const savedChunkIdx = currentChunkIdx;
+  const previousMode = options.previousMode || (scrollWrapper.classList.contains('scroll-mode-page') ? 'page' : 'scroll');
   console.log(`[Viewer-Txt] applyTxtSettings 전환 시작 - 현재 챕터:`, savedChunkIdx);
 
   if (scrollWrapper && scrollWrapper.__txtScrollHandler) {
@@ -500,6 +563,8 @@ export function applyTxtSettings() {
   }
 
   const { theme, fontSize, fontFamily, scrollMode, lineHeight } = getViewerSettings();
+  const isModeSwitch = previousMode !== scrollMode;
+  const preservedAnchor = isModeSwitch ? getTxtAnchorInfo(previousMode) : null;
 
   container.className = `viewer-pane ${theme.className}`;
   contentArea.style.fontSize = `${fontSize}rem`;
@@ -509,16 +574,40 @@ export function applyTxtSettings() {
     scrollWrapper.classList.add('scroll-mode-page');
     container.classList.add('scroll-mode-page');
 
+    // 페이지 모드에서는 패딩 오차를 제거해 페이지 폭 계산을 고정한다.
+    contentArea.style.paddingTop = '0';
+    contentArea.style.paddingBottom = '0';
+    contentArea.style.paddingLeft = '0';
+    contentArea.style.paddingRight = '0';
+
+    const padLeft = parseInt(localStorage.getItem('viewer_padding_left') || '20', 10);
+    const padRight = parseInt(localStorage.getItem('viewer_padding_right') || '20', 10);
+    const parentWidth = container ? container.clientWidth : window.innerWidth;
+    const targetWidth = Math.floor(parentWidth - (padLeft + padRight));
+
     const pageStep = localStorage.getItem('comic_page_step') || '1';
+    const pageGap = pageStep === '2' ? 40 : 0;
     if (pageStep === '2') {
-      scrollWrapper.style.maxWidth = '1600px';
-      scrollWrapper.style.columnCount = '2';
-      scrollWrapper.style.columnWidth = 'auto';
+      scrollWrapper.style.maxWidth = `${targetWidth}px`;
     } else {
-      scrollWrapper.style.maxWidth = '800px';
-      scrollWrapper.style.columnCount = '1';
-      scrollWrapper.style.columnWidth = 'auto';
+      scrollWrapper.style.maxWidth = `${Math.min(targetWidth, 800)}px`;
     }
+
+    // 페이지 모드에서는 wrapper가 실제 다단 레이아웃과 페이지 이동 단위를 함께 담당한다.
+    const wrapperWidth = Math.max(1, Math.floor(scrollWrapper.clientWidth));
+    const singleColWidth = pageStep === '2'
+      ? Math.max(1, Math.floor((wrapperWidth - pageGap) / 2))
+      : Math.max(1, wrapperWidth);
+
+    scrollWrapper.style.columnCount = pageStep === '2' ? '2' : '1';
+    scrollWrapper.style.columnGap = `${pageGap}px`;
+    scrollWrapper.style.columnWidth = `${singleColWidth}px`;
+
+    contentArea.style.columnCount = '';
+    contentArea.style.columnWidth = '';
+    contentArea.style.columnGap = '';
+    contentArea.style.columnFill = '';
+    contentArea.style.height = '';
   } else {
     scrollWrapper.classList.remove('scroll-mode-page');
     container.classList.remove('scroll-mode-page');
@@ -526,6 +615,23 @@ export function applyTxtSettings() {
     scrollWrapper.style.maxWidth = '';
     scrollWrapper.style.columnCount = '';
     scrollWrapper.style.columnWidth = '';
+    scrollWrapper.style.columnGap = '';
+
+    contentArea.style.columnCount = '';
+    contentArea.style.columnWidth = '';
+    contentArea.style.columnGap = '';
+    contentArea.style.columnFill = '';
+    contentArea.style.height = '';
+
+    // 스크롤 모드에서는 저장된 여백을 다시 적용한다.
+    const padTop = parseInt(localStorage.getItem('viewer_padding_top') || '40', 10);
+    const padBottom = parseInt(localStorage.getItem('viewer_padding_bottom') || '60', 10);
+    const padLeft = parseInt(localStorage.getItem('viewer_padding_left') || '20', 10);
+    const padRight = parseInt(localStorage.getItem('viewer_padding_right') || '20', 10);
+    contentArea.style.paddingTop = `${padTop}px`;
+    contentArea.style.paddingBottom = `${padBottom}px`;
+    contentArea.style.paddingLeft = `${padLeft}px`;
+    contentArea.style.paddingRight = `${padRight}px`;
   }
 
   applyFontFamilyToElement(contentArea, fontFamily);
@@ -536,21 +642,38 @@ export function applyTxtSettings() {
   // 로컬 세부 위치 복원 처리
   let restored = false;
   const savedPosStr = localStorage.getItem(`viewer_last_pos_${state.activeBookId}`);
-  if (savedPosStr) {
+  if (!isModeSwitch && savedPosStr) {
     try {
       const pos = JSON.parse(savedPosStr);
       if (pos && pos.chunkIdx === currentChunkIdx) {
-        setTimeout(() => {
+        showTxtRestoreLoadingToast();
+        txtPendingRestoreTimer = setTimeout(() => {
           if (scrollMode === 'scroll') {
             scrollWrapper.scrollTop = pos.scrollTop;
           } else {
             scrollWrapper.scrollLeft = pos.scrollLeft;
+            snapTxtPageScrollLeft(scrollWrapper);
           }
+          txtPendingRestoreTimer = null;
           console.log(`[Viewer-Txt] 로컬 세부 위치 복원 성공 (left=${pos.scrollLeft}, top=${pos.scrollTop})`);
         }, 150);
         restored = true;
       }
     } catch(e) {}
+  }
+
+  if (!restored && isModeSwitch && preservedAnchor) {
+    showTxtRestoreLoadingToast();
+    txtPendingRestoreTimer = setTimeout(() => {
+      const ok = restoreTxtAnchorInfo(preservedAnchor);
+      if (ok) {
+        snapTxtPageScrollLeft(scrollWrapper);
+        saveDetailPosition();
+        console.log('[Viewer-Txt] 모드 전환 앵커 복원 성공');
+      }
+      txtPendingRestoreTimer = null;
+    }, 150);
+    restored = true;
   }
 
   if (!restored) {
@@ -567,6 +690,7 @@ export function applyTxtSettings() {
       }, 150);
     } else {
       scrollWrapper.scrollLeft = 0;
+      snapTxtPageScrollLeft(scrollWrapper);
     }
   }
 
@@ -601,9 +725,11 @@ function applyFontFamilyToElement(element, fontKey) {
 export function prevTxtPage() {
   const scrollWrapper = document.getElementById('txt-scroll-wrapper');
   if (!scrollWrapper) return;
+  cancelPendingTxtRestore();
   
   const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
   if (scrollMode === 'page') {
+    snapTxtPageScrollLeft(scrollWrapper);
     if (scrollWrapper.scrollLeft <= 10) {
       if (currentChunkIdx > 0) {
         currentChunkIdx--;
@@ -616,9 +742,12 @@ export function prevTxtPage() {
         }, 50);
       }
     } else {
-      const pageScrollWidth = scrollWrapper.clientWidth + 40;
-      scrollWrapper.scrollBy({ left: -pageScrollWidth, behavior: 'auto' });
+      const pageStepWidth = getTxtPageAdvanceWidth(scrollWrapper);
+      const currentPageIdx = Math.round(scrollWrapper.scrollLeft / pageStepWidth);
+      const targetScrollLeft = Math.max(0, (currentPageIdx - 1) * pageStepWidth);
+      scrollWrapper.scrollTo({ left: targetScrollLeft, behavior: 'auto' });
       setTimeout(() => {
+        snapTxtPageScrollLeft(scrollWrapper);
         logActiveViewportText();
         saveDetailPosition();
       }, 100);
@@ -649,9 +778,11 @@ export function prevTxtPage() {
 export function nextTxtPage() {
   const scrollWrapper = document.getElementById('txt-scroll-wrapper');
   if (!scrollWrapper) return;
+  cancelPendingTxtRestore();
   
   const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
   if (scrollMode === 'page') {
+    snapTxtPageScrollLeft(scrollWrapper);
     const maxScrollLeft = scrollWrapper.scrollWidth - scrollWrapper.clientWidth;
     if (scrollWrapper.scrollLeft + 10 >= maxScrollLeft) {
       if (currentChunkIdx < txtChunks.length - 1) {
@@ -669,9 +800,12 @@ export function nextTxtPage() {
         });
       }
     } else {
-      const pageScrollWidth = scrollWrapper.clientWidth + 40;
-      scrollWrapper.scrollBy({ left: pageScrollWidth, behavior: 'auto' });
+      const pageStepWidth = getTxtPageAdvanceWidth(scrollWrapper);
+      const currentPageIdx = Math.round(scrollWrapper.scrollLeft / pageStepWidth);
+      const targetScrollLeft = (currentPageIdx + 1) * pageStepWidth;
+      scrollWrapper.scrollTo({ left: targetScrollLeft, behavior: 'auto' });
       setTimeout(() => {
+        snapTxtPageScrollLeft(scrollWrapper);
         logActiveViewportText();
         saveDetailPosition();
       }, 100);
@@ -705,6 +839,7 @@ export function nextTxtPage() {
 }
 
 export function txtJumpToFirstPage() {
+  cancelPendingTxtRestore();
   if (txtChunks.length > 0 && currentChunkIdx !== 0) {
     currentChunkIdx = 0;
     txtScrollPreloadTriggered = false;
@@ -719,6 +854,7 @@ export function txtJumpToFirstPage() {
 }
 
 export function txtJumpToLastPage() {
+  cancelPendingTxtRestore();
   const lastIdx = Math.max(0, txtChunks.length - 1);
   if (txtChunks.length > 0 && currentChunkIdx !== lastIdx) {
     currentChunkIdx = lastIdx;
@@ -764,6 +900,7 @@ export function txtSliderInput(slider, val) {
 }
 
 export function txtSliderChange(slider, val) {
+  cancelPendingTxtRestore();
   const targetIdx = Math.max(0, Math.min(txtChunks.length - 1, val - 1));
   if (currentChunkIdx !== targetIdx) {
     currentChunkIdx = targetIdx;
@@ -795,6 +932,9 @@ export const TxtViewer = {
   destroy() {
     txtChunks = [];
     currentChunkIdx = 0;
+    clearTimeout(txtPageSnapTimeout);
+    txtPageSnapInProgress = false;
+    cancelPendingTxtRestore();
     const contentArea = document.getElementById('txt-content-area');
     if (contentArea) contentArea.textContent = '';
     const pane = document.getElementById('txt-viewer-container');
