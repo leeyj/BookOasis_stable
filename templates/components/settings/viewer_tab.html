@@ -1,0 +1,67 @@
+<!-- 뷰어 설정 탭 -->
+<div id="settings-tab-viewer" class="settings-tab-content" style="display: none; flex-direction: column; gap: 1.5rem;">
+    <div class="dashboard-section">
+        <div class="section-header" style="margin-bottom: 1.2rem;">
+            <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1.2rem; font-weight: 700;">
+                <i class="fa-solid fa-book-open" style="color: #a855f7; margin-right: 0.5rem;"></i> <span data-i18n="settings.viewer_settings_title">뷰어 상세 설정</span>
+            </h3>
+            <p style="font-size: 0.82rem; color: #94a3b8; margin: 0.4rem 0 0 0;" data-i18n="settings.viewer_settings_subtitle">텍스트(소설)와 만화/PDF 뷰어의 기하학적 여백을 본인의 모바일/태블릿 화면에 맞게 최적화합니다.</p>
+        </div>
+        <div style="background: rgba(30, 41, 59, 0.25); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 1.5rem; backdrop-filter: blur(10px); color: #cbd5e1;">
+            <form id="settings-viewer-form" onsubmit="submitViewerSettings(event)" style="display: flex; flex-direction: column; gap: 1.5rem;">
+
+                <div style="display: flex; gap: 2.5rem; flex-wrap: wrap; justify-content: center;">
+                    
+                    <!-- 소설/텍스트 뷰어 여백 설정 -->
+                    <div style="flex: 1; max-width: 480px; display: flex; flex-direction: column; gap: 1.2rem;">
+                        <h4 style="color: #c084fc; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.5rem; margin: 0 0 0.5rem 0; font-size: 0.98rem; font-weight: 700;">
+                            <i class="fa-solid fa-file-lines" style="margin-right: 0.4rem;"></i> <span data-i18n="settings.viewer_novel_section">소설/텍스트 뷰어 여백 (EPUB, TXT)</span>
+                        </h4>
+                        
+                        <!-- 1. 소설 상단 여백 -->
+                        <div class="library-form-group">
+                            <label for="setting-viewer-padding-top" style="font-weight: 700; color: #fff; font-size: 0.88rem; margin-bottom: 0.4rem; display: block;">
+                                <i class="fa-solid fa-arrows-up-to-line" style="color: #a855f7; margin-right: 0.3rem;"></i> <span data-i18n="settings.padding_top_label">상단 여백 (Padding Top)</span>: <span id="setting-viewer-padding-top-val" style="color: #c084fc;">40</span>px
+                            </label>
+                            <input type="range" id="setting-viewer-padding-top" min="0" max="200" step="5" value="40" style="width: 100%; max-width: 480px; box-sizing: border-box; cursor: pointer; accent-color: #a855f7;" oninput="document.getElementById('setting-viewer-padding-top-val').innerText = this.value">
+                            <p style="font-size: 0.76rem; color: #94a3b8; margin: 0.3rem 0 0 0;" data-i18n="settings.padding_top_desc">뷰어 상단 영역의 내부 여백 크기입니다. 노치나 카메라 홀 침범을 피할 때 사용합니다.</p>
+                        </div>
+ 
+                        <!-- 2. 소설 하단 여백 -->
+                        <div class="library-form-group">
+                            <label for="setting-viewer-padding-bottom" style="font-weight: 700; color: #fff; font-size: 0.88rem; margin-bottom: 0.4rem; display: block;">
+                                <i class="fa-solid fa-arrows-down-to-line" style="color: #a855f7; margin-right: 0.3rem;"></i> <span data-i18n="settings.padding_bottom_label">하단 여백 (Padding Bottom)</span>: <span id="setting-viewer-padding-bottom-val" style="color: #c084fc;">60</span>px
+                            </label>
+                            <input type="range" id="setting-viewer-padding-bottom" min="0" max="200" step="5" value="60" style="width: 100%; max-width: 480px; box-sizing: border-box; cursor: pointer; accent-color: #a855f7;" oninput="document.getElementById('setting-viewer-padding-bottom-val').innerText = this.value">
+                            <p style="font-size: 0.76rem; color: #94a3b8; margin: 0.3rem 0 0 0;" data-i18n="settings.padding_bottom_desc">뷰어 하단 영역의 내부 여백 크기입니다. 모바일 기기의 소프트홈바/네비게이션바 오버랩을 막는 데 매우 유용합니다.</p>
+                        </div>
+ 
+                        <!-- 3. 소설 좌측 여백 -->
+                        <div class="library-form-group">
+                            <label for="setting-viewer-padding-left" style="font-weight: 700; color: #fff; font-size: 0.88rem; margin-bottom: 0.4rem; display: block;">
+                                <i class="fa-solid fa-arrows-left-right" style="color: #a855f7; margin-right: 0.3rem;"></i> <span data-i18n="settings.padding_left_label">좌측 여백 (Padding Left)</span>: <span id="setting-viewer-padding-left-val" style="color: #c084fc;">20</span>px
+                            </label>
+                            <input type="range" id="setting-viewer-padding-left" min="0" max="200" step="5" value="20" style="width: 100%; max-width: 480px; box-sizing: border-box; cursor: pointer; accent-color: #a855f7;" oninput="document.getElementById('setting-viewer-padding-left-val').innerText = this.value">
+                        </div>
+ 
+                        <!-- 4. 소설 우측 여백 -->
+                        <div class="library-form-group">
+                            <label for="setting-viewer-padding-right" style="font-weight: 700; color: #fff; font-size: 0.88rem; margin-bottom: 0.4rem; display: block;">
+                                <i class="fa-solid fa-arrows-left-right" style="color: #a855f7; margin-right: 0.3rem;"></i> <span data-i18n="settings.padding_right_label">우측 여백 (Padding Right)</span>: <span id="setting-viewer-padding-right-val" style="color: #c084fc;">20</span>px
+                            </label>
+                            <input type="range" id="setting-viewer-padding-right" min="0" max="200" step="5" value="20" style="width: 100%; max-width: 480px; box-sizing: border-box; cursor: pointer; accent-color: #a855f7;" oninput="document.getElementById('setting-viewer-padding-right-val').innerText = this.value">
+                        </div>
+                    </div>
+ 
+                </div>
+
+                <!-- 저장 버튼 -->
+                <div style="margin-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1.5rem;">
+                    <button type="submit" class="btn-toggle" style="background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%); color: #fff; border: none; padding: 0.6rem 1.8rem; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; box-shadow: 0 4px 12px rgba(168,85,247,0.25);">
+                        <i class="fa-solid fa-floppy-disk"></i> <span data-i18n="common.save">설정 저장</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

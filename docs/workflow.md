@@ -349,5 +349,7 @@ tags: [workflow, history]
 | 2026-07-11 | `epub_to_txt_viewer` | EPUB 뷰어 epub.js 엔진 걷어내기 및 텍스트/HTML 통합 뷰어 경량화 개선 (삽화 이미지 추출 및 슬라이더 버그 조치 완료) | [Task](./history/20260711_132738_epub_to_txt_viewer_task.md) | [Walkthrough](./history/20260711_132738_epub_to_txt_viewer_walkthrough.md) |
 | 2026-07-11 | `txt_scroll_mode_transition_reset` | TXT/EPUB 뷰어 모드 전환 시 읽기 위치 초기화 결함 조치 | [BugFix](./bug/20260711_bugfix_txt_scroll_mode_transition_reset.md) | - |
 | 2026-07-11 | `txt_anchor_text_restoration` | TXT/EPUB 통합 뷰어 내 앵커 텍스트 기반 정밀 읽기 위치 복원 구현 | [BugFix](./bug/20260711_bugfix_txt_anchor_text_restoration.md) | - |
+| 2026-07-11 | `duplicate_i18n_viewer_overlap` | i18n 번역 리소스 내 중복 viewer 객체 선언에 따른 다국어 렌더링 파괴 버그 수정 | [BugFix](./bug/20260711_bugfix_duplicate_i18n_viewer_overlap.md) | - |
 
 
+| 2026-07-11 | `session_20260711_181030` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260711_181030_session_20260711_181030_task.md) | [Walkthrough](./history/20260711_181030_session_20260711_181030_walkthrough.md) |

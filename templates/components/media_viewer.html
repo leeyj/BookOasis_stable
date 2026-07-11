@@ -73,6 +73,11 @@
                             <i class="fa-solid fa-arrows-up-down"></i> <span data-i18n="viewer.scroll">스크롤</span>
                         </button>
                     </div>
+
+                    <!-- 여백 조절 퀵 팝업 토글 -->
+                    <button onclick="toggleViewerPaddingPanel()" class="btn-overlay-fit" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; border: none; border-radius: 3px; cursor: pointer;" data-i18n-title="viewer.spacing_settings" title="여백 실시간 조절">
+                        <i class="fa-solid fa-arrows-up-down-left-right"></i> <span data-i18n="viewer.spacing_settings_short">여백 조절</span>
+                    </button>
                 </div>
 
                 <!-- 2행: 텍스트 및 EPUB 뷰어 스타일 옵션 -->
@@ -159,6 +164,42 @@
                 <!-- 현재 페이지 뱃지 -->
                 <div class="seekbar-current-badge">
                     <span id="comic-overlay-page-info">1 / 1</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 뷰어 여백 설정 퀵 조절 패널 -->
+        <div id="viewer-padding-overlay-panel" class="viewer-padding-panel" style="display: none; z-index: 10004;">
+            <div class="padding-panel-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.5rem; margin-bottom: 0.75rem;">
+                <h4 style="margin: 0; color: #fff; font-size: 0.88rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
+                    <i class="fa-solid fa-arrows-up-down-left-right" style="color: #a855f7;"></i>
+                    <span data-i18n="viewer.spacing_settings">뷰어 여백 상세 설정</span>
+                </h4>
+                <span class="padding-panel-close" onclick="toggleViewerPaddingPanel()" style="cursor: pointer; color: #94a3b8; font-size: 1.2rem; font-weight: bold;">&times;</span>
+            </div>
+            <div class="padding-panel-body">
+                <!-- 소설/텍스트 조절 폼 (TXT, EPUB) -->
+                <div id="quick-padding-novel-group" style="display: none; flex-direction: column; gap: 0.6rem;">
+                    <!-- 1. 상단 여백 -->
+                    <div class="quick-padding-row" style="display: flex; flex-direction: column; gap: 0.2rem;">
+                        <label style="font-size: 0.76rem; color: #cbd5e1; display: flex; justify-content: space-between;"><span data-i18n="settings.padding_top_label">상단 여백</span> <span><span id="quick-novel-top-val">40</span>px</span></label>
+                        <input type="range" id="quick-novel-top-slider" min="0" max="200" step="5" value="40" style="width: 100%; cursor: pointer; accent-color: #a855f7;">
+                    </div>
+                    <!-- 2. 하단 여백 -->
+                    <div class="quick-padding-row" style="display: flex; flex-direction: column; gap: 0.2rem;">
+                        <label style="font-size: 0.76rem; color: #cbd5e1; display: flex; justify-content: space-between;"><span data-i18n="settings.padding_bottom_label">하단 여백</span> <span><span id="quick-novel-bottom-val">60</span>px</span></label>
+                        <input type="range" id="quick-novel-bottom-slider" min="0" max="200" step="5" value="60" style="width: 100%; cursor: pointer; accent-color: #a855f7;">
+                    </div>
+                    <!-- 3. 좌측 여백 -->
+                    <div class="quick-padding-row" style="display: flex; flex-direction: column; gap: 0.2rem;">
+                        <label style="font-size: 0.76rem; color: #cbd5e1; display: flex; justify-content: space-between;"><span data-i18n="settings.padding_left_label">좌측 여백</span> <span><span id="quick-novel-left-val">20</span>px</span></label>
+                        <input type="range" id="quick-novel-left-slider" min="0" max="200" step="5" value="20" style="width: 100%; cursor: pointer; accent-color: #a855f7;">
+                    </div>
+                    <!-- 4. 우측 여백 -->
+                    <div class="quick-padding-row" style="display: flex; flex-direction: column; gap: 0.2rem;">
+                        <label style="font-size: 0.76rem; color: #cbd5e1; display: flex; justify-content: space-between;"><span data-i18n="settings.padding_right_label">우측 여백</span> <span><span id="quick-novel-right-val">20</span>px</span></label>
+                        <input type="range" id="quick-novel-right-slider" min="0" max="200" step="5" value="20" style="width: 100%; cursor: pointer; accent-color: #a855f7;">
+                    </div>
                 </div>
             </div>
         </div>

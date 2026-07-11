@@ -201,6 +201,12 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false) {
   const viewerModal = document.getElementById('media-viewer-modal');
   if (!viewerModal) return;
 
+  // 퀵 여백 설정 패널 강제 닫기
+  const padPanel = document.getElementById('viewer-padding-overlay-panel');
+  if (padPanel) {
+    padPanel.style.display = 'none';
+  }
+
   if (!isTransitioning) {
     viewerModal.classList.remove('fullscreen-mode');
     viewerModal.style.display = 'none';

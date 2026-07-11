@@ -30,6 +30,8 @@ nav:
 - 개발 워크플로우: workflow.md
 - 작업 히스토리:
   - history/index.md
+  - history/20260711_181030_session_20260711_181030_walkthrough.md
+  - history/20260711_181030_session_20260711_181030_task.md
   - history/20260711_132738_epub_to_txt_viewer_walkthrough.md
   - history/20260711_132738_epub_to_txt_viewer_task.md
   - history/20260711_132409_epub_to_txt_viewer_walkthrough.md
@@ -688,6 +690,8 @@ nav:
   - bug/20260711_bugfix_viewer_slider_imgdir.md
   - bug/20260711_bugfix_viewer_scroll_preload.md
   - bug/20260711_bugfix_user_progress_duplicate.md
+  - bug/20260711_bugfix_txt_scroll_mode_transition_reset.md
+  - bug/20260711_bugfix_txt_anchor_text_restoration.md
   - bug/20260711_bugfix_scanner_db_lock_concurrency.md
   - bug/20260711_bugfix_pdf_slider_not_available.md
   - bug/20260711_bugfix_orphaned_books_cleanup.md
@@ -697,6 +701,7 @@ nav:
   - bug/20260711_bugfix_epub_image_overflow_and_slider.md
   - bug/20260711_bugfix_epub_blocking_locations_reset.md
   - bug/20260711_bugfix_epub_anchor.md
+  - bug/20260711_bugfix_duplicate_i18n_viewer_overlap.md
   - bug/20260709_bugfix_viewer_scroll_mode_double_toggle.md
   - bug/20260709_bugfix_txt_overlay_menu_position.md
   - bug/20260709_bugfix_epub_scroll_mode_overlay_toggle.md

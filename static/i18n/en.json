@@ -191,10 +191,23 @@
     "general_save_done": "Settings Saved",
     "general_save_fail": "Failed to save some settings: {error}",
     "general_server_error": "A server connection error occurred.",
-    "general_scanner_start": "Starting Lazy Cover Scanner...",
     "general_scanner_fail": "Scanner start failed: {error}",
     "btn_scan_all": "Scan All",
-    "tab_queue": "Scan Queue Status"
+    "tab_queue": "Scan Queue Status",
+    "tab_viewer": "Viewer Settings",
+    "viewer_settings_title": "Viewer Settings",
+    "viewer_settings_subtitle": "Optimize geometric padding of Text(Novel) and Comic/PDF viewers to match your mobile or tablet screen.",
+    "viewer_novel_section": "Novel/Text Viewer Padding (EPUB, TXT)",
+    "viewer_comic_section": "Comic/PDF Viewer Padding (ZIP, CBZ, PDF, IMGDIR)",
+    "padding_top_label": "Padding Top",
+    "padding_top_desc": "Inner padding size at the top of the viewer. Useful to avoid notch or camera hole intrusion.",
+    "padding_bottom_label": "Padding Bottom",
+    "padding_bottom_desc": "Inner padding size at the bottom of the viewer. Very useful to prevent overlaps with mobile soft homebars/navbars.",
+    "padding_left_label": "Padding Left",
+    "padding_left_desc": "Inner padding size at the left side of the viewer.",
+    "padding_right_label": "Padding Right",
+    "padding_right_desc": "Inner padding size at the right side of the viewer.",
+    "viewer_settings_saved": "Viewer padding settings saved successfully!"
   },
   "sidebar": {
     "library": "Library",
@@ -255,14 +268,6 @@
     "text_author": "Author: {author}",
     "text_publisher": "Publisher: {publisher}"
   },
-  "filter": {
-    "modal_title": "Detailed Filter",
-    "reset_all": "Reset All Filters",
-    "search_placeholder": "Search genre or tag...",
-    "tab_genres": "Genres",
-    "tab_tags": "Tags",
-    "apply_btn": "Apply Filter"
-  },
   "system": {
     "ticker_title": "System News",
     "ticker_default_msg": "Background task is currently running."
@@ -280,6 +285,10 @@
     "mark_as_unread": "Mark as Unread (0%)"
   },
   "viewer": {
+    "spacing_settings": "Spacing Settings",
+    "spacing_settings_short": "Spacing",
+    "padding_vertical": "Vert. Margin",
+    "padding_horizontal": "Horiz. Margin",
     "close_fullscreen": "Close Fullscreen (ESC)",
     "reading": "Reading...",
     "fit_height": "Fit to Height",

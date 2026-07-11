@@ -15,7 +15,9 @@ export {
   loadReportList,
   loadReportDetail,
   loadUsersList,
-  loadPermissionsMatrix
+  loadPermissionsMatrix,
+  loadViewerSettings,
+  submitViewerSettings
 };
 
 // 환경설정 내부 탭 전환 함수
@@ -61,6 +63,8 @@ export function switchSettingsTab(tabId) {
   // 5. 각 탭 데이터 조회 로드
   if (tabId === 'general') {
     loadGeneralSettings();
+  } else if (tabId === 'viewer') {
+    loadViewerSettings();
   } else if (tabId === 'plugins') {
     loadPluginsSettings();
   } else if (tabId === 'reports') {
@@ -170,5 +174,105 @@ async function loadChangelog() {
   } finally {
     loadingEl.style.display = 'none';
     contentEl.style.display = 'block';
+  }
+}
+
+// 뷰어 여백 설정 로드
+function loadViewerSettings() {
+  const padTop = localStorage.getItem('viewer_padding_top') || '40';
+  const padBottom = localStorage.getItem('viewer_padding_bottom') || '60';
+  const padLeft = localStorage.getItem('viewer_padding_left') || '20';
+  const padRight = localStorage.getItem('viewer_padding_right') || '20';
+
+  const cPadTop = localStorage.getItem('comic_padding_top') || '0';
+  const cPadBottom = localStorage.getItem('comic_padding_bottom') || '40';
+  const cPadLeft = localStorage.getItem('comic_padding_left') || '0';
+  const cPadRight = localStorage.getItem('comic_padding_right') || '0';
+
+  const topInput = document.getElementById('setting-viewer-padding-top');
+  const bottomInput = document.getElementById('setting-viewer-padding-bottom');
+  const leftInput = document.getElementById('setting-viewer-padding-left');
+  const rightInput = document.getElementById('setting-viewer-padding-right');
+
+  const cTopInput = document.getElementById('setting-comic-padding-top');
+  const cBottomInput = document.getElementById('setting-comic-padding-bottom');
+  const cLeftInput = document.getElementById('setting-comic-padding-left');
+  const cRightInput = document.getElementById('setting-comic-padding-right');
+
+  if (topInput) {
+    topInput.value = padTop;
+    document.getElementById('setting-viewer-padding-top-val').innerText = padTop;
+  }
+  if (bottomInput) {
+    bottomInput.value = padBottom;
+    document.getElementById('setting-viewer-padding-bottom-val').innerText = padBottom;
+  }
+  if (leftInput) {
+    leftInput.value = padLeft;
+    document.getElementById('setting-viewer-padding-left-val').innerText = padLeft;
+  }
+  if (rightInput) {
+    rightInput.value = padRight;
+    document.getElementById('setting-viewer-padding-right-val').innerText = padRight;
+  }
+
+  if (cTopInput) {
+    cTopInput.value = cPadTop;
+    document.getElementById('setting-comic-padding-top-val').innerText = cPadTop;
+  }
+  if (cBottomInput) {
+    cBottomInput.value = cPadBottom;
+    document.getElementById('setting-comic-padding-bottom-val').innerText = cPadBottom;
+  }
+  if (cLeftInput) {
+    cLeftInput.value = cPadLeft;
+    document.getElementById('setting-comic-padding-left-val').innerText = cPadLeft;
+  }
+  if (cRightInput) {
+    cRightInput.value = cPadRight;
+    document.getElementById('setting-comic-padding-right-val').innerText = cPadRight;
+  }
+}
+
+// 뷰어 여백 설정 저장
+function submitViewerSettings(event) {
+  console.log('[Settings-Viewer] submitViewerSettings triggered');
+  if (event) event.preventDefault();
+  try {
+    const padTop = document.getElementById('setting-viewer-padding-top').value;
+    const padBottom = document.getElementById('setting-viewer-padding-bottom').value;
+    const padLeft = document.getElementById('setting-viewer-padding-left').value;
+    const padRight = document.getElementById('setting-viewer-padding-right').value;
+    console.log(`[Settings-Viewer] Read Novel Padding from Form: Top=${padTop}, Bottom=${padBottom}, Left=${padLeft}, Right=${padRight}`);
+
+    localStorage.setItem('viewer_padding_top', padTop);
+    localStorage.setItem('viewer_padding_bottom', padBottom);
+    localStorage.setItem('viewer_padding_left', padLeft);
+    localStorage.setItem('viewer_padding_right', padRight);
+    console.log('[Settings-Viewer] Saved Novel padding values to localStorage');
+
+    const cTopInput = document.getElementById('setting-comic-padding-top');
+    const cBottomInput = document.getElementById('setting-comic-padding-bottom');
+    const cLeftInput = document.getElementById('setting-comic-padding-left');
+    const cRightInput = document.getElementById('setting-comic-padding-right');
+
+    if (cTopInput) localStorage.setItem('comic_padding_top', cTopInput.value);
+    if (cBottomInput) localStorage.setItem('comic_padding_bottom', cBottomInput.value);
+    if (cLeftInput) localStorage.setItem('comic_padding_left', cLeftInput.value);
+    if (cRightInput) localStorage.setItem('comic_padding_right', cRightInput.value);
+    console.log('[Settings-Viewer] Saved Comic padding values to localStorage if present');
+
+    // 실시간 뷰어 여백 즉시 반영을 위해 통합 함수 대리 호출
+    if (typeof window.applyViewerPaddingRealtime === 'function') {
+      window.applyViewerPaddingRealtime('novel', 'top', padTop);
+      window.applyViewerPaddingRealtime('novel', 'bottom', padBottom);
+      window.applyViewerPaddingRealtime('novel', 'left', padLeft);
+      window.applyViewerPaddingRealtime('novel', 'right', padRight);
+      console.log('[Settings-Viewer] Realtime styles applied via applyViewerPaddingRealtime');
+    }
+
+    alert(window.i18n && window.i18n.t ? window.i18n.t('settings.viewer_settings_saved') || '뷰어 여백 설정이 저장되었습니다!' : '뷰어 여백 설정이 저장되었습니다!');
+  } catch (e) {
+    console.error('[Settings-Viewer] Error occurred inside submitViewerSettings:', e);
   }
 }

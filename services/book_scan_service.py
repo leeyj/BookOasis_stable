@@ -99,8 +99,25 @@ class BookScanService:
                 
             # 5. DB 업데이트 실행
             print(f"[BookScanService] DB 업데이트 트랜잭션 쿼리 빌드")
+            
+            # 부모 폴더 경로 기반의 올바른 series_name 추출
+            path_parts = os.path.normpath(parent_dir).split(os.sep)
+            real_series_name = ""
+            from tools.scanner.metadata import is_consonant_folder
+            for i in range(len(path_parts) - 1):
+                if is_consonant_folder(path_parts[i]):
+                    real_series_name = path_parts[i+1]
+                    break
+            if not real_series_name and len(path_parts) > 0:
+                real_series_name = path_parts[-1]
+
+            if real_series_name:
+                import re
+                real_series_name = re.sub(r'^\[(?:단행|연재|소설|만화|웹툰|일반)\]\s*', '', real_series_name).strip()
+
             cursor.execute("""
                 UPDATE books SET 
+                    series_name  = COALESCE(NULLIF(?, ''), series_name),
                     cover_image  = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE cover_image END,
                     cover_updated_at = CASE WHEN ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
                     author       = COALESCE(NULLIF(?, ''), author),
@@ -111,6 +128,7 @@ class BookScanService:
                     release_date = COALESCE(NULLIF(?, ''), release_date)
                 WHERE id = ?
             """, (
+                real_series_name,
                 cover_image, cover_image, cover_image,
                 cover_image, cover_image,
                 merged_meta['author'],

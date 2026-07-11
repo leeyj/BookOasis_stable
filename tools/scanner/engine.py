@@ -122,6 +122,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                 meta = d['merged_meta']
                 score = meta.get('score', 0)
                 update_data.append((
+                    d.get('series_name', ''),
                     d['cover_image'], d['cover_image'], d['cover_image'],
                     meta.get('author',''), meta.get('publisher',''), meta.get('link',''),
                     score, score, meta.get('summary',''), meta.get('release_date',''),
@@ -266,7 +267,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                             pending_updates.append({
                                 "action": "update", "is_offset_only": is_offset_only, "full_path": full_path, 
                                 "cover_image": cover_image, "merged_meta": merged_meta, "offsets_data": offsets_data, 
-                                "filename": filename, "file_mtime": item.get('file_mtime', 0.0), "file_size": item.get('file_size', 0)
+                                "filename": filename, "series_name": series_name, "file_mtime": item.get('file_mtime', 0.0), "file_size": item.get('file_size', 0)
                             })
                         else:
                             pending_inserts.append({

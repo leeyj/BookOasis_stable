@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 import os
 
-def update_book_metadata(cursor, full_path, cover_image, merged_meta):
+def update_book_metadata(cursor, full_path, cover_image, merged_meta, series_name=''):
     """Execute merge update for existing book info and local metadata"""
     cursor.execute("""
         UPDATE books SET 
+            series_name  = COALESCE(NULLIF(?, ''), series_name),
             cover_image  = COALESCE(NULLIF(?, ''), cover_image),
             cover_updated_at = CASE WHEN ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
             author       = COALESCE(NULLIF(?, ''), author),
@@ -17,6 +18,7 @@ def update_book_metadata(cursor, full_path, cover_image, merged_meta):
             tags         = COALESCE(NULLIF(?, ''), tags)
         WHERE file_path = ?
     """, (
+        series_name,
         cover_image,
         cover_image, cover_image,
         merged_meta['author'],
@@ -91,6 +93,7 @@ def bulk_update_books(cursor, update_data_list):
     if not update_data_list: return
     cursor.executemany("""
         UPDATE books SET 
+            series_name  = COALESCE(NULLIF(?, ''), series_name),
             cover_image  = COALESCE(NULLIF(?, ''), cover_image),
             cover_updated_at = CASE WHEN ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
             author       = COALESCE(NULLIF(?, ''), author),

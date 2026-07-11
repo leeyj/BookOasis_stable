@@ -21,6 +21,20 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
   if (!pane || !contentArea) return;
   pane.style.display = 'block';
   
+  // 뷰어 여백(Padding) 설정 동적 적용
+  import('./viewer/viewer_padding.js').then(m => {
+    const padTop = localStorage.getItem('viewer_padding_top') || '40';
+    const padBottom = localStorage.getItem('viewer_padding_bottom') || '60';
+    const padLeft = localStorage.getItem('viewer_padding_left') || '20';
+    const padRight = localStorage.getItem('viewer_padding_right') || '20';
+    m.applyViewerPaddingRealtime('novel', 'top', padTop);
+    m.applyViewerPaddingRealtime('novel', 'bottom', padBottom);
+    m.applyViewerPaddingRealtime('novel', 'left', padLeft);
+    m.applyViewerPaddingRealtime('novel', 'right', padRight);
+  }).catch(e => {
+    console.error('[Viewer-Txt] Failed to dynamically load viewer_padding.js:', e);
+  });
+  
   const txtCtrl = document.getElementById('txt-controls');
   if (txtCtrl) txtCtrl.style.display = 'none';
   

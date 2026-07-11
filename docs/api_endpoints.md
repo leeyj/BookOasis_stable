@@ -205,10 +205,32 @@
 * **요청 바디 (JSON)**:
   ```json
   {
+    "db_type": "general",
     "book_id": 105,
-    "type": "general",
-    "pages_read": 45,
-    "is_completed": 0
+    "page_idx": 7,
+    "total_pages": 32,
+    "epub_session": "..."
+  }
+  ```
+
+---
+
+### `[GET]` `/api/media/epub`
+* **설명**: EPUB 압축 파일 내부의 챕터(XHTML/HTML) 목록을 정제하여 순차적인 JSON 배열 형태로 가져옵니다. (내부 삽화 이미지 태그 주소 치환 완료)
+* **쿼리 스트링**:
+  * `book_id` (integer, 필수): 도서 고유 번호
+  * `db_type` (string, 필수): DB 종류 스코프 (`general` / `adult`)
+* **응답 예시 (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "chapters": [
+      {
+        "id": "cover.xhtml",
+        "title": "표지",
+        "content": "<div class=\"epub-content\">...</div>"
+      }
+    ]
   }
   ```
 

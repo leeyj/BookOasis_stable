@@ -22,11 +22,12 @@ import { openMetadataSearchModal, closeMetadataSearchModal, performMetadataSearc
 import { loadBooksList, loadReadingHistory, filterBooks, toggleLibrarySort, resumeSeries, updateSortButtonUI } from './book_list.js';
 
 // settings_tab.js 모듈로부터 환경설정 제어부 임포트
-import { switchSettingsTab, loadInitialSystemSettings, loadGeneralSettings, submitGeneralSettings, initReportsTab, loadReportList, loadReportDetail } from './settings_tab.js';
+import { switchSettingsTab, loadInitialSystemSettings, loadGeneralSettings, submitGeneralSettings, initReportsTab, loadReportList, loadReportDetail, loadViewerSettings, submitViewerSettings } from './settings_tab.js';
 
 // 장르 및 태그 플로팅 필터 모달 임포트
 import { initFloatingFilter, toggleFilterModal } from './genre_tag_filter.js';
 import { initSidebarAutoClose, restoreDesktopSidebarState } from './sidebar_manager.js';
+import './viewer/viewer_padding.js';
 
 function focusLibrarySearchInput() {
   const searchInput = document.getElementById('library-search');
@@ -343,6 +344,8 @@ window.initInfiniteScrollObserver = initInfiniteScrollObserver;
 window.switchSettingsTab = switchSettingsTab;
 window.loadGeneralSettings = loadGeneralSettings;
 window.submitGeneralSettings = submitGeneralSettings;
+window.loadViewerSettings = loadViewerSettings;
+window.submitViewerSettings = submitViewerSettings;
 window.initReportsTab = initReportsTab;
 window.loadReportList = loadReportList;
 window.loadReportDetail = loadReportDetail;

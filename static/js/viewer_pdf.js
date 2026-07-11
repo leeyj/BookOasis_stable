@@ -11,6 +11,7 @@ let currentRenderTasks = [];
 
 export async function initPdfViewer(bookId, pagesRead, totalPages) {
   console.log(`[Viewer-Pdf] initPdfViewer - PDF 렌더링 요청: bookId=${bookId}, pagesRead=${pagesRead}, totalPages=${totalPages}`);
+  
   document.getElementById('pdf-viewer-container').style.display = 'flex';
   pdfCurrentPage = pagesRead > 0 ? pagesRead : 1;
   pdfTotalPages = totalPages || 0;
@@ -138,48 +139,29 @@ export function renderPdfPage() {
           console.error(`[Viewer-Pdf] Page ${pageNum} rendering error:`, err);
         }
       });
+    }).catch(err => {
+      console.error(`[Viewer-Pdf] getPage failed for page ${pageNum}:`, err);
     });
   });
 
-  // 하단 페이지 바 레이블 및 시크바 동기화 처리
-  const pageText = `${pdfCurrentPage} / ${pdfTotalPages}`;
-  const pdfInfo = document.getElementById('pdf-page-info');
-  if (pdfInfo) pdfInfo.textContent = pageText;
-  const overlayInfo = document.getElementById('comic-overlay-page-info');
-  if (overlayInfo) overlayInfo.textContent = pageText;
-
-  // 공통 시크바 슬라이더 동기화
-  const slider = document.getElementById('viewer-page-slider');
-  if (slider) {
-    slider.max = pdfTotalPages;
-    slider.value = pdfCurrentPage;
-    const startLbl = document.getElementById('seekbar-start-label');
-    const endLbl = document.getElementById('seekbar-end-label');
-    if (startLbl) startLbl.textContent = '1';
-    if (endLbl) endLbl.textContent = String(pdfTotalPages);
-  }
-
-  // 진척도 저장 연동
-  saveProgress(state.activeBookId, pdfCurrentPage - 1, pdfTotalPages);
-}
-
-export function nextPdfPage() {
-  const step = (typeof getComicPageStep === 'function') ? getComicPageStep() : 1;
-  if (pdfCurrentPage < pdfTotalPages) {
-    pdfCurrentPage = Math.min(pdfCurrentPage + step, pdfTotalPages);
-    renderPdfPage();
-  } else {
-    import('./viewer_next_episode.js').then(m => {
-      m.handleNextEpisodeDirect(state.activeBookId);
-    });
-  }
+  updatePageInfo();
 }
 
 export function prevPdfPage() {
-  const step = (typeof getComicPageStep === 'function') ? getComicPageStep() : 1;
-  if (pdfCurrentPage > 1) {
-    pdfCurrentPage = Math.max(pdfCurrentPage - step, 1);
+  if (pdfDoc && pdfCurrentPage > 1) {
+    const step = (typeof getComicPageStep === 'function') ? getComicPageStep() : 1;
+    pdfCurrentPage = Math.max(1, pdfCurrentPage - step);
     renderPdfPage();
+    saveProgress(state.activeBookId, pdfCurrentPage, pdfTotalPages);
+  }
+}
+
+export function nextPdfPage() {
+  if (pdfDoc && pdfCurrentPage < pdfTotalPages) {
+    const step = (typeof getComicPageStep === 'function') ? getComicPageStep() : 1;
+    pdfCurrentPage = Math.min(pdfTotalPages, pdfCurrentPage + step);
+    renderPdfPage();
+    saveProgress(state.activeBookId, pdfCurrentPage, pdfTotalPages);
   }
 }
 

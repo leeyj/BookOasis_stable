@@ -191,10 +191,23 @@
     "general_save_done": "설정 저장 완료",
     "general_save_fail": "일부 설정 저장 실패: {error}",
     "general_server_error": "서버 연결 중 오류가 발생했습니다.",
-    "general_scanner_start": "Lazy 표지 스캐너를 기동하는 중...",
     "general_scanner_fail": "스캐너 기동 실패: {error}",
     "btn_scan_all": "일괄 스캔",
-    "tab_queue": "스캔 예약 조회"
+    "tab_queue": "스캔 예약 조회",
+    "tab_viewer": "뷰어 설정",
+    "viewer_settings_title": "뷰어 상세 설정",
+    "viewer_settings_subtitle": "텍스트(소설)와 만화/PDF 뷰어의 기하학적 여백을 본인의 모바일/태블릿 화면에 맞게 최적화합니다.",
+    "viewer_novel_section": "소설/텍스트 뷰어 여백 (EPUB, TXT)",
+    "viewer_comic_section": "만화/PDF 뷰어 여백 (ZIP, CBZ, PDF, 이미지폴더)",
+    "padding_top_label": "상단 여백 (Padding Top)",
+    "padding_top_desc": "뷰어 상단 영역의 내부 여백 크기입니다. 노치나 카메라 홀 침범을 피할 때 사용합니다.",
+    "padding_bottom_label": "하단 여백 (Padding Bottom)",
+    "padding_bottom_desc": "뷰어 하단 영역의 내부 여백 크기입니다. 모바일 기기의 소프트홈바/네비게이션바 오버랩을 막는 데 매우 유용합니다.",
+    "padding_left_label": "좌측 여백 (Padding Left)",
+    "padding_left_desc": "뷰어 좌측 측면의 내부 여백 크기입니다.",
+    "padding_right_label": "우측 여백 (Padding Right)",
+    "padding_right_desc": "뷰어 우측 측면의 내부 여백 크기입니다.",
+    "viewer_settings_saved": "뷰어 여백 설정이 저장되었습니다!"
   },
   "sidebar": {
     "library": "라이브러리",
@@ -280,6 +293,10 @@
     "mark_as_unread": "읽지 않은 상태로 변경 (0%)"
   },
   "viewer": {
+    "spacing_settings": "뷰어 여백 상세 설정",
+    "spacing_settings_short": "여백 조절",
+    "padding_vertical": "상하 여백",
+    "padding_horizontal": "좌우 여백",
     "close_fullscreen": "전체화면 닫기 (ESC)",
     "reading": "독서 중...",
     "fit_height": "높이에 맞추기",

@@ -10,6 +10,9 @@
                 <button class="settings-tab-btn" onclick="switchSettingsTab('general')">
                     <i class="fa-solid fa-sliders"></i> <span data-i18n="settings.tab_general">일반 설정</span>
                 </button>
+                <button class="settings-tab-btn" onclick="switchSettingsTab('viewer')">
+                    <i class="fa-solid fa-book-open"></i> <span data-i18n="settings.tab_viewer">뷰어 설정</span>
+                </button>
                 <button class="settings-tab-btn" onclick="switchSettingsTab('plugins')">
                     <i class="fa-solid fa-plug"></i> <span data-i18n="settings.tab_plugins">플러그인 설정</span>
                 </button>
@@ -41,6 +44,9 @@
 
             <!-- 2. 일반 설정 탭 -->
             {% include "components/settings/general_tab.html" %}
+
+            <!-- 2.5 뷰어 설정 탭 -->
+            {% include "components/settings/viewer_tab.html" %}
 
             <!-- 3. 플러그인 설정 탭 -->
             {% include "components/settings/plugins_tab.html" %}

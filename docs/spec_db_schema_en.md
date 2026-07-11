@@ -89,8 +89,8 @@ Per-user, per-book reading progress.
 - PK: `id`
 - Main FK: `book_id -> books.id`, `user_id -> users.id`
 - Common columns: `pages_read`, `is_completed`, `last_read_at`
-- General DB EPUB pointer extensions:
-  - `last_epub_cfi`, `last_epub_href`, `last_epub_spine_index`, `last_epub_percent`, `last_epub_updated_at`
+- General DB EPUB pointer extensions (Deprecated/Unused):
+  - `last_epub_cfi`, `last_epub_href`, `last_epub_spine_index`, `last_epub_percent`, `last_epub_updated_at` (Legacy fields related to the old epub.js engine, no longer used since unified text viewer was introduced)
 
 ### user_reading_log
 

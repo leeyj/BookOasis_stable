@@ -106,6 +106,8 @@ export async function initRenderer(bookId, pagesRead, totalPages) {
   // 뷰어 초기화가 시작되는 즉시 로딩 오버레이를 화면에 노출합니다.
   showViewerLoading('Loading...', 'Preparing pages');
 
+
+
   document.getElementById('comic-viewer-container').style.display = 'flex';
   document.getElementById('comic-fit-controls').style.display = 'flex';
 
@@ -513,7 +515,6 @@ export function loadComicPage() {
           });
           pairContainer.style.visibility = 'visible';
           hideViewerLoading();
-
           if (comicCurrentPage === 0 && pageIndices.length === 1) {
             const aspectRatio = imageElements[0].naturalWidth / imageElements[0].naturalHeight;
             if (aspectRatio < 0.7) {
