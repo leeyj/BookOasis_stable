@@ -155,17 +155,7 @@ export function updatePageInfo() {
   const infoEl = document.getElementById('comic-page-info');
   const overlayInfoEl = document.getElementById('comic-overlay-page-info');
 
-  if (state.currentViewerFormat === 'epub') {
-    const slider = document.getElementById('viewer-page-slider');
-    if (slider && overlayInfoEl) {
-      overlayInfoEl.textContent = `${slider.value}%`;
-    }
-    const overlayTitleEl = document.getElementById('overlay-title-text');
-    if (overlayTitleEl) overlayTitleEl.textContent = document.getElementById('viewer-title-text').textContent;
-    return;
-  }
-
-  if (state.currentViewerFormat === 'txt') {
+  if (state.currentViewerFormat === 'epub' || state.currentViewerFormat === 'txt') {
     const slider = document.getElementById('viewer-page-slider');
     if (slider && overlayInfoEl) {
       const maxVal = slider.max || '1';

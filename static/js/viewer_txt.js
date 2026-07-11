@@ -1,4 +1,4 @@
-// viewer_txt.js – 텍스트 리더(TXT) 뷰어 로직
+// viewer_txt.js – 텍스트 리더(TXT) 및 EPUB 뷰어 통합 로직
 import { state } from './state.js';
 
 let txtChunks = [];
@@ -12,32 +12,60 @@ let txtScrollNextEpisodeTriggered = false;
 
 import { showViewerLoading, hideViewerLoading, showViewerError } from './view_manager.js';
 import { saveProgress } from './viewer_progress.js';
+import { initPageStep, initReadingDirection } from './viewer/reader_settings.js';
 
 export function initTxtViewer(bookId, initialPageIdx = 0) {
-  console.log(`[Viewer-Txt] initTxtViewer - TXT 콘텐츠 요청 중: bookId=${bookId}, initialPageIdx=${initialPageIdx}`);
+  console.log(`[Viewer-Txt] initTxtViewer - 콘텐츠 요청 중: bookId=${bookId}, initialPageIdx=${initialPageIdx}, format=${state.currentViewerFormat}`);
   const pane = document.getElementById('txt-viewer-container');
   const contentArea = document.getElementById('txt-content-area');
   if (!pane || !contentArea) return;
   pane.style.display = 'block';
   
-  // 기존 수동 상단 컨트롤 패널은 숨김 처리
   const txtCtrl = document.getElementById('txt-controls');
   if (txtCtrl) txtCtrl.style.display = 'none';
   
   showViewerLoading(i18n.t("viewer.loading_txt_title"), i18n.t("viewer.loading_txt_sub"));
   
-  fetch(`/api/media/txt?db_type=${state.currentLibraryType}&book_id=${bookId}`)
-    .then(res => res.ok ? res.text() : Promise.reject(i18n.t('viewer.error_txt_load')))
-    .then(txt => {
+  const isEpub = (state.currentViewerFormat === 'epub');
+  const url = isEpub 
+    ? `/api/media/epub?db_type=${state.currentLibraryType}&book_id=${bookId}`
+    : `/api/media/txt?db_type=${state.currentLibraryType}&book_id=${bookId}`;
+
+  fetch(url)
+    .then(res => {
+      if (!res.ok) throw new Error(i18n.t('viewer.error_txt_load'));
+      return isEpub ? res.json() : res.text();
+    })
+    .then(data => {
       hideViewerLoading();
-      fullText = txt;
       txtScrollPreloadTriggered = false;
       txtScrollNextEpisodeTriggered = false;
-      // 대용량 텍스트 브라우저 렌더링 랙 방지를 위한 청크(페이지) 분할
-      txtChunks = chunkText(txt, 4000);
-      currentChunkIdx = initialPageIdx;
+
+      if (isEpub) {
+        const chapters = data.chapters || [];
+        txtChunks = chapters.map(ch => ch.content);
+        fullText = txtChunks.join('<hr class="epub-chapter-divider" style="border: none; border-top: 1px dashed rgba(255,255,255,0.15); margin: 3rem 0;"/>');
+      } else {
+        fullText = data;
+        txtChunks = chunkText(data, 4000);
+      }
+
+      let startIdx = initialPageIdx;
+      const savedPosStr = localStorage.getItem(`viewer_last_pos_${bookId}`);
+      if (savedPosStr) {
+        try {
+          const pos = JSON.parse(savedPosStr);
+          if (pos && pos.chunkIdx !== undefined) {
+            startIdx = pos.chunkIdx;
+            console.log(`[Viewer-Txt] 로컬 저장소에서 챕터 인덱스 감지: ${startIdx}`);
+          }
+        } catch(e) {}
+      }
+
+      currentChunkIdx = startIdx;
       
-      // 렌더 및 세팅 적용
+      initPageStep();
+      initReadingDirection();
       renderCurrentChunk(true);
       applyTxtSettings();
 
@@ -88,9 +116,21 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
           const scrollHeight = scrollWrapper.scrollHeight - scrollWrapper.clientHeight;
           if (scrollHeight <= 0) return;
 
-          // 전체 텍스트 스크롤 비율 연산 기반으로 진척도 역산
-          const ratio = scrollWrapper.scrollTop / scrollHeight;
-          const newIdx = Math.min(txtChunks.length - 1, Math.max(0, Math.floor(ratio * txtChunks.length)));
+          const currentScroll = scrollWrapper.scrollTop;
+          const chunks = contentArea.querySelectorAll('.txt-scroll-chunk');
+          let detectedIdx = 0;
+          
+          for (let chunk of chunks) {
+            const idx = parseInt(chunk.getAttribute('data-idx'));
+            if (currentScroll >= chunk.offsetTop - 120) {
+              detectedIdx = idx;
+            } else {
+              break;
+            }
+          }
+
+          const newIdx = Math.min(txtChunks.length - 1, Math.max(0, detectedIdx));
+          const ratio = scrollHeight > 0 ? scrollWrapper.scrollTop / scrollHeight : 0;
 
           if (!txtScrollPreloadTriggered && ratio >= 0.9 && txtChunks.length > 1) {
             txtScrollPreloadTriggered = true;
@@ -106,8 +146,9 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
             saveProgress(state.activeBookId, currentChunkIdx, txtChunks.length);
           }
 
-          // 마지막 바닥 도달 시 다음 화 이동
+          logActiveViewportText();
           triggerNextEpisodeIfNeeded();
+          saveDetailPosition();
         };
         scrollWrapper.addEventListener('scroll', scrollHandler, { passive: true });
         scrollWrapper.__txtScrollHandler = scrollHandler;
@@ -120,21 +161,17 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
         scrollWrapper.addEventListener('touchcancel', touchHandler, { passive: true });
       }
 
-      // 윈도우 리사이즈 시 읽기 진행 위치 자동 계산 및 레이아웃 보정
       const handleResize = () => {
         const wrapper = document.getElementById('txt-scroll-wrapper');
         if (!wrapper) return;
         const mode = localStorage.getItem('viewer_scroll_mode') || 'page';
 
         if (mode === 'page') {
-          // 1. 리사이즈 전 읽던 컬럼 번호 획득
           const currentColumnIdx = Math.round(wrapper.scrollLeft / (wrapper.clientWidth + 40));
-          // 2. 너비/다단 세팅 재연산
           applyTxtSettings();
-          // 3. 해당 컬럼 번호로 복원
           wrapper.scrollLeft = currentColumnIdx * (wrapper.clientWidth + 40);
+          logActiveViewportText();
         } else {
-          // 세로 스크롤일 때는 비율 기준으로 스크롤바 높이 복원
           const beforeHeight = wrapper.scrollHeight - wrapper.clientHeight;
           const ratio = beforeHeight > 0 ? wrapper.scrollTop / beforeHeight : 0;
           applyTxtSettings();
@@ -142,6 +179,7 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
           if (afterHeight > 0) {
             wrapper.scrollTop = afterHeight * ratio;
           }
+          logActiveViewportText();
         }
       };
 
@@ -161,7 +199,6 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
     });
 }
 
-// 텍스트를 문맥 단락 기준으로 약 4,000자씩 분할
 function chunkText(text, chunkSize = 4000) {
   const chunks = [];
   let start = 0;
@@ -170,7 +207,6 @@ function chunkText(text, chunkSize = 4000) {
       chunks.push(text.slice(start));
       break;
     }
-    // 단락 중간이 잘리지 않도록 줄바꿈 위치 기준 분할
     let end = start + chunkSize;
     const nextNewline = text.indexOf('\n', end);
     if (nextNewline !== -1 && nextNewline - end < 500) {
@@ -180,6 +216,16 @@ function chunkText(text, chunkSize = 4000) {
     start = end;
   }
   return chunks;
+}
+
+function escapeHtml(text) {
+  if (!text) return '';
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 function renderCurrentChunk(initMode = false) {
@@ -192,24 +238,239 @@ function renderCurrentChunk(initMode = false) {
   }
 
   const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
+  const isEpub = (state.currentViewerFormat === 'epub');
+
+  if (isEpub) {
+    contentArea.style.whiteSpace = 'normal';
+    contentArea.style.wordBreak = 'break-word';
+  } else {
+    contentArea.style.whiteSpace = 'normal';
+    contentArea.style.wordBreak = 'break-all';
+  }
+
+  const formatTxtToHtml = (rawText) => {
+    return rawText
+      .split('\n')
+      .map(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return '<p class="txt-paragraph txt-empty-line" style="margin: 0; min-height: 1rem;">&nbsp;</p>';
+        return `<p class="txt-paragraph" style="margin: 0;">${escapeHtml(line)}</p>`;
+      })
+      .join('');
+  };
 
   if (scrollMode === 'page') {
-    contentArea.innerHTML = `<div class="txt-chunk" data-idx="${currentChunkIdx}" style="white-space: pre-wrap; margin-bottom: 2rem;">${txtChunks[currentChunkIdx]}</div>`;
+    if (isEpub) {
+      contentArea.innerHTML = `<div class="txt-chunk epub-chunk" data-idx="${currentChunkIdx}" style="margin-bottom: 2rem;">${txtChunks[currentChunkIdx]}</div>`;
+    } else {
+      const htmlContent = formatTxtToHtml(txtChunks[currentChunkIdx]);
+      contentArea.innerHTML = `<div class="txt-chunk" data-idx="${currentChunkIdx}" style="margin-bottom: 2rem;">${htmlContent}</div>`;
+    }
   } else {
-    // 스크롤 모드인 경우 텍스트 전체를 단 한 번만 통째로 렌더링
     if (initMode || !contentArea.querySelector('.txt-full-content')) {
-      contentArea.innerHTML = `<div class="txt-full-content" style="white-space: pre-wrap; word-break: break-all; margin-bottom: 2rem;">${fullText}</div>`;
+      if (isEpub) {
+        const wrapped = txtChunks.map((ch, idx) => `<div class="txt-scroll-chunk" data-idx="${idx}" style="margin-bottom: 3rem;">${ch}</div>`).join('');
+        contentArea.innerHTML = `<div class="txt-full-content epub-full-content">${wrapped}</div>`;
+      } else {
+        const wrapped = txtChunks.map((ch, idx) => `<div class="txt-scroll-chunk" data-idx="${idx}" style="margin-bottom: 3rem;">${formatTxtToHtml(ch)}</div>`).join('');
+        contentArea.innerHTML = `<div class="txt-full-content">${wrapped}</div>`;
+      }
     }
   }
   
-  // 시크바 및 배지 통합 업데이트
+  applyDynamicParagraphStyles();
   updateTxtSeekBar();
-
-  // 진척도 전송 예약
   saveProgress(state.activeBookId, currentChunkIdx, txtChunks.length);
 }
 
+function applyDynamicParagraphStyles() {
+  const contentArea = document.getElementById('txt-content-area');
+  if (!contentArea) return;
+
+  const savedParagraphSpacing = localStorage.getItem('viewer_paragraph_spacing') || '1.0';
+  const pSpacingRem = parseFloat(savedParagraphSpacing);
+  const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
+
+  if (state.currentViewerFormat === 'epub') {
+    contentArea.querySelectorAll('img').forEach(img => {
+      img.style.maxHeight = scrollMode === 'page' ? '70vh' : '85vh';
+      img.style.maxWidth = '100%';
+      img.style.objectFit = 'contain';
+    });
+  }
+
+  contentArea.querySelectorAll('p, div.txt-chunk > div, div.txt-full-content > div, h1, h2, h3, h4, h5, h6').forEach(el => {
+    const tag = el.tagName.toLowerCase();
+    if (tag.startsWith('h')) {
+      el.style.marginBottom = `${pSpacingRem * 1.5}rem`;
+      el.style.marginTop = '1.5rem';
+      el.style.fontWeight = 'bold';
+    } else {
+      el.style.marginBottom = `${pSpacingRem}rem`;
+      el.style.marginTop = '0';
+    }
+  });
+}
+
 import { getViewerSettings } from './viewer_settings.js';
+
+export function logActiveViewportText() {
+  try {
+    const anchor = getTxtAnchorInfo();
+    if (anchor && anchor.anchorText) {
+      console.log(`[Viewer-Active-Text] 현재 화면 첫줄 감지: "${anchor.anchorText.trim()}" (챕터: ${anchor.chunkIdx})`);
+    } else {
+      console.log(`[Viewer-Active-Text] 현재 화면 첫줄 감지 실패 (null)`);
+    }
+  } catch (e) {
+    console.error(`[Viewer-Active-Text] 감지 중 예외 발생:`, e);
+  }
+}
+
+function stripHtml(html) {
+  if (!html) return '';
+  return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+}
+
+export function getTxtAnchorInfo() {
+  const scrollWrapper = document.getElementById('txt-scroll-wrapper');
+  const contentArea = document.getElementById('txt-content-area');
+  if (!scrollWrapper || !contentArea) return null;
+  
+  const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
+  const isEpub = (state.currentViewerFormat === 'epub');
+
+  if (scrollMode === 'scroll') {
+    const cleanText = isEpub ? stripHtml(fullText) : fullText.replace(/\s+/g, ' ').trim();
+    if (cleanText.length === 0) return null;
+
+    const maxScroll = scrollWrapper.scrollHeight - scrollWrapper.clientHeight;
+    const ratio = maxScroll > 0 ? scrollWrapper.scrollTop / maxScroll : 0;
+    const startIndex = Math.floor(cleanText.length * ratio);
+    const anchorText = cleanText.substring(startIndex, startIndex + 30);
+
+    return {
+      chunkIdx: currentChunkIdx,
+      anchorText: anchorText
+    };
+  } else {
+    const rawChunk = txtChunks[currentChunkIdx] || '';
+    const cleanText = isEpub ? stripHtml(rawChunk) : rawChunk.replace(/\s+/g, ' ').trim();
+    if (cleanText.length === 0) return null;
+
+    const maxScroll = scrollWrapper.scrollWidth - scrollWrapper.clientWidth;
+    const ratio = maxScroll > 0 ? scrollWrapper.scrollLeft / maxScroll : 0;
+    const startIndex = Math.floor(cleanText.length * ratio);
+    const anchorText = cleanText.substring(startIndex, startIndex + 30);
+
+    return {
+      chunkIdx: currentChunkIdx,
+      anchorText: anchorText
+    };
+  }
+}
+
+export function restoreTxtAnchorInfo(anchorInfo) {
+  if (!anchorInfo || !anchorInfo.anchorText) return false;
+  
+  const scrollWrapper = document.getElementById('txt-scroll-wrapper');
+  const contentArea = document.getElementById('txt-content-area');
+  if (!scrollWrapper || !contentArea) return false;
+
+  const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
+  const query = anchorInfo.anchorText;
+  const targetChunkIdx = anchorInfo.chunkIdx !== undefined ? anchorInfo.chunkIdx : currentChunkIdx;
+
+  let targetArea = contentArea;
+  if (scrollMode === 'scroll') {
+    const chunkContainer = contentArea.querySelector(`.txt-scroll-chunk[data-idx="${targetChunkIdx}"]`);
+    if (chunkContainer) targetArea = chunkContainer;
+  } else {
+    const chunkContainer = contentArea.querySelector(`.txt-chunk[data-idx="${targetChunkIdx}"]`);
+    if (chunkContainer) targetArea = chunkContainer;
+  }
+
+  const elements = targetArea.querySelectorAll('p, div, h1, h2, h3, h4, h5, h6');
+  let matchedElem = null;
+
+  for (let el of elements) {
+    if (el.children.length === 0 || el.tagName === 'P') {
+      const txt = el.textContent.replace(/\s+/g, ' ').trim();
+      if (txt.includes(query)) {
+        matchedElem = el;
+        break;
+      }
+    }
+  }
+
+  if (!matchedElem) {
+    for (let el of elements) {
+      if (el.textContent.includes(query)) {
+        matchedElem = el;
+        break;
+      }
+    }
+  }
+
+  if (matchedElem) {
+    if (scrollMode === 'scroll') {
+      scrollWrapper.scrollTop = Math.max(0, matchedElem.offsetTop - 30);
+      console.log(`[Viewer-Txt] DOM 매칭 앵커 복원 성공 (세로 scrollTop = ${scrollWrapper.scrollTop})`);
+      return true;
+    } else {
+      const colWidth = scrollWrapper.clientWidth + 40;
+      const pageIndex = Math.floor(matchedElem.offsetTop / scrollWrapper.clientHeight);
+      scrollWrapper.scrollLeft = pageIndex * colWidth;
+      console.log(`[Viewer-Txt] DOM 매칭 앵커 복원 성공 (가로 scrollLeft = ${scrollWrapper.scrollLeft})`);
+      return true;
+    }
+  }
+
+  const isEpub = (state.currentViewerFormat === 'epub');
+  if (scrollMode === 'scroll') {
+    const cleanText = isEpub ? stripHtml(fullText) : fullText.replace(/\s+/g, ' ').trim();
+    
+    let charOffset = 0;
+    for (let i = 0; i < targetChunkIdx; i++) {
+      const chunkText = isEpub ? stripHtml(txtChunks[i]) : txtChunks[i].replace(/\s+/g, ' ').trim();
+      charOffset += chunkText.length;
+    }
+
+    const matchIndex = cleanText.indexOf(query, charOffset);
+    if (matchIndex !== -1) {
+      const ratio = matchIndex / cleanText.length;
+      const maxScroll = scrollWrapper.scrollHeight - scrollWrapper.clientHeight;
+      scrollWrapper.scrollTop = maxScroll * ratio;
+      console.log(`[Viewer-Txt] Fallback 문자열 매핑 복원 성공 (세로 ratio=${ratio})`);
+      return true;
+    }
+  } else {
+    const rawChunk = txtChunks[targetChunkIdx] || '';
+    const cleanText = isEpub ? stripHtml(rawChunk) : rawChunk.replace(/\s+/g, ' ').trim();
+    const matchIndex = cleanText.indexOf(query);
+    if (matchIndex !== -1) {
+      const ratio = matchIndex / cleanText.length;
+      const colWidth = scrollWrapper.clientWidth + 40;
+      const maxScroll = scrollWrapper.scrollWidth - scrollWrapper.clientWidth;
+      scrollWrapper.scrollLeft = Math.round((maxScroll * ratio) / colWidth) * colWidth;
+      console.log(`[Viewer-Txt] Fallback 문자열 매핑 복원 성공 (가로 ratio=${ratio})`);
+      return true;
+    }
+  }
+  return false;
+}
+
+export function saveDetailPosition() {
+  const scrollWrapper = document.getElementById('txt-scroll-wrapper');
+  if (scrollWrapper && state.activeBookId) {
+    const pos = {
+      chunkIdx: currentChunkIdx,
+      scrollLeft: scrollWrapper.scrollLeft,
+      scrollTop: scrollWrapper.scrollTop
+    };
+    localStorage.setItem(`viewer_last_pos_${state.activeBookId}`, JSON.stringify(pos));
+  }
+}
 
 export function applyTxtSettings() {
   const container = document.getElementById('txt-viewer-container');
@@ -217,21 +478,23 @@ export function applyTxtSettings() {
   const contentArea = document.getElementById('txt-content-area');
   if (!container || !scrollWrapper || !contentArea) return;
 
+  const savedChunkIdx = currentChunkIdx;
+  console.log(`[Viewer-Txt] applyTxtSettings 전환 시작 - 현재 챕터:`, savedChunkIdx);
+
+  if (scrollWrapper && scrollWrapper.__txtScrollHandler) {
+    scrollWrapper.removeEventListener('scroll', scrollWrapper.__txtScrollHandler);
+  }
+
   const { theme, fontSize, fontFamily, scrollMode, lineHeight } = getViewerSettings();
 
-  // 1. 테마 클래스 교체
   container.className = `viewer-pane ${theme.className}`;
-
-  // 2. 폰트 크기 및 행간 적용 (rem)
   contentArea.style.fontSize = `${fontSize}rem`;
   contentArea.style.lineHeight = lineHeight;
 
-  // 3. 스크롤 모드 적용
   if (scrollMode === 'page') {
     scrollWrapper.classList.add('scroll-mode-page');
     container.classList.add('scroll-mode-page');
 
-    // 1장/2장(2단 분할) 보기 적용
     const pageStep = localStorage.getItem('comic_page_step') || '1';
     if (pageStep === '2') {
       scrollWrapper.style.maxWidth = '1600px';
@@ -246,29 +509,59 @@ export function applyTxtSettings() {
     scrollWrapper.classList.remove('scroll-mode-page');
     container.classList.remove('scroll-mode-page');
 
-    // 스크롤 모드 스타일 초기화
     scrollWrapper.style.maxWidth = '';
     scrollWrapper.style.columnCount = '';
     scrollWrapper.style.columnWidth = '';
   }
 
-  // 4. 폰트 종류 적용
   applyFontFamilyToElement(contentArea, fontFamily);
-
-  // 5. 보기 모드 전환에 따른 콘텐츠 갱신 (initMode = true 강제 적용)
+  
+  currentChunkIdx = savedChunkIdx;
   renderCurrentChunk(true);
 
-  // 6. 보기 모드 스위칭 시점에 읽던 진행 좌표 복구
-  if (scrollMode === 'scroll') {
-    if (currentChunkIdx > 0 && txtChunks.length > 0) {
-      setTimeout(() => {
-        const ratio = currentChunkIdx / txtChunks.length;
-        scrollWrapper.scrollTop = scrollWrapper.scrollHeight * ratio;
-      }, 50);
-    }
-  } else {
-    scrollWrapper.scrollLeft = 0;
+  // 로컬 세부 위치 복원 처리
+  let restored = false;
+  const savedPosStr = localStorage.getItem(`viewer_last_pos_${state.activeBookId}`);
+  if (savedPosStr) {
+    try {
+      const pos = JSON.parse(savedPosStr);
+      if (pos && pos.chunkIdx === currentChunkIdx) {
+        setTimeout(() => {
+          if (scrollMode === 'scroll') {
+            scrollWrapper.scrollTop = pos.scrollTop;
+          } else {
+            scrollWrapper.scrollLeft = pos.scrollLeft;
+          }
+          console.log(`[Viewer-Txt] 로컬 세부 위치 복원 성공 (left=${pos.scrollLeft}, top=${pos.scrollTop})`);
+        }, 150);
+        restored = true;
+      }
+    } catch(e) {}
   }
+
+  if (!restored) {
+    if (scrollMode === 'scroll') {
+      setTimeout(() => {
+        const targetChunk = contentArea.querySelector(`.txt-scroll-chunk[data-idx="${currentChunkIdx}"]`);
+        if (targetChunk) {
+          scrollWrapper.scrollTop = Math.max(0, targetChunk.offsetTop - 20);
+          console.log(`[Viewer-Txt] 챕터 오프셋 기준으로 스크롤 정렬 완료 (scrollTop = ${scrollWrapper.scrollTop})`);
+        } else {
+          const ratio = currentChunkIdx / txtChunks.length;
+          scrollWrapper.scrollTop = scrollWrapper.scrollHeight * ratio;
+        }
+      }, 150);
+    } else {
+      scrollWrapper.scrollLeft = 0;
+    }
+  }
+
+  // 리스너 바인딩 딜레이 적용
+  setTimeout(() => {
+    if (scrollWrapper && scrollWrapper.__txtScrollHandler) {
+      scrollWrapper.addEventListener('scroll', scrollWrapper.__txtScrollHandler, { passive: true });
+    }
+  }, 250);
 }
 
 function applyFontFamilyToElement(element, fontKey) {
@@ -279,7 +572,6 @@ function applyFontFamilyToElement(element, fontKey) {
   } else if (fontKey === 'pretendard') {
     element.style.fontFamily = "'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
   } else {
-    // 사용자 정의 폰트 검색
     const customFonts = window.customFonts || [];
     const found = customFonts.find(f => f.name === fontKey);
     if (found) {
@@ -298,36 +590,44 @@ export function prevTxtPage() {
   
   const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
   if (scrollMode === 'page') {
-    // 가로 스크롤 모드인 경우 (column-width: 800px + column-gap: 80px = 880px)
     if (scrollWrapper.scrollLeft <= 10) {
-      // 이전 청크로 이동
       if (currentChunkIdx > 0) {
         currentChunkIdx--;
-        scrollWrapper.style.scrollBehavior = 'auto'; // 애니메이션 일시 차단
+        scrollWrapper.style.scrollBehavior = 'auto';
         renderCurrentChunk();
         scrollWrapper.scrollLeft = scrollWrapper.scrollWidth;
         setTimeout(() => {
           scrollWrapper.style.scrollBehavior = '';
+          saveDetailPosition();
         }, 50);
       }
     } else {
       const pageScrollWidth = scrollWrapper.clientWidth + 40;
       scrollWrapper.scrollBy({ left: -pageScrollWidth, behavior: 'auto' });
+      setTimeout(() => {
+        logActiveViewportText();
+        saveDetailPosition();
+      }, 100);
     }
   } else {
-    // 세로 스크롤 모드인 경우
     if (scrollWrapper.scrollTop <= 10) {
       if (currentChunkIdx > 0) {
         currentChunkIdx--;
-        scrollWrapper.style.scrollBehavior = 'auto'; // 애니메이션 일시 차단
+        scrollWrapper.style.scrollBehavior = 'auto';
         renderCurrentChunk();
         scrollWrapper.scrollTop = scrollWrapper.scrollHeight;
         setTimeout(() => {
           scrollWrapper.style.scrollBehavior = '';
+          logActiveViewportText();
+          saveDetailPosition();
         }, 50);
       }
     } else {
       scrollWrapper.scrollBy({ top: -scrollWrapper.clientHeight * 0.9, behavior: 'smooth' });
+      setTimeout(() => {
+        logActiveViewportText();
+        saveDetailPosition();
+      }, 350);
     }
   }
 }
@@ -338,17 +638,16 @@ export function nextTxtPage() {
   
   const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
   if (scrollMode === 'page') {
-    // 가로 스크롤 모드인 경우 (column-width: 800px + column-gap: 80px = 880px)
     const maxScrollLeft = scrollWrapper.scrollWidth - scrollWrapper.clientWidth;
     if (scrollWrapper.scrollLeft + 10 >= maxScrollLeft) {
-      // 다음 청크로 이동
       if (currentChunkIdx < txtChunks.length - 1) {
         currentChunkIdx++;
-        scrollWrapper.style.scrollBehavior = 'auto'; // 애니메이션 일시 차단
+        scrollWrapper.style.scrollBehavior = 'auto';
         renderCurrentChunk();
         scrollWrapper.scrollLeft = 0;
         setTimeout(() => {
           scrollWrapper.style.scrollBehavior = '';
+          saveDetailPosition();
         }, 50);
       } else {
         import('./viewer_next_episode.js').then(m => {
@@ -358,18 +657,23 @@ export function nextTxtPage() {
     } else {
       const pageScrollWidth = scrollWrapper.clientWidth + 40;
       scrollWrapper.scrollBy({ left: pageScrollWidth, behavior: 'auto' });
+      setTimeout(() => {
+        logActiveViewportText();
+        saveDetailPosition();
+      }, 100);
     }
   } else {
-    // 세로 스크롤 모드인 경우
     const maxScrollTop = scrollWrapper.scrollHeight - scrollWrapper.clientHeight;
     if (scrollWrapper.scrollTop + 10 >= maxScrollTop) {
       if (currentChunkIdx < txtChunks.length - 1) {
         currentChunkIdx++;
-        scrollWrapper.style.scrollBehavior = 'auto'; // 애니메이션 일시 차단
+        scrollWrapper.style.scrollBehavior = 'auto';
         renderCurrentChunk();
         scrollWrapper.scrollTop = 0;
         setTimeout(() => {
           scrollWrapper.style.scrollBehavior = '';
+          logActiveViewportText();
+          saveDetailPosition();
         }, 50);
       } else {
         import('./viewer_next_episode.js').then(m => {
@@ -378,6 +682,10 @@ export function nextTxtPage() {
       }
     } else {
       scrollWrapper.scrollBy({ top: scrollWrapper.clientHeight * 0.9, behavior: 'smooth' });
+      setTimeout(() => {
+        logActiveViewportText();
+        saveDetailPosition();
+      }, 350);
     }
   }
 }
@@ -418,12 +726,10 @@ export function updateTxtSeekBar() {
 
   if (!slider || txtChunks.length === 0) return;
 
-  // 1. 슬라이더 속성 동기화 (1-indexed 기반)
   slider.min = "1";
   slider.max = String(txtChunks.length);
   slider.value = String(currentChunkIdx + 1);
 
-  // 2. 텍스트 라벨 동기화
   if (startLabel) startLabel.textContent = "1";
   if (endLabel) endLabel.textContent = String(txtChunks.length);
   if (pageInfo) {
@@ -449,14 +755,21 @@ export function txtSliderChange(slider, val) {
     currentChunkIdx = targetIdx;
     
     const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
+    const scrollWrapper = document.getElementById('txt-scroll-wrapper');
     if (scrollMode === 'scroll') {
-      const scrollWrapper = document.getElementById('txt-scroll-wrapper');
       if (scrollWrapper) {
-        const ratio = currentChunkIdx / txtChunks.length;
-        scrollWrapper.scrollTop = scrollWrapper.scrollHeight * ratio;
+        const maxScroll = scrollWrapper.scrollHeight - scrollWrapper.clientHeight;
+        const targetPercent = targetIdx / Math.max(1, txtChunks.length - 1);
+        scrollWrapper.scrollTop = maxScroll * targetPercent;
+        setTimeout(saveDetailPosition, 50);
       }
     } else {
+      if (scrollWrapper) {
+        scrollWrapper.scrollLeft = 0;
+      }
       renderCurrentChunk();
+      logActiveViewportText();
+      saveDetailPosition();
     }
   }
 }

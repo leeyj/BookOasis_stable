@@ -6,43 +6,13 @@ import { PdfViewer, initPdfViewer, nextPdfPage, prevPdfPage, clearPdfViewer, pdf
 
 export let activeViewerInstance = null;
 
-let epubModule = null;
-async function getEpubModule() {
-  if (!epubModule) {
-    epubModule = await import(`./viewer_epub.js?v=${new Date().getTime()}`);
-  }
-  return epubModule;
-}
-
-export async function initEpubViewer(bookId, pagesRead, totalPages) {
-  const m = await getEpubModule();
-  m.initEpubViewer(bookId, pagesRead, totalPages);
-}
-
-export async function clearEpubViewer() {
-  const m = await getEpubModule();
-  m.clearEpubViewer();
-}
-
-export async function epubPrevPage() {
-  const m = await getEpubModule();
-  m.epubPrevPage();
-}
-
-export async function epubNextPage() {
-  const m = await getEpubModule();
-  m.epubNextPage();
-}
-
-export async function applyEpubSettings(options) {
-  const m = await getEpubModule();
-  m.applyEpubSettings(options);
-}
-
-export async function changeEpubScrollMode(scrollMode) {
-  const m = await getEpubModule();
-  m.changeEpubScrollMode(scrollMode);
-}
+// Unused legacy EPUB functions (stubbed for compatibility)
+export async function initEpubViewer(bookId, pagesRead, totalPages) {}
+export async function clearEpubViewer() {}
+export async function epubPrevPage() {}
+export async function epubNextPage() {}
+export async function applyEpubSettings(options) {}
+export async function changeEpubScrollMode(scrollMode) {}
 import { updateFontSize, toggleTheme, updateLineHeight, updateParagraphSpacing } from './viewer_settings.js';
 
 // 사용자 정의 폰트 목록 로드 및 드롭다운 바인딩
@@ -217,11 +187,9 @@ export function openReader(bookId, format, title, pagesRead, totalPages) {
   } else if (fmt === 'epub') {
     if (overlayTxtControls) overlayTxtControls.style.display = 'flex';
     document.getElementById('comic-overlay-page-info').textContent = i18n.t('viewer.view_epub') || 'EPUB 보기';
-    getEpubModule().then(m => {
-      activeViewerInstance = m.EpubViewer;
-      activeViewerInstance.init(bookId, pagesRead, totalPages);
-      initViewerSeekBar();
-    });
+    activeViewerInstance = TxtViewer;
+    activeViewerInstance.init(bookId, pagesRead);
+    initViewerSeekBar();
   } else {
     alert(i18n.t('viewer.unsupported_format'));
     closeMediaViewer();
@@ -440,7 +408,8 @@ export function initWheelListener() {
     const isComicWidth = isComic && document.querySelector('.comic-image-wrapper') && document.querySelector('.comic-image-wrapper').classList.contains('fit-width');
     const isTxt = document.getElementById('txt-viewer-container').style.display !== 'none';
     const isPdf = document.getElementById('pdf-viewer-container').style.display !== 'none';
-    const isEpub = document.getElementById('epub-viewer-container').style.display !== 'none';
+    const epubEl = document.getElementById('epub-viewer-container');
+    const isEpub = epubEl ? epubEl.style.display !== 'none' : false;
 
     // 1. 만화 뷰어 스크롤/웹툰 모드, 텍스트 뷰어 세로 스크롤 모드일 경우 -> 휠 스크롤 직접 위임 전달
     if (isComicScroll || isComicWidth || (isTxt && scrollMode === 'scroll')) {
@@ -601,11 +570,7 @@ async function _getViewerModule(fmt) {
       if (!_viewerModules.comic) _viewerModules.comic = await import('./viewer_comic.js');
       return _viewerModules.comic;
     }
-    if (fmt === 'epub') {
-      if (!_viewerModules.epub) _viewerModules.epub = await import('./viewer_epub.js');
-      return _viewerModules.epub;
-    }
-    if (fmt === 'txt') {
+    if (fmt === 'epub' || fmt === 'txt') {
       if (!_viewerModules.txt) _viewerModules.txt = await import('./viewer_txt.js');
       return _viewerModules.txt;
     }
@@ -642,13 +607,7 @@ function initViewerSeekBar() {
         const fn = m.comicSliderInput || (window && window.comicSliderInput);
         if (typeof fn === 'function') fn(slider, val);
       }
-    } else if (fmt === 'epub') {
-      const m = await _getViewerModule(fmt);
-      if (m) {
-        const fn = m.epubSliderInput || (window && window.epubSliderInput);
-        if (typeof fn === 'function') fn(slider, val);
-      }
-    } else if (fmt === 'txt') {
+    } else if (fmt === 'epub' || fmt === 'txt') {
       const m = await _getViewerModule(fmt);
       if (m) {
         const fn = m.txtSliderInput;
@@ -677,13 +636,7 @@ function initViewerSeekBar() {
         const fn = m.comicSliderChange || (window && window.comicSliderChange);
         if (typeof fn === 'function') fn(slider, val);
       }
-    } else if (fmt === 'epub') {
-      const m = await _getViewerModule(fmt);
-      if (m) {
-        const fn = m.epubSliderChange || (window && window.epubSliderChange);
-        if (typeof fn === 'function') fn(slider, val);
-      }
-    } else if (fmt === 'txt') {
+    } else if (fmt === 'epub' || fmt === 'txt') {
       const m = await _getViewerModule(fmt);
       if (m) {
         const fn = m.txtSliderChange;

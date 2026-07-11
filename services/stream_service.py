@@ -199,14 +199,12 @@ class StreamService:
 
     @staticmethod
     def record_progress(db_type: str, book_id, page_idx: int, total_pages: int, user_id=1, epub_session=None):
-        """독서 진행률 및 활동 로그 기록 (EPUB 등 페이지 수가 없는 도서의 자동 동기화 포함)"""
+        """독서 진행률 및 활동 로그 기록 (EPUB 및 TXT도 실제 챕터 단위를 그대로 사용)"""
         conn   = database.get_connection(db_type)
         cursor = conn.cursor()
 
         cursor.execute("SELECT file_format, total_pages FROM books WHERE id = ?", (book_id,))
         book_row = cursor.fetchone()
-        file_format = (book_row['file_format'] or '').lower() if book_row else ''
-        is_epub = file_format == 'epub'
 
         try:
             page_idx = int(page_idx)
@@ -218,19 +216,14 @@ class StreamService:
         except Exception:
             total_pages = 0
         
-        # EPUB은 항상 퍼센트(0~100) 체계로 강제 정규화
-        if is_epub:
-            total_pages = 100
-            if not book_row or book_row['total_pages'] != 100:
-                cursor.execute("UPDATE books SET total_pages = 100 WHERE id = ?", (book_id,))
-        # 비-EPUB에 대해서만 기존 동적 total_pages 반영
-        elif total_pages > 0 and book_row and book_row['total_pages'] == 0:
+        # 실제 프론트엔드에서 전달된 총 페이지(챕터) 수를 기반으로 DB 업데이트
+        if total_pages > 0 and book_row and book_row['total_pages'] != total_pages:
             cursor.execute("UPDATE books SET total_pages = ? WHERE id = ?", (total_pages, book_id))
                 
         cursor.execute("SELECT pages_read, is_completed FROM user_progress WHERE book_id = ? AND user_id = ?", (book_id, user_id))
         row = cursor.fetchone()
 
-        pages_read   = max(0, min(100, page_idx)) if is_epub else (page_idx + 1)
+        pages_read   = page_idx + 1
         is_completed = 0
         if total_pages > 0:
             if (pages_read / total_pages) >= 0.95 or pages_read >= total_pages:
@@ -439,3 +432,169 @@ class StreamService:
         finally:
             if conn:
                 conn.close()
+
+    @staticmethod
+    def get_epub_content(file_path, book_id, db_type):
+        """EPUB 파일을 열고, OPF 및 Spine 구조를 따라 정제된 텍스트 및 마크업 데이터 추출 (이미지 주소 매핑 포함)"""
+        import zipfile
+        from html.parser import HTMLParser
+        import xml.etree.ElementTree as ET
+        import urllib.parse
+        import posixpath
+
+        if not os.path.exists(file_path):
+            return None, 'File not found'
+
+        class EPUBHTMLParser(HTMLParser):
+            def __init__(self, xhtml_path, book_id, db_type):
+                super().__init__()
+                self.recording = False
+                self.output = []
+                self.allowed_tags = {'p', 'br', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'img'}
+                self.xhtml_path = xhtml_path
+                self.book_id = book_id
+                self.db_type = db_type
+
+            def handle_starttag(self, tag, attrs):
+                tag_lower = tag.lower()
+                if tag_lower == 'body':
+                    self.recording = True
+                elif self.recording and tag_lower in self.allowed_tags:
+                    if tag_lower == 'br':
+                        self.output.append('<br/>')
+                    elif tag_lower == 'img':
+                        attrs_dict = dict(attrs)
+                        src_val = attrs_dict.get('src')
+                        if src_val:
+                            xhtml_dir = posixpath.dirname(self.xhtml_path)
+                            clean_src = urllib.parse.unquote(src_val.split('#')[0])
+                            resolved_path = posixpath.normpath(posixpath.join(xhtml_dir, clean_src)).replace('\\', '/')
+                            
+                            encoded_path = urllib.parse.quote(resolved_path)
+                            api_src = f"/api/media/epub-image?book_id={self.book_id}&db_type={self.db_type}&path={encoded_path}"
+                            
+                            self.output.append(f'<img src="{api_src}" style="max-width: 100%; max-height: 75vh; object-fit: contain; height: auto; display: block; margin: 1.5rem auto; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"/>')
+                    else:
+                        self.output.append(f'<{tag_lower}>')
+
+            def handle_endtag(self, tag):
+                tag_lower = tag.lower()
+                if tag_lower == 'body':
+                    self.recording = False
+                elif self.recording and tag_lower in self.allowed_tags:
+                    if tag_lower not in ('br', 'img'):
+                        self.output.append(f'</{tag_lower}>')
+
+            def handle_data(self, data):
+                if self.recording:
+                    import html
+                    self.output.append(html.escape(data))
+
+            def get_content(self):
+                return "".join(self.output)
+
+        try:
+            with zipfile.ZipFile(file_path, 'r') as zf:
+                # 1. META-INF/container.xml 파싱
+                container_data = zf.read('META-INF/container.xml')
+                root = ET.fromstring(container_data)
+                ns = {'ns': 'urn:oasis:names:tc:opendocument:xmlns:container'}
+                rootfile = root.find('.//ns:rootfile', ns)
+                if rootfile is None:
+                    rootfile = root.find('.//{urn:oasis:names:tc:opendocument:xmlns:container}rootfile')
+                if rootfile is None:
+                    return None, 'Invalid container.xml'
+                
+                opf_path = rootfile.attrib.get('full-path')
+                if not opf_path:
+                    return None, 'OPF file path not found in container.xml'
+
+                opf_dir = os.path.dirname(opf_path)
+                opf_data = zf.read(opf_path)
+                
+                opf_str = opf_data.decode('utf-8', errors='ignore')
+                opf_str_cleaned = re.sub(r'\sxmlns="[^"]+"', '', opf_str, count=1)
+                opf_root = ET.fromstring(opf_str_cleaned.encode('utf-8'))
+
+                title_elem = opf_root.find('.//title')
+                title = title_elem.text if title_elem is not None else 'Untitled'
+
+                manifest_items = {}
+                for item in opf_root.findall('.//manifest/item'):
+                    item_id = item.attrib.get('id')
+                    href = item.attrib.get('href')
+                    if item_id and href:
+                        manifest_items[item_id] = href
+
+                spine_itemrefs = []
+                for itemref in opf_root.findall('.//spine/itemref'):
+                    idref = itemref.attrib.get('idref')
+                    if idref in manifest_items:
+                        spine_itemrefs.append(manifest_items[idref])
+
+                chapters = []
+                for idx, rel_href in enumerate(spine_itemrefs):
+                    clean_rel_href = rel_href.split('#')[0]
+                    import urllib.parse
+                    clean_rel_href = urllib.parse.unquote(clean_rel_href)
+                    
+                    if opf_dir:
+                        full_href = os.path.join(opf_dir, clean_rel_href).replace('\\', '/')
+                    else:
+                        full_href = clean_rel_href
+                    
+                    try:
+                        html_bytes = zf.read(full_href)
+                        html_str = html_bytes.decode('utf-8', errors='ignore')
+                        
+                        parser = EPUBHTMLParser(full_href, book_id, db_type)
+                        parser.feed(html_str)
+                        chapter_content = parser.get_content()
+                        
+                        h_match = re.search(r'<h[1-6]>(.*?)</h[1-6]>', chapter_content, re.IGNORECASE)
+                        if h_match:
+                            import html
+                            ch_title = html.unescape(re.sub('<[^<]+?>', '', h_match.group(1))).strip()
+                        else:
+                            ch_title = f"Chapter {idx + 1}"
+                        
+                        if not ch_title:
+                            ch_title = f"Chapter {idx + 1}"
+
+                        chapters.append({
+                            'title': ch_title,
+                            'content': chapter_content
+                        })
+                    except KeyError:
+                        continue
+
+                return {
+                    'title': title,
+                    'chapters': chapters
+                }, None
+
+        except Exception as e:
+            return None, f"EPUB parsing failed: {e}"
+
+    @staticmethod
+    def extract_epub_resource(file_path, resource_path):
+        """EPUB 내 특정 상대경로 리소스(이미지 등)를 바이너리로 반환"""
+        import zipfile
+        if not os.path.exists(file_path):
+            return None, 'File not found'
+        
+        try:
+            with zipfile.ZipFile(file_path, 'r') as zf:
+                normalized_path = resource_path.replace('\\', '/')
+                try:
+                    data = zf.read(normalized_path)
+                    return data, None
+                except KeyError:
+                    # 대소문자 매핑 실패 대비 전체 검색
+                    for name in zf.namelist():
+                        if name.lower() == normalized_path.lower():
+                            return zf.read(name), None
+                    return None, 'Resource not found'
+        except Exception as e:
+            return None, str(e)
+

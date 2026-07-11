@@ -83,6 +83,54 @@ def get_txt_content():
 
     return Response(content, mimetype='text/plain; charset=utf-8')
 
+@stream_bp.route('/api/media/epub', methods=['GET'])
+@login_required
+def get_epub_content():
+    """EPUB 파일 파싱 후 정제된 텍스트/HTML 반환"""
+    db_type = request.args.get('db_type', 'general')
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+    book_id = request.args.get('book_id')
+    if not book_id:
+        return jsonify({'error': _t('api.err_book_id_required')}), 400
+
+    file_path = StreamService.get_file_path(db_type, book_id)
+    if not file_path:
+        return jsonify({'error': _t('api.err_book_not_found')}), 404
+
+    data, error = StreamService.get_epub_content(file_path, book_id, db_type)
+    if error:
+        return jsonify({'error': error}), 404 if error == 'File not found' else 500
+
+    return jsonify(data)
+
+@stream_bp.route('/api/media/epub-image', methods=['GET'])
+@login_required
+def get_epub_image():
+    """EPUB 파일 내부의 특정 이미지 서빙"""
+    db_type = request.args.get('db_type', 'general')
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+    book_id = request.args.get('book_id')
+    resource_path = request.args.get('path')
+    if not book_id or not resource_path:
+        return jsonify({'error': 'book_id and path are required'}), 400
+
+    file_path = StreamService.get_file_path(db_type, book_id)
+    if not file_path:
+        return jsonify({'error': _t('api.err_book_not_found')}), 404
+
+    data, error = StreamService.extract_epub_resource(file_path, resource_path)
+    if error:
+        return jsonify({'error': error}), 404 if error == 'Resource not found' else 500
+
+    mime, _ = mimetypes.guess_type(resource_path)
+    mime = mime or 'image/jpeg'
+
+    res = Response(data, mimetype=mime)
+    res.headers['Cache-Control'] = 'public, max-age=31536000'
+    return res
+
 @stream_bp.route('/api/media/pdf', methods=['GET'])
 @login_required
 def get_pdf_range():

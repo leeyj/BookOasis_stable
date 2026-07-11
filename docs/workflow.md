@@ -340,3 +340,14 @@ tags: [workflow, history]
 | 2026-07-11 | `epub_mode_transition_seekbar_sync` | EPUB 페이지-스크롤 모드 전환 시 슬라이더 프리징 결함 조치 | [BugFix](./bug/20260711_bugfix_epub_mode_transition_seekbar_sync.md) | -
 | 2026-07-11 | `epub_mode_transition_seekbar_sync` | EPUB 페이지-스크롤 모드 전환 시 슬라이더 프리징 결함 조치 | [Task](./history/20260711_095813_epub_mode_transition_seekbar_sync_task.md) | [Walkthrough](./history/20260711_095813_epub_mode_transition_seekbar_sync_walkthrough.md) |
 | 2026-07-11 | `epub_anchor_text_fix` | EPUB 모드 전환 시 DOM 찌꺼기에 의한 앵커 텍스트 추출 오류 완벽 수정 | [BugFix](./bug/20260711_bugfix_epub_anchor.md) | - |
+| 2026-07-11 | `epub_to_txt_viewer` | EPUB 뷰어 epub.js 엔진 걷어내기 및 텍스트/HTML 통합 뷰어 경량화 개선 | [Feature](./bug/20260711_feature_epub_to_txt_viewer.md) | - |
+
+| 2026-07-11 | `epub_to_txt_viewer` | EPUB 뷰어 epub.js 엔진 걷어내기 및 텍스트/HTML 통합 뷰어 경량화 개선 | [Task](./history/20260711_132319_epub_to_txt_viewer_task.md) | [Walkthrough](./history/20260711_132319_epub_to_txt_viewer_walkthrough.md) |
+| 2026-07-11 | `epub_to_txt_viewer` | EPUB 뷰어 epub.js 엔진 걷어내기 및 텍스트/HTML 통합 뷰어 경량화 개선 (삽화 이미지 추출 추가) | [Task](./history/20260711_132409_epub_to_txt_viewer_task.md) | [Walkthrough](./history/20260711_132409_epub_to_txt_viewer_walkthrough.md) |
+| 2026-07-11 | `epub_image_overflow_and_slider` | EPUB 이미지 넘침 및 하단 슬라이더 비정상 이동 결함 조치 | [BugFix](./bug/20260711_bugfix_epub_image_overflow_and_slider.md) | - |
+
+| 2026-07-11 | `epub_to_txt_viewer` | EPUB 뷰어 epub.js 엔진 걷어내기 및 텍스트/HTML 통합 뷰어 경량화 개선 (삽화 이미지 추출 및 슬라이더 버그 조치 완료) | [Task](./history/20260711_132738_epub_to_txt_viewer_task.md) | [Walkthrough](./history/20260711_132738_epub_to_txt_viewer_walkthrough.md) |
+| 2026-07-11 | `txt_scroll_mode_transition_reset` | TXT/EPUB 뷰어 모드 전환 시 읽기 위치 초기화 결함 조치 | [BugFix](./bug/20260711_bugfix_txt_scroll_mode_transition_reset.md) | - |
+| 2026-07-11 | `txt_anchor_text_restoration` | TXT/EPUB 통합 뷰어 내 앵커 텍스트 기반 정밀 읽기 위치 복원 구현 | [BugFix](./bug/20260711_bugfix_txt_anchor_text_restoration.md) | - |
+
+
