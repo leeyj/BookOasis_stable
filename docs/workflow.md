@@ -353,3 +353,7 @@ tags: [workflow, history]
 
 
 | 2026-07-11 | `session_20260711_181030` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260711_181030_session_20260711_181030_task.md) | [Walkthrough](./history/20260711_181030_session_20260711_181030_walkthrough.md) |
+| 2026-07-11 | `viewer_txt_export_error` | 텍스트 뷰어 컴포넌트화 후 nextTxtPage/prevTxtPage export 누락 수정 | [Bugfix](./bug/20260711_bugfix_viewer_txt_export_error.md) | - |
+| 2026-07-11 | `viewer_txt_export_error` | 텍스트 뷰어 컴포넌트화 후 nextTxtPage/prevTxtPage export 누락 수정 | [Task](./history/20260711_230122_viewer_txt_export_error_task.md) | [Walkthrough](./history/20260711_230122_viewer_txt_export_error_walkthrough.md) |
+| 2026-07-11 | `viewer_txt_export_error` | 텍스트 뷰어 컴포넌트화 후 nextTxtPage/prevTxtPage 및 Jump 함수 export 누락 수정 | [Task](./history/20260711_230208_viewer_txt_export_error_task.md) | [Walkthrough](./history/20260711_230208_viewer_txt_export_error_walkthrough.md) |
+| 2026-07-11 | `viewer_txt_export_error` | 텍스트 뷰어 컴포넌트화 후 nextTxtPage/prevTxtPage 및 순환 참조 오류 수정 | [Task](./history/20260711_230344_viewer_txt_export_error_task.md) | [Walkthrough](./history/20260711_230344_viewer_txt_export_error_walkthrough.md) |

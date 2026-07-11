@@ -262,9 +262,13 @@ function escapeHtml(text) {
 
 function getTxtPageGapPx(scrollWrapper) {
   if (!scrollWrapper) return 0;
-  const styles = window.getComputedStyle(scrollWrapper);
-  const columnCount = parseInt(styles.columnCount, 10);
-  if (!Number.isFinite(columnCount) || columnCount <= 1) return 0;
+  const pageStep = localStorage.getItem('comic_page_step') || '1';
+  if (pageStep !== '2') return 0;
+
+  // In page mode, multi-column styles are applied to contentArea (not wrapper).
+  const contentArea = document.getElementById('txt-content-area');
+  const target = contentArea || scrollWrapper;
+  const styles = window.getComputedStyle(target);
   const gap = parseFloat(styles.columnGap);
   return Number.isFinite(gap) ? gap : 0;
 }
@@ -292,7 +296,6 @@ function cancelPendingTxtRestore() {
 
 function showTxtRestoreLoadingToast() {
   const now = Date.now();
-  // 지연 복원이 연달아 예약될 때 토스트가 과도하게 반복되지 않도록 완충한다.
   if (now - txtRestoreToastAt < 700) return;
   txtRestoreToastAt = now;
   if (typeof showToast === 'function') {
@@ -333,10 +336,10 @@ function renderCurrentChunk(initMode = false) {
 
   if (scrollMode === 'page') {
     if (isEpub) {
-      contentArea.innerHTML = `<div class="txt-chunk epub-chunk" data-idx="${currentChunkIdx}" style="margin-bottom: 2rem;">${txtChunks[currentChunkIdx]}</div>`;
+      contentArea.innerHTML = `<div class="txt-chunk epub-chunk" data-idx="${currentChunkIdx}" style="height: 100%; box-sizing: border-box;">${txtChunks[currentChunkIdx]}</div>`;
     } else {
       const htmlContent = formatTxtToHtml(txtChunks[currentChunkIdx]);
-      contentArea.innerHTML = `<div class="txt-chunk" data-idx="${currentChunkIdx}" style="margin-bottom: 2rem;">${htmlContent}</div>`;
+      contentArea.innerHTML = `<div class="txt-chunk" data-idx="${currentChunkIdx}" style="height: 100%; box-sizing: border-box;">${htmlContent}</div>`;
     }
   } else {
     if (initMode || !contentArea.querySelector('.txt-full-content')) {
@@ -574,7 +577,6 @@ export function applyTxtSettings(options = {}) {
     scrollWrapper.classList.add('scroll-mode-page');
     container.classList.add('scroll-mode-page');
 
-    // 페이지 모드에서는 패딩 오차를 제거해 페이지 폭 계산을 고정한다.
     contentArea.style.paddingTop = '0';
     contentArea.style.paddingBottom = '0';
     contentArea.style.paddingLeft = '0';
@@ -593,21 +595,21 @@ export function applyTxtSettings(options = {}) {
       scrollWrapper.style.maxWidth = `${Math.min(targetWidth, 800)}px`;
     }
 
-    // 페이지 모드에서는 wrapper가 실제 다단 레이아웃과 페이지 이동 단위를 함께 담당한다.
     const wrapperWidth = Math.max(1, Math.floor(scrollWrapper.clientWidth));
     const singleColWidth = pageStep === '2'
       ? Math.max(1, Math.floor((wrapperWidth - pageGap) / 2))
       : Math.max(1, wrapperWidth);
 
-    scrollWrapper.style.columnCount = pageStep === '2' ? '2' : '1';
-    scrollWrapper.style.columnGap = `${pageGap}px`;
-    scrollWrapper.style.columnWidth = `${singleColWidth}px`;
+    // 다단(CSS Column) 정렬 설정을 부모가 아닌 자식(contentArea)에 부여하여 가로 스크롤 활성화
+    contentArea.style.columnCount = pageStep === '2' ? '2' : '1';
+    contentArea.style.columnGap = `${pageGap}px`;
+    contentArea.style.columnWidth = `${singleColWidth}px`;
+    contentArea.style.columnFill = 'auto';
+    contentArea.style.height = '100%';
 
-    contentArea.style.columnCount = '';
-    contentArea.style.columnWidth = '';
-    contentArea.style.columnGap = '';
-    contentArea.style.columnFill = '';
-    contentArea.style.height = '';
+    scrollWrapper.style.columnCount = '';
+    scrollWrapper.style.columnWidth = '';
+    scrollWrapper.style.columnGap = '';
   } else {
     scrollWrapper.classList.remove('scroll-mode-page');
     container.classList.remove('scroll-mode-page');
@@ -623,7 +625,6 @@ export function applyTxtSettings(options = {}) {
     contentArea.style.columnFill = '';
     contentArea.style.height = '';
 
-    // 스크롤 모드에서는 저장된 여백을 다시 적용한다.
     const padTop = parseInt(localStorage.getItem('viewer_padding_top') || '40', 10);
     const padBottom = parseInt(localStorage.getItem('viewer_padding_bottom') || '60', 10);
     const padLeft = parseInt(localStorage.getItem('viewer_padding_left') || '20', 10);
@@ -639,7 +640,6 @@ export function applyTxtSettings(options = {}) {
   currentChunkIdx = savedChunkIdx;
   renderCurrentChunk(true);
 
-  // 로컬 세부 위치 복원 처리
   let restored = false;
   const savedPosStr = localStorage.getItem(`viewer_last_pos_${state.activeBookId}`);
   if (!isModeSwitch && savedPosStr) {
@@ -694,7 +694,6 @@ export function applyTxtSettings(options = {}) {
     }
   }
 
-  // 리스너 바인딩 딜레이 적용
   setTimeout(() => {
     if (scrollWrapper && scrollWrapper.__txtScrollHandler) {
       scrollWrapper.addEventListener('scroll', scrollWrapper.__txtScrollHandler, { passive: true });
@@ -735,22 +734,28 @@ export function prevTxtPage() {
         currentChunkIdx--;
         scrollWrapper.style.scrollBehavior = 'auto';
         renderCurrentChunk();
-        scrollWrapper.scrollLeft = scrollWrapper.scrollWidth;
+        
+        setTimeout(() => {
+          scrollWrapper.scrollLeft = scrollWrapper.scrollWidth;
+        }, 20);
+        
         setTimeout(() => {
           scrollWrapper.style.scrollBehavior = '';
           saveDetailPosition();
-        }, 50);
+        }, 80);
       }
     } else {
       const pageStepWidth = getTxtPageAdvanceWidth(scrollWrapper);
       const currentPageIdx = Math.round(scrollWrapper.scrollLeft / pageStepWidth);
       const targetScrollLeft = Math.max(0, (currentPageIdx - 1) * pageStepWidth);
+      txtPageSnapInProgress = true;
       scrollWrapper.scrollTo({ left: targetScrollLeft, behavior: 'auto' });
       setTimeout(() => {
         snapTxtPageScrollLeft(scrollWrapper);
         logActiveViewportText();
         saveDetailPosition();
-      }, 100);
+        txtPageSnapInProgress = false;
+      }, 150);
     }
   } else {
     if (scrollWrapper.scrollTop <= 10) {
@@ -758,12 +763,16 @@ export function prevTxtPage() {
         currentChunkIdx--;
         scrollWrapper.style.scrollBehavior = 'auto';
         renderCurrentChunk();
-        scrollWrapper.scrollTop = scrollWrapper.scrollHeight;
+        
+        setTimeout(() => {
+          scrollWrapper.scrollTop = scrollWrapper.scrollHeight;
+        }, 20);
+        
         setTimeout(() => {
           scrollWrapper.style.scrollBehavior = '';
           logActiveViewportText();
           saveDetailPosition();
-        }, 50);
+        }, 80);
       }
     } else {
       scrollWrapper.scrollBy({ top: -scrollWrapper.clientHeight * 0.9, behavior: 'smooth' });
@@ -789,11 +798,16 @@ export function nextTxtPage() {
         currentChunkIdx++;
         scrollWrapper.style.scrollBehavior = 'auto';
         renderCurrentChunk();
-        scrollWrapper.scrollLeft = 0;
+        
+        setTimeout(() => {
+          scrollWrapper.scrollLeft = 0;
+          scrollWrapper.scrollTop = 0;
+        }, 20);
+        
         setTimeout(() => {
           scrollWrapper.style.scrollBehavior = '';
           saveDetailPosition();
-        }, 50);
+        }, 80);
       } else {
         import('./viewer_next_episode.js').then(m => {
           m.handleNextEpisodeDirect(state.activeBookId);
@@ -803,12 +817,14 @@ export function nextTxtPage() {
       const pageStepWidth = getTxtPageAdvanceWidth(scrollWrapper);
       const currentPageIdx = Math.round(scrollWrapper.scrollLeft / pageStepWidth);
       const targetScrollLeft = (currentPageIdx + 1) * pageStepWidth;
+      txtPageSnapInProgress = true;
       scrollWrapper.scrollTo({ left: targetScrollLeft, behavior: 'auto' });
       setTimeout(() => {
         snapTxtPageScrollLeft(scrollWrapper);
         logActiveViewportText();
         saveDetailPosition();
-      }, 100);
+        txtPageSnapInProgress = false;
+      }, 150);
     }
   } else {
     const maxScrollTop = scrollWrapper.scrollHeight - scrollWrapper.clientHeight;
@@ -817,12 +833,17 @@ export function nextTxtPage() {
         currentChunkIdx++;
         scrollWrapper.style.scrollBehavior = 'auto';
         renderCurrentChunk();
-        scrollWrapper.scrollTop = 0;
+        
+        setTimeout(() => {
+          scrollWrapper.scrollTop = 0;
+          scrollWrapper.scrollLeft = 0;
+        }, 20);
+        
         setTimeout(() => {
           scrollWrapper.style.scrollBehavior = '';
           logActiveViewportText();
           saveDetailPosition();
-        }, 50);
+        }, 80);
       } else {
         import('./viewer_next_episode.js').then(m => {
           m.handleNextEpisodeDirect(state.activeBookId);
