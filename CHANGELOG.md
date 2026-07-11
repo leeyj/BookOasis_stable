@@ -1,5 +1,13 @@
 # CHANGELOG
-* 알려진 버그: 대규모 도서 이동시 DB상에 없어진 도서의 정보가 제대로 삭제되지 않는 현상이 있음. (UI에는 표시 안됨. DB에 제대로 지워지지 않음. 원인 파악중)
+
+* 모바일에서는 전용 OPDS 사용을 권장합니다. epub의 경우 epub.js 성능 한계가 명확하기 때문에 opds를 따라 갈 수 없습니다. | Recommend using dedicated OPDS on mobile. Due to the clear performance limitations of epub.js, it cannot keep up with OPDS.
+
+
+## v0.8.9
+### fixed
+- 모드 전환시 슬라이드 미동작 해결 및 위치 소실 현상 일부 해결 | epub slide-mode transition and position loss fix
+* 모바일에서는 전용 OPDS 사용을 권장합니다. epub의 경우 epub.js 성능 한계가 명확하기 때문에 opds를 따라 갈 수 없습니다. | Recommend using dedicated OPDS on mobile. Due to the clear performance limitations of epub.js, it cannot keep up with OPDS.
+- 마이그래이터 업데이트 (by 짜파구리) | migrator update (by JapaGuri)
 
 ## v0.8.8
 ### fixed
