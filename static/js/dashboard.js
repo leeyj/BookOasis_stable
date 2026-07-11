@@ -10,8 +10,13 @@ export async function loadDashboardData() {
   state.isLoading = true;
   const historyRow = document.getElementById('dashboard-history-row');
   const newRow = document.getElementById('dashboard-new-row');
-  if (historyRow) historyRow.innerHTML = '<div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> 최근 읽은 도서를 불러오는 중...</div>';
-  if (newRow) newRow.innerHTML = '<div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> 신규 도서를 불러오는 중...</div>';
+  // Keep existing cards visible on refresh to avoid noticeable image re-mount flicker.
+  if (historyRow && !historyRow.children.length) {
+    historyRow.innerHTML = '<div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> 최근 읽은 도서를 불러오는 중...</div>';
+  }
+  if (newRow && !newRow.children.length) {
+    newRow.innerHTML = '<div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> 신규 도서를 불러오는 중...</div>';
+  }
   
   try {
     // 1. 최근 읽은 도서 조회

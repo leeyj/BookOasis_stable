@@ -193,15 +193,22 @@ def get_pdf_range():
 def get_cover_image(filename):
     """복원된 정적 표지 이미지 서빙 (더블 인코딩 방어용 unquote 적용, 하위 디렉토리 지원)"""
     import urllib.parse
+
+    def _send_cover(path):
+        res = send_file(path, mimetype='image/png', conditional=True, etag=True)
+        # Covers are mostly immutable between scans; cache to reduce dashboard refresh flicker/network.
+        res.headers['Cache-Control'] = 'public, max-age=86400'
+        return res
+
     decoded_filename = urllib.parse.unquote(filename)
     path = os.path.join(COVERS_DIR, decoded_filename)
     if not os.path.exists(path):
         # 만약 unquote 전 경로로 존재하는지 2차 체크 (Fallback)
         path_fallback = os.path.join(COVERS_DIR, filename)
         if os.path.exists(path_fallback):
-            return send_file(path_fallback, mimetype='image/png')
+            return _send_cover(path_fallback)
         return jsonify({'error': _t('api.err_cover_not_found')}), 404
-    return send_file(path, mimetype='image/png')
+    return _send_cover(path)
 
 @stream_bp.route('/api/media/cache/stats', methods=['GET'])
 @admin_required

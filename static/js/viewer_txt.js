@@ -199,14 +199,17 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
         if (mode === 'page') {
           const prevStepWidth = getTxtPageAdvanceWidth(wrapper);
           const currentColumnIdx = Math.round(wrapper.scrollLeft / prevStepWidth);
-          applyTxtSettings();
+          // Resize relayout should preserve current visual page, not stale saved localStorage position.
+          applyTxtSettings({ previousMode: mode, skipSavedPositionRestore: true });
           const newStepWidth = getTxtPageAdvanceWidth(wrapper);
           wrapper.scrollLeft = currentColumnIdx * newStepWidth;
+          snapTxtPageScrollLeft(wrapper);
           logActiveViewportText();
         } else {
           const beforeHeight = wrapper.scrollHeight - wrapper.clientHeight;
           const ratio = beforeHeight > 0 ? wrapper.scrollTop / beforeHeight : 0;
-          applyTxtSettings();
+          // Scroll mode resize also preserves ratio instead of restoring stale saved position.
+          applyTxtSettings({ previousMode: mode, skipSavedPositionRestore: true });
           const afterHeight = wrapper.scrollHeight - wrapper.clientHeight;
           if (afterHeight > 0) {
             wrapper.scrollTop = afterHeight * ratio;
@@ -374,12 +377,28 @@ function applyDynamicParagraphStyles() {
     });
   }
 
-  contentArea.querySelectorAll('p, div.txt-chunk > div, div.txt-full-content > div, h1, h2, h3, h4, h5, h6').forEach(el => {
+  contentArea.querySelectorAll('p, div.txt-chunk > div, div.txt-full-content > div, h1, h2, h3, h4, h5, h6, blockquote, ul, ol, li, hr, ruby, rt, rp, sup, sub').forEach(el => {
     const tag = el.tagName.toLowerCase();
     if (tag.startsWith('h')) {
       el.style.marginBottom = `${pSpacingRem * 1.5}rem`;
       el.style.marginTop = '1.5rem';
       el.style.fontWeight = 'bold';
+    } else if (tag === 'ul' || tag === 'ol') {
+      el.style.marginTop = '0';
+      el.style.marginBottom = `${pSpacingRem}rem`;
+      el.style.paddingLeft = '1.4rem';
+    } else if (tag === 'li') {
+      el.style.marginTop = '0';
+      el.style.marginBottom = `${Math.max(0.2, pSpacingRem * 0.45)}rem`;
+    } else if (tag === 'blockquote') {
+      el.style.marginTop = '0';
+      el.style.marginBottom = `${pSpacingRem}rem`;
+      el.style.paddingLeft = '0.9rem';
+      el.style.borderLeft = '3px solid rgba(148, 163, 184, 0.45)';
+      el.style.opacity = '0.95';
+    } else if (tag === 'hr') {
+      el.style.marginTop = `${pSpacingRem}rem`;
+      el.style.marginBottom = `${pSpacingRem}rem`;
     } else {
       el.style.marginBottom = `${pSpacingRem}rem`;
       el.style.marginTop = '0';
@@ -465,7 +484,7 @@ export function restoreTxtAnchorInfo(anchorInfo) {
     if (chunkContainer) targetArea = chunkContainer;
   }
 
-  const elements = targetArea.querySelectorAll('p, div, h1, h2, h3, h4, h5, h6');
+  const elements = targetArea.querySelectorAll('p, div, li, blockquote, h1, h2, h3, h4, h5, h6');
   let matchedElem = null;
 
   for (let el of elements) {
@@ -641,8 +660,9 @@ export function applyTxtSettings(options = {}) {
   renderCurrentChunk(true);
 
   let restored = false;
+  const skipSavedPositionRestore = !!options.skipSavedPositionRestore;
   const savedPosStr = localStorage.getItem(`viewer_last_pos_${state.activeBookId}`);
-  if (!isModeSwitch && savedPosStr) {
+  if (!skipSavedPositionRestore && !isModeSwitch && savedPosStr) {
     try {
       const pos = JSON.parse(savedPosStr);
       if (pos && pos.chunkIdx === currentChunkIdx) {
@@ -992,6 +1012,6 @@ export const TxtViewer = {
     }
   },
   applySettings(options) {
-    applyTxtSettings();
+    applyTxtSettings(options || {});
   }
 };

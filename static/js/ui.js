@@ -69,6 +69,7 @@ export function createBookCard(item, options = {}) {
     ? (item.series_name || normalizedTitle)
     : normalizedTitle;
   const coverSrc = item.cover_image ? `/covers/${item.cover_image}` : '/static/images/default_cover.jpg';
+  const useLazyLoad = options.lazyLoad !== false;
   
   // 1. 공통 카드 클릭 핸들러 (아이콘 및 별 클릭 분기)
   card.onclick = (e) => {
@@ -108,11 +109,13 @@ export function createBookCard(item, options = {}) {
 
   // 1x1 투명 GIF를 기본 src로 지정하고 data-src에 실제 coverSrc를 둡니다.
   const lazyPlaceholder = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+  const imgSrc = useLazyLoad ? lazyPlaceholder : coverSrc;
+  const imgDataSrcAttr = useLazyLoad ? `data-src="${coverSrc}"` : '';
 
   card.innerHTML = `
     <div class="book-card-cover">
       <div class="book-card-overlay"></div>
-      <img src="${lazyPlaceholder}" data-src="${coverSrc}" alt="${displayTitle}" onerror="this.onerror=null; this.src='/static/images/default_cover.jpg';">
+      <img src="${imgSrc}" ${imgDataSrcAttr} alt="${displayTitle}" onerror="this.onerror=null; this.src='/static/images/default_cover.jpg';">
       ${badgeHtml}
       ${favBtnHtml}
       <button class="btn-resume-series" title="${options.actionTitle || '읽기'}">
@@ -126,13 +129,13 @@ export function createBookCard(item, options = {}) {
   `;
 
   // IntersectionObserver 싱글톤 적용
-  const imgEl = card.querySelector('img[data-src]');
-  if (imgEl) {
-    if (lazyImageObserver) {
-      lazyImageObserver.observe(imgEl);
-    } else {
-      // Fallback: 브라우저가 지원하지 않을 경우 즉시 로딩
-      if (imgEl.dataset.src) {
+  const imgEl = card.querySelector('img');
+  if (imgEl && useLazyLoad) {
+    if (imgEl.dataset && imgEl.dataset.src) {
+      if (lazyImageObserver) {
+        lazyImageObserver.observe(imgEl);
+      } else {
+        // Fallback: 브라우저가 지원하지 않을 경우 즉시 로딩
         imgEl.src = imgEl.dataset.src;
       }
     }
@@ -273,6 +276,7 @@ export function renderDashboardHistory(booksList) {
     const normalizedTitle = normalizeBookTitle(item);
     const card = createBookCard(item, {
       showProgress: true,
+      lazyLoad: false,
       actionTitle: '이어읽기',
       onPrimaryClick: (e) => openBookDetail(e, item.series_name || normalizedTitle, item.library_id),
       onActionClick: () => openReader(item.id, item.file_format, normalizedTitle, item.pages_read, item.total_pages)
@@ -298,6 +302,7 @@ export function renderDashboardRecentlyAdded(booksList) {
     const normalizedTitle = normalizeBookTitle(item);
     const card = createBookCard(item, {
       isNew: true,
+      lazyLoad: false,
       actionTitle: '바로읽기',
       onPrimaryClick: (e) => openBookDetail(e, item.series_name || normalizedTitle, item.library_id),
       onActionClick: () => openReader(item.id, item.file_format, normalizedTitle, 0, item.total_pages)

@@ -450,7 +450,17 @@ class StreamService:
                 super().__init__()
                 self.recording = False
                 self.output = []
-                self.allowed_tags = {'p', 'br', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'img'}
+                # Keep a conservative allowlist for safe, readability-focused EPUB rendering.
+                self.allowed_tags = {
+                    'p', 'br', 'hr',
+                    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+                    'div', 'blockquote',
+                    'ul', 'ol', 'li',
+                    'strong', 'em', 'b', 'i', 'u', 's',
+                    'sup', 'sub',
+                    'ruby', 'rt', 'rp',
+                    'img'
+                }
                 self.xhtml_path = xhtml_path
                 self.book_id = book_id
                 self.db_type = db_type
@@ -462,6 +472,8 @@ class StreamService:
                 elif self.recording and tag_lower in self.allowed_tags:
                     if tag_lower == 'br':
                         self.output.append('<br/>')
+                    elif tag_lower == 'hr':
+                        self.output.append('<hr/>')
                     elif tag_lower == 'img':
                         attrs_dict = dict(attrs)
                         src_val = attrs_dict.get('src')
@@ -482,7 +494,7 @@ class StreamService:
                 if tag_lower == 'body':
                     self.recording = False
                 elif self.recording and tag_lower in self.allowed_tags:
-                    if tag_lower not in ('br', 'img'):
+                    if tag_lower not in ('br', 'hr', 'img'):
                         self.output.append(f'</{tag_lower}>')
 
             def handle_data(self, data):

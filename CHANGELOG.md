@@ -1,4 +1,10 @@
 # CHANGELOG
+
+## v0.9.2
+### fixed
+- 대시보드 깜빡거림 효과 개선 | dashboard flicker effect improvement 
+- 2페이지(페이지모드) 일때 좌표 어긋남 현상 해소 | 2nd page (page mode) coordinate misalignment resolution
+
 ## v0.9.1
 ### fixed
 - 스캔시 시리즈이름 누락되는 문제 해결   | tag click visibility effect added and back button restore logic reinforced
