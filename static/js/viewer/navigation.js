@@ -58,6 +58,12 @@ export function toggleComicOverlay() {
     if (pdfNavBar) { pdfNavBar.style.top = ''; pdfNavBar.style.bottom = ''; }
     if (epubNavBar) { epubNavBar.style.top = ''; epubNavBar.style.bottom = ''; }
     if (floatingCloseBtn) { floatingCloseBtn.style.top = ''; }
+    
+    // 여백 조절 상세 패널도 같이 닫아줌 (동시 열림 오버랩 완전 차단)
+    const paddingPanel = document.getElementById('viewer-padding-overlay-panel');
+    if (paddingPanel) {
+      paddingPanel.style.display = 'none';
+    }
   }
 
   menu.style.display = isOpening ? 'flex' : 'none';

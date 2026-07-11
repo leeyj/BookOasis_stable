@@ -5,6 +5,7 @@ import { state } from '../state.js';
 export function toggleViewerPaddingPanel() {
   console.log('[Viewer-Padding] toggleViewerPaddingPanel called. Current Format:', state.currentViewerFormat);
   const panel = document.getElementById('viewer-padding-overlay-panel');
+  const overlayMenu = document.getElementById('comic-overlay-menu');
   if (!panel) {
     console.error('[Viewer-Padding] #viewer-padding-overlay-panel not found in DOM');
     return;
@@ -13,10 +14,18 @@ export function toggleViewerPaddingPanel() {
   if (panel.style.display === 'none') {
     panel.style.display = 'block';
     console.log('[Viewer-Padding] Panel display set to block');
+    // 모바일 겹침 방지: 여백 조절판이 열릴 때 오버레이 제어 메뉴를 일단 숨김
+    if (overlayMenu) {
+      overlayMenu.style.display = 'none';
+    }
     initViewerPaddingPanel();
   } else {
     panel.style.display = 'none';
     console.log('[Viewer-Padding] Panel display set to none');
+    // 여백 조절판을 닫았을 때, 오버레이 메뉴를 다시 복원하여 노출
+    if (overlayMenu) {
+      overlayMenu.style.display = 'flex';
+    }
   }
 }
 
