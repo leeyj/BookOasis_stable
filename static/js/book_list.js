@@ -51,31 +51,29 @@ export async function loadBooksList(isAppend = false) {
   if (!container) return;
   const spinner = document.getElementById('infinite-scroll-spinner');
 
-  // append가 아닐 때는 최초 1회 전체 데이터를 가져옴
-  if (!isAppend) {
-    state.isLoading = true;
-    state.currentPage = 1;
-    state.hasMore = true;
-    container.innerHTML = `<div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('book_list.loading')}</div>`;
-    
-    try {
-      const data = await api.fetchAllBooksList(state.currentLibraryType, state.currentLibraryId);
-      if (data.success) {
-        state.allBooksData = data.series || [];
-      } else {
-        container.innerHTML = `<div class="loading-spinner">${i18n.t('book_list.load_fail', {error: data.error || ''})}</div>`;
-        state.isLoading = false;
+  state.isLoading = true;
+  
+  try {
+    // append가 아닐 때는 최초 1회 전체 데이터를 가져옴
+    if (!isAppend) {
+      state.currentPage = 1;
+      state.hasMore = true;
+      container.innerHTML = `<div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('book_list.loading')}</div>`;
+      
+      try {
+        const data = await api.fetchAllBooksList(state.currentLibraryType, state.currentLibraryId);
+        if (data.success) {
+          state.allBooksData = data.series || [];
+        } else {
+          container.innerHTML = `<div class="loading-spinner">${i18n.t('book_list.load_fail', {error: data.error || ''})}</div>`;
+          return;
+        }
+      } catch (e) {
+        container.innerHTML = `<div class="loading-spinner">${i18n.t('book_list.server_error')}</div>`;
+        console.error('도서 목록 로드 오류:', e);
         return;
       }
-    } catch (e) {
-      container.innerHTML = `<div class="loading-spinner">${i18n.t('book_list.server_error')}</div>`;
-      console.error('도서 목록 로드 오류:', e);
-      state.isLoading = false;
-      return;
-    } finally {
-      state.isLoading = false;
     }
-  }
 
   // 클라이언트 사이드 필터링 및 정렬 수행
   let filtered = [...state.allBooksData];
@@ -137,6 +135,9 @@ export async function loadBooksList(isAppend = false) {
 
   if (spinner) {
     spinner.style.display = state.hasMore ? 'block' : 'none';
+  }
+  } finally {
+    state.isLoading = false;
   }
 
   // 렌더링 및 스피너 상태 결정 완료 후 무한 스크롤 옵저버 재바인딩
