@@ -304,3 +304,14 @@ def _count_books(self, db_type):
 
 - 이 통계 항목(총계/주간/월간)은 플러그인에서 정의하는 영역입니다.
 - 코어는 공통 계약(`dashboard_widget`, `get_dashboard_data`)만 사용하므로, 항목 변경 시 코어 수정이 필요하지 않습니다.
+
+---
+
+## 💡 Tip: iframe 외부 연동 시 보안 제약 사항 안내
+독립된 플러그인 화면에서 `<iframe>`을 사용해 외부 웹 서비스를 끌어오고자 할 때는 브라우저 보안 제약에 유의해야 합니다.
+
+1. **X-Frame-Options / CSP 차단**:
+   - `X-Frame-Options: SAMEORIGIN` 또는 `Content-Security-Policy` 헤더를 통해 자신들의 사이트가 타사 사이트에 프레임 형태로 삽입되는 것을 차단하는 사이트(예: Google, Naver 등)는 iframe으로 직접 로딩이 불가능합니다.
+   - **해결 방안**: 플러그인 파이썬 백엔드(Python)에서 웹 콘텐츠를 직접 `requests`로 긁어온 뒤 보안 헤더를 필터링하여 응답하는 Proxy API를 구축해 프론트엔드로 전달하거나, `target="_blank"` 속성을 지정해 새 창/새 탭으로 바로 열어 주십시오.
+2. **Mixed Content 차단**:
+   - BookOasis 웹 서비스가 SSL(HTTPS) 환경에서 제공되는 경우, iframe 내에 호출되는 주소 역시 반드시 `https://` 보안 통신 주소여야 합니다. `http://`로 시작하는 일반 주소는 브라우저 보안 규격(Mixed Content)에 의해 자동으로 로드가 완전 차단됩니다.

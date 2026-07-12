@@ -27,8 +27,37 @@ def scan_library(db_path, library_id, physical_path, force=False, skip_vfs_refre
     
     target_paths = [p.strip() for p in str(physical_path).replace('\r', '').split('\n') if p.strip()]
     if not target_paths:
-        print(f"[Scanner] Warning: Scan path does not exist: {physical_path}")
-        return
+        raise ValueError("스캔 경로 정보가 입력되지 않았습니다.")
+
+    # ── [HDD/NAS Wake-up & Path Validation (4 attempts, 3s delay)] ──
+    import time
+    failed_paths = []
+    
+    for path in target_paths:
+        path_accessible = False
+        last_error_msg = ""
+        for attempt in range(1, 5):
+            try:
+                # os.path.exists()를 트리거하여 하드디스크 스핀업(Spin-up) 및 네트워크 세션 연결 유도
+                if os.path.exists(path):
+                    path_accessible = True
+                    break
+                else:
+                    last_error_msg = "경로를 찾을 수 없거나 마운트 해제 상태입니다."
+            except Exception as e:
+                last_error_msg = str(e)
+            
+            print(f"[Scanner-WakeUp] '{path}' 접근 준비 지연 (시도 {attempt}/4). 3초 후 재시도... 사유: {last_error_msg}")
+            time.sleep(3.0)
+            
+        if not path_accessible:
+            failed_paths.append((path, last_error_msg))
+
+    if failed_paths:
+        err_details = [f"'{p}' (사유: {msg})" for p, msg in failed_paths]
+        err_msg = f"스캔 대상 경로 접근 실패 (HDD/NAS Wake-up 실패): " + ", ".join(err_details)
+        print(f"[Scanner-WakeUp ERROR] {err_msg}")
+        raise FileNotFoundError(err_msg)
 
     if not skip_vfs_refresh:
         trigger_vfs_refresh(db_path, library_id, physical_path)

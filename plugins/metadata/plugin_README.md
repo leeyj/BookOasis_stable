@@ -273,3 +273,20 @@ class NaverBookMetadataProvider(BaseMetadataProvider):
     def run_context_menu_action(self, db_type, action_id, context):
         ...
 ```
+
+---
+
+### 💡 Tip: Handling iframe Security Constraints (iframe 보안 제약 사항 처리 팁)
+When displaying external web content inside a custom plugin dashboard via `<iframe>`, you may encounter loading failures due to security policies.
+커스텀 플러그인 화면에서 `<iframe>`을 이용해 외부 웹 사이트를 렌더링할 때, 보안 헤더 제약으로 인해 페이지 로딩이 실패할 수 있습니다.
+
+1. **X-Frame-Options / CSP (Content Security Policy)**:
+   - Many websites set `X-Frame-Options: SAMEORIGIN` or `Content-Security-Policy: frame-ancestors` headers (e.g. Google, Naver, GitHub) to prevent clickjacking. These sites **cannot** be rendered inside an iframe directly.
+   - 클릭재킹 방지를 위해 `X-Frame-Options: SAMEORIGIN` 등이 선언된 메이저 웹 사이트들은 브라우저 수준에서 iframe 렌더링이 차단됩니다.
+   - **Solution**: Implement a reverse proxy route in your plugin's python backend to fetch the HTML, strip out the restrictive headers, and return it to the frontend iframe. Or, simply use `target="_blank"` to open it in a new tab.
+   - **해결책**: 플러그인 파이썬 백엔드에서 외부 웹페이지를 `requests` 등으로 읽어 들여 헤더를 거르고 중계해주는 Proxy API를 만들거나, `target="_blank"` 속성을 사용해 새 창으로 링크아웃 처리하십시오.
+
+2. **Mixed Content**:
+   - If the BookOasis server runs on HTTPS, any iframe URL must also use `https://`. Unencrypted `http://` resources will be blocked by browsers.
+   - BookOasis 미디어 서버가 HTTPS 프로토콜로 작동하고 있는 경우, iframe의 src 주소 역시 반드시 `https://` 보안 통신 주소여야 로드됩니다. (`http://`는 Mixed Content 차단 대상)
+

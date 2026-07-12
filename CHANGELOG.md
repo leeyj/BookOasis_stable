@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## v0.9.4
+### fixed
+- 코믹 뷰에서 더블버퍼링 기법 도입(페이지 모드) | Introduce double buffering technique in comic viewer (page mode)
+- 만화 뷰어 다음 페이지 사전 로드 가비지 컬렉션(GC) 누수 방지 및 캐싱 안정성 고도화 | Prevent garbage collection leakage during page preloading and improve cache stability in comic reader
+- 스캐너 구동 전 HDD/NAS 스핀업 및 절전 대기(Wake-up Knock) 재시도 메커니즘 도입 (최대 4회, 3초 지연) | Introduce HDD/NAS spin-up & wake-up knock retry mechanism in library scanner
+- 대시보드 스크롤시 버벅임 감소 | dashboard scroll stuttering reduction
+- 대시보드 레이아웃 최적화 | dashboard layout optimization
+
 ## v0.9.3
 ### fixed
 - 플러그인 off시에도 노출되는 플러그인 목록 제거 | remove plugin from plugin list when plugin is off

@@ -304,3 +304,14 @@ Note:
 
 - These statistics items (total/weekly/monthly) are defined in the plugin.
 - The core only consumes shared contracts (`dashboard_widget`, `get_dashboard_data`), so changing items does not require core changes.
+
+---
+
+## 💡 Tip: Handling iframe Security Constraints
+When embedding external web services inside a custom plugin tab or card using `<iframe>`, you should be aware of security constraints enforced by browsers.
+
+1. **X-Frame-Options & CSP Blockage**:
+   - Websites that configure `X-Frame-Options: SAMEORIGIN` or restrictive `Content-Security-Policy` headers (e.g., Google, Naver, GitHub) **cannot** be rendered inside an iframe on third-party sites.
+   - **Solution**: Implement a reverse proxy route in your plugin's python backend (using `requests` to fetch the external page and stripping off the restrictive headers before returning it to the browser), or simply open the link in a new tab via `target="_blank"`.
+2. **Mixed Content Blockage**:
+   - If BookOasis is served over SSL (HTTPS), all iframe source URLs must also use `https://`. Unencrypted `http://` resources will be automatically blocked by modern web browsers.

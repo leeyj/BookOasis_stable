@@ -19,6 +19,7 @@ let imageWorker = null;
 let _workerRequestId = 1;
 const _workerPending = new Map();
 let _workerCleanupAdded = false;
+const activePreloadSet = new Set();
 
 function ensureImageWorker() {
   if (imageWorker) return;
@@ -473,16 +474,20 @@ export function loadComicPage() {
     const delayStr = localStorage.getItem('comic_loading_delay');
     const delay = (delayStr !== null) ? parseInt(delayStr, 10) : 300;
 
-    comicLoadingTimer = setTimeout(() => {
-      document.querySelectorAll('.comic-page-img').forEach(img => img.style.opacity = '0');
-      showViewerLoading('Loading...', 'Preparing pages');
-    }, delay);
-
-    wrapper.innerHTML = '<div class="comic-page-pair" style="visibility: hidden;"></div>';
-    const pairContainer = wrapper.querySelector('.comic-page-pair');
-    if (pageIndices.length === 1 && pairContainer) {
-      pairContainer.classList.add('single-page');
+    // 기존 페이지 페어 요소가 이미 렌더링되어 떠 있는지 확인합니다.
+    const hasExistingPair = !!wrapper.querySelector('.comic-page-pair');
+    if (!hasExistingPair) {
+      // 최초 기동 시에는 즉시 로딩을 보여줍니다.
+      comicLoadingTimer = setTimeout(() => {
+        showViewerLoading('Loading...', 'Preparing pages');
+      }, delay);
+    } else {
+      // 기존에 떠 있는 페이지가 있을 경우에는 백그라운드 다운로드가 지정 시간보다 지체될 때만 지연 노출되도록 타이머 마진을 늘려줍니다.
+      comicLoadingTimer = setTimeout(() => {
+        showViewerLoading('Loading...', 'Preparing pages');
+      }, delay + 100);
     }
+
     let loadedCount = 0;
     const expectedLoads = pageIndices.length;
     const imageElements = [];
@@ -506,7 +511,14 @@ export function loadComicPage() {
             clearTimeout(comicLoadingTimer);
             comicLoadingTimer = null;
           }
-          pairContainer.innerHTML = '';
+
+          // 이미지가 백그라운드 상에서 완전히 로드된 이 시점에만 기존 DOM을 밀고 새 페이지를 끼워넣습니다. (더블 버퍼링 기법)
+          wrapper.innerHTML = '<div class="comic-page-pair" style="visibility: hidden;"></div>';
+          const pairContainer = wrapper.querySelector('.comic-page-pair');
+          if (expectedLoads === 1 && pairContainer) {
+            pairContainer.classList.add('single-page');
+          }
+
           imageElements.forEach((loadedImg) => {
             if (loadedImg) {
               loadedImg.style.opacity = '1';
@@ -515,7 +527,8 @@ export function loadComicPage() {
           });
           pairContainer.style.visibility = 'visible';
           hideViewerLoading();
-          if (comicCurrentPage === 0 && pageIndices.length === 1) {
+
+          if (comicCurrentPage === 0 && expectedLoads === 1) {
             const aspectRatio = imageElements[0].naturalWidth / imageElements[0].naturalHeight;
             if (aspectRatio < 0.7) {
               setComicFitMode('width');
@@ -537,7 +550,6 @@ export function loadComicPage() {
           comicLoadingTimer = null;
         }
         showViewerError('Error', 'Failed to load image');
-        imgEl.style.opacity = '1';
       };
 
       const url = FileLoader.getPageStreamUrl(pageIndex);
@@ -585,8 +597,16 @@ function preloadNextPages() {
   for (let i = 1; i <= preloadCount; i++) {
     const nextIdx = basePage + i;
     if (nextIdx < comicTotalPages) {
+      const url = FileLoader.getPageStreamUrl(nextIdx);
       const preloadImg = new Image();
-      preloadImg.src = FileLoader.getPageStreamUrl(nextIdx);
+      activePreloadSet.add(preloadImg);
+      preloadImg.onload = () => {
+        activePreloadSet.delete(preloadImg);
+      };
+      preloadImg.onerror = () => {
+        activePreloadSet.delete(preloadImg);
+      };
+      preloadImg.src = url;
     }
   }
 }
@@ -619,4 +639,5 @@ export function clearComicViewer() {
     clearTimeout(comicLoadingTimer);
     comicLoadingTimer = null;
   }
+  activePreloadSet.clear();
 }
