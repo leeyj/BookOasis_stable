@@ -719,15 +719,16 @@
     cursor: pointer;
     display: flex;
     flex-direction: column;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
     position: relative;
     -webkit-touch-callout: none;
     -webkit-user-select: none;
     user-select: none;
+    will-change: transform, box-shadow;
 }
 
 .book-card:hover {
-    transform: translateY(-6px);
+    transform: translate3d(0, -6px, 0);
     border-color: #a855f7;
     box-shadow: 0 10px 20px rgba(168, 85, 247, 0.2);
 }
@@ -744,24 +745,24 @@
     height: 100%;
     object-fit: cover;
     transition: transform 0.5s ease;
+    will-change: transform;
 }
 
 .book-card:hover .book-card-cover img {
-    transform: scale(1.08);
+    transform: scale3d(1.08, 1.08, 1);
 }
 
 .book-badge-count {
     position: absolute;
     top: 8px;
     right: 8px;
-    background: rgba(15, 23, 42, 0.85);
+    background: rgba(15, 23, 42, 0.95);
     color: #e9d5ff;
     padding: 0.25rem 0.5rem;
     font-size: 0.7rem;
     font-weight: 700;
     border-radius: 4px;
     border: 1px solid rgba(168, 85, 247, 0.4);
-    backdrop-filter: blur(4px);
 }
 
 .book-card-info {

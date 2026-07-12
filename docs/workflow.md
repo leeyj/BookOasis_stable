@@ -369,4 +369,7 @@ tags: [workflow, history]
 | 2026-07-13 | `scan_imgdir_unpack` | 이미지 폴더 가상 책 스캔 시 튜플 언패킹(expected 3, got 2) 오류 조치 | [BugFix](./bug/20260713_bugfix_scan_imgdir_unpack.md) | - |
 | 2026-07-13 | `scan_hierarchy_series` | 계층 분석 기반 표준 이미지 가상 책 시리즈 그룹화 결함 조치 | [BugFix](./bug/20260713_bugfix_scan_hierarchy_series.md) | - |
 | 2026-07-13 | `covers_mime_type_lag` | 표지 이미지 서빙 시 MIME 타입 불일치에 따른 스크롤 렉 조치 | [BugFix](./bug/20260713_bugfix_covers_mime_type_lag.md) | - |
+| 2026-07-13 | `infinite_scroll_margin` | 무한 스크롤 감지 마진 완화를 통한 스크롤 잔 렉 최적화 | [BugFix](./bug/20260713_bugfix_infinite_scroll_margin.md) | - |
+| 2026-07-13 | `css_scroll_painting_lag` | 도서 그리드 CSS 렌더링(MIME 타입 및 backdrop-filter) 소거를 통한 상/하방 스크롤 렉 최적화 | [BugFix](./bug/20260713_bugfix_css_scroll_painting_lag.md) | - |
+| 2026-07-13 | `gpu_hardware_acceleration_lag` | GPU 하드웨어 가속 레이어 격리를 통한 성인도서 스크롤 렉 최적화 | [BugFix](./bug/20260713_bugfix_gpu_hardware_acceleration_lag.md) | - |
 

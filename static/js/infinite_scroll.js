@@ -25,7 +25,7 @@ export function initInfiniteScrollObserver() {
     }
   }, {
     root: null,
-    rootMargin: '0px 0px 2400px 0px', // 최하단 도달 1800px 전 선제적 미리 로딩 (스크롤 비어 보임 방지)
+    rootMargin: '0px 0px 800px 0px', // 최하단 도달 800px 전 선제적 미리 로딩 (스크롤 비어 보임 방지 및 렉 예방)
     threshold: 0
   });
 
