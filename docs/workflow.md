@@ -12,6 +12,10 @@ tags: [workflow, history]
 
 | 날짜 | 세션 키워드 | 한 줄 요약 | 태스크 문서 | 워크쓰루 문서 |
 | :--- | :--- | :--- | :--- | :--- |
+| 2026-07-12 | `dashboard_layout_scroll` | 대시보드 미세 스크롤 방지, 컨텍스트 메뉴 잘림 및 검색 플러그인 상태 동적 연동, 독립 플러그인 탭 & 정렬 개편 | [Bugfix & Refactoring](./bug/20260712_bugfix_dashboard_layout_scroll.md) | - |
+| 2026-07-12 | `worker_role_separation_major_roadmap` | 워커 역할 분리(웹/스캐너) 메이저 패치 로드맵, 영향도, 난이도 문서화 | [Roadmap](./roadmap_worker_role_separation_major_patch.md) | - |
+| 2026-07-12 | `worker_role_separation_phase1_detailed_design` | APP_ROLE 기반 역할 게이트 도입을 위한 Phase 1 상세 설계서 작성 | [Design](./roadmap_worker_role_separation_phase1_detailed_design.md) | - |
+| 2026-07-12 | `worker_role_separation_phase1_task_breakdown` | Phase 1 실행 착수용 작업 티켓 분해 문서 작성 | [Execution](./roadmap_worker_role_separation_phase1_task_breakdown.md) | - |
 | 2026-06-19 | `init_docs` | 독립 문서 관리 시스템 초기 구축 | [Task](./history/20260619_145226_init_docs_task.md) | [Walkthrough](./history/20260619_145226_init_docs_walkthrough.md) |
 | 2026-06-19 | `rename_project` | 프로젝트 네이밍 변경 및 Git 연동 (BookOasis) | [Task](./history/20260619_145705_rename_project_task.md) | [Walkthrough](./history/20260619_145705_rename_project_walkthrough.md) |
 | 2026-06-19 | `init_push` | GitHub 원격 저장소 최초 소스 코드 푸시 | [Task](./history/20260619_145949_init_push_task.md) | [Walkthrough](./history/20260619_145949_init_push_walkthrough.md) |

@@ -29,6 +29,8 @@
                             class="fa-solid fa-clock-rotate-left"></i> <span data-i18n="sidebar.recent_books">최근 읽은 도서</span></li>
                     <li class="menu-item" id="category-favorite" onclick="selectCategory('favorite')"><i
                             class="fa-solid fa-star" style="color: #eab308;"></i> <span data-i18n="sidebar.favorite">즐겨찾기</span></li>
+                    <li class="menu-item" id="category-plugins" onclick="selectCategory('plugins')"><i
+                            class="fa-solid fa-puzzle-piece" style="color: #38bdf8;"></i> <span data-i18n="sidebar.plugins">플러그인</span></li>
                     <li class="menu-item" id="category-all" onclick="selectCategory('all')"><i
                             class="fa-solid fa-layer-group"></i> <span data-i18n="sidebar.view_all">전체보기</span></li>
                 </ul>
@@ -78,9 +80,10 @@
                 </h2>
             </div>
 
-            <div class="library-search-center">
+            <div class="library-search-center" style="display: flex; gap: 0.5rem; align-items: center;">
                 <input type="text" id="library-search" class="form-control input-sm" data-i18n-placeholder="header.search_placeholder" placeholder="제목, 시리즈, 작가 검색..." title="검색 단축키: Alt+`"
                     oninput="filterBooks()">
+                <button id="btn-library-search-action" class="btn-toggle" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; flex-shrink: 0;" onclick="handleLibrarySearchAction()" data-i18n="common.search">검색</button>
             </div>
 
             <div class="library-controls">
@@ -119,6 +122,9 @@
 
         <!-- ===== 그리드 뷰 (기본 표시) ===== -->
         {% include "components/views/library_grid.html" %}
+
+        <!-- ===== 플러그인 뷰 (새로 생성됨) ===== -->
+        {% include "components/views/library_plugins.html" %}
 
         <!-- ===== 도서 상세 뷰 (클릭 시 전환) ===== -->
         {% include "components/views/library_detail.html" %}

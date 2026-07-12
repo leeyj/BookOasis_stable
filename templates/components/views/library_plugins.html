@@ -1,0 +1,21 @@
+<div id="library-plugins-view" style="display: none; flex-direction: column; gap: 1rem; width: 100%; box-sizing: border-box; padding: 0.5rem 1.5rem 1.5rem 1.5rem;">
+    <!-- 탭 헤더 영역 -->
+    <div class="plugins-tabs" id="plugins-view-tabs" style="display: flex; gap: 0.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+        <button class="settings-tab-btn active" id="tab-btn-common-desk" onclick="switchPluginsViewTab('common-desk')">
+            <i class="fa-solid fa-desktop"></i> <span data-i18n="dashboard.plugin_desk_title">공통 데스크</span>
+        </button>
+        <!-- 동적 탭 버튼이 추가될 공간 -->
+    </div>
+
+    <!-- 1. 공통 플러그인 데스크 탭 내용 -->
+    <div class="plugins-tab-content" id="plugins-content-common-desk" style="display: flex; width: 100%; flex-direction: column;">
+        <div class="dashboard-section" id="dashboard-plugins-section" style="width: 100%;">
+            <div class="plugins-container" id="dashboard-plugins-container" style="display: flex; gap: 1.5rem; flex-wrap: wrap; width: 100%;">
+                <!-- JS에 의해 동적으로 공통 위젯 카드가 채워짐 (Sortable 정렬 지원) -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. 동적 플러그인 탭 본문이 추가될 컨테이너 -->
+    <div id="plugins-dynamic-contents-wrapper" style="display: contents;"></div>
+</div>

@@ -41,8 +41,6 @@ export async function loadDashboardData() {
       if (newRow) newRow.innerHTML = `<div class="loading-spinner">신규 도서 로드 실패: ${newData.error || '오류'}</div>`;
     }
     
-    // 3. 플러그인 렌더링 (동적 위젯)
-    await loadDashboardPlugins(requestToken);
   } catch (e) {
     console.error('대시보드 데이터 로드 오류:', e);
     if (historyRow) historyRow.innerHTML = '<div class="loading-spinner">서버 연결 오류</div>';
@@ -64,35 +62,56 @@ export function scrollDashboardRow(type, dir) {
   }
 }
 
-async function loadDashboardPlugins(requestToken) {
+export async function loadDashboardPlugins(requestToken = null) {
   const section = document.getElementById('dashboard-plugins-section');
   const container = document.getElementById('dashboard-plugins-container');
+  const tabsContainer = document.getElementById('plugins-view-tabs');
+  const dynamicWrapper = document.getElementById('plugins-dynamic-contents-wrapper');
+
   if (!section || !container) return;
 
+  const currentToken = requestToken !== null ? requestToken : dashboardLoadToken;
+
+  // 1. 이전 동적 생성 탭 및 콘텐츠 초기화
+  if (tabsContainer) {
+    tabsContainer.querySelectorAll('.plugin-dynamic-tab-btn').forEach(btn => btn.remove());
+  }
+  if (dynamicWrapper) {
+    dynamicWrapper.innerHTML = '';
+  }
+  container.innerHTML = '';
+
   try {
-    const res = await fetch('/api/media/dashboard/widgets');
+    const res = await fetch(`/api/media/dashboard/widgets?type=${state.currentLibraryType}`);
     const data = await res.json();
 
-    // Stale 요청은 렌더링하지 않습니다.
-    if (requestToken !== dashboardLoadToken) return;
+    if (currentToken !== dashboardLoadToken) return;
 
     if (data.success && data.widgets && data.widgets.length > 0) {
       section.style.display = 'block';
-      container.innerHTML = '';
 
-      const widgetById = new Map();
-      for (const widget of data.widgets) {
-        const widgetId = String((widget && widget.id) || '').trim();
-        if (!widgetId) continue;
-        if (widgetById.has(widgetId)) {
-          console.warn(`[Dashboard] Duplicate widget id ignored: ${widgetId}`);
-          continue;
-        }
-        widgetById.set(widgetId, widget);
-      }
+      // 순서 복원을 위한 정렬 리스트 획득
+      let savedOrder = [];
+      try {
+        savedOrder = JSON.parse(localStorage.getItem('plugins_order') || '[]');
+      } catch (err) {}
 
-      for (const widget of widgetById.values()) {
-        if (requestToken !== dashboardLoadToken) return;
+      // widgets 정렬 처리 (all_desk_tab가 없고 순서 저장이 있는 경우 우선 적용)
+      const commonWidgets = data.widgets.filter(w => !w.all_desk_tab);
+      const tabWidgets = data.widgets.filter(w => w.all_desk_tab);
+
+      commonWidgets.sort((a, b) => {
+        const idxA = savedOrder.indexOf(a.id);
+        const idxB = savedOrder.indexOf(b.id);
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+        return 0;
+      });
+
+      // 2. 공통 데스크 위젯 카드 렌더링
+      for (const widget of commonWidgets) {
+        if (currentToken !== dashboardLoadToken) return;
 
         const widgetId = String(widget.id || '').trim();
         if (!widgetId) continue;
@@ -104,8 +123,8 @@ async function loadDashboardPlugins(requestToken) {
         const subtitle = widget.subtitle ? `<div style="margin-top: 0.35rem; color: #94a3b8; font-size: 0.78rem;">${escapeHtml(widget.subtitle)}</div>` : '';
 
         const cardHtml = `
-          <div class="plugin-card" id="plugin-${widgetId}" style="width: 100%; max-width: 500px; background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 1rem;">
-              <h4 style="margin: 0 0 0.7rem 0; color: #cbd5e1; font-size: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; gap: 0.6rem;">
+          <div class="plugin-card" id="plugin-${widgetId}" style="flex: 1 1 350px; min-width: 320px; background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 1rem; box-sizing: border-box; cursor: grab; user-select: none;">
+              <h4 style="margin: 0 0 0.7rem 0; color: #cbd5e1; font-size: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; pointer-events: none;">
                   <span style="display:flex; align-items:center; min-width:0;"><i class="${iconClass}" style="color: #38bdf8; margin-right: 0.35rem;"></i><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${title}</span></span>
                   <span style="font-size: 0.75rem; color: #64748b; font-weight: normal; flex-shrink:0;">제공: ${provider}</span>
               </h4>
@@ -116,9 +135,68 @@ async function loadDashboardPlugins(requestToken) {
           </div>
         `;
         container.insertAdjacentHTML('beforeend', cardHtml);
-
-        await loadDashboardWidgetData(widgetId, Number(widget.limit) || 10, contentId, requestToken);
+        await loadDashboardWidgetData(widgetId, Number(widget.limit) || 10, contentId, currentToken);
       }
+
+      // 3. 독점 탭 플러그인 구성
+      for (const widget of tabWidgets) {
+        if (currentToken !== dashboardLoadToken) return;
+
+        const widgetId = String(widget.id || '').trim();
+        if (!widgetId) continue;
+
+        const contentId = `dashboard-widget-content-${widgetId}`;
+        const iconClass = widget.icon || 'fa-solid fa-puzzle-piece';
+        const title = escapeHtml(widget.title || widget.name || widgetId);
+        const provider = escapeHtml(widget.provider || widget.name || 'Plugin');
+        const subtitle = widget.subtitle ? `<div style="margin-top: 0.35rem; color: #94a3b8; font-size: 0.85rem; margin-bottom: 0.5rem;">${escapeHtml(widget.subtitle)}</div>` : '';
+
+        // 탭 버튼 생성
+        if (tabsContainer) {
+          const tabBtnHtml = `
+            <button class="settings-tab-btn plugin-dynamic-tab-btn" id="tab-btn-${widgetId}" onclick="switchPluginsViewTab('${widgetId}')">
+              <i class="${iconClass}"></i> <span>${title}</span>
+            </button>
+          `;
+          tabsContainer.insertAdjacentHTML('beforeend', tabBtnHtml);
+        }
+
+        // 탭 본문 생성
+        if (dynamicWrapper) {
+          const tabContentHtml = `
+            <div class="plugins-tab-content plugin-dynamic-tab-content" id="plugins-content-${widgetId}" style="display: none; width: 100%; flex-direction: column;">
+              <div class="dashboard-section" style="width: 100%;">
+                <div class="section-header" style="margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 0.6rem; display: flex; justify-content: space-between; align-items: center;">
+                  <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1.2rem; font-weight: 700;">
+                    <i class="${iconClass}" style="color: #a855f7; margin-right: 0.5rem;"></i> <span>${title}</span>
+                  </h3>
+                  <span style="font-size: 0.8rem; color: #64748b;">제공: ${provider}</span>
+                </div>
+                ${subtitle}
+                <div id="${contentId}" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; width: 100%; margin-top: 1rem;">
+                  <div class="loading-spinner" style="padding: 2rem 0; grid-column: 1/-1;"><i class="fa-solid fa-circle-notch fa-spin"></i> 데이터를 불러오는 중...</div>
+                </div>
+              </div>
+            </div>
+          `;
+          dynamicWrapper.insertAdjacentHTML('beforeend', tabContentHtml);
+        }
+
+        await loadDashboardWidgetData(widgetId, Number(widget.limit) || 12, contentId, currentToken);
+      }
+
+      // 4. Sortable 활성화 (공통 데스크 카드들)
+      if (typeof Sortable !== 'undefined' && container && commonWidgets.length > 0) {
+        Sortable.create(container, {
+          animation: 180,
+          ghostClass: 'dragging',
+          onEnd: function () {
+            const newOrder = Array.from(container.children).map(child => child.id.replace('plugin-', ''));
+            localStorage.setItem('plugins_order', JSON.stringify(newOrder));
+          }
+        });
+      }
+
     } else {
       section.style.display = 'none';
       container.innerHTML = '';
@@ -128,6 +206,28 @@ async function loadDashboardPlugins(requestToken) {
     section.style.display = 'none';
   }
 }
+
+// 플러그인 뷰 내부 탭 전환 함수
+export function switchPluginsViewTab(tabId) {
+  // 1. 버튼 활성화 클래스 조율
+  const tabsContainer = document.getElementById('plugins-view-tabs');
+  if (tabsContainer) {
+    tabsContainer.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
+    const activeBtn = document.getElementById(tabId === 'common-desk' ? 'tab-btn-common-desk' : `tab-btn-${tabId}`);
+    if (activeBtn) activeBtn.classList.add('active');
+  }
+
+  // 2. 본문 활성화 전환
+  document.querySelectorAll('.plugins-tab-content').forEach(el => {
+    el.style.display = 'none';
+  });
+
+  const activeContent = document.getElementById(tabId === 'common-desk' ? 'plugins-content-common-desk' : `plugins-content-${tabId}`);
+  if (activeContent) {
+    activeContent.style.display = 'flex';
+  }
+}
+window.switchPluginsViewTab = switchPluginsViewTab;
 
 async function loadDashboardWidgetData(pluginId, limit, contentId, requestToken) {
   if (requestToken !== dashboardLoadToken) return;
@@ -184,13 +284,10 @@ async function loadDashboardWidgetData(pluginId, limit, contentId, requestToken)
         `;
         container.insertAdjacentHTML('beforeend', itemHtml);
       });
-    } else {
-      const emptyMsg = escapeHtml(data.error || '표시할 항목이 없습니다.');
-      container.innerHTML = `<div style="text-align: center; color: #ef4444; font-size: 0.9rem; padding: 1rem 0;">${emptyMsg}</div>`;
     }
   } catch (e) {
     console.error(`대시보드 위젯 로드 오류(${pluginId}):`, e);
-    container.innerHTML = '<div style="text-align: center; color: #ef4444; font-size: 0.9rem; padding: 1rem 0;">서버 연결 오류</div>';
+    container.innerHTML = '<div style="text-align: center; color: #ef4444; font-size: 0.9rem; padding: 1rem 0; grid-column: 1/-1;">서버 연결 오류</div>';
   }
 }
 

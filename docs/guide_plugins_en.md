@@ -48,7 +48,7 @@ Recommended class attributes:
 - `name` (str): display name
 - `is_searchable` (bool): show in manual metadata search modal
 - `config_schema` (list): settings form schema
-- `dashboard_widget` (dict or None): dashboard widget metadata
+- `dashboard_widget` (dict or None): dashboard widget metadata (common desk card or exclusive full-screen tab configurations)
 
 Required methods:
 
@@ -101,12 +101,9 @@ If present, they are automatically loaded in Settings > Plugin Settings.
 
 ---
 
-## 5. Dashboard Widget Contract
+## 5. Dashboard Widget & Exclusive Tab Contract
 
-To render a plugin card on the main dashboard:
-
-1. Define `dashboard_widget` metadata.
-2. Implement `get_dashboard_data()`.
+To render a card inside the dedicated **[Plugins]** category screen, or to display it as an exclusive full-screen tab, define `dashboard_widget` and implement `get_dashboard_data()`.
 
 Example:
 
@@ -117,11 +114,17 @@ dashboard_widget = {
     'provider': 'Example API',
     'icon': 'fa-solid fa-book-open',
     'limit': 10,
+    'all_desk_tab': True,  # (Optional) If True, rendered as an exclusive full-width tab instead of a card (Default: False)
+    'supported_types': ['general'],  # (Optional) Allowed library types (e.g. ['general', 'adult']). Omit to display on both.
 }
 
 def get_dashboard_data(self, db_type, limit=10):
     return {'success': True, 'items': []}
 ```
+
+### Layout & Sorting (Sortable.js)
+- Widgets with `'all_desk_tab': False` (or omitted) are grouped under the **[Common Desk]** tab in a responsive card grid.
+- Users can drag and drop these widget cards to arrange their layouts. The custom order is preserved in the browser's `localStorage`.
 
 Recommendation:
 

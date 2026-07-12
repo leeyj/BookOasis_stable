@@ -1,9 +1,19 @@
 # CHANGELOG
 
+## v0.9.3
+### fixed
+- 플러그인 off시에도 노출되는 플러그인 목록 제거 | remove plugin from plugin list when plugin is off
+### improved
+- 검색창 에 버튼 추가 및 초기화 기능 구현 | Added button to search bar and implemented reset function
+- 플러그인 카테고리 추가 및 구현 방법 문서화(개인 플러그인 개발 가이드) | Plugin category addition and implementation method documentation(Plugin development guide for developers)
+- 대시보드 일반/성인 도서 분리 및 플러그인 라이브러리 타입 지원 | Added plugin library type support and separated general/adult books in dashboard
+
 ## v0.9.2
 ### fixed
 - 대시보드 깜빡거림 효과 개선 | dashboard flicker effect improvement 
 - 2페이지(페이지모드) 일때 좌표 어긋남 현상 해소 | 2nd page (page mode) coordinate misalignment resolution
+
+
 
 ## v0.9.1
 ### fixed

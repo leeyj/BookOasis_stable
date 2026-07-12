@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify, session
+import sqlite3
 from services.category_service import CategoryService
 from services.book_service import BookService
 from services.series_service import SeriesService
@@ -25,6 +26,17 @@ def get_media_libraries():
         role = session.get('role')
         libraries = CategoryService.get_libraries(db_type, user_id=user_id, role=role)
         return jsonify({'success': True, 'libraries': libraries})
+    except sqlite3.OperationalError as e:
+        msg = str(e)
+        lock_like = ('locked' in msg.lower()) or ('pool exhausted' in msg.lower()) or ('timeout waiting for connection' in msg.lower())
+        if lock_like:
+            return jsonify({
+                'success': True,
+                'libraries': [],
+                'degraded': True,
+                'warning': 'DB가 일시적으로 혼잡합니다. 잠시 후 자동 재시도하거나 새로고침 해주세요.'
+            })
+        return jsonify({'success': False, 'error': msg}), 500
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -414,6 +426,7 @@ def save_metadata_plugin_config_api():
 @library_bp.route('/api/media/dashboard/widgets', methods=['GET'])
 def get_dashboard_widgets_api():
     """대시보드에 표시할 활성화된 위젯(플러그인) 목록을 반환합니다."""
+    db_type = request.args.get('type', 'general').strip()
     try:
         from services.metadata_factory import MetadataFactory
         providers = MetadataFactory.get_available_providers()
@@ -426,6 +439,11 @@ def get_dashboard_widgets_api():
             if not isinstance(widget, dict):
                 continue
 
+            # 라이브러리 타입(general / adult) 노출 필터링 (생략 시 둘 다 노출)
+            supported_types = widget.get('supported_types')
+            if isinstance(supported_types, list) and db_type not in supported_types:
+                continue
+
             active_widgets.append({
                 'id': p.get('id'),
                 'name': p.get('name'),
@@ -434,6 +452,7 @@ def get_dashboard_widgets_api():
                 'provider': widget.get('provider') or p.get('name'),
                 'icon': widget.get('icon') or 'fa-solid fa-puzzle-piece',
                 'limit': int(widget.get('limit') or 10),
+                'all_desk_tab': bool(widget.get('all_desk_tab') or False),
             })
 
         return jsonify({'success': True, 'widgets': active_widgets}), 200

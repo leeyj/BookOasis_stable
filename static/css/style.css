@@ -7,13 +7,15 @@
    -------------------------------------------------------- */
 
 .media-library-container {
-    padding: 1.5rem;
+    padding: 0.8rem 1.2rem;
     display: flex;
     flex-direction: row;
-    gap: 2rem;
+    gap: 1.2rem;
     color: #e2e8f0;
     width: 100%;
+    height: 100%;
     box-sizing: border-box;
+    overflow: hidden;
 }
 
 /* 좌측 사이드바 스타일 */
@@ -27,7 +29,7 @@
     gap: 1rem;
     position: sticky;
     top: 20px;
-    height: calc(100vh - 40px);
+    height: 100%;
     overflow-y: auto;
     background: transparent;
     border-radius: 0;
@@ -59,6 +61,22 @@
 }
 .library-sidebar::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.2);
+}
+
+/* 메인 콘텐츠 영역 전용 얇고 미려한 스크롤바 디자인 */
+.library-main-content::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+.library-main-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+.library-main-content::-webkit-scrollbar-thumb {
+    background: rgba(168, 85, 247, 0.25);
+    border-radius: 10px;
+}
+.library-main-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(168, 85, 247, 0.5);
 }
 
 .sidebar-menu .menu-item[draggable="true"] {
@@ -119,7 +137,8 @@
 .library-main-content {
     flex-grow: 1;
     min-width: 0;
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
@@ -1603,3 +1622,12 @@
     border-color: #fca5a5;
     box-shadow: 0 4px 12px rgba(239, 68, 68, 0.5);
 }
+
+/* Drag and Drop Sortable Plugins Style */
+.plugin-card.dragging {
+  opacity: 0.45;
+  border: 1px dashed #a855f7 !important;
+  background: rgba(168, 85, 247, 0.05) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3) !important;
+}
+

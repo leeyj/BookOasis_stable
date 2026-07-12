@@ -13,7 +13,7 @@ import { loadLibraries, triggerAddLibrary, triggerEditLibrary, triggerDeleteLibr
 import { loadLibrarySchedules, saveLibrarySchedule, runLibraryScanNow } from './scheduler.js';
 
 // 신규 리팩토링 분리 서브 모듈 임포트
-import { loadDashboardData, scrollDashboardRow } from './dashboard.js';
+import { loadDashboardData, scrollDashboardRow, loadDashboardPlugins } from './dashboard.js';
 import { initInfiniteScrollObserver } from './infinite_scroll.js';
 import { showBookContextMenu, triggerScanSingleBookAction, triggerSearchAladinMetadataAction, triggerMarkAsUnreadAction } from './book_context_menu.js';
 import { openMetadataSearchModal, closeMetadataSearchModal, performMetadataSearch } from './metadata_search.js';
@@ -230,6 +230,9 @@ export function selectCategory(id, skipHistory = false) {
     } else {
       switchSettingsTab('about');
     }
+  } else if (id === 'plugins') {
+    switchActiveView('plugins');
+    loadDashboardPlugins();
   } else {
     switchActiveView('grid');
     if (id === 'history') {
@@ -349,5 +352,19 @@ window.submitViewerSettings = submitViewerSettings;
 window.initReportsTab = initReportsTab;
 window.loadReportList = loadReportList;
 window.loadReportDetail = loadReportDetail;
+
+export function handleLibrarySearchAction() {
+  const searchInput = document.getElementById('library-search');
+  if (!searchInput) return;
+  const query = searchInput.value.trim();
+  if (query) {
+    searchInput.value = '';
+    filterBooks();
+    searchInput.focus();
+  } else {
+    searchInput.focus();
+  }
+}
+window.handleLibrarySearchAction = handleLibrarySearchAction;
 
 export { loadLibraries };

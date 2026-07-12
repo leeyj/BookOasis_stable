@@ -89,19 +89,33 @@ def run_sync_scanner():
     print("=== File System Sync Scanner Started ===")
     
     if os.path.exists(DB_GENERAL_PATH):
-        conn = database.get_connection('general')
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, name, physical_path FROM libraries")
-        libs = cursor.fetchall()
-        conn.close()
+        conn = None
+        try:
+            conn = database.get_connection('general')
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, name, physical_path FROM libraries")
+            libs = cursor.fetchall()
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
         for lib in libs:
             scan_library(DB_GENERAL_PATH, lib['id'], lib['physical_path'])
             
     if os.path.exists(DB_ADULT_PATH):
-        conn = database.get_connection('adult')
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, name, physical_path FROM libraries")
-        libs = cursor.fetchall()
-        conn.close()
+        conn = None
+        try:
+            conn = database.get_connection('adult')
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, name, physical_path FROM libraries")
+            libs = cursor.fetchall()
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
         for lib in libs:
             scan_library(DB_ADULT_PATH, lib['id'], lib['physical_path'])

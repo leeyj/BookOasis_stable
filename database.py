@@ -40,7 +40,7 @@ class SQLiteConnectionPool:
         self.allocated = 0
         self.lock = threading.Lock()
 
-    def get_connection(self):
+    def get_connection(self, wait_timeout=30.0):
         # 1. 풀에 유휴 커넥션이 있는지 확인
         try:
             conn = self.pool.get_nowait()
@@ -65,11 +65,11 @@ class SQLiteConnectionPool:
 
         # 3. 자리가 생길 때까지 대기
         try:
-            conn = self.pool.get(block=True, timeout=30.0)
+            conn = self.pool.get(block=True, timeout=max(0.01, float(wait_timeout)))
             conn._is_returned = False
             return conn
         except queue.Empty:
-            raise sqlite3.OperationalError("Database connection pool exhausted. Timeout waiting for connection.")
+            raise sqlite3.OperationalError(f"Database connection pool exhausted. Timeout waiting for connection ({wait_timeout}s).")
 
     def release_connection(self, conn):
         with self.lock:
@@ -115,6 +115,22 @@ class SQLiteConnectionPool:
                     break
             self.pool = new_pool
 
+    def get_stats(self):
+        with self.lock:
+            allocated = self.allocated
+            max_size = self.max_size
+            idle = self.pool.qsize()
+
+        in_use = max(0, allocated - idle)
+        util_pct = (in_use / max_size * 100.0) if max_size > 0 else 0.0
+        return {
+            'allocated': allocated,
+            'idle': idle,
+            'in_use': in_use,
+            'max_size': max_size,
+            'utilization_pct': util_pct,
+        }
+
 _pools = {'general': None, 'adult': None}
 _pools_lock = threading.Lock()
 
@@ -138,7 +154,7 @@ def _get_pool_size_raw():
         pass
     return 5
 
-def get_connection(db_type='general'):
+def get_connection(db_type='general', wait_timeout=30.0):
     """SQLite 데이터베이스 연결 반환 (커넥션 풀 적용)"""
     global _pools
     db_path = DB_ADULT_PATH if db_type == 'adult' else DB_GENERAL_PATH
@@ -153,7 +169,26 @@ def get_connection(db_type='general'):
         elif pool.max_size != pool_size:
             pool.resize(pool_size)
             
-    return pool.get_connection()
+    return pool.get_connection(wait_timeout=wait_timeout)
+
+def get_pool_stats(db_type='general'):
+    """현재 커넥션 풀 상태 스냅샷을 반환합니다."""
+    with _pools_lock:
+        pool = _pools.get(db_type)
+
+    if pool is None:
+        return {
+            'initialized': False,
+            'allocated': 0,
+            'idle': 0,
+            'in_use': 0,
+            'max_size': _get_pool_size_raw(),
+            'utilization_pct': 0.0,
+        }
+
+    stats = pool.get_stats()
+    stats['initialized'] = True
+    return stats
 
 def parse_schema_columns(schema_text):
     """schema SQL 정의 문자열로부터 각 테이블과 그 안의 컬럼 정의(컬럼명, 컬럼타입) 매핑 딕셔너리를 파싱하여 추출"""

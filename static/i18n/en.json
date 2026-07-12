@@ -12,6 +12,8 @@
     "confirm": "Confirm",
     "prev": "Previous",
     "next": "Next",
+    "search": "Search",
+    "reset": "Reset",
     "no_history_books": "No recently read books history.",
     "no_library_books": "No registered books in library.",
     "loading_books": "Loading book list..."
@@ -214,6 +216,7 @@
     "home": "Home",
     "recent_books": "Recent Readings",
     "favorite": "Favorites",
+    "plugins": "Plugins",
     "view_all": "All Books",
     "settings": "Settings",
     "logout_title": "Log Out"
@@ -477,6 +480,7 @@
     "home": "Home",
     "history": "Recently Read",
     "favorite": "Favorites",
+    "plugins": "Plugins",
     "all": "All Media",
     "add_title": "Add New Category",
     "edit_title": "Edit Category (ID: {id})",

@@ -175,6 +175,11 @@ export async function loadReadingHistory() {
 export function filterBooks() {
   const query = document.getElementById('library-search').value.toLowerCase().trim();
   state.searchQuery = query;
+
+  const searchBtn = document.getElementById('btn-library-search-action');
+  if (searchBtn) {
+    searchBtn.innerText = query ? i18n.t('common.reset') : i18n.t('common.search');
+  }
   
   if (query && state.currentLibraryId === 'history') {
     state.currentLibraryId = 'all';

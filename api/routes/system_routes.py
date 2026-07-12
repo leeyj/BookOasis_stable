@@ -26,38 +26,42 @@ def index():
 
 @system_bp.route('/api/system/status', methods=['GET'])
 def get_system_status():
-    """현재 백그라운드 스캔 상태, DB 최적화 튜닝 및 중복 경로 카테고리 경고 조회"""
+    """현재 백그라운드 스캔 상태를 메모리 기반으로 조회합니다."""
     db_type = request.args.get('type', 'general')
     try:
-        # 1. DB 튜닝 중 여부 파악
+        # 1. DB 튜닝 중 여부 (메모리 플래그)
         tuning_active = database.is_db_tuning(db_type)
-        
-        # 2. 카테고리 중 'scanning' 상태인 건이 있는지 파악
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, name FROM libraries WHERE scan_status = 'scanning'")
-        scanning_libs = cursor.fetchall()
-        conn.close()
-        
+        from services.scanner_queue import scanner_queue
+        status = scanner_queue.get_queue_status()
+
         running_tasks = []
         is_active = False
-        
-        if scanning_libs:
+
+        running = status.get('running')
+        if running:
             is_active = True
-            for lib in scanning_libs:
-                running_tasks.append(f"[{lib['name']}] 카테고리 도서 자동 스캔 동기화 진행 중...")
+            task_type = running.get('type')
+            kwargs = running.get('kwargs', {})
+            db_t = kwargs.get('db_type', db_type)
+            lib_id = kwargs.get('library_id')
+            if task_type == 'library_scan':
+                running_tasks.append(f"[Library {lib_id} ({db_t})] 카테고리 도서 자동 스캔 동기화 진행 중...")
+            elif task_type == 'cover_scan':
+                running_tasks.append(f"[Library {lib_id} ({db_t})] 표지 전용 스캔 진행 중...")
+            elif task_type == 'lazy_scan':
+                running_tasks.append("[전체 시스템] Lazy Scanner 실행 중...")
+            else:
+                running_tasks.append("백그라운드 작업 진행 중...")
+
+        pending = status.get('pending', [])
+        if pending:
+            is_active = True
+            running_tasks.append(f"스캔 대기열: {len(pending)}건")
         
         if tuning_active:
             is_active = True
             running_tasks.append("데이터베이스 파일 물리 파편화 압축 정리 및 인덱스 정밀 튜닝 실행 중...")
-            
-        # 3. 일반/성인 카테고리 간 중복 경로 경고 추가
-        from services.category_service import CategoryService
-        warnings = CategoryService.check_duplicate_path_warnings()
-        if warnings:
-            is_active = True
-            running_tasks.extend(warnings)
-        
+
         return jsonify({
             'success': True,
             'is_active': is_active,
@@ -74,25 +78,14 @@ def get_system_queue_status():
         from services.scanner_queue import scanner_queue
         status = scanner_queue.get_queue_status()
         
-        # 라이브러리 ID를 이름으로 변환 (보기 좋게 하기 위함)
+        # 메모리 기반 큐 데이터만 사용 (DB 조회 없음)
         def _enhance_task(task):
             if not task:
                 return task
             if task['type'] in ('library_scan', 'cover_scan'):
                 db_type = task['kwargs'].get('db_type', 'general')
                 lib_id = task['kwargs'].get('library_id')
-                task['library_name'] = f"Library {lib_id}"
-                if lib_id:
-                    try:
-                        conn = database.get_connection(db_type)
-                        cursor = conn.cursor()
-                        cursor.execute("SELECT name FROM libraries WHERE id = ?", (lib_id,))
-                        row = cursor.fetchone()
-                        if row:
-                            task['library_name'] = f"{row['name']} ({db_type})"
-                        conn.close()
-                    except Exception:
-                        pass
+                task['library_name'] = f"Library {lib_id} ({db_type})"
             elif task['type'] == 'lazy_scan':
                 task['library_name'] = "전체 시스템 (Lazy Scanner)"
             return task

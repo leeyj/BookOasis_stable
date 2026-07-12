@@ -72,19 +72,28 @@ You need to implement the following two methods:
 - `apply(self, db_type, book_id, item_data)`: Download covers and update the database.
 
 ### 5. Dashboard Widget Contract (대시보드 위젯 계약)
-If you want to expose a plugin widget on the main dashboard, implement the contract below.
+If you want to expose a plugin widget on the plugins desk category screen, implement the contract below.
 
-메인 대시보드에 플러그인 위젯을 표시하려면 아래 계약을 구현하세요.
+플러그인 카테고리 화면에 플러그인 위젯을 표시하려면 아래 계약을 구현하세요.
 
 - Class attribute `dashboard_widget` (dict)
-    - Example keys: `title`, `subtitle`, `provider`, `icon`, `limit`
+    - Keys: `title`, `subtitle`, `provider`, `icon`, `limit`
+    - `all_desk_tab` (bool, Optional):
+        - `True`: Renders the plugin as an exclusive full-screen tab instead of a grid card on the common desk.
+        - `False` (or omitted): Renders the plugin inside the **[Common Desk]** responsive grid. Cards in the common desk support drag-and-drop sorting via `Sortable.js` (layout order preserved in `localStorage`).
+        - `True` 설정 시, 공통 데스크의 그리드 카드로 들어가지 않고 상단에 전용 탭이 동적으로 추가되어 100% 가로폭 단독 화면으로 렌더링됩니다.
+        - `False` (혹은 생략) 시, **[공통 데스크]** 반응형 그리드에 카드로 배치되며 `Sortable.js`를 이용한 마우스 드래그 정렬을 기본 지원합니다. (정렬 순서는 `localStorage`에 자동 영구 저장)
+    - `supported_types` (list, Optional):
+        - Example: `["general", "adult"]`
+        - Specifies which library database types (general/adult) this widget is allowed to render on. If omitted, the widget displays on both libraries by default.
+        - 노출을 허용할 보관함 DB 타입의 리스트입니다. 생략 시 기본적으로 일반 도서와 성인 도서 화면 둘 다 노출됩니다.
 - Method `get_dashboard_data(self, db_type, limit=10)`
     - Must return JSON-like dict in this shape:
         - Success: `{'success': True, 'items': [...]}`
         - Failure: `{'success': False, 'error': '...'}`
 
 Important:
-- The core dashboard no longer knows plugin-specific names or routes.
+- The core no longer knows plugin-specific names or routes.
 - The core only discovers `dashboard_widget` metadata and calls `get_dashboard_data`.
 - Therefore, plugin-specific helper names (e.g. `_fetch_new_releases`) should remain internal/private.
 

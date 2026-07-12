@@ -13,6 +13,7 @@ export function switchActiveView(viewName) {
   const gridView = document.getElementById('books-grid-view');
   const detailView = document.getElementById('book-detail-view');
   const settingsView = document.getElementById('library-settings-view');
+  const pluginsView = document.getElementById('library-plugins-view');
   const btnSort = document.getElementById('btn-lib-sort');
 
   console.log(`[View-Manager] Switching view to: ${viewName} (Current category: ${state.currentLibraryId})`);
@@ -22,6 +23,7 @@ export function switchActiveView(viewName) {
   if (gridView) gridView.style.display = 'none';
   if (detailView) detailView.style.display = 'none';
   if (settingsView) settingsView.style.display = 'none';
+  if (pluginsView) pluginsView.style.display = 'none';
   
   unmountIndexScrollbar();
 
@@ -49,6 +51,11 @@ export function switchActiveView(viewName) {
       
     case 'settings':
       if (settingsView) settingsView.style.display = 'flex';
+      if (btnSort) btnSort.style.display = 'none';
+      break;
+
+    case 'plugins':
+      if (pluginsView) pluginsView.style.display = 'flex';
       if (btnSort) btnSort.style.display = 'none';
       break;
       

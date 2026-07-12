@@ -17,6 +17,7 @@ class StatsDashboardMetadataProvider(BaseMetadataProvider):
         "provider": "BookOasis",
         "icon": "fa-solid fa-chart-column",
         "limit": 3,
+        "all_desk_tab": True,
     }
 
     def search(self, db_type, query):

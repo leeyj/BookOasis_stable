@@ -56,6 +56,21 @@
 /* 펼침 상태 */
 .sidebar-collapsible-content.show {
     display: flex !important; /* HTML 인라인 display: none 오버라이드 */
+    max-height: 75vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* 모바일 사이드바 메뉴 얇은 스크롤바 디자인 */
+.sidebar-collapsible-content::-webkit-scrollbar {
+    width: 4px;
+}
+.sidebar-collapsible-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+.sidebar-collapsible-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
 }
 
 /* 사이드바 메뉴는 세로 나열 유지하여 가독성 개선 */

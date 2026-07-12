@@ -255,6 +255,12 @@ function bindPluginEvents() {
             statusText.innerText = isEnabled ? '활성화됨' : '비활성화됨';
             statusText.style.color = isEnabled ? '#4ade80' : '#94a3b8';
           }
+          
+          // 플러그인 활성 토글에 따른 전역 검색 플러그인 캐시 무효화 처리
+          if (typeof window.invalidateMetadataPluginsCache === 'function') {
+            window.invalidateMetadataPluginsCache();
+          }
+
           if (typeof window.showToast === 'function') {
             window.showToast(res.message, 'success');
           }

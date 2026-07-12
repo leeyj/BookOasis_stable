@@ -49,7 +49,7 @@ plugins/metadata/
 - `name` (str): UI 표시명
 - `is_searchable` (bool): 수동 메타데이터 검색 모달 노출 여부
 - `config_schema` (list): 설정 폼 스키마
-- `dashboard_widget` (dict 또는 None): 대시보드 위젯 메타
+- `dashboard_widget` (dict 또는 None): 대시보드 위젯 메타 (공통 데스크 카드 또는 단독 탭 뷰 구성 정보)
 
 필수 메서드:
 
@@ -100,9 +100,9 @@ config_schema = [
 
 ---
 
-## 5. 대시보드 위젯 계약
+## 5. 대시보드 위젯 및 플러그인 데스크 계약
 
-대시보드 카드 노출을 원하면 `dashboard_widget`를 정의하고 `get_dashboard_data()`를 구현하십시오.
+독립된 **[플러그인]** 카테고리 화면에 카드를 노출하거나 단독 탭으로 렌더링되기를 원하면 `dashboard_widget`를 정의하고 `get_dashboard_data()`를 구현하십시오.
 
 예시:
 
@@ -113,12 +113,18 @@ dashboard_widget = {
     'provider': 'Example',
     'icon': 'fa-solid fa-book-open',
     'limit': 10,
+    'all_desk_tab': True,  # (선택) True 시 공통 데스크 카드가 아닌 단독 전체화면 탭으로 동적 렌더링됨 (기본값: False)
+    'supported_types': ['general'],  # (선택) 노출을 허용할 보관함 DB 타입 지정 (생략 시 일반/성인 둘 다 노출)
 }
 
 def get_dashboard_data(self, db_type, limit=10):
     # 내부 fetch 헬퍼 호출
     return {'success': True, 'items': []}
 ```
+
+### 배치 및 정렬 (Sortable.js)
+- `'all_desk_tab': False` (혹은 지정 안 함) 상태의 플러그인들은 **[공통 데스크]** 탭 내의 반응형 카드 그리드 리스트에 함께 렌더링됩니다.
+- 이 영역의 위젯 카드들은 **마우스 드래그 앤 드롭**을 통해 자유롭게 순서를 바꿀 수 있으며, 브라우저 `localStorage`에 정렬 상태가 보관되어 새로고침 후에도 순서가 유지됩니다.
 
 권장 사항:
 

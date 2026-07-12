@@ -8,14 +8,18 @@ class CategoryRepository:
     @staticmethod
     def get_all_libraries(db_type):
         """정렬된 전체 카테고리(라이브러리) 정보 반환"""
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT id, name, physical_path, cron_schedule, last_scanned_at, scan_status, is_remote, vfs_refresh_before_scan, rclone_rc_url, icon, color "
-            "FROM libraries ORDER BY name ASC"
-        )
-        rows = cursor.fetchall()
-        conn.close()
+        conn = None
+        try:
+            conn = database.get_connection(db_type, wait_timeout=1.0)
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, name, physical_path, cron_schedule, last_scanned_at, scan_status, is_remote, vfs_refresh_before_scan, rclone_rc_url, icon, color "
+                "FROM libraries ORDER BY name ASC"
+            )
+            rows = cursor.fetchall()
+        finally:
+            if conn:
+                conn.close()
         return [dict(row) for row in rows]
 
     @staticmethod
@@ -34,17 +38,21 @@ class CategoryRepository:
     @staticmethod
     def get_libraries_by_user_permissions(db_type, user_id):
         """일반 사용자 권한에 매핑된 카테고리 리스트 반환 (Join 쿼리)"""
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT l.id, l.name, l.physical_path, l.is_remote, l.vfs_refresh_before_scan, l.rclone_rc_url, l.icon, l.color 
-            FROM libraries l
-            JOIN user_category_permissions p ON l.id = p.library_id
-            WHERE p.user_id = ? AND p.has_access = 1
-            ORDER BY l.name ASC
-        """, (user_id,))
-        rows = cursor.fetchall()
-        conn.close()
+        conn = None
+        try:
+            conn = database.get_connection(db_type, wait_timeout=1.0)
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT l.id, l.name, l.physical_path, l.is_remote, l.vfs_refresh_before_scan, l.rclone_rc_url, l.icon, l.color 
+                FROM libraries l
+                JOIN user_category_permissions p ON l.id = p.library_id
+                WHERE p.user_id = ? AND p.has_access = 1
+                ORDER BY l.name ASC
+            """, (user_id,))
+            rows = cursor.fetchall()
+        finally:
+            if conn:
+                conn.close()
         return [dict(row) for row in rows]
 
     @staticmethod

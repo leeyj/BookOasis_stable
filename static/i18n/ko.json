@@ -12,6 +12,8 @@
     "confirm": "확인",
     "prev": "이전",
     "next": "다음",
+    "search": "검색",
+    "reset": "초기화",
     "no_history_books": "최근에 읽은 도서 내역이 없습니다.",
     "no_library_books": "보관함에 등록된 도서가 없습니다.",
     "loading_books": "도서 목록을 불러오는 중..."
@@ -214,6 +216,7 @@
     "home": "Home",
     "recent_books": "최근 읽은 도서",
     "favorite": "즐겨찾기",
+    "plugins": "플러그인",
     "view_all": "전체보기",
     "settings": "환경설정",
     "logout_title": "로그아웃"
@@ -485,6 +488,7 @@
     "home": "Home",
     "history": "최근 읽은 도서",
     "favorite": "즐겨찾기",
+    "plugins": "플러그인",
     "all": "전체보기",
     "add_title": "새 카테고리 추가",
     "edit_title": "카테고리 수정 (ID: {id})",

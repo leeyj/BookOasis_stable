@@ -7,6 +7,11 @@ let currentSeriesName = null;
 let isSeriesMode = false;
 let cachedPlugins = null; // 플러그인 캐시
 
+export function invalidateSearchModalPluginsCache() {
+  cachedPlugins = null;
+}
+window.invalidateSearchModalPluginsCache = invalidateSearchModalPluginsCache;
+
 /**
  * 메타데이터 검색 모달창을 오픈하고 검색 소스 목록을 동적으로 구성합니다.
  */

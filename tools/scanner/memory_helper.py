@@ -9,16 +9,22 @@ if MEDIA_SERVER_DIR not in sys.path:
 import database
 
 def get_setting_float(key, default_value):
+    conn = None
     try:
         conn = database.get_connection('general')
         cursor = conn.cursor()
         cursor.execute("SELECT value FROM settings WHERE key = ?", (key,))
         row = cursor.fetchone()
-        conn.close()
         if row and row['value']:
             return float(row['value'])
     except Exception as e:
         print(f"[Scanner-Memory] Failed to read setting ({key}): {e}")
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
     return default_value
 
 def check_memory_exceeded():

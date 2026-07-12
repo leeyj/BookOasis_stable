@@ -14,6 +14,18 @@ let touchStartY = 0;
 const touchMoveThreshold = 10;
 let contextMenuLoadSeq = 0;
 let menuOpenedByTouchUntil = 0;
+let lastEventX = 0;
+let lastEventY = 0;
+let cachedSearchPlugins = null;
+
+export function invalidateMetadataPluginsCache() {
+  cachedSearchPlugins = null;
+  // metadata_search.js 등 외부 모듈 캐시 무효화가 필요한 경우 트리거
+  if (typeof window.invalidateSearchModalPluginsCache === 'function') {
+    window.invalidateSearchModalPluginsCache();
+  }
+}
+window.invalidateMetadataPluginsCache = invalidateMetadataPluginsCache;
 
 function getPluginAccentColor(pluginId) {
   const text = String(pluginId || 'plugin');
@@ -106,6 +118,33 @@ function renderPluginContextMenuItems(items) {
       }
     });
   });
+
+  // 플러그인 항목 렌더링 후 동적으로 확장된 메뉴 높이를 기반으로 위치 재보정
+  adjustMenuPosition(lastEventX, lastEventY);
+}
+
+function adjustMenuPosition(x, y) {
+  const bookMenu = document.getElementById('book-context-menu');
+  if (!bookMenu || bookMenu.style.display === 'none') return;
+
+  const menuHeight = bookMenu.offsetHeight || 180;
+  const menuWidth = bookMenu.offsetWidth || 160;
+
+  let targetX = x + window.scrollX;
+  let targetY = y + window.scrollY;
+
+  if (y + menuHeight > window.innerHeight) {
+    targetY = (y - menuHeight) + window.scrollY;
+    if (targetY < window.scrollY) targetY = window.scrollY;
+  }
+
+  if (x + menuWidth > window.innerWidth) {
+    targetX = (x - menuWidth) + window.scrollX;
+    if (targetX < window.scrollX) targetX = window.scrollX;
+  }
+
+  bookMenu.style.left = `${targetX}px`;
+  bookMenu.style.top = `${targetY}px`;
 }
 
 async function loadPluginContextMenuItems() {
@@ -183,30 +222,36 @@ export function showBookContextMenu(x, y, bookId, bookTitle, isVolumeDetail = fa
   if (Date.now() < contextMenuSuppressUntil) return;
   menuLastShownAt = Date.now();
   
+  lastEventX = x;
+  lastEventY = y;
   currentTargetBook = { id: bookId, title: bookTitle, isVolumeDetail };
   
+  // 메타정보 검색 메뉴의 플러그인 활성 상태 동적 검사
+  const metaSearchEl = document.getElementById('ctx-search-meta-book');
+  if (metaSearchEl) {
+    if (cachedSearchPlugins === null) {
+      // 1. 아직 로드되지 않은 경우 비동기 로드 시도
+      api.fetchMetadataPlugins().then(data => {
+        if (data.success && Array.isArray(data.plugins)) {
+          cachedSearchPlugins = data.plugins;
+          const hasActive = cachedSearchPlugins.some(p => p.enabled);
+          metaSearchEl.style.display = hasActive ? 'block' : 'none';
+          // 메뉴의 높이가 변경될 수 있으므로 재조정 호출
+          adjustMenuPosition(lastEventX, lastEventY);
+        }
+      }).catch(err => {
+        console.error('[BookContextMenu] Failed to check search plugins:', err);
+      });
+    } else {
+      // 2. 캐시된 목록 기준 판단
+      const hasActive = cachedSearchPlugins.some(p => p.enabled);
+      metaSearchEl.style.display = hasActive ? 'block' : 'none';
+    }
+  }
+
   // 임시 표시하여 실제 메뉴 크기 측정
   bookMenu.style.display = 'block';
-  const menuHeight = bookMenu.offsetHeight || 180;
-  const menuWidth = bookMenu.offsetWidth || 160;
-  
-  // 뷰포트 경계 검사 및 위치 보정
-  let targetX = x + window.scrollX;
-  let targetY = y + window.scrollY;
-  
-  if (y + menuHeight > window.innerHeight) {
-    targetY = (y - menuHeight) + window.scrollY;
-    // 음수가 되지 않도록 최소 한계 보정
-    if (targetY < window.scrollY) targetY = window.scrollY;
-  }
-  
-  if (x + menuWidth > window.innerWidth) {
-    targetX = (x - menuWidth) + window.scrollX;
-    if (targetX < window.scrollX) targetX = window.scrollX;
-  }
-  
-  bookMenu.style.left = `${targetX}px`;
-  bookMenu.style.top = `${targetY}px`;
+  adjustMenuPosition(x, y);
   
   // 다른 메뉴 닫기
   const libMenu = document.getElementById('library-context-menu');

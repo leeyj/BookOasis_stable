@@ -22,6 +22,18 @@ DB_DIR = os.path.join(MEDIA_SERVER_DIR, 'db')
 def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_type, target_paths, is_remote, threads_to_use, library_errors):
     cursor = conn.cursor()
 
+    def log_pool_stats(tag):
+        try:
+            s = database.get_pool_stats(db_type)
+            state = 'ready' if s.get('initialized') else 'cold'
+            print(
+                f"[DB-Pool] ({db_type}) [{tag}] state={state} "
+                f"allocated={s['allocated']} in_use={s['in_use']} idle={s['idle']} "
+                f"max={s['max_size']} util={s['utilization_pct']:.1f}%"
+            )
+        except Exception as e:
+            print(f"[DB-Pool] ({db_type}) [{tag}] stats read failed: {e}")
+
     cursor.execute("""
         SELECT id, file_path, has_offsets,
                cover_image, author, publisher, summary, file_mtime, file_size
@@ -81,6 +93,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
 
     # 2. Run thread pool and streaming process (as_completed)
     print(f"[Scanner] Multithread scan pool created (threads: {threads_to_use})")
+    log_pool_stats('scan-start')
     
     processed_folders_count = 0
     import json
@@ -293,6 +306,9 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     'meta_mtime': meta_mtime
                 })
                 processed_folders_count += 1
+
+                if processed_folders_count % 20 == 0:
+                    log_pool_stats(f'progress-{processed_folders_count}')
                 
                 # Hybrid Flush Trigger
                 if (len(pending_inserts) + len(pending_updates) >= 100) or len(pending_folders) >= 50:
@@ -304,27 +320,37 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                 # Detect manual cancel (abort) request and exit
                 # [버그수정] 장기 conn은 WAL 스냅샷 격리로 인해 다른 세션의 COMMIT을 읽지 못함.
                 # 취소 상태 확인만 독립 커넥션으로 조회하여 항상 최신 상태를 반영한다.
-                status_row = None
-                try:
-                    _cancel_conn = database.get_connection(db_type)
-                    _cancel_cur = _cancel_conn.cursor()
-                    _cancel_cur.execute("SELECT scan_status FROM libraries WHERE id = ?", (library_id,))
-                    status_row = _cancel_cur.fetchone()
-                    _cancel_conn.close()
-                except Exception as _e:
-                    print(f"[Scanner-Cancel] ⚠️ 취소 상태 확인 중 오류 (무시하고 계속 진행): {_e}")
-                if status_row and status_row['scan_status'] == 'cancelling':
-                    print(f"[Scanner-Cancel] 🛑 Safely aborting scan due to user request. (Completed folders: {processed_folders_count} folders)")
-                    flush_pending_data()
-                    cursor.execute("UPDATE libraries SET scan_status = 'ready' WHERE id = ?", (library_id,))
-                    conn.commit()
-                    conn.close()
-                    cleanup_jsonl_file()
-                    return
+                # 대시보드 부하를 줄이기 위해 매 폴더가 아닌 주기적으로만 조회한다.
+                if processed_folders_count % 10 == 0:
+                    status_row = None
+                    _cancel_conn = None
+                    try:
+                        _cancel_conn = database.get_connection(db_type)
+                        _cancel_cur = _cancel_conn.cursor()
+                        _cancel_cur.execute("SELECT scan_status FROM libraries WHERE id = ?", (library_id,))
+                        status_row = _cancel_cur.fetchone()
+                    except Exception as _e:
+                        print(f"[Scanner-Cancel] ⚠️ 취소 상태 확인 중 오류 (무시하고 계속 진행): {_e}")
+                    finally:
+                        if _cancel_conn:
+                            try:
+                                _cancel_conn.close()
+                            except Exception:
+                                pass
+                    if status_row and status_row['scan_status'] == 'cancelling':
+                        print(f"[Scanner-Cancel] 🛑 Safely aborting scan due to user request. (Completed folders: {processed_folders_count} folders)")
+                        log_pool_stats('cancel-abort')
+                        flush_pending_data()
+                        cursor.execute("UPDATE libraries SET scan_status = 'ready' WHERE id = ?", (library_id,))
+                        conn.commit()
+                        conn.close()
+                        cleanup_jsonl_file()
+                        return
 
                 # Self-exit for real-time OOM prevention
                 if check_memory_exceeded():
                     print(f"[Scanner-Memory] 🛑 Emergency pause due to memory limit. (Progress: {processed_folders_count} folders applied)")
+                    log_pool_stats('memory-emergency')
                     flush_pending_data()
                     try:
                         conn.close()
@@ -338,6 +364,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
 
         # Final flush for any remaining data at the end of the loop
         flush_pending_data()
+        log_pool_stats('scan-final-flush')
         cleanup_jsonl_file()
 
 
@@ -350,6 +377,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
     cursor.execute("DELETE FROM scanner_progress WHERE library_id = ?", (str(library_id),))
     conn.commit()
     conn.close()
+    log_pool_stats('scan-end')
     gc.collect()
 
     # Save scan result error reports
