@@ -368,4 +368,5 @@ tags: [workflow, history]
 | 2026-07-13 | `scan_multi_volume_fix` | 만화책 폴더 가상 책 스캔 시 경로 구분자 혼용으로 인한 다중 권수 등록 누락 버그 조치 | [Task](./history/20260713_012352_scan_multi_volume_fix_task.md) | [Walkthrough](./history/20260713_012352_scan_multi_volume_fix_walkthrough.md) |
 | 2026-07-13 | `scan_imgdir_unpack` | 이미지 폴더 가상 책 스캔 시 튜플 언패킹(expected 3, got 2) 오류 조치 | [BugFix](./bug/20260713_bugfix_scan_imgdir_unpack.md) | - |
 | 2026-07-13 | `scan_hierarchy_series` | 계층 분석 기반 표준 이미지 가상 책 시리즈 그룹화 결함 조치 | [BugFix](./bug/20260713_bugfix_scan_hierarchy_series.md) | - |
+| 2026-07-13 | `covers_mime_type_lag` | 표지 이미지 서빙 시 MIME 타입 불일치에 따른 스크롤 렉 조치 | [BugFix](./bug/20260713_bugfix_covers_mime_type_lag.md) | - |
 

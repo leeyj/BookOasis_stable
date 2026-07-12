@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v0.9.6
+### fixed
+- 표지 이미지 서빙 시 MIME 타입 불일치에 따른 스크롤 렉 조치 | Cover image MIME type mismatch scroll lag fix
+
 ## v0.9.5
 ### fixed
 - 로컬 물리 볼륨 내 ZIP 파일 감상 시 불필요한 이중 캐시 복사 및 디스크 I/O 병목 제거 | Remove redundant cache copy and disk I/O bottleneck for local ZIP books

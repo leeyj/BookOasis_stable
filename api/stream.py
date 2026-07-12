@@ -193,9 +193,12 @@ def get_pdf_range():
 def get_cover_image(filename):
     """복원된 정적 표지 이미지 서빙 (더블 인코딩 방어용 unquote 적용, 하위 디렉토리 지원)"""
     import urllib.parse
+    import mimetypes
 
     def _send_cover(path):
-        res = send_file(path, mimetype='image/png', conditional=True, etag=True)
+        mime, _ = mimetypes.guess_type(path)
+        mime = mime or 'image/png'
+        res = send_file(path, mimetype=mime, conditional=True, etag=True)
         # Covers are mostly immutable between scans; cache to reduce dashboard refresh flicker/network.
         res.headers['Cache-Control'] = 'public, max-age=86400'
         return res
