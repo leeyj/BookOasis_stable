@@ -267,3 +267,55 @@
   * 키워드(`q`)가 비어 있을 경우: OpenSearch Description XML 문서
   * 키워드(`q`)가 존재할 경우: 검색 결과 매칭 도서 목록 Atom XML 피드
 
+---
+
+## 📡 6. 외부 연동 및 자동화용 웹훅 API (Webhook)
+
+### `[GET]` 또는 `[POST]` `/api/webhook/scan`
+* **설명**: 외부 마운트 제어(gd-poller 등)나 자동화 갱신 트리거 시, 세션 로그인 없이 헤더나 쿼리 스트링 보안 토큰만으로 라이브러리 스캔 작업을 즉시 대기열에 비동기 등록합니다.
+* **권한**: 비세션 인증 (단, `.env`의 `WEBHOOK_TOKEN`과 매칭 검증 필수)
+* **요청 파라미터**:
+  | 파라미터명 | 타입 | 필수여부 | 설명 |
+  | :--- | :--- | :--- | :--- |
+  | `token` | string | 필수 | `.env`에 정의된 `WEBHOOK_TOKEN` 보안 API 토큰값 |
+  | `library_id` | integer | 필수 | 동기화 스캔을 수행할 대상 라이브러리 카테고리의 고유 ID |
+  | `type` | string | 선택 | 라이브러리 데이터베이스 영역 (`general` 또는 `adult`, 디폴트: `general`) |
+
+* **응답 예시 (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "message": "\"만화_완결A (general)\" 스캔 작업이 대기열에 성공적으로 등록되었습니다."
+  }
+  ```
+* **응답 예시 (401 Unauthorized - 토큰 오류)**:
+  ```json
+  {
+    "success": false,
+    "error": "Invalid webhook token."
+  }
+  ```
+
+#### 💡 외부 폴러(gd-poller 등) 연동 설정 예시 (YAML)
+
+외부 Google Drive 변경 모니터링 도구인 `gd-poller` 등과 연동할 때, 아래의 디스패처 설정을 활용해 북오아시스의 특정 라이브러리를 동적으로 재스캔할 수 있습니다.
+
+**[Option A] WebhookDispatcher 설정**
+```yaml
+- class: WebhookDispatcher
+  url: "http://your-bookoasis-ip:5930/api/webhook/scan"
+  method: "GET"
+  params:
+    token: "oasis_secure_api_token_1234"  # .env의 WEBHOOK_TOKEN 설정값
+    library_id: "25"                       # 대상 라이브러리 카테고리 ID
+    type: "general"                        # general 또는 adult
+  buffer_interval: 60                      # 변경 발생 시 60초 대기 후 누적 1회 트리거
+```
+
+**[Option B] CommandDispatcher (curl 쉘 스크립트 실행) 설정**
+```yaml
+- class: CommandDispatcher
+  command: "curl -s 'http://your-bookoasis-ip:5930/api/webhook/scan?token=oasis_secure_api_token_1234&library_id=25&type=general'"
+  buffer_interval: 60
+```
+

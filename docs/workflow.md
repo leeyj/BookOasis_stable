@@ -12,6 +12,7 @@ tags: [workflow, history]
 
 | 날짜 | 세션 키워드 | 한 줄 요약 | 태스크 문서 | 워크쓰루 문서 |
 | :--- | :--- | :--- | :--- | :--- |
+| 2026-07-13 | `scan_multi_volume_fix` | 만화책 폴더 가상 책 스캔 시 경로 구분자 혼용으로 인한 다중 권수 등록 누락 버그 조치 | [Bugfix](./bug/20260713_bugfix_scan_multi_volume.md) | - |
 | 2026-07-12 | `dashboard_layout_scroll` | 대시보드 미세 스크롤 방지, 컨텍스트 메뉴 잘림 및 검색 플러그인 상태 동적 연동, 독립 플러그인 탭 & 정렬 개편 | [Bugfix & Refactoring](./bug/20260712_bugfix_dashboard_layout_scroll.md) | - |
 | 2026-07-12 | `worker_role_separation_major_roadmap` | 워커 역할 분리(웹/스캐너) 메이저 패치 로드맵, 영향도, 난이도 문서화 | [Roadmap](./roadmap_worker_role_separation_major_patch.md) | - |
 | 2026-07-12 | `worker_role_separation_phase1_detailed_design` | APP_ROLE 기반 역할 게이트 도입을 위한 Phase 1 상세 설계서 작성 | [Design](./roadmap_worker_role_separation_phase1_detailed_design.md) | - |
@@ -363,3 +364,5 @@ tags: [workflow, history]
 | 2026-07-11 | `viewer_txt_export_error` | 텍스트 뷰어 컴포넌트화 후 nextTxtPage/prevTxtPage 및 순환 참조 오류 수정 | [Task](./history/20260711_230344_viewer_txt_export_error_task.md) | [Walkthrough](./history/20260711_230344_viewer_txt_export_error_walkthrough.md) |
 | 2026-07-12 | `viewer_shortcut_log_refactoring` | 뷰어 성능 최적화 및 단축키/로그 환경변수 제어 명세 최신화 | [Task](./history/20260712_195059_viewer_shortcut_log_refactoring_task.md) | [Walkthrough](./history/20260712_195059_viewer_shortcut_log_refactoring_walkthrough.md) |
 | 2026-07-12 | `scanner_title_protection_fix` | 스캐너 도서 제목 오버라이트 방지 및 VFS 캐시 꼬임 복원 검증 완수 | [Task](./history/20260712_202944_scanner_title_protection_fix_task.md) | [Walkthrough](./history/20260712_202944_scanner_title_protection_fix_walkthrough.md) |
+| 2026-07-12 | `webhook_dispatcher_docs` | 외부 gd-poller 연동 가이드 문서 보완 및 웹훅 API 마감 | [Task](./history/20260712_212935_webhook_dispatcher_docs_task.md) | [Walkthrough](./history/20260712_212935_webhook_dispatcher_docs_walkthrough.md) |
+| 2026-07-13 | `scan_multi_volume_fix` | 만화책 폴더 가상 책 스캔 시 경로 구분자 혼용으로 인한 다중 권수 등록 누락 버그 조치 | [Task](./history/20260713_012352_scan_multi_volume_fix_task.md) | [Walkthrough](./history/20260713_012352_scan_multi_volume_fix_walkthrough.md) |

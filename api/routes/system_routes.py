@@ -169,3 +169,34 @@ def get_about_info():
         },
         'github_url': 'https://github.com/leeyj/BookOasis_stable'
     })
+
+@system_bp.route('/api/webhook/scan', methods=['GET', 'POST'])
+def trigger_scan_via_webhook():
+    """외부 CLI 및 마운트 갱신 툴(gd-poller 등) 연동용 토큰 인증 방식 실시간 스캔 트리거 API"""
+    token = request.args.get('token') or request.form.get('token')
+    library_id = request.args.get('library_id') or request.form.get('library_id')
+    db_type = request.args.get('type') or request.form.get('type') or 'general'
+    
+    # 1. 보안 토큰 검증
+    sys_token = os.environ.get('WEBHOOK_TOKEN')
+    if not sys_token or not token or token != sys_token:
+        return jsonify({'success': False, 'error': 'Invalid webhook token.'}), 401
+        
+    if not library_id:
+        return jsonify({'success': False, 'error': 'library_id is required.'}), 400
+        
+    # 2. 백그라운드 스캔 대기열 주입
+    try:
+        from services.scanner_queue import scanner_queue
+        scanner_queue.add_task('library_scan', db_type=db_type, library_id=int(library_id))
+        
+        # 실제 카테고리명 조회
+        lib_name = get_library_name(db_type, int(library_id))
+        disp_name = lib_name if lib_name else f"Library {library_id}"
+        
+        return jsonify({
+            'success': True, 
+            'message': f'"{disp_name} ({db_type})" 스캔 작업이 대기열에 성공적으로 등록되었습니다.'
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500

@@ -17,6 +17,7 @@ IMGDIR_VIRTUAL_FILENAME = '__folder__.imgdir'
 
 def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_folder_mtimes, is_remote=False, library_id=None, db_files_cache=None):
     """Independent I/O scan task per folder (DB independent, pure FS/I/O scaling)"""
+    root = root.replace('\\', '/').strip()
     print(f"[Scanner-DEBUG-Task] 📂 entering process_folder_task - folder: '{root}'")
     
     media_files = [f for f in files if f.lower().endswith(SUPPORTED_FORMATS)]

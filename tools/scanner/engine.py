@@ -72,6 +72,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
             print(f"[Scanner] Warning: Path does not exist, skipping: {t_path}")
             continue
         for root, dirs, files in os.walk(t_path):
+            root = root.replace('\\', '/').strip()
             media_files = [f for f in files if f.lower().endswith(SUPPORTED_FORMATS)]
             image_files = [f for f in files if f.lower().endswith(SUPPORTED_IMAGE_FORMATS)]
             has_imgdir_candidate = bool(image_files) and not media_files
@@ -141,7 +142,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     score, score, meta.get('summary',''), meta.get('release_date',''),
                     meta.get('genre',''), meta.get('tags',''),
                     d.get('file_mtime', 0.0), d.get('file_size', 0),
-                    d['full_path']
+                    d['full_path'].replace('\\', '/')
                 ))
             if update_data:
                 bulk_update_books(cur, update_data)
@@ -155,7 +156,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     title, _ = os.path.splitext(d['filename'])
                 insert_data.append((
                     d['library_id'], title, d['series_name'], meta.get('author',''),
-                    d['full_path'], d['file_format'], 100 if d['file_format'] == 'epub' else 0,
+                    d['full_path'].replace('\\', '/'), d['file_format'], 100 if d['file_format'] == 'epub' else 0,
                     d['cover_image'], meta.get('publisher',''), meta.get('link',''),
                     meta.get('score',0), meta.get('summary',''), meta.get('release_date',''),
                     meta.get('genre',''), meta.get('tags',''),
