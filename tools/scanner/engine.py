@@ -86,7 +86,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
             if root in scanned_folders:
                 continue
                 
-            tasks.append((root, files))
+            tasks.append((root, files, t_path))
 
     # ── [Book movement detection and history preservation layer - pre-process before thread execution] ──
     deleted_paths = detect_and_handle_book_movement(cursor, db_books, found_file_paths, db_meta_full, db_offsets_cached)
@@ -246,8 +246,8 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
 
     with ThreadPoolExecutor(max_workers=threads_to_use) as executor:
         futures = {
-            executor.submit(process_folder_task, root, files, force, db_meta_full, db_offsets_cached, db_folder_mtimes, is_remote, library_id, db_files_cache): root
-            for root, files in tasks
+            executor.submit(process_folder_task, root, files, force, db_meta_full, db_offsets_cached, db_folder_mtimes, is_remote, library_id, db_files_cache, t_path): root
+            for root, files, t_path in tasks
         }
         
         for fut in as_completed(futures):
