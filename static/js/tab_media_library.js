@@ -36,17 +36,83 @@ function focusLibrarySearchInput() {
   searchInput.select();
 }
 
+let searchShortcutConfig = { ctrlKey: false, altKey: true, shiftKey: false, metaKey: false, key: '`', code: 'Backquote', display: 'Alt + `' };
+
+export function applySearchShortcutSetting() {
+  const savedRaw = localStorage.getItem('settings_search_shortcut');
+  if (savedRaw) {
+    try {
+      searchShortcutConfig = JSON.parse(savedRaw);
+    } catch (e) {
+      console.error('[Shortcut] 단축키 파싱 실패:', e);
+    }
+  } else {
+    searchShortcutConfig = { ctrlKey: false, altKey: true, shiftKey: false, metaKey: false, key: '`', code: 'Backquote', display: 'Alt + `' };
+  }
+
+  // 🌟 검색창 인풋의 placeholder 및 title 동적 갱신 연동
+  const searchInput = document.getElementById('library-search');
+  if (searchInput) {
+    const displayShortcut = searchShortcutConfig ? searchShortcutConfig.display : 'Alt + `';
+    
+    // i18n 다국어 포맷 라이브러리와 연동
+    if (window.i18n && typeof window.i18n.t === 'function') {
+      const translatedPlaceholder = window.i18n.t('header.search_placeholder', { shortcut: displayShortcut });
+      searchInput.setAttribute('placeholder', translatedPlaceholder);
+      
+      const titleLabel = window.i18n.t('settings.search_shortcut_label') || '검색 단축키 설정';
+      searchInput.setAttribute('title', `${titleLabel}: ${displayShortcut}`);
+    } else {
+      // i18n 번역 리소스 파싱 전 폴백
+      searchInput.setAttribute('placeholder', `제목,시리즈,작가 검색...... (단축키: ${displayShortcut})`);
+      searchInput.setAttribute('title', `검색 단축키: ${displayShortcut}`);
+    }
+  }
+}
+window.applySearchShortcutSetting = applySearchShortcutSetting;
+
 function initLibrarySearchShortcut() {
   if (window.__librarySearchShortcutBound) return;
 
+  applySearchShortcutSetting();
+
+  // 🌟 다국어 팩 전환 시 동적 placeholder 재바인딩
+  window.addEventListener('bookoasis_language_changed', () => {
+    applySearchShortcutSetting();
+  });
+
   document.addEventListener('keydown', (e) => {
+    // 사용자가 현재 설정(일반설정 탭 단축키 입력 등)을 기록 중일 때는 단축키 오발동 차단
+    if (document.getElementById('btn-record-shortcut')?.innerText === '입력 대기...') return;
+
+    // 🌟 스코프 유실 방지를 위해 keydown 감지 시점에 LocalStorage 데이터 실시간 로드
+    const savedRaw = localStorage.getItem('settings_search_shortcut');
+    let currentShortcut = null;
+    try {
+      currentShortcut = savedRaw ? JSON.parse(savedRaw) : null;
+    } catch (err) {
+      currentShortcut = null;
+    }
+
+    if (!currentShortcut) {
+      currentShortcut = { ctrlKey: false, altKey: true, shiftKey: false, metaKey: false, key: '`', code: 'Backquote' };
+    }
+
+    // 단축키 매칭 체크
+    const isCtrlMatch = e.ctrlKey === currentShortcut.ctrlKey;
+    const isAltMatch = e.altKey === currentShortcut.altKey;
+    const isShiftMatch = e.shiftKey === currentShortcut.shiftKey;
+    const isMetaMatch = e.metaKey === currentShortcut.metaKey;
+
     const key = String(e.key || '').toLowerCase();
-    const isBackquote = key === '`' || e.code === 'Backquote';
+    const targetKey = String(currentShortcut.key || '').toLowerCase();
 
-    if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || !isBackquote) return;
+    const isKeyMatch = (key === targetKey || e.code === currentShortcut.code);
 
-    e.preventDefault();
-    focusLibrarySearchInput();
+    if (isCtrlMatch && isAltMatch && isShiftMatch && isMetaMatch && isKeyMatch) {
+      e.preventDefault();
+      focusLibrarySearchInput();
+    }
   });
 
   window.__librarySearchShortcutBound = true;

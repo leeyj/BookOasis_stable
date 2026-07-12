@@ -10,6 +10,22 @@ import database
 
 system_bp = Blueprint('system', __name__)
 
+def get_library_name(db_type, lib_id):
+    """라이브러리 ID에 대치되는 실제 카테고리(라이브러리) 명칭을 DB에서 조회합니다."""
+    if not lib_id:
+        return None
+    try:
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM libraries WHERE id = ?", (lib_id,))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return row['name']
+    except Exception:
+        pass
+    return None
+
 @system_bp.route('/health', methods=['GET'])
 def health():
     return jsonify({
@@ -22,7 +38,8 @@ def health():
 @login_required
 def index():
     settings = {}
-    return render_template('index.html', active_page='media_library', settings=settings)
+    view_log_enabled = os.environ.get('VIEW_LOG', 'false').lower() == 'true'
+    return render_template('index.html', active_page='media_library', settings=settings, view_log_enabled=view_log_enabled)
 
 @system_bp.route('/api/system/status', methods=['GET'])
 def get_system_status():
@@ -44,10 +61,15 @@ def get_system_status():
             kwargs = running.get('kwargs', {})
             db_t = kwargs.get('db_type', db_type)
             lib_id = kwargs.get('library_id')
+            
+            # 라이브러리 ID를 실제 명칭으로 치환
+            lib_name = get_library_name(db_t, lib_id)
+            target_disp = lib_name if lib_name else f"Library {lib_id}"
+            
             if task_type == 'library_scan':
-                running_tasks.append(f"[Library {lib_id} ({db_t})] 카테고리 도서 자동 스캔 동기화 진행 중...")
+                running_tasks.append(f"[{target_disp} ({db_t})] 카테고리 도서 자동 스캔 동기화 진행 중...")
             elif task_type == 'cover_scan':
-                running_tasks.append(f"[Library {lib_id} ({db_t})] 표지 전용 스캔 진행 중...")
+                running_tasks.append(f"[{target_disp} ({db_t})] 표지 전용 스캔 진행 중...")
             elif task_type == 'lazy_scan':
                 running_tasks.append("[전체 시스템] Lazy Scanner 실행 중...")
             else:
@@ -78,14 +100,15 @@ def get_system_queue_status():
         from services.scanner_queue import scanner_queue
         status = scanner_queue.get_queue_status()
         
-        # 메모리 기반 큐 데이터만 사용 (DB 조회 없음)
+        # 라이브러리 명칭 DB 룩업 보완
         def _enhance_task(task):
             if not task:
                 return task
             if task['type'] in ('library_scan', 'cover_scan'):
                 db_type = task['kwargs'].get('db_type', 'general')
                 lib_id = task['kwargs'].get('library_id')
-                task['library_name'] = f"Library {lib_id} ({db_type})"
+                lib_name = get_library_name(db_type, lib_id)
+                task['library_name'] = f"{lib_name} ({db_type})" if lib_name else f"Library {lib_id} ({db_type})"
             elif task['type'] == 'lazy_scan':
                 task['library_name'] = "전체 시스템 (Lazy Scanner)"
             return task

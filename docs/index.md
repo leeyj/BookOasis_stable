@@ -27,4 +27,4 @@ This is the central technical documentation and task history archive portal for 
   - [플러그인 작성 체크리스트 (plugin_checklist.md)](./plugin_checklist.md) / [English (plugin_checklist_en.md)](./plugin_checklist_en.md): 새 플러그인 작성 시 필수 확인 항목 / Quick validation list for new plugin authors.
 
 ---
-*최종 업데이트 (Last Updated): 2026-07-05*
+*최종 업데이트 (Last Updated): 2026-07-12*

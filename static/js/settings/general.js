@@ -2,6 +2,9 @@
 import { state } from '../state.js';
 import * as api from '../api.js';
 
+let tempShortcut = null;
+let isRecordingShortcut = false;
+
 // 설정값을 CSS 변수 및 메모리 상태에 적용하는 헬퍼 함수
 export function applySettingsToUI(settings) {
   if (settings.BOOK_THUMBNAIL_WIDTH) {
@@ -123,12 +126,99 @@ export async function loadGeneralSettings() {
         ttsWakeLockEl.checked = (s.TTS_WAKE_LOCK === '1');
       }
       
+      // 🌟 도서관 검색 단축키 설정 로드
+      const shortcutDisplay = document.getElementById('setting-search-shortcut-display');
+      if (shortcutDisplay) {
+        const savedRaw = localStorage.getItem('settings_search_shortcut');
+        let saved = null;
+        try {
+          saved = savedRaw ? JSON.parse(savedRaw) : null;
+        } catch (e) {
+          saved = null;
+        }
+        if (!saved) {
+          saved = { ctrlKey: false, altKey: true, shiftKey: false, metaKey: false, key: '`', code: 'Backquote', display: 'Alt + `' };
+        }
+        tempShortcut = saved;
+        shortcutDisplay.value = saved.display;
+      }
+
+      initShortcutRecorderEvents();
+      
       // UI 즉시 갱신
       applySettingsToUI(s);
     }
   } catch (err) {
     console.error('설정 로드 에러:', err);
   }
+}
+
+// 🌟 단축키 레코더 이벤트 리스너 바인딩 헬퍼
+function initShortcutRecorderEvents() {
+  const btnRecord = document.getElementById('btn-record-shortcut');
+  const btnReset = document.getElementById('btn-reset-shortcut');
+  const displayEl = document.getElementById('setting-search-shortcut-display');
+  if (!btnRecord || !btnReset || !displayEl) return;
+
+  if (btnRecord.__bound) return;
+  btnRecord.__bound = true;
+
+  btnRecord.addEventListener('click', () => {
+    if (isRecordingShortcut) return;
+    isRecordingShortcut = true;
+    btnRecord.innerText = '입력 대기...';
+    displayEl.value = '원하는 단축키 조합을 누르세요...';
+
+    const onKeyDown = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const isModifierOnly = ['control', 'alt', 'shift', 'meta'].includes(e.key.toLowerCase());
+
+      const parts = [];
+      if (e.ctrlKey) parts.push('Ctrl');
+      if (e.altKey) parts.push('Alt');
+      if (e.shiftKey) parts.push('Shift');
+      if (e.metaKey) parts.push('Win');
+
+      if (isModifierOnly) {
+        displayEl.value = parts.join(' + ') + ' + ...';
+      } else {
+        let keyDisplay = e.key;
+        if (e.code === 'Space') keyDisplay = 'Space';
+        else if (e.code === 'Backquote') keyDisplay = '`';
+        else if (keyDisplay.length === 1) keyDisplay = keyDisplay.toUpperCase();
+
+        parts.push(keyDisplay);
+        const finalDisplay = parts.join(' + ');
+
+        tempShortcut = {
+          ctrlKey: e.ctrlKey,
+          altKey: e.altKey,
+          shiftKey: e.shiftKey,
+          metaKey: e.metaKey,
+          key: e.key,
+          code: e.code,
+          display: finalDisplay
+        };
+
+        displayEl.value = finalDisplay;
+
+        // 대기 종료
+        isRecordingShortcut = false;
+        btnRecord.innerText = '기록 시작';
+        window.removeEventListener('keydown', onKeyDown, true);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown, true);
+  });
+
+  btnReset.addEventListener('click', () => {
+    if (isRecordingShortcut) return;
+    tempShortcut = { ctrlKey: false, altKey: true, shiftKey: false, metaKey: false, key: '`', code: 'Backquote', display: 'Alt + `' };
+    displayEl.value = tempShortcut.display;
+  });
 }
 
 // 일반 환경설정 저장
@@ -157,6 +247,17 @@ export async function submitGeneralSettings(event) {
   const ttsWakeLock = document.getElementById('setting-tts-wake-lock')?.checked ? '1' : '0';
   
   try {
+    // 🌟 단축키 설정 영구 저장 및 활성화
+    if (tempShortcut) {
+      localStorage.setItem('settings_search_shortcut', JSON.stringify(tempShortcut));
+      if (typeof window.applySearchShortcutSetting === 'function') {
+        window.applySearchShortcutSetting();
+      }
+    }
+    
+    // LocalStorage 만화 지연 시간
+    localStorage.setItem('comic_loading_delay', comicDelay);
+
     // 모든 설정을 병렬 업데이트
     const promises = [
       api.updateSystemSetting('BOOK_THUMBNAIL_WIDTH', thumbWidth),

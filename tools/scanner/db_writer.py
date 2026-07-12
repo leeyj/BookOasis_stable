@@ -5,7 +5,7 @@ def update_book_metadata(cursor, full_path, cover_image, merged_meta, series_nam
     """Execute merge update for existing book info and local metadata"""
     cursor.execute("""
         UPDATE books SET 
-            series_name  = COALESCE(NULLIF(?, ''), series_name),
+            series_name  = CASE WHEN 1=0 THEN ? ELSE series_name END,
             cover_image  = COALESCE(NULLIF(?, ''), cover_image),
             cover_updated_at = CASE WHEN ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
             author       = COALESCE(NULLIF(?, ''), author),
@@ -93,7 +93,7 @@ def bulk_update_books(cursor, update_data_list):
     if not update_data_list: return
     cursor.executemany("""
         UPDATE books SET 
-            series_name  = COALESCE(NULLIF(?, ''), series_name),
+            series_name  = CASE WHEN 1=0 THEN ? ELSE series_name END,
             cover_image  = COALESCE(NULLIF(?, ''), cover_image),
             cover_updated_at = CASE WHEN ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
             author       = COALESCE(NULLIF(?, ''), author),

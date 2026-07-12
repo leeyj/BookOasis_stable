@@ -77,9 +77,24 @@ Ensures robust rendering performance across multiple mobile form-factors and mai
 
 ### 🛠️ Implementation Mechanism
 * **Notch & Safe Area Padding Support**:
-   - Leverages CSS `env(safe-area-inset-top)` in overlays and viewports to prevent content clipping on notch-style displays (e.g., Mobile Safari, Samsung Internet).
+   - Leverages CSS `env(safe-area-inset-top)` and `env(safe-area-inset-bottom)` inside modals and viewports to prevent content clipping on notch-style displays. Explicitly overrides WebKit absolute rendering issues using `height: 100% !important;` to ensure layout integrity on iOS Safari/Chrome.
 * **Safe Multilingual (i18n) innerHTML Rendering**:
    - Detects markup tags (e.g., `<strong>`) inside translated resources and securely renders them without exposing raw string codes.
 * **4-Tier Clean Architecture Separation**:
    - Decoupled SQL queries from routes/services into designated repositories: `UserRepository`, `CategoryRepository`, and `SettingsRepository`. This allows for seamless transitions to other database systems (e.g., PostgreSQL or MariaDB).
    - System maintenance routines (SQLite `REINDEX`, `VACUUM`, and database statistics updates) are isolated into a dedicated service layer (`db_tuning_service.py`).
+
+---
+
+## 6. [NEW] User Custom Shortcuts & Global Console Log Suppression
+
+### 💡 Overview
+Provides dynamic shortcut recording to avoid system-level key collisions (especially in Linux desktop environments) and optimizes production performance by silencing chatty browser debug logs.
+
+### 🛠️ Implementation Mechanism
+* **Browser-level keydown Shortcut Recorder**:
+   - Integrates a key capturing panel inside the settings page (`general_tab.html`). Users can record their modifier keys (Ctrl/Alt/Shift) along with character keys, storing the serialized JSON string directly in LocalStorage.
+* **Instant keydown Hooking**:
+   - To bypass module closure constraints and delay, the global event listener dynamically parses LocalStorage on keydown events to compare keycodes in real-time, providing instant shortcut updates without requiring a page refresh.
+* **VIEW_LOG Env-based Global Monkey Patch**:
+   - Flask reads `VIEW_LOG` from `.env` and passes it to the frontend via index.html templates. If not set to `true`, a global monkey patch replaces `console.log` and `console.warn` with empty functions, reducing rendering overhead. `console.error` remains intact for diagnostic tracking.

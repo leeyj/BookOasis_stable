@@ -209,7 +209,11 @@
     "padding_left_desc": "뷰어 좌측 측면의 내부 여백 크기입니다.",
     "padding_right_label": "우측 여백 (Padding Right)",
     "padding_right_desc": "뷰어 우측 측면의 내부 여백 크기입니다.",
-    "viewer_settings_saved": "뷰어 여백 설정이 저장되었습니다!"
+    "viewer_settings_saved": "뷰어 여백 설정이 저장되었습니다!",
+    "search_shortcut_label": "도서관 검색 단축키 설정",
+    "btn_record": "기록 시작",
+    "btn_reset": "초기화",
+    "search_shortcut_desc": "보관함 및 대시보드 화면에서 도서 검색창을 즉시 활성화할 전역 단축키입니다. '기록 시작'을 누르고 원하는 단축키 조합을 입력한 후 '설정 저장'을 클릭하세요."
   },
   "sidebar": {
     "library": "라이브러리",
@@ -227,7 +231,7 @@
     "filter_title": "장르/태그 필터 열기",
     "sort_title": "정렬 조건 변경",
     "sort_asc": "가나다 오름차순",
-    "search_placeholder": "제목,시리즈,작가 검색...... 검색 단축키는 Alt+`(퀘이크스타일)",
+    "search_placeholder": "제목,시리즈,작가 검색...... (단축키: {shortcut})",
     "general_books": "일반 도서",
     "adult_books": "성인 도서"
   },

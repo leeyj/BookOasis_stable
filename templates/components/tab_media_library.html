@@ -81,7 +81,7 @@
             </div>
 
             <div class="library-search-center" style="display: flex; gap: 0.5rem; align-items: center;">
-                <input type="text" id="library-search" class="form-control input-sm" data-i18n-placeholder="header.search_placeholder" placeholder="제목, 시리즈, 작가 검색..." title="검색 단축키: Alt+`"
+                <input type="text" id="library-search" class="form-control input-sm" placeholder="제목, 시리즈, 작가 검색..."
                     oninput="filterBooks()">
                 <button id="btn-library-search-action" class="btn-toggle" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; flex-shrink: 0;" onclick="handleLibrarySearchAction()" data-i18n="common.search">검색</button>
             </div>
@@ -200,4 +200,4 @@
         </div>
     </div>
 
-    <script type="module" src="{{ url_for('static', filename='js/tab_media_library.js') }}?v=1.3.1"></script>
+    <script type="module" src="{{ url_for('static', filename='js/tab_media_library.js') }}?v=1.3.5"></script>

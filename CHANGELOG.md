@@ -1,12 +1,21 @@
 # CHANGELOG
 
+## v0.9.5
+### fixed
+- 로컬 물리 볼륨 내 ZIP 파일 감상 시 불필요한 이중 캐시 복사 및 디스크 I/O 병목 제거 | Remove redundant cache copy and disk I/O bottleneck for local ZIP books
+- 프론트엔드 Blob URL 인메모리 캐싱 및 순차 프리로드 큐 스케줄러 적용 (HTTP 커넥션 락 완벽 해소) | Implement Blob URL memory cache & sequential preload queue in comic reader
+- iOS-사파리에서 미묘하게 이미지가 잘려보이는 현상 해소 | iOS-Safari subtle image clipping issue fix
+- 사용자가 수정한 제목등 메타데이터는 변경하지 않게 수정 | Do not modify metadata such as title modified by user
+### added
+- 단축키 설정 기능 추가(환경설정->일반설정) | add keyboard shortcut setting function(environment setting->general setting)
+
 ## v0.9.4
 ### fixed
 - 코믹 뷰에서 더블버퍼링 기법 도입(페이지 모드) | Introduce double buffering technique in comic viewer (page mode)
 - 만화 뷰어 다음 페이지 사전 로드 가비지 컬렉션(GC) 누수 방지 및 캐싱 안정성 고도화 | Prevent garbage collection leakage during page preloading and improve cache stability in comic reader
 - 스캐너 구동 전 HDD/NAS 스핀업 및 절전 대기(Wake-up Knock) 재시도 메커니즘 도입 (최대 4회, 3초 지연) | Introduce HDD/NAS spin-up & wake-up knock retry mechanism in library scanner
-- 대시보드 스크롤시 버벅임 감소 | dashboard scroll stuttering reduction
-- 대시보드 레이아웃 최적화 | dashboard layout optimization
+- 대시보드 스크롤시 버벅임 감소 및 레이아웃 렌더링 최적화 | dashboard scroll stuttering reduction and layout rendering optimization
+
 
 ## v0.9.3
 ### fixed

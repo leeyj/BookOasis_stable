@@ -20,6 +20,19 @@ let _workerRequestId = 1;
 const _workerPending = new Map();
 let _workerCleanupAdded = false;
 const activePreloadSet = new Set();
+const blobCacheMap = new Map();
+let currentPreloadQueue = [];
+let isPreloading = false;
+
+function clearBlobCache() {
+  blobCacheMap.forEach((objectUrl) => {
+    try {
+      URL.revokeObjectURL(objectUrl);
+    } catch (e) {}
+  });
+  blobCacheMap.clear();
+  currentPreloadQueue = [];
+}
 
 function ensureImageWorker() {
   if (imageWorker) return;
@@ -552,8 +565,26 @@ export function loadComicPage() {
         showViewerError('Error', 'Failed to load image');
       };
 
-      const url = FileLoader.getPageStreamUrl(pageIndex);
-      imgEl.src = url;
+      // 🌟 Blob 캐시 맵에서 Object URL을 즉시 히트하여 브라우저 대기 및 지연 제거
+      if (blobCacheMap.has(pageIndex)) {
+        imgEl.src = blobCacheMap.get(pageIndex);
+      } else {
+        const url = FileLoader.getPageStreamUrl(pageIndex);
+        fetch(url)
+          .then((res) => {
+            if (!res.ok) throw new Error('Fetch fail');
+            return res.blob();
+          })
+          .then((blob) => {
+            const objUrl = URL.createObjectURL(blob);
+            blobCacheMap.set(pageIndex, objUrl);
+            imgEl.src = objUrl;
+          })
+          .catch((err) => {
+            // fetch 에러 시 원본 뷰어 스트림 경로로 폴백 복구
+            imgEl.src = url;
+          });
+      }
     });
 
     updatePageInfo();
@@ -591,24 +622,56 @@ export function hideSeekbarTooltip() {
   if (tooltip) tooltip.classList.remove('visible');
 }
 
+async function startSequentialPreload(pageList) {
+  currentPreloadQueue = pageList;
+  if (isPreloading) return;
+
+  isPreloading = true;
+  while (currentPreloadQueue.length > 0) {
+    const nextIdx = currentPreloadQueue.shift();
+
+    // 범위 검사 및 이미 캐싱된 것은 패스
+    if (nextIdx >= comicTotalPages || nextIdx < 0 || blobCacheMap.has(nextIdx)) {
+      continue;
+    }
+
+    try {
+      const url = FileLoader.getPageStreamUrl(nextIdx);
+      const response = await fetch(url);
+      if (response.ok) {
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        blobCacheMap.set(nextIdx, objectUrl);
+      }
+    } catch (e) {
+      console.error(`[Preload-Blob Fail] Page ${nextIdx}:`, e);
+    }
+  }
+  isPreloading = false;
+}
+
 function preloadNextPages() {
+  // 이전 펜딩된 프리로드 이미지들의 다운로드를 강제 차단하여 브라우저 HTTP 커넥션 큐를 확보
+  activePreloadSet.forEach(img => {
+    img.onload = null;
+    img.onerror = null;
+    img.src = ""; 
+  });
+  activePreloadSet.clear();
+
   const preloadCount = 10;
   const basePage = getComicDisplayPageIndex(comicCurrentPage);
+  
+  const pagesToLoad = [];
   for (let i = 1; i <= preloadCount; i++) {
     const nextIdx = basePage + i;
     if (nextIdx < comicTotalPages) {
-      const url = FileLoader.getPageStreamUrl(nextIdx);
-      const preloadImg = new Image();
-      activePreloadSet.add(preloadImg);
-      preloadImg.onload = () => {
-        activePreloadSet.delete(preloadImg);
-      };
-      preloadImg.onerror = () => {
-        activePreloadSet.delete(preloadImg);
-      };
-      preloadImg.src = url;
+      pagesToLoad.push(nextIdx);
     }
   }
+
+  // 🌟 순차적 큐 기반 백그라운드 프리로드 시작
+  startSequentialPreload(pagesToLoad);
 }
 
 export function clearComicViewer() {
@@ -640,4 +703,5 @@ export function clearComicViewer() {
     comicLoadingTimer = null;
   }
   activePreloadSet.clear();
+  clearBlobCache();
 }

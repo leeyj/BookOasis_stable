@@ -79,7 +79,30 @@ def start_background_copy(original_path):
 def get_zip_file_hybrid(file_path):
     """
     하이브리드 ZIP 캐시 획득 헬퍼
+    (로컬 경로는 복사 없이 직결 서빙하여 디스크 I/O 병목을 차단하고, 원격 경로만 로컬 디스크 캐시 복사 기동)
     """
+    from utils.drive_helper import is_remote_path
+    
+    # 1. 로컬 물리 경로인 경우: 디스크 캐시 복사 단계 자체를 바이패스 (I/O 병목 방지)
+    if not is_remote_path(file_path):
+        zf = zip_cache.get(file_path)
+        if zf is not None:
+            return zf
+        if not os.path.exists(file_path):
+            return None
+        with get_file_load_lock(file_path):
+            zf = zip_cache.get(file_path)
+            if zf is not None:
+                return zf
+            try:
+                ram_zf = zipfile.ZipFile(file_path, 'r')
+                zip_cache.put(file_path, ram_zf)
+                return ram_zf
+            except Exception as e:
+                print(f"[DiskCacheHelper] Failed to open local ZIP file: {e}")
+                return None
+
+    # 2. 원격 경로(Google Drive 등)인 경우: 기존 하이브리드 캐시/백그라운드 복사 가동
     local_path = disk_cache_manager.get_local_path(file_path)
     done_file = local_path + '.done'
     

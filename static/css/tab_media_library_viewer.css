@@ -28,9 +28,10 @@
     /* 화면 전체를 완전히 차지하도록 fixed 고정 */
     position: fixed;
     top: 0;
+    bottom: 0;
     left: 0;
-    width: 100vw;
-    height: 100vh;
+    right: 0;
+    width: 100%;
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -73,8 +74,7 @@
 
 .viewer-modal .viewer-body {
     flex: 1 1 0;
-    /* header를 완전히 없앰에 따라 100% 뷰포트 높이 사용 */
-    height: 100vh;
+    min-height: 0; /* 부모 flex-direction: column 범위 밖 탈출 방지 */
     overflow: hidden;
     position: relative;
     background: #090d16;
@@ -98,12 +98,15 @@
 
 /* 만화 뷰어 이미지 조절 */
 .viewer-modal .comic-image-wrapper {
-    flex: 1 1 0;
-    position: relative; /* For absolute child */
+    position: absolute;
+    top: 0;
+    bottom: env(safe-area-inset-bottom);
+    left: 0;
+    right: 0;
     display: block;
     overflow: hidden; /* 기본: 스크롤바 숨김 */
     width: 100%;
-    height: 100%;
+    height: 100% !important;
     padding: 0;
     background: #000;
 }
@@ -123,6 +126,15 @@
     display: block;
 }
 
+.comic-page-img {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto !important;
+    height: auto !important;
+    object-fit: contain !important;
+    display: block;
+}
+
 .comic-page-pair {
     display: flex;
     justify-content: center;
@@ -133,15 +145,33 @@
     gap: 0.25rem;
 }
 
-.comic-page-pair img {
+/* 🌟 1장 보기 모드일 때 (화면을 최대한 가득 채움) */
+.comic-page-pair.single-page img,
+.comic-page-pair.single-page .comic-page-img {
     position: relative;
     top: auto;
     left: auto;
     transform: none;
-    max-width: 50%;
-    max-height: 100%;
-    width: auto;
-    height: auto;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    width: auto !important;
+    height: auto !important;
+    object-fit: contain !important;
+    margin: 0;
+}
+
+/* 🌟 2장 보기 모드일 때 (좌우 50%씩 분할 배치) */
+.comic-page-pair:not(.single-page) img,
+.comic-page-pair:not(.single-page) .comic-page-img {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
+    max-width: 50% !important;
+    max-height: 100% !important;
+    width: auto !important;
+    height: auto !important;
+    object-fit: contain !important;
     margin: 0;
 }
 

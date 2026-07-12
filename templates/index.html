@@ -23,6 +23,13 @@
             username: "{{ session.get('username', '') }}",
             role: "{{ session.get('role', '') }}"
         };
+        
+        // 🌟 VIEW_LOG 환경변수에 따른 전역 콘솔 로그 제어 (Monkey Patch)
+        window.VIEW_LOG = "{{ 'true' if view_log_enabled else 'false' }}" === "true";
+        if (window.VIEW_LOG !== true) {
+            console.log = function() {};
+            console.warn = function() {};
+        }
     </script>
     <!-- 프리미엄 커스텀 CSS -->
     <!-- 미디어 라이브러리 전용 CSS (tab_media_library.html에서 로드됨) -->

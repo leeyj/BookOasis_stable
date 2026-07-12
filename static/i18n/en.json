@@ -209,7 +209,11 @@
     "padding_left_desc": "Inner padding size at the left side of the viewer.",
     "padding_right_label": "Padding Right",
     "padding_right_desc": "Inner padding size at the right side of the viewer.",
-    "viewer_settings_saved": "Viewer padding settings saved successfully!"
+    "viewer_settings_saved": "Viewer padding settings saved successfully!",
+    "search_shortcut_label": "Library Search Shortcut Settings",
+    "btn_record": "Record",
+    "btn_reset": "Reset",
+    "search_shortcut_desc": "Global shortcut to focus the book search bar. Click 'Record', press desired key combination and click 'Save Settings'."
   },
   "sidebar": {
     "library": "Library",
@@ -227,7 +231,7 @@
     "filter_title": "Open Genre/Tag Filter",
     "sort_title": "Change Sort Criteria",
     "sort_asc": "Alphabetical Ascending",
-    "search_placeholder": "Search title, series, author...... Shortcut: Alt+` (Quake style)",
+    "search_placeholder": "Search title, series, author...... (Shortcut: {shortcut})",
     "general_books": "General Books",
     "adult_books": "Adult Books"
   },
