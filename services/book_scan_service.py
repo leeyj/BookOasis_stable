@@ -28,7 +28,7 @@ class BookScanService:
             if not book:
                 print(f"[BookScanService ERROR] DB에서 book_id={book_id}를 찾을 수 없습니다.")
                 conn.close()
-                return False, "존재하지 않는 도서입니다."
+                return False, "존재하지 않는 도서입니다.", None
                 
             file_path = book['file_path']
             library_id = book['library_id']
@@ -36,10 +36,14 @@ class BookScanService:
             file_format = book['file_format']
             print(f"[BookScanService] 대상 도서 매칭 성공: Title='{book['title']}', Path='{file_path}'")
             
-            if not os.path.exists(file_path):
-                print(f"[BookScanService ERROR] 물리 파일이 경로에 존재하지 않음: {file_path}")
+            # 가상 책(imgdir)인 경우 __folder__.imgdir 파일은 존재하지 않으므로 부모 폴더가 존재하는지 검증합니다.
+            is_imgdir = (file_format == 'imgdir') or file_path.lower().endswith('.imgdir')
+            check_path = os.path.dirname(file_path) if is_imgdir else file_path
+
+            if not os.path.exists(check_path):
+                print(f"[BookScanService ERROR] 물리 파일/디렉토리가 경로에 존재하지 않음: {check_path}")
                 conn.close()
-                return False, f"서버에 물리 파일이 존재하지 않습니다: {file_path}"
+                return False, f"서버에 물리 파일/디렉토리가 존재하지 않습니다: {check_path}", None
 
             # PDF 단일 스캔인 경우: 안전하게 격리된 서브프로세스(lazy_scanner) 실행 방식으로 우회 (Segfault/OOM 방지)
             filename = os.path.basename(file_path)
