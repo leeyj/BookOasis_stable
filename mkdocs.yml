@@ -30,6 +30,36 @@ nav:
 - 개발 워크플로우: workflow.md
 - 작업 히스토리:
   - history/index.md
+  - history/20260713_204239_session_20260713_204239_walkthrough.md
+  - history/20260713_204239_session_20260713_204239_task.md
+  - history/20260713_203815_session_20260713_203815_walkthrough.md
+  - history/20260713_203815_session_20260713_203815_task.md
+  - history/20260713_171238_session_20260713_171238_walkthrough.md
+  - history/20260713_171238_session_20260713_171238_task.md
+  - history/20260713_170852_session_20260713_170852_walkthrough.md
+  - history/20260713_170852_session_20260713_170852_task.md
+  - history/20260713_170722_session_20260713_170722_walkthrough.md
+  - history/20260713_170722_session_20260713_170722_task.md
+  - history/20260713_164657_session_20260713_164657_walkthrough.md
+  - history/20260713_164657_session_20260713_164657_task.md
+  - history/20260713_164336_session_20260713_164336_walkthrough.md
+  - history/20260713_164336_session_20260713_164336_task.md
+  - history/20260713_163002_session_20260713_163002_walkthrough.md
+  - history/20260713_163002_session_20260713_163002_task.md
+  - history/20260713_162514_session_20260713_162514_walkthrough.md
+  - history/20260713_162514_session_20260713_162514_task.md
+  - history/20260713_162201_session_20260713_162201_walkthrough.md
+  - history/20260713_162201_session_20260713_162201_task.md
+  - history/20260713_162139_session_20260713_162139_walkthrough.md
+  - history/20260713_162139_session_20260713_162139_task.md
+  - history/20260713_123919_settings_schedule_bottom_padding_walkthrough.md
+  - history/20260713_123919_settings_schedule_bottom_padding_task.md
+  - history/20260713_123754_settings_schedule_inputs_modal_unification_walkthrough.md
+  - history/20260713_123754_settings_schedule_inputs_modal_unification_task.md
+  - history/20260713_122537_settings_schedule_layout_simplification_walkthrough.md
+  - history/20260713_122537_settings_schedule_layout_simplification_task.md
+  - history/20260713_121902_mobile_detail_view_bottom_overlap_walkthrough.md
+  - history/20260713_121902_mobile_detail_view_bottom_overlap_task.md
   - history/20260713_012352_scan_multi_volume_fix_walkthrough.md
   - history/20260713_012352_scan_multi_volume_fix_task.md
   - history/20260712_212935_webhook_dispatcher_docs_walkthrough.md
@@ -699,7 +729,25 @@ nav:
   - history/20260619_145226_init_docs_task.md
 - 버그 트러블슈팅:
   - bug/index.md
+  - bug/20260713_improvement_imgdir_series_redefinition.md
+  - bug/20260713_improvement_dashboard_widget_click_contract.md
+  - bug/20260713_bugfix_virtual_book_detail_filter.md
+  - bug/20260713_bugfix_settings_tab_distortion.md
+  - bug/20260713_bugfix_settings_schedule_queue_tab_integration.md
+  - bug/20260713_bugfix_settings_schedule_layout_simplification.md
+  - bug/20260713_bugfix_settings_schedule_inputs_modal_unification.md
+  - bug/20260713_bugfix_settings_schedule_bottom_padding.md
   - bug/20260713_bugfix_scan_multi_volume.md
+  - bug/20260713_bugfix_scan_imgdir_unpack.md
+  - bug/20260713_bugfix_scan_hierarchy_series.md
+  - bug/20260713_bugfix_mobile_detail_view_bottom_overlap.md
+  - bug/20260713_bugfix_mobile_and_version_parsing.md
+  - bug/20260713_bugfix_infinite_scroll_margin.md
+  - bug/20260713_bugfix_gpu_hardware_acceleration_lag.md
+  - bug/20260713_bugfix_duplicate_plugins.md
+  - bug/20260713_bugfix_disabled_metadata_plugins.md
+  - bug/20260713_bugfix_css_scroll_painting_lag.md
+  - bug/20260713_bugfix_covers_mime_type_lag.md
   - bug/20260712_bugfix_dashboard_layout_scroll.md
   - bug/20260711_feature_epub_to_txt_viewer.md
   - bug/20260711_bugfix_viewer_txt_export_error.md

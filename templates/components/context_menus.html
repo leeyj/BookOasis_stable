@@ -24,3 +24,16 @@
         <li class="context-menu-item context-menu-close-item" onclick="if (window.closeBookContextMenu) window.closeBookContextMenu();"><i class="fa-solid fa-xmark" style="color: #f87171;"></i> <span>닫기</span></li>
     </ul>
 </div>
+
+<!-- 스케줄 작업용 컨텍스트 메뉴 -->
+<div id="schedule-action-context-menu" class="context-menu" style="display: none; min-width: 200px;">
+    <div class="context-menu-header" style="padding: 0.35rem 0.85rem 0.55rem 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;">
+        <span class="context-menu-title" style="font-size: 0.82rem; color: #94a3b8; font-weight: normal;"><i class="fa-solid fa-clock"></i> <span data-i18n="settings.col_last_scan">최근 스캔 시각</span></span>
+        <span id="schedule-action-last-scan" style="font-size: 0.82rem; color: #cbd5e1; font-family: monospace;">-</span>
+    </div>
+    <ul class="context-menu-list">
+        <li class="context-menu-item" id="schedule-action-scan"><i class="fa-solid fa-play" style="color: #a855f7;"></i> <span data-i18n="settings.btn_scan">스캔</span></li>
+        <li class="context-menu-item" id="schedule-action-force"><i class="fa-solid fa-arrows-rotate" style="color: #ea580c;"></i> <span data-i18n="settings.btn_force_scan">강제 스캔</span></li>
+        <li class="context-menu-item context-menu-close-item" id="schedule-action-close"><i class="fa-solid fa-xmark" style="color: #f87171;"></i> <span data-i18n="common.close">닫기</span></li>
+    </ul>
+</div>

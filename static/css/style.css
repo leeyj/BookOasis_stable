@@ -6,6 +6,21 @@
    1. LAYOUT & SYSTEM STRUCTURE (기존 tab_media_library_layout.css)
    -------------------------------------------------------- */
 
+.main-wrapper {
+    width: 100%;
+    margin: 0 auto;
+    background: rgba(30, 41, 59, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    height: calc(100vh - 40px);
+    min-height: calc(100vh - 40px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
 .media-library-container {
     padding: 0.8rem 1.2rem;
     display: flex;
@@ -672,6 +687,16 @@
 }
 
 /* 환경설정 탭 네비게이션 스타일 */
+.settings-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+    width: 100%;
+}
+
 .settings-tab-btn {
     background: rgba(30, 41, 59, 0.4);
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -685,6 +710,8 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .settings-tab-btn:hover {

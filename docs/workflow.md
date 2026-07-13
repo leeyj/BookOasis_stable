@@ -285,36 +285,6 @@ tags: [workflow, history]
 | 2026-07-05 | `category_migration` | 이관 중 브라우저 창 닫기/이탈 방지, 중복 경로 감지 속보 및 DB 커넥션 풀 누수 결함 최종 수정 | [Improvement](./bug/20260705_improvement_category_migration.md) | - |
 | 2026-07-05 | `category_migration` | 일반 ↔ 성인 데이터베이스 간 안전한 카테고리 데이터 마이그레이션 기능 구현 | [Task](./history/20260705_231206_category_migration_task.md) | [Walkthrough](./history/20260705_231206_category_migration_walkthrough.md) |
 | 2026-07-05 | `category_migration` | 창 이탈 방지 및 일반/성인 카테고리 경로 중복 감지 속보 구현 | [Task](./history/20260705_233820_category_migration_task.md) | [Walkthrough](./history/20260705_233820_category_migration_walkthrough.md) |
-| 2026-07-06 | `category_migration` | 마이그레이션 커넥션 누수 결함 최종 보완 및 빌드 | [Task](./history/20260706_004600_category_migration_task.md) | [Walkthrough](./history/20260706_004600_category_migration_walkthrough.md) |
-| 2026-07-06 | `opds_search` | OPDS/App-OPDS 검색 기능 추가 및 관련 가이드/API 문서 업데이트 | [Task](./history/20260706_014328_opds_search_task.md) | [Walkthrough](./history/20260706_014328_opds_search_walkthrough.md) |
-| 2026-07-06 | `category_vfs_toggle` | 카테고리 원격 드라이브(VFS) 토글 시 RC 주소 입력창 미노출 버그 수정 | [Bugfix](./bug/20260706_bugfix_category_vfs_toggle.md) | - |
-| 2026-07-06 | `category_vfs_toggle` | 카테고리 원격 드라이브(VFS) 토글 시 RC 주소 입력창 미노출 버그 수정 | [Task](./history/20260706_101236_category_vfs_toggle_task.md) | [Walkthrough](./history/20260706_101236_category_vfs_toggle_walkthrough.md) |
-| 2026-07-06 | `auto_resume_scan` | 스캐너 비정상 종료 시 자동 이어하기(Auto-Resume) 기능 구현 | [Improvement](./bug/20260706_improvement_auto_resume_scan.md) | - |
-| 2026-07-06 | `auto_resume_scan` | 스캐너 비정상 종료 시 자동 이어하기(Auto-Resume) 기능 구현 | [Task](./history/20260706_104310_auto_resume_scan_task.md) | [Walkthrough](./history/20260706_104310_auto_resume_scan_walkthrough.md) |
-| 2026-07-06 | `vfs_timeout_fallback` | VFS 캐시 새로고침 API 호출 타임아웃 20분(1200초) 유지 및 의사결정 | [Improvement](./bug/20260706_improvement_vfs_timeout_fallback.md) | - |
-| 2026-07-06 | `vfs_timeout_fallback` | VFS 캐시 새로고침 API 호출 타임아웃 단축 및 Fallback 강화 | [Task](./history/20260706_104611_vfs_timeout_fallback_task.md) | [Walkthrough](./history/20260706_104611_vfs_timeout_fallback_walkthrough.md) |
-| 2026-07-06 | `vfs_timeout_fallback` | VFS 캐시 새로고침 API 호출 타임아웃 20분(1200초) 유지 및 의사결정 | [Task](./history/20260706_104927_vfs_timeout_fallback_task.md) | [Walkthrough](./history/20260706_104927_vfs_timeout_fallback_walkthrough.md) |
-| 2026-07-06 | `trash_delete_manager` | 스캔 중 파일 유실 방지를 위한 삭제 관리(휴지통) 기능 개발 | [Improvement](./bug/20260706_improvement_trash_delete_manager.md) | - |
-| 2026-07-06 | `scan_mtime_caching` | 개별 도서 파일 속성(mtime/size) 캐싱을 통한 스캔 성능 최적화 | [Improvement](./bug/20260706_improvement_scan_mtime_caching.md) | - |
-| 2026-07-06 | `epub_scroll_lock` | EPUB 스크롤 보기 상태에서 다음 책 이동 시 화면 락 오류 수정 | [BugFix](./bug/20260706_bugfix_epub_scroll_lock.md) | - |
-| 2026-07-06 | `detail_refresh_restore` | 도서 상세 뷰 새로고침 시 기존 상태(히스토리) 복구 로직 구현 | [Improvement](./bug/20260706_improvement_detail_refresh_restore.md) | - |
-| 2026-07-06 | `opds_download_mime_mismatch` | OPDS 다운로드 시 EPUB/ZIP 파일 형식 다운로드 오류 수정 | [BugFix](./bug/20260706_bugfix_opds_download_mime_mismatch.md) | - |
-| 2026-07-06 | `pdf_page_info_unknown` | PDF 뷰어 로드 시 페이지 번호가 물음표(?)로 뜨는 현상 수정 | [BugFix](./bug/20260706_bugfix_pdf_page_info_unknown.md) | - |
-| 2026-07-06 | `txt_encoding_cp949_corrupted` | TXT 소설 파일 로드 시 CP949 인코딩 깨짐 현상 수정 | [BugFix](./bug/20260706_bugfix_txt_encoding_cp949_corrupted.md) | - |
-| 2026-07-06 | `is_completed_auto_reset` | 도서 감상 완료(is_completed) 플래그 강제 리셋 버그 수정 | [BugFix](./bug/20260706_bugfix_is_completed_auto_reset.md) | - |
-| 2026-07-06 | `mark_as_completed_broken_on_non_comics` | 비-만화책(PDF, EPUB, TXT) 뷰어 내 수동 읽음 완료 오작동 수정 | [BugFix](./bug/20260706_bugfix_mark_as_completed_broken_on_non_comics.md) | - |
-| 2026-07-06 | `epub_scroll_mode_rendering_break` | EPUB 보기 모드(스크롤/페이지) 전환 시 오작동 및 첫 장 이동 오류 수정 | [BugFix](./bug/20260706_bugfix_epub_scroll_mode_rendering_break.md) | - |
-| 2026-07-06 | `epub_scroll_hotspot_blocker` | EPUB 스크롤 보기 시 휠 스크롤 불가 및 터치 락 오류 수정 | [BugFix](./bug/20260706_bugfix_epub_scroll_hotspot_blocker.md) | - |
-| 2026-07-06 | `epub_iframe_hotspot_event_hijack` | EPUB 뷰어 전체 모드에서 휠 스크롤 및 중앙 클릭 오버레이 먹통 오류 수정 | [BugFix](./bug/20260706_bugfix_epub_iframe_hotspot_event_hijack.md) | - |
-| 2026-07-06 | `epub_scroll_y_mismatch_rebound` | EPUB 연속 스크롤 모드 시 첫 페이지 바운딩 튕김 오류 수정 | [BugFix](./bug/20260706_bugfix_epub_scroll_y_mismatch_rebound.md) | - |
-| 2026-07-06 | `epub_double_scrollbar` | EPUB 연속 스크롤 모드 시 이중 스크롤바 노출 오류 수정 | [BugFix](./bug/20260706_bugfix_epub_double_scrollbar.md) | - |
-| 2026-07-06 | `viewer_scrollbar_customization` | 뷰어 내 스크롤바 디자인 슬림화 및 보라색 다크 테마 커스터마이징 | [Improvement](./bug/20260706_improvement_viewer_scrollbar_customization.md) | - |
-| 2026-07-06 | `epub_location_restore_ratio` | EPUB 뷰어 진입 시 이어보기 위치 복원 비율 공식 오류 수정 | [BugFix](./bug/20260706_bugfix_epub_location_restore_ratio.md) | - |
-| 2026-07-06 | `epub_refactoring_core` | EPUB 뷰어 페이지/스크롤 모드 정밀 제어 및 끊김 없는 책 전체 로딩 구현 | [BugFix](./bug/20260706_bugfix_epub_refactoring_core.md) | - |
-| 2026-07-06 | `epub_resize_rebound` | F12 개발자 도구 활성화 및 창 리사이즈 시 EPUB 첫 페이지 튕김 오류 수정 | [BugFix](./bug/20260706_bugfix_epub_resize_rebound.md) | - |
-| 2026-07-07 | `viewer_refactoring` | 뷰어 생명주기 및 이벤트 클린업 시스템 표준화 | [Task](./history/20260707_002900_viewer_refactoring_task.md) | [Walkthrough](./history/20260707_002900_viewer_refactoring_walkthrough.md) |
-| 2026-07-07 | `viewer_refactoring` | 뷰어 아키텍처 리팩토링 및 스크롤 모드 오클릭 메뉴 방지 패치 | [Task](./history/20260707_003207_viewer_refactoring_task.md) | [Walkthrough](./history/20260707_003207_viewer_refactoring_walkthrough.md) |
-| 2026-07-07 | `viewer_refactoring` | 뷰어 아키텍처 리팩토링 및 EPUB 스크롤 로더 병목 버그 수정 | [Task](./history/20260707_003901_viewer_refactoring_task.md) | [Walkthrough](./history/20260707_003901_viewer_refactoring_walkthrough.md) |
 | 2026-07-07 | `viewer_refactoring` | 뷰어 아키텍처 리팩토링 및 EPUB 스크롤 로더 병목 및 내부 링크 500 에러 수정 | [Task](./history/20260707_004244_viewer_refactoring_task.md) | [Walkthrough](./history/20260707_004244_viewer_refactoring_walkthrough.md) |
 | 2026-07-07 | `scanner_early_skip_fix` | 스캔 중 중단 도서의 표지/메타데이터 유실 방지 조기 스킵 가드 패치 | [Task](./history/20260707_015855_scanner_early_skip_fix_task.md) | [Walkthrough](./history/20260707_015855_scanner_early_skip_fix_walkthrough.md) |
 | 2026-07-07 | `scanner_vfs_offline_skip` | 원격 드라이브 VFS 오프라인 시 이미 캐싱 완료된 도서의 조기 스킵 예외처리 적용 | [BugFix](./bug/20260707_bugfix_scanner_vfs_offline_skip_failure.md) | - |
@@ -346,17 +316,13 @@ tags: [workflow, history]
 | 2026-07-11 | `epub_mode_transition_seekbar_sync` | EPUB 페이지-스크롤 모드 전환 시 슬라이더 프리징 결함 조치 | [Task](./history/20260711_095813_epub_mode_transition_seekbar_sync_task.md) | [Walkthrough](./history/20260711_095813_epub_mode_transition_seekbar_sync_walkthrough.md) |
 | 2026-07-11 | `epub_anchor_text_fix` | EPUB 모드 전환 시 DOM 찌꺼기에 의한 앵커 텍스트 추출 오류 완벽 수정 | [BugFix](./bug/20260711_bugfix_epub_anchor.md) | - |
 | 2026-07-11 | `epub_to_txt_viewer` | EPUB 뷰어 epub.js 엔진 걷어내기 및 텍스트/HTML 통합 뷰어 경량화 개선 | [Feature](./bug/20260711_feature_epub_to_txt_viewer.md) | - |
-
 | 2026-07-11 | `epub_to_txt_viewer` | EPUB 뷰어 epub.js 엔진 걷어내기 및 텍스트/HTML 통합 뷰어 경량화 개선 | [Task](./history/20260711_132319_epub_to_txt_viewer_task.md) | [Walkthrough](./history/20260711_132319_epub_to_txt_viewer_walkthrough.md) |
 | 2026-07-11 | `epub_to_txt_viewer` | EPUB 뷰어 epub.js 엔진 걷어내기 및 텍스트/HTML 통합 뷰어 경량화 개선 (삽화 이미지 추출 추가) | [Task](./history/20260711_132409_epub_to_txt_viewer_task.md) | [Walkthrough](./history/20260711_132409_epub_to_txt_viewer_walkthrough.md) |
 | 2026-07-11 | `epub_image_overflow_and_slider` | EPUB 이미지 넘침 및 하단 슬라이더 비정상 이동 결함 조치 | [BugFix](./bug/20260711_bugfix_epub_image_overflow_and_slider.md) | - |
-
 | 2026-07-11 | `epub_to_txt_viewer` | EPUB 뷰어 epub.js 엔진 걷어내기 및 텍스트/HTML 통합 뷰어 경량화 개선 (삽화 이미지 추출 및 슬라이더 버그 조치 완료) | [Task](./history/20260711_132738_epub_to_txt_viewer_task.md) | [Walkthrough](./history/20260711_132738_epub_to_txt_viewer_walkthrough.md) |
 | 2026-07-11 | `txt_scroll_mode_transition_reset` | TXT/EPUB 뷰어 모드 전환 시 읽기 위치 초기화 결함 조치 | [BugFix](./bug/20260711_bugfix_txt_scroll_mode_transition_reset.md) | - |
 | 2026-07-11 | `txt_anchor_text_restoration` | TXT/EPUB 통합 뷰어 내 앵커 텍스트 기반 정밀 읽기 위치 복원 구현 | [BugFix](./bug/20260711_bugfix_txt_anchor_text_restoration.md) | - |
 | 2026-07-11 | `duplicate_i18n_viewer_overlap` | i18n 번역 리소스 내 중복 viewer 객체 선언에 따른 다국어 렌더링 파괴 버그 수정 | [BugFix](./bug/20260711_bugfix_duplicate_i18n_viewer_overlap.md) | - |
-
-
 | 2026-07-11 | `session_20260711_181030` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260711_181030_session_20260711_181030_task.md) | [Walkthrough](./history/20260711_181030_session_20260711_181030_walkthrough.md) |
 | 2026-07-11 | `viewer_txt_export_error` | 텍스트 뷰어 컴포넌트화 후 nextTxtPage/prevTxtPage export 누락 수정 | [Bugfix](./bug/20260711_bugfix_viewer_txt_export_error.md) | - |
 | 2026-07-11 | `viewer_txt_export_error` | 텍스트 뷰어 컴포넌트화 후 nextTxtPage/prevTxtPage export 누락 수정 | [Task](./history/20260711_230122_viewer_txt_export_error_task.md) | [Walkthrough](./history/20260711_230122_viewer_txt_export_error_walkthrough.md) |
@@ -371,5 +337,38 @@ tags: [workflow, history]
 | 2026-07-13 | `covers_mime_type_lag` | 표지 이미지 서빙 시 MIME 타입 불일치에 따른 스크롤 렉 조치 | [BugFix](./bug/20260713_bugfix_covers_mime_type_lag.md) | - |
 | 2026-07-13 | `infinite_scroll_margin` | 무한 스크롤 감지 마진 완화를 통한 스크롤 잔 렉 최적화 | [BugFix](./bug/20260713_bugfix_infinite_scroll_margin.md) | - |
 | 2026-07-13 | `css_scroll_painting_lag` | 도서 그리드 CSS 렌더링(MIME 타입 및 backdrop-filter) 소거를 통한 상/하방 스크롤 렉 최적화 | [BugFix](./bug/20260713_bugfix_css_scroll_painting_lag.md) | - |
-| 2026-07-13 | `gpu_hardware_acceleration_lag` | GPU 하드웨어 가속 레이어 격리를 통한 성인도서 스크롤 렉 최적화 | [BugFix](./bug/20260713_bugfix_gpu_hardware_acceleration_lag.md) | - |
+| 2026-07-13 | `mobile_detail_view_bottom_overlap` | 모바일 뷰 도서 상세리스트 하단 영역 가려짐 버그 수정 | [BugFix](./bug/20260713_bugfix_mobile_detail_view_bottom_overlap.md) | - |
+| 2026-07-13 | `settings_tab_distortion` | 중간 해상도 환경설정 탭 버튼 레이아웃 깨짐 버그 수정 | [BugFix](./bug/20260713_bugfix_settings_tab_distortion.md) | - |
+| 2026-07-13 | `settings_schedule_layout_simplification` | 환경설정 스캔 스케줄 설정 테이블 간소화 및 작업 컨텍스트 메뉴 통합 | [BugFix](./bug/20260713_bugfix_settings_schedule_layout_simplification.md) | - |
+| 2026-07-13 | `mobile_detail_view_bottom_overlap` | 모바일 상세 뷰 하단 가려짐 및 중간 해상도 환경설정 뒤틀림 수정 | [Task](./history/20260713_121902_mobile_detail_view_bottom_overlap_task.md) | [Walkthrough](./history/20260713_121902_mobile_detail_view_bottom_overlap_walkthrough.md) |
+| 2026-07-13 | `settings_schedule_layout_simplification` | 환경설정 스캔 스케줄 설정 테이블 간소화 및 작업 컨텍스트 메뉴 통합 | [Task](./history/20260713_122537_settings_schedule_layout_simplification_task.md) | [Walkthrough](./history/20260713_122537_settings_schedule_layout_simplification_walkthrough.md) |
+| 2026-07-13 | `settings_schedule_inputs_modal_unification` | 환경설정 스캔 설정 테이블 입력 폼 모달 통합 | [Task](./history/20260713_123754_settings_schedule_inputs_modal_unification_task.md) | [Walkthrough](./history/20260713_123754_settings_schedule_inputs_modal_unification_walkthrough.md) |
+| 2026-07-13 | `settings_schedule_bottom_padding` | 스캔 스케줄 및 대기열 통합 탭 하단 여백 가려짐 개선 | [BugFix](./bug/20260713_bugfix_settings_schedule_bottom_padding.md) | - |
+| 2026-07-13 | `settings_schedule_bottom_padding` | 스캔 스케줄 및 대기열 통합 탭 하단 여백 가려짐 개선 | [Task](./history/20260713_123919_settings_schedule_bottom_padding_task.md) | [Walkthrough](./history/20260713_123919_settings_schedule_bottom_padding_walkthrough.md) |
+| 2026-07-13 | `mobile_and_version_parsing_bugfix` | 모바일 뷰 레이아웃(삭제관리, 단축키설정) 및 버전 파싱(PC/모바일 공통) 결함 조치 | [BugFix](./bug/20260713_bugfix_mobile_and_version_parsing.md) | - |
+| 2026-07-13 | `imgdir_series_redefinition` | 이미지 폴더 가상 책 시리즈명 등록 기준 재정립 및 중간 경로 생략 | [Improvement](./bug/20260713_improvement_imgdir_series_redefinition.md) | - |
+| 2026-07-13 | `virtual_book_detail_filter_bugfix` | 이미지 폴더 가상 책 상세 페이지 목록 필터 누락 결함 수정 | [BugFix](./bug/20260713_bugfix_virtual_book_detail_filter.md) | - |
+| 2026-07-13 | `api_endpoints_docs_update` | 상세 정보 API 응답 예시 보완 및 프론트엔드 전역 JS API 명세 추가 | [Task](#) | - |
+| 2026-07-13 | `dashboard_widget_click_contract` | 대시보드 위젯 카드 클릭 계약 및 라우팅 지원 (상세정보/뷰어 직접 열기 지원) | [Improvement](./bug/20260713_improvement_dashboard_widget_click_contract.md) | - |
+| 2026-07-13 | `duplicate_plugins_bugfix` | 대시보드 플러그인 탭 중복 노출 비동기 동시성 결함 수정 | [BugFix](./bug/20260713_bugfix_duplicate_plugins.md) | - |
+| 2026-07-13 | `disabled_metadata_plugins_bugfix` | 비활성화된 메타데이터 플러그인 노출 방지 결함 수정 | [BugFix](./bug/20260713_bugfix_disabled_metadata_plugins.md) | - |
 
+
+
+
+
+
+
+
+
+| 2026-07-13 | `session_20260713_162139` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_162139_session_20260713_162139_task.md) | [Walkthrough](./history/20260713_162139_session_20260713_162139_walkthrough.md) |
+| 2026-07-13 | `session_20260713_162201` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_162201_session_20260713_162201_task.md) | [Walkthrough](./history/20260713_162201_session_20260713_162201_walkthrough.md) |
+| 2026-07-13 | `session_20260713_162514` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_162514_session_20260713_162514_task.md) | [Walkthrough](./history/20260713_162514_session_20260713_162514_walkthrough.md) |
+| 2026-07-13 | `session_20260713_163002` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_163002_session_20260713_163002_task.md) | [Walkthrough](./history/20260713_163002_session_20260713_163002_walkthrough.md) |
+| 2026-07-13 | `session_20260713_164336` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_164336_session_20260713_164336_task.md) | [Walkthrough](./history/20260713_164336_session_20260713_164336_walkthrough.md) |
+| 2026-07-13 | `session_20260713_164657` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_164657_session_20260713_164657_task.md) | [Walkthrough](./history/20260713_164657_session_20260713_164657_walkthrough.md) |
+| 2026-07-13 | `session_20260713_170722` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_170722_session_20260713_170722_task.md) | [Walkthrough](./history/20260713_170722_session_20260713_170722_walkthrough.md) |
+| 2026-07-13 | `session_20260713_170852` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_170852_session_20260713_170852_task.md) | [Walkthrough](./history/20260713_170852_session_20260713_170852_walkthrough.md) |
+| 2026-07-13 | `session_20260713_171238` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_171238_session_20260713_171238_task.md) | [Walkthrough](./history/20260713_171238_session_20260713_171238_walkthrough.md) |
+| 2026-07-13 | `session_20260713_203815` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_203815_session_20260713_203815_task.md) | [Walkthrough](./history/20260713_203815_session_20260713_203815_walkthrough.md) |
+| 2026-07-13 | `session_20260713_204239` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_204239_session_20260713_204239_task.md) | [Walkthrough](./history/20260713_204239_session_20260713_204239_walkthrough.md) |

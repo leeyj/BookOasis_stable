@@ -148,8 +148,14 @@ class BookDetailService:
         if restrict_same_directory and books_list:
             first_file_path = books_list[0]['file_path']
             if first_file_path:
-                target_dir = os.path.dirname(first_file_path)
-                books_list = [bk for bk in books_list if bk['file_path'] and os.path.dirname(bk['file_path']) == target_dir]
+                def get_comparison_dir(path):
+                    normalized = (path or '').replace('\\', '/')
+                    if normalized.endswith('/__folder__.imgdir'):
+                        return os.path.dirname(os.path.dirname(path))
+                    return os.path.dirname(path)
+
+                target_dir = get_comparison_dir(first_file_path)
+                books_list = [bk for bk in books_list if bk['file_path'] and get_comparison_dir(bk['file_path']) == target_dir]
                 
         books_list.sort(key=lambda x: natural_sort_key(x['title']))
         return meta, books_list

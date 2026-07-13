@@ -184,7 +184,38 @@
 * **쿼리 스트링**:
   * `type` (string, 필수): `general` / `adult`
   * `series` (string, 필수): 시리즈 명
-  * `library_id` (integer, 필수): 카테고리 ID
+  * `library_id` (integer/string, 필수): 카테고리 ID (특정 ID 또는 `'all'`, `'home'` 등)
+* **응답 예시 (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "meta": {
+      "author": "추공",
+      "publisher": "디앤씨미디어",
+      "link": "https://...",
+      "score": 5,
+      "summary": "재능 없는 E급 헌터 성진우의 기적 같은 레벨업 대서사시.",
+      "genre": "판타지, 액션",
+      "tags": "헌터물, 성장물",
+      "cover_image": "/covers/1/cover_l1.jpg?t=1710203948"
+    },
+    "books": [
+      {
+        "id": 198,
+        "title": "평범한 연애는 할 수 없어 01권 (리디)#198",
+        "file_format": "imgdir",
+        "total_pages": 192,
+        "has_offsets": 1,
+        "cover_image": "/covers/1/198.jpg?t=1710203948",
+        "file_path": "/data/comics/평범한 연애는 할 수 없어/평범한 연애는 할 수 없어 01권 (리디)#198/__folder__.imgdir",
+        "pages_read": 50,
+        "is_completed": 0,
+        "is_favorite": 0,
+        "last_read_at": "2026-07-13 12:00:00"
+      }
+    ]
+  }
+  ```
 
 ---
 
@@ -318,4 +349,56 @@
   command: "curl -s 'http://your-bookoasis-ip:5930/api/webhook/scan?token=oasis_secure_api_token_1234&library_id=25&type=general'"
   buffer_interval: 60
 ```
+
+---
+
+## 💻 7. 프론트엔드 연동용 전역 JavaScript API (Frontend JS API)
+
+플러그인이나 커스텀 스크립트 등 프론트엔드 환경에서 특정 도서를 클릭했을 때 상세 뷰어 화면으로 페이지 전환을 유발하려는 경우, 아래의 전역 함수를 호출할 수 있습니다.
+
+### `window.openBookDetail(event, seriesName, libraryId)`
+* **설명**: 메인 대시보드 또는 그리드 화면을 숨기고 지정한 시리즈의 상세 단행본 목록 화면(`detail` view)을 활성화하여 렌더링합니다.
+* **파라미터**:
+  * `event` (Object, 선택/nullable): 마우스 클릭 이벤트 객체 (필요하지 않은 경우 `null` 입력)
+  * `seriesName` (string, 필수): 이동하려는 시리즈명
+  * `libraryId` (integer/string, 선택/nullable): 해당 시리즈가 소속된 라이브러리 카테고리 ID
+    * *Tip*: `libraryId`를 모르는 경우 `null` 또는 `'all'`을 전달하면, 백엔드 서비스가 DB에서 해당 시리즈의 실제 소속 라이브러리를 역추적하여 매핑해주므로 안전하게 호출이 가능합니다.
+* **호출 예시**:
+  ```javascript
+  // 시리즈 상세화면 강제 이동 (라이브러리 자동 매핑)
+  window.openBookDetail(null, '평범한 연애는 할 수 없어');
+  ```
+
+### `window.openReader(bookId, format, title, pagesRead, totalPages)`
+* **설명**: 지정된 도서 ID의 뷰어(책 읽기 화면) 모달을 즉시 실행하여 띄웁니다.
+* **파라미터**:
+  * `bookId` (integer, 필수): 대상 도서의 고유 ID (`books.id`)
+  * `format` (string, 필수): 파일 포맷 (`'zip'`, `'cbz'`, `'epub'`, `'pdf'`, `'txt'`, `'imgdir'`)
+  * `title` (string, 필수): 뷰어 상단에 표기될 도서명
+  * `pagesRead` (integer, 선택): 기존 페이지 독서 진행도 (기본: `0`)
+  * `totalPages` (integer, 선택): 도서의 총 페이지 수 (기본: `0`)
+* **호출 예시**:
+  ```javascript
+  // 단일 도서 뷰어 즉시 열기
+  window.openReader(198, 'imgdir', '평범한 연애는 할 수 없어 01권', 0, 192);
+  ```
+
+---
+
+### 💡 대시보드 플러그인 위젯 카드 연동 규격 (Widget Item Click Contract)
+
+대시보드 위젯(플러그인)용 API(`/api/media/dashboard/widgets/<pluginId>/data`)가 반환하는 `items` 리스트의 각 객체에 대해 다음 규칙이 자동으로 프론트엔드(`dashboard.js`) 단에서 융합 적용됩니다.
+
+* **동작 규칙**:
+  * 아이템 객체에 외부 링크 `link`가 없는 경우 (또는 `#`인 경우)에만 아래 라우팅 분기가 성립됩니다:
+    1. **단일 도서 뷰어 즉시 열기**: `book_id` (또는 `bookId`)와 `file_format` (또는 `format`)이 동시에 존재하는 경우:
+       * 해당 카드의 최상위 컨테이너에 클릭 시 `window.openReader(bookId, format, title, pagesRead, totalPages)`를 즉시 실행하도록 이벤트가 지정되며, `cursor: pointer` 스타일이 부여됩니다.
+    2. **시리즈 상세 페이지로 이동**: 위 항목이 만족하지 않고 `series_name` (또는 `series`)만 존재하는 경우:
+       * 해당 카드의 최상위 컨테이너에 클릭 시 `window.openBookDetail(event, series_name, library_id)` 함수가 작동하며, `cursor: pointer` 스타일이 부여됩니다.
+  * 아이템 객체에 외부 링크 `link`가 있는 경우 (예: 외부 도서 리뷰 페이지 등):
+    * 해당 클릭 훅은 무시되며, 카드 본문의 타이틀 링크(`<a>` 태그의 아웃링크)를 통해 기존처럼 외부 탭으로 안전하게 이동합니다.
+  * 플러그인 개발 및 커스텀 이벤트를 위해, 위젯 카드 엘리먼트(`div.plugin-item-card`)에 `data-series-name`, `data-library-id`, `data-book-id`, `data-file-format` 속성이 항상 자동으로 주입됩니다.
+
+
+
 

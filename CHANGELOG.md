@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## v0.9.7
+### fixed
+- 모바일 뷰->환경설정시 설정화면 최적화 | mobile view->environment setting when setting screen optimization
+- 일부 메뉴 통합(스캐줄 설정등) | merge some menus (schedule setting etc)
+- 대시보드 플러그인 클릭 계약 및 라우팅 지원 | dashboard plugin click contract and routing support
+  * 상세내역은 [api_endpoint.md](./docs/api_endpoints.md) 참조.
+
 ## v0.9.6
 ### fixed
 - 표지 이미지 서빙 시 MIME 타입 불일치에 따른 스크롤 렉 조치 | Cover image MIME type mismatch scroll lag fix

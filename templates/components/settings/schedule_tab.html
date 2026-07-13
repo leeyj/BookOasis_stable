@@ -1,35 +1,63 @@
-            <div id="settings-tab-schedule" class="settings-tab-content active" style="display: flex; flex-direction: column; gap: 1.5rem;">
-                <div class="dashboard-section">
-                    <div class="section-header" style="margin-bottom: 1.2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-                        <div>
-                            <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1.2rem; font-weight: 700;">
-                                <i class="fa-solid fa-gears" style="color: #a855f7; margin-right: 0.5rem;"></i> <span data-i18n="settings.schedule_title">라이브러리 자동 스캔 &amp; 스케줄 설정</span>
-                            </h3>
-                            <p style="font-size: 0.82rem; color: #94a3b8; margin: 0.4rem 0 0 0;" data-i18n="settings.schedule_subtitle">각 카테고리의 동기화 스캔 스케줄(Cron) 주기를 일괄 관리하고 즉시 실행할 수 있습니다.</p>
-                            <p style="font-size: 0.76rem; color: #64748b; margin: 0.3rem 0 0 0;" data-i18n="settings.schedule_rclone_tip">💡 Tip! : Rclone RC 통신에 ID/비밀번호가 필요한 경우 http://id:password@localhost:5572 형식으로 등록하면 됩니다.</p>
-                        </div>
-                        <button type="button" onclick="runAllLibrariesScanNow(false)" class="btn-toggle" style="background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%); color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; height: 36px; font-size: 0.85rem; box-shadow: 0 4px 12px rgba(168,85,247,0.25);">
-                            <i class="fa-solid fa-play"></i> <span data-i18n="settings.btn_scan_all">일괄 스캔</span>
-                        </button>
-                    </div>
-                    
-                    <div class="settings-table-wrapper" style="background: rgba(30, 41, 59, 0.25); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; overflow: hidden; backdrop-filter: blur(10px);">
-                        <table class="settings-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
-                            <thead>
-                                <tr style="background: rgba(15, 23, 42, 0.4); border-bottom: 1px solid rgba(255,255,255,0.08); color: #94a3b8;">
-                                    <th style="padding: 1rem;" data-i18n="settings.col_category">카테고리명</th>
-                                    <th style="padding: 1rem;" data-i18n="settings.col_path">서버 물리 경로</th>
-                                    <th style="padding: 1rem; width: 230px;" data-i18n="settings.col_rclone">Rclone RC 주소</th>
-                                    <th style="padding: 1rem; width: 220px;" data-i18n="settings.col_cron">스케줄 주기 (Cron식)</th>
-                                    <th style="padding: 1rem; width: 180px;" data-i18n="settings.col_last_scan">최근 스캔 시각</th>
-                                    <th style="padding: 1rem; width: 100px; text-align: center;" data-i18n="settings.col_status">상태</th>
-                                    <th style="padding: 1rem; width: 180px; text-align: center;" data-i18n="settings.col_action">작업</th>
-                                </tr>
-                            </thead>
-                            <tbody id="settings-libraries-list">
-                                <!-- JS를 통해 동적 생성 -->
-                            </tbody>
-                        </table>
-                    </div>
+<div class="dashboard-section">
+    <div class="section-header" style="margin-bottom: 1.2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1.2rem; font-weight: 700;">
+                <i class="fa-solid fa-gears" style="color: #a855f7; margin-right: 0.5rem;"></i> <span data-i18n="settings.schedule_title">라이브러리 자동 스캔 &amp; 스케줄 설정</span>
+            </h3>
+            <p style="font-size: 0.82rem; color: #94a3b8; margin: 0.4rem 0 0 0;" data-i18n="settings.schedule_subtitle">각 카테고리의 동기화 스캔 스케줄(Cron) 주기를 일괄 관리하고 즉시 실행할 수 있습니다.</p>
+            <p style="font-size: 0.76rem; color: #64748b; margin: 0.3rem 0 0 0;" data-i18n="settings.schedule_rclone_tip">💡 Tip! : Rclone RC 통신에 ID/비밀번호가 필요한 경우 http://id:password@localhost:5572 형식으로 등록하면 됩니다.</p>
+        </div>
+        <button type="button" onclick="runAllLibrariesScanNow(false)" class="btn-toggle" style="background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%); color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; height: 36px; font-size: 0.85rem; box-shadow: 0 4px 12px rgba(168,85,247,0.25);">
+            <i class="fa-solid fa-play"></i> <span data-i18n="settings.btn_scan_all">일괄 스캔</span>
+        </button>
+    </div>
+    
+    <div class="settings-table-wrapper" style="background: rgba(30, 41, 59, 0.25); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; overflow: hidden; backdrop-filter: blur(10px);">
+        <table class="settings-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
+            <thead>
+                <tr style="background: rgba(15, 23, 42, 0.4); border-bottom: 1px solid rgba(255,255,255,0.08); color: #94a3b8;">
+                    <th style="padding: 1rem;" data-i18n="settings.col_category">카테고리명</th>
+                    <th style="padding: 1rem;" data-i18n="settings.col_path">서버 물리 경로</th>
+                    <th style="padding: 1rem; width: 100px; text-align: center;" data-i18n="settings.col_status">상태</th>
+                    <th style="padding: 1rem; width: 100px; text-align: center;" data-i18n="settings.col_config">설정</th>
+                    <th style="padding: 1rem; width: 100px; text-align: center;" data-i18n="settings.col_action">작업</th>
+                </tr>
+            </thead>
+            <tbody id="settings-libraries-list">
+                <!-- JS를 통해 동적 생성 -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 카테고리 스캔 설정 모달 -->
+<div id="library-scan-settings-modal" class="library-modal" style="display: none; z-index: 10005;">
+    <div class="library-modal-content" style="max-width: 480px;">
+        <div class="library-modal-header">
+            <h3 id="scan-settings-modal-title" style="margin: 0; color: #fff; font-size: 1.25rem;"><i class="fa-solid fa-gears" style="color: #a855f7; margin-right: 0.5rem;"></i> 카테고리 설정</h3>
+            <span class="library-modal-close" onclick="closeScanSettingsModal()">&times;</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 1.2rem; color: #cbd5e1;">
+            <input type="hidden" id="scan-settings-library-id">
+            
+            <div class="library-form-group">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #fff;">Rclone RC 주소</label>
+                <div id="scan-settings-rclone-container">
+                    <!-- JS에서 동적 분기 -->
                 </div>
             </div>
+            
+            <div class="library-form-group">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #fff;">스케줄 주기 (Cron식)</label>
+                <input type="text" id="scan-settings-cron" class="form-control" placeholder="예: 0 3 * * *" style="width: 100%; box-sizing: border-box; background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 0.5rem 0.8rem; border-radius: 6px;">
+                <div id="scan-settings-vfs-container" style="margin-top: 0.5rem;">
+                    <!-- JS에서 동적 분기 -->
+                </div>
+            </div>
+        </div>
+        <div class="library-modal-footer" style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 1rem;">
+            <button type="button" class="btn-toggle" onclick="closeScanSettingsModal()" style="padding: 0.4rem 1rem;">취소</button>
+            <button type="button" class="btn-toggle active" onclick="saveScanSettingsFromModal()" style="padding: 0.4rem 1rem;">저장</button>
+        </div>
+    </div>
+</div>

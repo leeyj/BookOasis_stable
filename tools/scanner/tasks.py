@@ -346,7 +346,12 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
         })
 
     if has_imgdir_candidate:
-        imgdir_series_name = series_name
+        parent_folder = os.path.basename(os.path.dirname(root))
+        if parent_folder:
+            import re
+            imgdir_series_name = re.sub(r'^\[(?:단행|연재|소설|만화|웹툰|일반)\]\s*', '', parent_folder).strip()
+        else:
+            imgdir_series_name = series_name
         imgdir_title = os.path.basename(root)
         imgdir_cover = None
         if not imgdir_skip:

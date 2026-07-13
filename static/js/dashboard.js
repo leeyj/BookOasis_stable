@@ -4,6 +4,7 @@ import * as api from './api.js';
 import { renderDashboardHistory, renderDashboardRecentlyAdded } from './ui.js';
 
 let dashboardLoadToken = 0;
+let pluginsLoadToken = 0;
 
 export async function loadDashboardData() {
   const requestToken = ++dashboardLoadToken;
@@ -70,7 +71,7 @@ export async function loadDashboardPlugins(requestToken = null) {
 
   if (!section || !container) return;
 
-  const currentToken = requestToken !== null ? requestToken : dashboardLoadToken;
+  const currentToken = requestToken !== null ? requestToken : ++pluginsLoadToken;
 
   // 1. 이전 동적 생성 탭 및 콘텐츠 초기화
   if (tabsContainer) {
@@ -85,7 +86,7 @@ export async function loadDashboardPlugins(requestToken = null) {
     const res = await fetch(`/api/media/dashboard/widgets?type=${state.currentLibraryType}`);
     const data = await res.json();
 
-    if (currentToken !== dashboardLoadToken) return;
+    if (currentToken !== pluginsLoadToken) return;
 
     if (data.success && data.widgets && data.widgets.length > 0) {
       section.style.display = 'block';
@@ -111,7 +112,7 @@ export async function loadDashboardPlugins(requestToken = null) {
 
       // 2. 공통 데스크 위젯 카드 렌더링
       for (const widget of commonWidgets) {
-        if (currentToken !== dashboardLoadToken) return;
+        if (currentToken !== pluginsLoadToken) return;
 
         const widgetId = String(widget.id || '').trim();
         if (!widgetId) continue;
@@ -140,7 +141,7 @@ export async function loadDashboardPlugins(requestToken = null) {
 
       // 3. 독점 탭 플러그인 구성
       for (const widget of tabWidgets) {
-        if (currentToken !== dashboardLoadToken) return;
+        if (currentToken !== pluginsLoadToken) return;
 
         const widgetId = String(widget.id || '').trim();
         if (!widgetId) continue;
@@ -230,7 +231,7 @@ export function switchPluginsViewTab(tabId) {
 window.switchPluginsViewTab = switchPluginsViewTab;
 
 async function loadDashboardWidgetData(pluginId, limit, contentId, requestToken) {
-  if (requestToken !== dashboardLoadToken) return;
+  if (requestToken !== pluginsLoadToken) return;
 
   const container = document.getElementById(contentId);
   if (!container) return;
@@ -239,7 +240,7 @@ async function loadDashboardWidgetData(pluginId, limit, contentId, requestToken)
     const res = await fetch(`/api/media/dashboard/widgets/${encodeURIComponent(pluginId)}/data?type=${state.currentLibraryType}&limit=${limit}`);
     const data = await res.json();
 
-    if (requestToken !== dashboardLoadToken) return;
+    if (requestToken !== pluginsLoadToken) return;
 
     if (data.success && Array.isArray(data.items) && data.items.length > 0) {
       container.innerHTML = '';
@@ -266,9 +267,28 @@ async function loadDashboardWidgetData(pluginId, limit, contentId, requestToken)
         const pubDate = escapeHtml(item.pubDate || '');
         const link = item.link || '#';
         const isExternal = link && link !== '#';
+        const rawSeriesName = String(item.series_name || item.series || '');
+        const rawLibraryId = String(item.library_id || item.libraryId || '');
+        const rawBookId = item.book_id || item.bookId || null;
+        const rawFileFormat = item.file_format || item.format || '';
+        const rawTitle = item.title || '';
+        const rawPagesRead = item.pages_read || item.pagesRead || 0;
+        const rawTotalPages = item.total_pages || item.totalPages || 0;
+
+        let clickAttr = '';
+        let cursorStyle = '';
+        if (!isExternal) {
+            if (rawBookId && rawFileFormat) {
+                clickAttr = `onclick="if(window.openReader) { window.openReader(${rawBookId}, '${rawFileFormat}', '${rawTitle.replace(/'/g, "\\'")}', ${rawPagesRead}, ${rawTotalPages}); event.preventDefault(); }"`;
+                cursorStyle = 'cursor: pointer;';
+            } else if (rawSeriesName) {
+                clickAttr = `onclick="if(window.openBookDetail) { window.openBookDetail(event, '${rawSeriesName.replace(/'/g, "\\'")}', ${rawLibraryId ? `'${rawLibraryId}'` : 'null'}); event.preventDefault(); }"`;
+                cursorStyle = 'cursor: pointer;';
+            }
+        }
 
         const itemHtml = `
-          <div style="display: flex; gap: 1rem; align-items: flex-start; padding-bottom: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
+          <div class="plugin-item-card" data-series-name="${escapeHtml(rawSeriesName)}" data-library-id="${escapeHtml(rawLibraryId)}" data-book-id="${rawBookId || ''}" data-file-format="${escapeHtml(rawFileFormat)}" style="display: flex; gap: 1rem; align-items: flex-start; padding-bottom: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.05); ${cursorStyle}" ${clickAttr}>
             <div style="width: 60px; height: 85px; flex-shrink: 0; border-radius: 4px; overflow: hidden; background: #1e293b;">
               <img src="${cover}" alt="cover" style="width: 100%; height: 100%; object-fit: cover;">
             </div>

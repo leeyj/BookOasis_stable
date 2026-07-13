@@ -24,7 +24,7 @@ export {
 export function switchSettingsTab(tabId) {
   // 일반 사용자는 어드민 전용 탭에 접근하지 못하도록 차단 및 'about'으로 우회
   const isAdmin = window.currentUser && window.currentUser.role === 'admin';
-  const adminOnlyTabs = ['schedule', 'queue', 'general', 'plugins', 'reports', 'users', 'permissions', 'trash'];
+  const adminOnlyTabs = ['schedule', 'general', 'plugins', 'reports', 'users', 'permissions', 'trash'];
   
   if (!isAdmin && adminOnlyTabs.includes(tabId)) {
     console.warn(`[Settings-Tab] Access denied for tab '${tabId}'. Redirecting to 'about'...`);
@@ -81,7 +81,7 @@ export function switchSettingsTab(tabId) {
     loadAboutInfo();
   } else if (tabId === 'changelog') {
     loadChangelog();
-  } else if (tabId === 'queue') {
+  } else if (tabId === 'schedule') {
     if (window.loadQueueStatus) {
       window.loadQueueStatus();
     }
@@ -90,8 +90,8 @@ export function switchSettingsTab(tabId) {
     }
   }
 
-  // Handle queue refresh interval clearing if leaving queue tab
-  if (tabId !== 'queue') {
+  // Handle queue refresh interval clearing if leaving schedule tab
+  if (tabId !== 'schedule') {
     if (window.queueRefreshInterval) {
       clearInterval(window.queueRefreshInterval);
       window.queueRefreshInterval = null;
@@ -127,7 +127,7 @@ async function loadAboutInfo() {
       const gitRes = await fetch('https://raw.githubusercontent.com/leeyj/BookOasis_stable/main/VERSION');
       if (gitRes.ok) {
         const text = await gitRes.text();
-        const match = text.match(/"dashboard":\s*([0-9\.]+)/);
+        const match = text.match(/"dashboard":\s*"([0-9\.]+)"/);
         if (match && match[1]) {
           latestEl.textContent = `v${match[1]}`;
         } else {

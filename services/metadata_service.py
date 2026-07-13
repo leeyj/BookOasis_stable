@@ -66,7 +66,8 @@ class MetadataService:
         """수동 검색 모달에 사용 가능한 메타데이터 플러그인 목록 조회"""
         try:
             from services.metadata_factory import MetadataFactory
-            return MetadataFactory.get_all_searchable_providers()
+            all_providers = MetadataFactory.get_all_searchable_providers()
+            return [p for p in all_providers if p.get('enabled', True)]
         except Exception as e:
             print(f"[MetadataService] Plugin list retrieval failed: {e}")
             return []

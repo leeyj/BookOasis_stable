@@ -1,6 +1,6 @@
 <!-- 4.5 삭제 관리 (휴지통) 탭 -->
 <div id="settings-tab-trash" class="settings-tab-content" style="display: none; flex-direction: column; gap: 1rem;">
-    <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06); padding: 0.75rem 1rem; border-radius: 8px;">
+    <div class="trash-header-container" style="display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06); padding: 0.75rem 1rem; border-radius: 8px;">
         <div style="display: flex; align-items: center; gap: 0.75rem;">
             <label style="font-size: 0.875rem; color: #94a3b8; font-weight: 500;">DB 선택:</label>
             <select id="trash-db-type" onchange="loadTrashList()" style="background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc; padding: 0.35rem 1.5rem 0.35rem 0.75rem; border-radius: 6px; font-size: 0.875rem; outline: none; cursor: pointer;">
@@ -8,7 +8,7 @@
                 <option value="adult">성인 도서 DB</option>
             </select>
         </div>
-        <div style="display: flex; gap: 0.5rem;">
+        <div class="trash-header-buttons" style="display: flex; gap: 0.5rem;">
             <button class="btn btn-secondary" onclick="restoreSelectedTrash()" style="display: flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.8rem; font-size: 0.825rem; border-radius: 6px;">
                 <i class="fa-solid fa-rotate-left"></i> 선택 복구
             </button>
@@ -22,9 +22,9 @@
     </div>
 
     <!-- 삭제 감지 목록 테이블 -->
-    <div style="flex: 1; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; overflow: hidden; background: rgba(30, 41, 59, 0.2); backdrop-filter: blur(10px);">
+    <div class="settings-table-wrapper" style="flex: 1; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; overflow-x: auto; background: rgba(30, 41, 59, 0.2); backdrop-filter: blur(10px);">
         <div style="max-height: 450px; overflow-y: auto;">
-            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.875rem; color: #cbd5e1;">
+            <table class="settings-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.875rem; color: #cbd5e1;">
                 <thead>
                     <tr style="background: rgba(255, 255, 255, 0.02); border-bottom: 1px solid rgba(255, 255, 255, 0.06); position: sticky; top: 0; z-index: 1;">
                         <th style="padding: 0.75rem 1rem; width: 40px; text-align: center;">
