@@ -30,6 +30,10 @@ nav:
 - 개발 워크플로우: workflow.md
 - 작업 히스토리:
   - history/index.md
+  - history/20260713_230556_session_20260713_230556_walkthrough.md
+  - history/20260713_230556_session_20260713_230556_task.md
+  - history/20260713_225901_session_20260713_225901_walkthrough.md
+  - history/20260713_225901_session_20260713_225901_task.md
   - history/20260713_224949_session_20260713_224949_walkthrough.md
   - history/20260713_224949_session_20260713_224949_task.md
   - history/20260713_224551_session_20260713_224551_walkthrough.md
@@ -735,6 +739,7 @@ nav:
   - history/20260619_145226_init_docs_task.md
 - 버그 트러블슈팅:
   - bug/index.md
+  - bug/20260713_improvement_pdf_dpr_scale.md
   - bug/20260713_improvement_imgdir_series_redefinition.md
   - bug/20260713_improvement_dashboard_widget_click_contract.md
   - bug/20260713_bugfix_virtual_book_detail_filter.md

@@ -120,8 +120,9 @@ export function renderPdfPage() {
       const scaleY = availableHeight / unscaledViewport.height;
       const scale = Math.min(scaleX, scaleY);
 
-      // DPR 오버샘플링 적용 (Retina 및 고해상도 모니터 대응, 최소 1.5배 보장)
-      const dpr = Math.max(window.devicePixelRatio || 1, 1.5);
+      // DPR 오버샘플링 적용 (모바일/태블릿은 메모리 세이프를 위해 1.5배, PC는 선명도를 위해 2.0배 보장)
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const dpr = Math.max(window.devicePixelRatio || 1, isMobile ? 1.5 : 2.0);
       const viewport = page.getViewport({ scale: scale * dpr });
       
       canvas.width = viewport.width;
