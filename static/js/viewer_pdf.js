@@ -37,7 +37,9 @@ export async function initPdfViewer(bookId, pagesRead, totalPages) {
   pdfjsLib.getDocument({
     url: url,
     disableAutoFetch: true,  // 브라우저가 전체 파일을 백그라운드에서 전부 받는 행위 억제
-    disableStream: false     // 스트림 단위로 조각 수신 허용
+    disableStream: false,    // 스트림 단위로 조각 수신 허용
+    cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/cmaps/',
+    cMapPacked: true
   }).promise
     .then(doc => { 
       pdfDoc = doc; 
@@ -144,7 +146,34 @@ export function renderPdfPage() {
     });
   });
 
-  updatePageInfo();
+  updatePdfPageInfo();
+}
+
+export function updatePdfPageInfo() {
+  const pageInfoEl = document.getElementById('pdf-page-info');
+  if (pageInfoEl) {
+    pageInfoEl.textContent = `${pdfCurrentPage} / ${pdfTotalPages}`;
+  }
+
+  const overlayInfoEl = document.getElementById('comic-overlay-page-info');
+  if (overlayInfoEl) {
+    overlayInfoEl.textContent = `${pdfCurrentPage} / ${pdfTotalPages}`;
+  }
+
+  const slider = document.getElementById('viewer-page-slider');
+  if (slider) {
+    slider.max = pdfTotalPages || 1;
+    slider.value = pdfCurrentPage;
+  }
+  const endLabel = document.getElementById('seekbar-end-label');
+  if (endLabel) {
+    endLabel.textContent = pdfTotalPages || '?';
+  }
+
+  const overlayTitleEl = document.getElementById('overlay-title-text');
+  if (overlayTitleEl) {
+    overlayTitleEl.textContent = document.getElementById('viewer-title-text').textContent;
+  }
 }
 
 export function prevPdfPage() {

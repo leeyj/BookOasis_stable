@@ -30,6 +30,12 @@ nav:
 - 개발 워크플로우: workflow.md
 - 작업 히스토리:
   - history/index.md
+  - history/20260713_224949_session_20260713_224949_walkthrough.md
+  - history/20260713_224949_session_20260713_224949_task.md
+  - history/20260713_224551_session_20260713_224551_walkthrough.md
+  - history/20260713_224551_session_20260713_224551_task.md
+  - history/20260713_224437_session_20260713_224437_walkthrough.md
+  - history/20260713_224437_session_20260713_224437_task.md
   - history/20260713_204239_session_20260713_204239_walkthrough.md
   - history/20260713_204239_session_20260713_204239_task.md
   - history/20260713_203815_session_20260713_203815_walkthrough.md
@@ -740,6 +746,8 @@ nav:
   - bug/20260713_bugfix_scan_multi_volume.md
   - bug/20260713_bugfix_scan_imgdir_unpack.md
   - bug/20260713_bugfix_scan_hierarchy_series.md
+  - bug/20260713_bugfix_pdf_seekbar_sync.md
+  - bug/20260713_bugfix_pdf_load_and_cmap_font.md
   - bug/20260713_bugfix_mobile_detail_view_bottom_overlap.md
   - bug/20260713_bugfix_mobile_and_version_parsing.md
   - bug/20260713_bugfix_infinite_scroll_margin.md
