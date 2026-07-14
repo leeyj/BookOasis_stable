@@ -532,17 +532,113 @@ class StreamService:
                 title = title_elem.text if title_elem is not None else 'Untitled'
 
                 manifest_items = {}
+                ncx_href = None
+                nav_href = None
                 for item in opf_root.findall('.//manifest/item'):
                     item_id = item.attrib.get('id')
                     href = item.attrib.get('href')
+                    media_type = item.attrib.get('media-type', '')
+                    properties = item.attrib.get('properties', '')
+                    
                     if item_id and href:
                         manifest_items[item_id] = href
+                    if media_type == 'application/x-dtbncx+xml':
+                        ncx_href = href
+                    if 'nav' in properties.split():
+                        nav_href = href
+
+                spine = opf_root.find('.//spine')
+                if not ncx_href and spine is not None:
+                    toc_id = spine.attrib.get('toc')
+                    if toc_id and toc_id in manifest_items:
+                        ncx_href = manifest_items[toc_id]
 
                 spine_itemrefs = []
-                for itemref in opf_root.findall('.//spine/itemref'):
-                    idref = itemref.attrib.get('idref')
-                    if idref in manifest_items:
-                        spine_itemrefs.append(manifest_items[idref])
+                if spine is not None:
+                    for itemref in spine.findall('./itemref'):
+                        idref = itemref.attrib.get('idref')
+                        if idref in manifest_items:
+                            spine_itemrefs.append(manifest_items[idref])
+
+                toc_list = []
+                try:
+                    from bs4 import BeautifulSoup
+                    import urllib.parse
+                    import posixpath
+
+                    def resolve_toc_item(src, base_href):
+                        if not src:
+                            return -1, ""
+                        parts = src.split('#')
+                        clean_src = urllib.parse.unquote(parts[0])
+                        anchor = parts[1] if len(parts) > 1 else ""
+                        base_dir = posixpath.dirname(base_href)
+                        src_rel_to_opf = posixpath.normpath(posixpath.join(base_dir, clean_src))
+                        if src_rel_to_opf.startswith('./'):
+                            src_rel_to_opf = src_rel_to_opf[2:]
+                        elif src_rel_to_opf == '.':
+                            src_rel_to_opf = ''
+                            
+                        idx = -1
+                        for i, spine_ref in enumerate(spine_itemrefs):
+                            if spine_ref == src_rel_to_opf or urllib.parse.unquote(spine_ref) == src_rel_to_opf:
+                                idx = i
+                                break
+                        return idx, anchor
+
+                    if nav_href:
+                        nav_full_path = posixpath.join(opf_dir, nav_href) if opf_dir else nav_href
+                        nav_data = zf.read(nav_full_path).decode('utf-8', errors='ignore')
+                        soup = BeautifulSoup(nav_data, 'html.parser')
+                        nav_elem = soup.find('nav', attrs={'epub:type': 'toc'})
+                        if not nav_elem:
+                            nav_elem = soup.find('nav', attrs={'role': 'doc-toc'})
+                        if nav_elem:
+                            def parse_nav_ol(ol_elem, level=1):
+                                for li in ol_elem.find_all('li', recursive=False):
+                                    a_tag = li.find('a')
+                                    if a_tag and a_tag.get('href'):
+                                        idx, anchor = resolve_toc_item(a_tag.get('href'), nav_href)
+                                        toc_list.append({
+                                            'title': a_tag.get_text(strip=True),
+                                            'chapter_idx': idx,
+                                            'anchor': anchor,
+                                            'level': level
+                                        })
+                                    child_ol = li.find('ol')
+                                    if child_ol:
+                                        parse_nav_ol(child_ol, level + 1)
+                            root_ol = nav_elem.find('ol')
+                            if root_ol:
+                                parse_nav_ol(root_ol, 1)
+
+                    if not toc_list and ncx_href:
+                        ncx_full_path = posixpath.join(opf_dir, ncx_href) if opf_dir else ncx_href
+                        ncx_data = zf.read(ncx_full_path).decode('utf-8', errors='ignore')
+                        soup = BeautifulSoup(ncx_data, 'html.parser')
+                        navmap = soup.find('navmap')
+                        if navmap:
+                            def parse_navpoint(np_elem, level=1):
+                                for np in np_elem.find_all('navpoint', recursive=False):
+                                    label_elem = np.find('navlabel')
+                                    text_elem = label_elem.find('text') if label_elem else None
+                                    title = text_elem.get_text(strip=True) if text_elem else 'Untitled'
+                                    
+                                    content_elem = np.find('content')
+                                    src = content_elem.get('src') if content_elem else None
+                                    
+                                    idx, anchor = resolve_toc_item(src, ncx_href)
+                                    toc_list.append({
+                                        'title': title,
+                                        'chapter_idx': idx,
+                                        'anchor': anchor,
+                                        'level': level
+                                    })
+                                    parse_navpoint(np, level + 1)
+                            parse_navpoint(navmap, 1)
+                except Exception as e:
+                    import logging
+                    logging.error(f"Failed to parse TOC: {e}")
 
                 chapters = []
                 for idx, rel_href in enumerate(spine_itemrefs):
@@ -582,7 +678,8 @@ class StreamService:
 
                 return {
                     'title': title,
-                    'chapters': chapters
+                    'chapters': chapters,
+                    'toc': toc_list
                 }, None
 
         except Exception as e:

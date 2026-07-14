@@ -63,9 +63,13 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
         const chapters = data.chapters || [];
         txtChunks = chapters.map(ch => ch.content);
         fullText = txtChunks.join('<hr class="epub-chapter-divider" style="border: none; border-top: 1px dashed rgba(255,255,255,0.15); margin: 3rem 0;"/>');
+        
+        const tocList = data.toc || [];
+        renderEpubToc(tocList);
       } else {
         fullText = data;
         txtChunks = chunkText(data, 4000);
+        renderEpubToc([]); // Fallback for TXT
       }
 
       let startIdx = initialPageIdx;
@@ -997,6 +1001,11 @@ export const TxtViewer = {
       activeResizeHandler = null;
     }
     clearTimeout(resizeTimeout);
+    
+    const tocBtn = document.getElementById('epub-toc-btn');
+    const tocContainer = document.getElementById('epub-toc-container');
+    if (tocBtn) tocBtn.remove();
+    if (tocContainer) tocContainer.remove();
   },
   prevPage() {
     prevTxtPage();
@@ -1015,3 +1024,134 @@ export const TxtViewer = {
     applyTxtSettings(options || {});
   }
 };
+
+function renderEpubToc(tocList) {
+    let container = document.getElementById('epub-toc-container');
+    let btn = document.getElementById('epub-toc-btn');
+
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'epub-toc-container';
+        container.className = 'epub-toc-container';
+        container.style.cssText = `
+            position: fixed;
+            top: 0;
+            right: -320px;
+            width: 300px;
+            height: 100%;
+            background: var(--bg-color, #1e1e1e);
+            color: var(--text-color, #d4d4d4);
+            box-shadow: -2px 0 12px rgba(0,0,0,0.5);
+            transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 9999;
+            overflow-y: auto;
+            padding: 20px;
+            box-sizing: border-box;
+            border-left: 1px solid rgba(255,255,255,0.1);
+        `;
+        document.body.appendChild(container);
+    }
+
+    if (!btn) {
+        btn = document.createElement('button');
+        btn.id = 'epub-toc-btn';
+        btn.innerHTML = '<i class="fas fa-list"></i>';
+        btn.style.cssText = `
+            position: fixed;
+            top: 90px;
+            right: 20px;
+            z-index: 10000;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            backdrop-filter: blur(4px);
+            transition: transform 0.2s, background 0.2s;
+        `;
+        btn.onmouseover = () => btn.style.transform = 'scale(1.05)';
+        btn.onmouseout = () => btn.style.transform = 'scale(1)';
+        btn.onclick = () => {
+            const isClosed = container.style.right.startsWith('-');
+            container.style.right = isClosed ? '0px' : '-320px';
+        };
+        document.body.appendChild(btn);
+    }
+
+    const headerEl = document.createElement('h3');
+    headerEl.style.cssText = 'margin-top:0; margin-bottom:20px; font-weight:600; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px;';
+    headerEl.textContent = '목차';
+
+    const ul = document.createElement('ul');
+    ul.style.cssText = 'list-style:none; padding:0; margin:0; font-size:0.95rem;';
+
+    const buildItem = (title, chapterIdx, anchor, paddingLeft) => {
+        const li = document.createElement('li');
+        li.style.cssText = `padding-left:${paddingLeft}px; margin-bottom:12px; line-height:1.4;`;
+        const a = document.createElement('a');
+        a.href = '#';
+        a.style.cssText = 'color:inherit; text-decoration:none; display:block; opacity:0.85; transition:opacity 0.2s;';
+        a.textContent = title;
+        a.addEventListener('mouseover', () => { a.style.opacity = '1'; });
+        a.addEventListener('mouseout', () => { a.style.opacity = '0.85'; });
+        a.addEventListener('click', (e) => {
+            e.preventDefault();
+            jumpToChapter(chapterIdx, anchor);
+        });
+        li.appendChild(a);
+        return li;
+    };
+
+    if (tocList && tocList.length > 0) {
+        tocList.forEach(item => {
+            ul.appendChild(buildItem(item.title, item.chapter_idx, item.anchor || '', (item.level - 1) * 16));
+        });
+    } else {
+        txtChunks.forEach((_, idx) => {
+            ul.appendChild(buildItem(`청크 ${idx + 1}`, idx, '', 0));
+        });
+    }
+
+    container.innerHTML = '';
+    container.appendChild(headerEl);
+    container.appendChild(ul);
+}
+
+function jumpToChapter(chapterIdx, anchor) {
+    if (chapterIdx < 0 || chapterIdx >= txtChunks.length) return;
+
+    const container = document.getElementById('epub-toc-container');
+    if (container) container.style.right = '-320px';
+
+    currentChunkIdx = chapterIdx;
+
+    const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
+    if (scrollMode === 'scroll') {
+        const scrollWrapper = document.getElementById('txt-scroll-wrapper');
+        const ratio = currentChunkIdx / txtChunks.length;
+        if (scrollWrapper) {
+            scrollWrapper.scrollTop = scrollWrapper.scrollHeight * ratio;
+        }
+    } else {
+        renderCurrentChunk(true);
+    }
+
+    saveProgress(state.activeBookId, currentChunkIdx, txtChunks.length);
+
+    if (anchor) {
+        setTimeout(() => {
+            const targetEl = document.getElementById(anchor);
+            if (targetEl) {
+                targetEl.scrollIntoView({ behavior: 'smooth' });
+            }
+        }, 100);
+    }
+}
+

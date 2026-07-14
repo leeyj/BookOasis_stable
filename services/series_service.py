@@ -163,6 +163,7 @@ class SeriesService:
                 'is_favorite' : r['is_favorite'] or 0,
                 'latest_added': r['latest_added'],
                 'representative_book_id': r['representative_book_id'],
+                'library_id'  : lib_id,
                 'genre'       : r['genre'] or '',
                 'tags'        : r['tags'] or ''
             })
@@ -270,6 +271,7 @@ class SeriesService:
                 'is_favorite' : r['is_favorite'] or 0,
                 'latest_added': r['latest_added'],
                 'representative_book_id': r['representative_book_id'],
+                'library_id'  : lib_id,
                 'genre'       : r['genre'] or '',
                 'tags'        : r['tags'] or ''
             })
