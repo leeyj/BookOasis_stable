@@ -145,9 +145,7 @@ def get_recently_added_entries(db_type: str, download_prefix: str, urn_prefix: s
             'cover': b['cover_image'],
         })
     return entries
-
-
-def get_recently_read_entries(db_type: str, download_prefix: str, urn_prefix: str):
+def get_recently_read_entries(db_type: str, download_prefix: str, urn_prefix: str, user_id: int = None):
     conn = database.get_connection(db_type)
     cursor = conn.cursor()
 
@@ -157,17 +155,32 @@ def get_recently_read_entries(db_type: str, download_prefix: str, urn_prefix: st
     if row_limit and row_limit['value'] and str(row_limit['value']).isdigit():
         limit = int(row_limit['value'])
 
-    cursor.execute(
-        """
-        SELECT b.id, b.title, b.file_path, b.cover_image, p.last_read_at
-        FROM user_progress p
-        JOIN books b ON p.book_id = b.id
-        WHERE b.title IS NOT NULL AND b.title != '' AND COALESCE(b.is_deleted, 0) = 0
-        ORDER BY p.last_read_at DESC
-        LIMIT ?
-        """,
-        (limit,)
-    )
+    if user_id is None:
+        cursor.execute(
+            """
+            SELECT b.id, b.title, b.file_path, b.cover_image, p.last_read_at
+            FROM user_progress AS p INDEXED BY idx_user_progress_last_read_book
+            JOIN books b ON p.book_id = b.id
+            WHERE b.title IS NOT NULL AND b.title != '' AND COALESCE(b.is_deleted, 0) = 0
+            ORDER BY p.last_read_at DESC
+            LIMIT ?
+            """,
+            (limit,)
+        )
+    else:
+        cursor.execute(
+            """
+            SELECT b.id, b.title, b.file_path, b.cover_image, p.last_read_at
+            FROM user_progress AS p INDEXED BY idx_user_progress_last_read
+            JOIN books b ON p.book_id = b.id
+            WHERE p.user_id = ?
+              AND b.title IS NOT NULL AND b.title != ''
+              AND COALESCE(b.is_deleted, 0) = 0
+            ORDER BY p.last_read_at DESC
+            LIMIT ?
+            """,
+            (user_id, limit)
+        )
     books = cursor.fetchall()
     conn.close()
 
@@ -187,10 +200,14 @@ def get_recently_read_entries(db_type: str, download_prefix: str, urn_prefix: st
         })
     return entries
 
-def search_books_entries(db_type: str, query: str, download_prefix: str, urn_prefix: str, limit: int = 100, offset: int = 0):
-    conn = database.get_connection(db_type)
-    cursor = conn.cursor()
-    
+def _build_fts_match_query(query: str) -> str:
+    terms = [term.strip() for term in re.split(r'\s+', str(query or '').strip()) if term.strip()]
+    if not terms:
+        return ''
+    return ' AND '.join(f'"{term.replace(chr(34), chr(34) * 2)}"' for term in terms)
+
+
+def _search_books_entries_like(cursor, query: str, limit: int, offset: int):
     like_query = f"%{query}%"
     cursor.execute(
         """
@@ -200,7 +217,7 @@ def search_books_entries(db_type: str, query: str, download_prefix: str, urn_pre
         (like_query, like_query, like_query)
     )
     total = cursor.fetchone()['total']
-    
+
     cursor.execute(
         """
         SELECT id, title, series_name, author, file_path, cover_image, summary
@@ -211,7 +228,46 @@ def search_books_entries(db_type: str, query: str, download_prefix: str, urn_pre
         """,
         (like_query, like_query, like_query, limit, offset)
     )
-    books = cursor.fetchall()
+    return cursor.fetchall(), total
+
+
+def _search_books_entries_fts(cursor, query: str, limit: int, offset: int):
+    match_query = _build_fts_match_query(query)
+    if not match_query:
+        return [], 0
+
+    cursor.execute(
+        """
+        SELECT COUNT(*) AS total
+        FROM books_search
+        JOIN books b ON b.id = books_search.rowid
+        WHERE books_search MATCH ? AND COALESCE(b.is_deleted, 0) = 0
+        """,
+        (match_query,)
+    )
+    total = cursor.fetchone()['total']
+
+    cursor.execute(
+        """
+        SELECT b.id, b.title, b.series_name, b.author, b.file_path, b.cover_image, b.summary
+        FROM books_search
+        JOIN books b ON b.id = books_search.rowid
+        WHERE books_search MATCH ? AND COALESCE(b.is_deleted, 0) = 0
+        ORDER BY bm25(books_search), b.title ASC, b.id ASC
+        LIMIT ? OFFSET ?
+        """,
+        (match_query, limit, offset)
+    )
+    return cursor.fetchall(), total
+
+
+def search_books_entries(db_type: str, query: str, download_prefix: str, urn_prefix: str, limit: int = 100, offset: int = 0):
+    conn = database.get_connection(db_type)
+    cursor = conn.cursor()
+    try:
+        books, total = _search_books_entries_fts(cursor, query, limit, offset)
+    except Exception:
+        books, total = _search_books_entries_like(cursor, query, limit, offset)
     conn.close()
     
     entries = []

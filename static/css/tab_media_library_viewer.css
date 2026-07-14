@@ -945,8 +945,9 @@
 /* PDF 영역 */
 .pdf-area canvas {
     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    margin: 1.5rem auto;
+    margin: 0;
     display: block;
+    flex: 0 0 auto;
 }
 
 /* ─── rclone/GDrive 다운로드 로딩 오버레이 ─────────────────────── */

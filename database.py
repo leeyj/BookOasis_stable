@@ -253,6 +253,58 @@ def auto_migrate_schema(conn, schema_text):
                 except Exception as e:
                     print(f"[DB-Migration ERROR] Failed to add dynamic column ({alter_query}): {e}")
 
+
+def ensure_books_search_index(conn):
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            CREATE VIRTUAL TABLE IF NOT EXISTS books_search USING fts5(
+                title,
+                series_name,
+                author,
+                summary,
+                content='books',
+                content_rowid='id',
+                tokenize='unicode61'
+            )
+            """
+        )
+        cursor.executescript(
+            """
+            CREATE TRIGGER IF NOT EXISTS books_search_ai AFTER INSERT ON books BEGIN
+                INSERT INTO books_search(rowid, title, series_name, author, summary)
+                VALUES (new.id, COALESCE(new.title, ''), COALESCE(new.series_name, ''), COALESCE(new.author, ''), COALESCE(new.summary, ''));
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS books_search_ad AFTER DELETE ON books BEGIN
+                INSERT INTO books_search(books_search, rowid, title, series_name, author, summary)
+                VALUES ('delete', old.id, COALESCE(old.title, ''), COALESCE(old.series_name, ''), COALESCE(old.author, ''), COALESCE(old.summary, ''));
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS books_search_au AFTER UPDATE ON books BEGIN
+                INSERT INTO books_search(books_search, rowid, title, series_name, author, summary)
+                VALUES ('delete', old.id, COALESCE(old.title, ''), COALESCE(old.series_name, ''), COALESCE(old.author, ''), COALESCE(old.summary, ''));
+                INSERT INTO books_search(rowid, title, series_name, author, summary)
+                VALUES (new.id, COALESCE(new.title, ''), COALESCE(new.series_name, ''), COALESCE(new.author, ''), COALESCE(new.summary, ''));
+            END;
+            """
+        )
+
+        cursor.execute("SELECT COUNT(*) FROM books")
+        books_count = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM books_search")
+        search_count = cursor.fetchone()[0]
+        if books_count != search_count:
+            cursor.execute("INSERT INTO books_search(books_search) VALUES ('rebuild')")
+        conn.commit()
+    except sqlite3.OperationalError as e:
+        conn.rollback()
+        if 'fts5' in str(e).lower() or 'no such module' in str(e).lower():
+            print(f"[DB-Migration Warning] FTS5 unavailable; OPDS search falls back to LIKE queries: {e}")
+            return
+        raise
+
 def init_databases():
     """두 데이터베이스(일반, 성인)의 테이블 스키마 초기화"""
     schema = """
@@ -375,8 +427,10 @@ def init_databases():
     CREATE INDEX IF NOT EXISTS idx_books_is_favorite ON books(is_favorite);
     CREATE INDEX IF NOT EXISTS idx_books_created_at ON books(created_at);
     CREATE INDEX IF NOT EXISTS idx_books_series_lib_title ON books(series_name, library_id, title);
+    CREATE INDEX IF NOT EXISTS idx_books_library_active_series ON books(library_id, COALESCE(is_deleted, 0), COALESCE(series_name, ''));
     CREATE UNIQUE INDEX IF NOT EXISTS idx_user_progress_book_user ON user_progress(book_id, user_id);
     CREATE INDEX IF NOT EXISTS idx_user_progress_last_read ON user_progress(user_id, last_read_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_user_progress_last_read_book ON user_progress(last_read_at DESC, book_id);
     CREATE INDEX IF NOT EXISTS idx_user_reading_log_user_date ON user_reading_log(user_id, read_date);
     CREATE INDEX IF NOT EXISTS idx_user_category_permissions_lookup ON user_category_permissions(user_id, library_id, has_access);
     """
@@ -386,6 +440,12 @@ def init_databases():
         cursor = conn.cursor()
         cursor.executescript(schema)
         conn.commit()
+
+        # 신규 표현식 인덱스 생성 전에 누락 컬럼을 먼저 보강해야 구버전 DB에서도 안전합니다.
+        try:
+            auto_migrate_schema(conn, schema)
+        except Exception as migrate_err:
+            print(f"[DB-Migration ERROR] Exception during pre-index schema auto-migration: {migrate_err}")
         
         # [마이그레이션] user_progress 중복 레코드 정리 및 고유 인덱스 설정 준비
         try:
@@ -421,6 +481,11 @@ def init_databases():
         # 테이블 생성 완료 후 별도 트랜잭션으로 인덱스 일괄 생성하여 SQLite OperationalError 예방
         cursor.executescript(indexes_schema)
         conn.commit()
+
+        try:
+            ensure_books_search_index(conn)
+        except Exception as search_idx_err:
+            print(f"[DB-Migration ERROR] books_search index setup failed: {search_idx_err}")
         
         # settings 테이블 초기값 주입 (ALADIN TTBKey)
         try:
@@ -475,12 +540,6 @@ def init_databases():
                 print(f"[DB-Migration] {db_type} DB - admin/admin initial account created")
         except Exception as e:
             print(f"[DB-Migration ERROR] Initial settings/users migration failed: {e}")
-        # 동적 스키마 자동 마이그레이터 구동 (테이블에 신규 필드가 추가되면 런타임에 동적으로 감지하여 ALTER TABLE 자동 수행)
-        try:
-            auto_migrate_schema(conn, schema)
-        except Exception as migrate_err:
-            print(f"[DB-Migration ERROR] Exception during dynamic schema auto-migration: {migrate_err}")
-
         # 권한 테이블 초기 데이터 시딩 (기존 사용자 및 라이브러리가 있을 때 권한 일괄 1로 주입)
         try:
             cursor.execute("SELECT id FROM users")

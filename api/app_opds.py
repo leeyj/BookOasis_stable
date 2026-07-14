@@ -23,7 +23,7 @@ import urllib.parse
 from flask import Blueprint, Response, jsonify, redirect, request, send_file, session
 import database
 from api.cache import LRUCache
-from api.opds_common.auth import unauthorized_response, verify_basic_auth_credentials
+from api.opds_common.auth import authenticate_basic_auth_user, unauthorized_response
 from api.opds_common.xml import atom_response, build_opds_xml, get_page_params
 from api.app_opds_handlers import AppOpdsHandlers
 from services.opds_service import (
@@ -58,66 +58,67 @@ _auth_lock = threading.Lock()
 _CACHE_TTL = 300  # 5분 (초 단위)
 
 
+def _session_user(is_adult: bool = False):
+    if not session.get('user_id'):
+        return None
+    role = session.get('role')
+    if is_adult and role != 'admin':
+        return None
+    return {
+        'id': session.get('user_id'),
+        'username': session.get('username'),
+        'role': role,
+    }
+
+
+def _get_authenticated_user_cached(is_adult: bool = False):
+    auth = request.authorization
+    if not auth or not auth.username or not auth.password:
+        return _session_user(is_adult=is_adult)
+
+    key = hashlib.sha256(f"{auth.username}:{auth.password}".encode()).hexdigest()
+    now = time.time()
+
+    if key in _auth_cache:
+        expires, user = _auth_cache[key]
+        if now < expires:
+            if is_adult and user.get('role') != 'admin':
+                return None
+            return user
+
+    with _auth_lock:
+        if key in _auth_cache:
+            expires, user = _auth_cache[key]
+            if now < expires:
+                if is_adult and user.get('role') != 'admin':
+                    return None
+                return user
+            _auth_cache.pop(key, None)
+
+        user = authenticate_basic_auth_user(auth.username, auth.password, require_admin=False)
+        if not user:
+            return None
+
+        user_meta = {
+            'id': user['id'],
+            'username': user['username'],
+            'role': user['role'],
+        }
+        _auth_cache[key] = (time.time() + _CACHE_TTL, user_meta)
+
+        if is_adult and user_meta['role'] != 'admin':
+            _auth_cache.pop(key, None)
+            return None
+
+        return user_meta
+
+
 def _check_auth_cached(is_adult: bool = False) -> bool:
     """
     Basic Auth 검증 결과를 TTL 캐시로 보관.
     Double-Checked Locking 패턴을 사용하여 타치요미 병렬 요청 시의 Thundering Herd 현상 방지.
     """
-    auth = request.authorization
-    if not auth or not auth.username or not auth.password:
-        # Browser-based compat clients may rely on existing web session auth instead of Basic Auth.
-        if session.get('user_id'):
-            if is_adult and session.get('role') != 'admin':
-                return False
-            return True
-        return False
-
-    key = hashlib.sha256(f"{auth.username}:{auth.password}".encode()).hexdigest()
-    now = time.time()
-
-    # 1. 락 없는 빠른 읽기 (Fast Path)
-    if key in _auth_cache:
-        expires, user = _auth_cache[key]
-        if now < expires:
-            if is_adult and user.get('role') != 'admin':
-                return False
-            return True
-
-    # 2. 캐시 미스 또는 만료된 경우 락 획득 (Slow Path)
-    with _auth_lock:
-        # 락 획득 후 이미 갱신되었는지 다시 한 번 확인 (Double Check)
-        if key in _auth_cache:
-            expires, user = _auth_cache[key]
-            if now < expires:
-                if is_adult and user.get('role') != 'admin':
-                    return False
-                return True
-            # 만료된 경우 쓰레드 안전하게 삭제 (pop 사용으로 KeyError 예방)
-            _auth_cache.pop(key, None)
-
-        # 3. 무거운 작업 (DB 접근 및 bcrypt 검증) 수행 (오직 하나의 스레드만 진입)
-        ok = verify_basic_auth_credentials(auth.username, auth.password, require_admin=False)
-        if not ok:
-            return False
-
-        # adult 여부는 캐시에 role 정보를 함께 저장해 빠르게 검사한다.
-        conn = database.get_connection('general')
-        try:
-            cursor = conn.cursor()
-            cursor.execute("SELECT role FROM users WHERE username = ?", (auth.username,))
-            role_row = cursor.fetchone()
-            role = role_row['role'] if role_row else None
-        finally:
-            conn.close()
-
-        # 4. 검증이 완료되면 캐시에 업데이트
-        _auth_cache[key] = (time.time() + _CACHE_TTL, {'role': role})
-
-        if is_adult and role != 'admin':
-            _auth_cache.pop(key, None)
-            return False
-            
-        return True
+    return _get_authenticated_user_cached(is_adult=is_adult) is not None
 
 
 def _unauthorized():
@@ -207,6 +208,7 @@ def _filter_supported_books_for_app_opds(books_list):
 
 _handlers = AppOpdsHandlers(
     check_auth_cached=_check_auth_cached,
+    get_current_user=_get_authenticated_user_cached,
     unauthorized=_unauthorized,
     get_cached_response=_get_cached_response,
     set_cached_response=_set_cached_response,

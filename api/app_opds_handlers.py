@@ -25,6 +25,7 @@ class AppOpdsHandlers:
         self,
         *,
         check_auth_cached,
+        get_current_user,
         unauthorized,
         get_cached_response,
         set_cached_response,
@@ -37,6 +38,7 @@ class AppOpdsHandlers:
         enrich_books,
     ):
         self._check_auth_cached = check_auth_cached
+        self._get_current_user = get_current_user
         self._unauthorized = unauthorized
         self._get_cached_response = get_cached_response
         self._set_cached_response = set_cached_response
@@ -225,11 +227,14 @@ class AppOpdsHandlers:
         return self._atom_response(xml)
 
     def handle_recently_feed(self, is_adult: bool, kind: str):
-        if not self._check_auth_cached(is_adult=is_adult):
+        user = self._get_current_user(is_adult=is_adult)
+        if not user:
             return self._unauthorized()
 
         db_type = 'adult' if is_adult else 'general'
         cache_key = f"app_opds_recently_{kind}:{db_type}"
+        if kind == 'read':
+            cache_key = f"{cache_key}:{user['id']}"
         cached_xml = self._get_cached_response(cache_key)
         if cached_xml is not None:
             return self._atom_response(cached_xml)
@@ -238,7 +243,7 @@ class AppOpdsHandlers:
             entries = get_recently_added_entries(db_type, f'/app-opds/download/{db_type}', f'app:{db_type}')
             title = '신규 추가'
         else:
-            entries = get_recently_read_entries(db_type, f'/app-opds/download/{db_type}', f'app:{db_type}')
+            entries = get_recently_read_entries(db_type, f'/app-opds/download/{db_type}', f'app:{db_type}', user_id=user['id'])
             title = '최근 읽은 도서'
 
         xml = self._opds_xml(db_type, title, entries, is_adult=is_adult)

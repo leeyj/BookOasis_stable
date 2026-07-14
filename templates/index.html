@@ -9,7 +9,7 @@
     <meta name="theme-color" content="#090d16">
     <title>BookOasis - 도서 보관함</title>
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logo.png') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logo.png') }}?sig=boe-favicon-a17f3c9">
     <!-- FontAwesome 아이콘 패키지 추가 (Local) -->
     <link rel="stylesheet" href="{{ url_for('static', filename='lib/font-awesome/css/all.min.css') }}">
     <!-- i18n 다국어 지원 엔진 -->
@@ -23,6 +23,7 @@
             username: "{{ session.get('username', '') }}",
             role: "{{ session.get('role', '') }}"
         };
+        window.bookOasisConsoleLog = typeof console.log === 'function' ? console.log.bind(console) : function() {};
         
         // 🌟 VIEW_LOG 환경변수에 따른 전역 콘솔 로그 제어 (Monkey Patch)
         window.VIEW_LOG = "{{ 'true' if view_log_enabled else 'false' }}" === "true";
@@ -40,6 +41,8 @@
             --color-accent-hover: {{ user_theme_color|default('#a855f7') }}cc;
             --bg-glow-1: {{ user_theme_color|default('#a855f7') }}33;
             --bg-glow-2: #3b82f633;
+            --bookoasis-engine-mark-a17f3c9: rgba(168, 85, 247, 0.12);
+            --boe-copyright-whisper-a17f3c9: rgba(148, 163, 184, 0.72);
         }
 
         body {
@@ -56,8 +59,8 @@
         }
     </style>
     <script>
-        console.log("%c📚 Powered by BookOasis Engine v1.0", "color: #a855f7; font-size: 20px; font-weight: bold; text-shadow: 1px 1px 2px black; padding: 10px; border-radius: 5px; border: 2px solid #a855f7;");
-        console.log("Licensed under GNU AGPLv3. https://github.com/leeyj/BookOasis_stable");
+        window.bookOasisConsoleLog("%c📚 Powered by BookOasis Engine v1.0", "color: #a855f7; font-size: 20px; font-weight: bold; text-shadow: 1px 1px 2px black; padding: 10px; border-radius: 5px; border: 2px solid #a855f7;");
+        window.bookOasisConsoleLog("Licensed under GNU AGPLv3. https://github.com/leeyj/BookOasis_stable");
     </script>
 </head>
 <body>

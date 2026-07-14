@@ -27,8 +27,10 @@ app.register_blueprint(api_bp)
 @app.after_request
 def add_fingerprint_headers(response):
     response.headers['X-Powered-By'] = 'BookOasis Engine'
+    response.headers['X-BookOasis-Engine'] = 'BookOasis Engine v1.0'
     response.headers['X-BookOasis-Version'] = '1.0'
     response.headers['X-BookOasis-License'] = 'AGPLv3'
+    response.headers['X-BookOasis-Signature'] = 'boe-core-a17f3c9'
     # 폰트, 이미지 및 외부 라이브러리(lib) 등 거의 변경되지 않는 리소스만 브라우저 강제 캐싱 적용
     # 커스텀 CSS/JS 파일들은 즉각적인 업데이트 반영을 위해 캐싱에서 제외
     is_cacheable_path = request.path.startswith('/static/lib/') or request.path.startswith('/static/fonts/')

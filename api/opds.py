@@ -9,12 +9,14 @@ opds.py – OPDS (외부 뷰어 앱 연동) 라우터
 """
 import mimetypes
 import os
+import threading
 import time
+import hashlib
 
 from flask import Blueprint, Response, jsonify, request, send_file  # type: ignore[reportMissingImports]
 import database
 from api.cache import LRUCache
-from api.opds_common.auth import unauthorized_response, verify_basic_auth_credentials
+from api.opds_common.auth import authenticate_basic_auth_user, unauthorized_response
 from api.opds_common.xml import atom_response, build_external_request_url, build_opds_xml, get_external_base_url, get_page_params
 from services.opds_service import (
     get_book_entries,
@@ -31,12 +33,56 @@ opds_bp = Blueprint('media_opds', __name__)
 
 # ─── 인증 헬퍼 ───────────────────────────────────────────────
 
-def _check_auth(is_adult: bool = False) -> bool:
-    """OPDS용 DB 기반 Basic Auth 인증 검사"""
+_auth_cache: dict = {}
+_auth_lock = threading.Lock()
+_AUTH_CACHE_TTL = 300
+
+def _get_authenticated_user(is_adult: bool = False):
+    """OPDS용 DB 기반 Basic Auth 인증 검사 및 사용자 정보 반환"""
     auth = request.authorization
     if not auth or not auth.username or not auth.password:
-        return False
-    return verify_basic_auth_credentials(auth.username, auth.password, require_admin=is_adult)
+        return None
+
+    key = hashlib.sha256(f"{auth.username}:{auth.password}".encode()).hexdigest()
+    now = time.time()
+
+    cached = _auth_cache.get(key)
+    if cached is not None:
+        expires, user = cached
+        if now < expires:
+            if is_adult and user.get('role') != 'admin':
+                return None
+            return user
+
+    with _auth_lock:
+        cached = _auth_cache.get(key)
+        if cached is not None:
+            expires, user = cached
+            if now < expires:
+                if is_adult and user.get('role') != 'admin':
+                    return None
+                return user
+            _auth_cache.pop(key, None)
+
+        user = authenticate_basic_auth_user(auth.username, auth.password, require_admin=False)
+        if not user:
+            return None
+
+        user_meta = {
+            'id': user['id'],
+            'username': user['username'],
+            'role': user['role'],
+        }
+        _auth_cache[key] = (time.time() + _AUTH_CACHE_TTL, user_meta)
+
+        if is_adult and user_meta['role'] != 'admin':
+            _auth_cache.pop(key, None)
+            return None
+        return user_meta
+
+
+def _check_auth(is_adult: bool = False) -> bool:
+    return _get_authenticated_user(is_adult=is_adult) is not None
 
 
 def _unauthorized():
@@ -234,14 +280,15 @@ def opds_recently_added():
 @opds_bp.route('/opds/recently-read', methods=['GET'])
 def opds_recently_read():
     """최근 읽은 도서 목록 (일반)"""
-    if not _check_auth(is_adult=False):
+    user = _get_authenticated_user(is_adult=False)
+    if not user:
         return _unauthorized()
-    cache_key = 'opds_recently_read:general'
+    cache_key = f"opds_recently_read:general:{user['id']}"
     cached_xml = _get_cached_opds_response(cache_key)
     if cached_xml is not None:
         return _atom_response(cached_xml)
 
-    entries = get_recently_read_entries('general', '/opds/download/general', 'general')
+    entries = get_recently_read_entries('general', '/opds/download/general', 'general', user_id=user['id'])
     xml = _opds_xml('general', "최근 읽은 도서", entries)
     _set_cached_opds_response(cache_key, xml)
     return _atom_response(xml)
@@ -266,14 +313,15 @@ def opds_adult_recently_added():
 @opds_bp.route('/opds/adult/recently-read', methods=['GET'])
 def opds_adult_recently_read():
     """최근 읽은 도서 목록 (성인)"""
-    if not _check_auth(is_adult=True):
+    user = _get_authenticated_user(is_adult=True)
+    if not user:
         return _unauthorized()
-    cache_key = 'opds_recently_read:adult'
+    cache_key = f"opds_recently_read:adult:{user['id']}"
     cached_xml = _get_cached_opds_response(cache_key)
     if cached_xml is not None:
         return _atom_response(cached_xml)
 
-    entries = get_recently_read_entries('adult', '/opds/download/adult', 'adult')
+    entries = get_recently_read_entries('adult', '/opds/download/adult', 'adult', user_id=user['id'])
     xml = _opds_xml('adult', "최근 읽은 도서", entries, is_adult=True)
     _set_cached_opds_response(cache_key, xml)
     return _atom_response(xml)

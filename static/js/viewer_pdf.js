@@ -94,15 +94,23 @@ export function renderPdfPage() {
     pagesToRender = [pdfCurrentPage];
   }
 
-  // 가용 가능한 최적의 가로/세로 뷰포트 크기 측정
-  const container = document.getElementById('pdf-render-area') || document.getElementById('pdf-viewer-container');
-  const bodyContainer = document.getElementById('viewer-body-container');
-  const containerWidth = Math.max(container.clientWidth || 0, (bodyContainer ? bodyContainer.clientWidth : 0) || 0, window.innerWidth || 0);
-  const containerHeight = Math.max(container.clientHeight || 0, (bodyContainer ? bodyContainer.clientHeight : 0) || 0, window.innerHeight || 0);
+  // 실제 PDF 렌더 영역 기준으로 가용 뷰포트를 계산해 후단 CSS 축소(뭉개짐)를 방지한다.
+  const areaRect = renderArea.getBoundingClientRect();
+  const areaStyle = window.getComputedStyle(renderArea);
+  const padLeft = parseFloat(areaStyle.paddingLeft || '0') || 0;
+  const padRight = parseFloat(areaStyle.paddingRight || '0') || 0;
+  const padTop = parseFloat(areaStyle.paddingTop || '0') || 0;
+  const padBottom = parseFloat(areaStyle.paddingBottom || '0') || 0;
+  const gapPx = pagesToRender.length === 2 ? (parseFloat(areaStyle.columnGap || areaStyle.gap || '0') || 0) : 0;
 
-  // 2장 보기 상태인 경우 개별 가용 가로 길이를 절반으로 배분
-  const availableWidth = pagesToRender.length === 2 ? (containerWidth - 60) / 2 : (containerWidth - 40);
-  const availableHeight = containerHeight - 40;
+  const innerWidth = Math.max(1, areaRect.width - padLeft - padRight);
+  const innerHeight = Math.max(1, areaRect.height - padTop - padBottom);
+
+  // 2장 보기 상태인 경우 개별 가용 가로 길이를 정확히 반분한다.
+  const availableWidth = pagesToRender.length === 2
+    ? Math.max(1, (innerWidth - gapPx) / 2)
+    : innerWidth;
+  const availableHeight = innerHeight;
 
   // 페이지 배열 순회하며 캔버스 생성 및 순차 비동기 렌더링 개시
   pagesToRender.forEach(pageNum => {
@@ -120,15 +128,24 @@ export function renderPdfPage() {
       const scaleY = availableHeight / unscaledViewport.height;
       const scale = Math.min(scaleX, scaleY);
 
-      // DPR 오버샘플링 적용 (모바일/태블릿은 메모리 세이프를 위해 1.5배, PC는 선명도를 위해 2.0배 보장)
+      // DPR 오버샘플링 적용 (실제 DPR 우선, 과도한 메모리 사용을 막기 위해 상한 적용)
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      const dpr = Math.max(window.devicePixelRatio || 1, isMobile ? 1.5 : 2.0);
+      const rawDpr = window.devicePixelRatio || 1;
+      const dpr = Math.min(isMobile ? 2.0 : 2.5, Math.max(rawDpr, isMobile ? 1.25 : 1.5));
       const viewport = page.getViewport({ scale: scale * dpr });
       
       canvas.width = viewport.width;
       canvas.height = viewport.height;
       canvas.style.width = `${viewport.width / dpr}px`;
       canvas.style.height = `${viewport.height / dpr}px`;
+      canvas.style.flex = '0 0 auto';
+
+      if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        if (typeof ctx.imageSmoothingQuality !== 'undefined') {
+          ctx.imageSmoothingQuality = 'high';
+        }
+      }
 
       const renderCtx = { canvasContext: ctx, viewport };
       const renderTask = page.render(renderCtx);

@@ -1,11 +1,46 @@
 # CHANGELOG
 
+## v0.9.8
+### fixed
+- 표준 OPDS 속도 개선 | OPDS Speed Optimization
+- 표준 OPDS 내 사용자별 히스토리 보존 | OPDS User History Retention
+- 플러그인내 개행문자 허용 | Newline character allowed in plugins
+- 문서 최신화 | documents updated
+--- 
+
 ## v0.9.7
 ### fixed
 - 모바일 뷰->환경설정시 설정화면 최적화 | mobile view->environment setting when setting screen optimization
 - 일부 메뉴 통합(스캐줄 설정등) | merge some menus (schedule setting etc)
 - 대시보드 플러그인 클릭 계약 및 라우팅 지원 | dashboard plugin click contract and routing support
-  * 상세내역은 [api_endpoint.md](./docs/api_endpoints.md) 참조.
+  * 상세내역은 [api_endpoint.md](./docs/api_endpoints.md) 참조. | see [api_endpoint.md](./docs/api_endpoints.md) for details.
+- 마이그레이터 업데이트(by 짜파구리) | migrator update(by JapaGuri)
+- 플러그인이 2개씩 로드되는 현상 수정 | plugin double load fix
+- 비활성화 된 플러그인이 노출되는 현상 수정 | disable plugin still showing
+- 플러그인 off/on 시 대시보드에 반영 안되는 현상 수정 | plugin off/on not reflecting on dashboard
+
+### improved
+- 이미지 폴더 스캔 방식 변경:
+  1) 이미지 폴더는 다음 구조로 등록됩니다.
+  
+  카테고리 등록시 : /mnt/comics
+
+  /mnt/comics/데스노트 컬러판/데스노트 1권/001.jpg
+  /mnt/comics/데스노트 컬러판/데스노트 2권/002.jpg
+  ....
+  
+  2) 스캔시 다음과 같이 파싱합니다.
+    데스노트 1권 -> "권"으로 인식 (이미지 파일 기준 상위 1뎁스)
+    데스노트 컬러판 -> "시리즈"로 인식(이미지 파일 기준 상위 2뎁스)
+
+  3) 카테고리 등록 기준과 이미지파일 기준 2뎁스만 사용하고 나머지 경로는 모두 무시됩니다.
+    /mnt/comics/개별모음/ㅊ/천지무용/천지무용 컬러판/천지무용 1권/001.jpg
+    천지무용 1권 -> "권"으로 인식
+    천지무용 컬러판 -> "시리즈"로 인식.
+    "/개별모음/ㅊ/천지무용"  은 무시됨.
+  
+
+
 
 ## v0.9.6
 ### fixed
