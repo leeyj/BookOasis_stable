@@ -115,3 +115,17 @@ export function flushProgress() {
     return null;
   });
 }
+
+// ── 페이지 이탈 / 탭 전환 시 진행률 즉시 전송 ──
+// 서버 재시작 등으로 인한 진행률 유실을 방지합니다.
+// pagehide: 페이지 닫기/뒤로가기/PWA 종료 시 (iOS Safari에서 beforeunload보다 안정적)
+window.addEventListener('pagehide', () => {
+  flushProgress();
+});
+
+// visibilitychange: 탭 전환/화면 꺼짐/앱 백그라운드 전환 시
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    flushProgress();
+  }
+});

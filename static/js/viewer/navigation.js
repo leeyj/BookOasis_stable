@@ -38,7 +38,11 @@ export function toggleComicOverlay() {
     menu.style.top = offset + 'px';
 
     if (floatingCloseBtn) {
-      floatingCloseBtn.style.top = (offset + 15) + 'px';
+      // PWA 환경의 Safe Area 및 추가 여백을 위해 CSS 커스텀 속성을 활용하거나,
+      // CSS에서 계산하도록 top을 직접 주입하는 대신 CSS 변수 --scroll-offset을 설정하고 top은 CSS에서 처리하게 유도할 수 있습니다.
+      // 여기서는 기존 호환성을 위해 offset + CSS 기준 탑 여백(기본 20px, PWA대응 40px 등)을 적용합니다.
+      const baseTop = 40; // 닫기 버튼 기본 상단 여백 (PWA 대응값)
+      floatingCloseBtn.style.top = `calc(${offset + baseTop}px + env(safe-area-inset-top, 0px))`;
     }
 
     const clientHeight = isScrollActive ? viewerModal.clientHeight : window.innerHeight;

@@ -131,8 +131,52 @@ class SQLiteConnectionPool:
             'utilization_pct': util_pct,
         }
 
+    def shutdown(self):
+        """풀의 모든 유휴 커넥션에 대해 WAL 체크포인트를 수행하고 물리적으로 닫습니다."""
+        closed_count = 0
+        checkpoint_done = False
+        with self.lock:
+            while not self.pool.empty():
+                try:
+                    conn = self.pool.get_nowait()
+                    # 첫 번째 커넥션에서만 WAL 체크포인트 수행
+                    if not checkpoint_done:
+                        try:
+                            conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+                            checkpoint_done = True
+                            print(f"[DB-Shutdown] WAL 체크포인트 완료: {self.db_path}")
+                        except Exception as ckpt_err:
+                            print(f"[DB-Shutdown] WAL 체크포인트 실패 (무시하고 계속): {ckpt_err}")
+                    try:
+                        conn.force_close()
+                        closed_count += 1
+                    except Exception:
+                        pass
+                except queue.Empty:
+                    break
+            self.allocated = max(0, self.allocated - closed_count)
+        print(f"[DB-Shutdown] 커넥션 {closed_count}개 정리 완료: {self.db_path}")
+
 _pools = {'general': None, 'adult': None}
 _pools_lock = threading.Lock()
+_shutdown_in_progress = False
+
+def shutdown_all_pools():
+    """서버 종료 시 모든 DB 커넥션 풀을 안전하게 종료합니다. (WAL 체크포인트 포함)"""
+    global _shutdown_in_progress
+    if _shutdown_in_progress:
+        return  # 중복 호출 방지
+    _shutdown_in_progress = True
+    
+    print("[DB-Shutdown] 모든 DB 커넥션 풀 종료 시작...")
+    with _pools_lock:
+        for db_type, pool in _pools.items():
+            if pool is not None:
+                try:
+                    pool.shutdown()
+                except Exception as e:
+                    print(f"[DB-Shutdown] {db_type} 풀 종료 중 오류: {e}")
+    print("[DB-Shutdown] 모든 DB 커넥션 풀 종료 완료.")
 
 def _get_pool_size_raw():
     db_path = DB_GENERAL_PATH

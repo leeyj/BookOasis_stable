@@ -1,4 +1,4 @@
-"dashboard": "0.9.9"
-"state": "public-beta"
+"dashboard": "1.0.0"
 "migrator": "1.0.6"
 "extensions": "1.0.2"
+"state": "release-production"

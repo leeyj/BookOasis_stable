@@ -47,6 +47,39 @@ init_databases()
 from services.scheduler_service import SchedulerService
 SchedulerService.start_scheduler()
 
+# ── Graceful Shutdown 핸들러 등록 ──
+# 서버 종료 시 (Docker stop, SIGTERM 등) DB 커넥션 풀을 안전하게 정리하고
+# WAL 체크포인트를 수행하여 DB 손상을 방지합니다.
+import atexit
+import signal
+from database import shutdown_all_pools
+
+def _graceful_shutdown(signum=None, frame=None):
+    """SIGTERM/SIGINT 수신 시 스케줄러 중지 및 DB 풀 안전 종료"""
+    sig_name = signal.Signals(signum).name if signum else 'atexit'
+    print(f"\n[Graceful-Shutdown] {sig_name} 수신, 서버 종료 프로세스 시작...")
+    try:
+        if hasattr(SchedulerService, 'stop_scheduler'):
+            SchedulerService.stop_scheduler()
+    except Exception as e:
+        print(f"[Graceful-Shutdown] 스케줄러 중지 중 오류 (무시): {e}")
+    shutdown_all_pools()
+    print("[Graceful-Shutdown] 종료 완료.")
+    if signum is not None:
+        raise SystemExit(0)
+
+# atexit: 정상 종료 시 DB 풀 정리 (중복 호출 방지 내장)
+atexit.register(shutdown_all_pools)
+
+# SIGTERM: Docker stop / kill -15 시 Graceful Shutdown
+# SIGINT: Ctrl+C 종료 시
+try:
+    signal.signal(signal.SIGTERM, _graceful_shutdown)
+    signal.signal(signal.SIGINT, _graceful_shutdown)
+except (OSError, ValueError):
+    # 메인 스레드가 아닌 경우 signal 등록 불가 (Gunicorn 워커 등) — atexit으로 대체
+    pass
+
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='BookOasis Media Server')

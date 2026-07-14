@@ -46,7 +46,7 @@
 
 .viewer-header {
     background: rgba(15, 23, 42, 0.95);
-    border-bottom: 1px solid rgba(255,255,255,0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     padding: 1rem 2rem;
     display: flex;
     justify-content: space-between;
@@ -74,7 +74,8 @@
 
 .viewer-modal .viewer-body {
     flex: 1 1 0;
-    min-height: 0; /* 부모 flex-direction: column 범위 밖 탈출 방지 */
+    min-height: 0;
+    /* 부모 flex-direction: column 범위 밖 탈출 방지 */
     overflow: hidden;
     position: relative;
     background: #090d16;
@@ -104,7 +105,8 @@
     left: 0;
     right: 0;
     display: block;
-    overflow: hidden; /* 기본: 스크롤바 숨김 */
+    overflow: hidden;
+    /* 기본: 스크롤바 숨김 */
     width: 100%;
     height: 100% !important;
     padding: 0;
@@ -185,7 +187,8 @@
 
 /* 너비에 맞추기 모드 (웹툰 등 세로 스크롤용) */
 .comic-image-wrapper.fit-width img {
-    position: relative; /* Override absolute */
+    position: relative;
+    /* Override absolute */
     top: 0;
     left: 0;
     transform: none;
@@ -249,7 +252,8 @@
     overflow-x: hidden;
     display: block;
     height: 100vh;
-    -webkit-overflow-scrolling: touch; /* iOS Safari 관성 스크롤 복원 */
+    -webkit-overflow-scrolling: touch;
+    /* iOS Safari 관성 스크롤 복원 */
 }
 
 /* 스크롤 모드 이미지: ID 선택자로 특이성 확보 (#media-viewer-modal > .viewer-modal 보다 높음) */
@@ -265,11 +269,13 @@
     max-width: 100%;
     height: auto;
     max-height: none;
-    
+
     /* iOS Safari 이미지 드래그 선택 및 스크롤 묵살 현상 해결 패치 */
-    pointer-events: auto !important; /* 터치 이벤트 시작점 확보를 위해 복원 */
+    pointer-events: auto !important;
+    /* 터치 이벤트 시작점 확보를 위해 복원 */
     -webkit-user-drag: none;
-    -webkit-touch-callout: none; /* Safari 이미지 길게 누름 메뉴 차단 */
+    -webkit-touch-callout: none;
+    /* Safari 이미지 길게 누름 메뉴 차단 */
     user-select: none;
 }
 
@@ -318,21 +324,26 @@
 #media-viewer-modal .viewer-header {
     display: none;
 }
+
 #media-viewer-modal .comic-nav-bar,
 #media-viewer-modal .pdf-nav-bar,
 #media-viewer-modal .epub-nav-bar {
     display: none;
 }
+
 #media-viewer-modal .viewer-body {
     height: 100vh;
 }
+
 #media-viewer-modal .viewer-pane {
     height: 100vh;
 }
+
 #media-viewer-modal .comic-image-wrapper {
     height: 100vh;
     width: 100vw;
 }
+
 #media-viewer-modal .comic-image-wrapper img {
     max-height: 100vh;
     max-width: 100vw;
@@ -343,7 +354,7 @@
 /* 전체화면 토글 버튼 */
 .btn-fullscreen {
     background: transparent;
-    border: 1px solid rgba(255,255,255,0.2);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     color: #94a3b8;
     padding: 0.3rem 0.7rem;
     border-radius: 4px;
@@ -352,6 +363,7 @@
     transition: all 0.2s ease;
     margin-right: 0.5rem;
 }
+
 .btn-fullscreen:hover {
     background: rgba(168, 85, 247, 0.2);
     color: #fff;
@@ -362,13 +374,14 @@
 .floating-close-btn {
     display: flex;
     position: fixed;
-    top: 20px;
-    right: 20px;
+    top: calc(40px + env(safe-area-inset-top, 0px));
+    right: calc(20px + env(safe-area-inset-right, 0px));
     background: rgba(15, 23, 42, 0.7);
     border: 1px solid rgba(255, 255, 255, 0.15);
     color: #fff;
     font-size: 1.2rem;
-    padding: 0.5rem 0.8rem;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     cursor: pointer;
     z-index: 10005;
@@ -394,7 +407,8 @@
     left: 0;
     width: 100%;
     height: 100%;
-    z-index: 10002; /* 이미지 위, 오버레이 메뉴 아래 */
+    z-index: 10002;
+    /* 이미지 위, 오버레이 메뉴 아래 */
     display: flex;
     pointer-events: auto;
 }
@@ -430,17 +444,21 @@
     top: 0;
     left: 0;
     width: 100vw;
-    height: 100vh;       /* dvh 미지원 브라우저 fallback */
-    height: 100dvh;      /* iOS Safari 17+, Chrome 108+: URL bar 포함 동적 뷰포트 */
+    height: 100vh;
+    /* dvh 미지원 브라우저 fallback */
+    height: 100dvh;
+    /* iOS Safari 17+, Chrome 108+: URL bar 포함 동적 뷰포트 */
     z-index: 10003;
-    pointer-events: none; /* 뒷배경 이벤트 차단 방지 */
+    pointer-events: none;
+    /* 뒷배경 이벤트 차단 방지 */
     display: flex;
     flex-direction: column;
     justify-content: space-between;
 }
 
-.comic-overlay-menu > * {
-    pointer-events: auto; /* 메뉴 요소 자체는 클릭 허용 */
+.comic-overlay-menu>* {
+    pointer-events: auto;
+    /* 메뉴 요소 자체는 클릭 허용 */
 }
 
 .overlay-header {
@@ -484,12 +502,13 @@
     border-radius: 8px;
     padding: 0.8rem 1.2rem;
     display: flex;
-    flex-direction: column;   /* 2행 레이아웃 */
+    flex-direction: column;
+    /* 2행 레이아웃 */
     gap: 0.6rem;
     align-self: center;
     max-width: 95vw;
     box-sizing: border-box;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
     animation: zoomIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -504,14 +523,16 @@
 
 /* 너비 조절 행 — 스크롤 모드에서만 표시 */
 .overlay-width-row {
-    display: none;            /* JS로 스크롤 모드 시만 show */
+    display: none;
+    /* JS로 스크롤 모드 시만 show */
     flex-wrap: wrap;
     gap: 0.6rem;
     align-items: center;
     justify-content: center;
-    border-top: 1px solid rgba(255,255,255,0.07);
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
     padding-top: 0.4rem;
 }
+
 .overlay-width-row.visible {
     display: flex;
 }
@@ -545,9 +566,11 @@
     cursor: pointer;
     transition: height 0.15s;
 }
+
 .comic-scroll-width-slider:hover {
     height: 6px;
 }
+
 .comic-scroll-width-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
     width: 16px;
@@ -558,9 +581,11 @@
     box-shadow: 0 0 6px rgba(168, 85, 247, 0.55);
     transition: transform 0.15s;
 }
+
 .comic-scroll-width-slider::-webkit-slider-thumb:hover {
     transform: scale(1.25);
 }
+
 .comic-scroll-width-slider::-moz-range-thumb {
     width: 16px;
     height: 16px;
@@ -597,7 +622,7 @@
     background: rgba(0, 0, 0, 0.3);
     padding: 2px;
     border-radius: 4px;
-    border: 1px solid rgba(255,255,255,0.05);
+    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .btn-overlay-fit {
@@ -780,24 +805,43 @@
 
 
 @keyframes slideDown {
-    from { transform: translateY(-100%); }
-    to { transform: translateY(0); }
+    from {
+        transform: translateY(-100%);
+    }
+
+    to {
+        transform: translateY(0);
+    }
 }
 
 @keyframes slideUp {
-    from { transform: translateY(100%); }
-    to { transform: translateY(0); }
+    from {
+        transform: translateY(100%);
+    }
+
+    to {
+        transform: translateY(0);
+    }
 }
 
 @keyframes zoomIn {
-    from { transform: scale(0.9); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
+    from {
+        transform: scale(0.9);
+        opacity: 0;
+    }
+
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
 
 
 
-.comic-nav-bar, .pdf-nav-bar, .epub-nav-bar {
+.comic-nav-bar,
+.pdf-nav-bar,
+.epub-nav-bar {
     background: rgba(15, 23, 42, 0.9);
     width: 100%;
     padding: 0.8rem;
@@ -805,7 +849,7 @@
     justify-content: center;
     align-items: center;
     gap: 2rem;
-    border-top: 1px solid rgba(255,255,255,0.08);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .btn-nav {
@@ -840,6 +884,7 @@
     .epub-area {
         padding: 5px;
     }
+
     #txt-scroll-wrapper:not(.scroll-mode-page) {
         padding: 5px !important;
     }
@@ -897,18 +942,21 @@
     overflow-x: auto;
     overflow-y: hidden;
     box-sizing: border-box;
-    
+
     /* 페이지 넘김은 JS 스냅으로 통일한다. */
     scroll-snap-type: none;
-    
+
     /* 스크롤바 숨기기 */
     -webkit-overflow-scrolling: touch;
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
+    -ms-overflow-style: none;
+    /* IE and Edge */
 }
 
 #txt-scroll-wrapper.scroll-mode-page::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, Opera */
+    display: none;
+    /* Chrome, Safari, Opera */
 }
 
 #txt-scroll-wrapper.scroll-mode-page .txt-content {
@@ -944,7 +992,7 @@
 
 /* PDF 영역 */
 .pdf-area canvas {
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     margin: 0;
     display: block;
     flex: 0 0 auto;
@@ -982,7 +1030,9 @@
 }
 
 @keyframes comic-spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .comic-loading-text {
@@ -1022,8 +1072,15 @@
 }
 
 @keyframes filter-fade-in {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .filter-modal-header {
@@ -1284,6 +1341,7 @@
 
 /* 모바일 및 터치 디바이스 가독성 최적화 (가로폭 768px 이하) */
 @media (max-width: 768px) {
+
     #media-viewer-modal #epub-viewer-container::-webkit-scrollbar,
     #media-viewer-modal #txt-scroll-wrapper::-webkit-scrollbar {
         width: 3px;
