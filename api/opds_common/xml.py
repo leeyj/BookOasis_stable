@@ -4,11 +4,54 @@
 import html
 import mimetypes
 from datetime import datetime
+from urllib.parse import urlencode
+
 from flask import Response
 
 
 def escape_xml(text: str) -> str:
     return html.escape(str(text), quote=True)
+
+
+def _get_forwarded_header(request, name: str) -> str:
+    raw = (request.headers.get(name) or '').strip()
+    if not raw:
+        return ''
+    return raw.split(',')[0].strip()
+
+
+def _normalize_prefix(prefix: str) -> str:
+    prefix = (prefix or '').strip()
+    if not prefix:
+        return ''
+    if not prefix.startswith('/'):
+        prefix = f'/{prefix}'
+    return prefix.rstrip('/')
+
+
+def get_external_base_url(request) -> str:
+    scheme = _get_forwarded_header(request, 'X-Forwarded-Proto') or request.scheme
+    host = _get_forwarded_header(request, 'X-Forwarded-Host') or request.host
+    forwarded_port = _get_forwarded_header(request, 'X-Forwarded-Port')
+    prefix = _normalize_prefix(_get_forwarded_header(request, 'X-Forwarded-Prefix'))
+
+    if forwarded_port and ':' not in host:
+        is_default_port = (scheme == 'http' and forwarded_port == '80') or (scheme == 'https' and forwarded_port == '443')
+        if not is_default_port:
+            host = f'{host}:{forwarded_port}'
+
+    return f'{scheme}://{host}{prefix}'
+
+
+def build_external_request_url(request, query_params=None) -> str:
+    base = f"{get_external_base_url(request)}{request.path}"
+    if query_params is None:
+        query_string = request.query_string.decode('utf-8')
+    else:
+        query_string = urlencode(query_params, doseq=True)
+    if query_string:
+        return f'{base}?{query_string}'
+    return base
 
 
 def get_page_params(args, default_page_size: int, max_page_size: int):
@@ -28,16 +71,17 @@ def get_page_params(args, default_page_size: int, max_page_size: int):
 
 
 def build_opds_xml(request, title: str, entries: list, start_path: str, search_path: str, next_link: str = None) -> str:
-    base_url = request.url_root.rstrip('/')
+    base_url = get_external_base_url(request)
+    current_url = build_external_request_url(request)
     now = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
 
     lines = [
         '<?xml version="1.0" encoding="utf-8"?>',
         '<feed xmlns="http://www.w3.org/2005/Atom" xmlns:opds="http://opds-spec.org/2010/catalog">',
-        f'  <id>{escape_xml(request.url)}</id>',
+        f'  <id>{escape_xml(current_url)}</id>',
         f'  <title>{escape_xml(title)}</title>',
         f'  <updated>{now}</updated>',
-        f'  <link rel="self" href="{escape_xml(request.url)}" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>',
+        f'  <link rel="self" href="{escape_xml(current_url)}" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>',
         f'  <link rel="start" href="{escape_xml(base_url + start_path)}" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>',
         f'  <link rel="search" href="{escape_xml(base_url + search_path)}" type="application/opensearchdescription+xml" title="Search Books"/>',
     ]

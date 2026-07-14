@@ -246,14 +246,14 @@ async function loadDashboardWidgetData(pluginId, limit, contentId, requestToken)
       container.innerHTML = '';
       data.items.forEach(item => {
         if (item && (item.item_type === 'metric' || item.metric)) {
-          const metric = escapeHtml(item.metric || item.title || '통계');
-          const value = escapeHtml(item.value || '-');
-          const desc = escapeHtml(item.description || '');
+          const metric = formatDashboardMetricText(item.metric || item.title || '통계');
+          const value = formatDashboardMetricText(item.value || '-');
+          const desc = formatDashboardMetricText(item.description || '');
           const metricHtml = `
             <div style="padding: 0.85rem 0.9rem; border-radius: 8px; background: rgba(15, 23, 42, 0.55); border: 1px solid rgba(148, 163, 184, 0.15); display: flex; flex-direction: column; gap: 0.2rem;">
-              <span style="color: #94a3b8; font-size: 0.8rem;">${metric}</span>
-              <strong style="color: #f8fafc; font-size: 1.15rem; line-height: 1.35;">${value}</strong>
-              ${desc ? `<span style="color: #64748b; font-size: 0.74rem;">${desc}</span>` : ''}
+              <span style="color: #94a3b8; font-size: 0.8rem; white-space: pre-line;">${metric}</span>
+              <strong style="color: #f8fafc; font-size: 1.15rem; line-height: 1.35; white-space: pre-line;">${value}</strong>
+              ${desc ? `<span style="color: #64748b; font-size: 0.74rem; white-space: pre-line;">${desc}</span>` : ''}
             </div>
           `;
           container.insertAdjacentHTML('beforeend', metricHtml);
@@ -309,6 +309,13 @@ async function loadDashboardWidgetData(pluginId, limit, contentId, requestToken)
     console.error(`대시보드 위젯 로드 오류(${pluginId}):`, e);
     container.innerHTML = '<div style="text-align: center; color: #ef4444; font-size: 0.9rem; padding: 1rem 0; grid-column: 1/-1;">서버 연결 오류</div>';
   }
+}
+
+function formatDashboardMetricText(value) {
+  return escapeHtml(value)
+    .replace(/\\r\\n/g, '\n')
+    .replace(/\\n/g, '\n')
+    .replace(/\r\n/g, '\n');
 }
 
 function escapeHtml(value) {

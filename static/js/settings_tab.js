@@ -20,6 +20,17 @@ export {
   submitViewerSettings
 };
 
+function refreshScheduleTabData() {
+  if (window.refreshLibraryScheduleStatuses) {
+    window.refreshLibraryScheduleStatuses();
+  } else if (window.loadLibrarySchedules) {
+    window.loadLibrarySchedules();
+  }
+  if (window.loadQueueStatus) {
+    window.loadQueueStatus();
+  }
+}
+
 // 환경설정 내부 탭 전환 함수
 export function switchSettingsTab(tabId) {
   // 일반 사용자는 어드민 전용 탭에 접근하지 못하도록 차단 및 'about'으로 우회
@@ -82,11 +93,9 @@ export function switchSettingsTab(tabId) {
   } else if (tabId === 'changelog') {
     loadChangelog();
   } else if (tabId === 'schedule') {
-    if (window.loadQueueStatus) {
-      window.loadQueueStatus();
-    }
-    if (!window.queueRefreshInterval && window.loadQueueStatus) {
-      window.queueRefreshInterval = setInterval(window.loadQueueStatus, 5000);
+    refreshScheduleTabData();
+    if (!window.queueRefreshInterval && (window.loadQueueStatus || window.loadLibrarySchedules)) {
+      window.queueRefreshInterval = setInterval(refreshScheduleTabData, 5000);
     }
   }
 

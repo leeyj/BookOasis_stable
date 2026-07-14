@@ -355,6 +355,8 @@ tags: [workflow, history]
 | 2026-07-13 | `pdf_load_and_cmap_font_bugfix` | PDF 뷰어 로드 실패 및 한글 CMap 폰트 오류 수정 | [BugFix](./bug/20260713_bugfix_pdf_load_and_cmap_font.md) | - |
 | 2026-07-13 | `pdf_seekbar_sync_bugfix` | PDF 뷰어 하단 시크바 및 페이지 지시자 동기화 결함 수정 | [BugFix](./bug/20260713_bugfix_pdf_seekbar_sync.md) | - |
 | 2026-07-13 | `pdf_dpr_scale_improvement` | PDF 뷰어 선명도 개선을 위한 해상도 배수 상향 조정 | [Improvement](./bug/20260713_improvement_pdf_dpr_scale.md) | - |
+| 2026-07-14 | `epub_toc_enhancement_spec` | EPUB 목차 추출 및 뷰어 이동 기능 고도화 설계 계획서 수립 | [Spec](./spec_epub_toc_enhancement.md) | - |
+
 
 
 
@@ -383,3 +385,4 @@ tags: [workflow, history]
 | 2026-07-13 | `session_20260713_224949` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_224949_session_20260713_224949_task.md) | [Walkthrough](./history/20260713_224949_session_20260713_224949_walkthrough.md) |
 | 2026-07-13 | `session_20260713_225901` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_225901_session_20260713_225901_task.md) | [Walkthrough](./history/20260713_225901_session_20260713_225901_walkthrough.md) |
 | 2026-07-13 | `session_20260713_230556` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_230556_session_20260713_230556_task.md) | [Walkthrough](./history/20260713_230556_session_20260713_230556_walkthrough.md) |
+| 2026-07-14 | `session_20260714_004719` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260714_004719_session_20260714_004719_task.md) | [Walkthrough](./history/20260714_004719_session_20260714_004719_walkthrough.md) |

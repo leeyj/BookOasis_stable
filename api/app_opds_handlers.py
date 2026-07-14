@@ -3,6 +3,8 @@
 
 from flask import Response, jsonify, request
 
+from api.opds_common.xml import build_external_request_url, get_external_base_url
+
 from services.book_detail_service import BookDetailService
 from services.book_info_service import BookInfoService
 from services.category_service import CategoryService
@@ -212,7 +214,7 @@ class AppOpdsHandlers:
 
         next_link = None
         if offset + page_size < total:
-            next_link = f"{request.base_url}?page={page + 1}&page_size={page_size}"
+            next_link = build_external_request_url(request, {'page': page + 1, 'page_size': page_size})
 
         if is_adult:
             xml = self._opds_xml('adult', f'Adult Series: {resolved_series_name}', entries, is_adult=True, next_link=next_link)
@@ -259,7 +261,7 @@ class AppOpdsHandlers:
             return self._unauthorized()
 
         query = request.args.get('q') or request.args.get('query') or ''
-        base_url = request.url_root.rstrip('/')
+        base_url = get_external_base_url(request)
         if not query:
             if is_adult:
                 return self._build_opensearch_description('BookOasis App Adult', 'Search BookOasis App Adult Catalog', f'{base_url}/app-opds-adult/search?q={{searchTerms}}')
@@ -273,7 +275,7 @@ class AppOpdsHandlers:
 
         next_link = None
         if offset + page_size < total:
-            next_link = f"{request.base_url}?q={query}&page={page+1}&page_size={page_size}"
+            next_link = build_external_request_url(request, {'q': query, 'page': page + 1, 'page_size': page_size})
 
         if is_adult:
             xml = self._opds_xml('adult', f'성인 검색 결과: {query}', entries, is_adult=True, next_link=next_link)

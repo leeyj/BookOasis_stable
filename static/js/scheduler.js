@@ -2,6 +2,42 @@
 import { state } from './state.js';
 import * as api from './api.js';
 
+function buildStatusBadge(scanStatus) {
+  if (scanStatus === 'scanning') {
+    return `<span class="badge-scan-status scanning"><i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('settings.status_scanning')}</span>`;
+  }
+  if (scanStatus === 'failed') {
+    return `<span class="badge-scan-status failed">${i18n.t('settings.status_failed')}</span>`;
+  }
+  return `<span class="badge-scan-status ready">${i18n.t('settings.status_ready')}</span>`;
+}
+
+function buildScheduleRow(lib) {
+  const statusBadge = buildStatusBadge(lib.scan_status);
+  const cleanName = lib.name.replace(/'/g, "\\'");
+  const cleanRcloneRcUrl = (lib.rclone_rc_url || '').replace(/'/g, "\\'");
+  const cleanCronSchedule = (lib.cron_schedule || '').replace(/'/g, "\\'");
+  const lastScannedAt = lib.last_scanned_at || '-';
+
+  return `
+    <tr data-library-id="${lib.id}" style="border-bottom: 1px solid rgba(255,255,255,0.05); hover: background: rgba(255,255,255,0.02);">
+      <td style="padding: 1rem; font-weight: 600; color: #fff;">${lib.name}</td>
+      <td style="padding: 1rem; color: #94a3b8; font-family: monospace; font-size: 0.8rem; white-space: pre-line;">${lib.physical_path}</td>
+      <td data-role="schedule-status" style="padding: 1rem; text-align: center;">${statusBadge}</td>
+      <td style="padding: 1rem; text-align: center;">
+        <button class="btn-toggle" style="white-space: nowrap; padding: 0.3rem 0.6rem; font-size: 0.75rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.2rem;" onclick="openScanSettingsModal(${lib.id}, '${cleanName}', ${lib.is_remote}, '${cleanRcloneRcUrl}', '${cleanCronSchedule}', ${lib.vfs_refresh_before_scan || 0})" title="상세 설정">
+          <i class="fa-solid fa-gear"></i> ${i18n.t('settings.col_config') || '설정'}
+        </button>
+      </td>
+      <td style="padding: 1rem; text-align: center;">
+        <button class="btn-toggle active" data-role="schedule-action" data-last-scanned-at="${lastScannedAt}" style="white-space: nowrap; padding: 0.3rem 0.6rem; font-size: 0.75rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.2rem;" onclick="showScheduleActionMenu(event, ${lib.id}, '${cleanName}')" title="작업 메뉴 열기">
+          ${i18n.t('settings.col_action') || '작업'} <i class="fa-solid fa-chevron-down" style="font-size: 0.65rem;"></i>
+        </button>
+      </td>
+    </tr>
+  `;
+}
+
 // 환경설정 (스케줄 관리) 리스트 로드 및 렌더링
 export async function loadLibrarySchedules() {
   const container = document.getElementById('settings-libraries-list');
@@ -15,41 +51,8 @@ export async function loadLibrarySchedules() {
         container.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:2rem; color:#94a3b8;">${i18n.t('settings.no_categories')}</td></tr>`;
         return;
       }
-      
-      let html = '';
-      data.libraries.forEach(lib => {
-        let statusBadge = '';
-        if (lib.scan_status === 'scanning') {
-          statusBadge = `<span class="badge-scan-status scanning"><i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('settings.status_scanning')}</span>`;
-        } else if (lib.scan_status === 'failed') {
-          statusBadge = `<span class="badge-scan-status failed">${i18n.t('settings.status_failed')}</span>`;
-        } else {
-          statusBadge = `<span class="badge-scan-status ready">${i18n.t('settings.status_ready')}</span>`;
-        }
-        
-        const cleanName = lib.name.replace(/'/g, "\\'");
-        const cleanRcloneRcUrl = (lib.rclone_rc_url || '').replace(/'/g, "\\'");
-        const cleanCronSchedule = (lib.cron_schedule || '').replace(/'/g, "\\'");
 
-        html += `
-          <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); hover: background: rgba(255,255,255,0.02);">
-            <td style="padding: 1rem; font-weight: 600; color: #fff;">${lib.name}</td>
-            <td style="padding: 1rem; color: #94a3b8; font-family: monospace; font-size: 0.8rem; white-space: pre-line;">${lib.physical_path}</td>
-            <td style="padding: 1rem; text-align: center;">${statusBadge}</td>
-            <td style="padding: 1rem; text-align: center;">
-              <button class="btn-toggle" style="white-space: nowrap; padding: 0.3rem 0.6rem; font-size: 0.75rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.2rem;" onclick="openScanSettingsModal(${lib.id}, '${cleanName}', ${lib.is_remote}, '${cleanRcloneRcUrl}', '${cleanCronSchedule}', ${lib.vfs_refresh_before_scan || 0})" title="상세 설정">
-                <i class="fa-solid fa-gear"></i> ${i18n.t('settings.col_config') || '설정'}
-              </button>
-            </td>
-            <td style="padding: 1rem; text-align: center;">
-              <button class="btn-toggle active" style="white-space: nowrap; padding: 0.3rem 0.6rem; font-size: 0.75rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.2rem;" onclick="showScheduleActionMenu(event, ${lib.id}, '${cleanName}', '${lib.last_scanned_at || '-'}')" title="작업 메뉴 열기">
-                ${i18n.t('settings.col_action') || '작업'} <i class="fa-solid fa-chevron-down" style="font-size: 0.65rem;"></i>
-              </button>
-            </td>
-          </tr>
-        `;
-      });
-      container.innerHTML = html;
+      container.innerHTML = data.libraries.map(buildScheduleRow).join('');
     } else {
       container.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:2rem; color:#ef4444;">${i18n.t('settings.fetch_failed')}: ${data.error}</td></tr>`;
     }
@@ -58,6 +61,46 @@ export async function loadLibrarySchedules() {
     container.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:2rem; color:#ef4444;">${i18n.t('settings.server_error')}</td></tr>`;
   }
 }
+
+export async function refreshLibraryScheduleStatuses() {
+  const container = document.getElementById('settings-libraries-list');
+  if (!container) return;
+
+  try {
+    const data = await api.fetchLibrarySchedules(state.currentLibraryType);
+    if (!data.success || !Array.isArray(data.libraries) || data.libraries.length === 0) {
+      return;
+    }
+
+    const existingRows = container.querySelectorAll('tr[data-library-id]');
+    if (existingRows.length !== data.libraries.length) {
+      loadLibrarySchedules();
+      return;
+    }
+
+    for (const lib of data.libraries) {
+      const row = container.querySelector(`tr[data-library-id="${lib.id}"]`);
+      if (!row) {
+        loadLibrarySchedules();
+        return;
+      }
+
+      const statusCell = row.querySelector('[data-role="schedule-status"]');
+      const nextStatusHtml = buildStatusBadge(lib.scan_status);
+      if (statusCell && statusCell.innerHTML !== nextStatusHtml) {
+        statusCell.innerHTML = nextStatusHtml;
+      }
+
+      const actionButton = row.querySelector('[data-role="schedule-action"]');
+      if (actionButton) {
+        actionButton.dataset.lastScannedAt = lib.last_scanned_at || '-';
+      }
+    }
+  } catch (e) {
+    console.error('스케줄 상태 갱신 에러:', e);
+  }
+}
+window.refreshLibraryScheduleStatuses = refreshLibraryScheduleStatuses;
 
 // 스케줄 저장 (모달 등에서 범용 호출 가능한 헬퍼)
 export async function saveLibrarySchedule(libraryId, cronVal, vfsRefresh, rcloneRcVal, name = '') {
@@ -132,13 +175,15 @@ window.runAllLibrariesScanNow = runAllLibrariesScanNow;
 let activeLibraryId = null;
 let activeLibraryName = '';
 
-export function showScheduleActionMenu(event, libraryId, name, lastScannedAt) {
+export function showScheduleActionMenu(event, libraryId, name) {
   event.stopPropagation();
   activeLibraryId = libraryId;
   activeLibraryName = name;
 
   const menu = document.getElementById('schedule-action-context-menu');
   if (!menu) return;
+
+  const lastScannedAt = event.currentTarget?.dataset?.lastScannedAt || '-';
 
   const lastScanEl = document.getElementById('schedule-action-last-scan');
   if (lastScanEl) {

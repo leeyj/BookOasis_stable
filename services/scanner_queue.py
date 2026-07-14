@@ -105,11 +105,32 @@ class ScannerQueue:
     def clear_queue(self):
         """대기열에 있는 모든 작업을 삭제합니다."""
         with self.queue_lock:
-            count = len(self.q.queue)
-            self.q.queue.clear()
+            with self.q.mutex:
+                count = len(self.q.queue)
+                self.q.queue.clear()
+                self.q.unfinished_tasks = max(0, self.q.unfinished_tasks - count)
             self.enqueued_items.clear()
             self.log(f"Queue cleared. Removed {count} items.")
             return count
+
+    def cancel_pending_task(self, task_key):
+        """대기열에 있는 특정 작업 1건을 제거합니다."""
+        if not task_key:
+            return False
+
+        with self.queue_lock:
+            with self.q.mutex:
+                for idx, item in enumerate(list(self.q.queue)):
+                    if item.get('key') != task_key:
+                        continue
+
+                    del self.q.queue[idx]
+                    self.q.unfinished_tasks = max(0, self.q.unfinished_tasks - 1)
+                    self.enqueued_items.discard(task_key)
+                    self.log(f"Pending task '{task_key}' cancelled successfully.")
+                    return True
+
+        return False
 
     def _worker_loop(self):
         while True:

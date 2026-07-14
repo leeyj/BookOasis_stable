@@ -136,6 +136,24 @@ def clear_system_queue():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@system_bp.route('/api/media/system/queue/cancel', methods=['POST'])
+@admin_required
+def cancel_system_queue_task():
+    """대기열에 있는 특정 스캐너 작업 1건을 취소합니다."""
+    task_id = request.args.get('task_id') or request.form.get('task_id')
+    if not task_id:
+        return jsonify({'success': False, 'error': 'task_id가 필요합니다.'}), 400
+
+    try:
+        from services.scanner_queue import scanner_queue
+        removed = scanner_queue.cancel_pending_task(task_id)
+        if not removed:
+            return jsonify({'success': False, 'error': '대기열에서 작업을 찾지 못했습니다.'}), 404
+
+        return jsonify({'success': True, 'message': '대기열 작업이 취소되었습니다.'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @system_bp.route('/api/media/about', methods=['GET'])
 def get_about_info():
     if 'user_id' not in session:

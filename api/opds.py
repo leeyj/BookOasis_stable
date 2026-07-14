@@ -15,7 +15,7 @@ from flask import Blueprint, Response, jsonify, request, send_file  # type: igno
 import database
 from api.cache import LRUCache
 from api.opds_common.auth import unauthorized_response, verify_basic_auth_credentials
-from api.opds_common.xml import atom_response, build_opds_xml, get_page_params
+from api.opds_common.xml import atom_response, build_external_request_url, build_opds_xml, get_external_base_url, get_page_params
 from services.opds_service import (
     get_book_entries,
     get_library_list,
@@ -189,7 +189,7 @@ def opds_series_books(lib_id: int, series_name: str):
     entries, total = get_book_entries('general', lib_id, series_name, '/opds/download/general', 'general', limit=page_size, offset=offset)
     next_link = None
     if offset + page_size < total:
-        next_link = f"{request.base_url}?page={page+1}&page_size={page_size}"
+        next_link = build_external_request_url(request, {'page': page + 1, 'page_size': page_size})
     xml = _opds_xml('general', f"Series: {series_name}", entries, next_link=next_link)
     _set_cached_opds_response(cache_key, xml)
     return _atom_response(xml)
@@ -209,7 +209,7 @@ def opds_adult_series_books(lib_id: int, series_name: str):
     entries, total = get_book_entries('adult', lib_id, series_name, '/opds/download/adult', 'adult', limit=page_size, offset=offset)
     next_link = None
     if offset + page_size < total:
-        next_link = f"{request.base_url}?page={page+1}&page_size={page_size}"
+        next_link = build_external_request_url(request, {'page': page + 1, 'page_size': page_size})
     xml = _opds_xml('adult', f"Adult Series: {series_name}", entries, is_adult=True, next_link=next_link)
     _set_cached_opds_response(cache_key, xml)
     return _atom_response(xml)
@@ -312,7 +312,7 @@ def opds_search():
     
     query = request.args.get('q') or request.args.get('query') or ''
     if not query:
-        base_url = request.url_root.rstrip('/')
+        base_url = get_external_base_url(request)
         xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
   <ShortName>BookOasis</ShortName>
@@ -328,7 +328,7 @@ def opds_search():
     
     next_link = None
     if offset + page_size < total:
-        next_link = f"{request.base_url}?q={query}&page={page+1}&page_size={page_size}"
+        next_link = build_external_request_url(request, {'q': query, 'page': page + 1, 'page_size': page_size})
         
     xml = _opds_xml('general', f"검색 결과: {query}", entries, next_link=next_link)
     return _atom_response(xml)
@@ -341,7 +341,7 @@ def opds_adult_search():
         
     query = request.args.get('q') or request.args.get('query') or ''
     if not query:
-        base_url = request.url_root.rstrip('/')
+        base_url = get_external_base_url(request)
         xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
   <ShortName>BookOasis Adult</ShortName>
@@ -357,7 +357,7 @@ def opds_adult_search():
     
     next_link = None
     if offset + page_size < total:
-        next_link = f"{request.base_url}?q={query}&page={page+1}&page_size={page_size}"
+        next_link = build_external_request_url(request, {'q': query, 'page': page + 1, 'page_size': page_size})
         
     xml = _opds_xml('adult', f"성인 검색 결과: {query}", entries, is_adult=True, next_link=next_link)
     return _atom_response(xml)
