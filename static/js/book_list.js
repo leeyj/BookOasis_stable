@@ -373,9 +373,19 @@ export function jumpToIndex(targetIndex) {
   setTimeout(() => {
     const cards = document.querySelectorAll('#books-list-container .book-card');
     if (cards[targetIndex]) {
-      // 상단 헤더 높이를 고려하여 여유있게 스크롤
-      const y = cards[targetIndex].getBoundingClientRect().top + window.scrollY - 80;
-      window.scrollTo({ top: y, behavior: 'smooth' });
+      // 실제 스크롤 컨테이너(.library-main-content) 기준으로 이동
+      // 레이아웃이 바뀌어도 동작하도록 window 스크롤은 fallback으로만 사용
+      const mainContent = document.querySelector('.library-main-content');
+      if (mainContent && mainContent.scrollHeight > mainContent.clientHeight) {
+        const cardRect = cards[targetIndex].getBoundingClientRect();
+        const mainRect = mainContent.getBoundingClientRect();
+        const relativeTop = cardRect.top - mainRect.top;
+        const y = Math.max(0, mainContent.scrollTop + relativeTop - 80);
+        mainContent.scrollTo({ top: y, behavior: 'smooth' });
+      } else {
+        const y = cards[targetIndex].getBoundingClientRect().top + window.scrollY - 80;
+        window.scrollTo({ top: y, behavior: 'smooth' });
+      }
       
       // 사용자에게 시각적 피드백 제공 (깜빡임 효과)
       cards[targetIndex].style.transition = 'box-shadow 0.3s ease';

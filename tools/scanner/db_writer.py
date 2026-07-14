@@ -1,24 +1,11 @@
 # -*- coding: utf-8 -*-
 import os
 
-def update_book_metadata(cursor, full_path, cover_image, merged_meta, series_name=''):
+def update_book_metadata(cursor, full_path, cover_image, merged_meta, series_name='', force=False):
     """Execute merge update for existing book info and local metadata"""
-    cursor.execute("""
-        UPDATE books SET 
-            series_name  = CASE WHEN 1=0 THEN ? ELSE series_name END,
-            cover_image  = COALESCE(NULLIF(?, ''), cover_image),
-            cover_updated_at = CASE WHEN ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
-            author       = COALESCE(NULLIF(?, ''), author),
-            publisher    = COALESCE(NULLIF(?, ''), publisher),
-            link         = COALESCE(NULLIF(?, ''), link),
-            score        = CASE WHEN ? != 0 THEN ? ELSE score END,
-            summary      = COALESCE(NULLIF(?, ''), summary),
-            release_date = COALESCE(NULLIF(?, ''), release_date),
-            genre        = COALESCE(NULLIF(?, ''), genre),
-            tags         = COALESCE(NULLIF(?, ''), tags)
-        WHERE file_path = ?
-    """, (
-        series_name,
+    # force=True: 경로에서 파싱한 series_name으로 강제 갱신
+    # force=False: 기존 series_name 유지 (메타데이터 병합만)
+    common_args = (
         cover_image,
         cover_image, cover_image,
         merged_meta['author'],
@@ -30,7 +17,40 @@ def update_book_metadata(cursor, full_path, cover_image, merged_meta, series_nam
         merged_meta.get('genre', ''),
         merged_meta.get('tags', ''),
         full_path
-    ))
+    )
+    if force:
+        cursor.execute("""
+            UPDATE books SET
+                series_name  = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE series_name END,
+                cover_image  = COALESCE(NULLIF(?, ''), cover_image),
+                cover_updated_at = CASE WHEN ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
+                author       = COALESCE(NULLIF(?, ''), author),
+                publisher    = COALESCE(NULLIF(?, ''), publisher),
+                link         = COALESCE(NULLIF(?, ''), link),
+                score        = CASE WHEN ? != 0 THEN ? ELSE score END,
+                summary      = COALESCE(NULLIF(?, ''), summary),
+                release_date = COALESCE(NULLIF(?, ''), release_date),
+                genre        = COALESCE(NULLIF(?, ''), genre),
+                tags         = COALESCE(NULLIF(?, ''), tags)
+            WHERE file_path = ?
+        """, (series_name, series_name, series_name) + common_args)
+    else:
+        cursor.execute("""
+            UPDATE books SET
+                series_name  = CASE WHEN 1=0 THEN ? ELSE series_name END,
+                cover_image  = COALESCE(NULLIF(?, ''), cover_image),
+                cover_updated_at = CASE WHEN ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
+                author       = COALESCE(NULLIF(?, ''), author),
+                publisher    = COALESCE(NULLIF(?, ''), publisher),
+                link         = COALESCE(NULLIF(?, ''), link),
+                score        = CASE WHEN ? != 0 THEN ? ELSE score END,
+                summary      = COALESCE(NULLIF(?, ''), summary),
+                release_date = COALESCE(NULLIF(?, ''), release_date),
+                genre        = COALESCE(NULLIF(?, ''), genre),
+                tags         = COALESCE(NULLIF(?, ''), tags)
+            WHERE file_path = ?
+        """, (series_name,) + common_args)
+
 
 def insert_new_book(cursor, library_id, filename, series_name, cover_image, merged_meta):
     """Insert new book info to DB and return book_id"""
@@ -88,26 +108,54 @@ def save_book_offsets(cursor, book_id, filename, offsets_data):
     """, (len(bulk_data), book_id))
     print(f"[Scanner-Offset] '{filename}' offset DB index complete ({len(bulk_data)} pages)")
 
-def bulk_update_books(cursor, update_data_list):
-    """Bulk update existing books"""
-    if not update_data_list: return
-    cursor.executemany("""
-        UPDATE books SET 
-            series_name  = CASE WHEN 1=0 THEN ? ELSE series_name END,
-            cover_image  = COALESCE(NULLIF(?, ''), cover_image),
-            cover_updated_at = CASE WHEN ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
-            author       = COALESCE(NULLIF(?, ''), author),
-            publisher    = COALESCE(NULLIF(?, ''), publisher),
-            link         = COALESCE(NULLIF(?, ''), link),
-            score        = CASE WHEN ? != 0 THEN ? ELSE score END,
-            summary      = COALESCE(NULLIF(?, ''), summary),
-            release_date = COALESCE(NULLIF(?, ''), release_date),
-            genre        = COALESCE(NULLIF(?, ''), genre),
-            tags         = COALESCE(NULLIF(?, ''), tags),
-            file_mtime   = ?,
-            file_size    = ?
-        WHERE file_path = ?
-    """, update_data_list)
+def bulk_update_books(cursor, update_data_list, force=False):
+    """Bulk update existing books
+    
+    update_data_list 각 항목 형식:
+      force=False: (series_name, cover_image, cover_image, cover_image, author, publisher, link, score, score, summary, release_date, genre, tags, file_mtime, file_size, file_path)
+      force=True : 동일 (series_name이 실제로 SET에 반영됨)
+    """
+    if not update_data_list:
+        return
+    if force:
+        cursor.executemany("""
+            UPDATE books SET 
+                series_name  = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE series_name END,
+                cover_image  = COALESCE(NULLIF(?, ''), cover_image),
+                cover_updated_at = CASE WHEN ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
+                author       = COALESCE(NULLIF(?, ''), author),
+                publisher    = COALESCE(NULLIF(?, ''), publisher),
+                link         = COALESCE(NULLIF(?, ''), link),
+                score        = CASE WHEN ? != 0 THEN ? ELSE score END,
+                summary      = COALESCE(NULLIF(?, ''), summary),
+                release_date = COALESCE(NULLIF(?, ''), release_date),
+                genre        = COALESCE(NULLIF(?, ''), genre),
+                tags         = COALESCE(NULLIF(?, ''), tags),
+                file_mtime   = ?,
+                file_size    = ?
+            WHERE file_path = ?
+        """, [
+            # series_name 3회 (CASE WHEN ? IS NOT NULL AND ? != '' THEN ? )
+            (row[0], row[0], row[0], *row[1:]) for row in update_data_list
+        ])
+    else:
+        cursor.executemany("""
+            UPDATE books SET 
+                series_name  = CASE WHEN 1=0 THEN ? ELSE series_name END,
+                cover_image  = COALESCE(NULLIF(?, ''), cover_image),
+                cover_updated_at = CASE WHEN ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
+                author       = COALESCE(NULLIF(?, ''), author),
+                publisher    = COALESCE(NULLIF(?, ''), publisher),
+                link         = COALESCE(NULLIF(?, ''), link),
+                score        = CASE WHEN ? != 0 THEN ? ELSE score END,
+                summary      = COALESCE(NULLIF(?, ''), summary),
+                release_date = COALESCE(NULLIF(?, ''), release_date),
+                genre        = COALESCE(NULLIF(?, ''), genre),
+                tags         = COALESCE(NULLIF(?, ''), tags),
+                file_mtime   = ?,
+                file_size    = ?
+            WHERE file_path = ?
+        """, update_data_list)
 
 def bulk_insert_books(cursor, insert_data_list):
     """Bulk insert new books"""

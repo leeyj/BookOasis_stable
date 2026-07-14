@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v0.9.9
+### fixed
+- 초성바로가기 오동작 수정 | incorrect operation of initial consonant shortcuts 
+- 0Z등 한글이 아닌 이름을 잘못 인식하는 내용 수정(강제재스캔 필요) | incorrect recognition of non-korean names such as 0Z(force rescan required)
+### added
+- entrypoint.sh 내 권한 체크 추가 | permission check to entrypoint.sh inclueded
+- 기동시(시작,재시작)DB 무결성 체크 및 보정 로직 추가 | DB integrity check and correction logic at startup(start, restart)
+--- 
+
+
 ## v0.9.8
 ### fixed
 - 표준 OPDS 속도 개선 | OPDS Speed Optimization

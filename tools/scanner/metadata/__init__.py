@@ -77,10 +77,21 @@ def normalize_metadata_list_field(value):
 
 
 def is_consonant_folder(foldername):
+    """Determine if folder name is initial consonant/index folder (Korean, English, numeric, etc.)"""
     foldername = foldername.strip()
+    # 한글 초성 / 음절 색인 폴더 (ㄱ, ㄴ... / 가, 나...)
     if foldername in HANGUL_CONSONANTS:
         return True
     if re.match(r'^[ㄱ-ㅎ]$', foldername):
+        return True
+    # 영문 단일 알파벳 색인 폴더 (A, B, ... Z)
+    if re.match(r'^[A-Za-z]$', foldername):
+        return True
+    # 숫자 또는 영숫자 혼합 단독 색인 폴더 (0, 1, 0-9, 0Z, A1 등, 최대 3자)
+    if re.match(r'^[A-Za-z0-9]{1,3}$', foldername):
+        return True
+    # 흔한 기타/특수문자 색인 폴더명
+    if foldername.lower() in {'기타', 'etc', 'other', 'others', 'misc', '#', '!', '_', '-', '0-9', 'a-z', 'z'}:
         return True
     return False
 

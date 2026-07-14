@@ -12,11 +12,6 @@ tags: [workflow, history]
 
 | 날짜 | 세션 키워드 | 한 줄 요약 | 태스크 문서 | 워크쓰루 문서 |
 | :--- | :--- | :--- | :--- | :--- |
-| 2026-07-13 | `scan_multi_volume_fix` | 만화책 폴더 가상 책 스캔 시 경로 구분자 혼용으로 인한 다중 권수 등록 누락 버그 조치 | [Bugfix](./bug/20260713_bugfix_scan_multi_volume.md) | - |
-| 2026-07-12 | `dashboard_layout_scroll` | 대시보드 미세 스크롤 방지, 컨텍스트 메뉴 잘림 및 검색 플러그인 상태 동적 연동, 독립 플러그인 탭 & 정렬 개편 | [Bugfix & Refactoring](./bug/20260712_bugfix_dashboard_layout_scroll.md) | - |
-| 2026-07-12 | `worker_role_separation_major_roadmap` | 워커 역할 분리(웹/스캐너) 메이저 패치 로드맵, 영향도, 난이도 문서화 | [Roadmap](./roadmap_worker_role_separation_major_patch.md) | - |
-| 2026-07-12 | `worker_role_separation_phase1_detailed_design` | APP_ROLE 기반 역할 게이트 도입을 위한 Phase 1 상세 설계서 작성 | [Design](./roadmap_worker_role_separation_phase1_detailed_design.md) | - |
-| 2026-07-12 | `worker_role_separation_phase1_task_breakdown` | Phase 1 실행 착수용 작업 티켓 분해 문서 작성 | [Execution](./roadmap_worker_role_separation_phase1_task_breakdown.md) | - |
 | 2026-06-19 | `init_docs` | 독립 문서 관리 시스템 초기 구축 | [Task](./history/20260619_145226_init_docs_task.md) | [Walkthrough](./history/20260619_145226_init_docs_walkthrough.md) |
 | 2026-06-19 | `rename_project` | 프로젝트 네이밍 변경 및 Git 연동 (BookOasis) | [Task](./history/20260619_145705_rename_project_task.md) | [Walkthrough](./history/20260619_145705_rename_project_walkthrough.md) |
 | 2026-06-19 | `init_push` | GitHub 원격 저장소 최초 소스 코드 푸시 | [Task](./history/20260619_145949_init_push_task.md) | [Walkthrough](./history/20260619_145949_init_push_walkthrough.md) |
@@ -331,6 +326,11 @@ tags: [workflow, history]
 | 2026-07-12 | `viewer_shortcut_log_refactoring` | 뷰어 성능 최적화 및 단축키/로그 환경변수 제어 명세 최신화 | [Task](./history/20260712_195059_viewer_shortcut_log_refactoring_task.md) | [Walkthrough](./history/20260712_195059_viewer_shortcut_log_refactoring_walkthrough.md) |
 | 2026-07-12 | `scanner_title_protection_fix` | 스캐너 도서 제목 오버라이트 방지 및 VFS 캐시 꼬임 복원 검증 완수 | [Task](./history/20260712_202944_scanner_title_protection_fix_task.md) | [Walkthrough](./history/20260712_202944_scanner_title_protection_fix_walkthrough.md) |
 | 2026-07-12 | `webhook_dispatcher_docs` | 외부 gd-poller 연동 가이드 문서 보완 및 웹훅 API 마감 | [Task](./history/20260712_212935_webhook_dispatcher_docs_task.md) | [Walkthrough](./history/20260712_212935_webhook_dispatcher_docs_walkthrough.md) |
+| 2026-07-12 | `dashboard_layout_scroll` | 대시보드 미세 스크롤 방지, 컨텍스트 메뉴 잘림 및 검색 플러그인 상태 동적 연동, 독립 플러그인 탭 & 정렬 개편 | [Bugfix & Refactoring](./bug/20260712_bugfix_dashboard_layout_scroll.md) | - |
+| 2026-07-12 | `worker_role_separation_major_roadmap` | 워커 역할 분리(웹/스캐너) 메이저 패치 로드맵, 영향도, 난이도 문서화 | [Roadmap](./roadmap_worker_role_separation_major_patch.md) | - |
+| 2026-07-12 | `worker_role_separation_phase1_detailed_design` | APP_ROLE 기반 역할 게이트 도입을 위한 Phase 1 상세 설계서 작성 | [Design](./roadmap_worker_role_separation_phase1_detailed_design.md) | - |
+| 2026-07-12 | `worker_role_separation_phase1_task_breakdown` | Phase 1 실행 착수용 작업 티켓 분해 문서 작성 | [Execution](./roadmap_worker_role_separation_phase1_task_breakdown.md) | - |
+| 2026-07-13 | `scan_multi_volume_fix` | 만화책 폴더 가상 책 스캔 시 경로 구분자 혼용으로 인한 다중 권수 등록 누락 버그 조치 | [Bugfix](./bug/20260713_bugfix_scan_multi_volume.md) | - |
 | 2026-07-13 | `scan_multi_volume_fix` | 만화책 폴더 가상 책 스캔 시 경로 구분자 혼용으로 인한 다중 권수 등록 누락 버그 조치 | [Task](./history/20260713_012352_scan_multi_volume_fix_task.md) | [Walkthrough](./history/20260713_012352_scan_multi_volume_fix_walkthrough.md) |
 | 2026-07-13 | `scan_imgdir_unpack` | 이미지 폴더 가상 책 스캔 시 튜플 언패킹(expected 3, got 2) 오류 조치 | [BugFix](./bug/20260713_bugfix_scan_imgdir_unpack.md) | - |
 | 2026-07-13 | `scan_hierarchy_series` | 계층 분석 기반 표준 이미지 가상 책 시리즈 그룹화 결함 조치 | [BugFix](./bug/20260713_bugfix_scan_hierarchy_series.md) | - |
@@ -356,33 +356,4 @@ tags: [workflow, history]
 | 2026-07-13 | `pdf_seekbar_sync_bugfix` | PDF 뷰어 하단 시크바 및 페이지 지시자 동기화 결함 수정 | [BugFix](./bug/20260713_bugfix_pdf_seekbar_sync.md) | - |
 | 2026-07-13 | `pdf_dpr_scale_improvement` | PDF 뷰어 선명도 개선을 위한 해상도 배수 상향 조정 | [Improvement](./bug/20260713_improvement_pdf_dpr_scale.md) | - |
 | 2026-07-14 | `epub_toc_enhancement_spec` | EPUB 목차 추출 및 뷰어 이동 기능 고도화 설계 계획서 수립 | [Spec](./spec_epub_toc_enhancement.md) | - |
-
-
-
-
-
-
-
-
-
-
-
-
-
 | 2026-07-13 | `session_20260713_162139` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_162139_session_20260713_162139_task.md) | [Walkthrough](./history/20260713_162139_session_20260713_162139_walkthrough.md) |
-| 2026-07-13 | `session_20260713_162201` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_162201_session_20260713_162201_task.md) | [Walkthrough](./history/20260713_162201_session_20260713_162201_walkthrough.md) |
-| 2026-07-13 | `session_20260713_162514` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_162514_session_20260713_162514_task.md) | [Walkthrough](./history/20260713_162514_session_20260713_162514_walkthrough.md) |
-| 2026-07-13 | `session_20260713_163002` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_163002_session_20260713_163002_task.md) | [Walkthrough](./history/20260713_163002_session_20260713_163002_walkthrough.md) |
-| 2026-07-13 | `session_20260713_164336` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_164336_session_20260713_164336_task.md) | [Walkthrough](./history/20260713_164336_session_20260713_164336_walkthrough.md) |
-| 2026-07-13 | `session_20260713_164657` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_164657_session_20260713_164657_task.md) | [Walkthrough](./history/20260713_164657_session_20260713_164657_walkthrough.md) |
-| 2026-07-13 | `session_20260713_170722` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_170722_session_20260713_170722_task.md) | [Walkthrough](./history/20260713_170722_session_20260713_170722_walkthrough.md) |
-| 2026-07-13 | `session_20260713_170852` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_170852_session_20260713_170852_task.md) | [Walkthrough](./history/20260713_170852_session_20260713_170852_walkthrough.md) |
-| 2026-07-13 | `session_20260713_171238` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_171238_session_20260713_171238_task.md) | [Walkthrough](./history/20260713_171238_session_20260713_171238_walkthrough.md) |
-| 2026-07-13 | `session_20260713_203815` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_203815_session_20260713_203815_task.md) | [Walkthrough](./history/20260713_203815_session_20260713_203815_walkthrough.md) |
-| 2026-07-13 | `session_20260713_204239` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_204239_session_20260713_204239_task.md) | [Walkthrough](./history/20260713_204239_session_20260713_204239_walkthrough.md) |
-| 2026-07-13 | `session_20260713_224437` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_224437_session_20260713_224437_task.md) | [Walkthrough](./history/20260713_224437_session_20260713_224437_walkthrough.md) |
-| 2026-07-13 | `session_20260713_224551` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_224551_session_20260713_224551_task.md) | [Walkthrough](./history/20260713_224551_session_20260713_224551_walkthrough.md) |
-| 2026-07-13 | `session_20260713_224949` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_224949_session_20260713_224949_task.md) | [Walkthrough](./history/20260713_224949_session_20260713_224949_walkthrough.md) |
-| 2026-07-13 | `session_20260713_225901` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_225901_session_20260713_225901_task.md) | [Walkthrough](./history/20260713_225901_session_20260713_225901_walkthrough.md) |
-| 2026-07-13 | `session_20260713_230556` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260713_230556_session_20260713_230556_task.md) | [Walkthrough](./history/20260713_230556_session_20260713_230556_walkthrough.md) |
-| 2026-07-14 | `session_20260714_004719` | 마크다운 문서 이력 아카이빙 및 동기화 | [Task](./history/20260714_004719_session_20260714_004719_task.md) | [Walkthrough](./history/20260714_004719_session_20260714_004719_walkthrough.md) |

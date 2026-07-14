@@ -145,7 +145,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     d['full_path'].replace('\\', '/')
                 ))
             if update_data:
-                bulk_update_books(cur, update_data)
+                bulk_update_books(cur, update_data, force=force)
             
         if ins_list:
             insert_data = []

@@ -305,6 +305,78 @@ def ensure_books_search_index(conn):
             return
         raise
 
+def startup_db_sanity_check():
+    """
+    앱 초기 기동 시 DB 파일 및 WAL/SHM 파일 무결성을 검증합니다.
+    - integrity_check 실패 또는 WAL 파일 손상 감지 시 WAL/SHM 파일을 자동 제거합니다.
+    - 메인 DB 파일 자체의 손상은 경고 로그만 출력하고 서버 기동은 계속합니다.
+    """
+    db_map = {
+        'general': DB_GENERAL_PATH,
+        'adult'  : DB_ADULT_PATH,
+    }
+    for db_type, db_path in db_map.items():
+        if not os.path.exists(db_path):
+            continue  # 아직 생성 전 (최초 기동)
+
+        wal_path = db_path + '-wal'
+        shm_path = db_path + '-shm'
+        has_wal  = os.path.exists(wal_path)
+        has_shm  = os.path.exists(shm_path)
+
+        # WAL/SHM 파일이 없으면 검사 불필요
+        if not has_wal and not has_shm:
+            continue
+
+        print(f"[DB-Sanity] {db_type} DB — WAL/SHM 파일 감지, 무결성 검증 시작...")
+        try:
+            conn = sqlite3.connect(db_path, timeout=10.0)
+            conn.execute("PRAGMA journal_mode=WAL;")
+            result = conn.execute("PRAGMA integrity_check;").fetchall()
+            integrity_ok = (len(result) == 1 and result[0][0] == 'ok')
+
+            if integrity_ok:
+                # WAL 체크포인트 수행 후 임시 파일 정리
+                conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+                conn.close()
+                for extra in [wal_path, shm_path]:
+                    if os.path.exists(extra):
+                        try:
+                            os.remove(extra)
+                            print(f"[DB-Sanity] {db_type} DB — {os.path.basename(extra)} 정리 완료")
+                        except Exception as rm_err:
+                            print(f"[DB-Sanity] {db_type} DB — {os.path.basename(extra)} 제거 실패: {rm_err}")
+                print(f"[DB-Sanity] {db_type} DB — 무결성 정상, WAL 체크포인트 완료")
+            else:
+                # integrity_check 실패 → WAL/SHM만 제거 시도 (메인 DB는 보존)
+                conn.close()
+                print(f"[DB-Sanity] {db_type} DB — 무결성 이상 감지: {result[:3]}")
+                print(f"[DB-Sanity] {db_type} DB — 손상된 WAL/SHM 파일 제거 시도...")
+                for extra in [wal_path, shm_path]:
+                    if os.path.exists(extra):
+                        try:
+                            os.remove(extra)
+                            print(f"[DB-Sanity] {db_type} DB — {os.path.basename(extra)} 제거 완료")
+                        except Exception as rm_err:
+                            print(f"[DB-Sanity] {db_type} DB — {os.path.basename(extra)} 제거 실패: {rm_err}")
+                print(f"[DB-Sanity] {db_type} DB — WAL/SHM 제거 후 서버 기동을 계속합니다.")
+                print(f"[DB-Sanity] 지속적인 오류 발생 시 tools/db_recovery.py 를 실행하세요.")
+
+        except sqlite3.DatabaseError as e:
+            # 메인 DB 파일 자체가 열리지 않는 경우
+            print(f"[DB-Sanity] {db_type} DB — DB 접속 실패: {e}")
+            print(f"[DB-Sanity] {db_type} DB — WAL/SHM 강제 제거 시도...")
+            for extra in [wal_path, shm_path]:
+                if os.path.exists(extra):
+                    try:
+                        os.remove(extra)
+                        print(f"[DB-Sanity] {db_type} DB — {os.path.basename(extra)} 제거 완료")
+                    except Exception as rm_err:
+                        print(f"[DB-Sanity] {db_type} DB — {os.path.basename(extra)} 제거 실패: {rm_err}")
+        except Exception as e:
+            print(f"[DB-Sanity] {db_type} DB — 예기치 못한 오류 (무시하고 계속): {e}")
+
+
 def init_databases():
     """두 데이터베이스(일반, 성인)의 테이블 스키마 초기화"""
     schema = """
@@ -435,6 +507,9 @@ def init_databases():
     CREATE INDEX IF NOT EXISTS idx_user_category_permissions_lookup ON user_category_permissions(user_id, library_id, has_access);
     """
     
+    # 기동 전 WAL/SHM 무결성 자동 검증 및 정리
+    startup_db_sanity_check()
+
     for db_type in ['general', 'adult']:
         conn = get_connection(db_type)
         cursor = conn.cursor()
