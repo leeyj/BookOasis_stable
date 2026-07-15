@@ -2,7 +2,22 @@ version: "3.8"
 
 services:
   bookoasis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bookoasis
+    restart: unless-stopped
+    stop_grace_period: 30s  # 종료 시 DB WAL 체크포인트 완료를 위한 유예 시간
+    ports:
+      - "5930:5930"
     volumes:
-      # 중요: 본인의 미디어 라이브러리(책/만화) 실제 저장 경로를 왼쪽에 입력하세요.
-      # 예시: - /mnt/nas/comics:/data/comics:ro
-      - /path/to/your/comics:/data/comics:ro
+      # 설정 및 데이터베이스 영구 소장용 바인딩
+      - ./db:/app/db
+      - ./covers:/app/covers
+      - ./cache:/app/cache
+      - ./plugins:/app/plugins
+    env_file:
+      - .env
+    environment:
+      - PORT=5930
+      # - TZ=Asia/Seoul  # (옵션) 컨테이너 로그 및 내부 콘솔 시간대를 정렬하려면 주석을 해제하세요. (웹 서비스의 스케줄 크론 주기는 컨테이너 타임존 대신 웹 UI 일반설정의 타임존 설정을 우선 추종합니다.)

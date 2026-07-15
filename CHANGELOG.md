@@ -1,8 +1,15 @@
 # CHANGELOG
 
-## 알려진 버그
-- OPDS내 검색시 단어 단위별로 검색됨 | Search in OPDS searches by word unit
 
+## v1.0.2
+### fixed
+- 문리더등 호환 패치 및 검색 지원 | Monnreader support,(search..)
+- 스캔시 시리즈이름 오류 정정 로직 추가 | scanner fixed series name update error
+- .dockerignore 추가
+
+### improved
+- DB 컬럼 추가(books.metadata_locked) | add columm(books.metadata_locked)
+  * 재시작시 자동 추가, 사용자가 수정한 메타정보는 스킵함 | restart auto upgrade, user edited metadata is skip the scanner
 
 ## v1.0.1
 ### added

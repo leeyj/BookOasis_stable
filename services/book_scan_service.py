@@ -104,16 +104,14 @@ class BookScanService:
             # 5. DB 업데이트 실행
             print(f"[BookScanService] DB 업데이트 트랜잭션 쿼리 빌드")
             
-            # 부모 폴더 경로 기반의 올바른 series_name 추출
-            path_parts = os.path.normpath(parent_dir).split(os.sep)
-            real_series_name = ""
-            from tools.scanner.metadata import is_consonant_folder
-            for i in range(len(path_parts) - 1):
-                if is_consonant_folder(path_parts[i]):
-                    real_series_name = path_parts[i+1]
-                    break
-            if not real_series_name and len(path_parts) > 0:
-                real_series_name = path_parts[-1]
+            # 시리즈 규칙 통일:
+            # - 일반 파일: 현재 폴더(=파일의 부모 폴더)
+            # - IMGDIR: 부모의 부모 폴더(현재 폴더는 책 제목 폴더)
+            if is_imgdir:
+                series_folder = os.path.basename(os.path.dirname(parent_dir.rstrip('/\\')))
+            else:
+                series_folder = os.path.basename(parent_dir.rstrip('/\\'))
+            real_series_name = series_folder or ""
 
             if real_series_name:
                 import re
@@ -122,14 +120,14 @@ class BookScanService:
             cursor.execute("""
                 UPDATE books SET 
                     series_name  = COALESCE(NULLIF(?, ''), series_name),
-                    cover_image  = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE cover_image END,
-                    cover_updated_at = CASE WHEN ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
-                    author       = COALESCE(NULLIF(?, ''), author),
-                    publisher    = COALESCE(NULLIF(?, ''), publisher),
-                    link         = COALESCE(NULLIF(?, ''), link),
-                    score        = CASE WHEN ? != 0 THEN ? ELSE score END,
-                    summary      = COALESCE(NULLIF(?, ''), summary),
-                    release_date = COALESCE(NULLIF(?, ''), release_date)
+                    cover_image  = CASE WHEN COALESCE(metadata_locked, 0) = 0 AND ? IS NOT NULL AND ? != '' THEN ? ELSE cover_image END,
+                    cover_updated_at = CASE WHEN COALESCE(metadata_locked, 0) = 0 AND ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
+                    author       = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), author) ELSE author END,
+                    publisher    = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), publisher) ELSE publisher END,
+                    link         = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), link) ELSE link END,
+                    score        = CASE WHEN COALESCE(metadata_locked, 0) = 0 AND ? != 0 THEN ? ELSE score END,
+                    summary      = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), summary) ELSE summary END,
+                    release_date = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), release_date) ELSE release_date END
                 WHERE id = ?
             """, (
                 real_series_name,

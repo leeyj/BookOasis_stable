@@ -240,7 +240,7 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
     while is_db_tuning(db_type):
         print(f"[Scanner-Trigger] ⚠️ DB Tuning ({db_type}) in progress. Waiting 3 seconds... (elapsed: {wait_count * 3}s)")
         write_scan_log("⚠️ 데이터베이스 최적화(튜닝) 작업이 진행 중입니다. 완료 시까지 일시 대기합니다.")
-        time.sleep(3.0)
+        time.sleep(10.0)
         wait_count += 1
         if wait_count > 40:  # 최대 2분 대기
             print(f"[Scanner-Trigger WARNING] DB Tuning wait timeout. Proceeding with scan anyway.")

@@ -268,6 +268,9 @@ def search_books_entries(db_type: str, query: str, download_prefix: str, urn_pre
     cursor = conn.cursor()
     try:
         books, total = _search_books_entries_fts(cursor, query, limit, offset)
+        # FTS가 예외 없이 0건을 반환하는 경우(토크나이저/질의 형태 이슈), LIKE로 보완한다.
+        if total == 0:
+            books, total = _search_books_entries_like(cursor, query, limit, offset)
     except Exception:
         books, total = _search_books_entries_like(cursor, query, limit, offset)
     conn.close()

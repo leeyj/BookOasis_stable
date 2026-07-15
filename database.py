@@ -461,6 +461,7 @@ def init_databases():
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         is_deleted INTEGER DEFAULT 0,
         deleted_at DATETIME DEFAULT NULL,
+        metadata_locked INTEGER DEFAULT 0,
         file_mtime REAL DEFAULT 0.0,
         file_size INTEGER DEFAULT 0
     );

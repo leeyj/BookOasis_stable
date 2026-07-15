@@ -205,6 +205,7 @@ class BookDetailService:
                     link = ?,
                     genre = ?,
                     tags = ?,
+                    metadata_locked = 1,
                     cover_updated_at = CURRENT_TIMESTAMP
                 WHERE series_name = ?
             """, (author, publisher, summary, link, genre, tags, series_name))

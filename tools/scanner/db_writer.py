@@ -4,7 +4,7 @@ import os
 def update_book_metadata(cursor, full_path, cover_image, merged_meta, series_name='', force=False):
     """Execute merge update for existing book info and local metadata"""
     # force=True: 경로에서 파싱한 series_name으로 강제 갱신
-    # force=False: 기존 series_name 유지 (메타데이터 병합만)
+    # force=False: 일반 스캔에서도 파싱된 series_name이 있으면 적극 반영
     common_args = (
         cover_image,
         cover_image, cover_image,
@@ -22,34 +22,34 @@ def update_book_metadata(cursor, full_path, cover_image, merged_meta, series_nam
         cursor.execute("""
             UPDATE books SET
                 series_name  = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE series_name END,
-                cover_image  = COALESCE(NULLIF(?, ''), cover_image),
-                cover_updated_at = CASE WHEN ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
-                author       = COALESCE(NULLIF(?, ''), author),
-                publisher    = COALESCE(NULLIF(?, ''), publisher),
-                link         = COALESCE(NULLIF(?, ''), link),
-                score        = CASE WHEN ? != 0 THEN ? ELSE score END,
-                summary      = COALESCE(NULLIF(?, ''), summary),
-                release_date = COALESCE(NULLIF(?, ''), release_date),
-                genre        = COALESCE(NULLIF(?, ''), genre),
-                tags         = COALESCE(NULLIF(?, ''), tags)
+                cover_image  = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), cover_image) ELSE cover_image END,
+                cover_updated_at = CASE WHEN COALESCE(metadata_locked, 0) = 0 AND ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
+                author       = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), author) ELSE author END,
+                publisher    = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), publisher) ELSE publisher END,
+                link         = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), link) ELSE link END,
+                score        = CASE WHEN COALESCE(metadata_locked, 0) = 0 AND ? != 0 THEN ? ELSE score END,
+                summary      = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), summary) ELSE summary END,
+                release_date = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), release_date) ELSE release_date END,
+                genre        = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), genre) ELSE genre END,
+                tags         = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), tags) ELSE tags END
             WHERE file_path = ?
         """, (series_name, series_name, series_name) + common_args)
     else:
         cursor.execute("""
             UPDATE books SET
-                series_name  = CASE WHEN 1=0 THEN ? ELSE series_name END,
-                cover_image  = COALESCE(NULLIF(?, ''), cover_image),
-                cover_updated_at = CASE WHEN ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
-                author       = COALESCE(NULLIF(?, ''), author),
-                publisher    = COALESCE(NULLIF(?, ''), publisher),
-                link         = COALESCE(NULLIF(?, ''), link),
-                score        = CASE WHEN ? != 0 THEN ? ELSE score END,
-                summary      = COALESCE(NULLIF(?, ''), summary),
-                release_date = COALESCE(NULLIF(?, ''), release_date),
-                genre        = COALESCE(NULLIF(?, ''), genre),
-                tags         = COALESCE(NULLIF(?, ''), tags)
+                series_name  = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE series_name END,
+                cover_image  = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), cover_image) ELSE cover_image END,
+                cover_updated_at = CASE WHEN COALESCE(metadata_locked, 0) = 0 AND ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
+                author       = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), author) ELSE author END,
+                publisher    = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), publisher) ELSE publisher END,
+                link         = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), link) ELSE link END,
+                score        = CASE WHEN COALESCE(metadata_locked, 0) = 0 AND ? != 0 THEN ? ELSE score END,
+                summary      = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), summary) ELSE summary END,
+                release_date = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), release_date) ELSE release_date END,
+                genre        = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), genre) ELSE genre END,
+                tags         = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), tags) ELSE tags END
             WHERE file_path = ?
-        """, (series_name,) + common_args)
+        """, (series_name, series_name, series_name) + common_args)
 
 
 def insert_new_book(cursor, library_id, filename, series_name, cover_image, merged_meta):
@@ -113,7 +113,7 @@ def bulk_update_books(cursor, update_data_list, force=False):
     
     update_data_list 각 항목 형식:
       force=False: (series_name, cover_image, cover_image, cover_image, author, publisher, link, score, score, summary, release_date, genre, tags, file_mtime, file_size, file_path)
-      force=True : 동일 (series_name이 실제로 SET에 반영됨)
+            force=True : series_name 강제 반영
     """
     if not update_data_list:
         return
@@ -121,16 +121,16 @@ def bulk_update_books(cursor, update_data_list, force=False):
         cursor.executemany("""
             UPDATE books SET 
                 series_name  = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE series_name END,
-                cover_image  = COALESCE(NULLIF(?, ''), cover_image),
-                cover_updated_at = CASE WHEN ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
-                author       = COALESCE(NULLIF(?, ''), author),
-                publisher    = COALESCE(NULLIF(?, ''), publisher),
-                link         = COALESCE(NULLIF(?, ''), link),
-                score        = CASE WHEN ? != 0 THEN ? ELSE score END,
-                summary      = COALESCE(NULLIF(?, ''), summary),
-                release_date = COALESCE(NULLIF(?, ''), release_date),
-                genre        = COALESCE(NULLIF(?, ''), genre),
-                tags         = COALESCE(NULLIF(?, ''), tags),
+                cover_image  = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), cover_image) ELSE cover_image END,
+                cover_updated_at = CASE WHEN COALESCE(metadata_locked, 0) = 0 AND ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
+                author       = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), author) ELSE author END,
+                publisher    = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), publisher) ELSE publisher END,
+                link         = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), link) ELSE link END,
+                score        = CASE WHEN COALESCE(metadata_locked, 0) = 0 AND ? != 0 THEN ? ELSE score END,
+                summary      = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), summary) ELSE summary END,
+                release_date = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), release_date) ELSE release_date END,
+                genre        = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), genre) ELSE genre END,
+                tags         = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), tags) ELSE tags END,
                 file_mtime   = ?,
                 file_size    = ?
             WHERE file_path = ?
@@ -141,21 +141,23 @@ def bulk_update_books(cursor, update_data_list, force=False):
     else:
         cursor.executemany("""
             UPDATE books SET 
-                series_name  = CASE WHEN 1=0 THEN ? ELSE series_name END,
-                cover_image  = COALESCE(NULLIF(?, ''), cover_image),
-                cover_updated_at = CASE WHEN ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
-                author       = COALESCE(NULLIF(?, ''), author),
-                publisher    = COALESCE(NULLIF(?, ''), publisher),
-                link         = COALESCE(NULLIF(?, ''), link),
-                score        = CASE WHEN ? != 0 THEN ? ELSE score END,
-                summary      = COALESCE(NULLIF(?, ''), summary),
-                release_date = COALESCE(NULLIF(?, ''), release_date),
-                genre        = COALESCE(NULLIF(?, ''), genre),
-                tags         = COALESCE(NULLIF(?, ''), tags),
+                series_name  = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE series_name END,
+                cover_image  = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), cover_image) ELSE cover_image END,
+                cover_updated_at = CASE WHEN COALESCE(metadata_locked, 0) = 0 AND ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
+                author       = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), author) ELSE author END,
+                publisher    = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), publisher) ELSE publisher END,
+                link         = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), link) ELSE link END,
+                score        = CASE WHEN COALESCE(metadata_locked, 0) = 0 AND ? != 0 THEN ? ELSE score END,
+                summary      = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), summary) ELSE summary END,
+                release_date = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), release_date) ELSE release_date END,
+                genre        = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), genre) ELSE genre END,
+                tags         = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), tags) ELSE tags END,
                 file_mtime   = ?,
                 file_size    = ?
             WHERE file_path = ?
-        """, update_data_list)
+        """, [
+            (row[0], row[0], row[0], *row[1:]) for row in update_data_list
+        ])
 
 def bulk_insert_books(cursor, insert_data_list):
     """Bulk insert new books"""

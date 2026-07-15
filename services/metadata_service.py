@@ -46,7 +46,7 @@ class MetadataService:
         # 커버 이미지(cover_image)는 건드리지 않고 텍스트 메타 정보만 업데이트
         cursor.execute("""
             UPDATE books
-            SET author = ?, publisher = ?, summary = ?, link = ?, score = ?
+            SET author = ?, publisher = ?, summary = ?, link = ?, score = ?, metadata_locked = 1
             WHERE series_name = ? AND library_id = ?
         """, (
             source['author'],

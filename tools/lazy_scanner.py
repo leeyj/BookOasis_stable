@@ -290,12 +290,12 @@ def run_lazy_cover_extraction(target_book_id=None):
                             if comicinfo_meta and any(comicinfo_meta.get(k) for k in ('author', 'summary', 'publisher', 'release_date')):
                                 cursor.execute("""
                                     UPDATE books SET
-                                        cover_image = ?,
-                                        cover_updated_at = CURRENT_TIMESTAMP,
-                                        author = COALESCE(NULLIF(?, ''), author),
-                                        publisher = COALESCE(NULLIF(?, ''), publisher),
-                                        summary = COALESCE(NULLIF(?, ''), summary),
-                                        release_date = COALESCE(NULLIF(?, ''), release_date)
+                                        cover_image = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN ? ELSE cover_image END,
+                                        cover_updated_at = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
+                                        author = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), author) ELSE author END,
+                                        publisher = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), publisher) ELSE publisher END,
+                                        summary = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), summary) ELSE summary END,
+                                        release_date = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), release_date) ELSE release_date END
                                     WHERE id = ?
                                 """, (
                                     cover_image_path,
@@ -308,8 +308,8 @@ def run_lazy_cover_extraction(target_book_id=None):
                             else:
                                 cursor.execute("""
                                     UPDATE books SET
-                                        cover_image = ?,
-                                        cover_updated_at = CURRENT_TIMESTAMP
+                                        cover_image = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN ? ELSE cover_image END,
+                                        cover_updated_at = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN CURRENT_TIMESTAMP ELSE cover_updated_at END
                                     WHERE id = ?
                                 """, (cover_image_path, book_id))
                             conn.commit()

@@ -262,15 +262,18 @@ class AppOpdsHandlers:
         return Response(xml, mimetype='application/opensearchdescription+xml; charset=utf-8')
 
     def handle_search_feed(self, is_adult: bool):
-        if not self._check_auth_cached(is_adult=is_adult):
-            return self._unauthorized()
-
         query = request.args.get('q') or request.args.get('query') or ''
         base_url = get_external_base_url(request)
         if not query:
+            # OpenSearch Description discovery request: allow without auth.
+            # Some OPDS clients probe this endpoint before sending credentials.
             if is_adult:
                 return self._build_opensearch_description('BookOasis App Adult', 'Search BookOasis App Adult Catalog', f'{base_url}/app-opds-adult/search?q={{searchTerms}}')
             return self._build_opensearch_description('BookOasis App', 'Search BookOasis App Catalog', f'{base_url}/app-opds/search?q={{searchTerms}}')
+
+        # Actual search requests require authentication.
+        if not self._check_auth_cached(is_adult=is_adult):
+            return self._unauthorized()
 
         page, page_size, offset = self._get_page_params()
         if is_adult:

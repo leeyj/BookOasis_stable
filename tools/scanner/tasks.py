@@ -15,6 +15,14 @@ SUPPORTED_FORMATS = ('.zip', '.cbz', '.epub', '.pdf', '.txt')
 SUPPORTED_IMAGE_FORMATS = ('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif')
 IMGDIR_VIRTUAL_FILENAME = '__folder__.imgdir'
 
+
+def _normalize_series_text(name):
+    """Normalize folder-derived series text."""
+    if not name:
+        return ''
+    import re
+    return re.sub(r'^\[(?:단행|연재|소설|만화|웹툰|일반)\]\s*', '', str(name)).strip()
+
 def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_folder_mtimes, is_remote=False, library_id=None, db_files_cache=None, library_root=None):
     """Independent I/O scan task per folder (DB independent, pure FS/I/O scaling)"""
     root = root.replace('\\', '/').strip()
@@ -116,33 +124,9 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
                         else:
                             print(f"[Scanner-DEBUG-Task] ⚠️ [Ultra-fast skip failed] mtime changed (dir: {int(c_dir_mtime)}->{int(dir_mtime)}, meta: {int(c_meta_mtime)}->{int(meta_mtime)}) - folder: '{root}'")
 
-    series_name = ""
-    # library_root 가 제공된 경우 라이브러리 물리 경로 기준 상대 계층 분석
-    if library_root:
-        norm_lib = library_root.replace('\\', '/').strip().rstrip('/')
-        norm_root = root.rstrip('/')
-        if norm_root.startswith(norm_lib) and norm_root != norm_lib:
-            relative_part = norm_root[len(norm_lib):].lstrip('/')
-            parts = relative_part.split('/')
-            # 초성 폴더를 제외한 첫 번째 폴더명을 시리즈명으로 인식
-            for part in parts:
-                if part and not is_consonant_folder(part):
-                    series_name = part
-                    break
-
-    # 상대 계층 분석이 실패했거나 없는 경우 기존 초성 폴더 매칭
-    if not series_name:
-        path_parts = os.path.normpath(root).split(os.sep)
-        for i in range(len(path_parts) - 1):
-            if is_consonant_folder(path_parts[i]):
-                series_name = path_parts[i+1]
-                break
-        if not series_name and len(path_parts) > 0:
-            series_name = path_parts[-1]
-
-    if series_name:
-        import re
-        series_name = re.sub(r'^\[(?:단행|연재|소설|만화|웹툰|일반)\]\s*', '', series_name).strip()
+    # 일반 파일(archive/txt/pdf/epub)은 "현재 폴더명"을 시리즈로 사용한다.
+    # 즉, 라이브러리 루트와 현재 폴더 사이의 중간 경로는 모두 무시한다.
+    series_name = _normalize_series_text(os.path.basename(root.rstrip('/')))
 
     print(f"[Scanner-DEBUG-Task]   - Metadata YAML/XML/JSON load started")
     merged_meta = merge_local_metadata(root, files=files, is_remote=is_remote)
@@ -346,12 +330,9 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
         })
 
     if has_imgdir_candidate:
-        parent_folder = os.path.basename(os.path.dirname(root))
-        if parent_folder:
-            import re
-            imgdir_series_name = re.sub(r'^\[(?:단행|연재|소설|만화|웹툰|일반)\]\s*', '', parent_folder).strip()
-        else:
-            imgdir_series_name = series_name
+        # 이미지 폴더(imgdir)는 "현재 폴더=책", "부모 폴더=시리즈" 규칙을 사용한다.
+        parent_folder = os.path.basename(os.path.dirname(root.rstrip('/')))
+        imgdir_series_name = _normalize_series_text(parent_folder) if parent_folder else series_name
         imgdir_title = os.path.basename(root)
         imgdir_cover = None
         if not imgdir_skip:
