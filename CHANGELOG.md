@@ -3,6 +3,7 @@
 ## 알려진 버그
 - OPDS내 검색시 단어 단위별로 검색됨 | Search in OPDS searches by word unit
 
+
 ## v1.0.1
 ### added
 - OPDS내 검색버튼 연동 | OPDS search button integration
