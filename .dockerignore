@@ -16,12 +16,9 @@ venv/
 
 
 # Local Data (DB, Covers, Cache & Logs)
-db/*.db*
-covers/*
-!covers/.gitkeep
-cache/*
-!cache/.gitkeep
-logs/*
-!logs/.gitkeep
+db/
+covers/
+cache/
+logs/
 
 

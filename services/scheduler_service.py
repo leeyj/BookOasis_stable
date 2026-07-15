@@ -249,6 +249,16 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
 
     print(f"[Scanner-Trigger] 🚀 Immediate scan started: DB={db_type}, ID={library_id}, Path={physical_path}, Force={force}")
     write_scan_log(f"스캔 기동 시작 - DB={db_type}, LibraryID={library_id}, Path='{physical_path}', Force={force}")
+
+    # VFS 갱신 단계도 사용자 관점에서는 스캔 진행 중이므로 즉시 scanning 상태로 전환
+    try:
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute("UPDATE libraries SET scan_status = 'scanning' WHERE id = ?", (library_id,))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"[Scheduler] Scan state update error(before VFS): {e}")
     
     # 큐 세부 진행 단계를 VFS 갱신 중으로 기록
     from services.scanner_queue import scanner_queue
@@ -410,16 +420,6 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
     if scanner_queue.current_task and scanner_queue.current_task.get('key') == f"library_scan_{db_type}_{library_id}":
         scanner_queue.current_task['stage'] = 'book_scan'
 
-    # 1. 상태를 'scanning'으로 업데이트
-    try:
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("UPDATE libraries SET scan_status = 'scanning' WHERE id = ?", (library_id,))
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        print(f"[Scheduler] Scan state update error: {e}")
-    
     try:
         scan_library(db_path, library_id, physical_path, force=force, skip_vfs_refresh=vfs_refreshed_in_wrapper)
         
