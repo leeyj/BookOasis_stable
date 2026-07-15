@@ -105,6 +105,53 @@ Quick start template:
 
 ---
 
+## HTML Rendering Policy (HTML 렌더링 정책)
+
+플러그인이 반환하는 데이터 필드 중 일부는 **제한적 HTML 태그**를 허용합니다.
+
+### ✅ HTML 허용 필드 (sanitizePluginHtml 적용)
+
+| 필드 | 적용 위치 | 설명 |
+|------|-----------|------|
+| `description` | `search()` 반환값, `get_dashboard_data()` items | 책 소개 등 서술형 텍스트 |
+| `metric`, `value` | `get_dashboard_data()` metric 아이템 | 통계 수치, 레이블 |
+| `subtitle` | `dashboard_widget` 속성 | 위젯 부제목 |
+
+### 허용 태그 목록
+
+```html
+<b>, <i>, <em>, <strong>, <br>, <span style="color|font-*|text-decoration">,
+<a href="https://...">, <ul>, <ol>, <li>, <p>, <small>, <mark>, <code>
+```
+
+### ❌ HTML 차단 필드 (escapeHtml 완전 이스케이프 유지)
+
+| 필드 | 이유 |
+|------|------|
+| `title`, `author`, `publisher`, `pubDate` | 고유명사로, HTML 렌더링 불필요 |
+| `id`, `name`, `icon` | 시스템 식별자 |
+
+### 차단되는 XSS 벡터
+
+- `<script>`, `<iframe>`, `<object>`, `<embed>`, `<form>`, `<svg>` 등 위험 태그
+- `onclick`, `onerror`, `onload` 등 `on*` 이벤트 속성
+- `javascript:` 프로토콜
+- `<span>` style 속성 중 `color`, `font-weight`, `font-style`, `font-size`, `text-decoration` 외 속성
+
+### 예시: description에 HTML 사용
+
+```python
+def search(self, db_type, query):
+    return [{
+        'title': '어린왕자',          # ← escapeHtml (태그 불허)
+        'author': '생텍쥐페리',        # ← escapeHtml (태그 불허)
+        'description': '사막에서 만난 <b>어린왕자</b>의 이야기.<br>별과 장미, 그리고 <em>우정</em>에 대하여.',  # ← sanitize (허용)
+        ...
+    }]
+```
+
+---
+
 ## Example Template (최신 예시 템플릿)
 
 다음은 UI 연동 및 DB 설정값 불러오기가 모두 포함된 완벽한 미국 Google Books API 플러그인 예시입니다.

@@ -114,20 +114,26 @@ function renderMetadataResults(books, source) {
   
   let html = '';
   books.forEach((book, idx) => {
-    let desc = book.description || i18n.t('metadata_search.no_description');
+    // description: 플러그인이 HTML을 포함할 수 있으므로 sanitize 허용
+    let desc = sanitizePluginHtml(book.description || i18n.t('metadata_search.no_description'));
     if (desc.length > 150) {
       desc = desc.substring(0, 150) + '...';
     }
+    // title/author/publisher: 고유명사이므로 완전 이스케이프 유지
+    const safeTitle = escapeHtml(book.title || '');
+    const safeAuthor = escapeHtml(book.author || '');
+    const safePublisher = escapeHtml(book.publisher || '');
+    const safePubDate = escapeHtml(book.pubDate || '');
     
     html += `
       <div class="metadata-result-card" style="display: flex; gap: 1rem; background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 1rem; cursor: pointer; transition: all 0.2s;" data-index="${idx}">
         <div style="flex-shrink: 0; width: 80px; height: 110px; background: rgba(15, 23, 42, 0.5); border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
-          <img src="${book.cover || '/static/images/default_cover.jpg'}" alt="Cover" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='/static/images/default_cover.jpg'">
+          <img src="${escapeHtml(book.cover || '/static/images/default_cover.jpg')}" alt="Cover" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='/static/images/default_cover.jpg'">
         </div>
         <div style="flex: 1; display: flex; flex-direction: column; gap: 0.3rem;">
-          <h4 style="margin: 0; color: #fff; font-size: 0.95rem; font-weight: 700;">${book.title}</h4>
+          <h4 style="margin: 0; color: #fff; font-size: 0.95rem; font-weight: 700;">${safeTitle}</h4>
           <div style="font-size: 0.8rem; color: #94a3b8;">
-            <span>${i18n.t('metadata_search.book_meta', {author: book.author, publisher: book.publisher, pubDate: book.pubDate})}</span>
+            <span>${i18n.t('metadata_search.book_meta', {author: safeAuthor, publisher: safePublisher, pubDate: safePubDate})}</span>
           </div>
           <p style="margin: 0.3rem 0 0 0; font-size: 0.78rem; color: #cbd5e1; line-height: 1.4;">${desc}</p>
         </div>
@@ -284,3 +290,71 @@ async function selectMetadataBook(book, source) {
 window.openMetadataSearchModal = openMetadataSearchModal;
 window.closeMetadataSearchModal = closeMetadataSearchModal;
 window.performMetadataSearch = performMetadataSearch;
+
+// ── XSS 방지 유틸 ────────────────────────────────────────────
+
+/**
+ * escapeHtml – 문자열을 HTML 엔티티로 완전 이스케이프 (title/author 등 고유명사용)
+ */
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * sanitizePluginHtml – 플러그인 콘텐츠용 제한적 HTML 허용 함수
+ *
+ * 허용 태그: b, i, em, strong, br, span, a(href만), ul, ol, li, p, small, mark, code
+ * 차단 대상: <script>, <iframe>, <object>, <embed>, on* 이벤트 속성, javascript: href
+ *
+ * description 같은 플러그인 콘텐츠 필드에만 사용할 것.
+ * title/author/publisher 같은 고유명사 필드에는 escapeHtml을 유지할 것.
+ */
+function sanitizePluginHtml(value) {
+  const raw = String(value || '');
+
+  // 1단계: 위험 태그 완전 제거
+  const DANGEROUS_TAGS = /(<\s*\/?(script|iframe|object|embed|form|input|button|select|textarea|style|link|meta|base|svg|math)[^>]*>)/gi;
+  let sanitized = raw.replace(DANGEROUS_TAGS, '');
+
+  // 2단계: on* 이벤트 속성 제거
+  sanitized = sanitized.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '');
+
+  // 3단계: javascript: 프로토콜 제거
+  sanitized = sanitized.replace(/(href|src)\s*=\s*["']?\s*javascript:[^"'>]*/gi, '$1="#"');
+
+  // 4단계: 허용 태그 화이트리스트 외 모든 태그 이스케이프
+  const ALLOWED_TAGS = new Set(['b', 'i', 'em', 'strong', 'br', 'span', 'a', 'ul', 'ol', 'li', 'p', 'small', 'mark', 'code']);
+  sanitized = sanitized.replace(/<(\/?)([\w]+)([^>]*)>/g, (match, slash, tag, attrs) => {
+    const lowerTag = tag.toLowerCase();
+    if (!ALLOWED_TAGS.has(lowerTag)) {
+      return match.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    if (lowerTag === 'a') {
+      const hrefMatch = attrs.match(/href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]*))/i);
+      const titleMatch = attrs.match(/title\s*=\s*(?:"([^"]*)"|'([^']*)')/i);
+      const href = hrefMatch ? (hrefMatch[1] || hrefMatch[2] || hrefMatch[3] || '#') : '#';
+      const title = titleMatch ? ` title="${escapeHtml(titleMatch[1] || titleMatch[2] || '')}"` : '';
+      const safeHref = /^(https?:\/\/|\/)/.test(href) ? href : '#';
+      return `<a href="${escapeHtml(safeHref)}"${title} target="_blank" rel="noopener noreferrer">`;
+    }
+    if (lowerTag === 'span') {
+      const styleMatch = attrs.match(/style\s*=\s*(?:"([^"]*)"|'([^']*)')/i);
+      if (styleMatch) {
+        const styleVal = styleMatch[1] || styleMatch[2] || '';
+        const safeStyle = styleVal.split(';')
+          .filter(rule => /^\s*(color|font-weight|font-style|font-size|text-decoration)\s*:/i.test(rule))
+          .join(';');
+        return safeStyle ? `<span style="${escapeHtml(safeStyle)}">` : '<span>';
+      }
+      return '<span>';
+    }
+    return `<${slash}${lowerTag}>`;
+  });
+
+  return sanitized;
+}

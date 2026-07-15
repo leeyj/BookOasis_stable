@@ -402,9 +402,10 @@ window.closeLibraryModal = closeLibraryModal;
 window.submitLibraryForm = submitLibraryForm;
 
 // 신규 뷰어 오버레이 함수 매핑 (viewer_comic.js에 위임)
-import { toggleComicOverlay, markAsCompleted } from './viewer_comic.js';
+// ※ markAsCompleted는 viewer.js의 통합 버전을 사용해야 epub/txt 포맷도 정상 동작함
+//   (viewer_comic.js의 버전으로 덮어쓰면 epub/txt에서 comic 페이지 카운트 조건에 걸려 미동작)
+import { toggleComicOverlay } from './viewer_comic.js';
 window.toggleComicOverlay = toggleComicOverlay;
-window.markAsCompleted = markAsCompleted;
 
 // 갱신 시 무한 스크롤 옵저버 다시 바인딩 헬퍼용 노출
 window.initInfiniteScrollObserver = initInfiniteScrollObserver;

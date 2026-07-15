@@ -664,7 +664,8 @@ export function viewerJumpToFirst() {
   if (fmt === 'zip' || fmt === 'cbz') {
     if (typeof comicJumpToFirstPage === 'function') comicJumpToFirstPage();
   } else if (fmt === 'epub') {
-    getEpubModule().then(m => m.epubJumpToFirstPage());
+    // EPUB도 TxtViewer를 사용하므로 txtJumpToFirstPage 호출
+    if (typeof txtJumpToFirstPage === 'function') txtJumpToFirstPage();
   } else if (fmt === 'pdf') {
     if (typeof pdfJumpToFirstPage === 'function') pdfJumpToFirstPage();
   } else if (fmt === 'txt') {
@@ -678,7 +679,8 @@ export function viewerJumpToLast() {
   if (fmt === 'zip' || fmt === 'cbz') {
     if (typeof comicJumpToLastPage === 'function') comicJumpToLastPage();
   } else if (fmt === 'epub') {
-    getEpubModule().then(m => m.epubJumpToLastPage());
+    // EPUB도 TxtViewer를 사용하므로 txtJumpToLastPage 호출
+    if (typeof txtJumpToLastPage === 'function') txtJumpToLastPage();
   } else if (fmt === 'pdf') {
     if (typeof pdfJumpToLastPage === 'function') pdfJumpToLastPage();
   } else if (fmt === 'txt') {

@@ -204,7 +204,9 @@ def _build_fts_match_query(query: str) -> str:
     terms = [term.strip() for term in re.split(r'\s+', str(query or '').strip()) if term.strip()]
     if not terms:
         return ''
-    return ' AND '.join(f'"{term.replace(chr(34), chr(34) * 2)}"' for term in terms)
+    # FTS5 prefix 매칭(*): "동기"* → 동기, 동기짱, 동기화 등 접두어 일치
+    # LIKE 검색의 %동기% 와 유사한 부분 검색 경험 제공
+    return ' AND '.join(f'"{term.replace(chr(34), chr(34) * 2)}"*' for term in terms)
 
 
 def _search_books_entries_like(cursor, query: str, limit: int, offset: int):

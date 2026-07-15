@@ -83,7 +83,11 @@ def build_opds_xml(request, title: str, entries: list, start_path: str, search_p
         f'  <updated>{now}</updated>',
         f'  <link rel="self" href="{escape_xml(current_url)}" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>',
         f'  <link rel="start" href="{escape_xml(base_url + start_path)}" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>',
+        # OpenSearch Description 문서 링크 (표준)
         f'  <link rel="search" href="{escape_xml(base_url + search_path)}" type="application/opensearchdescription+xml" title="Search Books"/>',
+        # 직접 검색 URL 템플릿 링크 (KOReader, Chunky, Panels 등 다수 앱 호환)
+        f'  <link rel="search" href="{escape_xml(base_url + search_path)}?q={{searchTerms}}" type="application/atom+xml" title="Search Books"/>',
+
     ]
     if next_link:
         lines.append(
