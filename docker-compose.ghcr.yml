@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  bookoasis:
+    image: ghcr.io/leeyj/bookoasis:stable
+    container_name: bookoasis
+    restart: unless-stopped
+    stop_grace_period: 30s
+    ports:
+      - "5930:5930"
+    volumes:
+      - ./db:/app/db
+      - ./covers:/app/covers
+      - ./cache:/app/cache
+      - ./plugins:/app/plugins
+    env_file:
+      - .env
+    environment:
+      - PORT=5930

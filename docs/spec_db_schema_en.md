@@ -5,15 +5,15 @@ BookOasis uses two SQLite files: `general` and `adult`.
 - General DB: `db/media_general.db`
 - Adult DB: `db/media_adult.db`
 
-This document summarizes the current schema snapshot (as of 2026-07-09) and table responsibilities.
+This document summarizes the latest code-based schema snapshot (as of 2026-07-15, `database.py:init_databases`) and table responsibilities.
 
 ---
 
 ## 1. Schema Overview
 
 - Both databases share the same core table set.
-- Some columns may differ depending on migration timing.
-- Core and plugins should use compatibility-friendly queries and safe defaults where needed.
+- On startup, `auto_migrate_schema(...)` adds missing declared columns automatically.
+- However, long-lived production DB files can still contain legacy columns/indexes, so queries should remain compatibility-friendly.
 
 ---
 
@@ -46,8 +46,8 @@ Book metadata and file identity.
   - Identity/path: `id`, `library_id`, `file_path`, `file_format`
   - Metadata: `title`, `author`, `publisher`, `series_name`, `summary`, `genre`, `tags`, `link`, `release_date`, `score`
   - Viewer/cover: `total_pages`, `cover_image`, `cover_updated_at`, `has_offsets`
-  - State: `is_favorite`, `created_at`
-  - General DB extensions: `is_deleted`, `deleted_at`, `file_mtime`, `file_size`
+  - State/protection: `is_favorite`, `metadata_locked`, `created_at`
+  - Runtime extensions: `is_deleted`, `deleted_at`, `file_mtime`, `file_size`
 
 ### book_offsets
 
@@ -63,7 +63,7 @@ Library roots and scan/runtime options.
 
 - PK: `id`
 - Columns: `name`, `physical_path`, `cron_schedule`, `last_scanned_at`, `scan_status`, `is_remote`, `vfs_refresh_before_scan`, `rclone_rc_url`, `icon`, `color`
-- Note: `media_adult.db` can include legacy migration residue such as `test_column`
+- Note: production DB files may contain legacy migration residue columns.
 
 ### settings
 
@@ -71,6 +71,9 @@ Global and plugin settings storage.
 
 - PK: `key`
 - Columns: `key`, `value`, `updated_at`
+- Common key examples:
+  - `TAG_FILTER_SEARCH_SCOPE_ALL`
+  - `RCLONE_RC_URL`
 - Plugin key examples:
   - `PLUGIN_ENABLED_<plugin_id>`
   - `PLUGIN_CONFIG_<plugin_id>`
@@ -88,9 +91,8 @@ Per-user, per-book reading progress.
 
 - PK: `id`
 - Main FK: `book_id -> books.id`, `user_id -> users.id`
-- Common columns: `pages_read`, `is_completed`, `last_read_at`
-- General DB EPUB pointer extensions (Deprecated/Unused):
-  - `last_epub_cfi`, `last_epub_href`, `last_epub_spine_index`, `last_epub_percent`, `last_epub_updated_at` (Legacy fields related to the old epub.js engine, no longer used since unified text viewer was introduced)
+- Columns: `pages_read`, `is_completed`, `last_read_at`, `last_epub_cfi`, `last_epub_href`, `last_epub_spine_index`, `last_epub_percent`, `last_epub_updated_at`
+- Note: these EPUB pointer fields are used by resume logic based on server/client session pointers (e.g., CFI, href, spine index).
 
 ### user_reading_log
 

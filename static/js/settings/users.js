@@ -19,7 +19,7 @@ export async function loadUsersList() {
 
       tbody.innerHTML = data.users.map(user => {
         const isDefault = user.is_default_password === 1 
-          ? `<span style="color:#f97316; font-weight:700;"><i class="fa-solid fa-triangle-exclamation"></i> ${window.i18n ? window.i18n.t('settings.user_pwd_not_changed') : '미변경'}</span>` 
+          ? `<span style="color:#f97316; font-weight:700;"><i class="fa-solid fa-triangle-exclamation"></i> ${window.i18n ? window.i18n.t('settings.user_pwd_not_changed') : '초기 비밀번호'}</span>` 
           : `<span style="color:#22c55e;"><i class="fa-solid fa-circle-check"></i> ${window.i18n ? window.i18n.t('settings.user_pwd_changed') : '변경완료'}</span>`;
 
         const deleteBtn = user.username === 'admin' 
@@ -28,7 +28,7 @@ export async function loadUsersList() {
 
         const resetPwdBtn = user.role === 'admin'
           ? `<button onclick="openAdminChangePwdModal(${user.id})" class="btn-settings-action" style="background:#3b82f6; color:#fff; border:none; padding:0.25rem 0.6rem; border-radius:4px; cursor:pointer; margin-right:0.5rem;"><i class="fa-solid fa-key"></i> ${window.i18n ? window.i18n.t('settings.admin_change_pwd') : '비번 변경'}</button>`
-          : `<button onclick="openResetPwdModal(${user.id})" class="btn-settings-action" style="background:#f59e0b; color:#fff; border:none; padding:0.25rem 0.6rem; border-radius:4px; cursor:pointer; margin-right:0.5rem;"><i class="fa-solid fa-unlock-keyhole"></i> ${window.i18n ? window.i18n.t('settings.user_reset_pwd') : '비번 재설정'}</button>`;
+          : `<button onclick="openResetPwdModal(${user.id})" class="btn-settings-action" style="background:#f59e0b; color:#fff; border:none; padding:0.25rem 0.6rem; border-radius:4px; cursor:pointer; margin-right:0.5rem;"><i class="fa-solid fa-unlock-keyhole"></i> ${window.i18n ? window.i18n.t('settings.user_reset_pwd') : '초기 비밀번호 재설정'}</button>`;
 
         return `
           <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">

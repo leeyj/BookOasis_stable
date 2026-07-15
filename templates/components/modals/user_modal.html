@@ -43,6 +43,10 @@
         <form id="user-reset-pwd-form" onsubmit="submitResetPwdForm(event)">
             <input type="hidden" id="reset-pwd-user-id" name="user_id">
             <input type="hidden" id="reset-pwd-role" name="role" value="user">
+            <p style="margin: 0 0 0.8rem 0; padding: 0.65rem 0.75rem; border-radius: 6px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); color: #fcd34d; font-size: 0.82rem; line-height: 1.45;">
+                <i class="fa-solid fa-circle-info" style="margin-right: 0.35rem;"></i>
+                <span data-i18n="modal.reset_pwd_help">이 기능은 사용자 비밀번호를 초기 비밀번호로 다시 설정합니다. 다음 로그인 시 사용자에게 비밀번호를 변경하도록 안내해 주세요.</span>
+            </p>
             <div class="library-form-group">
                 <label for="reset-pwd-new" data-i18n="modal.new_password_label">새 비밀번호 (최소 4자)</label>
                 <input type="password" id="reset-pwd-new" name="new_password" required data-i18n-placeholder="modal.new_password_placeholder" placeholder="새 비밀번호 입력">

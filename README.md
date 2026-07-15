@@ -89,6 +89,8 @@ BookOasis가 대용량(10만 권 이상) 환경에서도 버벅임 없이 초광
    ```
 > **Tip:** `docker-compose.override.yml`은 `.gitignore`에 등록되어 있으므로 향후 프로젝트 소스가 업데이트되어 `git pull`을 받아도 사용자의 개인 경로 설정 파일이 충돌을 일으키거나 유실되지 않습니다.
 
+> 운영자용 배포/업데이트(GHCR, 릴리스 태깅)는 [설치 가이드 운영자 섹션](./docs/guide_installation.md#31-ghcr-기반-업데이트-운영자)을 참고하세요.
+
 ### 직접 구동 (Native Python)
 
 #### 🐧 Linux / macOS 환경
