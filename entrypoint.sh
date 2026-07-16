@@ -10,7 +10,7 @@ PGID=${PGID:-0}
 # NAS(Synology, QNAP 등) 환경에서 bind mount 시
 # 디렉토리가 read-only로 마운트되는 경우를 사전에 감지합니다.
 # ─────────────────────────────────────────────────────────
-DATA_DIRS="/app/db /app/covers /app/cache /app/plugins"
+DATA_DIRS="/app/db /app/covers /app/cache /app/plugins /app/logs"
 
 echo "[Entrypoint] 데이터 디렉토리 권한 확인 중..."
 for dir in $DATA_DIRS; do
@@ -71,7 +71,7 @@ if [ "$PUID" -ne 0 ]; then
     fi
 
     # 데이터 저장용 폴더들의 소유권을 media_user로 변경
-    chown -R media_user:media_group /app/db /app/covers /app/cache /app/plugins 2>/dev/null || true
+    chown -R media_user:media_group /app/db /app/covers /app/cache /app/plugins /app/logs 2>/dev/null || true
     
     # gosu를 사용하여 권한을 강등한 후 명령어 실행
     echo "[Entrypoint] Starting application as media_user..."

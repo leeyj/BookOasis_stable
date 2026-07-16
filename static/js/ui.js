@@ -47,50 +47,9 @@ function normalizeBookTitle(item) {
 
 function resolveCardDisplayTitle(item, showVolumeCount) {
   const normalizedTitle = normalizeBookTitle(item);
-  if (!showVolumeCount) {
-    return normalizedTitle;
-  }
-
-  const bookCount = parseInt(item.book_count, 10) || 0;
   const representativeTitle = String(item.representative_title || '').trim();
   const seriesName = String(item.series_name || '').trim();
-  const authorName = String(item.author || '').trim();
-  const normalizedSeries = seriesName.toLowerCase();
-  const normalizedAuthor = authorName.toLowerCase();
-  const isAuthorOnlySeries = !!(normalizedSeries && normalizedAuthor && normalizedSeries === normalizedAuthor);
-
-  const toSeriesLikeTitle = (rawTitle) => {
-    let text = String(rawTitle || '').trim();
-    if (!text) return '';
-    if (seriesName) {
-      const escapedSeries = seriesName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      text = text.replace(new RegExp(`^\\[\\s*${escapedSeries}\\s*\\]\\s*`, 'i'), '').trim();
-    }
-    const trimmed = text
-      .replace(/\s*[-:|]\s*\d+\s*(권|화|부|편)$/i, '')
-      .replace(/\s+제?\d+\s*(권|화|부|편)$/i, '')
-      .replace(/\s+\d+\s*(권|화|부|편)$/i, '')
-      .trim();
-    return trimmed || text;
-  };
-
-  if (bookCount === 1 && representativeTitle) {
-    return representativeTitle;
-  }
-
-  if (bookCount > 1 && representativeTitle && (isAuthorOnlySeries || !seriesName || seriesName === '기타 단행본')) {
-    return toSeriesLikeTitle(representativeTitle);
-  }
-
-  if (bookCount > 1 && representativeTitle && seriesName) {
-    const escapedSeries = seriesName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const bracketPrefix = new RegExp(`^\\[\\s*${escapedSeries}\\s*\\]\\s*(.+)$`, 'i');
-    const match = representativeTitle.match(bracketPrefix);
-    if (match && match[1] && match[1].trim()) {
-      return toSeriesLikeTitle(match[1].trim());
-    }
-  }
-
+  // Keep card labels consistent across list/dashboard by always preferring series_name.
   return seriesName || representativeTitle || normalizedTitle;
 }
 

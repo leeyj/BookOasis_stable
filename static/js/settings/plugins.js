@@ -24,6 +24,12 @@ export async function loadPluginsSettings() {
         const schema = p.config_schema || [];
         const config = p.config || {};
         const hasCustomUi = !!(p.ui && p.ui.html);
+        const updateManifest = p.update_manifest || null;
+        const showSampleUpdateButton = !!(
+          updateManifest &&
+          updateManifest.enabled &&
+          updateManifest.show_sample_update_button
+        );
         
         // 플러그인별 카드 및 폼 템플릿 구성
         html += `
@@ -63,6 +69,15 @@ export async function loadPluginsSettings() {
                       </button>
                   </div>
                   ` : '<p style="font-size: 0.82rem; color: #94a3b8; margin: 0;">이 플러그인은 별도의 추가 설정값이 필요하지 않습니다.</p>'}
+
+                  ${showSampleUpdateButton ? `
+                  <div style="margin-top: 0.4rem; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 0.9rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                    <button type="button" class="plugin-sample-update-btn" data-plugin-id="${p.id}" style="display: inline-flex; align-items: center; gap: 0.45rem; width: fit-content; padding: 0.5rem 1.0rem; font-size: 0.8rem; border-radius: 6px; border: 1px solid rgba(56,189,248,0.5); background: rgba(2,132,199,0.22); color: #dbeafe; cursor: pointer;">
+                      <i class="fa-solid fa-cloud-arrow-down"></i> 샘플 업데이트 (${p.id})
+                    </button>
+                    <span id="plugin-sample-update-status-${p.id}" style="font-size: 0.78rem; color: #94a3b8;">업데이트 가능 조건: 현재 버전 &lt; GitHub 버전</span>
+                  </div>
+                  ` : ''}
               </form>
           </div>
         `;
@@ -318,6 +333,55 @@ function bindPluginEvents() {
           submitBtn.disabled = false;
           submitBtn.innerHTML = '<i class="fa-regular fa-floppy-disk"></i> 설정 저장';
         }
+      }
+    });
+  });
+
+  // 3. 샘플 업데이트 버튼 (plugin update_manifest.show_sample_update_button 기반)
+  container.querySelectorAll('.plugin-sample-update-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const pluginId = e.currentTarget.dataset.pluginId;
+      const statusEl = document.getElementById(`plugin-sample-update-status-${pluginId}`);
+      const prevText = btn.innerHTML;
+      try {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> 업데이트 중...';
+        if (statusEl) {
+          statusEl.textContent = '업데이트 확인/적용 진행 중...';
+          statusEl.style.color = '#38bdf8';
+        }
+
+        const res = await api.sampleUpdateMetadataPlugin(pluginId);
+        if (res.success) {
+          const msg = `업데이트 완료 (${res.local_version} -> ${res.github_version})`;
+          if (statusEl) {
+            statusEl.textContent = msg;
+            statusEl.style.color = '#4ade80';
+          }
+          if (typeof window.showToast === 'function') {
+            window.showToast(msg, 'success');
+          }
+        } else {
+          const err = res.error || '업데이트 실패';
+          if (statusEl) {
+            statusEl.textContent = err;
+            statusEl.style.color = '#f43f5e';
+          }
+          if (typeof window.showToast === 'function') {
+            window.showToast(err, 'error');
+          } else {
+            alert(err);
+          }
+        }
+      } catch (err) {
+        console.error('샘플 플러그인 업데이트 에러:', err);
+        if (statusEl) {
+          statusEl.textContent = '서버 통신 오류';
+          statusEl.style.color = '#f43f5e';
+        }
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = prevText;
       }
     });
   });

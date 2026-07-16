@@ -9,6 +9,7 @@ import urllib.parse
 from flask import Blueprint, request, Response, jsonify, send_file, session
 from services.stream_service import StreamService
 from api.auth import login_required, check_adult_permission, admin_required
+from utils.safe_file_response import stream_file_safely
 from utils.i18n import _t
 import database
 
@@ -237,7 +238,10 @@ def get_pdf_range():
 
     range_header = request.headers.get('Range')
     if not range_header:
-        return send_file(file_path, mimetype=mime)
+        try:
+            return stream_file_safely(file_path, mimetype=mime)
+        except OSError as e:
+            return jsonify({'error': str(e)}), 500
 
     size = os.path.getsize(file_path)
     byte1, byte2 = 0, None

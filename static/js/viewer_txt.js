@@ -82,7 +82,12 @@ import {
   txtSliderInputAction,
   txtSliderChangeAction,
 } from './viewer/txt_navigation.js';
-import { renderEpubTocPanel, jumpToTxtTocChapter } from './viewer/txt_toc.js';
+import { renderEpubTocPanel, jumpToTxtTocChapter, highlightEpubTocChapter } from './viewer/txt_toc.js';
+
+function syncActiveEpubToc(scrollIntoView = false) {
+  if ((state.currentViewerFormat || '').toLowerCase() !== 'epub') return;
+  highlightEpubTocChapter(currentChunkIdx, { scrollIntoView });
+}
 
 export function initTxtViewer(bookId, initialPageIdx = 0) {
   console.log(`[Viewer-Txt] initTxtViewer - 콘텐츠 요청 중: bookId=${bookId}, initialPageIdx=${initialPageIdx}, format=${state.currentViewerFormat}`);
@@ -135,7 +140,11 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
       } else {
         fullText = data;
         txtChunks = chunkText(data, 4000);
-        renderEpubToc([]); // Fallback for TXT
+        // TXT mode: TOC UI is intentionally disabled.
+        const tocBtn = document.getElementById('epub-toc-btn');
+        const tocContainer = document.getElementById('epub-toc-container');
+        if (tocBtn) tocBtn.remove();
+        if (tocContainer) tocContainer.remove();
       }
 
       let startIdx = initialPageIdx;
@@ -243,6 +252,7 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
             if (pageInfo) {
               pageInfo.textContent = i18n.t('viewer.txt_chunk_info', {current: currentChunkIdx + 1, total: txtChunks.length});
             }
+            syncActiveEpubToc();
             saveProgress(state.activeBookId, currentChunkIdx, txtChunks.length);
           }
 
@@ -341,6 +351,7 @@ function renderCurrentChunk(initMode = false) {
 
   applyDynamicParagraphStyles();
   updateTxtSeekBar();
+  syncActiveEpubToc();
   saveProgress(state.activeBookId, currentChunkIdx, txtChunks.length);
 }
 
@@ -678,6 +689,7 @@ function renderEpubToc(tocList) {
     txtChunks,
     onJumpToChapter: jumpToChapter
   });
+  syncActiveEpubToc(true);
 }
 
 function jumpToChapter(chapterIdx, anchor) {
@@ -692,7 +704,11 @@ function jumpToChapter(chapterIdx, anchor) {
     getScrollWrapper: () => document.getElementById('txt-scroll-wrapper'),
     renderCurrentChunk,
     saveProgress,
-    activeBookId: state.activeBookId
+    activeBookId: state.activeBookId,
+    onActiveChapterChange: idx => {
+      currentChunkIdx = idx;
+      syncActiveEpubToc(true);
+    }
   });
 }
 

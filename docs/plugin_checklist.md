@@ -84,7 +84,23 @@
 
 ---
 
-## 7. 오류 예방
+## 7. 자동 업데이트 계약 (플러그인 내부 선언)
+
+- 자동 업데이트 규칙은 코어 하드코딩이 아니라 `update_manifest`로 선언합니다.
+- 자동 업데이트 지원 대상이면 플러그인 루트 `VERSION` 파일에 `"plugin version"` 키를 둡니다.
+
+체크 항목:
+
+- `update_manifest.enabled = True` 인가
+- `provider = "github-raw"` 인가
+- `raw_base_url`가 실제 GitHub raw 경로와 일치하는가
+- `files` 목록에 실제 배포 파일과 `VERSION`이 포함되어 있는가
+- `version_key`를 `plugin version`으로 선언했는가
+- 업데이트 게이트가 `현재 버전 < GitHub 버전`일 때만 통과하는가
+
+---
+
+## 8. 오류 예방
 
 - import 에러가 없나 확인합니다.
 - 클래스명과 파일명 매칭이 맞는지 확인합니다.
@@ -93,7 +109,7 @@
 
 ---
 
-## 8. 최소 검증
+## 9. 최소 검증
 
 플러그인 추가 후 아래 순서로 확인합니다.
 
@@ -102,3 +118,4 @@
 3. 대시보드 위젯이면 `/api/media/dashboard/widgets` 응답 확인
 4. 컨텍스트 메뉴면 `/api/media/context-menu/book/plugins` 응답 확인
 5. 플러그인 데이터 호출이 500 없이 동작하는지 확인
+6. (업데이트 지원 플러그인) `sample-update` 호출 시 404/버전 게이트 메시지가 의도대로 노출되는지 확인

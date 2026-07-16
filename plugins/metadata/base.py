@@ -11,6 +11,18 @@ class BaseMetadataProvider(ABC):
     config_schema = []
     enabled = True
     dashboard_widget = None
+    # Optional self-update contract declared by each plugin.
+    # Example:
+    # {
+    #   "enabled": True,
+    #   "provider": "github-raw",
+    #   "raw_base_url": "https://raw.githubusercontent.com/<org>/<repo>/<branch>/plugins/metadata/<plugin_id>",
+    #   "files": ["<plugin_module>.py", "__init__.py", "VERSION"],
+    #   "version_file": "VERSION",
+    #   "version_key": "plugin version",
+    #   "show_sample_update_button": True,
+    # }
+    update_manifest = None
 
     def get_db_gateway(self, db_type):
         """Return a cached DB gateway instance for the requested db_type."""
@@ -28,6 +40,20 @@ class BaseMetadataProvider(ABC):
         gateway = self.get_db_gateway(db_type)
         return gateway.get_plugin_config(self.id, default=default)
 
+    def dispatch_webhook(self, event, payload=None, channels=None):
+        """플러그인에서 공용 웹훅 디스패처를 호출하는 편의 헬퍼."""
+        from services.webhook_dispatcher import dispatch_webhook_event
+
+        event_name = str(event or '').strip()
+        if not event_name:
+            event_name = 'event'
+        if not event_name.startswith('plugin.'):
+            event_name = f"plugin.{self.id}.{event_name}"
+
+        body = dict(payload or {})
+        body.setdefault('plugin_id', self.id)
+        return dispatch_webhook_event(event_name, body, channels=channels)
+
     def get_context_menu_items(self, db_type, context):
         """도서 컨텍스트 메뉴 확장 항목 계약 (선택 구현)."""
         return []
@@ -39,6 +65,10 @@ class BaseMetadataProvider(ABC):
     def get_dashboard_data(self, db_type, limit=10):
         """대시보드 위젯 데이터 공통 계약 (위젯을 쓰는 플러그인에서 override)."""
         return {'success': False, 'error': 'dashboard widget not implemented'}
+
+    def on_scan_new_books_detected(self, db_type, payload):
+        """스캐너 신규도서 감지 후크 (선택 구현)."""
+        return {'success': True, 'skipped': True, 'message': 'scan hook not implemented'}
 
     @abstractmethod
     def search(self, db_type, query):

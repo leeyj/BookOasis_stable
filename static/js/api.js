@@ -260,6 +260,19 @@ export async function saveMetadataPluginConfig(type, pluginId, configData) {
   return res.json();
 }
 
+export async function sampleUpdateMetadataPlugin(pluginId) {
+  const res = await fetch('/api/media/metadata/plugins/sample-update', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      plugin_id: pluginId
+    })
+  });
+  return res.json();
+}
+
 export async function editMediaDetail(formData) {
   const res = await fetch('/api/media/detail/edit', {
     method: 'POST',

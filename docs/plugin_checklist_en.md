@@ -84,7 +84,23 @@ Checklist:
 
 ---
 
-## 7. Error Prevention
+## 7. Auto-Update Contract (Plugin-Owned Declaration)
+
+- Auto-update behavior must be declared by the plugin class via `update_manifest`, not core hardcoding.
+- If auto-update is supported, the plugin root `VERSION` file must include `"plugin version"`.
+
+Checklist:
+
+- Is `update_manifest.enabled = True`?
+- Is `provider = "github-raw"`?
+- Does `raw_base_url` match the real GitHub raw path?
+- Does `files` include all deploy files and `VERSION`?
+- Is `version_key` set to `plugin version`?
+- Does the gate allow updates only when `current version < GitHub version`?
+
+---
+
+## 8. Error Prevention
 
 - Check for import errors.
 - Make sure class names and file names match discovery rules.
@@ -93,7 +109,7 @@ Checklist:
 
 ---
 
-## 8. Minimum Validation
+## 9. Minimum Validation
 
 After adding the plugin, verify in this order:
 
@@ -102,3 +118,4 @@ After adding the plugin, verify in this order:
 3. For dashboard widgets, check `/api/media/dashboard/widgets`
 4. For context menu actions, check `/api/media/context-menu/book/plugins`
 5. Confirm plugin data calls work without 500 errors
+6. (For update-enabled plugins) verify `sample-update` responses for 404 and version gate messages behave as expected

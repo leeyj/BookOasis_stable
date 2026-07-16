@@ -159,6 +159,40 @@ def get_recently_added_entries(db_type: str, download_prefix: str, urn_prefix: s
             'cover_mime': 'image/svg+xml' if not b['cover_image'] else None,
         })
     return entries
+
+
+def get_favorite_entries(db_type: str, download_prefix: str, urn_prefix: str):
+    conn = database.get_connection(db_type)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT id, title, file_path, cover_image
+        FROM books
+        WHERE COALESCE(is_deleted, 0) = 0 AND COALESCE(is_favorite, 0) = 1
+        ORDER BY title ASC, id ASC
+        LIMIT 200
+        """
+    )
+    books = cursor.fetchall()
+    conn.close()
+
+    entries = []
+    for i, b in enumerate(books):
+        ext = os.path.splitext(b['file_path'] or '')[1].lower().replace('.', '') or 'text'
+        entries.append({
+            'id': f"urn:{urn_prefix}:favorite:{i}",
+            'title': b['title'],
+            'summary': '',
+            'type': 'acquisition',
+            'href': f"{download_prefix}/{b['id']}",
+            'mime': _guess_mime_type(b['file_path']),
+            'cover': b['cover_image'],
+            'cover_url': None if b['cover_image'] else _build_fallback_cover_href(b['title'], ext),
+            'cover_mime': 'image/svg+xml' if not b['cover_image'] else None,
+        })
+    return entries
+
+
 def get_recently_read_entries(db_type: str, download_prefix: str, urn_prefix: str, user_id: int = None):
     conn = database.get_connection(db_type)
     cursor = conn.cursor()

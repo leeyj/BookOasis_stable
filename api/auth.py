@@ -219,6 +219,18 @@ def delete_user(target_user_id):
         
     if session.get('user_id') == target_user_id:
         return jsonify({'success': False, 'error': _t('api.delete_self_error')}), 400
+
+    target_user = UserRepository.find_by_id('general', target_user_id)
+    if not target_user:
+        return jsonify({'success': False, 'error': _t('api.user_not_found', default='사용자를 찾을 수 없습니다.')}), 404
+
+    if target_user.get('role') == 'admin':
+        admin_count = UserRepository.count_by_role('general', 'admin')
+        if admin_count <= 1:
+            return jsonify({
+                'success': False,
+                'error': _t('api.delete_last_admin_error', default='마지막 관리자 계정은 삭제할 수 없습니다.')
+            }), 400
         
     # 두 데이터베이스 모두에서 삭제
     for db_type in ['general', 'adult']:

@@ -1,4 +1,4 @@
-# 🧩 Metadata Plugin Development Guide (New Standard)
+# 🧩 Plugin Development Guide (New Standard)
 
 This document describes the current plugin standard for BookOasis metadata/dashboard plugins.
 
@@ -24,10 +24,28 @@ plugins/metadata/
   my_widget/
     __init__.py
     my_widget.py
+        VERSION         # required for auto-update support
     index.html      # optional: custom settings UI
     style.css       # optional: custom settings styles
     script.js       # optional: custom settings initializer
 ```
+
+### Version File Contract for Auto-Update Support (Required)
+
+To be eligible for GitHub-based plugin auto-update support, each plugin must include a `VERSION` file at the plugin root with the key below.
+
+```json
+{
+    "plugin version": "1.0.0"
+}
+```
+
+Policy:
+
+- Key name must be exactly `plugin version` (with a space)
+- SemVer format is recommended (`MAJOR.MINOR.PATCH`)
+- If missing, the plugin is excluded from auto-update support
+- Legacy key (`plugin_version`) may be parsed for backward compatibility, but new/official plugins must use `plugin version`
 
 Legacy single-file modules are still loadable, but new development should use folder-based modules.
 
@@ -49,6 +67,7 @@ Recommended class attributes:
 - `is_searchable` (bool): show in manual metadata search modal
 - `config_schema` (list): settings form schema
 - `dashboard_widget` (dict or None): dashboard widget metadata (common desk card or exclusive full-screen tab configurations)
+- `update_manifest` (dict or None): plugin-owned update declaration contract
 
 Required methods:
 
@@ -63,6 +82,39 @@ Return shape:
 
 - Success: `{'success': True, 'items': [...]}`
 - Failure: `{'success': False, 'error': '...'}`
+
+### Plugin-Owned Update Contract (`update_manifest`)
+
+Update button visibility and execution rules are not core hardcoding anymore. They are driven by each plugin's own `update_manifest` declaration.
+
+Example (same pattern as `stats_dashboard`):
+
+```python
+update_manifest = {
+    "enabled": True,
+    "provider": "github-raw",
+    "raw_base_url": "https://raw.githubusercontent.com/<org>/<repo>/<branch>/plugins/metadata/<plugin_id>",
+    "files": ["<plugin_module>.py", "__init__.py", "VERSION"],
+    "version_file": "VERSION",
+    "version_key": "plugin version",
+    "show_sample_update_button": True,
+}
+```
+
+Field notes:
+
+- `enabled`: whether update support is enabled
+- `provider`: currently only `github-raw` is supported
+- `raw_base_url`: source path for plugin files
+- `files`: files to replace during update
+- `version_file`: version source file
+- `version_key`: JSON key for version parsing (recommended: `plugin version`)
+- `show_sample_update_button`: whether to show sample update button in settings
+
+Execution policy:
+
+- Update is allowed only when `current version < GitHub version`
+- 404 on `raw_base_url/files` is expected before push; retry after publishing files
 
 ---
 
@@ -206,6 +258,114 @@ Example return payload:
 }
 ```
 
+### Webhook Integration (Recommended Modern Flow)
+
+The recommended modern flow is configuring webhook targets from the **Plugin Settings UI**, not from `.env`.
+
+In addition, the scanner emits `scan.new_books_detected` automatically when new books are found.
+
+- payload: `db_type`, `library_id`, `library_name`, `new_books_count`, `sample_titles`
+
+### New Books Webhook Notification Example Plugin
+
+- Path: `plugins/metadata/webhook_new_books_notify/webhook_new_books_notify.py`
+- Behavior: after scan completes with new books, it sends notifications to configured multi webhook targets via `on_scan_new_books_detected`
+- Supported formats: `discord`, `slack`, `telegram`, `generic`, `custom`
+- Note: works from plugin settings only (no `.env` required).
+
+How to use:
+
+1. Enable plugin `신규도서 웹훅 알림` in Settings > Plugin Settings
+2. Save `ENABLE_SCAN_WEBHOOK_NOTIFY=true`
+3. Set `WEBHOOK_TARGETS_JSON`
+4. (Optional) Adjust `CUSTOM_EVENT_PAYLOAD_JSON`, `MAX_SAMPLE_TITLES`, `REQUEST_TIMEOUT_SEC`
+5. Run a library scan
+
+Quick test URL validation:
+
+1. Open `https://webhook.site` and generate a temporary endpoint URL
+2. Add a test target in `WEBHOOK_TARGETS_JSON` like below
+3. Run a scan and verify incoming JSON in webhook.site logs
+
+```json
+[
+    {
+        "name": "webhook-site-test",
+        "url": "https://webhook.site/your-uuid",
+        "format": "generic",
+        "method": "POST"
+    }
+]
+```
+
+Response-path validation test (httpbin):
+
+```json
+[
+    {
+        "name": "httpbin-ok",
+        "url": "https://httpbin.org/post",
+        "format": "custom",
+        "method": "POST",
+        "body": {
+            "ok": true,
+            "event": "{{event}}",
+            "count": "{{new_books_count}}"
+        },
+        "success_path": "json.ok"
+    }
+]
+```
+
+Warning: do not send production secrets or sensitive payload data to public test endpoints.
+
+---
+
+## 7. Plugin Developer Release Flow (With Auto-Update)
+
+1. After code changes, bump `plugin version` in `VERSION`
+2. Verify `update_manifest` path/file list matches actual repository layout
+3. Push to GitHub and confirm files are reachable under `raw_base_url` (404 resolved)
+4. Run sample update from Settings > Plugin Settings
+5. Verify gate behavior: update only when `current < GitHub`, block otherwise
+
+`WEBHOOK_TARGETS_JSON` example:
+
+```json
+[
+    {
+        "name": "discord-main",
+        "url": "https://discord.com/api/webhooks/...",
+        "format": "discord"
+    },
+    {
+        "name": "telegram-main",
+        "url": "https://api.telegram.org/bot<token>/sendMessage",
+        "format": "telegram",
+        "chat_id": "123456789"
+    },
+    {
+        "name": "ops-custom",
+        "url": "https://example.com/hook",
+        "format": "custom",
+        "method": "POST",
+        "headers": {
+            "Authorization": "Bearer YOUR_TOKEN"
+        },
+        "body": {
+            "event": "{{event}}",
+            "library": "{{library_name}}",
+            "count": "{{new_books_count}}",
+            "titles": "{{sample_titles_csv}}"
+        },
+        "success_path": "ok"
+    }
+]
+```
+
+When `success_path` is set, the target is considered successful only if that JSON path is truthy.
+(Example: `ok`, `result.success`)
+
 ---
 
 ## 7. Minimal Example
@@ -220,6 +380,15 @@ class MyWidgetMetadataProvider(BaseMetadataProvider):
     name = "My Widget"
     is_searchable = False
     config_schema = []
+    update_manifest = {
+        "enabled": True,
+        "provider": "github-raw",
+        "raw_base_url": "https://raw.githubusercontent.com/<org>/<repo>/<branch>/plugins/metadata/my_widget",
+        "files": ["my_widget.py", "__init__.py", "VERSION"],
+        "version_file": "VERSION",
+        "version_key": "plugin version",
+        "show_sample_update_button": True,
+    }
     dashboard_widget = {
         "title": "My Widget",
         "subtitle": "Demo",
@@ -240,6 +409,9 @@ class MyWidgetMetadataProvider(BaseMetadataProvider):
     def get_dashboard_data(self, db_type, limit=10):
         return self._fetch_items(db_type, limit=limit)
 ```
+
+If your plugin supports updates, declare `update_manifest` inside the class as shown above,
+and keep `"plugin version"` in the plugin root `VERSION` file.
 
 ### Plugin DB Gateway (Recommended)
 

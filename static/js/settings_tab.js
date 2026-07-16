@@ -113,6 +113,7 @@ async function loadAboutInfo() {
   const dashEl = document.getElementById('about-ver-dashboard');
   const latestEl = document.getElementById('about-ver-latest');
   const stateEl = document.getElementById('about-ver-state');
+  const versionInfoEl = document.getElementById('about-update-status');
   if (!dashEl || !stateEl) return;
   
   try {
@@ -121,33 +122,41 @@ async function loadAboutInfo() {
     if (data.success) {
       dashEl.textContent = `v${data.version.dashboard}`;
       stateEl.textContent = data.version.state;
+
+      if (latestEl) {
+        if (data.github_version && data.github_version.dashboard) {
+          latestEl.textContent = `v${data.github_version.dashboard}`;
+        } else {
+          latestEl.textContent = '불러오기 실패';
+        }
+      }
+
+      if (versionInfoEl && data.update) {
+        if (data.update.can_update) {
+          versionInfoEl.textContent = '업데이트 가능 (현재 버전이 GitHub 버전보다 낮음)';
+          versionInfoEl.style.color = '#4ade80';
+        } else {
+          versionInfoEl.textContent = '업데이트 불가 (현재 버전이 최신이거나 더 높음)';
+          versionInfoEl.style.color = '#94a3b8';
+        }
+      }
     } else {
       dashEl.textContent = '불러오기 실패';
       stateEl.textContent = '오류';
+      if (latestEl) latestEl.textContent = '불러오기 실패';
+      if (versionInfoEl) {
+        versionInfoEl.textContent = '업데이트 상태 확인 실패';
+        versionInfoEl.style.color = '#f43f5e';
+      }
     }
   } catch (e) {
     console.error('About 정보 로딩 실패:', e);
     dashEl.textContent = '연결 오류';
     stateEl.textContent = '오류';
-  }
-
-  if (latestEl) {
-    try {
-      const gitRes = await fetch('https://raw.githubusercontent.com/leeyj/BookOasis_stable/main/VERSION');
-      if (gitRes.ok) {
-        const text = await gitRes.text();
-        const match = text.match(/"dashboard":\s*"([0-9\.]+)"/);
-        if (match && match[1]) {
-          latestEl.textContent = `v${match[1]}`;
-        } else {
-          latestEl.textContent = '버전 파싱 실패';
-        }
-      } else {
-        latestEl.textContent = '불러오기 실패';
-      }
-    } catch (e) {
-      console.error('GitHub 최신 버전 로딩 실패:', e);
-      latestEl.textContent = '연결 오류';
+    if (latestEl) latestEl.textContent = '연결 오류';
+    if (versionInfoEl) {
+      versionInfoEl.textContent = '업데이트 상태 확인 실패';
+      versionInfoEl.style.color = '#f43f5e';
     }
   }
 }

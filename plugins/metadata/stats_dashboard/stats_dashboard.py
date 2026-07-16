@@ -19,6 +19,15 @@ class StatsDashboardMetadataProvider(BaseMetadataProvider):
         "limit": 3,
         "all_desk_tab": True,
     }
+    update_manifest = {
+        "enabled": True,
+        "provider": "github-raw",
+        "raw_base_url": "https://raw.githubusercontent.com/leeyj/BookOasis_stable/main/plugins/metadata/stats_dashboard",
+        "files": ["stats_dashboard.py", "__init__.py", "VERSION"],
+        "version_file": "VERSION",
+        "version_key": "plugin version",
+        "show_sample_update_button": True,
+    }
 
     def search(self, db_type, query):
         return []

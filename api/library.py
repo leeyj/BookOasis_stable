@@ -339,6 +339,32 @@ def get_metadata_plugins_manage_api():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@library_bp.route('/api/media/plugins/update-eligibility', methods=['POST'])
+def plugin_update_eligibility():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'Login required'}), 401
+
+    data = request.get_json(silent=True) or {}
+    current_version = str(data.get('current_version', '')).strip()
+    github_version = str(data.get('github_version', '')).strip()
+
+    if not current_version or not github_version:
+        return jsonify({
+            'success': False,
+            'error': 'current_version and github_version are required'
+        }), 400
+
+    try:
+        can_update, reason = PluginService.can_update_to_github_version(current_version, github_version)
+        return jsonify({
+            'success': True,
+            'can_update': can_update,
+            'reason': reason
+        })
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 @library_bp.route('/api/media/books/search-metadata', methods=['GET'])
 @admin_required
 def search_book_metadata_api():
@@ -427,6 +453,25 @@ def save_metadata_plugin_config_api():
         if not success:
             return jsonify({'success': False, 'error': error}), 400
         return jsonify({'success': True, 'message': _t('api.msg_plugin_config_saved', plugin_id=plugin_id)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@library_bp.route('/api/media/metadata/plugins/sample-update', methods=['POST'])
+@admin_required
+def sample_update_metadata_plugin_api():
+    data = request.get_json(silent=True) or {}
+    plugin_id = str(data.get('plugin_id', '')).strip()
+    if not plugin_id:
+        return jsonify({'success': False, 'error': _t('api.err_plugin_id_missing')}), 400
+
+    try:
+        success, payload = PluginService.sample_update_plugin(plugin_id)
+        if not success:
+            return jsonify({'success': False, **payload}), 400
+        return jsonify({'success': True, **payload})
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

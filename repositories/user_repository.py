@@ -44,6 +44,16 @@ class UserRepository:
         return [dict(row) for row in rows]
 
     @staticmethod
+    def count_by_role(db_type, role):
+        """특정 권한(role) 사용자 수 조회"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) AS cnt FROM users WHERE role = ?", (role,))
+        row = cursor.fetchone()
+        conn.close()
+        return int(row['cnt']) if row else 0
+
+    @staticmethod
     def add_user(db_type, username, password_hash, role, has_adult_access):
         """신규 사용자 등록 및 카테고리 권한 기본 매핑 시딩"""
         conn = database.get_connection(db_type)

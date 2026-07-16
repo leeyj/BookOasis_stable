@@ -1,6 +1,117 @@
+import { state } from '../state.js';
+
+let overlayVisibilityListenerBound = false;
+let tocEntryRefs = [];
+let activeTocIdx = -1;
+
+function _applyTocItemVisualState(li, anchorEl, isActive) {
+  if (!li || !anchorEl) return;
+
+  if (isActive) {
+    li.style.background = 'rgba(168, 85, 247, 0.18)';
+    li.style.border = '1px solid rgba(192, 132, 252, 0.45)';
+    li.style.borderRadius = '8px';
+    li.style.paddingTop = '6px';
+    li.style.paddingBottom = '6px';
+    anchorEl.style.opacity = '1';
+    anchorEl.style.color = '#f5d0fe';
+    anchorEl.style.fontWeight = '700';
+  } else {
+    li.style.background = 'transparent';
+    li.style.border = '1px solid transparent';
+    li.style.borderRadius = '8px';
+    li.style.paddingTop = '';
+    li.style.paddingBottom = '';
+    anchorEl.style.opacity = '0.85';
+    anchorEl.style.color = 'inherit';
+    anchorEl.style.fontWeight = '400';
+  }
+}
+
+function _resolveBestTocIndex(chapterIdx) {
+  const target = Number.isFinite(chapterIdx) ? chapterIdx : parseInt(chapterIdx, 10);
+  if (!Number.isFinite(target)) return -1;
+  if (!Array.isArray(tocEntryRefs) || tocEntryRefs.length === 0) return -1;
+
+  // 1) Exact chapter index match.
+  const exact = tocEntryRefs.findIndex(ref => ref.chapterIdx === target);
+  if (exact >= 0) return exact;
+
+  // 2) Nearest previous chapter index.
+  let best = -1;
+  let bestChapter = -1;
+  tocEntryRefs.forEach((ref, idx) => {
+    if (ref.chapterIdx >= 0 && ref.chapterIdx <= target && ref.chapterIdx >= bestChapter) {
+      best = idx;
+      bestChapter = ref.chapterIdx;
+    }
+  });
+  if (best >= 0) return best;
+
+  // 3) If only future chapters exist, use the earliest one.
+  let earliest = -1;
+  let earliestChapter = Number.MAX_SAFE_INTEGER;
+  tocEntryRefs.forEach((ref, idx) => {
+    if (ref.chapterIdx >= 0 && ref.chapterIdx < earliestChapter) {
+      earliest = idx;
+      earliestChapter = ref.chapterIdx;
+    }
+  });
+  return earliest;
+}
+
+export function highlightEpubTocChapter(chapterIdx, options = {}) {
+  const resolvedIdx = _resolveBestTocIndex(chapterIdx);
+  if (resolvedIdx < 0 || resolvedIdx >= tocEntryRefs.length) return;
+
+  const shouldScroll = !!options.scrollIntoView;
+  if (activeTocIdx === resolvedIdx && !shouldScroll) return;
+
+  if (activeTocIdx >= 0 && activeTocIdx < tocEntryRefs.length) {
+    const prev = tocEntryRefs[activeTocIdx];
+    _applyTocItemVisualState(prev.li, prev.anchorEl, false);
+  }
+
+  const next = tocEntryRefs[resolvedIdx];
+  _applyTocItemVisualState(next.li, next.anchorEl, true);
+  activeTocIdx = resolvedIdx;
+
+  if (shouldScroll && next.li && typeof next.li.scrollIntoView === 'function') {
+    next.li.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+}
+
+function syncEpubTocVisibility() {
+  const container = document.getElementById('epub-toc-container');
+  const btn = document.getElementById('epub-toc-btn');
+  const overlayMenu = document.getElementById('comic-overlay-menu');
+  const isOverlayOpen = !!overlayMenu && overlayMenu.style.display !== 'none';
+  const isEpub = (state.currentViewerFormat || '').toLowerCase() === 'epub';
+  const shouldShow = isEpub && isOverlayOpen;
+
+  if (btn) {
+    btn.style.display = shouldShow ? 'flex' : 'none';
+  }
+
+  if (container && !shouldShow) {
+    container.style.right = '-320px';
+  }
+}
+
+function ensureOverlayVisibilityListener() {
+  if (overlayVisibilityListenerBound) return;
+  overlayVisibilityListenerBound = true;
+
+  document.addEventListener('viewer-overlay-visibility-changed', () => {
+    syncEpubTocVisibility();
+  });
+}
+
 export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
   let container = document.getElementById('epub-toc-container');
   let btn = document.getElementById('epub-toc-btn');
+
+  ensureOverlayVisibilityListener();
 
   if (!container) {
     container = document.createElement('div');
@@ -33,7 +144,7 @@ export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
       position: fixed;
       top: 90px;
       right: 20px;
-      z-index: 10000;
+      z-index: 9998;
       background: rgba(0,0,0,0.6);
       color: white;
       border: 1px solid rgba(255,255,255,0.2);
@@ -41,7 +152,7 @@ export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
       width: 44px;
       height: 44px;
       cursor: pointer;
-      display: flex;
+      display: none;
       align-items: center;
       justify-content: center;
       font-size: 18px;
@@ -68,10 +179,13 @@ export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
 
   const ul = document.createElement('ul');
   ul.style.cssText = 'list-style:none; padding:0; margin:0; font-size:0.95rem;';
+  tocEntryRefs = [];
+  activeTocIdx = -1;
 
   const buildItem = (title, chapterIdx, anchor, paddingLeft) => {
     const li = document.createElement('li');
     li.style.cssText = `padding-left:${paddingLeft}px; margin-bottom:12px; line-height:1.4;`;
+    li.dataset.chapterIdx = String(chapterIdx);
     const a = document.createElement('a');
     a.href = '#';
     a.style.cssText = 'color:inherit; text-decoration:none; display:block; opacity:0.85; transition:opacity 0.2s;';
@@ -87,6 +201,11 @@ export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
       onJumpToChapter(chapterIdx, anchor);
     });
     li.appendChild(a);
+    tocEntryRefs.push({
+      chapterIdx: Number.isFinite(chapterIdx) ? chapterIdx : parseInt(chapterIdx, 10),
+      li,
+      anchorEl: a,
+    });
     return li;
   };
 
@@ -103,6 +222,8 @@ export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
   container.innerHTML = '';
   container.appendChild(headerEl);
   container.appendChild(ul);
+
+  syncEpubTocVisibility();
 }
 
 export function jumpToTxtTocChapter({
@@ -110,6 +231,7 @@ export function jumpToTxtTocChapter({
   anchor,
   chunkCount,
   setCurrentChunkIdx,
+  onActiveChapterChange,
   getScrollMode,
   getScrollWrapper,
   renderCurrentChunk,
@@ -122,6 +244,9 @@ export function jumpToTxtTocChapter({
   if (container) container.style.right = '-320px';
 
   setCurrentChunkIdx(chapterIdx);
+  if (typeof onActiveChapterChange === 'function') {
+    onActiveChapterChange(chapterIdx);
+  }
 
   const scrollMode = getScrollMode();
   if (scrollMode === 'scroll') {

@@ -3,9 +3,12 @@
 system_routes.py – 시스템 상태, 큐, 정보 조회 라우터
 """
 import os
+import re
 from flask import Blueprint, request, jsonify, session
 from api.auth import admin_required, login_required
 from flask import render_template
+from urllib.request import Request, urlopen
+from services.plugin_service import PluginService
 import database
 
 system_bp = Blueprint('system', __name__)
@@ -179,12 +182,48 @@ def get_about_info():
         except Exception as e:
             pass
     
+    github_dashboard_ver = None
+    update_check = {
+        'can_update': False,
+        'reason': 'github_version_unavailable'
+    }
+
+    try:
+        req = Request(
+            'https://raw.githubusercontent.com/leeyj/BookOasis_stable/main/VERSION',
+            headers={'User-Agent': 'BookOasis/1.0'}
+        )
+        with urlopen(req, timeout=5) as resp:
+            text = resp.read().decode('utf-8', errors='replace')
+            match = re.search(r'"dashboard"\s*:\s*"([^"]+)"', text)
+            if match:
+                github_dashboard_ver = match.group(1).strip()
+    except Exception:
+        github_dashboard_ver = None
+
+    if github_dashboard_ver:
+        try:
+            can_update, reason = PluginService.can_update_to_github_version(dashboard_ver, github_dashboard_ver)
+            update_check = {
+                'can_update': can_update,
+                'reason': reason
+            }
+        except Exception:
+            update_check = {
+                'can_update': False,
+                'reason': 'version_compare_failed'
+            }
+
     return jsonify({
         'success': True,
         'version': {
             'dashboard': dashboard_ver,
             'state': state_ver
         },
+        'github_version': {
+            'dashboard': github_dashboard_ver
+        },
+        'update': update_check,
         'github_url': 'https://github.com/leeyj/BookOasis_stable'
     })
 

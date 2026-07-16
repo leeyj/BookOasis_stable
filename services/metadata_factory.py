@@ -280,6 +280,7 @@ class MetadataFactory:
                 p_searchable = getattr(target_class, 'is_searchable', True)
                 p_schema = getattr(target_class, 'config_schema', [])
                 p_widget = getattr(target_class, 'dashboard_widget', None)
+                p_update_manifest = getattr(target_class, 'update_manifest', None)
 
                 enabled_key = f"PLUGIN_ENABLED_{p_id}"
                 is_enabled = db_settings.get(enabled_key, '1') == '1'
@@ -300,6 +301,7 @@ class MetadataFactory:
                     'config_schema': p_schema,
                     'config': config_data,
                     'dashboard_widget': p_widget,
+                    'update_manifest': p_update_manifest,
                 }
 
                 providers.append(provider_item)

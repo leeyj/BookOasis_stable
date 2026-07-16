@@ -22,6 +22,20 @@ For folder-based plugins, this loader also supports optional UI assets:
 - `plugins/metadata/google/style.css` (plugin-specific styles)
 - `plugins/metadata/google/script.js` (optional initializer script)
 
+### 1-1. Auto-Update Version Contract (자동 업데이트 버전 계약)
+
+GitHub 기반 플러그인 자동 업데이트 지원 대상으로 등록하려면, 플러그인 루트에 `VERSION` 파일을 추가하고 아래 JSON 키를 반드시 포함해야 합니다.
+
+```json
+{
+    "plugin version": "1.0.0"
+}
+```
+
+- 키 이름은 정확히 `plugin version` (공백 포함)
+- 값은 SemVer 형식 권장 (`MAJOR.MINOR.PATCH`)
+- 누락 시 자동 업데이트 지원 대상에서 제외됨
+
 ### 2. Implement the provider class (프로바이더 클래스 구현)
 Your class must inherit from `BaseMetadataProvider` defined in [base.py](base.py).
 The class name must follow this pattern: `{CamelCaseFileName}MetadataProvider`.

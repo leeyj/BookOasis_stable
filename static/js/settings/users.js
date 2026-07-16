@@ -22,7 +22,9 @@ export async function loadUsersList() {
           ? `<span style="color:#f97316; font-weight:700;"><i class="fa-solid fa-triangle-exclamation"></i> ${window.i18n ? window.i18n.t('settings.user_pwd_not_changed') : '초기 비밀번호'}</span>` 
           : `<span style="color:#22c55e;"><i class="fa-solid fa-circle-check"></i> ${window.i18n ? window.i18n.t('settings.user_pwd_changed') : '변경완료'}</span>`;
 
-        const deleteBtn = user.username === 'admin' 
+        const myUserId = Number(window.currentUser?.id || 0);
+        const isSelf = Number(user.id) === myUserId;
+        const deleteBtn = isSelf
           ? `<span style="color:#64748b; font-size:0.8rem;">${window.i18n ? window.i18n.t('settings.user_cannot_delete') : '삭제불가'}</span>`
           : `<button onclick="deleteUser(${user.id}, '${user.username}')" class="btn-settings-action" style="background:#ef4444; color:#fff; border:none; padding:0.25rem 0.6rem; border-radius:4px; cursor:pointer;"><i class="fa-solid fa-trash-can"></i> ${window.i18n ? window.i18n.t('settings.user_delete') : '삭제'}</button>`;
 

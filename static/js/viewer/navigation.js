@@ -78,6 +78,13 @@ export function toggleComicOverlay() {
   if (epubNavBar) epubNavBar.style.display = isOpening ? 'flex' : 'none';
   if (floatingCloseBtn) floatingCloseBtn.style.display = isOpening ? 'flex' : 'none';
 
+  document.dispatchEvent(new CustomEvent('viewer-overlay-visibility-changed', {
+    detail: {
+      isOpen: isOpening,
+      format: state.currentViewerFormat || ''
+    }
+  }));
+
   // ── iOS Safari 스크롤 락 패턴 (조건부) ────────────────────────────────────
   // TXT/EPUB 스크롤 모드에서 실제 스크롤은 body가 아닌 내부 컨테이너
   // (#txt-scroll-wrapper 등)에서 발생하므로 window.scrollY = 0이 대부분.

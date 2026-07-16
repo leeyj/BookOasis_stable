@@ -1,4 +1,4 @@
-# 🧩 메타데이터 플러그인 개발 가이드 (Metadata Plugin Guide)
+# 🧩 플러그인 개발 가이드 (Metadata Plugin Guide)
 
 이 문서는 BookOasis 미디어 서버에서 코어 수정 없이 메타데이터/대시보드 플러그인을 추가하는 최신 규격을 설명합니다.
 
@@ -25,10 +25,28 @@ plugins/metadata/
   my_widget/
     __init__.py
     my_widget.py
+        VERSION         # 필수(자동 업데이트 지원 대상인 경우)
     index.html      # 선택: 설정 화면 커스텀 UI
     style.css       # 선택: 설정 화면 커스텀 스타일
     script.js       # 선택: 설정 화면 커스텀 스크립트
 ```
+
+### 자동 업데이트 지원용 버전 파일 규격 (필수)
+
+GitHub 기반 플러그인 자동 업데이트 지원 대상으로 등록하려면, 플러그인 루트에 `VERSION` 파일을 두고 아래 키를 반드시 포함해야 합니다.
+
+```json
+{
+    "plugin version": "1.0.0"
+}
+```
+
+정책:
+
+- 키 이름은 반드시 `plugin version` (공백 포함)
+- 값은 SemVer 형식 권장 (`MAJOR.MINOR.PATCH`)
+- 이 값이 없으면 자동 업데이트 지원 대상에서 제외
+- 구 키(`plugin_version`)는 하위 호환 파싱 대상이지만 신규/공식 규약은 `plugin version`만 사용
 
 구 방식(단일 파일)도 하위 호환으로 로드되지만, 신규 개발은 폴더 기반을 권장합니다.
 
@@ -50,6 +68,7 @@ plugins/metadata/
 - `is_searchable` (bool): 수동 메타데이터 검색 모달 노출 여부
 - `config_schema` (list): 설정 폼 스키마
 - `dashboard_widget` (dict 또는 None): 대시보드 위젯 메타 (공통 데스크 카드 또는 단독 탭 뷰 구성 정보)
+- `update_manifest` (dict 또는 None): 플러그인 내부 업데이트 선언 계약
 
 필수 메서드:
 
@@ -64,6 +83,39 @@ plugins/metadata/
 
 - 성공: `{'success': True, 'items': [...]}`
 - 실패: `{'success': False, 'error': '...'}`
+
+### 플러그인 내부 업데이트 계약 (`update_manifest`)
+
+업데이트 버튼 노출/실행 규칙은 코어 하드코딩이 아니라, **각 플러그인 클래스 내부의 `update_manifest` 선언**으로 동작합니다.
+
+예시 (`stats_dashboard` 방식):
+
+```python
+update_manifest = {
+    "enabled": True,
+    "provider": "github-raw",
+    "raw_base_url": "https://raw.githubusercontent.com/<org>/<repo>/<branch>/plugins/metadata/<plugin_id>",
+    "files": ["<plugin_module>.py", "__init__.py", "VERSION"],
+    "version_file": "VERSION",
+    "version_key": "plugin version",
+    "show_sample_update_button": True,
+}
+```
+
+필드 설명:
+
+- `enabled`: 업데이트 기능 사용 여부
+- `provider`: 현재 `github-raw`만 지원
+- `raw_base_url`: 플러그인 파일 원본 경로
+- `files`: 업데이트 시 교체할 파일 목록
+- `version_file`: 버전 파싱 대상 파일
+- `version_key`: 버전 JSON 키 (권장: `plugin version`)
+- `show_sample_update_button`: 환경설정 화면에 샘플 업데이트 버튼 노출 여부
+
+실행 정책:
+
+- 업데이트는 `현재 버전 < GitHub 버전`일 때만 허용
+- `raw_base_url/files`가 GitHub에 아직 없으면 404가 정상이며, 푸시 이후 재시도
 
 ---
 
@@ -206,6 +258,114 @@ def get_context_menu_items(self, db_type, context):
 }
 ```
 
+### 웹훅 연동 (최신 권장 방식)
+
+최신 권장 방식은 `.env`가 아니라 **플러그인 설정 화면**에서 웹훅 대상을 구성하는 것입니다.
+
+추가로 스캐너는 신규 도서를 감지하면 자동으로 `scan.new_books_detected` 이벤트를 발송합니다.
+
+- payload: `db_type`, `library_id`, `library_name`, `new_books_count`, `sample_titles`
+
+### 신규도서 웹훅 알림 예제 플러그인
+
+- 경로: `plugins/metadata/webhook_new_books_notify/webhook_new_books_notify.py`
+- 동작: 스캔 완료 후 신규 도서가 있으면 `on_scan_new_books_detected` 훅에서 설정된 다중 웹훅 대상으로 전송
+- 지원 포맷: `discord`, `slack`, `telegram`, `generic`, `custom`
+- 참고: `.env` 없이 플러그인 설정만으로 동작합니다.
+
+사용 방법:
+
+1. 환경설정 > 플러그인 설정에서 `신규도서 웹훅 알림` 활성화
+2. `ENABLE_SCAN_WEBHOOK_NOTIFY=true` 저장
+3. `WEBHOOK_TARGETS_JSON` 입력
+4. (선택) `CUSTOM_EVENT_PAYLOAD_JSON`, `MAX_SAMPLE_TITLES`, `REQUEST_TIMEOUT_SEC` 조정
+5. 라이브러리 스캔 실행
+
+테스트 URL 빠른 검증:
+
+1. `https://webhook.site` 접속 후 임시 수신 URL 발급
+2. 아래처럼 `WEBHOOK_TARGETS_JSON`에 테스트 타깃 추가
+3. 스캔 실행 후 webhook.site 수신 로그에서 요청 본문(JSON) 확인
+
+```json
+[
+    {
+        "name": "webhook-site-test",
+        "url": "https://webhook.site/your-uuid",
+        "format": "generic",
+        "method": "POST"
+    }
+]
+```
+
+응답 판별 테스트(httpbin):
+
+```json
+[
+    {
+        "name": "httpbin-ok",
+        "url": "https://httpbin.org/post",
+        "format": "custom",
+        "method": "POST",
+        "body": {
+            "ok": true,
+            "event": "{{event}}",
+            "count": "{{new_books_count}}"
+        },
+        "success_path": "json.ok"
+    }
+]
+```
+
+주의: 테스트 URL에는 토큰/개인정보가 포함된 실제 운영 payload를 보내지 마십시오.
+
+---
+
+## 7. 플러그인 개발자 릴리즈 절차 (자동 업데이트 포함)
+
+1. 플러그인 코드 변경 후 `VERSION`의 `plugin version`을 증가
+2. 플러그인 클래스의 `update_manifest` 경로/파일 목록이 실제 리포지토리와 일치하는지 점검
+3. GitHub에 push 후 `raw_base_url`에서 파일 직접 열람(404 해소 확인)
+4. 환경설정 > 플러그인 설정에서 샘플 업데이트 버튼 실행
+5. `현재 < GitHub` 조건에서만 업데이트되는지, 동일/낮은 GitHub 버전에선 차단되는지 검증
+
+`WEBHOOK_TARGETS_JSON` 예시:
+
+```json
+[
+    {
+        "name": "discord-main",
+        "url": "https://discord.com/api/webhooks/...",
+        "format": "discord"
+    },
+    {
+        "name": "telegram-main",
+        "url": "https://api.telegram.org/bot<token>/sendMessage",
+        "format": "telegram",
+        "chat_id": "123456789"
+    },
+    {
+        "name": "ops-custom",
+        "url": "https://example.com/hook",
+        "format": "custom",
+        "method": "POST",
+        "headers": {
+            "Authorization": "Bearer YOUR_TOKEN"
+        },
+        "body": {
+            "event": "{{event}}",
+            "library": "{{library_name}}",
+            "count": "{{new_books_count}}",
+            "titles": "{{sample_titles_csv}}"
+        },
+        "success_path": "ok"
+    }
+]
+```
+
+`success_path`를 설정하면 응답 JSON에서 해당 경로가 truthy일 때만 성공으로 판정합니다.
+(예: `ok`, `result.success`)
+
 ---
 
 ## 7. 구현 예시 (간단)
@@ -221,6 +381,15 @@ class MyWidgetMetadataProvider(BaseMetadataProvider):
     name = "My Widget"
     is_searchable = False
     config_schema = [{"key": "API_KEY", "label": "API Key", "type": "text", "required": True}]
+    update_manifest = {
+        "enabled": True,
+        "provider": "github-raw",
+        "raw_base_url": "https://raw.githubusercontent.com/<org>/<repo>/<branch>/plugins/metadata/my_widget",
+        "files": ["my_widget.py", "__init__.py", "VERSION"],
+        "version_file": "VERSION",
+        "version_key": "plugin version",
+        "show_sample_update_button": True,
+    }
     dashboard_widget = {
         "title": "My Widget",
         "subtitle": "Demo",
@@ -241,6 +410,9 @@ class MyWidgetMetadataProvider(BaseMetadataProvider):
     def get_dashboard_data(self, db_type, limit=10):
         return self._fetch_items(db_type, limit=limit)
 ```
+
+업데이트 지원 플러그인이라면 위 예시처럼 `update_manifest`를 클래스 내부에 선언하고,
+`VERSION` 파일에 `"plugin version"` 키를 함께 유지하십시오.
 
 ### 플러그인 DB 게이트웨이 (권장)
 

@@ -43,6 +43,7 @@ from services.opds_compat_service import (
     filter_supported_books_for_app_opds,
     filter_supported_series_for_app_opds,
 )
+from utils.safe_file_response import stream_file_safely
 from utils.i18n import _t
 
 app_opds_bp = Blueprint('media_app_opds', __name__)
@@ -330,7 +331,10 @@ def app_opds_pdf_compat():
 
     range_header = request.headers.get('Range')
     if not range_header:
-        return send_file(file_path, mimetype=mime)
+        try:
+            return stream_file_safely(file_path, mimetype=mime)
+        except OSError as e:
+            return jsonify({'error': str(e)}), 500
 
     size = os.path.getsize(file_path)
     byte1, byte2 = 0, None
@@ -525,6 +529,11 @@ def app_opds_recently_read():
     return _handlers.handle_recently_feed(is_adult=False, kind='read')
 
 
+@app_opds_bp.route('/app-opds/favorite', methods=['GET'])
+def app_opds_favorite():
+    return _handlers.handle_recently_feed(is_adult=False, kind='favorite')
+
+
 @app_opds_bp.route('/app-opds/adult/recently-added', methods=['GET'])
 def app_opds_adult_recently_added():
     return _handlers.handle_recently_feed(is_adult=True, kind='added')
@@ -533,6 +542,11 @@ def app_opds_adult_recently_added():
 @app_opds_bp.route('/app-opds/adult/recently-read', methods=['GET'])
 def app_opds_adult_recently_read():
     return _handlers.handle_recently_feed(is_adult=True, kind='read')
+
+
+@app_opds_bp.route('/app-opds/adult/favorite', methods=['GET'])
+def app_opds_adult_favorite():
+    return _handlers.handle_recently_feed(is_adult=True, kind='favorite')
 
 
 @app_opds_bp.route('/app-opds/download/<string:db_type>/<int:book_id>', methods=['GET'])

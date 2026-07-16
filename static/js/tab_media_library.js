@@ -29,6 +29,27 @@ import { initFloatingFilter, toggleFilterModal } from './genre_tag_filter.js';
 import { initSidebarAutoClose, restoreDesktopSidebarState } from './sidebar_manager.js';
 import './viewer/viewer_padding.js';
 
+function canAccessAdultLibrary() {
+  const user = state.currentUser || window.currentUser || {};
+  const role = String(user.role || '').toLowerCase();
+  if (role === 'admin') return true;
+
+  const raw = user.has_adult_access;
+  return raw === true || raw === 1 || String(raw) === '1';
+}
+
+function applyLibraryTypeToggleVisibility() {
+  const toggleGroup = document.getElementById('library-type-toggle-group');
+  if (!toggleGroup) return;
+
+  const allowAdult = canAccessAdultLibrary();
+  toggleGroup.style.display = allowAdult ? 'inline-flex' : 'none';
+
+  if (!allowAdult && state.currentLibraryType === 'adult') {
+    state.currentLibraryType = 'general';
+  }
+}
+
 function focusLibrarySearchInput() {
   const searchInput = document.getElementById('library-search');
   if (!searchInput) return;
@@ -151,6 +172,8 @@ async function initTabMediaLibrary() {
     }
   }
 
+  applyLibraryTypeToggleVisibility();
+
   // fixed 모달창들이 transform 조상 컨테이너 내부에서 스크롤을 이탈하는 버그 방지 (body 최하단으로 강제 이동)
   document.querySelectorAll('.library-modal').forEach(modal => {
     document.body.appendChild(modal);
@@ -251,6 +274,11 @@ if (window.i18nReady) {
 
 // 라이브러리 타입 스위칭 (일반/성인)
 export function switchLibraryType(type) {
+  if (type === 'adult' && !canAccessAdultLibrary()) {
+    state.currentLibraryType = 'general';
+    return;
+  }
+
   window.scrollTo(0, 0);
   state.currentLibraryType = type;
   document.querySelectorAll('.btn-toggle').forEach(btn => btn.classList.remove('active'));
@@ -261,6 +289,38 @@ export function switchLibraryType(type) {
   }
   loadLibraries();
   selectCategory('home');
+}
+
+function getSystemCategoryLabel(id) {
+  if (!window.i18n || typeof window.i18n.t !== 'function') return String(id || '');
+  if (id === 'home') return window.i18n.t('category.home');
+  if (id === 'history') return window.i18n.t('category.history');
+  if (id === 'favorite') return window.i18n.t('category.favorite');
+  if (id === 'plugins') return window.i18n.t('category.plugins');
+  if (id === 'all') return window.i18n.t('category.all');
+  if (id === 'settings') return window.i18n.t('sidebar.settings');
+  return String(id || '');
+}
+
+function updateCurrentCategoryIndicator(id, activeItem) {
+  const indicator = document.getElementById('current-category-indicator');
+  if (!indicator) return;
+
+  let label = '';
+  if (activeItem && activeItem.dataset && activeItem.dataset.type === 'custom') {
+    label = String(activeItem.dataset.name || '').trim();
+  }
+  if (!label && ['home', 'history', 'favorite', 'plugins', 'all', 'settings'].includes(String(id))) {
+    label = getSystemCategoryLabel(id);
+  }
+  if (!label && activeItem) {
+    const fallbackText = String(activeItem.textContent || '').replace(/\s+/g, ' ').trim();
+    label = fallbackText;
+  }
+  if (!label) label = String(id || '');
+
+  indicator.textContent = label;
+  indicator.title = label;
 }
 
 // 카테고리 선택 처리
@@ -284,6 +344,7 @@ export function selectCategory(id, skipHistory = false) {
   if (activeItem) {
     activeItem.classList.add('active');
   }
+  updateCurrentCategoryIndicator(id, activeItem);
 
   goBackToList();
 

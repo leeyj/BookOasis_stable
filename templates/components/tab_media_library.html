@@ -76,6 +76,7 @@
                 </button>
                 <h2 class="library-title" style="display: flex; align-items: center; margin: 0;">
                     <span><i class="fa-solid fa-book-open" style="color: #a855f7; margin-right: 0.5rem;"></i> <span data-i18n="header.title">도서 보관함</span></span>
+                    <span id="current-category-indicator" class="current-category-indicator" aria-live="polite">Home</span>
                     <span id="library-total-count" style="font-size: 0.9rem; color: #94a3b8; margin-left: 0.8rem; font-weight: normal; white-space: nowrap;"></span>
                 </h2>
             </div>
@@ -97,7 +98,7 @@
                     onclick="toggleLibrarySort()" data-i18n-title="header.sort_title" title="정렬 조건 변경">
                     <i class="fa-solid fa-sort-alpha-down"></i> <span data-i18n="header.sort_asc">가나다 오름차순</span>
                 </button>
-                <div class="library-toggle-group">
+                <div id="library-type-toggle-group" class="library-toggle-group">
                     <button class="btn-toggle active" id="btn-lib-general" onclick="switchLibraryType('general')" data-i18n="header.general_books">일반 도서</button>
                     <button class="btn-toggle" id="btn-lib-adult" onclick="switchLibraryType('adult')" data-i18n="header.adult_books">성인 도서</button>
                 </div>

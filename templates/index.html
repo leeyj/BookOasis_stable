@@ -20,8 +20,10 @@
     <script src="/static/lib/Sortable.min.js"></script>
     <script>
         window.currentUser = {
+            id: {{ session.get('user_id', 0)|int }},
             username: "{{ session.get('username', '') }}",
-            role: "{{ session.get('role', '') }}"
+            role: "{{ session.get('role', '') }}",
+            has_adult_access: {{ session.get('has_adult_access', 0)|int }}
         };
         window.bookOasisConsoleLog = typeof console.log === 'function' ? console.log.bind(console) : function() {};
         

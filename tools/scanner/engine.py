@@ -10,6 +10,8 @@ if MEDIA_SERVER_DIR not in sys.path:
 
 import database
 from tools.scanner.vfs import trigger_vfs_refresh
+from services.webhook_dispatcher import dispatch_webhook_event
+from services.metadata_factory import MetadataFactory
 from utils.drive_helper import is_remote_path
 from tools.scanner.memory_helper import check_memory_exceeded
 from tools.scanner.db_writer import update_book_metadata, insert_new_book_v2, save_book_offsets, bulk_update_books, bulk_insert_books, bulk_save_book_offsets
@@ -18,6 +20,34 @@ from tools.scanner.sync_detector import detect_and_handle_book_movement, handle_
 
 MAX_SCANNER_THREADS = 4
 DB_DIR = os.path.join(MEDIA_SERVER_DIR, 'db')
+
+
+def _dispatch_new_books_to_plugin_hooks(db_type, event_payload):
+    """Call optional on_scan_new_books_detected hook on each enabled metadata plugin."""
+    try:
+        providers = MetadataFactory.get_available_providers()
+    except Exception as discover_err:
+        print(f"[Scanner-PluginHook] provider discovery failed: {discover_err}")
+        return
+
+    for meta in providers:
+        try:
+            if not meta.get('enabled'):
+                continue
+
+            provider_id = meta.get('id')
+            if not provider_id:
+                continue
+
+            provider = MetadataFactory.get_provider_by_id(provider_id)
+            hook = getattr(provider, 'on_scan_new_books_detected', None)
+            if not callable(hook):
+                continue
+
+            result = hook(db_type, dict(event_payload))
+            print(f"[Scanner-PluginHook] provider={provider_id} result={result}")
+        except Exception as hook_err:
+            print(f"[Scanner-PluginHook] provider={meta.get('id')} failed: {hook_err}")
 
 def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_type, target_paths, is_remote, threads_to_use, library_errors):
     cursor = conn.cursor()
@@ -188,6 +218,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
     pending_inserts = []
     pending_updates = []
     pending_folders = []
+    detected_new_books = []
 
     def flush_pending_data():
         if not pending_inserts and not pending_updates and not pending_folders:
@@ -290,6 +321,11 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                                 "title": title,
                                 "cover_image": cover_image, "merged_meta": merged_meta, "offsets_data": offsets_data,
                                 "file_mtime": item.get('file_mtime', 0.0), "file_size": item.get('file_size', 0)
+                            })
+                            detected_new_books.append({
+                                'title': title or os.path.splitext(filename)[0],
+                                'file_path': full_path,
+                                'series_name': series_name,
                             })
                             print(f"[Scanner-Process] Found new book: {filename} (Series: {series_name})")
                         batch_item_count += 1
@@ -394,6 +430,22 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
     t = threading.Thread(target=database.optimize_database, args=(db_type,))
     t.daemon = True
     t.start()
+
+    if detected_new_books:
+        sample = [b['title'] for b in detected_new_books[:10]]
+        event_payload = {
+            'db_type': db_type,
+            'library_id': library_id,
+            'library_name': library_name,
+            'new_books_count': len(detected_new_books),
+            'sample_titles': sample,
+        }
+        try:
+            dispatch_webhook_event('scan.new_books_detected', event_payload)
+        except Exception as hook_err:
+            print(f"[Scanner-Webhook] dispatch failed: {hook_err}")
+
+        _dispatch_new_books_to_plugin_hooks(db_type, event_payload)
 
 
 def _scan_library_covers_only_internal(conn, db_path, library_id, physical_path, target_paths, db_type):

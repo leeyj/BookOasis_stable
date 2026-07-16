@@ -11,6 +11,7 @@ from services.category_service import CategoryService
 from services.opds_service import (
     EMPTY_SERIES_TOKEN,
     get_book_entries,
+    get_favorite_entries,
     get_library_list,
     get_recently_added_entries,
     get_recently_read_entries,
@@ -76,12 +77,14 @@ class AppOpdsHandlers:
             entries.extend([
                 {'id': 'urn:app:adult:recently-added', 'title': '신규 추가', 'type': 'navigation', 'href': '/app-opds/adult/recently-added'},
                 {'id': 'urn:app:adult:recently-read', 'title': '최근 읽은 도서', 'type': 'navigation', 'href': '/app-opds/adult/recently-read'},
+                {'id': 'urn:app:adult:favorite', 'title': '즐겨찾기', 'type': 'navigation', 'href': '/app-opds/adult/favorite'},
             ])
             title = 'BookOasis App Adult OPDS Catalog'
         else:
             entries.extend([
                 {'id': 'urn:app:recently-added', 'title': '신규 추가', 'type': 'navigation', 'href': '/app-opds/recently-added'},
                 {'id': 'urn:app:recently-read', 'title': '최근 읽은 도서', 'type': 'navigation', 'href': '/app-opds/recently-read'},
+                {'id': 'urn:app:favorite', 'title': '즐겨찾기', 'type': 'navigation', 'href': '/app-opds/favorite'},
             ])
             title = 'BookOasis App OPDS Catalog'
 
@@ -232,7 +235,7 @@ class AppOpdsHandlers:
             return self._unauthorized()
 
         db_type = 'adult' if is_adult else 'general'
-        cache_key = f"app_opds_recently_{kind}:{db_type}"
+        cache_key = f"app_opds_special_{kind}:{db_type}"
         if kind == 'read':
             cache_key = f"{cache_key}:{user['id']}"
         cached_xml = self._get_cached_response(cache_key)
@@ -242,9 +245,14 @@ class AppOpdsHandlers:
         if kind == 'added':
             entries = get_recently_added_entries(db_type, f'/app-opds/download/{db_type}', f'app:{db_type}')
             title = '신규 추가'
-        else:
+        elif kind == 'read':
             entries = get_recently_read_entries(db_type, f'/app-opds/download/{db_type}', f'app:{db_type}', user_id=user['id'])
             title = '최근 읽은 도서'
+        elif kind == 'favorite':
+            entries = get_favorite_entries(db_type, f'/app-opds/download/{db_type}', f'app:{db_type}')
+            title = '즐겨찾기'
+        else:
+            return self._unauthorized()
 
         xml = self._opds_xml(db_type, title, entries, is_adult=is_adult)
         self._set_cached_response(cache_key, xml)

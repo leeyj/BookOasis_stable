@@ -20,6 +20,7 @@ from api.opds_common.auth import authenticate_basic_auth_user, unauthorized_resp
 from api.opds_common.xml import atom_response, build_external_request_url, build_opds_xml, get_external_base_url, get_page_params
 from services.opds_service import (
     get_book_entries,
+    get_favorite_entries,
     get_library_list,
     get_recently_added_entries,
     get_recently_read_entries,
@@ -156,6 +157,8 @@ def opds_root():
          'type': 'navigation', 'href': '/opds/recently-added'},
         {'id': 'urn:recently-read', 'title': '최근 읽은 도서',
          'type': 'navigation', 'href': '/opds/recently-read'},
+           {'id': 'urn:favorite', 'title': '즐겨찾기',
+            'type': 'navigation', 'href': '/opds/favorite'},
     ])
     xml = _opds_xml('general', "My Supporter OPDS Catalog", entries)
     _set_cached_opds_response(cache_key, xml)
@@ -185,6 +188,8 @@ def opds_adult_root():
          'type': 'navigation', 'href': '/opds/adult/recently-added'},
         {'id': 'urn:adult:recently-read', 'title': '최근 읽은 도서',
          'type': 'navigation', 'href': '/opds/adult/recently-read'},
+           {'id': 'urn:adult:favorite', 'title': '즐겨찾기',
+            'type': 'navigation', 'href': '/opds/adult/favorite'},
     ])
     xml = _opds_xml('adult', "My Supporter Adult OPDS Catalog", entries, is_adult=True)
     _set_cached_opds_response(cache_key, xml)
@@ -294,6 +299,22 @@ def opds_recently_read():
     return _atom_response(xml)
 
 
+@opds_bp.route('/opds/favorite', methods=['GET'])
+def opds_favorite():
+    """즐겨찾기 도서 목록 (일반)"""
+    if not _check_auth(is_adult=False):
+        return _unauthorized()
+    cache_key = 'opds_favorite:general'
+    cached_xml = _get_cached_opds_response(cache_key)
+    if cached_xml is not None:
+        return _atom_response(cached_xml)
+
+    entries = get_favorite_entries('general', '/opds/download/general', 'general')
+    xml = _opds_xml('general', "즐겨찾기", entries)
+    _set_cached_opds_response(cache_key, xml)
+    return _atom_response(xml)
+
+
 @opds_bp.route('/opds/adult/recently-added', methods=['GET'])
 def opds_adult_recently_added():
     """신규 추가 도서 목록 (성인)"""
@@ -323,6 +344,22 @@ def opds_adult_recently_read():
 
     entries = get_recently_read_entries('adult', '/opds/download/adult', 'adult', user_id=user['id'])
     xml = _opds_xml('adult', "최근 읽은 도서", entries, is_adult=True)
+    _set_cached_opds_response(cache_key, xml)
+    return _atom_response(xml)
+
+
+@opds_bp.route('/opds/adult/favorite', methods=['GET'])
+def opds_adult_favorite():
+    """즐겨찾기 도서 목록 (성인)"""
+    if not _check_auth(is_adult=True):
+        return _unauthorized()
+    cache_key = 'opds_favorite:adult'
+    cached_xml = _get_cached_opds_response(cache_key)
+    if cached_xml is not None:
+        return _atom_response(cached_xml)
+
+    entries = get_favorite_entries('adult', '/opds/download/adult', 'adult')
+    xml = _opds_xml('adult', "즐겨찾기", entries, is_adult=True)
     _set_cached_opds_response(cache_key, xml)
     return _atom_response(xml)
 
