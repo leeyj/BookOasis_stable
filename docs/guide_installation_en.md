@@ -113,61 +113,22 @@ services:
       - /path/to/your/comics:/data/comics:ro
 ```
 
-**③ Build and Run Service**
+**③ Run Service (GHCR image-based)**
 ```bash
-# Build and run the docker container in the background
-docker compose up -d --build
+# First run (use GHCR image, no local build)
+docker compose -f docker-compose.ghcr.yml -f docker-compose.override.yml up -d
+
+# For updates
+docker compose -f docker-compose.ghcr.yml -f docker-compose.override.yml pull
+docker compose -f docker-compose.ghcr.yml -f docker-compose.override.yml up -d
 ```
-* The container's internal port `5930` is bound to the host's `5930` port. If you wish to change the host port, modify the left-side port number in `docker-compose.yml` like `ports: - "8080:5930"`.
+* The default path uses GHCR images, so end users do not need to build Docker images locally.
+* The container's internal port `5930` is bound to the host's `5930` port. If you wish to change the host port, modify the left-side port number in `docker-compose.ghcr.yml` like `ports: - "8080:5930"`.
 * The database (`db/`), cover cache (`covers/`), temp upload folder (`cache/`), and custom plugins (`plugins/`) are automatically mapped as persistent volumes in the project root directory.
 * 💡 Thanks to the `plugins/` volume mapping, you can instantly add external metadata plugins simply by dropping a new python file into the host's `plugins/metadata/` folder without needing to rebuild the docker container.
 * 💡 Since `docker-compose.override.yml` is listed in `.gitignore`, your local path configuration won't be overwritten or cause conflicts when you pull updates (`git pull`) from the remote repository.
 
-### 3-1) GHCR-Based Updates (Operator)
-
-For community users, GHCR image updates are recommended as the default update path.
-
-> Policy: this project uses a `stable`-only GHCR channel. When a `v*` release tag is pushed, both the version tag image and the `stable` image are updated.
-
-**① Prepare GHCR compose file**
-Set the real repository owner in `docker-compose.ghcr.yml`.
-
-```yaml
-services:
-    bookoasis:
-        image: ghcr.io/<github_owner>/bookoasis:stable
-```
-
-**② First run**
-```bash
-docker compose -f docker-compose.ghcr.yml up -d
-```
-
-**③ Apply updates**
-```bash
-docker compose -f docker-compose.ghcr.yml pull
-docker compose -f docker-compose.ghcr.yml up -d
-```
-
-**④ Pin to a version tag (recommended)**
-When needed, pin `stable` to a specific version tag (e.g., `v1.2.3`) for safer rollback.
-
-### 3-2) Release Auto Tagging (Operator)
-
-When pushing through the deployment mirror, `export_stable.py` can auto-create/push a `vX.Y.Z` tag from the `dashboard` value in the `VERSION` file.
-
-```bash
-# push main + try VERSION-based auto tagging
-python export_stable.py "Version update"
-
-# explicitly set a release tag (overrides auto tagging)
-python export_stable.py "Release v1.2.3" --tag v1.2.3
-
-# disable auto tagging (push main only)
-python export_stable.py "Hotfix" --no-auto-tag
-```
-
-Recommended tag formats: `v1.2.3`, `v1.2.3-rc.1`
+> Security policy: operator-only deployment and release automation procedures are maintained in private internal documentation.
 
 ---
 

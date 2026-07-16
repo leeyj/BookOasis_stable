@@ -1,11 +1,23 @@
 # -*- coding: utf-8 -*-
 import os
 import urllib.request
+import urllib.error
 import urllib.parse
 import json
 import base64
+import time
 import database
 from utils.drive_helper import is_remote_path, get_rclone_relative_path
+
+
+def _is_connection_refused_error(err):
+    reason = getattr(err, 'reason', err)
+    if isinstance(reason, ConnectionRefusedError):
+        return True
+    errno = getattr(reason, 'errno', None)
+    if errno in (111, 10061):
+        return True
+    return 'Connection refused' in str(reason)
 
 def trigger_vfs_refresh(db_path, library_id, physical_path):
     """Refresh rclone cache before starting scan if remote mount path (VFS)."""
@@ -91,10 +103,21 @@ def trigger_vfs_refresh(db_path, library_id, physical_path):
                         data=req_data,
                         headers=headers
                     )
-                    
-                    with urllib.request.urlopen(req, timeout=5) as resp:
-                        print(f"[Scanner-VFS] VFS cache refresh success - Server: '{clean_rc_url}', Target: '{rel_path}', Result: {resp.read().decode('utf-8')}")
-                        refreshed = True
+
+                    for attempt in range(1, 4):
+                        try:
+                            with urllib.request.urlopen(req, timeout=5) as resp:
+                                print(f"[Scanner-VFS] VFS cache refresh success - Server: '{clean_rc_url}', Target: '{rel_path}', Result: {resp.read().decode('utf-8')}")
+                                refreshed = True
+                                break
+                        except urllib.error.URLError as e:
+                            if attempt < 3 and _is_connection_refused_error(e):
+                                print(f"[Scanner-VFS Warning] RC server not ready yet. Retrying shortly (server='{clean_rc_url}', path='{rel_path}', attempt={attempt}/3)")
+                                time.sleep(2.0)
+                                continue
+                            raise
+
+                    if refreshed:
                         break
                 except Exception as e:
                     # Obfuscate credentials in logs if present

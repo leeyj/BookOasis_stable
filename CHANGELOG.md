@@ -1,6 +1,16 @@
 # CHANGELOG
+## v1.0.4
+### fxed
+- 기본 커버를 제목 조합으로 변경 | Change default cover to title and author combination
+- 대시보드에서 도서권수 표시 오류 수정 | Fix incorrect book count display on dashboard
+- 대시보드에서 종종 잘못된 커버 표시 오류 수정 | Fix intermittent incorrect cover display on dashboard
+- TXT 커버 이미지 미검출 경고를 분리하고 단계별로 표시하도록 개선 | Split missing-cover warnings for TXT and display them by severity level
+
+### added
+- 환경설정 -> 일반설정에 TXT 무커버 안내 배너 표시/숨김 옵션 추가 | Added a toggle in Settings > General to show or hide the TXT no-cover info banner
+---
 ## v1.0.3
-- 도커이미지 지원
+- 도커이미지 지원 | support docker image update
 
 ## v1.0.2
 ### fixed

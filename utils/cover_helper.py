@@ -21,7 +21,7 @@ def get_cover_image_with_t(cover_image, updated_at):
         ts = 0
     return f"{cover_image}?t={ts}"
 
-def resolve_series_cover(series_name, lib_id, db_cover, covers_dir, conn, candidates_rows=None):
+def resolve_series_cover(series_name, lib_id, db_cover, covers_dir, conn, candidates_rows=None, allow_series_cover=True):
     """시리즈 대표 커버의 물리적 실존을 카테고리별 분할 구조에 맞추어 검사하고,
     유실된 경우 실존하는 다른 도서 커버로 대체(Fallback)
     """
@@ -35,10 +35,11 @@ def resolve_series_cover(series_name, lib_id, db_cover, covers_dir, conn, candid
     legacy_series_cover_name = f"series_{series_hash}.jpg"
     legacy_series_cover_path = os.path.join(covers_dir, legacy_series_cover_name)
 
-    if os.path.exists(series_cover_path) and os.path.getsize(series_cover_path) > 0:
-        return series_cover_name
-    if os.path.exists(legacy_series_cover_path) and os.path.getsize(legacy_series_cover_path) > 0:
-        return legacy_series_cover_name
+    if allow_series_cover:
+        if os.path.exists(series_cover_path) and os.path.getsize(series_cover_path) > 0:
+            return series_cover_name
+        if os.path.exists(legacy_series_cover_path) and os.path.getsize(legacy_series_cover_path) > 0:
+            return legacy_series_cover_name
 
     db_cover_path = os.path.join(covers_dir, db_cover) if db_cover else None
     if db_cover_path and os.path.exists(db_cover_path) and os.path.getsize(db_cover_path) > 0:
@@ -54,12 +55,20 @@ def resolve_series_cover(series_name, lib_id, db_cover, covers_dir, conn, candid
                     return cand_cover
     else:
         fallback_cursor = conn.cursor()
-        fallback_cursor.execute("""
+        if lib_id is not None:
+            fallback_cursor.execute("""
             SELECT cover_image 
             FROM books 
-            WHERE series_name = ? AND cover_image IS NOT NULL AND cover_image != ''
+            WHERE series_name = ? AND library_id = ? AND COALESCE(is_deleted, 0) = 0 AND cover_image IS NOT NULL AND cover_image != ''
             ORDER BY title ASC
-        """, (series_name,))
+            """, (series_name, lib_id))
+        else:
+            fallback_cursor.execute("""
+            SELECT cover_image 
+            FROM books 
+            WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0 AND cover_image IS NOT NULL AND cover_image != ''
+            ORDER BY title ASC
+            """, (series_name,))
         candidates = fallback_cursor.fetchall()
         for cand in candidates:
             cand_cover = cand['cover_image']

@@ -31,6 +31,12 @@ def _encode_url_segment(value: str) -> str:
     return quote(str(value), safe='')
 
 
+def _build_fallback_cover_href(title: str, file_format: str = 'text') -> str:
+    safe_title = _encode_url_segment(title or 'Untitled')
+    safe_format = _encode_url_segment(file_format or 'text')
+    return f"/covers/fallback?title={safe_title}&format={safe_format}"
+
+
 def _extract_title_from_path(file_path: str) -> str:
     if not file_path:
         return ''
@@ -79,6 +85,8 @@ def get_series_entries(db_type: str, lib_id: int, prefix: str, urn_prefix: str):
             'type': 'navigation',
             'href': f"{prefix}/{lib_id}/{_encode_url_segment(s['series_name'] if s['series_name'] else EMPTY_SERIES_TOKEN)}",
             'cover': s['cover_image'],
+            'cover_url': None if s['cover_image'] else _build_fallback_cover_href(s['series_name'] or '기타', 'text'),
+            'cover_mime': 'image/svg+xml' if not s['cover_image'] else None,
         }
         for i, s in enumerate(rows)
     ]
@@ -106,6 +114,7 @@ def get_book_entries(db_type: str, lib_id: int, series_name: str, download_prefi
 
     entries = []
     for b in books:
+        ext = os.path.splitext(b['file_path'] or '')[1].lower().replace('.', '') or 'text'
         entries.append({
             'id': f"urn:{urn_prefix}:book:{b['id']}",
             'title': b['title'],
@@ -114,6 +123,8 @@ def get_book_entries(db_type: str, lib_id: int, series_name: str, download_prefi
             'href': f"{download_prefix}/{b['id']}",
             'mime': _guess_mime_type(b['file_path']),
             'cover': b['cover_image'],
+            'cover_url': None if b['cover_image'] else _build_fallback_cover_href(b['title'], ext),
+            'cover_mime': 'image/svg+xml' if not b['cover_image'] else None,
         })
     return entries, total
 
@@ -135,6 +146,7 @@ def get_recently_added_entries(db_type: str, download_prefix: str, urn_prefix: s
 
     entries = []
     for i, b in enumerate(books):
+        ext = os.path.splitext(b['file_path'] or '')[1].lower().replace('.', '') or 'text'
         entries.append({
             'id': f"urn:{urn_prefix}:new:{i}",
             'title': b['title'],
@@ -143,6 +155,8 @@ def get_recently_added_entries(db_type: str, download_prefix: str, urn_prefix: s
             'href': f"{download_prefix}/{b['id']}",
             'mime': _guess_mime_type(b['file_path']),
             'cover': b['cover_image'],
+            'cover_url': None if b['cover_image'] else _build_fallback_cover_href(b['title'], ext),
+            'cover_mime': 'image/svg+xml' if not b['cover_image'] else None,
         })
     return entries
 def get_recently_read_entries(db_type: str, download_prefix: str, urn_prefix: str, user_id: int = None):
@@ -189,6 +203,7 @@ def get_recently_read_entries(db_type: str, download_prefix: str, urn_prefix: st
         title = b['title']
         if _is_corrupted_title(title):
             title = _extract_title_from_path(b['file_path'])
+        ext = os.path.splitext(b['file_path'] or '')[1].lower().replace('.', '') or 'text'
         entries.append({
             'id': f"urn:{urn_prefix}:read:{i}",
             'title': title,
@@ -197,6 +212,8 @@ def get_recently_read_entries(db_type: str, download_prefix: str, urn_prefix: st
             'href': f"{download_prefix}/{b['id']}",
             'mime': _guess_mime_type(b['file_path']),
             'cover': b['cover_image'],
+            'cover_url': None if b['cover_image'] else _build_fallback_cover_href(title, ext),
+            'cover_mime': 'image/svg+xml' if not b['cover_image'] else None,
         })
     return entries
 
@@ -285,6 +302,7 @@ def search_books_entries(db_type: str, query: str, download_prefix: str, urn_pre
             if b['author']:
                 meta.append(f"저자: {b['author']}")
             desc = " / ".join(meta) if meta else "상세 설명 없음"
+        ext = os.path.splitext(b['file_path'] or '')[1].lower().replace('.', '') or 'text'
             
         entries.append({
             'id': f"urn:{urn_prefix}:search:{b['id']}",
@@ -294,6 +312,8 @@ def search_books_entries(db_type: str, query: str, download_prefix: str, urn_pre
             'href': f"{download_prefix}/{b['id']}",
             'mime': _guess_mime_type(b['file_path']),
             'cover': b['cover_image'],
+            'cover_url': None if b['cover_image'] else _build_fallback_cover_href(b['title'], ext),
+            'cover_mime': 'image/svg+xml' if not b['cover_image'] else None,
         })
     return entries, total
 

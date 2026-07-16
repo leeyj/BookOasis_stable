@@ -303,7 +303,7 @@ export function toggleLibrarySort() {
 }
 
 // 시리즈 이어보기 로직
-export async function resumeSeries(e, seriesName, libraryId) {
+export async function resumeSeries(e, seriesName, libraryId, representativeBookId = null) {
   if (e) {
     e.stopPropagation();
     e.preventDefault();
@@ -313,7 +313,7 @@ export async function resumeSeries(e, seriesName, libraryId) {
   const activeLibId = libraryId || state.currentLibraryId || 'all';
 
   try {
-    const data = await api.fetchMediaDetail(state.currentLibraryType, activeLibId, seriesName);
+    const data = await api.fetchMediaDetail(state.currentLibraryType, activeLibId, seriesName, representativeBookId);
     if (data.success && data.books && data.books.length > 0) {
       // 이어보기 우선순위 선정:
       // 1. 읽는 중인 도서 (0 < pages_read < total_pages 이며 미완료인 것)

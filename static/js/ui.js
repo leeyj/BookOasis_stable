@@ -3,6 +3,7 @@ import { state } from './state.js';
 import { openBookDetail } from './modal.js';
 import { openReader } from './viewer.js';
 import { showToast } from './view_manager.js';
+import { buildFallbackCoverUrl, getBookCoverSrc } from './cover_fallback.js';
 
 // 지연 로딩을 위한 단일 싱글톤 IntersectionObserver 인스턴스
 const lazyImageObserver = ('IntersectionObserver' in window)
@@ -44,6 +45,55 @@ function normalizeBookTitle(item) {
   return title;
 }
 
+function resolveCardDisplayTitle(item, showVolumeCount) {
+  const normalizedTitle = normalizeBookTitle(item);
+  if (!showVolumeCount) {
+    return normalizedTitle;
+  }
+
+  const bookCount = parseInt(item.book_count, 10) || 0;
+  const representativeTitle = String(item.representative_title || '').trim();
+  const seriesName = String(item.series_name || '').trim();
+  const authorName = String(item.author || '').trim();
+  const normalizedSeries = seriesName.toLowerCase();
+  const normalizedAuthor = authorName.toLowerCase();
+  const isAuthorOnlySeries = !!(normalizedSeries && normalizedAuthor && normalizedSeries === normalizedAuthor);
+
+  const toSeriesLikeTitle = (rawTitle) => {
+    let text = String(rawTitle || '').trim();
+    if (!text) return '';
+    if (seriesName) {
+      const escapedSeries = seriesName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      text = text.replace(new RegExp(`^\\[\\s*${escapedSeries}\\s*\\]\\s*`, 'i'), '').trim();
+    }
+    const trimmed = text
+      .replace(/\s*[-:|]\s*\d+\s*(권|화|부|편)$/i, '')
+      .replace(/\s+제?\d+\s*(권|화|부|편)$/i, '')
+      .replace(/\s+\d+\s*(권|화|부|편)$/i, '')
+      .trim();
+    return trimmed || text;
+  };
+
+  if (bookCount === 1 && representativeTitle) {
+    return representativeTitle;
+  }
+
+  if (bookCount > 1 && representativeTitle && (isAuthorOnlySeries || !seriesName || seriesName === '기타 단행본')) {
+    return toSeriesLikeTitle(representativeTitle);
+  }
+
+  if (bookCount > 1 && representativeTitle && seriesName) {
+    const escapedSeries = seriesName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const bracketPrefix = new RegExp(`^\\[\\s*${escapedSeries}\\s*\\]\\s*(.+)$`, 'i');
+    const match = representativeTitle.match(bracketPrefix);
+    if (match && match[1] && match[1].trim()) {
+      return toSeriesLikeTitle(match[1].trim());
+    }
+  }
+
+  return seriesName || representativeTitle || normalizedTitle;
+}
+
 
 /**
  * ────────────────────────────────────────────────────────
@@ -64,11 +114,18 @@ export function createBookCard(item, options = {}) {
   card.className = 'book-card';
   card.dataset.bookId = item.id || item.representative_book_id || '';
 
-  const normalizedTitle = normalizeBookTitle(item);
-  const displayTitle = options.showVolumeCount
-    ? (item.series_name || normalizedTitle)
-    : normalizedTitle;
-  const coverSrc = item.cover_image ? `/covers/${item.cover_image}` : '/static/images/default_cover.jpg';
+  const displayTitle = resolveCardDisplayTitle(item, options.showVolumeCount);
+  const fallbackCoverSrc = buildFallbackCoverUrl({
+    title: displayTitle,
+    format: item.file_format,
+    seed: item.id || item.representative_book_id || item.file_path || displayTitle
+  });
+  const coverSrc = getBookCoverSrc({
+    coverImage: item.cover_image,
+    title: displayTitle,
+    format: item.file_format,
+    seed: item.id || item.representative_book_id || item.file_path || displayTitle
+  });
   const useLazyLoad = options.lazyLoad !== false;
   
   // 1. 공통 카드 클릭 핸들러 (아이콘 및 별 클릭 분기)
@@ -115,7 +172,7 @@ export function createBookCard(item, options = {}) {
   card.innerHTML = `
     <div class="book-card-cover">
       <div class="book-card-overlay"></div>
-      <img src="${imgSrc}" ${imgDataSrcAttr} alt="${displayTitle}" onerror="this.onerror=null; this.src='/static/images/default_cover.jpg';">
+      <img src="${imgSrc}" ${imgDataSrcAttr} alt="${displayTitle}">
       ${badgeHtml}
       ${favBtnHtml}
       <button class="btn-resume-series" title="${options.actionTitle || '읽기'}">
@@ -130,6 +187,17 @@ export function createBookCard(item, options = {}) {
 
   // IntersectionObserver 싱글톤 적용
   const imgEl = card.querySelector('img');
+  if (imgEl) {
+    imgEl.onerror = () => {
+      const currentSrc = imgEl.getAttribute('src') || '';
+      if (currentSrc !== fallbackCoverSrc) {
+        imgEl.setAttribute('src', fallbackCoverSrc);
+        return;
+      }
+      imgEl.onerror = null;
+      imgEl.setAttribute('src', '/static/images/default_cover.jpg');
+    };
+  }
   if (imgEl && useLazyLoad) {
     if (imgEl.dataset && imgEl.dataset.src) {
       if (lazyImageObserver) {
@@ -214,7 +282,7 @@ export function renderHistoryGrid(booksList) {
     const card = createBookCard(item, {
       showProgress: true,
       actionTitle: '이어읽기',
-      onPrimaryClick: (e) => openBookDetail(e, item.series_name || normalizedTitle, item.library_id),
+      onPrimaryClick: (e) => openBookDetail(e, item.series_name || normalizedTitle, item.library_id, item.id),
       onActionClick: () => openReader(item.id, item.file_format, normalizedTitle, item.pages_read, item.total_pages)
     });
     fragment.appendChild(card);
@@ -244,13 +312,14 @@ export function appendBooksGrid(seriesList) {
 
   const fragment = document.createDocumentFragment();
   seriesList.forEach(item => {
+    const detailDisplayTitle = resolveCardDisplayTitle(item, true);
     const card = createBookCard(item, {
       showVolumeCount: true,
       actionTitle: '이어읽기',
-      onPrimaryClick: (e) => openBookDetail(e, item.series_name, item.library_id),
+      onPrimaryClick: (e) => openBookDetail(e, item.series_name, item.library_id, item.representative_book_id, detailDisplayTitle),
       onActionClick: (e) => {
         if (typeof window.resumeSeries === 'function') {
-          window.resumeSeries(e, item.series_name, item.library_id);
+          window.resumeSeries(e, item.series_name, item.library_id, item.representative_book_id);
         }
       }
     });
@@ -278,7 +347,7 @@ export function renderDashboardHistory(booksList) {
       showProgress: true,
       lazyLoad: false,
       actionTitle: '이어읽기',
-      onPrimaryClick: (e) => openBookDetail(e, item.series_name || normalizedTitle, item.library_id),
+      onPrimaryClick: (e) => openBookDetail(e, item.series_name || normalizedTitle, item.library_id, item.id),
       onActionClick: () => openReader(item.id, item.file_format, normalizedTitle, item.pages_read, item.total_pages)
     });
     fragment.appendChild(card);
@@ -304,7 +373,7 @@ export function renderDashboardRecentlyAdded(booksList) {
       isNew: true,
       lazyLoad: false,
       actionTitle: '바로읽기',
-      onPrimaryClick: (e) => openBookDetail(e, item.series_name || normalizedTitle, item.library_id),
+      onPrimaryClick: (e) => openBookDetail(e, item.series_name || normalizedTitle, item.library_id, item.id),
       onActionClick: () => openReader(item.id, item.file_format, normalizedTitle, 0, item.total_pages)
     });
     fragment.appendChild(card);

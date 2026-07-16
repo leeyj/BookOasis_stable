@@ -42,3 +42,6 @@ docker-compose.override.yml
 logs/*
 !logs/.gitkeep
 
+# Private operator docs (local only, not published)
+docs/operator_deployment_private.md
+

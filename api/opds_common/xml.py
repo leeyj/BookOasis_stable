@@ -110,9 +110,15 @@ def build_opds_xml(request, title: str, entries: list, start_path: str, search_p
                 f'    <link rel="subsection" href="{escape_xml(href)}" '
                 f'type="application/atom+xml;profile=opds-catalog;kind=navigation"/>'
             )
-            if entry.get('cover'):
+            cover_url = None
+            cover_mime = entry.get('cover_mime')
+            if entry.get('cover_url'):
+                cover_url = f"{base_url}{entry['cover_url']}"
+            elif entry.get('cover'):
                 cover_url = f"{base_url}/covers/{escape_xml(entry['cover'])}"
-                cover_mime = entry.get('cover_mime') or mimetypes.guess_type(entry['cover'])[0] or 'image/png'
+                cover_mime = cover_mime or mimetypes.guess_type(entry['cover'])[0] or 'image/png'
+            if cover_url:
+                cover_mime = cover_mime or 'image/png'
                 lines.append(f'    <link rel="http://opds-spec.org/image" href="{escape_xml(cover_url)}" type="{escape_xml(cover_mime)}"/>')
                 lines.append(f'    <link rel="http://opds-spec.org/image/thumbnail" href="{escape_xml(cover_url)}" type="{escape_xml(cover_mime)}"/>')
         elif entry['type'] == 'acquisition':
@@ -120,9 +126,15 @@ def build_opds_xml(request, title: str, entries: list, start_path: str, search_p
                 f'    <link rel="http://opds-spec.org/acquisition" '
                 f'href="{escape_xml(href)}" type="{escape_xml(entry["mime"])}"/>'
             )
-            if entry.get('cover'):
+            cover_url = None
+            cover_mime = entry.get('cover_mime')
+            if entry.get('cover_url'):
+                cover_url = f"{base_url}{entry['cover_url']}"
+            elif entry.get('cover'):
                 cover_url = f"{base_url}/covers/{escape_xml(entry['cover'])}"
-                cover_mime = entry.get('cover_mime') or mimetypes.guess_type(entry['cover'])[0] or 'image/png'
+                cover_mime = cover_mime or mimetypes.guess_type(entry['cover'])[0] or 'image/png'
+            if cover_url:
+                cover_mime = cover_mime or 'image/png'
                 lines.append(f'    <link rel="http://opds-spec.org/image" href="{escape_xml(cover_url)}" type="{escape_xml(cover_mime)}"/>')
                 lines.append(f'    <link rel="http://opds-spec.org/image/thumbnail" href="{escape_xml(cover_url)}" type="{escape_xml(cover_mime)}"/>')
         lines.append('  </entry>')

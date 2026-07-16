@@ -195,9 +195,11 @@ async function initTabMediaLibrary() {
   if (window.location.hash.startsWith('#detail') && hashParams.series) {
     const restoreSeries = hashParams.series;
     const restoreLibraryId = hashParams.libraryId || 'all';
+    const restoreRepBookId = hashParams.repBookId || null;
+    const restoreDisplayTitle = hashParams.displayTitle || '';
     console.log('[History] 해시 주소 기반 복원 감지 - 상세 뷰 복구:', restoreSeries);
     setTimeout(() => {
-      openBookDetail(null, restoreSeries, restoreLibraryId);
+      openBookDetail(null, restoreSeries, restoreLibraryId, restoreRepBookId, restoreDisplayTitle);
     }, 150);
   }
 
@@ -221,7 +223,7 @@ async function initTabMediaLibrary() {
     
     // 2. 목적지 상태가 상세 뷰(detail)인 경우
     if (event.state && event.state.view === 'detail') {
-      openBookDetail(null, event.state.series, event.state.libraryId);
+      openBookDetail(null, event.state.series, event.state.libraryId, event.state.repBookId || null, event.state.displayTitle || '');
       return;
     }
     

@@ -113,61 +113,22 @@ services:
       - /실제/책/저장/경로:/data/comics:ro
 ```
 
-**③ 서비스 빌드 및 기동**
+**③ 서비스 실행 (GHCR 이미지 기반)**
 ```bash
-# 백그라운드로 도커 컨테이너 빌드 및 실행
-docker compose up -d --build
+# 최초 실행 (로컬 빌드 없이 GHCR 이미지 사용)
+docker compose -f docker-compose.ghcr.yml -f docker-compose.override.yml up -d
+
+# 업데이트 시
+docker compose -f docker-compose.ghcr.yml -f docker-compose.override.yml pull
+docker compose -f docker-compose.ghcr.yml -f docker-compose.override.yml up -d
 ```
-* 컨테이너 내부 포트 `5930`이 호스트의 `5930` 포트로 바인딩됩니다. 호스트 포트를 변경하고 싶다면 `docker-compose.yml` 파일에서 `ports: - "8080:5930"`과 같이 좌측 포트 번호를 수정하십시오.
+* 기본 경로는 GHCR 이미지를 사용하므로 사용자가 직접 Docker 이미지를 빌드할 필요가 없습니다.
+* 컨테이너 내부 포트 `5930`이 호스트의 `5930` 포트로 바인딩됩니다. 호스트 포트를 변경하고 싶다면 `docker-compose.ghcr.yml` 파일에서 `ports: - "8080:5930"`과 같이 좌측 포트 번호를 수정하십시오.
 * 데이터베이스(`db/`), 표지 캐시(`covers/`), 임시 업로드 폴더(`cache/`), 커스텀 플러그인(`plugins/`)이 프로젝트 루트 디렉터리에 영구 보존용 볼륨으로 자동 매핑됩니다.
 * 💡 `plugins/` 볼륨 매핑 덕분에 도커 컨테이너를 다시 빌드할 필요 없이 호스트의 `plugins/metadata/` 폴더에 새 파이썬 파일을 넣기만 하면 외부 메타데이터 플러그인을 즉시 추가할 수 있습니다.
 * 💡 `docker-compose.override.yml`은 `.gitignore`에 등록되어 있으므로 향후 업데이트(`git pull`) 시 사용자의 개인 설정이 충돌하거나 초기화되지 않습니다.
 
-### 3-1) GHCR 기반 업데이트 (운영자)
-
-커뮤니티 사용자는 기본적으로 GHCR 이미지를 통해 업데이트하는 것을 권장합니다.
-
-> 운영 정책: 본 프로젝트의 GHCR 채널은 `stable` 전용입니다. `v*` 릴리스 태그 푸시 시 `stable` 및 버전 태그 이미지가 갱신됩니다.
-
-**① GHCR용 compose 파일 준비**
-`docker-compose.ghcr.yml`의 이미지 소유자를 실제 저장소 소유자로 변경합니다.
-
-```yaml
-services:
-    bookoasis:
-        image: ghcr.io/<github_owner>/bookoasis:stable
-```
-
-**② 최초 실행**
-```bash
-docker compose -f docker-compose.ghcr.yml up -d
-```
-
-**③ 업데이트 적용**
-```bash
-docker compose -f docker-compose.ghcr.yml pull
-docker compose -f docker-compose.ghcr.yml up -d
-```
-
-**④ 버전 고정 업데이트(권장)**
-필요 시 `stable` 대신 `v1.2.3` 같은 버전 태그를 고정해 롤백 가능성을 높일 수 있습니다.
-
-### 3-2) 릴리스 자동 태깅 (운영자)
-
-배포 미러 저장소로 푸시할 때 `export_stable.py`를 사용하면, `VERSION` 파일의 `dashboard` 값을 읽어 `vX.Y.Z` 태그를 자동 생성/푸시할 수 있습니다.
-
-```bash
-# main 푸시 + VERSION 기반 자동 태깅 시도
-python export_stable.py "버전 업데이트"
-
-# 태그 명시 (자동 태깅보다 우선)
-python export_stable.py "v1.2.3 릴리스" --tag v1.2.3
-
-# 자동 태깅 비활성화 (main만 푸시)
-python export_stable.py "핫픽스" --no-auto-tag
-```
-
-태그 형식 권장: `v1.2.3`, `v1.2.3-rc.1`
+> 보안 정책: 운영자 전용 배포/릴리스 자동화 절차는 비공개 내부 문서로 관리합니다.
 
 ---
 

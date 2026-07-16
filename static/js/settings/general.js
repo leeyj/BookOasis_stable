@@ -22,6 +22,9 @@ export function applySettingsToUI(settings) {
   if (settings.TAG_FILTER_SEARCH_SCOPE_ALL !== undefined) {
     state.tagFilterSearchInAll = (settings.TAG_FILTER_SEARCH_SCOPE_ALL === '1');
   }
+  if (settings.SHOW_TXT_NO_COVER_INFO_BANNER !== undefined) {
+    state.showTxtNoCoverInfoBanner = (settings.SHOW_TXT_NO_COVER_INFO_BANNER === '1');
+  }
   if (settings.TTS_ENABLED !== undefined) {
     state.ttsEnabled = (settings.TTS_ENABLED === '1');
   }
@@ -103,6 +106,11 @@ export async function loadGeneralSettings() {
       const tagScopeAllEl = document.getElementById('setting-tag-filter-scope-all');
       if (tagScopeAllEl) {
         tagScopeAllEl.checked = (s.TAG_FILTER_SEARCH_SCOPE_ALL === '1');
+      }
+
+      const txtNoCoverBannerEl = document.getElementById('setting-show-txt-no-cover-info-banner');
+      if (txtNoCoverBannerEl) {
+        txtNoCoverBannerEl.checked = (s.SHOW_TXT_NO_COVER_INFO_BANNER !== '0');
       }
 
       // 프록시 헤더 인증 (SSO) 설정
@@ -240,6 +248,7 @@ export async function submitGeneralSettings(event) {
   const comicDelay = document.getElementById('setting-comic-loading-delay')?.value || '300';
   const hideCompleted = document.getElementById('setting-hide-completed-in-history')?.checked ? '1' : '0';
   const tagFilterScopeAll = document.getElementById('setting-tag-filter-scope-all')?.checked ? '1' : '0';
+  const showTxtNoCoverInfoBanner = document.getElementById('setting-show-txt-no-cover-info-banner')?.checked ? '1' : '0';
   const proxyAuth = document.getElementById('setting-proxy-header-auth')?.value || '0';
   const rcloneRcUrl = document.getElementById('setting-rclone-rc-url')?.value || 'http://localhost:5572';
   const timezone = document.getElementById('setting-timezone')?.value || 'UTC';
@@ -273,6 +282,7 @@ export async function submitGeneralSettings(event) {
       api.updateSystemSetting('PROCESS_RSS_LIMIT', procRss),
       api.updateSystemSetting('HIDE_COMPLETED_IN_HISTORY', hideCompleted),
       api.updateSystemSetting('TAG_FILTER_SEARCH_SCOPE_ALL', tagFilterScopeAll),
+      api.updateSystemSetting('SHOW_TXT_NO_COVER_INFO_BANNER', showTxtNoCoverInfoBanner),
       api.updateSystemSetting('PROXY_HEADER_AUTH', proxyAuth),
       api.updateSystemSetting('RCLONE_RC_URL', rcloneRcUrl),
       api.updateSystemSetting('TTS_ENABLED', ttsEnabled),
@@ -298,6 +308,7 @@ export async function submitGeneralSettings(event) {
         PAGE_LIMIT: pageLimit,
         HIDE_COMPLETED_IN_HISTORY: hideCompleted,
         TAG_FILTER_SEARCH_SCOPE_ALL: tagFilterScopeAll,
+        SHOW_TXT_NO_COVER_INFO_BANNER: showTxtNoCoverInfoBanner,
         TTS_ENABLED: ttsEnabled,
         TTS_WAKE_LOCK: ttsWakeLock
       });

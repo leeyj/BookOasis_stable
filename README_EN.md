@@ -87,7 +87,7 @@ For detailed environment configuration and installation methods, please refer to
    ```
 > **Tip:** Since `docker-compose.override.yml` is listed in `.gitignore`, your local path configuration won't be overwritten or cause conflicts when you pull updates from the remote repository.
 
-> For operator-only deployment/update (GHCR and release tagging), see the [Installation Guide operator section](./docs/guide_installation_en.md#31-ghcr-based-updates-operator).
+> Per security policy, operator-only deployment/update procedures are maintained in private internal documentation.
 
 ### Direct Operation (Native Python)
 

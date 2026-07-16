@@ -211,7 +211,7 @@ class SchedulerService:
             print(f"[Scheduler] Job removal failed: ID={job_id}, Error: {e}")
 
 
-def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
+def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initial_add_scan=False):
     """실제 스케줄에 맞춰 구동될 래핑 헬퍼 함수 (진행 및 내역 상세 로깅 보강)"""
     import database
     from tools.scanner import scan_library
@@ -235,6 +235,15 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
     # DB가 현재 최적화(VACUUM 등) 튜닝 진행 중인 경우, 완료될 때까지 안전하게 대기
     from services.db_tuning_service import is_db_tuning
     import time
+
+    def is_connection_refused_error(err):
+        reason = getattr(err, 'reason', err)
+        if isinstance(reason, ConnectionRefusedError):
+            return True
+        errno = getattr(reason, 'errno', None)
+        if errno in (111, 10061):
+            return True
+        return 'Connection refused' in str(reason)
     
     wait_count = 0
     while is_db_tuning(db_type):
@@ -270,7 +279,7 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
     try:
         conn_chk = database.get_connection(db_type)
         cursor_chk = conn_chk.cursor()
-        cursor_chk.execute("SELECT vfs_refresh_before_scan FROM libraries WHERE id = ?", (library_id,))
+        cursor_chk.execute("SELECT vfs_refresh_before_scan, rclone_rc_url FROM libraries WHERE id = ?", (library_id,))
         row_chk = cursor_chk.fetchone()
         conn_chk.close()
         
@@ -298,17 +307,15 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
             import base64
             
             # RC URL 조회: 라이브러리별 rclone_rc_url 우선 → 전역 RCLONE_RC_URL 폴백 (vfs.py와 동일)
-            rc_urls = ["http://localhost:5572"]
+            rc_urls = []
+            rc_url_source = None
             try:
-                conn_s = database.get_connection(db_type)
-                cursor_s = conn_s.cursor()
-                cursor_s.execute("SELECT vfs_refresh_before_scan, rclone_rc_url FROM libraries WHERE id = ?", (library_id,))
-                row_lib = cursor_s.fetchone()
-                conn_s.close()
-                
+                row_lib = row_chk
+
                 if row_lib and row_lib['rclone_rc_url'] and row_lib['rclone_rc_url'].strip():
                     # 라이브러리별 RC URL 우선 사용
                     rc_urls = [u.strip().rstrip('/') for u in str(row_lib['rclone_rc_url']).split(',') if u.strip()]
+                    rc_url_source = 'library'
                 else:
                     # 전역 설정 폴백
                     conn_g = None
@@ -319,6 +326,7 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
                         row_g = cursor_g.fetchone()
                         if row_g and row_g['value']:
                             rc_urls = [u.strip().rstrip('/') for u in str(row_g['value']).split(',') if u.strip()]
+                            rc_url_source = 'global'
                     except Exception:
                         pass
                     finally:
@@ -330,6 +338,15 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
             except Exception:
                 pass
 
+            if not rc_urls:
+                if initial_add_scan:
+                    print(f"[Scanner-Trigger] Initial add scan has no configured RC URL. Skipping VFS refresh for library {library_id}.")
+                    write_scan_log("초기 자동 스캔: 설정된 Rclone RC 주소가 없어 VFS 사전 새로고침을 건너뜁니다.")
+                    vfs_refreshed_in_wrapper = False
+                else:
+                    rc_urls = ["http://localhost:5572"]
+                    rc_url_source = 'default'
+
             # 중복 RC URL 제거 (순서 보존)
             rc_urls = list(dict.fromkeys(rc_urls))
             
@@ -339,6 +356,9 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
                 remote_paths = list(dict.fromkeys([p for p in target_paths if is_remote_path(p)]))
                 
                 for r_path in remote_paths:
+                    if not rc_urls:
+                        break
+
                     # 중간에 스캔 취소가 요청되었는지 확인
                     try:
                         conn_chk = database.get_connection(db_type)
@@ -381,28 +401,51 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False):
                                 data=req_data,
                                 headers=headers
                             )
-                            try:
-                                with urllib.request.urlopen(req, timeout=1200) as resp:
-                                    res_text = resp.read().decode('utf-8')
-                                    print(f"[Scanner-Trigger] VFS update result (server={clean_rc_url}, path={rel_path}): {res_text}")
-                                    write_scan_log(f"VFS 갱신 완료 (server={clean_rc_url}, path={rel_path}): {res_text}")
-                                    refreshed = True
+                            for attempt in range(1, 4):
+                                try:
+                                    with urllib.request.urlopen(req, timeout=1200) as resp:
+                                        res_text = resp.read().decode('utf-8')
+                                        print(f"[Scanner-Trigger] VFS update result (server={clean_rc_url}, path={rel_path}): {res_text}")
+                                        write_scan_log(f"VFS 갱신 완료 (server={clean_rc_url}, path={rel_path}): {res_text}")
+                                        refreshed = True
+                                        break
+                                except urllib.error.HTTPError as http_ex:
+                                    err_body = http_ex.read().decode('utf-8') if hasattr(http_ex, 'read') else str(http_ex)
+                                    print(f"[Scanner-Trigger ERROR] VFS update request failed ({rel_path}): {http_ex.code} - {err_body}")
+                                    write_scan_log(f"VFS update request failed ({rel_path}): {http_ex.code} - {err_body}")
                                     break
-                            except urllib.error.HTTPError as http_ex:
-                                err_body = http_ex.read().decode('utf-8') if hasattr(http_ex, 'read') else str(http_ex)
-                                print(f"[Scanner-Trigger ERROR] VFS update request failed ({rel_path}): {http_ex.code} - {err_body}")
-                                write_scan_log(f"VFS update request failed ({rel_path}): {http_ex.code} - {err_body}")
-                            except Exception as http_ex:
-                                # 로그에 인증 정보 노출 방지
-                                safe_url = rc_url
-                                if '@' in rc_url:
-                                    try:
-                                        p = urllib.parse.urlparse(rc_url)
-                                        safe_url = f"{p.scheme}://****:****@{p.netloc.split('@')[-1]}"
-                                    except Exception:
-                                        safe_url = "[Protected URL]"
-                                print(f"[Scanner-Trigger ERROR] VFS update request failed ({rel_path}): Server='{safe_url}', Error={http_ex}")
-                                write_scan_log(f"VFS update request failed ({rel_path}): {http_ex}")
+                                except urllib.error.URLError as http_ex:
+                                    if attempt < 3 and is_connection_refused_error(http_ex):
+                                        print(f"[Scanner-Trigger WARNING] VFS RC server not ready yet (source={rc_url_source}, server={clean_rc_url}, path={rel_path}, attempt={attempt}/3). Retrying shortly.")
+                                        write_scan_log(f"VFS RC 서버 연결 거부로 재시도합니다 (server={clean_rc_url}, path={rel_path}, attempt={attempt}/3)")
+                                        time.sleep(2.0)
+                                        continue
+                                    # 로그에 인증 정보 노출 방지
+                                    safe_url = rc_url
+                                    if '@' in rc_url:
+                                        try:
+                                            p = urllib.parse.urlparse(rc_url)
+                                            safe_url = f"{p.scheme}://****:****@{p.netloc.split('@')[-1]}"
+                                        except Exception:
+                                            safe_url = "[Protected URL]"
+                                    print(f"[Scanner-Trigger ERROR] VFS update request failed ({rel_path}): Server='{safe_url}', Error={http_ex}")
+                                    write_scan_log(f"VFS update request failed ({rel_path}): {http_ex}")
+                                    break
+                                except Exception as http_ex:
+                                    # 로그에 인증 정보 노출 방지
+                                    safe_url = rc_url
+                                    if '@' in rc_url:
+                                        try:
+                                            p = urllib.parse.urlparse(rc_url)
+                                            safe_url = f"{p.scheme}://****:****@{p.netloc.split('@')[-1]}"
+                                        except Exception:
+                                            safe_url = "[Protected URL]"
+                                    print(f"[Scanner-Trigger ERROR] VFS update request failed ({rel_path}): Server='{safe_url}', Error={http_ex}")
+                                    write_scan_log(f"VFS update request failed ({rel_path}): {http_ex}")
+                                    break
+
+                            if refreshed:
+                                break
                         except Exception as e_rc:
                             print(f"[Scanner-Trigger ERROR] VFS RC URL processing error: {e_rc}")
                             write_scan_log(f"VFS RC URL 처리 오류: {e_rc}")

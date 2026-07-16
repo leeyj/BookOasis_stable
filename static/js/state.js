@@ -25,7 +25,10 @@ export const state = {
   systemSettings: {},
   hideCompletedInHistory: false,
   tagFilterSearchInAll: false,
+  showTxtNoCoverInfoBanner: true,
   detailLibraryId: null,
+  detailRepresentativeBookId: null,
+  detailDisplayTitle: '',
   
   // 로그인 사용자 세션 정보
   currentUser: {

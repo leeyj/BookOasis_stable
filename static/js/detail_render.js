@@ -1,4 +1,6 @@
 // detail_render.js – 도서 상세 화면의 HTML 템플릿 생성기
+import { buildFallbackCoverUrl, getBookCoverSrc } from './cover_fallback.js';
+import { state } from './state.js';
 
 function normalizeMetadataToken(token) {
   if (!token) return '';
@@ -8,11 +10,48 @@ function normalizeMetadataToken(token) {
     .trim();
 }
 
-export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId) {
+export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId, displayTitle = '') {
+  let visibleTitle = String(displayTitle || '').trim() || safeSeriesName;
+
+  const toSeriesLikeTitle = (rawTitle) => {
+    let text = String(rawTitle || '').trim();
+    if (!text) return '';
+    if (safeSeriesName) {
+      const escapedSeries = safeSeriesName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      text = text.replace(new RegExp(`^\\[\\s*${escapedSeries}\\s*\\]\\s*`, 'i'), '').trim();
+    }
+    const trimmed = text
+      .replace(/\s*[-:|]\s*\d+\s*(권|화|부|편)$/i, '')
+      .replace(/\s+제?\d+\s*(권|화|부|편)$/i, '')
+      .replace(/\s+\d+\s*(권|화|부|편)$/i, '')
+      .trim();
+    return trimmed || text;
+  };
+
+  if ((!displayTitle || !String(displayTitle).trim()) && books && books.length > 0 && safeSeriesName) {
+    const firstTitle = String(books[0].title || '').trim();
+    if (firstTitle) {
+      const escapedSeries = safeSeriesName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const bracketPrefix = new RegExp(`^\\[\\s*${escapedSeries}\\s*\\]\\s*(.+)$`, 'i');
+      const match = firstTitle.match(bracketPrefix);
+      if (match && match[1] && match[1].trim()) {
+        visibleTitle = toSeriesLikeTitle(match[1].trim());
+      }
+    }
+  }
   const firstBookId = books.length > 0 ? books[0].id : null;
-  const coverSrc = meta.cover_image
-    ? `/covers/${meta.cover_image}`
-    : '/static/images/default_cover.jpg';
+  const headerFormat = books.length > 0 ? books[0].file_format : 'text';
+  const headerFallbackCoverSrc = buildFallbackCoverUrl({
+    title: visibleTitle,
+    format: headerFormat,
+    seed: `${actualLibraryId}:${safeSeriesName}`
+  });
+  const coverSrc = getBookCoverSrc({
+    coverImage: meta.cover_image,
+    title: visibleTitle,
+    format: headerFormat,
+    seed: `${actualLibraryId}:${safeSeriesName}`
+  });
   const stars = '★'.repeat(Math.round(meta.score / 20)) + '☆'.repeat(5 - Math.round(meta.score / 20));
   const linkHtml = meta.link
     ? `<a href="${meta.link}" target="_blank" class="ridi-link-btn">${i18n.t('detail.ridi_link')}</a>`
@@ -140,8 +179,8 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId)
            ondragover="event.preventDefault(); this.style.borderColor='#a855f7';" 
            ondragleave="this.style.borderColor='rgba(255,255,255,0.08)';" 
            ondrop="handleCoverDrop(event); this.style.borderColor='rgba(255,255,255,0.08)';">
-        <img class="detail-cover-sm" id="detail-cover-img-preview" src="${coverSrc}" alt="Cover"
-             onerror="this.onerror=null; this.src='/static/images/default_cover.jpg';">
+           <img class="detail-cover-sm" id="detail-cover-img-preview" src="${coverSrc}" alt="Cover"
+             onerror="if(this.src.indexOf('/covers/fallback')===-1){this.src='${headerFallbackCoverSrc}';}else{this.onerror=null; this.src='/static/images/default_cover.jpg';}">
         <div class="cover-upload-overlay" id="cover-upload-overlay-btn" onclick="triggerCoverUpload(event)">
           <i class="fa-solid fa-camera"></i>
           <span>${i18n.t('detail.change_cover')}</span>
@@ -152,7 +191,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId)
       <!-- 뷰어 모드 (일반 노출) -->
       <div id="detail-header-meta-view" class="detail-header-meta">
         <h3 class="book-detail-title" style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
-          ${safeSeriesName}
+          ${visibleTitle}
           <button class="btn-fav-toggle" onclick="toggleSeriesFavorite(event, '${safeSeriesName.replace(/'/g, "\\'")}', ${isSeriesFav ? 1 : 0}, '${actualLibraryId}')" style="background:none; border:none; color:${seriesFavIconColor}; cursor:pointer; font-size:1.4rem; display:inline-flex; align-items:center;" title="${i18n.t('detail.toggle_fav_series')}">
             <i class="${seriesFavIconClass}"></i>
           </button>
@@ -161,7 +200,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId)
           </button>
         </h3>
         <div class="detail-meta">
-          <span class="badge">${safeSeriesName}</span>
+          <span class="badge">${visibleTitle}</span>
           <span class="meta-item"><i class="fa-solid fa-pen-nib"></i> ${meta.author || '-'}</span>
           <span class="meta-item"><i class="fa-solid fa-building"></i> ${meta.publisher || '-'}</span>
           <span class="meta-item"><i class="fa-solid fa-book-open"></i> ${books.length}권</span>
@@ -252,9 +291,17 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId) {
     const readBtnText = b.pages_read > 0
       ? `<i class="fa-solid fa-play"></i> ${i18n.t('detail.btn_resume')}`
       : `<i class="fa-solid fa-play"></i> ${i18n.t('detail.btn_start')}`;
-    const volCoverSrc = b.cover_image
-      ? `/covers/${b.cover_image}`
-      : '/static/images/default_cover.jpg';
+    const volumeFallbackCoverSrc = buildFallbackCoverUrl({
+      title: displayTitle,
+      format: b.file_format,
+      seed: b.id || b.file_path || `${safeSeriesName}:${displayTitle}`
+    });
+    const volCoverSrc = getBookCoverSrc({
+      coverImage: b.cover_image,
+      title: displayTitle,
+      format: b.file_format,
+      seed: b.id || b.file_path || `${safeSeriesName}:${displayTitle}`
+    });
     const isCompleted = b.is_completed
       ? `<span class="vol-badge-completed">${i18n.t('detail.badge_completed')}</span>`
       : '';
@@ -269,6 +316,7 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId) {
     `;
 
     const noCover = !b.cover_image;
+    const isTextFormat = ['txt', 'text'].includes((b.file_format || '').toLowerCase());
     const isZipFormat = ['zip', 'cbz'].includes((b.file_format || '').toLowerCase());
     
     // 원격 경로 여부 판단 (gdrive, rclone, vfs, google_drive, onedrive, sharepoint, nas_share, webdav 등)
@@ -278,10 +326,12 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId) {
     
     // 원격 파일은 백그라운드 오프셋 조회를 하지 않으므로 warn_no_offset 경고창 노출 대상에서 제외합니다.
     const noOffsets = isZipFormat && !isRemoteFile && (b.total_pages === 0 || b.has_offsets === 0);
-    const needsWarn = noCover || noOffsets;
+    const noCoverWarn = noCover && !isTextFormat;
+    const noCoverInfo = noCover && isTextFormat;
+    const needsWarn = noCoverWarn || noOffsets;
 
     let warnTexts = [];
-    if (noCover) warnTexts.push(i18n.t('detail.warn_no_cover'));
+    if (noCoverWarn) warnTexts.push(i18n.t('detail.warn_no_cover'));
     if (noOffsets) warnTexts.push(i18n.t('detail.warn_no_offset'));
     const warnBannerHtml = needsWarn ? `
       <div class="vol-warn-banner">
@@ -293,12 +343,20 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId) {
       </div>
     ` : '';
 
+    const infoBannerHtml = (noCoverInfo && state.showTxtNoCoverInfoBanner !== false) ? `
+      <div class="vol-warn-banner" style="border-color: rgba(59, 130, 246, 0.35); background: rgba(30, 58, 138, 0.22); color: #93c5fd;">
+        <i class="fa-solid fa-circle-info"></i>
+        <span>기본 커버 사용 중 (TXT)</span>
+      </div>
+    ` : '';
+
     volumesHtml += `
       <div class="volume-card" data-book-id="${b.id}" data-page-missing="${noOffsets ? 1 : 0}" oncontextmenu="event.preventDefault(); event.stopPropagation(); if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(event.clientX, event.clientY, ${b.id}, '${(b.title || '').replace(/'/g, "\\'")}', true);" ontouchstart="window.handleLongPressTouchStart(event, (x, y) => { if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(x, y, ${b.id}, '${(b.title || '').replace(/'/g, "\\\\'")}', true); })" ontouchmove="window.handleLongPressTouchMove(event)" ontouchend="window.handleLongPressTouchEnd(event)" ontouchcancel="window.handleLongPressTouchEnd(event)">
         <img class="volume-thumb" src="${volCoverSrc}" alt="cover"
-             onerror="this.onerror=null; this.src='/static/images/default_cover.jpg';">
+             onerror="if(this.src.indexOf('/covers/fallback')===-1){this.src='${volumeFallbackCoverSrc}';}else{this.onerror=null; this.src='/static/images/default_cover.jpg';}">
         <div class="volume-info">
           ${warnBannerHtml}
+          ${infoBannerHtml}
           <div class="volume-title-row" style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
             <span class="volume-title">${displayTitle}</span>
             ${isCompleted}

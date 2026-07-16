@@ -88,10 +88,17 @@ def get_media_detail():
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
     series_name = request.args.get('series', '')
     library_id  = request.args.get('library_id', 'all')
+    representative_book_id = request.args.get('representative_book_id')
     user_id     = session.get('user_id', 1)
 
     try:
-        meta, books_list = BookDetailService.get_media_detail(db_type, series_name, library_id, user_id=user_id)
+        meta, books_list = BookDetailService.get_media_detail(
+            db_type,
+            series_name,
+            library_id,
+            user_id=user_id,
+            representative_book_id=representative_book_id
+        )
         return jsonify({'success': True, 'meta': meta, 'books': books_list})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

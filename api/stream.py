@@ -5,6 +5,7 @@ stream.py – 만화/TXT/PDF 스트리밍 및 커버 이미지 서빙 라우터 
 import os
 import re
 import mimetypes
+import urllib.parse
 from flask import Blueprint, request, Response, jsonify, send_file, session
 from services.stream_service import StreamService
 from api.auth import login_required, check_adult_permission, admin_required
@@ -15,6 +16,78 @@ stream_bp = Blueprint('media_stream', __name__)
 
 BASE_DIR  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 COVERS_DIR = os.path.join(BASE_DIR, 'covers')
+
+
+def _hash_string(value):
+    text = str(value or '')
+    h = 2166136261
+    for ch in text:
+        h ^= ord(ch)
+        h = (h * 16777619) & 0xFFFFFFFF
+    return h
+
+
+def _escape_xml(value):
+    return str(value or '').replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;').replace("'", '&apos;')
+
+
+def _split_title_lines(title, max_chars=9, max_lines=3):
+    chars = list(str(title or '').strip() or 'Untitled')
+    lines = []
+    idx = 0
+    while idx < len(chars) and len(lines) < max_lines:
+        lines.append(''.join(chars[idx:idx + max_chars]))
+        idx += max_chars
+    if idx < len(chars) and lines:
+        last = lines[-1]
+        lines[-1] = f"{last[:-1]}…" if len(last) > 1 else '…'
+    return lines
+
+
+def _format_cover_label(file_format):
+    key = str(file_format or 'text').lower()
+    if key in ('zip', 'cbz'):
+        return 'COMIC'
+    if key == 'imgdir':
+        return 'IMG'
+    if key == 'epub':
+        return 'EPUB'
+    if key == 'pdf':
+        return 'PDF'
+    if key == 'audiobook':
+        return 'AUDIO'
+    return 'TEXT'
+
+
+def _build_fallback_svg(title, file_format='text', seed=''):
+    themes = [
+        ('#13253a', '#0b1828', '#79c2ff', '#a7dcff', '#82d9b1'),
+        ('#2b1f3a', '#15142a', '#b79bff', '#cab9ff', '#ffd06e'),
+        ('#3a231e', '#1f1516', '#ffaf8f', '#ffc5ab', '#ffd66e'),
+        ('#1b2f3a', '#101924', '#8dd3ff', '#b7e6ff', '#f8d878'),
+        ('#3a311d', '#1f1a12', '#dfc37e', '#f1dcab', '#8cd0ff'),
+        ('#22263a', '#121625', '#9ea8ff', '#c0c7ff', '#a4e3b0'),
+    ]
+    ref = seed or title or 'Untitled'
+    h = _hash_string(ref)
+    bg_start, bg_end, border, line, accent = themes[h % len(themes)]
+    lines = _split_title_lines(title)
+    y_start = 250 if len(lines) == 1 else 222 if len(lines) == 2 else 202
+    line_gap = 48
+    lines_svg = ''.join(
+        f'<text x="210" y="{y_start + i * line_gap}" text-anchor="middle" fill="#f8fafc" font-family="Noto Sans KR, Pretendard, sans-serif" font-size="42" font-weight="700">{_escape_xml(line)}</text>'
+        for i, line in enumerate(lines)
+    )
+    label = _format_cover_label(file_format)
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="420" height="600" viewBox="0 0 420 600" role="img" aria-label="{_escape_xml(title)}">
+  <defs><linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="{bg_start}" /><stop offset="100%" stop-color="{bg_end}" /></linearGradient></defs>
+  <rect width="420" height="600" rx="20" fill="url(#bg)" />
+  <polygon points="366,0 420,0 420,54" fill="{accent}" opacity="0.9" />
+  <rect x="28" y="22" width="364" height="556" rx="14" fill="none" stroke="{border}" stroke-width="3.2" opacity="0.95" />
+  <rect x="48" y="52" width="324" height="4" rx="2" fill="{line}" opacity="0.92" />
+  {lines_svg}
+  <text x="210" y="500" text-anchor="middle" fill="#dbe3ea" font-family="monospace" font-size="28" letter-spacing="4" opacity="0.88">{label}</text>
+</svg>'''
 
 @stream_bp.route('/api/media/stream', methods=['GET'])
 @login_required
@@ -212,6 +285,21 @@ def get_cover_image(filename):
             return _send_cover(path_fallback)
         return jsonify({'error': _t('api.err_cover_not_found')}), 404
     return _send_cover(path)
+
+
+@stream_bp.route('/covers/fallback', methods=['GET'])
+def get_fallback_cover_image():
+    """커버 누락 시 제목 기반 SVG 커버를 동적으로 생성하여 반환"""
+    title = (request.args.get('title') or 'Untitled').strip()
+    file_format = (request.args.get('format') or 'text').strip()
+    seed = (request.args.get('seed') or '').strip()
+
+    svg = _build_fallback_svg(title, file_format, seed)
+    res = Response(svg, mimetype='image/svg+xml')
+    # 제목/포맷 기반 생성 이미지이므로 강한 캐시 허용
+    res.headers['Cache-Control'] = 'public, max-age=86400'
+    res.set_etag(str(_hash_string(f"{title}|{file_format}|{seed}")))
+    return res
 
 @stream_bp.route('/api/media/cache/stats', methods=['GET'])
 @admin_required

@@ -1,6 +1,7 @@
 // metadata_search.js – 통합 도서 메타데이터 검색 및 선택 적용 모듈
 import { state } from './state.js';
 import * as api from './api.js';
+import { buildFallbackCoverUrl } from './cover_fallback.js';
 
 let currentTargetBookId = null;
 let currentSeriesName = null;
@@ -124,11 +125,17 @@ function renderMetadataResults(books, source) {
     const safeAuthor = escapeHtml(book.author || '');
     const safePublisher = escapeHtml(book.publisher || '');
     const safePubDate = escapeHtml(book.pubDate || '');
+    const fallbackCoverSrc = buildFallbackCoverUrl({
+      title: book.title || currentSeriesName || 'Untitled',
+      format: 'text',
+      seed: `${source || 'meta'}:${book.title || ''}:${book.author || ''}`
+    });
+    const coverSrc = escapeHtml(book.cover || fallbackCoverSrc);
     
     html += `
       <div class="metadata-result-card" style="display: flex; gap: 1rem; background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 1rem; cursor: pointer; transition: all 0.2s;" data-index="${idx}">
         <div style="flex-shrink: 0; width: 80px; height: 110px; background: rgba(15, 23, 42, 0.5); border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
-          <img src="${escapeHtml(book.cover || '/static/images/default_cover.jpg')}" alt="Cover" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='/static/images/default_cover.jpg'">
+          <img src="${coverSrc}" alt="Cover" style="width: 100%; height: 100%; object-fit: cover;" onerror="if(this.src.indexOf('/covers/fallback')===-1){this.src='${fallbackCoverSrc}';}else{this.onerror=null; this.src='/static/images/default_cover.jpg';}">
         </div>
         <div style="flex: 1; display: flex; flex-direction: column; gap: 0.3rem;">
           <h4 style="margin: 0; color: #fff; font-size: 0.95rem; font-weight: 700;">${safeTitle}</h4>

@@ -23,8 +23,12 @@ export async function fetchReadingHistory(type) {
   return res.json();
 }
 
-export async function fetchMediaDetail(type, libraryId, series) {
-  const res = await fetch(`/api/media/detail?type=${type}&library_id=${libraryId}&series=${encodeURIComponent(series)}`);
+export async function fetchMediaDetail(type, libraryId, series, representativeBookId = null) {
+  let url = `/api/media/detail?type=${type}&library_id=${libraryId}&series=${encodeURIComponent(series)}`;
+  if (representativeBookId) {
+    url += `&representative_book_id=${encodeURIComponent(representativeBookId)}`;
+  }
+  const res = await fetch(url);
   return res.json();
 }
 

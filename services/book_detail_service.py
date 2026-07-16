@@ -6,10 +6,35 @@ from utils.cover_helper import get_cover_image_with_t, resolve_series_cover
 
 class BookDetailService:
     @staticmethod
-    def get_media_detail(db_type, series_name, library_id='all', user_id=1, restrict_same_directory=True):
+    def get_media_detail(db_type, series_name, library_id='all', user_id=1, restrict_same_directory=True, representative_book_id=None):
         conn = database.get_connection(db_type)
         conn.row_factory = database.sqlite3.Row
         cursor = conn.cursor()
+
+        def _comparison_dir(path, file_format):
+            normalized = (path or '').replace('\\', '/')
+            if not normalized:
+                return ''
+            if str(file_format or '').lower() == 'imgdir' and normalized.endswith('/__folder__.imgdir'):
+                return os.path.dirname(os.path.dirname(path))
+            return os.path.dirname(path)
+
+        anchor_dir = None
+
+        if representative_book_id:
+            try:
+                rep_id_int = int(representative_book_id)
+                cursor.execute(
+                    "SELECT id, series_name, library_id, file_path, file_format FROM books WHERE id = ? AND COALESCE(is_deleted, 0) = 0",
+                    (rep_id_int,)
+                )
+                rep_row = cursor.fetchone()
+                if rep_row:
+                    series_name = rep_row['series_name'] or series_name
+                    library_id = rep_row['library_id'] if rep_row['library_id'] is not None else library_id
+                    anchor_dir = _comparison_dir(rep_row['file_path'], rep_row['file_format'])
+            except (ValueError, TypeError):
+                pass
 
         # 만약 library_id가 시스템 성격(all, history, favorite, home)이거나 없을 때
         # series_name이 중복 등록된 경우를 대비하여 해당 시리즈의 실제 library_id를 역추출합니다.
@@ -146,16 +171,14 @@ class BookDetailService:
         
         # 부모 디렉토리 기반 단행본 격리 필터 (필요 시 비활성화 가능)
         if restrict_same_directory and books_list:
-            first_file_path = books_list[0]['file_path']
-            if first_file_path:
-                def get_comparison_dir(path):
-                    normalized = (path or '').replace('\\', '/')
-                    if normalized.endswith('/__folder__.imgdir'):
-                        return os.path.dirname(os.path.dirname(path))
-                    return os.path.dirname(path)
-
-                target_dir = get_comparison_dir(first_file_path)
-                books_list = [bk for bk in books_list if bk['file_path'] and get_comparison_dir(bk['file_path']) == target_dir]
+            target_dir = anchor_dir
+            if not target_dir:
+                target_dir = _comparison_dir(books_list[0]['file_path'], books_list[0]['file_format'])
+            if target_dir:
+                books_list = [
+                    bk for bk in books_list
+                    if bk['file_path'] and _comparison_dir(bk['file_path'], bk['file_format']) == target_dir
+                ]
                 
         books_list.sort(key=lambda x: natural_sort_key(x['title']))
         return meta, books_list

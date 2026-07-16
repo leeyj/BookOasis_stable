@@ -5,11 +5,12 @@ import { switchActiveView } from './view_manager.js';
 import { renderDetailHeader, renderVolumesList, renderRecommendList } from './detail_render.js';
 
 // 그리드 뷰 → 상세 뷰 전환
-export async function openBookDetail(event, seriesName, libraryId) {
+export async function openBookDetail(event, seriesName, libraryId, representativeBookId = null, displayTitle = '') {
   const detailView = document.getElementById('book-detail-view');
   if (!detailView) return;
 
   const safeSeriesName = seriesName || '';
+  const safeDisplayTitle = String(displayTitle || '').trim() || safeSeriesName;
   // 전달된 libraryId가 없으면 현재 상태값을 사용하되, 대시보드 시스템성 값이면 'all'로 대체 처리
   const activeLibId = libraryId || state.currentLibraryId || 'all';
 
@@ -32,16 +33,18 @@ export async function openBookDetail(event, seriesName, libraryId) {
   switchActiveView('detail');
 
   try {
-    const data = await api.fetchMediaDetail(state.currentLibraryType, activeLibId, safeSeriesName);
+    const data = await api.fetchMediaDetail(state.currentLibraryType, activeLibId, safeSeriesName, representativeBookId);
 
     if (data.success) {
       const meta = data.meta;
       const books = data.books || [];
       const actualLibraryId = (books.length > 0 && books[0].library_id) ? books[0].library_id : activeLibId;
       state.detailLibraryId = actualLibraryId;
+      state.detailRepresentativeBookId = representativeBookId || (books.length > 0 ? books[0].id : null);
+      state.detailDisplayTitle = safeDisplayTitle;
 
       // 컴포넌트 렌더러 모듈 호출
-      const headerHtml = renderDetailHeader(meta, books, safeSeriesName, actualLibraryId);
+      const headerHtml = renderDetailHeader(meta, books, safeSeriesName, actualLibraryId, safeDisplayTitle);
       const volumesSectionHtml = renderVolumesList(books, safeSeriesName, actualLibraryId);
 
       detailView.innerHTML = `
@@ -83,7 +86,7 @@ export async function openBookDetail(event, seriesName, libraryId) {
                     const copyRes = await api.copyMetadata(formData);
                     if (copyRes.success) {
                       alert(copyRes.message);
-                      openBookDetail(null, safeSeriesName, actualLibraryId);
+                      openBookDetail(null, safeSeriesName, actualLibraryId, state.detailRepresentativeBookId, state.detailDisplayTitle);
                     } else {
                       alert(i18n.t('modal.apply_fail', {error: copyRes.error}));
                       e.target.disabled = false;
@@ -123,11 +126,13 @@ export async function openBookDetail(event, seriesName, libraryId) {
       }
 
       // 히스토리 해시가 #detail이 아닌 경우 상태 푸시, 이미 #detail인데 상태가 유실된 경우 상태 보정 (URL에 상세 정보 쿼리파라미터 포함)
-      const detailHash = `#detail?series=${encodeURIComponent(safeSeriesName)}&libraryId=${actualLibraryId}`;
+      const repIdForHistory = state.detailRepresentativeBookId || '';
+      const displayTitleForHistory = state.detailDisplayTitle || '';
+      const detailHash = `#detail?series=${encodeURIComponent(safeSeriesName)}&libraryId=${actualLibraryId}${repIdForHistory ? `&repBookId=${encodeURIComponent(repIdForHistory)}` : ''}${displayTitleForHistory ? `&displayTitle=${encodeURIComponent(displayTitleForHistory)}` : ''}`;
       if (!window.location.hash.startsWith('#detail')) {
-        history.pushState({ view: 'detail', series: safeSeriesName, libraryId: actualLibraryId }, '', detailHash);
+        history.pushState({ view: 'detail', series: safeSeriesName, libraryId: actualLibraryId, repBookId: repIdForHistory || null, displayTitle: displayTitleForHistory || null }, '', detailHash);
       } else {
-        history.replaceState({ view: 'detail', series: safeSeriesName, libraryId: actualLibraryId }, '', detailHash);
+        history.replaceState({ view: 'detail', series: safeSeriesName, libraryId: actualLibraryId, repBookId: repIdForHistory || null, displayTitle: displayTitleForHistory || null }, '', detailHash);
       }
 
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -186,7 +191,7 @@ window.toggleBookFavorite = async (event, bookId, nextStatus, seriesName, librar
     if (typeof window.showToast === 'function') {
       window.showToast(i18n.t('modal.fav_status', {statusText: statusText}), 'success');
     }
-    openBookDetail(null, seriesName, libraryId);
+    openBookDetail(null, seriesName, libraryId, state.detailRepresentativeBookId, state.detailDisplayTitle);
   } else {
     if (typeof window.showToast === 'function') {
       window.showToast(i18n.t('modal.fav_fail'), 'error');
@@ -199,7 +204,12 @@ window.toggleBookFavorite = async (event, bookId, nextStatus, seriesName, librar
 window.toggleSeriesFavorite = async (event, seriesName, currentStatus, libraryId) => {
   if (event) event.stopPropagation();
   try {
-    const data = await api.fetchMediaDetail(state.currentLibraryType, libraryId || state.currentLibraryId, seriesName);
+    const data = await api.fetchMediaDetail(
+      state.currentLibraryType,
+      libraryId || state.currentLibraryId,
+      seriesName,
+      state.detailRepresentativeBookId
+    );
     if (data.success && data.books && data.books.length > 0) {
       const nextStatus = currentStatus === 1 ? 0 : 1;
       const promises = data.books.map(b => window.toggleFavoriteAction(b.id, nextStatus));
@@ -208,7 +218,7 @@ window.toggleSeriesFavorite = async (event, seriesName, currentStatus, libraryId
       if (typeof window.showToast === 'function') {
         window.showToast(i18n.t('modal.series_fav_status', {seriesName: seriesName, statusText: statusText}), 'success');
       }
-      openBookDetail(null, seriesName, libraryId);
+      openBookDetail(null, seriesName, libraryId, state.detailRepresentativeBookId, state.detailDisplayTitle);
     }
   } catch (err) {
     console.error('시리즈 즐겨찾기 토글 실패:', err);
@@ -331,7 +341,7 @@ window.saveManualMetadata = async (seriesName) => {
       } else {
         alert(res.message || i18n.t('modal.meta_updated'));
       }
-      openBookDetail(null, seriesName);
+      openBookDetail(null, seriesName, state.detailLibraryId || state.currentLibraryId, state.detailRepresentativeBookId, state.detailDisplayTitle);
     } else {
       alert(i18n.t('modal.update_fail', {error: res.error}));
     }
@@ -368,7 +378,7 @@ window.rescanBook = async (event, bookId, seriesName, libraryId) => {
         window.showToast(i18n.t('modal.scan_done'), 'success');
       }
       // 1초 후 상세 화면 새로고침 (토스트 메시지 표시 시간 확보)
-      setTimeout(() => openBookDetail(null, seriesName, libraryId), 1000);
+      setTimeout(() => openBookDetail(null, seriesName, libraryId, state.detailRepresentativeBookId, state.detailDisplayTitle), 1000);
     } else {
       btn.disabled = false;
       btn.innerHTML = originalHtml;
@@ -426,7 +436,7 @@ window.rescanMissingBooks = async (event, seriesName, libraryId) => {
       if (typeof window.showToast === 'function') {
         window.showToast(i18n.t('modal.scan_done'), 'success');
       }
-      setTimeout(() => openBookDetail(null, seriesName, libraryId), 1000);
+      setTimeout(() => openBookDetail(null, seriesName, libraryId, state.detailRepresentativeBookId, state.detailDisplayTitle), 1000);
     } else {
       btn.disabled = false;
       btn.innerHTML = originalHtml;

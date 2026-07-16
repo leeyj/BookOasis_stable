@@ -162,6 +162,7 @@
     "recent_limit_desc": "사이드바 '최근 읽은 도서' 메뉴에서 보여줄 최대 도서 개수입니다. (기본 30개)",
     "hide_completed_label": "다 읽은 도서는 최근 읽은 도서에서 삭제",
     "tag_filter_scope_all_label": "태그 선택 시 전체 목록에서 조회",
+    "show_txt_no_cover_info_banner_label": "TXT 무커버 안내 배너 표시",
     "sys_mem_label": "스캐너 시스템 여유 메모리 하한 (MB)",
     "sys_mem_desc": "스캐너 동작 중 시스템 전체 가용 메모리가 이 값(MB) 미만으로 떨어지면 스캔 작업을 일시 중단하여 시스템 뻗음을 방지합니다. (기본 1536MB)",
     "proc_rss_label": "스캐너 프로세스 최대 메모리 사용량 (MB)",
@@ -275,14 +276,6 @@
     "btn_apply_meta": "이 정보로 채우기",
     "text_author": "저자: {author}",
     "text_publisher": "출판사: {publisher}"
-  },
-  "filter": {
-    "modal_title": "상세 필터",
-    "reset_all": "필터 전체 초기화",
-    "search_placeholder": "장르 또는 태그 검색...",
-    "tab_genres": "장르",
-    "tab_tags": "태그",
-    "apply_btn": "필터 적용"
   },
   "system": {
     "ticker_title": "시스템 속보",
