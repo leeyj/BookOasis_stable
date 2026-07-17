@@ -1,4 +1,7 @@
 # CHANGELOG
+## v1.0.8
+-추가 안정화 
+
 ## v1.0.7
 - 최신,과거추가순일때 초성바로가기 감춤 | Data_desc,Data_asc sort-> hide quickmatch
 - 카테고리->기본커버로 보이게 하기 추가 | default cover view logic add
