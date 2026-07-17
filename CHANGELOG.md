@@ -1,8 +1,20 @@
 # CHANGELOG
+## v1.0.7
+- 최신,과거추가순일때 초성바로가기 감춤 | Data_desc,Data_asc sort-> hide quickmatch
+- 카테고리->기본커버로 보이게 하기 추가 | default cover view logic add
+- 스케줄 설정 모달에 스케줄 도우미 추가(매일/평일/주말/요일/매월) | Added easy schedule helper in scan settings modal (preset to Cron)
+- 도서 완독 후 중간으로 이동시 버그 수정 | Fixed navigation bug after completing a book read
+- 모바일 뷰어 전체화면 API 연동(지원 환경에서 하단 시스템바 최소화) | Connected viewer fullscreen API to minimize mobile system navigation bar where supported
+- 모바일 뷰어 진입시 자동 전체화면 시도 추가(지원 환경) | Added automatic fullscreen attempt on mobile viewer open where supported
+- viewer.js 입력 계층 분리(키보드/휠/핫스팟/클릭 토글) | Split viewer input layer into input_controller (keyboard/wheel/hotspot/click)
+- viewer.js 시크바/라이프사이클 분리 및 파사드 축소 | Split viewer seekbar/lifecycle into controllers and reduced viewer.js to facade
+- 일부 하드코딩된 텍스트를 언어팩으로 분리 | Moved hardcoded strings to a separate language pack module
+
 ## v1.0.6
 - 대시보드 버전 1.0.6으로 상향 | Bumped dashboard version to 1.0.6
-- OWASP 기준 보안 충족(보안패치) | patch to OWASP guide.
+- OWASP 기준 보안 충족(보안 패치) | patch to OWASP guide.
 - 원격 디렉토리 인식 구조 개선(루트마운트 외 폴더마운트도 지원) | Improved remote directory detection to support both root mounts and subfolder mounts
+- 웹훅 엔드포인트 추가(문서 참조) | add webhook end_point(check md)
 ---
 ## v1.0.5
 - 선택한 카테고리 하이라이트 추가 | Added selected category highlight

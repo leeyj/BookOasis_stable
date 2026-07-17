@@ -444,6 +444,35 @@ window.toggleCardFavoriteEvent = async (event, name, bookId, nextStatus) => {
 let statusIntervalId = null;
 let lastTickerContent = '';
 
+function syncSystemTickerLayout() {
+  const root = document.documentElement;
+  const footer = document.getElementById('system-ticker-footer');
+  if (!root || !footer) return;
+
+  // 모바일/태블릿에서는 전체 폭 유지, 데스크톱에서만 사이드바 영역을 비웁니다.
+  if (window.innerWidth <= 1200) {
+    root.style.setProperty('--system-ticker-left', '0px');
+    return;
+  }
+
+  const sidebar = document.querySelector('.library-sidebar');
+  if (sidebar) {
+    const isCollapsed = sidebar.classList.contains('collapsed');
+    const sidebarRect = sidebar.getBoundingClientRect();
+    const sidebarWidth = Math.max(0, sidebarRect.width || 0);
+
+    // 사이드바가 보이는 상태에서는 우측 끝에 티커를 딱 붙입니다.
+    if (!isCollapsed && sidebarWidth > 8) {
+      const left = Math.max(0, Math.round(sidebarRect.right));
+      root.style.setProperty('--system-ticker-left', `${left}px`);
+      return;
+    }
+  }
+
+  // 사이드바가 접힌 상태면 전체 폭 사용
+  root.style.setProperty('--system-ticker-left', '0px');
+}
+
 export function startSystemStatusPolling() {
   if (statusIntervalId) return;
   
@@ -470,12 +499,19 @@ export function startSystemStatusPolling() {
           
           if (footer.style.display === 'none') {
             footer.style.display = 'flex';
+            document.body.classList.add('has-system-ticker');
+            syncSystemTickerLayout();
             console.log('[SystemTicker] 📢 백그라운드 활성 태스크 감지로 속보 푸터 바 활성화.');
+          } else {
+            // 사이드바 접힘/펼침 등 레이아웃 변화에 맞춰 주기적으로 동기화
+            syncSystemTickerLayout();
           }
         }
       } else {
         if (footer && footer.style.display !== 'none') {
           footer.style.display = 'none';
+          document.body.classList.remove('has-system-ticker');
+          document.documentElement.style.setProperty('--system-ticker-left', '0px');
           lastTickerContent = '';
           console.log('[SystemTicker] 🤫 백그라운드 태스크가 없어 속보 푸터 바 은닉.');
           
@@ -498,6 +534,13 @@ export function startSystemStatusPolling() {
   poll();
   statusIntervalId = setInterval(poll, 5000);
 }
+
+window.addEventListener('resize', () => {
+  const footer = document.getElementById('system-ticker-footer');
+  if (footer && footer.style.display !== 'none') {
+    syncSystemTickerLayout();
+  }
+});
 
 // 스크립트 로드 시 즉시 시작
 if (document.readyState === 'loading') {

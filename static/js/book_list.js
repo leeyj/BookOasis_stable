@@ -5,6 +5,7 @@ import { openReader } from './viewer.js';
 import { loadLibraries } from './category.js';
 import { initInfiniteScrollObserver } from './infinite_scroll.js';
 import { stripLeadingBracketTags } from './series_display.js';
+import { mountIndexScrollbar, unmountIndexScrollbar } from './index_scrollbar.js';
 
 function normalizeMetadataToken(token) {
   if (!token) return '';
@@ -304,6 +305,17 @@ export function toggleLibrarySort() {
   const spinner = document.getElementById('infinite-scroll-spinner');
   if (spinner) {
     spinner.style.display = state.hasMore ? 'block' : 'none';
+  }
+
+  // 정렬 변경 즉시 우측 초성 바로가기 가시성 동기화
+  const gridView = document.getElementById('books-grid-view');
+  const isGridActive = !!(gridView && gridView.style.display !== 'none');
+  if (isGridActive && state.currentLibraryId !== 'history') {
+    if (newSort === 'date_desc' || newSort === 'date_asc') {
+      unmountIndexScrollbar();
+    } else {
+      mountIndexScrollbar();
+    }
   }
 }
 

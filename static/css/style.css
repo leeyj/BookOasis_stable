@@ -196,6 +196,14 @@
     transform: translate3d(0, 0, 0);
 }
 
+body.has-system-ticker .library-main-content {
+    padding-bottom: calc(48px + env(safe-area-inset-bottom, 0px));
+}
+
+body.has-system-ticker .library-sidebar {
+    padding-bottom: calc(44px + env(safe-area-inset-bottom, 0px));
+}
+
 .btn-sidebar-toggle-desktop:hover {
     color: #a855f7 !important;
 }
@@ -1407,11 +1415,12 @@
 .system-ticker-footer {
     position: fixed;
     bottom: 0;
-    left: 0;
-    width: 100%;
-    height: 38px;
+    left: var(--system-ticker-left, 0px);
+    width: calc(100% - var(--system-ticker-left, 0px));
+    height: 30px;
     background: rgba(15, 23, 42, 0.98);
     border-top: 1px solid rgba(168, 85, 247, 0.35);
+    border-top-left-radius: 8px;
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5), 0 0 10px rgba(168, 85, 247, 0.15);
     z-index: 9999;
     display: flex;
@@ -1419,6 +1428,7 @@
     box-sizing: border-box;
     font-family: inherit;
     animation: tickerSlideUp 0.3s ease-out;
+    pointer-events: none;
 }
 
 @keyframes tickerSlideUp {
@@ -1429,15 +1439,15 @@
 .system-ticker-footer .ticker-title {
     background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
     color: #fff;
-    font-size: 0.72rem;
+    font-size: 0.64rem;
     font-weight: 800;
-    padding: 0 0.8rem;
+    padding: 0 0.55rem;
     height: 100%;
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.3rem;
     white-space: nowrap;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.35px;
     text-transform: uppercase;
     box-shadow: 4px 0 10px rgba(0, 0, 0, 0.3);
     z-index: 10;
@@ -1450,16 +1460,16 @@
     display: flex;
     align-items: center;
     position: relative;
-    padding-left: 1.5rem;
+    padding-left: 0.8rem;
 }
 
 .system-ticker-footer .ticker-content {
     display: inline-block;
     white-space: nowrap;
     padding-left: 100%;
-    font-size: 0.82rem;
+    font-size: 0.72rem;
     color: #cbd5e1;
-    font-weight: 600;
+    font-weight: 500;
     animation: marquee 40s linear infinite;
     position: absolute;
     will-change: transform;

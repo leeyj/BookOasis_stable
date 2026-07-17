@@ -105,6 +105,14 @@
     padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
 }
 
+body.has-system-ticker .library-main-content {
+    padding-bottom: calc(52px + env(safe-area-inset-bottom, 0px));
+}
+
+body.has-system-ticker .library-sidebar {
+    padding-bottom: calc(46px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
 /* 컨텍스트 메뉴 닫기 버튼 모바일 가독성 강화 */
 .context-menu {
     min-width: 220px;

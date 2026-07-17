@@ -31,6 +31,19 @@ function refreshScheduleTabData() {
   }
 }
 
+function setAboutUpdateStatus(versionInfoEl, messageKey, fallbackText, color) {
+  if (!versionInfoEl) return;
+  versionInfoEl.textContent = i18n.t(messageKey) || fallbackText;
+  versionInfoEl.style.color = color;
+}
+
+function setAboutVersionLoadError(dashEl, latestEl, stateEl, messageKey, fallbackText) {
+  const text = i18n.t(messageKey) || fallbackText;
+  dashEl.textContent = text;
+  stateEl.textContent = i18n.t('common.error') || '오류';
+  if (latestEl) latestEl.textContent = text;
+}
+
 // 환경설정 내부 탭 전환 함수
 export function switchSettingsTab(tabId) {
   // 일반 사용자는 어드민 전용 탭에 접근하지 못하도록 차단 및 'about'으로 우회
@@ -127,37 +140,35 @@ async function loadAboutInfo() {
         if (data.github_version && data.github_version.dashboard) {
           latestEl.textContent = `v${data.github_version.dashboard}`;
         } else {
-          latestEl.textContent = '불러오기 실패';
+          latestEl.textContent = i18n.t('settings.about_load_failed') || '불러오기 실패';
         }
       }
 
       if (versionInfoEl && data.update) {
         if (data.update.can_update) {
-          versionInfoEl.textContent = '업데이트 가능 (현재 버전이 GitHub 버전보다 낮음)';
-          versionInfoEl.style.color = '#4ade80';
+          setAboutUpdateStatus(
+            versionInfoEl,
+            'settings.about_update_available',
+            '업데이트 가능 (현재 버전이 GitHub 버전보다 낮음)',
+            '#4ade80'
+          );
         } else {
-          versionInfoEl.textContent = '업데이트 불가 (현재 버전이 최신이거나 더 높음)';
-          versionInfoEl.style.color = '#94a3b8';
+          setAboutUpdateStatus(
+            versionInfoEl,
+            'settings.about_update_not_required',
+            '업데이트 불필요 (현재 버전이 최신이거나 더 높음)',
+            '#94a3b8'
+          );
         }
       }
     } else {
-      dashEl.textContent = '불러오기 실패';
-      stateEl.textContent = '오류';
-      if (latestEl) latestEl.textContent = '불러오기 실패';
-      if (versionInfoEl) {
-        versionInfoEl.textContent = '업데이트 상태 확인 실패';
-        versionInfoEl.style.color = '#f43f5e';
-      }
+      setAboutVersionLoadError(dashEl, latestEl, stateEl, 'settings.about_load_failed', '불러오기 실패');
+      setAboutUpdateStatus(versionInfoEl, 'settings.about_update_status_failed', '업데이트 상태 확인 실패', '#f43f5e');
     }
   } catch (e) {
     console.error('About 정보 로딩 실패:', e);
-    dashEl.textContent = '연결 오류';
-    stateEl.textContent = '오류';
-    if (latestEl) latestEl.textContent = '연결 오류';
-    if (versionInfoEl) {
-      versionInfoEl.textContent = '업데이트 상태 확인 실패';
-      versionInfoEl.style.color = '#f43f5e';
-    }
+    setAboutVersionLoadError(dashEl, latestEl, stateEl, 'settings.about_connection_error', '연결 오류');
+    setAboutUpdateStatus(versionInfoEl, 'settings.about_update_status_failed', '업데이트 상태 확인 실패', '#f43f5e');
   }
 }
 
