@@ -50,6 +50,8 @@ def get_media_list():
     library_id = request.args.get('library_id')
     search_query = request.args.get('search', '').strip()
     sort = request.args.get('sort', 'asc').strip().lower()
+    user_id = session.get('user_id')
+    role = session.get('role')
     try:
         page  = int(request.args.get('page', 1))
         limit = int(request.args.get('limit', 30))
@@ -57,7 +59,16 @@ def get_media_list():
         page, limit = 1, 30
 
     try:
-        series_list = SeriesService.get_books_list(db_type, library_id, page, limit, search_query, sort)
+        series_list = SeriesService.get_books_list(
+            db_type,
+            library_id,
+            page,
+            limit,
+            search_query,
+            sort,
+            user_id=user_id,
+            role=role
+        )
         has_more = len(series_list) > limit
         if has_more:
             series_list = series_list[:limit]
@@ -73,8 +84,10 @@ def get_media_all_list():
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
     library_id = request.args.get('library_id')
+    user_id = session.get('user_id')
+    role = session.get('role')
     try:
-        series_list = SeriesService.get_all_books_list(db_type, library_id)
+        series_list = SeriesService.get_all_books_list(db_type, library_id, user_id=user_id, role=role)
         return jsonify({'success': True, 'series': series_list})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -90,6 +103,7 @@ def get_media_detail():
     library_id  = request.args.get('library_id', 'all')
     representative_book_id = request.args.get('representative_book_id')
     user_id     = session.get('user_id', 1)
+    role        = session.get('role')
 
     try:
         meta, books_list = BookDetailService.get_media_detail(
@@ -97,6 +111,7 @@ def get_media_detail():
             series_name,
             library_id,
             user_id=user_id,
+            role=role,
             representative_book_id=representative_book_id
         )
         return jsonify({'success': True, 'meta': meta, 'books': books_list})

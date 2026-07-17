@@ -1,12 +1,51 @@
 # -*- coding: utf-8 -*-
 import os
 import importlib
+import sys
 from plugins.metadata.base import BaseMetadataProvider
 
 class MetadataFactory:
     _instance = None
     _cached_provider = None
     _loaded_provider_name = None
+
+    @classmethod
+    def hot_reload_plugin(cls, plugin_id=None):
+        """
+        플러그인 파일 변경 직후 Python import 캐시와 provider 캐시를 초기화합니다.
+        plugin_id가 주어지면 해당 패키지 하위 모듈만 언로드합니다.
+        """
+        importlib.invalidate_caches()
+
+        target = str(plugin_id or '').strip()
+        removed_modules = []
+
+        if target:
+            base = f"plugins.metadata.{target}"
+            prefixes = (base, f"{base}.")
+            for name in list(sys.modules.keys()):
+                if name in prefixes or any(name.startswith(prefix) for prefix in prefixes):
+                    sys.modules.pop(name, None)
+                    removed_modules.append(name)
+
+            if cls._loaded_provider_name == target:
+                cls._cached_provider = None
+                cls._loaded_provider_name = None
+        else:
+            for name in list(sys.modules.keys()):
+                if name.startswith('plugins.metadata.') and name != 'plugins.metadata.base':
+                    sys.modules.pop(name, None)
+                    removed_modules.append(name)
+
+            cls._cached_provider = None
+            cls._loaded_provider_name = None
+
+        return {
+            'plugin_id': target or None,
+            'removed_modules': removed_modules,
+            'removed_count': len(removed_modules),
+            'provider_cache_cleared': (cls._loaded_provider_name is None),
+        }
 
     @classmethod
     def _build_expected_class_names(cls, provider_name):

@@ -183,11 +183,35 @@ class PluginService:
             with open(path, 'w', encoding='utf-8', newline='') as f:
                 f.write(content)
 
+        reload_info = {
+            'plugin_id': plugin_id,
+            'removed_modules': [],
+            'removed_count': 0,
+            'provider_cache_cleared': False,
+            'reload_ok': True,
+        }
+
+        try:
+            from services.metadata_factory import MetadataFactory
+            reload_info = MetadataFactory.hot_reload_plugin(plugin_id)
+            reload_info['reload_ok'] = True
+        except Exception as e:
+            # 업데이트 자체는 성공으로 유지하되, 리로드 실패는 응답에 경고로 포함
+            reload_info = {
+                'plugin_id': plugin_id,
+                'removed_modules': [],
+                'removed_count': 0,
+                'provider_cache_cleared': False,
+                'reload_ok': False,
+                'reload_error': str(e),
+            }
+
         return True, {
             'message': f'{plugin_id} plugin updated successfully',
             'plugin_id': plugin_id,
             'local_version': local_ver,
             'github_version': remote_ver,
+            'reload': reload_info,
         }
 
     @staticmethod

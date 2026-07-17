@@ -6,10 +6,23 @@ from utils.cover_helper import get_cover_image_with_t, resolve_series_cover
 
 class BookDetailService:
     @staticmethod
-    def get_media_detail(db_type, series_name, library_id='all', user_id=1, restrict_same_directory=True, representative_book_id=None):
+    def get_media_detail(db_type, series_name, library_id='all', user_id=1, role=None, restrict_same_directory=True, representative_book_id=None):
         conn = database.get_connection(db_type)
         conn.row_factory = database.sqlite3.Row
         cursor = conn.cursor()
+
+        enforce_permission = (role != 'admin' and bool(user_id))
+
+        def _permission_exists_sql(book_alias):
+            if not enforce_permission:
+                return '', []
+            sql = (
+                f" AND EXISTS ("
+                f"SELECT 1 FROM user_category_permissions p "
+                f"WHERE p.library_id = {book_alias}.library_id AND p.user_id = ? AND p.has_access = 1"
+                f")"
+            )
+            return sql, [user_id]
 
         def _comparison_dir(path, file_format):
             normalized = (path or '').replace('\\', '/')
@@ -24,9 +37,12 @@ class BookDetailService:
         if representative_book_id:
             try:
                 rep_id_int = int(representative_book_id)
+                perm_sql, perm_params = _permission_exists_sql('books')
                 cursor.execute(
-                    "SELECT id, series_name, library_id, file_path, file_format FROM books WHERE id = ? AND COALESCE(is_deleted, 0) = 0",
-                    (rep_id_int,)
+                    "SELECT id, series_name, library_id, file_path, file_format FROM books "
+                    "WHERE id = ? AND COALESCE(is_deleted, 0) = 0"
+                    + perm_sql,
+                    (rep_id_int, *perm_params)
                 )
                 rep_row = cursor.fetchone()
                 if rep_row:
@@ -39,7 +55,13 @@ class BookDetailService:
         # 만약 library_id가 시스템 성격(all, history, favorite, home)이거나 없을 때
         # series_name이 중복 등록된 경우를 대비하여 해당 시리즈의 실제 library_id를 역추출합니다.
         if not library_id or library_id in ('all', 'history', 'favorite', 'home'):
-            cursor.execute("SELECT library_id FROM books WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0 LIMIT 1", (series_name,))
+            perm_sql, perm_params = _permission_exists_sql('books')
+            cursor.execute(
+                "SELECT library_id FROM books WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0"
+                + perm_sql +
+                " LIMIT 1",
+                (series_name, *perm_params)
+            )
             resolved_row = cursor.fetchone()
             if resolved_row and resolved_row['library_id']:
                 library_id = resolved_row['library_id']
@@ -48,55 +70,70 @@ class BookDetailService:
 
         # 1. 시리즈 메타 정보 조회
         if use_lib_filter:
+            perm_sql, perm_params = _permission_exists_sql('books')
             cursor.execute("""
                 SELECT author, publisher, link, score, summary, genre, tags
                 FROM books
-                WHERE series_name = ? AND library_id = ? AND COALESCE(is_deleted, 0) = 0 AND (summary IS NOT NULL AND summary != '')
+                WHERE series_name = ? AND library_id = ? AND COALESCE(is_deleted, 0) = 0
+            """ + perm_sql + """ AND (summary IS NOT NULL AND summary != '')
                 LIMIT 1
-            """, (series_name, library_id))
+            """, (series_name, library_id, *perm_params))
             meta_row = cursor.fetchone()
             if not meta_row:
                 cursor.execute("""
                     SELECT author, publisher, link, score, summary, genre, tags
-                    FROM books WHERE series_name = ? AND library_id = ? AND COALESCE(is_deleted, 0) = 0 LIMIT 1
-                """, (series_name, library_id))
+                    FROM books WHERE series_name = ? AND library_id = ? AND COALESCE(is_deleted, 0) = 0
+                """ + perm_sql + """ LIMIT 1
+                """, (series_name, library_id, *perm_params))
                 meta_row = cursor.fetchone()
         else:
+            perm_sql, perm_params = _permission_exists_sql('books')
             cursor.execute("""
                 SELECT author, publisher, link, score, summary, genre, tags
                 FROM books
-                WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0 AND (summary IS NOT NULL AND summary != '')
+                WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0
+            """ + perm_sql + """ AND (summary IS NOT NULL AND summary != '')
                 LIMIT 1
-            """, (series_name,))
+            """, (series_name, *perm_params))
             meta_row = cursor.fetchone()
             if not meta_row:
                 cursor.execute("""
                     SELECT author, publisher, link, score, summary, genre, tags
-                    FROM books WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0 LIMIT 1
-                """, (series_name,))
+                    FROM books WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0
+                """ + perm_sql + """ LIMIT 1
+                """, (series_name, *perm_params))
                 meta_row = cursor.fetchone()
 
         # 2. 책 목록 조회
         if use_lib_filter:
+            perm_sql, perm_params = _permission_exists_sql('b')
             cursor.execute("""
                 SELECT b.id, b.title, b.file_format, b.total_pages, b.has_offsets, b.cover_image, b.cover_updated_at,
                        b.file_path, p.pages_read, p.is_completed, b.is_favorite, b.library_id, p.last_read_at
                 FROM books b
                 LEFT JOIN user_progress p ON b.id = p.book_id AND p.user_id = ?
                 WHERE COALESCE(b.is_deleted, 0) = 0 AND b.series_name = ? AND b.library_id = ?
-            """, (user_id, series_name, library_id))
+            """ + perm_sql,
+            (user_id, series_name, library_id, *perm_params))
         else:
+            perm_sql, perm_params = _permission_exists_sql('b')
             cursor.execute("""
                 SELECT b.id, b.title, b.file_format, b.total_pages, b.has_offsets, b.cover_image, b.cover_updated_at,
                        b.file_path, p.pages_read, p.is_completed, b.is_favorite, b.library_id, p.last_read_at
                 FROM books b
                 LEFT JOIN user_progress p ON b.id = p.book_id AND p.user_id = ?
                 WHERE COALESCE(b.is_deleted, 0) = 0 AND b.series_name = ?
-            """, (user_id, series_name))
+            """ + perm_sql,
+            (user_id, series_name, *perm_params))
         books_rows = cursor.fetchall()
 
         # 실제 covers 폴더 내 시리즈 이미지 갱신 타임스탬프 쿼리
-        cursor.execute("SELECT MAX(cover_updated_at) AS latest_updated FROM books WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0", (series_name,))
+        perm_sql, perm_params = _permission_exists_sql('books')
+        cursor.execute(
+            "SELECT MAX(cover_updated_at) AS latest_updated FROM books WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0"
+            + perm_sql,
+            (series_name, *perm_params)
+        )
         time_row = cursor.fetchone()
         latest_updated = time_row['latest_updated'] if time_row else None
         conn.close()

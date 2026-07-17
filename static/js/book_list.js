@@ -183,6 +183,12 @@ export function filterBooks() {
   const query = document.getElementById('library-search').value.toLowerCase().trim();
   state.searchQuery = query;
 
+  // 홈 대시보드에서는 검색 시 전체보기로 전환해 동일한 검색어로 목록 필터링한다.
+  if (query && state.currentLibraryId === 'home' && typeof window.selectCategory === 'function') {
+    window.selectCategory('all');
+    return;
+  }
+
   const searchBtn = document.getElementById('btn-library-search-action');
   if (searchBtn) {
     searchBtn.innerText = query ? i18n.t('common.reset') : i18n.t('common.search');

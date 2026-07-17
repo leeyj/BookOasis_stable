@@ -251,6 +251,18 @@ function injectToggleSwitchCSS() {
   document.head.appendChild(style);
 }
 
+function buildPluginReloadStatusText(res) {
+  const base = `업데이트 완료 (${res.local_version} -> ${res.github_version})`;
+  const reload = res.reload || null;
+  if (!reload) return base;
+
+  if (reload.reload_ok) {
+    return `${base} | 핫리로드 완료 (모듈 ${reload.removed_count || 0}개 반영)`;
+  }
+
+  return `${base} | 업데이트는 완료됐지만 핫리로드 실패`;
+}
+
 // 플러그인 이벤트 핸들러 바인딩
 function bindPluginEvents() {
   const container = document.getElementById('settings-plugins-container');
@@ -353,13 +365,24 @@ function bindPluginEvents() {
 
         const res = await api.sampleUpdateMetadataPlugin(pluginId);
         if (res.success) {
-          const msg = `업데이트 완료 (${res.local_version} -> ${res.github_version})`;
+          const msg = buildPluginReloadStatusText(res);
           if (statusEl) {
             statusEl.textContent = msg;
-            statusEl.style.color = '#4ade80';
+            statusEl.style.color = (res.reload && res.reload.reload_ok === false) ? '#f59e0b' : '#4ade80';
           }
           if (typeof window.showToast === 'function') {
             window.showToast(msg, 'success');
+          }
+
+          if (res.reload && res.reload.reload_ok === false) {
+            const warn = `핫리로드 실패: ${res.reload.reload_error || '원인 미상'} (필요 시 컨테이너 재시작)`;
+            if (statusEl) {
+              statusEl.textContent = `${msg} | ${warn}`;
+              statusEl.style.color = '#f59e0b';
+            }
+            if (typeof window.showToast === 'function') {
+              window.showToast(warn, 'error');
+            }
           }
         } else {
           const err = res.error || '업데이트 실패';

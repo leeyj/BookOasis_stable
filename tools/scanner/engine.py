@@ -2,6 +2,8 @@
 import os
 import sys
 import gc
+import time
+import sqlite3
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 MEDIA_SERVER_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -21,6 +23,36 @@ from tools.scanner.sync_detector import detect_and_handle_book_movement, handle_
 
 MAX_SCANNER_THREADS = 4
 DB_DIR = os.path.join(MEDIA_SERVER_DIR, 'db')
+
+
+def _is_db_locked_error(exc):
+    try:
+        return isinstance(exc, sqlite3.OperationalError) and 'locked' in str(exc).lower()
+    except Exception:
+        return False
+
+
+def _commit_with_retry(conn, context_label, max_attempts=6):
+    last_exc = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            conn.commit()
+            return True
+        except Exception as e:
+            last_exc = e
+            if not _is_db_locked_error(e):
+                raise
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            wait_sec = min(3.0, 0.2 * (2 ** (attempt - 1)))
+            print(f"[Scanner-DB] {context_label} commit locked (attempt {attempt}/{max_attempts}). Retrying in {wait_sec:.2f}s...")
+            time.sleep(wait_sec)
+
+    if last_exc:
+        raise last_exc
+    return False
 
 
 def _dispatch_new_books_to_plugin_hooks(db_type, event_payload):
@@ -121,7 +153,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
 
     # ── [Book movement detection and history preservation layer - pre-process before thread execution] ──
     deleted_paths = detect_and_handle_book_movement(cursor, db_books, found_file_paths, db_meta_full, db_offsets_cached)
-    conn.commit()
+    _commit_with_retry(conn, 'pre-move-detection')
 
     # 2. Run thread pool and streaming process (as_completed)
     print(f"[Scanner] Multithread scan pool created (threads: {threads_to_use})")
@@ -223,39 +255,52 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
 
     def flush_pending_data():
         if not pending_inserts and not pending_updates and not pending_folders:
-            return
-        
-        try:
-            # 1. DB Bulk Update
-            if pending_inserts or pending_updates:
-                process_batch(cursor, pending_inserts, pending_updates)
-            
-            # 2. Scanner Progress Update
-            for pf in pending_folders:
-                cursor.execute("INSERT OR IGNORE INTO scanner_progress (library_id, folder_path) VALUES (?, ?)", (str(library_id), pf['root']))
-                if pf.get('dir_mtime') is not None:
-                    cursor.execute("INSERT OR REPLACE INTO folder_mtimes (folder_path, dir_mtime, meta_mtime) VALUES (?, ?, ?)", (pf['root'], pf['dir_mtime'], pf['meta_mtime']))
-            
-            # 3. Commit ALL at once (Atomic Transaction)
-            conn.commit()
-            import time
-            time.sleep(0.05)  # 대시보드 측 DB 락 선점을 돕기 위해 미세 양보(micro-yield)
+            return True
 
-            # 4. Append to JSONL log
-            if pending_inserts or pending_updates:
-                with file_lock:
-                    with open(scan_temp_file, 'a', encoding='utf-8') as f:
-                        for item in pending_inserts:
-                            f.write(json.dumps(item, ensure_ascii=False) + '\n')
-                        for item in pending_updates:
-                            f.write(json.dumps(item, ensure_ascii=False) + '\n')
+        max_attempts = 6
+        for attempt in range(1, max_attempts + 1):
+            try:
+                # 1. DB Bulk Update
+                if pending_inserts or pending_updates:
+                    process_batch(cursor, pending_inserts, pending_updates)
 
-        except Exception as e:
-            print(f"[Scanner ERROR] Flush failed: {e}")
-        finally:
-            pending_inserts.clear()
-            pending_updates.clear()
-            pending_folders.clear()
+                # 2. Scanner Progress Update
+                for pf in pending_folders:
+                    cursor.execute("INSERT OR IGNORE INTO scanner_progress (library_id, folder_path) VALUES (?, ?)", (str(library_id), pf['root']))
+                    if pf.get('dir_mtime') is not None:
+                        cursor.execute("INSERT OR REPLACE INTO folder_mtimes (folder_path, dir_mtime, meta_mtime) VALUES (?, ?, ?)", (pf['root'], pf['dir_mtime'], pf['meta_mtime']))
+
+                # 3. Commit ALL at once (Atomic Transaction)
+                _commit_with_retry(conn, 'flush-pending')
+                time.sleep(0.05)  # 대시보드 측 DB 락 선점을 돕기 위해 미세 양보(micro-yield)
+
+                # 4. Append to JSONL log
+                if pending_inserts or pending_updates:
+                    with file_lock:
+                        with open(scan_temp_file, 'a', encoding='utf-8') as f:
+                            for item in pending_inserts:
+                                f.write(json.dumps(item, ensure_ascii=False) + '\n')
+                            for item in pending_updates:
+                                f.write(json.dumps(item, ensure_ascii=False) + '\n')
+
+                pending_inserts.clear()
+                pending_updates.clear()
+                pending_folders.clear()
+                return True
+            except Exception as e:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                if _is_db_locked_error(e) and attempt < max_attempts:
+                    wait_sec = min(3.0, 0.2 * (2 ** (attempt - 1)))
+                    print(f"[Scanner-DB] Flush locked (attempt {attempt}/{max_attempts}). Retrying in {wait_sec:.2f}s...")
+                    time.sleep(wait_sec)
+                    continue
+                print(f"[Scanner ERROR] Flush failed: {e}")
+                return False
+
+        return False
 
     def cleanup_jsonl_file():
         load_dotenv()
@@ -353,7 +398,8 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                 
                 # Hybrid Flush Trigger
                 if (len(pending_inserts) + len(pending_updates) >= 100) or len(pending_folders) >= 50:
-                    flush_pending_data()
+                    if not flush_pending_data():
+                        raise RuntimeError('Scanner flush failed due to persistent DB contention.')
 
                 if processed_folders_count % 50 == 0:
                     gc.collect()
@@ -381,9 +427,10 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     if status_row and status_row['scan_status'] == 'cancelling':
                         print(f"[Scanner-Cancel] 🛑 Safely aborting scan due to user request. (Completed folders: {processed_folders_count} folders)")
                         log_pool_stats('cancel-abort')
-                        flush_pending_data()
+                        if not flush_pending_data():
+                            raise RuntimeError('Scanner flush failed while processing cancel request.')
                         cursor.execute("UPDATE libraries SET scan_status = 'ready' WHERE id = ?", (library_id,))
-                        conn.commit()
+                        _commit_with_retry(conn, 'cancel-status-update')
                         conn.close()
                         cleanup_jsonl_file()
                         return
@@ -392,7 +439,8 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                 if check_memory_exceeded():
                     print(f"[Scanner-Memory] 🛑 Emergency pause due to memory limit. (Progress: {processed_folders_count} folders applied)")
                     log_pool_stats('memory-emergency')
-                    flush_pending_data()
+                    if not flush_pending_data():
+                        raise RuntimeError('Scanner flush failed during memory emergency handling.')
                     try:
                         conn.close()
                     except Exception:
@@ -404,7 +452,8 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                 print(f"[Scanner-DEBUG-Pool] ❌ Folder '{root_folder}' processing exception: {e}")
 
         # Final flush for any remaining data at the end of the loop
-        flush_pending_data()
+        if not flush_pending_data():
+            raise RuntimeError('Scanner final flush failed due to persistent DB contention.')
         log_pool_stats('scan-final-flush')
         cleanup_jsonl_file()
 
@@ -416,7 +465,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
 
     # Initialize checkpoint of library upon successful completion
     cursor.execute("DELETE FROM scanner_progress WHERE library_id = ?", (str(library_id),))
-    conn.commit()
+    _commit_with_retry(conn, 'scan-end-cleanup')
     conn.close()
     log_pool_stats('scan-end')
     gc.collect()
@@ -526,6 +575,6 @@ def _scan_library_covers_only_internal(conn, db_path, library_id, physical_path,
             """, (cover_image, book_id))
             processed_count += 1
             
-    conn.commit()
+    _commit_with_retry(conn, 'cover-only-scan')
     print(f"[Scanner-Covers] Cover-only scan finally completed! (total {processed_count} covers updated)")
 

@@ -5,6 +5,12 @@ import * as api from '../api.js';
 let tempShortcut = null;
 let isRecordingShortcut = false;
 
+function applySidebarTopControlsSetting(enabled) {
+  const sidebarContent = document.getElementById('sidebar-collapsible-content');
+  if (!sidebarContent) return;
+  sidebarContent.classList.toggle('sidebar-controls-top', !!enabled);
+}
+
 // 설정값을 CSS 변수 및 메모리 상태에 적용하는 헬퍼 함수
 export function applySettingsToUI(settings) {
   if (settings.BOOK_THUMBNAIL_WIDTH) {
@@ -25,12 +31,20 @@ export function applySettingsToUI(settings) {
   if (settings.SHOW_TXT_NO_COVER_INFO_BANNER !== undefined) {
     state.showTxtNoCoverInfoBanner = (settings.SHOW_TXT_NO_COVER_INFO_BANNER === '1');
   }
+  if (settings.SIDEBAR_TOP_CONTROLS !== undefined) {
+    state.sidebarTopControls = (settings.SIDEBAR_TOP_CONTROLS === '1');
+  }
+  if (settings.HDD_AGGRESSIVE_WARMUP !== undefined) {
+    state.hddAggressiveWarmup = (settings.HDD_AGGRESSIVE_WARMUP === '1');
+  }
   if (settings.TTS_ENABLED !== undefined) {
     state.ttsEnabled = (settings.TTS_ENABLED === '1');
   }
   if (settings.TTS_WAKE_LOCK !== undefined) {
     state.ttsWakeLock = (settings.TTS_WAKE_LOCK === '1');
   }
+
+  applySidebarTopControlsSetting(state.sidebarTopControls === true);
 }
 
 // 최초 로드 시 설정 일괄 호출 적용
@@ -111,6 +125,16 @@ export async function loadGeneralSettings() {
       const txtNoCoverBannerEl = document.getElementById('setting-show-txt-no-cover-info-banner');
       if (txtNoCoverBannerEl) {
         txtNoCoverBannerEl.checked = (s.SHOW_TXT_NO_COVER_INFO_BANNER !== '0');
+      }
+
+      const sidebarTopControlsEl = document.getElementById('setting-sidebar-top-controls');
+      if (sidebarTopControlsEl) {
+        sidebarTopControlsEl.checked = (s.SIDEBAR_TOP_CONTROLS === '1');
+      }
+
+      const hddAggressiveWarmupEl = document.getElementById('setting-hdd-aggressive-warmup');
+      if (hddAggressiveWarmupEl) {
+        hddAggressiveWarmupEl.checked = (s.HDD_AGGRESSIVE_WARMUP === '1');
       }
 
       // 프록시 헤더 인증 (SSO) 설정
@@ -249,6 +273,8 @@ export async function submitGeneralSettings(event) {
   const hideCompleted = document.getElementById('setting-hide-completed-in-history')?.checked ? '1' : '0';
   const tagFilterScopeAll = document.getElementById('setting-tag-filter-scope-all')?.checked ? '1' : '0';
   const showTxtNoCoverInfoBanner = document.getElementById('setting-show-txt-no-cover-info-banner')?.checked ? '1' : '0';
+  const sidebarTopControls = document.getElementById('setting-sidebar-top-controls')?.checked ? '1' : '0';
+  const hddAggressiveWarmup = document.getElementById('setting-hdd-aggressive-warmup')?.checked ? '1' : '0';
   const proxyAuth = document.getElementById('setting-proxy-header-auth')?.value || '0';
   const rcloneRcUrl = document.getElementById('setting-rclone-rc-url')?.value || 'http://localhost:5572';
   const timezone = document.getElementById('setting-timezone')?.value || 'UTC';
@@ -283,6 +309,8 @@ export async function submitGeneralSettings(event) {
       api.updateSystemSetting('HIDE_COMPLETED_IN_HISTORY', hideCompleted),
       api.updateSystemSetting('TAG_FILTER_SEARCH_SCOPE_ALL', tagFilterScopeAll),
       api.updateSystemSetting('SHOW_TXT_NO_COVER_INFO_BANNER', showTxtNoCoverInfoBanner),
+      api.updateSystemSetting('SIDEBAR_TOP_CONTROLS', sidebarTopControls),
+      api.updateSystemSetting('HDD_AGGRESSIVE_WARMUP', hddAggressiveWarmup),
       api.updateSystemSetting('PROXY_HEADER_AUTH', proxyAuth),
       api.updateSystemSetting('RCLONE_RC_URL', rcloneRcUrl),
       api.updateSystemSetting('TTS_ENABLED', ttsEnabled),
@@ -309,6 +337,8 @@ export async function submitGeneralSettings(event) {
         HIDE_COMPLETED_IN_HISTORY: hideCompleted,
         TAG_FILTER_SEARCH_SCOPE_ALL: tagFilterScopeAll,
         SHOW_TXT_NO_COVER_INFO_BANNER: showTxtNoCoverInfoBanner,
+        SIDEBAR_TOP_CONTROLS: sidebarTopControls,
+        HDD_AGGRESSIVE_WARMUP: hddAggressiveWarmup,
         TTS_ENABLED: ttsEnabled,
         TTS_WAKE_LOCK: ttsWakeLock
       });

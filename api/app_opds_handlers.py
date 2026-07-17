@@ -96,6 +96,10 @@ class AppOpdsHandlers:
         if not self._check_auth_cached(is_adult=is_adult):
             return self._unauthorized()
 
+        current_user = self._get_current_user(is_adult=is_adult)
+        user_id = current_user.get('id') if current_user else None
+        role = current_user.get('role') if current_user else None
+
         db_type = request.args.get('type', 'adult' if is_adult else 'general')
         if (not is_adult) and db_type == 'adult' and not self._check_auth_cached(is_adult=True):
             return self._unauthorized()
@@ -106,12 +110,21 @@ class AppOpdsHandlers:
 
         try:
             if request.path.endswith('/all-list'):
-                series_list = SeriesService.get_all_books_list(db_type, library_id)
+                series_list = SeriesService.get_all_books_list(db_type, library_id, user_id=user_id, role=role)
                 series_list = self._filter_supported_series(db_type, series_list)
                 return jsonify({'success': True, 'series': series_list})
 
             page, limit = self._parse_paging_args(default_limit=30)
-            series_list = SeriesService.get_books_list(db_type, library_id, page, limit, search_query, sort)
+            series_list = SeriesService.get_books_list(
+                db_type,
+                library_id,
+                page,
+                limit,
+                search_query,
+                sort,
+                user_id=user_id,
+                role=role
+            )
             series_list = self._filter_supported_series(db_type, series_list)
             has_more = len(series_list) > limit
             if has_more:
@@ -124,12 +137,16 @@ class AppOpdsHandlers:
         if not self._check_auth_cached(is_adult=is_adult):
             return self._unauthorized()
 
+        current_user = self._get_current_user(is_adult=is_adult)
+        user_id = current_user.get('id') if current_user else None
+        role = current_user.get('role') if current_user else None
+
         db_type = request.args.get('type', 'adult' if is_adult else 'general')
         if (not is_adult) and db_type == 'adult' and not self._check_auth_cached(is_adult=True):
             return self._unauthorized()
 
         try:
-            libraries = CategoryService.get_libraries(db_type, user_id=None, role='admin')
+            libraries = CategoryService.get_libraries(db_type, user_id=user_id, role=role)
             return jsonify({'success': True, 'libraries': libraries})
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)}), 500
@@ -137,6 +154,10 @@ class AppOpdsHandlers:
     def handle_media_detail_compat(self, is_adult: bool):
         if not self._check_auth_cached(is_adult=is_adult):
             return self._unauthorized()
+
+        current_user = self._get_current_user(is_adult=is_adult)
+        user_id = current_user.get('id') if current_user else None
+        role = current_user.get('role') if current_user else None
 
         db_type = request.args.get('type', 'adult' if is_adult else 'general')
         if (not is_adult) and db_type == 'adult' and not self._check_auth_cached(is_adult=True):
@@ -150,7 +171,8 @@ class AppOpdsHandlers:
                 db_type,
                 series_name,
                 library_id,
-                user_id=1,
+                user_id=user_id,
+                role=role,
                 restrict_same_directory=False,
             )
             books_list = self._filter_supported_books(books_list)

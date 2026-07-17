@@ -167,6 +167,20 @@
                                 <label for="setting-show-txt-no-cover-info-banner" style="cursor: pointer; font-weight: 700; color: #fff; font-size: 0.9rem; margin: 0;" data-i18n="settings.show_txt_no_cover_info_banner_label">TXT 무커버 안내 배너 표시</label>
                             </div>
 
+                            <!-- 9-5. 사이드바 설정/계정 블록 상단 배치 설정 -->
+                            <div class="library-form-group-row" style="margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.5rem;">
+                                <input type="checkbox" id="setting-sidebar-top-controls" name="SIDEBAR_TOP_CONTROLS" style="cursor: pointer; accent-color: #a855f7; width: 1.1rem; height: 1.1rem; margin: 0;">
+                                <label for="setting-sidebar-top-controls" style="cursor: pointer; font-weight: 700; color: #fff; font-size: 0.9rem; margin: 0;" data-i18n="settings.sidebar_top_controls_label">사이드바의 환경설정/계정 메뉴를 상단에 배치</label>
+                            </div>
+                            <p style="font-size: 0.78rem; color: #94a3b8; margin: 0 0 0.8rem 1.6rem;" data-i18n="settings.sidebar_top_controls_desc">해제 시 기존처럼 하단에 고정되며, 체크 시 라이브러리 목록 위쪽으로 이동합니다.</p>
+
+                            <!-- 9-6. HDD 환경 적극 웜업 설정 -->
+                            <div class="library-form-group-row" style="margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.5rem;">
+                                <input type="checkbox" id="setting-hdd-aggressive-warmup" name="HDD_AGGRESSIVE_WARMUP" style="cursor: pointer; accent-color: #a855f7; width: 1.1rem; height: 1.1rem; margin: 0;">
+                                <label for="setting-hdd-aggressive-warmup" style="cursor: pointer; font-weight: 700; color: #fff; font-size: 0.9rem; margin: 0;" data-i18n="settings.hdd_aggressive_warmup_label">HDD 환경시 체크 (적극 웜업)</label>
+                            </div>
+                            <p style="font-size: 0.78rem; color: #94a3b8; margin: 0 0 0.8rem 1.6rem;" data-i18n="settings.hdd_aggressive_warmup_desc">체크 시 로컬 스캔 시작 전 디스크 스핀업/메타데이터 예열을 강화하여 database is locked 발생을 완화합니다. SSD 환경은 해제를 권장합니다.</p>
+
                             <!-- 10. 스캐너 시스템 메모리 제한 -->
                             <div class="library-form-group" style="margin-bottom: 0.5rem;">
                                 <label for="setting-system-mem-limit" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">

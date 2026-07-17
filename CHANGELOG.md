@@ -9,6 +9,8 @@
 - viewer.js 입력 계층 분리(키보드/휠/핫스팟/클릭 토글) | Split viewer input layer into input_controller (keyboard/wheel/hotspot/click)
 - viewer.js 시크바/라이프사이클 분리 및 파사드 축소 | Split viewer seekbar/lifecycle into controllers and reduced viewer.js to facade
 - 일부 하드코딩된 텍스트를 언어팩으로 분리 | Moved hardcoded strings to a separate language pack module
+- 디스크 웜업 설정 추가(환경설정->일반설정) | Added disk warm-up settings (Settings > General)
+- 환경설정 및 사용자 계정 위치 조절 기능 추가 | Added ability to adjust positions of environment settings and user accounts
 
 ## v1.0.6
 - 대시보드 버전 1.0.6으로 상향 | Bumped dashboard version to 1.0.6

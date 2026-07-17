@@ -13,6 +13,7 @@ os.makedirs(DB_DIR, exist_ok=True)
 
 DB_GENERAL_PATH = os.path.join(DB_DIR, 'media_general.db')
 DB_ADULT_PATH = os.path.join(DB_DIR, 'media_adult.db')
+SQLITE_BUSY_TIMEOUT_MS = int(os.environ.get('SQLITE_BUSY_TIMEOUT_MS', '60000') or '60000')
 
 class PooledConnection(sqlite3.Connection):
     def init_pool(self, pool):
@@ -56,6 +57,7 @@ class SQLiteConnectionPool:
                 try:
                     conn.execute("PRAGMA journal_mode=WAL;")
                     conn.execute("PRAGMA synchronous = NORMAL;")
+                    conn.execute(f"PRAGMA busy_timeout = {max(1000, SQLITE_BUSY_TIMEOUT_MS)};")
                 except sqlite3.OperationalError:
                     pass
                 conn.row_factory = sqlite3.Row
@@ -643,6 +645,8 @@ def init_databases():
                 ('PROCESS_RSS_LIMIT', '2048.0'),
                 ('RECENT_BOOKS_LIMIT', '30'),
                 ('TAG_FILTER_SEARCH_SCOPE_ALL', '0'),
+                ('SIDEBAR_TOP_CONTROLS', '0'),
+                ('HDD_AGGRESSIVE_WARMUP', '0'),
                 ('RCLONE_RC_URL', 'http://localhost:5572')
             ]
             for k, v in default_settings:

@@ -167,6 +167,21 @@
     text-shadow: 0 0 8px rgba(240, 171, 252, 0.5);
 }
 
+/* 사이드바 하단 고정 블록(설정/계정)의 상단 이동 옵션 */
+#sidebar-collapsible-content.sidebar-controls-top {
+    justify-content: flex-start !important;
+}
+
+#sidebar-collapsible-content.sidebar-controls-top .sidebar-settings-wrap {
+    order: -1;
+    margin-top: 0 !important;
+    margin-bottom: 0.8rem;
+    border-top: none !important;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    padding-top: 0;
+    padding-bottom: 0.8rem;
+}
+
 .current-category-indicator {
     display: inline-flex;
     align-items: center;

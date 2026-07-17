@@ -28,7 +28,7 @@ def _normalize_library_id(library_id):
     return library_id
 
 
-def _fetch_books_for_grouping(cursor, library_id, search_query='', favorite_only=False):
+def _fetch_books_for_grouping(cursor, library_id, search_query='', favorite_only=False, user_id=None, role=None):
     where = ["COALESCE(b.is_deleted, 0) = 0"]
     params = []
 
@@ -43,6 +43,16 @@ def _fetch_books_for_grouping(cursor, library_id, search_query='', favorite_only
         like = f"%{search_query}%"
         where.append("(b.series_name LIKE ? OR b.author LIKE ?)")
         params.extend([like, like])
+
+    # 일반 사용자는 user_category_permissions에 허용된 카테고리만 조회
+    if role != 'admin' and user_id:
+        where.append(
+            "EXISTS ("
+            "SELECT 1 FROM user_category_permissions p "
+            "WHERE p.library_id = b.library_id AND p.user_id = ? AND p.has_access = 1"
+            ")"
+        )
+        params.append(user_id)
 
     sql = f"""
         SELECT b.id, b.series_name, b.title, b.author, b.file_path, b.file_format,
@@ -135,7 +145,7 @@ def _sort_entries(entries, sort='asc'):
 
 class SeriesService:
     @staticmethod
-    def get_books_list(db_type, library_id, page, limit, search_query, sort='asc'):
+    def get_books_list(db_type, library_id, page, limit, search_query, sort='asc', user_id=None, role=None):
         library_id = _normalize_library_id(library_id)
         favorite_only = library_id == 'favorite'
         if library_id in ('all', 'favorite', 'history', 'home'):
@@ -151,7 +161,9 @@ class SeriesService:
             cursor,
             library_filter,
             search_query=search_query or '',
-            favorite_only=favorite_only
+            favorite_only=favorite_only,
+            user_id=user_id,
+            role=role
         )
 
         entries = _build_series_entries(rows, conn)
@@ -163,7 +175,7 @@ class SeriesService:
         return paged
 
     @staticmethod
-    def get_all_books_list(db_type, library_id):
+    def get_all_books_list(db_type, library_id, user_id=None, role=None):
         """Kavita 방식의 선로드를 위해 특정 라이브러리의 전체 시리즈 목록을 페이징 없이 경량 조회"""
         library_id = _normalize_library_id(library_id)
         favorite_only = library_id == 'favorite'
@@ -180,7 +192,9 @@ class SeriesService:
             cursor,
             library_filter,
             search_query='',
-            favorite_only=favorite_only
+            favorite_only=favorite_only,
+            user_id=user_id,
+            role=role
         )
         entries = _build_series_entries(rows, conn)
         _sort_entries(entries, sort='asc')

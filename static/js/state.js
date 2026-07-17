@@ -27,6 +27,8 @@ export const state = {
   hideCompletedInHistory: false,
   tagFilterSearchInAll: false,
   showTxtNoCoverInfoBanner: true,
+  sidebarTopControls: false,
+  hddAggressiveWarmup: false,
   detailSeriesName: '',
   detailLibraryId: null,
   detailRepresentativeBookId: null,
