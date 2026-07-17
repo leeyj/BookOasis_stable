@@ -1,6 +1,10 @@
 // static/js/settings/users.js – 사용자 관리 탭 모듈
 import { state } from '../state.js';
 
+const MAX_USERNAME_LENGTH = 128;
+const MAX_PASSWORD_LENGTH = 256;
+const MIN_PASSWORD_LENGTH = 4;
+
 export async function loadUsersList() {
   const tbody = document.getElementById('settings-users-list');
   if (!tbody) return;
@@ -75,6 +79,23 @@ export async function submitUserForm(e) {
   const role = document.getElementById('user-form-role').value;
   const has_adult_access = document.getElementById('user-form-adult-access').checked;
 
+  if (!username) {
+    alert(i18n.t('settings.users_add_fail', {error: '사용자 아이디를 입력해 주세요.'}));
+    return;
+  }
+  if (username.length > MAX_USERNAME_LENGTH) {
+    alert(i18n.t('settings.users_add_fail', {error: `사용자 아이디는 최대 ${MAX_USERNAME_LENGTH}자까지 허용됩니다.`}));
+    return;
+  }
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    alert(i18n.t('settings.users_add_fail', {error: `비밀번호는 최소 ${MIN_PASSWORD_LENGTH}자 이상이어야 합니다.`}));
+    return;
+  }
+  if (password.length > MAX_PASSWORD_LENGTH) {
+    alert(i18n.t('settings.users_add_fail', {error: `비밀번호는 최대 ${MAX_PASSWORD_LENGTH}자까지 허용됩니다.`}));
+    return;
+  }
+
   try {
     const res = await fetch(`/api/admin/users?type=${state.currentLibraryType}`, {
       method: 'POST',
@@ -140,6 +161,15 @@ export async function submitResetPwdForm(e) {
   const userId = document.getElementById('reset-pwd-user-id').value;
   const newPassword = document.getElementById('reset-pwd-new').value.trim();
 
+  if (newPassword.length < MIN_PASSWORD_LENGTH) {
+    alert(`비밀번호는 최소 ${MIN_PASSWORD_LENGTH}자 이상이어야 합니다.`);
+    return;
+  }
+  if (newPassword.length > MAX_PASSWORD_LENGTH) {
+    alert(`비밀번호는 최대 ${MAX_PASSWORD_LENGTH}자까지 허용됩니다.`);
+    return;
+  }
+
   try {
     const res = await fetch(`/api/admin/users/${userId}/password`, {
       method: 'PUT',
@@ -180,6 +210,15 @@ export async function submitAdminChangePwdForm(e) {
   const userId = document.getElementById('change-pwd-admin-id').value;
   const currentPassword = document.getElementById('change-pwd-current').value.trim();
   const newPassword = document.getElementById('change-pwd-new').value.trim();
+
+  if (currentPassword.length > MAX_PASSWORD_LENGTH || newPassword.length > MAX_PASSWORD_LENGTH) {
+    alert(`비밀번호는 최대 ${MAX_PASSWORD_LENGTH}자까지 허용됩니다.`);
+    return;
+  }
+  if (newPassword.length < MIN_PASSWORD_LENGTH) {
+    alert(`비밀번호는 최소 ${MIN_PASSWORD_LENGTH}자 이상이어야 합니다.`);
+    return;
+  }
 
   try {
     const res = await fetch(`/api/admin/users/${userId}/password`, {

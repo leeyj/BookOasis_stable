@@ -39,6 +39,7 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
       const meta = data.meta;
       const books = data.books || [];
       const actualLibraryId = (books.length > 0 && books[0].library_id) ? books[0].library_id : activeLibId;
+      state.detailSeriesName = safeSeriesName;
       state.detailLibraryId = actualLibraryId;
       state.detailRepresentativeBookId = representativeBookId || (books.length > 0 ? books[0].id : null);
       state.detailDisplayTitle = safeDisplayTitle;

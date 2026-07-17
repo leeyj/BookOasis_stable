@@ -10,6 +10,19 @@ from utils.i18n import _t
 
 settings_bp = Blueprint('settings', __name__)
 
+MAX_SETTINGS_REQUEST_BYTES = 32 * 1024
+MAX_SETTING_KEY_LENGTH = 64
+MAX_SETTING_VALUE_DEFAULT_LENGTH = 4096
+SETTING_VALUE_LIMITS = {
+    'RCLONE_RC_URL': 512,
+    'LAZY_SCAN_CRON': 100,
+    'TIMEZONE': 64,
+    'SEARCH_SHORTCUT': 64,
+    'PROXY_HEADER_TRUSTED_IPS': 2048,
+    'WEBHOOK_TOKEN': 512,
+    'WEBHOOK_EVENT_SECRET': 1024,
+}
+
 @settings_bp.route('/api/media/settings', methods=['GET'])
 @admin_required
 def get_system_settings():
@@ -25,11 +38,21 @@ def get_system_settings():
 @admin_required
 def update_system_setting():
     """시스템 설정값 추가 및 업데이트"""
+    content_length = request.content_length
+    if content_length is not None and content_length > MAX_SETTINGS_REQUEST_BYTES:
+        return jsonify({'success': False, 'error': '설정 요청 본문이 너무 큽니다.'}), 413
+
     key = request.form.get('key', '').strip()
     value = request.form.get('value', '').strip()
     
     if not key:
         return jsonify({'success': False, 'error': _t('api.err_setting_key_required')}), 400
+    if len(key) > MAX_SETTING_KEY_LENGTH:
+        return jsonify({'success': False, 'error': f'설정 키 길이는 최대 {MAX_SETTING_KEY_LENGTH}자까지 허용됩니다.'}), 400
+
+    max_value_len = SETTING_VALUE_LIMITS.get(key, MAX_SETTING_VALUE_DEFAULT_LENGTH)
+    if len(value) > max_value_len:
+        return jsonify({'success': False, 'error': f'설정 값 길이는 최대 {max_value_len}자까지 허용됩니다. ({key})'}), 400
     
     if key == 'DB_POOL_SIZE':
         try:

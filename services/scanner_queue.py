@@ -21,6 +21,7 @@ class ScannerQueue:
         self.q = queue.Queue()
         self.enqueued_items = set()
         self.queue_lock = threading.Lock()
+        self.current_task = None
         
         # Start worker thread
         self.worker_thread = threading.Thread(target=self._worker_loop, daemon=True, name="ScannerWorker")
@@ -70,6 +71,11 @@ class ScannerQueue:
         task_key = self._get_task_key(task_type, kwargs)
         
         with self.queue_lock:
+            running_key = (self.current_task or {}).get('key') if isinstance(self.current_task, dict) else None
+            if running_key == task_key:
+                self.log(f"Task '{task_key}' is already running. Rejecting duplicate request.")
+                return False
+
             if task_key in self.enqueued_items:
                 self.log(f"Task '{task_key}' is already in the queue. Skipping duplicate.")
                 return False

@@ -350,6 +350,88 @@
   buffer_interval: 60
 ```
 
+### 아웃바운드 표준 이벤트 웹훅 (Outbound Standard Event Webhook)
+
+BookOasis는 외부 수신 서버로 도서 이벤트를 `POST` 전송할 수 있습니다.
+
+- 대상 URL 설정:
+  - `WEBHOOK_EVENT_ENDPOINT` (단일)
+  - `WEBHOOK_EVENT_ENDPOINTS` (다중, 쉼표/개행/세미콜론 구분)
+- 관련 설정:
+  - `WEBHOOK_EVENT_TIMEOUT` (초)
+  - `WEBHOOK_EVENT_RETRY` (재시도 횟수)
+  - `WEBHOOK_EVENT_SECRET` (설정 시 `X-BookOasis-Signature` HMAC-SHA256 헤더 포함)
+
+* **발행 이벤트 타입**:
+  - `book.new` : 신규 도서 감지 시
+  - `book.read` : 독서 진행도 증가 시
+  - `book.finish` : 완독 전이(미완료 -> 완료) 시
+
+* **요청 메서드**: `POST`
+* **Content-Type**: `application/json`
+* **요청 바디 예시**:
+  ```json
+  {
+    "event": "book.read",
+    "user": true,
+    "Account": {
+      "id": 123456,
+      "title": "사용자이름"
+    },
+    "Metadata": {
+      "type": "book",
+      "format": "epub",
+      "title": "책 제목",
+      "author": "저자 이름",
+      "publisher": "출판사",
+      "series": "시리즈 명",
+      "seriesIndex": null,
+      "progress": 45,
+      "totalPages": null,
+      "currentLocation": "epubcfi(/6/2[chap01]!/4/2/14)",
+      "addedAt": 1690000000
+    }
+  }
+  ```
+
+* **포맷별 제약사항**:
+  - EPUB/TXT는 물리 페이지가 고정되지 않아 `totalPages`가 `null`일 수 있습니다.
+  - 진행도 해석은 `Metadata.progress`(0~100)를 우선 사용하십시오.
+  - `Metadata.currentLocation`은 포맷별 포인터로 해석하십시오.
+    - EPUB: `href`/`cfi`/`spine` 문자열
+    - TXT: `chunk:N`
+    - PDF/ZIP/CBZ: `page:N`
+
+* **헤더 예시 (서명 사용 시)**:
+  - `X-BookOasis-Event: book.read`
+  - `X-BookOasis-Signature: sha256=<hexdigest>`
+
+#### 이벤트 필드 보장/Nullable 규격표
+
+| 필드 경로 | 타입 | 보장 여부 | Nullable | 비고 |
+| :--- | :--- | :--- | :--- | :--- |
+| `event` | string | 항상 포함 | 아니오 | `book.new`, `book.read`, `book.finish` |
+| `user` | boolean | 항상 포함 | 아니오 | 시스템 이벤트는 `false` 가능 |
+| `Account.id` | integer | 항상 포함 | 아니오 | 시스템 이벤트는 `0` |
+| `Account.title` | string | 항상 포함 | 아니오 | 시스템 이벤트는 `system` |
+| `Metadata.type` | string | 항상 포함 | 아니오 | 현재 `book` |
+| `Metadata.format` | string | 항상 포함 | 예 | 미확인 포맷은 빈 문자열 가능 |
+| `Metadata.title` | string | 항상 포함 | 예 | 원본 메타 누락 시 빈 문자열 |
+| `Metadata.author` | string | 항상 포함 | 예 | 원본 메타 누락 시 빈 문자열 |
+| `Metadata.publisher` | string | 항상 포함 | 예 | 원본 메타 누락 시 빈 문자열 |
+| `Metadata.series` | string | 항상 포함 | 예 | 시리즈 미매핑 시 `null` |
+| `Metadata.seriesIndex` | integer | 항상 포함 | 예 | 현재 기본 `null` |
+| `Metadata.progress` | integer | 항상 포함 | 아니오 | 0~100 정수 |
+| `Metadata.totalPages` | integer | 항상 포함 | 예 | EPUB/TXT에서 `null` 가능 |
+| `Metadata.currentLocation` | string | 항상 포함 | 예 | 포맷별 포인터(`epubcfi`, `chunk:N`, `page:N`) |
+| `Metadata.addedAt` | integer | 항상 포함 | 예 | Unix timestamp seconds |
+
+#### 이벤트별 권장 소비 규칙
+
+- `book.new`: 신규 인덱싱 이벤트로 간주, 진행률 필드는 참고용
+- `book.read`: 진행률 갱신 이벤트로 간주, `progress`를 1차 소스로 사용
+- `book.finish`: 완독 확정 이벤트로 간주, 동일 도서/사용자 중복 처리(멱등) 권장
+
 ---
 
 ## 💻 7. 프론트엔드 연동용 전역 JavaScript API (Frontend JS API)

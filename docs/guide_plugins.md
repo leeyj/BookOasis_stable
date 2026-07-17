@@ -14,6 +14,19 @@
 
 즉, "메인은 이제 플러그인에 관여하지 않는다"가 설계 목표입니다.
 
+### 호환성 매트릭스 (코어 ↔ 플러그인 계약)
+
+| 코어 버전 범위 | 필수 계약 | 선택 계약 | 비고 |
+| :--- | :--- | :--- | :--- |
+| 1.0.0 ~ 1.0.4 | `search`, `apply` | `dashboard_widget`, `get_dashboard_data` | 폴더 기반/단일 파일 모두 허용 |
+| 1.0.5 ~ 1.0.6 | `search`, `apply` | `get_context_menu_items`, `run_context_menu_action`, `update_manifest` | 컨텍스트 메뉴/샘플 업데이트 지원 |
+| 1.0.7+ (현재) | `search`, `apply` | `on_scan_new_books_detected`, `dispatch_webhook`, `update_manifest` | 표준 이벤트 웹훅(`book.new/read/finish`) 병행 운영 권장 |
+
+호환성 원칙:
+
+- 코어는 **필수 계약**만 보장합니다.
+- 선택 계약은 코어 버전에 따라 미지원일 수 있으므로, 플러그인 내부에서 기능 감지(fallback) 처리하는 것을 권장합니다.
+
 ---
 
 ## 2. 디렉토리 구조 규격
@@ -319,6 +332,68 @@ def get_context_menu_items(self, db_type, context):
 
 주의: 테스트 URL에는 토큰/개인정보가 포함된 실제 운영 payload를 보내지 마십시오.
 
+### 표준 이벤트 웹훅 스키마 (book.new / book.read / book.finish)
+
+커뮤니티 연동용 표준 이벤트 웹훅은 아래 형태를 권장합니다.
+
+- Endpoint: `POST http://<server>/webhook`
+- Event: `book.new`, `book.read`, `book.finish`
+- 공통 최상위 키: `event`, `user`, `Account`, `Metadata`
+
+예시:
+
+```json
+{
+    "event": "book.read",
+    "user": true,
+    "Account": {
+        "id": 123456,
+        "title": "사용자이름"
+    },
+    "Metadata": {
+        "type": "book",
+        "format": "epub",
+        "title": "책 제목",
+        "author": "저자 이름",
+        "publisher": "출판사",
+        "series": "시리즈 명",
+        "seriesIndex": null,
+        "progress": 45,
+        "totalPages": null,
+        "currentLocation": "epubcfi(/6/2[chap01]!/4/2/14)",
+        "addedAt": 1690000000
+    }
+}
+```
+
+포맷 제약(중요):
+
+- EPUB/TXT는 물리 페이지가 고정되지 않으므로 `totalPages`는 `null`일 수 있습니다.
+- 이 경우 진행률은 `progress`(0~100 퍼센트)를 기준으로 처리하십시오.
+- `currentLocation`은 포맷별 포인터로 해석하십시오.
+    - EPUB: `href`/`cfi`/`spine` 기반 문자열
+    - TXT: `chunk:N` 형태
+    - 고정 페이지 포맷(PDF/ZIP/CBZ): `page:N` 형태
+
+권장 소비 정책:
+
+- 완독 판정은 `progress` 또는 `book.finish` 이벤트를 우선 사용
+- `totalPages`는 보조 정보로만 사용
+
+### 표준 이벤트 전송 환경변수
+
+코어 표준 이벤트 웹훅은 아래 환경변수로 제어합니다.
+
+- `WEBHOOK_EVENT_ENDPOINT` 또는 `WEBHOOK_EVENT_ENDPOINTS`
+- `WEBHOOK_EVENT_TIMEOUT`
+- `WEBHOOK_EVENT_RETRY`
+- `WEBHOOK_EVENT_SECRET` (HMAC 서명, 헤더: `X-BookOasis-Signature`)
+
+참고:
+
+- 기존 `WEBHOOK_TARGETS_JSON` 기반 플러그인 방식과 병행 가능합니다.
+- 표준 이벤트는 플러그인 제작자가 공통 계약만으로 수신 로직을 구현할 수 있도록 설계되었습니다.
+
 ---
 
 ## 7. 플러그인 개발자 릴리즈 절차 (자동 업데이트 포함)
@@ -369,6 +444,44 @@ def get_context_menu_items(self, db_type, context):
 ---
 
 ## 7. 구현 예시 (간단)
+
+아래 두 예시는 AI/사람 모두가 복사해 바로 실행하기 쉬운 최소 샘플입니다.
+
+### 예시 A: 검색형 메타데이터 플러그인 (최소)
+
+```python
+# -*- coding: utf-8 -*-
+from plugins.metadata.base import BaseMetadataProvider
+
+
+class DemoSearchMetadataProvider(BaseMetadataProvider):
+    id = "demo_search"
+    name = "Demo Search"
+    is_searchable = True
+    config_schema = []
+
+    def search(self, db_type, query):
+        q = str(query or '').strip()
+        if not q:
+            return {'success': True, 'items': []}
+        return {
+            'success': True,
+            'items': [
+                {
+                    'title': q,
+                    'author': 'Unknown',
+                    'publisher': '',
+                    'summary': 'Demo search result',
+                }
+            ]
+        }
+
+    def apply(self, db_type, book_id, item_data):
+        # 실제 플러그인은 게이트웨이로 books UPDATE 처리
+        return True, 'demo applied'
+```
+
+### 예시 B: 대시보드 위젯 플러그인 (최소)
 
 ```python
 # -*- coding: utf-8 -*-

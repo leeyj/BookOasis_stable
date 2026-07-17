@@ -3,6 +3,7 @@ export const state = {
   // 라이브러리/타입
   currentLibraryType: 'general',
   currentLibraryId: 'home', // 기본값: 홈 화면 (Kavita 대시보드)
+  currentLibraryHideCovers: false,
 
   // 도서 데이터
   currentBooksData: [],
@@ -26,6 +27,7 @@ export const state = {
   hideCompletedInHistory: false,
   tagFilterSearchInAll: false,
   showTxtNoCoverInfoBanner: true,
+  detailSeriesName: '',
   detailLibraryId: null,
   detailRepresentativeBookId: null,
   detailDisplayTitle: '',

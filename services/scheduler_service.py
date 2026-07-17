@@ -291,6 +291,16 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
         
         # VFS 설정이 활성화되었거나, 원격 경로가 있으면 VFS 갱신 강제 수행
         should_vfs_refresh = (row_chk and row_chk['vfs_refresh_before_scan'] == 1) or has_remote_paths
+        vfs_flag_enabled = bool(row_chk and row_chk['vfs_refresh_before_scan'] == 1)
+        print(
+            f"[Scanner-Trigger] VFS decision: enabled={vfs_flag_enabled}, "
+            f"has_remote_paths={has_remote_paths}, should_refresh={should_vfs_refresh}, "
+            f"target_paths={target_paths}"
+        )
+        write_scan_log(
+            f"VFS 판단: enabled={vfs_flag_enabled}, has_remote_paths={has_remote_paths}, "
+            f"should_refresh={should_vfs_refresh}, target_paths={target_paths}"
+        )
         
         if should_vfs_refresh:
             vfs_refreshed_in_wrapper = True
@@ -351,9 +361,12 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
             rc_urls = list(dict.fromkeys(rc_urls))
             
             try:
-                from utils.drive_helper import get_rclone_relative_path
+                from utils.drive_helper import get_rclone_refresh_dirs
                 
                 remote_paths = list(dict.fromkeys([p for p in target_paths if is_remote_path(p)]))
+                if not remote_paths:
+                    print("[Scanner-Trigger] VFS refresh skipped: no remote paths resolved by detector. (likely forced by setting only)")
+                    write_scan_log("VFS 새로고침 건너뜀: 원격 경로로 판별된 대상이 없습니다. (설정 강제 실행 케이스 가능)")
                 
                 for r_path in remote_paths:
                     if not rc_urls:
@@ -373,88 +386,99 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
                     except Exception as e_status:
                         print(f"[Scanner-Trigger WARNING] Failed to check status: {e_status}")
 
-                    rel_path = get_rclone_relative_path(r_path)
-                    print(f"[Scanner-Trigger] VFS cache update target folder: '{rel_path}'")
+                    rel_paths = get_rclone_refresh_dirs(r_path)
+                    print(f"[Scanner-Trigger] VFS cache update target folder candidates: {rel_paths}")
                     
                     refreshed = False
-                    for rc_url in rc_urls:
-                        try:
-                            parsed = urllib.parse.urlparse(rc_url)
-                            headers = {'Content-Type': 'application/json'}
-                            
-                            # URL 내 인증 정보(user:pass@host) 파싱 및 Basic Auth 헤더 적용 (vfs.py와 동일)
-                            if parsed.username and parsed.password:
-                                auth_str = f"{parsed.username}:{parsed.password}"
-                                auth_b64 = base64.b64encode(auth_str.encode('utf-8')).decode('utf-8')
-                                headers['Authorization'] = f"Basic {auth_b64}"
+                    for rel_idx, rel_path in enumerate(rel_paths, start=1):
+                        print(f"[Scanner-Trigger] VFS refresh candidate path attempt: '{rel_path}' ({rel_idx}/{len(rel_paths)})")
+                        write_scan_log(f"VFS 갱신 후보 경로 시도: {rel_path} ({rel_idx}/{len(rel_paths)})")
+                        for rc_url in rc_urls:
+                            try:
+                                parsed = urllib.parse.urlparse(rc_url)
+                                headers = {'Content-Type': 'application/json'}
                                 
-                                # URL에서 인증 정보를 제거한 클린 URL 생성
-                                netloc = parsed.netloc.split('@')[-1]
-                                clean_rc_url = f"{parsed.scheme}://{netloc}"
-                            else:
-                                clean_rc_url = rc_url
-                            
-                            full_url = f"{clean_rc_url.rstrip('/')}/vfs/refresh"
-                            req_data = json.dumps({"dir": rel_path, "recursive": "true"}).encode('utf-8')
-                            req = urllib.request.Request(
-                                full_url, 
-                                data=req_data,
-                                headers=headers
-                            )
-                            for attempt in range(1, 4):
-                                try:
-                                    with urllib.request.urlopen(req, timeout=1200) as resp:
-                                        res_text = resp.read().decode('utf-8')
-                                        print(f"[Scanner-Trigger] VFS update result (server={clean_rc_url}, path={rel_path}): {res_text}")
-                                        write_scan_log(f"VFS 갱신 완료 (server={clean_rc_url}, path={rel_path}): {res_text}")
-                                        refreshed = True
+                                # URL 내 인증 정보(user:pass@host) 파싱 및 Basic Auth 헤더 적용 (vfs.py와 동일)
+                                if parsed.username and parsed.password:
+                                    auth_str = f"{parsed.username}:{parsed.password}"
+                                    auth_b64 = base64.b64encode(auth_str.encode('utf-8')).decode('utf-8')
+                                    headers['Authorization'] = f"Basic {auth_b64}"
+                                    
+                                    # URL에서 인증 정보를 제거한 클린 URL 생성
+                                    netloc = parsed.netloc.split('@')[-1]
+                                    clean_rc_url = f"{parsed.scheme}://{netloc}"
+                                else:
+                                    clean_rc_url = rc_url
+                                
+                                full_url = f"{clean_rc_url.rstrip('/')}/vfs/refresh"
+                                req_data = json.dumps({"dir": rel_path, "recursive": "true"}).encode('utf-8')
+                                req = urllib.request.Request(
+                                    full_url, 
+                                    data=req_data,
+                                    headers=headers
+                                )
+                                for attempt in range(1, 4):
+                                    try:
+                                        with urllib.request.urlopen(req, timeout=1200) as resp:
+                                            res_text = resp.read().decode('utf-8')
+                                            print(f"[Scanner-Trigger] VFS update result (server={clean_rc_url}, path={rel_path}): {res_text}")
+                                            print(f"[Scanner-Trigger] VFS refresh candidate selected: '{rel_path}' ({rel_idx}/{len(rel_paths)})")
+                                            write_scan_log(f"VFS 갱신 완료 (server={clean_rc_url}, path={rel_path}): {res_text}")
+                                            write_scan_log(f"VFS 갱신 성공 후보 경로: {rel_path} ({rel_idx}/{len(rel_paths)})")
+                                            refreshed = True
+                                            break
+                                    except urllib.error.HTTPError as http_ex:
+                                        err_body = http_ex.read().decode('utf-8') if hasattr(http_ex, 'read') else str(http_ex)
+                                        print(f"[Scanner-Trigger ERROR] VFS update request failed ({rel_path}): {http_ex.code} - {err_body}")
+                                        write_scan_log(f"VFS update request failed ({rel_path}): {http_ex.code} - {err_body}")
                                         break
-                                except urllib.error.HTTPError as http_ex:
-                                    err_body = http_ex.read().decode('utf-8') if hasattr(http_ex, 'read') else str(http_ex)
-                                    print(f"[Scanner-Trigger ERROR] VFS update request failed ({rel_path}): {http_ex.code} - {err_body}")
-                                    write_scan_log(f"VFS update request failed ({rel_path}): {http_ex.code} - {err_body}")
-                                    break
-                                except urllib.error.URLError as http_ex:
-                                    if attempt < 3 and is_connection_refused_error(http_ex):
-                                        print(f"[Scanner-Trigger WARNING] VFS RC server not ready yet (source={rc_url_source}, server={clean_rc_url}, path={rel_path}, attempt={attempt}/3). Retrying shortly.")
-                                        write_scan_log(f"VFS RC 서버 연결 거부로 재시도합니다 (server={clean_rc_url}, path={rel_path}, attempt={attempt}/3)")
-                                        time.sleep(2.0)
-                                        continue
-                                    # 로그에 인증 정보 노출 방지
-                                    safe_url = rc_url
-                                    if '@' in rc_url:
-                                        try:
-                                            p = urllib.parse.urlparse(rc_url)
-                                            safe_url = f"{p.scheme}://****:****@{p.netloc.split('@')[-1]}"
-                                        except Exception:
-                                            safe_url = "[Protected URL]"
-                                    print(f"[Scanner-Trigger ERROR] VFS update request failed ({rel_path}): Server='{safe_url}', Error={http_ex}")
-                                    write_scan_log(f"VFS update request failed ({rel_path}): {http_ex}")
-                                    break
-                                except Exception as http_ex:
-                                    # 로그에 인증 정보 노출 방지
-                                    safe_url = rc_url
-                                    if '@' in rc_url:
-                                        try:
-                                            p = urllib.parse.urlparse(rc_url)
-                                            safe_url = f"{p.scheme}://****:****@{p.netloc.split('@')[-1]}"
-                                        except Exception:
-                                            safe_url = "[Protected URL]"
-                                    print(f"[Scanner-Trigger ERROR] VFS update request failed ({rel_path}): Server='{safe_url}', Error={http_ex}")
-                                    write_scan_log(f"VFS update request failed ({rel_path}): {http_ex}")
-                                    break
+                                    except urllib.error.URLError as http_ex:
+                                        if attempt < 3 and is_connection_refused_error(http_ex):
+                                            print(f"[Scanner-Trigger WARNING] VFS RC server not ready yet (source={rc_url_source}, server={clean_rc_url}, path={rel_path}, attempt={attempt}/3). Retrying shortly.")
+                                            write_scan_log(f"VFS RC 서버 연결 거부로 재시도합니다 (server={clean_rc_url}, path={rel_path}, attempt={attempt}/3)")
+                                            time.sleep(2.0)
+                                            continue
+                                        # 로그에 인증 정보 노출 방지
+                                        safe_url = rc_url
+                                        if '@' in rc_url:
+                                            try:
+                                                p = urllib.parse.urlparse(rc_url)
+                                                safe_url = f"{p.scheme}://****:****@{p.netloc.split('@')[-1]}"
+                                            except Exception:
+                                                safe_url = "[Protected URL]"
+                                        print(f"[Scanner-Trigger ERROR] VFS update request failed ({rel_path}): Server='{safe_url}', Error={http_ex}")
+                                        write_scan_log(f"VFS update request failed ({rel_path}): {http_ex}")
+                                        break
+                                    except Exception as http_ex:
+                                        # 로그에 인증 정보 노출 방지
+                                        safe_url = rc_url
+                                        if '@' in rc_url:
+                                            try:
+                                                p = urllib.parse.urlparse(rc_url)
+                                                safe_url = f"{p.scheme}://****:****@{p.netloc.split('@')[-1]}"
+                                            except Exception:
+                                                safe_url = "[Protected URL]"
+                                        print(f"[Scanner-Trigger ERROR] VFS update request failed ({rel_path}): Server='{safe_url}', Error={http_ex}")
+                                        write_scan_log(f"VFS update request failed ({rel_path}): {http_ex}")
+                                        break
 
-                            if refreshed:
-                                break
-                        except Exception as e_rc:
-                            print(f"[Scanner-Trigger ERROR] VFS RC URL processing error: {e_rc}")
-                            write_scan_log(f"VFS RC URL 처리 오류: {e_rc}")
+                                if refreshed:
+                                    break
+                            except Exception as e_rc:
+                                print(f"[Scanner-Trigger ERROR] VFS RC URL processing error: {e_rc}")
+                                write_scan_log(f"VFS RC URL 처리 오류: {e_rc}")
+
+                        if refreshed:
+                            break
 
                     if refreshed:
                         continue
             except Exception as e_vfs:
                 print(f"[Scanner-Trigger ERROR] Error during VFS refresh: {e_vfs}")
                 write_scan_log(f"VFS 새로고침 오류: {e_vfs}")
+        else:
+            print("[Scanner-Trigger] VFS refresh skipped: disabled and no remote paths detected.")
+            write_scan_log("VFS 새로고침 건너뜀: 비활성 상태이며 원격 경로가 감지되지 않았습니다.")
     except Exception as db_err:
         print(f"[Scanner-Trigger] VFS 옵션 DB 조회 Error: {db_err}")
     

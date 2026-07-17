@@ -51,15 +51,30 @@ pip install -r requirements.txt
 
 ### ③ Environment Variables Setup (Optional)
 
-Complex settings that used to exist in the `.env` file (such as plugin activation, API keys, etc.) have been deprecated. In the latest architecture, you can safely configure and manage them directly in the DB through the Web UI's **[Settings > Plugin Settings]** tab after running the system. Therefore, you can skip creating an environment variables file and proceed directly to execution unless you have a specific reason.
+Complex `.env` settings from older versions (plugin activation flags, API keys, etc.) are deprecated. Most operational settings are now managed in the DB via the Web UI's **[Settings > Plugin Settings]** tab. So in many cases, you can run BookOasis without a `.env` file.
 
-However, to **prevent the web login session from being cleared (maintaining logged-in status)** when Gunicorn worker processes restart due to memory threshold detection or system reboots, you must create a `.env` file at the project root and register a fixed secret key (`SECRET_KEY`).
+However, the following are still recommended to be managed via `.env`:
+
+- **Fixed session key**: keep login sessions across restarts (`SECRET_KEY`)
+- **Inbound scan webhook token**: external poller-triggered scans (`WEBHOOK_TOKEN`)
+- **Outbound standard event webhook**: delivery for `book.new/read/finish` (`WEBHOOK_EVENT_*`)
 
 **.env Configuration Example:**
 ```env
 # Fixed secret key to preserve user login sessions upon Gunicorn restarts
 SECRET_KEY=yoursupersecretfixedkey12345!
+
+# (Optional) inbound webhook token for external-triggered scan
+WEBHOOK_TOKEN=your_secure_api_token_here
+
+# (Optional) outbound standard event webhook
+WEBHOOK_EVENT_ENDPOINT=http://127.0.0.1:9000/webhook
+WEBHOOK_EVENT_TIMEOUT=5
+WEBHOOK_EVENT_RETRY=2
+WEBHOOK_EVENT_SECRET=change_me
 ```
+
+For payload contract details and format constraints (EPUB/TXT `totalPages` may be nullable), see [API Endpoints Specification](./api_endpoints.md#-6-외부-연동-및-자동화용-웹훅-api-webhook).
 
 ---
 

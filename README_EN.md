@@ -62,7 +62,10 @@ For detailed environment configuration and installation methods, please refer to
 * Mobile Viewer Integration: [OPDS Integration Guide (docs/guide_opds_en.md)](./docs/guide_opds_en.md)
 * Architecture and Source Structure: [Architecture Guide (docs/guide_architecture_en.md)](./docs/guide_architecture_en.md)
 * Plugin Development: [Plugin Guide (docs/guide_plugins_en.md)](./docs/guide_plugins_en.md)
+* Standard Event Webhook Spec: [API Endpoints Specification (docs/api_endpoints.md)](./docs/api_endpoints.md#-6-외부-연동-및-자동화용-웹훅-api-webhook)
 * Wiki Portal: [Wiki Home (docs/index.md)](./docs/index.md)
+
+> Outbound event webhooks (`book.new`, `book.read`, `book.finish`) are format-aware. For EPUB/TXT, physical pages are not always stable, so `totalPages` may be `null`. Receiver implementations should prioritize `progress` (0-100).
 
 ### Easy Operation (Docker)
 
@@ -140,6 +143,13 @@ By trusting the HTTP headers (`Remote-User` or `X-Forwarded-User`) delivered aft
 1. Log in with an admin account and navigate to the **General Settings** menu.
 2. Scroll down to find and toggle the **Proxy Header Auth (Reverse Proxy Auto Login)** option.
 3. Save the settings, and configure your upstream Nginx/Proxy server to pass the correct username header to BookOasis.
+
+**Optional security hardening (recommended):**
+- `PROXY_HEADER_TRUSTED_IPS`: Trusted proxy source IP/CIDR whitelist (example: `127.0.0.1,10.0.0.0/8,192.168.0.0/16`)
+  - When set, `Remote-User`/`X-Forwarded-User` headers from non-whitelisted source IPs are ignored.
+- `PROXY_HEADER_DENY_DIRECT`: Set to `1` to deny direct access without proxy headers (force reverse-proxy path)
+
+> These options can be configured via DB settings (`settings` table) or environment variables (`.env`). DB settings take precedence.
 
 ---
 

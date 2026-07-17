@@ -18,7 +18,8 @@ class CategoryService:
             'vfs_refresh_before_scan': r['vfs_refresh_before_scan'] or 0,
             'rclone_rc_url': r['rclone_rc_url'] or '',
             'icon': r['icon'] or 'fa-book',
-            'color': r['color'] or '#94a3b8'
+            'color': r['color'] or '#94a3b8',
+            'hide_cover': r['hide_cover'] or 0,
         } for r in rows]
 
     @staticmethod
@@ -28,7 +29,7 @@ class CategoryService:
         return '\n'.join([line for line in lines if line])
 
     @staticmethod
-    def add_library(db_type, name, physical_path, is_remote=0, rclone_rc_url=None, icon='fa-book', color='#94a3b8'):
+    def add_library(db_type, name, physical_path, is_remote=0, rclone_rc_url=None, icon='fa-book', color='#94a3b8', hide_cover=0):
         # 이름 방어 로직: 양끝 공백 제거, 빈 이름 거부, 최대 100자 제한
         name = str(name or '').strip()
         if not name:
@@ -36,10 +37,10 @@ class CategoryService:
         if len(name) > 25:
             raise ValueError('카테고리 이름은 25자를 초과할 수 없습니다.')
         physical_path = CategoryService._clean_physical_path(physical_path)
-        return CategoryRepository.add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color)
+        return CategoryRepository.add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover)
 
     @staticmethod
-    def edit_library(db_type, library_id, name, physical_path, is_remote=0, rclone_rc_url=None, icon='fa-book', color='#94a3b8'):
+    def edit_library(db_type, library_id, name, physical_path, is_remote=0, rclone_rc_url=None, icon='fa-book', color='#94a3b8', hide_cover=0):
         # 이름 방어 로직: 양끝 공백 제거, 빈 이름 거부, 최대 25자 제한
         name = str(name or '').strip()
         if not name:
@@ -47,7 +48,7 @@ class CategoryService:
         if len(name) > 25:
             raise ValueError('카테고리 이름은 25자를 초과할 수 없습니다.')
         physical_path = CategoryService._clean_physical_path(physical_path)
-        CategoryRepository.edit_library(db_type, library_id, name, physical_path, is_remote, rclone_rc_url, icon, color)
+        CategoryRepository.edit_library(db_type, library_id, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover)
 
     @staticmethod
     def delete_library(db_type, library_id):
@@ -113,10 +114,10 @@ class CategoryService:
             # 3. 목적지 DB에 카테고리 삽입
             cursor_dst.execute(
                 """INSERT INTO libraries 
-                   (name, physical_path, cron_schedule, last_scanned_at, scan_status, is_remote, vfs_refresh_before_scan, rclone_rc_url, icon, color) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                         (name, physical_path, cron_schedule, last_scanned_at, scan_status, is_remote, vfs_refresh_before_scan, rclone_rc_url, icon, color, hide_cover) 
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (lib["name"], lib["physical_path"], lib["cron_schedule"], lib["last_scanned_at"], lib["scan_status"], 
-                 lib["is_remote"], lib["vfs_refresh_before_scan"], lib["rclone_rc_url"], lib["icon"], lib["color"])
+                      lib["is_remote"], lib["vfs_refresh_before_scan"], lib["rclone_rc_url"], lib["icon"], lib["color"], lib["hide_cover"])
             )
             new_lib_id = cursor_dst.lastrowid
             

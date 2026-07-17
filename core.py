@@ -5,7 +5,7 @@ load_dotenv()
 from utils.logger import setup_rotating_logger
 setup_rotating_logger()
 
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from database import init_databases
 from api import api_bp
 
@@ -15,6 +15,17 @@ app = Flask(__name__,
             template_folder=os.path.join(BASE_DIR, 'templates'),
             static_folder=os.path.join(BASE_DIR, 'static'))
 
+def _get_max_content_length_bytes():
+    raw = str(os.environ.get('MAX_CONTENT_LENGTH_MB', '100')).strip()
+    try:
+        size_mb = int(raw)
+    except ValueError:
+        size_mb = 100
+    size_mb = max(1, min(size_mb, 1024))
+    return size_mb * 1024 * 1024
+
+app.config['MAX_CONTENT_LENGTH'] = _get_max_content_length_bytes()
+
 # Flask 세션 관리용 암호화 키 설정 (환경변수 부재 시 보안 난수 자동 주입)
 app.secret_key = os.environ.get('SECRET_KEY')
 if not app.secret_key:
@@ -23,6 +34,12 @@ if not app.secret_key:
 
 # 블루프린트 등록
 app.register_blueprint(api_bp)
+
+@app.errorhandler(413)
+def handle_request_entity_too_large(_error):
+    if request.path.startswith('/api/'):
+        return jsonify({'success': False, 'error': 'Request payload too large'}), 413
+    return 'Request payload too large', 413
 
 @app.after_request
 def add_fingerprint_headers(response):
@@ -84,7 +101,11 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='BookOasis Media Server')
     parser.add_argument('-p', '--port', type=int, default=int(os.environ.get('PORT', 5930)), help='Port to run the server on (default: 5930 or $PORT)')
+    parser.add_argument('--debug', action='store_true', help='Enable Flask debug mode (default: disabled)')
     args = parser.parse_args()
 
+    env_debug = str(os.environ.get('FLASK_DEBUG', '')).strip().lower() in ('1', 'true', 'yes', 'on')
+    debug_mode = bool(args.debug or env_debug)
+
     # 파라미터 또는 환경변수에 따라 포트 할당
-    app.run(host='0.0.0.0', port=args.port, debug=True)
+    app.run(host='0.0.0.0', port=args.port, debug=debug_mode)

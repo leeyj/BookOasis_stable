@@ -9,6 +9,7 @@ from api.auth import admin_required, login_required
 from flask import render_template
 from urllib.request import Request, urlopen
 from services.plugin_service import PluginService
+from services.settings_service import SettingsService
 import database
 
 system_bp = Blueprint('system', __name__)
@@ -235,7 +236,7 @@ def trigger_scan_via_webhook():
     db_type = request.args.get('type') or request.form.get('type') or 'general'
     
     # 1. 보안 토큰 검증
-    sys_token = os.environ.get('WEBHOOK_TOKEN')
+    sys_token = SettingsService.get('WEBHOOK_TOKEN', '', db_type='general') or os.environ.get('WEBHOOK_TOKEN')
     if not sys_token or not token or token != sys_token:
         return jsonify({'success': False, 'error': 'Invalid webhook token.'}), 401
         

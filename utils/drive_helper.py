@@ -3,6 +3,74 @@ import os
 import platform
 import sys
 
+
+_REMOTE_FS_TYPES = ('fuse.rclone', 'rclone', 'cifs', 'nfs', 'nfs4', 'davfs', 'smbfs', 'fuse', 'sshfs')
+
+
+def _decode_mount_token(token):
+    """Decode escaped mount path tokens from /proc/mounts (e.g. \040 -> space)."""
+    if not token or '\\' not in token:
+        return token
+
+    out = []
+    i = 0
+    length = len(token)
+    while i < length:
+        ch = token[i]
+        if ch == '\\' and i + 3 < length:
+            octal = token[i + 1:i + 4]
+            if all(c in '01234567' for c in octal):
+                out.append(chr(int(octal, 8)))
+                i += 4
+                continue
+        out.append(ch)
+        i += 1
+    return ''.join(out)
+
+
+def _iter_mounts():
+    """Yield tuples of (mount_point, fstype) from /proc/mounts."""
+    if not os.path.exists('/proc/mounts'):
+        return
+
+    try:
+        with open('/proc/mounts', 'r', encoding='utf-8') as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) < 3:
+                    continue
+                mount_point = _decode_mount_token(parts[1])
+                fstype = parts[2].lower()
+                yield mount_point, fstype
+    except Exception as e:
+        print(f"[drive_helper] mounts 파싱 실패: {e}")
+
+
+def _is_same_or_subpath(path, root):
+    """Return True if path is equal to root or inside root directory."""
+    try:
+        path_norm = os.path.normcase(os.path.realpath(os.path.abspath(path)))
+        root_norm = os.path.normcase(os.path.realpath(os.path.abspath(root)))
+        return os.path.commonpath([path_norm, root_norm]) == root_norm
+    except Exception:
+        # Fallback for invalid path edge-cases.
+        path_norm = os.path.normcase(os.path.abspath(path))
+        root_norm = os.path.normcase(os.path.abspath(root))
+        return path_norm == root_norm or path_norm.startswith(root_norm + os.sep)
+
+
+def _find_best_remote_mount_point(path):
+    """Find the longest matching remote mount point that contains path."""
+    best = ''
+    for mount_point, fstype in _iter_mounts() or []:
+        if mount_point == '/':
+            continue
+        if not any(t in fstype for t in _REMOTE_FS_TYPES):
+            continue
+        if _is_same_or_subpath(path, mount_point) and len(mount_point) > len(best):
+            best = mount_point
+    return best
+
 def is_remote_path(path):
     """
     주어진 경로가 원격 마운트(VFS, rclone, 네트워크 드라이브 등)인지 자동으로 판별합니다.
@@ -32,20 +100,9 @@ def is_remote_path(path):
     # 2. Linux / Unix 환경 판별
     elif system in ('linux', 'darwin'):
         try:
-            # /proc/mounts 파일이 있는지 확인
-            if os.path.exists('/proc/mounts'):
-                with open('/proc/mounts', 'r', encoding='utf-8') as f:
-                    for line in f:
-                        parts = line.split()
-                        if len(parts) >= 3:
-                            mount_point = parts[1]
-                            fstype = parts[2].lower()
-                            # 대상 경로가 해당 마운트 지점의 하위 경로인지 확인
-                            if path.startswith(mount_point):
-                                # 원격 파일 시스템 종류 매칭
-                                remote_types = ('fuse.rclone', 'rclone', 'cifs', 'nfs', 'nfs4', 'davfs', 'smbfs', 'fuse', 'sshfs')
-                                if any(t in fstype for t in remote_types):
-                                    return True
+            remote_mount = _find_best_remote_mount_point(path)
+            if remote_mount:
+                return True
         except Exception as e:
             print(f"[is_remote_path] Linux mounts 체크 실패: {e}")
 
@@ -77,21 +134,19 @@ def get_rclone_relative_path(path):
         
     # 2. Linux/Unix: /mnt/gdrive/Library/Fantasy -> Library/Fantasy
     elif system in ('linux', 'darwin'):
-        mount_point = ""
         try:
-            if os.path.exists('/proc/mounts'):
-                with open('/proc/mounts', 'r', encoding='utf-8') as f:
-                    for line in f:
-                        parts = line.split()
-                        if len(parts) >= 2:
-                            pt = parts[1]
-                            if path.startswith(pt) and len(pt) > len(mount_point) and pt != '/':
-                                mount_point = pt
+            mount_point = _find_best_remote_mount_point(path)
         except Exception as e:
             print(f"[get_rclone_relative_path] Linux mounts 파싱 실패: {e}")
+            mount_point = ''
             
         if mount_point:
-            relative = path[len(mount_point):].strip("\\/")
+            try:
+                relative = os.path.relpath(path, mount_point)
+            except Exception:
+                relative = path[len(mount_point):].strip("\\/")
+            if relative in ('.', ''):
+                return '.'
             return relative.replace("\\", "/")
             
         # 3. 폴백: 마운트 포인트를 찾지 못한 경우 관례적 걷어내기
@@ -105,3 +160,31 @@ def get_rclone_relative_path(path):
         return "/".join(parts[1:])
         
     return path
+
+
+def get_rclone_refresh_dirs(path):
+    """
+    Build ordered candidate directories for rclone rc vfs/refresh.
+    This improves compatibility when a remote is mounted at root vs specific subfolder.
+    """
+    rel = get_rclone_relative_path(path)
+    candidates = []
+
+    def _push(value):
+        value = '' if value is None else str(value)
+        if value not in candidates:
+            candidates.append(value)
+
+    if rel:
+        _push(rel)
+
+    if rel in ('.', ''):
+        _push('')
+    elif '/' in rel:
+        # Fallback for cases where mountpoint detection includes one extra prefix segment.
+        _push(rel.split('/')[-1])
+
+    # Last-resort root refresh for mount-root scoped remotes.
+    _push('.')
+
+    return candidates

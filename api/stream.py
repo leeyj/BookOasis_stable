@@ -6,6 +6,7 @@ import os
 import re
 import mimetypes
 import urllib.parse
+from pathlib import Path
 from flask import Blueprint, request, Response, jsonify, send_file, session
 from services.stream_service import StreamService
 from api.auth import login_required, check_adult_permission, admin_required
@@ -272,6 +273,18 @@ def get_cover_image(filename):
     import urllib.parse
     import mimetypes
 
+    covers_root = Path(COVERS_DIR).resolve()
+
+    def _resolve_cover_path(name):
+        # Prevent absolute-path override and path traversal outside covers directory.
+        cleaned = str(name or '').lstrip('/\\')
+        candidate = (covers_root / cleaned).resolve()
+        try:
+            candidate.relative_to(covers_root)
+        except ValueError:
+            return None
+        return candidate
+
     def _send_cover(path):
         mime, _ = mimetypes.guess_type(path)
         mime = mime or 'image/png'
@@ -281,11 +294,11 @@ def get_cover_image(filename):
         return res
 
     decoded_filename = urllib.parse.unquote(filename)
-    path = os.path.join(COVERS_DIR, decoded_filename)
-    if not os.path.exists(path):
+    path = _resolve_cover_path(decoded_filename)
+    if not path or not path.exists() or not path.is_file():
         # 만약 unquote 전 경로로 존재하는지 2차 체크 (Fallback)
-        path_fallback = os.path.join(COVERS_DIR, filename)
-        if os.path.exists(path_fallback):
+        path_fallback = _resolve_cover_path(filename)
+        if path_fallback and path_fallback.exists() and path_fallback.is_file():
             return _send_cover(path_fallback)
         return jsonify({'error': _t('api.err_cover_not_found')}), 404
     return _send_cover(path)

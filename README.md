@@ -64,7 +64,10 @@ BookOasis가 대용량(10만 권 이상) 환경에서도 버벅임 없이 초광
 * 모바일 뷰어 연동: [OPDS 연동 가이드 (docs/guide_opds.md)](./docs/guide_opds.md)
 * 아키텍처 및 소스 구조: [아키텍처 가이드 (docs/guide_architecture.md)](./docs/guide_architecture.md)
 * 플러그인 개발 정보: [플러그인 개발 가이드 (docs/guide_plugins.md)](./docs/guide_plugins.md)
+* 표준 이벤트 웹훅 명세: [API 엔드포인트 명세 (docs/api_endpoints.md)](./docs/api_endpoints.md#-6-외부-연동-및-자동화용-웹훅-api-webhook)
 * 위키 포털: [기술 위키 홈 (docs/index.md)](./docs/index.md)
+
+> 이벤트 웹훅(`book.new`, `book.read`, `book.finish`)은 포맷별 진행률 제약을 반영합니다. EPUB/TXT는 물리 페이지가 고정되지 않아 `totalPages`가 `null`일 수 있으며, 수신 측에서는 `progress`(0~100)를 우선 처리하는 것을 권장합니다.
 
 ### 간편 구동 (Docker)
 
@@ -140,6 +143,13 @@ Authelia, Authentik 등 앞단의 리버스 프록시 인증 서버가 검증을
 1. 어드민 계정으로 로그인 후 **일반 설정** 메뉴에 진입합니다.
 2. 스크롤을 내려 **Proxy Header Auth (리버스 프록시 자동 로그인)** 항목을 찾아 토글합니다.
 3. 설정을 저장한 뒤, 앞단의 Nginx/프록시 서버가 올바른 사용자명 헤더를 BookOasis 로 넘겨주도록 구성하십시오.
+
+**선택 보안 옵션 (권장):**
+- `PROXY_HEADER_TRUSTED_IPS`: 프록시 원본 IP/CIDR 화이트리스트 (예: `127.0.0.1,10.0.0.0/8,192.168.0.0/16`)
+  - 이 값이 설정되면, 화이트리스트에 없는 소스 IP에서 전달된 `Remote-User`/`X-Forwarded-User` 헤더는 무시됩니다.
+- `PROXY_HEADER_DENY_DIRECT`: `1`로 설정 시, 프록시 헤더가 없는 직접 접속을 거부 (reverse proxy 경유 강제)
+
+> 위 옵션은 DB 설정(`settings` 테이블) 또는 환경변수(`.env`)로 설정할 수 있습니다. DB 설정값이 우선 적용됩니다.
 
 ---
 

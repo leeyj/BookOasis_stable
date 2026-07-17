@@ -1,5 +1,6 @@
 import { state } from './state.js';
 import { jumpToIndex } from './book_list.js';
+import { stripLeadingBracketTags } from './series_display.js';
 
 // 한글 초성 배열
 const CHOSEONG = [
@@ -110,7 +111,7 @@ function handleIndexClick(char) {
   for (let i = 0; i < state.filteredBooksData.length; i++) {
     const book = state.filteredBooksData[i];
     // ui.js의 normalizeBookTitle 로직과 동일하게 제목을 가져옴
-    const title = book.series_name || book.title || '';
+    const title = stripLeadingBracketTags(book.series_name || book.title || '');
     const initial = getInitial(title);
 
     // ASC 정렬 시 첫 번째 매칭 아이템

@@ -13,6 +13,19 @@ This document describes the current plugin standard for BookOasis metadata/dashb
 - The core only relies on shared contracts.
 - Plugin extension should be completed inside `plugins/metadata/` without core code forks.
 
+### Compatibility Matrix (Core ↔ Plugin Contract)
+
+| Core Version Range | Required Contract | Optional Contract | Notes |
+| :--- | :--- | :--- | :--- |
+| 1.0.0 ~ 1.0.4 | `search`, `apply` | `dashboard_widget`, `get_dashboard_data` | Both folder-based and single-file plugins supported |
+| 1.0.5 ~ 1.0.6 | `search`, `apply` | `get_context_menu_items`, `run_context_menu_action`, `update_manifest` | Context menu and sample update support |
+| 1.0.7+ (current) | `search`, `apply` | `on_scan_new_books_detected`, `dispatch_webhook`, `update_manifest` | Standard event webhooks (`book.new/read/finish`) recommended |
+
+Compatibility rules:
+
+- Core guarantees only the **required contract**.
+- Optional hooks may be unavailable in older cores; implement plugin-side feature detection/fallbacks.
+
 ---
 
 ## 2. Directory Structure
@@ -319,6 +332,68 @@ Response-path validation test (httpbin):
 
 Warning: do not send production secrets or sensitive payload data to public test endpoints.
 
+### Standard Event Webhook Schema (book.new / book.read / book.finish)
+
+For community integrations, the recommended standardized outbound event webhook contract is:
+
+- Endpoint: `POST http://<server>/webhook`
+- Events: `book.new`, `book.read`, `book.finish`
+- Top-level keys: `event`, `user`, `Account`, `Metadata`
+
+Example payload:
+
+```json
+{
+    "event": "book.read",
+    "user": true,
+    "Account": {
+        "id": 123456,
+        "title": "username"
+    },
+    "Metadata": {
+        "type": "book",
+        "format": "epub",
+        "title": "Book title",
+        "author": "Author name",
+        "publisher": "Publisher",
+        "series": "Series name",
+        "seriesIndex": null,
+        "progress": 45,
+        "totalPages": null,
+        "currentLocation": "epubcfi(/6/2[chap01]!/4/2/14)",
+        "addedAt": 1690000000
+    }
+}
+```
+
+Format constraints (important):
+
+- EPUB/TXT do not always have stable physical pages, so `totalPages` may be `null`.
+- Consumers should treat `progress` (0-100) as the primary progress signal.
+- `currentLocation` should be interpreted by format:
+    - EPUB: `href` / `cfi` / `spine`-based string
+    - TXT: `chunk:N`
+    - Fixed-page formats (PDF/ZIP/CBZ): `page:N`
+
+Recommended consumer policy:
+
+- Determine completion primarily by `book.finish` event or `progress`
+- Treat `totalPages` as auxiliary metadata
+
+### Standard Event Delivery Environment Variables
+
+Core standardized event webhook delivery is controlled by:
+
+- `WEBHOOK_EVENT_ENDPOINT` or `WEBHOOK_EVENT_ENDPOINTS`
+- `WEBHOOK_EVENT_TIMEOUT`
+- `WEBHOOK_EVENT_RETRY`
+- `WEBHOOK_EVENT_SECRET` (HMAC signature header: `X-BookOasis-Signature`)
+
+Notes:
+
+- This can coexist with plugin-level `WEBHOOK_TARGETS_JSON` delivery.
+- The standardized payload is intended to let plugin/integration developers implement receivers against one stable contract.
+
 ---
 
 ## 7. Plugin Developer Release Flow (With Auto-Update)
@@ -369,6 +444,44 @@ When `success_path` is set, the target is considered successful only if that JSO
 ---
 
 ## 7. Minimal Example
+
+The two snippets below are copy-paste friendly baseline templates for both human and AI-assisted plugin development.
+
+### Example A: Search-Type Metadata Plugin (Minimal)
+
+```python
+# -*- coding: utf-8 -*-
+from plugins.metadata.base import BaseMetadataProvider
+
+
+class DemoSearchMetadataProvider(BaseMetadataProvider):
+    id = "demo_search"
+    name = "Demo Search"
+    is_searchable = True
+    config_schema = []
+
+    def search(self, db_type, query):
+        q = str(query or '').strip()
+        if not q:
+            return {'success': True, 'items': []}
+        return {
+            'success': True,
+            'items': [
+                {
+                    'title': q,
+                    'author': 'Unknown',
+                    'publisher': '',
+                    'summary': 'Demo search result',
+                }
+            ]
+        }
+
+    def apply(self, db_type, book_id, item_data):
+        # Real plugins should persist updates through DB gateway APIs.
+        return True, 'demo applied'
+```
+
+### Example B: Dashboard Widget Plugin (Minimal)
 
 ```python
 # -*- coding: utf-8 -*-

@@ -344,6 +344,7 @@ export function selectCategory(id, skipHistory = false) {
   if (activeItem) {
     activeItem.classList.add('active');
   }
+  state.currentLibraryHideCovers = !!(activeItem && activeItem.dataset && activeItem.dataset.type === 'custom' && activeItem.dataset.hideCover === '1');
   updateCurrentCategoryIndicator(id, activeItem);
 
   goBackToList();

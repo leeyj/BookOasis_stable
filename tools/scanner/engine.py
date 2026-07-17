@@ -11,6 +11,7 @@ if MEDIA_SERVER_DIR not in sys.path:
 import database
 from tools.scanner.vfs import trigger_vfs_refresh
 from services.webhook_dispatcher import dispatch_webhook_event
+from services.webhook_dispatcher import build_book_event_payload, dispatch_standard_book_event
 from services.metadata_factory import MetadataFactory
 from utils.drive_helper import is_remote_path
 from tools.scanner.memory_helper import check_memory_exceeded
@@ -326,6 +327,9 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                                 'title': title or os.path.splitext(filename)[0],
                                 'file_path': full_path,
                                 'series_name': series_name,
+                                'author': (merged_meta.get('author') if isinstance(merged_meta, dict) else '') or '',
+                                'publisher': (merged_meta.get('publisher') if isinstance(merged_meta, dict) else '') or '',
+                                'format': file_format,
                             })
                             print(f"[Scanner-Process] Found new book: {filename} (Series: {series_name})")
                         batch_item_count += 1
@@ -409,7 +413,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
     if not handle_deleted_books(cursor, db_books, deleted_paths, target_paths, found_file_paths):
         conn.close()
         return
-        
+
     # Initialize checkpoint of library upon successful completion
     cursor.execute("DELETE FROM scanner_progress WHERE library_id = ?", (str(library_id),))
     conn.commit()
@@ -444,6 +448,27 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
             dispatch_webhook_event('scan.new_books_detected', event_payload)
         except Exception as hook_err:
             print(f"[Scanner-Webhook] dispatch failed: {hook_err}")
+
+        # 커뮤니티 표준 이벤트: book.new (신규 도서별 개별 발행)
+        try:
+            for book in detected_new_books:
+                metadata = {
+                    'type': 'book',
+                    'format': (book.get('format') or '').lower(),
+                    'title': book.get('title') or '',
+                    'author': book.get('author') or '',
+                    'publisher': book.get('publisher') or '',
+                    'series': book.get('series_name') or None,
+                    'seriesIndex': None,
+                    'progress': 0,
+                    'totalPages': None,
+                    'currentLocation': None,
+                    'addedAt': int(time.time()),
+                }
+                payload = build_book_event_payload('book.new', metadata=metadata, user=False)
+                dispatch_standard_book_event(payload)
+        except Exception as hook_err:
+            print(f"[Scanner-Webhook] standard book.new dispatch failed: {hook_err}")
 
         _dispatch_new_books_to_plugin_hooks(db_type, event_payload)
 

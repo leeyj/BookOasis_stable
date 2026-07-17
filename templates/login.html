@@ -30,11 +30,11 @@
 
         <form id="login-form" onsubmit="handleLogin(event)">
             <div class="form-group">
-                <input type="text" id="username" class="form-control" data-i18n-placeholder="login.username_placeholder" placeholder="아이디" required autocomplete="username">
+                <input type="text" id="username" class="form-control" data-i18n-placeholder="login.username_placeholder" placeholder="아이디" required autocomplete="username" maxlength="128">
                 <i class="fa-solid fa-user"></i>
             </div>
             <div class="form-group">
-                <input type="password" id="password" class="form-control" data-i18n-placeholder="login.password_placeholder" placeholder="비밀번호" required autocomplete="current-password">
+                <input type="password" id="password" class="form-control" data-i18n-placeholder="login.password_placeholder" placeholder="비밀번호" required autocomplete="current-password" maxlength="256">
                 <i class="fa-solid fa-lock"></i>
             </div>
             <div style="margin: -0.5rem 0 1rem 0; text-align: left;">
@@ -65,11 +65,11 @@
 
         <form id="change-form" onsubmit="handleChangePassword(event)">
             <div class="form-group">
-                <input type="password" id="new-password" class="form-control" placeholder="새 비밀번호 (4자리 이상)" required autocomplete="new-password">
+                <input type="password" id="new-password" class="form-control" placeholder="새 비밀번호 (4자리 이상)" required autocomplete="new-password" maxlength="256">
                 <i class="fa-solid fa-lock"></i>
             </div>
             <div class="form-group">
-                <input type="password" id="confirm-password" class="form-control" placeholder="새 비밀번호 확인" required autocomplete="new-password">
+                <input type="password" id="confirm-password" class="form-control" placeholder="새 비밀번호 확인" required autocomplete="new-password" maxlength="256">
                 <i class="fa-solid fa-lock"></i>
             </div>
             <button type="submit" class="btn-submit btn-warning">

@@ -26,5 +26,23 @@ This is the central technical documentation and task history archive portal for 
   - [스캔 로직 기술 사양서 (spec_scanner_logic.md)](./spec_scanner_logic.md) / [English (spec_scanner_logic_en.md)](./spec_scanner_logic_en.md): 백그라운드 동기화 스캔 엔진 세부 동작 메커니즘 / Multi-threaded scanner engine internals.
   - [플러그인 작성 체크리스트 (plugin_checklist.md)](./plugin_checklist.md) / [English (plugin_checklist_en.md)](./plugin_checklist_en.md): 새 플러그인 작성 시 필수 확인 항목 / Quick validation list for new plugin authors.
 
+  ---
+
+  ## 🚀 플러그인 개발 빠른 시작 (Plugin Dev Quick Start)
+
+  신규 개발자와 AI 에이전트가 가장 자주 찾는 문서를 한 번에 진입할 수 있도록 정리했습니다.  
+  This section provides a one-pass entry for new developers and AI agents.
+
+  1. 시작점 (Start Here)
+    - [플러그인 개발 가이드 (guide_plugins.md)](./guide_plugins.md) / [English (guide_plugins_en.md)](./guide_plugins_en.md)
+  2. 바로 실행 가능한 검증 항목 (Validation Checklist)
+    - [플러그인 작성 체크리스트 (plugin_checklist.md)](./plugin_checklist.md) / [English (plugin_checklist_en.md)](./plugin_checklist_en.md)
+  3. 웹훅 계약(이벤트/필드 보장/nullable) 확인 (Webhook Contract)
+    - [API 엔드포인트 명세서 (api_endpoints.md)](./api_endpoints.md)
+  4. 운영 환경 변수/배포 전 점검 (Deployment and Env)
+    - [설치 가이드 (guide_installation.md)](./guide_installation.md) / [English (guide_installation_en.md)](./guide_installation_en.md)
+  5. 데이터 모델 참조 (Data Model Reference)
+    - [DB 스키마 명세서 (spec_db_schema.md)](./spec_db_schema.md) / [English (spec_db_schema_en.md)](./spec_db_schema_en.md)
+
 ---
-*최종 업데이트 (Last Updated): 2026-07-12*
+  *최종 업데이트 (Last Updated): 2026-07-17*

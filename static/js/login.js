@@ -1,3 +1,6 @@
+const MAX_USERNAME_LENGTH = 128;
+const MAX_PASSWORD_LENGTH = 256;
+
 async function handleLogin(e) {
     e.preventDefault();
     const usernameInput = document.getElementById('username').value.trim();
@@ -7,6 +10,17 @@ async function handleLogin(e) {
     const errText = document.getElementById('login-error-text');
 
     errDiv.style.display = 'none';
+
+    if (usernameInput.length > MAX_USERNAME_LENGTH) {
+        errText.innerText = `아이디는 최대 ${MAX_USERNAME_LENGTH}자까지 입력할 수 있습니다.`;
+        errDiv.style.display = 'flex';
+        return;
+    }
+    if (passwordInput.length > MAX_PASSWORD_LENGTH) {
+        errText.innerText = `비밀번호는 최대 ${MAX_PASSWORD_LENGTH}자까지 입력할 수 있습니다.`;
+        errDiv.style.display = 'flex';
+        return;
+    }
 
     try {
         const res = await fetch('/login', {
@@ -56,6 +70,12 @@ async function handleChangePassword(e) {
     const errText = document.getElementById('change-error-text');
 
     errDiv.style.display = 'none';
+
+    if (newPw.length > MAX_PASSWORD_LENGTH || confirmPw.length > MAX_PASSWORD_LENGTH) {
+        errText.innerText = `비밀번호는 최대 ${MAX_PASSWORD_LENGTH}자까지 입력할 수 있습니다.`;
+        errDiv.style.display = 'flex';
+        return;
+    }
 
     if (newPw !== confirmPw) {
         errText.innerText = '비밀번호가 일치하지 않습니다.';

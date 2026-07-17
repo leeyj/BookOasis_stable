@@ -45,8 +45,13 @@ def trigger_library_scan(library_id):
         db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
         
         from services.scanner_queue import scanner_queue
-        scanner_queue.enqueue('library_scan', db_type=db_type, db_path=db_path, 
+        enqueued = scanner_queue.enqueue('library_scan', db_type=db_type, db_path=db_path, 
                              library_id=library_id, physical_path=physical_path, force=force)
+        if not enqueued:
+            return jsonify({
+                'success': False,
+                'error': '동일 라이브러리 스캔이 이미 실행 중이거나 대기 중입니다.'
+            }), 409
         
         return jsonify({'success': True, 'message': _t('api.msg_scan_started')})
     except Exception as e:
@@ -86,8 +91,13 @@ def trigger_library_cover_scan(library_id):
         db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
         
         from services.scanner_queue import scanner_queue
-        scanner_queue.enqueue('cover_scan', db_type=db_type, db_path=db_path, 
+        enqueued = scanner_queue.enqueue('cover_scan', db_type=db_type, db_path=db_path, 
                              library_id=library_id, physical_path=physical_path)
+        if not enqueued:
+            return jsonify({
+                'success': False,
+                'error': '동일 라이브러리 표지 스캔이 이미 실행 중이거나 대기 중입니다.'
+            }), 409
         
         return jsonify({'success': True, 'message': _t('api.msg_cover_scan_started')})
     except Exception as e:
@@ -114,12 +124,16 @@ def trigger_all_libraries_scan():
         from services.scanner_queue import scanner_queue
         
         enqueued_count = 0
+        skipped_count = 0
         for row in rows:
-            scanner_queue.enqueue('library_scan', db_type=db_type, db_path=db_path, 
+            enqueued = scanner_queue.enqueue('library_scan', db_type=db_type, db_path=db_path, 
                                  library_id=row['id'], physical_path=row['physical_path'], force=force)
-            enqueued_count += 1
+            if enqueued:
+                enqueued_count += 1
+            else:
+                skipped_count += 1
             
-        return jsonify({'success': True, 'message': f'{enqueued_count}개의 카테고리가 순차 스캔 대기열에 추가되었습니다.'})
+        return jsonify({'success': True, 'message': f'{enqueued_count}개의 카테고리가 순차 스캔 대기열에 추가되었습니다. (중복 제외: {skipped_count})'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

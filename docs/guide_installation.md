@@ -51,15 +51,30 @@ pip install -r requirements.txt
 
 ### ③ 환경 변수 설정 (선택)
 
-과거 버전에 존재하던 `.env` 파일의 복잡한 설정(플러그인 활성화, API 키 등)은 모두 폐기되었으며, 최신 아키텍처에서는 시스템 구동 후 웹 브라우저의 **[환경설정 > 플러그인 설정]** 탭에서 안전하게 DB에 직접 저장하고 관리합니다. 따라서 특별한 목적이 없다면 별도의 환경 변수 파일 생성 없이 곧바로 실행 단계로 넘어가셔도 무방합니다.
+과거 버전에 존재하던 `.env` 파일의 복잡한 설정(플러그인 활성화, API 키 등)은 폐기되었고, 대부분의 운영 설정은 웹 UI의 **[환경설정 > 플러그인 설정]**에서 DB에 저장/관리합니다. 따라서 특별한 목적이 없다면 `.env` 없이 바로 실행해도 됩니다.
 
-다만, Gunicorn 워커 프로세스가 메모리 한계점 감지로 자진 재구동되거나 시스템이 재시작될 때 **웹 로그인 상태가 풀리지 않고 유지**되도록 하려면, 프로젝트 루트에 `.env` 파일을 생성하고 고정된 암호화 키(`SECRET_KEY`)를 등록해야 합니다.
+다만 아래 항목은 여전히 `.env` 기반으로 관리하는 것을 권장합니다.
+
+- **세션 고정 키**: 서버 재기동 시 로그인 세션 유지 (`SECRET_KEY`)
+- **인바운드 스캔 웹훅 토큰**: 외부 폴러 연동 (`WEBHOOK_TOKEN`)
+- **아웃바운드 표준 이벤트 웹훅**: `book.new/read/finish` 전송 (`WEBHOOK_EVENT_*`)
 
 **.env 파일 구성 예시:**
 ```env
 # Gunicorn 재구동 시 사용자 로그인 세션 유지를 위한 고정 키
 SECRET_KEY=yoursupersecretfixedkey12345!
+
+# (선택) 외부 트리거 스캔 인바운드 웹훅 토큰
+WEBHOOK_TOKEN=your_secure_api_token_here
+
+# (선택) 아웃바운드 표준 이벤트 웹훅
+WEBHOOK_EVENT_ENDPOINT=http://127.0.0.1:9000/webhook
+WEBHOOK_EVENT_TIMEOUT=5
+WEBHOOK_EVENT_RETRY=2
+WEBHOOK_EVENT_SECRET=change_me
 ```
+
+표준 이벤트 웹훅 페이로드 계약과 포맷 제약(EPUB/TXT `totalPages` nullable)은 [API 엔드포인트 명세](./api_endpoints.md#-6-외부-연동-및-자동화용-웹훅-api-webhook)를 참고하십시오.
 
 ---
 

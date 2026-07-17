@@ -4,6 +4,7 @@ import { openBookDetail } from './modal.js';
 import { openReader } from './viewer.js';
 import { showToast } from './view_manager.js';
 import { buildFallbackCoverUrl, getBookCoverSrc } from './cover_fallback.js';
+import { stripLeadingBracketTags } from './series_display.js';
 
 // 지연 로딩을 위한 단일 싱글톤 IntersectionObserver 인스턴스
 const lazyImageObserver = ('IntersectionObserver' in window)
@@ -46,10 +47,46 @@ function normalizeBookTitle(item) {
 }
 
 function resolveCardDisplayTitle(item, showVolumeCount) {
-  const normalizedTitle = normalizeBookTitle(item);
-  const representativeTitle = String(item.representative_title || '').trim();
-  const seriesName = String(item.series_name || '').trim();
-  // Keep card labels consistent across list/dashboard by always preferring series_name.
+  const rawNormalizedTitle = String(normalizeBookTitle(item) || '').trim();
+  const rawRepresentativeTitle = String(item.representative_title || '').trim();
+  const rawSeriesName = String(item.series_name || '').trim();
+  const rawAnchorDir = String(item.anchor_dir || '').trim();
+  const normalizedTitle = stripLeadingBracketTags(rawNormalizedTitle);
+  const representativeTitle = stripLeadingBracketTags(rawRepresentativeTitle);
+  const seriesName = stripLeadingBracketTags(rawSeriesName);
+  let anchorDirTitle = '';
+  if (rawAnchorDir) {
+    const normalizedDir = rawAnchorDir.replace(/\\/g, '/').replace(/\/+$/, '');
+    const segments = normalizedDir.split('/').filter(Boolean);
+    if (segments.length > 0) {
+      anchorDirTitle = stripLeadingBracketTags(segments[segments.length - 1]);
+    }
+  }
+  // Single-volume groups should open detail with the actual title, not author-like series labels.
+  const bookCount = parseInt(item.book_count, 10) || 0;
+  if (showVolumeCount && bookCount === 1) {
+    if (anchorDirTitle) {
+      return anchorDirTitle;
+    }
+
+    if (rawRepresentativeTitle && seriesName) {
+      const escapedSeries = seriesName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const bracketPrefix = new RegExp(`^\\[\\s*${escapedSeries}\\s*\\]\\s*(.+)$`, 'i');
+      const match = rawRepresentativeTitle.match(bracketPrefix);
+      if (match && match[1] && match[1].trim()) {
+        const extracted = stripLeadingBracketTags(match[1].trim());
+        if (extracted) return extracted;
+      }
+    }
+
+    const looksLikeFileLabel = /(^\d{1,4}\s*[-_.]\s*\d|\[(txt|epub|pdf|cbz|zip)\]\s*$|\.(txt|epub|pdf|cbz|zip)\s*$)/i
+      .test(rawRepresentativeTitle);
+    if (looksLikeFileLabel && seriesName) {
+      return seriesName;
+    }
+
+    return representativeTitle || seriesName || normalizedTitle;
+  }
   return seriesName || representativeTitle || normalizedTitle;
 }
 
@@ -73,6 +110,7 @@ export function createBookCard(item, options = {}) {
   card.className = 'book-card';
   card.dataset.bookId = item.id || item.representative_book_id || '';
 
+  const rawSeriesName = String(item.series_name || '').trim();
   const displayTitle = resolveCardDisplayTitle(item, options.showVolumeCount);
   const fallbackCoverSrc = buildFallbackCoverUrl({
     title: displayTitle,
@@ -86,6 +124,7 @@ export function createBookCard(item, options = {}) {
     seed: item.id || item.representative_book_id || item.file_path || displayTitle
   });
   const useLazyLoad = options.lazyLoad !== false;
+  const shouldHideCover = !!state.currentLibraryHideCovers;
   
   // 1. 공통 카드 클릭 핸들러 (아이콘 및 별 클릭 분기)
   card.onclick = (e) => {
@@ -117,16 +156,17 @@ export function createBookCard(item, options = {}) {
   // 4. 즐겨찾기 버튼 구성
   const isFav = item.is_favorite === 1;
   const favIconClass = isFav ? 'fa-solid fa-star' : 'fa-regular fa-star';
+  const favoriteTargetName = rawSeriesName || displayTitle;
   const favBtnHtml = `
-    <button class="btn-card-fav-toggle ${isFav ? 'active' : ''}" title="즐겨찾기 토글" onclick="toggleCardFavoriteEvent(event, '${displayTitle.replace(/'/g, "\\'")}', ${item.id || 'null'}, ${isFav ? 0 : 1})">
+    <button class="btn-card-fav-toggle ${isFav ? 'active' : ''}" title="즐겨찾기 토글" onclick="toggleCardFavoriteEvent(event, '${favoriteTargetName.replace(/'/g, "\\'")}', ${item.id || 'null'}, ${isFav ? 0 : 1})">
       <i class="${favIconClass}"></i>
     </button>
   `;
 
   // 1x1 투명 GIF를 기본 src로 지정하고 data-src에 실제 coverSrc를 둡니다.
   const lazyPlaceholder = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-  const imgSrc = useLazyLoad ? lazyPlaceholder : coverSrc;
-  const imgDataSrcAttr = useLazyLoad ? `data-src="${coverSrc}"` : '';
+  const imgSrc = shouldHideCover ? fallbackCoverSrc : (useLazyLoad ? lazyPlaceholder : coverSrc);
+  const imgDataSrcAttr = (!shouldHideCover && useLazyLoad) ? `data-src="${coverSrc}"` : '';
 
   card.innerHTML = `
     <div class="book-card-cover">
@@ -146,7 +186,7 @@ export function createBookCard(item, options = {}) {
 
   // IntersectionObserver 싱글톤 적용
   const imgEl = card.querySelector('img');
-  if (imgEl) {
+  if (imgEl && !shouldHideCover) {
     imgEl.onerror = () => {
       const currentSrc = imgEl.getAttribute('src') || '';
       if (currentSrc !== fallbackCoverSrc) {
@@ -157,7 +197,7 @@ export function createBookCard(item, options = {}) {
       imgEl.setAttribute('src', '/static/images/default_cover.jpg');
     };
   }
-  if (imgEl && useLazyLoad) {
+  if (imgEl && useLazyLoad && !shouldHideCover) {
     if (imgEl.dataset && imgEl.dataset.src) {
       if (lazyImageObserver) {
         lazyImageObserver.observe(imgEl);
@@ -237,7 +277,7 @@ export function renderHistoryGrid(booksList) {
   container.innerHTML = '';
   const fragment = document.createDocumentFragment();
   booksList.forEach(item => {
-    const normalizedTitle = normalizeBookTitle(item);
+    const normalizedTitle = stripLeadingBracketTags(normalizeBookTitle(item));
     const card = createBookCard(item, {
       showProgress: true,
       actionTitle: '이어읽기',
@@ -301,7 +341,7 @@ export function renderDashboardHistory(booksList) {
   container.innerHTML = '';
   const fragment = document.createDocumentFragment();
   booksList.forEach(item => {
-    const normalizedTitle = normalizeBookTitle(item);
+    const normalizedTitle = stripLeadingBracketTags(normalizeBookTitle(item));
     const card = createBookCard(item, {
       showProgress: true,
       lazyLoad: false,
@@ -327,7 +367,7 @@ export function renderDashboardRecentlyAdded(booksList) {
   container.innerHTML = '';
   const fragment = document.createDocumentFragment();
   booksList.forEach(item => {
-    const normalizedTitle = normalizeBookTitle(item);
+    const normalizedTitle = stripLeadingBracketTags(normalizeBookTitle(item));
     const card = createBookCard(item, {
       isNew: true,
       lazyLoad: false,

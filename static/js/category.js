@@ -18,6 +18,12 @@ function escapeHtml(str) {
 
 let currentTargetLibrary = null; // 우클릭 대상 저장
 
+const MAX_LIBRARY_NAME_LENGTH = 25;
+const MAX_LIBRARY_PATHS = 20;
+const MAX_LIBRARY_PATH_LINE_LENGTH = 1024;
+const MAX_LIBRARY_PATH_TEXT_LENGTH = 8192;
+const MAX_PATH_BROWSER_INPUT_LENGTH = 1024;
+
 // 0. 라이브러리(카테고리) 목록 로드 및 사이드바 렌더링
 export async function loadLibraries() {
   window.loadLibraries = loadLibraries;
@@ -81,10 +87,13 @@ export async function loadLibraries() {
           const safeRclone  = escapeHtml(lib.rclone_rc_url || '');
           const safeIcon    = escapeHtml(lib.icon || 'fa-book');
           const safeColor   = escapeHtml(lib.color || '#94a3b8');
-          html += `<li class="menu-item ${isActive}" data-type="custom" data-id="${lib.id}" data-name="${safeName}" data-path="${safePath}" data-remote="${lib.is_remote || 0}" data-rclone-url="${safeRclone}" data-icon="${safeIcon}" data-color="${safeColor}" ${draggableAttr} onclick="selectCategory('${lib.id}')"><i class="fa-solid ${safeIcon}" style="color: ${safeColor};"></i> ${safeName}</li>`;
+          const hideCover = Number(lib.hide_cover || 0) ? 1 : 0;
+          html += `<li class="menu-item ${isActive}" data-type="custom" data-id="${lib.id}" data-name="${safeName}" data-path="${safePath}" data-remote="${lib.is_remote || 0}" data-rclone-url="${safeRclone}" data-icon="${safeIcon}" data-color="${safeColor}" data-hide-cover="${hideCover}" ${draggableAttr} onclick="selectCategory('${lib.id}')"><i class="fa-solid ${safeIcon}" style="color: ${safeColor};"></i> ${safeName}</li>`;
         });
       }
       sidebar.innerHTML = html;
+      const activeItem = document.getElementById(`category-${state.currentLibraryId}`) || sidebar.querySelector(`[data-id="${state.currentLibraryId}"]`);
+      state.currentLibraryHideCovers = !!(activeItem && activeItem.dataset && activeItem.dataset.type === 'custom' && activeItem.dataset.hideCover === '1');
       bindSidebarContextMenu();
       bindDragAndDropEvents(!isPinned);
     }
@@ -339,6 +348,9 @@ export function triggerAddLibrary() {
     else el.classList.remove('active');
   });
 
+  const hideCoverEl = document.getElementById('library-form-hide-cover');
+  if (hideCoverEl) hideCoverEl.checked = false;
+
   // 체크박스 변경 감지 바인딩 (최초 1회)
   if (remoteEl && !remoteEl.dataset.listenerBound) {
     remoteEl.dataset.listenerBound = 'true';
@@ -417,6 +429,10 @@ export async function triggerEditLibrary() {
     if (el.dataset.color === colorVal) el.classList.add('active');
     else el.classList.remove('active');
   });
+
+  const hideCoverVal = document.querySelector(`[data-id="${id}"]`).dataset.hideCover || '0';
+  const hideCoverEl = document.getElementById('library-form-hide-cover');
+  if (hideCoverEl) hideCoverEl.checked = (hideCoverVal === '1');
 
   // 체크박스 변경 감지 바인딩 (최초 1회)
   if (remoteEl && !remoteEl.dataset.listenerBound) {
@@ -544,10 +560,38 @@ export async function submitLibraryForm(event) {
   event.preventDefault();
   const form = document.getElementById('library-crud-form');
   const formData = new FormData(form);
+
+  const name = String(formData.get('name') || '').trim();
+  const physicalPathRaw = String(formData.get('physical_path') || '').replace(/\r/g, '');
+  const targetPaths = physicalPathRaw.split('\n').map(p => p.trim()).filter(Boolean);
+
+  if (!name) {
+    alert(i18n.t('category.name_required'));
+    return;
+  }
+  if (name.length > MAX_LIBRARY_NAME_LENGTH) {
+    alert(`카테고리 이름은 최대 ${MAX_LIBRARY_NAME_LENGTH}자까지 입력할 수 있습니다.`);
+    return;
+  }
+  if (physicalPathRaw.length > MAX_LIBRARY_PATH_TEXT_LENGTH) {
+    alert(`경로 입력 길이는 최대 ${MAX_LIBRARY_PATH_TEXT_LENGTH}자까지 허용됩니다.`);
+    return;
+  }
+  if (targetPaths.length > MAX_LIBRARY_PATHS) {
+    alert(`경로는 최대 ${MAX_LIBRARY_PATHS}개까지 입력할 수 있습니다.`);
+    return;
+  }
+  if (targetPaths.some(p => p.length > MAX_LIBRARY_PATH_LINE_LENGTH)) {
+    alert(`각 경로는 최대 ${MAX_LIBRARY_PATH_LINE_LENGTH}자까지 허용됩니다.`);
+    return;
+  }
+
   formData.append('type', state.currentLibraryType);
   
   const isRemoteChecked = document.getElementById('library-form-remote')?.checked;
   formData.set('is_remote', isRemoteChecked ? '1' : '0');
+  const hideCoverChecked = document.getElementById('library-form-hide-cover')?.checked;
+  formData.set('hide_cover', hideCoverChecked ? '1' : '0');
 
   const id = formData.get('id');
   const isEdit = !!id;
@@ -569,7 +613,10 @@ export async function submitLibraryForm(event) {
     if (result.success) {
       alert(result.message);
       closeLibraryModal();
-      loadLibraries();
+      await loadLibraries();
+      if (isEdit && String(state.currentLibraryId) === String(id)) {
+        selectCategory(String(id), true);
+      }
     } else {
       alert(i18n.t('category.save_error', {error: result.error}));
     }
@@ -608,7 +655,12 @@ export function closePathBrowser() {
 export async function refreshPathBrowser() {
   const inputEl = document.getElementById('path-browser-input');
   if (inputEl) {
-    pathBrowserCurrentPath = inputEl.value.trim() || pathBrowserCurrentPath;
+    const candidatePath = inputEl.value.trim();
+    if (candidatePath.length > MAX_PATH_BROWSER_INPUT_LENGTH) {
+      alert(`경로 입력은 최대 ${MAX_PATH_BROWSER_INPUT_LENGTH}자까지 허용됩니다.`);
+      return;
+    }
+    pathBrowserCurrentPath = candidatePath || pathBrowserCurrentPath;
   }
   
   await loadPathBrowserItems();
@@ -700,8 +752,22 @@ export function selectPathFromBrowser() {
   if (!newPaths.includes(pathBrowserCurrentPath)) {
     newPaths.push(pathBrowserCurrentPath);
   }
+
+  if (newPaths.length > MAX_LIBRARY_PATHS) {
+    alert(`경로는 최대 ${MAX_LIBRARY_PATHS}개까지 입력할 수 있습니다.`);
+    return;
+  }
+  if (newPaths.some(p => p.length > MAX_LIBRARY_PATH_LINE_LENGTH)) {
+    alert(`각 경로는 최대 ${MAX_LIBRARY_PATH_LINE_LENGTH}자까지 허용됩니다.`);
+    return;
+  }
+  const joined = newPaths.join('\n');
+  if (joined.length > MAX_LIBRARY_PATH_TEXT_LENGTH) {
+    alert(`경로 입력 길이는 최대 ${MAX_LIBRARY_PATH_TEXT_LENGTH}자까지 허용됩니다.`);
+    return;
+  }
   
-  pathEl.value = newPaths.join('\n');
+  pathEl.value = joined;
   
   // 경로가 rclone/원격 마운트인지 자동 감지하여 is_remote 체크박스 업데이트
   detectAndUpdateRemoteFlag(pathBrowserCurrentPath);

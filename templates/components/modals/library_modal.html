@@ -14,7 +14,7 @@
             <div class="library-form-group">
                 <label for="library-form-path" data-i18n="modal.category_path_label">서버 물리 경로 (엔터로 여러 개 입력 가능)</label>
                 <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
-                    <textarea id="library-form-path" name="physical_path" required rows="3" data-i18n-placeholder="modal.category_path_placeholder" placeholder="예: C:\library\fantasy&#10;/home/user/manga" style="flex: 1;"></textarea>
+                    <textarea id="library-form-path" name="physical_path" required rows="3" maxlength="8192" data-i18n-placeholder="modal.category_path_placeholder" placeholder="예: C:\library\fantasy&#10;/home/user/manga" style="flex: 1;"></textarea>
                     <button type="button" id="btn-browse-paths" class="btn-browse-paths" onclick="openPathBrowser()" style="padding: 0.5rem 1rem; background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.5); color: #a855f7; border-radius: 4px; cursor: pointer; font-weight: 600; white-space: nowrap; align-self: flex-start; transition: all 0.2s;" onmouseenter="this.style.background='rgba(168, 85, 247, 0.3)'" onmouseleave="this.style.background='rgba(168, 85, 247, 0.2)'" title="찾아보기">
                         <i class="fa-solid fa-folder-open"></i> 찾아보기
                     </button>
@@ -23,6 +23,10 @@
             <div class="library-form-group-row">
                 <input type="checkbox" id="library-form-remote" name="is_remote">
                 <label for="library-form-remote" data-i18n="modal.remote_drive_label">원격 드라이브 (VFS 마운트 / rclone 등)</label>
+            </div>
+            <div class="library-form-group-row">
+                <input type="checkbox" id="library-form-hide-cover" name="hide_cover">
+                <label for="library-form-hide-cover">이 카테고리 커버 감추기</label>
             </div>
 <style>
 .icon-option {
@@ -140,7 +144,7 @@ function selectColorOption(element) {
         <!-- 현재 경로 표시 및 입력 -->
         <div style="padding: 0.8rem; background: rgba(168, 85, 247, 0.05); border-bottom: 1px solid rgba(168, 85, 247, 0.2); display: flex; gap: 0.5rem; align-items: center;">
             <label style="flex-shrink: 0; color: #a855f7; font-weight: 600;">경로:</label>
-            <input type="text" id="path-browser-input" value="" style="flex: 1; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; padding: 0.5rem 0.8rem; border-radius: 4px; font-size: 0.85rem;" placeholder="경로를 입력하거나 아래에서 선택하세요">
+            <input type="text" id="path-browser-input" value="" maxlength="1024" style="flex: 1; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; padding: 0.5rem 0.8rem; border-radius: 4px; font-size: 0.85rem;" placeholder="경로를 입력하거나 아래에서 선택하세요">
             <button type="button" onclick="refreshPathBrowser()" style="padding: 0.5rem 0.8rem; background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.5); color: #a855f7; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">
                 <i class="fa-solid fa-rotate"></i> 새로고침
             </button>

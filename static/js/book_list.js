@@ -4,6 +4,7 @@ import { renderHistoryGrid, renderBooksGrid, appendBooksGrid } from './ui.js';
 import { openReader } from './viewer.js';
 import { loadLibraries } from './category.js';
 import { initInfiniteScrollObserver } from './infinite_scroll.js';
+import { stripLeadingBracketTags } from './series_display.js';
 
 function normalizeMetadataToken(token) {
   if (!token) return '';
@@ -28,8 +29,8 @@ function updateLibraryTotalCount(items) {
 function sortBooksList(filtered, sortDir) {
   filtered.sort((a, b) => {
     if (sortDir === 'asc' || sortDir === 'desc') {
-      const nameA = a.series_name || '';
-      const nameB = b.series_name || '';
+      const nameA = stripLeadingBracketTags(a.series_name || '');
+      const nameB = stripLeadingBracketTags(b.series_name || '');
       return sortDir === 'asc' 
         ? nameA.localeCompare(nameB, 'ko', { numeric: true, sensitivity: 'base' })
         : nameB.localeCompare(nameA, 'ko', { numeric: true, sensitivity: 'base' });
@@ -40,6 +41,10 @@ function sortBooksList(filtered, sortDir) {
       return sortDir === 'date_desc' ? (dateB - dateA) : (dateA - dateB);
     }
   });
+}
+
+function getSearchableSeriesName(item) {
+  return stripLeadingBracketTags(item && item.series_name ? item.series_name : '').toLowerCase();
 }
 
 
@@ -81,7 +86,7 @@ export async function loadBooksList(isAppend = false) {
   // 1) 검색 필터링
   if (state.searchQuery) {
     filtered = filtered.filter(item => 
-      (item.series_name && item.series_name.toLowerCase().includes(state.searchQuery)) ||
+      (getSearchableSeriesName(item).includes(state.searchQuery)) ||
       (item.author && item.author.toLowerCase().includes(state.searchQuery))
     );
   }
@@ -194,7 +199,7 @@ export function filterBooks() {
   let filtered = [...state.allBooksData];
   if (state.searchQuery) {
     filtered = filtered.filter(item => 
-      (item.series_name && item.series_name.toLowerCase().includes(state.searchQuery)) ||
+      (getSearchableSeriesName(item).includes(state.searchQuery)) ||
       (item.author && item.author.toLowerCase().includes(state.searchQuery))
     );
   }
@@ -279,7 +284,7 @@ export function toggleLibrarySort() {
   let filtered = [...state.allBooksData];
   if (state.searchQuery) {
     filtered = filtered.filter(item => 
-      (item.series_name && item.series_name.toLowerCase().includes(state.searchQuery)) ||
+      (getSearchableSeriesName(item).includes(state.searchQuery)) ||
       (item.author && item.author.toLowerCase().includes(state.searchQuery))
     );
   }

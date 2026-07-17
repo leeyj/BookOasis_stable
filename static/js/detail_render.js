@@ -1,6 +1,7 @@
 // detail_render.js – 도서 상세 화면의 HTML 템플릿 생성기
 import { buildFallbackCoverUrl, getBookCoverSrc } from './cover_fallback.js';
 import { state } from './state.js';
+import { stripLeadingBracketTags } from './series_display.js';
 
 function normalizeMetadataToken(token) {
   if (!token) return '';
@@ -11,7 +12,7 @@ function normalizeMetadataToken(token) {
 }
 
 export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId, displayTitle = '') {
-  let visibleTitle = String(displayTitle || '').trim() || safeSeriesName;
+  let visibleTitle = stripLeadingBracketTags(String(displayTitle || '').trim() || safeSeriesName);
 
   const toSeriesLikeTitle = (rawTitle) => {
     let text = String(rawTitle || '').trim();
@@ -25,7 +26,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
       .replace(/\s+제?\d+\s*(권|화|부|편)$/i, '')
       .replace(/\s+\d+\s*(권|화|부|편)$/i, '')
       .trim();
-    return trimmed || text;
+    return stripLeadingBracketTags(trimmed || text);
   };
 
   if ((!displayTitle || !String(displayTitle).trim()) && books && books.length > 0 && safeSeriesName) {
@@ -275,14 +276,15 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId) {
     const pathText = b.file_path || '';
     const imgdirPathDisplay = pathText.replace(/[\\/]__folder__\.imgdir$/i, '');
     const pathDisplay = fmt === 'imgdir' ? imgdirPathDisplay : pathText;
-    let displayTitle = b.title || '';
-    if (fmt === 'imgdir' && (!displayTitle || displayTitle === '__folder__')) {
+    let rawDisplayTitle = b.title || '';
+    if (fmt === 'imgdir' && (!rawDisplayTitle || rawDisplayTitle === '__folder__')) {
       const normalized = (pathDisplay || '').replace(/\\/g, '/').replace(/\/+$/, '');
       const segments = normalized.split('/').filter(Boolean);
       if (segments.length > 0) {
-        displayTitle = segments[segments.length - 1];
+        rawDisplayTitle = segments[segments.length - 1];
       }
     }
+    const imageDisplayTitle = stripLeadingBracketTags(rawDisplayTitle);
 
     const progressPercent = b.total_pages > 0 ? Math.round((b.pages_read / b.total_pages) * 100) : 0;
     const progressText = b.pages_read > 0
@@ -292,15 +294,15 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId) {
       ? `<i class="fa-solid fa-play"></i> ${i18n.t('detail.btn_resume')}`
       : `<i class="fa-solid fa-play"></i> ${i18n.t('detail.btn_start')}`;
     const volumeFallbackCoverSrc = buildFallbackCoverUrl({
-      title: displayTitle,
+      title: imageDisplayTitle,
       format: b.file_format,
-      seed: b.id || b.file_path || `${safeSeriesName}:${displayTitle}`
+      seed: b.id || b.file_path || `${safeSeriesName}:${imageDisplayTitle}`
     });
     const volCoverSrc = getBookCoverSrc({
       coverImage: b.cover_image,
-      title: displayTitle,
+      title: imageDisplayTitle,
       format: b.file_format,
-      seed: b.id || b.file_path || `${safeSeriesName}:${displayTitle}`
+      seed: b.id || b.file_path || `${safeSeriesName}:${imageDisplayTitle}`
     });
     const isCompleted = b.is_completed
       ? `<span class="vol-badge-completed">${i18n.t('detail.badge_completed')}</span>`
@@ -351,14 +353,14 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId) {
     ` : '';
 
     volumesHtml += `
-      <div class="volume-card" data-book-id="${b.id}" data-page-missing="${noOffsets ? 1 : 0}" oncontextmenu="event.preventDefault(); event.stopPropagation(); if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(event.clientX, event.clientY, ${b.id}, '${(b.title || '').replace(/'/g, "\\'")}', true);" ontouchstart="window.handleLongPressTouchStart(event, (x, y) => { if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(x, y, ${b.id}, '${(b.title || '').replace(/'/g, "\\\\'")}', true); })" ontouchmove="window.handleLongPressTouchMove(event)" ontouchend="window.handleLongPressTouchEnd(event)" ontouchcancel="window.handleLongPressTouchEnd(event)">
+      <div class="volume-card" data-book-id="${b.id}" data-page-missing="${noOffsets ? 1 : 0}" oncontextmenu="event.preventDefault(); event.stopPropagation(); if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(event.clientX, event.clientY, ${b.id}, '${(rawDisplayTitle || '').replace(/'/g, "\\'")}', true);" ontouchstart="window.handleLongPressTouchStart(event, (x, y) => { if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(x, y, ${b.id}, '${(rawDisplayTitle || '').replace(/'/g, "\\\\'")}', true); })" ontouchmove="window.handleLongPressTouchMove(event)" ontouchend="window.handleLongPressTouchEnd(event)" ontouchcancel="window.handleLongPressTouchEnd(event)">
         <img class="volume-thumb" src="${volCoverSrc}" alt="cover"
              onerror="if(this.src.indexOf('/covers/fallback')===-1){this.src='${volumeFallbackCoverSrc}';}else{this.onerror=null; this.src='/static/images/default_cover.jpg';}">
         <div class="volume-info">
           ${warnBannerHtml}
           ${infoBannerHtml}
           <div class="volume-title-row" style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
-            <span class="volume-title">${displayTitle}</span>
+            <span class="volume-title">${rawDisplayTitle}</span>
             ${isCompleted}
             ${favBtnHtml}
           </div>
@@ -372,7 +374,7 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId) {
           </div>
           <div class="chapter-progress-text">${progressText}</div>
         </div>
-        <button class="btn-read" onclick="openReader(${b.id}, '${(b.file_format || '').replace(/'/g, "\\'")}', '${(displayTitle || '').replace(/'/g, "\\'")}', ${b.pages_read}, ${b.total_pages})">${readBtnText}</button>
+        <button class="btn-read" onclick="openReader(${b.id}, '${(b.file_format || '').replace(/'/g, "\\'")}', '${(rawDisplayTitle || '').replace(/'/g, "\\'")}', ${b.pages_read}, ${b.total_pages})">${readBtnText}</button>
       </div>
     `;
   });
@@ -393,10 +395,11 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId) {
 export function renderRecommendList(recommends, seriesName) {
   let recHtml = '';
   recommends.forEach(rec => {
+    const recDisplaySeries = stripLeadingBracketTags(rec.series_name);
     recHtml += `
       <div class="recommend-card" style="display: flex; flex-direction: column; gap: 0.3rem; padding: 0.6rem; background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255,255,255,0.05); border-radius: 6px;">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
-          <strong style="font-size: 0.85rem; color: #fff;">${rec.series_name}</strong>
+          <strong style="font-size: 0.85rem; color: #fff;">${recDisplaySeries}</strong>
           <button class="btn-apply-meta" data-source-id="${rec.id}" style="padding: 0.2rem 0.6rem; font-size: 0.72rem; font-weight: 700; color: #fff; background: #7c3aed; border: none; border-radius: 4px; cursor: pointer; transition: background 0.2s;">${i18n.t('detail.btn_apply_meta')}</button>
         </div>
         <div style="font-size: 0.72rem; color: #94a3b8;">

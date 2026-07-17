@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template, g
 from functools import wraps
+import ipaddress
+import os
 import database
 from werkzeug.security import generate_password_hash, check_password_hash
 from services.settings_service import SettingsService
@@ -10,6 +12,89 @@ from utils.i18n_helper import get_available_languages
 from utils.i18n import _t
 
 auth_bp = Blueprint('auth', __name__)
+
+MAX_AUTH_REQUEST_BYTES = 16 * 1024
+MAX_USERNAME_LENGTH = 128
+MAX_PASSWORD_LENGTH = 256
+
+
+def _as_bool(value, default=False):
+    if value is None:
+        return default
+    return str(value).strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def _get_security_option(key, default=''):
+    val = SettingsService.get(key, '', db_type='general')
+    if str(val).strip() != '':
+        return val
+    return os.environ.get(key, default)
+
+
+def _iter_trusted_proxy_networks(raw_list):
+    for item in str(raw_list or '').split(','):
+        token = item.strip()
+        if not token:
+            continue
+        try:
+            if '/' in token:
+                yield ipaddress.ip_network(token, strict=False)
+            else:
+                yield ipaddress.ip_network(token + '/32', strict=False)
+        except ValueError:
+            print(f"[Auth WARNING] Invalid PROXY_HEADER_TRUSTED_IPS entry ignored: {token}")
+
+
+def _request_from_trusted_proxy():
+    trusted_raw = _get_security_option('PROXY_HEADER_TRUSTED_IPS', '').strip()
+    if not trusted_raw:
+        return True
+
+    remote_addr = request.remote_addr
+    if not remote_addr:
+        return False
+    try:
+        remote_ip = ipaddress.ip_address(remote_addr)
+    except ValueError:
+        return False
+
+    for network in _iter_trusted_proxy_networks(trusted_raw):
+        if remote_ip in network:
+            return True
+    return False
+
+
+def _looks_like_proxy_request():
+    return any([
+        request.headers.get('X-Forwarded-For'),
+        request.headers.get('X-Forwarded-Proto'),
+        request.headers.get('X-Real-IP'),
+        request.headers.get('Forwarded'),
+    ])
+
+
+def _reject_oversized_auth_request():
+    cl = request.content_length
+    if cl is not None and cl > MAX_AUTH_REQUEST_BYTES:
+        return jsonify({'success': False, 'error': 'Request payload too large'}), 413
+    return None
+
+
+def _validate_username_password_lengths(username, password):
+    u = str(username or '')
+    p = str(password or '')
+    if len(u) > MAX_USERNAME_LENGTH:
+        return jsonify({'success': False, 'error': f'Username too long (max {MAX_USERNAME_LENGTH})'}), 400
+    if len(p) > MAX_PASSWORD_LENGTH:
+        return jsonify({'success': False, 'error': f'Password too long (max {MAX_PASSWORD_LENGTH})'}), 400
+    return None
+
+
+def _validate_password_length_only(password):
+    p = str(password or '')
+    if len(p) > MAX_PASSWORD_LENGTH:
+        return jsonify({'success': False, 'error': f'Password too long (max {MAX_PASSWORD_LENGTH})'}), 400
+    return None
 
 def login_required(f):
     @wraps(f)
@@ -72,18 +157,30 @@ def check_authentication():
     # 예외 경로 검사
     if request.path in exempt_paths:
         return
+
+    proxy_header_auth_enabled = _as_bool(_get_security_option('PROXY_HEADER_AUTH', '0'))
+    proxy_deny_direct_enabled = _as_bool(_get_security_option('PROXY_HEADER_DENY_DIRECT', '0'))
+
+    # [선택 옵션] Proxy Header Auth 사용 시, 프록시 헤더가 없는 직접 접근을 차단할 수 있음
+    if proxy_header_auth_enabled and proxy_deny_direct_enabled and not _looks_like_proxy_request():
+        if request.path.startswith('/api/'):
+            return jsonify({'success': False, 'error': 'Direct access denied. Please use reverse proxy.'}), 403
+        return jsonify({'success': False, 'error': 'Direct access denied. Please use reverse proxy.'}), 403
         
     # [프록시 헤더 인증 처리]
     if 'user_id' not in session:
-        if SettingsService.get('PROXY_HEADER_AUTH', '0') == '1':
+        if proxy_header_auth_enabled:
             remote_user = request.headers.get('Remote-User') or request.headers.get('X-Forwarded-User')
             if remote_user:
-                user = UserRepository.find_by_username('general', remote_user)
-                if user:
-                    session['user_id'] = user['id']
-                    session['username'] = user['username']
-                    session['role'] = user['role']
-                    session['is_default_password'] = user['is_default_password']
+                if not _request_from_trusted_proxy():
+                    print(f"[Auth WARNING] Ignored proxy auth header from untrusted source IP: {request.remote_addr}")
+                else:
+                    user = UserRepository.find_by_username('general', remote_user)
+                    if user:
+                        session['user_id'] = user['id']
+                        session['username'] = user['username']
+                        session['role'] = user['role']
+                        session['is_default_password'] = user['is_default_password']
         
     # 1. 미로그인 시 차단
     if 'user_id' not in session:
@@ -102,6 +199,10 @@ def check_authentication():
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
+        oversized = _reject_oversized_auth_request()
+        if oversized:
+            return oversized
+
         # JSON 요청과 일반 Form 요청 모두 대응
         remember_me = False
         if request.is_json:
@@ -113,6 +214,10 @@ def login():
             username = request.form.get('username')
             password = request.form.get('password')
             remember_me = request.form.get('remember_me') == 'on'
+
+        length_error = _validate_username_password_lengths(username, password)
+        if length_error:
+            return length_error
             
         if not username or not password:
             return jsonify({'success': False, 'error': _t('api.username_password_required')}), 400
@@ -153,8 +258,16 @@ def logout():
 @auth_bp.route('/change-password', methods=['POST'])
 @login_required
 def change_password():
+    oversized = _reject_oversized_auth_request()
+    if oversized:
+        return oversized
+
     data = request.get_json() or {}
     new_password = data.get('new_password')
+
+    length_error = _validate_password_length_only(new_password)
+    if length_error:
+        return length_error
     
     if not new_password or len(new_password.strip()) < 4:
         return jsonify({'success': False, 'error': _t('api.new_password_length_error')}), 400
@@ -185,12 +298,20 @@ def get_users():
 def add_user():
     if session.get('role') != 'admin':
         return jsonify({'success': False, 'error': _t('api.admin_required')}), 403
+
+    oversized = _reject_oversized_auth_request()
+    if oversized:
+        return oversized
         
     data = request.get_json() or {}
     username = data.get('username', '').strip()
     password = data.get('password', '').strip()
     role = data.get('role', 'user').strip()
     has_adult_access = 1 if data.get('has_adult_access', True) else 0
+
+    length_error = _validate_username_password_lengths(username, password)
+    if length_error:
+        return length_error
     
     if not username or not password:
         return jsonify({'success': False, 'error': _t('api.username_password_initial_required')}), 400
@@ -243,10 +364,21 @@ def delete_user(target_user_id):
 def reset_user_password(target_user_id):
     if session.get('role') != 'admin':
         return jsonify({'success': False, 'error': _t('api.admin_required')}), 403
+
+    oversized = _reject_oversized_auth_request()
+    if oversized:
+        return oversized
         
     data = request.get_json() or {}
     new_password = data.get('new_password', '').strip()
     current_password = data.get('current_password', '').strip()
+
+    length_error = _validate_password_length_only(new_password)
+    if length_error:
+        return length_error
+    current_length_error = _validate_password_length_only(current_password)
+    if current_length_error:
+        return current_length_error
     
     if len(new_password) < 4:
         return jsonify({'success': False, 'error': _t('api.new_password_length_error')}), 400

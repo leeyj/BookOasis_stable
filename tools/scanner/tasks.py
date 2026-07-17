@@ -23,6 +23,7 @@ def _normalize_series_text(name):
     import re
     return re.sub(r'^\[(?:단행|연재|소설|만화|웹툰|일반)\]\s*', '', str(name)).strip()
 
+
 def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_folder_mtimes, is_remote=False, library_id=None, db_files_cache=None, library_root=None):
     """Independent I/O scan task per folder (DB independent, pure FS/I/O scaling)"""
     root = root.replace('\\', '/').strip()

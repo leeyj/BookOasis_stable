@@ -256,11 +256,16 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false) {
       // 도서 상세 화면이 노출되어 있는 경우 상세 영역도 실시간 리렌더링
       const detailView = document.getElementById('book-detail-view');
       if (detailView && detailView.style.display !== 'none') {
-        const titleEl = detailView.querySelector('.book-detail-title');
-        if (titleEl) {
-          const seriesName = titleEl.textContent.replace(i18n.t('detail.edit_info'), '').trim();
+        const seriesName = String(state.detailSeriesName || '').trim();
+        if (seriesName) {
           import('./modal.js').then(mod => {
-            mod.openBookDetail(null, seriesName, state.currentLibraryId);
+            mod.openBookDetail(
+              null,
+              seriesName,
+              state.detailLibraryId || state.currentLibraryId,
+              state.detailRepresentativeBookId || null,
+              state.detailDisplayTitle || ''
+            );
           });
         }
       }

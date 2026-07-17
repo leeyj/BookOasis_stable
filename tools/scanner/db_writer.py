@@ -112,7 +112,7 @@ def bulk_update_books(cursor, update_data_list, force=False):
     """Bulk update existing books
     
     update_data_list 각 항목 형식:
-      force=False: (series_name, cover_image, cover_image, cover_image, author, publisher, link, score, score, summary, release_date, genre, tags, file_mtime, file_size, file_path)
+            force=False: (series_name, cover_image, cover_image, cover_image, author, publisher, link, score, score, summary, release_date, genre, tags, file_mtime, file_size, file_path)
             force=True : series_name 강제 반영
     """
     if not update_data_list:

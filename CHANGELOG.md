@@ -1,4 +1,9 @@
 # CHANGELOG
+## v1.0.6
+- 대시보드 버전 1.0.6으로 상향 | Bumped dashboard version to 1.0.6
+- OWASP 기준 보안 충족(보안패치) | patch to OWASP guide.
+- 원격 디렉토리 인식 구조 개선(루트마운트 외 폴더마운트도 지원) | Improved remote directory detection to support both root mounts and subfolder mounts
+---
 ## v1.0.5
 - 선택한 카테고리 하이라이트 추가 | Added selected category highlight
 - docker entrypoint.sh 에 logs 폴더 권한 변경 추가 | Added logs folder permission update in docker entrypoint.sh

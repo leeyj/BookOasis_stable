@@ -6,6 +6,11 @@ from datetime import datetime
 from api.cache import namelist_cache, image_cache
 from utils.cache_helper import get_zip_file_hybrid, get_zip_read_lock
 import database
+from services.webhook_dispatcher import (
+    build_book_event_payload,
+    dispatch_standard_book_event,
+    _to_unix_timestamp,
+)
 
 IMG_EXT = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp')
 
@@ -203,7 +208,13 @@ class StreamService:
         conn   = database.get_connection(db_type)
         cursor = conn.cursor()
 
-        cursor.execute("SELECT file_format, total_pages FROM books WHERE id = ?", (book_id,))
+        cursor.execute(
+            """
+            SELECT file_format, total_pages, title, author, publisher, series_name, created_at
+            FROM books WHERE id = ?
+            """,
+            (book_id,)
+        )
         book_row = cursor.fetchone()
 
         try:
@@ -222,6 +233,7 @@ class StreamService:
                 
         cursor.execute("SELECT pages_read, is_completed FROM user_progress WHERE book_id = ? AND user_id = ?", (book_id, user_id))
         row = cursor.fetchone()
+        old_completed = 1 if (row and row['is_completed'] == 1) else 0
 
         pages_read   = page_idx + 1
         is_completed = 0
@@ -311,7 +323,72 @@ class StreamService:
                 )
 
         conn.commit()
-        conn.close()
+
+        # 표준 이벤트 웹훅(book.read / book.finish) 발행
+        try:
+            account_name = f"user-{user_id}"
+            try:
+                cursor.execute("SELECT username FROM users WHERE id = ?", (user_id,))
+                user_row = cursor.fetchone()
+                if user_row and user_row['username']:
+                    account_name = str(user_row['username'])
+            except Exception:
+                pass
+
+            effective_total_pages = total_pages if total_pages > 0 else (book_row['total_pages'] if book_row else 0)
+            if effective_total_pages and effective_total_pages > 0:
+                progress_percent = max(0, min(100, int(round((pages_read / effective_total_pages) * 100))))
+            else:
+                progress_percent = 0
+
+            fmt = (book_row['file_format'] or '').lower() if book_row else ''
+            location = None
+            if fmt == 'epub':
+                if last_epub_href:
+                    location = last_epub_href
+                elif last_epub_cfi:
+                    location = last_epub_cfi
+                elif last_epub_spine_index is not None:
+                    location = f"spine:{last_epub_spine_index}"
+            elif fmt == 'txt':
+                location = f"chunk:{max(1, page_idx + 1)}"
+            elif pages_read > 0:
+                location = f"page:{pages_read}"
+
+            metadata = {
+                'type': 'book',
+                'format': fmt,
+                'title': (book_row['title'] if book_row else '') or '',
+                'author': (book_row['author'] if book_row else '') or '',
+                'publisher': (book_row['publisher'] if book_row else '') or '',
+                'series': (book_row['series_name'] if book_row else '') or None,
+                'seriesIndex': None,
+                'progress': progress_percent,
+                # Fixed-page formats only are truly stable; keep optional for clients.
+                'totalPages': int(effective_total_pages) if effective_total_pages and effective_total_pages > 0 else None,
+                'currentLocation': location,
+                'addedAt': _to_unix_timestamp(book_row['created_at'] if book_row else None),
+            }
+
+            account = {
+                'id': int(user_id),
+                'title': account_name,
+            }
+
+            should_emit_read = (delta > 0)
+            should_emit_finish = (old_completed == 0 and is_completed == 1)
+
+            if should_emit_read:
+                payload = build_book_event_payload('book.read', account=account, metadata=metadata, user=True)
+                dispatch_standard_book_event(payload)
+
+            if should_emit_finish:
+                payload = build_book_event_payload('book.finish', account=account, metadata=metadata, user=True)
+                dispatch_standard_book_event(payload)
+        except Exception as webhook_err:
+            print(f"[Progress Webhook] dispatch skipped due to error: {webhook_err}")
+        finally:
+            conn.close()
 
     @staticmethod
     def get_progress_state(db_type: str, book_id, user_id=1):
