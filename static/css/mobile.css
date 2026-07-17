@@ -153,6 +153,36 @@ body.has-system-ticker .library-sidebar {
     grid-area: title;
 }
 
+.library-title {
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: 0.35rem;
+}
+
+.library-title-main {
+    white-space: nowrap;
+    min-width: 0;
+    flex-shrink: 1;
+}
+
+.library-title-main [data-i18n="header.title"] {
+    white-space: nowrap;
+}
+
+#current-category-indicator {
+    white-space: nowrap;
+    max-width: 46vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#library-total-count {
+    flex-basis: 100%;
+    margin-left: 0 !important;
+    margin-top: 0.1rem;
+    white-space: nowrap;
+}
+
 .library-search-center {
     grid-area: search;
 }

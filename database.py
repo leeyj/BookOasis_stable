@@ -492,6 +492,14 @@ def init_databases():
         read_date DATE DEFAULT CURRENT_DATE
     );
 
+    CREATE TABLE IF NOT EXISTS user_favorites (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        book_id INTEGER REFERENCES books(id),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, book_id)
+    );
+
     CREATE TABLE IF NOT EXISTS book_offsets (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         book_id INTEGER REFERENCES books(id),
@@ -552,6 +560,8 @@ def init_databases():
     CREATE INDEX IF NOT EXISTS idx_user_progress_last_read ON user_progress(user_id, last_read_at DESC);
     CREATE INDEX IF NOT EXISTS idx_user_progress_last_read_book ON user_progress(last_read_at DESC, book_id);
     CREATE INDEX IF NOT EXISTS idx_user_reading_log_user_date ON user_reading_log(user_id, read_date);
+    CREATE INDEX IF NOT EXISTS idx_user_favorites_user_book ON user_favorites(user_id, book_id);
+    CREATE INDEX IF NOT EXISTS idx_user_favorites_book ON user_favorites(book_id);
     CREATE INDEX IF NOT EXISTS idx_user_category_permissions_lookup ON user_category_permissions(user_id, library_id, has_access);
     """
     
@@ -663,6 +673,23 @@ def init_databases():
                 cursor.execute("INSERT INTO users (username, password_hash, role, is_default_password, has_adult_access) VALUES ('admin', ?, 'admin', 1, 1)", (admin_hash,))
                 conn.commit()
                 print(f"[DB-Migration] {db_type} DB - admin/admin initial account created")
+
+            # Legacy books.is_favorite -> user_favorites 1회 시드
+            # 기존 전역 즐겨찾기 데이터를 모든 사용자 초기값으로 복제한 뒤, 이후부터는 계정별로 독립 운용
+            cursor.execute("SELECT COUNT(*) FROM user_favorites")
+            favorite_rows = cursor.fetchone()[0]
+            if favorite_rows == 0:
+                cursor.execute("SELECT COUNT(*) FROM books WHERE COALESCE(is_favorite, 0) = 1")
+                legacy_fav_count = cursor.fetchone()[0]
+                if legacy_fav_count > 0:
+                    cursor.execute("""
+                        INSERT OR IGNORE INTO user_favorites (user_id, book_id, created_at)
+                        SELECT u.id, b.id, CURRENT_TIMESTAMP
+                        FROM users u
+                        JOIN books b ON COALESCE(b.is_favorite, 0) = 1
+                    """)
+                    conn.commit()
+                    print(f"[DB-Migration] {db_type} DB - migrated legacy favorites into user_favorites for all users")
         except Exception as e:
             print(f"[DB-Migration ERROR] Initial settings/users migration failed: {e}")
         # 권한 테이블 초기 데이터 시딩 (기존 사용자 및 라이브러리가 있을 때 권한 일괄 1로 주입)

@@ -150,6 +150,7 @@
 
 ### `[GET]` `/api/media/list`
 * **설명**: 보관함 내의 시리즈(도서 묶음) 리스트를 무한 스크롤 및 검색 조건에 맞게 페이지네이션하여 반환합니다.
+* **비고**: 응답의 `is_favorite` 값은 로그인한 현재 사용자 기준으로 계산됩니다. (계정별 분리)
 * **쿼리 스트링**:
   * `type` (string, 필수): `general` / `adult`
   * `library_id` (string, 선택): 특정 보관함 ID (전체일 경우 `home`)
@@ -181,6 +182,7 @@
 
 ### `[GET]` `/api/media/detail`
 * **설명**: 특정 시리즈의 메타 정보 및 속해 있는 단행본 권차 목록을 순서대로 조회합니다.
+* **비고**: `books[].is_favorite` 값은 로그인한 현재 사용자 기준입니다. (계정별 분리)
 * **쿼리 스트링**:
   * `type` (string, 필수): `general` / `adult`
   * `series` (string, 필수): 시리즈 명
@@ -216,6 +218,31 @@
     ]
   }
   ```
+
+---
+
+### `[POST|PATCH]` `/api/media/books/{book_id}/favorite`
+* **설명**: 단일 도서의 즐겨찾기 상태를 변경합니다.
+* **권한**: 로그인 사용자
+* **Content-Type**: `application/x-www-form-urlencoded`
+* **요청 파라미터**:
+  | 파라미터명 | 타입 | 필수여부 | 설명 |
+  | :--- | :--- | :--- | :--- |
+  | `type` | string | 필수 | DB 스코프 (`general` 또는 `adult`) |
+  | `is_favorite` | integer | 필수 | `1`: 즐겨찾기 추가, `0`: 즐겨찾기 해제 |
+* **비고**: 즐겨찾기 저장은 계정별(`user_id`)로 분리되며, 다른 사용자 계정에는 영향이 없습니다.
+
+### `[POST|PATCH]` `/api/media/series/favorite`
+* **설명**: 특정 시리즈 전체 도서를 즐겨찾기/해제 처리합니다.
+* **권한**: 로그인 사용자
+* **Content-Type**: `application/x-www-form-urlencoded`
+* **요청 파라미터**:
+  | 파라미터명 | 타입 | 필수여부 | 설명 |
+  | :--- | :--- | :--- | :--- |
+  | `type` | string | 필수 | DB 스코프 (`general` 또는 `adult`) |
+  | `series_name` | string | 필수 | 대상 시리즈명 |
+  | `is_favorite` | integer | 필수 | `1`: 즐겨찾기 추가, `0`: 즐겨찾기 해제 |
+* **비고**: 처리 결과는 현재 로그인한 사용자 계정에만 적용됩니다.
 
 ---
 
@@ -297,6 +324,10 @@
 * **응답 규격**:
   * 키워드(`q`)가 비어 있을 경우: OpenSearch Description XML 문서
   * 키워드(`q`)가 존재할 경우: 검색 결과 매칭 도서 목록 Atom XML 피드
+
+### `[GET]` `/opds/favorite` / `/opds/adult/favorite` / `/app-opds/favorite` / `/app-opds/adult/favorite`
+* **설명**: 즐겨찾기 전용 피드(Atom XML)를 반환합니다.
+* **비고**: Basic Auth로 인증된 사용자 계정 기준의 즐겨찾기만 반환합니다. (계정별 분리)
 
 ---
 

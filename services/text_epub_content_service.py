@@ -99,7 +99,15 @@ class TextEpubContentService:
                                 f'<img src="{api_src}" style="max-width: 100%; max-height: 75vh; object-fit: contain; height: auto; display: block; margin: 1.5rem auto; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"/>'
                             )
                     else:
-                        self.output.append(f'<{tag_lower}>')
+                        attrs_dict = dict(attrs)
+                        elem_id = attrs_dict.get('id')
+                        if elem_id:
+                            import html
+
+                            safe_id = html.escape(str(elem_id), quote=True)
+                            self.output.append(f'<{tag_lower} id="{safe_id}">')
+                        else:
+                            self.output.append(f'<{tag_lower}>')
 
             def handle_endtag(self, tag):
                 tag_lower = tag.lower()

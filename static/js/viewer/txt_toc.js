@@ -3,6 +3,50 @@ import { state } from '../state.js';
 let overlayVisibilityListenerBound = false;
 let tocEntryRefs = [];
 let activeTocIdx = -1;
+let isTocPanelOpen = false;
+
+function _debugToc() {
+  // Debug hook reserved for temporary TOC troubleshooting.
+}
+
+function _teardownTocDebugWatchers() {
+  // no-op
+}
+
+function _setupTocDebugWatchers() {
+  // no-op
+}
+
+function _applyTocPanelState(container, shouldShowButton) {
+  if (!container) return;
+  if (!shouldShowButton) {
+    container.style.display = 'none';
+    container.style.right = '-320px';
+    container.style.opacity = '0';
+    container.style.visibility = 'hidden';
+    container.style.pointerEvents = 'none';
+    _debugToc('apply-panel-state:hidden-no-button', {
+      shouldShowButton: false,
+      shouldOpen: false,
+    });
+    return;
+  }
+
+  const shouldOpen = !!shouldShowButton && !!isTocPanelOpen;
+  container.style.display = 'block';
+  container.style.right = shouldOpen ? '0px' : '-320px';
+  container.style.opacity = shouldOpen ? '1' : '0';
+  container.style.visibility = shouldOpen ? 'visible' : 'hidden';
+  container.style.pointerEvents = shouldOpen ? 'auto' : 'none';
+  _debugToc('apply-panel-state', {
+    shouldShowButton: !!shouldShowButton,
+    shouldOpen,
+  });
+}
+
+function _getTocHostElement() {
+  return document.getElementById('media-viewer-modal') || document.body;
+}
 
 function _applyTocItemVisualState(li, anchorEl, isActive) {
   if (!li || !anchorEl) return;
@@ -85,7 +129,9 @@ function syncEpubTocVisibility() {
   const container = document.getElementById('epub-toc-container');
   const btn = document.getElementById('epub-toc-btn');
   const overlayMenu = document.getElementById('comic-overlay-menu');
-  const isOverlayOpen = !!overlayMenu && overlayMenu.style.display !== 'none';
+  // 오버레이는 navigation.js에서 inline style('flex'/'none')로만 토글한다.
+  // style 값이 비어 있을 때를 열린 상태로 오인하지 않도록 엄격 비교한다.
+  const isOverlayOpen = !!overlayMenu && overlayMenu.style.display === 'flex';
   const isEpub = (state.currentViewerFormat || '').toLowerCase() === 'epub';
   const shouldShow = isEpub && isOverlayOpen;
 
@@ -93,16 +139,35 @@ function syncEpubTocVisibility() {
     btn.style.display = shouldShow ? 'flex' : 'none';
   }
 
-  if (container && !shouldShow) {
-    container.style.right = '-320px';
+  if (!shouldShow) {
+    isTocPanelOpen = false;
   }
+  _applyTocPanelState(container, shouldShow);
+  _debugToc('sync-visibility', {
+    isOverlayOpen,
+    isEpub,
+    shouldShow,
+  });
 }
 
 function ensureOverlayVisibilityListener() {
   if (overlayVisibilityListenerBound) return;
   overlayVisibilityListenerBound = true;
 
-  document.addEventListener('viewer-overlay-visibility-changed', () => {
+  document.addEventListener('viewer-overlay-visibility-changed', (e) => {
+    _debugToc('event:viewer-overlay-visibility-changed', {
+      detail: e && e.detail ? e.detail : null,
+    });
+    syncEpubTocVisibility();
+  });
+  document.addEventListener('fullscreenchange', () => {
+    isTocPanelOpen = false;
+    _debugToc('event:fullscreenchange');
+    syncEpubTocVisibility();
+  });
+  document.addEventListener('webkitfullscreenchange', () => {
+    isTocPanelOpen = false;
+    _debugToc('event:webkitfullscreenchange');
     syncEpubTocVisibility();
   });
 }
@@ -110,8 +175,13 @@ function ensureOverlayVisibilityListener() {
 export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
   let container = document.getElementById('epub-toc-container');
   let btn = document.getElementById('epub-toc-btn');
+  const hostEl = _getTocHostElement();
 
   ensureOverlayVisibilityListener();
+  _debugToc('render-start', {
+    tocCount: Array.isArray(tocList) ? tocList.length : -1,
+    chunkCount: Array.isArray(txtChunks) ? txtChunks.length : -1,
+  });
 
   if (!container) {
     container = document.createElement('div');
@@ -123,18 +193,28 @@ export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
       right: -320px;
       width: 300px;
       height: 100%;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
       background: var(--bg-color, #1e1e1e);
       color: var(--text-color, #d4d4d4);
       box-shadow: -2px 0 12px rgba(0,0,0,0.5);
-      transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      z-index: 9999;
+      transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+      z-index: 10008;
       overflow-y: auto;
       padding: 20px;
       box-sizing: border-box;
       border-left: 1px solid rgba(255,255,255,0.1);
     `;
-    document.body.appendChild(container);
+    container.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+    hostEl.appendChild(container);
+  } else if (container.parentElement !== hostEl) {
+    hostEl.appendChild(container);
   }
+
+  _setupTocDebugWatchers(container);
 
   if (!btn) {
     btn = document.createElement('button');
@@ -144,7 +224,7 @@ export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
       position: fixed;
       top: 90px;
       right: 20px;
-      z-index: 9998;
+      z-index: 10009;
       background: rgba(0,0,0,0.6);
       color: white;
       border: 1px solid rgba(255,255,255,0.2);
@@ -158,6 +238,7 @@ export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
       font-size: 18px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
       backdrop-filter: blur(4px);
+      touch-action: manipulation;
       transition: transform 0.2s, background 0.2s;
     `;
     btn.onmouseover = () => {
@@ -166,11 +247,33 @@ export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
     btn.onmouseout = () => {
       btn.style.transform = 'scale(1)';
     };
-    btn.onclick = () => {
-      const isClosed = container.style.right.startsWith('-');
-      container.style.right = isClosed ? '0px' : '-320px';
+    let lastToggleAt = 0;
+    const toggleFromButton = (e, source) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      const now = Date.now();
+      if (now - lastToggleAt < 250) return;
+      lastToggleAt = now;
+
+      const overlayMenu = document.getElementById('comic-overlay-menu');
+      const isOverlayOpen = !!overlayMenu && overlayMenu.style.display === 'flex';
+      if (!isOverlayOpen) {
+        _debugToc('btn-click-ignored-overlay-closed', { source });
+        return;
+      }
+      isTocPanelOpen = !isTocPanelOpen;
+      _debugToc('btn-click-toggle', { nextOpen: isTocPanelOpen, source });
+      _applyTocPanelState(container, true);
     };
-    document.body.appendChild(btn);
+    btn.onclick = (e) => toggleFromButton(e, 'click');
+    btn.addEventListener('touchend', (e) => {
+      toggleFromButton(e, 'touchend');
+    }, { passive: false });
+    hostEl.appendChild(btn);
+  } else if (btn.parentElement !== hostEl) {
+    hostEl.appendChild(btn);
   }
 
   const headerEl = document.createElement('h3');
@@ -189,6 +292,7 @@ export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
     const a = document.createElement('a');
     a.href = '#';
     a.style.cssText = 'color:inherit; text-decoration:none; display:block; opacity:0.85; transition:opacity 0.2s;';
+    a.style.touchAction = 'manipulation';
     a.textContent = title;
     a.addEventListener('mouseover', () => {
       a.style.opacity = '1';
@@ -196,10 +300,22 @@ export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
     a.addEventListener('mouseout', () => {
       a.style.opacity = '0.85';
     });
-    a.addEventListener('click', e => {
+    let lastJumpAt = 0;
+    const handleJump = (e, source) => {
       e.preventDefault();
+      e.stopPropagation();
+      const now = Date.now();
+      if (now - lastJumpAt < 250) return;
+      lastJumpAt = now;
+      _debugToc('toc-item-jump', { chapterIdx, hasAnchor: !!anchor, source });
       onJumpToChapter(chapterIdx, anchor);
+    };
+    a.addEventListener('click', e => {
+      handleJump(e, 'click');
     });
+    a.addEventListener('touchend', e => {
+      handleJump(e, 'touchend');
+    }, { passive: false });
     li.appendChild(a);
     tocEntryRefs.push({
       chapterIdx: Number.isFinite(chapterIdx) ? chapterIdx : parseInt(chapterIdx, 10),
@@ -223,6 +339,11 @@ export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
   container.appendChild(headerEl);
   container.appendChild(ul);
 
+  // EPUB 새 렌더 시 이전 열림 상태가 남지 않도록 항상 닫힌 상태로 초기화한다.
+  isTocPanelOpen = false;
+  _applyTocPanelState(container, false);
+  _debugToc('render-end-reset-closed');
+
   syncEpubTocVisibility();
 }
 
@@ -241,7 +362,9 @@ export function jumpToTxtTocChapter({
   if (chapterIdx < 0 || chapterIdx >= chunkCount) return;
 
   const container = document.getElementById('epub-toc-container');
-  if (container) container.style.right = '-320px';
+  isTocPanelOpen = false;
+  _applyTocPanelState(container, false);
+  _debugToc('jump-chapter-close-toc', { chapterIdx, hasAnchor: !!anchor });
 
   setCurrentChunkIdx(chapterIdx);
   if (typeof onActiveChapterChange === 'function') {
@@ -251,9 +374,16 @@ export function jumpToTxtTocChapter({
   const scrollMode = getScrollMode();
   if (scrollMode === 'scroll') {
     const scrollWrapper = getScrollWrapper();
-    const ratio = chapterIdx / chunkCount;
     if (scrollWrapper) {
-      scrollWrapper.scrollTop = scrollWrapper.scrollHeight * ratio;
+      const targetChunk = scrollWrapper.querySelector(`.txt-scroll-chunk[data-idx="${chapterIdx}"]`);
+      if (targetChunk) {
+        const top = Math.max(0, targetChunk.offsetTop - 20);
+        scrollWrapper.scrollTo({ top, behavior: 'smooth' });
+      } else {
+        const safeChunkCount = Math.max(1, chunkCount);
+        const ratio = chapterIdx / safeChunkCount;
+        scrollWrapper.scrollTop = scrollWrapper.scrollHeight * ratio;
+      }
     }
   } else {
     renderCurrentChunk(true);
@@ -270,3 +400,4 @@ export function jumpToTxtTocChapter({
     }, 100);
   }
 }
+

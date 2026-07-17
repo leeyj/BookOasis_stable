@@ -19,7 +19,7 @@ This document summarizes the latest code-based schema snapshot (as of 2026-07-17
 
 ## 2. Shared Table List
 
-Tables common to both databases (10):
+Tables common to both databases (11):
 
 1. `books`
 2. `book_offsets`
@@ -28,9 +28,10 @@ Tables common to both databases (10):
 5. `users`
 6. `user_progress`
 7. `user_reading_log`
-8. `user_category_permissions`
-9. `scanner_progress`
-10. `folder_mtimes`
+8. `user_favorites`
+9. `user_category_permissions`
+10. `scanner_progress`
+11. `folder_mtimes`
 
 ---
 
@@ -46,8 +47,9 @@ Book metadata and file identity.
   - Identity/path: `id`, `library_id`, `file_path`, `file_format`
   - Metadata: `title`, `author`, `publisher`, `series_name`, `summary`, `genre`, `tags`, `link`, `release_date`, `score`
   - Viewer/cover: `total_pages`, `cover_image`, `cover_updated_at`, `has_offsets`
-  - State/protection: `is_favorite`, `metadata_locked`, `created_at`
+  - State/protection: `metadata_locked`, `created_at`
   - Runtime extensions: `is_deleted`, `deleted_at`, `file_mtime`, `file_size`
+- Note: `is_favorite` remains as a legacy compatibility column, but active favorites are now stored in `user_favorites`.
 
 ### book_offsets
 
@@ -103,6 +105,15 @@ Reading activity log rows used for stats and trends.
 - Main FK: `book_id -> books.id`, `user_id -> users.id`
 - Columns: `pages_read_delta`, `duration_seconds`, `read_date`
 
+### user_favorites
+
+Per-user favorites mapping table.
+
+- PK: `id`
+- Main FK: `user_id -> users.id`, `book_id -> books.id`
+- Columns: `user_id`, `book_id`, `created_at`
+- Constraint: `UNIQUE(user_id, book_id)`
+
 ### user_category_permissions
 
 User-to-library access mapping.
@@ -134,6 +145,8 @@ Folder mtime cache for incremental scan optimization.
 - `books (1) -> user_progress (N)`
 - `users (1) -> user_reading_log (N)`
 - `books (1) -> user_reading_log (N)`
+- `users (1) -> user_favorites (N)`
+- `books (1) -> user_favorites (N)`
 - `users (1) -> user_category_permissions (N)`
 - `libraries (1) -> user_category_permissions (N)`
 
@@ -223,6 +236,14 @@ CREATE TABLE IF NOT EXISTS user_reading_log (
   read_date DATE DEFAULT CURRENT_DATE
 );
 
+CREATE TABLE IF NOT EXISTS user_favorites (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  book_id INTEGER REFERENCES books(id),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(user_id, book_id)
+);
+
 CREATE TABLE IF NOT EXISTS book_offsets (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   book_id INTEGER REFERENCES books(id),
@@ -285,5 +306,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_user_progress_book_user ON user_progress(b
 CREATE INDEX IF NOT EXISTS idx_user_progress_last_read ON user_progress(user_id, last_read_at DESC);
 CREATE INDEX IF NOT EXISTS idx_user_progress_last_read_book ON user_progress(last_read_at DESC, book_id);
 CREATE INDEX IF NOT EXISTS idx_user_reading_log_user_date ON user_reading_log(user_id, read_date);
+CREATE INDEX IF NOT EXISTS idx_user_favorites_user_book ON user_favorites(user_id, book_id);
+CREATE INDEX IF NOT EXISTS idx_user_favorites_book ON user_favorites(book_id);
 CREATE INDEX IF NOT EXISTS idx_user_category_permissions_lookup ON user_category_permissions(user_id, library_id, has_access);
 ```

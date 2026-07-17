@@ -297,13 +297,14 @@ def toggle_book_favorite(book_id):
     db_type = request.form.get('type', 'general')
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+    user_id = session.get('user_id', 1)
     try:
         is_favorite = int(request.form.get('is_favorite', 0))
     except ValueError:
         is_favorite = 0
 
     try:
-        BookService.update_favorite(db_type, book_id, is_favorite)
+        BookService.update_favorite(db_type, book_id, is_favorite, user_id=user_id)
         return jsonify({'success': True, 'message': _t('api.msg_favorite_updated')})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -316,6 +317,7 @@ def toggle_series_favorite_api():
     db_type = request.form.get('type', 'general')
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+    user_id = session.get('user_id', 1)
     series_name = request.form.get('series_name', '').strip()
     try:
         is_favorite = int(request.form.get('is_favorite', 0))
@@ -326,7 +328,7 @@ def toggle_series_favorite_api():
         return jsonify({'success': False, 'error': 'series_name이 누락되었습니다.'}), 400
 
     try:
-        BookService.update_series_favorite(db_type, series_name, is_favorite)
+        BookService.update_series_favorite(db_type, series_name, is_favorite, user_id=user_id)
         return jsonify({'success': True, 'message': _t('api.msg_series_favorite_updated')})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

@@ -69,21 +69,47 @@ class BookService:
         return next_book
 
     @staticmethod
-    def update_favorite(db_type, book_id, is_favorite):
-        """특정 도서의 즐겨찾기 상태 변경"""
+    def update_favorite(db_type, book_id, is_favorite, user_id):
+        """특정 도서의 즐겨찾기 상태 변경 (사용자별)"""
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
-        cursor.execute("UPDATE books SET is_favorite = ? WHERE id = ?", (is_favorite, book_id))
+        if int(is_favorite) == 1:
+            cursor.execute(
+                "INSERT OR IGNORE INTO user_favorites (user_id, book_id, created_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
+                (user_id, book_id)
+            )
+        else:
+            cursor.execute("DELETE FROM user_favorites WHERE user_id = ? AND book_id = ?", (user_id, book_id))
         conn.commit()
         conn.close()
         return True
 
     @staticmethod
-    def update_series_favorite(db_type, series_name, is_favorite):
-        """특정 시리즈 전체 도서의 즐겨찾기 상태 변경"""
+    def update_series_favorite(db_type, series_name, is_favorite, user_id):
+        """특정 시리즈 전체 도서의 즐겨찾기 상태 변경 (사용자별)"""
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
-        cursor.execute("UPDATE books SET is_favorite = ? WHERE series_name = ?", (is_favorite, series_name))
+        if int(is_favorite) == 1:
+            cursor.execute(
+                """
+                INSERT OR IGNORE INTO user_favorites (user_id, book_id, created_at)
+                SELECT ?, id, CURRENT_TIMESTAMP
+                FROM books
+                WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0
+                """,
+                (user_id, series_name)
+            )
+        else:
+            cursor.execute(
+                """
+                DELETE FROM user_favorites
+                WHERE user_id = ?
+                  AND book_id IN (
+                      SELECT id FROM books WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0
+                  )
+                """,
+                (user_id, series_name)
+            )
         conn.commit()
         conn.close()
         return True

@@ -1,6 +1,14 @@
 # CHANGELOG
+## v1.0.9
+- 모바일 헤더 줄바꿈 개선: 도서보관함+카테고리는 1줄 유지, 전체 권수는 다음 줄 표시 | Mobile header wrap fix: title+category stay on one line, total count moves to next line
+- EPUB 전체화면에서 목차(목록보기) 아이콘이 보이지 않던 문제 수정 | Fixed EPUB TOC button visibility in fullscreen mode
+- EPUB 목차 패널 자동 노출/클릭 불가(z-index·터치 이벤트) 수정 및 TOC 점프 정확도 개선(스크롤 모드 위치 보정, 앵커 id 보존) | Fixed EPUB TOC auto-open/click issues and improved TOC jump accuracy (scroll-mode targeting, anchor id preservation)
+
+
 ## v1.0.8
--추가 안정화 
+- 추가 안정화
+- 즐겨찾기를 계정별로 분리 저장하도록 변경 (사용자별 독립) | Favorites are now isolated per account
+
 
 ## v1.0.7
 - 최신,과거추가순일때 초성바로가기 감춤 | Data_desc,Data_asc sort-> hide quickmatch

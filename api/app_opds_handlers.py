@@ -258,7 +258,7 @@ class AppOpdsHandlers:
 
         db_type = 'adult' if is_adult else 'general'
         cache_key = f"app_opds_special_{kind}:{db_type}"
-        if kind == 'read':
+        if kind in ('read', 'favorite'):
             cache_key = f"{cache_key}:{user['id']}"
         cached_xml = self._get_cached_response(cache_key)
         if cached_xml is not None:
@@ -271,7 +271,7 @@ class AppOpdsHandlers:
             entries = get_recently_read_entries(db_type, f'/app-opds/download/{db_type}', f'app:{db_type}', user_id=user['id'])
             title = '최근 읽은 도서'
         elif kind == 'favorite':
-            entries = get_favorite_entries(db_type, f'/app-opds/download/{db_type}', f'app:{db_type}')
+            entries = get_favorite_entries(db_type, f'/app-opds/download/{db_type}', f'app:{db_type}', user_id=user['id'])
             title = '즐겨찾기'
         else:
             return self._unauthorized()

@@ -161,17 +161,20 @@ def get_recently_added_entries(db_type: str, download_prefix: str, urn_prefix: s
     return entries
 
 
-def get_favorite_entries(db_type: str, download_prefix: str, urn_prefix: str):
+def get_favorite_entries(db_type: str, download_prefix: str, urn_prefix: str, user_id: int):
     conn = database.get_connection(db_type)
     cursor = conn.cursor()
     cursor.execute(
         """
-        SELECT id, title, file_path, cover_image
-        FROM books
-        WHERE COALESCE(is_deleted, 0) = 0 AND COALESCE(is_favorite, 0) = 1
-        ORDER BY title ASC, id ASC
+        SELECT b.id, b.title, b.file_path, b.cover_image
+        FROM books b
+        JOIN user_favorites uf ON uf.book_id = b.id
+        WHERE COALESCE(b.is_deleted, 0) = 0 AND uf.user_id = ?
+        ORDER BY b.title ASC, b.id ASC
         LIMIT 200
         """
+        ,
+        (user_id,)
     )
     books = cursor.fetchall()
     conn.close()

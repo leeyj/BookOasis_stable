@@ -109,22 +109,28 @@ class BookDetailService:
             perm_sql, perm_params = _permission_exists_sql('b')
             cursor.execute("""
                 SELECT b.id, b.title, b.file_format, b.total_pages, b.has_offsets, b.cover_image, b.cover_updated_at,
-                       b.file_path, p.pages_read, p.is_completed, b.is_favorite, b.library_id, p.last_read_at
+                       b.file_path, p.pages_read, p.is_completed,
+                       CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
+                       b.library_id, p.last_read_at
                 FROM books b
                 LEFT JOIN user_progress p ON b.id = p.book_id AND p.user_id = ?
+                LEFT JOIN user_favorites uf ON b.id = uf.book_id AND uf.user_id = ?
                 WHERE COALESCE(b.is_deleted, 0) = 0 AND b.series_name = ? AND b.library_id = ?
             """ + perm_sql,
-            (user_id, series_name, library_id, *perm_params))
+            (user_id, user_id, series_name, library_id, *perm_params))
         else:
             perm_sql, perm_params = _permission_exists_sql('b')
             cursor.execute("""
                 SELECT b.id, b.title, b.file_format, b.total_pages, b.has_offsets, b.cover_image, b.cover_updated_at,
-                       b.file_path, p.pages_read, p.is_completed, b.is_favorite, b.library_id, p.last_read_at
+                       b.file_path, p.pages_read, p.is_completed,
+                       CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
+                       b.library_id, p.last_read_at
                 FROM books b
                 LEFT JOIN user_progress p ON b.id = p.book_id AND p.user_id = ?
+                LEFT JOIN user_favorites uf ON b.id = uf.book_id AND uf.user_id = ?
                 WHERE COALESCE(b.is_deleted, 0) = 0 AND b.series_name = ?
             """ + perm_sql,
-            (user_id, series_name, *perm_params))
+            (user_id, user_id, series_name, *perm_params))
         books_rows = cursor.fetchall()
 
         # 실제 covers 폴더 내 시리즈 이미지 갱신 타임스탬프 쿼리

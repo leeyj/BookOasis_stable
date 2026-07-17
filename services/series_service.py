@@ -29,11 +29,15 @@ def _normalize_library_id(library_id):
 
 
 def _fetch_books_for_grouping(cursor, library_id, search_query='', favorite_only=False, user_id=None, role=None):
+    if favorite_only and user_id is None:
+        return []
+
+    safe_user_id = int(user_id) if user_id is not None else 0
     where = ["COALESCE(b.is_deleted, 0) = 0"]
-    params = []
+    params = [safe_user_id]
 
     if favorite_only:
-        where.append("b.is_favorite = 1")
+        where.append("uf.book_id IS NOT NULL")
 
     if library_id and library_id != 'all':
         where.append("b.library_id = ?")
@@ -56,9 +60,12 @@ def _fetch_books_for_grouping(cursor, library_id, search_query='', favorite_only
 
     sql = f"""
         SELECT b.id, b.series_name, b.title, b.author, b.file_path, b.file_format,
-               b.cover_image, b.cover_updated_at, b.is_favorite, b.created_at,
+               b.cover_image, b.cover_updated_at,
+               CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
+               b.created_at,
                b.genre, b.tags, b.library_id
         FROM books b
+        LEFT JOIN user_favorites uf ON uf.book_id = b.id AND uf.user_id = ?
         WHERE {' AND '.join(where)}
         ORDER BY b.library_id ASC, b.series_name ASC, b.id ASC
     """

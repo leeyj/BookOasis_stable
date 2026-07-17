@@ -302,14 +302,15 @@ def opds_recently_read():
 @opds_bp.route('/opds/favorite', methods=['GET'])
 def opds_favorite():
     """즐겨찾기 도서 목록 (일반)"""
-    if not _check_auth(is_adult=False):
+    user = _get_authenticated_user(is_adult=False)
+    if not user:
         return _unauthorized()
-    cache_key = 'opds_favorite:general'
+    cache_key = f"opds_favorite:general:{user['id']}"
     cached_xml = _get_cached_opds_response(cache_key)
     if cached_xml is not None:
         return _atom_response(cached_xml)
 
-    entries = get_favorite_entries('general', '/opds/download/general', 'general')
+    entries = get_favorite_entries('general', '/opds/download/general', 'general', user_id=user['id'])
     xml = _opds_xml('general', "즐겨찾기", entries)
     _set_cached_opds_response(cache_key, xml)
     return _atom_response(xml)
@@ -351,14 +352,15 @@ def opds_adult_recently_read():
 @opds_bp.route('/opds/adult/favorite', methods=['GET'])
 def opds_adult_favorite():
     """즐겨찾기 도서 목록 (성인)"""
-    if not _check_auth(is_adult=True):
+    user = _get_authenticated_user(is_adult=True)
+    if not user:
         return _unauthorized()
-    cache_key = 'opds_favorite:adult'
+    cache_key = f"opds_favorite:adult:{user['id']}"
     cached_xml = _get_cached_opds_response(cache_key)
     if cached_xml is not None:
         return _atom_response(cached_xml)
 
-    entries = get_favorite_entries('adult', '/opds/download/adult', 'adult')
+    entries = get_favorite_entries('adult', '/opds/download/adult', 'adult', user_id=user['id'])
     xml = _opds_xml('adult', "즐겨찾기", entries, is_adult=True)
     _set_cached_opds_response(cache_key, xml)
     return _atom_response(xml)

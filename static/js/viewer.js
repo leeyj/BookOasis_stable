@@ -59,13 +59,17 @@ export function loadCustomFontsList() {
 
         const select = document.getElementById('viewer-font-select');
         if (select) {
+          const sortedFontsDesc = [...data.fonts].sort((a, b) =>
+            String(b.name || '').localeCompare(String(a.name || ''), undefined, { sensitivity: 'base' })
+          );
+
           // 기존 기본 옵션만 남기고 초기화
           select.innerHTML = `
             <option value="batang">KoPub 바탕</option>
             <option value="gothic">나눔고딕</option>
             <option value="pretendard">Pretendard</option>
           `;
-          data.fonts.forEach(font => {
+          sortedFontsDesc.forEach(font => {
             const opt = document.createElement('option');
             opt.value = font.name;
             opt.textContent = font.name;

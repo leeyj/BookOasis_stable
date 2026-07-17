@@ -28,9 +28,12 @@ class ReadingHistoryService:
 
         base_select = """
             SELECT b.id, b.library_id, b.title, b.series_name, b.cover_image, b.cover_updated_at, b.file_format,
-                   p.pages_read, b.total_pages, p.last_read_at, b.is_favorite, p.is_completed
+                   p.pages_read, b.total_pages, p.last_read_at,
+                   CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
+                   p.is_completed
             FROM user_progress p
             JOIN books b ON p.book_id = b.id
+            LEFT JOIN user_favorites uf ON uf.book_id = b.id AND uf.user_id = p.user_id
             WHERE COALESCE(b.is_deleted, 0) = 0 AND p.user_id = ?
         """
         if hide_completed:
@@ -72,7 +75,8 @@ class ReadingHistoryService:
         if user_id and role != 'admin':
             # 권한이 설정된 카테고리(libraries)의 도서만 필터링
             cursor.execute("""
-                SELECT b.id, b.library_id, b.title, b.series_name, b.cover_image, b.cover_updated_at, b.file_format, b.total_pages, b.created_at, b.is_favorite
+                SELECT b.id, b.library_id, b.title, b.series_name, b.cover_image, b.cover_updated_at, b.file_format, b.total_pages, b.created_at,
+                       CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite
                 FROM books b
                 INNER JOIN (
                     SELECT MAX(id) as max_id
@@ -81,13 +85,15 @@ class ReadingHistoryService:
                     GROUP BY CASE WHEN series_name IS NOT NULL AND series_name != '' THEN series_name ELSE CAST(id AS TEXT) END
                 ) g ON b.id = g.max_id
                 JOIN user_category_permissions p ON b.library_id = p.library_id
+                LEFT JOIN user_favorites uf ON uf.book_id = b.id AND uf.user_id = ?
                 WHERE COALESCE(b.is_deleted, 0) = 0 AND p.user_id = ? AND p.has_access = 1
                 ORDER BY b.created_at DESC, b.id DESC
                 LIMIT 20
-            """, (user_id,))
+            """, (user_id, user_id))
         else:
             cursor.execute("""
-                SELECT b.id, b.library_id, b.title, b.series_name, b.cover_image, b.cover_updated_at, b.file_format, b.total_pages, b.created_at, b.is_favorite
+                SELECT b.id, b.library_id, b.title, b.series_name, b.cover_image, b.cover_updated_at, b.file_format, b.total_pages, b.created_at,
+                       CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite
                 FROM books b
                 INNER JOIN (
                     SELECT MAX(id) as max_id
@@ -95,10 +101,11 @@ class ReadingHistoryService:
                     WHERE COALESCE(is_deleted, 0) = 0
                     GROUP BY CASE WHEN series_name IS NOT NULL AND series_name != '' THEN series_name ELSE CAST(id AS TEXT) END
                 ) g ON b.id = g.max_id
+                LEFT JOIN user_favorites uf ON uf.book_id = b.id AND uf.user_id = ?
                 WHERE COALESCE(b.is_deleted, 0) = 0
                 ORDER BY b.created_at DESC, b.id DESC
                 LIMIT 20
-            """)
+            """, (int(user_id) if user_id is not None else 0,))
         rows = cursor.fetchall()
         conn.close()
         return [
