@@ -1,4 +1,11 @@
 # CHANGELOG
+## v1.1.3
+- DB 복구시 인덱스 재빌드 과정 추가 | added index rebuild process during db recovery
+
+## v1.1.2
+- 일반/성인 도서 전환시 디바운스 추가 | debounce added for general/adult toggle
+- DB 복구 툴 추가(/tools/db_recovery.py) | added db recovery tool
+
 ## v1.1.1
 - 도서 스캔 및 엔드포인트에 ISBN 정보 추가 | add ISBN info
 - 워커 구동 안정화 및 DB경합 이슈 완화 | worker restart issue fix

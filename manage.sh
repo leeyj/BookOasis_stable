@@ -115,7 +115,7 @@ stop() {
     fi
 
     # 2. 잔존 gunicorn core:app 프로세스 소탕
-    PIDS=$(pgrep -f "gunicorn.*core:app")
+    PIDS=$(ps ax | grep "gunicorn.*core:app" | grep -v grep | awk '{print $1}')
     if [ -n "$PIDS" ]; then
         echo "[*] 남아있는 미디어 Gunicorn 프로세스 정리 대상: $PIDS"
         for P in $PIDS; do
@@ -147,7 +147,7 @@ stop() {
     fi
 
     # 잔존 워커 루프 프로세스 소탕
-    W_PIDS=$(pgrep -f "tools/scanner_worker.py")
+    W_PIDS=$(ps ax | grep "tools/scanner_worker.py" | grep -v grep | awk '{print $1}')
     if [ -n "$W_PIDS" ]; then
         echo "[*] 남아있는 스캐너 워커 프로세스 정리 대상: $W_PIDS"
         for WP in $W_PIDS; do
@@ -170,7 +170,7 @@ status() {
             echo "[-] 미디어 서버: 정지 상태 (오래된 PID 파일 존재)"
         fi
     else
-        PID=$(pgrep -f "gunicorn.*core:app")
+        PID=$(ps ax | grep "gunicorn.*core:app" | grep -v grep | awk '{print $1}' | head -n 1)
         if [ -n "$PID" ]; then
             echo "[+] 미디어 서버: 실행 중 (PID: $PID, PID 파일 없음)"
         else
@@ -187,7 +187,7 @@ status() {
             echo "[-] 스캐너 워커: 정지 상태 (오래된 PID 파일 존재)"
         fi
     else
-        W_PID=$(pgrep -f "tools/scanner_worker.py")
+        W_PID=$(ps ax | grep "tools/scanner_worker.py" | grep -v grep | awk '{print $1}' | head -n 1)
         if [ -n "$W_PID" ]; then
             echo "[+] 스캐너 워커: 실행 중 (PID: $W_PID, PID 파일 없음)"
         else
