@@ -34,7 +34,7 @@ EXPOSE 5930
 STOPSIGNAL SIGTERM
 
 # 10. Volume Configuration for persistence
-VOLUME ["/app/db", "/app/covers", "/app/cache", "/app/plugins"]
+VOLUME ["/app/db", "/app/covers", "/app/cache"]
 
 # 11. Startup Command
 ENTRYPOINT ["/app/entrypoint.sh"]

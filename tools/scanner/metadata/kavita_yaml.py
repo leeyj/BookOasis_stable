@@ -109,7 +109,8 @@ def parse_kavita_yaml(folder_path, files=None, is_remote=False):
         'genre': '',
         'tags': '',
         'cover_b64_map': {},
-        'has_yaml': False
+        'has_yaml': False,
+        'parser_warnings': []
     }
 
     has_yaml = False
@@ -200,6 +201,12 @@ def parse_kavita_yaml(folder_path, files=None, is_remote=False):
         del data
     except Exception as e:
         print(f"[Scanner] YAML parsing error ({folder_path}): {e}")
+        meta['parser_warnings'].append({
+            'file_path': actual_yaml_path,
+            'filename': os.path.basename(actual_yaml_path),
+            'error_type': 'YamlParseError',
+            'message': str(e)
+        })
 
     meta['summary'] = clean_html_tags(meta['summary'])
     return meta

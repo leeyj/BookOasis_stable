@@ -153,12 +153,6 @@ def scan_library(db_path, library_id, physical_path, force=False, skip_vfs_refre
         except Exception as report_err:
             print(f"[Scanner ERROR] Scan report save failed: {report_err}")
 
-    # Trigger database optimization tuning after scan
-    import threading
-    t = threading.Thread(target=database.optimize_database, args=(db_type,))
-    t.daemon = True
-    t.start()
-
 @scanner_print_control_decorator
 def scan_library_covers_only(db_path, library_id, physical_path):
     """Force re-extract/regenerate only covers of existing books in library path and sync (skip offset/meta)"""

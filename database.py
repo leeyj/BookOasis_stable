@@ -24,6 +24,14 @@ class PooledConnection(sqlite3.Connection):
         """커넥션을 닫지 않고 풀로 반환합니다."""
         if hasattr(self, '_pool') and self._pool:
             if not self._is_returned:
+                try:
+                    # sqlite3 기본 close()처럼 미완료 트랜잭션을 정리해
+                    # 재사용 커넥션이 오래된 읽기 스냅샷을 유지하지 않도록 합니다.
+                    self.rollback()
+                except sqlite3.ProgrammingError:
+                    pass
+                except sqlite3.OperationalError:
+                    pass
                 self._is_returned = True
                 self._pool.release_connection(self)
         else:
@@ -441,6 +449,19 @@ def init_databases():
         hide_cover INTEGER DEFAULT 0
     );
 
+    CREATE TABLE IF NOT EXISTS scanner_tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_type TEXT NOT NULL,
+        task_key TEXT NOT NULL UNIQUE,
+        status TEXT NOT NULL DEFAULT 'pending',
+        kwargs TEXT,
+        stage TEXT,
+        enqueue_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        started_at DATETIME DEFAULT NULL,
+        finished_at DATETIME DEFAULT NULL,
+        error_message TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS books (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         library_id INTEGER REFERENCES libraries(id),
@@ -721,10 +742,22 @@ def init_databases():
         except Exception as migration_err:
             print(f"[DB-Migration ERROR] libraries is_remote auto-detection fallback failed: {migration_err}")
 
-        # 서버 재시작 시 고착된(Stuck) 스캔 상태 초기화 방어코드
+        # 서버 재시작 시 고착된(Stuck) 스캔 상태 초기화 및 자동 복원(Auto-Resume) 연계 방어코드
         try:
+            # 1. 취소 중이던 상태는 복원하지 않고 ready로 초기화하여 재스캔 구동 보장
+            cursor.execute("UPDATE libraries SET scan_status = 'ready' WHERE scan_status = 'cancelling'")
+            # 2. 스캔 중이던 상태는 interrupted로 보정하여 scheduler가 기동 시 Auto-Resume(자동 재스캔)을 구동하게 함
             cursor.execute("UPDATE libraries SET scan_status = 'interrupted' WHERE scan_status = 'scanning'")
+            # 3. 큐 태스크 중 이미 running 중이던 작업만 실패 처리하고 pending(대기 중) 태스크는 이어서 수행하도록 유지
+            cursor.execute("""
+                UPDATE scanner_tasks 
+                SET status = 'failed', 
+                    error_message = 'Interrupted by server restart',
+                    finished_at = CURRENT_TIMESTAMP
+                WHERE status = 'running'
+            """)
             conn.commit()
+            print("[DB-Migration] Stuck scan states cleaned up. Pending queue and Auto-Resume chain preserved.")
         except Exception as reset_err:
             print(f"[DB-Migration ERROR] Scan status reset failed: {reset_err}")
 

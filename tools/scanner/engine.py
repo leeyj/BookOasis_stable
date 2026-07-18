@@ -478,12 +478,6 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
         except Exception as report_err:
             print(f"[Scanner ERROR] Scan report save failed: {report_err}")
 
-    # Trigger database optimization tuning after scan
-    import threading
-    t = threading.Thread(target=database.optimize_database, args=(db_type,))
-    t.daemon = True
-    t.start()
-
     if detected_new_books:
         sample = [b['title'] for b in detected_new_books[:10]]
         event_payload = {

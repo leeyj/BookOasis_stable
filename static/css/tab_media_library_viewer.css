@@ -646,12 +646,19 @@
     background: rgba(15, 23, 42, 0.85);
     backdrop-filter: blur(10px);
     border-top: 1px solid rgba(255, 255, 255, 0.08);
-    padding: 0.7rem 1.2rem 0.8rem;
+    padding: 0.7rem 1.2rem calc(0.8rem + env(safe-area-inset-bottom, 0px));
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 0.5rem;
     animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 전체화면 진입 시 safe-area-inset-bottom 무력화에 대응하는 안전 보정 패딩 */
+.fullscreen-mode .overlay-footer,
+:fullscreen .overlay-footer,
+:-webkit-full-screen .overlay-footer {
+    padding-bottom: calc(2.2rem + env(safe-area-inset-bottom, 0px)) !important;
 }
 
 /* ────────────────────────────────────────────────────────

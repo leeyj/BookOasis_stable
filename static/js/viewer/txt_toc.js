@@ -222,8 +222,8 @@ export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
     btn.innerHTML = '<i class="fas fa-list"></i>';
     btn.style.cssText = `
       position: fixed;
-      top: 90px;
-      right: 20px;
+      top: calc(100px + env(safe-area-inset-top, 0px));
+      right: calc(20px + env(safe-area-inset-right, 0px));
       z-index: 10009;
       background: rgba(0,0,0,0.6);
       color: white;

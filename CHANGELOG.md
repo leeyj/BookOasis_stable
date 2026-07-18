@@ -1,4 +1,13 @@
 # CHANGELOG
+## v1.1.0
+- 워커 구동 방식 변경(웹,스캐너 분리) | worker process separated(web, scanner)
+- 도커 이미지내 plugin VOLUME 삭제 | remove plugin volume from docker image
+- 모바일 크롬에서 닫기/목차 버튼 겹침 버그 수정 | Mobile browser button overlap fix
+- 모바일 크롬에서 하단 영역 가려짐 현상 개선 | Mobile browser bottom area display fix
+- 모바일 크롬에서 캐시로 인한 뷰어 화면 미갱신 버그 수정 | Mobile browser cache miss fix
+- ymal 오류시에 경고리포트 남김 |
+- 로컬 고속 스캔 시 발생하던 일시적 DB 경합(persistent contention) 재시도(최대 3회, 2.0s/4.0s)로 실패 오탐 완화 확인 | Verified mitigation of false scan failures on fast local scans via transient DB contention retry (up to 3 attempts with 2.0s/4.0s backoff)
+
 ## v1.0.9
 - 모바일 헤더 줄바꿈 개선: 도서보관함+카테고리는 1줄 유지, 전체 권수는 다음 줄 표시 | Mobile header wrap fix: title+category stay on one line, total count moves to next line
 - EPUB 전체화면에서 목차(목록보기) 아이콘이 보이지 않던 문제 수정 | Fixed EPUB TOC button visibility in fullscreen mode

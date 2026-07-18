@@ -10,7 +10,7 @@ PGID=${PGID:-0}
 # NAS(Synology, QNAP 등) 환경에서 bind mount 시
 # 디렉토리가 read-only로 마운트되는 경우를 사전에 감지합니다.
 # ─────────────────────────────────────────────────────────
-DATA_DIRS="/app/db /app/covers /app/cache /app/plugins /app/logs"
+DATA_DIRS="/app/db /app/covers /app/cache /app/logs"
 
 echo "[Entrypoint] 데이터 디렉토리 권한 확인 중..."
 for dir in $DATA_DIRS; do
@@ -71,7 +71,11 @@ if [ "$PUID" -ne 0 ]; then
     fi
 
     # 데이터 저장용 폴더들의 소유권을 media_user로 변경
-    chown -R media_user:media_group /app/db /app/covers /app/cache /app/plugins /app/logs 2>/dev/null || true
+    chown -R media_user:media_group /app/db /app/covers /app/cache /app/logs 2>/dev/null || true
+    
+    # ── 도커 내부 스캐너 워커 프로세스 병렬 기동 (media_user 권한) ──
+    echo "[Entrypoint] Starting scanner worker process as media_user..."
+    gosu media_user python3 tools/scanner_worker.py > /app/logs/media_server_worker.log 2>&1 &
     
     # gosu를 사용하여 권한을 강등한 후 명령어 실행
     echo "[Entrypoint] Starting application as media_user..."
@@ -79,6 +83,11 @@ if [ "$PUID" -ne 0 ]; then
 else
     # PUID가 0이거나 설정되지 않은 경우 기본적으로 root로 실행
     echo "[Entrypoint] Running as root..."
+    
+    # ── 도커 내부 스캐너 워커 프로세스 병렬 기동 (root 권한) ──
+    echo "[Entrypoint] Starting scanner worker process as root..."
+    python3 tools/scanner_worker.py > /app/logs/media_server_worker.log 2>&1 &
+    
     exec "$@"
 fi
 

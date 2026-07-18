@@ -133,6 +133,8 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
     merged_meta = merge_local_metadata(root, files=files, is_remote=is_remote)
     print(f"[Scanner-DEBUG-Task]   - Metadata load completed")
 
+    parser_warnings = merged_meta.pop('parser_warnings', [])
+
     meta_has_data = bool(
         merged_meta['author'] or merged_meta['publisher'] or
         merged_meta['summary'] or merged_meta['release_date'] or
@@ -146,7 +148,7 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
 
     import zipfile
     results = []
-    errors = []
+    errors = list(parser_warnings)
     for filename in media_files:
         full_path = os.path.join(root, filename)
         _, ext = os.path.splitext(filename)

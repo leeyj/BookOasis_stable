@@ -15,7 +15,6 @@ services:
       - ./db:/app/db
       - ./covers:/app/covers
       - ./cache:/app/cache
-      - ./plugins:/app/plugins
     env_file:
       - .env
     environment:

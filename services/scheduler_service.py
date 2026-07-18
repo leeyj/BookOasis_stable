@@ -7,6 +7,19 @@ from apscheduler.triggers.cron import CronTrigger
 from tools.scanner import scan_library
 
 
+def _update_task_stage(task_key, stage):
+    """DB 큐의 작업 단계(stage) 정보를 갱신합니다."""
+    try:
+        import database
+        conn = database.get_connection('general')
+        cursor = conn.cursor()
+        cursor.execute("UPDATE scanner_tasks SET stage = ? WHERE task_key = ? AND status = 'running'", (stage, task_key))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"[Scheduler Warning] Failed to update task stage ({task_key} -> {stage}): {e}")
+
+
 def normalize_cron_expression(cron_expression):
     """Convert Linux-style cron weekday numbers to APScheduler-compatible values.
 
@@ -217,6 +230,24 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
     from tools.scanner import scan_library
     from datetime import datetime
     
+    # [버그조치] 큐 대기 시간 중 카테고리 경로 수정 시의 일관성 보장을 위해 DB 최신 경로 실시간 갱신
+    conn_path = None
+    try:
+        conn_path = database.get_connection(db_type)
+        cursor_path = conn_path.cursor()
+        cursor_path.execute("SELECT physical_path FROM libraries WHERE id = ?", (int(library_id),))
+        row_path = cursor_path.fetchone()
+        if row_path and row_path['physical_path']:
+            physical_path = row_path['physical_path']
+    except Exception as e_path:
+        print(f"[Scanner-Trigger WARNING] Failed to query latest physical_path from DB: {e_path}")
+    finally:
+        if conn_path:
+            try:
+                conn_path.close()
+            except:
+                pass
+
     start_time = datetime.now()
     start_str = start_time.strftime('%Y-%m-%d %H:%M:%S')
     
@@ -244,6 +275,16 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
         if errno in (111, 10061):
             return True
         return 'Connection refused' in str(reason)
+
+    def is_transient_scan_error(err):
+        text = str(err).lower()
+        transient_markers = (
+            'persistent db contention',
+            'database is locked',
+            'database table is locked',
+            'database schema is locked',
+        )
+        return any(marker in text for marker in transient_markers)
     
     wait_count = 0
     while is_db_tuning(db_type):
@@ -270,9 +311,7 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
         print(f"[Scheduler] Scan state update error(before VFS): {e}")
     
     # 큐 세부 진행 단계를 VFS 갱신 중으로 기록
-    from services.scanner_queue import scanner_queue
-    if scanner_queue.current_task and scanner_queue.current_task.get('key') == f"library_scan_{db_type}_{library_id}":
-        scanner_queue.current_task['stage'] = 'vfs_refresh'
+    _update_task_stage(f"library_scan_{db_type}_{library_id}", 'vfs_refresh')
     
     # VFS 캐시 사전 갱신 옵션 확인 및 수행
     vfs_refreshed_in_wrapper = False
@@ -419,7 +458,7 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
                                 )
                                 for attempt in range(1, 4):
                                     try:
-                                        with urllib.request.urlopen(req, timeout=1200) as resp:
+                                        with urllib.request.urlopen(req, timeout=15) as resp:
                                             res_text = resp.read().decode('utf-8')
                                             print(f"[Scanner-Trigger] VFS update result (server={clean_rc_url}, path={rel_path}): {res_text}")
                                             print(f"[Scanner-Trigger] VFS refresh candidate selected: '{rel_path}' ({rel_idx}/{len(rel_paths)})")
@@ -483,12 +522,36 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
         print(f"[Scanner-Trigger] VFS 옵션 DB 조회 Error: {db_err}")
     
     # 큐 세부 진행 단계를 도서 스캔 중으로 기록
-    from services.scanner_queue import scanner_queue
-    if scanner_queue.current_task and scanner_queue.current_task.get('key') == f"library_scan_{db_type}_{library_id}":
-        scanner_queue.current_task['stage'] = 'book_scan'
+    _update_task_stage(f"library_scan_{db_type}_{library_id}", 'book_scan')
 
     try:
-        scan_library(db_path, library_id, physical_path, force=force, skip_vfs_refresh=vfs_refreshed_in_wrapper)
+        # 로컬(비원격) 경로는 스캔이 매우 빠르게 끝나 flush 타이밍 경합이 발생하기 쉬워
+        # 재시도 횟수/간격을 조금 더 보수적으로 운용한다.
+        if vfs_refreshed_in_wrapper:
+            max_scan_attempts = 2
+            retry_wait_seconds = (1.5,)
+        else:
+            max_scan_attempts = 3
+            retry_wait_seconds = (2.0, 4.0)
+
+        for attempt in range(1, max_scan_attempts + 1):
+            try:
+                scan_library(db_path, library_id, physical_path, force=force, skip_vfs_refresh=vfs_refreshed_in_wrapper)
+                break
+            except Exception as scan_err:
+                if attempt < max_scan_attempts and is_transient_scan_error(scan_err):
+                    wait_sec = retry_wait_seconds[min(attempt - 1, len(retry_wait_seconds) - 1)]
+                    print(
+                        f"[Scanner-Trigger WARNING] Transient scan error detected "
+                        f"(attempt {attempt}/{max_scan_attempts}): {scan_err}. Retrying in {wait_sec:.1f}s..."
+                    )
+                    write_scan_log(
+                        f"일시적 DB 경합 오류 감지 (attempt {attempt}/{max_scan_attempts}): {scan_err}. "
+                        f"{wait_sec:.1f}초 후 재시도합니다."
+                    )
+                    time.sleep(wait_sec)
+                    continue
+                raise
         
         # 2. 성공 시 'ready' 및 last_scanned_at 기록
         end_time = datetime.now()

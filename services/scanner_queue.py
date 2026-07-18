@@ -1,32 +1,19 @@
 # -*- coding: utf-8 -*-
-import threading
-import queue
-import sys
-import subprocess
 import os
+import sys
+import json
+import time
+import subprocess
 import datetime
+import database
 
 class ScannerQueue:
     _instance = None
-    _lock = threading.Lock()
 
     def __new__(cls):
-        with cls._lock:
-            if cls._instance is None:
-                cls._instance = super(ScannerQueue, cls).__new__(cls)
-                cls._instance._init_queue()
-            return cls._instance
-
-    def _init_queue(self):
-        self.q = queue.Queue()
-        self.enqueued_items = set()
-        self.queue_lock = threading.Lock()
-        self.current_task = None
-        
-        # Start worker thread
-        self.worker_thread = threading.Thread(target=self._worker_loop, daemon=True, name="ScannerWorker")
-        self.worker_thread.start()
-        self.log("Scanner worker thread started.")
+        if cls._instance is None:
+            cls._instance = super(ScannerQueue, cls).__new__(cls)
+        return cls._instance
 
     def log(self, message):
         try:
@@ -39,169 +26,328 @@ class ScannerQueue:
         if task_type == 'lazy_scan':
             return 'lazy_scan'
         elif task_type in ('library_scan', 'cover_scan'):
-            db_type = kwargs.get('db_type')
+            db_type = kwargs.get('db_type', 'general')
             library_id = kwargs.get('library_id')
             return f"{task_type}_{db_type}_{library_id}"
         return str(task_type)
 
-    def _append_task_before_lazy(self, task_item):
-        """일반 스캔 작업은 대기 중인 lazy_scan 앞에 들어가도록 보장합니다."""
-        lazy_index = None
-
-        with self.q.mutex:
-            queue_items = list(self.q.queue)
-            for idx, item in enumerate(queue_items):
-                if item.get('type') == 'lazy_scan':
-                    lazy_index = idx
-                    break
-
-            if lazy_index is None:
-                # Keep queue internals consistent and wake any blocked consumer.
-                self.q.queue.append(task_item)
-                self.q.unfinished_tasks += 1
-                self.q.not_empty.notify()
-                return
-
-            # Insert before first lazy task while preserving existing order.
-            self.q.queue.insert(lazy_index, task_item)
-            self.q.unfinished_tasks += 1
-            self.q.not_empty.notify()
-
     def enqueue(self, task_type, **kwargs):
         task_key = self._get_task_key(task_type, kwargs)
-        
-        with self.queue_lock:
-            running_key = (self.current_task or {}).get('key') if isinstance(self.current_task, dict) else None
-            if running_key == task_key:
-                self.log(f"Task '{task_key}' is already running. Rejecting duplicate request.")
+        conn = None
+        try:
+            conn = database.get_connection('general')
+            cursor = conn.cursor()
+
+            # task_key가 UNIQUE이므로 과거 완료/실패 이력은 재사용하고,
+            # 현재 pending/running 인 작업만 중복으로 간주합니다.
+            cursor.execute(
+                "SELECT id, status FROM scanner_tasks WHERE task_key = ?",
+                (task_key,)
+            )
+            existing = cursor.fetchone()
+            if existing and existing['status'] in ('pending', 'running'):
+                self.log(f"Task '{task_key}' is already in state '{existing['status']}'. Rejecting duplicate.")
                 return False
 
-            if task_key in self.enqueued_items:
-                self.log(f"Task '{task_key}' is already in the queue. Skipping duplicate.")
-                return False
-                
-            self.enqueued_items.add(task_key)
-            task_item = {
-                'type': task_type, 
-                'key': task_key, 
-                'kwargs': kwargs,
-                'enqueued_at': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            }
+            kwargs_json = json.dumps(kwargs, ensure_ascii=False)
+            now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-            if task_type in ('library_scan', 'cover_scan'):
-                self._append_task_before_lazy(task_item)
+            if existing:
+                cursor.execute(
+                    """
+                    UPDATE scanner_tasks
+                    SET task_type = ?,
+                        status = 'pending',
+                        kwargs = ?,
+                        stage = NULL,
+                        enqueue_at = ?,
+                        started_at = NULL,
+                        finished_at = NULL,
+                        error_message = NULL
+                    WHERE id = ?
+                    """,
+                    (task_type, kwargs_json, now_str, existing['id'])
+                )
             else:
-                self.q.put(task_item)
+                cursor.execute(
+                    """
+                    INSERT INTO scanner_tasks (task_type, task_key, status, kwargs, enqueue_at)
+                    VALUES (?, ?, 'pending', ?, ?)
+                    """,
+                    (task_type, task_key, kwargs_json, now_str)
+                )
 
-            self.log(f"Task '{task_key}' enqueued successfully. Queue size: {self.q.qsize()}")
+            if cursor.rowcount == 0:
+                conn.rollback()
+                self.log(f"Task '{task_key}' was not enqueued because no DB row was written.")
+                return False
+
+            conn.commit()
+            self.log(f"Task '{task_key}' enqueued successfully (DB-backed).")
             return True
+        except Exception as e:
+            self.log(f"Enqueue failed: {e}")
+            return False
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except:
+                    pass
+
+    def add_task(self, task_type, **kwargs):
+        """webhook 등에서 호출하는 하위 호환성용 메서드"""
+        return self.enqueue(task_type, **kwargs)
 
     def get_queue_status(self):
         """현재 실행 중인 작업과 큐 대기열의 상태를 반환합니다."""
         status = {
-            'running': getattr(self, 'current_task', None),
+            'running': None,
             'pending': []
         }
-        with self.queue_lock:
-            # 큐의 내부 deque 복사
-            for item in list(self.q.queue):
-                status['pending'].append(item)
+        conn = None
+        try:
+            conn = database.get_connection('general')
+            cursor = conn.cursor()
+            
+            # running 작업 조회 (최대 1개)
+            cursor.execute(
+                "SELECT task_type, task_key, kwargs, enqueue_at, started_at, stage FROM scanner_tasks WHERE status = 'running' ORDER BY started_at DESC LIMIT 1"
+            )
+            row_run = cursor.fetchone()
+            if row_run:
+                try:
+                    kwargs = json.loads(row_run['kwargs']) if row_run['kwargs'] else {}
+                except:
+                    kwargs = {}
+                status['running'] = {
+                    'type': row_run['task_type'],
+                    'key': row_run['task_key'],
+                    'kwargs': kwargs,
+                    'enqueued_at': row_run['enqueue_at'],
+                    'started_at': row_run['started_at'],
+                    'stage': row_run['stage']
+                }
+
+            # pending 작업 조회 (정렬 규칙 적용: 일반 스캔이 lazy_scan보다 항상 먼저 진행되도록 함)
+            cursor.execute(
+                """
+                SELECT task_type, task_key, kwargs, enqueue_at, stage 
+                FROM scanner_tasks 
+                WHERE status = 'pending' 
+                ORDER BY CASE WHEN task_type = 'lazy_scan' THEN 2 ELSE 1 END, id ASC
+                """
+            )
+            rows_pending = cursor.fetchall()
+            for row in rows_pending:
+                try:
+                    kwargs = json.loads(row['kwargs']) if row['kwargs'] else {}
+                except:
+                    kwargs = {}
+                status['pending'].append({
+                    'type': row['task_type'],
+                    'key': row['task_key'],
+                    'kwargs': kwargs,
+                    'enqueued_at': row['enqueue_at'],
+                    'stage': row['stage']
+                })
+        except Exception as e:
+            self.log(f"Failed to get queue status from DB: {e}")
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except:
+                    pass
         return status
 
     def clear_queue(self):
-        """대기열에 있는 모든 작업을 삭제합니다."""
-        with self.queue_lock:
-            with self.q.mutex:
-                count = len(self.q.queue)
-                self.q.queue.clear()
-                self.q.unfinished_tasks = max(0, self.q.unfinished_tasks - count)
-            self.enqueued_items.clear()
-            self.log(f"Queue cleared. Removed {count} items.")
+        """대기열에 있는 모든 작업을 취소(cancelled) 처리합니다."""
+        conn = None
+        try:
+            conn = database.get_connection('general')
+            cursor = conn.cursor()
+            now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            cursor.execute(
+                "UPDATE scanner_tasks SET status = 'cancelled', finished_at = ? WHERE status = 'pending'",
+                (now_str,)
+            )
+            count = cursor.rowcount
+            conn.commit()
+            self.log(f"Queue cleared. Cancelled {count} pending items in DB.")
             return count
+        except Exception as e:
+            self.log(f"Failed to clear queue: {e}")
+            return 0
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except:
+                    pass
 
     def cancel_pending_task(self, task_key):
-        """대기열에 있는 특정 작업 1건을 제거합니다."""
+        """대기열에 있는 특정 작업 1건을 취소(cancelled) 처리합니다."""
         if not task_key:
             return False
-
-        with self.queue_lock:
-            with self.q.mutex:
-                for idx, item in enumerate(list(self.q.queue)):
-                    if item.get('key') != task_key:
-                        continue
-
-                    del self.q.queue[idx]
-                    self.q.unfinished_tasks = max(0, self.q.unfinished_tasks - 1)
-                    self.enqueued_items.discard(task_key)
-                    self.log(f"Pending task '{task_key}' cancelled successfully.")
-                    return True
-
-        return False
-
-    def _worker_loop(self):
-        while True:
-            task_key = None
-            try:
-                task = self.q.get()
-                self.current_task = task
-                self.current_task['started_at'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                
-                task_type = task['type']
-                task_key = task['key']
-                kwargs = task['kwargs']
-
-                # 큐에서 작업을 꺼냈으므로 대기열 목록에서 제거 (새로운 동일 요청 수락 가능)
-                with self.queue_lock:
-                    if task_key in self.enqueued_items:
-                        self.enqueued_items.remove(task_key)
-
-                self.log(f"Starting task: {task_key}")
-                
-                if task_type == 'lazy_scan':
-                    self._process_lazy_scan()
-                elif task_type == 'library_scan':
-                    self._process_library_scan(**kwargs)
-                elif task_type == 'cover_scan':
-                    self._process_cover_scan(**kwargs)
-                else:
-                    self.log(f"Unknown task type: {task_type}")
-
-            except Exception as e:
-                self.log(f"Error processing task: {e}")
-            finally:
-                self.current_task = None
-                if task_key is not None:
-                    self.q.task_done()
-                    self.log(f"Finished task: {task_key}. Remaining queue size: {self.q.qsize()}")
-
-    def _process_lazy_scan(self):
-        BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        script_path = os.path.join(BASE_DIR, 'tools', 'lazy_scanner.py')
-        
+        conn = None
         try:
-            # 동기식(block)으로 실행하여 프로세스가 끝날 때까지 기다림
-            subprocess.run(
-                [sys.executable, script_path],
-                cwd=BASE_DIR,
-                check=False
-            )
-        except Exception as e:
-            self.log(f"Lazy cover script execution failed: {e}")
-
-    def _process_library_scan(self, db_type, db_path, library_id, physical_path, force=False):
-        try:
-            from services.scheduler_service import run_scan_job
-            # 직접 함수 호출 (이미 Background 워커 스레드 위에서 도는 중)
-            run_scan_job(db_type, db_path, library_id, physical_path, force=force)
-        except Exception as e:
-            self.log(f"Library scan failed: {e}")
+            conn = database.get_connection('general')
+            cursor = conn.cursor()
+            now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
-    def _process_cover_scan(self, db_type, db_path, library_id, physical_path):
-        try:
-            from services.cover_scan_service import CoverScanService
-            CoverScanService.run_cover_scan_job(db_type, db_path, library_id, physical_path)
+            cursor.execute(
+                "UPDATE scanner_tasks SET status = 'cancelled', finished_at = ? WHERE task_key = ? AND status = 'pending'",
+                (now_str, task_key)
+            )
+            success = cursor.rowcount > 0
+            conn.commit()
+            if success:
+                self.log(f"Pending task '{task_key}' cancelled successfully in DB.")
+            return success
         except Exception as e:
-            self.log(f"Cover scan failed: {e}")
+            self.log(f"Failed to cancel pending task: {e}")
+            return False
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except:
+                    pass
 
-# 전역 싱글톤 인스턴스 노출
+
+def run_scanner_worker_loop():
+    """
+    독립된 백그라운드 프로세스에서 동작할 워커의 무한루프 진입점입니다.
+    """
+    try:
+        from utils.logger import setup_rotating_logger
+        setup_rotating_logger()
+    except:
+        pass
+
+    sq = ScannerQueue()
+    sq.log(f"Scanner worker process started. PID: {os.getpid()}")
+
+    while True:
+        conn = None
+        try:
+            conn = database.get_connection('general')
+            cursor = conn.cursor()
+            
+            # 1. 대기 중인 작업 중 가장 최우선 작업을 하나 선택 (일반 스캔 우선, lazy_scan 후순위)
+            cursor.execute(
+                """
+                SELECT id, task_type, task_key, kwargs 
+                FROM scanner_tasks 
+                WHERE status = 'pending' 
+                ORDER BY CASE WHEN task_type = 'lazy_scan' THEN 2 ELSE 1 END, id ASC
+                LIMIT 1
+                """
+            )
+            task = cursor.fetchone()
+            
+            if not task:
+                conn.close()
+                conn = None
+                time.sleep(3.0)
+                continue
+                
+            task_id = task['id']
+            task_type = task['task_type']
+            task_key = task['task_key']
+            
+            try:
+                kwargs = json.loads(task['kwargs']) if task['kwargs'] else {}
+            except Exception as j_err:
+                kwargs = {}
+                sq.log(f"Failed to parse kwargs JSON: {j_err}")
+
+            # 2. Race Condition 방지를 위한 원자적 상태 변경 시도
+            now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            cursor.execute(
+                "UPDATE scanner_tasks SET status = 'running', started_at = ? WHERE id = ? AND status = 'pending'",
+                (now_str, task_id)
+            )
+            conn.commit()
+            
+            # 업데이트가 성공했는지 검증 (다른 프로세스가 먼저 선점하지 않았는지)
+            if cursor.rowcount == 0:
+                conn.close()
+                conn = None
+                continue
+                
+            conn.close()
+            conn = None
+            
+            sq.log(f"Processing task: {task_key}")
+            
+            # 3. 작업 유형별 실행 분기
+            error_message = None
+            try:
+                if task_type == 'lazy_scan':
+                    _process_lazy_scan(sq)
+                elif task_type == 'library_scan':
+                    _process_library_scan(sq, **kwargs)
+                elif task_type == 'cover_scan':
+                    _process_cover_scan(sq, **kwargs)
+                else:
+                    error_message = f"Unknown task type: {task_type}"
+                    sq.log(error_message)
+            except Exception as work_err:
+                error_message = str(work_err)
+                sq.log(f"Task processing crashed: {work_err}")
+
+            # 4. 작업 결과 반영
+            conn = database.get_connection('general')
+            cursor = conn.cursor()
+            finished_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            if error_message:
+                cursor.execute(
+                    "UPDATE scanner_tasks SET status = 'failed', finished_at = ?, error_message = ? WHERE id = ?",
+                    (finished_str, error_message, task_id)
+                )
+            else:
+                cursor.execute(
+                    "UPDATE scanner_tasks SET status = 'completed', finished_at = ? WHERE id = ?",
+                    (finished_str, task_id)
+                )
+            conn.commit()
+            sq.log(f"Finished task: {task_key}.")
+            
+        except Exception as loop_err:
+            sq.log(f"Error in worker loop: {loop_err}")
+            time.sleep(5.0)
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except:
+                    pass
+
+
+def _process_lazy_scan(sq):
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    script_path = os.path.join(BASE_DIR, 'tools', 'lazy_scanner.py')
+    
+    # 동기식(block)으로 실행하여 프로세스가 끝날 때까지 기다림
+    subprocess.run(
+        [sys.executable, script_path],
+        cwd=BASE_DIR,
+        check=False
+    )
+
+def _process_library_scan(sq, **kwargs):
+    from services.scheduler_service import run_scan_job
+    # 가변 인자 딕셔너리를 그대로 포워딩하여 호출
+    run_scan_job(**kwargs)
+    
+def _process_cover_scan(sq, **kwargs):
+    from services.cover_scan_service import CoverScanService
+    CoverScanService.run_cover_scan_job(**kwargs)
+
+
+# 하위 호환성 유지를 위한 전역 싱글톤 인스턴스
 scanner_queue = ScannerQueue()

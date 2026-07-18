@@ -29,6 +29,7 @@ def _base_meta():
         'cover_image_url': '',
         'is_webtoon': False,
         'has_yaml': False,
+        'parser_warnings': [],
     }
 
 
@@ -97,6 +98,11 @@ def is_consonant_folder(foldername):
 
 
 def _merge_value(target, key, value):
+    if key == 'parser_warnings':
+        if isinstance(value, list) and value:
+            target[key].extend(value)
+        return
+
     if key in ('genre', 'tags'):
         value = normalize_metadata_list_field(value)
 
