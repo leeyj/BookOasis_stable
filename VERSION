@@ -1,6 +1,5 @@
-{
-	"dashboard": "1.1.1",
-	"migrator": "1.0.6",
-	"extensions": "1.0.2",
-	"state": "release-production"
-}
+"dashboard": "1.1.1",
+"migrator": "1.0.6",
+"extensions": "1.0.2",
+"state": "release-production"
+
