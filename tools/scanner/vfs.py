@@ -19,6 +19,33 @@ def _is_connection_refused_error(err):
         return True
     return 'Connection refused' in str(reason)
 
+
+def _is_vfs_refresh_success_response(res_text, rel_path):
+    text = str(res_text or '').strip()
+    lowered = text.lower()
+    if not text:
+        return False, 'empty response'
+    if 'file does not exist' in lowered:
+        return False, 'file does not exist'
+
+    try:
+        payload = json.loads(text)
+    except Exception:
+        return True, 'non-json success response'
+
+    if isinstance(payload, dict) and payload.get('error'):
+        return False, str(payload.get('error'))
+
+    result = payload.get('result') if isinstance(payload, dict) else None
+    if isinstance(result, dict):
+        entry = result.get(rel_path)
+        if isinstance(entry, str) and 'file does not exist' in entry.lower():
+            return False, entry
+        if rel_path in result:
+            return True, str(entry)
+
+    return True, 'ok'
+
 def trigger_vfs_refresh(db_path, library_id, physical_path):
     """Refresh rclone cache before starting scan if remote mount path (VFS)."""
     target_paths_raw = [p.strip() for p in str(physical_path).replace('\r', '').split('\n') if p.strip()]
@@ -108,10 +135,15 @@ def trigger_vfs_refresh(db_path, library_id, physical_path):
 
                         for attempt in range(1, 4):
                             try:
-                                with urllib.request.urlopen(req, timeout=5) as resp:
-                                    print(f"[Scanner-VFS] VFS cache refresh success - Server: '{clean_rc_url}', Target: '{rel_path}', Result: {resp.read().decode('utf-8')}")
-                                    print(f"[Scanner-VFS] VFS refresh candidate selected: '{rel_path}' ({rel_idx}/{len(rel_paths)})")
-                                    refreshed = True
+                                with urllib.request.urlopen(req, timeout=1200) as resp:
+                                    res_text = resp.read().decode('utf-8')
+                                    ok, reason = _is_vfs_refresh_success_response(res_text, rel_path)
+                                    if ok:
+                                        print(f"[Scanner-VFS] VFS cache refresh success - Server: '{clean_rc_url}', Target: '{rel_path}', Result: {res_text}")
+                                        print(f"[Scanner-VFS] VFS refresh candidate selected: '{rel_path}' ({rel_idx}/{len(rel_paths)})")
+                                        refreshed = True
+                                        break
+                                    print(f"[Scanner-VFS Warning] Non-success VFS refresh response ignored - Server: '{clean_rc_url}', Target: '{rel_path}', Reason: {reason}")
                                     break
                             except urllib.error.URLError as e:
                                 if attempt < 3 and _is_connection_refused_error(e):

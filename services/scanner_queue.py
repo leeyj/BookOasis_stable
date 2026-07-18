@@ -65,6 +65,7 @@ class ScannerQueue:
                         finished_at = NULL,
                         error_message = NULL
                     WHERE id = ?
+                      AND status NOT IN ('pending', 'running')
                     """,
                     (task_type, kwargs_json, now_str, existing['id'])
                 )
@@ -79,7 +80,10 @@ class ScannerQueue:
 
             if cursor.rowcount == 0:
                 conn.rollback()
-                self.log(f"Task '{task_key}' was not enqueued because no DB row was written.")
+                self.log(
+                    f"Task '{task_key}' was not enqueued because it is already pending/running "
+                    f"(or no DB row was written)."
+                )
                 return False
 
             conn.commit()

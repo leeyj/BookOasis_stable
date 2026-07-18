@@ -124,8 +124,12 @@ def get_system_queue_status():
         for t in status['pending']:
             enhanced_pending.append(_enhance_task(t))
         status['pending'] = enhanced_pending
-        
-        return jsonify({'success': True, 'queue': status})
+
+        response = jsonify({'success': True, 'queue': status})
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

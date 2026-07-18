@@ -1,4 +1,10 @@
 # CHANGELOG
+## v1.1.5
+- 스캔 완료 후 간헐적으로 대기상태에 머무르는 현상 수정 | Issue where the system remains in an intermittent idle state after scanning completion
+- 모바일 뷰에서 뒤로가기/닫기시 즉시 상태저장 안되는 현상 수정 | Issue where the status is not immediately saved upon back navigation or closing on mobile view
+- VFS 갱신시 우선순위 조정 및 로그 표시 상태 수정 | Priority adjustment and log status correction during VFS updates
+- DB lock 상태 발견시 방어로직 개선(기존 2회 ->5회 및 6회차부터 로그에 기록) | Improved defense logic when DB lock status is detected (increased retries from 2 to 5, then 6, with logging from the 6th attempt)
+
 ## v1.1.4
 - epub에서, 목차선택시 정상적으로 이동하지 않는 현상 수정 | Fixed issue where selection in the EPUB table of contents did not navigate correctly
 - epub에서, 목차 부분 스크롤 안되는 현상 수정 | Fixed issue where scrolling within the EPUB table of contents area was not working

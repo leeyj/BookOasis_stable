@@ -41,7 +41,7 @@
 
     window.loadQueueStatus = async function() {
         try {
-            const response = await fetch('/api/media/system/queue');
+            const response = await fetch(`/api/media/system/queue?_ts=${Date.now()}`, { cache: 'no-store' });
             if (!response.ok) throw new Error('API Response Error');
             const data = await response.json();
             

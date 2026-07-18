@@ -285,6 +285,33 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
             'database schema is locked',
         )
         return any(marker in text for marker in transient_markers)
+
+    def is_vfs_refresh_success_response(res_text, rel_path):
+        text = str(res_text or '').strip()
+        lowered = text.lower()
+        if not text:
+            return False, 'empty response'
+        if 'file does not exist' in lowered:
+            return False, 'file does not exist'
+
+        try:
+            payload = json.loads(text)
+        except Exception:
+            return True, 'non-json success response'
+
+        if isinstance(payload, dict) and payload.get('error'):
+            return False, str(payload.get('error'))
+
+        result = payload.get('result') if isinstance(payload, dict) else None
+        if isinstance(result, dict):
+            entry = result.get(rel_path)
+            if isinstance(entry, str) and 'file does not exist' in entry.lower():
+                return False, entry
+            # Any explicit entry for the requested path that is not an error string is acceptable.
+            if rel_path in result:
+                return True, str(entry)
+
+        return True, 'ok'
     
     wait_count = 0
     while is_db_tuning(db_type):
@@ -458,13 +485,18 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
                                 )
                                 for attempt in range(1, 4):
                                     try:
-                                        with urllib.request.urlopen(req, timeout=15) as resp:
+                                        with urllib.request.urlopen(req, timeout=1200) as resp:
                                             res_text = resp.read().decode('utf-8')
-                                            print(f"[Scanner-Trigger] VFS update result (server={clean_rc_url}, path={rel_path}): {res_text}")
-                                            print(f"[Scanner-Trigger] VFS refresh candidate selected: '{rel_path}' ({rel_idx}/{len(rel_paths)})")
-                                            write_scan_log(f"VFS 갱신 완료 (server={clean_rc_url}, path={rel_path}): {res_text}")
-                                            write_scan_log(f"VFS 갱신 성공 후보 경로: {rel_path} ({rel_idx}/{len(rel_paths)})")
-                                            refreshed = True
+                                            ok, reason = is_vfs_refresh_success_response(res_text, rel_path)
+                                            if ok:
+                                                print(f"[Scanner-Trigger] VFS update result (server={clean_rc_url}, path={rel_path}): {res_text}")
+                                                print(f"[Scanner-Trigger] VFS refresh candidate selected: '{rel_path}' ({rel_idx}/{len(rel_paths)})")
+                                                write_scan_log(f"VFS 갱신 완료 (server={clean_rc_url}, path={rel_path}): {res_text}")
+                                                write_scan_log(f"VFS 갱신 성공 후보 경로: {rel_path} ({rel_idx}/{len(rel_paths)})")
+                                                refreshed = True
+                                                break
+                                            print(f"[Scanner-Trigger WARNING] VFS update returned non-success payload (server={clean_rc_url}, path={rel_path}): {reason}")
+                                            write_scan_log(f"VFS update request failed ({rel_path}): non-success response - {reason}")
                                             break
                                     except urllib.error.HTTPError as http_ex:
                                         err_body = http_ex.read().decode('utf-8') if hasattr(http_ex, 'read') else str(http_ex)
@@ -527,12 +559,22 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
     try:
         # 로컬(비원격) 경로는 스캔이 매우 빠르게 끝나 flush 타이밍 경합이 발생하기 쉬워
         # 재시도 횟수/간격을 조금 더 보수적으로 운용한다.
+        # 고정 정책: 최대 5회 재시도(총 6회 시도), 6회차부터 상세 경합 로그 출력
+        max_scan_attempts = 6
         if vfs_refreshed_in_wrapper:
-            max_scan_attempts = 2
-            retry_wait_seconds = (1.5,)
+            retry_wait_seconds = (1.5, 2.0, 3.0, 5.0, 8.0)
+            retry_policy_label = 'vfs'
         else:
-            max_scan_attempts = 3
-            retry_wait_seconds = (2.0, 4.0)
+            retry_wait_seconds = (2.0, 4.0, 6.0, 8.0, 10.0)
+            retry_policy_label = 'local'
+
+        print(
+            f"[Scanner-Trigger] Retry policy selected: mode={retry_policy_label}, "
+            f"attempts={max_scan_attempts}, waits={retry_wait_seconds}"
+        )
+        write_scan_log(
+            f"재시도 정책: mode={retry_policy_label}, attempts={max_scan_attempts}, waits={retry_wait_seconds}"
+        )
 
         for attempt in range(1, max_scan_attempts + 1):
             try:
@@ -541,14 +583,17 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
             except Exception as scan_err:
                 if attempt < max_scan_attempts and is_transient_scan_error(scan_err):
                     wait_sec = retry_wait_seconds[min(attempt - 1, len(retry_wait_seconds) - 1)]
-                    print(
-                        f"[Scanner-Trigger WARNING] Transient scan error detected "
-                        f"(attempt {attempt}/{max_scan_attempts}): {scan_err}. Retrying in {wait_sec:.1f}s..."
-                    )
-                    write_scan_log(
-                        f"일시적 DB 경합 오류 감지 (attempt {attempt}/{max_scan_attempts}): {scan_err}. "
-                        f"{wait_sec:.1f}초 후 재시도합니다."
-                    )
+                    next_attempt = attempt + 1
+                    if next_attempt >= 6:
+                        print(
+                            f"[Scanner-Trigger WARNING] Transient scan error persists "
+                            f"(attempt {attempt}/{max_scan_attempts}): {scan_err}. "
+                            f"Entering attempt {next_attempt} after {wait_sec:.1f}s."
+                        )
+                        write_scan_log(
+                            f"일시적 DB 경합 오류 지속 (attempt {attempt}/{max_scan_attempts}): {scan_err}. "
+                            f"{wait_sec:.1f}초 후 {next_attempt}회차 시도를 진행합니다."
+                        )
                     time.sleep(wait_sec)
                     continue
                 raise
