@@ -193,6 +193,7 @@
     "success": true,
     "meta": {
       "author": "추공",
+      "isbn": "9791167771234",
       "publisher": "디앤씨미디어",
       "link": "https://...",
       "score": 5,
@@ -218,6 +219,58 @@
     ]
   }
   ```
+
+### `[POST]` `/api/media/detail/edit`
+* **설명**: 시리즈 메타정보를 수동으로 수정합니다. (관리자 전용)
+* **권한**: `@admin_required`
+* **Content-Type**: `application/x-www-form-urlencoded`
+* **요청 파라미터**:
+  | 파라미터명 | 타입 | 필수여부 | 설명 |
+  | :--- | :--- | :--- | :--- |
+  | `type` | string | 필수 | DB 스코프 (`general` 또는 `adult`) |
+  | `series` | string | 필수 | 수정 대상 시리즈명 |
+  | `author` | string | 선택 | 저자 |
+  | `isbn` | string | 선택 | ISBN |
+  | `publisher` | string | 선택 | 출판사 |
+  | `summary` | string | 선택 | 줄거리 |
+  | `link` | string | 선택 | 외부 링크 |
+  | `genre` | string | 선택 | 장르(쉼표 구분) |
+  | `tags` | string | 선택 | 태그(쉼표 구분) |
+  | `cover_image` | file | 선택 | 표지 이미지 파일 |
+
+### `[POST]` `/api/media/books/{book_id}/apply-metadata`
+* **설명**: 메타데이터 검색(플러그인) 결과를 선택해 단일 도서에 적용합니다. (관리자 전용)
+* **권한**: `@admin_required`
+* **Content-Type**: `application/json` 또는 `application/x-www-form-urlencoded`
+* **요청 바디(JSON) 예시**:
+  ```json
+  {
+    "type": "general",
+    "source": "aladin",
+    "item_data": {
+      "title": "도서명",
+      "author": "저자",
+      "isbn": "9791167771234",
+      "publisher": "출판사",
+      "description": "설명",
+      "link": "https://..."
+    }
+  }
+  ```
+* **비고**: `item_data.isbn`이 제공되면 플러그인 apply 로직에서 `books.isbn`까지 함께 반영됩니다.
+
+### `[POST]` `/api/media/meta/copy`
+* **설명**: 추천 메타정보를 동일 시리즈에 일괄 복사합니다. (관리자 전용)
+* **권한**: `@admin_required`
+* **Content-Type**: `application/x-www-form-urlencoded`
+* **요청 파라미터**:
+  | 파라미터명 | 타입 | 필수여부 | 설명 |
+  | :--- | :--- | :--- | :--- |
+  | `type` | string | 필수 | DB 스코프 (`general` 또는 `adult`) |
+  | `target_series` | string | 필수 | 대상 시리즈명 |
+  | `target_library_id` | integer | 필수 | 대상 라이브러리 ID |
+  | `source_book_id` | integer | 필수 | 원본 메타를 가져올 도서 ID |
+* **비고**: 복사 항목에 `isbn`이 포함됩니다.
 
 ---
 

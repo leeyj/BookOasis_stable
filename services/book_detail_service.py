@@ -72,7 +72,7 @@ class BookDetailService:
         if use_lib_filter:
             perm_sql, perm_params = _permission_exists_sql('books')
             cursor.execute("""
-                SELECT author, publisher, link, score, summary, genre, tags
+                SELECT author, isbn, publisher, link, score, summary, genre, tags
                 FROM books
                 WHERE series_name = ? AND library_id = ? AND COALESCE(is_deleted, 0) = 0
             """ + perm_sql + """ AND (summary IS NOT NULL AND summary != '')
@@ -81,7 +81,7 @@ class BookDetailService:
             meta_row = cursor.fetchone()
             if not meta_row:
                 cursor.execute("""
-                    SELECT author, publisher, link, score, summary, genre, tags
+                    SELECT author, isbn, publisher, link, score, summary, genre, tags
                     FROM books WHERE series_name = ? AND library_id = ? AND COALESCE(is_deleted, 0) = 0
                 """ + perm_sql + """ LIMIT 1
                 """, (series_name, library_id, *perm_params))
@@ -89,7 +89,7 @@ class BookDetailService:
         else:
             perm_sql, perm_params = _permission_exists_sql('books')
             cursor.execute("""
-                SELECT author, publisher, link, score, summary, genre, tags
+                SELECT author, isbn, publisher, link, score, summary, genre, tags
                 FROM books
                 WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0
             """ + perm_sql + """ AND (summary IS NOT NULL AND summary != '')
@@ -98,7 +98,7 @@ class BookDetailService:
             meta_row = cursor.fetchone()
             if not meta_row:
                 cursor.execute("""
-                    SELECT author, publisher, link, score, summary, genre, tags
+                    SELECT author, isbn, publisher, link, score, summary, genre, tags
                     FROM books WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0
                 """ + perm_sql + """ LIMIT 1
                 """, (series_name, *perm_params))
@@ -172,6 +172,7 @@ class BookDetailService:
 
         meta = {
             'author'   : _val(meta_row, 'author',    '-'),
+            'isbn'     : _val(meta_row, 'isbn',      ''),
             'publisher': _val(meta_row, 'publisher', '-'),
             'link'     : _val(meta_row, 'link',       ''),
             'score'    : _val(meta_row, 'score',       0),
@@ -227,7 +228,7 @@ class BookDetailService:
         return meta, books_list
 
     @staticmethod
-    def update_media_detail(db_type, series_name, author, publisher, summary, link, genre='', tags='', cover_file=None):
+    def update_media_detail(db_type, series_name, author, isbn, publisher, summary, link, genre='', tags='', cover_file=None):
         import hashlib
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
@@ -266,6 +267,7 @@ class BookDetailService:
             cursor.execute("""
                 UPDATE books
                 SET author = ?,
+                    isbn = ?,
                     publisher = ?,
                     summary = ?,
                     link = ?,
@@ -274,7 +276,7 @@ class BookDetailService:
                     metadata_locked = 1,
                     cover_updated_at = CURRENT_TIMESTAMP
                 WHERE series_name = ?
-            """, (author, publisher, summary, link, genre, tags, series_name))
+            """, (author, isbn, publisher, summary, link, genre, tags, series_name))
             
             conn.commit()
             conn.close()

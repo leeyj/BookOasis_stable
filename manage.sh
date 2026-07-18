@@ -57,7 +57,7 @@ start() {
     mkdir -p "$APP_DIR/logs"
     
     # Gunicorn을 통해 5930 포트로 백그라운드 기동 (주기적 워커 재시작 적용 및 타임아웃 방지)
-    nohup env PYTHONUNBUFFERED=1 python3 -m gunicorn -w 1 --threads 12 --max-requests 500 --max-requests-jitter 50 --timeout 300 -b 0.0.0.0:5930 core:app > "$LOG_FILE" 2>&1 &
+    nohup env PYTHONUNBUFFERED=1 BOOKOASIS_ENABLE_EMBEDDED_WORKER=false python3 -m gunicorn -w 1 --threads 12 --max-requests 500 --max-requests-jitter 50 --timeout 300 -b 0.0.0.0:5930 core:app > "$LOG_FILE" 2>&1 &
     
     NEW_PID=$!
     echo "$NEW_PID" > "$PID_FILE"

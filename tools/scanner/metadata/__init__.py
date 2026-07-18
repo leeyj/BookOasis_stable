@@ -18,6 +18,7 @@ def _base_meta():
     return {
         'title': '',
         'author': '',
+        'isbn': '',
         'publisher': '',
         'summary': '',
         'link': '',

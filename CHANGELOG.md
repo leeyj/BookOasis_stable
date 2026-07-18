@@ -1,4 +1,10 @@
 # CHANGELOG
+## v1.1.1
+- 도서 스캔 및 엔드포인트에 ISBN 정보 추가 | add ISBN info
+- 워커 구동 안정화 및 DB경합 이슈 완화 | worker restart issue fix
+- 기존 카테고리에 신규 경로 추가시 간헐적으로 발생하는 스캔 오류 수정 | Fix scan error when adding new path to existing category
+- 대시보드 튕김 현상(DB lock, Worker timeout) 개선 | Fix dashboard crash(DB lock, Worker timeout)
+
 ## v1.1.0
 - 워커 구동 방식 변경(웹,스캐너 분리) | worker process separated(web, scanner)
 - 도커 이미지내 plugin VOLUME 삭제 | remove plugin volume from docker image

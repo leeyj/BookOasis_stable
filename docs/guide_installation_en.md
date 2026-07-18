@@ -97,18 +97,26 @@ python core.py
 # Run with a custom port (using -p parameter)
 python core.py -p 8080
 ```
+* Default behavior: in non-Docker environments, the scanner worker starts automatically.
+* Disable worker if needed: `BOOKOASIS_ENABLE_EMBEDDED_WORKER=0 python core.py`
 * Default running port: `http://localhost:5930` (Can be changed via parameter)
 
 ### 2) Production Server Deployment Mode (Linux - Gunicorn)
-In Linux server environments, use Gunicorn to run the service stably, preventing lock phenomena and utilizing multi-worker processing.
+In Linux server environments, run the web process with Gunicorn. For this project, the recommended baseline is a single web worker (`--workers 1`). Choose one scanner-worker strategy below.
 
 ```bash
-# Background run example (using default 5930 port)
-gunicorn --workers 4 --bind 0.0.0.0:5930 --timeout 120 api:app --daemon
+# [Recommended] Single-command mode: single web worker + embedded scanner worker
+BOOKOASIS_ENABLE_EMBEDDED_WORKER=true gunicorn --workers 1 --bind 0.0.0.0:5930 --timeout 120 core:app --daemon
 
 # If you want to change the port to 8080, modify the bind option:
-# gunicorn --workers 4 --bind 0.0.0.0:8080 --timeout 120 api:app --daemon
+# BOOKOASIS_ENABLE_EMBEDDED_WORKER=true gunicorn --workers 1 --bind 0.0.0.0:8080 --timeout 120 core:app --daemon
 ```
+
+```bash
+# [Alternative] Two-process manager mode (separate web/worker)
+./manage.sh start
+```
+* In `manage.sh` mode, the web process embedded worker is disabled and the scanner worker is managed as a separate process.
 
 ### 3) Easy Run via Docker
 If Docker is installed, you can quickly boot up the environment containerized without building from source.
@@ -139,8 +147,8 @@ docker compose -f docker-compose.ghcr.yml -f docker-compose.override.yml up -d
 ```
 * The default path uses GHCR images, so end users do not need to build Docker images locally.
 * The container's internal port `5930` is bound to the host's `5930` port. If you wish to change the host port, modify the left-side port number in `docker-compose.ghcr.yml` like `ports: - "8080:5930"`.
-* The database (`db/`), cover cache (`covers/`), temp upload folder (`cache/`), and custom plugins (`plugins/`) are automatically mapped as persistent volumes in the project root directory.
-* 💡 Thanks to the `plugins/` volume mapping, you can instantly add external metadata plugins simply by dropping a new python file into the host's `plugins/metadata/` folder without needing to rebuild the docker container.
+* The database (`db/`), cover cache (`covers/`), and cache folder (`cache/`) are mapped as persistent volumes in the project root directory.
+* In Docker mode, the entrypoint starts both the web service and scanner worker together.
 * 💡 Since `docker-compose.override.yml` is listed in `.gitignore`, your local path configuration won't be overwritten or cause conflicts when you pull updates (`git pull`) from the remote repository.
 
 > Security policy: operator-only deployment and release automation procedures are maintained in private internal documentation.

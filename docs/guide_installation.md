@@ -97,18 +97,26 @@ python core.py
 # 포트를 변경하여 실행할 경우 (-p 파라미터 사용)
 python core.py -p 8080
 ```
+* 기본 동작: 도커 외 환경에서는 스캐너 워커가 자동으로 함께 기동됩니다.
+* 필요 시 워커 비활성화: `BOOKOASIS_ENABLE_EMBEDDED_WORKER=0 python core.py`
 * 기본 구동 포트: `http://localhost:5930` (파라미터로 변경 가능)
 
 ### 2) 운영 서버 배포 모드 (Linux - Gunicorn)
-Linux 서버 환경에서는 락 현상을 예방하고 멀티 워커 처리를 위해 Gunicorn을 이용하여 안정적으로 서비스를 구동합니다.
+Linux 서버 환경에서는 Gunicorn으로 웹 프로세스를 안정적으로 운용합니다. 본 프로젝트 기준 권장값은 단일 웹 워커(`--workers 1`)입니다. 실행 방식에 따라 스캐너 워커 기동 정책을 아래처럼 선택하세요.
 
 ```bash
-# 백그라운드 구동 예시 (기본 5930 포트 사용)
-gunicorn --workers 4 --bind 0.0.0.0:5930 --timeout 120 api:app --daemon
+# [권장] 단일 명령 기동: 단일 웹 워커 + 내장 스캐너 워커 자동 기동
+BOOKOASIS_ENABLE_EMBEDDED_WORKER=true gunicorn --workers 1 --bind 0.0.0.0:5930 --timeout 120 core:app --daemon
 
 # 만약 포트를 8080으로 변경하고 싶다면 바인딩 옵션을 수정하세요:
-# gunicorn --workers 4 --bind 0.0.0.0:8080 --timeout 120 api:app --daemon
+# BOOKOASIS_ENABLE_EMBEDDED_WORKER=true gunicorn --workers 1 --bind 0.0.0.0:8080 --timeout 120 core:app --daemon
 ```
+
+```bash
+# [대안] 2프로세스 관리 스크립트 방식(웹/워커 분리)
+./manage.sh start
+```
+* `manage.sh` 경로는 웹과 스캐너 워커를 별도 프로세스로 관리하며, 웹 프로세스의 내장 워커는 자동으로 비활성화됩니다.
 
 ### 3) Docker 기반 간편 실행
 도커 환경이 설치되어 있다면, 환경 구성을 빌드 없이 컨테이너 기반으로 빠르게 기동할 수 있습니다.
@@ -139,8 +147,8 @@ docker compose -f docker-compose.ghcr.yml -f docker-compose.override.yml up -d
 ```
 * 기본 경로는 GHCR 이미지를 사용하므로 사용자가 직접 Docker 이미지를 빌드할 필요가 없습니다.
 * 컨테이너 내부 포트 `5930`이 호스트의 `5930` 포트로 바인딩됩니다. 호스트 포트를 변경하고 싶다면 `docker-compose.ghcr.yml` 파일에서 `ports: - "8080:5930"`과 같이 좌측 포트 번호를 수정하십시오.
-* 데이터베이스(`db/`), 표지 캐시(`covers/`), 임시 업로드 폴더(`cache/`), 커스텀 플러그인(`plugins/`)이 프로젝트 루트 디렉터리에 영구 보존용 볼륨으로 자동 매핑됩니다.
-* 💡 `plugins/` 볼륨 매핑 덕분에 도커 컨테이너를 다시 빌드할 필요 없이 호스트의 `plugins/metadata/` 폴더에 새 파이썬 파일을 넣기만 하면 외부 메타데이터 플러그인을 즉시 추가할 수 있습니다.
+* 데이터베이스(`db/`), 표지 캐시(`covers/`), 캐시 폴더(`cache/`)가 프로젝트 루트 디렉터리에 영구 보존용 볼륨으로 매핑됩니다.
+* 도커 경로에서는 엔트리포인트가 웹과 스캐너 워커를 함께 기동합니다.
 * 💡 `docker-compose.override.yml`은 `.gitignore`에 등록되어 있으므로 향후 업데이트(`git pull`) 시 사용자의 개인 설정이 충돌하거나 초기화되지 않습니다.
 
 > 보안 정책: 운영자 전용 배포/릴리스 자동화 절차는 비공개 내부 문서로 관리합니다.

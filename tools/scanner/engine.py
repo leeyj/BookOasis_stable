@@ -201,7 +201,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                 update_data.append((
                     d.get('series_name', ''),
                     d['cover_image'], d['cover_image'], d['cover_image'],
-                    meta.get('author',''), meta.get('publisher',''), meta.get('link',''),
+                    meta.get('author',''), meta.get('isbn',''), meta.get('publisher',''), meta.get('link',''),
                     score, score, meta.get('summary',''), meta.get('release_date',''),
                     meta.get('genre',''), meta.get('tags',''),
                     d.get('file_mtime', 0.0), d.get('file_size', 0),
@@ -218,7 +218,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                 if not title:
                     title, _ = os.path.splitext(d['filename'])
                 insert_data.append((
-                    d['library_id'], title, d['series_name'], meta.get('author',''),
+                    d['library_id'], title, d['series_name'], meta.get('author',''), meta.get('isbn',''),
                     d['full_path'].replace('\\', '/'), d['file_format'], 100 if d['file_format'] == 'epub' else 0,
                     d['cover_image'], meta.get('publisher',''), meta.get('link',''),
                     meta.get('score',0), meta.get('summary',''), meta.get('release_date',''),

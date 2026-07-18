@@ -1,4 +1,6 @@
 import os
+import sys
+import subprocess
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -8,40 +10,21 @@ IS_WORKER = os.environ.get('BOOKOASIS_IS_WORKER') == 'true'
 # 글로벌 자식 프로세스 레퍼런스
 _worker_process = None
 
-def _worker_process_entry():
-    """자식 프로세스용 격리 실행 진입점"""
-    os.environ['BOOKOASIS_IS_WORKER'] = 'true'
-    # Gunicorn 등의 시그널 간섭 차단을 위해 시그널 핸들러 초기화
-    import signal
-    try:
-        signal.signal(signal.SIGTERM, signal.SIG_DFL)
-        signal.signal(signal.SIGINT, signal.SIG_DFL)
-    except:
-        pass
-    from services.scanner_queue import run_scanner_worker_loop
-    run_scanner_worker_loop()
-
 def start_scanner_worker_process():
     """독립 스캐너 워커 프로세스를 기동합니다."""
     global _worker_process
-    if _worker_process is not None and _worker_process.is_alive():
+    if _worker_process is not None and _worker_process.poll() is None:
         return
-        
-    import multiprocessing
-    # 자식 프로세스가 spawn될 때 부모 환경변수를 그대로 복사하여 전달하므로,
-    # start() 직전에 환경변수를 주입하고 직후에 제거하는 방식으로 안전 격리를 보장합니다.
-    os.environ['BOOKOASIS_IS_WORKER'] = 'true'
-    try:
-        _worker_process = multiprocessing.Process(
-            target=_worker_process_entry,
-            name="BookOasis-Scanner-Worker",
-            daemon=True
-        )
-        _worker_process.start()
-    finally:
-        # 부모 프로세스는 자신이 워커가 아니므로 환경변수를 지워줍니다.
-        if 'BOOKOASIS_IS_WORKER' in os.environ:
-            del os.environ['BOOKOASIS_IS_WORKER']
+
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    worker_script = os.path.join(base_dir, 'tools', 'scanner_worker.py')
+    env = os.environ.copy()
+    env['BOOKOASIS_IS_WORKER'] = 'true'
+    _worker_process = subprocess.Popen(
+        [sys.executable, worker_script],
+        cwd=base_dir,
+        env=env
+    )
             
     print(f"[Scanner-Process] Started daemon worker process (PID: {_worker_process.pid})")
 
@@ -107,11 +90,21 @@ if not IS_WORKER:
     from services.scheduler_service import SchedulerService
     SchedulerService.start_scheduler()
 
-    # ── 백그라운드 스캐너 프로세스 기동 (Debug 리로더 parent 프로세스 중복 실행 차단) ──
-    # Gunicorn 충돌 방지를 위해, 워커 프로세스는 manage.sh를 통해 독자적 프로세스로 백그라운드 기동됩니다.
-    # is_reloader_parent = os.environ.get('FLASK_DEBUG') in ('1', 'true', 'yes', 'on') and os.environ.get('WERKZEUG_RUN_MAIN') != 'true'
-    # if not is_reloader_parent:
-    #     start_scanner_worker_process()
+    # ── 선택적 내장 스캐너 워커 기동 ──
+    # 우선순위:
+    # 1) BOOKOASIS_ENABLE_EMBEDDED_WORKER 명시값(true/false)
+    # 2) 미지정 시: 도커 컨테이너 내부는 OFF, 그 외(리눅스 직접 실행 포함)는 ON
+    embedded_worker_raw = os.environ.get('BOOKOASIS_ENABLE_EMBEDDED_WORKER', '').strip().lower()
+    if embedded_worker_raw in ('1', 'true', 'yes', 'on'):
+        embedded_worker_enabled = True
+    elif embedded_worker_raw in ('0', 'false', 'no', 'off'):
+        embedded_worker_enabled = False
+    else:
+        in_docker = os.path.exists('/.dockerenv')
+        embedded_worker_enabled = not in_docker
+    is_reloader_parent = os.environ.get('FLASK_DEBUG') in ('1', 'true', 'yes', 'on') and os.environ.get('WERKZEUG_RUN_MAIN') != 'true'
+    if embedded_worker_enabled and not is_reloader_parent:
+        start_scanner_worker_process()
 
     # ── Graceful Shutdown 핸들러 등록 ──
     import atexit
@@ -125,11 +118,11 @@ if not IS_WORKER:
         
         # 자식 스캐너 프로세스 강제 종료
         global _worker_process
-        if _worker_process is not None and _worker_process.is_alive():
+        if _worker_process is not None and _worker_process.poll() is None:
             try:
                 print("[Graceful-Shutdown] 스캐너 워커 프로세스 종료 중...")
                 _worker_process.terminate()
-                _worker_process.join(timeout=5)
+                _worker_process.wait(timeout=5)
             except Exception as pe:
                 print(f"[Graceful-Shutdown] 워커 프로세스 종료 오류: {pe}")
 

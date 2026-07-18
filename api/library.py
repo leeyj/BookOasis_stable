@@ -125,6 +125,7 @@ def edit_media_detail():
     db_type     = request.form.get('type', 'general')
     series_name = request.form.get('series', '').strip()
     author      = request.form.get('author', '').strip()
+    isbn        = request.form.get('isbn', '').strip()
     publisher   = request.form.get('publisher', '').strip()
     summary     = request.form.get('summary', '').strip()
     link        = request.form.get('link', '').strip()
@@ -140,6 +141,7 @@ def edit_media_detail():
             db_type=db_type,
             series_name=series_name,
             author=author,
+            isbn=isbn,
             publisher=publisher,
             summary=summary,
             link=link,

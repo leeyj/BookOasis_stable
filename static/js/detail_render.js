@@ -203,6 +203,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
         <div class="detail-meta">
           <span class="badge">${visibleTitle}</span>
           <span class="meta-item"><i class="fa-solid fa-pen-nib"></i> ${meta.author || '-'}</span>
+          <span class="meta-item"><i class="fa-solid fa-barcode"></i> ${meta.isbn || '-'}</span>
           <span class="meta-item"><i class="fa-solid fa-building"></i> ${meta.publisher || '-'}</span>
           <span class="meta-item"><i class="fa-solid fa-book-open"></i> ${books.length}권</span>
         </div>
@@ -230,6 +231,10 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
           <div class="edit-meta-row-item">
             <label>${i18n.t('detail.label_author')}</label>
             <input type="text" id="edit-author-input" class="edit-meta-input" value="${meta.author === '-' ? '' : meta.author}">
+          </div>
+          <div class="edit-meta-row-item">
+            <label>ISBN</label>
+            <input type="text" id="edit-isbn-input" class="edit-meta-input" value="${meta.isbn || ''}">
           </div>
           <div class="edit-meta-row-item">
             <label>${i18n.t('detail.label_publisher')}</label>

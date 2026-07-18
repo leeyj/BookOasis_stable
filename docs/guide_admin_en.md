@@ -61,7 +61,7 @@ A Library is a unit that binds books in a physical directory to a specific libra
 
 ## 4. Library Scanner Control
 
-The Scanner is the core engine that synchronizes the file system and database in a background thread.
+The Scanner is the core engine that synchronizes the file system and database through a queue-backed background worker process.
 
 * **Scan All**: Integrates and executes the addition of new books, path movements, and removal of deleted books in the specified library.
 * **Covers Only**: Skips metadata parsing or offset extraction and targets only missing or corrupted cover images (Cover) for rapid extraction/generation.

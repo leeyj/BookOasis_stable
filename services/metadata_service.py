@@ -34,7 +34,7 @@ class MetadataService:
         cursor = conn.cursor()
         # 커버 이미지는 제외하고 순수 텍스트 메타 정보만 가져옴
         cursor.execute("""
-            SELECT author, publisher, summary, link, score
+            SELECT author, isbn, publisher, summary, link, score
             FROM books WHERE id = ?
         """, (source_book_id,))
         source = cursor.fetchone()
@@ -46,10 +46,11 @@ class MetadataService:
         # 커버 이미지(cover_image)는 건드리지 않고 텍스트 메타 정보만 업데이트
         cursor.execute("""
             UPDATE books
-            SET author = ?, publisher = ?, summary = ?, link = ?, score = ?, metadata_locked = 1
+            SET author = ?, isbn = ?, publisher = ?, summary = ?, link = ?, score = ?, metadata_locked = 1
             WHERE series_name = ? AND library_id = ?
         """, (
             source['author'],
+            source['isbn'],
             source['publisher'],
             source['summary'],
             source['link'],

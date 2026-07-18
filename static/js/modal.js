@@ -313,6 +313,7 @@ window.handleCoverDrop = (event) => {
 
 window.saveManualMetadata = async (seriesName) => {
   const author = document.getElementById('edit-author-input').value.trim();
+  const isbn = document.getElementById('edit-isbn-input').value.trim();
   const publisher = document.getElementById('edit-publisher-input').value.trim();
   const link = document.getElementById('edit-link-input').value.trim();
   const summary = document.getElementById('edit-summary-input').value.trim();
@@ -325,6 +326,7 @@ window.saveManualMetadata = async (seriesName) => {
   formData.append('type', state.currentLibraryType);
   formData.append('series', seriesName);
   formData.append('author', author);
+  formData.append('isbn', isbn);
   formData.append('publisher', publisher);
   formData.append('summary', summary);
   formData.append('link', link);

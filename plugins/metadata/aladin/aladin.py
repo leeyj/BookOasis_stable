@@ -98,6 +98,7 @@ class AladinMetadataProvider(BaseMetadataProvider):
                     results.append({
                         'title': item.get('title'),
                         'author': item.get('author'),
+                        'isbn': item.get('isbn13') or item.get('isbn') or '',
                         'publisher': item.get('publisher'),
                         'pubDate': item.get('pubDate'),
                         'cover': item.get('cover'),
@@ -164,12 +165,14 @@ class AladinMetadataProvider(BaseMetadataProvider):
 
             title = item_data.get('title', '')
             author = item_data.get('author', '')
+            isbn = item_data.get('isbn') or item_data.get('isbn13') or item_data.get('isbn_13') or ''
             publisher = item_data.get('publisher', '')
             link = item_data.get('link', '')
 
             gateway.execute("""
                 UPDATE books
                 SET author = ?,
+                    isbn = ?,
                     publisher = ?,
                     summary = ?,
                     link = ?,
@@ -178,6 +181,7 @@ class AladinMetadataProvider(BaseMetadataProvider):
                 WHERE id = ?
             """, (
                 author,
+                isbn,
                 publisher,
                 description,
                 link,

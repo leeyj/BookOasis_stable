@@ -468,6 +468,7 @@ def init_databases():
         title TEXT NOT NULL,
         series_name TEXT,
         author TEXT,
+        isbn TEXT,
         file_path TEXT NOT NULL UNIQUE,
         file_format TEXT NOT NULL,
         total_pages INTEGER NOT NULL,

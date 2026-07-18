@@ -102,6 +102,7 @@ def parse_kavita_yaml(folder_path, files=None, is_remote=False):
     yaml_path = os.path.join(folder_path, 'kavita.yaml')
     meta = {
         'author': '',
+        'isbn': '',
         'publisher': '',
         'summary': '',
         'score': 0,
@@ -157,6 +158,17 @@ def parse_kavita_yaml(folder_path, files=None, is_remote=False):
                 return ', '.join(str(v).strip() for v in val if v)
             return str(val).strip()
 
+        def _parse_isbn(val):
+            if val is None:
+                return ''
+            if isinstance(val, list):
+                for item in val:
+                    text = str(item or '').strip()
+                    if text:
+                        return text
+                return ''
+            return str(val).strip()
+
         if isinstance(data, dict):
             sources = [data.get('meta', {}), data]
             for src in sources:
@@ -164,6 +176,9 @@ def parse_kavita_yaml(folder_path, files=None, is_remote=False):
                     continue
                 meta['publisher'] = meta['publisher'] or src.get('Person Publisher') or src.get('publisher') or ''
                 meta['author'] = meta['author'] or src.get('Person Writers') or src.get('Writer') or src.get('author') or ''
+                meta['isbn'] = meta['isbn'] or _parse_isbn(
+                    src.get('ISBN') or src.get('Isbn') or src.get('isbn') or src.get('isbn13') or src.get('isbn_13')
+                )
                 meta['summary'] = meta['summary'] or src.get('Summary') or src.get('summary') or ''
                 meta['link'] = meta['link'] or src.get('Web Links') or src.get('link') or ''
                 meta['tags'] = meta['tags'] or _parse_list_or_str(src.get('Tags') or src.get('tags') or src.get('tag'))
@@ -175,6 +190,9 @@ def parse_kavita_yaml(folder_path, files=None, is_remote=False):
                 if isinstance(search_item, dict):
                     meta['author'] = meta['author'] or search_item.get('author', '')
                     meta['publisher'] = meta['publisher'] or search_item.get('publisher', '')
+                    meta['isbn'] = meta['isbn'] or _parse_isbn(
+                        search_item.get('isbn') or search_item.get('isbn13') or search_item.get('isbn_13')
+                    )
                     meta['link'] = meta['link'] or search_item.get('link', '')
                     meta['summary'] = meta['summary'] or search_item.get('description', '')
                     meta['score'] = search_item.get('score', meta['score'])

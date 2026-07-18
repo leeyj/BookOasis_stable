@@ -9,6 +9,9 @@ echo.
 
 cd /d "%~dp0"
 
+:: 단일 프로세스 실행(Windows)에서 큐 처리 워커를 함께 기동
+set "BOOKOASIS_ENABLE_EMBEDDED_WORKER=true"
+
 :: 1. 필수 물리 디렉토리 생성
 echo [*] 필수 디렉토리 확인 및 생성 중...
 if not exist db mkdir db

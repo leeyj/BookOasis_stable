@@ -110,11 +110,16 @@ pip install -r requirements.txt
 # 서버 기동
 python core.py
 ```
+* 기본 동작: 도커 외 환경에서는 스캐너 워커가 자동으로 함께 기동되어 큐 대기열(`pending`)을 처리합니다.
+* 필요 시 비활성화: `BOOKOASIS_ENABLE_EMBEDDED_WORKER=0 python core.py`
+
 #### 🪟 Windows 환경
 윈도우 환경에서는 마우스 더블클릭 한 번으로 구동 디렉토리 생성 및 패키지 설치부터 프로덕션 수준의 웹 서버(`waitress`) 실행까지 자동으로 원클릭 셋업해 주는 배치 파일을 제공합니다.
 
 1. `.env.example` 파일을 복사하여 `.env` 파일로 이름 변경 후 필요한 설정 입력.(SECURITY_KEY)
 2. 프로젝트 루트의 **`run_windows.bat`** 파일을 마우스 더블클릭하여 기동.
+
+* `run_windows.bat`는 웹 서버와 스캐너 워커를 함께 기동하도록 구성되어 있습니다.
 
 * 로컬 포트: `http://localhost:5930`
 

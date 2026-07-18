@@ -109,12 +109,16 @@ pip install -r requirements.txt
 # Start the server
 python core.py
 ```
+* Default behavior: in non-Docker environments, the scanner worker starts automatically and consumes queued `pending` tasks.
+* Disable if needed: `BOOKOASIS_ENABLE_EMBEDDED_WORKER=0 python core.py`
 
 #### 🪟 Windows
 For Windows environments, we provide a batch file that automatically handles directory creation, packages installation, and runs a production-ready web server (`waitress`) with a single click.
 
 1. Copy `.env.example` to `.env` and fill in your settings. (SECURITY_KEY)
 2. Double-click the **`run_windows.bat`** file in the project root directory.
+
+* `run_windows.bat` starts both the web server and scanner worker together.
 
 * Local Port: `http://localhost:5930`
 
