@@ -1,4 +1,13 @@
 # CHANGELOG
+## v1.1.4
+- epub에서, 목차선택시 정상적으로 이동하지 않는 현상 수정 | Fixed issue where selection in the EPUB table of contents did not navigate correctly
+- epub에서, 목차 부분 스크롤 안되는 현상 수정 | Fixed issue where scrolling within the EPUB table of contents area was not working
+- epub에서, 하단 여백이 제대로 적용되지 않는 현상 수정(전체화면 제외) | Fixed issue where bottom margins were not applied correctly in EPUB view (except in fullscreen mode)
+- epub,txt에서 스크롤 모드일때 처음으로가 동작하지 않는 현상 수정(iOS)| Scroll mode not working on the first page in epub and txt formats(iOS).
+-epub에서, 목차 이동후 다시 원복되는 현상 수정(공통) | Issue where EPUB content was reverted after moving through the table of contents(common)
+-epub에서, 기기간 이동시 이어서 읽기 동기화 기능 개선 | Improved synchronization for continuous reading during period navigation in EPUB format
+* 제약사항: 읽던 책을 닫아야 정상적으로 동기화 됩니다. | Synchronization for continuous reading during period navigation now requires closing the book being read
+
 ## v1.1.3
 - DB 복구시 인덱스 재빌드 과정 추가 | added index rebuild process during db recovery
 

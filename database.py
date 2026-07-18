@@ -523,6 +523,7 @@ def init_databases():
         last_epub_href TEXT,
         last_epub_spine_index INTEGER,
         last_epub_percent INTEGER DEFAULT 0,
+        last_epub_fingerprint TEXT,
         last_epub_updated_at DATETIME
     );
 

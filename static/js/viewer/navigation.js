@@ -4,6 +4,16 @@ import * as Settings from './reader_settings.js';
 import { saveProgress } from '../viewer_progress.js';
 import { state } from '../state.js'; // window.state 대신 ES 모듈 import 사용
 
+function isViewerDebugEnabled() {
+  const v = String(localStorage.getItem('DEBUG_VIEWER') || '').toLowerCase();
+  return v === '1' || v === 'true' || v === 'on';
+}
+
+function viewerDebugLog(...args) {
+  if (!isViewerDebugEnabled()) return;
+  console.log(...args);
+}
+
 export function comicSliderInput(slider, val) {
   Renderer.showSeekbarTooltip(slider, val);
   const badge = document.getElementById('comic-overlay-page-info');
@@ -110,7 +120,7 @@ export function toggleComicOverlay() {
         document.body.style.width = '100%';
         menu.dataset.savedBodyScrollY = String(bodyScrollY);
         menu.dataset.iosBodyLock = 'true';
-        console.log(`[Viewer-Nav] iOS body-lock applied. bodyScrollY=${bodyScrollY}`);
+        viewerDebugLog(`[Viewer-Nav] iOS body-lock applied. bodyScrollY=${bodyScrollY}`);
       } else {
         // 내부 컨테이너가 스크롤된 경우 — scrollTop만 기록해둠 (body-lock 없음)
         menu.dataset.iosBodyLock = 'false';
@@ -126,7 +136,7 @@ export function toggleComicOverlay() {
           if (el && el.scrollTop > 0) scrollData[id] = el.scrollTop;
         });
         menu.dataset.savedInnerScroll = JSON.stringify(scrollData);
-        console.log(`[Viewer-Nav] Inner scroll saved:`, scrollData);
+        viewerDebugLog(`[Viewer-Nav] Inner scroll saved:`, scrollData);
       }
     }
 
@@ -145,23 +155,41 @@ export function toggleComicOverlay() {
         document.body.style.top = '';
         document.body.style.width = '';
         window.scrollTo(0, savedScrollY);
-        console.log(`[Viewer-Nav] iOS body-lock released. bodyScrollY restored=${savedScrollY}`);
+        viewerDebugLog(`[Viewer-Nav] iOS body-lock released. bodyScrollY restored=${savedScrollY}`);
       } else {
+        const skipInnerRestore = menu.dataset.skipInnerScrollRestore === 'true';
+        if (skipInnerRestore) {
+          viewerDebugLog('[Viewer-Nav] skipInnerScrollRestore=true, stale inner scroll restore skipped once');
+        }
         // 내부 컨테이너 scrollTop 복원
-        try {
-          const scrollData = JSON.parse(menu.dataset.savedInnerScroll || '{}');
-          Object.entries(scrollData).forEach(([id, top]) => {
-            if ((state.currentViewerFormat || '').toLowerCase() === 'epub' && id === 'epub-viewer-container') {
-              return;
-            }
-            const el = document.getElementById(id);
-            if (el) el.scrollTop = top;
-          });
-        } catch (e) { /* ignore */ }
+        if (!skipInnerRestore) {
+          try {
+            const scrollData = JSON.parse(menu.dataset.savedInnerScroll || '{}');
+            Object.entries(scrollData).forEach(([id, top]) => {
+              if ((state.currentViewerFormat || '').toLowerCase() === 'epub' && id === 'epub-viewer-container') {
+                return;
+              }
+              const el = document.getElementById(id);
+              if (!el) return;
+
+              const savedTop = Number(top) || 0;
+              const currentTop = Number(el.scrollTop) || 0;
+              // If position already changed while overlay was open (TOC jump, slider jump, first/last),
+              // do not overwrite with stale pre-open value.
+              if (Math.abs(currentTop - savedTop) > 3) {
+                viewerDebugLog(`[Viewer-Nav] inner restore skipped for ${id} (current=${currentTop}, saved=${savedTop})`);
+                return;
+              }
+
+              el.scrollTop = savedTop;
+            });
+          } catch (e) { /* ignore */ }
+        }
       }
       delete menu.dataset.savedBodyScrollY;
       delete menu.dataset.savedInnerScroll;
       delete menu.dataset.iosBodyLock;
+      delete menu.dataset.skipInnerScrollRestore;
     }
   }
 

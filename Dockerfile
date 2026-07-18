@@ -22,7 +22,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 # 6. Copy Source Code and Entrypoint
 COPY . .
-RUN chmod +x /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh /app/manage.sh
 
 # 7. Create volumes and directories
 RUN mkdir -p db covers cache plugins

@@ -35,6 +35,18 @@ class ReadingProgressService:
         except Exception:
             total_pages = 0
 
+        file_format = (book_row['file_format'] or '').lower() if book_row else ''
+        is_epub = file_format == 'epub'
+
+        # EPUB은 저장 단위를 0~100 퍼센트로 정규화하여 크로스 디바이스 오차를 줄인다.
+        if is_epub:
+            raw_total = max(1, total_pages)
+            raw_idx = max(0, page_idx)
+            normalized_percent = int(round(((raw_idx + 1) / raw_total) * 100))
+            normalized_percent = max(0, min(100, normalized_percent))
+            total_pages = 100
+            page_idx = max(0, normalized_percent - 1)
+
         # 실제 프론트엔드에서 전달된 총 페이지(챕터) 수를 기반으로 DB 업데이트
         if total_pages > 0 and book_row and book_row['total_pages'] != total_pages:
             cursor.execute("UPDATE books SET total_pages = ? WHERE id = ?", (total_pages, book_id))
@@ -58,7 +70,26 @@ class ReadingProgressService:
         last_epub_href = epub_session.get('href')
         last_epub_spine_index = epub_session.get('index')
         last_epub_percent = epub_session.get('percent')
-        last_epub_updated_at = now_str if (last_epub_cfi or last_epub_href) else None
+        last_epub_fingerprint = epub_session.get('fingerprint')
+
+        if is_epub:
+            if last_epub_percent is None:
+                last_epub_percent = max(0, min(100, int(page_idx + 1)))
+            else:
+                try:
+                    last_epub_percent = int(round(float(last_epub_percent)))
+                except Exception:
+                    last_epub_percent = max(0, min(100, int(page_idx + 1)))
+                last_epub_percent = max(0, min(100, last_epub_percent))
+
+        has_epub_pointer_update = (
+            last_epub_cfi is not None
+            or last_epub_href is not None
+            or last_epub_spine_index is not None
+            or last_epub_percent is not None
+            or last_epub_fingerprint is not None
+        )
+        last_epub_updated_at = now_str if has_epub_pointer_update else None
 
         if not row:
             # 경쟁 상태 대비: INSERT OR IGNORE 로 레코드 선삽입
@@ -67,8 +98,8 @@ class ReadingProgressService:
                 INSERT OR IGNORE INTO user_progress (
                     book_id, user_id, pages_read, is_completed, last_read_at,
                     last_epub_cfi, last_epub_href, last_epub_spine_index,
-                    last_epub_percent, last_epub_updated_at
-                ) VALUES (?,?,?,?,?,?,?,?,?,?)
+                    last_epub_percent, last_epub_fingerprint, last_epub_updated_at
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 (
                     book_id,
@@ -81,6 +112,7 @@ class ReadingProgressService:
                     None,
                     0,
                     None,
+                    None,
                 ),
             )
             delta = pages_read
@@ -89,13 +121,13 @@ class ReadingProgressService:
             delta = max(0, pages_read - old_pages)
 
         # 레코드가 확실히 존재하므로 일괄 UPDATE 수행하여 최종 상태 저장
-        if last_epub_cfi or last_epub_href:
+        if has_epub_pointer_update:
             cursor.execute(
                 """
                 UPDATE user_progress
                 SET pages_read=?, is_completed=?, last_read_at=?,
                     last_epub_cfi=?, last_epub_href=?, last_epub_spine_index=?,
-                    last_epub_percent=?, last_epub_updated_at=?
+                    last_epub_percent=?, last_epub_fingerprint=?, last_epub_updated_at=?
                 WHERE book_id=? AND user_id=?
                 """,
                 (
@@ -106,6 +138,7 @@ class ReadingProgressService:
                     last_epub_href,
                     last_epub_spine_index,
                     last_epub_percent,
+                    last_epub_fingerprint,
                     last_epub_updated_at,
                     book_id,
                     user_id,
@@ -219,6 +252,7 @@ class ReadingProgressService:
                 p.last_epub_href,
                 p.last_epub_spine_index,
                 p.last_epub_percent,
+                p.last_epub_fingerprint,
                 p.last_epub_updated_at
             FROM books b
             LEFT JOIN user_progress p ON b.id = p.book_id AND p.user_id = ?
@@ -266,6 +300,7 @@ class ReadingProgressService:
                 'href': row['last_epub_href'],
                 'index': row['last_epub_spine_index'],
                 'percent': last_epub_percent,
+                'fingerprint': row['last_epub_fingerprint'],
                 'updatedAt': row['last_epub_updated_at'],
             },
         }

@@ -260,6 +260,8 @@ window.setScrollMode = function (mode) {
 
 export function viewerJumpToFirst() {
   const fmt = state.currentViewerFormat;
+  const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
+  const overlayMenu = document.getElementById('comic-overlay-menu');
   if (fmt === 'zip' || fmt === 'cbz') {
     if (typeof comicJumpToFirstPage === 'function') comicJumpToFirstPage();
   } else if (fmt === 'epub') {
@@ -270,11 +272,20 @@ export function viewerJumpToFirst() {
   } else if (fmt === 'txt') {
     if (typeof txtJumpToFirstPage === 'function') txtJumpToFirstPage();
   }
+
+  // iOS Safari scroll mode: overlay close path can restore stale inner scroll.
+  // When user explicitly jumps, skip one-time inner scroll restore.
+  if (overlayMenu && scrollMode === 'scroll' && (fmt === 'epub' || fmt === 'txt')) {
+    overlayMenu.dataset.skipInnerScrollRestore = 'true';
+  }
+
   toggleComicOverlay();
 }
 
 export function viewerJumpToLast() {
   const fmt = state.currentViewerFormat;
+  const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
+  const overlayMenu = document.getElementById('comic-overlay-menu');
   if (fmt === 'zip' || fmt === 'cbz') {
     if (typeof comicJumpToLastPage === 'function') comicJumpToLastPage();
   } else if (fmt === 'epub') {
@@ -285,6 +296,12 @@ export function viewerJumpToLast() {
   } else if (fmt === 'txt') {
     if (typeof txtJumpToLastPage === 'function') txtJumpToLastPage();
   }
+
+  // Same guard for explicit jump-to-last in scroll mode.
+  if (overlayMenu && scrollMode === 'scroll' && (fmt === 'epub' || fmt === 'txt')) {
+    overlayMenu.dataset.skipInnerScrollRestore = 'true';
+  }
+
   toggleComicOverlay();
 }
 

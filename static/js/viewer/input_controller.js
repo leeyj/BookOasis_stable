@@ -257,6 +257,8 @@ export function initViewerClickToggle() {
       if (!target) return;
       if (
         target.closest('#comic-overlay-menu') ||
+        target.closest('#epub-toc-container') ||
+        target.closest('#epub-toc-btn') ||
         target.closest('.viewer-controls') ||
         target.closest('.floating-close-btn') ||
         target.closest('#common-viewer-hotspot') ||
@@ -291,6 +293,8 @@ export function initViewerClickToggle() {
 
     if (
       e.target.closest('#comic-overlay-menu') ||
+      e.target.closest('#epub-toc-container') ||
+      e.target.closest('#epub-toc-btn') ||
       e.target.closest('.viewer-controls') ||
       e.target.closest('.floating-close-btn') ||
       e.target.closest('#common-viewer-hotspot') ||

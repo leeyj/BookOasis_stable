@@ -138,16 +138,19 @@ export function nextTxtPageAction(ctx) {
 
 export function txtJumpToFirstPageAction(ctx) {
   ctx.cancelPendingRestore();
+  const scrollWrapper = ctx.getScrollWrapper();
+
   if (ctx.getChunkCount() > 0 && ctx.getCurrentChunkIdx() !== 0) {
     ctx.setCurrentChunkIdx(0);
     ctx.setTxtScrollPreloadTriggered(false);
     ctx.setTxtScrollNextEpisodeTriggered(false);
     ctx.renderCurrentChunk();
-    const scrollWrapper = ctx.getScrollWrapper();
-    if (scrollWrapper) {
-      scrollWrapper.scrollTop = 0;
-      scrollWrapper.scrollLeft = 0;
-    }
+  }
+
+  // Even if already on chunk 0, reset the in-chapter scroll position.
+  if (scrollWrapper) {
+    scrollWrapper.scrollTop = 0;
+    scrollWrapper.scrollLeft = 0;
   }
 }
 
@@ -187,6 +190,10 @@ export function txtSliderChangeAction(ctx, val) {
     const scrollMode = ctx.getScrollMode();
     const scrollWrapper = ctx.getScrollWrapper();
     if (scrollMode === 'scroll') {
+      const overlayMenu = document.getElementById('comic-overlay-menu');
+      if (overlayMenu) {
+        overlayMenu.dataset.skipInnerScrollRestore = 'true';
+      }
       if (scrollWrapper) {
         const maxScroll = scrollWrapper.scrollHeight - scrollWrapper.clientHeight;
         const targetPercent = targetIdx / Math.max(1, ctx.getChunkCount() - 1);

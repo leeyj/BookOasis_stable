@@ -301,6 +301,11 @@ export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
       a.style.opacity = '0.85';
     });
     let lastJumpAt = 0;
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchMoved = false;
+    let suppressClickUntil = 0;
+    const TOUCH_TAP_THRESHOLD = 10;
     const handleJump = (e, source) => {
       e.preventDefault();
       e.stopPropagation();
@@ -311,11 +316,41 @@ export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
       onJumpToChapter(chapterIdx, anchor);
     };
     a.addEventListener('click', e => {
+      if (Date.now() < suppressClickUntil) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       handleJump(e, 'click');
     });
+    a.addEventListener('touchstart', e => {
+      const touch = e.touches && e.touches[0];
+      if (!touch) return;
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
+      touchMoved = false;
+    }, { passive: true });
+    a.addEventListener('touchmove', e => {
+      const touch = e.touches && e.touches[0];
+      if (!touch) return;
+      const dx = Math.abs(touch.clientX - touchStartX);
+      const dy = Math.abs(touch.clientY - touchStartY);
+      if (dx > TOUCH_TAP_THRESHOLD || dy > TOUCH_TAP_THRESHOLD) {
+        touchMoved = true;
+      }
+    }, { passive: true });
     a.addEventListener('touchend', e => {
+      if (touchMoved) {
+        suppressClickUntil = Date.now() + 350;
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       handleJump(e, 'touchend');
     }, { passive: false });
+    a.addEventListener('touchcancel', () => {
+      touchMoved = false;
+    }, { passive: true });
     li.appendChild(a);
     tocEntryRefs.push({
       chapterIdx: Number.isFinite(chapterIdx) ? chapterIdx : parseInt(chapterIdx, 10),
@@ -361,6 +396,15 @@ export function jumpToTxtTocChapter({
 }) {
   if (chapterIdx < 0 || chapterIdx >= chunkCount) return;
 
+  const findAnchorInElement = (rootEl, anchorId) => {
+    if (!rootEl || !anchorId) return null;
+    if (window.CSS && typeof window.CSS.escape === 'function') {
+      return rootEl.querySelector(`#${window.CSS.escape(anchorId)}`);
+    }
+    const safeAnchor = String(anchorId).replace(/"/g, '\\"');
+    return rootEl.querySelector(`[id="${safeAnchor}"]`);
+  };
+
   const container = document.getElementById('epub-toc-container');
   isTocPanelOpen = false;
   _applyTocPanelState(container, false);
@@ -372,10 +416,19 @@ export function jumpToTxtTocChapter({
   }
 
   const scrollMode = getScrollMode();
+  const isPageMode = scrollMode !== 'scroll';
+  const overlayMenu = document.getElementById('comic-overlay-menu');
+  let selectedChunkEl = null;
   if (scrollMode === 'scroll') {
+    // TOC jump is an explicit navigation action.
+    // Prevent overlay-close handler from restoring stale pre-jump scrollTop.
+    if (overlayMenu) {
+      overlayMenu.dataset.skipInnerScrollRestore = 'true';
+    }
     const scrollWrapper = getScrollWrapper();
     if (scrollWrapper) {
       const targetChunk = scrollWrapper.querySelector(`.txt-scroll-chunk[data-idx="${chapterIdx}"]`);
+      selectedChunkEl = targetChunk || null;
       if (targetChunk) {
         const top = Math.max(0, targetChunk.offsetTop - 20);
         scrollWrapper.scrollTo({ top, behavior: 'smooth' });
@@ -386,6 +439,8 @@ export function jumpToTxtTocChapter({
       }
     }
   } else {
+    // Page mode keeps only the current chapter in DOM.
+    // Re-render first so anchor lookup points to the selected chapter content.
     renderCurrentChunk(true);
   }
 
@@ -393,9 +448,21 @@ export function jumpToTxtTocChapter({
 
   if (anchor) {
     setTimeout(() => {
-      const targetEl = document.getElementById(anchor);
+      let targetEl = null;
+      if (selectedChunkEl) {
+        targetEl = findAnchorInElement(selectedChunkEl, anchor);
+      }
+      if (!targetEl) {
+        targetEl = document.getElementById(anchor);
+      }
       if (targetEl) {
         targetEl.scrollIntoView({ behavior: 'smooth' });
+      } else if (isPageMode) {
+        // Fallback: ensure selected chapter is visible even if anchor id is missing.
+        const scrollWrapper = getScrollWrapper();
+        if (scrollWrapper) {
+          scrollWrapper.scrollTo({ left: 0, top: 0, behavior: 'auto' });
+        }
       }
     }, 100);
   }

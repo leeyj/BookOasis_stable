@@ -62,10 +62,21 @@ export function applyTxtSettingsCore(ctx) {
     contentArea.style.paddingLeft = '0';
     contentArea.style.paddingRight = '0';
 
+    const padTop = parseInt(localStorage.getItem('viewer_padding_top') || '40', 10);
+    const padBottom = parseInt(localStorage.getItem('viewer_padding_bottom') || '60', 10);
     const padLeft = parseInt(localStorage.getItem('viewer_padding_left') || '20', 10);
     const padRight = parseInt(localStorage.getItem('viewer_padding_right') || '20', 10);
     const parentWidth = container ? container.clientWidth : window.innerWidth;
     const targetWidth = Math.floor(parentWidth - (padLeft + padRight));
+
+    // Page mode also needs top/bottom spacing at init time.
+    // Previously this was only applied via commitViewerPadding() when closing the spacing panel.
+    scrollWrapper.style.height = `calc(100vh - ${80 + padTop + padBottom}px)`;
+    scrollWrapper.style.marginTop = `${padTop + 40}px`;
+    scrollWrapper.style.marginBottom = '40px';
+    scrollWrapper.style.marginLeft = 'auto';
+    scrollWrapper.style.marginRight = 'auto';
+    scrollWrapper.style.padding = '0';
 
     const pageStep = localStorage.getItem('comic_page_step') || '1';
     const pageGap = pageStep === '2' ? 40 : 0;
@@ -93,6 +104,9 @@ export function applyTxtSettingsCore(ctx) {
     scrollWrapper.classList.remove('scroll-mode-page');
     container.classList.remove('scroll-mode-page');
 
+    scrollWrapper.style.height = '100%';
+    scrollWrapper.style.margin = '0';
+    scrollWrapper.style.padding = '0';
     scrollWrapper.style.maxWidth = '';
     scrollWrapper.style.columnCount = '';
     scrollWrapper.style.columnWidth = '';

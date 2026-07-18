@@ -125,7 +125,7 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
       if (!res.ok) throw new Error(i18n.t('viewer.error_txt_load'));
       return isEpub ? res.json() : res.text();
     })
-    .then(data => {
+    .then(async data => {
       hideViewerLoading();
       txtScrollPreloadTriggered = false;
       txtScrollNextEpisodeTriggered = false;
@@ -148,6 +148,21 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
       }
 
       let startIdx = initialPageIdx;
+
+      // Cross-device EPUB resume: prefer server pointer when available.
+      let serverEpubSession = null;
+      if (isEpub) {
+        try {
+          const stateRes = await fetch(`/api/media/progress-state?db_type=${state.currentLibraryType}&book_id=${bookId}`);
+          if (stateRes.ok) {
+            const stateData = await stateRes.json();
+            if (stateData && stateData.success && stateData.state && stateData.state.epub_session) {
+              serverEpubSession = stateData.state.epub_session;
+            }
+          }
+        } catch (_) {}
+      }
+
       const savedPosStr = localStorage.getItem(`viewer_last_pos_${bookId}`);
       if (savedPosStr) {
         try {
@@ -157,6 +172,28 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
             console.log(`[Viewer-Txt] 로컬 저장소에서 챕터 인덱스 감지: ${startIdx}`);
           }
         } catch(e) {}
+      }
+
+      if (isEpub && serverEpubSession) {
+        if (Number.isFinite(serverEpubSession.index)) {
+          startIdx = Number(serverEpubSession.index);
+        } else if (Number.isFinite(serverEpubSession.percent)) {
+          const byPercent = Math.round((Number(serverEpubSession.percent) / 100) * Math.max(0, txtChunks.length - 1));
+          startIdx = byPercent;
+        }
+
+        // Fallback backup pointer: text fingerprint match.
+        const fp = String(serverEpubSession.fingerprint || '').trim();
+        if (fp) {
+          const matchedIdx = txtChunks.findIndex(ch => stripHtml(ch).includes(fp));
+          if (matchedIdx >= 0) {
+            startIdx = matchedIdx;
+          }
+        }
+      }
+
+      if (isEpub && txtChunks.length > 0) {
+        startIdx = Math.max(0, Math.min(txtChunks.length - 1, parseInt(startIdx, 10) || 0));
       }
 
       currentChunkIdx = startIdx;
@@ -240,10 +277,30 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
 
           const newIdx = Math.min(txtChunks.length - 1, Math.max(0, detectedIdx));
           const ratio = scrollHeight > 0 ? scrollWrapper.scrollTop / scrollHeight : 0;
+          const isEpubMode = (state.currentViewerFormat === 'epub');
+          const targetChunk = contentArea.querySelector(`.txt-scroll-chunk[data-idx="${newIdx}"]`);
+          let fingerprint = '';
+          if (targetChunk) {
+            fingerprint = String(targetChunk.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 180);
+          }
+          const epubSessionPayload = isEpubMode
+            ? {
+                epub_session: {
+                  index: newIdx,
+                  percent: Math.max(0, Math.min(100, Math.round(ratio * 100))),
+                  fingerprint: fingerprint || undefined
+                }
+              }
+            : null;
 
           if (!txtScrollPreloadTriggered && ratio >= 0.9 && txtChunks.length > 1) {
             txtScrollPreloadTriggered = true;
-            saveProgress(state.activeBookId, Math.min(txtChunks.length - 1, newIdx), txtChunks.length);
+            saveProgress(
+              state.activeBookId,
+              Math.min(txtChunks.length - 1, newIdx),
+              txtChunks.length,
+              epubSessionPayload
+            );
           }
 
           if (newIdx !== currentChunkIdx) {
@@ -253,12 +310,17 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
               pageInfo.textContent = i18n.t('viewer.txt_chunk_info', {current: currentChunkIdx + 1, total: txtChunks.length});
             }
             syncActiveEpubToc();
-            saveProgress(state.activeBookId, currentChunkIdx, txtChunks.length);
+            saveProgress(state.activeBookId, currentChunkIdx, txtChunks.length, epubSessionPayload);
           }
 
           logActiveViewportText();
           triggerNextEpisodeIfNeeded();
           saveDetailPosition();
+
+          // EPUB scroll mode: persist fine-grained percent even when chapter index does not change.
+          if (isEpubMode) {
+            saveProgress(state.activeBookId, newIdx, txtChunks.length, epubSessionPayload);
+          }
         };
         scrollWrapper.addEventListener('scroll', scrollHandler, { passive: true });
         scrollWrapper.__txtScrollHandler = scrollHandler;
