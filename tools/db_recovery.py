@@ -141,7 +141,7 @@ def step2_full_recovery(db_path, label):
     try:
         result = subprocess.run(
             ['sqlite3', db_path, '.recover'],
-            capture_output=True, text=True, timeout=300
+            capture_output=True, text=False, timeout=300
         )
         if result.returncode != 0 and not result.stdout:
             log(f"❌ sqlite3 CLI 복구 실패: {result.stderr[:200]}")
@@ -151,13 +151,13 @@ def step2_full_recovery(db_path, label):
             log("   Alpine Linux : apk add sqlite")
             return False
 
-        with open(sql_dump_path, 'w', encoding='utf-8') as f:
+        with open(sql_dump_path, 'wb') as f:
             f.write(result.stdout)
         log(f"SQL 덤프 저장 완료: {os.path.getsize(sql_dump_path):,} bytes")
 
         # 3) 복구된 SQL로 새 DB 생성
         log("새 DB 생성 중...")
-        with open(sql_dump_path, 'r', encoding='utf-8') as f:
+        with open(sql_dump_path, 'r', encoding='utf-8', errors='ignore') as f:
             sql_content = f.read()
 
         new_conn = sqlite3.connect(recovered_path)

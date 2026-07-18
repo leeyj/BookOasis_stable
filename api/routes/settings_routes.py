@@ -64,6 +64,9 @@ def update_system_setting():
     
     try:
         SettingsService.set(key, value)
+        if key == 'DB_POOL_SIZE':
+            import database
+            database.invalidate_pool_size_cache()
         if key in ('LAZY_SCAN_CRON', 'TIMEZONE'):
             try:
                 SchedulerService.reload_all_jobs()

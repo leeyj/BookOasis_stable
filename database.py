@@ -171,6 +171,15 @@ _pools = {'general': None, 'adult': None}
 _pools_lock = threading.Lock()
 _shutdown_in_progress = False
 
+_cached_pool_size = None
+_pool_size_cache_lock = threading.Lock()
+
+def invalidate_pool_size_cache():
+    """DB 풀 크기 캐시를 무효화하여 다음 커넥션 요청 시 DB에서 다시 로드하도록 합니다."""
+    global _cached_pool_size
+    with _pool_size_cache_lock:
+        _cached_pool_size = None
+
 def shutdown_all_pools():
     """서버 종료 시 모든 DB 커넥션 풀을 안전하게 종료합니다. (WAL 체크포인트 포함)"""
     global _shutdown_in_progress
@@ -189,6 +198,11 @@ def shutdown_all_pools():
     print("[DB-Shutdown] 모든 DB 커넥션 풀 종료 완료.")
 
 def _get_pool_size_raw():
+    global _cached_pool_size
+    with _pool_size_cache_lock:
+        if _cached_pool_size is not None:
+            return _cached_pool_size
+
     db_path = DB_GENERAL_PATH
     if not os.path.exists(db_path):
         return 5
@@ -202,10 +216,17 @@ def _get_pool_size_raw():
             if row:
                 conn.close()
                 val = int(row[0])
-                return max(1, min(50, val))
+                val = max(1, min(50, val))
+                with _pool_size_cache_lock:
+                    _cached_pool_size = val
+                return val
         conn.close()
     except Exception:
         pass
+    
+    # 캐시 갱신 실패 혹은 기본값 반환 시에도 캐싱 처리하여 다음 연결 시 불필요한 반복 쿼리 방지
+    with _pool_size_cache_lock:
+        _cached_pool_size = 5
     return 5
 
 def get_connection(db_type='general', wait_timeout=30.0):
