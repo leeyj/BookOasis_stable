@@ -5,7 +5,7 @@ services:
     image: ghcr.io/leeyj/bookoasis:stable
     container_name: bookoasis
     restart: unless-stopped
-    stop_grace_period: 30s
+    stop_grace_period: 1m
     ports:
       - "5930:5930"
     volumes:
@@ -16,3 +16,11 @@ services:
       - .env
     environment:
       - PORT=5930
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    container_name: bookoasis_redis
+    restart: unless-stopped

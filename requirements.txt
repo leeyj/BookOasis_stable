@@ -7,3 +7,4 @@ Pillow==10.0.0
 psutil==5.9.8
 PyYAML==6.0.1
 beautifulsoup4==4.12.3
+redis==5.0.1

@@ -1,13 +1,42 @@
 #!/bin/bash
 
 # --- BookOasis 미디어 서버 관리 스크립트 ---
-SCRIPT_PATH="${BASH_SOURCE[0]}"
+SCRIPT_PATH=""
+if [ -n "$BASH_VERSION" ]; then
+    eval 'SCRIPT_PATH="${BASH_SOURCE[0]}"'
+fi
 [ -z "$SCRIPT_PATH" ] && SCRIPT_PATH="$0"
 APP_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 PID_FILE="$APP_DIR/media_server.pid"
 WORKER_PID_FILE="$APP_DIR/media_server_worker.pid"
 LOG_FILE="$APP_DIR/logs/media_server_startup.log"
 WORKER_LOG_FILE="$APP_DIR/logs/media_server_worker_startup.log"
+
+check_pid_alive() {
+    local pid="$1"
+    [ -n "$pid" ] && kill -0 "$pid" >/dev/null 2>&1
+}
+
+find_pids_by_pattern() {
+    local pattern="$1"
+    if command -v ps >/dev/null 2>&1; then
+        ps ax | grep "$pattern" | grep -v grep | awk '{print $1}'
+    elif [ -d "/proc" ]; then
+        # ps 명령어가 없는 경우 /proc/[PID]/cmdline 직접 파싱 Fallback
+        for name in /proc/[0-9]*; do
+            if [ -d "$name" ]; then
+                local pid
+                pid=$(basename "$name")
+                if [ -f "$name/cmdline" ]; then
+                    # cmdline 파일은 널(\x00) 바이트로 나뉘어 있으므로 grep -a(바이너리) 검사 적용
+                    if grep -q -a "$pattern" "$name/cmdline" 2>/dev/null; then
+                        echo "$pid"
+                    fi
+                fi
+            fi
+        done
+    fi
+}
 
 cd "$APP_DIR" || exit 1
 
@@ -103,7 +132,7 @@ start() {
     echo "$NEW_PID" > "$PID_FILE"
     
     sleep 2
-    if ps -p "$NEW_PID" > /dev/null 2>&1; then
+    if check_pid_alive "$NEW_PID"; then
         echo "[+] 미디어 서버 구동 성공! (PID: $NEW_PID)"
     else
         echo "[!] 미디어 서버 구동 실패. $LOG_FILE 로그를 확인해 주세요."
@@ -116,7 +145,7 @@ start() {
     # ── 독자적인 백그라운드 스캐너 워커 프로세스 기동 ──
     if [ -f "$WORKER_PID_FILE" ]; then
         W_PID=$(cat "$WORKER_PID_FILE")
-        if ps -p "$W_PID" > /dev/null 2>&1; then
+        if check_pid_alive "$W_PID"; then
             echo "[*] 이미 스캐너 워커가 실행 중입니다. (PID: $W_PID)"
             return 0
         else
@@ -130,7 +159,7 @@ start() {
     echo "$W_NEW_PID" > "$WORKER_PID_FILE"
     
     sleep 2
-    if ps -p "$W_NEW_PID" > /dev/null 2>&1; then
+    if check_pid_alive "$W_NEW_PID"; then
         echo "[+] 스캐너 워커 구동 성공! (PID: $W_NEW_PID)"
     else
         echo "[!] 스캐너 워커 구동 실패. $WORKER_LOG_FILE 로그를 확인해 주세요."
@@ -171,19 +200,19 @@ stop() {
     # 1. PID 파일 기준 종료
     if [ -f "$PID_FILE" ]; then
         PID=$(cat "$PID_FILE")
-        if ps -p "$PID" > /dev/null 2>&1; then
+        if check_pid_alive "$PID"; then
             echo "[*] PID 파일 기준 미디어 서버 종료 시도 (PID: $PID)"
             kill -15 "$PID"
             
             # Graceful Shutdown 대기 (최대 15초)
             for i in {1..15}; do
-                if ! ps -p "$PID" > /dev/null 2>&1; then
+                if ! check_pid_alive "$PID"; then
                     break
                 fi
                 sleep 1
             done
             
-            if ps -p "$PID" > /dev/null 2>&1; then
+            if check_pid_alive "$PID"; then
                 echo "[!] 미디어 서버가 SIGTERM(15)에 응답하지 않아 강제 종료(SIGKILL)합니다."
                 kill -9 "$PID"
             fi
@@ -192,11 +221,11 @@ stop() {
     fi
 
     # 2. 잔존 gunicorn core:app 프로세스 소탕
-    PIDS=$(ps ax | grep "gunicorn.*core:app" | grep -v grep | awk '{print $1}')
+    PIDS=$(find_pids_by_pattern "gunicorn.*core:app")
     if [ -n "$PIDS" ]; then
         echo "[*] 남아있는 미디어 Gunicorn 프로세스 정리 대상: $PIDS"
         for P in $PIDS; do
-            if ps -p "$P" > /dev/null 2>&1; then
+            if check_pid_alive "$P"; then
                 kill -15 "$P"
             fi
         done
@@ -205,7 +234,7 @@ stop() {
         for i in {1..10}; do
             STILL_ALIVE=false
             for P in $PIDS; do
-                if ps -p "$P" > /dev/null 2>&1; then
+                if check_pid_alive "$P"; then
                     STILL_ALIVE=true
                 fi
             done
@@ -216,7 +245,7 @@ stop() {
         done
         
         for P in $PIDS; do
-            if ps -p "$P" > /dev/null 2>&1; then
+            if check_pid_alive "$P"; then
                 kill -9 "$P"
             fi
         done
@@ -226,19 +255,19 @@ stop() {
     # 3. 스캐너 워커 프로세스 정리
     if [ -f "$WORKER_PID_FILE" ]; then
         W_PID=$(cat "$WORKER_PID_FILE")
-        if ps -p "$W_PID" > /dev/null 2>&1; then
+        if check_pid_alive "$W_PID"; then
             echo "[*] PID 파일 기준 스캐너 워커 종료 시도 (PID: $W_PID)"
             kill -15 "$W_PID"
             
             # 스캐너 워커의 안전한 트랜잭션 마무리를 위해 최대 15초 대기
             for i in {1..15}; do
-                if ! ps -p "$W_PID" > /dev/null 2>&1; then
+                if ! check_pid_alive "$W_PID"; then
                     break
                 fi
                 sleep 1
             done
             
-            if ps -p "$W_PID" > /dev/null 2>&1; then
+            if check_pid_alive "$W_PID"; then
                 echo "[!] 스캐너 워커가 SIGTERM(15)에 응답하지 않아 강제 종료(SIGKILL)합니다."
                 kill -9 "$W_PID"
             fi
@@ -247,11 +276,11 @@ stop() {
     fi
 
     # 잔존 워커 루프 프로세스 소탕
-    W_PIDS=$(ps ax | grep "tools/scanner_worker.py" | grep -v grep | awk '{print $1}')
+    W_PIDS=$(find_pids_by_pattern "tools/scanner_worker.py")
     if [ -n "$W_PIDS" ]; then
         echo "[*] 남아있는 스캐너 워커 프로세스 정리 대상: $W_PIDS"
         for WP in $W_PIDS; do
-            if ps -p "$WP" > /dev/null 2>&1; then
+            if check_pid_alive "$WP"; then
                 kill -15 "$WP"
             fi
         done
@@ -259,7 +288,7 @@ stop() {
         for i in {1..10}; do
             W_STILL_ALIVE=false
             for WP in $W_PIDS; do
-                if ps -p "$WP" > /dev/null 2>&1; then
+                if check_pid_alive "$WP"; then
                     W_STILL_ALIVE=true
                 fi
             done
@@ -270,7 +299,7 @@ stop() {
         done
         
         for WP in $W_PIDS; do
-            if ps -p "$WP" > /dev/null 2>&1; then
+            if check_pid_alive "$WP"; then
                 kill -9 "$WP"
             fi
         done
@@ -281,7 +310,7 @@ status() {
     echo "=== [미디어 서버 서비스 상태] ==="
     if [ -f "$PID_FILE" ]; then
         PID=$(cat "$PID_FILE")
-        if ps -p "$PID" > /dev/null 2>&1; then
+        if check_pid_alive "$PID"; then
             echo "[+] 미디어 서버: 실행 중 (PID: $PID)"
             PORT_INFO=$(netstat -tlpn 2>/dev/null | grep "$PID")
             [ -n "$PORT_INFO" ] && echo "    포트 정보: $PORT_INFO"
@@ -289,7 +318,7 @@ status() {
             echo "[-] 미디어 서버: 정지 상태 (오래된 PID 파일 존재)"
         fi
     else
-        PID=$(ps ax | grep "gunicorn.*core:app" | grep -v grep | awk '{print $1}' | head -n 1)
+        PID=$(find_pids_by_pattern "gunicorn.*core:app" | head -n 1)
         if [ -n "$PID" ]; then
             echo "[+] 미디어 서버: 실행 중 (PID: $PID, PID 파일 없음)"
         else
@@ -300,13 +329,13 @@ status() {
     echo "=== [스캐너 워커 서비스 상태] ==="
     if [ -f "$WORKER_PID_FILE" ]; then
         W_PID=$(cat "$WORKER_PID_FILE")
-        if ps -p "$W_PID" > /dev/null 2>&1; then
+        if check_pid_alive "$W_PID"; then
             echo "[+] 스캐너 워커: 실행 중 (PID: $W_PID)"
         else
             echo "[-] 스캐너 워커: 정지 상태 (오래된 PID 파일 존재)"
         fi
     else
-        W_PID=$(ps ax | grep "tools/scanner_worker.py" | grep -v grep | awk '{print $1}' | head -n 1)
+        W_PID=$(find_pids_by_pattern "tools/scanner_worker.py" | head -n 1)
         if [ -n "$W_PID" ]; then
             echo "[+] 스캐너 워커: 실행 중 (PID: $W_PID, PID 파일 없음)"
         else

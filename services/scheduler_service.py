@@ -77,6 +77,19 @@ class SchedulerService:
         if not scheduler.running:
             scheduler.start()
             print("[Scheduler] APScheduler started successfully!")
+            
+        # ── [Redis 캐시 동기화 백그라운드 Job 등록] ──
+        from services.reading_progress_service import ReadingProgressService
+        if not scheduler.get_job('redis_cache_flush_job'):
+            scheduler.add_job(
+                ReadingProgressService.flush_progress_cache, 
+                'interval', 
+                minutes=1, 
+                id='redis_cache_flush_job',
+                max_instances=1
+            )
+            print("[Scheduler] Redis cache flush job registered successfully (interval: 1m)")
+
         SchedulerService.reload_all_jobs()
         try:
             SchedulerService.auto_resume_interrupted_jobs()

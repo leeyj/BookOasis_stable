@@ -116,6 +116,13 @@ if not IS_WORKER:
         sig_name = signal.Signals(signum).name if signum else 'atexit'
         print(f"\n[Graceful-Shutdown] {sig_name} 수신, 서버 종료 프로세스 시작...")
         
+        # ── [Redis 캐시 강제 Flush 동기화] ──
+        try:
+            from services.reading_progress_service import ReadingProgressService
+            ReadingProgressService.flush_progress_cache()
+        except Exception as fe:
+            print(f"[Graceful-Shutdown] Redis cache flush failed (ignored): {fe}")
+        
         # 자식 스캐너 프로세스 강제 종료
         global _worker_process
         if _worker_process is not None and _worker_process.poll() is None:

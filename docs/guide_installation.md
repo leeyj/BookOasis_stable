@@ -17,6 +17,7 @@ tags: [install, guide, setup]
 * **운영체제**: Windows 10/11, Linux (Ubuntu 20.04+ 권장), macOS
 * **Python**: 3.9 이상 권장
 * **데이터베이스**: SQLite (Python 내장 라이브러리로 별도 설치 불필요)
+* **캐시 데이터베이스 (선택)**: Redis (실시간 독서 진행도 캐싱을 통해 SQLite 디스크 쓰기 병목을 완화하고, 대량 스캔 중 정전/종료 시 DB 손상을 완벽 예방하기 위해 강하게 권장합니다.)
 * **네트워크**: 외부 통신(알라딘 API 메타데이터 연동 목적) 및 리버스 프록시 환경 지원
 
 ---
@@ -58,6 +59,10 @@ pip install -r requirements.txt
 - **세션 고정 키**: 서버 재기동 시 로그인 세션 유지 (`SECRET_KEY`)
 - **인바운드 스캔 웹훅 토큰**: 외부 폴러 연동 (`WEBHOOK_TOKEN`)
 - **아웃바운드 표준 이벤트 웹훅**: `book.new/read/finish` 전송 (`WEBHOOK_EVENT_*`)
+- **Redis 인메모리 캐시 연동 (선택 및 권장)**: SQLite 파일의 실시간 쓰기 부하를 제어해 손상을 방지합니다. (`REDIS_URL`)
+
+**하이브리드(Fallback) 설계:**
+BookOasis는 레디스 연결 실패 시 또는 환경변수 부재 시 **자동으로 기존의 SQLite 직접 쓰기 모드로 우회(Fallback)**하므로, 레디스 설치나 기동 없이도 기존과 완전히 똑같이 실행 가능합니다.
 
 **.env 파일 구성 예시:**
 ```env
@@ -72,6 +77,11 @@ WEBHOOK_EVENT_ENDPOINT=http://127.0.0.1:9000/webhook
 WEBHOOK_EVENT_TIMEOUT=5
 WEBHOOK_EVENT_RETRY=2
 WEBHOOK_EVENT_SECRET=change_me
+
+# (선택) Redis 캐시 데이터베이스 연동 URL
+# 기존에 사용 중인 로컬/외부 레디스 자원이 있는 경우 데이터 충돌을 막기 위해 DB 번호를 다르게 지정하십시오. (예: /9)
+# 모든 데이터 키 앞에는 'bookoasis:' 접두사가 강제 지정되므로 네임스페이스가 격리됩니다.
+REDIS_URL=redis://127.0.0.1:6379/9
 ```
 
 표준 이벤트 웹훅 페이로드 계약과 포맷 제약(EPUB/TXT `totalPages` nullable)은 [API 엔드포인트 명세](./api_endpoints.md#-6-외부-연동-및-자동화용-웹훅-api-webhook)를 참고하십시오.

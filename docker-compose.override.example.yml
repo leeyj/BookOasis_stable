@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
     container_name: bookoasis
     restart: unless-stopped
-    stop_grace_period: 30s  # 종료 시 DB WAL 체크포인트 완료를 위한 유예 시간
+    stop_grace_period: 1m  # 종료 시 DB WAL 체크포인트 및 캐시 Flush 완료를 위한 유예 시간
     ports:
       - "5930:5930"
     volumes:
@@ -19,4 +19,12 @@ services:
       - .env
     environment:
       - PORT=5930
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    container_name: bookoasis_redis
+    restart: unless-stopped
       # - TZ=Asia/Seoul  # (옵션) 컨테이너 로그 및 내부 콘솔 시간대를 정렬하려면 주석을 해제하세요. (웹 서비스의 스케줄 크론 주기는 컨테이너 타임존 대신 웹 UI 일반설정의 타임존 설정을 우선 추종합니다.)

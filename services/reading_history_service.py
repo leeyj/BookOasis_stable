@@ -1,10 +1,21 @@
 # -*- coding: utf-8 -*-
+import json
 import database
 from services.book_service import get_cover_image_with_t
+from utils.redis_helper import redis_get, redis_set
 
 class ReadingHistoryService:
     @staticmethod
     def get_history(db_type, user_id=1):
+        # 1. Redis 캐시 확인
+        cache_key = f"cache:history:{db_type}:{user_id}"
+        cached_data = redis_get(cache_key)
+        if cached_data:
+            try:
+                return json.loads(cached_data)
+            except Exception:
+                pass
+
         conn = database.get_connection(db_type)
         conn.row_factory = database.sqlite3.Row
         cursor = conn.cursor()
@@ -49,7 +60,7 @@ class ReadingHistoryService:
         cursor.execute(base_select, (user_id, limit))
         rows = cursor.fetchall()
         conn.close()
-        return [
+        result = [
             {
                 'id'          : r['id'],
                 'library_id'  : r['library_id'],
@@ -66,9 +77,26 @@ class ReadingHistoryService:
             for r in rows
         ]
 
+        # 2. Redis 캐시 세팅 (3600초=1시간 만료 설정)
+        try:
+            redis_set(cache_key, json.dumps(result, ensure_ascii=False), ex=3600)
+        except Exception:
+            pass
+
+        return result
+
 
     @staticmethod
     def get_recently_added(db_type, user_id=None, role=None):
+        # 1. Redis 캐시 확인
+        cache_key = f"cache:recent_added:{db_type}:{user_id}:{role}"
+        cached_data = redis_get(cache_key)
+        if cached_data:
+            try:
+                return json.loads(cached_data)
+            except Exception:
+                pass
+
         conn = database.get_connection(db_type)
         conn.row_factory = database.sqlite3.Row
         cursor = conn.cursor()
@@ -108,7 +136,7 @@ class ReadingHistoryService:
             """, (int(user_id) if user_id is not None else 0,))
         rows = cursor.fetchall()
         conn.close()
-        return [
+        result = [
             {
                 'id'          : r['id'],
                 'library_id'  : r['library_id'],
@@ -122,4 +150,12 @@ class ReadingHistoryService:
             }
             for r in rows
         ]
+
+        # 2. Redis 캐시 세팅 (3600초=1시간 만료 설정)
+        try:
+            redis_set(cache_key, json.dumps(result, ensure_ascii=False), ex=3600)
+        except Exception:
+            pass
+
+        return result
 

@@ -124,6 +124,27 @@ For Windows environments, we provide a batch file that automatically handles dir
 
 ---
 
+## 💾 Redis Cache Integration & Performance Guide (Optional & Recommended)
+
+BookOasis supports a **Hybrid Redis Cache Mode** that safely intercepts real-time progress updates inside an in-memory (RAM) cache before syncing them to SQLite files.
+This drastically minimizes SQLite disk write operations, preventing database corruption (malformed files) and resolving I/O bottlenecks.
+
+### 🐳 For Docker Users (Zero-Configuration)
+- `docker-compose.yml` natively integrates a `redis:7-alpine` container service.
+- No need to configure `.env`. Running `docker compose up -d` automatically spins up the Redis container and securely hooks it up in an isolated bridge network.
+- `stop_grace_period` is set to `1m` (1 minute) to ensure Gunicorn and Scanner Workers safely write cached progress data back to SQLite on shutdown.
+
+### 🖥️ For Native Python Users (Linux / Windows)
+1. Install and start Redis server on the host OS. (Ubuntu example: `sudo apt install redis-server -y`)
+2. Configure your connection URL in `.env`:
+   ```env
+   REDIS_URL=redis://127.0.0.1:6379/9
+   ```
+   * **Tip**: If sharing a Redis instance with other applications, point to a different DB index (e.g., `/9`) to secure isolation. All BookOasis keys will be prefixed with `bookoasis:` to prevent namespace collisions.
+3. If Redis is unavailable or fails to connect, BookOasis **automatically falls back to SQLite-direct write mode** with no crash or error.
+
+---
+
 ## 🔑 Initial Login Credentials
 - When logging in for the first time after server startup, use the following default administrator account:
   - **Username (ID)**: `admin`

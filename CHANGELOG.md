@@ -1,4 +1,11 @@
 # CHANGELOG
+## v1.2.1
+- Redis 도입 | Redis implementation
+ * 도커사용자는 자동 적용 / 네이티브 사용자는 .env에 REDIS_URL=redis://redis_ip:6379/0 추가 및 Redis 서버 구동 필요 | Docker users automatically apply / Native users need to add REDIS_URL=redis://redis_ip:6379/0 to .env and run Redis server
+- Redis를 사용하지 않는 경우, DB Lock 발생시 recovery 1회만 진행 | If Redis is not used, only one recovery will be performed when DB Lock occurs
+- Redis 적용 범위(도서 진행현황,대시보드, 스캔 상태) | Redis scope (book progress, dashboard, scan status)
+- 도커 컴포즈에 레디스 관련 내용 추가 | added redis related content to docker compose
+
 ## v1.2.0
 - bash 환경변수 추가(manage.sh) | Add bash environment variables(manage.sh)
 

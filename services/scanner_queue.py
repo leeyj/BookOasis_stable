@@ -88,6 +88,14 @@ class ScannerQueue:
 
             conn.commit()
             self.log(f"Task '{task_key}' enqueued successfully (DB-backed).")
+
+            # Redis List에 작업 키 푸시
+            try:
+                from utils.redis_helper import redis_lpush
+                redis_lpush("queue:scanner", task_key)
+            except Exception as r_err:
+                self.log(f"Redis queue push failed (ignored): {r_err}")
+
             return True
         except Exception as e:
             self.log(f"Enqueue failed: {e}")
@@ -237,25 +245,55 @@ def run_scanner_worker_loop():
     while True:
         conn = None
         try:
+            # Redis가 사용 가능한 경우 BRPOP으로 작업 대기
+            task_key_popped = None
+            try:
+                from utils.redis_helper import redis_brpop
+                # 3초 동안 블로킹 대기. (SQLite 폴링 간격 3초와 주기를 맞춤)
+                task_key_popped = redis_brpop("queue:scanner", timeout=3)
+            except Exception:
+                pass
+
             conn = database.get_connection('general')
             cursor = conn.cursor()
             
-            # 1. 대기 중인 작업 중 가장 최우선 작업을 하나 선택 (일반 스캔 우선, lazy_scan 후순위)
-            cursor.execute(
-                """
-                SELECT id, task_type, task_key, kwargs 
-                FROM scanner_tasks 
-                WHERE status = 'pending' 
-                ORDER BY CASE WHEN task_type = 'lazy_scan' THEN 2 ELSE 1 END, id ASC
-                LIMIT 1
-                """
-            )
-            task = cursor.fetchone()
+            task = None
+            if task_key_popped:
+                # Redis에서 팝된 특정 작업 정보를 우선 조회
+                cursor.execute(
+                    """
+                    SELECT id, task_type, task_key, kwargs 
+                    FROM scanner_tasks 
+                    WHERE task_key = ? AND status = 'pending'
+                    """,
+                    (task_key_popped,)
+                )
+                task = cursor.fetchone()
+
+            # Redis 팝 결과가 없거나 DB 조회 실패 시 Fallback으로 SQLite 전체 pending 조회
+            if not task:
+                cursor.execute(
+                    """
+                    SELECT id, task_type, task_key, kwargs 
+                    FROM scanner_tasks 
+                    WHERE status = 'pending' 
+                    ORDER BY CASE WHEN task_type = 'lazy_scan' THEN 2 ELSE 1 END, id ASC
+                    LIMIT 1
+                    """
+                )
+                task = cursor.fetchone()
             
             if not task:
                 conn.close()
                 conn = None
-                time.sleep(3.0)
+                
+                # Redis가 살아있을 때는 이미 BRPOP으로 3초 대기했거나 즉시 반응했으므로 추가 sleep 최소화.
+                # Redis 미연결(Fallback) 시 3초 간격 대기
+                from utils.redis_helper import get_redis_client
+                if not get_redis_client():
+                    time.sleep(3.0)
+                else:
+                    time.sleep(0.5)
                 continue
                 
             task_id = task['id']
@@ -318,6 +356,13 @@ def run_scanner_worker_loop():
                     "UPDATE scanner_tasks SET status = 'completed', finished_at = ? WHERE id = ?",
                     (finished_str, task_id)
                 )
+                # 스캔 완료 시 신규 추가 도서 대시보드 캐시 무효화
+                try:
+                    from utils.redis_helper import redis_delete_pattern
+                    target_db = kwargs.get('db_type', 'general')
+                    redis_delete_pattern(f"cache:recent_added:{target_db}:*")
+                except Exception as cache_err:
+                    sq.log(f"Failed to invalidate recently_added cache: {cache_err}")
             conn.commit()
             sq.log(f"Finished task: {task_key}.")
             

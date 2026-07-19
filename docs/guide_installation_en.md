@@ -17,6 +17,7 @@ This document is a comprehensive guide to installing the BookOasis media server 
 * **Operating System**: Windows 10/11, Linux (Ubuntu 20.04+ recommended), macOS
 * **Python**: 3.9 or higher recommended
 * **Database**: SQLite (Built-in Python library, no separate installation required)
+* **Cache Database (Optional)**: Redis (Strongly recommended to mitigate SQLite disk write bottlenecks and prevent database corruption during concurrent scan jobs)
 * **Network**: External communication support (for metadata plugins) and reverse proxy support
 
 ---
@@ -58,6 +59,10 @@ However, the following are still recommended to be managed via `.env`:
 - **Fixed session key**: keep login sessions across restarts (`SECRET_KEY`)
 - **Inbound scan webhook token**: external poller-triggered scans (`WEBHOOK_TOKEN`)
 - **Outbound standard event webhook**: delivery for `book.new/read/finish` (`WEBHOOK_EVENT_*`)
+- **Redis In-Memory Cache (Optional & Recommended)**: Safely intercepts write operations to prevent SQLite database corruption. (`REDIS_URL`)
+
+**Hybrid (Fallback) Architecture:**
+BookOasis automatically falls back to SQLite-direct write mode if a Redis connection is unavailable or if `REDIS_URL` is omitted, ensuring backwards compatibility without mandatory configuration.
 
 **.env Configuration Example:**
 ```env
@@ -72,6 +77,11 @@ WEBHOOK_EVENT_ENDPOINT=http://127.0.0.1:9000/webhook
 WEBHOOK_EVENT_TIMEOUT=5
 WEBHOOK_EVENT_RETRY=2
 WEBHOOK_EVENT_SECRET=change_me
+
+# (Optional) Redis Cache Connection URL
+# If sharing an existing Redis server on native OS, assign a different DB index (e.g., /9) to prevent collisions.
+# All BookOasis keys will be automatically prefixed with 'bookoasis:' to secure namespacing.
+REDIS_URL=redis://127.0.0.1:6379/9
 ```
 
 For payload contract details and format constraints (EPUB/TXT `totalPages` may be nullable), see [API Endpoints Specification](./api_endpoints.md#-6-외부-연동-및-자동화용-웹훅-api-webhook).
