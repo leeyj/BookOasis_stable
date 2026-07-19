@@ -48,15 +48,15 @@ def _split_title_lines(title, max_chars=9, max_lines=3):
 
 def _format_cover_label(file_format):
     key = str(file_format or 'text').lower()
-    if key in ('zip', 'cbz'):
+    if key in ('zip', 'cbz', 'comic'):
         return 'COMIC'
-    if key == 'imgdir':
+    if key in ('imgdir', 'img'):
         return 'IMG'
     if key == 'epub':
         return 'EPUB'
     if key == 'pdf':
         return 'PDF'
-    if key == 'audiobook':
+    if key in ('audiobook', 'audio'):
         return 'AUDIO'
     return 'TEXT'
 
@@ -94,13 +94,14 @@ def _build_fallback_svg(title, file_format='text', seed=''):
 @stream_bp.route('/api/media/stream', methods=['GET'])
 @login_required
 def stream_comic_page():
-    """만화책 ZIP/CBZ 실시간 이미지 추출 (RAM 캐시 + Prefetch 적용)"""
+    """만화책 ZIP/CBZ 실시간 이미지 추출 (RAM 캐시 + Prefetch 적용, 읽기 전용)"""
     db_type  = request.args.get('db_type', 'general')
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+    user_id  = session.get('user_id', 1)
+    role     = session.get('role')
     book_id  = request.args.get('book_id')
     page_idx = int(request.args.get('page_idx', 0))
-    user_id  = session.get('user_id', 1)
 
     if not book_id:
         return jsonify({'error': _t('api.err_book_id_required')}), 400
@@ -110,7 +111,7 @@ def stream_comic_page():
     except (ValueError, TypeError):
         return jsonify({'error': _t('api.err_book_id_required')}), 400
 
-    file_path, file_format = StreamService.get_book_file_info(db_type, book_id)
+    file_path, file_format = StreamService.get_book_file_info(db_type, book_id, user_id=user_id, role=role)
     if not file_path:
         return jsonify({'error': _t('api.err_book_not_found')}), 404
 
@@ -119,19 +120,6 @@ def stream_comic_page():
         return jsonify({'error': _t('api.err_extract_page')}), 400
 
     img_data, mime_type = result
-
-    # 진행도 기록
-    try:
-        total_pages = StreamService.get_total_pages_for_book(
-            db_type,
-            book_id,
-            file_path=file_path,
-            file_format=file_format
-        )
-        if total_pages > 0:
-            StreamService.record_progress(db_type, book_id, page_idx, total_pages, user_id=user_id)
-    except Exception as e:
-        print(f"[Progress Recorder] Fail: {e}")
 
     res = Response(img_data, mimetype=mime_type)
     res.headers['Cache-Control'] = 'public, max-age=31536000'
@@ -144,11 +132,13 @@ def get_txt_content():
     db_type = request.args.get('db_type', 'general')
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+    user_id = session.get('user_id', 1)
+    role = session.get('role')
     book_id = request.args.get('book_id')
     if not book_id:
         return jsonify({'error': _t('api.err_book_id_required')}), 400
 
-    file_path = StreamService.get_file_path(db_type, book_id)
+    file_path = StreamService.get_file_path(db_type, book_id, user_id=user_id, role=role)
     if not file_path:
         return jsonify({'error': _t('api.err_book_not_found')}), 404
 
@@ -165,11 +155,13 @@ def get_epub_content():
     db_type = request.args.get('db_type', 'general')
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+    user_id = session.get('user_id', 1)
+    role = session.get('role')
     book_id = request.args.get('book_id')
     if not book_id:
         return jsonify({'error': _t('api.err_book_id_required')}), 400
 
-    file_path = StreamService.get_file_path(db_type, book_id)
+    file_path = StreamService.get_file_path(db_type, book_id, user_id=user_id, role=role)
     if not file_path:
         return jsonify({'error': _t('api.err_book_not_found')}), 404
 
@@ -186,12 +178,14 @@ def get_epub_image():
     db_type = request.args.get('db_type', 'general')
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+    user_id = session.get('user_id', 1)
+    role = session.get('role')
     book_id = request.args.get('book_id')
     resource_path = request.args.get('path')
     if not book_id or not resource_path:
         return jsonify({'error': 'book_id and path are required'}), 400
 
-    file_path = StreamService.get_file_path(db_type, book_id)
+    file_path = StreamService.get_file_path(db_type, book_id, user_id=user_id, role=role)
     if not file_path:
         return jsonify({'error': _t('api.err_book_not_found')}), 404
 
@@ -213,11 +207,13 @@ def get_pdf_range():
     db_type = request.args.get('db_type', 'general')
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+    user_id = session.get('user_id', 1)
+    role = session.get('role')
     book_id = request.args.get('book_id')
     if not book_id:
         return jsonify({'error': _t('api.err_book_id_required')}), 400
 
-    file_path = StreamService.get_file_path(db_type, book_id)
+    file_path = StreamService.get_file_path(db_type, book_id, user_id=user_id, role=role)
     if not file_path:
         return jsonify({'error': _t('api.err_book_not_found')}), 404
 

@@ -337,11 +337,13 @@ def _process_lazy_scan(sq):
     script_path = os.path.join(BASE_DIR, 'tools', 'lazy_scanner.py')
     
     # 동기식(block)으로 실행하여 프로세스가 끝날 때까지 기다림
-    subprocess.run(
+    proc = subprocess.run(
         [sys.executable, script_path],
         cwd=BASE_DIR,
         check=False
     )
+    if proc.returncode != 0:
+        raise RuntimeError(f"lazy_scanner exited with code {proc.returncode}")
 
 def _process_library_scan(sq, **kwargs):
     from services.scheduler_service import run_scan_job

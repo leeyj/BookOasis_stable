@@ -8,8 +8,8 @@ import database
 from services.stream_service import StreamService
 
 
-def get_stream_page(db_type: str, book_id: int, page_idx: int, user_id: int = 1):
-    file_path, file_format = StreamService.get_book_file_info(db_type, book_id)
+def get_stream_page(db_type: str, book_id: int, page_idx: int, user_id: int = 1, role=None):
+    file_path, file_format = StreamService.get_book_file_info(db_type, book_id, user_id=user_id, role=role)
     if not file_path:
         return {'status': 'book_not_found'}
 
@@ -34,8 +34,8 @@ def get_stream_page(db_type: str, book_id: int, page_idx: int, user_id: int = 1)
     return {'status': 'ok', 'img_data': img_data, 'mime_type': mime_type}
 
 
-def get_txt_content(db_type: str, book_id):
-    file_path = StreamService.get_file_path(db_type, book_id)
+def get_txt_content(db_type: str, book_id, user_id: int = 1, role=None):
+    file_path = StreamService.get_file_path(db_type, book_id, user_id=user_id, role=role)
     if not file_path:
         return {'status': 'book_not_found'}
 
@@ -48,8 +48,8 @@ def get_txt_content(db_type: str, book_id):
     return {'status': 'ok', 'content': content}
 
 
-def get_pdf_source(db_type: str, book_id):
-    file_path = StreamService.get_file_path(db_type, book_id)
+def get_pdf_source(db_type: str, book_id, user_id: int = 1, role=None):
+    file_path = StreamService.get_file_path(db_type, book_id, user_id=user_id, role=role)
     if not file_path:
         return {'status': 'book_not_found'}
     if not os.path.exists(file_path):

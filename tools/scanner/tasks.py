@@ -10,6 +10,7 @@ import gc
 from tools.scanner.metadata import parse_info_xml, parse_kavita_yaml, parse_series_json, parse_comicinfo_from_cbz, merge_local_metadata, is_consonant_folder
 from tools.scanner.cover import get_series_cover_fallback, get_imgdir_cover, extract_cover_from_b64, download_cover_from_url
 from tools.scanner.offset import collect_zip_offsets_data
+from tools.scanner.path_utils import canonical_path, join_canonical
 
 SUPPORTED_FORMATS = ('.zip', '.cbz', '.epub', '.pdf', '.txt')
 SUPPORTED_IMAGE_FORMATS = ('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif')
@@ -26,7 +27,7 @@ def _normalize_series_text(name):
 
 def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_folder_mtimes, is_remote=False, library_id=None, db_files_cache=None, library_root=None):
     """Independent I/O scan task per folder (DB independent, pure FS/I/O scaling)"""
-    root = root.replace('\\', '/').strip()
+    root = canonical_path(root)
     print(f"[Scanner-DEBUG-Task] 📂 entering process_folder_task - folder: '{root}'")
     
     media_files = [f for f in files if f.lower().endswith(SUPPORTED_FORMATS)]
@@ -48,10 +49,10 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
         meta_mtimes_list = []
         if has_yaml:
             yaml_file = next(f for f in files if f.lower() == 'kavita.yaml')
-            meta_mtimes_list.append(os.path.getmtime(os.path.join(root, yaml_file)))
+            meta_mtimes_list.append(os.path.getmtime(join_canonical(root, yaml_file)))
         if has_xml:
             xml_file = next(f for f in files if f.lower() == 'info.xml')
-            meta_mtimes_list.append(os.path.getmtime(os.path.join(root, xml_file)))
+            meta_mtimes_list.append(os.path.getmtime(join_canonical(root, xml_file)))
         
         if meta_mtimes_list:
             meta_mtime = max(meta_mtimes_list)
@@ -64,10 +65,10 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
     # 2. Early skip if files are unchanged (mtime & size match DB cache)
     skipped_files = set()
     imgdir_skip = False
-    imgdir_virtual_path = os.path.join(root, IMGDIR_VIRTUAL_FILENAME)
+    imgdir_virtual_path = join_canonical(root, IMGDIR_VIRTUAL_FILENAME)
     if not force and db_files_cache:
         for filename in media_files:
-            full_path = os.path.join(root, filename)
+            full_path = join_canonical(root, filename)
             if full_path in db_files_cache:
                 try:
                     p_mtime = os.path.getmtime(full_path)
@@ -96,9 +97,9 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
             try:
                 p_mtime = os.path.getmtime(root)
                 p_size = sum(
-                    os.path.getsize(os.path.join(root, f))
+                    os.path.getsize(join_canonical(root, f))
                     for f in image_files
-                    if os.path.exists(os.path.join(root, f))
+                    if os.path.exists(join_canonical(root, f))
                 )
                 c_mtime, c_size = db_files_cache[imgdir_virtual_path]
                 if int(c_mtime) == int(p_mtime) and int(c_size) == int(p_size):
@@ -150,7 +151,7 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
     results = []
     errors = list(parser_warnings)
     for filename in media_files:
-        full_path = os.path.join(root, filename)
+        full_path = join_canonical(root, filename)
         _, ext = os.path.splitext(filename)
         file_format = ext.replace('.', '').lower()
 
@@ -355,9 +356,9 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
         try:
             f_mtime = os.path.getmtime(root)
             f_size = sum(
-                os.path.getsize(os.path.join(root, f))
+                os.path.getsize(join_canonical(root, f))
                 for f in image_files
-                if os.path.exists(os.path.join(root, f))
+                if os.path.exists(join_canonical(root, f))
             )
         except Exception:
             pass

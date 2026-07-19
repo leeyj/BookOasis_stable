@@ -1,10 +1,22 @@
 # CHANGELOG
+## v1.1.9
+- 스트림 GET(`/api/media/stream`)을 읽기 전용으로 정리하여 프리패치 호출이 진행률을 갱신하지 않도록 수정 | fixed the issue where prefetch calls would not update the progress
+- 스트림/TXT/PDF/EPUB 파일 조회 경로에 카테고리 권한(`user_category_permissions`) 검사와 삭제 도서 제외 조건을 서비스 레벨에 중앙화 | Centralized category permission checks and deleted book exclusions for stream/TXT/PDF/EPUB file access in the service level
+- 스캐너 경로 정규화 유틸(`canonical_path`, `join_canonical`)을 도입해 Windows 경로 혼용으로 인한 이동/삭제 오탐 가능성 완화 | Introduced canonical path utilities to mitigate misidentification of move/delete operations caused by mixed Windows paths
+- 스캐너 실패 전파 보강: `run_scan_job` 실패 재전파 및 lazy scanner 비정상 종료코드 검증으로 큐 `completed` 오판정 방지 | scanner scan_job failure re-transmission and lazy scanner abnormal termination code validation to prevent queue completed misjudgment
+- SQLite 연결 초기화 시 `PRAGMA foreign_keys=ON` 적용으로 참조 무결성 강제 | SQLite connection initialization `PRAGMA foreign_keys=ON` applied for forced referential integrity
+- 단일 PDF 재스캔에서 `db_type` 인자 누락을 보강하여 격리 스캔이 요청 DB 범위(`general`/`adult`)를 정확히 따르도록 수정 | Reinforced `db_type` argument for single PDF rescan to ensure isolated scans accurately follow the requested DB range (`general`/`adult`)
+- 휴지통 비우기 시 표지 파일 물리 삭제를 참조수 0인 경우로 제한하여 공유 커버 오삭제 방지 | Trash cleanup now only physically deletes cover files when the reference count is 0 to prevent accidental deletion of shared covers
+- 스캐너 폴더 순회 부분 실패(`os.walk` 경고) 시 해당 회차의 move/delete 동기화를 건너뛰는 안전 가드 추가 | Added safety guard to skip move/delete synchronization for episodes when folder traversal fails (`os.walk` warning)
+- 도커 엔트리포인트에서 웹 health 확인 후 워커를 지연 기동하도록 변경하고, `manage.sh start`에서도 웹 기동 실패 시 워커 단독 기동을 차단 | Docker entrypoint now delays worker startup after web health check, and `manage.sh start` blocks standalone worker startup if web startup fails
+
 ## v1.1.8
 - 스캔 상태 표시 개선: 대기열(pending)만 있을 때는 '동작중'으로 표시하지 않도록 조정
 - EPUB 스크롤 모드에서 초기 스크롤 직후 첫 목차 이동이 빗나가던 문제 안정화(초기 복원 타이머 충돌 방지)
 - EPUB 목차 챕터 이동 시 이전 페이지 오프셋이 남아 다음 화 2페이지로 열리던 문제 수정(챕터 시작점 강제)
 - EPUB 목차에서 상위 챕터 항목 클릭 시 anchor 오프셋을 무시하고 챕터 시작점으로 이동하도록 보강(하위 소제목 anchor는 유지)
 - VFS 로그 용어 정리: enabled/should_refresh 대신 flag_enabled/effective_refresh로 분리 표기
+
 
 ## v1.1.5
 - 스캔 완료 후 간헐적으로 대기상태에 머무르는 현상 수정 | Issue where the system remains in an intermittent idle state after scanning completion

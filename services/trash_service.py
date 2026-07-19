@@ -91,23 +91,27 @@ class TrashService:
                 # 2.1. 삭제 대상 도서들의 커버 이미지 정보 사전 로드
                 cursor.execute(f"SELECT cover_image FROM books WHERE id IN ({placeholders})", chunk)
                 cover_rows = cursor.fetchall()
+                target_covers = sorted({r['cover_image'] for r in cover_rows if r['cover_image']})
                 
                 cursor.execute(f"DELETE FROM user_progress WHERE book_id IN ({placeholders})", chunk)
                 cursor.execute(f"DELETE FROM user_reading_log WHERE book_id IN ({placeholders})", chunk)
                 cursor.execute(f"DELETE FROM book_offsets WHERE book_id IN ({placeholders})", chunk)
                 cursor.execute(f"DELETE FROM books WHERE id IN ({placeholders})", chunk)
                 
-                # 2.2. 로컬 정적 커버 파일 동반 삭제 실행
-                for row in cover_rows:
-                    cover_img = row['cover_image']
-                    if cover_img:
-                        cover_path = os.path.join(covers_dir, cover_img)
-                        if os.path.exists(cover_path) and os.path.isfile(cover_path):
-                            try:
-                                os.remove(cover_path)
-                                print(f"[TrashService] Physically deleted unused cover: {cover_path}")
-                            except Exception as ex_file:
-                                print(f"[TrashService WARNING] Failed to delete cover file '{cover_path}': {ex_file}")
+                # 2.2. 로컬 정적 커버 파일 삭제는 "남은 참조수=0"인 경우에만 수행
+                for cover_img in target_covers:
+                    cursor.execute("SELECT COUNT(1) AS cnt FROM books WHERE cover_image = ?", (cover_img,))
+                    row_cnt = cursor.fetchone()
+                    if (row_cnt['cnt'] or 0) > 0:
+                        continue
+
+                    cover_path = os.path.join(covers_dir, cover_img)
+                    if os.path.exists(cover_path) and os.path.isfile(cover_path):
+                        try:
+                            os.remove(cover_path)
+                            print(f"[TrashService] Physically deleted unreferenced cover: {cover_path}")
+                        except Exception as ex_file:
+                            print(f"[TrashService WARNING] Failed to delete cover file '{cover_path}': {ex_file}")
                 
             conn.commit()
             print(f"[TrashService] Successfully hard deleted {len(target_ids)} books from DB and storage.")

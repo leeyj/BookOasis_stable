@@ -17,6 +17,7 @@ from services.webhook_dispatcher import build_book_event_payload, dispatch_stand
 from services.metadata_factory import MetadataFactory
 from utils.drive_helper import is_remote_path
 from tools.scanner.memory_helper import check_memory_exceeded
+from tools.scanner.path_utils import canonical_path, join_canonical
 from tools.scanner.db_writer import update_book_metadata, insert_new_book_v2, save_book_offsets, bulk_update_books, bulk_insert_books, bulk_save_book_offsets
 from tools.scanner.tasks import process_folder_task, process_folder_covers, SUPPORTED_FORMATS, SUPPORTED_IMAGE_FORMATS, IMGDIR_VIRTUAL_FILENAME
 from tools.scanner.sync_detector import detect_and_handle_book_movement, handle_deleted_books
@@ -108,52 +109,67 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
     db_offsets_cached = set() 
     db_files_cache = {}
     for row in all_rows:
-        db_books[row['file_path']] = row['id']
-        db_files_cache[row['file_path']] = (row['file_mtime'] or 0.0, row['file_size'] or 0)
+        norm_path = canonical_path(row['file_path'])
+        db_books[norm_path] = row['id']
+        db_files_cache[norm_path] = (row['file_mtime'] or 0.0, row['file_size'] or 0)
         if row['has_offsets'] == 1:
-            db_offsets_cached.add(row['file_path'])
+            db_offsets_cached.add(norm_path)
         if (row['cover_image'] and not row['cover_image'].startswith('series_') and
                 row['author'] and row['publisher'] and row['summary']):
-            db_meta_full.add(row['file_path'])
+            db_meta_full.add(norm_path)
 
     cursor.execute("SELECT folder_path, dir_mtime, meta_mtime FROM folder_mtimes")
-    db_folder_mtimes = {row['folder_path']: (row['dir_mtime'], row['meta_mtime']) for row in cursor.fetchall()}
+    db_folder_mtimes = {canonical_path(row['folder_path']): (row['dir_mtime'], row['meta_mtime']) for row in cursor.fetchall()}
 
     # 0. Load completely scanned folders from previous checkpoint
     cursor.execute("SELECT folder_path FROM scanner_progress WHERE library_id = ?", (str(library_id),))
-    scanned_folders = set(row['folder_path'] for row in cursor.fetchall())
+    scanned_folders = set(canonical_path(row['folder_path']) for row in cursor.fetchall())
     if scanned_folders:
         print(f"[Scanner-Progress] 🔄 Previous scan progress detected ({len(scanned_folders)}folders completed). Resuming scan.")
 
     # 1. Traverse physical folder tree and pre-collect file list
     tasks = []
     found_file_paths = set()
+    traversal_errors = []
+
+    def _walk_onerror(err):
+        traversal_errors.append(str(err))
+        print(f"[Scanner] os.walk traversal warning: {err}")
+
     print(f"[Scanner] Scanning physical folder tree...")
     folder_count = 0
     for t_path in target_paths:
         if not os.path.exists(t_path):
             print(f"[Scanner] Warning: Path does not exist, skipping: {t_path}")
             continue
-        for root, dirs, files in os.walk(t_path):
-            root = root.replace('\\', '/').strip()
+        for root, dirs, files in os.walk(t_path, onerror=_walk_onerror):
+            root = canonical_path(root)
             media_files = [f for f in files if f.lower().endswith(SUPPORTED_FORMATS)]
             image_files = [f for f in files if f.lower().endswith(SUPPORTED_IMAGE_FORMATS)]
             has_imgdir_candidate = bool(image_files) and not media_files
             if not media_files and not has_imgdir_candidate:
                 continue
             for f in media_files:
-                found_file_paths.add(os.path.join(root, f))
+                found_file_paths.add(join_canonical(root, f))
             if has_imgdir_candidate:
-                found_file_paths.add(os.path.join(root, IMGDIR_VIRTUAL_FILENAME))
+                found_file_paths.add(join_canonical(root, IMGDIR_VIRTUAL_FILENAME))
             
             if root in scanned_folders:
                 continue
                 
             tasks.append((root, files, t_path))
 
-    # ── [Book movement detection and history preservation layer - pre-process before thread execution] ──
-    deleted_paths = detect_and_handle_book_movement(cursor, db_books, found_file_paths, db_meta_full, db_offsets_cached)
-    _commit_with_retry(conn, 'pre-move-detection')
+    # 순회가 부분 실패한 경우 삭제/이동 동기화를 건너뛰어 오탐 soft-delete를 방지한다.
+    if traversal_errors:
+        print(
+            f"[Scanner] Traversal completed with {len(traversal_errors)} warning(s). "
+            "Move/delete synchronization is skipped for safety."
+        )
+        deleted_paths = set()
+    else:
+        # ── [Book movement detection and history preservation layer - pre-process before thread execution] ──
+        deleted_paths = detect_and_handle_book_movement(cursor, db_books, found_file_paths, db_meta_full, db_offsets_cached)
+        _commit_with_retry(conn, 'pre-move-detection')
 
     # 2. Run thread pool and streaming process (as_completed)
     print(f"[Scanner] Multithread scan pool created (threads: {threads_to_use})")
@@ -205,7 +221,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     score, score, meta.get('summary',''), meta.get('release_date',''),
                     meta.get('genre',''), meta.get('tags',''),
                     d.get('file_mtime', 0.0), d.get('file_size', 0),
-                    d['full_path'].replace('\\', '/')
+                    canonical_path(d['full_path'])
                 ))
             if update_data:
                 bulk_update_books(cur, update_data, force=force)
@@ -219,7 +235,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     title, _ = os.path.splitext(d['filename'])
                 insert_data.append((
                     d['library_id'], title, d['series_name'], meta.get('author',''), meta.get('isbn',''),
-                    d['full_path'].replace('\\', '/'), d['file_format'], 100 if d['file_format'] == 'epub' else 0,
+                    canonical_path(d['full_path']), d['file_format'], 100 if d['file_format'] == 'epub' else 0,
                     d['cover_image'], meta.get('publisher',''), meta.get('link',''),
                     meta.get('score',0), meta.get('summary',''), meta.get('release_date',''),
                     meta.get('genre',''), meta.get('tags',''),
@@ -227,7 +243,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                 ))
             bulk_insert_books(cur, insert_data)
 
-        all_paths = [d['full_path'] for d in ins_list] + [d['full_path'] for d in upd_list if d.get('offsets_data')]
+        all_paths = [canonical_path(d['full_path']) for d in ins_list] + [canonical_path(d['full_path']) for d in upd_list if d.get('offsets_data')]
         if all_paths:
             path_to_id = {}
             for i in range(0, len(all_paths), 900):
@@ -235,12 +251,12 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                 placeholders = ','.join(['?']*len(chunk))
                 cur.execute(f"SELECT id, file_path FROM books WHERE file_path IN ({placeholders})", chunk)
                 for row in cur.fetchall():
-                    path_to_id[row['file_path']] = row['id']
+                    path_to_id[canonical_path(row['file_path'])] = row['id']
             
             offsets_to_save = []
             for d in upd_list + ins_list:
                 if d.get('offsets_data'):
-                    bid = path_to_id.get(d['full_path'])
+                    bid = path_to_id.get(canonical_path(d['full_path']))
                     if bid:
                         for off in d['offsets_data']:
                             offsets_to_save.append((bid, *off))

@@ -4,6 +4,7 @@ import sys
 import gc
 import time
 import sqlite3
+import argparse
 from PIL import Image
 
 MEDIA_SERVER_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -75,7 +76,7 @@ def setup_lazy_scanner_logging():
         builtins.print = lambda *args, **kwargs: None
 
 
-def run_lazy_cover_extraction(target_book_id=None):
+def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
     setup_lazy_scanner_logging()
     if target_book_id is not None:
         print(f"[Lazy-Scanner] 🚀 단일 도서 즉시 스캔 기동 시작 (Book ID: {target_book_id})")
@@ -84,7 +85,11 @@ def run_lazy_cover_extraction(target_book_id=None):
     
     conn = None
     try:
-        for db_type in ['general', 'adult']:
+        db_types = ['general', 'adult']
+        if target_db_type in ('general', 'adult'):
+            db_types = [target_db_type]
+
+        for db_type in db_types:
             db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
             if not os.path.exists(db_path):
                 continue
@@ -503,11 +508,10 @@ def get_series_cover_fallback_single(series_name, parent_dir, filename, file_pat
 
 
 if __name__ == '__main__':
-    target_id = None
-    if len(sys.argv) > 2 and sys.argv[1] == '--book-id':
-        try:
-            target_id = int(sys.argv[2])
-        except ValueError:
-            pass
-    run_lazy_cover_extraction(target_book_id=target_id)
+    parser = argparse.ArgumentParser(description='Lazy scanner runner')
+    parser.add_argument('--book-id', type=int, default=None)
+    parser.add_argument('--db-type', choices=['general', 'adult'], default=None)
+    args = parser.parse_args()
+
+    run_lazy_cover_extraction(target_book_id=args.book_id, target_db_type=args.db_type)
 

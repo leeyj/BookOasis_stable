@@ -59,10 +59,10 @@ class BookScanService:
                 import subprocess
                 import sys
                 script_path = os.path.join(BASE_DIR, 'tools', 'lazy_scanner.py')
-                print(f"[BookScanService] PDF 즉시 스캔 격리 구동: {script_path} --book-id {book_id}")
+                print(f"[BookScanService] PDF 즉시 스캔 격리 구동: {script_path} --book-id {book_id} --db-type {db_type}")
                 try:
                     subprocess.Popen(
-                        [sys.executable, script_path, '--book-id', str(book_id)],
+                        [sys.executable, script_path, '--book-id', str(book_id), '--db-type', str(db_type)],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                         cwd=BASE_DIR

@@ -258,13 +258,15 @@ def app_opds_stream_compat():
     auth_error = _require_app_opds_auth(db_type)
     if auth_error:
         return auth_error
+    current_user = _get_authenticated_user_cached(is_adult=default_db_type == 'adult' or db_type == 'adult') or {}
 
     book_id = request.args.get('book_id')
     try:
         page_idx = int(request.args.get('page_idx', 0))
     except (ValueError, TypeError):
         page_idx = 0
-    user_id = 1
+    user_id = current_user.get('id', 1)
+    role = current_user.get('role')
 
     if not book_id:
         return jsonify({'error': _t('api.err_book_id_required')}), 400
@@ -273,7 +275,7 @@ def app_opds_stream_compat():
     except (ValueError, TypeError):
         return jsonify({'error': _t('api.err_book_id_required')}), 400
 
-    result = viewer_get_stream_page(db_type, book_id, page_idx, user_id=user_id)
+    result = viewer_get_stream_page(db_type, book_id, page_idx, user_id=user_id, role=role)
     if result['status'] == 'book_not_found':
         return jsonify({'error': _t('api.err_book_not_found')}), 404
     if result['status'] == 'extract_failed':
@@ -292,12 +294,15 @@ def app_opds_txt_compat():
     auth_error = _require_app_opds_auth(db_type)
     if auth_error:
         return auth_error
+    current_user = _get_authenticated_user_cached(is_adult=default_db_type == 'adult' or db_type == 'adult') or {}
+    user_id = current_user.get('id', 1)
+    role = current_user.get('role')
 
     book_id = request.args.get('book_id')
     if not book_id:
         return jsonify({'error': _t('api.err_book_id_required')}), 400
 
-    result = viewer_get_txt_content(db_type, book_id)
+    result = viewer_get_txt_content(db_type, book_id, user_id=user_id, role=role)
     if result['status'] == 'book_not_found':
         return jsonify({'error': _t('api.err_book_not_found')}), 404
     if result['status'] == 'file_not_found':
@@ -315,12 +320,15 @@ def app_opds_pdf_compat():
     auth_error = _require_app_opds_auth(db_type)
     if auth_error:
         return auth_error
+    current_user = _get_authenticated_user_cached(is_adult=default_db_type == 'adult' or db_type == 'adult') or {}
+    user_id = current_user.get('id', 1)
+    role = current_user.get('role')
 
     book_id = request.args.get('book_id')
     if not book_id:
         return jsonify({'error': _t('api.err_book_id_required')}), 400
 
-    source = viewer_get_pdf_source(db_type, book_id)
+    source = viewer_get_pdf_source(db_type, book_id, user_id=user_id, role=role)
     if source['status'] == 'book_not_found':
         return jsonify({'error': _t('api.err_book_not_found')}), 404
     if source['status'] == 'file_not_found':

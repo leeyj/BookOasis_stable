@@ -68,6 +68,7 @@ start() {
     else
         echo "[!] 미디어 서버 구동 실패. $LOG_FILE 로그를 확인해 주세요."
         [ -f "$PID_FILE" ] && rm "$PID_FILE"
+        return 1
     fi
 
     wait_for_app_ready
@@ -98,6 +99,33 @@ start() {
 }
 
 stop() {
+    # 스캔 상태 체크 가드
+    if [ -f "db/media_general.db" ] && command -v sqlite3 >/dev/null 2>&1; then
+        SCANNING_COUNT=$(sqlite3 db/media_general.db "SELECT COUNT(*) FROM libraries WHERE scan_status = 'scanning';")
+        RUNNING_TASKS=$(sqlite3 db/media_general.db "SELECT COUNT(*) FROM scanner_tasks WHERE status = 'running';")
+        TOTAL_SCANNING=$((SCANNING_COUNT + RUNNING_TASKS))
+        
+        if [ "$TOTAL_SCANNING" -gt 0 ]; then
+            echo "[!] 경고: 현재 라이브러리 스캔 작업이 진행 중입니다. (진행 중인 스캔: $SCANNING_COUNT, 실행 중인 태스크: $RUNNING_TASKS)"
+            echo "[!] 이 상태에서 강제 종료 시 데이터베이스 손상(malformed) 위험이 매우 큽니다."
+            
+            if [ "$1" = "--force" ] || [ "$FORCE_RESTART" = "true" ]; then
+                echo "[*] --force 옵션이 감지되어 종료를 강행합니다."
+            else
+                if [ -t 0 ]; then
+                    read -p "정말 종료하시겠습니까? (y/N): " CONFIRM
+                    if [[ ! "$CONFIRM" =~ ^[yY](es)?$ ]]; then
+                        echo "[-] 중단되었습니다."
+                        exit 1
+                    fi
+                else
+                    echo "[❌ 오류] 비대화형 환경에서 스캔 중 종료 시도가 차단되었습니다. 스캔 완료 후 시도하시거나 --force 옵션을 사용해 주세요."
+                    exit 1
+                fi
+            fi
+        fi
+    fi
+
     echo "[*] 미디어 서버 프로세스를 모두 검출하여 정리합니다..."
     
     # 1. PID 파일 기준 종료
@@ -106,8 +134,17 @@ stop() {
         if ps -p "$PID" > /dev/null 2>&1; then
             echo "[*] PID 파일 기준 미디어 서버 종료 시도 (PID: $PID)"
             kill -15 "$PID"
-            sleep 1
+            
+            # Graceful Shutdown 대기 (최대 15초)
+            for i in {1..15}; do
+                if ! ps -p "$PID" > /dev/null 2>&1; then
+                    break
+                fi
+                sleep 1
+            done
+            
             if ps -p "$PID" > /dev/null 2>&1; then
+                echo "[!] 미디어 서버가 SIGTERM(15)에 응답하지 않아 강제 종료(SIGKILL)합니다."
                 kill -9 "$PID"
             fi
         fi
@@ -123,7 +160,21 @@ stop() {
                 kill -15 "$P"
             fi
         done
-        sleep 1
+        
+        # 잔존 프로세스들에 대해서도 최대 10초 대기
+        for i in {1..10}; do
+            STILL_ALIVE=false
+            for P in $PIDS; do
+                if ps -p "$P" > /dev/null 2>&1; then
+                    STILL_ALIVE=true
+                fi
+            done
+            if [ "$STILL_ALIVE" = false ]; then
+                break
+            fi
+            sleep 1
+        done
+        
         for P in $PIDS; do
             if ps -p "$P" > /dev/null 2>&1; then
                 kill -9 "$P"
@@ -138,8 +189,17 @@ stop() {
         if ps -p "$W_PID" > /dev/null 2>&1; then
             echo "[*] PID 파일 기준 스캐너 워커 종료 시도 (PID: $W_PID)"
             kill -15 "$W_PID"
-            sleep 1
+            
+            # 스캐너 워커의 안전한 트랜잭션 마무리를 위해 최대 15초 대기
+            for i in {1..15}; do
+                if ! ps -p "$W_PID" > /dev/null 2>&1; then
+                    break
+                fi
+                sleep 1
+            done
+            
             if ps -p "$W_PID" > /dev/null 2>&1; then
+                echo "[!] 스캐너 워커가 SIGTERM(15)에 응답하지 않아 강제 종료(SIGKILL)합니다."
                 kill -9 "$W_PID"
             fi
         fi
@@ -150,6 +210,25 @@ stop() {
     W_PIDS=$(ps ax | grep "tools/scanner_worker.py" | grep -v grep | awk '{print $1}')
     if [ -n "$W_PIDS" ]; then
         echo "[*] 남아있는 스캐너 워커 프로세스 정리 대상: $W_PIDS"
+        for WP in $W_PIDS; do
+            if ps -p "$WP" > /dev/null 2>&1; then
+                kill -15 "$WP"
+            fi
+        done
+        
+        for i in {1..10}; do
+            W_STILL_ALIVE=false
+            for WP in $W_PIDS; do
+                if ps -p "$WP" > /dev/null 2>&1; then
+                    W_STILL_ALIVE=true
+                fi
+            done
+            if [ "$W_STILL_ALIVE" = false ]; then
+                break
+            fi
+            sleep 1
+        done
+        
         for WP in $W_PIDS; do
             if ps -p "$WP" > /dev/null 2>&1; then
                 kill -9 "$WP"
@@ -197,7 +276,7 @@ status() {
 }
 
 restart() {
-    stop
+    stop "$@"
     sleep 1
     start
 }

@@ -633,6 +633,7 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
         msg = f"스캔 실패 - DB={db_type}, LibraryID={library_id}, 소요시간={duration:.2f}초, 에러={e}"
         print(f"[Scanner-Trigger] ❌ {msg}")
         write_scan_log(msg)
+        raise
 
 
 def enqueue_scan_job(db_type, db_path, library_id, physical_path, force=False):

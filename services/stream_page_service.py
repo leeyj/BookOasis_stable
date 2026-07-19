@@ -58,12 +58,29 @@ def get_imgdir_files(folder_path: str) -> list:
 
 class StreamPageService:
     @staticmethod
-    def get_book_file_info(db_type, book_id):
+    def _book_permission_clause(user_id=None, role=None, book_alias='b'):
+        is_admin = str(role or '').lower() == 'admin'
+        if is_admin or not user_id:
+            return '', []
+        clause = (
+            f" AND EXISTS ("
+            f"SELECT 1 FROM user_category_permissions p "
+            f"WHERE p.library_id = {book_alias}.library_id AND p.user_id = ? AND p.has_access = 1"
+            f")"
+        )
+        return clause, [user_id]
+
+    @staticmethod
+    def get_book_file_info(db_type, book_id, user_id=None, role=None):
         conn = None
         try:
             conn = database.get_connection(db_type)
             cursor = conn.cursor()
-            cursor.execute("SELECT file_path, file_format FROM books WHERE id=?", (book_id,))
+            perm_clause, perm_params = StreamPageService._book_permission_clause(user_id=user_id, role=role, book_alias='b')
+            cursor.execute(
+                f"SELECT b.file_path, b.file_format FROM books b WHERE b.id = ? AND COALESCE(b.is_deleted, 0) = 0{perm_clause}",
+                (book_id, *perm_params),
+            )
             row = cursor.fetchone()
             if not row:
                 return None, None
@@ -206,12 +223,16 @@ class StreamPageService:
                 return None
 
     @staticmethod
-    def get_file_path(db_type, book_id):
+    def get_file_path(db_type, book_id, user_id=None, role=None):
         conn = None
         try:
             conn = database.get_connection(db_type)
             cursor = conn.cursor()
-            cursor.execute("SELECT file_path FROM books WHERE id=?", (book_id,))
+            perm_clause, perm_params = StreamPageService._book_permission_clause(user_id=user_id, role=role, book_alias='b')
+            cursor.execute(
+                f"SELECT b.file_path FROM books b WHERE b.id = ? AND COALESCE(b.is_deleted, 0) = 0{perm_clause}",
+                (book_id, *perm_params),
+            )
             row = cursor.fetchone()
             return row['file_path'] if row else None
         finally:

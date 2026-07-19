@@ -11,8 +11,8 @@ from services.text_epub_content_service import TextEpubContentService
 
 class StreamService:
     @staticmethod
-    def get_book_file_info(db_type, book_id):
-        return StreamPageService.get_book_file_info(db_type, book_id)
+    def get_book_file_info(db_type, book_id, user_id=None, role=None):
+        return StreamPageService.get_book_file_info(db_type, book_id, user_id=user_id, role=role)
 
     @staticmethod
     def get_total_pages_for_book(db_type, book_id, file_path=None, file_format=None):
@@ -47,8 +47,8 @@ class StreamService:
         return TextEpubContentService.get_txt_content(file_path)
 
     @staticmethod
-    def get_file_path(db_type, book_id):
-        return StreamPageService.get_file_path(db_type, book_id)
+    def get_file_path(db_type, book_id, user_id=None, role=None):
+        return StreamPageService.get_file_path(db_type, book_id, user_id=user_id, role=role)
 
     @staticmethod
     def get_epub_content(file_path, book_id, db_type):

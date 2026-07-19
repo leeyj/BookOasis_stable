@@ -65,6 +65,7 @@ class SQLiteConnectionPool:
                 try:
                     conn.execute("PRAGMA journal_mode=WAL;")
                     conn.execute("PRAGMA synchronous = NORMAL;")
+                    conn.execute("PRAGMA foreign_keys = ON;")
                     conn.execute(f"PRAGMA busy_timeout = {max(1000, SQLITE_BUSY_TIMEOUT_MS)};")
                 except sqlite3.OperationalError:
                     pass
