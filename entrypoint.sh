@@ -158,6 +158,42 @@ chmod 664 /app/db/*.db-shm 2>/dev/null || true
 
 echo "[Entrypoint] ✅ 데이터 디렉토리 쓰기 권한 확인 완료"
 
+# ── [기동 전 DB 무결성 및 스키마 검사 가드] ──
+echo "[Entrypoint] 기동 전 데이터베이스 무결성(PRAGMA integrity_check) 검사 중..."
+db_ok=true
+for db_name in "media_general.db" "media_adult.db"; do
+    db_file="/app/db/$db_name"
+    if [ -f "$db_file" ]; then
+        if command -v sqlite3 >/dev/null 2>&1; then
+            res=$(sqlite3 "$db_file" "PRAGMA integrity_check;" 2>&1)
+            if [ "$res" != "ok" ]; then
+                echo "[Entrypoint] ⚠️  경고: 데이터베이스 파일이 손상되었습니다: $db_name (오류: $res)"
+                db_ok=false
+            fi
+        fi
+    fi
+done
+
+if [ "$db_ok" = false ]; then
+    echo "[Entrypoint] ⚠️  손상된 DB가 발견되어 자동 복구(db_recovery.py)를 가동합니다..."
+    if python3 tools/db_recovery.py --yes; then
+        echo "[Entrypoint] ✅ 데이터베이스 자동 복구가 성공적으로 완료되었습니다."
+    else
+        echo "[Entrypoint] ❌ 치명적 오류: 데이터베이스 자동 복구에 실패했습니다. 안전을 위해 서비스를 구동하지 않습니다."
+        exit 1
+    fi
+else
+    echo "[Entrypoint] ✅ 데이터베이스 무결성 정상 확인."
+fi
+
+# ── [최신 스키마 강제 동기화 의무화] ──
+echo "[Entrypoint] 데이터베이스 최신 스키마 자동 동기화(db_schema_updater.py) 실행 중..."
+if python3 tools/db_schema_updater.py; then
+    echo "[Entrypoint] ✅ 최신 스키마 동기화 완료."
+else
+    echo "[Entrypoint] ⚠️  경고: 스키마 동기화 진행 중 오류가 발생했으나 기동을 계속합니다."
+fi
+
 # PUID가 0이 아니면 커스텀 유저를 생성하여 권한을 매핑
 if [ "$PUID" -ne 0 ]; then
     echo "[Entrypoint] Running with PUID: $PUID and PGID: $PGID"
