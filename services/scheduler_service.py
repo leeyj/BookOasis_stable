@@ -359,19 +359,19 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
         should_vfs_refresh = (row_chk and row_chk['vfs_refresh_before_scan'] == 1) or has_remote_paths
         vfs_flag_enabled = bool(row_chk and row_chk['vfs_refresh_before_scan'] == 1)
         print(
-            f"[Scanner-Trigger] VFS decision: enabled={vfs_flag_enabled}, "
-            f"has_remote_paths={has_remote_paths}, should_refresh={should_vfs_refresh}, "
+            f"[Scanner-Trigger] VFS decision: flag_enabled={vfs_flag_enabled}, "
+            f"has_remote_paths={has_remote_paths}, effective_refresh={should_vfs_refresh}, "
             f"target_paths={target_paths}"
         )
         write_scan_log(
-            f"VFS 판단: enabled={vfs_flag_enabled}, has_remote_paths={has_remote_paths}, "
-            f"should_refresh={should_vfs_refresh}, target_paths={target_paths}"
+            f"VFS 판단: flag_enabled={vfs_flag_enabled}, has_remote_paths={has_remote_paths}, "
+            f"effective_refresh={should_vfs_refresh}, target_paths={target_paths}"
         )
         
         if should_vfs_refresh:
             vfs_refreshed_in_wrapper = True
             if has_remote_paths and not (row_chk and row_chk['vfs_refresh_before_scan'] == 1):
-                print(f"[Scanner-Trigger] ⚠️ Remote paths detected but VFS refresh disabled. Forcing VFS refresh for data integrity.")
+                print(f"[Scanner-Trigger] ⚠️ Remote paths detected while VFS flag is disabled. Forcing VFS refresh for data integrity.")
                 write_scan_log("⚠️ 원격 경로 감지됨. VFS 새로고침을 강제 실행합니다 (데이터 무결성 보장).")
             else:
                 print(f"[Scanner-Trigger] VFS pre-refresh active. Attempting rclone cache update.")

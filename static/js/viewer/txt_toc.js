@@ -285,7 +285,7 @@ export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
   tocEntryRefs = [];
   activeTocIdx = -1;
 
-  const buildItem = (title, chapterIdx, anchor, paddingLeft) => {
+  const buildItem = (title, chapterIdx, anchor, paddingLeft, level = 1) => {
     const li = document.createElement('li');
     li.style.cssText = `padding-left:${paddingLeft}px; margin-bottom:12px; line-height:1.4;`;
     li.dataset.chapterIdx = String(chapterIdx);
@@ -312,8 +312,11 @@ export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
       const now = Date.now();
       if (now - lastJumpAt < 250) return;
       lastJumpAt = now;
+      const isTopLevelChapter = Number(level || 1) <= 1;
       _debugToc('toc-item-jump', { chapterIdx, hasAnchor: !!anchor, source });
-      onJumpToChapter(chapterIdx, anchor);
+      onJumpToChapter(chapterIdx, anchor, {
+        preferChapterStart: isTopLevelChapter,
+      });
     };
     a.addEventListener('click', e => {
       if (Date.now() < suppressClickUntil) {
@@ -362,7 +365,7 @@ export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
 
   if (tocList && tocList.length > 0) {
     tocList.forEach(item => {
-      ul.appendChild(buildItem(item.title, item.chapter_idx, item.anchor || '', (item.level - 1) * 16));
+      ul.appendChild(buildItem(item.title, item.chapter_idx, item.anchor || '', (item.level - 1) * 16, item.level || 1));
     });
   } else {
     txtChunks.forEach((_, idx) => {
@@ -385,7 +388,9 @@ export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
 export function jumpToTxtTocChapter({
   chapterIdx,
   anchor,
+  options,
   chunkCount,
+  cancelPendingRestore,
   setCurrentChunkIdx,
   onActiveChapterChange,
   getScrollMode,
@@ -395,6 +400,10 @@ export function jumpToTxtTocChapter({
   activeBookId,
 }) {
   if (chapterIdx < 0 || chapterIdx >= chunkCount) return;
+
+  if (typeof cancelPendingRestore === 'function') {
+    cancelPendingRestore();
+  }
 
   const findAnchorInElement = (rootEl, anchorId) => {
     if (!rootEl || !anchorId) return null;
@@ -417,7 +426,9 @@ export function jumpToTxtTocChapter({
 
   const scrollMode = getScrollMode();
   const isPageMode = scrollMode !== 'scroll';
+  const preferChapterStart = !!(options && options.preferChapterStart);
   const overlayMenu = document.getElementById('comic-overlay-menu');
+  const scrollWrapper = getScrollWrapper();
   let selectedChunkEl = null;
   if (scrollMode === 'scroll') {
     // TOC jump is an explicit navigation action.
@@ -425,13 +436,13 @@ export function jumpToTxtTocChapter({
     if (overlayMenu) {
       overlayMenu.dataset.skipInnerScrollRestore = 'true';
     }
-    const scrollWrapper = getScrollWrapper();
     if (scrollWrapper) {
       const targetChunk = scrollWrapper.querySelector(`.txt-scroll-chunk[data-idx="${chapterIdx}"]`);
       selectedChunkEl = targetChunk || null;
       if (targetChunk) {
-        const top = Math.max(0, targetChunk.offsetTop - 20);
-        scrollWrapper.scrollTo({ top, behavior: 'smooth' });
+        const top = Math.max(0, targetChunk.offsetTop);
+        // 첫 TOC 점프는 즉시 정렬로 고정해 초기 복원/관성 스크롤과의 레이스를 줄인다.
+        scrollWrapper.scrollTo({ top, behavior: 'auto' });
       } else {
         const safeChunkCount = Math.max(1, chunkCount);
         const ratio = chapterIdx / safeChunkCount;
@@ -442,12 +453,18 @@ export function jumpToTxtTocChapter({
     // Page mode keeps only the current chapter in DOM.
     // Re-render first so anchor lookup points to the selected chapter content.
     renderCurrentChunk(true);
+    if (scrollWrapper) {
+      // 챕터 전환 시 이전 챕터의 가로 페이지 오프셋이 남지 않도록 항상 시작점으로 초기화한다.
+      scrollWrapper.scrollLeft = 0;
+      scrollWrapper.scrollTop = 0;
+    }
   }
 
   saveProgress(activeBookId, chapterIdx, chunkCount);
 
-  if (anchor) {
-    setTimeout(() => {
+  if (anchor && !preferChapterStart) {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
       let targetEl = null;
       if (selectedChunkEl) {
         targetEl = findAnchorInElement(selectedChunkEl, anchor);
@@ -456,15 +473,15 @@ export function jumpToTxtTocChapter({
         targetEl = document.getElementById(anchor);
       }
       if (targetEl) {
-        targetEl.scrollIntoView({ behavior: 'smooth' });
+        targetEl.scrollIntoView({ behavior: 'auto', block: 'start', inline: 'start' });
       } else if (isPageMode) {
         // Fallback: ensure selected chapter is visible even if anchor id is missing.
-        const scrollWrapper = getScrollWrapper();
         if (scrollWrapper) {
           scrollWrapper.scrollTo({ left: 0, top: 0, behavior: 'auto' });
         }
       }
-    }, 100);
+      });
+    });
   }
 }
 

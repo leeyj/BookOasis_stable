@@ -235,9 +235,10 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
         // 스크롤 모드 시 이전 진척도 스크롤 위치 복구
         const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
         if (scrollMode === 'scroll' && currentChunkIdx > 0 && txtChunks.length > 0) {
-          setTimeout(() => {
+          txtPendingRestoreTimer = setTimeout(() => {
             const ratio = currentChunkIdx / txtChunks.length;
             scrollWrapper.scrollTop = scrollWrapper.scrollHeight * ratio;
+            txtPendingRestoreTimer = null;
           }, 150);
         }
 
@@ -754,11 +755,13 @@ function renderEpubToc(tocList) {
   syncActiveEpubToc(true);
 }
 
-function jumpToChapter(chapterIdx, anchor) {
+function jumpToChapter(chapterIdx, anchor, options = null) {
   jumpToTxtTocChapter({
     chapterIdx,
     anchor,
+    options,
     chunkCount: txtChunks.length,
+    cancelPendingRestore: cancelPendingTxtRestore,
     setCurrentChunkIdx: value => {
     currentChunkIdx = value;
     },

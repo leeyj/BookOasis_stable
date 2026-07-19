@@ -1,7 +1,10 @@
 # CHANGELOG
-## v1.1.7
--DB과도한 엑세스 완화(by 드럼쟁이) 
+## v1.1.8
 - 스캔 상태 표시 개선: 대기열(pending)만 있을 때는 '동작중'으로 표시하지 않도록 조정
+- EPUB 스크롤 모드에서 초기 스크롤 직후 첫 목차 이동이 빗나가던 문제 안정화(초기 복원 타이머 충돌 방지)
+- EPUB 목차 챕터 이동 시 이전 페이지 오프셋이 남아 다음 화 2페이지로 열리던 문제 수정(챕터 시작점 강제)
+- EPUB 목차에서 상위 챕터 항목 클릭 시 anchor 오프셋을 무시하고 챕터 시작점으로 이동하도록 보강(하위 소제목 anchor는 유지)
+- VFS 로그 용어 정리: enabled/should_refresh 대신 flag_enabled/effective_refresh로 분리 표기
 
 ## v1.1.5
 - 스캔 완료 후 간헐적으로 대기상태에 머무르는 현상 수정 | Issue where the system remains in an intermittent idle state after scanning completion
