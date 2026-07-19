@@ -56,10 +56,13 @@ def get_system_status():
         status = scanner_queue.get_queue_status()
 
         running_tasks = []
+        has_running = False
+        has_pending = False
         is_active = False
 
         running = status.get('running')
         if running:
+            has_running = True
             is_active = True
             task_type = running.get('type')
             kwargs = running.get('kwargs', {})
@@ -81,17 +84,24 @@ def get_system_status():
 
         pending = status.get('pending', [])
         if pending:
-            is_active = True
+            has_pending = True
             running_tasks.append(f"스캔 대기열: {len(pending)}건")
         
         if tuning_active:
             is_active = True
             running_tasks.append("데이터베이스 파일 물리 파편화 압축 정리 및 인덱스 정밀 튜닝 실행 중...")
 
+        # 실제 '동작 중' 표시는 running/tuning 기준으로만 활성화한다.
+        # pending만 남아있는 경우는 대기 상태로 간주한다.
+        is_active = bool(has_running or tuning_active)
+
         return jsonify({
             'success': True,
             'is_active': is_active,
-            'tasks': running_tasks
+            'tasks': running_tasks,
+            'has_running': has_running,
+            'has_pending': has_pending,
+            'pending_count': len(pending)
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

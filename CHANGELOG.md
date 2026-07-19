@@ -1,6 +1,7 @@
 # CHANGELOG
-## v1.1.6
+## v1.1.7
 -DB과도한 엑세스 완화(by 드럼쟁이) 
+- 스캔 상태 표시 개선: 대기열(pending)만 있을 때는 '동작중'으로 표시하지 않도록 조정
 
 ## v1.1.5
 - 스캔 완료 후 간헐적으로 대기상태에 머무르는 현상 수정 | Issue where the system remains in an intermittent idle state after scanning completion

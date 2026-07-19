@@ -54,7 +54,7 @@
             console.error("Failed to fetch queue status", error);
             const tbody = document.getElementById('queue-table-body');
             if (tbody) {
-                tbody.innerHTML = `<tr><td colspan="5" style="padding: 2rem; text-align: center; color: #ef4444;"><i class="fa-solid fa-triangle-exclamation"></i> ${window.i18n ? window.i18n.t('queue.load_error') : '대기열 정보를 불러오지 못했습니다.'}</td></tr>`;
+                tbody.innerHTML = `<tr data-queue-error="true"><td colspan="5" style="padding: 2rem; text-align: center; color: #ef4444;"><i class="fa-solid fa-triangle-exclamation"></i> ${window.i18n ? window.i18n.t('queue.load_error') : '대기열 정보를 불러오지 못했습니다.'}</td></tr>`;
             }
         }
     }
@@ -180,6 +180,9 @@
             tbody.innerHTML = `<tr data-queue-empty="true"><td colspan="5" style="padding: 3rem; text-align: center; color: #94a3b8;"><i class="fa-solid fa-check-circle" style="font-size: 2rem; margin-bottom: 1rem; display: block; color: #22c55e;"></i>${t('queue.empty')}</td></tr>`;
             return;
         }
+
+        // 이전 로딩/오류 행처럼 관리 대상이 아닌 고정 행은 먼저 제거한다.
+        tbody.querySelectorAll('tr:not([data-queue-key]):not([data-queue-empty])').forEach(row => row.remove());
 
         const existingRows = new Map();
         tbody.querySelectorAll('tr[data-queue-key]').forEach(row => {
