@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import sys
+import time
 
 MEDIA_SERVER_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if MEDIA_SERVER_DIR not in sys.path:
@@ -8,26 +9,52 @@ if MEDIA_SERVER_DIR not in sys.path:
 
 import database
 
-def get_setting_float(key, default_value):
+_SETTING_CACHE_TTL_SEC = 30.0
+_setting_cache = {}
+_error_log_ts = {}
+
+
+def _should_log_error(key, interval_sec=30.0):
+    now = time.monotonic()
+    last = _error_log_ts.get(key, 0.0)
+    if now - last >= interval_sec:
+        _error_log_ts[key] = now
+        return True
+    return False
+
+
+def get_setting_float(key, default_value, db_type='general'):
+    cache_key = f"{db_type}:{key}"
+    cached = _setting_cache.get(cache_key)
+    now = time.monotonic()
+    if cached and (now - cached['ts'] <= _SETTING_CACHE_TTL_SEC):
+        return cached['value']
+
     conn = None
     try:
-        conn = database.get_connection('general')
+        conn = database.get_connection(db_type)
         cursor = conn.cursor()
         cursor.execute("SELECT value FROM settings WHERE key = ?", (key,))
         row = cursor.fetchone()
         if row and row['value']:
-            return float(row['value'])
+            value = float(row['value'])
+            _setting_cache[cache_key] = {'value': value, 'ts': now}
+            return value
     except Exception as e:
-        print(f"[Scanner-Memory] Failed to read setting ({key}): {e}")
+        if _should_log_error(cache_key):
+            print(f"[Scanner-Memory] Failed to read setting ({key}, db={db_type}): {e}")
     finally:
         if conn:
             try:
                 conn.close()
             except Exception:
                 pass
+
+    _setting_cache[cache_key] = {'value': default_value, 'ts': now}
     return default_value
 
-def check_memory_exceeded():
+
+def check_memory_exceeded(db_type='general'):
     """Detect memory threshold exceeded (reflect DB settings)"""
     available_mb = None
     try:
@@ -46,8 +73,8 @@ def check_memory_exceeded():
     except Exception as e:
         print(f"[Scanner-Memory] Failed to read process memory: {e}")
 
-    sys_limit = get_setting_float('SYSTEM_MEM_LIMIT', 1536.0)
-    rss_limit = get_setting_float('PROCESS_RSS_LIMIT', 2048.0)
+    sys_limit = get_setting_float('SYSTEM_MEM_LIMIT', 1536.0, db_type=db_type)
+    rss_limit = get_setting_float('PROCESS_RSS_LIMIT', 2048.0, db_type=db_type)
 
     system_leak = (available_mb is not None and available_mb < sys_limit)
     process_leak = (rss_mb is not None and rss_mb > rss_limit)

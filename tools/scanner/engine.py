@@ -436,7 +436,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                         return
 
                 # Self-exit for real-time OOM prevention
-                if check_memory_exceeded():
+                if check_memory_exceeded(db_type=db_type):
                     print(f"[Scanner-Memory] 🛑 Emergency pause due to memory limit. (Progress: {processed_folders_count} folders applied)")
                     log_pool_stats('memory-emergency')
                     if not flush_pending_data():

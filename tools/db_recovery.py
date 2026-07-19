@@ -23,6 +23,7 @@ import shutil
 import sqlite3
 import datetime
 import subprocess
+import argparse
 
 # ─────────────────────────────────────────────
 # 경로 설정 (이 스크립트 위치 기준으로 자동 탐색)
@@ -266,10 +267,26 @@ def rebuild_fts_index(db_path, label):
 # 메인 실행
 # ─────────────────────────────────────────────
 def main():
+    parser = argparse.ArgumentParser(description="BookOasis DB 복구 스크립트")
+    parser.add_argument('--db', type=str, help="복구할 특정 DB 파일 경로 (예: test/chinh_media_general.db)")
+    parser.add_argument('--yes', action='store_true', help="확인 프롬프트를 건너뛰고 바로 진행")
+    args = parser.parse_args()
+
+    # DB_FILES 재구성
+    if args.db:
+        db_path = os.path.abspath(args.db)
+        label = os.path.splitext(os.path.basename(db_path))[0]
+        target_db_files = {label: db_path}
+    else:
+        target_db_files = DB_FILES
+
     sep('=')
     print("  BookOasis DB 복구 스크립트")
     print(f"  실행 시각: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"  DB 경로  : {DB_DIR}")
+    if args.db:
+        print(f"  대상 DB  : {args.db}")
+    else:
+        print(f"  DB 경로  : {DB_DIR}")
     sep('=')
     print()
 
@@ -278,20 +295,24 @@ def main():
     print("  완전히 정지되어 있는지 반드시 확인하세요.")
     print("  실행 중인 서버와 동시에 사용 시 DB가 추가 손상될 수 있습니다.")
     print()
-    confirm = input("  계속 진행하려면 'yes'를 입력하세요: ").strip().lower()
-    if confirm != 'yes':
-        print("  취소되었습니다.")
-        sys.exit(0)
+
+    if not args.yes:
+        confirm = input("  계속 진행하려면 'yes'를 입력하세요: ").strip().lower()
+        if confirm != 'yes':
+            print("  취소되었습니다.")
+            sys.exit(0)
+    else:
+        print("  [--yes] 옵션으로 인해 확인 프롬프트를 건너뜁니다.")
 
     print()
 
-    # ── STEP 1: 모든 DB에 WAL 체크포인트 시도 ──
+    # ── STEP 1: WAL 체크포인트 시도 ──
     sep('=')
     print("  STEP 1 — WAL 체크포인트 (데이터 손실 없음)")
     sep('=')
 
     step1_results = {}
-    for label, db_path in DB_FILES.items():
+    for label, db_path in target_db_files.items():
         ok = step1_wal_checkpoint(db_path, label)
         step1_results[label] = ok
 
@@ -307,19 +328,25 @@ def main():
         print("  Step 2는 복구 가능한 데이터를 추출하여 DB를 재생성합니다.")
         print("  최근 일부 변경사항(읽기 진행률 등)이 손실될 수 있습니다.")
         print()
-        confirm2 = input("  Step 2를 계속 진행하려면 'yes'를 입력하세요: ").strip().lower()
+        
+        if args.yes:
+            confirm2 = 'yes'
+            print("  [--yes] 옵션으로 인해 Step 2를 바로 진행합니다.")
+        else:
+            confirm2 = input("  Step 2를 계속 진행하려면 'yes'를 입력하세요: ").strip().lower()
+            
         if confirm2 == 'yes':
             for label in failed:
-                step2_full_recovery(DB_FILES[label], label)
+                step2_full_recovery(target_db_files[label], label)
         else:
             print("  Step 2를 건너뜁니다.")
 
-    # ── STEP 3: FTS5 검색 인덱스 강제 재구축 (깨진 인덱스 복구) ──
+    # ── STEP 3: FTS5 검색 인덱스 강제 재구축 ──
     print()
     sep('=')
     print("  STEP 3 — FTS5 검색 인덱스 재빌드")
     sep('=')
-    for label, db_path in DB_FILES.items():
+    for label, db_path in target_db_files.items():
         rebuild_fts_index(db_path, label)
 
     # ── 최종 상태 요약 ──
@@ -327,7 +354,7 @@ def main():
     sep('=')
     print("  복구 작업 완료 — 최종 상태 확인")
     sep('=')
-    for label, db_path in DB_FILES.items():
+    for label, db_path in target_db_files.items():
         if os.path.exists(db_path):
             try:
                 conn   = sqlite3.connect(db_path, timeout=5.0)
