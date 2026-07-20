@@ -346,24 +346,14 @@ def ensure_books_search_index(conn):
             )
             """
         )
+
+        # 운영 안정성을 위해 FTS 실시간 동기화 트리거는 기본적으로 비활성화합니다.
+        # 검색 인덱스는 스케줄러 배치 작업에서 주기적으로 재빌드합니다.
         cursor.executescript(
             """
-            CREATE TRIGGER IF NOT EXISTS books_search_ai AFTER INSERT ON books BEGIN
-                INSERT INTO books_search(rowid, title, series_name, author, summary)
-                VALUES (new.id, COALESCE(new.title, ''), COALESCE(new.series_name, ''), COALESCE(new.author, ''), COALESCE(new.summary, ''));
-            END;
-
-            CREATE TRIGGER IF NOT EXISTS books_search_ad AFTER DELETE ON books BEGIN
-                INSERT INTO books_search(books_search, rowid, title, series_name, author, summary)
-                VALUES ('delete', old.id, COALESCE(old.title, ''), COALESCE(old.series_name, ''), COALESCE(old.author, ''), COALESCE(old.summary, ''));
-            END;
-
-            CREATE TRIGGER IF NOT EXISTS books_search_au AFTER UPDATE ON books BEGIN
-                INSERT INTO books_search(books_search, rowid, title, series_name, author, summary)
-                VALUES ('delete', old.id, COALESCE(old.title, ''), COALESCE(old.series_name, ''), COALESCE(old.author, ''), COALESCE(old.summary, ''));
-                INSERT INTO books_search(rowid, title, series_name, author, summary)
-                VALUES (new.id, COALESCE(new.title, ''), COALESCE(new.series_name, ''), COALESCE(new.author, ''), COALESCE(new.summary, ''));
-            END;
+            DROP TRIGGER IF EXISTS books_search_ai;
+            DROP TRIGGER IF EXISTS books_search_ad;
+            DROP TRIGGER IF EXISTS books_search_au;
             """
         )
 
@@ -702,7 +692,8 @@ def init_databases():
                 ('TAG_FILTER_SEARCH_SCOPE_ALL', '0'),
                 ('SIDEBAR_TOP_CONTROLS', '0'),
                 ('HDD_AGGRESSIVE_WARMUP', '0'),
-                ('RCLONE_RC_URL', 'http://localhost:5572')
+                ('RCLONE_RC_URL', 'http://localhost:5572'),
+                ('FTS_REBUILD_CRON', '30 4 * * *')
             ]
             for k, v in default_settings:
                 cursor.execute("SELECT value FROM settings WHERE key = ?", (k,))

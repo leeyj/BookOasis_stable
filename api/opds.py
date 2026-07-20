@@ -394,6 +394,8 @@ def opds_download_book(db_type: str, book_id: int):
 
 @opds_bp.route('/opds/search', methods=['GET'])
 def opds_search():
+    return jsonify({'success': False, 'error': 'OPDS search is temporarily disabled'}), 503
+
     query = request.args.get('q') or request.args.get('query') or ''
 
     if not query:
@@ -428,6 +430,8 @@ def opds_search():
 
 @opds_bp.route('/opds-adult/search', methods=['GET'])
 def opds_adult_search():
+    return jsonify({'success': False, 'error': 'OPDS search is temporarily disabled'}), 503
+
     query = request.args.get('q') or request.args.get('query') or ''
 
     if not query:

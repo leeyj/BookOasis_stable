@@ -581,11 +581,11 @@ def app_opds_download_book(db_type: str, book_id: int):
 
 @app_opds_bp.route('/app-opds/search', methods=['GET'])
 def app_opds_search():
-    return _handlers.handle_search_feed(is_adult=False)
+    return jsonify({'success': False, 'error': 'App-OPDS search is temporarily disabled'}), 503
 
 
 @app_opds_bp.route('/app-opds-adult/search', methods=['GET'])
 def app_opds_adult_search():
-    return _handlers.handle_search_feed(is_adult=True)
+    return jsonify({'success': False, 'error': 'App-OPDS search is temporarily disabled'}), 503
 
 

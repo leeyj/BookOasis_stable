@@ -1,10 +1,15 @@
 # CHANGELOG
+## v1.2.4
+- FTS 가상 테이블 제거(opds 검색기능 차단) | Removed FTS virtual table (disabling OPDS search functionality)
+- 시작/재시작시 오류 수정 | Fixed errors occurring at startup/restart
+- DB 무결성 검증 로직 강화 | Strengthened DB integrity verification logic
+
+
 ## v1.2.3
 - 서비스 재시작시 DB 무결성 검증 강화 | Enhanced DB integrity verification during service restart
 - DB 복구 프로세스 안정성 및 무결성 강화 | Improved stability and integrity of the DB recovery process
-- Redis 도입범위 확대(스캔대게열,도서읽은범위,도서읽은 범위) | Expanded Redis implementation scope (Scan queue, Book read range, Book read range)
+- Redis 도입범위 확대(스캔대게열,도서읽은범위,도서읽은 책) | Expanded Redis implementation scope (Scan queue, Book read range, Book read range)
 - 모바일 뷰에서 카테고리 선택시 ui 불편사항 수정 | Fixed UI inconvenience when selecting a category in mobile view
-
 
 
 ## v1.2.2

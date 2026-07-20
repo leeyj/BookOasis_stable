@@ -181,6 +181,21 @@ class SchedulerService:
                             print(f"[Scheduler] Lazy cover scanner job registered: Schedule={lazy_cron}")
                         except ValueError as cron_err:
                             print(f"[Scheduler] Invalid lazy script cron passed ({lazy_cron}): {cron_err}")
+
+                    fts_cron = ReadingProgressRepository.get_settings_value(db_type, 'FTS_REBUILD_CRON')
+                    if fts_cron:
+                        try:
+                            fts_trigger = CronTrigger.from_crontab(fts_cron)
+                            scheduler.add_job(
+                                run_fts_rebuild_job,
+                                fts_trigger,
+                                id="fts_rebuild_job",
+                                replace_existing=True,
+                                max_instances=1,
+                            )
+                            print(f"[Scheduler] FTS rebuild job registered: Schedule={fts_cron}")
+                        except ValueError as cron_err:
+                            print(f"[Scheduler] Invalid FTS rebuild cron passed ({fts_cron}): {cron_err}")
                 
                 for lib in libs:
                     SchedulerService.register_job(db_type, db_path, lib['id'], lib['physical_path'], lib['cron_schedule'])
@@ -614,4 +629,31 @@ def run_lazy_scanner_job():
     from services.scanner_queue import scanner_queue
     print("[Scheduler] Lazy cover scanner job scheduled -> Enqueuing...")
     scanner_queue.enqueue('lazy_scan')
+
+
+def run_fts_rebuild_job():
+    """books_search 인덱스를 주기적으로 재빌드합니다. (실시간 트리거 미사용 정책)"""
+    conn = None
+    try:
+        conn = database.get_connection('general')
+        from database import ensure_books_search_index
+
+        ensure_books_search_index(conn)
+        cur = conn.cursor()
+        cur.execute("INSERT INTO books_search(books_search) VALUES ('rebuild')")
+        conn.commit()
+        print("[Scheduler] FTS rebuild job completed successfully.")
+    except Exception as e:
+        try:
+            if conn:
+                conn.rollback()
+        except Exception:
+            pass
+        print(f"[Scheduler ERROR] FTS rebuild job failed: {e}")
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 

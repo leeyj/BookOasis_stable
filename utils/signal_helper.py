@@ -9,6 +9,15 @@ def register_shutdown_handlers():
     """
     def handle_signal(signum, frame):
         print(f"\n[Shutdown-Signal-Guard] 종료 시그널({signum}) 수신. 우아한 종료 프로세스를 기동합니다...")
+
+        # 0. 스크립트 직접 실행(__main__) 경로의 전역 플래그도 함께 갱신
+        # 예) python tools/lazy_scanner.py 로 실행 시 stop_requested는 __main__에 존재
+        try:
+            main_mod = sys.modules.get('__main__')
+            if main_mod is not None and hasattr(main_mod, 'stop_requested'):
+                setattr(main_mod, 'stop_requested', True)
+        except Exception:
+            pass
         
         # 1. 메인 스캐너 엔진 플래그 설정
         try:
@@ -27,6 +36,7 @@ def register_shutdown_handlers():
         # 3. 큐 프로세스에 가동 중인 활성 자식 서브프로세스 정리
         try:
             import services.scanner_queue
+            services.scanner_queue.stop_requested = True
             if services.scanner_queue.active_subprocess:
                 print(f"[Shutdown-Signal-Guard] 실행 중인 자식 서브프로세스 감지. 종료 신호 전파 (PID: {services.scanner_queue.active_subprocess.pid})")
                 services.scanner_queue.active_subprocess.terminate()

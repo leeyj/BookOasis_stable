@@ -403,7 +403,6 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     
                     if batch_item_count > 0:
                         # ── [GIL Throttling] ──
-                        import time
                         time.sleep(0.01 * min(batch_item_count, 5))
                         
                     del res

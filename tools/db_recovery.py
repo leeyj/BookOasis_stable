@@ -199,12 +199,34 @@ def step2_full_recovery(db_path, label):
             )
             return any(re.search(pattern, normalized, re.IGNORECASE) for pattern in patterns)
 
+        def should_skip_recovery_line(line):
+            """.recover 스트림의 단일 라인 제어문을 선차단합니다."""
+            s = line.strip()
+            if not s:
+                return False
+
+            # sqlite3 .recover 출력에 간헐적으로 섞이는 트랜잭션 제어문은
+            # 스트리밍 import 쪽에서 그대로 실행하면 'cannot commit - no transaction is active'를 유발할 수 있습니다.
+            txn_line_patterns = (
+                r'^BEGIN(?:\s+TRANSACTION)?\s*;?$',
+                r'^COMMIT\s*;?$',
+                r'^ROLLBACK\s*;?$',
+                r'^SAVEPOINT\s+\S+\s*;?$',
+                r'^RELEASE\s+\S+\s*;?$',
+                r'^END(?:\s+TRANSACTION)?\s*;?$',
+            )
+            return any(re.search(p, s, re.IGNORECASE) for p in txn_line_patterns)
+
         # 디스크 파일 없이 스트리밍으로 statement를 넘깁니다.
         try:
             skipped_statements = 0
             written_statements = 0
             statement_lines = []
             for line in recover_proc.stdout:
+                if should_skip_recovery_line(line):
+                    skipped_statements += 1
+                    continue
+
                 statement_lines.append(line)
                 if ';' not in line:
                     continue
@@ -326,7 +348,7 @@ def rebuild_fts_index(db_path, label):
         cursor.execute("DROP TRIGGER IF EXISTS books_search_au;")
         cursor.execute("DROP TABLE IF EXISTS books_search;")
         
-        log("FTS5 가상 테이블 및 트리거 재생성 중...")
+        log("FTS5 가상 테이블 재생성 중...")
         cursor.execute(
             """
             CREATE VIRTUAL TABLE books_search USING fts5(
@@ -340,26 +362,10 @@ def rebuild_fts_index(db_path, label):
             );
             """
         )
-        cursor.executescript(
-            """
-            CREATE TRIGGER books_search_ai AFTER INSERT ON books BEGIN
-                INSERT INTO books_search(rowid, title, series_name, author, summary)
-                VALUES (new.id, COALESCE(new.title, ''), COALESCE(new.series_name, ''), COALESCE(new.author, ''), COALESCE(new.summary, ''));
-            END;
-
-            CREATE TRIGGER books_search_ad AFTER DELETE ON books BEGIN
-                INSERT INTO books_search(books_search, rowid, title, series_name, author, summary)
-                VALUES ('delete', old.id, COALESCE(old.title, ''), COALESCE(old.series_name, ''), COALESCE(old.author, ''), COALESCE(old.summary, ''));
-            END;
-
-            CREATE TRIGGER books_search_au AFTER UPDATE ON books BEGIN
-                INSERT INTO books_search(books_search, rowid, title, series_name, author, summary)
-                VALUES ('delete', old.id, COALESCE(old.title, ''), COALESCE(old.series_name, ''), COALESCE(old.author, ''), COALESCE(old.summary, ''));
-                INSERT INTO books_search(rowid, title, series_name, author, summary)
-                VALUES (new.id, COALESCE(new.title, ''), COALESCE(new.series_name, ''), COALESCE(new.author, ''), COALESCE(new.summary, ''));
-            END;
-            """
-        )
+        # 실시간 트리거는 비활성화 정책: 주기적 스케줄러 재빌드로만 유지
+        cursor.execute("DROP TRIGGER IF EXISTS books_search_ai;")
+        cursor.execute("DROP TRIGGER IF EXISTS books_search_ad;")
+        cursor.execute("DROP TRIGGER IF EXISTS books_search_au;")
         
         log("FTS5 인덱스 데이터 동기화(Rebuild) 중...")
         cursor.execute("INSERT INTO books_search(books_search) VALUES('rebuild');")

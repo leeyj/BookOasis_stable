@@ -7,6 +7,9 @@ import subprocess
 import datetime
 import database
 
+# SIGTERM/SIGINT 수신 시 워커 루프를 안전 종료하기 위한 전역 플래그
+stop_requested = False
+
 class ScannerQueue:
     _instance = None
 
@@ -156,7 +159,13 @@ def run_scanner_worker_loop():
 
     from repositories.scanner_queue_repository import ScannerQueueRepository
 
+    global stop_requested
+
     while True:
+        if stop_requested:
+            sq.log("Shutdown flag detected. Exiting scanner worker loop.")
+            break
+
         try:
             # Redis가 사용 가능한 경우 BRPOP으로 작업 대기
             task_key_popped = None
@@ -181,6 +190,10 @@ def run_scanner_worker_loop():
                 else:
                     time.sleep(0.5)
                 continue
+
+            if stop_requested:
+                sq.log("Shutdown flag detected before task acquisition. Exiting scanner worker loop.")
+                break
                 
             task_id = task['id']
             task_type = task['task_type']
@@ -235,11 +248,13 @@ def run_scanner_worker_loop():
             sq.log(f"Error in worker loop: {loop_err}")
             time.sleep(5.0)
 
+    sq.log("Scanner worker process terminated gracefully.")
+
 
 active_subprocess = None
 
 def _process_lazy_scan(sq):
-    global active_subprocess
+    global active_subprocess, stop_requested
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     script_path = os.path.join(BASE_DIR, 'tools', 'lazy_scanner.py')
     
@@ -248,7 +263,17 @@ def _process_lazy_scan(sq):
         cwd=BASE_DIR
     )
     try:
-        returncode = active_subprocess.wait()
+        # 종료 시그널 수신 시 stop_requested 플래그와 함께 자식 종료를 기다립니다.
+        while True:
+            returncode = active_subprocess.poll()
+            if returncode is not None:
+                break
+            if stop_requested:
+                try:
+                    active_subprocess.terminate()
+                except Exception:
+                    pass
+            time.sleep(0.2)
     finally:
         active_subprocess = None
         
