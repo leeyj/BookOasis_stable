@@ -278,7 +278,25 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
 
         max_attempts = 6
         for attempt in range(1, max_attempts + 1):
+            gate_token = None
             try:
+                from utils.redis_helper import redis_acquire_lock, redis_release_lock
+
+                gate_token = redis_acquire_lock(f"lock:db_write:{db_type}", ttl=90, wait_timeout=1.0)
+                if not gate_token:
+                    wait_sec = min(3.0, 0.2 * (2 ** (attempt - 1)))
+                    print(
+                        f"[Scanner-DB] DB write gate busy (attempt {attempt}/{max_attempts}) "
+                        f"db={db_type} ins={len(pending_inserts)} upd={len(pending_updates)} folders={len(pending_folders)} "
+                        f"Retrying in {wait_sec:.2f}s..."
+                    )
+                    time.sleep(wait_sec)
+                    continue
+
+                print(
+                    f"[Scanner-DB] Flush start (attempt {attempt}/{max_attempts}) "
+                    f"ins={len(pending_inserts)} upd={len(pending_updates)} folders={len(pending_folders)}"
+                )
                 # 1. DB Bulk Update
                 if pending_inserts or pending_updates:
                     process_batch(cursor, pending_inserts, pending_updates)
@@ -305,6 +323,10 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                 pending_inserts.clear()
                 pending_updates.clear()
                 pending_folders.clear()
+                print(
+                    f"[Scanner-DB] Flush success (attempt {attempt}/{max_attempts}) "
+                    f"remaining_ins={len(pending_inserts)} remaining_upd={len(pending_updates)} remaining_folders={len(pending_folders)}"
+                )
                 return True
             except Exception as e:
                 try:
@@ -313,11 +335,24 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     pass
                 if _is_db_locked_error(e) and attempt < max_attempts:
                     wait_sec = min(3.0, 0.2 * (2 ** (attempt - 1)))
-                    print(f"[Scanner-DB] Flush locked (attempt {attempt}/{max_attempts}). Retrying in {wait_sec:.2f}s...")
+                    print(
+                        f"[Scanner-DB] Flush locked (attempt {attempt}/{max_attempts}) "
+                        f"ins={len(pending_inserts)} upd={len(pending_updates)} folders={len(pending_folders)} "
+                        f"Retrying in {wait_sec:.2f}s..."
+                    )
                     time.sleep(wait_sec)
                     continue
-                print(f"[Scanner ERROR] Flush failed: {e}")
+                print(
+                    f"[Scanner ERROR] Flush failed after attempt {attempt}/{max_attempts}: {e} "
+                    f"ins={len(pending_inserts)} upd={len(pending_updates)} folders={len(pending_folders)}"
+                )
                 return False
+            finally:
+                if gate_token:
+                    try:
+                        redis_release_lock(f"lock:db_write:{db_type}", gate_token)
+                    except Exception:
+                        pass
 
         return False
 
@@ -407,86 +442,123 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                         
                     del res
                 
-                pending_folders.append({
-                    'root': root_folder,
-                    'dir_mtime': dir_mtime,
-                    'meta_mtime': meta_mtime
-                })
-                processed_folders_count += 1
-
-                if processed_folders_count % 20 == 0:
-                    log_pool_stats(f'progress-{processed_folders_count}')
+                # 락 경쟁 최소화 최적화: 폴더의 수정 시간(mtime)이 DB 캐시와 완전히 일치하고,
+                # 해당 폴더 내에서 새로 추가되거나 변경된 도서(ins/upd)가 전혀 없다면
+                # 불필요한 folder_mtimes 갱신 및 scanner_progress DB 쓰기를 건너뜁니다.
+                has_actual_changes = (batch_item_count > 0)
+                cached_mtimes = db_folder_mtimes.get(root_folder)
+                mtimes_match = False
+                if cached_mtimes:
+                    cached_dir_mtime, cached_meta_mtime = cached_mtimes
+                    if cached_dir_mtime == dir_mtime and cached_meta_mtime == meta_mtime:
+                        mtimes_match = True
                 
-                # Hybrid Flush Trigger
-                if (len(pending_inserts) + len(pending_updates) >= 100) or len(pending_folders) >= 50:
-                    if not flush_pending_data():
-                        raise RuntimeError('Scanner flush failed due to persistent DB contention.')
-
-                if processed_folders_count % 50 == 0:
-                    gc.collect()
-
-                # Detect manual cancel (abort) request and exit
-                # [버그수정] 장기 conn은 WAL 스냅샷 격리로 인해 다른 세션의 COMMIT을 읽지 못함.
-                # 취소 상태 확인만 독립 커넥션으로 조회하여 항상 최신 상태를 반영한다.
-                # 대시보드 부하를 줄이기 위해 매 폴더가 아닌 주기적으로만 조회한다.
-                if processed_folders_count % 10 == 0:
-                    status_row = None
-                    _cancel_conn = None
-                    try:
-                        _cancel_conn = database.get_connection(db_type)
-                        _cancel_cur = _cancel_conn.cursor()
-                        _cancel_cur.execute("SELECT scan_status FROM libraries WHERE id = ?", (library_id,))
-                        status_row = _cancel_cur.fetchone()
-                    except Exception as _e:
-                        print(f"[Scanner-Cancel] ⚠️ 취소 상태 확인 중 오류 (무시하고 계속 진행): {_e}")
-                    finally:
-                        if _cancel_conn:
-                            try:
-                                _cancel_conn.close()
-                            except Exception:
-                                pass
-                    if status_row and status_row['scan_status'] == 'cancelling':
-                        print(f"[Scanner-Cancel] 🛑 Safely aborting scan due to user request. (Completed folders: {processed_folders_count} folders)")
-                        log_pool_stats('cancel-abort')
-                        if not flush_pending_data():
-                            raise RuntimeError('Scanner flush failed while processing cancel request.')
-                        cursor.execute("UPDATE libraries SET scan_status = 'ready' WHERE id = ?", (library_id,))
-                        _commit_with_retry(conn, 'cancel-status-update')
-                        conn.close()
-                        cleanup_jsonl_file()
-                        return
-
-                # Self-exit for real-time OOM prevention
-                if check_memory_exceeded(db_type=db_type):
-                    print(f"[Scanner-Memory] 🛑 Emergency pause due to memory limit. (Progress: {processed_folders_count} folders applied)")
-                    log_pool_stats('memory-emergency')
-                    if not flush_pending_data():
-                        raise RuntimeError('Scanner flush failed during memory emergency handling.')
-                    try:
-                        conn.close()
-                    except Exception:
-                        pass
-                    cleanup_jsonl_file()
-                    os._exit(0)
+                if has_actual_changes or not mtimes_match:
+                    pending_folders.append({
+                        'root': root_folder,
+                        'dir_mtime': dir_mtime,
+                        'meta_mtime': meta_mtime
+                    })
+                
+                processed_folders_count += 1
 
             except Exception as e:
                 print(f"[Scanner-DEBUG-Pool] ❌ Folder '{root_folder}' processing exception: {e}")
+                continue
+
+            if processed_folders_count % 20 == 0:
+                log_pool_stats(f'progress-{processed_folders_count}')
+            
+            # Hybrid Flush Trigger
+            if (len(pending_inserts) + len(pending_updates) >= 100) or len(pending_folders) >= 50:
+                if not flush_pending_data():
+                    raise RuntimeError('Scanner flush failed due to persistent DB contention.')
+
+            if processed_folders_count % 50 == 0:
+                gc.collect()
+
+            # Detect manual cancel (abort) request and exit
+            # [버그수정] 장기 conn은 WAL 스냅샷 격리로 인해 다른 세션의 COMMIT을 읽지 못함.
+            # 취소 상태 확인만 독립 커넥션으로 조회하여 항상 최신 상태를 반영한다.
+            # 대시보드 부하를 줄이기 위해 매 폴더가 아닌 주기적으로만 조회한다.
+            if processed_folders_count % 10 == 0:
+                status_row = None
+                _cancel_conn = None
+                try:
+                    _cancel_conn = database.get_connection(db_type)
+                    _cancel_cur = _cancel_conn.cursor()
+                    _cancel_cur.execute("SELECT scan_status FROM libraries WHERE id = ?", (library_id,))
+                    status_row = _cancel_cur.fetchone()
+                except Exception as _e:
+                    print(f"[Scanner-Cancel] ⚠️ 취소 상태 확인 중 오류 (무시하고 계속 진행): {_e}")
+                finally:
+                    if _cancel_conn:
+                        try:
+                            _cancel_conn.close()
+                        except Exception:
+                            pass
+                if status_row and status_row['scan_status'] == 'cancelling':
+                    print(f"[Scanner-Cancel] 🛑 Safely aborting scan due to user request. (Completed folders: {processed_folders_count} folders)")
+                    log_pool_stats('cancel-abort')
+                    if not flush_pending_data():
+                        raise RuntimeError('Scanner flush failed while processing cancel request.')
+                    cursor.execute("UPDATE libraries SET scan_status = 'ready' WHERE id = ?", (library_id,))
+                    _commit_with_retry(conn, 'cancel-status-update')
+                    conn.close()
+                    cleanup_jsonl_file()
+                    return
+
+            # Self-exit for real-time OOM prevention
+            if check_memory_exceeded(db_type=db_type):
+                print(f"[Scanner-Memory] 🛑 Emergency pause due to memory limit. (Progress: {processed_folders_count} folders applied)")
+                log_pool_stats('memory-emergency')
+                if not flush_pending_data():
+                    raise RuntimeError('Scanner flush failed during memory emergency handling.')
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+                cleanup_jsonl_file()
+                os._exit(0)
 
         # Final flush for any remaining data at the end of the loop
+        print(
+            f"[Scanner-DB] Final flush begin db={db_type} library_id={library_id} "
+            f"pending_ins={len(pending_inserts)} pending_upd={len(pending_updates)} pending_folders={len(pending_folders)}"
+        )
         if not flush_pending_data():
             raise RuntimeError('Scanner final flush failed due to persistent DB contention.')
+        print(f"[Scanner-DB] Final flush done db={db_type} library_id={library_id}")
         log_pool_stats('scan-final-flush')
         cleanup_jsonl_file()
 
 
     # 3. Real-time deletion monitoring: Remove book info disappeared from file system
+    print(f"[Scanner-DB] Deletion sync begin db={db_type} library_id={library_id}")
     if not handle_deleted_books(cursor, db_books, deleted_paths, target_paths, found_file_paths):
+        print(f"[Scanner-DB] Deletion sync aborted db={db_type} library_id={library_id}")
         conn.close()
         return
+    print(f"[Scanner-DB] Deletion sync done db={db_type} library_id={library_id}")
 
     # Initialize checkpoint of library upon successful completion
-    cursor.execute("DELETE FROM scanner_progress WHERE library_id = ?", (str(library_id),))
-    _commit_with_retry(conn, 'scan-end-cleanup')
+    print(f"[Scanner-DB] scan-end-cleanup commit begin db={db_type} library_id={library_id}")
+    end_gate_token = None
+    try:
+        from utils.redis_helper import redis_acquire_lock, redis_release_lock
+
+        end_gate_token = redis_acquire_lock(f"lock:db_write:{db_type}", ttl=90, wait_timeout=5.0)
+        if not end_gate_token:
+            raise RuntimeError(f"scan-end-cleanup db write gate busy for db_type={db_type}")
+        cursor.execute("DELETE FROM scanner_progress WHERE library_id = ?", (str(library_id),))
+        _commit_with_retry(conn, 'scan-end-cleanup')
+    finally:
+        if end_gate_token:
+            try:
+                redis_release_lock(f"lock:db_write:{db_type}", end_gate_token)
+            except Exception:
+                pass
+    print(f"[Scanner-DB] scan-end-cleanup commit done db={db_type} library_id={library_id}")
     conn.close()
     log_pool_stats('scan-end')
     gc.collect()

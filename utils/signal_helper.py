@@ -1,6 +1,19 @@
 # -*- coding: utf-8 -*-
+import os
 import signal
 import sys
+import threading
+import time
+
+
+def _arm_forced_exit_after_grace(grace_seconds=25):
+    def _watchdog():
+        time.sleep(max(1, int(grace_seconds)))
+        print(f"[Shutdown-Signal-Guard] Grace period expired after {grace_seconds}s. Forcing process exit.")
+        os._exit(0)
+
+    t = threading.Thread(target=_watchdog, daemon=True)
+    t.start()
 
 def register_shutdown_handlers():
     """
@@ -9,6 +22,7 @@ def register_shutdown_handlers():
     """
     def handle_signal(signum, frame):
         print(f"\n[Shutdown-Signal-Guard] 종료 시그널({signum}) 수신. 우아한 종료 프로세스를 기동합니다...")
+        _arm_forced_exit_after_grace(25)
 
         # 0. 스크립트 직접 실행(__main__) 경로의 전역 플래그도 함께 갱신
         # 예) python tools/lazy_scanner.py 로 실행 시 stop_requested는 __main__에 존재

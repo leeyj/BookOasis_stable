@@ -9,7 +9,7 @@ from services.webhook_dispatcher import (
     dispatch_standard_book_event,
     _to_unix_timestamp,
 )
-from utils.redis_helper import get_redis_client, make_key, redis_del
+from utils.redis_helper import get_redis_client, make_key, redis_del, redis_acquire_lock, redis_release_lock
 
 class ReadingProgressService:
     @staticmethod
@@ -313,53 +313,139 @@ class ReadingProgressService:
         logger_db = logging.getLogger("bookoasis")
         logger_db.info(f"[Redis Cache Flush] Starting sync for {len(pending_items)} items...")
 
+        import database
         synced_count = 0
-        
+
+        # db_type 별로 아이템 그룹화
+        items_by_db = {}
         for item in pending_items:
-            parts = item.split(':')
+            item_str = item.decode('utf-8') if isinstance(item, bytes) else item
+            parts = item_str.split(':')
             if len(parts) < 3:
                 continue
-            db_type, user_id, book_id = parts[0], parts[1], parts[2]
-            
-            cache_key = make_key(f"user:progress:{db_type}:{user_id}:{book_id}")
-            cached_data_str = redis_client.get(cache_key)
-            if not cached_data_str:
-                redis_client.srem(pending_key, item)
-                continue
-                
+            db_type = parts[0]
+            if db_type not in items_by_db:
+                items_by_db[db_type] = []
+            items_by_db[db_type].append(item_str)
+
+        for db_type, db_items in items_by_db.items():
+            lock_token = None
             try:
-                data = json.loads(cached_data_str)
-                pages_read = data.get('pages_read')
-                is_completed = data.get('is_completed')
-                last_read_at = data.get('last_read_at')
-                last_epub_cfi = data.get('last_epub_cfi')
-                last_epub_href = data.get('last_epub_href')
-                last_epub_spine_index = data.get('last_epub_spine_index')
-                last_epub_percent = data.get('last_epub_percent')
-                last_epub_fingerprint = data.get('last_epub_fingerprint')
-                last_epub_updated_at = data.get('last_epub_updated_at')
-                delta = data.get('delta', 0)
+                # 단일 db_type에 대해 락 획득 시도 (대기 시간 5.0초)
+                lock_token = redis_acquire_lock(f"lock:db_write:{db_type}", ttl=90, wait_timeout=5.0)
+                if not lock_token:
+                    logger_db.info(f"[Redis Cache Flush] DB write gate busy for db_type={db_type}; deferred {len(db_items)} items")
+                    continue
+
+                logger_db.info(f"[Redis Cache Flush] DB write gate acquired for db_type={db_type}; processing {len(db_items)} items...")
                 
-                # 1. user_progress 테이블 반영
-                row = ReadingProgressRepository.get_progress_only(db_type, book_id, user_id)
-                if not row:
-                    ReadingProgressRepository.insert_empty_progress(db_type, book_id, user_id, last_read_at)
-                
-                ReadingProgressRepository.update_progress_full(
-                    db_type, book_id, user_id, pages_read, is_completed, last_read_at,
-                    last_epub_cfi, last_epub_href, last_epub_spine_index,
-                    last_epub_percent, last_epub_fingerprint, last_epub_updated_at
-                )
-                
-                # 2. 일일 활동 로그 반영
-                if delta > 0:
-                    today_str = datetime.now().strftime('%Y-%m-%d')
-                    ReadingProgressRepository.update_or_insert_reading_log(db_type, book_id, user_id, delta, today_str)
+                conn = database.get_connection(db_type)
+                cursor = conn.cursor()
+                try:
+                    for item in db_items:
+                        parts = item.split(':')
+                        user_id, book_id = parts[1], parts[2]
                         
-                redis_client.srem(pending_key, item)
-                synced_count += 1
-            except Exception as e:
-                logger_db.error(f"[Redis Cache Flush ERROR] Failed to sync progress for item {item}: {e}")
+                        cache_key = make_key(f"user:progress:{db_type}:{user_id}:{book_id}")
+                        cached_data_str = redis_client.get(cache_key)
+                        if not cached_data_str:
+                            redis_client.srem(pending_key, item)
+                            continue
+                            
+                        try:
+                            data = json.loads(cached_data_str)
+                            pages_read = data.get('pages_read')
+                            is_completed = data.get('is_completed')
+                            last_read_at = data.get('last_read_at')
+                            last_epub_cfi = data.get('last_epub_cfi')
+                            last_epub_href = data.get('last_epub_href')
+                            last_epub_spine_index = data.get('last_epub_spine_index')
+                            last_epub_percent = data.get('last_epub_percent')
+                            last_epub_fingerprint = data.get('last_epub_fingerprint')
+                            last_epub_updated_at = data.get('last_epub_updated_at')
+                            delta = data.get('delta', 0)
+                            
+                            # 1. user_progress 테이블 반영
+                            cursor.execute(
+                                "SELECT pages_read, is_completed FROM user_progress WHERE book_id = ? AND user_id = ?",
+                                (book_id, user_id),
+                            )
+                            row = cursor.fetchone()
+                            if not row:
+                                cursor.execute(
+                                    """
+                                    INSERT OR IGNORE INTO user_progress (
+                                        book_id, user_id, pages_read, is_completed, last_read_at,
+                                        last_epub_cfi, last_epub_href, last_epub_spine_index,
+                                        last_epub_percent, last_epub_fingerprint, last_epub_updated_at
+                                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                                    """,
+                                    (book_id, user_id, 0, 0, last_read_at, None, None, None, 0, None, None),
+                                )
+                            
+                            cursor.execute(
+                                """
+                                UPDATE user_progress
+                                SET pages_read=?, is_completed=?, last_read_at=?,
+                                    last_epub_cfi=?, last_epub_href=?, last_epub_spine_index=?,
+                                    last_epub_percent=?, last_epub_fingerprint=?, last_epub_updated_at=?
+                                WHERE book_id=? AND user_id=?
+                                """,
+                                (
+                                    pages_read,
+                                    is_completed,
+                                    last_read_at,
+                                    last_epub_cfi,
+                                    last_epub_href,
+                                    last_epub_spine_index,
+                                    last_epub_percent,
+                                    last_epub_fingerprint,
+                                    last_epub_updated_at,
+                                    book_id,
+                                    user_id,
+                                ),
+                            )
+                            
+                            # 2. 일일 활동 로그 반영
+                            if delta > 0:
+                                today_str = datetime.now().strftime('%Y-%m-%d')
+                                cursor.execute(
+                                    "SELECT id FROM user_reading_log WHERE book_id=? AND user_id=? AND read_date=?",
+                                    (book_id, user_id, today_str),
+                                )
+                                log_row = cursor.fetchone()
+                                if log_row:
+                                    cursor.execute(
+                                        "UPDATE user_reading_log SET pages_read_delta=pages_read_delta+? WHERE id=?",
+                                        (delta, log_row['id']),
+                                    )
+                                else:
+                                    cursor.execute(
+                                        "INSERT INTO user_reading_log (book_id, user_id, pages_read_delta, duration_seconds, read_date) VALUES (?,?,?,60,?)",
+                                        (book_id, user_id, delta, today_str),
+                                    )
+                                    
+                            redis_client.srem(pending_key, item)
+                            synced_count += 1
+                        except Exception as e:
+                            logger_db.error(f"[Redis Cache Flush ERROR] Failed to sync progress for item {item}: {e}")
+                    
+                    conn.commit()
+                except Exception as db_err:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+                    logger_db.error(f"[Redis Cache Flush ERROR] Database transaction failed for db_type={db_type}: {db_err}")
+                finally:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+            finally:
+                if lock_token:
+                    redis_release_lock(f"lock:db_write:{db_type}", lock_token)
+                    logger_db.info(f"[Redis Cache Flush] DB write gate released for db_type={db_type}")
 
         logger_db.info(f"[Redis Cache Flush] Finished sync. {synced_count} items merged to SQLite.")
         return synced_count

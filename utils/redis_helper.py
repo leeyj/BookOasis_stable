@@ -2,6 +2,8 @@
 import os
 import redis
 import logging
+import time
+import uuid
 
 logger = logging.getLogger("bookoasis")
 
@@ -125,4 +127,48 @@ def redis_brpop(key: str, timeout: int = 5) -> str:
     except Exception as e:
         logger.warning(f"[Redis] redis_brpop failed for key '{key}': {e}")
         return None
+
+def redis_acquire_lock(key: str, ttl: int = 60, wait_timeout: float = 0.0, sleep_interval: float = 0.1):
+    """Redis 기반 분산 락을 획득합니다. 성공 시 token, 실패 시 None을 반환합니다."""
+    client = get_redis_client()
+    if not client:
+        # Redis가 설정되어 있지 않거나 연결할 수 없는 경우,
+        # SQLite 직접 쓰기 모드로 진행할 수 있도록 가상의 토큰을 반환합니다.
+        return "mock_sqlite_direct_token"
+
+    lock_key = make_key(key)
+    token = uuid.uuid4().hex
+    ttl = max(1, int(ttl))
+    deadline = time.monotonic() + max(0.0, float(wait_timeout))
+
+    while True:
+        try:
+            if client.set(lock_key, token, nx=True, ex=ttl):
+                return token
+        except Exception as e:
+            logger.warning(f"[Redis] redis_acquire_lock failed for key '{key}': {e}")
+            return None
+
+        if wait_timeout <= 0.0 or time.monotonic() >= deadline:
+            return None
+
+        time.sleep(max(0.01, float(sleep_interval)))
+
+def redis_release_lock(key: str, token: str) -> bool:
+    """Redis 기반 분산 락을 안전하게 해제합니다."""
+    client = get_redis_client()
+    if not client or not token:
+        return False
+
+    lock_key = make_key(key)
+    release_script = (
+        "if redis.call('get', KEYS[1]) == ARGV[1] then "
+        "return redis.call('del', KEYS[1]) "
+        "else return 0 end"
+    )
+    try:
+        return bool(client.eval(release_script, 1, lock_key, token))
+    except Exception as e:
+        logger.warning(f"[Redis] redis_release_lock failed for key '{key}': {e}")
+        return False
 

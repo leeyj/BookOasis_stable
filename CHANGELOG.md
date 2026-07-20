@@ -1,4 +1,8 @@
 # CHANGELOG
+## v1.2.7
+- 스캔시 변동없는 폴더(도서)는 DB 스캔 진행률(scanner_progress) 테이블 업데이트 로직 제외 | Exclude DB scan progress(scanner_progress) table update logic for folders (books) with no changes during scanning
+- 스캔시 Redis 참조 못하는 버그 수정 | Fix bug where Redis could not be referenced during scanning
+- 스캔시 과도한 DB 엑세스 부하 90% 이상 감소 | Reduced excessive DB access load by over 90% during scanning
 ## v1.2.6
 - EPUB/PDF/TXT/ZIP 종료 후 최근 읽은 도서 및 이어읽기 위치 반영 개선 | Improved recent-history and resume-position updates after closing EPUB/PDF/TXT/ZIP viewers
 - TXT 0% 구간 재오픈 시 이전 위치로 되감기던 문제 수정 | Fixed TXT reopening regression that could restore an older position while progress still showed 0%

@@ -209,9 +209,10 @@ def run_scanner_worker_loop():
             now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             success = ScannerQueueRepository.try_acquire_task(task_id, now_str)
             if not success:
+                sq.log(f"Task acquire skipped: key={task_key}, id={task_id}, reason=already acquired by another worker")
                 continue
                 
-            sq.log(f"Processing task: {task_key}")
+            sq.log(f"Task started: key={task_key}, type={task_type}, id={task_id}")
             
             # 3. 작업 유형별 실행 분기
             error_message = None
@@ -231,7 +232,23 @@ def run_scanner_worker_loop():
 
             # 4. 작업 결과 반영
             finished_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            ScannerQueueRepository.update_task_result(task_id, finished_str, error_message)
+            sq.log(f"Task finishing: key={task_key}, type={task_type}, id={task_id}, status={'failed' if error_message else 'completed'}")
+            sq.log(f"Task result update begin: key={task_key}, type={task_type}, id={task_id}")
+            from utils.redis_helper import redis_acquire_lock, redis_release_lock
+            queue_gate_token = None
+            try:
+                queue_gate_token = redis_acquire_lock("lock:db_write:general", ttl=60, wait_timeout=5.0)
+                if not queue_gate_token:
+                    sq.log(f"Task result update gate busy: key={task_key}, type={task_type}, id={task_id}")
+                    queue_gate_token = None
+                ScannerQueueRepository.update_task_result(task_id, finished_str, error_message)
+            finally:
+                if queue_gate_token:
+                    try:
+                        redis_release_lock("lock:db_write:general", queue_gate_token)
+                    except Exception:
+                        pass
+            sq.log(f"Task result update done: key={task_key}, type={task_type}, id={task_id}")
 
             if not error_message:
                 # 스캔 완료 시 신규 추가 도서 대시보드 캐시 무효화
@@ -242,7 +259,7 @@ def run_scanner_worker_loop():
                 except Exception as cache_err:
                     sq.log(f"Failed to invalidate recently_added cache: {cache_err}")
 
-            sq.log(f"Finished task: {task_key}.")
+            sq.log(f"Task finished: key={task_key}, type={task_type}, id={task_id}, status={'failed' if error_message else 'completed'}")
             
         except Exception as loop_err:
             sq.log(f"Error in worker loop: {loop_err}")

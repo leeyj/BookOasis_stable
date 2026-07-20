@@ -13,6 +13,14 @@ if BASE_DIR not in sys.path:
 from services.scanner_queue import run_scanner_worker_loop
 
 if __name__ == '__main__':
+    # ─── .env 환경 변수 로드 ───
+    try:
+        from dotenv import load_dotenv
+        env_path = os.path.join(BASE_DIR, '.env')
+        load_dotenv(env_path)
+    except Exception as env_err:
+        print(f"[Scanner-Worker] .env 로드 실패: {env_err}")
+
     # ─── 종료 시그널 핸들러 등록 ───
     try:
         from utils.signal_helper import register_shutdown_handlers

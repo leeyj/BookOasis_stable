@@ -94,6 +94,24 @@ def read_file_with_timeout(file_path, is_remote, timeout=10):
     return res
 
 
+def _normalize_dash_prefixed_mapping_lines(content):
+    """Convert dash-prefixed mapping lines into plain mapping lines for loose YAML fallbacks."""
+    normalized_lines = []
+    changed = False
+
+    for line in content.splitlines():
+        match = re.match(r'^(\s*)-\s*([^:]+?)\s*:\s*(.*)$', line)
+        if match:
+            indent, key, value = match.groups()
+            normalized_lines.append(f"{indent}{key.strip()}: {value}")
+            changed = True
+            continue
+
+        normalized_lines.append(line)
+
+    return ('\n'.join(normalized_lines), changed)
+
+
 def parse(target_path, files=None, is_remote=False):
     return parse_kavita_yaml(target_path, files=files, is_remote=is_remote)
 
@@ -138,6 +156,7 @@ def parse_kavita_yaml(folder_path, files=None, is_remote=False):
         return meta
 
     meta['has_yaml'] = True
+    parse_started_at = time.monotonic()
 
     try:
         from yaml import CSafeLoader as SafeLoader
@@ -148,15 +167,18 @@ def parse_kavita_yaml(folder_path, files=None, is_remote=False):
     if content is None:
         return meta
 
-    # 1차 보정: 비정상적인 "- Key: Value" 문법을 "Key: Value"로 보정 (공백 유무 자비 허용)
-    import re
-    content = re.sub(r'^\s*-\s*([a-zA-Z0-9_\s]+)\s*:', r'\1:', content, flags=re.MULTILINE)
+    # 1차 보정: 비정상적인 "- Key: Value" 문법을 "Key: Value"로 보정
+    # ASCII 한정 대신 key 부분을 넓게 허용하여 한국어/기호가 섞인 메타데이터도 흡수한다.
+    content, normalized_dash_lines = _normalize_dash_prefixed_mapping_lines(content)
 
     data = {}
     try:
         data = yaml.load(content, Loader=SafeLoader) or {}
     except Exception as e:
-        print(f"[Scanner] YAML parsing error ({folder_path}): {e}. Running Regex Fallback Parser...")
+        if normalized_dash_lines:
+            print(f"[Scanner] YAML parsing error ({folder_path}): {e}. Dash-prefixed mapping lines were normalized; running Regex Fallback Parser...")
+        else:
+            print(f"[Scanner] YAML parsing error ({folder_path}): {e}. Running Regex Fallback Parser...")
         meta['parser_warnings'].append({
             'file_path': actual_yaml_path,
             'filename': os.path.basename(actual_yaml_path),
@@ -165,14 +187,17 @@ def parse_kavita_yaml(folder_path, files=None, is_remote=False):
         })
         # 2차 보정: Regex Fallback Parser 기동
         try:
+            fallback_started_at = time.monotonic()
             for line in content.splitlines():
-                match = re.match(r'^\s*-?\s*([a-zA-Z0-9_\s]{2,40})\s*:\s*(.*)$', line)
+                match = re.match(r'^\s*-?\s*([^:]{2,80}?)\s*:\s*(.*)$', line)
                 if match:
                     key = match.group(1).strip()
                     val = match.group(2).strip()
                     if (val.startswith("'") and val.endswith("'")) or (val.startswith('"') and val.endswith('"')):
                         val = val[1:-1]
                     data[key] = val
+            fallback_elapsed_ms = (time.monotonic() - fallback_started_at) * 1000.0
+            print(f"[Scanner] YAML Regex Fallback completed ({folder_path}) in {fallback_elapsed_ms:.1f}ms")
         except Exception as fallback_err:
             print(f"[Scanner] YAML Regex Fallback also failed ({folder_path}): {fallback_err}")
 
@@ -253,4 +278,6 @@ def parse_kavita_yaml(folder_path, files=None, is_remote=False):
         })
 
     meta['summary'] = clean_html_tags(meta['summary'])
+    parse_elapsed_ms = (time.monotonic() - parse_started_at) * 1000.0
+    print(f"[Scanner] YAML metadata parse finished ({folder_path}) in {parse_elapsed_ms:.1f}ms")
     return meta
