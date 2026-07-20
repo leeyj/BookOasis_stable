@@ -9,7 +9,7 @@ from services.webhook_dispatcher import (
     dispatch_standard_book_event,
     _to_unix_timestamp,
 )
-from utils.redis_helper import get_redis_client, make_key
+from utils.redis_helper import get_redis_client, make_key, redis_del
 
 class ReadingProgressService:
     @staticmethod
@@ -277,6 +277,26 @@ class ReadingProgressService:
                 'updatedAt': last_epub_updated_at,
             },
         }
+
+    @staticmethod
+    def mark_unread(db_type: str, book_id, user_id=1):
+        ReadingProgressRepository.delete_user_progress_by_book(db_type, book_id, user_id)
+
+        redis_del(f"cache:history:{db_type}:{user_id}")
+
+        redis_client = get_redis_client()
+        if not redis_client:
+            return
+
+        progress_key = make_key(f"user:progress:{db_type}:{user_id}:{book_id}")
+        pending_key = make_key("sync:progress:pending")
+        pending_member = f"{db_type}:{user_id}:{book_id}"
+
+        try:
+            redis_client.delete(progress_key)
+            redis_client.srem(pending_key, pending_member)
+        except Exception as e:
+            logger.warning(f"[Redis] mark_unread cache invalidation failed for {pending_member}: {e}")
 
     @staticmethod
     def flush_progress_cache():

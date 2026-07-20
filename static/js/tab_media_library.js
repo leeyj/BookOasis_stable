@@ -26,7 +26,7 @@ import { switchSettingsTab, loadInitialSystemSettings, loadGeneralSettings, subm
 
 // 장르 및 태그 플로팅 필터 모달 임포트
 import { initFloatingFilter, toggleFilterModal } from './genre_tag_filter.js';
-import { initSidebarAutoClose, restoreDesktopSidebarState } from './sidebar_manager.js';
+import { initSidebarInteractions, restoreDesktopSidebarState } from './sidebar_manager.js';
 import './viewer/viewer_padding.js';
 
 function canAccessAdultLibrary() {
@@ -186,7 +186,7 @@ async function initTabMediaLibrary() {
 
   // 사이드바 상태 복원 및 리스너 등록
   restoreDesktopSidebarState();
-  initSidebarAutoClose();
+  initSidebarInteractions();
 
   state.currentLibraryId = 'home';
   loadLibraries();
@@ -371,6 +371,11 @@ export function selectCategory(id, skipHistory = false) {
       loadBooksList(false);
     }
   }
+
+  // 카테고리 전환 완료 이벤트 발행 (사이드바/기타 UI 모듈과 느슨한 결합 유지)
+  window.dispatchEvent(new CustomEvent('library:category-selected', {
+    detail: { id, skipHistory }
+  }));
 }
 
 // 글로벌 함수 노출 (HTML 인라인 핸들러용)

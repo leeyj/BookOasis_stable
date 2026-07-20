@@ -1,7 +1,7 @@
 <!-- CSS 및 외부 라이브러리 로드 -->
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=1.2.0">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/tab_media_library_viewer.css') }}?v=1.2.3">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}?v=1.0.2" media="screen and (max-width: 1200px)">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}?v=1.0.3" media="screen and (max-width: 1200px)">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 <script>
@@ -15,7 +15,7 @@
         style="display: flex; flex-direction: column; justify-content: space-between; min-height: auto;">
         <div class="sidebar-header-wrapper" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
             <h3 class="sidebar-title" style="margin: 0;"><i class="fa-solid fa-folder-open" style="color: #a855f7; margin-right: 0.5rem;"></i> <span data-i18n="sidebar.library">라이브러리</span></h3>
-            <button id="btn-sidebar-toggle" class="btn-sidebar-toggle" onclick="toggleSidebarMenu()" style="display: none; background: transparent; border: none; color: #f8fafc; font-size: 1.25rem; cursor: pointer; padding: 0.2rem 0.5rem; outline: none;">
+            <button id="btn-sidebar-toggle" class="btn-sidebar-toggle" aria-expanded="false" style="display: none; background: transparent; border: none; color: #f8fafc; font-size: 1.25rem; cursor: pointer; padding: 0.2rem 0.5rem; outline: none;">
                 <i class="fa-solid fa-bars"></i>
             </button>
         </div>
@@ -201,4 +201,4 @@
         </div>
     </div>
 
-    <script type="module" src="{{ url_for('static', filename='js/tab_media_library.js') }}?v=1.3.5"></script>
+    <script type="module" src="{{ url_for('static', filename='js/tab_media_library.js') }}?v=1.4.1"></script>

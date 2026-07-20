@@ -8,6 +8,7 @@ import mimetypes
 import urllib.parse
 from pathlib import Path
 from flask import Blueprint, request, Response, jsonify, send_file, session
+from services.reading_progress_service import ReadingProgressService
 from services.stream_service import StreamService
 from api.auth import login_required, check_adult_permission, admin_required
 from utils.safe_file_response import stream_file_safely
@@ -426,15 +427,7 @@ def mark_book_as_unread():
         if book_id is None:
             return jsonify({'success': False, 'error': 'book_id가 누락되었습니다.'}), 400
 
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        
-        # user_progress 및 user_reading_log 내역 삭제
-        cursor.execute("DELETE FROM user_progress WHERE book_id = ? AND user_id = ?", (book_id, user_id))
-        cursor.execute("DELETE FROM user_reading_log WHERE book_id = ? AND user_id = ?", (book_id, user_id))
-        
-        conn.commit()
-        conn.close()
+        ReadingProgressService.mark_unread(db_type, book_id, user_id=user_id)
         return jsonify({'success': True})
     except Exception as e:
         print(f"[Unread API Error] {e}")

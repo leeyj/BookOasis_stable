@@ -96,6 +96,14 @@ export async function loadLibraries() {
       state.currentLibraryHideCovers = !!(activeItem && activeItem.dataset && activeItem.dataset.type === 'custom' && activeItem.dataset.hideCover === '1');
       bindSidebarContextMenu();
       bindDragAndDropEvents(!isPinned);
+
+      // 사이드바 목록이 동적으로 다시 그려졌음을 알림
+      window.dispatchEvent(new CustomEvent('library:categories-rendered', {
+        detail: {
+          libraryType: state.currentLibraryType,
+          currentLibraryId: state.currentLibraryId
+        }
+      }));
     }
   } catch (e) {
     console.error('라이브러리 목록 로드 실패:', e);

@@ -1,5 +1,8 @@
 # CHANGELOG
-## v1.2.4
+## v1.2.5
+- 모바일 뷰에서 카테고리 선택시 ui 겹침현상 수정 | **English translation** |
+- 읽지않음으로 변경 기능 버그 수정 | **English translation** |
+## v1.2.4 
 - FTS 가상 테이블 제거(opds 검색기능 차단) | Removed FTS virtual table (disabling OPDS search functionality)
 - 시작/재시작시 오류 수정 | Fixed errors occurring at startup/restart
 - DB 무결성 검증 로직 강화 | Strengthened DB integrity verification logic

@@ -4,16 +4,16 @@
 
 /* 1. 기본 전체 레이아웃 조정 (Flex 방향 변경) */
 .main-wrapper {
-    height: calc(100vh - 20px - env(safe-area-inset-bottom, 0px)) !important;
-    height: calc(100dvh - 20px - env(safe-area-inset-bottom, 0px)) !important;
-    min-height: calc(100vh - 20px - env(safe-area-inset-bottom, 0px)) !important;
-    min-height: calc(100dvh - 20px - env(safe-area-inset-bottom, 0px)) !important;
+    height: calc(100vh - 20px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
+    height: calc(100dvh - 20px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
+    min-height: calc(100vh - 20px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
+    min-height: calc(100dvh - 20px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
 }
 
 .media-library-container {
     flex-direction: column;
     gap: 0.9rem;
-    padding: 0.75rem;
+    padding: calc(1rem + env(safe-area-inset-top, 0px)) 0.75rem 0.75rem 0.75rem;
 }
 
 /* 2. 좌측 사이드바 -> 상단 네비게이션 형태로 전환 및 햄버거 토글 */
@@ -22,6 +22,7 @@
     display: flex !important;
     flex-direction: column !important;
     justify-content: flex-start !important;
+    flex: 0 0 auto !important;
     width: 100% !important;
     min-width: 100% !important;
     min-height: 0 !important;
@@ -29,11 +30,11 @@
     position: relative !important;
     top: 0 !important;
     border-right: none;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    padding: 0.55rem 0.75rem !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+    padding: 0.8rem 0.75rem !important;
     gap: 0.35rem;
-    overflow-y: visible;
-    background: rgba(30, 41, 59, 0.15);
+    overflow: hidden;
+    background: rgba(15, 23, 42, 0.9);
     border-radius: 8px;
     box-sizing: border-box;
 }
@@ -42,12 +43,12 @@
 .library-sidebar.collapsed {
     width: 100% !important;
     min-width: 100% !important;
-    padding: 0.55rem 0.75rem !important;
+    padding: 0.8rem 0.75rem !important;
     opacity: 1 !important;
     pointer-events: auto !important;
     overflow: visible !important;
     border-right: none;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.18);
 }
 
 .sidebar-header-wrapper {
@@ -71,27 +72,35 @@
 
 /* 기본 접힌 상태 */
 .sidebar-collapsible-content {
-    display: none !important; /* HTML 인라인 display: flex 오버라이드 */
-    height: 0 !important;
+    display: none !important;
+    height: auto !important;
     min-height: 0 !important;
     flex: 0 0 auto !important;
+    overflow: hidden !important;
     margin: 0 !important;
     padding: 0 !important;
     width: 100%;
-    transition: all 0.3s ease;
+    justify-content: flex-start !important; /* 인라인 justify-content:space-between 무력화 */
 }
 
 /* 펼침 상태 */
 .sidebar-collapsible-content.show {
-    display: flex !important; /* HTML 인라인 display: none 오버라이드 */
+    display: flex !important;
+    flex-direction: column !important;
     height: auto !important;
     min-height: 0 !important;
-    flex: 1 1 auto !important;
-    max-height: 75vh !important;
+    flex: 0 0 auto !important;
+    max-height: min(72dvh, 560px) !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
-    margin: initial !important;
-    padding: initial !important;
+    margin: 0 !important;
+    padding: 0.45rem 0 0 0 !important;
+    justify-content: flex-start !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.sidebar-collapsible-content.show > div:first-child {
+    margin-top: 0.35rem !important;
 }
 
 /* 모바일 사이드바 메뉴 얇은 스크롤바 디자인 */
@@ -116,17 +125,30 @@
     padding: 0.6rem 0.8rem;
     font-size: 0.9rem;
     justify-content: flex-start;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.sidebar-menu .menu-item:hover {
+    border-color: rgba(255, 255, 255, 0.24);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.sidebar-menu .menu-item.active {
+    border-color: rgba(216, 180, 254, 0.82);
 }
 
 /* 프로필 및 로그아웃 영역 재배치 */
 .sidebar-settings-wrap {
     margin-top: 1rem !important; /* HTML 인라인 margin-top 오버라이드 */
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    border-top: 1px solid rgba(255, 255, 255, 0.16);
     padding-top: 1rem;
 }
 
 /* 3. 우측 메인 콘텐츠 영역 조정 */
 .library-main-content {
+    flex: 1 1 auto;
+    min-height: 0;
     width: 100%;
     padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
 }

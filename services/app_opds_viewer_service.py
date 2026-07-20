@@ -91,8 +91,8 @@ def save_progress(db_type: str, book_id, page_idx, total_pages, epub_session=Non
 
 
 def mark_unread(db_type: str, book_id, user_id: int = 1):
-    from repositories.reading_progress_repository import ReadingProgressRepository
-    ReadingProgressRepository.delete_user_progress_by_book(db_type, book_id, user_id)
+    from services.reading_progress_service import ReadingProgressService
+    ReadingProgressService.mark_unread(db_type, book_id, user_id=user_id)
 
 
 def preload_next_book(db_type: str, book_id, user_id: int = 1):

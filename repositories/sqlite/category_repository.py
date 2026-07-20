@@ -88,6 +88,7 @@ class CategoryRepository:
                 cursor.execute("DELETE FROM book_offsets WHERE book_id = ?", (bid,))
                 cursor.execute("DELETE FROM user_progress WHERE book_id = ?", (bid,))
                 cursor.execute("DELETE FROM user_reading_log WHERE book_id = ?", (bid,))
+                cursor.execute("DELETE FROM user_favorites WHERE book_id = ?", (bid,))
             
             cursor.execute("DELETE FROM books WHERE library_id = ?", (library_id,))
             # 3. 라이브러리 레코드 소거
@@ -227,6 +228,7 @@ class CategoryRepository:
                 cursor_src.execute("DELETE FROM book_offsets WHERE book_id = ?", (old_book_id,))
                 cursor_src.execute("DELETE FROM user_progress WHERE book_id = ?", (old_book_id,))
                 cursor_src.execute("DELETE FROM user_reading_log WHERE book_id = ?", (old_book_id,))
+                cursor_src.execute("DELETE FROM user_favorites WHERE book_id = ?", (old_book_id,))
                 
             cursor_src.execute("DELETE FROM books WHERE library_id = ?", (library_id,))
             cursor_src.execute("DELETE FROM user_category_permissions WHERE library_id = ?", (library_id,))
