@@ -1,28 +1,33 @@
 # -*- coding: utf-8 -*-
 import os
-import database
+from repositories.book_repository import BookRepository
 from utils.sort_helper import natural_sort_key
 from utils.cover_helper import get_cover_image_with_t, resolve_series_cover
 
 class BookDetailService:
     @staticmethod
     def get_media_detail(db_type, series_name, library_id='all', user_id=1, role=None, restrict_same_directory=True, representative_book_id=None):
-        conn = database.get_connection(db_type)
-        conn.row_factory = database.sqlite3.Row
-        cursor = conn.cursor()
-
         enforce_permission = (role != 'admin' and bool(user_id))
 
-        def _permission_exists_sql(book_alias):
-            if not enforce_permission:
-                return '', []
-            sql = (
-                f" AND EXISTS ("
-                f"SELECT 1 FROM user_category_permissions p "
-                f"WHERE p.library_id = {book_alias}.library_id AND p.user_id = ? AND p.has_access = 1"
-                f")"
+        # 권한 제어 절 정보 결정
+        if enforce_permission:
+            perm_clause = (
+                " AND EXISTS ("
+                "SELECT 1 FROM user_category_permissions p "
+                "WHERE p.library_id = books.library_id AND p.user_id = ? AND p.has_access = 1"
+                ")"
             )
-            return sql, [user_id]
+            perm_clause_b = (
+                " AND EXISTS ("
+                "SELECT 1 FROM user_category_permissions p "
+                "WHERE p.library_id = b.library_id AND p.user_id = ? AND p.has_access = 1"
+                ")"
+            )
+            perm_params = [user_id]
+        else:
+            perm_clause = ''
+            perm_clause_b = ''
+            perm_params = []
 
         def _comparison_dir(path, file_format):
             normalized = (path or '').replace('\\', '/')
@@ -37,14 +42,7 @@ class BookDetailService:
         if representative_book_id:
             try:
                 rep_id_int = int(representative_book_id)
-                perm_sql, perm_params = _permission_exists_sql('books')
-                cursor.execute(
-                    "SELECT id, series_name, library_id, file_path, file_format FROM books "
-                    "WHERE id = ? AND COALESCE(is_deleted, 0) = 0"
-                    + perm_sql,
-                    (rep_id_int, *perm_params)
-                )
-                rep_row = cursor.fetchone()
+                rep_row = BookRepository.get_representative_book_info(db_type, rep_id_int, perm_clause, perm_params)
                 if rep_row:
                     series_name = rep_row['series_name'] or series_name
                     library_id = rep_row['library_id'] if rep_row['library_id'] is not None else library_id
@@ -52,97 +50,21 @@ class BookDetailService:
             except (ValueError, TypeError):
                 pass
 
-        # 만약 library_id가 시스템 성격(all, history, favorite, home)이거나 없을 때
-        # series_name이 중복 등록된 경우를 대비하여 해당 시리즈의 실제 library_id를 역추출합니다.
         if not library_id or library_id in ('all', 'history', 'favorite', 'home'):
-            perm_sql, perm_params = _permission_exists_sql('books')
-            cursor.execute(
-                "SELECT library_id FROM books WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0"
-                + perm_sql +
-                " LIMIT 1",
-                (series_name, *perm_params)
-            )
-            resolved_row = cursor.fetchone()
-            if resolved_row and resolved_row['library_id']:
-                library_id = resolved_row['library_id']
+            resolved_lib_id = BookRepository.resolve_series_library_id(db_type, series_name, perm_clause, perm_params)
+            if resolved_lib_id:
+                library_id = resolved_lib_id
 
         use_lib_filter = library_id and library_id not in ('all', 'history', 'favorite', 'home')
 
         # 1. 시리즈 메타 정보 조회
-        if use_lib_filter:
-            perm_sql, perm_params = _permission_exists_sql('books')
-            cursor.execute("""
-                SELECT author, isbn, publisher, link, score, summary, genre, tags
-                FROM books
-                WHERE series_name = ? AND library_id = ? AND COALESCE(is_deleted, 0) = 0
-            """ + perm_sql + """ AND (summary IS NOT NULL AND summary != '')
-                LIMIT 1
-            """, (series_name, library_id, *perm_params))
-            meta_row = cursor.fetchone()
-            if not meta_row:
-                cursor.execute("""
-                    SELECT author, isbn, publisher, link, score, summary, genre, tags
-                    FROM books WHERE series_name = ? AND library_id = ? AND COALESCE(is_deleted, 0) = 0
-                """ + perm_sql + """ LIMIT 1
-                """, (series_name, library_id, *perm_params))
-                meta_row = cursor.fetchone()
-        else:
-            perm_sql, perm_params = _permission_exists_sql('books')
-            cursor.execute("""
-                SELECT author, isbn, publisher, link, score, summary, genre, tags
-                FROM books
-                WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0
-            """ + perm_sql + """ AND (summary IS NOT NULL AND summary != '')
-                LIMIT 1
-            """, (series_name, *perm_params))
-            meta_row = cursor.fetchone()
-            if not meta_row:
-                cursor.execute("""
-                    SELECT author, isbn, publisher, link, score, summary, genre, tags
-                    FROM books WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0
-                """ + perm_sql + """ LIMIT 1
-                """, (series_name, *perm_params))
-                meta_row = cursor.fetchone()
+        meta_row = BookRepository.get_series_meta(db_type, series_name, library_id, perm_clause, perm_params)
 
         # 2. 책 목록 조회
-        if use_lib_filter:
-            perm_sql, perm_params = _permission_exists_sql('b')
-            cursor.execute("""
-                SELECT b.id, b.title, b.file_format, b.total_pages, b.has_offsets, b.cover_image, b.cover_updated_at,
-                       b.file_path, p.pages_read, p.is_completed,
-                       CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
-                       b.library_id, p.last_read_at
-                FROM books b
-                LEFT JOIN user_progress p ON b.id = p.book_id AND p.user_id = ?
-                LEFT JOIN user_favorites uf ON b.id = uf.book_id AND uf.user_id = ?
-                WHERE COALESCE(b.is_deleted, 0) = 0 AND b.series_name = ? AND b.library_id = ?
-            """ + perm_sql,
-            (user_id, user_id, series_name, library_id, *perm_params))
-        else:
-            perm_sql, perm_params = _permission_exists_sql('b')
-            cursor.execute("""
-                SELECT b.id, b.title, b.file_format, b.total_pages, b.has_offsets, b.cover_image, b.cover_updated_at,
-                       b.file_path, p.pages_read, p.is_completed,
-                       CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
-                       b.library_id, p.last_read_at
-                FROM books b
-                LEFT JOIN user_progress p ON b.id = p.book_id AND p.user_id = ?
-                LEFT JOIN user_favorites uf ON b.id = uf.book_id AND uf.user_id = ?
-                WHERE COALESCE(b.is_deleted, 0) = 0 AND b.series_name = ?
-            """ + perm_sql,
-            (user_id, user_id, series_name, *perm_params))
-        books_rows = cursor.fetchall()
+        books_rows = BookRepository.get_books_by_series_detail(db_type, series_name, library_id, user_id, perm_clause_b, perm_params)
 
         # 실제 covers 폴더 내 시리즈 이미지 갱신 타임스탬프 쿼리
-        perm_sql, perm_params = _permission_exists_sql('books')
-        cursor.execute(
-            "SELECT MAX(cover_updated_at) AS latest_updated FROM books WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0"
-            + perm_sql,
-            (series_name, *perm_params)
-        )
-        time_row = cursor.fetchone()
-        latest_updated = time_row['latest_updated'] if time_row else None
-        conn.close()
+        latest_updated = BookRepository.get_series_latest_updated(db_type, series_name, perm_clause, perm_params)
 
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         covers_dir = os.path.join(base_dir, 'covers')
@@ -163,7 +85,7 @@ class BookDetailService:
             lib_id=lib_id,
             db_cover=books_rows[0]['cover_image'] if books_rows else None,
             covers_dir=covers_dir,
-            conn=conn,
+            conn=None,
             candidates_rows=books_rows
         )
 
@@ -187,17 +109,12 @@ class BookDetailService:
             clean_title = b['title']
             file_format = (b['file_format'] or '').lower()
             if file_format == 'imgdir' and b['file_path']:
-                # IMGDIR books use a virtual filename (__folder__.imgdir), so display folder name instead.
                 clean_title = os.path.basename(os.path.dirname(b['file_path'])) or clean_title
             elif b['file_path']:
                 filename_with_ext = os.path.basename(b['file_path'])
                 clean_title, _ = os.path.splitext(filename_with_ext)
                 
             total_pages = b['total_pages'] or 0
-            if total_pages == 0 and file_format in ('zip', 'cbz') and b['file_path'] and os.path.exists(b['file_path']):
-                # Removed synchronous fallback calculation of total_pages to prevent API timeouts,
-                # especially for remote files (e.g. Google Drive) where fetching the zip structure blocks the request.
-                pass
 
             books_list.append({
                 'id'          : b['id'],
@@ -213,7 +130,7 @@ class BookDetailService:
                 'last_read_at': b['last_read_at'] or '',
             })
         
-        # 부모 디렉토리 기반 단행본 격리 필터 (필요 시 비활성화 가능)
+        # 부모 디렉토리 기반 단행본 격리 필터
         if restrict_same_directory and books_list:
             target_dir = anchor_dir
             if not target_dir:
@@ -230,59 +147,32 @@ class BookDetailService:
     @staticmethod
     def update_media_detail(db_type, series_name, author, isbn, publisher, summary, link, genre='', tags='', cover_file=None):
         import hashlib
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
+        
+        # 1. 해당 시리즈에 속한 도서의 library_id와 대표 book 레코드 1개 조회
+        from repositories.book_repository import BookRepository
+        library_id = BookRepository.resolve_series_library_id(db_type, series_name, '', [])
+        if library_id is None:
+            return False, '해당 시리즈에 속한 도서를 찾을 수 없습니다.'
         
         try:
-            # 1. 해당 시리즈에 속한 도서의 library_id와 대표 book 레코드 1개 조회
-            cursor.execute("SELECT library_id FROM books WHERE series_name = ? LIMIT 1", (series_name,))
-            row = cursor.fetchone()
-            if not row:
-                conn.close()
-                return False, '해당 시리즈에 속한 도서를 찾을 수 없습니다.'
-            
-            library_id = row['library_id']
-            
             # 2. 커버 이미지 파일 업로드 처리
             if cover_file:
-                # covers 디렉터리 경로 계산
                 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                 covers_dir = os.path.join(base_dir, 'covers')
                 
-                # library_id별 서브폴더 보장
-                target_covers_dir = os.path.join(covers_dir, str(library_id)) if library_id is not None else covers_dir
+                target_covers_dir = os.path.join(covers_dir, str(library_id))
                 os.makedirs(target_covers_dir, exist_ok=True)
                 
-                # 시리즈명 해시를 따서 series_{series_hash}.jpg 규격으로 생성
                 series_hash = hashlib.md5(series_name.encode('utf-8')).hexdigest()
                 cover_filename = f"series_{series_hash}.jpg"
                 dest_path = os.path.join(target_covers_dir, cover_filename)
                 
-                # 업로드된 파일 저장 (물리적 덮어쓰기 강제 진행)
                 cover_file.save(dest_path)
                 print(f"[BookDetailService] 시리즈 대표 표지 수동 업로드 완료: {dest_path}")
             
-            # 3. 시리즈에 속하는 모든 도서 레코드 메타데이터 일괄 업데이트
-            # (수정 시 cover_updated_at을 CURRENT_TIMESTAMP로 갱신하여 브라우저 캐시 버스팅 보장)
-            cursor.execute("""
-                UPDATE books
-                SET author = ?,
-                    isbn = ?,
-                    publisher = ?,
-                    summary = ?,
-                    link = ?,
-                    genre = ?,
-                    tags = ?,
-                    metadata_locked = 1,
-                    cover_updated_at = CURRENT_TIMESTAMP
-                WHERE series_name = ?
-            """, (author, isbn, publisher, summary, link, genre, tags, series_name))
-            
-            conn.commit()
-            conn.close()
+            # 3. 시리즈 메타 정보 일괄 업데이트
+            BookRepository.update_media_detail(db_type, series_name, author, isbn, publisher, summary, link, genre, tags)
             return True, f'"{series_name}" 메타정보가 성공적으로 수정되었습니다.'
         except Exception as e:
-            if conn:
-                conn.close()
             print(f"[BookDetailService] 메타정보 수정 에러: {e}")
             return False, f'DB 업데이트 오류: {str(e)}'

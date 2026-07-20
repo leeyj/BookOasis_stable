@@ -21,7 +21,7 @@ def get_cover_image_with_t(cover_image, updated_at):
         ts = 0
     return f"{cover_image}?t={ts}"
 
-def resolve_series_cover(series_name, lib_id, db_cover, covers_dir, conn, candidates_rows=None, allow_series_cover=True):
+def resolve_series_cover(series_name, lib_id, db_cover, covers_dir, conn=None, candidates_rows=None, allow_series_cover=True, db_type='general'):
     """시리즈 대표 커버의 물리적 실존을 카테고리별 분할 구조에 맞추어 검사하고,
     유실된 경우 실존하는 다른 도서 커버로 대체(Fallback)
     """
@@ -54,26 +54,15 @@ def resolve_series_cover(series_name, lib_id, db_cover, covers_dir, conn, candid
                 if os.path.exists(cand_path) and os.path.getsize(cand_path) > 0:
                     return cand_cover
     else:
-        fallback_cursor = conn.cursor()
-        if lib_id is not None:
-            fallback_cursor.execute("""
-            SELECT cover_image 
-            FROM books 
-            WHERE series_name = ? AND library_id = ? AND COALESCE(is_deleted, 0) = 0 AND cover_image IS NOT NULL AND cover_image != ''
-            ORDER BY title ASC
-            """, (series_name, lib_id))
-        else:
-            fallback_cursor.execute("""
-            SELECT cover_image 
-            FROM books 
-            WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0 AND cover_image IS NOT NULL AND cover_image != ''
-            ORDER BY title ASC
-            """, (series_name,))
-        candidates = fallback_cursor.fetchall()
-        for cand in candidates:
-            cand_cover = cand['cover_image']
-            cand_path = os.path.join(covers_dir, cand_cover)
-            if os.path.exists(cand_path) and os.path.getsize(cand_path) > 0:
-                return cand_cover
+        from repositories.book_repository import BookRepository
+        try:
+            candidates = BookRepository.get_series_cover_candidates(db_type, series_name, lib_id)
+            for cand in candidates:
+                cand_cover = cand['cover_image']
+                cand_path = os.path.join(covers_dir, cand_cover)
+                if os.path.exists(cand_path) and os.path.getsize(cand_path) > 0:
+                    return cand_cover
+        except Exception as e:
+            print(f"[resolve_series_cover WARNING] Failed to fetch cover candidates from repository: {e}")
 
     return db_cover

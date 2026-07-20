@@ -280,6 +280,7 @@
     "warn_series_missing_pages": "{count} books are missing page info. Please rescan to fix them.",
     "btn_rescan": "Rescan",
     "btn_rescan_all": "Rescan all",
+    "btn_rescan_series": "Rescan Series",
     "no_missing_page_books": "No books with missing page info found.",
     "time_est": "~ {minutes} min",
     "btn_apply_meta": "Apply",

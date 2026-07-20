@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
-import database
+from repositories.category_repository import CategoryRepository
 from tools.scanner import scan_library_covers_only
 from datetime import datetime
 
@@ -28,19 +28,9 @@ class CoverScanService:
         
         # 1. 상태를 'scanning'으로 업데이트
         try:
-            conn = None
-            conn = database.get_connection(db_type)
-            cursor = conn.cursor()
-            cursor.execute("UPDATE libraries SET scan_status = 'scanning' WHERE id = ?", (library_id,))
-            conn.commit()
+            CategoryRepository.update_library_scan_status(db_type, library_id, 'scanning')
         except Exception as e:
             print(f"[CoverScanner] Scan state update error: {e}")
-        finally:
-            if conn:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
         
         try:
             # 표지 전용 고속 스캔 실행
@@ -51,23 +41,7 @@ class CoverScanService:
             duration = (end_time - start_time).total_seconds()
             end_str = end_time.strftime('%Y-%m-%d %H:%M:%S')
 
-            conn = None
-            try:
-                conn = database.get_connection(db_type)
-                cursor = conn.cursor()
-                cursor.execute("""
-                    UPDATE libraries 
-                    SET scan_status = 'ready', 
-                        last_scanned_at = ? 
-                    WHERE id = ?
-                """, (end_str, library_id))
-                conn.commit()
-            finally:
-                if conn:
-                    try:
-                        conn.close()
-                    except Exception:
-                        pass
+            CategoryRepository.update_library_scan_success(db_type, library_id, end_str)
             
             msg = f"표지 전용 스캔 성공 완료 - DB={db_type}, LibraryID={library_id}, 소요시간={duration:.2f}초"
             print(f"[CoverScanner-Trigger] ✅ {msg}")
@@ -76,20 +50,10 @@ class CoverScanService:
             # 3. 실패 시 'failed' 기록
             end_time = datetime.now()
             duration = (end_time - start_time).total_seconds()
-            conn = None
             try:
-                conn = database.get_connection(db_type)
-                cursor = conn.cursor()
-                cursor.execute("UPDATE libraries SET scan_status = 'failed' WHERE id = ?", (library_id,))
-                conn.commit()
+                CategoryRepository.update_library_scan_status(db_type, library_id, 'failed')
             except Exception:
                 pass
-            finally:
-                if conn:
-                    try:
-                        conn.close()
-                    except Exception:
-                        pass
             
             msg = f"표지 전용 스캔 실패 - DB={db_type}, LibraryID={library_id}, 소요시간={duration:.2f}초, 에러={e}"
             print(f"[CoverScanner-Trigger] ❌ {msg}")

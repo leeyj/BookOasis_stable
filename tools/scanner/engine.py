@@ -25,6 +25,9 @@ from tools.scanner.sync_detector import detect_and_handle_book_movement, handle_
 MAX_SCANNER_THREADS = 4
 DB_DIR = os.path.join(MEDIA_SERVER_DIR, 'db')
 
+# 우아한 종료 시그널 감지 플래그
+stop_requested = False
+
 
 def _is_db_locked_error(exc):
     try:
@@ -344,6 +347,9 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
         }
         
         for fut in as_completed(futures):
+            if stop_requested:
+                print("[Scanner] ⚠️ 스캔 중단 요청(SIGTERM/SIGINT)이 감지되었습니다. 루프를 탈출하여 현재까지의 변경점만 DB에 쓰고 마감합니다.")
+                break
             root_folder = futures[fut]
             try:
                 res = fut.result()

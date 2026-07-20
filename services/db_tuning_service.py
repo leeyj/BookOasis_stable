@@ -34,21 +34,8 @@ def optimize_database(db_type='general'):
     print(f"[*] [{db_type}] Starting database optimization engine...")
     
     try:
-        # 1. ANALYZE & REINDEX는 풀 커넥션을 통해 안전하게 실행
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("ANALYZE;")
-        cursor.execute("REINDEX;")
-        conn.commit()
-        conn.close()
-        
-        # 2. VACUUM은 트랜잭션 외부(autocommit) 모드에서 수행해야 하므로 
-        # 커넥션 풀을 타지 않는 독립 물리 커넥션으로 수행
-        db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
-        conn_vacuum = sqlite3.connect(db_path, timeout=60.0)
-        conn_vacuum.isolation_level = None  # autocommit 설정
-        conn_vacuum.execute("VACUUM;")
-        conn_vacuum.close()
+        from repositories.db_tuning_repository import DbTuningRepository
+        DbTuningRepository.run_sqlite_optimize(db_type)
         
         print(f"[+] [{db_type}] Database defragmentation and optimization tuning successful!")
         return True, "최적화 완료"

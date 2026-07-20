@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from flask import json
 import os
 import importlib
 import sys
@@ -230,16 +231,10 @@ class MetadataFactory:
         if not os.path.exists(plugins_dir):
             return providers
 
-        # DB 연결하여 모든 설정을 미리 한 번에 로드 (성능)
-        import database
-        import json
         db_settings = {}
         try:
-            conn = database.get_connection('general')
-            cursor = conn.cursor()
-            cursor.execute("SELECT key, value FROM settings")
-            db_settings = {row['key']: row['value'] for row in cursor.fetchall()}
-            conn.close()
+            from repositories.metadata_repository import MetadataRepository
+            db_settings = MetadataRepository.get_all_settings('general')
         except Exception as e:
             print(f"[MetadataFactory] DB 설정 사전 load failed: {e}")
 
@@ -299,11 +294,8 @@ class MetadataFactory:
 
         db_settings = {}
         try:
-            conn = database.get_connection('general')
-            cursor = conn.cursor()
-            cursor.execute("SELECT key, value FROM settings")
-            db_settings = {row['key']: row['value'] for row in cursor.fetchall()}
-            conn.close()
+            from repositories.metadata_repository import MetadataRepository
+            db_settings = MetadataRepository.get_all_settings('general')
         except Exception as e:
             print(f"[MetadataFactory] DB 설정 사전 load failed: {e}")
 
@@ -358,16 +350,11 @@ class MetadataFactory:
         if not provider_id:
             provider_id = cls._get_provider_name_from_env()
             
-        # 활성화 여부 DB 조회
-        import database
         is_enabled = True
         try:
-            conn = database.get_connection('general')
-            cursor = conn.cursor()
-            cursor.execute("SELECT value FROM settings WHERE key = ?", (f"PLUGIN_ENABLED_{provider_id}",))
-            row = cursor.fetchone()
-            conn.close()
-            if row and row['value'] == '0':
+            from repositories.metadata_repository import MetadataRepository
+            val = MetadataRepository.get_setting_value('general', f"PLUGIN_ENABLED_{provider_id}")
+            if val == '0':
                 is_enabled = False
         except Exception:
             pass

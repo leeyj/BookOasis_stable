@@ -181,6 +181,7 @@ def check_authentication():
                         session['username'] = user['username']
                         session['role'] = user['role']
                         session['is_default_password'] = user['is_default_password']
+                        session['has_adult_access'] = user['has_adult_access']
         
     # 1. 미로그인 시 차단
     if 'user_id' not in session:

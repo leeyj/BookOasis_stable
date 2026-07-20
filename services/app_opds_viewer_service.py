@@ -91,14 +91,8 @@ def save_progress(db_type: str, book_id, page_idx, total_pages, epub_session=Non
 
 
 def mark_unread(db_type: str, book_id, user_id: int = 1):
-    conn = database.get_connection(db_type)
-    try:
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM user_progress WHERE book_id = ? AND user_id = ?", (book_id, user_id))
-        cursor.execute("DELETE FROM user_reading_log WHERE book_id = ? AND user_id = ?", (book_id, user_id))
-        conn.commit()
-    finally:
-        conn.close()
+    from repositories.reading_progress_repository import ReadingProgressRepository
+    ReadingProgressRepository.delete_user_progress_by_book(db_type, book_id, user_id)
 
 
 def preload_next_book(db_type: str, book_id, user_id: int = 1):

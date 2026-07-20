@@ -29,7 +29,7 @@ def get_redis_client():
         # 단일 레디스 클라이언트 생성 (socket_timeout 및 connection_pool 튜닝)
         pool = redis.ConnectionPool.from_url(
             REDIS_URL, 
-            socket_timeout=2.0, 
+            socket_timeout=15.0, 
             socket_connect_timeout=2.0,
             max_connections=20,
             decode_responses=True  # 문자열 자동 디코딩

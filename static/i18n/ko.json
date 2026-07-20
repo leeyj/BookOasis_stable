@@ -280,6 +280,7 @@
     "warn_series_missing_pages": "페이지 정보가 부족한 도서가 {count}권 있습니다. 먼저 재스캔을 눌러 문제를 해결하세요.",
     "btn_rescan": "다시 스캔",
     "btn_rescan_all": "모두 재스캔",
+    "btn_rescan_series": "이 시리즈 재스캔",
     "no_missing_page_books": "페이지 정보가 부족한 도서가 없습니다.",
     "time_est": "약 {minutes}분",
     "btn_apply_meta": "이 정보로 채우기",

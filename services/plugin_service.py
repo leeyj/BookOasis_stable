@@ -219,12 +219,9 @@ class PluginService:
         if not plugin_id:
             return False, 'plugin_id is required'
 
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
+        from repositories.plugin_repository import PluginRepository
         key = f"PLUGIN_ENABLED_{plugin_id}"
-        cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, enabled_val))
-        conn.commit()
-        conn.close()
+        PluginRepository.save_plugin_setting(db_type, key, enabled_val)
 
         return True, None
 
@@ -246,11 +243,8 @@ class PluginService:
         except (TypeError, ValueError):
             return False, 'Invalid JSON config'
 
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
+        from repositories.plugin_repository import PluginRepository
         key = f"PLUGIN_CONFIG_{plugin_id}"
-        cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, config_str))
-        conn.commit()
-        conn.close()
+        PluginRepository.save_plugin_setting(db_type, key, config_str)
 
         return True, None

@@ -1,5 +1,13 @@
 // sidebar_manager.js – 모바일/데스크톱 사이드바 토글 및 상태 유지 관리
+let lastToggleTime = 0;
+
 export function toggleSidebarMenu() {
+  const now = Date.now();
+  if (now - lastToggleTime < 350) {
+    return; // 고스트 클릭 차단
+  }
+  lastToggleTime = now;
+
   const content = document.getElementById('sidebar-collapsible-content');
   const btnIcon = document.querySelector('#btn-sidebar-toggle i');
   if (!content) return;
@@ -32,6 +40,8 @@ export function initSidebarAutoClose() {
         const content = document.getElementById('sidebar-collapsible-content');
         const btnIcon = document.querySelector('#btn-sidebar-toggle i');
         if (content && content.classList.contains('show')) {
+          // 자동 닫힘 발생 시점도 타임스탬프를 갱신하여 300ms 뒤 발생하는 햄버거 토글 고스트 클릭 차단
+          lastToggleTime = Date.now();
           content.classList.remove('show');
           if (btnIcon) btnIcon.className = 'fa-solid fa-bars';
         }

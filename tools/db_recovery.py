@@ -24,6 +24,7 @@ import sqlite3
 import datetime
 import subprocess
 import argparse
+import re
 
 # ─────────────────────────────────────────────
 # 경로 설정 (이 스크립트 위치 기준으로 자동 탐색)
@@ -130,46 +131,152 @@ def step2_full_recovery(db_path, label):
     ts             = timestamp()
     backup_path    = os.path.join(BACKUP_DIR, f"{label}_{ts}.db.bak")
     recovered_path = db_path + '.recovered'
-    sql_dump_path  = db_path + f'.{ts}.sql'
 
     # 1) 원본 백업
     log(f"원본 백업 중: {backup_path}")
     shutil.copy2(db_path, backup_path)
     log(f"✅ 백업 완료: {os.path.getsize(backup_path):,} bytes")
 
-    # 2) sqlite3 CLI로 .recover 실행 (Python 내장 모듈은 .recover 미지원)
-    log("sqlite3 CLI를 사용한 데이터 복구 시도 중...")
+    # 2) sqlite3 CLI로 .recover 스트리밍 복구 실행
+    log("sqlite3 CLI를 사용한 스트리밍 데이터 복구 시도 중...")
     try:
-        result = subprocess.run(
-            ['sqlite3', db_path, '.recover'],
-            capture_output=True, text=False, timeout=300
+        if os.path.exists(recovered_path):
+            os.remove(recovered_path)
+
+        # 디스크에 5GB SQL 덤프를 따로 저장하지 않고 바로 새 DB에 주입합니다.
+        import_proc = subprocess.Popen(
+            ['sqlite3', recovered_path],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding='utf-8',
+            errors='ignore',
+            bufsize=1,
         )
-        if result.returncode != 0 and not result.stdout:
-            log(f"❌ sqlite3 CLI 복구 실패: {result.stderr[:200]}")
-            log("→ 시스템에 sqlite3 CLI가 설치되어 있지 않거나 복구 불가 상태입니다.")
-            log(f"→ 백업 파일({backup_path})을 보존합니다.")
-            log("   Ubuntu/Debian: sudo apt install sqlite3")
-            log("   Alpine Linux : apk add sqlite")
+        recover_proc = subprocess.Popen(
+            ['sqlite3', db_path, '.recover'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding='utf-8',
+            errors='ignore',
+            bufsize=1,
+        )
+
+        # 대량 쓰기 성능을 위해 새 DB 쪽은 저널/동기화를 완화합니다.
+        assert import_proc.stdin is not None
+        assert import_proc.stderr is not None
+        assert recover_proc.stdout is not None
+        assert recover_proc.stderr is not None
+        import_proc.stdin.write("PRAGMA journal_mode=OFF;\n")
+        import_proc.stdin.write("PRAGMA synchronous=OFF;\n")
+        import_proc.stdin.write("PRAGMA temp_store=MEMORY;\n")
+        import_proc.stdin.write("PRAGMA foreign_keys=OFF;\n")
+        import_proc.stdin.write("PRAGMA locking_mode=EXCLUSIVE;\n")
+
+        log("새 DB 생성 중...")
+
+        def should_skip_recovery_statement(statement):
+            """FTS5 shadow table과 books_search 관련 statement를 제외합니다."""
+            normalized = re.sub(r'\s+', ' ', statement).strip()
+            if not normalized:
+                return True
+
+            patterns = (
+                r'^BEGIN(?:\s+TRANSACTION)?\s*;?$',
+                r'^COMMIT\s*;?$',
+                r'^ROLLBACK\s*;?$',
+                r'^SAVEPOINT\s+\S+\s*;?$',
+                r'^RELEASE\s+\S+\s*;?$',
+                r'^CREATE\s+(?:VIRTUAL\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:["`\[])?books_search(?:["`\]])?(?:\s|\()',
+                r'^CREATE\s+TRIGGER\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:["`\[])?books_search_',
+                r'^INSERT\s+INTO\s+(?:["`\[])?books_search(?:_(?:data|idx|content|docsize|config))?(?:["`\]])?(?:\s|\()',
+                r'^UPDATE\s+(?:["`\[])?books_search(?:_(?:data|idx|content|docsize|config))?(?:["`\]])?\s+SET\b',
+                r'^DELETE\s+FROM\s+(?:["`\[])?books_search(?:_(?:data|idx|content|docsize|config))?(?:["`\]])?(?:\s|;|$)',
+                r'^DROP\s+(?:VIRTUAL\s+)?TABLE\s+(?:IF\s+EXISTS\s+)?(?:["`\[])?books_search(?:["`\]])?(?:\s|;|$)',
+                r'^ALTER\s+TABLE\s+(?:["`\[])?books_search(?:_(?:data|idx|content|docsize|config))?(?:["`\]])?',
+            )
+            return any(re.search(pattern, normalized, re.IGNORECASE) for pattern in patterns)
+
+        # 디스크 파일 없이 스트리밍으로 statement를 넘깁니다.
+        try:
+            skipped_statements = 0
+            written_statements = 0
+            statement_lines = []
+            for line in recover_proc.stdout:
+                statement_lines.append(line)
+                if ';' not in line:
+                    continue
+
+                statement = ''.join(statement_lines)
+                statement_lines = []
+
+                if should_skip_recovery_statement(statement):
+                    skipped_statements += 1
+                    continue
+
+                import_proc.stdin.write(statement)
+                written_statements += 1
+
+            if statement_lines:
+                statement = ''.join(statement_lines)
+                if not should_skip_recovery_statement(statement):
+                    import_proc.stdin.write(statement)
+                    written_statements += 1
+
+            recover_stderr = recover_proc.stderr.read()
+            recover_rc = recover_proc.wait(timeout=300)
+            if recover_rc != 0 and not recover_stderr.strip():
+                log("❌ sqlite3 CLI 복구 실패: recover 단계가 실패했습니다.")
+                log("→ 시스템에 sqlite3 CLI가 설치되어 있지 않거나 복구 불가 상태입니다.")
+                log(f"→ 백업 파일({backup_path})을 보존합니다.")
+                log("   Ubuntu/Debian: sudo apt install sqlite3")
+                log("   Alpine Linux : apk add sqlite")
+                return False
+
+            import_proc.stdin.close()
+            import_stderr = import_proc.stderr.read()
+            import_rc = import_proc.wait(timeout=300)
+            if import_rc != 0:
+                log(f"❌ 복구 SQL 실행 실패 (code: {import_rc}): {import_stderr[:300]}")
+                try:
+                    if os.path.exists(recovered_path):
+                        os.remove(recovered_path)
+                        log("임시 부분 복구본 폐기 완료.")
+                except Exception:
+                    pass
+                return False
+
+            log(f"복구 SQL 적용 완료: {written_statements:,}개 statement 반영, {skipped_statements:,}개 FTS statement 제외")
+        except Exception as import_err:
+            log(f"❌ 복구 SQL 스트리밍 중 예외 발생: {import_err}")
+            try:
+                if 'import_proc' in locals() and import_proc.stdin and not import_proc.stdin.closed:
+                    import_proc.stdin.close()
+            except Exception:
+                pass
+            try:
+                if os.path.exists(recovered_path):
+                    os.remove(recovered_path)
+                    log("임시 부분 복구본 폐기 완료.")
+            except Exception:
+                pass
             return False
 
-        with open(sql_dump_path, 'wb') as f:
-            f.write(result.stdout)
-        log(f"SQL 덤프 저장 완료: {os.path.getsize(sql_dump_path):,} bytes")
-
-        # 3) 복구된 SQL로 새 DB 생성
-        log("새 DB 생성 중...")
-        with open(sql_dump_path, 'r', encoding='utf-8', errors='ignore') as f:
-            sql_content = f.read()
-
-        new_conn = sqlite3.connect(recovered_path)
-        new_conn.executescript(sql_content)
-        new_conn.execute("PRAGMA journal_mode=WAL;")
-        new_conn.execute("PRAGMA synchronous=NORMAL;")
-        new_conn.commit()
-
-        # 복구 DB 무결성 검증
-        verify = new_conn.execute("PRAGMA integrity_check;").fetchone()
-        new_conn.close()
+        # 새 DB 무결성 및 설정 마무리
+        try:
+            new_conn = sqlite3.connect(recovered_path, timeout=10.0)
+            new_conn.execute("PRAGMA journal_mode=WAL;")
+            new_conn.execute("PRAGMA synchronous=NORMAL;")
+            new_conn.commit()
+            
+            # 복구 DB 무결성 검증
+            verify = new_conn.execute("PRAGMA integrity_check;").fetchone()
+            new_conn.close()
+        except Exception as db_err:
+            log(f"❌ 새 DB 세팅 및 무결성 검사 중 에러: {db_err}")
+            return False
 
         if verify and verify[0] == 'ok':
             log("✅ 복구 DB 무결성: OK")
@@ -177,10 +284,15 @@ def step2_full_recovery(db_path, label):
             os.replace(recovered_path, db_path)
             log(f"✅ [{label}] 복구 완료 — 원본 파일 교체됨")
             log(f"   백업 위치: {backup_path}")
-            os.remove(sql_dump_path)
             return True
         else:
             log(f"❌ 복구 DB 검증 실패: {verify}")
+            try:
+                if os.path.exists(recovered_path):
+                    os.remove(recovered_path)
+                    log("임시 부분 복구본 폐기 완료.")
+            except Exception:
+                pass
             return False
 
     except FileNotFoundError:

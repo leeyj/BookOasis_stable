@@ -45,7 +45,7 @@
     padding: 0.55rem 0.75rem !important;
     opacity: 1 !important;
     pointer-events: auto !important;
-    overflow: visible;
+    overflow: visible !important;
     border-right: none;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -87,9 +87,11 @@
     height: auto !important;
     min-height: 0 !important;
     flex: 1 1 auto !important;
-    max-height: 75vh;
-    overflow-y: auto;
-    overflow-x: hidden;
+    max-height: 75vh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    margin: initial !important;
+    padding: initial !important;
 }
 
 /* 모바일 사이드바 메뉴 얇은 스크롤바 디자인 */

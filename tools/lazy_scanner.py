@@ -16,6 +16,9 @@ import datetime
 import database
 from tools.scanner.cover import get_series_cover_fallback
 
+# 우아한 종료 시그널 감지 플래그
+stop_requested = False
+
 
 def _collect_zip_offsets_safe(file_path):
     """ZIP/CBZ 파일의 이미지 오프셋 메타데이터를 안전하게 수집합니다.
@@ -202,6 +205,31 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
                 
                 for book, offset_only in folder_books:
                     done += 1
+                    
+                    # ─── 우아한 종료 시그널 감지 가드 ───
+                    if stop_requested:
+                        print("[Lazy-Scanner] ⚠️ 중단 요청(SIGTERM/SIGINT)이 감지되었습니다. 작업을 정지하고 우아하게 마감합니다.")
+                        if conn:
+                            try:
+                                conn.close()
+                            except:
+                                pass
+                        sys.exit(0)
+
+                    # ─── 메모리 자가 진단 및 Graceful 자진 종료 가드 ───
+                    try:
+                        from tools.scanner.memory_helper import check_memory_exceeded
+                        if check_memory_exceeded(db_type=db_type):
+                            print(f"[Lazy-Scanner] ⚠️ 메모리 사용량 한계 초과 감지. 안전한 자진 종료(Graceful Self-Termination)를 기동합니다.")
+                            if conn:
+                                try:
+                                    conn.close()
+                                except:
+                                    pass
+                            sys.exit(0)
+                    except Exception as mem_err:
+                        pass
+                        
                     book_id = book['id']
                     file_path = book['file_path']
                     series_name = book['series_name'] or ""
@@ -508,6 +536,13 @@ def get_series_cover_fallback_single(series_name, parent_dir, filename, file_pat
 
 
 if __name__ == '__main__':
+    # ─── 종료 시그널 핸들러 등록 ───
+    try:
+        from utils.signal_helper import register_shutdown_handlers
+        register_shutdown_handlers()
+    except Exception as sig_err:
+        print(f"[Lazy-Scanner] 시그널 핸들러 등록 실패: {sig_err}")
+
     parser = argparse.ArgumentParser(description='Lazy scanner runner')
     parser.add_argument('--book-id', type=int, default=None)
     parser.add_argument('--db-type', choices=['general', 'adult'], default=None)

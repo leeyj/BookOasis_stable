@@ -72,22 +72,12 @@ class StreamPageService:
 
     @staticmethod
     def get_book_file_info(db_type, book_id, user_id=None, role=None):
-        conn = None
-        try:
-            conn = database.get_connection(db_type)
-            cursor = conn.cursor()
-            perm_clause, perm_params = StreamPageService._book_permission_clause(user_id=user_id, role=role, book_alias='b')
-            cursor.execute(
-                f"SELECT b.file_path, b.file_format FROM books b WHERE b.id = ? AND COALESCE(b.is_deleted, 0) = 0{perm_clause}",
-                (book_id, *perm_params),
-            )
-            row = cursor.fetchone()
-            if not row:
-                return None, None
-            return row['file_path'], (row['file_format'] or '').lower()
-        finally:
-            if conn:
-                conn.close()
+        from repositories.book_repository import BookRepository
+        perm_clause, perm_params = StreamPageService._book_permission_clause(user_id=user_id, role=role, book_alias='b')
+        row = BookRepository.get_book_file_info_with_permission(db_type, book_id, perm_clause, perm_params)
+        if not row:
+            return None, None
+        return row['file_path'], (row['file_format'] or '').lower()
 
     @staticmethod
     def get_total_pages_for_book(db_type, book_id, file_path=None, file_format=None):
@@ -117,6 +107,24 @@ class StreamPageService:
         if cached is not None:
             return cached
 
+        # ─── Redis 캐시 조회 ───
+        redis_cache_key = f"cache:stream:book:{book_id}:page:{page_idx}" if book_id else None
+        if redis_cache_key:
+            try:
+                from utils.redis_helper import redis_get
+                redis_data = redis_get(redis_cache_key)
+                if redis_data:
+                    import base64
+                    import json
+                    payload = json.loads(redis_data)
+                    img_data = base64.b64decode(payload['data'])
+                    mime_type = payload['mime']
+                    result = (img_data, mime_type)
+                    image_cache.put(cache_key, result, len(img_data))
+                    return result
+            except Exception as r_err:
+                print(f"[Redis Cache Get ERROR] {r_err}")
+
         with get_zip_read_lock(file_path):
             cached = image_cache.get(cache_key)
             if cached is not None:
@@ -137,6 +145,21 @@ class StreamPageService:
                     mime = mime or 'image/jpeg'
                     result = (data, mime)
                     image_cache.put(cache_key, result, len(data))
+                    
+                    # Redis 캐시 저장
+                    if redis_cache_key:
+                        try:
+                            from utils.redis_helper import redis_set
+                            import base64
+                            import json
+                            payload = {
+                                'mime': mime,
+                                'data': base64.b64encode(data).decode('utf-8')
+                            }
+                            redis_set(redis_cache_key, json.dumps(payload), ex=3600)
+                        except Exception as r_err:
+                            print(f"[Redis Cache Put ERROR] {r_err}")
+                            
                     return result
                 except Exception as e:
                     print(f"[StreamPageService] IMGDIR page extract fail [{target}]: {e}")
@@ -144,19 +167,9 @@ class StreamPageService:
 
             # [Fast Path] Zip 오프셋 기반 부분 스트리밍 가속 기동
             if book_id is not None:
-                conn = None
                 try:
-                    conn = database.get_connection(db_type)
-                    cursor = conn.cursor()
-                    cursor.execute(
-                        """
-                        SELECT filename, local_header_offset, compress_size, file_size, compress_type
-                        FROM book_offsets
-                        WHERE book_id = ? AND page_idx = ?
-                        """,
-                        (book_id, page_idx),
-                    )
-                    row = cursor.fetchone()
+                    from repositories.book_offset_repository import BookOffsetRepository
+                    row = BookOffsetRepository.get_book_offset(db_type, book_id, page_idx)
 
                     if row and os.path.exists(file_path):
                         local_header_offset = row['local_header_offset']
@@ -191,14 +204,26 @@ class StreamPageService:
                                     mime = mime or 'image/jpeg'
                                     result = (img_data, mime)
                                     image_cache.put(cache_key, result, len(img_data))
+                                    
+                                    # Redis 캐시 저장
+                                    if redis_cache_key:
+                                        try:
+                                            from utils.redis_helper import redis_set
+                                            import base64
+                                            import json
+                                            payload = {
+                                                'mime': mime,
+                                                'data': base64.b64encode(img_data).decode('utf-8')
+                                            }
+                                            redis_set(redis_cache_key, json.dumps(payload), ex=3600)
+                                        except Exception as r_err:
+                                            print(f"[Redis Cache Put ERROR] {r_err}")
+                                            
                                     return result
                 except Exception as ex_offset:
                     print(
                         f"[Offset-SpeedRun FAIL] {os.path.basename(file_path)} [{page_idx}]: {ex_offset} (Fallback executed)"
                     )
-                finally:
-                    if conn:
-                        conn.close()
 
             # [Fallback Path]
             zf = get_zip_file_hybrid(file_path)
@@ -217,6 +242,21 @@ class StreamPageService:
                 result = (data, mime)
 
                 image_cache.put(cache_key, result, len(data))
+                
+                # Redis 캐시 저장
+                if redis_cache_key:
+                    try:
+                        from utils.redis_helper import redis_set
+                        import base64
+                        import json
+                        payload = {
+                            'mime': mime,
+                            'data': base64.b64encode(data).decode('utf-8')
+                        }
+                        redis_set(redis_cache_key, json.dumps(payload), ex=3600)
+                    except Exception as r_err:
+                        print(f"[Redis Cache Put ERROR] {r_err}")
+                        
                 return result
             except Exception as e:
                 print(f"[StreamPageService] Page extract fail [{file_path}:{page_idx}]: {e}")
@@ -224,17 +264,6 @@ class StreamPageService:
 
     @staticmethod
     def get_file_path(db_type, book_id, user_id=None, role=None):
-        conn = None
-        try:
-            conn = database.get_connection(db_type)
-            cursor = conn.cursor()
-            perm_clause, perm_params = StreamPageService._book_permission_clause(user_id=user_id, role=role, book_alias='b')
-            cursor.execute(
-                f"SELECT b.file_path FROM books b WHERE b.id = ? AND COALESCE(b.is_deleted, 0) = 0{perm_clause}",
-                (book_id, *perm_params),
-            )
-            row = cursor.fetchone()
-            return row['file_path'] if row else None
-        finally:
-            if conn:
-                conn.close()
+        from repositories.book_repository import BookRepository
+        perm_clause, perm_params = StreamPageService._book_permission_clause(user_id=user_id, role=role, book_alias='b')
+        return BookRepository.get_book_file_path_with_permission(db_type, book_id, perm_clause, perm_params)

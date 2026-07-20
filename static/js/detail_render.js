@@ -221,6 +221,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
           ${continueBtnHtml}
           <button id="btn-manual-meta-search" class="ridi-link-btn" style="display:none; margin: 0; background: #7c3aed; border-color: #a855f7;"><i class="fa-solid fa-wand-magic-sparkles"></i> ${i18n.t('detail.btn_recommend_match')}</button>
           <button id="btn-plugin-meta-search" class="ridi-link-btn" onclick="openMetadataSearchModal(${firstBookId}, '${safeSeriesName.replace(/'/g, "\\'")}', true)" style="margin: 0; background: #2563eb; border-color: #3b82f6;"><i class="fa-solid fa-magnifying-glass"></i> ${i18n.t('detail.btn_search_meta')}</button>
+          <button class="ridi-link-btn" onclick="rescanSeries(event, '${safeSeriesName.replace(/'/g, "\\'")}', '${actualLibraryId}')" style="margin: 0; background: #ea580c; border-color: #f97316; display: inline-flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-arrows-rotate"></i> ${i18n.t('detail.btn_rescan_series')}</button>
         </div>
       </div>
 

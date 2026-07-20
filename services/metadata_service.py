@@ -1,21 +1,11 @@
 # -*- coding: utf-8 -*-
 import json
-import database
+from repositories.metadata_repository import MetadataRepository
 
 class MetadataService:
     @staticmethod
     def get_meta_recommend(db_type, series_name):
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT MIN(id) AS id, series_name, author, publisher, summary, MAX(cover_image) AS cover_image
-            FROM books
-            WHERE series_name LIKE ? AND (summary IS NOT NULL AND summary != '' AND summary != '등록된 설명이 없습니다.')
-            GROUP BY series_name
-            LIMIT 3
-        """, (f"%{series_name}%",))
-        rows = cursor.fetchall()
-        conn.close()
+        rows = MetadataRepository.get_meta_recommend(db_type, series_name)
         return [
             {
                 'id': r['id'],
@@ -30,37 +20,7 @@ class MetadataService:
 
     @staticmethod
     def copy_metadata(db_type, target_series, target_lib_id, source_book_id):
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        # 커버 이미지는 제외하고 순수 텍스트 메타 정보만 가져옴
-        cursor.execute("""
-            SELECT author, isbn, publisher, summary, link, score
-            FROM books WHERE id = ?
-        """, (source_book_id,))
-        source = cursor.fetchone()
-        
-        if not source:
-            conn.close()
-            return False, '원본 메타데이터를 찾을 수 없습니다.'
-            
-        # 커버 이미지(cover_image)는 건드리지 않고 텍스트 메타 정보만 업데이트
-        cursor.execute("""
-            UPDATE books
-            SET author = ?, isbn = ?, publisher = ?, summary = ?, link = ?, score = ?, metadata_locked = 1
-            WHERE series_name = ? AND library_id = ?
-        """, (
-            source['author'],
-            source['isbn'],
-            source['publisher'],
-            source['summary'],
-            source['link'],
-            source['score'],
-            target_series,
-            target_lib_id
-        ))
-        conn.commit()
-        conn.close()
-        return True, f'"{target_series}"에 추천 메타데이터가 정상 복사 및 적재되었습니다.'
+        return MetadataRepository.copy_metadata(db_type, target_series, target_lib_id, source_book_id)
 
     @staticmethod
     def get_searchable_plugins():
@@ -98,9 +58,8 @@ class MetadataService:
     @staticmethod
     def search_aladin(db_type, query):
         """하위 호환성 유지용"""
-        return MetadataService.search_metadata(db_type, query, 'aladin')
-
-    @staticmethod
-    def apply_aladin_metadata(db_type, book_id, aladin_item):
-        """하위 호환성 유지용"""
-        return MetadataService.apply_metadata(db_type, book_id, aladin_item, 'aladin')
+        from services.metadata_factory import MetadataFactory
+        provider = MetadataFactory.get_provider_by_id('aladin')
+        if provider:
+            return provider.search(db_type, query)
+        return []

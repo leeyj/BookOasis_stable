@@ -623,12 +623,19 @@ export function hideSeekbarTooltip() {
 }
 
 async function startSequentialPreload(pageList) {
+  const currentBookId = state.currentBookId || (window.state ? window.state.currentBookId : null);
   currentPreloadQueue = pageList;
   if (isPreloading) return;
 
   isPreloading = true;
   while (currentPreloadQueue.length > 0) {
     const nextIdx = currentPreloadQueue.shift();
+
+    // 책이 닫혔거나 다른 책으로 전환되었다면 루프 즉시 탈출
+    const activeBookId = state.currentBookId || (window.state ? window.state.currentBookId : null);
+    if (activeBookId !== currentBookId) {
+      break;
+    }
 
     // 범위 검사 및 이미 캐싱된 것은 패스
     if (nextIdx >= comicTotalPages || nextIdx < 0 || blobCacheMap.has(nextIdx)) {
@@ -640,6 +647,13 @@ async function startSequentialPreload(pageList) {
       const response = await fetch(url);
       if (response.ok) {
         const blob = await response.blob();
+        
+        // 비동기 fetch가 완료된 시점에 다시 한 번 책 전환 여부 체크
+        const postActiveBookId = state.currentBookId || (window.state ? window.state.currentBookId : null);
+        if (postActiveBookId !== currentBookId) {
+          break;
+        }
+
         const objectUrl = URL.createObjectURL(blob);
         blobCacheMap.set(nextIdx, objectUrl);
       }

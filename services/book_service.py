@@ -1,20 +1,15 @@
 # -*- coding: utf-8 -*-
 import os
-import database
+from repositories.book_repository import BookRepository
 from utils.sort_helper import natural_sort_key
 from utils.cover_helper import get_cover_image_with_t
 
 class BookService:
     @staticmethod
     def get_next_book(db_type, book_id, user_id=1):
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        
         # 1. 대상 책의 series_name, library_id, file_path 조회
-        cursor.execute("SELECT series_name, library_id, file_path FROM books WHERE id = ? AND COALESCE(is_deleted, 0) = 0", (book_id,))
-        current_book = cursor.fetchone()
+        current_book = BookRepository.get_book_basic_info(db_type, book_id)
         if not current_book:
-            conn.close()
             return None
 
         series_name = current_book['series_name']
@@ -22,14 +17,7 @@ class BookService:
         current_file_path = current_book['file_path']
 
         # 2. 같은 시리즈 내의 책 전체 조회 (진척도 결합)
-        cursor.execute("""
-            SELECT b.id, b.title, b.file_format, b.total_pages, b.cover_image, b.cover_updated_at, b.file_path, p.pages_read
-            FROM books b
-            LEFT JOIN user_progress p ON b.id = p.book_id AND p.user_id = ?
-            WHERE COALESCE(b.is_deleted, 0) = 0 AND b.series_name = ? AND b.library_id = ?
-        """, (user_id, series_name, library_id))
-        rows = cursor.fetchall()
-        conn.close()
+        rows = BookRepository.get_books_by_series(db_type, series_name, library_id, user_id)
 
         # 3. 책 목록 정제 및 정렬
         books_list = []
@@ -71,45 +59,9 @@ class BookService:
     @staticmethod
     def update_favorite(db_type, book_id, is_favorite, user_id):
         """특정 도서의 즐겨찾기 상태 변경 (사용자별)"""
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        if int(is_favorite) == 1:
-            cursor.execute(
-                "INSERT OR IGNORE INTO user_favorites (user_id, book_id, created_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
-                (user_id, book_id)
-            )
-        else:
-            cursor.execute("DELETE FROM user_favorites WHERE user_id = ? AND book_id = ?", (user_id, book_id))
-        conn.commit()
-        conn.close()
-        return True
+        return BookRepository.update_favorite(db_type, book_id, is_favorite, user_id)
 
     @staticmethod
     def update_series_favorite(db_type, series_name, is_favorite, user_id):
         """특정 시리즈 전체 도서의 즐겨찾기 상태 변경 (사용자별)"""
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        if int(is_favorite) == 1:
-            cursor.execute(
-                """
-                INSERT OR IGNORE INTO user_favorites (user_id, book_id, created_at)
-                SELECT ?, id, CURRENT_TIMESTAMP
-                FROM books
-                WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0
-                """,
-                (user_id, series_name)
-            )
-        else:
-            cursor.execute(
-                """
-                DELETE FROM user_favorites
-                WHERE user_id = ?
-                  AND book_id IN (
-                      SELECT id FROM books WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0
-                  )
-                """,
-                (user_id, series_name)
-            )
-        conn.commit()
-        conn.close()
-        return True
+        return BookRepository.update_series_favorite(db_type, series_name, is_favorite, user_id)

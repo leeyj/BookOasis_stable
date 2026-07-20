@@ -12,6 +12,13 @@ WORKER_PID_FILE="$APP_DIR/media_server_worker.pid"
 LOG_FILE="$APP_DIR/logs/media_server_startup.log"
 WORKER_LOG_FILE="$APP_DIR/logs/media_server_worker_startup.log"
 
+FORCE_RESTART="false"
+for arg in "$@"; do
+    if [ "$arg" = "--force" ]; then
+        FORCE_RESTART="true"
+    fi
+done
+
 check_pid_alive() {
     local pid="$1"
     [ -n "$pid" ] && kill -0 "$pid" >/dev/null 2>&1
@@ -170,15 +177,15 @@ start() {
 stop() {
     # 스캔 상태 체크 가드
     if [ -f "db/media_general.db" ] && command -v sqlite3 >/dev/null 2>&1; then
-        SCANNING_COUNT=$(sqlite3 db/media_general.db "SELECT COUNT(*) FROM libraries WHERE scan_status = 'scanning';")
-        RUNNING_TASKS=$(sqlite3 db/media_general.db "SELECT COUNT(*) FROM scanner_tasks WHERE status = 'running';")
+        SCANNING_COUNT=$(sqlite3 -init /dev/null -cmd ".timeout 2000" db/media_general.db "SELECT COUNT(*) FROM libraries WHERE scan_status = 'scanning';" 2>/dev/null || echo 0)
+        RUNNING_TASKS=$(sqlite3 -init /dev/null -cmd ".timeout 2000" db/media_general.db "SELECT COUNT(*) FROM scanner_tasks WHERE status = 'running';" 2>/dev/null || echo 0)
         TOTAL_SCANNING=$((SCANNING_COUNT + RUNNING_TASKS))
         
         if [ "$TOTAL_SCANNING" -gt 0 ]; then
             echo "[!] 경고: 현재 라이브러리 스캔 작업이 진행 중입니다. (진행 중인 스캔: $SCANNING_COUNT, 실행 중인 태스크: $RUNNING_TASKS)"
             echo "[!] 이 상태에서 강제 종료 시 데이터베이스 손상(malformed) 위험이 매우 큽니다."
             
-            if [ "$1" = "--force" ] || [ "$FORCE_RESTART" = "true" ]; then
+            if [ "$FORCE_RESTART" = "true" ]; then
                 echo "[*] --force 옵션이 감지되어 종료를 강행합니다."
             else
                 if [ -t 0 ]; then
@@ -204,8 +211,8 @@ stop() {
             echo "[*] PID 파일 기준 미디어 서버 종료 시도 (PID: $PID)"
             kill -15 "$PID"
             
-            # Graceful Shutdown 대기 (최대 15초)
-            for i in {1..15}; do
+            # Graceful Shutdown 대기 (최대 30초)
+            for i in {1..30}; do
                 if ! check_pid_alive "$PID"; then
                     break
                 fi
@@ -213,8 +220,13 @@ stop() {
             done
             
             if check_pid_alive "$PID"; then
-                echo "[!] 미디어 서버가 SIGTERM(15)에 응답하지 않아 강제 종료(SIGKILL)합니다."
-                kill -9 "$PID"
+                if [ "$FORCE_RESTART" = "true" ]; then
+                    echo "[!] 미디어 서버가 SIGTERM(15)에 응답하지 않아 강제 종료(SIGKILL)합니다."
+                    kill -9 "$PID"
+                else
+                    echo "[!] 미디어 서버가 SIGTERM(15)에 응답하지 않았습니다. 강제 종료는 수행하지 않고 종료를 중단합니다."
+                    return 1
+                fi
             fi
         fi
         rm -f "$PID_FILE"
@@ -246,7 +258,12 @@ stop() {
         
         for P in $PIDS; do
             if check_pid_alive "$P"; then
-                kill -9 "$P"
+                if [ "$FORCE_RESTART" = "true" ]; then
+                    kill -9 "$P"
+                else
+                    echo "[!] 남아있는 미디어 Gunicorn 프로세스는 강제 종료하지 않습니다."
+                    return 1
+                fi
             fi
         done
         echo "[+] 남아있던 프로세스 정리 완료."
@@ -259,8 +276,8 @@ stop() {
             echo "[*] PID 파일 기준 스캐너 워커 종료 시도 (PID: $W_PID)"
             kill -15 "$W_PID"
             
-            # 스캐너 워커의 안전한 트랜잭션 마무리를 위해 최대 15초 대기
-            for i in {1..15}; do
+            # 스캐너 워커의 안전한 트랜잭션 마무리를 위해 최대 30초 대기
+            for i in {1..30}; do
                 if ! check_pid_alive "$W_PID"; then
                     break
                 fi
@@ -268,8 +285,13 @@ stop() {
             done
             
             if check_pid_alive "$W_PID"; then
-                echo "[!] 스캐너 워커가 SIGTERM(15)에 응답하지 않아 강제 종료(SIGKILL)합니다."
-                kill -9 "$W_PID"
+                if [ "$FORCE_RESTART" = "true" ]; then
+                    echo "[!] 스캐너 워커가 SIGTERM(15)에 응답하지 않아 강제 종료(SIGKILL)합니다."
+                    kill -9 "$W_PID"
+                else
+                    echo "[!] 스캐너 워커가 SIGTERM(15)에 응답하지 않았습니다. 강제 종료는 수행하지 않고 종료를 중단합니다."
+                    return 1
+                fi
             fi
         fi
         rm -f "$WORKER_PID_FILE"
@@ -285,7 +307,7 @@ stop() {
             fi
         done
         
-        for i in {1..10}; do
+        for i in {1..30}; do
             W_STILL_ALIVE=false
             for WP in $W_PIDS; do
                 if check_pid_alive "$WP"; then
@@ -300,7 +322,48 @@ stop() {
         
         for WP in $W_PIDS; do
             if check_pid_alive "$WP"; then
-                kill -9 "$WP"
+                if [ "$FORCE_RESTART" = "true" ]; then
+                    kill -9 "$WP"
+                else
+                    echo "[!] 남아있는 스캐너 워커 프로세스는 강제 종료하지 않습니다."
+                    return 1
+                fi
+            fi
+        done
+    fi
+
+    # 4. 잔존 독립 레이지 스캐너 프로세스 소탕
+    LAZY_PIDS=$(find_pids_by_pattern "tools/lazy_scanner.py")
+    if [ -n "$LAZY_PIDS" ]; then
+        echo "[*] 백그라운드 레이지 스캐너 프로세스 정리 대상: $LAZY_PIDS"
+        for LP in $LAZY_PIDS; do
+            if check_pid_alive "$LP"; then
+                kill -15 "$LP"
+            fi
+        done
+        
+        for i in {1..30}; do
+            L_STILL_ALIVE=false
+            for LP in $LAZY_PIDS; do
+                if check_pid_alive "$LP"; then
+                    L_STILL_ALIVE=true
+                fi
+            done
+            if [ "$L_STILL_ALIVE" = false ]; then
+                break
+            fi
+            sleep 1
+        done
+        
+        for LP in $LAZY_PIDS; do
+            if check_pid_alive "$LP"; then
+                if [ "$FORCE_RESTART" = "true" ]; then
+                    echo "[!] 레이지 스캐너 강제 종료 (PID: $LP)"
+                    kill -9 "$LP"
+                else
+                    echo "[!] 남아있는 레이지 스캐너 프로세스는 강제 종료하지 않습니다."
+                    return 1
+                fi
             fi
         done
     fi

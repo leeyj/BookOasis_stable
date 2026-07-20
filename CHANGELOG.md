@@ -1,4 +1,16 @@
 # CHANGELOG
+## v1.2.3
+- 서비스 재시작시 DB 무결성 검증 강화 | Enhanced DB integrity verification during service restart
+- DB 복구 프로세스 안정성 및 무결성 강화 | Improved stability and integrity of the DB recovery process
+- Redis 도입범위 확대(스캔대게열,도서읽은범위,도서읽은 범위) | Expanded Redis implementation scope (Scan queue, Book read range, Book read range)
+- 모바일 뷰에서 카테고리 선택시 ui 불편사항 수정 | Fixed UI inconvenience when selecting a category in mobile view
+
+
+
+## v1.2.2
+- 서비스 재시작시 스캔 대기열 초기화 이슈 수정 | Fixed issue where scan queue was reset during service restart
+- 도서상세리스트에  재스캔 버튼 추가 및 기능 연동 | Added rescan button to book detail list and linked functionality
+
 ## v1.2.1
 - Redis 도입 | Redis implementation
  * 도커사용자는 자동 적용 / 네이티브 사용자는 .env에 REDIS_URL=redis://redis_ip:6379/0 추가 및 Redis 서버 구동 필요 | Docker users automatically apply / Native users need to add REDIS_URL=redis://redis_ip:6379/0 to .env and run Redis server

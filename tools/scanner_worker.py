@@ -13,4 +13,11 @@ if BASE_DIR not in sys.path:
 from services.scanner_queue import run_scanner_worker_loop
 
 if __name__ == '__main__':
+    # ─── 종료 시그널 핸들러 등록 ───
+    try:
+        from utils.signal_helper import register_shutdown_handlers
+        register_shutdown_handlers()
+    except Exception as sig_err:
+        print(f"[Scanner-Worker] 시그널 핸들러 등록 실패: {sig_err}")
+
     run_scanner_worker_loop()

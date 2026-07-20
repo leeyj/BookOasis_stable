@@ -10,12 +10,15 @@ from tools.scanner import scan_library
 def _update_task_stage(task_key, stage):
     """DB 큐의 작업 단계(stage) 정보를 갱신합니다."""
     try:
-        import database
-        conn = database.get_connection('general')
-        cursor = conn.cursor()
-        cursor.execute("UPDATE scanner_tasks SET stage = ? WHERE task_key = ? AND status = 'running'", (stage, task_key))
-        conn.commit()
-        conn.close()
+        from repositories.scheduler_repository import SchedulerRepository
+        SchedulerRepository.update_task_stage(task_key, stage)
+        
+        # Redis 캐싱
+        try:
+            from utils.redis_helper import redis_set
+            redis_set(f"status:scan:stage:{task_key}", stage, ex=1800)  # 30분 만료
+        except Exception as r_err:
+            print(f"[Redis Cache Update Warning] {r_err}")
     except Exception as e:
         print(f"[Scheduler Warning] Failed to update task stage ({task_key} -> {stage}): {e}")
 
@@ -101,6 +104,7 @@ class SchedulerService:
         """이전 실행 중 비정상 종료(interrupted)된 카테고리를 찾아 자동으로 재인큐"""
         import database
         from services.scheduler_service import enqueue_scan_job
+        from repositories.scheduler_repository import SchedulerRepository
         
         print("[Scheduler] Checking for interrupted scan jobs to auto-resume...")
         for db_type in ['general', 'adult']:
@@ -109,10 +113,7 @@ class SchedulerService:
                 continue
                 
             try:
-                conn = database.get_connection(db_type)
-                cursor = conn.cursor()
-                cursor.execute("SELECT id, name, physical_path FROM libraries WHERE scan_status = 'interrupted'")
-                interrupted_libs = cursor.fetchall()
+                interrupted_libs = SchedulerRepository.get_interrupted_libraries(db_type)
                 
                 for lib in interrupted_libs:
                     lib_id = lib['id']
@@ -122,13 +123,11 @@ class SchedulerService:
                     print(f"[Scheduler] 🔄 Auto-resuming interrupted scan: DB={db_type}, Name={lib_name}, ID={lib_id}")
                     
                     # 1. 큐에 적재 전 중복 인큐 방지를 위해 상태를 일단 ready로 업데이트
-                    cursor.execute("UPDATE libraries SET scan_status = 'ready' WHERE id = ?", (lib_id,))
-                    conn.commit()
+                    SchedulerRepository.update_library_scan_status(db_type, lib_id, 'ready')
                     
                     # 2. 스캔 큐에 인큐
                     enqueue_scan_job(db_type, db_path, lib_id, phys_path, force=False)
                     
-                conn.close()
             except Exception as e:
                 print(f"[Scheduler ERROR] Failed to auto-resume interrupted jobs for {db_type}: {e}")
 
@@ -163,17 +162,14 @@ class SchedulerService:
                 continue
                 
             try:
-                conn = database.get_connection(db_type)
-                cursor = conn.cursor()
-                cursor.execute("SELECT id, name, physical_path, cron_schedule FROM libraries WHERE cron_schedule IS NOT NULL AND cron_schedule != ''")
-                libs = cursor.fetchall()
+                from repositories.scheduler_repository import SchedulerRepository
+                libs = SchedulerRepository.get_scheduled_libraries(db_type)
                 
                 # general DB에서 LAZY_SCAN_CRON 설정을 가져와 등록
                 if db_type == 'general':
-                    cursor.execute("SELECT value FROM settings WHERE key = 'LAZY_SCAN_CRON'")
-                    row_cron = cursor.fetchone()
-                    if row_cron and row_cron['value']:
-                        lazy_cron = row_cron['value']
+                    from repositories.reading_progress_repository import ReadingProgressRepository
+                    lazy_cron = ReadingProgressRepository.get_settings_value(db_type, 'LAZY_SCAN_CRON')
+                    if lazy_cron:
                         try:
                             lazy_trigger = CronTrigger.from_crontab(lazy_cron)
                             scheduler.add_job(
@@ -185,8 +181,6 @@ class SchedulerService:
                             print(f"[Scheduler] Lazy cover scanner job registered: Schedule={lazy_cron}")
                         except ValueError as cron_err:
                             print(f"[Scheduler] Invalid lazy script cron passed ({lazy_cron}): {cron_err}")
-                
-                conn.close()
                 
                 for lib in libs:
                     SchedulerService.register_job(db_type, db_path, lib['id'], lib['physical_path'], lib['cron_schedule'])
@@ -244,22 +238,13 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
     from datetime import datetime
     
     # [버그조치] 큐 대기 시간 중 카테고리 경로 수정 시의 일관성 보장을 위해 DB 최신 경로 실시간 갱신
-    conn_path = None
     try:
-        conn_path = database.get_connection(db_type)
-        cursor_path = conn_path.cursor()
-        cursor_path.execute("SELECT physical_path FROM libraries WHERE id = ?", (int(library_id),))
-        row_path = cursor_path.fetchone()
-        if row_path and row_path['physical_path']:
-            physical_path = row_path['physical_path']
+        from repositories.scheduler_repository import SchedulerRepository
+        latest_path = SchedulerRepository.get_library_physical_path(db_type, library_id)
+        if latest_path:
+            physical_path = latest_path
     except Exception as e_path:
         print(f"[Scanner-Trigger WARNING] Failed to query latest physical_path from DB: {e_path}")
-    finally:
-        if conn_path:
-            try:
-                conn_path.close()
-            except:
-                pass
 
     start_time = datetime.now()
     start_str = start_time.strftime('%Y-%m-%d %H:%M:%S')
@@ -342,11 +327,8 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
 
     # VFS 갱신 단계도 사용자 관점에서는 스캔 진행 중이므로 즉시 scanning 상태로 전환
     try:
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("UPDATE libraries SET scan_status = 'scanning' WHERE id = ?", (library_id,))
-        conn.commit()
-        conn.close()
+        from repositories.scheduler_repository import SchedulerRepository
+        SchedulerRepository.update_library_scan_status(db_type, library_id, 'scanning')
     except Exception as e:
         print(f"[Scheduler] Scan state update error(before VFS): {e}")
     
@@ -356,11 +338,8 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
     # VFS 캐시 사전 갱신 옵션 확인 및 수행
     vfs_refreshed_in_wrapper = False
     try:
-        conn_chk = database.get_connection(db_type)
-        cursor_chk = conn_chk.cursor()
-        cursor_chk.execute("SELECT vfs_refresh_before_scan, rclone_rc_url FROM libraries WHERE id = ?", (library_id,))
-        row_chk = cursor_chk.fetchone()
-        conn_chk.close()
+        from repositories.scheduler_repository import SchedulerRepository
+        row_chk = SchedulerRepository.get_library_vfs_config(db_type, library_id)
         
         # 원격 경로가 있는지 확인
         from utils.drive_helper import is_remote_path
@@ -407,23 +386,14 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
                     rc_url_source = 'library'
                 else:
                     # 전역 설정 폴백
-                    conn_g = None
                     try:
-                        conn_g = database.get_connection(db_type)
-                        cursor_g = conn_g.cursor()
-                        cursor_g.execute("SELECT value FROM settings WHERE key = 'RCLONE_RC_URL'")
-                        row_g = cursor_g.fetchone()
-                        if row_g and row_g['value']:
-                            rc_urls = [u.strip().rstrip('/') for u in str(row_g['value']).split(',') if u.strip()]
+                        from repositories.reading_progress_repository import ReadingProgressRepository
+                        val_g = ReadingProgressRepository.get_settings_value(db_type, 'RCLONE_RC_URL')
+                        if val_g:
+                            rc_urls = [u.strip().rstrip('/') for u in str(val_g).split(',') if u.strip()]
                             rc_url_source = 'global'
                     except Exception:
                         pass
-                    finally:
-                        if conn_g:
-                            try:
-                                conn_g.close()
-                            except Exception:
-                                pass
             except Exception:
                 pass
 
@@ -453,12 +423,9 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
 
                     # 중간에 스캔 취소가 요청되었는지 확인
                     try:
-                        conn_chk = database.get_connection(db_type)
-                        cursor_chk = conn_chk.cursor()
-                        cursor_chk.execute("SELECT scan_status FROM libraries WHERE id = ?", (library_id,))
-                        row_status = cursor_chk.fetchone()
-                        conn_chk.close()
-                        if row_status and row_status['scan_status'] == 'cancelling':
+                        from repositories.scheduler_repository import SchedulerRepository
+                        scan_status = SchedulerRepository.get_library_scan_status(db_type, library_id)
+                        if scan_status == 'cancelling':
                             print(f"[Scanner-Trigger] Scan cancellation detected during VFS refresh loop. Aborting VFS updates.")
                             write_scan_log("스캔 취소 감지됨. VFS 갱신을 중단합니다.")
                             break
@@ -616,16 +583,8 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
         duration = (end_time - start_time).total_seconds()
         end_str = end_time.strftime('%Y-%m-%d %H:%M:%S')
         
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("""
-            UPDATE libraries 
-            SET scan_status = 'ready', 
-                last_scanned_at = ? 
-            WHERE id = ?
-        """, (end_str, library_id))
-        conn.commit()
-        conn.close()
+        from repositories.scheduler_repository import SchedulerRepository
+        SchedulerRepository.update_library_scan_success(db_type, library_id, end_str)
         
         msg = f"스캔 성공 완료 - DB={db_type}, LibraryID={library_id}, 소요시간={duration:.2f}초"
         print(f"[Scanner-Trigger] ✅ {msg}")
@@ -635,11 +594,8 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
         end_time = datetime.now()
         duration = (end_time - start_time).total_seconds()
         try:
-            conn = database.get_connection(db_type)
-            cursor = conn.cursor()
-            cursor.execute("UPDATE libraries SET scan_status = 'failed' WHERE id = ?", (library_id,))
-            conn.commit()
-            conn.close()
+            from repositories.scheduler_repository import SchedulerRepository
+            SchedulerRepository.update_library_scan_status(db_type, library_id, 'failed')
         except Exception:
             pass
         

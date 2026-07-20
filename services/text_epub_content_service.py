@@ -10,11 +10,31 @@ class TextEpubContentService:
         if not os.path.exists(file_path):
             return None, 'File not found'
 
+        # ─── Redis 캐시 조회 ───
+        import hashlib
+        path_hash = hashlib.md5(file_path.encode('utf-8')).hexdigest()
+        redis_cache_key = f"cache:txt:file:{path_hash}"
+        try:
+            from utils.redis_helper import redis_get
+            redis_data = redis_get(redis_cache_key)
+            if redis_data:
+                return redis_data, None
+        except Exception as r_err:
+            print(f"[Redis Cache Get ERROR] {r_err}")
+
+        def save_and_return(text):
+            try:
+                from utils.redis_helper import redis_set
+                redis_set(redis_cache_key, text, ex=43200)  # 12시간 캐시 유지
+            except Exception as r_err:
+                print(f"[Redis Cache Put ERROR] {r_err}")
+            return text, None
+
         # 1. UTF-8 인코딩은 엄격하게 검증하여 시도
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
-            return content, None
+            return save_and_return(content)
         except UnicodeDecodeError:
             pass
 
@@ -23,7 +43,7 @@ class TextEpubContentService:
             try:
                 with open(file_path, 'r', encoding=enc) as f:
                     content = f.read()
-                return content, None
+                return save_and_return(content)
             except UnicodeDecodeError:
                 continue
 
@@ -31,7 +51,7 @@ class TextEpubContentService:
         try:
             with open(file_path, 'r', encoding='cp949', errors='replace') as f:
                 content = f.read()
-            return content, None
+            return save_and_return(content)
         except Exception:
             pass
 
@@ -39,7 +59,7 @@ class TextEpubContentService:
         try:
             with open(file_path, 'rb') as f:
                 content = f.read().decode('utf-8', errors='ignore')
-            return content, None
+            return save_and_return(content)
         except Exception as e:
             return None, f"Failed to decode file: {e}"
 
@@ -54,6 +74,18 @@ class TextEpubContentService:
 
         if not os.path.exists(file_path):
             return None, 'File not found'
+
+        # ─── Redis 캐시 조회 ───
+        redis_cache_key = f"cache:epub:content:book:{book_id}" if book_id else None
+        if redis_cache_key:
+            try:
+                from utils.redis_helper import redis_get
+                redis_data = redis_get(redis_cache_key)
+                if redis_data:
+                    import json
+                    return json.loads(redis_data), None
+            except Exception as r_err:
+                print(f"[Redis Cache Get ERROR] {r_err}")
 
         class EPUBHTMLParser(HTMLParser):
             def __init__(self, xhtml_path, book_id, db_type):
@@ -303,11 +335,19 @@ class TextEpubContentService:
                     except KeyError:
                         continue
 
-                return {
+                result = {
                     'title': title,
                     'chapters': chapters,
                     'toc': toc_list,
-                }, None
+                }
+                if redis_cache_key:
+                    try:
+                        from utils.redis_helper import redis_set
+                        import json
+                        redis_set(redis_cache_key, json.dumps(result, ensure_ascii=False), ex=43200)  # 12시간 캐시
+                    except Exception as r_err:
+                        print(f"[Redis Cache Put ERROR] {r_err}")
+                return result, None
 
         except Exception as e:
             return None, f"EPUB parsing failed: {e}"

@@ -1,18 +1,13 @@
 # -*- coding: utf-8 -*-
 import os
-import database
+from repositories.book_repository import BookRepository
 from utils.cache_helper import get_zip_file_hybrid
 from services.stream_service import get_imgdir_files
 
 class BookInfoService:
     @staticmethod
     def get_viewer_info(db_type, book_id):
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, cover_image FROM books WHERE id = ?", (book_id,))
-        row = cursor.fetchone()
-        conn.close()
-
+        row = BookRepository.get_book_cover_image(db_type, book_id)
         if not row:
             return None
 
@@ -27,13 +22,8 @@ class BookInfoService:
 
     @staticmethod
     def get_total_pages(db_type, book_id):
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("SELECT total_pages, file_path, file_format FROM books WHERE id = ?", (book_id,))
-        row = cursor.fetchone()
-
+        row = BookRepository.get_book_pages_and_path(db_type, book_id)
         if not row:
-            conn.close()
             return None
 
         total_pages = row['total_pages'] or 0
@@ -50,8 +40,6 @@ class BookInfoService:
                         total_pages = len([n for n in zf.namelist() if n.lower().endswith(img_ext)])
                     except Exception:
                         total_pages = 0
-                    # `get_zip_file_hybrid` returns a cached ZipFile object.
-                    # Closing it here can invalidate the shared cache and break later stream extraction.
 
             elif file_format == 'imgdir':
                 try:
@@ -69,10 +57,6 @@ class BookInfoService:
                     total_pages = 0
 
             if total_pages > 0:
-                conn2 = database.get_connection(db_type)
-                conn2.execute("UPDATE books SET total_pages = ? WHERE id = ?", (total_pages, book_id))
-                conn2.commit()
-                conn2.close()
+                BookRepository.update_book_pages(db_type, book_id, total_pages)
 
-        conn.close()
         return total_pages

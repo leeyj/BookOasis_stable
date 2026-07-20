@@ -38,21 +38,8 @@ def get_supported_series_names(db_type: str, series_names):
     if not clean_names:
         return set()
 
-    conn = database.get_connection(db_type)
-    try:
-        cursor = conn.cursor()
-        placeholders = ','.join(['?'] * len(clean_names))
-        query = f"""
-            SELECT DISTINCT series_name
-            FROM books
-            WHERE COALESCE(is_deleted, 0) = 0
-              AND lower(COALESCE(file_format, '')) IN ('zip', 'cbz')
-              AND series_name IN ({placeholders})
-        """
-        cursor.execute(query, tuple(clean_names))
-        return {row['series_name'] for row in cursor.fetchall()}
-    finally:
-        conn.close()
+    from repositories.opds_repository import OpdsRepository
+    return OpdsRepository.get_supported_series_names(db_type, clean_names)
 
 
 def filter_supported_series_for_app_opds(db_type: str, series_list):

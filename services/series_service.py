@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 import os
 import hashlib
-import database
 from utils.cover_helper import get_cover_image_with_t, resolve_series_cover
-
+from repositories.series_repository import SeriesRepository
 
 def _comparison_dir_for_book(file_path, file_format):
     normalized = str(file_path or '').replace('\\', '/')
@@ -28,52 +27,7 @@ def _normalize_library_id(library_id):
     return library_id
 
 
-def _fetch_books_for_grouping(cursor, library_id, search_query='', favorite_only=False, user_id=None, role=None):
-    if favorite_only and user_id is None:
-        return []
-
-    safe_user_id = int(user_id) if user_id is not None else 0
-    where = ["COALESCE(b.is_deleted, 0) = 0"]
-    params = [safe_user_id]
-
-    if favorite_only:
-        where.append("uf.book_id IS NOT NULL")
-
-    if library_id and library_id != 'all':
-        where.append("b.library_id = ?")
-        params.append(library_id)
-
-    if search_query:
-        like = f"%{search_query}%"
-        where.append("(b.series_name LIKE ? OR b.author LIKE ?)")
-        params.extend([like, like])
-
-    # 일반 사용자는 user_category_permissions에 허용된 카테고리만 조회
-    if role != 'admin' and user_id:
-        where.append(
-            "EXISTS ("
-            "SELECT 1 FROM user_category_permissions p "
-            "WHERE p.library_id = b.library_id AND p.user_id = ? AND p.has_access = 1"
-            ")"
-        )
-        params.append(user_id)
-
-    sql = f"""
-        SELECT b.id, b.series_name, b.title, b.author, b.file_path, b.file_format,
-               b.cover_image, b.cover_updated_at,
-               CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
-               b.created_at,
-               b.genre, b.tags, b.library_id
-        FROM books b
-        LEFT JOIN user_favorites uf ON uf.book_id = b.id AND uf.user_id = ?
-        WHERE {' AND '.join(where)}
-        ORDER BY b.library_id ASC, b.series_name ASC, b.id ASC
-    """
-    cursor.execute(sql, tuple(params))
-    return cursor.fetchall()
-
-
-def _build_series_entries(rows, conn):
+def _build_series_entries(db_type, rows):
     groups = {}
     order = []
 
@@ -104,9 +58,10 @@ def _build_series_entries(rows, conn):
             lib_id=lib_id,
             db_cover=db_cover,
             covers_dir=covers_dir,
-            conn=conn,
+            conn=None,
             candidates_rows=books,
-            allow_series_cover=False
+            allow_series_cover=False,
+            db_type=db_type
         )
 
         latest_added = max((b['created_at'] for b in books if b['created_at']), default='')
@@ -160,12 +115,8 @@ class SeriesService:
         else:
             library_filter = library_id
 
-        conn = database.get_connection(db_type)
-        conn.row_factory = database.sqlite3.Row
-        cursor = conn.cursor()
-
-        rows = _fetch_books_for_grouping(
-            cursor,
+        rows = SeriesRepository.fetch_books_for_grouping(
+            db_type,
             library_filter,
             search_query=search_query or '',
             favorite_only=favorite_only,
@@ -173,12 +124,11 @@ class SeriesService:
             role=role
         )
 
-        entries = _build_series_entries(rows, conn)
+        entries = _build_series_entries(db_type, rows)
         _sort_entries(entries, sort=sort)
 
         offset = max(0, (page - 1) * limit)
         paged = entries[offset:offset + limit + 1]
-        conn.close()
         return paged
 
     @staticmethod
@@ -191,20 +141,15 @@ class SeriesService:
         else:
             library_filter = library_id
 
-        conn = database.get_connection(db_type)
-        conn.row_factory = database.sqlite3.Row
-        cursor = conn.cursor()
-
-        rows = _fetch_books_for_grouping(
-            cursor,
+        rows = SeriesRepository.fetch_books_for_grouping(
+            db_type,
             library_filter,
             search_query='',
             favorite_only=favorite_only,
             user_id=user_id,
             role=role
         )
-        entries = _build_series_entries(rows, conn)
+        entries = _build_series_entries(db_type, rows)
         _sort_entries(entries, sort='asc')
 
-        conn.close()
         return entries

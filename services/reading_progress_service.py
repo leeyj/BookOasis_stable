@@ -1,8 +1,9 @@
+# -*- coding: utf-8 -*-
 import json
 import logging
 from datetime import datetime
 
-import database
+from repositories.reading_progress_repository import ReadingProgressRepository
 from services.webhook_dispatcher import (
     build_book_event_payload,
     dispatch_standard_book_event,
@@ -10,22 +11,11 @@ from services.webhook_dispatcher import (
 )
 from utils.redis_helper import get_redis_client, make_key
 
-
 class ReadingProgressService:
     @staticmethod
     def record_progress(db_type: str, book_id, page_idx: int, total_pages: int, user_id=1, epub_session=None):
         """독서 진행률 및 활동 로그 기록 (EPUB 및 TXT도 실제 챕터 단위를 그대로 사용)"""
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-
-        cursor.execute(
-            """
-            SELECT file_format, total_pages, title, author, publisher, series_name, created_at
-            FROM books WHERE id = ?
-            """,
-            (book_id,),
-        )
-        book_row = cursor.fetchone()
+        book_row = ReadingProgressRepository.get_book_for_progress(db_type, book_id)
 
         try:
             page_idx = int(page_idx)
@@ -51,8 +41,7 @@ class ReadingProgressService:
 
         # 실제 프론트엔드에서 전달된 총 페이지(챕터) 수를 기반으로 DB 업데이트
         if total_pages > 0 and book_row and book_row['total_pages'] != total_pages:
-            cursor.execute("UPDATE books SET total_pages = ? WHERE id = ?", (total_pages, book_id))
-            conn.commit()
+            ReadingProgressRepository.update_book_total_pages(db_type, book_id, total_pages)
 
         pages_read = page_idx + 1
         is_completed = 0
@@ -108,11 +97,7 @@ class ReadingProgressService:
                 except Exception:
                     pass
             else:
-                cursor.execute(
-                    "SELECT pages_read, is_completed FROM user_progress WHERE book_id = ? AND user_id = ?",
-                    (book_id, user_id),
-                )
-                db_row = cursor.fetchone()
+                db_row = ReadingProgressRepository.get_progress_only(db_type, book_id, user_id)
                 if db_row:
                     old_pages = db_row['pages_read']
                     old_completed = 1 if db_row['is_completed'] == 1 else 0
@@ -136,104 +121,40 @@ class ReadingProgressService:
             redis_client.set(cache_key, json.dumps(progress_payload))
             pending_sync_key = make_key("sync:progress:pending")
             redis_client.sadd(pending_sync_key, f"{db_type}:{user_id}:{book_id}")
-            
-            # DB 연결 조기 릴리즈
-            conn.close()
         else:
             # ── 레디스가 없으면 기존 SQLite 트랜잭션 구동 ──
-            cursor.execute(
-                "SELECT pages_read, is_completed FROM user_progress WHERE book_id = ? AND user_id = ?",
-                (book_id, user_id),
-            )
-            row = cursor.fetchone()
+            row = ReadingProgressRepository.get_progress_only(db_type, book_id, user_id)
             old_completed = 1 if (row and row['is_completed'] == 1) else 0
 
             if not row:
-                cursor.execute(
-                    """
-                    INSERT OR IGNORE INTO user_progress (
-                        book_id, user_id, pages_read, is_completed, last_read_at,
-                        last_epub_cfi, last_epub_href, last_epub_spine_index,
-                        last_epub_percent, last_epub_fingerprint, last_epub_updated_at
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?)
-                    """,
-                    (
-                        book_id,
-                        user_id,
-                        0,
-                        0,
-                        now_str,
-                        None,
-                        None,
-                        None,
-                        0,
-                        None,
-                        None,
-                    ),
-                )
+                ReadingProgressRepository.insert_empty_progress(db_type, book_id, user_id, now_str)
                 delta = pages_read
             else:
                 old_pages = row['pages_read']
                 delta = max(0, pages_read - old_pages)
 
             if has_epub_pointer_update:
-                cursor.execute(
-                    """
-                    UPDATE user_progress
-                    SET pages_read=?, is_completed=?, last_read_at=?,
-                        last_epub_cfi=?, last_epub_href=?, last_epub_spine_index=?,
-                        last_epub_percent=?, last_epub_fingerprint=?, last_epub_updated_at=?
-                    WHERE book_id=? AND user_id=?
-                    """,
-                    (
-                        pages_read,
-                        is_completed,
-                        now_str,
-                        last_epub_cfi,
-                        last_epub_href,
-                        last_epub_spine_index,
-                        last_epub_percent,
-                        last_epub_fingerprint,
-                        last_epub_updated_at,
-                        book_id,
-                        user_id,
-                    ),
+                ReadingProgressRepository.update_progress_full(
+                    db_type, book_id, user_id, pages_read, is_completed, now_str,
+                    last_epub_cfi, last_epub_href, last_epub_spine_index,
+                    last_epub_percent, last_epub_fingerprint, last_epub_updated_at
                 )
             else:
-                cursor.execute(
-                    "UPDATE user_progress SET pages_read=?, is_completed=?, last_read_at=? WHERE book_id=? AND user_id=?",
-                    (pages_read, is_completed, now_str, book_id, user_id),
+                ReadingProgressRepository.update_progress_simple(
+                    db_type, book_id, user_id, pages_read, is_completed, now_str
                 )
 
             if delta > 0:
                 today_str = datetime.now().strftime('%Y-%m-%d')
-                cursor.execute(
-                    "SELECT id FROM user_reading_log WHERE book_id=? AND user_id=? AND read_date=?",
-                    (book_id, user_id, today_str),
-                )
-                log_row = cursor.fetchone()
-                if log_row:
-                    cursor.execute(
-                        "UPDATE user_reading_log SET pages_read_delta=pages_read_delta+? WHERE id=?",
-                        (delta, log_row['id']),
-                    )
-                else:
-                    cursor.execute(
-                        "INSERT INTO user_reading_log (book_id, user_id, pages_read_delta, duration_seconds, read_date) VALUES (?,?,?,60,?)",
-                        (book_id, user_id, delta, today_str),
-                    )
-
-            conn.commit()
-            conn.close()
+                ReadingProgressRepository.update_or_insert_reading_log(db_type, book_id, user_id, delta, today_str)
 
         # 표준 이벤트 웹훅(book.read / book.finish) 발행
         try:
             account_name = f"user-{user_id}"
             try:
-                cursor.execute("SELECT username FROM users WHERE id = ?", (user_id,))
-                user_row = cursor.fetchone()
-                if user_row and user_row['username']:
-                    account_name = str(user_row['username'])
+                username = ReadingProgressRepository.get_username_by_id(db_type, user_id)
+                if username:
+                    account_name = str(username)
             except Exception:
                 pass
 
@@ -266,7 +187,6 @@ class ReadingProgressService:
                 'series': (book_row['series_name'] if book_row else '') or None,
                 'seriesIndex': None,
                 'progress': progress_percent,
-                # Fixed-page formats only are truly stable; keep optional for clients.
                 'totalPages': int(effective_total_pages) if effective_total_pages and effective_total_pages > 0 else None,
                 'currentLocation': location,
                 'addedAt': _to_unix_timestamp(book_row['created_at'] if book_row else None),
@@ -289,37 +209,11 @@ class ReadingProgressService:
                 dispatch_standard_book_event(payload)
         except Exception as webhook_err:
             print(f"[Progress Webhook] dispatch skipped due to error: {webhook_err}")
-        finally:
-            conn.close()
 
     @staticmethod
     def get_progress_state(db_type: str, book_id, user_id=1):
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-
-        cursor.execute(
-            """
-            SELECT
-                b.file_format,
-                b.total_pages,
-                p.pages_read,
-                p.last_read_at,
-                p.last_epub_cfi,
-                p.last_epub_href,
-                p.last_epub_spine_index,
-                p.last_epub_percent,
-                p.last_epub_fingerprint,
-                p.last_epub_updated_at
-            FROM books b
-            LEFT JOIN user_progress p ON b.id = p.book_id AND p.user_id = ?
-            WHERE b.id = ?
-            """,
-            (user_id, book_id),
-        )
-        row = cursor.fetchone()
-
+        row = ReadingProgressRepository.get_progress_state(db_type, book_id, user_id)
         if not row:
-            conn.close()
             return None
 
         file_format = (row['file_format'] or '').lower()
@@ -370,8 +264,6 @@ class ReadingProgressService:
             total_pages = normalized_total
             pages_read = normalized_pages
 
-        conn.close()
-
         return {
             'total_pages': total_pages,
             'pages_read': pages_read,
@@ -394,7 +286,6 @@ class ReadingProgressService:
             return 0
 
         pending_key = make_key("sync:progress:pending")
-        # 동기화할 대상 목록을 가져옵니다.
         pending_items = redis_client.smembers(pending_key)
         if not pending_items:
             return 0
@@ -404,11 +295,7 @@ class ReadingProgressService:
 
         synced_count = 0
         
-        # 커넥션 캐싱을 위해 DB 타입별 커넥션과 커서를 사전 격리 확보합니다.
-        connections = {}
-        
         for item in pending_items:
-            # item 형식: "db_type:user_id:book_id"
             parts = item.split(':')
             if len(parts) < 3:
                 continue
@@ -417,7 +304,6 @@ class ReadingProgressService:
             cache_key = make_key(f"user:progress:{db_type}:{user_id}:{book_id}")
             cached_data_str = redis_client.get(cache_key)
             if not cached_data_str:
-                # 동기화할 캐시 데이터가 없다면 목록에서 삭제 처리
                 redis_client.srem(pending_key, item)
                 continue
                 
@@ -434,86 +320,26 @@ class ReadingProgressService:
                 last_epub_updated_at = data.get('last_epub_updated_at')
                 delta = data.get('delta', 0)
                 
-                # DB 타입별로 커넥션 재사용
-                if db_type not in connections:
-                    conn = database.get_connection(db_type)
-                    connections[db_type] = (conn, conn.cursor())
+                # 1. user_progress 테이블 반영
+                row = ReadingProgressRepository.get_progress_only(db_type, book_id, user_id)
+                if not row:
+                    ReadingProgressRepository.insert_empty_progress(db_type, book_id, user_id, last_read_at)
                 
-                conn, cursor = connections[db_type]
-                
-                # 1. user_progress 테이블에 저장 (INSERT OR IGNORE 후 UPDATE 구조)
-                cursor.execute(
-                    "SELECT pages_read FROM user_progress WHERE book_id = ? AND user_id = ?",
-                    (book_id, user_id),
-                )
-                exists = cursor.fetchone()
-                if not exists:
-                    cursor.execute(
-                        """
-                        INSERT OR IGNORE INTO user_progress (
-                            book_id, user_id, pages_read, is_completed, last_read_at,
-                            last_epub_cfi, last_epub_href, last_epub_spine_index,
-                            last_epub_percent, last_epub_fingerprint, last_epub_updated_at
-                        ) VALUES (?,?,?,?,?,?,?,?,?,?,?)
-                        """,
-                        (book_id, user_id, 0, 0, last_read_at, None, None, None, 0, None, None),
-                    )
-                
-                cursor.execute(
-                    """
-                    UPDATE user_progress
-                    SET pages_read=?, is_completed=?, last_read_at=?,
-                        last_epub_cfi=?, last_epub_href=?, last_epub_spine_index=?,
-                        last_epub_percent=?, last_epub_fingerprint=?, last_epub_updated_at=?
-                    WHERE book_id=? AND user_id=?
-                    """,
-                    (
-                        pages_read,
-                        is_completed,
-                        last_read_at,
-                        last_epub_cfi,
-                        last_epub_href,
-                        last_epub_spine_index,
-                        last_epub_percent,
-                        last_epub_fingerprint,
-                        last_epub_updated_at,
-                        book_id,
-                        user_id,
-                    ),
+                ReadingProgressRepository.update_progress_full(
+                    db_type, book_id, user_id, pages_read, is_completed, last_read_at,
+                    last_epub_cfi, last_epub_href, last_epub_spine_index,
+                    last_epub_percent, last_epub_fingerprint, last_epub_updated_at
                 )
                 
-                # 2. user_reading_log 누적 기록 반영
+                # 2. 일일 활동 로그 반영
                 if delta > 0:
                     today_str = datetime.now().strftime('%Y-%m-%d')
-                    cursor.execute(
-                        "SELECT id FROM user_reading_log WHERE book_id=? AND user_id=? AND read_date=?",
-                        (book_id, user_id, today_str),
-                    )
-                    log_row = cursor.fetchone()
-                    if log_row:
-                        cursor.execute(
-                            "UPDATE user_reading_log SET pages_read_delta=pages_read_delta+? WHERE id=?",
-                            (delta, log_row['id']),
-                        )
-                    else:
-                        cursor.execute(
-                            "INSERT INTO user_reading_log (book_id, user_id, pages_read_delta, duration_seconds, read_date) VALUES (?,?,?,60,?)",
-                            (book_id, user_id, delta, today_str),
-                        )
+                    ReadingProgressRepository.update_or_insert_reading_log(db_type, book_id, user_id, delta, today_str)
                         
-                # 성공적으로 DB 트랜잭션 영역에 흘려보냈으므로, 레디스 목록 및 캐시 정리
                 redis_client.srem(pending_key, item)
                 synced_count += 1
             except Exception as e:
                 logger_db.error(f"[Redis Cache Flush ERROR] Failed to sync progress for item {item}: {e}")
 
-        # 모든 커넥션 일괄 커밋 및 릴리즈
-        for db_type, (conn, cursor) in connections.items():
-            try:
-                conn.commit()
-                conn.close()
-            except Exception:
-                pass
-                
         logger_db.info(f"[Redis Cache Flush] Finished sync. {synced_count} items merged to SQLite.")
         return synced_count

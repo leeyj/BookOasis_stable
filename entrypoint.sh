@@ -14,6 +14,27 @@ DATA_DIRS="/app/db /app/covers /app/cache /app/logs"
 
 # ── Graceful Shutdown을 위한 시그널 트랩 ──
 WEB_PID=0
+WORKER_PID=0
+
+check_pid_alive() {
+    local pid="$1"
+    [ -n "$pid" ] && kill -0 "$pid" >/dev/null 2>&1
+}
+
+find_pids_by_pattern() {
+    local pattern="$1"
+    if [ -d "/proc" ]; then
+        for name in /proc/[0-9]*; do
+            if [ -d "$name" ] && [ -f "$name/cmdline" ]; then
+                local pid
+                pid=$(basename "$name")
+                if grep -q -a "$pattern" "$name/cmdline" 2>/dev/null; then
+                    echo "$pid"
+                fi
+            fi
+        done
+    fi
+}
 
 cleanup() {
     echo "[Entrypoint] SIGTERM/SIGINT received. Shutting down gracefully..."
@@ -25,7 +46,18 @@ cleanup() {
     fi
     
     # 2. 스캐너 워커 프로세스 검출 및 종료
-    W_PIDS=$(pgrep -f "tools/scanner_worker.py")
+    W_PIDS=""
+    if [ "$WORKER_PID" -ne 0 ] && check_pid_alive "$WORKER_PID"; then
+        W_PIDS="$WORKER_PID"
+    fi
+    EXTRA_W_PIDS=$(find_pids_by_pattern "tools/scanner_worker.py")
+    if [ -n "$EXTRA_W_PIDS" ]; then
+        if [ -n "$W_PIDS" ]; then
+            W_PIDS="$W_PIDS $EXTRA_W_PIDS"
+        else
+            W_PIDS="$EXTRA_W_PIDS"
+        fi
+    fi
     if [ -n "$W_PIDS" ]; then
         echo "[Entrypoint] Stopping Scanner Workers (PIDs: $W_PIDS)..."
         for WP in $W_PIDS; do
@@ -36,10 +68,17 @@ cleanup() {
     # 3. 최대 15초 동안 프로세스 자발적 종료 대기
     for i in {1..15}; do
         ALIVE=false
-        if [ "$WEB_PID" -ne 0 ] && ps -p "$WEB_PID" >/dev/null 2>&1; then
+        if [ "$WEB_PID" -ne 0 ] && check_pid_alive "$WEB_PID"; then
             ALIVE=true
         fi
-        W_PIDS_CHECK=$(pgrep -f "tools/scanner_worker.py")
+        W_PIDS_CHECK=""
+        if [ "$WORKER_PID" -ne 0 ] && check_pid_alive "$WORKER_PID"; then
+            W_PIDS_CHECK="$WORKER_PID"
+        fi
+        EXTRA_W_PIDS_CHECK=$(find_pids_by_pattern "tools/scanner_worker.py")
+        if [ -n "$EXTRA_W_PIDS_CHECK" ]; then
+            W_PIDS_CHECK="$W_PIDS_CHECK $EXTRA_W_PIDS_CHECK"
+        fi
         if [ -n "$W_PIDS_CHECK" ]; then
             ALIVE=true
         fi
@@ -51,11 +90,22 @@ cleanup() {
     done
     
     # 4. 15초 이후에도 살아있는 프로세스는 강제 종료 (SIGKILL)
-    if [ "$WEB_PID" -ne 0 ] && ps -p "$WEB_PID" >/dev/null 2>&1; then
+    if [ "$WEB_PID" -ne 0 ] && check_pid_alive "$WEB_PID"; then
         echo "[Entrypoint] Gunicorn failed to exit. Force killing..."
         kill -9 "$WEB_PID" 2>/dev/null || true
     fi
-    W_PIDS_KILL=$(pgrep -f "tools/scanner_worker.py")
+    W_PIDS_KILL=""
+    if [ "$WORKER_PID" -ne 0 ] && check_pid_alive "$WORKER_PID"; then
+        W_PIDS_KILL="$WORKER_PID"
+    fi
+    EXTRA_W_PIDS_KILL=$(find_pids_by_pattern "tools/scanner_worker.py")
+    if [ -n "$EXTRA_W_PIDS_KILL" ]; then
+        if [ -n "$W_PIDS_KILL" ]; then
+            W_PIDS_KILL="$W_PIDS_KILL $EXTRA_W_PIDS_KILL"
+        else
+            W_PIDS_KILL="$EXTRA_W_PIDS_KILL"
+        fi
+    fi
     if [ -n "$W_PIDS_KILL" ]; then
         echo "[Entrypoint] Scanner workers failed to exit. Force killing..."
         for WP in $W_PIDS_KILL; do
@@ -107,11 +157,12 @@ start_worker_after_health() {
         fi
 
         if [ -n "$run_as_user" ]; then
-            gosu "$run_as_user" python3 tools/scanner_worker.py > /app/logs/media_server_worker.log 2>&1
+                gosu "$run_as_user" python3 tools/scanner_worker.py > /app/logs/media_server_worker.log 2>&1
         else
             python3 tools/scanner_worker.py > /app/logs/media_server_worker.log 2>&1
         fi
     ) &
+        WORKER_PID=$!
 }
 
 echo "[Entrypoint] 데이터 디렉토리 권한 확인 중..."

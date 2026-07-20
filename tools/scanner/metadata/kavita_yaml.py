@@ -144,13 +144,39 @@ def parse_kavita_yaml(folder_path, files=None, is_remote=False):
     except ImportError:
         from yaml import SafeLoader
 
+    content = read_file_with_timeout(actual_yaml_path, is_remote)
+    if content is None:
+        return meta
+
+    # 1차 보정: 비정상적인 "- Key: Value" 문법을 "Key: Value"로 보정 (공백 유무 자비 허용)
+    import re
+    content = re.sub(r'^\s*-\s*([a-zA-Z0-9_\s]+)\s*:', r'\1:', content, flags=re.MULTILINE)
+
+    data = {}
     try:
-        content = read_file_with_timeout(actual_yaml_path, is_remote)
-        if content is None:
-            return meta
-
         data = yaml.load(content, Loader=SafeLoader) or {}
+    except Exception as e:
+        print(f"[Scanner] YAML parsing error ({folder_path}): {e}. Running Regex Fallback Parser...")
+        meta['parser_warnings'].append({
+            'file_path': actual_yaml_path,
+            'filename': os.path.basename(actual_yaml_path),
+            'error_type': 'YamlParseError',
+            'message': f"YAML Parse failed, fallback active: {e}"
+        })
+        # 2차 보정: Regex Fallback Parser 기동
+        try:
+            for line in content.splitlines():
+                match = re.match(r'^\s*-?\s*([a-zA-Z0-9_\s]{2,40})\s*:\s*(.*)$', line)
+                if match:
+                    key = match.group(1).strip()
+                    val = match.group(2).strip()
+                    if (val.startswith("'") and val.endswith("'")) or (val.startswith('"') and val.endswith('"')):
+                        val = val[1:-1]
+                    data[key] = val
+        except Exception as fallback_err:
+            print(f"[Scanner] YAML Regex Fallback also failed ({folder_path}): {fallback_err}")
 
+    try:
         def _parse_list_or_str(val):
             if not val:
                 return ''
@@ -218,7 +244,7 @@ def parse_kavita_yaml(folder_path, files=None, is_remote=False):
 
         del data
     except Exception as e:
-        print(f"[Scanner] YAML parsing error ({folder_path}): {e}")
+        print(f"[Scanner] YAML data processing error ({folder_path}): {e}")
         meta['parser_warnings'].append({
             'file_path': actual_yaml_path,
             'filename': os.path.basename(actual_yaml_path),
