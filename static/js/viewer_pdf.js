@@ -13,7 +13,7 @@ export async function initPdfViewer(bookId, pagesRead, totalPages) {
   console.log(`[Viewer-Pdf] initPdfViewer - PDF 렌더링 요청: bookId=${bookId}, pagesRead=${pagesRead}, totalPages=${totalPages}`);
   
   document.getElementById('pdf-viewer-container').style.display = 'flex';
-  pdfCurrentPage = pagesRead > 0 ? pagesRead : 1;
+  pdfCurrentPage = pagesRead > 0 ? Math.max(1, parseInt(pagesRead, 10) || 1) : 1;
   pdfTotalPages = totalPages || 0;
   
   // 뷰어 진입 시 totalPages가 0이면 백엔드 API를 통해 동적 계산 시도 (DB 동기화용)
@@ -199,7 +199,7 @@ export function prevPdfPage() {
     const step = (typeof getComicPageStep === 'function') ? getComicPageStep() : 1;
     pdfCurrentPage = Math.max(1, pdfCurrentPage - step);
     renderPdfPage();
-    saveProgress(state.activeBookId, pdfCurrentPage, pdfTotalPages);
+    saveProgress(state.activeBookId, pdfCurrentPage - 1, pdfTotalPages);
   }
 }
 
@@ -208,7 +208,7 @@ export function nextPdfPage() {
     const step = (typeof getComicPageStep === 'function') ? getComicPageStep() : 1;
     pdfCurrentPage = Math.min(pdfTotalPages, pdfCurrentPage + step);
     renderPdfPage();
-    saveProgress(state.activeBookId, pdfCurrentPage, pdfTotalPages);
+    saveProgress(state.activeBookId, pdfCurrentPage - 1, pdfTotalPages);
   }
 }
 
@@ -255,6 +255,10 @@ export function pdfSliderChange(slider, val) {
 export const PdfViewer = {
   async init(bookId, pagesRead, totalPages) {
     return initPdfViewer(bookId, pagesRead, totalPages);
+  },
+  prepareForClose() {
+    if (!state.activeBookId || !pdfDoc || !pdfTotalPages || pdfTotalPages <= 0) return;
+    saveProgress(state.activeBookId, pdfCurrentPage - 1, pdfTotalPages);
   },
   destroy() {
     clearPdfViewer();

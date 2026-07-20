@@ -3,6 +3,8 @@ import * as Viewer from './viewer/viewer_init.js';
 import * as Settings from './viewer/reader_settings.js';
 import * as Renderer from './viewer/renderer.js';
 import * as Nav from './viewer/navigation.js';
+import { state } from './state.js';
+import { saveProgress } from './viewer_progress.js';
 
 // Re-export commonly used APIs as wrappers to avoid circular-import undefineds
 export function initComicViewer(...args) { return (Viewer.initComicViewer || Viewer.initViewer).apply(null, args); }
@@ -62,6 +64,11 @@ if (typeof window !== 'undefined') {
 export const ComicViewer = {
   async init(bookId, pagesRead, totalPages) {
     return initComicViewer(bookId, pagesRead, totalPages);
+  },
+  prepareForClose() {
+    const totalPages = Renderer.getComicTotalPages();
+    if (!state.activeBookId || !totalPages || totalPages <= 0) return;
+    saveProgress(state.activeBookId, Renderer.getComicCurrentPage(), totalPages);
   },
   destroy() {
     clearComicViewer();

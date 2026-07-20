@@ -1,7 +1,14 @@
 # CHANGELOG
+## v1.2.6
+- EPUB/PDF/TXT/ZIP 종료 후 최근 읽은 도서 및 이어읽기 위치 반영 개선 | Improved recent-history and resume-position updates after closing EPUB/PDF/TXT/ZIP viewers
+- TXT 0% 구간 재오픈 시 이전 위치로 되감기던 문제 수정 | Fixed TXT reopening regression that could restore an older position while progress still showed 0%
+- 최근 읽은 도서 캐시에 Redis 최신 진행률 병합 적용 | Merged live Redis progress into recent-history cache responses
+
 ## v1.2.5
-- 모바일 뷰에서 카테고리 선택시 ui 겹침현상 수정 | **English translation** |
-- 읽지않음으로 변경 기능 버그 수정 | **English translation** |
+- 모바일 뷰에서 카테고리 선택시 ui 겹침현상 수정 | Fix overlapping UI issue when selecting a category on mobile view
+- 읽지않음으로 변경 기능 버그 수정 | Fix bug for switching to "Unread"
+- 카테고리 삭제시 즐겨찾기 항목있어도 삭제 | Delete category even if there are bookmark items
+---
 ## v1.2.4 
 - FTS 가상 테이블 제거(opds 검색기능 차단) | Removed FTS virtual table (disabling OPDS search functionality)
 - 시작/재시작시 오류 수정 | Fixed errors occurring at startup/restart

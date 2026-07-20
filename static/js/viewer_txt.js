@@ -428,6 +428,60 @@ function applyDynamicParagraphStyles() {
   });
 }
 
+function persistTxtProgressSnapshot() {
+  if (!state.activeBookId || !Array.isArray(txtChunks) || txtChunks.length === 0) return;
+
+  // TXT는 첫 청크/첫 퍼센트 구간에서는 서버 progress가 0으로 남을 수 있으므로,
+  // 같은 기기 재오픈용 세부 스크롤/페이지 위치를 닫기 직전에 반드시 갱신합니다.
+  saveDetailPosition();
+
+  const totalChunks = txtChunks.length;
+  const safeChunkIdx = Math.max(0, Math.min(totalChunks - 1, currentChunkIdx));
+  const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
+  const isEpub = (state.currentViewerFormat === 'epub');
+
+  if (!isEpub) {
+    saveProgress(state.activeBookId, safeChunkIdx, totalChunks);
+    return;
+  }
+
+  const scrollWrapper = document.getElementById('txt-scroll-wrapper');
+  const contentArea = document.getElementById('txt-content-area');
+  let snapshotIdx = safeChunkIdx;
+  let snapshotPercent = totalChunks > 0 ? Math.round((safeChunkIdx / totalChunks) * 100) : 0;
+
+  if (scrollMode === 'scroll' && scrollWrapper && contentArea) {
+    const scrollHeight = scrollWrapper.scrollHeight - scrollWrapper.clientHeight;
+    const ratio = scrollHeight > 0 ? scrollWrapper.scrollTop / scrollHeight : 0;
+    const chunks = contentArea.querySelectorAll('.txt-scroll-chunk');
+    for (const chunk of chunks) {
+      const idx = parseInt(chunk.getAttribute('data-idx'), 10);
+      if (Number.isFinite(idx) && scrollWrapper.scrollTop >= chunk.offsetTop - 120) {
+        snapshotIdx = idx;
+      } else {
+        break;
+      }
+    }
+    snapshotPercent = Math.max(0, Math.min(100, Math.round(ratio * 100)));
+  }
+
+  let fingerprint = '';
+  if (contentArea) {
+    const currentChunk = contentArea.querySelector(`.txt-scroll-chunk[data-idx="${snapshotIdx}"]`) || contentArea.querySelector('.txt-chunk, .epub-chunk');
+    if (currentChunk) {
+      fingerprint = String(currentChunk.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 180);
+    }
+  }
+
+  saveProgress(state.activeBookId, snapshotIdx, totalChunks, {
+    epub_session: {
+      index: snapshotIdx,
+      percent: snapshotPercent,
+      fingerprint: fingerprint || undefined
+    }
+  });
+}
+
 import { getViewerSettings } from './viewer_settings.js';
 
 export function logActiveViewportText() {
@@ -695,6 +749,9 @@ export function txtSliderChange(slider, val) {
 export const TxtViewer = {
   async init(bookId, initialPageIdx = 0) {
     return initTxtViewer(bookId, initialPageIdx);
+  },
+  prepareForClose() {
+    persistTxtProgressSnapshot();
   },
   destroy() {
     txtRuntimeState.reset();

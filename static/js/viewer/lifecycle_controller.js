@@ -150,6 +150,14 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false) {
   const viewerModal = document.getElementById('media-viewer-modal');
   if (!viewerModal) return;
 
+  if (activeViewerInstance && typeof activeViewerInstance.prepareForClose === 'function') {
+    try {
+      activeViewerInstance.prepareForClose();
+    } catch (e) {
+      console.warn('[Viewer-Core] Error preparing viewer for close:', e);
+    }
+  }
+
   exitFullscreenIfNeeded();
 
   const padPanel = document.getElementById('viewer-padding-overlay-panel');
