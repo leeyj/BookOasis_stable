@@ -123,15 +123,31 @@ if not IS_WORKER:
         except Exception as fe:
             print(f"[Graceful-Shutdown] Redis cache flush failed (ignored): {fe}")
         
-        # 자식 스캐너 프로세스 강제 종료
+        # 자식 스캐너 프로세스 및 독립 레이지 스캐너 정리
         global _worker_process
         if _worker_process is not None and _worker_process.poll() is None:
             try:
-                print("[Graceful-Shutdown] 스캐너 워커 프로세스 종료 중...")
+                print("[Graceful-Shutdown] 스캐너 워커 자식 프로세스 종료 중...")
                 _worker_process.terminate()
                 _worker_process.wait(timeout=5)
             except Exception as pe:
                 print(f"[Graceful-Shutdown] 워커 프로세스 종료 오류: {pe}")
+
+        # 실행 중인 독립 lazy_scanner 프로세스 감지 시 SIGTERM 및 안전 마감 대기
+        try:
+            import psutil
+            current_pid = os.getpid()
+            for proc in psutil.process_iter(['pid', 'cmdline']):
+                try:
+                    cmd = proc.info.get('cmdline')
+                    if cmd and proc.info['pid'] != current_pid and any('lazy_scanner.py' in arg for arg in cmd):
+                        print(f"[Graceful-Shutdown] 🛑 백그라운드 레이지 스캐너 감지 (PID: {proc.info['pid']}). SIGTERM 송신 후 대기...")
+                        proc.terminate()
+                        proc.wait(timeout=5)
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
         try:
             if hasattr(SchedulerService, 'stop_scheduler'):

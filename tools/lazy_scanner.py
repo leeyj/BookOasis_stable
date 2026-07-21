@@ -61,6 +61,7 @@ def setup_lazy_scanner_logging():
         def custom_print(*args, **kwargs):
             # 터미널용 출력 (콘솔 실행 시 확인용)
             original_print(*args, **kwargs)
+            sys.stdout.flush()
             
             # lazy_scanner.log 파일 기록
             try:
@@ -80,7 +81,14 @@ def setup_lazy_scanner_logging():
 
 
 def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
+    global stop_requested
     setup_lazy_scanner_logging()
+    try:
+        from utils.signal_helper import register_shutdown_handlers
+        register_shutdown_handlers()
+    except Exception:
+        pass
+
     if target_book_id is not None:
         print(f"[Lazy-Scanner] 🚀 단일 도서 즉시 스캔 기동 시작 (Book ID: {target_book_id})")
     else:
@@ -92,34 +100,55 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
         if target_db_type in ('general', 'adult'):
             db_types = [target_db_type]
 
-        # ── 최대 스캔 허용 파일 크기(MB) 설정 로드 ──────────────────────
-        # 0이면 제한 없음. 원격 마운트(VFS/NAS 등) 포함 os.path.getsize 시도.
-        max_size_mb = 300.0  # 안전 기본값
+        # ── 최대 스캔 허용 파일 크기(MB) 및 세션 누적 제한(MB) 설정 로드 ──
+        max_size_mb = 300.0   # 개별 파일 안전 기본값 (300MB)
+        max_batch_mb = 1024.0 # 세션 누적 안전 기본값 (1024MB = 1GB)
         try:
             gen_db_path = os.path.join(MEDIA_SERVER_DIR, 'db', 'media_general.db')
             if os.path.exists(gen_db_path):
-                _tmp_conn = sqlite3.connect(gen_db_path, timeout=2.0)
+                _tmp_conn = sqlite3.connect(gen_db_path, timeout=30.0)
                 _tmp_conn.row_factory = sqlite3.Row
                 _tmp_cur = _tmp_conn.cursor()
-                _tmp_cur.execute("SELECT value FROM settings WHERE key = 'LAZY_SCAN_MAX_FILE_SIZE_MB'")
-                _row = _tmp_cur.fetchone()
+                _tmp_cur.execute("SELECT key, value FROM settings WHERE key IN ('LAZY_SCAN_MAX_FILE_SIZE_MB', 'LAZY_SCAN_MAX_BATCH_SIZE_MB')")
+                _rows = {r['key']: r['value'] for r in _tmp_cur.fetchall()}
                 _tmp_conn.close()
-                if _row:
-                    max_size_mb = float(str(_row['value']).strip() or '300')
+                if 'LAZY_SCAN_MAX_FILE_SIZE_MB' in _rows:
+                    max_size_mb = float(str(_rows['LAZY_SCAN_MAX_FILE_SIZE_MB']).strip() or '300')
+                if 'LAZY_SCAN_MAX_BATCH_SIZE_MB' in _rows:
+                    max_batch_mb = float(str(_rows['LAZY_SCAN_MAX_BATCH_SIZE_MB']).strip() or '1024')
         except Exception as _se:
-            print(f"[Lazy-Scanner] 최대 파일 크기 설정 로드 실패 (기본 300MB 적용): {_se}")
+            print(f"[Lazy-Scanner] 크기 설정 로드 실패 (기본 300MB/1024MB 적용): {_se}")
+        
         if max_size_mb > 0:
-            print(f"[Lazy-Scanner] 📏 최대 스캔 허용 파일 크기: {max_size_mb:.0f} MB (초과 시 스킵 + 리포트 기록)")
+            print(f"[Lazy-Scanner] 📏 개별 파일 크기 제한: {max_size_mb:.0f} MB (초과 시 스킵)")
         else:
-            print("[Lazy-Scanner] 📏 최대 파일 크기 제한 없음 (LAZY_SCAN_MAX_FILE_SIZE_MB=0)")
+            print("[Lazy-Scanner] 📏 개별 파일 크기 제한 없음 (LAZY_SCAN_MAX_FILE_SIZE_MB=0)")
+
+        if max_batch_mb > 0:
+            print(f"[Lazy-Scanner] 📊 1회 세션 누적 처리 용량 한도: {max_batch_mb:.0f} MB (도달 시 다음 스케줄로 안전 이관)")
+        else:
+            print("[Lazy-Scanner] 📊 세션 누적 처리 용량 제한 없음 (LAZY_SCAN_MAX_BATCH_SIZE_MB=0)")
+
+        session_accumulated_bytes = 0.0
+        batch_limit_reached = False
 
         for db_type in db_types:
+            if stop_requested:
+                print("[Lazy-Scanner] ⚠️ 중단 요청(SIGTERM/SIGINT) 감지. DB 순회를 중단합니다.")
+                break
+
             db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
             if not os.path.exists(db_path):
                 continue
                 
-            print(f"[Lazy-Scanner] DB 검사 중: {db_type}")
-            conn = database.get_connection(db_type)
+            print(f"[Lazy-Scanner] 🔍 DB 연결 및 검사 시작: {db_type}")
+            conn = sqlite3.connect(db_path, timeout=60.0)
+            conn.row_factory = sqlite3.Row
+            try:
+                conn.execute("PRAGMA busy_timeout = 60000;")
+                conn.execute("PRAGMA synchronous = NORMAL;")
+            except Exception:
+                pass
             cursor = conn.cursor()
             
             if target_book_id is not None:
@@ -128,12 +157,25 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
                     FROM books WHERE id = ?
                 """, (target_book_id,))
             else:
+                # ── DB SQL 필터링 최적화 ──
+                # 1. txt 확장자 제외
+                # 2. 커버 경로가 없는 경우(NULL 또는 빈 문자열)
+                # 3. ZIP/CBZ 포맷 중 페이지 수(total_pages)=0 이거나 오프셋(has_offsets)=0 인 경우
+                # 위 스캔 후보 도서만 DB 인덱스 레벨에서 1차 선별하여 퍼포먼스 극대화
                 cursor.execute("""
                     SELECT id, file_path, series_name, file_format, cover_image, library_id, total_pages, has_offsets
                     FROM books
+                    WHERE LOWER(file_path) NOT LIKE '%.txt'
+                      AND (
+                          (cover_image IS NULL OR cover_image = '')
+                          OR (LOWER(COALESCE(file_format, '')) IN ('zip', 'cbz') AND COALESCE(has_offsets, 0) = 0)
+                      )
+                      AND COALESCE(cover_image, '') != 'NO_COVER'
+                      AND COALESCE(has_offsets, 0) != -1
                 """)
                 
             books = cursor.fetchall()
+            print(f"[Lazy-Scanner] 📋 DB({db_type}) 스캔 필요 후보 도서 레코드 조회 완료 (총 {len(books)}권). 파일 물리 점검 시작...")
             
             targets = []
             for book in books:
@@ -229,11 +271,12 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
                     
                     # ─── 우아한 종료 시그널 감지 가드 ───
                     if stop_requested:
-                        print("[Lazy-Scanner] ⚠️ 중단 요청(SIGTERM/SIGINT)이 감지되었습니다. 작업을 정지하고 우아하게 마감합니다.")
+                        print("[Lazy-Scanner] ⚠️ 중단 요청(SIGTERM/SIGINT)이 감지되었습니다. 진행 중 트랜잭션 롤백 후 우아하게 마감합니다.")
                         if conn:
                             try:
+                                conn.rollback()
                                 conn.close()
-                            except:
+                            except Exception:
                                 pass
                         sys.exit(0)
 
@@ -270,25 +313,27 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
                         mode_label = "[커버]"          # EPUB/PDF 등: 커버만 없음
                     print(f"[Lazy-Scanner] ({done}/{total}) {mode_label} 처리 시작 -> {filename}")
 
-                    # ─── 최대 파일 크기 초과 여부 체크 (로컬+VFS/NAS 원격 마운트 포함) ───
-                    # getsize() 실패 시에도 안전 우선으로 스킵 + 리포트 기록.
-                    # (크기를 확인할 수 없는 원격 파일을 무조건 스캔하는 것은 OOM 위험)
+                    # ─── 1. 개별 파일 크기 초과 체크 ───
+                    curr_file_size = 0.0
+                    try:
+                        curr_file_size = os.path.getsize(file_path)
+                    except OSError:
+                        pass
+
                     if max_size_mb > 0:
                         try:
-                            file_size_mb = os.path.getsize(file_path) / (1024.0 * 1024.0)
+                            file_size_mb = curr_file_size / (1024.0 * 1024.0)
                             if file_size_mb > max_size_mb:
                                 print(f"[Lazy-Scanner] ⛔ 파일 크기 초과 스킵 ({file_size_mb:.1f} MB > {max_size_mb:.0f} MB): {filename}")
                                 lib_errors[library_id].append({
                                     'file_path': file_path,
                                     'filename': filename,
                                     'error_type': 'SkippedOversizedFile',
-                                    'message': f"LAZY_SKIP: 파일 크기({file_size_mb:.1f} MB)가 허용 한도({max_size_mb:.0f} MB)를 초과하여 스캔을 건너뜁니다."
+                                    'message': f"LAZY_SKIP: 개별 파일 크기({file_size_mb:.1f} MB)가 허용 한도({max_size_mb:.0f} MB)를 초과하여 스캔을 건너뜁니다."
                                 })
                                 gc.collect()
                                 continue
                         except OSError as _size_err:
-                            # 크기 조회 자체가 실패(원격 마운트 오류·권한 없음 등) →
-                            # 크기를 보증할 수 없으므로 안전 우선으로 스킵 + 리포트 기록
                             print(f"[Lazy-Scanner] ⚠️ 파일 크기 조회 실패 → 안전 스킵: {filename} ({_size_err})")
                             lib_errors[library_id].append({
                                 'file_path': file_path,
@@ -298,7 +343,7 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
                             })
                             gc.collect()
                             continue
-                    
+
                     try:
                         # ── 오프셋만 없는 경우: 커버 재추출 없이 오프셋만 수집 ──
                         if offset_only:
@@ -336,6 +381,14 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
                                     save_book_offsets(cursor, book_id, filename, offsets)
                                     conn.commit()
                                     print(f"[Lazy-Scanner] 오프셋 전용 저장 완료 ({len(offsets)}p): {filename}")
+                                    
+                                    # ── 성공 시 세션 누적 가산 ──
+                                    session_accumulated_bytes += curr_file_size
+                                    session_accumulated_mb = session_accumulated_bytes / (1024.0 * 1024.0)
+                                    if max_batch_mb > 0 and session_accumulated_mb >= max_batch_mb:
+                                        print(f"[Lazy-Scanner] 🛑 세션 성공 처리 누적 용량 한도 달성 ({session_accumulated_mb:.1f} MB / {max_batch_mb:.0f} MB). 차기 서브-배치 세션을 기동합니다.")
+                                        batch_limit_reached = True
+                                        break
                                 else:
                                     print(f"[Lazy-Scanner] 오프셋 수집 결과 없음 (이미지 없는 ZIP?): {filename}")
                             if target_book_id is None:
@@ -415,9 +468,17 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
                                 conn.commit()
                                 print(f"[Lazy-Scanner] 커버 없이 오프셋 단독 저장 완료: {filename}")
                             except Exception as oe:
-                                print(f"[Lazy-Scanner] 오프셋 단독 저장 중 예외 무시: {oe}")
+                                print("[Lazy-Scanner] 표지 없이 오프셋 단독 저장 완료: " + filename)
                         else:
                             raise ValueError("표지 이미지를 추출할 수 없거나 파일 포맷이 무효합니다.")
+
+                        # ── 성공(Success) 시에만 세션 누적 처리 용량 가산 및 마감 체크 ──
+                        session_accumulated_bytes += curr_file_size
+                        session_accumulated_mb = session_accumulated_bytes / (1024.0 * 1024.0)
+                        if max_batch_mb > 0 and session_accumulated_mb >= max_batch_mb:
+                            print(f"[Lazy-Scanner] 🛑 세션 성공 처리 누적 용량 한도 달성 ({session_accumulated_mb:.1f} MB / {max_batch_mb:.0f} MB). 메모리 환수를 위해 차기 서브-배치 세션을 기동합니다.")
+                            batch_limit_reached = True
+                            break
 
                     except Exception as e:
                         err_msg = str(e)
@@ -433,6 +494,18 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
                         elif file_path.lower().endswith('.pdf') and ("mupdf" in err_msg.lower() or "syntax error" in err_msg.lower() or "page tree" in err_msg.lower() or "cannot open" in err_msg.lower() or "fitz" in err_msg.lower()):
                             error_type = "MuPDFFormatError"
                             
+                        # ── 실패한 도서는 cover_image = 'NO_COVER'로 갱신하여 다음 쿼리에서 무한 반복 스킵 ──
+                        try:
+                            cursor.execute("""
+                                UPDATE books SET
+                                    cover_image = CASE WHEN COALESCE(cover_image, '') = '' THEN 'NO_COVER' ELSE cover_image END,
+                                    has_offsets = CASE WHEN (COALESCE(total_pages, 0) = 0 OR COALESCE(has_offsets, 0) = 0) THEN -1 ELSE has_offsets END
+                                WHERE id = ?
+                            """, (book_id,))
+                            conn.commit()
+                        except Exception as db_mark_err:
+                            print(f"[Lazy-Scanner WARNING] 실패 상태 마킹 중 무시된 에러: {db_mark_err}")
+
                         lib_errors[library_id].append({
                             'file_path': file_path,
                             'filename': filename,
@@ -441,8 +514,12 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
                         })
                         
                     gc.collect()
+                    if batch_limit_reached or stop_requested:
+                        break
                     if target_book_id is None:
                         time.sleep(3.0)
+                if batch_limit_reached or stop_requested:
+                    break
                 
             # 카테고리별 수집된 에러 리포트 저장 트리거
             from utils.report_helper import save_scan_report
@@ -462,7 +539,12 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
                 conn.close()
             except Exception:
                 pass
-    print("[Lazy-Scanner] ✅ 모든 DB의 Lazy 표지 스캔 작업 완료")
+    print("[Lazy-Scanner] ✅ 현재 회차의 Lazy 표지 스캔 작업 마감")
+    if batch_limit_reached:
+        print("[Lazy-Scanner] 🔄 세션 용량 한도 도달로 인한 차기 서브-배치 세션 기동 요청 (Exit Code 10)")
+        sys.exit(10)
+    else:
+        sys.exit(0)
 
 def get_series_cover_fallback_single(series_name, parent_dir, filename, file_path, library_id,
                                      b64_keys_lower=None, series_cover_url=None, shared_cover=None,
@@ -598,5 +680,13 @@ if __name__ == '__main__':
     parser.add_argument('--db-type', choices=['general', 'adult'], default=None)
     args = parser.parse_args()
 
-    run_lazy_cover_extraction(target_book_id=args.book_id, target_db_type=args.db_type)
+    try:
+        run_lazy_cover_extraction(target_book_id=args.book_id, target_db_type=args.db_type)
+    except SystemExit as se:
+        sys.exit(se.code)
+    except Exception as main_err:
+        import traceback
+        tb = traceback.format_exc()
+        print(f"[Lazy-Scanner FATAL ERROR] 치명적 예외 발생으로 프로세스가 중단되었습니다:\n{tb}")
+        sys.exit(1)
 

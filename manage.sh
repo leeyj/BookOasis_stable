@@ -202,74 +202,17 @@ stop() {
         fi
     fi
 
-    echo "[*] 미디어 서버 프로세스를 모두 검출하여 정리합니다..."
+    # ───────────────────────────────────────────────────────────────────
+    # ⚠️ [CRITICAL WARNING] 종료 순서 절대 변경 금지! (DB MALFORMED 손상 방지)
+    # 반드시 스캐너 프로세스(스캐너 워커 -> 레이지 스캐너)를 1, 2순위로 종료하고,
+    # 웹 서버(Gunicorn/core:app)를 맨 마지막(3순위)으로 종료해야 합니다.
+    # 만약 웹 서버가 먼저 꺼지면 atexit/shutdown_all_pools가 DB 커넥션 풀을 끊고
+    # WAL 체크포인트를 치는 동안, 잔존 스캐너가 DB 쓰기를 시도하여 
+    # 'database disk image is malformed' 결함이 100% 발생합니다!
+    # ───────────────────────────────────────────────────────────────────
+    echo "[*] 미디어 서버 프로세스를 모두 검출하여 안전한 순서(스캐너 워커 -> 레이지 스캐너 -> 웹서버)로 정리합니다..."
     
-    # 1. PID 파일 기준 종료
-    if [ -f "$PID_FILE" ]; then
-        PID=$(cat "$PID_FILE")
-        if check_pid_alive "$PID"; then
-            echo "[*] PID 파일 기준 미디어 서버 종료 시도 (PID: $PID)"
-            kill -15 "$PID"
-            
-            # Graceful Shutdown 대기 (최대 30초)
-            for i in {1..30}; do
-                if ! check_pid_alive "$PID"; then
-                    break
-                fi
-                sleep 1
-            done
-            
-            if check_pid_alive "$PID"; then
-                if [ "$FORCE_RESTART" = "true" ]; then
-                    echo "[!] 미디어 서버가 SIGTERM(15)에 응답하지 않아 강제 종료(SIGKILL)합니다."
-                    kill -9 "$PID"
-                else
-                    echo "[!] 미디어 서버가 SIGTERM(15)에 응답하지 않았습니다. 강제 종료는 수행하지 않고 종료를 중단합니다."
-                    return 1
-                fi
-            fi
-        fi
-        rm -f "$PID_FILE"
-    fi
-
-    # 2. 잔존 gunicorn core:app 프로세스 소탕
-    PIDS=$(find_pids_by_pattern "gunicorn.*core:app")
-    if [ -n "$PIDS" ]; then
-        echo "[*] 남아있는 미디어 Gunicorn 프로세스 정리 대상: $PIDS"
-        for P in $PIDS; do
-            if check_pid_alive "$P"; then
-                kill -15 "$P"
-            fi
-        done
-        
-        # 잔존 프로세스들에 대해서도 최대 10초 대기
-        for i in {1..10}; do
-            STILL_ALIVE=false
-            for P in $PIDS; do
-                if check_pid_alive "$P"; then
-                    STILL_ALIVE=true
-                fi
-            done
-            if [ "$STILL_ALIVE" = false ]; then
-                break
-            fi
-            sleep 1
-        done
-        
-        for P in $PIDS; do
-            if check_pid_alive "$P"; then
-                if [ "$FORCE_RESTART" = "true" ]; then
-                    kill -9 "$P"
-                else
-                    echo "[!] 남아있는 미디어 Gunicorn 프로세스는 강제 종료하지 않습니다."
-                    return 1
-                fi
-            fi
-        done
-        echo "[+] 남아있던 프로세스 정리 완료."
-    fi
-
-    # 3. 스캐너 워커 프로세스 정리
+    # 1. 스캐너 워커 프로세스 정리 (DB 커넥션 안전 마감 1순위)
     if [ -f "$WORKER_PID_FILE" ]; then
         W_PID=$(cat "$WORKER_PID_FILE")
         if check_pid_alive "$W_PID"; then
@@ -332,7 +275,7 @@ stop() {
         done
     fi
 
-    # 4. 잔존 독립 레이지 스캐너 프로세스 소탕
+    # 2. 백그라운드 레이지 스캐너 프로세스 소탕 (DB 커넥션 안전 마감 2순위)
     LAZY_PIDS=$(find_pids_by_pattern "tools/lazy_scanner.py")
     if [ -n "$LAZY_PIDS" ]; then
         echo "[*] 백그라운드 레이지 스캐너 프로세스 정리 대상: $LAZY_PIDS"
@@ -366,6 +309,71 @@ stop() {
                 fi
             fi
         done
+    fi
+
+    # 3. 메인 웹 서버 프로세스 종료 (모든 스캐너 정리가 끝난 후 마지막에 DB 풀 및 WAL 체크포인트 닫기)
+    if [ -f "$PID_FILE" ]; then
+        PID=$(cat "$PID_FILE")
+        if check_pid_alive "$PID"; then
+            echo "[*] PID 파일 기준 미디어 서버 종료 시도 (PID: $PID)"
+            kill -15 "$PID"
+            
+            # Graceful Shutdown 대기 (최대 30초)
+            for i in {1..30}; do
+                if ! check_pid_alive "$PID"; then
+                    break
+                fi
+                sleep 1
+            done
+            
+            if check_pid_alive "$PID"; then
+                if [ "$FORCE_RESTART" = "true" ]; then
+                    echo "[!] 미디어 서버가 SIGTERM(15)에 응답하지 않아 강제 종료(SIGKILL)합니다."
+                    kill -9 "$PID"
+                else
+                    echo "[!] 미디어 서버가 SIGTERM(15)에 응답하지 않았습니다. 강제 종료는 수행하지 않고 종료를 중단합니다."
+                    return 1
+                fi
+            fi
+        fi
+        rm -f "$PID_FILE"
+    fi
+
+    # 잔존 gunicorn core:app 프로세스 소탕
+    PIDS=$(find_pids_by_pattern "gunicorn.*core:app")
+    if [ -n "$PIDS" ]; then
+        echo "[*] 남아있는 미디어 Gunicorn 프로세스 정리 대상: $PIDS"
+        for P in $PIDS; do
+            if check_pid_alive "$P"; then
+                kill -15 "$P"
+            fi
+        done
+        
+        # 잔존 프로세스들에 대해서도 최대 10초 대기
+        for i in {1..10}; do
+            STILL_ALIVE=false
+            for P in $PIDS; do
+                if check_pid_alive "$P"; then
+                    STILL_ALIVE=true
+                fi
+            done
+            if [ "$STILL_ALIVE" = false ]; then
+                break
+            fi
+            sleep 1
+        done
+        
+        for P in $PIDS; do
+            if check_pid_alive "$P"; then
+                if [ "$FORCE_RESTART" = "true" ]; then
+                    kill -9 "$P"
+                else
+                    echo "[!] 남아있는 미디어 Gunicorn 프로세스는 강제 종료하지 않습니다."
+                    return 1
+                fi
+            fi
+        done
+        echo "[+] 남아있던 프로세스 정리 완료."
     fi
 }
 

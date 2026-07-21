@@ -695,6 +695,7 @@ def init_databases():
                 ('RCLONE_RC_URL', 'http://localhost:5572'),
                 ('FTS_REBUILD_CRON', '30 4 * * *'),
                 ('LAZY_SCAN_MAX_FILE_SIZE_MB', '300'),
+                ('LAZY_SCAN_MAX_BATCH_SIZE_MB', '1024'),
             ]
             for k, v in default_settings:
                 cursor.execute("SELECT value FROM settings WHERE key = ?", (k,))

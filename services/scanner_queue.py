@@ -36,10 +36,11 @@ class ScannerQueue:
 
     def enqueue(self, task_type, **kwargs):
         task_key = self._get_task_key(task_type, kwargs)
+        force_requeue = kwargs.pop('force_requeue', False)
         try:
             from repositories.scanner_queue_repository import ScannerQueueRepository
             existing = ScannerQueueRepository.get_task_by_key(task_key)
-            if existing and existing['status'] in ('pending', 'running'):
+            if existing and existing['status'] in ('pending', 'running') and not force_requeue and task_type != 'lazy_scan':
                 self.log(f"Task '{task_key}' is already in state '{existing['status']}'. Rejecting duplicate.")
                 return False
 
@@ -227,8 +228,10 @@ def run_scanner_worker_loop():
                     error_message = f"Unknown task type: {task_type}"
                     sq.log(error_message)
             except Exception as work_err:
-                error_message = str(work_err)
-                sq.log(f"Task processing crashed: {work_err}")
+                import traceback
+                tb_str = traceback.format_exc()
+                error_message = f"{work_err}\n{tb_str}"
+                sq.log(f"❌ Task processing crashed:\n{tb_str}")
 
             # 4. 작업 결과 반영
             finished_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -275,31 +278,55 @@ def _process_lazy_scan(sq):
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     script_path = os.path.join(BASE_DIR, 'tools', 'lazy_scanner.py')
     
-    active_subprocess = subprocess.Popen(
-        [sys.executable, script_path],
-        cwd=BASE_DIR
-    )
-    try:
-        # 종료 시그널 수신 시 stop_requested 플래그와 함께 자식 종료를 기다립니다.
-        while True:
-            returncode = active_subprocess.poll()
-            if returncode is not None:
-                break
-            if stop_requested:
-                try:
-                    active_subprocess.terminate()
-                except Exception:
-                    pass
-            time.sleep(0.2)
-    finally:
-        active_subprocess = None
-        
-    if returncode != 0:
-        # 우아한 종료에 의한 중단의 경우 exit 0 또는 시그널에 따른 음수 리턴코드가 뜰 수 있음
-        if returncode in (-15, -9, 0):
-            print(f"[Scanner-Queue] lazy_scanner terminated gracefully (code: {returncode})")
-            return
-        raise RuntimeError(f"lazy_scanner exited with code {returncode}")
+    sub_batch_count = 0
+    env = os.environ.copy()
+    env['PYTHONPATH'] = BASE_DIR + (os.pathsep + env.get('PYTHONPATH', ''))
+
+    while not stop_requested:
+        sub_batch_count += 1
+        if sub_batch_count > 1:
+            sq.log(f"🔄 RAM 환수 쿨다운(3초) 후 서브-배치 세션 #{sub_batch_count} 이어서 기동 중...")
+            time.sleep(3.0)
+
+        active_subprocess = subprocess.Popen(
+            [sys.executable, script_path],
+            cwd=BASE_DIR,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        try:
+            stdout_data, stderr_data = active_subprocess.communicate(timeout=7200)
+            returncode = active_subprocess.returncode
+            if stdout_data:
+                for line in stdout_data.splitlines():
+                    if line.strip():
+                        sq.log(f"[Lazy-Scanner-Out] {line}")
+            if stderr_data:
+                for line in stderr_data.splitlines():
+                    if line.strip():
+                        sq.log(f"[Lazy-Scanner-Err] {line}")
+        except Exception as pe:
+            sq.log(f"Subprocess wait error: {pe}")
+            try:
+                active_subprocess.kill()
+            except Exception:
+                pass
+            returncode = -1
+        finally:
+            active_subprocess = None
+            
+        if returncode == 10:
+            sq.log(f"⚡ 서브-배치 세션 #{sub_batch_count} 마감 (RAM 환수 완료). 다음 분량을 계속 처리합니다.")
+            continue
+        elif returncode in (0, -15, -9, None):
+            sq.log(f"✅ lazy_scanner completed gracefully (code: {returncode})")
+            break
+        else:
+            err_msg = f"lazy_scanner failed with exit code {returncode}. Stderr: {stderr_data}"
+            sq.log(f"❌ {err_msg}")
+            raise RuntimeError(err_msg)
 
 def _process_library_scan(sq, **kwargs):
     from services.scheduler_service import run_scan_job

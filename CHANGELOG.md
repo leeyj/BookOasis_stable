@@ -1,4 +1,9 @@
 # CHANGELOG
+## v1.2.9
+- lazy 스캐너의 1회당 처리 용량 설정 기능 추가 | Added lazy scanner max file size limit
+** 램 기준 1~2G (1024MB) / 4G(1544MB) / 8G 이상(2048MB)
+- entrypoint.sh / mange.sh 내 프로세스 실행순서 변경 | entrypoint.sh / manage.sh in process step change
+
 ## v1.2.8
 - lazy 스캐너 최대 파일 크기 제한 기능 추가 | Added lazy scanner max file size limit
 ** 램 기준 1~2G (~150M) / 4G(250MB) / 8G 이상(300~500M)

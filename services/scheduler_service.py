@@ -641,8 +641,8 @@ def enqueue_scan_job(db_type, db_path, library_id, physical_path, force=False):
 def run_lazy_scanner_job():
     """백그라운드 스캐너 작업을 큐에 적재"""
     from services.scanner_queue import scanner_queue
-    print("[Scheduler] Lazy cover scanner job scheduled -> Enqueuing...")
-    scanner_queue.enqueue('lazy_scan')
+    print("[Scheduler] Lazy cover scanner job scheduled -> Enqueuing (force_requeue)...")
+    scanner_queue.enqueue('lazy_scan', force_requeue=True)
 
 
 def run_fts_rebuild_job():

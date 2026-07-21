@@ -99,6 +99,9 @@ export async function loadGeneralSettings() {
       const lazyMaxFileSizeEl = document.getElementById('setting-lazy-scan-max-file-size');
       if (lazyMaxFileSizeEl) lazyMaxFileSizeEl.value = s.LAZY_SCAN_MAX_FILE_SIZE_MB !== undefined ? s.LAZY_SCAN_MAX_FILE_SIZE_MB : '300';
 
+      const lazyMaxBatchSizeEl = document.getElementById('setting-lazy-scan-max-batch-size');
+      if (lazyMaxBatchSizeEl) lazyMaxBatchSizeEl.value = s.LAZY_SCAN_MAX_BATCH_SIZE_MB !== undefined ? s.LAZY_SCAN_MAX_BATCH_SIZE_MB : '1024';
+
       const timezoneEl = document.getElementById('setting-timezone');
       if (timezoneEl) timezoneEl.value = s.TIMEZONE || 'UTC';
       
@@ -269,7 +272,8 @@ export async function submitGeneralSettings(event) {
   const dbPoolSize = document.getElementById('setting-db-pool-size')?.value || '5';
   const scannerLog = document.getElementById('setting-scanner-write-log')?.value || '1';
   const lazyCron = document.getElementById('setting-lazy-scan-cron')?.value || '0 3 * * *';
-  const lazyMaxFileSize = document.getElementById('setting-lazy-scan-max-file-size')?.value || '500';
+  const lazyMaxFileSize = document.getElementById('setting-lazy-scan-max-file-size')?.value || '300';
+  const lazyMaxBatchSize = document.getElementById('setting-lazy-scan-max-batch-size')?.value || '1024';
   const recentBooks = document.getElementById('setting-recent-books-limit')?.value || '30';
   const sysMem = document.getElementById('setting-system-mem-limit')?.value || '1536';
   const procRss = document.getElementById('setting-process-rss-limit')?.value || '2048';
@@ -307,6 +311,7 @@ export async function submitGeneralSettings(event) {
       api.updateSystemSetting('SCANNER_WRITE_LOG', scannerLog),
       api.updateSystemSetting('LAZY_SCAN_CRON', lazyCron),
       api.updateSystemSetting('LAZY_SCAN_MAX_FILE_SIZE_MB', lazyMaxFileSize),
+      api.updateSystemSetting('LAZY_SCAN_MAX_BATCH_SIZE_MB', lazyMaxBatchSize),
       api.updateSystemSetting('TIMEZONE', timezone),
       api.updateSystemSetting('RECENT_BOOKS_LIMIT', recentBooks),
       api.updateSystemSetting('SYSTEM_MEM_LIMIT', sysMem),

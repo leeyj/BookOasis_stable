@@ -215,7 +215,9 @@ class TextEpubContentService:
 
                 toc_list = []
                 try:
-                    from bs4 import BeautifulSoup
+                    import warnings
+                    from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
+                    warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
                     import urllib.parse
                     import posixpath
 
@@ -242,7 +244,10 @@ class TextEpubContentService:
                     if nav_href:
                         nav_full_path = posixpath.join(opf_dir, nav_href) if opf_dir else nav_href
                         nav_data = zf.read(nav_full_path).decode('utf-8', errors='ignore')
-                        soup = BeautifulSoup(nav_data, 'html.parser')
+                        try:
+                            soup = BeautifulSoup(nav_data, 'xml')
+                        except Exception:
+                            soup = BeautifulSoup(nav_data, 'html.parser')
                         nav_elem = soup.find('nav', attrs={'epub:type': 'toc'})
                         if not nav_elem:
                             nav_elem = soup.find('nav', attrs={'role': 'doc-toc'})
@@ -271,7 +276,10 @@ class TextEpubContentService:
                     if not toc_list and ncx_href:
                         ncx_full_path = posixpath.join(opf_dir, ncx_href) if opf_dir else ncx_href
                         ncx_data = zf.read(ncx_full_path).decode('utf-8', errors='ignore')
-                        soup = BeautifulSoup(ncx_data, 'html.parser')
+                        try:
+                            soup = BeautifulSoup(ncx_data, 'xml')
+                        except Exception:
+                            soup = BeautifulSoup(ncx_data, 'html.parser')
                         navmap = soup.find('navmap')
                         if navmap:
                             def parse_navpoint(np_elem, level=1):

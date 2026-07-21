@@ -37,15 +37,17 @@ find_pids_by_pattern() {
 }
 
 cleanup() {
-    echo "[Entrypoint] SIGTERM/SIGINT received. Shutting down gracefully..."
+    # ───────────────────────────────────────────────────────────────────
+    # ⚠️ [CRITICAL WARNING] 종료 순서 절대 변경 금지! (DB MALFORMED 손상 방지)
+    # 반드시 스캐너 프로세스(스캐너 워커 -> 레이지 스캐너)를 1, 2순위로 종료하고,
+    # 웹 서버(Gunicorn/core:app)를 맨 마지막(3순위)으로 종료해야 합니다.
+    # 만약 웹 서버가 먼저 꺼지면 atexit/shutdown_all_pools가 DB 커넥션 풀을 끊고
+    # WAL 체크포인트를 치는 동안, 잔존 스캐너가 DB 쓰기를 시도하여 
+    # 'database disk image is malformed' 결함이 100% 발생합니다!
+    # ───────────────────────────────────────────────────────────────────
+    echo "[Entrypoint] SIGTERM/SIGINT received. Shutting down gracefully in safe order (Scanners -> Web Server)..."
     
-    # 1. Gunicorn 웹 서버 종료
-    if [ "$WEB_PID" -ne 0 ]; then
-        echo "[Entrypoint] Stopping Gunicorn web server (PID: $WEB_PID)..."
-        kill -15 "$WEB_PID" 2>/dev/null || true
-    fi
-    
-    # 2. 스캐너 워커 프로세스 검출 및 종료
+    # 1. 스캐너 워커 프로세스 검출 및 종료 (DB 커넥션 안전 마감 1순위)
     W_PIDS=""
     if [ "$WORKER_PID" -ne 0 ] && check_pid_alive "$WORKER_PID"; then
         W_PIDS="$WORKER_PID"
@@ -64,32 +66,50 @@ cleanup() {
             kill -15 "$WP" 2>/dev/null || true
         done
     fi
-    
-    # 3. 최대 15초 동안 프로세스 자발적 종료 대기
+
+    # 2. 독립 백그라운드 레이지 스캐너 프로세스 검출 및 종료 (DB 커넥션 안전 마감 2순위)
+    LAZY_PIDS=$(find_pids_by_pattern "tools/lazy_scanner.py")
+    if [ -n "$LAZY_PIDS" ]; then
+        echo "[Entrypoint] Stopping Lazy Scanners (PIDs: $LAZY_PIDS)..."
+        for LP in $LAZY_PIDS; do
+            kill -15 "$LP" 2>/dev/null || true
+        done
+    fi
+
+    # 스캐너 프로세스들의 자발적 마감 대기 (최대 15초)
     for i in {1..15}; do
-        ALIVE=false
-        if [ "$WEB_PID" -ne 0 ] && check_pid_alive "$WEB_PID"; then
-            ALIVE=true
-        fi
+        SCANNER_ALIVE=false
         W_PIDS_CHECK=""
         if [ "$WORKER_PID" -ne 0 ] && check_pid_alive "$WORKER_PID"; then
             W_PIDS_CHECK="$WORKER_PID"
         fi
         EXTRA_W_PIDS_CHECK=$(find_pids_by_pattern "tools/scanner_worker.py")
-        if [ -n "$EXTRA_W_PIDS_CHECK" ]; then
-            W_PIDS_CHECK="$W_PIDS_CHECK $EXTRA_W_PIDS_CHECK"
-        fi
-        if [ -n "$W_PIDS_CHECK" ]; then
-            ALIVE=true
+        LAZY_PIDS_CHECK=$(find_pids_by_pattern "tools/lazy_scanner.py")
+        if [ -n "$W_PIDS_CHECK" ] || [ -n "$EXTRA_W_PIDS_CHECK" ] || [ -n "$LAZY_PIDS_CHECK" ]; then
+            SCANNER_ALIVE=true
         fi
         
-        if [ "$ALIVE" = false ]; then
+        if [ "$SCANNER_ALIVE" = false ]; then
+            break
+        fi
+        sleep 1
+    done
+
+    # 3. Gunicorn 웹 서버 종료 (스캐너들이 모두 정리된 후 마지막에 DB 풀/WAL 체크포인트 닫기)
+    if [ "$WEB_PID" -ne 0 ]; then
+        echo "[Entrypoint] Stopping Gunicorn web server (PID: $WEB_PID)..."
+        kill -15 "$WEB_PID" 2>/dev/null || true
+    fi
+    
+    # 4. 최대 10초 동안 웹 서버 자발적 종료 대기
+    for i in {1..10}; do
+        if [ "$WEB_PID" -ne 0 ] && ! check_pid_alive "$WEB_PID"; then
             break
         fi
         sleep 1
     done
     
-    # 4. 15초 이후에도 살아있는 프로세스는 강제 종료 (SIGKILL)
+    # 5. 미종료 잔존 프로세스 강제 정리 (SIGKILL)
     if [ "$WEB_PID" -ne 0 ] && check_pid_alive "$WEB_PID"; then
         echo "[Entrypoint] Gunicorn failed to exit. Force killing..."
         kill -9 "$WEB_PID" 2>/dev/null || true
