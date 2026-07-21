@@ -275,7 +275,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
   `;
 }
 
-export function renderVolumesList(books, safeSeriesName, actualLibraryId) {
+export function renderVolumesList(books, safeSeriesName, actualLibraryId, dbType = 'general') {
   let volumesHtml = '';
   books.forEach(b => {
     const fmt = (b.file_format || '').toLowerCase();
@@ -358,6 +358,17 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId) {
       </div>
     ` : '';
 
+    // epub/pdf/txt 포맷은 이어보기(절반) + 다운로드 버튼을 나란히 표시
+    const isDownloadable = ['epub', 'pdf', 'txt', 'text'].includes(fmt);
+    const readBtnHtml = isDownloadable
+      ? `<div class="btn-read-row">
+           <button class="btn-read" onclick="openReader(${b.id}, '${(b.file_format || '').replace(/'/g, "\\'")}', '${(rawDisplayTitle || '').replace(/'/g, "\\'")}', ${b.pages_read}, ${b.total_pages})">${readBtnText}</button>
+           <a class="btn-download" href="/api/media/books/${b.id}/download?type=${dbType}" download title="${i18n.t('detail.btn_download')}">
+             <i class="fa-solid fa-download"></i> ${i18n.t('detail.btn_download')}
+           </a>
+         </div>`
+      : `<button class="btn-read" onclick="openReader(${b.id}, '${(b.file_format || '').replace(/'/g, "\\'")}', '${(rawDisplayTitle || '').replace(/'/g, "\\'")}', ${b.pages_read}, ${b.total_pages})">${readBtnText}</button>`;
+
     volumesHtml += `
       <div class="volume-card" data-book-id="${b.id}" data-page-missing="${noOffsets ? 1 : 0}" oncontextmenu="event.preventDefault(); event.stopPropagation(); if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(event.clientX, event.clientY, ${b.id}, '${(rawDisplayTitle || '').replace(/'/g, "\\'")}', true);" ontouchstart="window.handleLongPressTouchStart(event, (x, y) => { if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(x, y, ${b.id}, '${(rawDisplayTitle || '').replace(/'/g, "\\\\'")}', true); })" ontouchmove="window.handleLongPressTouchMove(event)" ontouchend="window.handleLongPressTouchEnd(event)" ontouchcancel="window.handleLongPressTouchEnd(event)">
         <img class="volume-thumb" src="${volCoverSrc}" alt="cover"
@@ -380,7 +391,7 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId) {
           </div>
           <div class="chapter-progress-text">${progressText}</div>
         </div>
-        <button class="btn-read" onclick="openReader(${b.id}, '${(b.file_format || '').replace(/'/g, "\\'")}', '${(rawDisplayTitle || '').replace(/'/g, "\\'")}', ${b.pages_read}, ${b.total_pages})">${readBtnText}</button>
+        ${readBtnHtml}
       </div>
     `;
   });

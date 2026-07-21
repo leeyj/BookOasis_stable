@@ -273,6 +273,7 @@
     "status_unread": "Unread",
     "btn_resume": "Resume",
     "btn_start": "Start",
+    "btn_download": "Download",
     "badge_completed": "Completed",
     "toggle_fav_book": "Toggle Favorite Book",
     "warn_no_cover": "No cover detected",

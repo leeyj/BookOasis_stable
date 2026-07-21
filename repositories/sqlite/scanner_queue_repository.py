@@ -37,13 +37,18 @@ class ScannerQueueRepository:
             conn.close()
 
     @staticmethod
-    def update_task_to_pending(task_id, task_type, kwargs_json, now_str):
-        """완료되었거나 취소된 기존 태스크를 다시 pending으로 대기 상태 갱신"""
+    def update_task_to_pending(task_id, task_type, kwargs_json, now_str, force_requeue=False):
+        """완료되었거나 취소된 기존 태스크(또는 force_requeue 시 running/exit_pending 상태 포함)를 다시 pending으로 대기 상태 갱신"""
         conn = database.get_connection('general')
         cursor = conn.cursor()
         try:
+            if force_requeue:
+                where_clause = "WHERE id = ?"
+            else:
+                where_clause = "WHERE id = ? AND status NOT IN ('pending', 'running')"
+
             cursor.execute(
-                """
+                f"""
                 UPDATE scanner_tasks
                 SET task_type = ?,
                     status = 'pending',
@@ -53,10 +58,27 @@ class ScannerQueueRepository:
                     started_at = NULL,
                     finished_at = NULL,
                     error_message = NULL
-                WHERE id = ?
-                  AND status NOT IN ('pending', 'running')
+                {where_clause}
                 """,
                 (task_type, kwargs_json, now_str, task_id)
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    @staticmethod
+    def update_task_status(task_id, status, stage=None, error_message=None):
+        """태스크 상태(예: exit_pending, pending 등) 임의 변경"""
+        conn = database.get_connection('general')
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "UPDATE scanner_tasks SET status = ?, stage = ?, error_message = ? WHERE id = ?",
+                (status, stage, error_message, task_id)
             )
             conn.commit()
             return cursor.rowcount > 0

@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, session
+from flask import Blueprint, request, jsonify, session, send_file
 import sqlite3
 from services.category_service import CategoryService
 from services.book_service import BookService
@@ -655,4 +655,58 @@ def run_book_context_menu_plugin_action_api():
     except Exception as e:
         import traceback
         print(f"[ContextMenuAPI] action fatal error:\n{traceback.format_exc()}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@library_bp.route('/api/media/books/<int:book_id>/download', methods=['GET'])
+@login_required
+def download_book(book_id):
+    """도서 파일을 다운로드합니다 (EPUB/PDF/TXT 전용 — iOS Books 앱 등 외부 앱 연동용)"""
+    import os
+    import mimetypes
+    db_type = request.args.get('type', 'general')
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+
+    # 허용 포맷: epub / pdf / txt
+    ALLOWED_FORMATS = ('epub', 'pdf', 'txt')
+
+    try:
+        import database
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT file_path, file_format FROM books WHERE id = ?",
+            (book_id,)
+        )
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            return jsonify({'success': False, 'error': _t('api.err_book_not_found')}), 404
+
+        file_path = row['file_path']
+        file_format = (row['file_format'] or '').lower()
+
+        if file_format not in ALLOWED_FORMATS:
+            return jsonify({'success': False, 'error': '다운로드는 EPUB, PDF, TXT 포맷만 지원합니다.'}), 400
+
+        if not os.path.exists(file_path):
+            return jsonify({'success': False, 'error': _t('api.err_file_not_found')}), 404
+
+        filename = os.path.basename(file_path)
+        mime_type, _ = mimetypes.guess_type(file_path)
+        if not mime_type:
+            mime_map = {'epub': 'application/epub+zip', 'pdf': 'application/pdf', 'txt': 'text/plain'}
+            mime_type = mime_map.get(file_format, 'application/octet-stream')
+
+        return send_file(
+            file_path,
+            as_attachment=True,
+            download_name=filename,
+            mimetype=mime_type
+        )
+    except Exception as e:
+        import traceback
+        print(f"[Download API] 오류:\n{traceback.format_exc()}")
         return jsonify({'success': False, 'error': str(e)}), 500

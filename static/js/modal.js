@@ -46,7 +46,7 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
 
       // 컴포넌트 렌더러 모듈 호출
       const headerHtml = renderDetailHeader(meta, books, safeSeriesName, actualLibraryId, safeDisplayTitle);
-      const volumesSectionHtml = renderVolumesList(books, safeSeriesName, actualLibraryId);
+      const volumesSectionHtml = renderVolumesList(books, safeSeriesName, actualLibraryId, state.currentLibraryType || 'general');
 
       detailView.innerHTML = `
         <button class="btn-back-to-list" onclick="goBackToList()">

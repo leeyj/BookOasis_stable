@@ -273,6 +273,7 @@
     "status_unread": "미독",
     "btn_resume": "이어보기",
     "btn_start": "처음부터",
+    "btn_download": "다운로드",
     "badge_completed": "완독",
     "toggle_fav_book": "즐겨찾기 토글",
     "warn_no_cover": "커버 미검출",

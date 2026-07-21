@@ -1421,6 +1421,44 @@ body.has-system-ticker .library-sidebar {
     box-shadow: 0 4px 12px rgba(124, 58, 237, 0.5);
 }
 
+/* 이어보기 + 다운로드 버튼 행 컨테이너 (epub/pdf/txt 전용) */
+.btn-read-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: stretch;
+    margin-top: 0.45rem;
+}
+
+.btn-read-row .btn-read {
+    flex: 1;
+    justify-content: center;
+    margin-top: 0;
+}
+
+.btn-download {
+    background: linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%);
+    border: none;
+    color: #fff;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    border-radius: 6px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(3, 105, 161, 0.35);
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-shrink: 0;
+    text-decoration: none;
+}
+
+.btn-download:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(3, 105, 161, 0.5);
+}
+
 /* 하위 호환 레이아웃 */
 .detail-layout { display: flex; gap: 2rem; }
 .detail-left { width: 30%; min-width: 200px; }

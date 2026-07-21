@@ -179,6 +179,10 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
             
             targets = []
             for book in books:
+                if stop_requested:
+                    print(f"[Lazy-Scanner] ⚠️ DB({db_type}) 파일 물리 점검 도중 중단 요청(SIGTERM/SIGINT) 감지. 점검을 중단합니다.")
+                    break
+
                 file_path = book['file_path']
                 cover_image = book['cover_image']
                 
@@ -533,17 +537,20 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
                 pass
             conn = None
 
+            if batch_limit_reached or stop_requested:
+                break
+
     finally:
         if conn:
             try:
                 conn.close()
             except Exception:
                 pass
-    print("[Lazy-Scanner] ✅ 현재 회차의 Lazy 표지 스캔 작업 마감")
     if batch_limit_reached:
         print("[Lazy-Scanner] 🔄 세션 용량 한도 도달로 인한 차기 서브-배치 세션 기동 요청 (Exit Code 10)")
         sys.exit(10)
     else:
+        print("[Lazy-Scanner] 🎉 더 이상 스캔할 대상 도서가 없습니다. 모든 Lazy 표지 스캔 작업이 완료되었습니다. (Exit Code 0)")
         sys.exit(0)
 
 def get_series_cover_fallback_single(series_name, parent_dir, filename, file_path, library_id,

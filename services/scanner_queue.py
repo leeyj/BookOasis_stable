@@ -48,7 +48,9 @@ class ScannerQueue:
             now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             if existing:
-                success = ScannerQueueRepository.update_task_to_pending(existing['id'], task_type, kwargs_json, now_str)
+                success = ScannerQueueRepository.update_task_to_pending(
+                    existing['id'], task_type, kwargs_json, now_str, force_requeue=force_requeue
+                )
             else:
                 success = ScannerQueueRepository.insert_task(task_type, task_key, kwargs_json, now_str)
 
@@ -319,6 +321,13 @@ def _process_lazy_scan(sq):
             
         if returncode == 10:
             sq.log(f"⚡ 서브-배치 세션 #{sub_batch_count} 마감 (RAM 환수 완료). 다음 분량을 계속 처리합니다.")
+            try:
+                from repositories.scanner_queue_repository import ScannerQueueRepository
+                task = ScannerQueueRepository.get_task_by_key('lazy_scan')
+                if task and task.get('id'):
+                    ScannerQueueRepository.update_task_status(task['id'], 'exit_pending', stage=f'RAM 환수 재기동 (배치 #{sub_batch_count})')
+            except Exception as st_err:
+                sq.log(f"[Lazy-Scanner] Intermediate status update warning: {st_err}")
             continue
         elif returncode in (0, -15, -9, None):
             sq.log(f"✅ lazy_scanner completed gracefully (code: {returncode})")

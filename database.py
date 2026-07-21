@@ -765,7 +765,14 @@ def init_databases():
             cursor.execute("UPDATE libraries SET scan_status = 'ready' WHERE scan_status = 'cancelling'")
             # 2. 스캔 중이던 상태는 interrupted로 보정하여 scheduler가 기동 시 Auto-Resume(자동 재스캔)을 구동하게 함
             cursor.execute("UPDATE libraries SET scan_status = 'interrupted' WHERE scan_status = 'scanning'")
-            # 3. 큐 태스크 중 이미 running 중이던 작업만 실패 처리하고 pending(대기 중) 태스크는 이어서 수행하도록 유지
+            # 3. 큐 태스크 중 exit_pending(RAM 환수 대기) 상태는 pending으로 복구하여 재기동 시 자동 처리되도록 함
+            cursor.execute("""
+                UPDATE scanner_tasks
+                SET status = 'pending',
+                    stage = 'Auto-resumed on startup'
+                WHERE status = 'exit_pending'
+            """)
+            # 4. 큐 태스크 중 이미 running 중이던 작업만 실패 처리하고 pending(대기 중) 태스크는 이어서 수행하도록 유지
             cursor.execute("""
                 UPDATE scanner_tasks 
                 SET status = 'failed', 

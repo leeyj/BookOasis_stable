@@ -1,7 +1,11 @@
 # CHANGELOG
+## v1.3.0
+- lazy 스캐너 안정성 강화 | Improve lazy scanner stability
+- txt, pdf, epub 다운로드 기능 추가 | Add download function for txt, pdf, epub
+
 ## v1.2.9
 - lazy 스캐너의 1회당 처리 용량 설정 기능 추가 | Added lazy scanner max file size limit
-** 램 기준 1~2G (1024MB) / 4G(1544MB) / 8G 이상(2048MB)
+** 램 기준 1~2G (2048MB) / 4G(4096MB) / 8G 이상(10240MB)
 - entrypoint.sh / mange.sh 내 프로세스 실행순서 변경 | entrypoint.sh / manage.sh in process step change
 
 ## v1.2.8
