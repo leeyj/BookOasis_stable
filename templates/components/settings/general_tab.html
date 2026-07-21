@@ -121,6 +121,18 @@
                                     </button>
                                 </div>
                             </div>
+
+                            <!-- 8-1. Lazy 스캐너 최대 파일 크기 제한 -->
+                            <div class="library-form-group" style="margin-bottom: 0.5rem;">
+                                <label for="setting-lazy-scan-max-file-size" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                    <i class="fa-solid fa-weight-hanging" style="color: #a855f7; margin-right: 0.3rem;"></i> Lazy 스캐너 최대 파일 크기 제한 (MB)
+                                </label>
+                                <div style="display: flex; gap: 0.5rem; align-items: center; max-width: 480px; width: 100%;">
+                                    <input type="number" id="setting-lazy-scan-max-file-size" name="LAZY_SCAN_MAX_FILE_SIZE_MB" min="0" max="10240" value="300" style="flex: 1; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
+                                    <span style="color: #94a3b8; font-size: 0.85rem; white-space: nowrap;">MB</span>
+                                </div>
+                                <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;">이 크기를 초과하는 ZIP/CBZ 파일은 스캔을 건너뛰고 오류 리포트에 기록합니다. 로컬·VFS/NAS 원격 마운트 모두 적용됩니다. <strong style="color: #fbbf24;">0 = 제한 없음.</strong> (기본값: 300 MB)</p>
+                            </div>
                             
                             <!-- 8-2. 시스템 타임존 설정 -->
                             <div class="library-form-group" style="margin-bottom: 0.5rem;">

@@ -220,6 +220,7 @@ window.onViewerParagraphSpacingChange = function (value) {
 window.setScrollMode = function (mode) {
   console.log(`[Viewer-Core] Scroll mode changed to: ${mode}`);
   const previousMode = localStorage.getItem('viewer_scroll_mode') || 'page';
+  if (previousMode === mode) return; // 동일 모드 클릭 시 무시
   localStorage.setItem('viewer_scroll_mode', mode);
 
   const btnPage = document.getElementById('btn-scroll-page');
@@ -238,6 +239,49 @@ window.setScrollMode = function (mode) {
     widthRow.classList.toggle('visible', mode === 'scroll');
   }
 
+  // ── 보기 모드 전환 중 즉시 피드백 오버레이 ──────────────────────
+  // 전체 뷰어를 덮는 반투명 블러 배경 + 중앙 알림 라벨
+  // pointer-events: all → 터치/클릭 완전 차단
+  const viewerBody = document.getElementById('viewer-body-container');
+  const existingBanner = document.getElementById('viewer-mode-switch-banner');
+  if (existingBanner) existingBanner.remove();
+
+  const banner = document.createElement('div');
+  banner.id = 'viewer-mode-switch-banner';
+  banner.style.cssText = `
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 20000;
+    pointer-events: all;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: wait;
+  `;
+  banner.innerHTML = `
+    <div style="
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid rgba(168, 85, 247, 0.6);
+      color: #fff;
+      padding: 0.9rem 2rem;
+      border-radius: 50px;
+      font-size: 1rem;
+      font-weight: 600;
+      white-space: nowrap;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 20px rgba(168,85,247,0.2);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    ">
+      <i class="fa-solid fa-arrows-rotate" style="color:#a855f7; font-size:1rem;"></i>
+      보기 모드 전환 중...
+    </div>
+  `;
+  if (viewerBody) viewerBody.appendChild(banner);
+
   // 만화책 뷰어가 활성화되어 있는 경우, 스크롤 모드를 적용하여 다시 렌더링
   if (document.getElementById('comic-viewer-container').style.display !== 'none') {
     const mod = import('./viewer_comic.js');
@@ -253,9 +297,19 @@ window.setScrollMode = function (mode) {
     }).catch(err => console.warn('[Viewer-Core] Failed to import viewer_comic:', err));
   }
 
-  applyTxtSettings({ previousMode });
-  changeEpubScrollMode(mode);
-  syncHotspotPointerEvents();
+  // 다음 프레임에서 실제 렌더링 (banner가 화면에 그려진 뒤 실행)
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      applyTxtSettings({ previousMode });
+      changeEpubScrollMode(mode);
+      syncHotspotPointerEvents();
+      // 전환 완료 후 배너 제거
+      setTimeout(() => {
+        const b = document.getElementById('viewer-mode-switch-banner');
+        if (b) b.remove();
+      }, 400);
+    });
+  });
 };
 
 export function viewerJumpToFirst() {

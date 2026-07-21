@@ -693,7 +693,8 @@ def init_databases():
                 ('SIDEBAR_TOP_CONTROLS', '0'),
                 ('HDD_AGGRESSIVE_WARMUP', '0'),
                 ('RCLONE_RC_URL', 'http://localhost:5572'),
-                ('FTS_REBUILD_CRON', '30 4 * * *')
+                ('FTS_REBUILD_CRON', '30 4 * * *'),
+                ('LAZY_SCAN_MAX_FILE_SIZE_MB', '300'),
             ]
             for k, v in default_settings:
                 cursor.execute("SELECT value FROM settings WHERE key = ?", (k,))

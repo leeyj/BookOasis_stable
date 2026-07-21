@@ -1,4 +1,12 @@
 # CHANGELOG
+## v1.2.8
+- lazy 스캐너 최대 파일 크기 제한 기능 추가 | Added lazy scanner max file size limit
+** 램 기준 1~2G (~150M) / 4G(250MB) / 8G 이상(300~500M)
+- 모바일 epub 뷰어 스크롤 버벅임 및 전체화면 강제 종료 결함 수정 | Fixed mobile EPUB viewer scroll jank and fullscreen forced exit bug
+- 모바일 epub 뷰어 폰트 크기 변경시 전체 페이지 리렌더링 수정 | Fixed mobile EPUB viewer font size change full page relayout bug
+- epub 뷰어 전환(스크롤<->페이지)시 화면 차단 기능 추가 | Added screen blocking function when switching epub viewer (scroll <-> page)
+- epub 뷰어 전환시 간헐적으로 페이지 제대로 찾아가지 못하는 현상 수정 | Fixed epub viewer occasionally failing to navigate to the correct page when switching views
+
 ## v1.2.7
 - 스캔시 변동없는 폴더(도서)는 DB 스캔 진행률(scanner_progress) 테이블 업데이트 로직 제외 | Exclude DB scan progress(scanner_progress) table update logic for folders (books) with no changes during scanning
 - 스캔시 Redis 참조 못하는 버그 수정 | Fix bug where Redis could not be referenced during scanning

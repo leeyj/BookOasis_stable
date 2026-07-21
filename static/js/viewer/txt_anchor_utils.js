@@ -1,3 +1,32 @@
+/**
+ * startIndex 주변에서 실제 내용(비공백 5자 이상)이 포함된 30자 앵커 텍스트를 탐색.
+ * 앞에서 실패하면 뒤(startIndex+1 방향)로 최대 100자까지 탐색 후 반환.
+ * @param {string} text - 정제된 전체 텍스트
+ * @param {number} startIndex - 탐색 시작 인덱스
+ * @param {number} length - 앵커 길이 (기본 30)
+ * @returns {string|null}
+ */
+function _findMeaningfulAnchor(text, startIndex, length = 30) {
+  if (!text || text.length === 0) return null;
+
+  // 앞뒤로 탐색 (최대 ±200자 범위)
+  const searchRange = 200;
+  const lo = Math.max(0, startIndex - searchRange);
+  const hi = Math.min(text.length - length, startIndex + searchRange);
+
+  // 먼저 startIndex 부근 → 앞 방향으로 탐색
+  for (let i = startIndex; i <= hi; i++) {
+    const slice = text.substring(i, i + length);
+    if (slice.replace(/\s/g, '').length >= 5) return slice.trim();
+  }
+  // 그다음 startIndex 이전 방향으로 탐색
+  for (let i = startIndex - 1; i >= lo; i--) {
+    const slice = text.substring(i, i + length);
+    if (slice.replace(/\s/g, '').length >= 5) return slice.trim();
+  }
+  return null;
+}
+
 export function getTxtAnchorInfoByMode({
   scrollWrapper,
   contentArea,
@@ -14,13 +43,24 @@ export function getTxtAnchorInfoByMode({
   const scrollMode = forcedMode || storage.getItem('viewer_scroll_mode') || 'page';
 
   if (scrollMode === 'scroll') {
-    const cleanText = isEpub ? stripHtml(fullText) : fullText.replace(/\s+/g, ' ').trim();
+    const rawChunk = (Array.isArray(txtChunks) && txtChunks[currentChunkIdx]) ? txtChunks[currentChunkIdx] : '';
+    const cleanText = isEpub ? stripHtml(rawChunk) : (rawChunk || fullText || '').replace(/\s+/g, ' ').trim();
     if (cleanText.length === 0) return null;
 
-    const maxScroll = scrollWrapper.scrollHeight - scrollWrapper.clientHeight;
-    const ratio = maxScroll > 0 ? scrollWrapper.scrollTop / maxScroll : 0;
+    const targetChunk = contentArea.querySelector(`.txt-scroll-chunk[data-idx="${currentChunkIdx}"]`);
+    let ratio = 0;
+    if (targetChunk && targetChunk.offsetHeight > 0) {
+      const chunkRelativeScroll = Math.max(0, scrollWrapper.scrollTop - targetChunk.offsetTop);
+      ratio = Math.min(1, chunkRelativeScroll / targetChunk.offsetHeight);
+    } else {
+      const maxScroll = scrollWrapper.scrollHeight - scrollWrapper.clientHeight;
+      ratio = maxScroll > 0 ? scrollWrapper.scrollTop / maxScroll : 0;
+    }
+
     const startIndex = Math.floor(cleanText.length * ratio);
-    const anchorText = cleanText.substring(startIndex, startIndex + 30);
+    // 공백/특수문자만 있는 구간을 피해 실제 의미있는 텍스트가 나오는 위치를 앞뒤로 탐색
+    const anchorText = _findMeaningfulAnchor(cleanText, startIndex, 30);
+    if (!anchorText) return null;
 
     return {
       chunkIdx: currentChunkIdx,
@@ -35,7 +75,9 @@ export function getTxtAnchorInfoByMode({
   const maxScroll = scrollWrapper.scrollWidth - scrollWrapper.clientWidth;
   const ratio = maxScroll > 0 ? scrollWrapper.scrollLeft / maxScroll : 0;
   const startIndex = Math.floor(cleanText.length * ratio);
-  const anchorText = cleanText.substring(startIndex, startIndex + 30);
+  // 공백/특수문자만 있는 구간을 피해 실제 의미있는 텍스트가 나오는 위치를 앞뒤로 탐색
+  const anchorText = _findMeaningfulAnchor(cleanText, startIndex, 30);
+  if (!anchorText) return null;
 
   return {
     chunkIdx: currentChunkIdx,

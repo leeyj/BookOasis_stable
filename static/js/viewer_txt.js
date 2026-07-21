@@ -243,7 +243,11 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
         }
 
         let isTransitioning = false;
-        const scrollHandler = () => {
+        let rAfPending = false;
+        let scrollDebounceTimeout = null;
+
+        const processScroll = () => {
+          rAfPending = false;
           const mode = localStorage.getItem('viewer_scroll_mode') || 'page';
           if (mode === 'page') {
             if (txtPageSnapInProgress) return;
@@ -279,20 +283,6 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
           const newIdx = Math.min(txtChunks.length - 1, Math.max(0, detectedIdx));
           const ratio = scrollHeight > 0 ? scrollWrapper.scrollTop / scrollHeight : 0;
           const isEpubMode = (state.currentViewerFormat === 'epub');
-          const targetChunk = contentArea.querySelector(`.txt-scroll-chunk[data-idx="${newIdx}"]`);
-          let fingerprint = '';
-          if (targetChunk) {
-            fingerprint = String(targetChunk.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 180);
-          }
-          const epubSessionPayload = isEpubMode
-            ? {
-                epub_session: {
-                  index: newIdx,
-                  percent: Math.max(0, Math.min(100, Math.round(ratio * 100))),
-                  fingerprint: fingerprint || undefined
-                }
-              }
-            : null;
 
           if (!txtScrollPreloadTriggered && ratio >= 0.9 && txtChunks.length > 1) {
             txtScrollPreloadTriggered = true;
@@ -300,7 +290,7 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
               state.activeBookId,
               Math.min(txtChunks.length - 1, newIdx),
               txtChunks.length,
-              epubSessionPayload
+              isEpubMode ? { epub_session: { index: newIdx, percent: Math.round(ratio * 100) } } : null
             );
           }
 
@@ -311,16 +301,53 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
               pageInfo.textContent = i18n.t('viewer.txt_chunk_info', {current: currentChunkIdx + 1, total: txtChunks.length});
             }
             syncActiveEpubToc();
+
+            const targetChunk = contentArea.querySelector(`.txt-scroll-chunk[data-idx="${newIdx}"]`);
+            let fingerprint = '';
+            if (targetChunk) {
+              fingerprint = String(targetChunk.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 180);
+            }
+            const epubSessionPayload = isEpubMode
+              ? {
+                  epub_session: {
+                    index: newIdx,
+                    percent: Math.max(0, Math.min(100, Math.round(ratio * 100))),
+                    fingerprint: fingerprint || undefined
+                  }
+                }
+              : null;
             saveProgress(state.activeBookId, currentChunkIdx, txtChunks.length, epubSessionPayload);
           }
 
-          logActiveViewportText();
           triggerNextEpisodeIfNeeded();
-          saveDetailPosition();
 
-          // EPUB scroll mode: persist fine-grained percent even when chapter index does not change.
-          if (isEpubMode) {
-            saveProgress(state.activeBookId, newIdx, txtChunks.length, epubSessionPayload);
+          // Debounce heavy operations (logActiveViewportText, saveDetailPosition, fine-grained progress)
+          clearTimeout(scrollDebounceTimeout);
+          scrollDebounceTimeout = setTimeout(() => {
+            logActiveViewportText();
+            saveDetailPosition();
+            if (isEpubMode) {
+              const targetChunk = contentArea.querySelector(`.txt-scroll-chunk[data-idx="${currentChunkIdx}"]`);
+              let fingerprint = '';
+              if (targetChunk) {
+                fingerprint = String(targetChunk.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 180);
+              }
+              const epubSessionPayload = {
+                epub_session: {
+                  index: currentChunkIdx,
+                  percent: Math.max(0, Math.min(100, Math.round(ratio * 100))),
+                  fingerprint: fingerprint || undefined
+                }
+              };
+              saveProgress(state.activeBookId, currentChunkIdx, txtChunks.length, epubSessionPayload);
+            }
+          }, 150);
+        };
+
+        const scrollHandler = () => {
+          if (!rAfPending) {
+            rAfPending = true;
+            requestAnimationFrame(processScroll);
           }
         };
         scrollWrapper.addEventListener('scroll', scrollHandler, { passive: true });
@@ -334,10 +361,15 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
         scrollWrapper.addEventListener('touchcancel', touchHandler, { passive: true });
       }
 
+      let lastWindowWidth = window.innerWidth;
       const handleResize = () => {
         const wrapper = document.getElementById('txt-scroll-wrapper');
         if (!wrapper) return;
         const mode = localStorage.getItem('viewer_scroll_mode') || 'page';
+
+        const currentWidth = window.innerWidth;
+        const widthChanged = Math.abs(currentWidth - lastWindowWidth) > 5;
+        lastWindowWidth = currentWidth;
 
         if (mode === 'page') {
           const prevStepWidth = getTxtPageAdvanceWidth(wrapper);
@@ -349,6 +381,9 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
           snapTxtPageScrollLeft(wrapper);
           logActiveViewportText();
         } else {
+          // In scroll mode, mobile address bar toggles change height only. Skip DOM re-render if width hasn't changed.
+          if (!widthChanged) return;
+
           const beforeHeight = wrapper.scrollHeight - wrapper.clientHeight;
           const ratio = beforeHeight > 0 ? wrapper.scrollTop / beforeHeight : 0;
           // Scroll mode resize also preserves ratio instead of restoring stale saved position.
@@ -384,12 +419,12 @@ function cancelPendingTxtRestore() {
   }
 }
 
-function showTxtRestoreLoadingToast() {
+function showTxtRestoreLoadingToast(msg = null) {
   const now = Date.now();
-  if (now - txtRestoreToastAt < 700) return;
+  if (now - txtRestoreToastAt < 300) return;
   txtRestoreToastAt = now;
   if (typeof showToast === 'function') {
-    showToast('로딩중입니다', 'info');
+    showToast(typeof msg === 'string' ? msg : '로딩중입니다', 'info');
   }
 }
 

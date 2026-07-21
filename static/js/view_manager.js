@@ -161,11 +161,11 @@ export function showToast(message, type = 'success') {
 
   container.innerHTML = `${iconHtml} <span>${message}</span>`;
   
-  // 브라우저 렌더링 동기화 후 활성화
-  setTimeout(() => {
+  // 브라우저 렌더링 동기화 후 활성화 (rAF로 즉시 다음 Paint 프레임에서 표시)
+  requestAnimationFrame(() => {
     container.style.opacity = '1';
     container.style.transform = 'translateX(-50%) translateY(0)';
-  }, 10);
+  });
 
   // 이전 타이머 정리
   if (window.toastTimer) clearTimeout(window.toastTimer);

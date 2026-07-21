@@ -92,6 +92,27 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
         if target_db_type in ('general', 'adult'):
             db_types = [target_db_type]
 
+        # ── 최대 스캔 허용 파일 크기(MB) 설정 로드 ──────────────────────
+        # 0이면 제한 없음. 원격 마운트(VFS/NAS 등) 포함 os.path.getsize 시도.
+        max_size_mb = 300.0  # 안전 기본값
+        try:
+            gen_db_path = os.path.join(MEDIA_SERVER_DIR, 'db', 'media_general.db')
+            if os.path.exists(gen_db_path):
+                _tmp_conn = sqlite3.connect(gen_db_path, timeout=2.0)
+                _tmp_conn.row_factory = sqlite3.Row
+                _tmp_cur = _tmp_conn.cursor()
+                _tmp_cur.execute("SELECT value FROM settings WHERE key = 'LAZY_SCAN_MAX_FILE_SIZE_MB'")
+                _row = _tmp_cur.fetchone()
+                _tmp_conn.close()
+                if _row:
+                    max_size_mb = float(str(_row['value']).strip() or '300')
+        except Exception as _se:
+            print(f"[Lazy-Scanner] 최대 파일 크기 설정 로드 실패 (기본 300MB 적용): {_se}")
+        if max_size_mb > 0:
+            print(f"[Lazy-Scanner] 📏 최대 스캔 허용 파일 크기: {max_size_mb:.0f} MB (초과 시 스킵 + 리포트 기록)")
+        else:
+            print("[Lazy-Scanner] 📏 최대 파일 크기 제한 없음 (LAZY_SCAN_MAX_FILE_SIZE_MB=0)")
+
         for db_type in db_types:
             db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
             if not os.path.exists(db_path):
@@ -248,6 +269,35 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
                     else:
                         mode_label = "[커버]"          # EPUB/PDF 등: 커버만 없음
                     print(f"[Lazy-Scanner] ({done}/{total}) {mode_label} 처리 시작 -> {filename}")
+
+                    # ─── 최대 파일 크기 초과 여부 체크 (로컬+VFS/NAS 원격 마운트 포함) ───
+                    # getsize() 실패 시에도 안전 우선으로 스킵 + 리포트 기록.
+                    # (크기를 확인할 수 없는 원격 파일을 무조건 스캔하는 것은 OOM 위험)
+                    if max_size_mb > 0:
+                        try:
+                            file_size_mb = os.path.getsize(file_path) / (1024.0 * 1024.0)
+                            if file_size_mb > max_size_mb:
+                                print(f"[Lazy-Scanner] ⛔ 파일 크기 초과 스킵 ({file_size_mb:.1f} MB > {max_size_mb:.0f} MB): {filename}")
+                                lib_errors[library_id].append({
+                                    'file_path': file_path,
+                                    'filename': filename,
+                                    'error_type': 'SkippedOversizedFile',
+                                    'message': f"LAZY_SKIP: 파일 크기({file_size_mb:.1f} MB)가 허용 한도({max_size_mb:.0f} MB)를 초과하여 스캔을 건너뜁니다."
+                                })
+                                gc.collect()
+                                continue
+                        except OSError as _size_err:
+                            # 크기 조회 자체가 실패(원격 마운트 오류·권한 없음 등) →
+                            # 크기를 보증할 수 없으므로 안전 우선으로 스킵 + 리포트 기록
+                            print(f"[Lazy-Scanner] ⚠️ 파일 크기 조회 실패 → 안전 스킵: {filename} ({_size_err})")
+                            lib_errors[library_id].append({
+                                'file_path': file_path,
+                                'filename': filename,
+                                'error_type': 'SizeCheckFailed',
+                                'message': f"LAZY_SKIP: 파일 크기 조회 실패로 안전하게 스캔을 건너뜁니다. ({_size_err})"
+                            })
+                            gc.collect()
+                            continue
                     
                     try:
                         # ── 오프셋만 없는 경우: 커버 재추출 없이 오프셋만 수집 ──

@@ -78,8 +78,12 @@ class SchedulerService:
     def start_scheduler():
         """서버 기동 시 스케줄러를 시작하고 DB에서 기존 스케줄 로드"""
         if not scheduler.running:
+            # start() 전에 reload_all_jobs()를 호출하여 configure가 안전하게 실행되도록 조정
+            SchedulerService.reload_all_jobs()
             scheduler.start()
             print("[Scheduler] APScheduler started successfully!")
+        else:
+            SchedulerService.reload_all_jobs()
             
         # ── [Redis 캐시 동기화 백그라운드 Job 등록] ──
         from services.reading_progress_service import ReadingProgressService
@@ -93,7 +97,6 @@ class SchedulerService:
             )
             print("[Scheduler] Redis cache flush job registered successfully (interval: 1m)")
 
-        SchedulerService.reload_all_jobs()
         try:
             SchedulerService.auto_resume_interrupted_jobs()
         except Exception as e:
@@ -138,15 +141,26 @@ class SchedulerService:
         from services.settings_service import SettingsService
         from zoneinfo import ZoneInfo
         tz_str = SettingsService.get('TIMEZONE', 'UTC')
-        try:
-            scheduler.configure(timezone=ZoneInfo(tz_str))
-            print(f"[Scheduler] Timezone configured successfully to: {tz_str}")
-        except Exception as tz_err:
-            print(f"[Scheduler ERROR] Failed to configure scheduler timezone ({tz_str}): {tz_err}")
+        
+        target_tz = ZoneInfo(tz_str)
+        if not scheduler.running:
             try:
-                scheduler.configure(timezone=ZoneInfo('UTC'))
-            except:
-                pass
+                scheduler.configure(timezone=target_tz)
+                print(f"[Scheduler] Timezone configured successfully to: {tz_str}")
+            except Exception as tz_err:
+                print(f"[Scheduler ERROR] Failed to configure scheduler timezone ({tz_str}): {tz_err}")
+                try:
+                    scheduler.configure(timezone=ZoneInfo('UTC'))
+                except:
+                    pass
+        else:
+            try:
+                scheduler._timezone = target_tz
+                if hasattr(scheduler, 'timezone'):
+                    scheduler.timezone = target_tz
+                print(f"[Scheduler] Dynamic timezone update (running): {tz_str}")
+            except Exception as tz_err:
+                print(f"[Scheduler ERROR] Failed to dynamically update running timezone ({tz_str}): {tz_err}")
 
         # 기존 모든 job 제거
         try:
