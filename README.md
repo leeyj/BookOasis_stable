@@ -247,9 +247,18 @@ server {
     add_header Referrer-Policy "no-referrer-when-downgrade" always;
 
     # ------------------------------------------------------------------
-    # 1. 커버 이미지 정적 서빙 최적화 (/covers/)
-    # 파이썬 애플리케이션 우회 다이렉트 0ms 이미지 서빙
+    # 1. 커버 이미지 라우팅 최적화
     # ------------------------------------------------------------------
+    # 1-1. 동적 SVG 커버 생성 API (백엔드 파이썬으로 전달)
+    location /covers/fallback {
+        proxy_pass http://bookoasis_backend;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+    }
+
+    # 1-2. 커버 이미지 정적 서빙 최적화 (파이썬 우회 다이렉트 0ms 서빙)
     location /covers/ {
         alias /path/to/media_server/covers/; # <== 본인의 설치 경로/covers/ 로 변경하세요.
         expires 1d;

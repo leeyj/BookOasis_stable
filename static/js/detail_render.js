@@ -1,5 +1,5 @@
 // detail_render.js – 도서 상세 화면의 HTML 템플릿 생성기
-import { buildFallbackCoverUrl, getBookCoverSrc } from './cover_fallback.js';
+import { buildFallbackCoverUrl, getBookCoverSrc, buildTextCoverDataUri } from './cover_fallback.js';
 import { state } from './state.js';
 import { stripLeadingBracketTags } from './series_display.js';
 
@@ -181,7 +181,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
            ondragleave="this.style.borderColor='rgba(255,255,255,0.08)';" 
            ondrop="handleCoverDrop(event); this.style.borderColor='rgba(255,255,255,0.08)';">
            <img class="detail-cover-sm" id="detail-cover-img-preview" src="${coverSrc}" alt="Cover"
-             onerror="if(this.src.indexOf('/covers/fallback')===-1){this.src='${headerFallbackCoverSrc}';}else{this.onerror=null; this.src='/static/images/default_cover.jpg';}">
+              onerror="if(this.src.indexOf('/covers/fallback')===-1 && !this.src.startsWith('data:image/svg+xml')){this.src='${headerFallbackCoverSrc}';}else{this.onerror=null; this.src='${buildTextCoverDataUri({ title: visibleTitle, format: 'text', seed: actualLibraryId })}';}">
         <div class="cover-upload-overlay" id="cover-upload-overlay-btn" onclick="triggerCoverUpload(event)">
           <i class="fa-solid fa-camera"></i>
           <span>${i18n.t('detail.change_cover')}</span>
@@ -372,7 +372,7 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId, dbType
     volumesHtml += `
       <div class="volume-card" data-book-id="${b.id}" data-page-missing="${noOffsets ? 1 : 0}" oncontextmenu="event.preventDefault(); event.stopPropagation(); if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(event.clientX, event.clientY, ${b.id}, '${(rawDisplayTitle || '').replace(/'/g, "\\'")}', true);" ontouchstart="window.handleLongPressTouchStart(event, (x, y) => { if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(x, y, ${b.id}, '${(rawDisplayTitle || '').replace(/'/g, "\\\\'")}', true); })" ontouchmove="window.handleLongPressTouchMove(event)" ontouchend="window.handleLongPressTouchEnd(event)" ontouchcancel="window.handleLongPressTouchEnd(event)">
         <img class="volume-thumb" src="${volCoverSrc}" alt="cover"
-             onerror="if(this.src.indexOf('/covers/fallback')===-1){this.src='${volumeFallbackCoverSrc}';}else{this.onerror=null; this.src='/static/images/default_cover.jpg';}">
+             onerror="if(this.src.indexOf('/covers/fallback')===-1 &amp;&amp; !this.src.startsWith('data:image/svg+xml')){this.src='${volumeFallbackCoverSrc}';}else{this.onerror=null; this.src='${buildTextCoverDataUri({ title: b.title || rawDisplayTitle, format: b.file_format, seed: b.id })}';}">
         <div class="volume-info">
           ${warnBannerHtml}
           ${infoBannerHtml}

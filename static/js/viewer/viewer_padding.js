@@ -145,10 +145,14 @@ export function commitViewerPadding() {
     const container = document.getElementById('txt-viewer-container');
     const parentWidth = container ? container.clientWidth : window.innerWidth;
     const targetWidth = Math.floor(parentWidth - (padLeft + padRight));
+    const pageStep = localStorage.getItem('comic_page_step') || '1';
+    const maxAllowedWidth = pageStep === '2' ? Math.min(targetWidth, 1600) : Math.min(targetWidth, 800);
 
     wrapper.style.height = `calc(100vh - ${80 + padTop + padBottom}px)`;
     wrapper.style.marginTop = `${padTop + 40}px`;
-    wrapper.style.maxWidth = `${targetWidth}px`;
+    wrapper.style.maxWidth = `${maxAllowedWidth}px`;
+    wrapper.style.marginLeft = 'auto';
+    wrapper.style.marginRight = 'auto';
     wrapper.style.padding = '0';
     contentArea.style.padding = '0';
     console.log(`[Viewer-Padding] Wrapper maxWidth locked to integer: ${targetWidth}px`);
@@ -156,7 +160,9 @@ export function commitViewerPadding() {
     // 세로 스크롤 모드
     wrapper.style.height = '100%';
     wrapper.style.marginTop = '0';
-    wrapper.style.maxWidth = '100%';
+    wrapper.style.maxWidth = '850px';
+    wrapper.style.marginLeft = 'auto';
+    wrapper.style.marginRight = 'auto';
     wrapper.style.padding = '0';
 
     contentArea.style.paddingTop = `${padTop}px`;

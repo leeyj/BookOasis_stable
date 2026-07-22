@@ -247,9 +247,18 @@ server {
     add_header Referrer-Policy "no-referrer-when-downgrade" always;
 
     # ------------------------------------------------------------------
-    # 1. Cover Image Static Serving Optimization (/covers/)
-    # Direct 0ms static image serving by bypassing Python backend
+    # 1. Cover Image Routing Optimization
     # ------------------------------------------------------------------
+    # 1-1. Dynamic SVG Cover Generation API (Pass to Python backend)
+    location /covers/fallback {
+        proxy_pass http://bookoasis_backend;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+    }
+
+    # 1-2. Cover Image Static Serving Optimization (Bypass Python backend)
     location /covers/ {
         alias /path/to/media_server/covers/; # <== Change this to your installation path /covers/
         expires 1d;

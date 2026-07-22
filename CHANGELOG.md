@@ -1,4 +1,8 @@
 # CHANGELOG
+## v1.3.4
+- 동적 SVG 커버 API Nginx 프록시 우치 라우팅 설정 보완 & 프론트엔드 onerror 2차 Fallback inline SVG 적용 (구형 펼쳐진 책 사진 이미지 완전 노출 차단) | Fix Nginx fallback cover route bypass & frontend fallback to inline SVG data URI
+- EPUB/TXT 뷰어 레이아웃 최적화 (스크롤 모드 본문 850px 중앙 정렬 제한 & 2장 보기 모드 1600px 시원한 펼침 지원) | Optimize EPUB/TXT viewer layout (Limit scroll mode width to 850px & Expand 2-page view width to 1600px)
+---
 ## v1.3.3
 - 스캔 완료 후 웹 대기열(Queue) 고착 및 다음 스캔 미진행 버그 수정 (웹훅/플러그인 비동기화 및 try-finally 큐 상태 반영) | Fix scan queue status hang & block after scan completion (Async webhook dispatch & try-finally queue status update)
 - 스캐너 큐 및 라이브러리 스캔 상태 전이 명세서(Specification) 수립 및 고착 방지 검증 완료 | Established Scanner Queue State Transition Specification & deadlock prevention audit (`spec_scanner_queue_state_transitions.md`)

@@ -98,7 +98,7 @@ export function applyTxtSettingsCore(ctx) {
       const pageStep = localStorage.getItem('comic_page_step') || '1';
       const pageGap = pageStep === '2' ? 40 : 0;
       if (pageStep === '2') {
-        scrollWrapper.style.maxWidth = `${targetWidth}px`;
+        scrollWrapper.style.maxWidth = `${Math.min(targetWidth, 1600)}px`;
       } else {
         scrollWrapper.style.maxWidth = `${Math.min(targetWidth, 800)}px`;
       }
@@ -122,9 +122,10 @@ export function applyTxtSettingsCore(ctx) {
       container.classList.remove('scroll-mode-page');
 
       scrollWrapper.style.height = '100%';
-      scrollWrapper.style.margin = '0';
+      scrollWrapper.style.maxWidth = '850px';
+      scrollWrapper.style.marginLeft = 'auto';
+      scrollWrapper.style.marginRight = 'auto';
       scrollWrapper.style.padding = '0';
-      scrollWrapper.style.maxWidth = '';
       scrollWrapper.style.columnCount = '';
       scrollWrapper.style.columnWidth = '';
       scrollWrapper.style.columnGap = '';

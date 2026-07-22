@@ -3,7 +3,7 @@ import { state } from './state.js';
 import { openBookDetail } from './modal.js';
 import { openReader } from './viewer.js';
 import { showToast } from './view_manager.js';
-import { buildFallbackCoverUrl, getBookCoverSrc } from './cover_fallback.js';
+import { buildFallbackCoverUrl, getBookCoverSrc, buildTextCoverDataUri } from './cover_fallback.js';
 import { stripLeadingBracketTags } from './series_display.js';
 
 // 지연 로딩을 위한 단일 싱글톤 IntersectionObserver 인스턴스
@@ -190,12 +190,13 @@ export function createBookCard(item, options = {}) {
   if (imgEl && !shouldHideCover) {
     imgEl.onerror = () => {
       const currentSrc = imgEl.getAttribute('src') || '';
-      if (currentSrc !== fallbackCoverSrc) {
+      if (currentSrc !== fallbackCoverSrc && !currentSrc.startsWith('data:image/svg+xml')) {
         imgEl.setAttribute('src', fallbackCoverSrc);
         return;
       }
       imgEl.onerror = null;
-      imgEl.setAttribute('src', '/static/images/default_cover.jpg');
+      const svgUri = buildTextCoverDataUri({ title: item.title, format: item.file_format, seed: item.id });
+      imgEl.setAttribute('src', svgUri);
     };
   }
 

@@ -995,6 +995,13 @@
     font-size: 1.15rem;
     line-height: 2.0;
     letter-spacing: 0.5px;
+    box-sizing: border-box;
+}
+
+#txt-scroll-wrapper:not(.scroll-mode-page) {
+    max-width: 850px;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 /* PDF 영역 */
