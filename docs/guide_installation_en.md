@@ -175,6 +175,12 @@ This is the optimized configuration for when you link the service to an external
 ### Nginx Virtual Host Setup Example (`/etc/nginx/sites-available/book`)
 
 ```nginx
+# Backend persistent connection pool setup (0ms socket connection overhead)
+upstream bookoasis_backend {
+    server 127.0.0.1:5930;
+    keepalive 64; # Maintain 64 persistent backend connections
+}
+
 server {
     listen 80;
     server_name book.yourdomain.com; # Change to your domain
@@ -190,7 +196,7 @@ server {
     gzip_vary on;
     gzip_proxied any;
     gzip_comp_level 6;
-    gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml image/svg+xml;
 
     # 2. Upload Size Limit & Buffer Extension
     client_max_body_size 100M;
@@ -232,9 +238,19 @@ server {
 
     real_ip_header CF-Connecting-IP;
 
-    # 5. Reverse Proxy Link & Performance Optimization
+    # 5. Cover Image Static Serving Optimization (/covers/)
+    # Direct 0ms static image serving by bypassing Python backend
+    location /covers/ {
+        alias /path/to/media_server/covers/; # Change to your installation path /covers/
+        expires 1d;
+        add_header Cache-Control "public, max-age=86400";
+        sendfile on;
+        tcp_nopush on;
+    }
+
+    # 6. Main API & Web Service (WebSocket Support)
     location / {
-        proxy_pass http://127.0.0.1:5930/;
+        proxy_pass http://bookoasis_backend/;
 
         # Basic proxy header setup (Changed from $host to $http_host to maintain port and enhance compatibility)
         proxy_set_header Host $http_host;
@@ -250,9 +266,12 @@ server {
         # Optimize large comic file transfer (Turn off intermediate buffering and stream immediately)
         proxy_buffering off;
 
-        # Timeout handling for long-running tasks like AI analysis
+        # Timeout handling for long-running tasks
         proxy_read_timeout 300;
         proxy_connect_timeout 300;
+        proxy_send_timeout 300;
+    }
+}
         proxy_send_timeout 300;
     }
 }

@@ -14,10 +14,16 @@ import database
 
 system_bp = Blueprint('system', __name__)
 
+_LIB_NAME_MEM_CACHE = {}
+
 def get_library_name(db_type, lib_id):
-    """라이브러리 ID에 대치되는 실제 카테고리(라이브러리) 명칭을 DB에서 조회합니다."""
+    """라이브러리 ID에 대치되는 실제 카테고리(라이브러리) 명칭을 메모리 캐시에서 즉시 조회합니다 (DB Lock 예방)."""
     if not lib_id:
         return None
+    cache_key = f"{db_type}:{lib_id}"
+    if cache_key in _LIB_NAME_MEM_CACHE:
+        return _LIB_NAME_MEM_CACHE[cache_key]
+
     try:
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
@@ -25,10 +31,13 @@ def get_library_name(db_type, lib_id):
         row = cursor.fetchone()
         conn.close()
         if row:
-            return row['name']
+            name = row['name']
+            _LIB_NAME_MEM_CACHE[cache_key] = name
+            return name
     except Exception:
         pass
     return None
+
 
 @system_bp.route('/health', methods=['GET'])
 def health():

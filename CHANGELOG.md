@@ -1,4 +1,9 @@
 # CHANGELOG
+## v1.3.3
+- 스캔 완료 후 웹 대기열(Queue) 고착 및 다음 스캔 미진행 버그 수정 (웹훅/플러그인 비동기화 및 try-finally 큐 상태 반영) | Fix scan queue status hang & block after scan completion (Async webhook dispatch & try-finally queue status update)
+- 스캐너 큐 및 라이브러리 스캔 상태 전이 명세서(Specification) 수립 및 고착 방지 검증 완료 | Established Scanner Queue State Transition Specification & deadlock prevention audit (`spec_scanner_queue_state_transitions.md`)
+- 대시보드->도서 상세리스트 에서 뒤로가기시 이전위치로 복원 | Fix back button position memory when navigating from Dashboard to Book Details
+---
 ## v1.3.2
 - 최근읽은도서 반영 안되는 현상 수정 | Fix latest read books reflection issue
 - FTS5 완전배제로 안정성 강화 | remove the vtable(FTS5)

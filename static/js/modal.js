@@ -14,14 +14,19 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
   // 전달된 libraryId가 없으면 현재 상태값을 사용하되, 대시보드 시스템성 값이면 'all'로 대체 처리
   const activeLibId = libraryId || state.currentLibraryId || 'all';
 
-  // 현재 리스트 스크롤 위치 저장 (복귀 시 사용)
+  // 현재 화면의 스크롤 위치 저장 (실제 스크롤 주체인 .library-main-content 캡처)
   state.scrollPositions = state.scrollPositions || {};
-  try {
-    state.scrollPositions[activeLibId] = window.pageYOffset || document.documentElement.scrollTop || 0;
-  } catch (e) {
-    // 접근이 실패하면 무시
-    console.warn('[detail] failed to capture scroll position', e);
-  }
+  const mainContent = document.querySelector('.library-main-content');
+  const currentScrollY = (mainContent && mainContent.scrollTop > 0)
+    ? mainContent.scrollTop
+    : (window.pageYOffset || document.documentElement.scrollTop || 0);
+
+  state.scrollPositions['last_pos'] = currentScrollY;
+  state.scrollPositions[state.currentLibraryId] = currentScrollY;
+  state.scrollPositions[activeLibId] = currentScrollY;
+
+  console.log(`[Scroll-Debug] SAVED scroll position: ${currentScrollY}px (Current lib: ${state.currentLibraryId}, Active lib: ${activeLibId})`);
+
 
   // 로딩 표시
   detailView.innerHTML = `
@@ -31,6 +36,7 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
     <div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('modal.loading_detail')}</div>
   `;
   switchActiveView('detail');
+
 
   try {
     const data = await api.fetchMediaDetail(state.currentLibraryType, activeLibId, safeSeriesName, representativeBookId);
@@ -158,31 +164,50 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
 
 // 상세 뷰 → 그리드 뷰/대시보드 복귀
 export function goBackToList(triggerBack = true) {
+  const targetScroll = (state.scrollPositions && (
+    state.scrollPositions['last_pos'] ?? 
+    state.scrollPositions[state.currentLibraryId]
+  )) || 0;
+
+  console.log(`[Scroll-Debug] RESTORING scroll position to: ${targetScroll}px (Current lib: ${state.currentLibraryId})`);
+
   if (state.currentLibraryId === 'home') {
     switchActiveView('dashboard');
   } else {
     switchActiveView('grid');
   }
 
-  // 상세에서 돌아올 때 저장된 스크롤 위치가 있으면 복원
-  try {
-    const saved = state.scrollPositions && state.scrollPositions[state.currentLibraryId];
-    if (typeof saved !== 'undefined' && saved !== null) {
-      // 뷰 전환 렌더링이 완료될 시간을 약간 둔 후 복원
-      setTimeout(() => {
-        window.scrollTo({ top: saved, behavior: 'auto' });
-      }, 50);
-      // 복원 후 캐시 정리
-      delete state.scrollPositions[state.currentLibraryId];
+  // 상세에서 돌아올 때 저장된 스크롤 위치가 있으면 즉시 및 렌더 후 다중 복원
+  const doScroll = (pos) => {
+    window.scrollTo(0, pos);
+    document.documentElement.scrollTop = pos;
+    document.body.scrollTop = pos;
+    const mainContent = document.querySelector('.library-main-content');
+    if (mainContent) mainContent.scrollTop = pos;
+    const gridView = document.getElementById('books-grid-view');
+    const dashView = document.getElementById('library-dashboard-view');
+    if (gridView) gridView.scrollTop = pos;
+    if (dashView) dashView.scrollTop = pos;
+  };
+
+
+  if (targetScroll > 0) {
+    try {
+      doScroll(targetScroll);
+      requestAnimationFrame(() => doScroll(targetScroll));
+      setTimeout(() => doScroll(targetScroll), 50);
+      setTimeout(() => doScroll(targetScroll), 150);
+    } catch (e) {
+      console.warn('[goBackToList] failed to restore scroll', e);
     }
-  } catch (e) {
-    console.warn('[goBackToList] failed to restore scroll', e);
   }
+
   // 수동 목록으로 돌아가기 버튼을 누른 경우에만 브라우저 히스토리 스택 원상복구
   if (triggerBack && window.location.hash.startsWith('#detail')) {
     history.back();
   }
 }
+
 
 window.toggleBookFavorite = async (event, bookId, nextStatus, seriesName, libraryId) => {
   if (event) event.stopPropagation();

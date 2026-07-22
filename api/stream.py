@@ -14,8 +14,10 @@ from api.auth import login_required, check_adult_permission, admin_required
 from utils.safe_file_response import stream_file_safely
 from utils.i18n import _t
 import database
+import hashlib
 
 stream_bp = Blueprint('media_stream', __name__)
+
 
 BASE_DIR  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 COVERS_DIR = os.path.join(BASE_DIR, 'covers')
@@ -330,11 +332,20 @@ def get_cover_image(filename):
         return candidate
 
     def _send_cover(path):
+        # 304 빠른 반환 (디스크 I/O 지연 5초 방지)
+        etag_val = hashlib.md5(str(path).encode('utf-8')).hexdigest()[:16]
+        if_none_match = request.headers.get('If-None-Match')
+        if if_none_match and (if_none_match == etag_val or if_none_match == f'"{etag_val}"'):
+            res = Response(status=304)
+            res.headers['Cache-Control'] = 'public, max-age=86400'
+            res.headers['ETag'] = f'"{etag_val}"'
+            return res
+
         mime, _ = mimetypes.guess_type(path)
         mime = mime or 'image/png'
-        res = send_file(path, mimetype=mime, conditional=True, etag=True)
-        # Covers are mostly immutable between scans; cache to reduce dashboard refresh flicker/network.
+        res = send_file(path, mimetype=mime, conditional=False)
         res.headers['Cache-Control'] = 'public, max-age=86400'
+        res.headers['ETag'] = f'"{etag_val}"'
         return res
 
     decoded_filename = urllib.parse.unquote(filename)
@@ -348,6 +359,7 @@ def get_cover_image(filename):
     return _send_cover(path)
 
 
+
 @stream_bp.route('/covers/fallback', methods=['GET'])
 def get_fallback_cover_image():
     """커버 누락 시 제목 기반 SVG 커버를 동적으로 생성하여 반환"""
@@ -357,10 +369,11 @@ def get_fallback_cover_image():
 
     svg = _build_fallback_svg(title, file_format, seed)
     res = Response(svg, mimetype='image/svg+xml')
-    # 제목/포맷 기반 생성 이미지이므로 강한 캐시 허용
     res.headers['Cache-Control'] = 'public, max-age=86400'
     res.set_etag(str(_hash_string(f"{title}|{file_format}|{seed}")))
     return res
+
+
 
 @stream_bp.route('/api/media/cache/stats', methods=['GET'])
 @admin_required

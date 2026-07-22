@@ -100,7 +100,13 @@ class ScannerQueue:
         return self.enqueue(task_type, **kwargs)
 
     def get_queue_status(self):
-        """현재 실행 중인 작업과 큐 대기열의 상태를 반환합니다."""
+        """현재 실행 중인 작업과 큐 대기열의 상태를 반환합니다 (DB Lock 지연 방지 메모리 캐시 포함)."""
+        import time
+        now = time.time()
+        if hasattr(self, '_cached_status') and hasattr(self, '_cached_status_time'):
+            if now - self._cached_status_time < 2.0:
+                return self._cached_status
+
         status = {
             'running': None,
             'pending': []
@@ -137,7 +143,11 @@ class ScannerQueue:
                 })
         except Exception as e:
             self.log(f"Failed to get queue status from DB: {e}")
+
+        self._cached_status = status
+        self._cached_status_time = now
         return status
+
 
     def clear_queue(self):
         """대기열에 있는 모든 작업을 취소(cancelled) 처리합니다."""
@@ -240,40 +250,43 @@ def run_scanner_worker_loop():
             # 3. 작업 유형별 실행 분기
             error_message = None
             try:
-                if task_type == 'lazy_scan':
-                    _process_lazy_scan(sq)
-                elif task_type == 'library_scan':
-                    _process_library_scan(sq, **kwargs)
-                elif task_type == 'cover_scan':
-                    _process_cover_scan(sq, **kwargs)
-                else:
-                    error_message = f"Unknown task type: {task_type}"
-                    sq.log(error_message)
-            except Exception as work_err:
-                import traceback
-                tb_str = traceback.format_exc()
-                error_message = f"{work_err}\n{tb_str}"
-                sq.log(f"❌ Task processing crashed:\n{tb_str}")
-
-            # 4. 작업 결과 반영
-            finished_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            sq.log(f"Task finishing: key={task_key}, type={task_type}, id={task_id}, status={'failed' if error_message else 'completed'}")
-            sq.log(f"Task result update begin: key={task_key}, type={task_type}, id={task_id}")
-            from utils.redis_helper import redis_acquire_lock, redis_release_lock
-            queue_gate_token = None
-            try:
-                queue_gate_token = redis_acquire_lock("lock:db_write:general", ttl=60, wait_timeout=5.0)
-                if not queue_gate_token:
-                    sq.log(f"Task result update gate busy: key={task_key}, type={task_type}, id={task_id}")
-                    queue_gate_token = None
-                ScannerQueueRepository.update_task_result(task_id, finished_str, error_message)
+                try:
+                    if task_type == 'lazy_scan':
+                        _process_lazy_scan(sq)
+                    elif task_type == 'library_scan':
+                        _process_library_scan(sq, **kwargs)
+                    elif task_type == 'cover_scan':
+                        _process_cover_scan(sq, **kwargs)
+                    else:
+                        error_message = f"Unknown task type: {task_type}"
+                        sq.log(error_message)
+                except Exception as work_err:
+                    import traceback
+                    tb_str = traceback.format_exc()
+                    error_message = f"{work_err}\n{tb_str}"
+                    sq.log(f"❌ Task processing crashed:\n{tb_str}")
             finally:
-                if queue_gate_token:
-                    try:
-                        redis_release_lock("lock:db_write:general", queue_gate_token)
-                    except Exception:
-                        pass
-            sq.log(f"Task result update done: key={task_key}, type={task_type}, id={task_id}")
+                # 4. 작업 결과 반영 (예외 발생 시에도 반드시 실행 보장)
+                finished_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                sq.log(f"Task finishing: key={task_key}, type={task_type}, id={task_id}, status={'failed' if error_message else 'completed'}")
+                sq.log(f"Task result update begin: key={task_key}, type={task_type}, id={task_id}")
+                from utils.redis_helper import redis_acquire_lock, redis_release_lock
+                queue_gate_token = None
+                try:
+                    queue_gate_token = redis_acquire_lock("lock:db_write:general", ttl=60, wait_timeout=5.0)
+                    if not queue_gate_token:
+                        sq.log(f"Task result update gate busy: key={task_key}, type={task_type}, id={task_id}")
+                        queue_gate_token = None
+                    ScannerQueueRepository.update_task_result(task_id, finished_str, error_message)
+                except Exception as update_err:
+                    sq.log(f"❌ ScannerQueueRepository.update_task_result failed: {update_err}")
+                finally:
+                    if queue_gate_token:
+                        try:
+                            redis_release_lock("lock:db_write:general", queue_gate_token)
+                        except Exception:
+                            pass
+                sq.log(f"Task result update done: key={task_key}, type={task_type}, id={task_id}")
 
             if not error_message:
                 # 스캔 완료 시 신규 추가 도서 대시보드 캐시 무효화

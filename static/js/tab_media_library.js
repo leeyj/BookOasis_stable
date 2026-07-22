@@ -255,16 +255,20 @@ async function initTabMediaLibrary() {
     if (detailView && detailView.style.display !== 'none') {
       goBackToList(false);
     }
-    
+
     if (event.state && event.state.view === 'category' && event.state.libraryId) {
-        // 히스토리에 저장된 이전 카테고리로 복원 (히스토리 스택 중복 방지를 위해 skipHistory = true 전달)
+      // 현재 이미 같은 카테고리 그리드 DOM이 형성되어 있다면 selectCategory(재조회)를 생략하여 무한 스크롤 카드 및 스크롤 위치 보존
+      if (state.currentLibraryId !== event.state.libraryId) {
         selectCategory(event.state.libraryId, true);
+      }
     } else if (!event.state && (window.location.hash === '' || window.location.hash.startsWith('#library='))) {
-        // 해시가 비어있거나 library 진입인 경우 상태가 없어도 home으로 복원
+      if (state.currentLibraryId !== 'home') {
         selectCategory('home', true);
+      }
     }
   });
 }
+
 
 if (window.i18nReady) {
   initTabMediaLibrary();

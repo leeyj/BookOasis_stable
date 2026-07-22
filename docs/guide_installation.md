@@ -175,6 +175,12 @@ docker compose -f docker-compose.ghcr.yml -f docker-compose.override.yml up -d
 ### Nginx 가상 호스트 설정 예시 (`/etc/nginx/sites-available/book`)
 
 ```nginx
+# 백엔드 영구 커넥션 풀 설정 (소켓 생성 지연 0ms)
+upstream bookoasis_backend {
+    server 127.0.0.1:5930;
+    keepalive 64; # 64개 백엔드 커넥션을 영구 유지하여 연결 소모 방지
+}
+
 server {
     listen 80;
     server_name book.yourdomain.com; # 본인의 도메인으로 변경하세요
@@ -190,7 +196,7 @@ server {
     gzip_vary on;
     gzip_proxied any;
     gzip_comp_level 6;
-    gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml image/svg+xml;
 
     # 2. 업로드 용량 제한 및 버퍼 확장
     client_max_body_size 100M;
@@ -232,9 +238,19 @@ server {
 
     real_ip_header CF-Connecting-IP;
 
-    # 5. 리버스 프록시 연동 및 성능 최적화
+    # 5. 커버 이미지 정적 서빙 최적화 (/covers/)
+    # 파이썬 애플리케이션 우회 다이렉트 0ms 이미지 서빙
+    location /covers/ {
+        alias /path/to/media_server/covers/; # 본인의 설치 경로/covers/ 로 변경하세요
+        expires 1d;
+        add_header Cache-Control "public, max-age=86400";
+        sendfile on;
+        tcp_nopush on;
+    }
+
+    # 6. 일반 API 및 메인 웹 서비스 (WebSocket 지원)
     location / {
-        proxy_pass http://127.0.0.1:5930/;
+        proxy_pass http://bookoasis_backend/;
 
         # 기본 프록시 헤더 설정 ($host에서 $http_host로 변경하여 포트 유지 및 호환성 강화)
         proxy_set_header Host $http_host;
@@ -250,9 +266,12 @@ server {
         # 만화책 대용량 파일 전송 최적화 (중간 버퍼링 끄고 즉시 스트리밍)
         proxy_buffering off;
 
-        # AI 분석 등 장시간 작업 처리 대응 타임아웃
+        # 장시간 작업 처리 대응 타임아웃
         proxy_read_timeout 300;
         proxy_connect_timeout 300;
+        proxy_send_timeout 300;
+    }
+}
         proxy_send_timeout 300;
     }
 }

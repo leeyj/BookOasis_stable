@@ -4,6 +4,7 @@ import sys
 import gc
 import time
 import sqlite3
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 MEDIA_SERVER_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -572,41 +573,52 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
             print(f"[Scanner ERROR] Scan report save failed: {report_err}")
 
     if detected_new_books:
-        sample = [b['title'] for b in detected_new_books[:10]]
-        event_payload = {
-            'db_type': db_type,
-            'library_id': library_id,
-            'library_name': library_name,
-            'new_books_count': len(detected_new_books),
-            'sample_titles': sample,
-        }
-        try:
-            dispatch_webhook_event('scan.new_books_detected', event_payload)
-        except Exception as hook_err:
-            print(f"[Scanner-Webhook] dispatch failed: {hook_err}")
-
-        # 커뮤니티 표준 이벤트: book.new (신규 도서별 개별 발행)
-        try:
-            for book in detected_new_books:
-                metadata = {
-                    'type': 'book',
-                    'format': (book.get('format') or '').lower(),
-                    'title': book.get('title') or '',
-                    'author': book.get('author') or '',
-                    'publisher': book.get('publisher') or '',
-                    'series': book.get('series_name') or None,
-                    'seriesIndex': None,
-                    'progress': 0,
-                    'totalPages': None,
-                    'currentLocation': None,
-                    'addedAt': int(time.time()),
+        def _async_event_worker(books, target_db, lib_id, lib_name):
+            try:
+                sample = [b['title'] for b in books[:10]]
+                event_payload = {
+                    'db_type': target_db,
+                    'library_id': lib_id,
+                    'library_name': lib_name,
+                    'new_books_count': len(books),
+                    'sample_titles': sample,
                 }
-                payload = build_book_event_payload('book.new', metadata=metadata, user=False)
-                dispatch_standard_book_event(payload)
-        except Exception as hook_err:
-            print(f"[Scanner-Webhook] standard book.new dispatch failed: {hook_err}")
+                try:
+                    dispatch_webhook_event('scan.new_books_detected', event_payload)
+                except Exception as hook_err:
+                    print(f"[Scanner-Webhook] dispatch failed: {hook_err}")
 
-        _dispatch_new_books_to_plugin_hooks(db_type, event_payload)
+                # 커뮤니티 표준 이벤트: book.new (신규 도서별 개별 발행)
+                try:
+                    for book in books:
+                        metadata = {
+                            'type': 'book',
+                            'format': (book.get('format') or '').lower(),
+                            'title': book.get('title') or '',
+                            'author': book.get('author') or '',
+                            'publisher': book.get('publisher') or '',
+                            'series': book.get('series_name') or None,
+                            'seriesIndex': None,
+                            'progress': 0,
+                            'totalPages': None,
+                            'currentLocation': None,
+                            'addedAt': int(time.time()),
+                        }
+                        payload = build_book_event_payload('book.new', metadata=metadata, user=False)
+                        dispatch_standard_book_event(payload)
+                except Exception as hook_err:
+                    print(f"[Scanner-Webhook] standard book.new dispatch failed: {hook_err}")
+
+                _dispatch_new_books_to_plugin_hooks(target_db, event_payload)
+            except Exception as async_err:
+                print(f"[Scanner-AsyncEvent ERROR] Failed to dispatch scan events: {async_err}")
+
+        dispatch_thread = threading.Thread(
+            target=_async_event_worker,
+            args=(detected_new_books, db_type, library_id, library_name),
+            daemon=True
+        )
+        dispatch_thread.start()
 
 
 def _scan_library_covers_only_internal(conn, db_path, library_id, physical_path, target_paths, db_type):

@@ -64,6 +64,8 @@ def _build_series_entries(db_type, rows):
             db_type=db_type
         )
 
+
+
         latest_added = max((b['created_at'] for b in books if b['created_at']), default='')
         any_favorite = 1 if any((b['is_favorite'] or 0) == 1 for b in books) else 0
         author = next((b['author'] for b in books if b['author']), '')

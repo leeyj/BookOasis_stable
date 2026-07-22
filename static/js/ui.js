@@ -14,16 +14,18 @@ const lazyImageObserver = ('IntersectionObserver' in window)
           const lazyImage = entry.target;
           if (lazyImage.dataset.src) {
             lazyImage.src = lazyImage.dataset.src;
-            lazyImage.removeAttribute('data-src'); // 중복 분석 방지용 속성 제거
+            lazyImage.removeAttribute('data-src');
           }
           observer.unobserve(lazyImage);
         }
       });
     }, {
-      rootMargin: '100px 0px', // 뷰포트에 도달하기 100px 전에 로딩 시작
+      rootMargin: '200px 0px',
       threshold: 0.01
     })
   : null;
+
+
 
 function normalizeBookTitle(item) {
   let title = item.title || '';
@@ -163,7 +165,6 @@ export function createBookCard(item, options = {}) {
     </button>
   `;
 
-  // 1x1 투명 GIF를 기본 src로 지정하고 data-src에 실제 coverSrc를 둡니다.
   const lazyPlaceholder = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
   const imgSrc = shouldHideCover ? fallbackCoverSrc : (useLazyLoad ? lazyPlaceholder : coverSrc);
   const imgDataSrcAttr = (!shouldHideCover && useLazyLoad) ? `data-src="${coverSrc}"` : '';
@@ -171,9 +172,10 @@ export function createBookCard(item, options = {}) {
   card.innerHTML = `
     <div class="book-card-cover">
       <div class="book-card-overlay"></div>
-      <img src="${imgSrc}" ${imgDataSrcAttr} alt="${displayTitle}">
+      <img src="${imgSrc}" ${imgDataSrcAttr} alt="${displayTitle}" decoding="async">
       ${badgeHtml}
       ${favBtnHtml}
+
       <button class="btn-resume-series" title="${options.actionTitle || '읽기'}">
         <i class="fa-solid fa-book-open"></i>
       </button>
@@ -184,7 +186,6 @@ export function createBookCard(item, options = {}) {
     </div>
   `;
 
-  // IntersectionObserver 싱글톤 적용
   const imgEl = card.querySelector('img');
   if (imgEl && !shouldHideCover) {
     imgEl.onerror = () => {
@@ -197,16 +198,19 @@ export function createBookCard(item, options = {}) {
       imgEl.setAttribute('src', '/static/images/default_cover.jpg');
     };
   }
+
   if (imgEl && useLazyLoad && !shouldHideCover) {
     if (imgEl.dataset && imgEl.dataset.src) {
       if (lazyImageObserver) {
         lazyImageObserver.observe(imgEl);
       } else {
-        // Fallback: 브라우저가 지원하지 않을 경우 즉시 로딩
         imgEl.src = imgEl.dataset.src;
       }
     }
   }
+
+
+
 
   // 재생 버튼 클릭 핸들러 명시적 바인딩
   const resumeBtn = card.querySelector('.btn-resume-series');

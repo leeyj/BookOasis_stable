@@ -208,28 +208,35 @@ http {
 2. BookOasis 가상 호스트 설정 (sites-available)
 /etc/nginx/sites-available/default 파일(또는 가상 호스트 설정 블록)에 아래 내용을 작성하고, sites-enabled에 심볼릭 링크를 걸어 적용합니다.
 
-```
+```nginx
+# ------------------------------------------------------------------
+# 백엔드 영구 커넥션 풀 설정 (소켓 생성 지연 0ms)
+# ------------------------------------------------------------------
+upstream bookoasis_backend {
+    server 127.0.0.1:5930;
+    keepalive 64; # 64개 백엔드 커넥션을 영구 유지하여 연결 소모 방지
+}
+
 server {
     listen 80;
     server_name your-domain.com; # <== 본인의 도메인으로 변경하세요.
 
     # HTTP로 들어오는 요청을 HTTPS로 강제 리다이렉트 (보안)
     if ($http_x_forwarded_proto = "http") {
-        return 301 https://$host$request_uri;
+        return 301 https://$host$request_uri/;
     }
 
     # ------------------------------------------------------------------
-    # Gzip 텍스트 압축 설정 (UI 및 JSON API 가속)
-    # 이미지 바이너리는 압축하지 않고, 텍스트 자원만 압축하여 CPU 자원을 아낍니다.
+    # Gzip 텍스트 및 SVG 압축 설정 (UI 및 JSON API 가속)
     # ------------------------------------------------------------------
     gzip on;
     gzip_disable "msie6";
     gzip_vary on;
     gzip_proxied any;
     gzip_comp_level 6;
-    gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml image/svg+xml;
 
-    # 알라딘 메타데이터 플러그인 등 커버 이미지 업로드를 고려한 최대 바디 크기 제한
+    # 메타데이터 플러그인 및 대용량 파일 업로드를 고려한 바디 크기 제한
     client_max_body_size 100M;
 
     # ------------------------------------------------------------------
@@ -240,13 +247,24 @@ server {
     add_header Referrer-Policy "no-referrer-when-downgrade" always;
 
     # ------------------------------------------------------------------
-    # 메인 어플리케이션 프록시 라우팅
+    # 1. 커버 이미지 정적 서빙 최적화 (/covers/)
+    # 파이썬 애플리케이션 우회 다이렉트 0ms 이미지 서빙
+    # ------------------------------------------------------------------
+    location /covers/ {
+        alias /path/to/media_server/covers/; # <== 본인의 설치 경로/covers/ 로 변경하세요.
+        expires 1d;
+        add_header Cache-Control "public, max-age=86400";
+        sendfile on;
+        tcp_nopush on;
+    }
+
+    # ------------------------------------------------------------------
+    # 2. 일반 API 및 메인 웹 서비스 (WebSocket 지원)
     # ------------------------------------------------------------------
     location / {
-        proxy_pass http://127.0.0.1:5930/; # BookOasis 내부 구동 포트
+        proxy_pass http://bookoasis_backend/;
 
         # [기본 프록시 헤더 설정]
-        # $host 대신 $http_host를 사용하여 외부 포트 및 Cloudflare 호환성을 완벽히 유지합니다.
         proxy_set_header Host $http_host; 
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -257,15 +275,10 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
 
-        # --------------------------------------------------------------
         # [CRITICAL] 대용량 파일 전송 최적화 (프록시 버퍼링 끔)
-        # BookOasis의 핵심 기능인 '오프셋 기반 실시간 스트리밍'이 Nginx 임시 
-        # 버퍼에 가로막히지 않고 브라우저 뷰어에 지연 없이 다이렉트로
-        # 전달되도록 합니다. 디스크 I/O와 메모리 낭비를 방어하는 핵심 설정입니다.
-        # --------------------------------------------------------------
         proxy_buffering off;
 
-        # [타임아웃 확장] 대용량 스캔 프로세스 및 외부 AI 분석 장시간 작업 대응
+        # [타임아웃 확장] 대용량 스캔 프로세스 및 장시간 작업 대응
         proxy_read_timeout 300;
         proxy_connect_timeout 300;
         proxy_send_timeout 300;

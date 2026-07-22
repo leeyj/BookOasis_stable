@@ -209,27 +209,34 @@ http {
 Write the following content into `/etc/nginx/sites-available/default` (or the virtual host configuration block) and create a symbolic link to `sites-enabled` to apply it.
 
 ```nginx
+# ------------------------------------------------------------------
+# Backend Persistent Connection Pool (0ms Socket Connection Overhead)
+# ------------------------------------------------------------------
+upstream bookoasis_backend {
+    server 127.0.0.1:5930;
+    keepalive 64; # Maintain 64 persistent backend connections
+}
+
 server {
     listen 80;
     server_name your-domain.com; # <== Change this to your own domain
 
     # Force redirect incoming HTTP requests to HTTPS (Security)
     if ($http_x_forwarded_proto = "http") {
-        return 301 https://$host$request_uri;
+        return 301 https://$host$request_uri/;
     }
 
     # ------------------------------------------------------------------
-    # Gzip Text Compression (Speed up UI and JSON API)
-    # Do not compress images, compress only text resources to save CPU resources.
+    # Gzip Text and SVG Compression (Speed up UI and JSON API)
     # ------------------------------------------------------------------
     gzip on;
     gzip_disable "msie6";
     gzip_vary on;
     gzip_proxied any;
     gzip_comp_level 6;
-    gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml image/svg+xml;
 
-    # Maximum body size limit considering Aladin metadata plugin cover image uploads
+    # Maximum body size limit considering metadata plugin cover image uploads
     client_max_body_size 100M;
 
     # ------------------------------------------------------------------
@@ -240,13 +247,24 @@ server {
     add_header Referrer-Policy "no-referrer-when-downgrade" always;
 
     # ------------------------------------------------------------------
-    # Main Application Proxy Routing
+    # 1. Cover Image Static Serving Optimization (/covers/)
+    # Direct 0ms static image serving by bypassing Python backend
+    # ------------------------------------------------------------------
+    location /covers/ {
+        alias /path/to/media_server/covers/; # <== Change this to your installation path /covers/
+        expires 1d;
+        add_header Cache-Control "public, max-age=86400";
+        sendfile on;
+        tcp_nopush on;
+    }
+
+    # ------------------------------------------------------------------
+    # 2. Main API & Web Service (WebSocket Support)
     # ------------------------------------------------------------------
     location / {
-        proxy_pass http://127.0.0.1:5930/; # BookOasis internal runtime port
+        proxy_pass http://bookoasis_backend/;
 
         # [Basic Proxy Header Settings]
-        # Uses $http_host instead of $host to perfectly maintain external port and Cloudflare compatibility.
         proxy_set_header Host $http_host; 
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -257,15 +275,10 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
 
-        # --------------------------------------------------------------
         # [CRITICAL] Large File Transfer Optimization (Disable Proxy Buffering)
-        # Ensures BookOasis's core feature of 'offset-based real-time streaming' bypasses Nginx's
-        # temporary buffers and delivers 'point-to-point direct delay' to the browser viewer immediately.
-        # This is the core setting to defend against disk I/O and memory waste.
-        # --------------------------------------------------------------
         proxy_buffering off;
 
-        # [Timeout Extension] Response to long-running operations for large scans and external AI analysis
+        # [Timeout Extension] Long-running operations for large scans
         proxy_read_timeout 300;
         proxy_connect_timeout 300;
         proxy_send_timeout 300;

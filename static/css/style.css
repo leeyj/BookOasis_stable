@@ -817,7 +817,10 @@ body.has-system-ticker .library-sidebar {
     -webkit-user-select: none;
     user-select: none;
     will-change: transform, box-shadow;
+    content-visibility: auto;
+    contain-intrinsic-size: 160px 280px;
 }
+
 
 .book-card:hover {
     transform: translate3d(0, -6px, 0);

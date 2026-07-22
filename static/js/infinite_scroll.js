@@ -12,6 +12,8 @@ export function initInfiniteScrollObserver() {
     infiniteScrollObserver.disconnect();
   }
 
+  const mainContent = document.querySelector('.library-main-content');
+
   infiniteScrollObserver = new IntersectionObserver((entries) => {
     const entry = entries[0];
     if (entry.isIntersecting) {
@@ -24,10 +26,11 @@ export function initInfiniteScrollObserver() {
       loadBooksList(true);
     }
   }, {
-    root: null,
-    rootMargin: '0px 0px 800px 0px', // 최하단 도달 800px 전 선제적 미리 로딩 (스크롤 비어 보임 방지 및 렉 예방)
+    root: mainContent || null,
+    rootMargin: '0px 0px 800px 0px',
     threshold: 0
   });
 
   infiniteScrollObserver.observe(spinner);
 }
+
