@@ -115,6 +115,7 @@ def redis_lpush(key: str, value: str) -> bool:
 
 def redis_brpop(key: str, timeout: int = 5) -> str:
     """Redis List의 오른쪽에서 값을 블로킹으로 꺼내옵니다. (Timeout 단위: 초)"""
+    global _client
     client = get_redis_client()
     if not client:
         return None
@@ -125,7 +126,8 @@ def redis_brpop(key: str, timeout: int = 5) -> str:
             return res[1]
         return None
     except Exception as e:
-        logger.warning(f"[Redis] redis_brpop failed for key '{key}': {e}")
+        logger.warning(f"[Redis] redis_brpop failed for key '{key}': {e}. Resetting Redis client reference for auto-reconnect.")
+        _client = None
         return None
 
 def redis_acquire_lock(key: str, ttl: int = 60, wait_timeout: float = 0.0, sleep_interval: float = 0.1):

@@ -14,7 +14,7 @@
     <div class="library-sidebar"
         style="display: flex; flex-direction: column; justify-content: space-between; min-height: auto;">
         <div class="sidebar-header-wrapper" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-            <h3 class="sidebar-title" style="margin: 0;"><i class="fa-solid fa-folder-open" style="color: #a855f7; margin-right: 0.5rem;"></i> <span data-i18n="sidebar.library">라이브러리</span></h3>
+            <h3 class="sidebar-title" style="margin: 0; display: flex; align-items: center; gap: 0.55rem;"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="BookOasis" style="width: 32px; height: 32px; object-fit: contain;"> <span>BookOasis</span></h3>
             <button id="btn-sidebar-toggle" class="btn-sidebar-toggle" aria-expanded="false" style="display: none; background: transparent; border: none; color: #f8fafc; font-size: 1.25rem; cursor: pointer; padding: 0.2rem 0.5rem; outline: none;">
                 <i class="fa-solid fa-bars"></i>
             </button>
@@ -75,8 +75,7 @@
                     <i class="fa-solid fa-bars"></i>
                 </button>
                 <h2 class="library-title" style="display: flex; align-items: center; margin: 0;">
-                    <span class="library-title-main"><i class="fa-solid fa-book-open" style="color: #a855f7; margin-right: 0.5rem;"></i> <span data-i18n="header.title">도서 보관함</span></span>
-                    <span id="current-category-indicator" class="current-category-indicator" aria-live="polite">Home</span>
+                    <span class="library-title-main"><i class="fa-solid fa-book-open" style="color: #a855f7; margin-right: 0.5rem;"></i> <span id="current-category-indicator" class="current-category-indicator-title" aria-live="polite">도서 보관함</span></span>
                     <span id="library-total-count" style="font-size: 0.9rem; color: #94a3b8; margin-left: 0.8rem; font-weight: normal; white-space: nowrap;"></span>
                 </h2>
             </div>

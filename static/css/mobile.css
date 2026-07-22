@@ -13,7 +13,7 @@
 .media-library-container {
     flex-direction: column;
     gap: 0.9rem;
-    padding: calc(1rem + env(safe-area-inset-top, 0px)) 0.75rem 0.75rem 0.75rem;
+    padding: calc(1rem + env(safe-area-inset-top, 0px)) 0.75rem calc(4.5rem + env(safe-area-inset-bottom, 0px)) 0.75rem;
 }
 
 /* 2. 좌측 사이드바 -> 상단 네비게이션 형태로 전환 및 햄버거 토글 */
@@ -150,11 +150,11 @@
     flex: 1 1 auto;
     min-height: 0;
     width: 100%;
-    padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
 }
 
 body.has-system-ticker .library-main-content {
-    padding-bottom: calc(52px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px));
 }
 
 body.has-system-ticker .library-sidebar {
@@ -163,6 +163,14 @@ body.has-system-ticker .library-sidebar {
 
 body.has-system-ticker .sidebar-collapsible-content.show {
     padding-bottom: calc(46px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+/* 태블릿 및 모바일 반응형 하단 속보(system-ticker-footer) 가려짐 조치 */
+.system-ticker-footer {
+    left: 0 !important;
+    width: 100% !important;
+    z-index: 10005 !important;
+    bottom: env(safe-area-inset-bottom, 0px) !important;
 }
 
 /* 컨텍스트 메뉴 닫기 버튼 모바일 가독성 강화 */

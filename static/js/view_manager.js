@@ -159,22 +159,29 @@ export function showToast(message, type = 'success') {
     iconHtml = '<i class="fa-solid fa-circle-info" style="color: #3b82f6; font-size: 1.05rem;"></i>';
   }
 
+  // 이전 타이머 및 스타일 즉시 리셋 (토스트 중복/재호출 시 고착 방지)
+  if (window.toastTimer) {
+    clearTimeout(window.toastTimer);
+    window.toastTimer = null;
+  }
+
   container.innerHTML = `${iconHtml} <span>${message}</span>`;
+  container.style.opacity = '0';
+  container.style.transform = 'translateX(-50%) translateY(20px)';
   
-  // 브라우저 렌더링 동기화 후 활성화 (rAF로 즉시 다음 Paint 프레임에서 표시)
+  // 브라우저 repaint 후 활성화
   requestAnimationFrame(() => {
-    container.style.opacity = '1';
-    container.style.transform = 'translateX(-50%) translateY(0)';
+    requestAnimationFrame(() => {
+      container.style.opacity = '1';
+      container.style.transform = 'translateX(-50%) translateY(0)';
+    });
   });
 
-  // 이전 타이머 정리
-  if (window.toastTimer) clearTimeout(window.toastTimer);
-  
-  // 2초 뒤 비활성화
+  // 3초 뒤 비활성화
   window.toastTimer = setTimeout(() => {
     container.style.opacity = '0';
     container.style.transform = 'translateX(-50%) translateY(20px)';
-  }, 2000);
+  }, 3000);
 }
 
 // 글로벌 노출

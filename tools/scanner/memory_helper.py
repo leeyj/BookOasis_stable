@@ -9,18 +9,8 @@ if MEDIA_SERVER_DIR not in sys.path:
 
 import database
 
-_SETTING_CACHE_TTL_SEC = 30.0
+_SETTING_CACHE_TTL_SEC = 300.0
 _setting_cache = {}
-_error_log_ts = {}
-
-
-def _should_log_error(key, interval_sec=30.0):
-    now = time.monotonic()
-    last = _error_log_ts.get(key, 0.0)
-    if now - last >= interval_sec:
-        _error_log_ts[key] = now
-        return True
-    return False
 
 
 def get_setting_float(key, default_value, db_type='general'):
@@ -40,9 +30,11 @@ def get_setting_float(key, default_value, db_type='general'):
             value = float(row['value'])
             _setting_cache[cache_key] = {'value': value, 'ts': now}
             return value
-    except Exception as e:
-        if _should_log_error(cache_key):
-            print(f"[Scanner-Memory] Failed to read setting ({key}, db={db_type}): {e}")
+    except Exception:
+        # DB 경합/disk I/O error 발생 시 기존 캐시값이 존재하면 캐시 만올 연장 후 반환 (노이즈 로그 차단)
+        if cached:
+            _setting_cache[cache_key]['ts'] = now
+            return cached['value']
     finally:
         if conn:
             try:

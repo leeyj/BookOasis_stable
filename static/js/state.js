@@ -28,6 +28,7 @@ export const state = {
   tagFilterSearchInAll: false,
   showTxtNoCoverInfoBanner: true,
   sidebarTopControls: false,
+  showSidebarCategoryAll: true,
   hddAggressiveWarmup: false,
   detailSeriesName: '',
   detailLibraryId: null,

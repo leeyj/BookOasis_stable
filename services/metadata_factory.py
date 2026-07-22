@@ -233,7 +233,8 @@ class MetadataFactory:
 
         db_settings = {}
         try:
-            from repositories.metadata_repository import MetadataRepository
+            # pyrefly: ignore [missing-import]
+            from repositories.metadata_repository import MetadataRepository 
             db_settings = MetadataRepository.get_all_settings('general')
         except Exception as e:
             print(f"[MetadataFactory] DB 설정 사전 load failed: {e}")

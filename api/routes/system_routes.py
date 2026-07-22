@@ -248,6 +248,8 @@ def trigger_scan_via_webhook():
     token = request.args.get('token') or request.form.get('token')
     library_id = request.args.get('library_id') or request.form.get('library_id')
     db_type = request.args.get('type') or request.form.get('type') or 'general'
+    force_param = request.args.get('force') or request.form.get('force')
+    force_requeue = True if force_param in ('1', 'true', 'True', 'on') else False
     
     # 1. 보안 토큰 검증
     sys_token = SettingsService.get('WEBHOOK_TOKEN', '', db_type='general') or os.environ.get('WEBHOOK_TOKEN')
@@ -256,19 +258,33 @@ def trigger_scan_via_webhook():
         
     if not library_id:
         return jsonify({'success': False, 'error': 'library_id is required.'}), 400
+
+    try:
+        lib_id_int = int(library_id)
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'error': 'Invalid library_id format.'}), 400
+
+    # 2. 보관함 존재 여부 및 카테고리명 조회
+    lib_name = get_library_name(db_type, lib_id_int)
+    if not lib_name:
+        return jsonify({'success': False, 'error': f'Library ID {library_id} not found in {db_type}.'}), 404
         
-    # 2. 백그라운드 스캔 대기열 주입
+    # 3. 백그라운드 스캔 대기열 주입
     try:
         from services.scanner_queue import scanner_queue
-        scanner_queue.add_task('library_scan', db_type=db_type, library_id=int(library_id))
+        enqueued = scanner_queue.add_task('library_scan', db_type=db_type, library_id=lib_id_int, force_requeue=force_requeue)
         
-        # 실제 카테고리명 조회
-        lib_name = get_library_name(db_type, int(library_id))
-        disp_name = lib_name if lib_name else f"Library {library_id}"
-        
+        if not enqueued:
+            return jsonify({
+                'success': True,
+                'already_queued': True,
+                'message': f'"{lib_name} ({db_type})" 스캔 작업이 이미 진행 중이거나 대기열에 존재합니다.'
+            }), 200
+
         return jsonify({
-            'success': True, 
-            'message': f'"{disp_name} ({db_type})" 스캔 작업이 대기열에 성공적으로 등록되었습니다.'
+            'success': True,
+            'already_queued': False,
+            'message': f'"{lib_name} ({db_type})" 스캔 작업이 대기열에 성공적으로 등록되었습니다.'
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

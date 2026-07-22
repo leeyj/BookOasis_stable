@@ -7,10 +7,15 @@ import database
 class ScannerQueueRepository:
     @staticmethod
     def get_task_by_key(task_key):
-        """특정 작업 키에 대응하는 태스크 정보 조회"""
+        """특정 작업 키에 대응하는 태스크 정보 조회 (동일 키 중 최신 행 우선 반환)"""
         conn = database.get_connection('general')
         cursor = conn.cursor()
-        cursor.execute("SELECT id, status FROM scanner_tasks WHERE task_key = ?", (task_key,))
+        # [버그픽스] ORDER BY id DESC LIMIT 1: 동일 task_key 레코드가 여러 개 쌓인 경우
+        # 과거의 completed/failed 행이 먼저 반환되어 중복 판정이 오염되는 것을 방지.
+        cursor.execute(
+            "SELECT id, status FROM scanner_tasks WHERE task_key = ? ORDER BY id DESC LIMIT 1",
+            (task_key,)
+        )
         row = cursor.fetchone()
         conn.close()
         return dict(row) if row else None
@@ -90,31 +95,51 @@ class ScannerQueueRepository:
 
     @staticmethod
     def fetch_queue_status():
-        """현재 실행(running) 중이거나 대기(pending) 상태인 대기열 현황 조회"""
+        """현재 실행(running/exit_pending) 중이거나 대기(pending) 상태인 대기열 현황 조회"""
         conn = database.get_connection('general')
         cursor = conn.cursor()
         
-        # running 작업 조회 (최대 1개)
+        # running 또는 exit_pending(Lazy Scanner 재기동 대기 중) 작업 조회 (최대 1개)
         cursor.execute(
-            "SELECT task_type, task_key, kwargs, enqueue_at, started_at, stage FROM scanner_tasks WHERE status = 'running' ORDER BY started_at DESC LIMIT 1"
+            """
+            SELECT id, task_type, task_key, kwargs, enqueue_at, started_at, stage, status 
+            FROM scanner_tasks 
+            WHERE status IN ('running', 'exit_pending') 
+            ORDER BY CASE WHEN status = 'running' THEN 1 ELSE 2 END, started_at DESC 
+            LIMIT 1
+            """
         )
         row_run = cursor.fetchone()
         running_task = dict(row_run) if row_run else None
 
-        # pending 작업 조회 (일반 스캔 선진행 우선순위 규칙 적용)
-        cursor.execute(
-            """
-            SELECT task_type, task_key, kwargs, enqueue_at, stage 
-            FROM scanner_tasks 
-            WHERE status = 'pending' 
-            ORDER BY CASE WHEN task_type = 'lazy_scan' THEN 2 ELSE 1 END, id ASC
-            """
-        )
+        running_id = running_task['id'] if running_task else None
+
+        # pending 작업 조회 (일반 스캔 선진행 우선순위 규칙 적용, 현재 실행 중인 태스크 ID 제외)
+        if running_id:
+            cursor.execute(
+                """
+                SELECT id, task_type, task_key, kwargs, enqueue_at, stage 
+                FROM scanner_tasks 
+                WHERE status = 'pending' AND id != ?
+                ORDER BY CASE WHEN task_type = 'lazy_scan' THEN 2 ELSE 1 END, id ASC
+                """,
+                (running_id,)
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT id, task_type, task_key, kwargs, enqueue_at, stage 
+                FROM scanner_tasks 
+                WHERE status = 'pending' 
+                ORDER BY CASE WHEN task_type = 'lazy_scan' THEN 2 ELSE 1 END, id ASC
+                """
+            )
         rows_pending = cursor.fetchall()
         pending_tasks = [dict(row) for row in rows_pending]
         
         conn.close()
         return running_task, pending_tasks
+
 
     @staticmethod
     def clear_pending_tasks(now_str):
@@ -156,14 +181,15 @@ class ScannerQueueRepository:
 
     @staticmethod
     def get_pending_task_by_key(task_key):
-        """특정 작업 키의 pending 태스크 상세 조회"""
+        """특정 작업 키의 pending/exit_pending 태스크 상세 조회"""
         conn = database.get_connection('general')
         cursor = conn.cursor()
         cursor.execute(
             """
             SELECT id, task_type, task_key, kwargs 
             FROM scanner_tasks 
-            WHERE task_key = ? AND status = 'pending'
+            WHERE task_key = ? AND status IN ('pending', 'exit_pending')
+            ORDER BY id DESC LIMIT 1
             """,
             (task_key,)
         )
@@ -180,8 +206,9 @@ class ScannerQueueRepository:
             """
             SELECT id, task_type, task_key, kwargs 
             FROM scanner_tasks 
-            WHERE status = 'pending' 
-            ORDER BY CASE WHEN task_type = 'lazy_scan' THEN 2 ELSE 1 END, id ASC
+            WHERE status IN ('pending', 'exit_pending') 
+            ORDER BY CASE WHEN status = 'exit_pending' THEN 1 ELSE 2 END,
+                     CASE WHEN task_type = 'lazy_scan' THEN 2 ELSE 1 END, id ASC
             LIMIT 1
             """
         )
@@ -196,7 +223,7 @@ class ScannerQueueRepository:
         cursor = conn.cursor()
         try:
             cursor.execute(
-                "UPDATE scanner_tasks SET status = 'running', started_at = ? WHERE id = ? AND status = 'pending'",
+                "UPDATE scanner_tasks SET status = 'running', started_at = ? WHERE id = ? AND status IN ('pending', 'exit_pending')",
                 (now_str, task_id)
             )
             success = cursor.rowcount > 0

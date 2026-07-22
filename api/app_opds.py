@@ -154,13 +154,14 @@ def _get_page_params():
 
 def _opds_xml(db_type: str, title: str, entries: list,
               is_adult: bool = False, next_link: str = None) -> str:
-    """Atom XML 규격의 OPDS 피드 생성 (start 링크는 /app-opds 기준)"""
+    """Atom XML 규격의 OPDS 피드 생성 (start 링크는 is_adult 여부에 따라 설정)"""
     search_href = '/app-opds/search' if not is_adult else '/app-opds-adult/search'
+    start_href = '/app-opds' if not is_adult else '/app-opds-adult'
     return build_opds_xml(
         request,
         title=title,
         entries=entries,
-        start_path='/app-opds',
+        start_path=start_href,
         search_path=search_href,
         next_link=next_link,
     )

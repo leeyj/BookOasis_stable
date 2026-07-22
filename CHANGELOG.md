@@ -1,4 +1,19 @@
 # CHANGELOG
+## v1.3.1
+- lazy 스캔시 간헐적 오동작 수정 | Fix intermittent misbehavior during lazy scan
+- 전체스캔시 간헐적 오동작 수정 | Fix intermittent misbehavior during full scan
+- db lock 경합으로인한 메타데이터 파싱시 오류 수정 | Fix metadata parsing errors due to db lock contention
+- 대시보드 스캔 진행상태 표시 오류 수정 | Fix scan progress display errors on dashboard
+- 대기열 관리 ui에서 스캔 진행상태 표시 오류 수정 | Fix scan progress display errors on queue management ui
+- 토스트 메시지 표시 오류 수정 | Fix toast message display errors
+- 성인전용 OPDS 피드 주소(/opds-adult) 하위 하이퍼링크 규격화 및 별칭 라우트 호환 조치 | Fix for OPDS adult feed address (/opds-adult) sub-hyperlink standardization and alias route compatibility
+- UI 편의성 개선(환경설정->일반설정 그룹화) | UI convenience improvement (environment settings -> general settings grouping)
+- 카테고리 선택 ui 개선 | Category selection UI improvement
+- "전체보기" 카테고리 감추기 기능추가 | Add "View All" category hide function
+- curl 호출 방식 개선 | curl call improvement
+- yaml 파서 에러 수정 | yaml parser error fix
+- 스캐줄 변경시 에러 수정 | error fix for change scheduler registers
+
 ## v1.3.0
 - lazy 스캐너 안정성 강화 | Improve lazy scanner stability
 - txt, pdf, epub 다운로드 기능 추가 | Add download function for txt, pdf, epub

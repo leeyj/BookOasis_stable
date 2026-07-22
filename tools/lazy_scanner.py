@@ -133,8 +133,11 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
         batch_limit_reached = False
 
         for db_type in db_types:
-            if stop_requested:
-                print("[Lazy-Scanner] ⚠️ 중단 요청(SIGTERM/SIGINT) 감지. DB 순회를 중단합니다.")
+            if stop_requested or batch_limit_reached:
+                if stop_requested:
+                    print("[Lazy-Scanner] ⚠️ 중단 요청(SIGTERM/SIGINT) 감지. DB 순회를 중단합니다.")
+                else:
+                    print("[Lazy-Scanner] 🛑 용량 한도 달성으로 DB 순회를 중단하고 차기 서브-배치로 이관합니다.")
                 break
 
             db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
@@ -275,26 +278,26 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
                     
                     # ─── 우아한 종료 시그널 감지 가드 ───
                     if stop_requested:
-                        print("[Lazy-Scanner] ⚠️ 중단 요청(SIGTERM/SIGINT)이 감지되었습니다. 진행 중 트랜잭션 롤백 후 우아하게 마감합니다.")
+                        print("[Lazy-Scanner] ⚠️ 중단 요청(SIGTERM/SIGINT)이 감지되었습니다. 진행 중 트랜잭션 롤백 후 차기 재실행을 위해 우아하게 마감합니다 (Exit Code 10).")
                         if conn:
                             try:
                                 conn.rollback()
                                 conn.close()
                             except Exception:
                                 pass
-                        sys.exit(0)
+                        sys.exit(10)
 
                     # ─── 메모리 자가 진단 및 Graceful 자진 종료 가드 ───
                     try:
                         from tools.scanner.memory_helper import check_memory_exceeded
                         if check_memory_exceeded(db_type=db_type):
-                            print(f"[Lazy-Scanner] ⚠️ 메모리 사용량 한계 초과 감지. 안전한 자진 종료(Graceful Self-Termination)를 기동합니다.")
+                            print(f"[Lazy-Scanner] ⚠️ 메모리 사용량 한계 초과 감지. 차기 세션 재기동을 위한 안전 자진 종료를 기동합니다 (Exit Code 10).")
                             if conn:
                                 try:
                                     conn.close()
                                 except:
                                     pass
-                            sys.exit(0)
+                            sys.exit(10)
                     except Exception as mem_err:
                         pass
                         
@@ -532,7 +535,12 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
                     save_scan_report(lib_id, err_list)
             
             try:
-                conn.close()
+                if conn:
+                    try:
+                        conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+                    except Exception:
+                        pass
+                    conn.close()
             except Exception:
                 pass
             conn = None
@@ -543,11 +551,18 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
     finally:
         if conn:
             try:
+                conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+            except Exception:
+                pass
+            try:
                 conn.close()
             except Exception:
                 pass
-    if batch_limit_reached:
-        print("[Lazy-Scanner] 🔄 세션 용량 한도 도달로 인한 차기 서브-배치 세션 기동 요청 (Exit Code 10)")
+    if batch_limit_reached or stop_requested:
+        if stop_requested:
+            print("[Lazy-Scanner] 🛑 서버 재기동/종료 시그널 감지로 안전 중단 (잔여 도서 자동 재개 대기, Exit Code 10)")
+        else:
+            print("[Lazy-Scanner] 🔄 세션 용량 한도 도달로 인한 차기 서브-배치 세션 기동 요청 (Exit Code 10)")
         sys.exit(10)
     else:
         print("[Lazy-Scanner] 🎉 더 이상 스캔할 대상 도서가 없습니다. 모든 Lazy 표지 스캔 작업이 완료되었습니다. (Exit Code 0)")

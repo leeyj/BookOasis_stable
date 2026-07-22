@@ -34,6 +34,9 @@ export function applySettingsToUI(settings) {
   if (settings.SIDEBAR_TOP_CONTROLS !== undefined) {
     state.sidebarTopControls = (settings.SIDEBAR_TOP_CONTROLS === '1');
   }
+  if (settings.SHOW_SIDEBAR_CATEGORY_ALL !== undefined) {
+    state.showSidebarCategoryAll = (settings.SHOW_SIDEBAR_CATEGORY_ALL !== '0');
+  }
   if (settings.HDD_AGGRESSIVE_WARMUP !== undefined) {
     state.hddAggressiveWarmup = (settings.HDD_AGGRESSIVE_WARMUP === '1');
   }
@@ -136,6 +139,11 @@ export async function loadGeneralSettings() {
       const sidebarTopControlsEl = document.getElementById('setting-sidebar-top-controls');
       if (sidebarTopControlsEl) {
         sidebarTopControlsEl.checked = (s.SIDEBAR_TOP_CONTROLS === '1');
+      }
+
+      const showCategoryAllEl = document.getElementById('setting-show-sidebar-category-all');
+      if (showCategoryAllEl) {
+        showCategoryAllEl.checked = (s.SHOW_SIDEBAR_CATEGORY_ALL !== '0');
       }
 
       const hddAggressiveWarmupEl = document.getElementById('setting-hdd-aggressive-warmup');
@@ -282,6 +290,7 @@ export async function submitGeneralSettings(event) {
   const tagFilterScopeAll = document.getElementById('setting-tag-filter-scope-all')?.checked ? '1' : '0';
   const showTxtNoCoverInfoBanner = document.getElementById('setting-show-txt-no-cover-info-banner')?.checked ? '1' : '0';
   const sidebarTopControls = document.getElementById('setting-sidebar-top-controls')?.checked ? '1' : '0';
+  const showSidebarCategoryAll = document.getElementById('setting-show-sidebar-category-all')?.checked ? '1' : '0';
   const hddAggressiveWarmup = document.getElementById('setting-hdd-aggressive-warmup')?.checked ? '1' : '0';
   const proxyAuth = document.getElementById('setting-proxy-header-auth')?.value || '0';
   const rcloneRcUrl = document.getElementById('setting-rclone-rc-url')?.value || 'http://localhost:5572';
@@ -320,6 +329,7 @@ export async function submitGeneralSettings(event) {
       api.updateSystemSetting('TAG_FILTER_SEARCH_SCOPE_ALL', tagFilterScopeAll),
       api.updateSystemSetting('SHOW_TXT_NO_COVER_INFO_BANNER', showTxtNoCoverInfoBanner),
       api.updateSystemSetting('SIDEBAR_TOP_CONTROLS', sidebarTopControls),
+      api.updateSystemSetting('SHOW_SIDEBAR_CATEGORY_ALL', showSidebarCategoryAll),
       api.updateSystemSetting('HDD_AGGRESSIVE_WARMUP', hddAggressiveWarmup),
       api.updateSystemSetting('PROXY_HEADER_AUTH', proxyAuth),
       api.updateSystemSetting('RCLONE_RC_URL', rcloneRcUrl),
@@ -348,11 +358,15 @@ export async function submitGeneralSettings(event) {
         TAG_FILTER_SEARCH_SCOPE_ALL: tagFilterScopeAll,
         SHOW_TXT_NO_COVER_INFO_BANNER: showTxtNoCoverInfoBanner,
         SIDEBAR_TOP_CONTROLS: sidebarTopControls,
+        SHOW_SIDEBAR_CATEGORY_ALL: showSidebarCategoryAll,
         HDD_AGGRESSIVE_WARMUP: hddAggressiveWarmup,
         TTS_ENABLED: ttsEnabled,
         TTS_WAKE_LOCK: ttsWakeLock
       });
       loadGeneralSettings();
+      if (typeof window.loadLibraries === 'function') {
+        window.loadLibraries();
+      }
     } else {
       alert(i18n.t('settings.general_save_fail', {error: failed.error}));
     }

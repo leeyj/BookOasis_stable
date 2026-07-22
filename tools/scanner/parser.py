@@ -106,8 +106,15 @@ def read_file_with_timeout(file_path, is_remote, timeout=10):
     return res
 
 
+KNOWN_KAVITA_KEYS = {
+    'title', 'series', 'author', 'publisher', 'summary', 'description', 'isbn',
+    'score', 'link', 'genre', 'genres', 'tags', 'tag', 'cover_b64_map', 'meta',
+    'search', 'person publisher', 'person writers', 'web links', 'writer'
+}
+
+
 def _normalize_dash_prefixed_mapping_lines(content):
-    """Convert dash-prefixed mapping lines into plain mapping lines for loose YAML fallbacks."""
+    """Convert top-level dash-prefixed mapping lines into plain mapping lines for loose YAML fallbacks."""
     normalized_lines = []
     changed = False
 
@@ -115,9 +122,11 @@ def _normalize_dash_prefixed_mapping_lines(content):
         match = re.match(r'^(\s*)-\s*([^:]+?)\s*:\s*(.*)$', line)
         if match:
             indent, key, value = match.groups()
-            normalized_lines.append(f"{indent}{key.strip()}: {value}")
-            changed = True
-            continue
+            key_clean = key.strip().lower()
+            if len(indent) <= 2 or key_clean in KNOWN_KAVITA_KEYS:
+                normalized_lines.append(f"{indent}{key.strip()}: {value}")
+                changed = True
+                continue
 
         normalized_lines.append(line)
 
@@ -243,34 +252,43 @@ def parse_kavita_yaml(folder_path, files=None, is_remote=False):
     except ImportError:
         from yaml import SafeLoader
         
-    content = read_file_with_timeout(actual_yaml_path, is_remote)
-    if content is None:
+    raw_content = read_file_with_timeout(actual_yaml_path, is_remote)
+    if raw_content is None:
         return meta
         
-    # 1차 보정: 비정상적인 "- Key: Value" 문법을 "Key: Value"로 보정
-    # ASCII 한정 대신 key 부분을 넓게 허용하여 한국어/기호가 섞인 메타데이터도 흡수한다.
-    content, normalized_dash_lines = _normalize_dash_prefixed_mapping_lines(content)
-
     data = {}
+    parsed_ok = False
+
+    # 1. 표준 YAML 로딩을 원본 내용으로 1차 시도 (정상 리스트 파싱 보장)
     try:
-        data = yaml.load(content, Loader=SafeLoader) or {}
-    except Exception as e:
-        if normalized_dash_lines:
-            print(f"[Scanner] YAML parsing error ({folder_path}): {e}. Dash-prefixed mapping lines were normalized; running Regex Fallback Parser...")
-        else:
-            print(f"[Scanner] YAML parsing error ({folder_path}): {e}. Running Regex Fallback Parser...")
-        # 2차 보정: Regex Fallback Parser 기동
+        data = yaml.load(raw_content, Loader=SafeLoader) or {}
+        parsed_ok = True
+    except Exception:
+        pass
+
+    # 2. 파싱 실패 시, 대시 오탈자(- Key: Value) 보정 후 2차 시도
+    if not parsed_ok:
+        content, normalized_dash_lines = _normalize_dash_prefixed_mapping_lines(raw_content)
         try:
-            for line in content.splitlines():
-                match = re.match(r'^\s*-?\s*([^:]{2,80}?)\s*:\s*(.*)$', line)
-                if match:
-                    key = match.group(1).strip()
-                    val = match.group(2).strip()
-                    if (val.startswith("'") and val.endswith("'")) or (val.startswith('"') and val.endswith('"')):
-                        val = val[1:-1]
-                    data[key] = val
-        except Exception as fallback_err:
-            print(f"[Scanner] YAML Regex Fallback also failed ({folder_path}): {fallback_err}")
+            data = yaml.load(content, Loader=SafeLoader) or {}
+            parsed_ok = True
+        except Exception as e:
+            if normalized_dash_lines:
+                print(f"[Scanner] YAML parsing error ({folder_path}): {e}. Dash-prefixed mapping lines were normalized; running Regex Fallback Parser...")
+            else:
+                print(f"[Scanner] YAML parsing error ({folder_path}): {e}. Running Regex Fallback Parser...")
+            # 3. Regex Fallback Parser 기동
+            try:
+                for line in content.splitlines():
+                    match = re.match(r'^\s*-?\s*([^:]{2,80}?)\s*:\s*(.*)$', line)
+                    if match:
+                        key = match.group(1).strip()
+                        val = match.group(2).strip()
+                        if (val.startswith("'") and val.endswith("'")) or (val.startswith('"') and val.endswith('"')):
+                            val = val[1:-1]
+                        data[key] = val
+            except Exception as fallback_err:
+                print(f"[Scanner] YAML Regex Fallback also failed ({folder_path}): {fallback_err}")
 
     try:
         def _parse_list_or_str(val):

@@ -47,10 +47,29 @@ class ScannerQueue:
             kwargs_json = json.dumps(kwargs, ensure_ascii=False)
             now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+            success = False
             if existing:
                 success = ScannerQueueRepository.update_task_to_pending(
                     existing['id'], task_type, kwargs_json, now_str, force_requeue=force_requeue
                 )
+                if not success:
+                    # [버그픽스] update_task_to_pending()이 False를 반환한 경우:
+                    # existing row가 pending/running 상태여서 WHERE 조건이 불충족된 것.
+                    # (get_task_by_key 조회 후 status가 바뀐 race condition 또는 exit_pending 등 예외 상태)
+                    # → 새 row를 INSERT하여 확실히 대기열에 추가한다.
+                    self.log(
+                        f"Task '{task_key}': update_task_to_pending failed (row id={existing['id']}, "
+                        f"status={existing['status']}). Falling back to INSERT new row."
+                    )
+                    try:
+                        success = ScannerQueueRepository.insert_task(task_type, task_key, kwargs_json, now_str)
+                    except Exception as insert_err:
+                        # INSERT도 실패한 경우: 이미 pending/running인 동일 키 row가 있다는 의미이므로 중복 거부
+                        self.log(
+                            f"Task '{task_key}': INSERT fallback also failed ({insert_err}). "
+                            f"Treating as already queued."
+                        )
+                        return False
             else:
                 success = ScannerQueueRepository.insert_task(task_type, task_key, kwargs_json, now_str)
 
@@ -74,6 +93,7 @@ class ScannerQueue:
         except Exception as e:
             self.log(f"Enqueue failed: {e}")
             return False
+
 
     def add_task(self, task_type, **kwargs):
         """webhook 등에서 호출하는 하위 호환성용 메서드"""
@@ -175,8 +195,8 @@ def run_scanner_worker_loop():
             try:
                 from utils.redis_helper import redis_brpop
                 task_key_popped = redis_brpop("queue:scanner", timeout=3)
-            except Exception:
-                pass
+            except Exception as r_pop_err:
+                sq.log(f"Redis brpop polling error (falling back to DB check): {r_pop_err}")
 
             task = None
             if task_key_popped:

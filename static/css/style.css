@@ -182,6 +182,13 @@
     padding-bottom: 0.8rem;
 }
 
+.current-category-indicator-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.01em;
+}
+
 .current-category-indicator {
     display: inline-flex;
     align-items: center;
@@ -206,13 +213,14 @@
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    padding-bottom: calc(2.5rem + env(safe-area-inset-bottom, 0px));
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     will-change: scroll-position;
     transform: translate3d(0, 0, 0);
 }
 
 body.has-system-ticker .library-main-content {
-    padding-bottom: calc(48px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
 }
 
 body.has-system-ticker .library-sidebar {

@@ -290,3 +290,25 @@ class CategoryRepository:
             raise e
         finally:
             conn.close()
+
+    @staticmethod
+    def update_schedule(db_type, library_id, cron_schedule, vfs_refresh_before_scan, rclone_rc_url):
+        """라이브러리 주기 스케줄 및 VFS/rclone 설정 업데이트"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                UPDATE libraries 
+                SET cron_schedule = ?, 
+                    vfs_refresh_before_scan = ?, 
+                    rclone_rc_url = ? 
+                WHERE id = ?
+            """, (cron_schedule, vfs_refresh_before_scan, rclone_rc_url, library_id))
+            conn.commit()
+            return True
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+

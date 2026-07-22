@@ -58,7 +58,9 @@ export async function loadLibraries() {
       html += `<li class="menu-item ${state.currentLibraryId === 'history' ? 'active' : ''}" data-type="system" id="category-history" data-id="history" onclick="selectCategory('history')"><i class="fa-solid fa-clock-rotate-left"></i> ${i18n.t('category.history')}</li>`;
       html += `<li class="menu-item ${state.currentLibraryId === 'favorite' ? 'active' : ''}" data-type="system" id="category-favorite" data-id="favorite" onclick="selectCategory('favorite')"><i class="fa-solid fa-star" style="color: #eab308;"></i> ${i18n.t('category.favorite')}</li>`;
       html += `<li class="menu-item ${state.currentLibraryId === 'plugins' ? 'active' : ''}" data-type="system" id="category-plugins" data-id="plugins" onclick="selectCategory('plugins')"><i class="fa-solid fa-puzzle-piece" style="color: #38bdf8;"></i> ${i18n.t('category.plugins')}</li>`;
-      html += `<li class="menu-item ${state.currentLibraryId === 'all' ? 'active' : ''}" data-type="system" id="category-all" data-id="all" onclick="selectCategory('all')"><i class="fa-solid fa-layer-group"></i> ${i18n.t('category.all')}</li>`;
+      if (state.showSidebarCategoryAll !== false) {
+        html += `<li class="menu-item ${state.currentLibraryId === 'all' ? 'active' : ''}" data-type="system" id="category-all" data-id="all" onclick="selectCategory('all')"><i class="fa-solid fa-layer-group"></i> ${i18n.t('category.all')}</li>`;
+      }
       
       if (data.libraries && data.libraries.length > 0) {
         // localStorage에서 순서 읽기

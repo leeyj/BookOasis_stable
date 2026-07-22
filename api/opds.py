@@ -118,11 +118,12 @@ def _get_page_params():
 
 def _opds_xml(db_type: str, title: str, entries: list, is_adult: bool = False, next_link: str = None) -> str:
     search_href = '/opds/search' if not is_adult else '/opds-adult/search'
+    start_href = '/opds' if not is_adult else '/opds-adult'
     return build_opds_xml(
         request,
         title=title,
         entries=entries,
-        start_path='/opds',
+        start_path=start_href,
         search_path=search_href,
         next_link=next_link,
     )
@@ -157,8 +158,8 @@ def opds_root():
          'type': 'navigation', 'href': '/opds/recently-added'},
         {'id': 'urn:recently-read', 'title': '최근 읽은 도서',
          'type': 'navigation', 'href': '/opds/recently-read'},
-           {'id': 'urn:favorite', 'title': '즐겨찾기',
-            'type': 'navigation', 'href': '/opds/favorite'},
+        {'id': 'urn:favorite', 'title': '즐겨찾기',
+         'type': 'navigation', 'href': '/opds/favorite'},
     ])
     xml = _opds_xml('general', "My Supporter OPDS Catalog", entries)
     _set_cached_opds_response(cache_key, xml)
@@ -179,17 +180,17 @@ def opds_adult_root():
     libs = get_library_list('adult')
     entries = [
         {'id': f"urn:adult:library:{l['id']}", 'title': l['name'],
-         'type': 'navigation', 'href': f"/opds/adult/library/{l['id']}"}
+         'type': 'navigation', 'href': f"/opds-adult/library/{l['id']}"}
         for l in libs
     ]
     # 신규 추가, 최근 읽은 섹션 추가
     entries.extend([
         {'id': 'urn:adult:recently-added', 'title': '신규 추가',
-         'type': 'navigation', 'href': '/opds/adult/recently-added'},
+         'type': 'navigation', 'href': '/opds-adult/recently-added'},
         {'id': 'urn:adult:recently-read', 'title': '최근 읽은 도서',
-         'type': 'navigation', 'href': '/opds/adult/recently-read'},
-           {'id': 'urn:adult:favorite', 'title': '즐겨찾기',
-            'type': 'navigation', 'href': '/opds/adult/favorite'},
+         'type': 'navigation', 'href': '/opds-adult/recently-read'},
+        {'id': 'urn:adult:favorite', 'title': '즐겨찾기',
+         'type': 'navigation', 'href': '/opds-adult/favorite'},
     ])
     xml = _opds_xml('adult', "My Supporter Adult OPDS Catalog", entries, is_adult=True)
     _set_cached_opds_response(cache_key, xml)
@@ -212,6 +213,7 @@ def opds_library(lib_id: int):
 
 
 @opds_bp.route('/opds/adult/library/<int:lib_id>', methods=['GET'])
+@opds_bp.route('/opds-adult/library/<int:lib_id>', methods=['GET'])
 def opds_adult_library(lib_id: int):
     if not _check_auth(is_adult=True):
         return _unauthorized()
@@ -220,7 +222,7 @@ def opds_adult_library(lib_id: int):
     if cached_xml is not None:
         return _atom_response(cached_xml)
 
-    entries = get_series_entries('adult', lib_id, '/opds/adult/series', 'adult')
+    entries = get_series_entries('adult', lib_id, '/opds-adult/series', 'adult')
     xml = _opds_xml('adult', "Adult Library Series", entries, is_adult=True)
     _set_cached_opds_response(cache_key, xml)
     return _atom_response(xml)
@@ -247,6 +249,7 @@ def opds_series_books(lib_id: int, series_name: str):
 
 
 @opds_bp.route('/opds/adult/series/<int:lib_id>/<string:series_name>', methods=['GET'])
+@opds_bp.route('/opds-adult/series/<int:lib_id>/<string:series_name>', methods=['GET'])
 def opds_adult_series_books(lib_id: int, series_name: str):
     if not _check_auth(is_adult=True):
         return _unauthorized()
@@ -317,6 +320,7 @@ def opds_favorite():
 
 
 @opds_bp.route('/opds/adult/recently-added', methods=['GET'])
+@opds_bp.route('/opds-adult/recently-added', methods=['GET'])
 def opds_adult_recently_added():
     """신규 추가 도서 목록 (성인)"""
     if not _check_auth(is_adult=True):
@@ -333,6 +337,7 @@ def opds_adult_recently_added():
 
 
 @opds_bp.route('/opds/adult/recently-read', methods=['GET'])
+@opds_bp.route('/opds-adult/recently-read', methods=['GET'])
 def opds_adult_recently_read():
     """최근 읽은 도서 목록 (성인)"""
     user = _get_authenticated_user(is_adult=True)
@@ -350,6 +355,7 @@ def opds_adult_recently_read():
 
 
 @opds_bp.route('/opds/adult/favorite', methods=['GET'])
+@opds_bp.route('/opds-adult/favorite', methods=['GET'])
 def opds_adult_favorite():
     """즐겨찾기 도서 목록 (성인)"""
     user = _get_authenticated_user(is_adult=True)
