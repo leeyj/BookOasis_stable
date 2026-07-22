@@ -55,5 +55,13 @@ class StreamService:
         return TextEpubContentService.get_epub_content(file_path, book_id, db_type)
 
     @staticmethod
+    def get_epub_meta(file_path, book_id, db_type):
+        return TextEpubContentService.get_epub_meta(file_path, book_id, db_type)
+
+    @staticmethod
+    def get_epub_chapter(file_path, book_id, db_type, chapter_idx):
+        return TextEpubContentService.get_epub_chapter(file_path, book_id, db_type, chapter_idx)
+
+    @staticmethod
     def extract_epub_resource(file_path, resource_path):
         return TextEpubContentService.extract_epub_resource(file_path, resource_path)

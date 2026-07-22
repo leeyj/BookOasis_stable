@@ -33,7 +33,7 @@ export function renderTxtChunkView({
   } else if (initMode || !contentArea.querySelector('.txt-full-content')) {
     if (isEpub) {
       const wrapped = txtChunks
-        .map((ch, idx) => `<div class="txt-scroll-chunk" data-idx="${idx}" style="margin-bottom: 3rem;">${ch}</div>`)
+        .map((ch, idx) => `<div class="txt-scroll-chunk" data-idx="${idx}" style="margin-bottom: 3rem;">${ch !== null ? ch : '<div class="epub-ch-loading" style="padding: 2rem; text-align: center; opacity: 0.5;">챕터 불러오는 중...</div>'}</div>`)
         .join('');
       contentArea.innerHTML = `<div class="txt-full-content epub-full-content">${wrapped}</div>`;
     } else {

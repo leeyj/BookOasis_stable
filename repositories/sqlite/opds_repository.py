@@ -178,36 +178,7 @@ class OpdsRepository:
         conn.close()
         return [dict(row) for row in rows], total
 
-    @staticmethod
-    def search_books_fts(db_type, query, match_query, limit, offset):
-        """FTS5 형태소 매칭 기반 도서 통합 검색"""
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT COUNT(*) AS total
-            FROM books_search
-            JOIN books b ON b.id = books_search.rowid
-            WHERE books_search MATCH ? AND COALESCE(b.is_deleted, 0) = 0
-            """,
-            (match_query,)
-        )
-        total = cursor.fetchone()['total']
 
-        cursor.execute(
-            """
-            SELECT b.id, b.title, b.series_name, b.author, b.file_path, b.cover_image, b.summary
-            FROM books_search
-            JOIN books b ON b.id = books_search.rowid
-            WHERE books_search MATCH ? AND COALESCE(b.is_deleted, 0) = 0
-            ORDER BY bm25(books_search), b.title ASC, b.id ASC
-            LIMIT ? OFFSET ?
-            """,
-            (match_query, limit, offset)
-        )
-        rows = cursor.fetchall()
-        conn.close()
-        return [dict(row) for row in rows], total
 
     @staticmethod
     def get_supported_series_names(db_type, clean_names):

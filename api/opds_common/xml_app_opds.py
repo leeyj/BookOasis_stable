@@ -1,76 +1,17 @@
 # -*- coding: utf-8 -*-
-"""Shared XML and paging helpers for OPDS style feeds."""
+"""타치요미 / 미혼 등 비표준 앱 OPDS 전용 XML 빌더 모듈"""
 
-import html
 import mimetypes
 from datetime import datetime
-from urllib.parse import urlencode
-
-from flask import Response
-
-
-def escape_xml(text: str) -> str:
-    return html.escape(str(text), quote=True)
+from api.opds_common.xml import (
+    escape_xml,
+    get_external_base_url,
+    build_external_request_url,
+)
 
 
-def _get_forwarded_header(request, name: str) -> str:
-    raw = (request.headers.get(name) or '').strip()
-    if not raw:
-        return ''
-    return raw.split(',')[0].strip()
-
-
-def _normalize_prefix(prefix: str) -> str:
-    prefix = (prefix or '').strip()
-    if not prefix:
-        return ''
-    if not prefix.startswith('/'):
-        prefix = f'/{prefix}'
-    return prefix.rstrip('/')
-
-
-def get_external_base_url(request) -> str:
-    scheme = _get_forwarded_header(request, 'X-Forwarded-Proto') or request.scheme
-    host = _get_forwarded_header(request, 'X-Forwarded-Host') or request.host
-    forwarded_port = _get_forwarded_header(request, 'X-Forwarded-Port')
-    prefix = _normalize_prefix(_get_forwarded_header(request, 'X-Forwarded-Prefix'))
-
-    if forwarded_port and ':' not in host:
-        is_default_port = (scheme == 'http' and forwarded_port == '80') or (scheme == 'https' and forwarded_port == '443')
-        if not is_default_port:
-            host = f'{host}:{forwarded_port}'
-
-    return f'{scheme}://{host}{prefix}'
-
-
-def build_external_request_url(request, query_params=None) -> str:
-    base = f"{get_external_base_url(request)}{request.path}"
-    if query_params is None:
-        query_string = request.query_string.decode('utf-8')
-    else:
-        query_string = urlencode(query_params, doseq=True)
-    if query_string:
-        return f'{base}?{query_string}'
-    return base
-
-
-def get_page_params(args, default_page_size: int, max_page_size: int):
-    try:
-        page = int(args.get('page', '1'))
-    except ValueError:
-        page = 1
-    try:
-        page_size = int(args.get('page_size', str(default_page_size)))
-    except ValueError:
-        page_size = default_page_size
-
-    page = max(page, 1)
-    page_size = min(max(page_size, 1), max_page_size)
-    offset = (page - 1) * page_size
-    return page, page_size, offset
-
-
-def build_opds_xml(request, title: str, entries: list, start_path: str, search_path: str, next_link: str = None) -> str:
+def build_app_opds_xml(request, title: str, entries: list, start_path: str, search_path: str, next_link: str = None) -> str:
+    """타치요미/미혼 전용 OPDS XML (실시간 이미지 스트리밍 open-book 링크 포함)"""
     base_url = get_external_base_url(request)
     current_url = build_external_request_url(request)
     now = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -83,11 +24,8 @@ def build_opds_xml(request, title: str, entries: list, start_path: str, search_p
         f'  <updated>{now}</updated>',
         f'  <link rel="self" href="{escape_xml(current_url)}" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>',
         f'  <link rel="start" href="{escape_xml(base_url + start_path)}" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>',
-        # OpenSearch Description 문서 링크 (표준)
         f'  <link rel="search" href="{escape_xml(base_url + search_path)}" type="application/opensearchdescription+xml" title="Search Books"/>',
-        # 직접 검색 URL 템플릿 링크 (KOReader, Chunky, Panels 등 다수 앱 호환)
         f'  <link rel="search" href="{escape_xml(base_url + search_path)}?q={{searchTerms}}" type="application/atom+xml" title="Search Books"/>',
-
     ]
     if next_link:
         lines.append(
@@ -122,10 +60,13 @@ def build_opds_xml(request, title: str, entries: list, start_path: str, search_p
                 lines.append(f'    <link rel="http://opds-spec.org/image" href="{escape_xml(cover_url)}" type="{escape_xml(cover_mime)}"/>')
                 lines.append(f'    <link rel="http://opds-spec.org/image/thumbnail" href="{escape_xml(cover_url)}" type="{escape_xml(cover_mime)}"/>')
         elif entry['type'] == 'acquisition':
-            lines.append(
-                f'    <link rel="http://opds-spec.org/acquisition/open-book" '
-                f'href="{escape_xml(href)}" type="{escape_xml(entry["mime"])}"/>'
-            )
+            # 타치요미 스트리밍용 open-book 링크 지원
+            if entry.get('stream_href'):
+                stream_url = f"{base_url}{entry['stream_href']}"
+                lines.append(
+                    f'    <link rel="http://opds-spec.org/acquisition/open-book" '
+                    f'href="{escape_xml(stream_url)}" type="{escape_xml(entry.get("stream_mime", entry["mime"]))}"/>'
+                )
             lines.append(
                 f'    <link rel="http://opds-spec.org/acquisition" '
                 f'href="{escape_xml(href)}" type="{escape_xml(entry["mime"])}"/>'
@@ -145,7 +86,3 @@ def build_opds_xml(request, title: str, entries: list, start_path: str, search_p
 
     lines.append('</feed>')
     return '\n'.join(lines)
-
-
-def atom_response(xml: str) -> Response:
-    return Response(xml, mimetype='application/atom+xml; charset=utf-8')

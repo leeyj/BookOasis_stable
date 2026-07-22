@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import json
-from repositories.reading_progress_repository import ReadingProgressRepository
+from repositories.sqlite.reading_progress_repository import ReadingProgressRepository
 from services.book_service import get_cover_image_with_t
 from utils.redis_helper import redis_get, redis_set
 

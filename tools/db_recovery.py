@@ -328,11 +328,10 @@ def step2_full_recovery(db_path, label):
 
 def rebuild_fts_index(db_path, label):
     """
-    FTS5 가상 테이블(books_search)의 내부 인덱스 손상(malformed)을 해결하기 위해
-    해당 테이블과 트리거를 정리 후 재빌드합니다.
+    구형 FTS5 가상 테이블 및 그림자 테이블을 완전히 소거합니다.
     """
     sep()
-    log(f"[{label}] FTS5 검색 인덱스 재빌드 시작", prefix='')
+    log(f"[{label}] 구형 FTS5 가상 테이블 소거 작업 시작", prefix='')
     
     if not os.path.exists(db_path):
         log("⚠️  DB 파일이 존재하지 않습니다. 건너뜁니다.")
@@ -340,45 +339,13 @@ def rebuild_fts_index(db_path, label):
 
     try:
         conn = sqlite3.connect(db_path, timeout=15.0)
-        cursor = conn.cursor()
-        
-        log("FTS5 관련 트리거 및 가상 테이블 정리 중...")
-        cursor.execute("DROP TRIGGER IF EXISTS books_search_ai;")
-        cursor.execute("DROP TRIGGER IF EXISTS books_search_ad;")
-        cursor.execute("DROP TRIGGER IF EXISTS books_search_au;")
-        cursor.execute("DROP TABLE IF EXISTS books_search;")
-        
-        log("FTS5 가상 테이블 재생성 중...")
-        cursor.execute(
-            """
-            CREATE VIRTUAL TABLE books_search USING fts5(
-                title,
-                series_name,
-                author,
-                summary,
-                content='books',
-                content_rowid='id',
-                tokenize='unicode61'
-            );
-            """
-        )
-        # 실시간 트리거는 비활성화 정책: 주기적 스케줄러 재빌드로만 유지
-        cursor.execute("DROP TRIGGER IF EXISTS books_search_ai;")
-        cursor.execute("DROP TRIGGER IF EXISTS books_search_ad;")
-        cursor.execute("DROP TRIGGER IF EXISTS books_search_au;")
-        
-        log("FTS5 인덱스 데이터 동기화(Rebuild) 중...")
-        cursor.execute("INSERT INTO books_search(books_search) VALUES('rebuild');")
-        conn.commit()
+        from database import cleanup_legacy_fts_index
+        cleanup_legacy_fts_index(conn)
         conn.close()
-        log("✅ FTS5 검색 인덱스 재빌드 완료.")
+        log("✅ 구형 FTS5 가상 테이블 소거 완료.")
         return True
     except Exception as e:
-        log(f"❌ FTS5 재빌드 실패: {e}")
-        try:
-            conn.close()
-        except:
-            pass
+        log(f"⚠️  소거 진행 중 참고 안내: {e}")
         return False
 
 # ─────────────────────────────────────────────
@@ -459,13 +426,21 @@ def main():
         else:
             print("  Step 2를 건너뜁니다.")
 
-    # ── STEP 3: FTS5 검색 인덱스 강제 재구축 ──
+    # ── STEP 3: 구형 FTS5 가상 테이블 디스크 잔여물 완전 정돈 ──
     print()
     sep('=')
-    print("  STEP 3 — FTS5 검색 인덱스 재빌드")
+    print("  STEP 3 — 구형 FTS5 가상 테이블 디스크 완전 정돈")
     sep('=')
     for label, db_path in target_db_files.items():
-        rebuild_fts_index(db_path, label)
+        if os.path.exists(db_path):
+            try:
+                conn = sqlite3.connect(db_path, timeout=10.0)
+                from database import cleanup_legacy_fts_index
+                cleanup_legacy_fts_index(conn)
+                conn.close()
+                log(f"[{label}] 구형 FTS5 테이블 디스크 정리 완료.")
+            except Exception as fts_clean_err:
+                log(f"[{label}] 구형 FTS5 정리 통과: {fts_clean_err}")
 
     # ── 최종 상태 요약 ──
     print()

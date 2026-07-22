@@ -330,46 +330,27 @@ def auto_migrate_schema(conn, schema_text):
                     print(f"[DB-Migration ERROR] Failed to add dynamic column ({alter_query}): {e}")
 
 
-def ensure_books_search_index(conn):
+def cleanup_legacy_fts_index(conn):
+    """기존 FTS5 가상 테이블 및 그림자 테이블(shadow tables)을 소거하여 DB 락 및 손상 위험 차단"""
     cursor = conn.cursor()
     try:
-        cursor.execute(
-            """
-            CREATE VIRTUAL TABLE IF NOT EXISTS books_search USING fts5(
-                title,
-                series_name,
-                author,
-                summary,
-                content='books',
-                content_rowid='id',
-                tokenize='unicode61'
-            )
-            """
-        )
-
-        # 운영 안정성을 위해 FTS 실시간 동기화 트리거는 기본적으로 비활성화합니다.
-        # 검색 인덱스는 스케줄러 배치 작업에서 주기적으로 재빌드합니다.
         cursor.executescript(
             """
             DROP TRIGGER IF EXISTS books_search_ai;
             DROP TRIGGER IF EXISTS books_search_ad;
             DROP TRIGGER IF EXISTS books_search_au;
+            DROP TABLE IF EXISTS books_search;
+            DROP TABLE IF EXISTS books_search_data;
+            DROP TABLE IF EXISTS books_search_idx;
+            DROP TABLE IF EXISTS books_search_content;
+            DROP TABLE IF EXISTS books_search_docsize;
+            DROP TABLE IF EXISTS books_search_config;
             """
         )
-
-        cursor.execute("SELECT COUNT(*) FROM books")
-        books_count = cursor.fetchone()[0]
-        cursor.execute("SELECT COUNT(*) FROM books_search")
-        search_count = cursor.fetchone()[0]
-        if books_count != search_count:
-            cursor.execute("INSERT INTO books_search(books_search) VALUES ('rebuild')")
         conn.commit()
-    except sqlite3.OperationalError as e:
+    except Exception as e:
         conn.rollback()
-        if 'fts5' in str(e).lower() or 'no such module' in str(e).lower():
-            print(f"[DB-Migration Warning] FTS5 unavailable; OPDS search falls back to LIKE queries: {e}")
-            return
-        raise
+        print(f"[DB-Cleanup] Legacy FTS5 table cleanup skipped: {e}")
 
 def startup_db_sanity_check():
     """
@@ -651,9 +632,9 @@ def init_databases():
         conn.commit()
 
         try:
-            ensure_books_search_index(conn)
+            cleanup_legacy_fts_index(conn)
         except Exception as search_idx_err:
-            print(f"[DB-Migration ERROR] books_search index setup failed: {search_idx_err}")
+            print(f"[DB-Cleanup] Legacy FTS5 cleanup notice: {search_idx_err}")
         
         # settings 테이블 초기값 주입 (ALADIN TTBKey)
         try:
@@ -693,7 +674,6 @@ def init_databases():
                 ('SIDEBAR_TOP_CONTROLS', '0'),
                 ('HDD_AGGRESSIVE_WARMUP', '0'),
                 ('RCLONE_RC_URL', 'http://localhost:5572'),
-                ('FTS_REBUILD_CRON', '30 4 * * *'),
                 ('LAZY_SCAN_MAX_FILE_SIZE_MB', '300'),
                 ('LAZY_SCAN_MAX_BATCH_SIZE_MB', '1024'),
             ]

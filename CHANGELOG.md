@@ -1,4 +1,10 @@
 # CHANGELOG
+## v1.3.2
+- 최근읽은도서 반영 안되는 현상 수정 | Fix latest read books reflection issue
+- FTS5 완전배제로 안정성 강화 | remove the vtable(FTS5)
+- OPDS 호환 추가 보완(문리더,panels) | OPDS compatibility additional support (Moon+ Reader, Panels)
+- 타치요미 익스텐션 업데이트(develop by hejerd) | Update Tachiyomi extension (developed by hejerd)
+---
 ## v1.3.1
 - lazy 스캔시 간헐적 오동작 수정 | Fix intermittent misbehavior during lazy scan
 - 전체스캔시 간헐적 오동작 수정 | Fix intermittent misbehavior during full scan

@@ -17,7 +17,7 @@ try:
         init_databases,
         get_connection,
         auto_migrate_schema,
-        ensure_books_search_index
+        cleanup_legacy_fts_index
     )
 except ImportError as e:
     print(f"[오류] database.py 모듈을 임포트할 수 없습니다: {e}")
@@ -112,13 +112,14 @@ def run_schema_update():
                                 print(f"    -> 인덱스 생성 에러 ({query[:30]}...): {idx_err}")
                 conn.commit()
             
-            # (4) FTS5 검색 인덱스 검증
-            print(f"  - FTS5 검색 인덱스 상태 점검 중...")
+            # (4) 구형 FTS5 가상 테이블 디스크 정리
+            print(f"  - 구형 FTS5 가상 테이블 및 그림자 세그먼트 정리 중...")
             try:
-                ensure_books_search_index(conn)
-                print(f"    -> 검색 인덱스 점검 및 재빌드 완료.")
+                from database import cleanup_legacy_fts_index
+                cleanup_legacy_fts_index(conn)
+                print(f"    -> 구형 FTS5 가상 테이블 정리 완료.")
             except Exception as fts_err:
-                print(f"    -> FTS5 인덱스 점검 실패 (무시 가능): {fts_err}")
+                print(f"    -> FTS5 정리 통과: {fts_err}")
             
             # (5) WAL 모드 트랜케이트 (체크포인트를 통해 WAL에 남아있는 모든 데이터를 DB 원본에 병합)
             print(f"  - WAL 체크포인트(TRUNCATE) 수행 중...")

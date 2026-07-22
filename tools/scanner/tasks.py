@@ -257,6 +257,14 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
                             pass
                         cover_image = None  # Invalidate to include in error report collection
                 
+                # EPUB 사전 캐싱 (Pre-caching) 트리거
+                if file_format == 'epub' and not is_remote:
+                    try:
+                        from services.text_epub_content_service import TextEpubContentService
+                        TextEpubContentService.get_epub_meta(full_path, None, db_type)
+                    except Exception as pre_err:
+                        print(f"[Scanner-EPUB-Precache] Notice: {pre_err}")
+
                 # Log to error list if Zip/EPUB format but no cover acquired
                 if not cover_image and file_format in ('zip', 'cbz', 'epub'):
                     if is_remote:

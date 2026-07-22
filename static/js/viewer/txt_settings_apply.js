@@ -161,6 +161,10 @@ export function applyTxtSettingsCore(ctx) {
           const timerId = setTimeout(() => {
             if (scrollMode === 'scroll') {
               scrollWrapper.scrollTop = pos.scrollTop;
+              // 스크롤 오프셋 복원 후 눈에 보이는 챕터 주변(null) 동적 fetch
+              if (window.dispatchEvent) {
+                scrollWrapper.dispatchEvent(new Event('scroll'));
+              }
             } else {
               scrollWrapper.scrollLeft = pos.scrollLeft;
               snapTxtPageScrollLeft(scrollWrapper);

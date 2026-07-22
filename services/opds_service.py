@@ -16,15 +16,18 @@ def _guess_mime_type(file_path: str) -> str:
     ext = os.path.splitext(file_path)[1].lower()
     custom_mimes = {
         '.epub': 'application/epub+zip',
-        '.cbz': 'application/x-cbz',
+        '.cbz': 'application/vnd.comicbook+zip',    # Moon+ Reader 직접 열기 지원
         '.cbr': 'application/x-cbr',
         '.pdf': 'application/pdf',
         '.txt': 'text/plain',
-        '.zip': 'application/zip',
+        # .zip → CBZ와 동일 포맷이므로 comicbook+zip 사용
+        # application/zip은 Moon+ Reader가 "다운로드 팝업"으로 처리함
+        '.zip': 'application/vnd.comicbook+zip',
     }
     if ext in custom_mimes:
         return custom_mimes[ext]
     return mimetypes.guess_type(file_path)[0] or 'application/octet-stream'
+
 
 
 def _encode_url_segment(value: str) -> str:
@@ -72,20 +75,38 @@ def get_series_entries(db_type: str, lib_id: int, prefix: str, urn_prefix: str):
     ]
 
 
+def _build_stream_href(file_path: str, db_type: str, book_id: int, is_app_opds: bool = False) -> str:
+    if not is_app_opds:
+        return None
+    ext = os.path.splitext(file_path or '')[1].lower()
+    prefix = '/app-opds'
+    if ext in ('.zip', '.cbz', '.imgdir') or file_path.lower().endswith('.imgdir'):
+        return f"{prefix}/api/media/stream?db_type={db_type}&book_id={book_id}&page_idx=0"
+    elif ext == '.txt':
+        return f"{prefix}/api/media/txt?db_type={db_type}&book_id={book_id}"
+    elif ext in ('.epub', '.pdf'):
+        return f"{prefix}/api/media/pdf?db_type={db_type}&book_id={book_id}"
+    return None
+
+
 def get_book_entries(db_type: str, lib_id: int, series_name: str, download_prefix: str, urn_prefix: str, limit: int = None, offset: int = 0):
     total = OpdsRepository.get_book_entries_count(db_type, lib_id, series_name)
     books = OpdsRepository.get_book_entries(db_type, lib_id, series_name, limit, offset)
+    is_app_opds = 'app' in urn_prefix
 
     entries = []
     for b in books:
         ext = os.path.splitext(b['file_path'] or '')[1].lower().replace('.', '') or 'text'
+        mime = _guess_mime_type(b['file_path'])
+        stream_href = _build_stream_href(b['file_path'], db_type, b['id'], is_app_opds)
         entries.append({
             'id': f"urn:{urn_prefix}:book:{b['id']}",
             'title': b['title'],
             'summary': b['summary'],
             'type': 'acquisition',
             'href': f"{download_prefix}/{b['id']}",
-            'mime': _guess_mime_type(b['file_path']),
+            'stream_href': stream_href,
+            'mime': mime,
             'cover': b['cover_image'],
             'cover_url': None if b['cover_image'] else _build_fallback_cover_href(b['title'], ext),
             'cover_mime': 'image/svg+xml' if not b['cover_image'] else None,
@@ -95,15 +116,18 @@ def get_book_entries(db_type: str, lib_id: int, series_name: str, download_prefi
 
 def get_recently_added_entries(db_type: str, download_prefix: str, urn_prefix: str):
     books = OpdsRepository.get_recently_added_entries(db_type)
+    is_app_opds = 'app' in urn_prefix
     entries = []
     for i, b in enumerate(books):
         ext = os.path.splitext(b['file_path'] or '')[1].lower().replace('.', '') or 'text'
+        stream_href = _build_stream_href(b['file_path'], db_type, b['id'], is_app_opds)
         entries.append({
             'id': f"urn:{urn_prefix}:new:{i}",
             'title': b['title'],
             'summary': '',
             'type': 'acquisition',
             'href': f"{download_prefix}/{b['id']}",
+            'stream_href': stream_href,
             'mime': _guess_mime_type(b['file_path']),
             'cover': b['cover_image'],
             'cover_url': None if b['cover_image'] else _build_fallback_cover_href(b['title'], ext),
@@ -114,15 +138,18 @@ def get_recently_added_entries(db_type: str, download_prefix: str, urn_prefix: s
 
 def get_favorite_entries(db_type: str, download_prefix: str, urn_prefix: str, user_id: int):
     books = OpdsRepository.get_favorite_entries(db_type, user_id)
+    is_app_opds = 'app' in urn_prefix
     entries = []
     for i, b in enumerate(books):
         ext = os.path.splitext(b['file_path'] or '')[1].lower().replace('.', '') or 'text'
+        stream_href = _build_stream_href(b['file_path'], db_type, b['id'], is_app_opds)
         entries.append({
             'id': f"urn:{urn_prefix}:favorite:{i}",
             'title': b['title'],
             'summary': '',
             'type': 'acquisition',
             'href': f"{download_prefix}/{b['id']}",
+            'stream_href': stream_href,
             'mime': _guess_mime_type(b['file_path']),
             'cover': b['cover_image'],
             'cover_url': None if b['cover_image'] else _build_fallback_cover_href(b['title'], ext),
@@ -133,7 +160,7 @@ def get_favorite_entries(db_type: str, download_prefix: str, urn_prefix: str, us
 
 def get_recently_read_entries(db_type: str, download_prefix: str, urn_prefix: str, user_id: int = None):
     # 표시 건수 설정 조회
-    from repositories.reading_progress_repository import ReadingProgressRepository
+    from repositories.sqlite.reading_progress_repository import ReadingProgressRepository
     row_limit = ReadingProgressRepository.get_settings_value(db_type, 'RECENT_BOOKS_LIMIT')
     limit = 30
     if row_limit and str(row_limit).isdigit():
@@ -144,18 +171,21 @@ def get_recently_read_entries(db_type: str, download_prefix: str, urn_prefix: st
     else:
         books = OpdsRepository.get_recently_read_entries_by_user(db_type, user_id, limit)
 
+    is_app_opds = 'app' in urn_prefix
     entries = []
     for i, b in enumerate(books):
         title = b['title']
         if _is_corrupted_title(title):
             title = _extract_title_from_path(b['file_path'])
         ext = os.path.splitext(b['file_path'] or '')[1].lower().replace('.', '') or 'text'
+        stream_href = _build_stream_href(b['file_path'], db_type, b['id'], is_app_opds)
         entries.append({
             'id': f"urn:{urn_prefix}:read:{i}",
             'title': title,
             'summary': '',
             'type': 'acquisition',
             'href': f"{download_prefix}/{b['id']}",
+            'stream_href': stream_href,
             'mime': _guess_mime_type(b['file_path']),
             'cover': b['cover_image'],
             'cover_url': None if b['cover_image'] else _build_fallback_cover_href(title, ext),
@@ -171,24 +201,9 @@ def _build_fts_match_query(query: str) -> str:
     return ' AND '.join(f'"{term.replace(chr(34), chr(34) * 2)}"*' for term in terms)
 
 
-def _search_books_entries_like(db_type: str, query: str, limit: int, offset: int):
-    return OpdsRepository.search_books_like(db_type, query, limit, offset)
-
-
-def _search_books_entries_fts(db_type: str, query: str, limit: int, offset: int):
-    match_query = _build_fts_match_query(query)
-    if not match_query:
-        return [], 0
-    return OpdsRepository.search_books_fts(db_type, query, match_query, limit, offset)
-
-
 def search_books_entries(db_type: str, query: str, download_prefix: str, urn_prefix: str, limit: int = 100, offset: int = 0):
-    try:
-        books, total = _search_books_entries_fts(db_type, query, limit, offset)
-        if total == 0:
-            books, total = _search_books_entries_like(db_type, query, limit, offset)
-    except Exception:
-        books, total = _search_books_entries_like(db_type, query, limit, offset)
+    books, total = OpdsRepository.search_books_like(db_type, query, limit, offset)
+    is_app_opds = 'app' in urn_prefix
     
     entries = []
     for b in books:
@@ -201,6 +216,7 @@ def search_books_entries(db_type: str, query: str, download_prefix: str, urn_pre
                 meta.append(f"저자: {b['author']}")
             desc = " / ".join(meta) if meta else "상세 설명 없음"
         ext = os.path.splitext(b['file_path'] or '')[1].lower().replace('.', '') or 'text'
+        stream_href = _build_stream_href(b['file_path'], db_type, b['id'], is_app_opds)
             
         entries.append({
             'id': f"urn:{urn_prefix}:search:{b['id']}",
@@ -208,6 +224,7 @@ def search_books_entries(db_type: str, query: str, download_prefix: str, urn_pre
             'summary': desc,
             'type': 'acquisition',
             'href': f"{download_prefix}/{b['id']}",
+            'stream_href': stream_href,
             'mime': _guess_mime_type(b['file_path']),
             'cover': b['cover_image'],
             'cover_url': None if b['cover_image'] else _build_fallback_cover_href(b['title'], ext),

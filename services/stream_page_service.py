@@ -56,6 +56,11 @@ def get_imgdir_files(folder_path: str) -> list:
     return files
 
 
+from api.cache import LRUCache, PREFETCH_AHEAD
+import threading
+
+_book_info_cache = LRUCache(capacity=2000)
+
 class StreamPageService:
     @staticmethod
     def _book_permission_clause(user_id=None, role=None, book_alias='b'):
@@ -72,12 +77,20 @@ class StreamPageService:
 
     @staticmethod
     def get_book_file_info(db_type, book_id, user_id=None, role=None):
+        cache_key = f"{db_type}:{book_id}:{user_id}:{role}"
+        cached = _book_info_cache.get(cache_key)
+        if cached is not None:
+            return cached if cached != 'NOT_FOUND' else (None, None)
+
         from repositories.book_repository import BookRepository
         perm_clause, perm_params = StreamPageService._book_permission_clause(user_id=user_id, role=role, book_alias='b')
         row = BookRepository.get_book_file_info_with_permission(db_type, book_id, perm_clause, perm_params)
         if not row:
+            _book_info_cache.put(cache_key, 'NOT_FOUND')
             return None, None
-        return row['file_path'], (row['file_format'] or '').lower()
+        result = (row['file_path'], (row['file_format'] or '').lower())
+        _book_info_cache.put(cache_key, result)
+        return result
 
     @staticmethod
     def get_total_pages_for_book(db_type, book_id, file_path=None, file_format=None):
@@ -100,11 +113,30 @@ class StreamPageService:
         return 0
 
     @staticmethod
-    def extract_page(file_path: str, page_idx: int, db_type: str = 'general', book_id=None):
-        """단일 페이지를 (img_data, mime_type)으로 반환 (Zip 오프셋 최적화 및 Fallback 지원)"""
+    def _trigger_background_prefetch(file_path: str, current_page_idx: int, db_type: str, book_id):
+        """현재 읽고 있는 페이지 다음 PREFETCH_AHEAD (4페이지)를 스레드 안전하게 백그라운드 사전 추출"""
+        def _prefetch_worker():
+            for next_offset in range(1, PREFETCH_AHEAD + 1):
+                target_idx = current_page_idx + next_offset
+                target_cache_key = (file_path, target_idx)
+                if image_cache.get(target_cache_key) is not None:
+                    continue
+                try:
+                    StreamPageService.extract_page(file_path, target_idx, db_type=db_type, book_id=book_id, is_prefetch=True)
+                except Exception as p_err:
+                    break
+
+        thread = threading.Thread(target=_prefetch_worker, daemon=True)
+        thread.start()
+
+    @staticmethod
+    def extract_page(file_path: str, page_idx: int, db_type: str = 'general', book_id=None, is_prefetch=False):
+        """단일 페이지를 (img_data, mime_type)으로 반환 (Zip 오프셋 최적화, 백그라운드 프리페치 및 Fallback 지원)"""
         cache_key = (file_path, page_idx)
         cached = image_cache.get(cache_key)
         if cached is not None:
+            if not is_prefetch and book_id is not None:
+                StreamPageService._trigger_background_prefetch(file_path, page_idx, db_type, book_id)
             return cached
 
         # ─── Redis 캐시 조회 ───
@@ -121,6 +153,8 @@ class StreamPageService:
                     mime_type = payload['mime']
                     result = (img_data, mime_type)
                     image_cache.put(cache_key, result, len(img_data))
+                    if not is_prefetch and book_id is not None:
+                        StreamPageService._trigger_background_prefetch(file_path, page_idx, db_type, book_id)
                     return result
             except Exception as r_err:
                 print(f"[Redis Cache Get ERROR] {r_err}")
@@ -128,6 +162,8 @@ class StreamPageService:
         with get_zip_read_lock(file_path):
             cached = image_cache.get(cache_key)
             if cached is not None:
+                if not is_prefetch and book_id is not None:
+                    StreamPageService._trigger_background_prefetch(file_path, page_idx, db_type, book_id)
                 return cached
 
             # [IMGDIR Path] 폴더 이미지 직접 스트리밍
@@ -160,6 +196,8 @@ class StreamPageService:
                         except Exception as r_err:
                             print(f"[Redis Cache Put ERROR] {r_err}")
                             
+                    if not is_prefetch and book_id is not None:
+                        StreamPageService._trigger_background_prefetch(file_path, page_idx, db_type, book_id)
                     return result
                 except Exception as e:
                     print(f"[StreamPageService] IMGDIR page extract fail [{target}]: {e}")
@@ -168,7 +206,7 @@ class StreamPageService:
             # [Fast Path] Zip 오프셋 기반 부분 스트리밍 가속 기동
             if book_id is not None:
                 try:
-                    from repositories.book_offset_repository import BookOffsetRepository
+                    from repositories.sqlite.book_offset_repository import BookOffsetRepository
                     row = BookOffsetRepository.get_book_offset(db_type, book_id, page_idx)
 
                     if row and os.path.exists(file_path):
@@ -218,7 +256,9 @@ class StreamPageService:
                                             redis_set(redis_cache_key, json.dumps(payload), ex=3600)
                                         except Exception as r_err:
                                             print(f"[Redis Cache Put ERROR] {r_err}")
-                                            
+
+                                    if not is_prefetch and book_id is not None:
+                                        StreamPageService._trigger_background_prefetch(file_path, page_idx, db_type, book_id)
                                     return result
                 except Exception as ex_offset:
                     print(
@@ -256,7 +296,9 @@ class StreamPageService:
                         redis_set(redis_cache_key, json.dumps(payload), ex=3600)
                     except Exception as r_err:
                         print(f"[Redis Cache Put ERROR] {r_err}")
-                        
+
+                if not is_prefetch and book_id is not None:
+                    StreamPageService._trigger_background_prefetch(file_path, page_idx, db_type, book_id)
                 return result
             except Exception as e:
                 print(f"[StreamPageService] Page extract fail [{file_path}:{page_idx}]: {e}")

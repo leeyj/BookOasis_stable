@@ -50,6 +50,30 @@ class CategoryService:
 
     @staticmethod
     def delete_library(db_type, library_id):
+        # 1. 카테고리 정보 및 스캔 상태 검증
+        lib = CategoryRepository.get_library_by_id(db_type, library_id)
+        if not lib:
+            raise ValueError("삭제하려는 카테고리를 찾을 수 없습니다.")
+
+        # [제약 조건] 스캔 상태 검증: 현재 카테고리가 스캔 중인 경우 삭제 차단
+        if lib.get("scan_status") in ("scanning", "cancelling"):
+            raise ValueError("현재 카테고리가 스캔 진행 중입니다. 스캔이 완료된 후 삭제해 주세요.")
+
+        # [제약 조건] 스캐너 큐 상태 검증: 현재 카테고리 스캔 작업이 실행/대기 중인 경우 삭제 차단
+        from services.scanner_queue import scanner_queue
+        q_status = scanner_queue.get_queue_status()
+        running = q_status.get('running')
+        if running and running.get('type') in ('library_scan', 'cover_scan'):
+            kwargs = running.get('kwargs', {})
+            if kwargs.get('db_type') == db_type and int(kwargs.get('library_id', 0)) == int(library_id):
+                raise ValueError("현재 카테고리에 대한 백그라운드 스캔이 진행 중입니다. 스캔 완료 후 다시 시도해 주세요.")
+
+        for item in q_status.get('pending', []):
+            if item.get('type') in ('library_scan', 'cover_scan'):
+                kwargs = item.get('kwargs', {})
+                if kwargs.get('db_type') == db_type and int(kwargs.get('library_id', 0)) == int(library_id):
+                    raise ValueError("현재 카테고리에 대한 스캔 작업이 대기열에 존재합니다. 스캔 완료 또는 취소 후 다시 시도해 주세요.")
+
         try:
             from utils.report_helper import delete_all_reports
             delete_all_reports(library_id)

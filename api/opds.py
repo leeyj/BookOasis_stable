@@ -7,17 +7,20 @@ opds.py – OPDS (외부 뷰어 앱 연동) 라우터
   - /opds/series/…      : 시리즈 단행본 다운로드 링크
   - /opds/download/…    : 개별 도서 파일 전송
 """
+import hmac
 import mimetypes
 import os
+import secrets
 import threading
 import time
 import hashlib
 
-from flask import Blueprint, Response, jsonify, request, send_file  # type: ignore[reportMissingImports]
+from flask import Blueprint, Response, jsonify, request, send_file, session  # type: ignore[reportMissingImports]
 import database
 from api.cache import LRUCache
 from api.opds_common.auth import authenticate_basic_auth_user, unauthorized_response
-from api.opds_common.xml import atom_response, build_external_request_url, build_opds_xml, get_external_base_url, get_page_params
+from api.opds_common.xml import atom_response, build_external_request_url, get_external_base_url, get_page_params
+from api.opds_common.xml_opds import build_opds_standard_xml
 from services.opds_service import (
     get_book_entries,
     get_favorite_entries,
@@ -38,11 +41,24 @@ _auth_cache: dict = {}
 _auth_lock = threading.Lock()
 _AUTH_CACHE_TTL = 300
 
+def _session_user(is_adult: bool = False):
+    if not session.get('user_id'):
+        return None
+    role = session.get('role')
+    if is_adult and role != 'admin':
+        return None
+    return {
+        'id': session.get('user_id'),
+        'username': session.get('username'),
+        'role': role,
+    }
+
+
 def _get_authenticated_user(is_adult: bool = False):
-    """OPDS용 DB 기반 Basic Auth 인증 검사 및 사용자 정보 반환"""
+    """OPDS용 DB 기반 Basic Auth 인증 검사 및 사용자 정보 반환 (세션 폴백 지원)"""
     auth = request.authorization
     if not auth or not auth.username or not auth.password:
-        return None
+        return _session_user(is_adult=is_adult)
 
     key = hashlib.sha256(f"{auth.username}:{auth.password}".encode()).hexdigest()
     now = time.time()
@@ -90,6 +106,37 @@ def _unauthorized():
     return unauthorized_response('BookOasis OPDS Catalog')
 
 
+# ─── Signed URL (다운로드 토큰) ────────────────────────────────
+# Moon+ Reader가 다운로드 확인 후 재요청 시 인증 없이 요청하는 문제 해결
+# HMAC 서명 토큰을 URL에 포함하여 Basic Auth 없이도 파일 접근 허용
+
+_SIGN_SECRET = os.getenv('SIGN_SECRET', 'bookoasis-opds-sign-2026')
+_SIGN_TTL = 3600  # 1시간
+
+
+def _make_download_token(db_type: str, book_id: int, user_id: int) -> str:
+    """HMAC-SHA256 서명 토큰 생성 (db_type:book_id:user_id:expires)"""
+    expires = int(time.time()) + _SIGN_TTL
+    msg = f"{db_type}:{book_id}:{user_id}:{expires}"
+    sig = hmac.new(_SIGN_SECRET.encode(), msg.encode(), hashlib.sha256).hexdigest()
+    return f"{sig}:{expires}:{user_id}"
+
+
+def _verify_download_token(db_type: str, book_id: int, token: str) -> bool:
+    """다운로드 토큰 검증 (만료 및 HMAC 검증)"""
+    try:
+        sig, expires_str, uid_str = token.split(':')
+        expires = int(expires_str)
+        user_id = int(uid_str)
+    except Exception:
+        return False
+    if time.time() > expires:
+        return False
+    msg = f"{db_type}:{book_id}:{user_id}:{expires}"
+    expected = hmac.new(_SIGN_SECRET.encode(), msg.encode(), hashlib.sha256).hexdigest()
+    return hmac.compare_digest(sig, expected)
+
+
 # ─── Atom XML 생성 ────────────────────────────────────────────
 
 OPDS_CACHE_TTL = 60  # seconds
@@ -119,7 +166,7 @@ def _get_page_params():
 def _opds_xml(db_type: str, title: str, entries: list, is_adult: bool = False, next_link: str = None) -> str:
     search_href = '/opds/search' if not is_adult else '/opds-adult/search'
     start_href = '/opds' if not is_adult else '/opds-adult'
-    return build_opds_xml(
+    return build_opds_standard_xml(
         request,
         title=title,
         entries=entries,
@@ -230,22 +277,37 @@ def opds_adult_library(lib_id: int):
 
 @opds_bp.route('/opds/series/<int:lib_id>/<string:series_name>', methods=['GET'])
 def opds_series_books(lib_id: int, series_name: str):
-    if not _check_auth(is_adult=False):
+    auth_user = _get_authenticated_user(is_adult=False)
+    if not auth_user:
         return _unauthorized()
 
     page, page_size, offset = _get_page_params()
     cache_key = f'opds_series:general:{lib_id}:{series_name}:{page}:{page_size}'
     cached_xml = _get_cached_opds_response(cache_key)
-    if cached_xml is not None:
-        return _atom_response(cached_xml)
 
     entries, total = get_book_entries('general', lib_id, series_name, '/opds/download/general', 'general', limit=page_size, offset=offset)
     next_link = None
     if offset + page_size < total:
         next_link = build_external_request_url(request, {'page': page + 1, 'page_size': page_size})
-    xml = _opds_xml('general', f"Series: {series_name}", entries, next_link=next_link)
-    _set_cached_opds_response(cache_key, xml)
+
+    if cached_xml is None:
+        xml = _opds_xml('general', f"Series: {series_name}", entries, next_link=next_link)
+        _set_cached_opds_response(cache_key, xml)
+    else:
+        xml = cached_xml
+
+    # 각 acquisition href에 Signed URL 토큰 주입 (캐시 후 처리 - 토큰은 동적으로 생성)
+    uid = auth_user.get('id', 0)
+    for entry in entries:
+        if entry.get('type') == 'acquisition':
+            book_id = int(entry['href'].rsplit('/', 1)[-1])
+            token = _make_download_token('general', book_id, uid)
+            old = f'/opds/download/general/{book_id}"'
+            new = f'/opds/download/general/{book_id}?token={token}"'
+            xml = xml.replace(old, new)
+
     return _atom_response(xml)
+
 
 
 @opds_bp.route('/opds/adult/series/<int:lib_id>/<string:series_name>', methods=['GET'])
@@ -374,28 +436,114 @@ def opds_adult_favorite():
 
 @opds_bp.route('/opds/download/<string:db_type>/<int:book_id>', methods=['GET'])
 def opds_download_book(db_type: str, book_id: int):
-    """외부 뷰어 앱이 직접 파일을 다운로드하는 엔드포인트"""
+    """외부 뷰어 앱이 직접 파일을 다운로드하는 엔드포인트 (상세 디버그 로깅 포함)"""
+    import time
+    import traceback
+    start_t = time.time()
+    print(f"[OPDS-Debug] 📥 /opds/download 시작 - db_type={db_type}, book_id={book_id}")
+
     is_adult = (db_type == 'adult')
-    if not _check_auth(is_adult=is_adult):
-        return _unauthorized()
-    conn = database.get_connection(db_type)
-    cursor = conn.cursor()
-    cursor.execute("SELECT file_path FROM books WHERE id=?", (book_id,))
-    row = cursor.fetchone()
-    conn.close()
+    auth_user = _get_authenticated_user(is_adult=is_adult)
+    if not auth_user:
+        # Basic Auth/세션 실패 시 → Signed URL 토큰으로 2차 검증
+        # (Moon+ Reader가 다운로드 확인 후 재요청 시 인증 정보 없이 보내는 문제 해결)
+        dl_token = request.args.get('token', '')
+        if dl_token and _verify_download_token(db_type, book_id, dl_token):
+            print(f"[OPDS-Debug] 🔑 토큰 인증 성공 - db_type={db_type}, book_id={book_id}")
+            auth_user = {'id': 0, 'username': 'token_auth', 'role': 'admin'}
+        else:
+            print(f"[OPDS-Debug] ❌ 인증 실패 (401 반환) - db_type={db_type}, book_id={book_id}")
+            return _unauthorized()
+
+
+    try:
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute("SELECT file_path FROM books WHERE id=?", (book_id,))
+        row = cursor.fetchone()
+        conn.close()
+    except Exception as db_err:
+        print(f"[OPDS-Debug] ❌ DB 조회 에러: {db_err}\n{traceback.format_exc()}")
+        return jsonify({'error': str(db_err)}), 500
+
     if not row:
+        print(f"[OPDS-Debug] ❌ DB 도서 미존재 (404) - book_id={book_id}")
         return jsonify({'error': _t('api.err_book_not_found')}), 404
+
     file_path = row['file_path']
-    if not os.path.exists(file_path):
+    file_exists = os.path.exists(file_path)
+    file_size_mb = (os.path.getsize(file_path) / (1024 * 1024)) if file_exists else 0
+    print(f"[OPDS-Debug] 🔍 DB 조회 성공 - file_path='{file_path}', 존재={file_exists}, 크기={file_size_mb:.2f}MB")
+
+    if not file_exists:
+        print(f"[OPDS-Debug] ❌ 실물 파일 미존재 (404) - '{file_path}'")
         return jsonify({'error': _t('api.err_file_not_found')}), 404
 
     from services.opds_service import _guess_mime_type
+    import urllib.parse
+    import re
+
     mime_type = _guess_mime_type(file_path)
     filename = os.path.basename(file_path)
+    ext = os.path.splitext(filename)[1].lower()
 
-    response = send_file(file_path, as_attachment=True, download_name=filename, mimetype=mime_type)
+    # HTTP 헤더 불안전 문자 제거 (#?'"등)
+    safe_filename = re.sub(r'[#?\"\'\r\n]', '_', filename)
+
+    # .zip → .cbz 로 제공: Moon+ Reader가 .zip을 텍스트 뷰어로 열고 .cbz는 이미지 뷰어로 열기 때문
+    if ext == '.zip':
+        safe_filename = os.path.splitext(safe_filename)[0] + '.cbz'
+
+    # filename= 파라미터: ASCII 전용 (한글이 있으면 Cloudflare 502 발생)
+    # 한글 언더바 나열보다 book_id 기반 단순 이름이 훨씬 명확함
+    dl_ext = os.path.splitext(safe_filename)[1] or '.zip'
+    ascii_filename = f"book_{book_id}{dl_ext}"
+
+    # filename*= 파라미터: UTF-8 RFC 5987 인코딩 (한글 원본 파일명, 앱에서 표시용)
+    encoded_filename = urllib.parse.quote(safe_filename, safe='')
+
+    # ETag: 파일 stat 기반 순수 ASCII hex 해시 (한글/특수문자 포함 방지)
+    try:
+        st = os.stat(file_path)
+        etag_raw = f"{st.st_size}:{st.st_mtime_ns}"
+        etag_value = hashlib.md5(etag_raw.encode()).hexdigest()
+    except Exception:
+        etag_value = None
+
+    print(f"[OPDS-Debug] 🚀 파일 전송 준비 - mime_type={mime_type}, raw_filename='{filename}', ascii_filename='{ascii_filename}'")
+    try:
+        # download_name=ascii_filename: Flask Content-Disposition에 ASCII만 포함 (한글/# 방지)
+        # etag=False: Flask 자동 ETag 비활성화 (파일 경로 기반 ETag에 한글 포함 방지)
+        response = send_file(
+            file_path,
+            mimetype=mime_type,
+            conditional=False,
+            etag=False,
+            as_attachment=False,
+            download_name=ascii_filename,
+        )
+        print(f"[OPDS-Debug] ✅ send_file 생성 성공 (소요시간: {(time.time() - start_t)*1000:.1f}ms)")
+    except Exception as sf_err:
+        print(f"[OPDS-Debug] ⚠️ send_file 실패 -> stream_file_safely Fallback: {sf_err}\n{traceback.format_exc()}")
+        from utils.safe_file_response import stream_file_safely
+        response = stream_file_safely(file_path, mimetype=mime_type, chunk_size=4096 * 1024)
+
     response.headers['Content-Type'] = f"{mime_type}; charset=utf-8" if mime_type.startswith('text/') else mime_type
+    # Content-Disposition:
+    #   filename=     → 순수 ASCII (Cloudflare 호환, RFC 6266)
+    #   filename*=    → UTF-8 RFC 5987 인코딩 (한글 파일명, Moon+ Reader 표시용)
+    response.headers['Content-Disposition'] = (
+        f"inline; filename=\"{ascii_filename}\"; filename*=UTF-8''{encoded_filename}"
+    )
+
+    # ETag: 순수 ASCII hex (한글/특수문자 없음) → Cloudflare 502 방지
+    if etag_value:
+        response.headers['ETag'] = f'"{etag_value}"'
+    response.headers['X-Accel-Buffering'] = 'no'
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return response
+
+
 
 
 @opds_bp.route('/opds/search', methods=['GET'])

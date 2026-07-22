@@ -390,6 +390,7 @@ export function jumpToTxtTocChapter({
   anchor,
   options,
   chunkCount,
+  txtChunks,
   cancelPendingRestore,
   setCurrentChunkIdx,
   onActiveChapterChange,
@@ -429,10 +430,50 @@ export function jumpToTxtTocChapter({
   const preferChapterStart = !!(options && options.preferChapterStart);
   const overlayMenu = document.getElementById('comic-overlay-menu');
   const scrollWrapper = getScrollWrapper();
+
+  console.log(`[EPUB-TOC-Jump] 챕터 점프 시도 - chapterIdx=${chapterIdx}, isLoaded=${txtChunks && txtChunks[chapterIdx] !== null}`);
+  // 목차 클릭한 챕터가 미로드 상태(null)인 경우 즉시 fetch 후 렌더링
+  if (state.currentViewerFormat === 'epub' && Array.isArray(txtChunks) && txtChunks[chapterIdx] === null) {
+    console.log(`[EPUB-TOC-Jump] 챕터 ${chapterIdx} 미로드 상태(null) -> 비동기 fetch 요청`);
+    fetch(`/api/media/epub/chapter?db_type=${state.currentLibraryType}&book_id=${activeBookId}&chapter_idx=${chapterIdx}`)
+      .then(res => res.json())
+      .then(data => {
+        const content = data.content || '<p>내용이 없습니다.</p>';
+        txtChunks[chapterIdx] = content;
+
+        const contentArea = document.getElementById('txt-content-area');
+        if (contentArea) {
+          const chunkEl = contentArea.querySelector(`.txt-scroll-chunk[data-idx="${chapterIdx}"]`);
+          console.log(`[EPUB-TOC-Jump] 챕터 ${chapterIdx} fetch 완료. chunkEl 발견: ${!!chunkEl}`);
+          if (chunkEl) {
+            chunkEl.innerHTML = content;
+          }
+        }
+
+        jumpToTxtTocChapter({
+          chapterIdx,
+          anchor,
+          options,
+          chunkCount,
+          txtChunks,
+          cancelPendingRestore,
+          setCurrentChunkIdx,
+          onActiveChapterChange,
+          getScrollMode,
+          getScrollWrapper,
+          renderCurrentChunk,
+          saveProgress,
+          activeBookId
+        });
+      })
+      .catch(err => {
+        console.error('[EPUB-TOC-Jump] Failed to fetch chapter:', err);
+      });
+    return;
+  }
+
   let selectedChunkEl = null;
   if (scrollMode === 'scroll') {
-    // TOC jump is an explicit navigation action.
-    // Prevent overlay-close handler from restoring stale pre-jump scrollTop.
     if (overlayMenu) {
       overlayMenu.dataset.skipInnerScrollRestore = 'true';
     }
@@ -441,20 +482,47 @@ export function jumpToTxtTocChapter({
       selectedChunkEl = targetChunk || null;
       if (targetChunk) {
         const top = Math.max(0, targetChunk.offsetTop);
-        // 첫 TOC 점프는 즉시 정렬로 고정해 초기 복원/관성 스크롤과의 레이스를 줄인다.
         scrollWrapper.scrollTo({ top, behavior: 'auto' });
       } else {
         const safeChunkCount = Math.max(1, chunkCount);
         const ratio = chapterIdx / safeChunkCount;
         scrollWrapper.scrollTop = scrollWrapper.scrollHeight * ratio;
       }
+      
+      // TOC 점프 완료 후 점프한 챕터 주변(전후 10개 챕터) null 챕터 즉시 백그라운드 프리패치
+      const neighbors = [];
+      for (let offset = -10; offset <= 10; offset++) {
+        if (offset !== 0) neighbors.push(chapterIdx + offset);
+      }
+      const validNeighbors = neighbors.filter(i => i >= 0 && i < chunkCount);
+      validNeighbors.forEach(fIdx => {
+        if (Array.isArray(txtChunks) && txtChunks[fIdx] === null) {
+          txtChunks[fIdx] = 'LOADING_PENDING';
+          fetch(`/api/media/epub/chapter?db_type=${state.currentLibraryType}&book_id=${activeBookId}&chapter_idx=${fIdx}`)
+            .then(r => r.json())
+            .then(d => {
+              const content = (d && d.content) ? d.content : '<p>내용이 없습니다.</p>';
+              txtChunks[fIdx] = content;
+              const contentArea = document.getElementById('txt-content-area');
+              if (contentArea) {
+                const chunkEl = contentArea.querySelector(`.txt-scroll-chunk[data-idx="${fIdx}"]`);
+                if (chunkEl) chunkEl.innerHTML = content;
+              }
+            })
+            .catch(() => {
+              txtChunks[fIdx] = null;
+            });
+        }
+      });
+
+      // 스크롤 이벤트 수동 트리거
+      if (window.dispatchEvent) {
+        scrollWrapper.dispatchEvent(new Event('scroll'));
+      }
     }
   } else {
-    // Page mode keeps only the current chapter in DOM.
-    // Re-render first so anchor lookup points to the selected chapter content.
     renderCurrentChunk(true);
     if (scrollWrapper) {
-      // 챕터 전환 시 이전 챕터의 가로 페이지 오프셋이 남지 않도록 항상 시작점으로 초기화한다.
       scrollWrapper.scrollLeft = 0;
       scrollWrapper.scrollTop = 0;
     }

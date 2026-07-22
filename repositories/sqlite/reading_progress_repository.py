@@ -219,6 +219,7 @@ class ReadingProgressRepository:
                    p.is_completed
             FROM user_progress p
             JOIN books b ON p.book_id = b.id
+            JOIN user_category_permissions ucp ON b.library_id = ucp.library_id AND ucp.user_id = p.user_id AND ucp.has_access = 1
             LEFT JOIN user_favorites uf ON uf.book_id = b.id AND uf.user_id = p.user_id
             WHERE COALESCE(b.is_deleted, 0) = 0 AND p.user_id = ?
         """

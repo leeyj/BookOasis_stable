@@ -172,6 +172,53 @@ def get_epub_content():
 
     return jsonify(data)
 
+@stream_bp.route('/api/media/epub/meta', methods=['GET'])
+@login_required
+def get_epub_meta_api():
+    """EPUB 초고속 메타데이터(제목, TOC 목차, total_chapters) 반환"""
+    db_type = request.args.get('db_type', 'general')
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+    user_id = session.get('user_id', 1)
+    role = session.get('role')
+    book_id = request.args.get('book_id')
+    if not book_id:
+        return jsonify({'error': _t('api.err_book_id_required')}), 400
+
+    file_path = StreamService.get_file_path(db_type, book_id, user_id=user_id, role=role)
+    if not file_path:
+        return jsonify({'error': _t('api.err_book_not_found')}), 404
+
+    data, error = StreamService.get_epub_meta(file_path, book_id, db_type)
+    if error:
+        return jsonify({'error': error}), 404 if error == 'File not found' else 500
+
+    return jsonify(data)
+
+@stream_bp.route('/api/media/epub/chapter', methods=['GET'])
+@login_required
+def get_epub_chapter_api():
+    """EPUB 단일 챕터(chapter_idx) 텍스트/HTML 전용 스트리밍 반환"""
+    db_type = request.args.get('db_type', 'general')
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+    user_id = session.get('user_id', 1)
+    role = session.get('role')
+    book_id = request.args.get('book_id')
+    chapter_idx = request.args.get('chapter_idx', 0)
+    if not book_id:
+        return jsonify({'error': _t('api.err_book_id_required')}), 400
+
+    file_path = StreamService.get_file_path(db_type, book_id, user_id=user_id, role=role)
+    if not file_path:
+        return jsonify({'error': _t('api.err_book_not_found')}), 404
+
+    data, error = StreamService.get_epub_chapter(file_path, book_id, db_type, chapter_idx)
+    if error:
+        return jsonify({'error': error}), 404 if error == 'File not found' else 500
+
+    return jsonify(data)
+
 @stream_bp.route('/api/media/epub-image', methods=['GET'])
 @login_required
 def get_epub_image():

@@ -24,7 +24,8 @@ from flask import Blueprint, Response, jsonify, redirect, request, send_file, se
 import database
 from api.cache import LRUCache
 from api.opds_common.auth import authenticate_basic_auth_user, unauthorized_response
-from api.opds_common.xml import atom_response, build_opds_xml, get_page_params
+from api.opds_common.xml import atom_response, get_page_params
+from api.opds_common.xml_app_opds import build_app_opds_xml
 from api.app_opds_handlers import AppOpdsHandlers
 from services.opds_service import (
     EMPTY_SERIES_TOKEN,
@@ -157,7 +158,7 @@ def _opds_xml(db_type: str, title: str, entries: list,
     """Atom XML 규격의 OPDS 피드 생성 (start 링크는 is_adult 여부에 따라 설정)"""
     search_href = '/app-opds/search' if not is_adult else '/app-opds-adult/search'
     start_href = '/app-opds' if not is_adult else '/app-opds-adult'
-    return build_opds_xml(
+    return build_app_opds_xml(
         request,
         title=title,
         entries=entries,
