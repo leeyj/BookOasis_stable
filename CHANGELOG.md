@@ -1,4 +1,7 @@
 # CHANGELOG
+## v1.3.7
+- 이 시리즈 재스캔 오류 긴급 복구 | recover series re-scan error
+---
 ## v1.3.6
 - 카테고리 내보내기/들이기 추가(tools/import_category,export_category.py) | Add category import/export function (tools/import_category,export_category.py)
   * 상세 사용방법은 /docs/guide_category_migration.md 참조 | For detailed usage instructions, refer to /docs/guide_category_migration.md

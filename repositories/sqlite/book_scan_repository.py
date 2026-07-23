@@ -63,15 +63,19 @@ class BookScanRepository:
             if row and row['series_name'] and cover_image:
                 lib_id = row['library_id']
                 s_name = row['series_name']
-                cursor.execute(
-                    """
-                    UPDATE series SET 
-                        cover_image = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN ? ELSE cover_image END,
-                        cover_updated_at = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN CURRENT_TIMESTAMP ELSE cover_updated_at END
-                    WHERE name = ? AND library_id = ?
-                    """,
-                    (cover_image, s_name, lib_id)
-                )
+                try:
+                    cursor.execute(
+                        """
+                        UPDATE series SET 
+                            cover_image = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN ? ELSE cover_image END,
+                            cover_updated_at = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN CURRENT_TIMESTAMP ELSE cover_updated_at END
+                        WHERE name = ? AND library_id = ?
+                        """,
+                        (cover_image, s_name, lib_id)
+                    )
+                except Exception as s_err:
+                    # series 테이블이 없는 adult DB이거나 구형 스키마인 경우 예외 발생 시 안전하게 스킵
+                    pass
 
             conn.commit()
             return True
