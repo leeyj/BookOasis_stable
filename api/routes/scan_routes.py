@@ -137,3 +137,50 @@ def trigger_all_libraries_scan():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+
+def format_relative_time(target_dt_str):
+    if not target_dt_str or target_dt_str == '-':
+        return '-'
+    try:
+        from datetime import datetime
+        dt = datetime.strptime(target_dt_str, '%Y-%m-%d %H:%M:%S')
+        now = datetime.now()
+        diff = now - dt
+        seconds = int(diff.total_seconds())
+        if seconds < 0:
+            return '방금 전'
+        if seconds < 60:
+            return '방금 전'
+        minutes = seconds // 60
+        if minutes < 60:
+            return f'{minutes}분 전'
+        hours = minutes // 60
+        if hours < 24:
+            return f'{hours}시간 전'
+        days = hours // 24
+        if days == 1:
+            return '어제'
+        if days < 30:
+            return f'{days}일 전'
+        months = days // 30
+        return f'{months}달 전'
+    except Exception:
+        return target_dt_str
+
+
+@scan_bp.route('/api/media/scan-history', methods=['GET'])
+@admin_required
+def get_scan_history_api():
+    """최근 스캔 이력 목록 (최대 20건, 레이지스캔 제외) 조회"""
+    try:
+        from repositories.scanner_queue_repository import ScannerQueueRepository
+        history = ScannerQueueRepository.get_scan_history(limit=20)
+        
+        for item in history:
+            ref_time = item.get('finished_at') or item.get('started_at') or item.get('enqueue_at')
+            item['time_ago'] = format_relative_time(ref_time)
+            
+        return jsonify({'success': True, 'history': history})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+

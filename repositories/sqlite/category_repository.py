@@ -78,19 +78,17 @@ class CategoryRepository:
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
-            # 1. 도서 권한 삭제
+            # 1. 도서 권한 및 시리즈 정보 삭제
             cursor.execute("DELETE FROM user_category_permissions WHERE library_id = ?", (library_id,))
-            # 2. 관련 도서들 정보 연쇄 소거
-            cursor.execute("SELECT id FROM books WHERE library_id = ?", (library_id,))
-            books = cursor.fetchall()
-            for b in books:
-                bid = b['id']
-                cursor.execute("DELETE FROM book_offsets WHERE book_id = ?", (bid,))
-                cursor.execute("DELETE FROM user_progress WHERE book_id = ?", (bid,))
-                cursor.execute("DELETE FROM user_reading_log WHERE book_id = ?", (bid,))
-                cursor.execute("DELETE FROM user_favorites WHERE book_id = ?", (bid,))
+            cursor.execute("DELETE FROM series WHERE library_id = ?", (library_id,))
             
+            # 2. 관련 도서 종속 데이터 초고속 서브쿼리 일괄 소거
+            cursor.execute("DELETE FROM book_offsets WHERE book_id IN (SELECT id FROM books WHERE library_id = ?)", (library_id,))
+            cursor.execute("DELETE FROM user_progress WHERE book_id IN (SELECT id FROM books WHERE library_id = ?)", (library_id,))
+            cursor.execute("DELETE FROM user_reading_log WHERE book_id IN (SELECT id FROM books WHERE library_id = ?)", (library_id,))
+            cursor.execute("DELETE FROM user_favorites WHERE book_id IN (SELECT id FROM books WHERE library_id = ?)", (library_id,))
             cursor.execute("DELETE FROM books WHERE library_id = ?", (library_id,))
+            
             # 3. 라이브러리 레코드 소거
             cursor.execute("DELETE FROM libraries WHERE id = ?", (library_id,))
             conn.commit()

@@ -273,21 +273,23 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
     pending_folders = []
     detected_new_books = []
 
-    def flush_pending_data():
+    def flush_pending_data(is_final=False):
         if not pending_inserts and not pending_updates and not pending_folders:
+            print(f"[Scanner-DB] Flush skipped: 0 pending items (is_final={is_final})")
             return True
 
-        max_attempts = 6
+        max_attempts = 15 if is_final else 6
+        lock_timeout = 10.0 if is_final else 1.0
         for attempt in range(1, max_attempts + 1):
             gate_token = None
             try:
                 from utils.redis_helper import redis_acquire_lock, redis_release_lock
 
-                gate_token = redis_acquire_lock(f"lock:db_write:{db_type}", ttl=90, wait_timeout=1.0)
+                gate_token = redis_acquire_lock(f"lock:db_write:{db_type}", ttl=90, wait_timeout=lock_timeout)
                 if not gate_token:
-                    wait_sec = min(3.0, 0.2 * (2 ** (attempt - 1)))
+                    wait_sec = min(4.0, 0.25 * (2 ** (attempt - 1)))
                     print(
-                        f"[Scanner-DB] DB write gate busy (attempt {attempt}/{max_attempts}) "
+                        f"[Scanner-DB] DB write gate busy (attempt {attempt}/{max_attempts}, is_final={is_final}) "
                         f"db={db_type} ins={len(pending_inserts)} upd={len(pending_updates)} folders={len(pending_folders)} "
                         f"Retrying in {wait_sec:.2f}s..."
                     )
@@ -295,7 +297,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     continue
 
                 print(
-                    f"[Scanner-DB] Flush start (attempt {attempt}/{max_attempts}) "
+                    f"[Scanner-DB] Flush start (attempt {attempt}/{max_attempts}, is_final={is_final}) "
                     f"ins={len(pending_inserts)} upd={len(pending_updates)} folders={len(pending_folders)}"
                 )
                 # 1. DB Bulk Update
@@ -310,7 +312,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
 
                 # 3. Commit ALL at once (Atomic Transaction)
                 _commit_with_retry(conn, 'flush-pending')
-                time.sleep(0.05)  # 대시보드 측 DB 락 선점을 돕기 위해 미세 양보(micro-yield)
+                time.sleep(0.05)
 
                 # 4. Append to JSONL log
                 if pending_inserts or pending_updates:
@@ -325,7 +327,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                 pending_updates.clear()
                 pending_folders.clear()
                 print(
-                    f"[Scanner-DB] Flush success (attempt {attempt}/{max_attempts}) "
+                    f"[Scanner-DB] Flush success (attempt {attempt}/{max_attempts}, is_final={is_final}) "
                     f"remaining_ins={len(pending_inserts)} remaining_upd={len(pending_updates)} remaining_folders={len(pending_folders)}"
                 )
                 return True
@@ -335,9 +337,9 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                 except Exception:
                     pass
                 if _is_db_locked_error(e) and attempt < max_attempts:
-                    wait_sec = min(3.0, 0.2 * (2 ** (attempt - 1)))
+                    wait_sec = min(4.0, 0.25 * (2 ** (attempt - 1)))
                     print(
-                        f"[Scanner-DB] Flush locked (attempt {attempt}/{max_attempts}) "
+                        f"[Scanner-DB] Flush locked (attempt {attempt}/{max_attempts}, is_final={is_final}) "
                         f"ins={len(pending_inserts)} upd={len(pending_updates)} folders={len(pending_folders)} "
                         f"Retrying in {wait_sec:.2f}s..."
                     )
@@ -527,7 +529,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
             f"[Scanner-DB] Final flush begin db={db_type} library_id={library_id} "
             f"pending_ins={len(pending_inserts)} pending_upd={len(pending_updates)} pending_folders={len(pending_folders)}"
         )
-        if not flush_pending_data():
+        if not flush_pending_data(is_final=True):
             raise RuntimeError('Scanner final flush failed due to persistent DB contention.')
         print(f"[Scanner-DB] Final flush done db={db_type} library_id={library_id}")
         log_pool_stats('scan-final-flush')
@@ -552,6 +554,12 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
         if not end_gate_token:
             raise RuntimeError(f"scan-end-cleanup db write gate busy for db_type={db_type}")
         cursor.execute("DELETE FROM scanner_progress WHERE library_id = ?", (str(library_id),))
+        cursor.execute("""
+            UPDATE libraries 
+            SET scan_status = 'ready', 
+                last_scanned_at = datetime('now', 'localtime')
+            WHERE id = ?
+        """, (library_id,))
         _commit_with_retry(conn, 'scan-end-cleanup')
     finally:
         if end_gate_token:

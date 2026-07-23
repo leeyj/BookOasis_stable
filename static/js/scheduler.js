@@ -96,6 +96,9 @@ export async function refreshLibraryScheduleStatuses() {
         actionButton.dataset.lastScannedAt = lib.last_scanned_at || '-';
       }
     }
+    if (typeof window.loadLibraries === 'function') {
+      window.loadLibraries();
+    }
   } catch (e) {
     console.error('스케줄 상태 갱신 에러:', e);
   }

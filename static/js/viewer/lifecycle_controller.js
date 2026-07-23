@@ -236,3 +236,26 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false) {
     history.back();
   }
 }
+
+export function handleBookDeletedFallback(reason = '해당 도서(카테고리)가 서버에서 삭제되었습니다.') {
+  console.warn(`[Viewer-Fallback] 도서 삭제 감지 404: ${reason}`);
+  
+  // 1. 진행 중인 뷰어 닫기
+  try {
+    closeMediaViewer(false);
+  } catch (e) {}
+  
+  // 2. 사용자용 알림 표출
+  if (typeof window.showToast === 'function') {
+    window.showToast(`⚠️ ${reason} 목록 화면으로 이동합니다.`, 'error');
+  } else {
+    alert(`⚠️ ${reason}\n목록 화면으로 이동합니다.`);
+  }
+
+  // 3. 해시 정리 및 목록으로 안전 이동
+  if (window.location.hash === '#viewer') {
+    window.location.hash = '';
+  }
+}
+
+window.handleBookDeletedFallback = handleBookDeletedFallback;

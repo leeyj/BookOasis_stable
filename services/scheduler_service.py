@@ -600,7 +600,10 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
         end_str = end_time.strftime('%Y-%m-%d %H:%M:%S')
         
         from repositories.scheduler_repository import SchedulerRepository
-        SchedulerRepository.update_library_scan_success(db_type, library_id, end_str)
+        try:
+            SchedulerRepository.update_library_scan_success(db_type, library_id, end_str)
+        except Exception as repo_err:
+            print(f"[Scanner-Trigger WARNING] Secondary status update skipped (already committed atomically in engine): {repo_err}")
         
         msg = f"스캔 성공 완료 - DB={db_type}, LibraryID={library_id}, 소요시간={duration:.2f}초"
         print(f"[Scanner-Trigger] ✅ {msg}")

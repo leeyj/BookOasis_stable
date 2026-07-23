@@ -39,15 +39,15 @@ class ScannerQueueRepository:
                     except (OSError, ProcessLookupError, ValueError):
                         is_alive = False
 
-                # 프로세스가 OS에서 완전히 소멸된 경우에만 안전 정화
+                # 프로세스가 OS에서 완전히 소멸된 경우 pending 상태로 복구하여 자동 재개(Auto-Resume) 보장
                 if not is_alive:
                     cursor.execute(
                         """
                         UPDATE scanner_tasks 
-                        SET status = 'failed', finished_at = ?, error_message = 'Worker process terminated unexpectedly (PID dead)' 
+                        SET status = 'pending', stage = 'Worker restarted (Auto-Resumed)' 
                         WHERE id = ?
                         """,
-                        (now_str, row['id'])
+                        (row['id'],)
                     )
                     cleaned_count += cursor.rowcount
 
@@ -318,3 +318,89 @@ class ScannerQueueRepository:
             raise e
         finally:
             conn.close()
+
+    @staticmethod
+    def get_scan_history(limit=20):
+        """
+        레이지 스캔(lazy_scan)을 제외한 최근 스캔 이력 목록을 조회합니다.
+        카테고리명, 스캔 시작/종료 시각, 스캔 종류(수동/크론), 상태 등을 반환합니다.
+        """
+        import json
+        conn_gen = database.get_connection('general')
+        cursor_gen = conn_gen.cursor()
+        
+        # 카테고리 ID -> 카테고리명 맵 사전 구축 (general/adult 양쪽)
+        lib_names = {}
+        try:
+            cursor_gen.execute("SELECT id, name FROM libraries")
+            for r in cursor_gen.fetchall():
+                lib_names[f"general_{r['id']}"] = r['name']
+        except Exception:
+            pass
+
+        try:
+            conn_adult = database.get_connection('adult')
+            cursor_adult = conn_adult.cursor()
+            cursor_adult.execute("SELECT id, name FROM libraries")
+            for r in cursor_adult.fetchall():
+                lib_names[f"adult_{r['id']}"] = r['name']
+            conn_adult.close()
+        except Exception:
+            pass
+
+        try:
+            cursor_gen.execute(
+                """
+                SELECT id, task_type, task_key, status, kwargs, enqueue_at, started_at, finished_at, error_message
+                FROM scanner_tasks
+                WHERE task_type != 'lazy_scan'
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (limit,)
+            )
+            rows = cursor_gen.fetchall()
+            
+            history = []
+            for r in rows:
+                item = dict(r)
+                kwargs = {}
+                if item.get('kwargs'):
+                    try:
+                        kwargs = json.loads(item['kwargs'])
+                    except Exception:
+                        pass
+                
+                db_type = kwargs.get('db_type', 'general')
+                library_id = kwargs.get('library_id')
+                trigger_type = kwargs.get('trigger_type') or kwargs.get('trigger') or ('cron' if kwargs.get('is_cron') else None)
+                
+                if not trigger_type:
+                    if kwargs.get('is_cron') or 'cron' in item.get('task_key', ''):
+                        trigger_type = 'cron'
+                    else:
+                        trigger_type = 'manual'
+                
+                # 카테고리명 조인 매핑
+                lib_key = f"{db_type}_{library_id}"
+                library_name = lib_names.get(lib_key)
+                if not library_name:
+                    if item['task_type'] == 'cover_scan':
+                        library_name = f"표지 스캔 (DB: {db_type})"
+                    elif library_id:
+                        library_name = f"카테고리 #{library_id}"
+                    else:
+                        library_name = f"전체 스캔 ({db_type})"
+
+                item['db_type'] = db_type
+                item['library_id'] = library_id
+                item['library_name'] = library_name
+                item['trigger_type'] = trigger_type
+                history.append(item)
+
+            return history
+        except Exception as e:
+            print(f"[ScannerQueueRepository ERROR] get_scan_history failed: {e}")
+            return []
+        finally:
+            conn_gen.close()

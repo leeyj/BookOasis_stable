@@ -142,6 +142,10 @@ function emptyTrashAll() {
         return;
     }
     
+    if (typeof window.showGlobalLoadingSpinner === 'function') {
+        window.showGlobalLoadingSpinner(`휴지통 내의 모든 도서 및 표지 데이터를 영구 삭제 중입니다...\n잠시만 기다려 주세요.`);
+    }
+
     fetch('/api/admin/trash/empty', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -149,6 +153,9 @@ function emptyTrashAll() {
     })
     .then(res => res.json())
     .then(data => {
+        if (typeof window.hideGlobalLoadingSpinner === 'function') {
+            window.hideGlobalLoadingSpinner();
+        }
         if (data.success) {
             alert(data.message);
             loadTrashList();
@@ -156,7 +163,12 @@ function emptyTrashAll() {
             alert('휴지통 비우기 실패: ' + data.error);
         }
     })
-    .catch(err => alert('오류: ' + err.message));
+    .catch(err => {
+        if (typeof window.hideGlobalLoadingSpinner === 'function') {
+            window.hideGlobalLoadingSpinner();
+        }
+        alert('오류: ' + err.message);
+    });
 }
 
 function escapeHtml(text) {

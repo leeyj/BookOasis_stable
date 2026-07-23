@@ -74,13 +74,28 @@ class CategoryService:
                 if kwargs.get('db_type') == db_type and int(kwargs.get('library_id', 0)) == int(library_id):
                     raise ValueError("현재 카테고리에 대한 스캔 작업이 대기열에 존재합니다. 스캔 완료 또는 취소 후 다시 시도해 주세요.")
 
+        gate_token = None
         try:
-            from utils.report_helper import delete_all_reports
-            delete_all_reports(library_id)
-        except Exception as e:
-            print(f"[CategoryService ERROR] Bulk report file removal failed: {e}")
+            from utils.redis_helper import redis_acquire_lock
+            gate_token = redis_acquire_lock(f"lock:db_write:{db_type}", ttl=120, wait_timeout=10.0)
+        except Exception:
+            gate_token = None
 
-        CategoryRepository.delete_library(db_type, library_id)
+        try:
+            try:
+                from utils.report_helper import delete_all_reports
+                delete_all_reports(library_id)
+            except Exception as e:
+                print(f"[CategoryService ERROR] Bulk report file removal failed: {e}")
+
+            CategoryRepository.delete_library(db_type, library_id)
+        finally:
+            if gate_token:
+                try:
+                    from utils.redis_helper import redis_release_lock
+                    redis_release_lock(f"lock:db_write:{db_type}", gate_token)
+                except Exception:
+                    pass
 
         import threading
         t = threading.Thread(target=database.optimize_database, args=(db_type,))

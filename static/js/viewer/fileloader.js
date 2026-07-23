@@ -10,6 +10,12 @@ export async function fetchTotalPagesIfNeeded(bookId, currentTotal) {
   try {
     const libType = state.currentLibraryType || 'general';
     const res = await fetch(`/api/media/books/${bookId}/info?type=${libType}`);
+    if (res.status === 404) {
+      if (typeof window.handleBookDeletedFallback === 'function') {
+        window.handleBookDeletedFallback('해당 도서(카테고리)가 서버에서 삭제되었습니다.');
+      }
+      return 0;
+    }
     const data = await res.json();
     if (data && data.success && data.total_pages > 0) {
       return data.total_pages;

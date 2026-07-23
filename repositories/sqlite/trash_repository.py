@@ -86,19 +86,20 @@ class TrashRepository:
 
     @staticmethod
     def hard_delete_books_transaction(db_type, book_ids, target_covers):
-        """도서 정보 및 종속된 진척도, 활동로그, 오프셋 정보 일괄 물리 삭제 트랜잭션"""
+        """도서 정보 및 종속된 진척도, 활동로그, 오프셋 정보 일괄 물리 삭제 트랜잭션 (is_deleted=1 엄격 지정)"""
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
             placeholders = ','.join(['?'] * len(book_ids))
             
-            # 진척도 및 로그 하드 딜리트
-            cursor.execute(f"DELETE FROM user_progress WHERE book_id IN ({placeholders})", book_ids)
-            cursor.execute(f"DELETE FROM user_reading_log WHERE book_id IN ({placeholders})", book_ids)
-            cursor.execute(f"DELETE FROM book_offsets WHERE book_id IN ({placeholders})", book_ids)
-            cursor.execute(f"DELETE FROM books WHERE id IN ({placeholders})", book_ids)
+            # 1. 휴지통(is_deleted=1) 상태인 도서의 종속 데이터 및 책 레코드 물리 삭제
+            cursor.execute(f"DELETE FROM user_progress WHERE book_id IN (SELECT id FROM books WHERE id IN ({placeholders}) AND COALESCE(is_deleted, 0) = 1)", book_ids)
+            cursor.execute(f"DELETE FROM user_reading_log WHERE book_id IN (SELECT id FROM books WHERE id IN ({placeholders}) AND COALESCE(is_deleted, 0) = 1)", book_ids)
+            cursor.execute(f"DELETE FROM user_favorites WHERE book_id IN (SELECT id FROM books WHERE id IN ({placeholders}) AND COALESCE(is_deleted, 0) = 1)", book_ids)
+            cursor.execute(f"DELETE FROM book_offsets WHERE book_id IN (SELECT id FROM books WHERE id IN ({placeholders}) AND COALESCE(is_deleted, 0) = 1)", book_ids)
+            cursor.execute(f"DELETE FROM books WHERE id IN ({placeholders}) AND COALESCE(is_deleted, 0) = 1", book_ids)
             
-            # 커버 이미지 참조 여부를 필터링하여 지울 파일 목록만 추려 반환
+            # 2. 커버 이미지 참조 여부를 필터링하여 살아있는 도서(is_deleted=0)가 쓰지 않는 파일 목록만 추려 반환
             unreferenced_covers = []
             for cover_img in target_covers:
                 cursor.execute("SELECT COUNT(1) AS cnt FROM books WHERE cover_image = ?", (cover_img,))

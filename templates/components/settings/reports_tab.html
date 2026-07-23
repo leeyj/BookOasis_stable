@@ -1,9 +1,48 @@
-<!-- 4. 스캔 에러 리포트 탭 -->
-<div id="settings-tab-reports" class="settings-tab-content" style="display: none; flex-direction: column; gap: 1.5rem;">
+<!-- 4. 스캔 에러 리포트 & 스캔 히스토리 탭 -->
+<div id="settings-tab-reports" class="settings-tab-content" style="display: none; flex-direction: column; gap: 2rem;">
+    
+    <!-- 4-1. 최근 스캔 실행 히스토리 (최대 20건) -->
     <div class="dashboard-section">
+        <div class="section-header" style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.8rem;">
+            <div>
+                <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1.15rem; font-weight: 700;">
+                    <i class="fa-solid fa-clock-rotate-left" style="color: #a855f7; margin-right: 0.5rem;"></i> <span>최근 스캔 히스토리</span>
+                </h3>
+                <p style="font-size: 0.82rem; color: #94a3b8; margin: 0.3rem 0 0 0;">수동 실행 및 크론(Cron) 자동 스케줄로 구동된 최근 스캔 이력 (최대 20건)</p>
+            </div>
+            <button onclick="loadScanHistory()" class="btn-toggle" style="padding: 0.4rem 0.8rem; font-size: 0.8rem; border-radius: 6px; display: inline-flex; align-items: center; gap: 0.4rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; cursor: pointer;">
+                <i class="fa-solid fa-rotate-right"></i> 이력 새로고침
+            </button>
+        </div>
+
+        <div class="settings-table-wrapper" style="background: rgba(30, 41, 59, 0.25); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; overflow: hidden; backdrop-filter: blur(10px);">
+            <table class="settings-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+                <thead>
+                    <tr style="background: rgba(15, 23, 42, 0.4); border-bottom: 1px solid rgba(255,255,255,0.08); color: #94a3b8;">
+                        <th style="padding: 0.8rem 1rem; width: 22%;">카테고리명</th>
+                        <th style="padding: 0.8rem 1rem; width: 14%; text-align: center;">경과 시각</th>
+                        <th style="padding: 0.8rem 1rem; width: 22%; text-align: center;">시작 시간</th>
+                        <th style="padding: 0.8rem 1rem; width: 22%; text-align: center;">종료 시간</th>
+                        <th style="padding: 0.8rem 1rem; width: 10%; text-align: center;">종류</th>
+                        <th style="padding: 0.8rem 1rem; width: 10%; text-align: center;">상태</th>
+                    </tr>
+                </thead>
+                <tbody id="scan-history-table-body">
+                    <tr>
+                        <td colspan="6" style="padding: 2rem; text-align: center; color: #94a3b8;">
+                            <i class="fa-solid fa-circle-notch fa-spin" style="margin-right: 0.3rem; color: #a855f7;"></i> 최근 스캔 이력을 불러오는 중...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 4-2. 도서 스캔 에러 리포트 뷰어 -->
+    <div class="dashboard-section" style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1.5rem;">
         <div class="section-header" style="margin-bottom: 1.2rem; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 1rem;">
             <div>
-                <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1.2rem; font-weight: 700;">
+                <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1.15rem; font-weight: 700;">
                     <i class="fa-solid fa-triangle-exclamation" style="color: #ea580c; margin-right: 0.5rem;"></i> <span data-i18n="settings.report_title">도서 스캔 에러 리포트 뷰어</span>
                 </h3>
                 <p style="font-size: 0.82rem; color: #94a3b8; margin: 0.4rem 0 0 0;" data-i18n="settings.report_subtitle">스캔 작업 도중 발생한 손상 압축파일 및 표지 추출 오류 등 비정상 도서 내역을 카테고리별로 모니터링합니다.</p>

@@ -10,7 +10,7 @@ def _arm_forced_exit_after_grace(grace_seconds=25):
     def _watchdog():
         time.sleep(max(1, int(grace_seconds)))
         print(f"[Shutdown-Signal-Guard] Grace period expired after {grace_seconds}s. Forcing process exit.")
-        os._exit(0)
+        os._exit(143)
 
     t = threading.Thread(target=_watchdog, daemon=True)
     t.start()

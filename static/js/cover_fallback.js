@@ -112,8 +112,14 @@ export function buildFallbackCoverUrl({ title, format, seed } = {}) {
 }
 
 export function getBookCoverSrc({ coverImage, title, format, seed } = {}) {
-  if (coverImage) {
-    return `/covers/${coverImage}`;
+  if (coverImage && typeof coverImage === 'string') {
+    let clean = coverImage.trim().replace(/^[\/\\]+/, '');
+    if (clean.toLowerCase().startsWith('covers/')) {
+      clean = clean.substring(7).replace(/^[\/\\]+/, '');
+    }
+    if (clean) {
+      return `/covers/${clean}`;
+    }
   }
   return buildFallbackCoverUrl({ title, format, seed });
 }

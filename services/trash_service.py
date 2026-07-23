@@ -49,26 +49,42 @@ class TrashService:
             base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             covers_dir = os.path.join(base_dir, 'covers')
             
-            # 2. 관련 진척도 및 로그 데이터 하드 딜리트 트랜잭션 구동
-            for i in range(0, len(target_ids), 900):
-                chunk = target_ids[i:i+900]
-                
-                # 2.1. 삭제 대상 도서들의 커버 이미지 정보 사전 로드
-                cover_images = TrashRepository.fetch_book_covers(db_type, chunk)
-                target_covers = sorted(set(cover_images))
-                
-                # DB 및 종속 테이블 완전 삭제 수행 & 참조 없는 커버 리스트 리턴
-                unreferenced_covers = TrashRepository.hard_delete_books_transaction(db_type, chunk, target_covers)
-                
-                # 2.2. 로컬 정적 커버 파일 삭제
-                for cover_img in unreferenced_covers:
-                    cover_path = os.path.join(covers_dir, cover_img)
-                    if os.path.exists(cover_path) and os.path.isfile(cover_path):
+            gate_token = None
+            try:
+                from utils.redis_helper import redis_acquire_lock
+                gate_token = redis_acquire_lock(f"lock:db_write:{db_type}", ttl=120, wait_timeout=10.0)
+            except Exception:
+                gate_token = None
+
+            try:
+                # 2. 관련 진척도 및 로그 데이터 하드 딜리트 트랜잭션 구동
+                for i in range(0, len(target_ids), 900):
+                    chunk = target_ids[i:i+900]
+                    
+                    # 2.1. 삭제 대상 도서들의 커버 이미지 정보 사전 로드
+                    cover_images = TrashRepository.fetch_book_covers(db_type, chunk)
+                    target_covers = sorted(set(cover_images))
+                    
+                    # DB 및 종속 테이블 완전 삭제 수행 & 참조 없는 커버 리스트 리턴
+                    unreferenced_covers = TrashRepository.hard_delete_books_transaction(db_type, chunk, target_covers)
+                    
+                    # 2.2. 로컬 정적 커버 파일 삭제 (안전 방어막: 실물 파일 미존재/삭제 오류 시에도 DB 삭제 안전 완수)
+                    for cover_img in unreferenced_covers:
                         try:
-                            os.remove(cover_path)
-                            print(f"[TrashService] Physically deleted unreferenced cover: {cover_path}")
+                            clean_c = str(cover_img).replace('\\', '/').lstrip('/')
+                            cover_path = os.path.join(covers_dir, clean_c.replace('/', os.sep))
+                            if os.path.exists(cover_path) and os.path.isfile(cover_path):
+                                os.remove(cover_path)
+                                print(f"[TrashService] Physically deleted unreferenced cover: {cover_path}")
                         except Exception as ex_file:
-                            print(f"[TrashService WARNING] Failed to delete cover file '{cover_path}': {ex_file}")
+                            print(f"[TrashService WARNING] Ignored cover file removal error for '{cover_img}': {ex_file}")
+            finally:
+                if gate_token:
+                    try:
+                        from utils.redis_helper import redis_release_lock
+                        redis_release_lock(f"lock:db_write:{db_type}", gate_token)
+                    except Exception:
+                        pass
                  
             print(f"[TrashService] Successfully hard deleted {len(target_ids)} books from DB and storage.")
             return True

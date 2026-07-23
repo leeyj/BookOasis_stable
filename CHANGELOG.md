@@ -1,4 +1,13 @@
 # CHANGELOG
+## v1.3.6
+- 카테고리 내보내기/들이기 추가(tools/import_category,export_category.py) | Add category import/export function (tools/import_category,export_category.py)
+  * 상세 사용방법은 /docs/guide_category_migration.md 참조 | For detailed usage instructions, refer to /docs/guide_category_migration.md
+- 휴지통 비우기, 카테고리 대량 삭제시 작업 차단 로딩 모달 표시 | Add loading overlay when emptying trash or bulk deleting categories
+- 뷰어에서 삭제된 도서 404 감지시 안전 퇴장 처리 | Add safe exit processing when detecting deleted books in the viewer
+- 스캔완료시 완료 표시 안되는 현상 수정 | Fix scan completion not being displayed
+- 스캔건수가 0건 인경우 DB Flush 로 인한 경합 해소 | Fix DB flush contention when scan count is 0
+- 스캔 완료 후 웹훅/플러그인 호출 로직 비동기화 | Asynchronous webhook/plugin calling logic after scan completion
+
 ## v1.3.5
 - api/webhook에 인증예외 추가 | Add authentication exception to api/webhook
 - 도서상세리스트에 뒤로가기시 현재 위치 찾아가게 변경 | Fix back button position memory when navigating from Book Details to Dashboard

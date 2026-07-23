@@ -474,9 +474,16 @@ export async function triggerDeleteLibrary() {
   formData.append('type', state.currentLibraryType);
   formData.append('id', currentTargetLibrary.id);
 
+  if (typeof window.showGlobalLoadingSpinner === 'function') {
+    window.showGlobalLoadingSpinner(`'${currentTargetLibrary.name}' 카테고리와 관련 도서 데이터를 안전하게 삭제 중입니다...\n잠시만 기다려 주세요.`);
+  }
+
   try {
     const data = await api.deleteLibrary(formData);
     if (data.success) {
+      if (typeof window.hideGlobalLoadingSpinner === 'function') {
+        window.hideGlobalLoadingSpinner();
+      }
       alert(data.message);
       // 삭제 완료 후 즉각 사이드바 카테고리 목록 다시 렌더링
       await loadLibraries();
@@ -486,9 +493,15 @@ export async function triggerDeleteLibrary() {
         selectCategory('history');
       }
     } else {
+      if (typeof window.hideGlobalLoadingSpinner === 'function') {
+        window.hideGlobalLoadingSpinner();
+      }
       alert(i18n.t('category.delete_fail', {error: data.error}));
     }
   } catch (e) {
+    if (typeof window.hideGlobalLoadingSpinner === 'function') {
+      window.hideGlobalLoadingSpinner();
+    }
     console.error('삭제 API 호출 오류:', e);
     alert(i18n.t('category.server_error'));
   }

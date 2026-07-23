@@ -56,6 +56,23 @@ class BookScanRepository:
                     book_id
                 )
             )
+
+            # 도서의 library_id 및 최신 series_name 조회 후 series 테이블 커버 동기화
+            cursor.execute("SELECT library_id, series_name FROM books WHERE id = ?", (book_id,))
+            row = cursor.fetchone()
+            if row and row['series_name'] and cover_image:
+                lib_id = row['library_id']
+                s_name = row['series_name']
+                cursor.execute(
+                    """
+                    UPDATE series SET 
+                        cover_image = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN ? ELSE cover_image END,
+                        cover_updated_at = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN CURRENT_TIMESTAMP ELSE cover_updated_at END
+                    WHERE name = ? AND library_id = ?
+                    """,
+                    (cover_image, s_name, lib_id)
+                )
+
             conn.commit()
             return True
         except Exception as e:

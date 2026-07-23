@@ -551,3 +551,51 @@ window.rescanSeries = async (event, seriesName, libraryId) => {
     }
   }
 };
+
+// 전역 작업 차단 로딩 오버레이 헬퍼 (대량 삭제/긴 비동기 작업용)
+export function showGlobalLoadingSpinner(message = '처리 중입니다. 잠시만 기다려 주세요...') {
+  let overlay = document.getElementById('global-loading-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'global-loading-overlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      z-index: 99999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-family: inherit;
+      pointer-events: auto;
+    `;
+    overlay.innerHTML = `
+      <div style="background: rgba(30, 41, 59, 0.95); padding: 2rem 2.5rem; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); text-align: center; max-width: 90vw; width: 400px;">
+        <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 2.5rem; color: #a855f7; margin-bottom: 1.2rem;"></i>
+        <div id="global-loading-overlay-msg" style="font-size: 1rem; font-weight: 600; color: #f8fafc; line-height: 1.5; word-break: keep-all;">${message}</div>
+        <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 0.8rem;">작업이 진행되는 동안 잠시만 기다려 주세요</div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  } else {
+    const msgEl = document.getElementById('global-loading-overlay-msg');
+    if (msgEl) msgEl.innerText = message;
+    overlay.style.display = 'flex';
+  }
+}
+
+export function hideGlobalLoadingSpinner() {
+  const overlay = document.getElementById('global-loading-overlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+  }
+}
+
+window.showGlobalLoadingSpinner = showGlobalLoadingSpinner;
+window.hideGlobalLoadingSpinner = hideGlobalLoadingSpinner;
