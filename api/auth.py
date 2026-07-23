@@ -146,12 +146,13 @@ def check_authentication():
         '/change-password'
     ]
     
-    # static 폴더, health 체크, OPDS/cover 경로 예외
+    # static 폴더, health 체크, OPDS/cover, 웹훅 경로 예외
     if (request.path.startswith('/static/')
             or request.path == '/health'
             or request.path.startswith('/opds')
             or request.path.startswith('/app-opds')   # 타치요미 전용 엔드포인트 (자체 인증 처리)
-            or request.path.startswith('/covers')):
+            or request.path.startswith('/covers')
+            or request.path.startswith('/api/webhook/')):
         return
         
     # 예외 경로 검사

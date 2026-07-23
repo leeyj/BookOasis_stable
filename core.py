@@ -29,6 +29,14 @@ def start_scanner_worker_process():
     print(f"[Scanner-Process] Started daemon worker process (PID: {_worker_process.pid})")
 
 
+def ensure_scanner_worker_running():
+    """독립 스캐너 워커 프로세스가 실행 중인지 확인하고 필요 시 출발시킵니다."""
+    global _worker_process
+    if _worker_process is None or _worker_process.poll() is not None:
+        start_scanner_worker_process()
+
+
+
 if not IS_WORKER:
     from utils.logger import setup_rotating_logger
     setup_rotating_logger()

@@ -82,6 +82,13 @@ class ScannerQueue:
 
             self.log(f"Task '{task_key}' enqueued successfully (DB-backed).")
 
+            # 내장 워커 가동 상태 헬스체크 및 필요 시 자동 재기동
+            try:
+                from core import ensure_scanner_worker_running
+                ensure_scanner_worker_running()
+            except Exception as w_err:
+                pass
+
             # Redis List에 작업 키 푸시
             try:
                 from utils.redis_helper import redis_lpush
@@ -192,12 +199,30 @@ def run_scanner_worker_loop():
 
     from repositories.scanner_queue_repository import ScannerQueueRepository
 
+    # 부팅 시 이전 실행 중 고착(stale/hung)된 running/exit_pending 태스크 자동 정화 (OS 프로세스 생존 검사)
+    try:
+        cleaned_count = ScannerQueueRepository.cleanup_stale_tasks()
+        if cleaned_count > 0:
+            sq.log(f"Cleaned up {cleaned_count} stale/hung running tasks from queue.")
+    except Exception as c_err:
+        sq.log(f"Stale task cleanup warning: {c_err}")
+
+    last_stale_check = time.time()
     global stop_requested
 
     while True:
         if stop_requested:
             sq.log("Shutdown flag detected. Exiting scanner worker loop.")
             break
+
+        # 5분 간격 주기적 고착 작업 자동 정화 (OS 프로세스 소멸 검사)
+        now_ts = time.time()
+        if now_ts - last_stale_check > 300:
+            try:
+                ScannerQueueRepository.cleanup_stale_tasks()
+            except Exception:
+                pass
+            last_stale_check = now_ts
 
         try:
             # Redis가 사용 가능한 경우 BRPOP으로 작업 대기
@@ -206,7 +231,7 @@ def run_scanner_worker_loop():
                 from utils.redis_helper import redis_brpop
                 task_key_popped = redis_brpop("queue:scanner", timeout=3)
             except Exception as r_pop_err:
-                sq.log(f"Redis brpop polling error (falling back to DB check): {r_pop_err}")
+                pass
 
             task = None
             if task_key_popped:
@@ -227,6 +252,7 @@ def run_scanner_worker_loop():
             if stop_requested:
                 sq.log("Shutdown flag detected before task acquisition. Exiting scanner worker loop.")
                 break
+
                 
             task_id = task['id']
             task_type = task['task_type']

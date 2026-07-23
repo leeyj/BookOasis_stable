@@ -816,7 +816,6 @@ body.has-system-ticker .library-sidebar {
     -webkit-touch-callout: none;
     -webkit-user-select: none;
     user-select: none;
-    will-change: transform, box-shadow;
     content-visibility: auto;
     contain-intrinsic-size: 160px 280px;
 }
@@ -840,7 +839,6 @@ body.has-system-ticker .library-sidebar {
     height: 100%;
     object-fit: cover;
     transition: transform 0.5s ease;
-    will-change: transform;
 }
 
 .book-card:hover .book-card-cover img {

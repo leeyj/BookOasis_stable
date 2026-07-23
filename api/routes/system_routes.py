@@ -273,15 +273,37 @@ def trigger_scan_via_webhook():
     except (ValueError, TypeError):
         return jsonify({'success': False, 'error': 'Invalid library_id format.'}), 400
 
-    # 2. 보관함 존재 여부 및 카테고리명 조회
-    lib_name = get_library_name(db_type, lib_id_int)
-    if not lib_name:
+    # 2. 보관함 존재 여부, 경로 및 카테고리명 조회
+    physical_path = None
+    lib_name = None
+    try:
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute("SELECT physical_path, name FROM libraries WHERE id = ?", (lib_id_int,))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            physical_path = row['physical_path']
+            lib_name = row['name']
+    except Exception as db_err:
+        return jsonify({'success': False, 'error': f'Failed to query library info: {db_err}'}), 500
+
+    if not lib_name or not physical_path:
         return jsonify({'success': False, 'error': f'Library ID {library_id} not found in {db_type}.'}), 404
         
-    # 3. 백그라운드 스캔 대기열 주입
+    # 3. 백그라운드 스캔 대기열 주입 (스캐너 워커 필수 인자 포함)
     try:
+        db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
         from services.scanner_queue import scanner_queue
-        enqueued = scanner_queue.add_task('library_scan', db_type=db_type, library_id=lib_id_int, force_requeue=force_requeue)
+        enqueued = scanner_queue.enqueue(
+            'library_scan',
+            db_type=db_type,
+            db_path=db_path,
+            library_id=lib_id_int,
+            physical_path=physical_path,
+            force=force_requeue,
+            force_requeue=force_requeue
+        )
         
         if not enqueued:
             return jsonify({

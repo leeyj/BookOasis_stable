@@ -28,11 +28,13 @@ def get_redis_client():
         return None
 
     try:
-        # 단일 레디스 클라이언트 생성 (socket_timeout 및 connection_pool 튜닝)
+        # 단일 레디스 클라이언트 생성 (socket_timeout, socket_keepalive 및 connection_pool 튜닝)
         pool = redis.ConnectionPool.from_url(
             REDIS_URL, 
             socket_timeout=15.0, 
             socket_connect_timeout=2.0,
+            socket_keepalive=True,
+            health_check_interval=30,
             max_connections=20,
             decode_responses=True  # 문자열 자동 디코딩
         )
@@ -113,7 +115,7 @@ def redis_lpush(key: str, value: str) -> bool:
         logger.warning(f"[Redis] redis_lpush failed for key '{key}': {e}")
         return False
 
-def redis_brpop(key: str, timeout: int = 5) -> str:
+def redis_brpop(key: str, timeout: int = 3) -> str:
     """Redis List의 오른쪽에서 값을 블로킹으로 꺼내옵니다. (Timeout 단위: 초)"""
     global _client
     client = get_redis_client()
@@ -125,8 +127,8 @@ def redis_brpop(key: str, timeout: int = 5) -> str:
             # brpop은 (key, value) 튜플을 반환하므로 값만 꺼냅니다.
             return res[1]
         return None
-    except Exception as e:
-        logger.warning(f"[Redis] redis_brpop failed for key '{key}': {e}. Resetting Redis client reference for auto-reconnect.")
+    except (redis.ConnectionError, redis.TimeoutError, OSError, Exception) as e:
+        logger.warning(f"[Redis] redis_brpop failed for key '{key}': {e}. Resetting Redis client for auto-reconnect.")
         _client = None
         return None
 

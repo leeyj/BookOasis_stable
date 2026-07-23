@@ -449,6 +449,7 @@ def init_databases():
         status TEXT NOT NULL DEFAULT 'pending',
         kwargs TEXT,
         stage TEXT,
+        worker_pid INTEGER DEFAULT NULL,
         enqueue_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         started_at DATETIME DEFAULT NULL,
         finished_at DATETIME DEFAULT NULL,

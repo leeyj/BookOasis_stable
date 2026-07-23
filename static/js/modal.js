@@ -14,18 +14,23 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
   // 전달된 libraryId가 없으면 현재 상태값을 사용하되, 대시보드 시스템성 값이면 'all'로 대체 처리
   const activeLibId = libraryId || state.currentLibraryId || 'all';
 
-  // 현재 화면의 스크롤 위치 저장 (실제 스크롤 주체인 .library-main-content 캡처)
-  state.scrollPositions = state.scrollPositions || {};
-  const mainContent = document.querySelector('.library-main-content');
-  const currentScrollY = (mainContent && mainContent.scrollTop > 0)
-    ? mainContent.scrollTop
-    : (window.pageYOffset || document.documentElement.scrollTop || 0);
+  // 현재 화면의 스크롤 위치 저장 (목록/대시보드에서 상세 뷰로 최초 진입하는 경우에만 저장)
+  const isAlreadyOpen = detailView && detailView.style.display !== 'none';
+  if (!isAlreadyOpen) {
+    state.scrollPositions = state.scrollPositions || {};
+    const mainContent = document.querySelector('.library-main-content');
+    const currentScrollY = (mainContent && mainContent.scrollTop > 0)
+      ? mainContent.scrollTop
+      : (window.pageYOffset || document.documentElement.scrollTop || 0);
 
-  state.scrollPositions['last_pos'] = currentScrollY;
-  state.scrollPositions[state.currentLibraryId] = currentScrollY;
-  state.scrollPositions[activeLibId] = currentScrollY;
+    state.scrollPositions['last_pos'] = currentScrollY;
+    state.scrollPositions[state.currentLibraryId] = currentScrollY;
+    state.scrollPositions[activeLibId] = currentScrollY;
 
-  console.log(`[Scroll-Debug] SAVED scroll position: ${currentScrollY}px (Current lib: ${state.currentLibraryId}, Active lib: ${activeLibId})`);
+    console.log(`[Scroll-Debug] SAVED scroll position: ${currentScrollY}px (Current lib: ${state.currentLibraryId}, Active lib: ${activeLibId})`);
+  } else {
+    console.log(`[Scroll-Debug] PRESERVED existing scroll position: ${state.scrollPositions ? state.scrollPositions['last_pos'] : 0}px (Detail view already open)`);
+  }
 
 
   // 로딩 표시
@@ -142,7 +147,9 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
         history.replaceState({ view: 'detail', series: safeSeriesName, libraryId: actualLibraryId, repBookId: repIdForHistory || null, displayTitle: displayTitleForHistory || null }, '', detailHash);
       }
 
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (!isAlreadyOpen) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     } else {
       detailView.innerHTML = `
         <button class="btn-back-to-list" onclick="goBackToList()">

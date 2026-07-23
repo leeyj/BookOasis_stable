@@ -1,4 +1,9 @@
 # CHANGELOG
+## v1.3.5
+- api/webhook에 인증예외 추가 | Add authentication exception to api/webhook
+- 도서상세리스트에 뒤로가기시 현재 위치 찾아가게 변경 | Fix back button position memory when navigating from Book Details to Dashboard
+- iOS(사파리) 에서 뷰어 버벅임 현상 해소 | Fix viewer stuttering issue in iOS (Safari)
+- 스캔워커와 Redis간 통신 절단시 재연결 로직 추가 | Add reconnect logic when communication between scan worker and Redis is cut off
 ## v1.3.4
 - 동적 SVG 커버 API Nginx 프록시 우치 라우팅 설정 보완 & 프론트엔드 onerror 2차 Fallback inline SVG 적용 (구형 펼쳐진 책 사진 이미지 완전 노출 차단) | Fix Nginx fallback cover route bypass & frontend fallback to inline SVG data URI
 - EPUB/TXT 뷰어 레이아웃 최적화 (스크롤 모드 본문 850px 중앙 정렬 제한 & 2장 보기 모드 1600px 시원한 펼침 지원) | Optimize EPUB/TXT viewer layout (Limit scroll mode width to 850px & Expand 2-page view width to 1600px)

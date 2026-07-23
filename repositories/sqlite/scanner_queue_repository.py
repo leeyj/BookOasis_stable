@@ -2,9 +2,67 @@
 """
 scanner_queue_repository.py – 백그라운드 스캐너 작업 대기열(scanner_tasks) 삽입, 처리, 갱신 트랜잭션 전담 데이터 액세스 레이어
 """
+import datetime
 import database
 
 class ScannerQueueRepository:
+    @staticmethod
+    def cleanup_stale_tasks(timeout_seconds=None):
+        """
+        시간 기반 타임아웃이 아닌, OS 상에서 실제 워커 프로세스(worker_pid)의 생존 여부(Process Alive Check)를
+        직접 검사하여 프로세스가 이미 소멸한 유령(Orphan/Stale) 태스크만 안전하게 정화합니다.
+        프로세스가 살아서 작동 중인 경우 스캔 시간이 수 시간 이상 걸려도 절대로 취소하지 않습니다.
+        """
+        import os
+        conn = database.get_connection('general')
+        cursor = conn.cursor()
+        try:
+            now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            cursor.execute("SELECT id, worker_pid FROM scanner_tasks WHERE status IN ('running', 'exit_pending')")
+            rows = cursor.fetchall()
+            cleaned_count = 0
+            
+            for row in rows:
+                pid = row['worker_pid']
+                # PID 정보가 없는 과거 레코드는 생킵
+                if not pid:
+                    continue
+
+                is_alive = False
+                try:
+                    import psutil
+                    is_alive = psutil.pid_exists(pid)
+                except ImportError:
+                    try:
+                        os.kill(pid, 0)
+                        is_alive = True
+                    except (OSError, ProcessLookupError, ValueError):
+                        is_alive = False
+
+                # 프로세스가 OS에서 완전히 소멸된 경우에만 안전 정화
+                if not is_alive:
+                    cursor.execute(
+                        """
+                        UPDATE scanner_tasks 
+                        SET status = 'failed', finished_at = ?, error_message = 'Worker process terminated unexpectedly (PID dead)' 
+                        WHERE id = ?
+                        """,
+                        (now_str, row['id'])
+                    )
+                    cleaned_count += cursor.rowcount
+
+            conn.commit()
+            return cleaned_count
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+
+
+
+
     @staticmethod
     def get_task_by_key(task_key):
         """특정 작업 키에 대응하는 태스크 정보 조회 (동일 키 중 최신 행 우선 반환)"""
@@ -218,13 +276,15 @@ class ScannerQueueRepository:
 
     @staticmethod
     def try_acquire_task(task_id, now_str):
-        """경합 선점을 극복하여 태스크를 running 상태로 원자적 갱신 시도"""
+        """경합 선점을 극복하여 태스크를 running 상태로 원자적 갱신 시도 (워커 PID 함께 기록)"""
+        import os
         conn = database.get_connection('general')
         cursor = conn.cursor()
         try:
+            worker_pid = os.getpid()
             cursor.execute(
-                "UPDATE scanner_tasks SET status = 'running', started_at = ? WHERE id = ? AND status IN ('pending', 'exit_pending')",
-                (now_str, task_id)
+                "UPDATE scanner_tasks SET status = 'running', started_at = ?, worker_pid = ? WHERE id = ? AND status IN ('pending', 'exit_pending')",
+                (now_str, worker_pid, task_id)
             )
             success = cursor.rowcount > 0
             conn.commit()
