@@ -21,11 +21,11 @@ if __name__ == '__main__':
     except Exception as env_err:
         print(f"[Scanner-Worker] .env 로드 실패: {env_err}")
 
-    # ─── 종료 시그널 핸들러 등록 ───
+    # ─── 유령 태스크 및 고착 스캔 상태 부팅 시점 자동 정화 ───
     try:
-        from utils.signal_helper import register_shutdown_handlers
-        register_shutdown_handlers()
-    except Exception as sig_err:
-        print(f"[Scanner-Worker] 시그널 핸들러 등록 실패: {sig_err}")
+        from repositories.sqlite.scanner_queue_repository import ScannerQueueRepository
+        ScannerQueueRepository.startup_cleanup_ghost_tasks()
+    except Exception as clean_err:
+        print(f"[Scanner-Worker] 부팅 시점 유령 태스크 정화 실패: {clean_err}")
 
     run_scanner_worker_loop()

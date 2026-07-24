@@ -93,13 +93,7 @@ def step1_wal_checkpoint(db_path, label):
         log(f"결과: busy={ckpt[0]}, log={ckpt[1]}, checkpointed={ckpt[2]}")
         conn.close()
 
-        # WAL/SHM 파일이 남아있으면 강제 제거
-        for extra in [wal_path, shm_path]:
-            if os.path.exists(extra):
-                os.remove(extra)
-                log(f"임시 파일 제거: {os.path.basename(extra)}")
-
-        log(f"✅ [{label}] WAL 체크포인트 완료 — 데이터 손실 없음")
+        log(f"✅ [{label}] WAL 체크포인트 마감 완료 — 데이터 손실 없음")
         return True
 
     except sqlite3.DatabaseError as e:

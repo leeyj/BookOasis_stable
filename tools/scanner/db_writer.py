@@ -124,6 +124,8 @@ def bulk_update_books(cursor, update_data_list, force=False):
     if force:
         cursor.executemany("""
             UPDATE books SET 
+                is_deleted   = 0,
+                library_id   = CASE WHEN ? IS NOT NULL AND ? > 0 THEN ? ELSE library_id END,
                 series_name  = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE series_name END,
                 cover_image  = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), cover_image) ELSE cover_image END,
                 cover_updated_at = CASE WHEN COALESCE(metadata_locked, 0) = 0 AND ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
@@ -140,12 +142,14 @@ def bulk_update_books(cursor, update_data_list, force=False):
                 file_size    = ?
             WHERE file_path = ?
         """, [
-            # series_name 3회 (CASE WHEN ? IS NOT NULL AND ? != '' THEN ? )
-            (row[0], row[0], row[0], *row[1:]) for row in update_data_list
+            # library_id 3회 + series_name 3회
+            (row[0], row[0], row[0], row[1], row[1], row[1], *row[2:]) for row in update_data_list
         ])
     else:
         cursor.executemany("""
             UPDATE books SET 
+                is_deleted   = 0,
+                library_id   = CASE WHEN ? IS NOT NULL AND ? > 0 THEN ? ELSE library_id END,
                 series_name  = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE series_name END,
                 cover_image  = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), cover_image) ELSE cover_image END,
                 cover_updated_at = CASE WHEN COALESCE(metadata_locked, 0) = 0 AND ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
@@ -162,16 +166,24 @@ def bulk_update_books(cursor, update_data_list, force=False):
                 file_size    = ?
             WHERE file_path = ?
         """, [
-            (row[0], row[0], row[0], *row[1:]) for row in update_data_list
+            (row[0], row[0], row[0], row[1], row[1], row[1], *row[2:]) for row in update_data_list
         ])
 
 def bulk_insert_books(cursor, insert_data_list):
-    """Bulk insert new books"""
+    """Bulk insert or upsert new books when file_path conflicts"""
     if not insert_data_list: return
     cursor.executemany("""
-        INSERT OR IGNORE INTO books 
-        (library_id, title, series_name, author, isbn, file_path, file_format, total_pages, cover_image, publisher, link, score, summary, release_date, genre, tags, file_mtime, file_size) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO books 
+        (library_id, title, series_name, author, isbn, file_path, file_format, total_pages, cover_image, publisher, link, score, summary, release_date, genre, tags, file_mtime, file_size, is_deleted) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+        ON CONFLICT(file_path) DO UPDATE SET
+            library_id   = EXCLUDED.library_id,
+            is_deleted   = 0,
+            title        = EXCLUDED.title,
+            series_name  = EXCLUDED.series_name,
+            cover_image  = CASE WHEN COALESCE(books.metadata_locked, 0) = 0 THEN COALESCE(NULLIF(EXCLUDED.cover_image, ''), books.cover_image) ELSE books.cover_image END,
+            file_mtime   = EXCLUDED.file_mtime,
+            file_size    = EXCLUDED.file_size
     """, insert_data_list)
 
 def bulk_save_book_offsets(cursor, offsets_data_list):

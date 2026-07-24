@@ -107,6 +107,19 @@ export async function scanSingleBook(type, bookId) {
   return res.json();
 }
 
+export async function unlockMetadata(type, seriesName, libraryId, bookId) {
+  const formData = new FormData();
+  formData.append('type', type || 'general');
+  if (seriesName) formData.append('series_name', seriesName);
+  if (libraryId) formData.append('library_id', libraryId);
+  if (bookId) formData.append('book_id', bookId);
+  const res = await fetch('/api/media/unlock-metadata', {
+    method: 'POST',
+    body: formData
+  });
+  return res.json();
+}
+
 export async function markBookAsUnread(type, bookId) {
   const res = await fetch('/api/media/unread', {
     method: 'POST',

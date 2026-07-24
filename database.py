@@ -28,10 +28,17 @@ class PooledConnection(sqlite3.Connection):
                     # sqlite3 기본 close()처럼 미완료 트랜잭션을 정리해
                     # 재사용 커넥션이 오래된 읽기 스냅샷을 유지하지 않도록 합니다.
                     self.rollback()
-                except sqlite3.ProgrammingError:
-                    pass
-                except sqlite3.OperationalError:
-                    pass
+                except (sqlite3.OperationalError, sqlite3.DatabaseError) as err:
+                    # OperationalError/DatabaseError 가 터진 커넥션은 오염된 커넥션이므로 풀로 돌려보내지 않고 즉시 폐기
+                    self._is_returned = True
+                    try:
+                        super().close()
+                    except Exception:
+                        pass
+                    if hasattr(self, '_pool') and self._pool:
+                        with self._pool.lock:
+                            self._pool.allocated = max(0, self._pool.allocated - 1)
+                    return
                 self._is_returned = True
                 self._pool.release_connection(self)
         else:
@@ -51,22 +58,33 @@ class SQLiteConnectionPool:
 
     def get_connection(self, wait_timeout=30.0):
         # 1. 풀에 유휴 커넥션이 있는지 확인
-        try:
-            conn = self.pool.get_nowait()
-            conn._is_returned = False
-            return conn
-        except queue.Empty:
-            pass
+        while True:
+            try:
+                conn = self.pool.get_nowait()
+                conn._is_returned = False
+                # 풀에서 꺼낸 커넥션이 썩었는지(Stale/malformed/disk I/O) 즉시 핑 검사
+                try:
+                    conn.execute("SELECT 1;")
+                    return conn
+                except (sqlite3.OperationalError, sqlite3.DatabaseError) as test_err:
+                    # 무효화되거나 손상된 썩은 커넥션은 즉시 풀에서 폐기
+                    try:
+                        conn.force_close()
+                    except Exception:
+                        pass
+                    with self.lock:
+                        self.allocated = max(0, self.allocated - 1)
+            except queue.Empty:
+                break
 
         # 2. 최대 크기 미만인 경우 새로 연결 생성
         with self.lock:
             if self.allocated < self.max_size:
                 conn = sqlite3.connect(self.db_path, timeout=30.0, factory=PooledConnection, check_same_thread=False)
                 try:
-                    conn.execute("PRAGMA journal_mode=WAL;")
+                    conn.execute(f"PRAGMA busy_timeout = {max(1000, SQLITE_BUSY_TIMEOUT_MS)};")
                     conn.execute("PRAGMA synchronous = NORMAL;")
                     conn.execute("PRAGMA foreign_keys = ON;")
-                    conn.execute(f"PRAGMA busy_timeout = {max(1000, SQLITE_BUSY_TIMEOUT_MS)};")
                 except sqlite3.OperationalError:
                     pass
                 conn.row_factory = sqlite3.Row
@@ -383,43 +401,17 @@ def startup_db_sanity_check():
             integrity_ok = (len(result) == 1 and result[0][0] == 'ok')
 
             if integrity_ok:
-                # WAL 체크포인트 수행 후 임시 파일 정리
+                # WAL 체크포인트 수행 (SQLite C-Engine이 스스로 마감하도록 맡김)
                 conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
                 conn.close()
-                for extra in [wal_path, shm_path]:
-                    if os.path.exists(extra):
-                        try:
-                            os.remove(extra)
-                            print(f"[DB-Sanity] {db_type} DB — {os.path.basename(extra)} 정리 완료")
-                        except Exception as rm_err:
-                            print(f"[DB-Sanity] {db_type} DB — {os.path.basename(extra)} 제거 실패: {rm_err}")
-                print(f"[DB-Sanity] {db_type} DB — 무결성 정상, WAL 체크포인트 완료")
+                print(f"[DB-Sanity] {db_type} DB — 무결성 정상, WAL 체크포인트 마감 완료")
             else:
-                # integrity_check 실패 → WAL/SHM만 제거 시도 (메인 DB는 보존)
                 conn.close()
                 print(f"[DB-Sanity] {db_type} DB — 무결성 이상 감지: {result[:3]}")
-                print(f"[DB-Sanity] {db_type} DB — 손상된 WAL/SHM 파일 제거 시도...")
-                for extra in [wal_path, shm_path]:
-                    if os.path.exists(extra):
-                        try:
-                            os.remove(extra)
-                            print(f"[DB-Sanity] {db_type} DB — {os.path.basename(extra)} 제거 완료")
-                        except Exception as rm_err:
-                            print(f"[DB-Sanity] {db_type} DB — {os.path.basename(extra)} 제거 실패: {rm_err}")
-                print(f"[DB-Sanity] {db_type} DB — WAL/SHM 제거 후 서버 기동을 계속합니다.")
                 print(f"[DB-Sanity] 지속적인 오류 발생 시 tools/db_recovery.py 를 실행하세요.")
 
         except sqlite3.DatabaseError as e:
-            # 메인 DB 파일 자체가 열리지 않는 경우
             print(f"[DB-Sanity] {db_type} DB — DB 접속 실패: {e}")
-            print(f"[DB-Sanity] {db_type} DB — WAL/SHM 강제 제거 시도...")
-            for extra in [wal_path, shm_path]:
-                if os.path.exists(extra):
-                    try:
-                        os.remove(extra)
-                        print(f"[DB-Sanity] {db_type} DB — {os.path.basename(extra)} 제거 완료")
-                    except Exception as rm_err:
-                        print(f"[DB-Sanity] {db_type} DB — {os.path.basename(extra)} 제거 실패: {rm_err}")
         except Exception as e:
             print(f"[DB-Sanity] {db_type} DB — 예기치 못한 오류 (무시하고 계속): {e}")
 
@@ -543,6 +535,33 @@ def init_databases():
         folder_path TEXT PRIMARY KEY,
         dir_mtime REAL,
         meta_mtime REAL
+    );
+
+    CREATE TABLE IF NOT EXISTS scan_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_type TEXT NOT NULL,
+        task_key TEXT,
+        status TEXT NOT NULL,
+        kwargs TEXT,
+        enqueue_at TEXT,
+        started_at TEXT,
+        finished_at TEXT,
+        error_message TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS scanner_tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_type TEXT NOT NULL,
+        task_key TEXT,
+        status TEXT NOT NULL DEFAULT 'pending',
+        kwargs TEXT,
+        enqueue_at TEXT,
+        started_at TEXT,
+        finished_at TEXT,
+        stage TEXT,
+        worker_pid INTEGER,
+        error_message TEXT
     );
 
     CREATE TABLE IF NOT EXISTS users (
@@ -740,21 +759,13 @@ def init_databases():
         except Exception as migration_err:
             print(f"[DB-Migration ERROR] libraries is_remote auto-detection fallback failed: {migration_err}")
 
-        # 서버 재시작 시 고착된(Stuck) 스캔 상태 초기화 및 자동 복원(Auto-Resume) 연계 방어코드
+        # 서버 재시작 시 중단된 스캔 카테고리를 interrupted로 전환하고 태스크를 pending으로 복원 (Auto-Resume 보장)
         try:
-            # 1. 취소 중이던 상태는 복원하지 않고 ready로 초기화하여 재스캔 구동 보장
             cursor.execute("UPDATE libraries SET scan_status = 'ready' WHERE scan_status = 'cancelling'")
-            # 2. 스캔 중이던 상태는 interrupted로 보정하여 scheduler가 기동 시 Auto-Resume(자동 재스캔)을 구동하게 함
             cursor.execute("UPDATE libraries SET scan_status = 'interrupted' WHERE scan_status = 'scanning'")
-            # 3. 큐 태스크 중 running 및 exit_pending 상태는 모두 pending으로 복구하여 재기동 시 자동 재개(Auto-Resume)되도록 함
-            cursor.execute("""
-                UPDATE scanner_tasks
-                SET status = 'pending',
-                    stage = 'Interrupted by server restart (Auto-Resumed)'
-                WHERE status IN ('running', 'exit_pending')
-            """)
+            cursor.execute("UPDATE scanner_tasks SET status = 'pending', stage = '재시작 후 자동 이어서 수행' WHERE status IN ('running', 'exit_pending')")
             conn.commit()
-            print("[DB-Migration] Stuck scan states cleaned up. Pending queue and Auto-Resume chain preserved.")
+            print("[DB-Migration] 🔄 Interrupted scan status preserved for Auto-Resume on startup.")
         except Exception as reset_err:
             print(f"[DB-Migration ERROR] Scan status reset failed: {reset_err}")
 

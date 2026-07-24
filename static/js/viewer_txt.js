@@ -234,19 +234,23 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
 
       let startIdx = initialPageIdx;
 
-      // Cross-device EPUB resume: prefer server pointer when available.
+      // Cross-device resume: prefer server pointer / pages_read when available for both TXT and EPUB
       let serverEpubSession = null;
-      if (isEpub) {
-        try {
-          const stateRes = await fetch(`/api/media/progress-state?db_type=${state.currentLibraryType}&book_id=${bookId}`);
-          if (stateRes.ok) {
-            const stateData = await stateRes.json();
-            if (stateData && stateData.success && stateData.state && stateData.state.epub_session) {
+      let serverPagesRead = 0;
+      try {
+        const stateRes = await fetch(`/api/media/progress-state?db_type=${state.currentLibraryType}&book_id=${bookId}`);
+        if (stateRes.ok) {
+          const stateData = await stateRes.json();
+          if (stateData && stateData.success && stateData.state) {
+            if (stateData.state.epub_session) {
               serverEpubSession = stateData.state.epub_session;
             }
+            if (typeof stateData.state.pages_read === 'number' && stateData.state.pages_read > 0) {
+              serverPagesRead = stateData.state.pages_read;
+            }
           }
-        } catch (_) {}
-      }
+        }
+      } catch (_) {}
 
       const savedPosStr = localStorage.getItem(`viewer_last_pos_${bookId}`);
       if (savedPosStr) {
@@ -257,6 +261,11 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
             console.log(`[Viewer-Txt] 로컬 저장소에서 챕터 인덱스 감지: ${startIdx}`);
           }
         } catch(e) {}
+      }
+
+      if (serverPagesRead > 0) {
+        startIdx = Math.max(0, serverPagesRead - 1);
+        console.log(`[Viewer-Txt] Server progress-state fetched: chunk ${startIdx + 1}`);
       }
 
       if (isEpub && serverEpubSession) {

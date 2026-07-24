@@ -111,7 +111,7 @@ class ScannerQueue:
         import time
         now = time.time()
         if hasattr(self, '_cached_status') and hasattr(self, '_cached_status_time'):
-            if now - self._cached_status_time < 2.0:
+            if now - self._cached_status_time < 0.5:
                 return self._cached_status
 
         status = {
@@ -271,7 +271,7 @@ def run_scanner_worker_loop():
                 sq.log(f"Task acquire skipped: key={task_key}, id={task_id}, reason=already acquired by another worker")
                 continue
                 
-            sq.log(f"Task started: key={task_key}, type={task_type}, id={task_id}")
+            sq.log(f"🚀 [Worker-Acquire] Task STARTED: key={task_key}, type={task_type}, id={task_id}, kwargs={kwargs}")
             
             # 3. 작업 유형별 실행 분기
             error_message = None

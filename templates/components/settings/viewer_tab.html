@@ -10,12 +10,13 @@
         <div style="background: rgba(30, 41, 59, 0.25); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 1.5rem; backdrop-filter: blur(10px); color: #cbd5e1;">
             <form id="settings-viewer-form" onsubmit="submitViewerSettings(event)" style="display: flex; flex-direction: column; gap: 1.5rem;">
 
-                <div style="display: flex; gap: 2.5rem; flex-wrap: wrap; justify-content: center;">
+                <!-- 좌우 2-컬럼 그리드 레이아웃 -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
                     
-                    <!-- 소설/텍스트 뷰어 여백 설정 -->
-                    <div style="flex: 1; max-width: 480px; display: flex; flex-direction: column; gap: 1.2rem;">
-                        <h4 style="color: #c084fc; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.5rem; margin: 0 0 0.5rem 0; font-size: 0.98rem; font-weight: 700;">
-                            <i class="fa-solid fa-file-lines" style="margin-right: 0.4rem;"></i> <span data-i18n="settings.viewer_novel_section">소설/텍스트 뷰어 여백 (EPUB, TXT)</span>
+                    <!-- [왼쪽 파트] 소설/텍스트 뷰어 여백 설정 -->
+                    <div style="background: rgba(15, 23, 42, 0.35); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px; padding: 1.25rem; display: flex; flex-direction: column; gap: 1.2rem;">
+                        <h4 style="color: #c084fc; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.5rem; margin: 0; font-size: 0.98rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
+                            <i class="fa-solid fa-sliders" style="color: #c084fc;"></i> <span data-i18n="settings.viewer_novel_section">소설/텍스트 뷰어 여백 (EPUB, TXT)</span>
                         </h4>
                         
                         <!-- 1. 소설 상단 여백 -->
@@ -23,7 +24,7 @@
                             <label for="setting-viewer-padding-top" style="font-weight: 700; color: #fff; font-size: 0.88rem; margin-bottom: 0.4rem; display: block;">
                                 <i class="fa-solid fa-arrows-up-to-line" style="color: #a855f7; margin-right: 0.3rem;"></i> <span data-i18n="settings.padding_top_label">상단 여백 (Padding Top)</span>: <span id="setting-viewer-padding-top-val" style="color: #c084fc;">40</span>px
                             </label>
-                            <input type="range" id="setting-viewer-padding-top" min="0" max="200" step="5" value="40" style="width: 100%; max-width: 480px; box-sizing: border-box; cursor: pointer; accent-color: #a855f7;" oninput="document.getElementById('setting-viewer-padding-top-val').innerText = this.value">
+                            <input type="range" id="setting-viewer-padding-top" min="0" max="200" step="5" value="40" style="width: 100%; box-sizing: border-box; cursor: pointer; accent-color: #a855f7;" oninput="document.getElementById('setting-viewer-padding-top-val').innerText = this.value">
                             <p style="font-size: 0.76rem; color: #94a3b8; margin: 0.3rem 0 0 0;" data-i18n="settings.padding_top_desc">뷰어 상단 영역의 내부 여백 크기입니다. 노치나 카메라 홀 침범을 피할 때 사용합니다.</p>
                         </div>
  
@@ -32,7 +33,7 @@
                             <label for="setting-viewer-padding-bottom" style="font-weight: 700; color: #fff; font-size: 0.88rem; margin-bottom: 0.4rem; display: block;">
                                 <i class="fa-solid fa-arrows-down-to-line" style="color: #a855f7; margin-right: 0.3rem;"></i> <span data-i18n="settings.padding_bottom_label">하단 여백 (Padding Bottom)</span>: <span id="setting-viewer-padding-bottom-val" style="color: #c084fc;">60</span>px
                             </label>
-                            <input type="range" id="setting-viewer-padding-bottom" min="0" max="200" step="5" value="60" style="width: 100%; max-width: 480px; box-sizing: border-box; cursor: pointer; accent-color: #a855f7;" oninput="document.getElementById('setting-viewer-padding-bottom-val').innerText = this.value">
+                            <input type="range" id="setting-viewer-padding-bottom" min="0" max="200" step="5" value="60" style="width: 100%; box-sizing: border-box; cursor: pointer; accent-color: #a855f7;" oninput="document.getElementById('setting-viewer-padding-bottom-val').innerText = this.value">
                             <p style="font-size: 0.76rem; color: #94a3b8; margin: 0.3rem 0 0 0;" data-i18n="settings.padding_bottom_desc">뷰어 하단 영역의 내부 여백 크기입니다. 모바일 기기의 소프트홈바/네비게이션바 오버랩을 막는 데 매우 유용합니다.</p>
                         </div>
  
@@ -41,7 +42,7 @@
                             <label for="setting-viewer-padding-left" style="font-weight: 700; color: #fff; font-size: 0.88rem; margin-bottom: 0.4rem; display: block;">
                                 <i class="fa-solid fa-arrows-left-right" style="color: #a855f7; margin-right: 0.3rem;"></i> <span data-i18n="settings.padding_left_label">좌측 여백 (Padding Left)</span>: <span id="setting-viewer-padding-left-val" style="color: #c084fc;">20</span>px
                             </label>
-                            <input type="range" id="setting-viewer-padding-left" min="0" max="200" step="5" value="20" style="width: 100%; max-width: 480px; box-sizing: border-box; cursor: pointer; accent-color: #a855f7;" oninput="document.getElementById('setting-viewer-padding-left-val').innerText = this.value">
+                            <input type="range" id="setting-viewer-padding-left" min="0" max="200" step="5" value="20" style="width: 100%; box-sizing: border-box; cursor: pointer; accent-color: #a855f7;" oninput="document.getElementById('setting-viewer-padding-left-val').innerText = this.value">
                         </div>
  
                         <!-- 4. 소설 우측 여백 -->
@@ -49,15 +50,52 @@
                             <label for="setting-viewer-padding-right" style="font-weight: 700; color: #fff; font-size: 0.88rem; margin-bottom: 0.4rem; display: block;">
                                 <i class="fa-solid fa-arrows-left-right" style="color: #a855f7; margin-right: 0.3rem;"></i> <span data-i18n="settings.padding_right_label">우측 여백 (Padding Right)</span>: <span id="setting-viewer-padding-right-val" style="color: #c084fc;">20</span>px
                             </label>
-                            <input type="range" id="setting-viewer-padding-right" min="0" max="200" step="5" value="20" style="width: 100%; max-width: 480px; box-sizing: border-box; cursor: pointer; accent-color: #a855f7;" oninput="document.getElementById('setting-viewer-padding-right-val').innerText = this.value">
+                            <input type="range" id="setting-viewer-padding-right" min="0" max="200" step="5" value="20" style="width: 100%; box-sizing: border-box; cursor: pointer; accent-color: #a855f7;" oninput="document.getElementById('setting-viewer-padding-right-val').innerText = this.value">
                         </div>
+                    </div>
+
+                    <!-- [오른쪽 파트] 뷰어 세부/고급 기능 설정 -->
+                    <div style="background: rgba(15, 23, 42, 0.35); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px; padding: 1.25rem; display: flex; flex-direction: column; gap: 1.2rem;">
+                        <h4 style="color: #c084fc; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.5rem; margin: 0; font-size: 0.98rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
+                            <i class="fa-solid fa-gear" style="color: #c084fc;"></i> <span data-i18n="settings.viewer_advanced_section">뷰어 세부/고급 옵션</span>
+                        </h4>
+
+                        <!-- 1. 2장 보기 시 가운데 여백 제거 옵션 -->
+                        <div class="library-form-group" style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.08); padding: 1.1rem; border-radius: 8px;">
+                            <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;">
+                                <div style="flex: 1;">
+                                    <label for="setting-remove-2page-center-gap" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; cursor: pointer; display: flex; align-items: center; gap: 0.4rem;">
+                                        <i class="fa-solid fa-table-columns" style="color: #38bdf8;"></i> 2장 보기 시 가운데 여백 제거
+                                    </label>
+                                    <p style="font-size: 0.78rem; color: #94a3b8; margin: 0; line-height: 1.45;">
+                                        EPUB/TXT 소설 및 만화 뷰어에서 2장 보기(2쪽 펼침) 모드로 감상할 때, 좌우 페이지 사이의 중앙 간격/여백(Gap)을 완전히 소거하여 바짝 붙여서 감상합니다. (기본값: 해제)
+                                    </p>
+                                </div>
+                                <div style="position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; margin-top: 0.2rem;">
+                                    <input type="checkbox" id="setting-remove-2page-center-gap" style="opacity: 0; width: 0; height: 0; position: absolute;">
+                                    <label for="setting-remove-2page-center-gap" class="toggle-switch-slider"></label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2. 모바일/PC 여백 적용 가이드 카드 (우측 빈공간 조화용 디자인 카드) -->
+                        <div style="background: rgba(30, 41, 59, 0.3); border: 1px dashed rgba(255, 255, 255, 0.1); padding: 1.1rem; border-radius: 8px; display: flex; flex-direction: column; gap: 0.5rem;">
+                            <div style="font-weight: 700; color: #cbd5e1; font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem;">
+                                <i class="fa-solid fa-circle-info" style="color: #38bdf8;"></i> 뷰어 여백 가이드
+                            </div>
+                            <p style="font-size: 0.78rem; color: #94a3b8; margin: 0; line-height: 1.5;">
+                                • <strong>모바일 기기</strong>: 상/하/좌/우 여백 슬라이더가 노치 및 모바일 뷰포트에 맞게 100% 동작합니다.<br>
+                                • <strong>PC / 대형 태블릿</strong>: 텍스트 줄바꿈 가독성을 사수하기 위해 가로폭 800px 상한선 및 중앙 정렬이 안전하게 유지됩니다.
+                            </p>
+                        </div>
+
                     </div>
  
                 </div>
 
                 <!-- 저장 버튼 -->
-                <div style="margin-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1.5rem;">
-                    <button type="submit" class="btn-toggle" style="background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%); color: #fff; border: none; padding: 0.6rem 1.8rem; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; box-shadow: 0 4px 12px rgba(168,85,247,0.25);">
+                <div style="margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 1.2rem; display: flex; justify-content: flex-start;">
+                    <button type="submit" class="btn-toggle" style="background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%); color: #fff; border: none; padding: 0.65rem 2rem; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; box-shadow: 0 4px 12px rgba(168,85,247,0.3);">
                         <i class="fa-solid fa-floppy-disk"></i> <span data-i18n="common.save">설정 저장</span>
                     </button>
                 </div>

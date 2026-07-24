@@ -13,7 +13,25 @@ export async function initPdfViewer(bookId, pagesRead, totalPages) {
   console.log(`[Viewer-Pdf] initPdfViewer - PDF 렌더링 요청: bookId=${bookId}, pagesRead=${pagesRead}, totalPages=${totalPages}`);
   
   document.getElementById('pdf-viewer-container').style.display = 'flex';
-  pdfCurrentPage = pagesRead > 0 ? Math.max(1, parseInt(pagesRead, 10) || 1) : 1;
+
+  let initialPage = pagesRead > 0 ? Math.max(1, parseInt(pagesRead, 10) || 1) : 1;
+
+  // 크로스 디바이스(모바일-PC) 동기화: 서버 최신 진행도(progress-state)를 비동기 조회하여 최신 위치 복원
+  try {
+    const libType = state.currentLibraryType || 'general';
+    const stateRes = await fetch(`/api/media/progress-state?db_type=${libType}&book_id=${bookId}`);
+    if (stateRes.ok) {
+      const stateData = await stateRes.json();
+      if (stateData && stateData.success && stateData.state && typeof stateData.state.pages_read === 'number' && stateData.state.pages_read > 0) {
+        initialPage = stateData.state.pages_read;
+        console.log(`[Viewer-Pdf] Server progress-state fetched: page ${initialPage} (local fallback: ${pagesRead})`);
+      }
+    }
+  } catch (err) {
+    console.warn('[Viewer-Pdf] Failed to fetch server progress-state:', err);
+  }
+
+  pdfCurrentPage = initialPage;
   pdfTotalPages = totalPages || 0;
   
   // 뷰어 진입 시 totalPages가 0이면 백엔드 API를 통해 동적 계산 시도 (DB 동기화용)

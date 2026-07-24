@@ -597,5 +597,37 @@ export function hideGlobalLoadingSpinner() {
   }
 }
 
+export async function handleUnlockMetadataEvent(event, seriesName, libraryId, bookId) {
+  if (event) event.stopPropagation();
+  if (!confirm('이 시리즈/도서의 메타데이터 잠금을 해제하시겠습니까?\n해제 후 스캔 시 메타데이터 및 커버가 다시 자동 업데이트됩니다.')) {
+    return;
+  }
+  showGlobalLoadingSpinner('메타데이터 잠금을 해제하는 중입니다...');
+  try {
+    const res = await api.unlockMetadata(state.currentLibraryType, seriesName, libraryId, bookId);
+    hideGlobalLoadingSpinner();
+    if (res && res.success) {
+      if (typeof window.showToast === 'function') {
+        window.showToast('메타데이터 잠금이 해제되었습니다.');
+      } else {
+        alert('메타데이터 잠금이 해제되었습니다.');
+      }
+      // 상세 뷰 새로고침
+      openBookDetail(null, seriesName, libraryId, state.detailRepresentativeBookId, state.detailDisplayTitle);
+      // 메인 카드 목록 갱신 (자물쇠 아이콘 업데이트)
+      if (typeof window.loadBooksList === 'function') {
+        window.loadBooksList(false);
+      }
+    } else {
+      alert(`잠금 해제 실패: ${res.error || '오류가 발생했습니다.'}`);
+    }
+  } catch (e) {
+    hideGlobalLoadingSpinner();
+    console.error('unlockMetadata 에러:', e);
+    alert('잠금 해제 처리 중 오류가 발생했습니다.');
+  }
+}
+
 window.showGlobalLoadingSpinner = showGlobalLoadingSpinner;
 window.hideGlobalLoadingSpinner = hideGlobalLoadingSpinner;
+window.handleUnlockMetadataEvent = handleUnlockMetadataEvent;

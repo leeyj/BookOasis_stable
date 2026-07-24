@@ -120,12 +120,27 @@ export async function initRenderer(bookId, pagesRead, totalPages) {
   // 뷰어 초기화가 시작되는 즉시 로딩 오버레이를 화면에 노출합니다.
   showViewerLoading('Loading...', 'Preparing pages');
 
-
-
   document.getElementById('comic-viewer-container').style.display = 'flex';
   document.getElementById('comic-fit-controls').style.display = 'flex';
 
-  comicCurrentPage = pagesRead > 0 ? pagesRead - 1 : 0;
+  let initialPage = pagesRead > 0 ? pagesRead - 1 : 0;
+
+  // 크로스 디바이스(모바일-PC) 동기화: 서버의 최신 진행도 상태(progress-state)를 비동기 조회하여 최신 위치 복원
+  try {
+    const res = await fetch(`/api/media/progress-state?db_type=${state.currentLibraryType}&book_id=${bookId}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.state && typeof data.state.pages_read === 'number' && data.state.pages_read > 0) {
+        const serverPageIdx = data.state.pages_read - 1;
+        console.log(`[Viewer-Comic] Server progress-state fetched: page ${data.state.pages_read} (local fallback: ${pagesRead})`);
+        initialPage = serverPageIdx;
+      }
+    }
+  } catch (err) {
+    console.warn('[Viewer-Comic] Failed to fetch server progress-state, fallback to client params:', err);
+  }
+
+  comicCurrentPage = initialPage;
   comicTotalPages = await FileLoader.fetchTotalPagesIfNeeded(bookId, totalPages);
 
   Settings.initReadingDirection();
@@ -526,7 +541,8 @@ export function loadComicPage() {
           }
 
           // 이미지가 백그라운드 상에서 완전히 로드된 이 시점에만 기존 DOM을 밀고 새 페이지를 끼워넣습니다. (더블 버퍼링 기법)
-          wrapper.innerHTML = '<div class="comic-page-pair" style="visibility: hidden;"></div>';
+          const removeCenterGap = (localStorage.getItem('remove_2page_center_gap') === '1');
+          wrapper.innerHTML = `<div class="comic-page-pair ${removeCenterGap ? 'no-center-gap' : ''}" style="visibility: hidden;"></div>`;
           const pairContainer = wrapper.querySelector('.comic-page-pair');
           if (expectedLoads === 1 && pairContainer) {
             pairContainer.classList.add('single-page');

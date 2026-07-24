@@ -173,15 +173,28 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
     `;
   }
 
+  const isLocked = Number(meta && meta.metadata_locked) === 1 || (books && books.some(b => Number(b.metadata_locked) === 1));
+  const detailLockedBadgeHtml = isLocked ? `
+    <div class="book-card-locked-badge" title="메타데이터 잠김 (수동 편집됨)" style="position: absolute; bottom: 8px; left: 8px; z-index: 5; background: rgba(0, 0, 0, 0.65); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.4); width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.4); backdrop-filter: blur(2px);">
+      <i class="fa-solid fa-lock" style="font-size: 0.7rem;"></i>
+    </div>
+  ` : '';
+  const unlockBtnHtml = isLocked ? `
+    <button class="ridi-link-btn btn-unlock-metadata" onclick="handleUnlockMetadataEvent(event, '${safeSeriesName.replace(/'/g, "\\'")}', '${actualLibraryId}', ${firstBookId || 'null'})" style="background: #16a34a; border-color: #22c55e; font-size: 0.75rem; padding: 0.2rem 0.6rem; display: inline-flex; align-items: center; gap: 0.2rem; margin-left: 0.3rem;" title="메타데이터 잠금을 해제하고 자동 스캔 갱신을 허용합니다">
+      <i class="fa-solid fa-lock-open"></i> 잠금해제
+    </button>
+  ` : '';
+
   return `
     <!-- 상단 헤더: 커버(작게) + 메타정보 -->
     <div class="detail-header-panel">
-      <div class="detail-cover-container" 
+      <div class="detail-cover-container" style="position: relative;" 
            ondragover="event.preventDefault(); this.style.borderColor='#a855f7';" 
            ondragleave="this.style.borderColor='rgba(255,255,255,0.08)';" 
            ondrop="handleCoverDrop(event); this.style.borderColor='rgba(255,255,255,0.08)';">
            <img class="detail-cover-sm" id="detail-cover-img-preview" src="${coverSrc}" alt="Cover"
               onerror="if(this.src.indexOf('/covers/fallback')===-1 && !this.src.startsWith('data:image/svg+xml')){this.src='${headerFallbackCoverSrc}';}else{this.onerror=null; this.src='${buildTextCoverDataUri({ title: visibleTitle, format: 'text', seed: actualLibraryId })}';}">
+        ${detailLockedBadgeHtml}
         <div class="cover-upload-overlay" id="cover-upload-overlay-btn" onclick="triggerCoverUpload(event)">
           <i class="fa-solid fa-camera"></i>
           <span>${i18n.t('detail.change_cover')}</span>
@@ -199,6 +212,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
           <button class="ridi-link-btn btn-edit-toggle" onclick="toggleMetaEditMode()" style="background: #0284c7; border-color: #0ea5e9; font-size: 0.75rem; padding: 0.2rem 0.6rem; display: inline-flex; align-items: center; gap: 0.2rem; margin-left: 0.4rem;">
             <i class="fa-solid fa-pen-to-square"></i> ${i18n.t('detail.edit_info')}
           </button>
+          ${unlockBtnHtml}
         </h3>
         <div class="detail-meta">
           <span class="badge">${visibleTitle}</span>

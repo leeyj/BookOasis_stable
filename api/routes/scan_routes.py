@@ -44,15 +44,19 @@ def trigger_library_scan(library_id):
         physical_path = row['physical_path']
         db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
         
+        print(f"[API-ScanTrigger] 🚀 User requested scan for library_id={library_id}, db_type={db_type}, path='{physical_path}', force={force}")
+        
         from services.scanner_queue import scanner_queue
         enqueued = scanner_queue.enqueue('library_scan', db_type=db_type, db_path=db_path, 
-                             library_id=library_id, physical_path=physical_path, force=force)
+                             library_id=library_id, physical_path=physical_path, force=force, force_requeue=True, trigger_type='manual', is_cron=False)
         if not enqueued:
+            print(f"[API-ScanTrigger WARNING] ❌ Enqueue rejected for library_id={library_id}")
             return jsonify({
                 'success': False,
                 'error': '동일 라이브러리 스캔이 이미 실행 중이거나 대기 중입니다.'
             }), 409
         
+        print(f"[API-ScanTrigger SUCCESS] ✅ Library_id={library_id} scan task enqueued successfully.")
         return jsonify({'success': True, 'message': _t('api.msg_scan_started')})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -92,7 +96,7 @@ def trigger_library_cover_scan(library_id):
         
         from services.scanner_queue import scanner_queue
         enqueued = scanner_queue.enqueue('cover_scan', db_type=db_type, db_path=db_path, 
-                             library_id=library_id, physical_path=physical_path)
+                             library_id=library_id, physical_path=physical_path, force_requeue=True)
         if not enqueued:
             return jsonify({
                 'success': False,
@@ -118,17 +122,17 @@ def trigger_all_libraries_scan():
         conn.close()
         
         if not rows:
-            return jsonify({'success': False, 'error': '스캔할 라이브러리 카테고리가 없습니다.'}), 400
+            return jsonify({'success': False, 'error': _t('api.err_no_libraries')}), 404
         
         db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
         from services.scanner_queue import scanner_queue
         
         enqueued_count = 0
         skipped_count = 0
-        for row in rows:
-            enqueued = scanner_queue.enqueue('library_scan', db_type=db_type, db_path=db_path, 
-                                 library_id=row['id'], physical_path=row['physical_path'], force=force)
-            if enqueued:
+        for r in rows:
+            res = scanner_queue.enqueue('library_scan', db_type=db_type, db_path=db_path, 
+                                        library_id=r['id'], physical_path=r['physical_path'], force=force, force_requeue=True, trigger_type='manual', is_cron=False)
+            if res:
                 enqueued_count += 1
             else:
                 skipped_count += 1

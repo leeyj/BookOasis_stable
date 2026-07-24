@@ -80,7 +80,10 @@ class CategoryRepository:
         try:
             # 1. 도서 권한 및 시리즈 정보 삭제
             cursor.execute("DELETE FROM user_category_permissions WHERE library_id = ?", (library_id,))
-            cursor.execute("DELETE FROM series WHERE library_id = ?", (library_id,))
+            try:
+                cursor.execute("DELETE FROM series WHERE library_id = ?", (library_id,))
+            except Exception:
+                pass
             
             # 2. 관련 도서 종속 데이터 초고속 서브쿼리 일괄 소거
             cursor.execute("DELETE FROM book_offsets WHERE book_id IN (SELECT id FROM books WHERE library_id = ?)", (library_id,))

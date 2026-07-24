@@ -88,8 +88,9 @@ function triggerPreloadNextBook(bookId) {
 
 /**
  * 대기 중인 진척도 저장 예약 건이 있다면 즉시 동기 전송(Flush)하고 청소
+ * @param {boolean} useBeacon - 모바일 탭 닫기/이탈 시 sendBeacon 사용 여부
  */
-export function flushProgress() {
+export function flushProgress(useBeacon = false) {
   if (!pendingProgress) return Promise.resolve(null);
 
   const data = { ...pendingProgress };
@@ -101,6 +102,20 @@ export function flushProgress() {
   }
 
   console.log(`[Viewer-Progress] Flushing progress: book_id=${data.book_id}, page_idx=${data.page_idx}/${data.total_pages}`);
+
+  // 모바일 탭 닫기/이탈 시 sendBeacon을 사용하여 100% 안전 전송 보장
+  if (useBeacon && typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+    try {
+      const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+      const sent = navigator.sendBeacon('/api/media/progress', blob);
+      if (sent) {
+        console.log('[Viewer-Progress] sendBeacon successfully sent progress payload');
+        return Promise.resolve(true);
+      }
+    } catch (e) {
+      console.warn('[Viewer-Progress] sendBeacon failed, falling back to fetch:', e);
+    }
+  }
 
   // Fetch API를 사용해 백그라운드로 전송 (keepalive 사용으로 브라우저 닫혀도 전송 보장 시도)
   return fetch('/api/media/progress', {
@@ -120,12 +135,16 @@ export function flushProgress() {
 // 서버 재시작 등으로 인한 진행률 유실을 방지합니다.
 // pagehide: 페이지 닫기/뒤로가기/PWA 종료 시 (iOS Safari에서 beforeunload보다 안정적)
 window.addEventListener('pagehide', () => {
-  flushProgress();
+  flushProgress(true);
+});
+
+window.addEventListener('beforeunload', () => {
+  flushProgress(true);
 });
 
 // visibilitychange: 탭 전환/화면 꺼짐/앱 백그라운드 전환 시
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
-    flushProgress();
+    flushProgress(true);
   }
 });

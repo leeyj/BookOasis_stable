@@ -76,10 +76,25 @@ def _aggressive_warmup_path(path):
     except Exception as e:
         print(f"[Scanner-WakeUp] 적극 웜업 중 예외(무시): {e}")
 
+def _run_db_self_recovery(db_type):
+    import subprocess
+    import sqlite3
+    db_file_name = f"media_{db_type}.db"
+    db_full_path = os.path.join(DB_DIR, db_file_name)
+    recovery_script = os.path.join(MEDIA_SERVER_DIR, 'tools', 'db_recovery.py')
+    print(f"[Scanner-SelfHealing] 🚨 Running db_recovery.py for {db_full_path}...")
+    try:
+        res = subprocess.run([sys.executable, recovery_script, '--db', db_full_path, '--yes'], capture_output=True, text=True, timeout=300)
+        print(f"[Scanner-SelfHealing] Recovery exit code: {res.returncode}")
+        if res.stdout:
+            print(f"[Scanner-SelfHealing] Output:\n{res.stdout}")
+    except Exception as rec_err:
+        print(f"[Scanner-SelfHealing ERROR] Auto recovery failed: {rec_err}")
+
 @scanner_print_control_decorator
 def scan_library(db_path, library_id, physical_path, force=False, skip_vfs_refresh=False):
     """Scan library path and sync DB with file system (force full reindex if force=True)"""
-    print(f"[Scanner] Scan started: Library ID={library_id}, Path='{physical_path}', Force={force}")
+    print(f"🚀🚀🚀 [ScannerEngine] Core scan_library EXECUTING! DB Path={db_path}, Library ID={library_id}, Path='{physical_path}', Force={force}")
     
     library_errors = []
     
@@ -134,6 +149,28 @@ def scan_library(db_path, library_id, physical_path, force=False, skip_vfs_refre
 
     if is_remote:
         print(f"[Scanner-VFS] Remote mount path detected. Serializing scan threads({threads_to_use} folders), Skipping heavy archive I/O analysis.")
+
+    # ── [Self-Healing: 사전 DB 무결성 점검 및 손상 감지 시 자동 복구] ──
+    try:
+        check_conn = database.get_connection(db_type, wait_timeout=5.0)
+        try:
+            check_cur = check_conn.cursor()
+            res = check_cur.execute("PRAGMA integrity_check;").fetchone()
+            if not res or str(res[0]).lower() != 'ok':
+                print(f"[Scanner-SelfHealing] ⚠️ 무결성 이상 감지 ({res}). 자동 복구(db_recovery.py)를 가동합니다.")
+                check_conn.close()
+                _run_db_self_recovery(db_type)
+            else:
+                check_conn.close()
+        except Exception as db_malformed_err:
+            print(f"[Scanner-SelfHealing] ⚠️ DB 손상 감지 ({db_malformed_err}). 자동 복구(db_recovery.py)를 가동합니다.")
+            try:
+                check_conn.close()
+            except Exception:
+                pass
+            _run_db_self_recovery(db_type)
+    except Exception as check_err:
+        print(f"[Scanner-SelfHealing] 사전 무결성 점검 경고 (무시하고 계속): {check_err}")
 
     conn = database.get_connection(db_type)
     try:

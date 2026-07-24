@@ -158,6 +158,11 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false) {
     }
   }
 
+  // 뷰어 닫기 시점에 대기 중인 독서 진행도(pendingProgress)를 즉시 동기 반영(Flush)
+  import('../viewer_progress.js').then((m) => {
+    if (m.flushProgress) m.flushProgress();
+  }).catch(() => {});
+
   exitFullscreenIfNeeded();
 
   const padPanel = document.getElementById('viewer-padding-overlay-panel');

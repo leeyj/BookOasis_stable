@@ -216,7 +216,7 @@ class ReadingProgressRepository:
             SELECT b.id, b.library_id, b.title, b.series_name, b.cover_image, b.cover_updated_at, b.file_format,
                    p.pages_read, b.total_pages, p.last_read_at,
                    CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
-                   p.is_completed
+                   p.is_completed, COALESCE(b.metadata_locked, 0) AS metadata_locked
             FROM user_progress p
             JOIN books b ON p.book_id = b.id
             JOIN user_category_permissions ucp ON b.library_id = ucp.library_id AND ucp.user_id = p.user_id AND ucp.has_access = 1
@@ -244,7 +244,7 @@ class ReadingProgressRepository:
         cursor = conn.cursor()
         cursor.execute("""
             SELECT b.id, b.library_id, b.title, b.series_name, b.cover_image, b.cover_updated_at, b.file_format, b.total_pages, b.created_at,
-                   CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite
+                   CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite, COALESCE(b.metadata_locked, 0) AS metadata_locked
             FROM books b
             INNER JOIN (
                 SELECT MAX(id) as max_id
@@ -269,7 +269,7 @@ class ReadingProgressRepository:
         cursor = conn.cursor()
         cursor.execute("""
             SELECT b.id, b.library_id, b.title, b.series_name, b.cover_image, b.cover_updated_at, b.file_format, b.total_pages, b.created_at,
-                   CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite
+                   CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite, COALESCE(b.metadata_locked, 0) AS metadata_locked
             FROM books b
             INNER JOIN (
                 SELECT MAX(id) as max_id

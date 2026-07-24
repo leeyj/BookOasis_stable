@@ -102,6 +102,7 @@ class BookDetailService:
             'summary'  : _val(meta_row, 'summary', '등록된 설명이 없습니다.'),
             'genre'    : _val(meta_row, 'genre',      ''),
             'tags'     : _val(meta_row, 'tags',       ''),
+            'metadata_locked': meta_row.get('metadata_locked', 0) if meta_row else (1 if any(b.get('metadata_locked', 0) == 1 for b in books_rows) else 0),
             'cover_image': get_cover_image_with_t(final_cover, latest_updated)
         }
 
@@ -129,6 +130,7 @@ class BookDetailService:
                 'is_completed': b['is_completed'] or 0,
                 'is_favorite' : b['is_favorite'] or 0,
                 'last_read_at': b['last_read_at'] or '',
+                'metadata_locked': b.get('metadata_locked', 0),
             })
         
         # 부모 디렉토리 기반 단행본 격리 필터

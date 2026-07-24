@@ -54,7 +54,7 @@ def add_media_library():
         from services.scanner_queue import scanner_queue
         scanner_queue.enqueue('library_scan', db_type=db_type, db_path=db_path, 
                              library_id=library_id, physical_path=physical_path, force=False,
-                             initial_add_scan=True)
+                             initial_add_scan=True, trigger_type='manual', is_cron=False)
         SchedulerService.reload_all_jobs()
     except Exception as e:
         print(f"[API] Background scan failed: {e}")
@@ -111,7 +111,7 @@ def edit_media_library():
             db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
             from services.scanner_queue import scanner_queue
             scanner_queue.enqueue('library_scan', db_type=db_type, db_path=db_path, 
-                                 library_id=int(library_id), physical_path=physical_path, force=False)
+                                 library_id=int(library_id), physical_path=physical_path, force=False, trigger_type='manual', is_cron=False)
             print(f"[API] Category {library_id} path changed. Enqueued scan job.")
         else:
             print(f"[API] Category {library_id} meta updated (no path change). Scan skipped.")

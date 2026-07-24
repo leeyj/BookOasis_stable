@@ -218,7 +218,9 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     continue
                 meta = d['merged_meta']
                 score = meta.get('score', 0)
+                lib_id_int = int(d['library_id']) if d.get('library_id') is not None else None
                 update_data.append((
+                    lib_id_int,
                     d.get('series_name', ''),
                     d['cover_image'], d['cover_image'], d['cover_image'],
                     meta.get('author',''), meta.get('isbn',''), meta.get('publisher',''), meta.get('link',''),
@@ -237,8 +239,9 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                 title = d.get('title')
                 if not title:
                     title, _ = os.path.splitext(d['filename'])
+                lib_id_int = int(d['library_id']) if d.get('library_id') is not None else None
                 insert_data.append((
-                    d['library_id'], title, d['series_name'], meta.get('author',''), meta.get('isbn',''),
+                    lib_id_int, title, d['series_name'], meta.get('author',''), meta.get('isbn',''),
                     canonical_path(d['full_path']), d['file_format'], 100 if d['file_format'] == 'epub' else 0,
                     d['cover_image'], meta.get('publisher',''), meta.get('link',''),
                     meta.get('score',0), meta.get('summary',''), meta.get('release_date',''),
@@ -330,6 +333,13 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     f"[Scanner-DB] Flush success (attempt {attempt}/{max_attempts}, is_final={is_final}) "
                     f"remaining_ins={len(pending_inserts)} remaining_upd={len(pending_updates)} remaining_folders={len(pending_folders)}"
                 )
+
+                # 5. WAL checkpoint (PASSIVE) to merge journal into main DB without blocking or closing connections
+                try:
+                    conn.execute("PRAGMA wal_checkpoint(PASSIVE);")
+                except Exception as ckpt_err:
+                    print(f"[Scanner-DB] WAL checkpoint passive warning (ignored): {ckpt_err}")
+
                 return True
             except Exception as e:
                 try:
@@ -416,7 +426,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
 
                         if full_path in db_books:
                             pending_updates.append({
-                                "action": "update", "is_offset_only": is_offset_only, "full_path": full_path, 
+                                "action": "update", "library_id": library_id, "is_offset_only": is_offset_only, "full_path": full_path, 
                                 "cover_image": cover_image, "merged_meta": merged_meta, "offsets_data": offsets_data, 
                                 "filename": filename, "series_name": series_name, "file_mtime": item.get('file_mtime', 0.0), "file_size": item.get('file_size', 0)
                             })
@@ -483,15 +493,22 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
             # Detect manual cancel (abort) request and exit
             # [버그수정] 장기 conn은 WAL 스냅샷 격리로 인해 다른 세션의 COMMIT을 읽지 못함.
             # 취소 상태 확인만 독립 커넥션으로 조회하여 항상 최신 상태를 반영한다.
-            # 대시보드 부하를 줄이기 위해 매 폴더가 아닌 주기적으로만 조회한다.
-            if processed_folders_count % 10 == 0:
-                status_row = None
+            if processed_folders_count % 3 == 0:
+                is_cancelled = False
                 _cancel_conn = None
                 try:
-                    _cancel_conn = database.get_connection(db_type)
+                    _cancel_conn = database.get_connection('general')
                     _cancel_cur = _cancel_conn.cursor()
                     _cancel_cur.execute("SELECT scan_status FROM libraries WHERE id = ?", (library_id,))
                     status_row = _cancel_cur.fetchone()
+                    if status_row and status_row['scan_status'] == 'cancelling':
+                        is_cancelled = True
+
+                    if not is_cancelled:
+                        task_key = f"library_scan_{db_type}_{library_id}"
+                        _cancel_cur.execute("SELECT status FROM scanner_tasks WHERE task_key = ? AND status = 'cancelled'", (task_key,))
+                        if _cancel_cur.fetchone():
+                            is_cancelled = True
                 except Exception as _e:
                     print(f"[Scanner-Cancel] ⚠️ 취소 상태 확인 중 오류 (무시하고 계속 진행): {_e}")
                 finally:
@@ -500,8 +517,9 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                             _cancel_conn.close()
                         except Exception:
                             pass
-                if status_row and status_row['scan_status'] == 'cancelling':
-                    print(f"[Scanner-Cancel] 🛑 Safely aborting scan due to user request. (Completed folders: {processed_folders_count} folders)")
+
+                if is_cancelled:
+                    print(f"[Scanner-Cancel] 🛑 Safely aborting scan due to user cancel request. (Completed folders: {processed_folders_count} folders)")
                     log_pool_stats('cancel-abort')
                     if not flush_pending_data():
                         raise RuntimeError('Scanner flush failed while processing cancel request.')
@@ -517,6 +535,18 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                 log_pool_stats('memory-emergency')
                 if not flush_pending_data():
                     raise RuntimeError('Scanner flush failed during memory emergency handling.')
+                try:
+                    task_key = f"library_scan_{db_type}_{library_id}"
+                    _exit_conn = database.get_connection('general')
+                    _exit_cur = _exit_conn.cursor()
+                    _exit_cur.execute(
+                        "UPDATE scanner_tasks SET status = 'exit_pending', stage = 'Paused due to memory limit (Auto-Resuming...)' WHERE task_key = ? AND status = 'running'",
+                        (task_key,)
+                    )
+                    _exit_conn.commit()
+                    _exit_conn.close()
+                except Exception as _ex_err:
+                    print(f"[Scanner-Memory Warning] Failed to update task exit status: {_ex_err}")
                 try:
                     conn.close()
                 except Exception:

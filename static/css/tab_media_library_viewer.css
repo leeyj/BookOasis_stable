@@ -147,6 +147,10 @@
     gap: 0.25rem;
 }
 
+.comic-page-pair.no-center-gap {
+    gap: 0 !important;
+}
+
 /* 🌟 1장 보기 모드일 때 (화면을 최대한 가득 채움) */
 .comic-page-pair.single-page img,
 .comic-page-pair.single-page .comic-page-img {
@@ -1388,4 +1392,42 @@
         width: auto;
         padding: 1rem;
     }
+}
+
+/* 🌟 뷰어 설정 커스텀 토글 스위치 스타일 */
+.toggle-switch-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #334155;
+    transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.toggle-switch-slider::before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 2px;
+    bottom: 2px;
+    background-color: #cbd5e1;
+    transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+input:checked + .toggle-switch-slider {
+    background: linear-gradient(135deg, #a855f7 0%, #38bdf8 100%);
+    border-color: rgba(168, 85, 247, 0.4);
+}
+
+input:checked + .toggle-switch-slider::before {
+    transform: translateX(20px);
+    background-color: #ffffff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
 }

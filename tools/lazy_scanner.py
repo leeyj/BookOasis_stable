@@ -35,7 +35,7 @@ def setup_lazy_scanner_logging():
     try:
         db_path = os.path.join(MEDIA_SERVER_DIR, 'db', 'media_general.db')
         if os.path.exists(db_path):
-            conn = sqlite3.connect(db_path, timeout=1.0)
+            conn = sqlite3.connect(db_path, timeout=30.0)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute("SELECT value FROM settings WHERE key = 'SCANNER_WRITE_LOG'")

@@ -109,7 +109,9 @@ function bindPaddingSliders() {
   });
 }
 
-// 실시간 조작 시에는 스토리지 캐시 및 라벨 값만 변경 (실시간 화면 뷰포트 흔들기 중단)
+let realtimeDebounceTimer = null;
+
+// 실시간 조작 시 스토리지 캐시 업데이트 및 뷰어 레이아웃 즉시 반영
 export function applyViewerPaddingRealtime(type, side, value) {
   if (type === 'novel') {
     if (side === 'top') localStorage.setItem('viewer_padding_top', value);
@@ -119,7 +121,16 @@ export function applyViewerPaddingRealtime(type, side, value) {
 
     const valEl = document.getElementById(`quick-novel-${side}-val`);
     if (valEl) valEl.innerText = value;
+
+    const settingValEl = document.getElementById(`setting-viewer-padding-${side}-val`);
+    if (settingValEl) settingValEl.innerText = value;
+
     console.log(`[Viewer-Padding] Live Spacing Cache updated: ${side}=${value}px`);
+
+    if (realtimeDebounceTimer) clearTimeout(realtimeDebounceTimer);
+    realtimeDebounceTimer = setTimeout(() => {
+      commitViewerPadding();
+    }, 50);
   }
 }
 

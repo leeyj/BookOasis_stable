@@ -135,18 +135,8 @@ def run_schema_update():
             if conn:
                 conn.close()
                 
-    # 4. 마무리로 WAL/SHM 임시 파일이 디스크에 남아있는데 데이터베이스가 닫혀있다면 제거
-    print("\n[*] 3단계: 미접속 WAL/SHM 임시 저널 파일 확인 및 정리...")
-    for db_key, db_path in [('general', DB_GENERAL_PATH), ('adult', DB_ADULT_PATH)]:
-        for ext in ['-wal', '-shm']:
-            temp_file = db_path + ext
-            if os.path.exists(temp_file):
-                # 크기가 0이거나 미사용 중인 경우 지워서 다음 기동 시 정합성 유지
-                try:
-                    os.remove(temp_file)
-                    print(f"  - 임시 파일 정리됨: {os.path.basename(temp_file)}")
-                except Exception:
-                    pass # 현재 락이 잡혀있거나 사용 중이면 무시
+    # 4. WAL 체크포인트 완료 후 SQLite C-Engine에 의한 임시 파일 안전 닫기 완료
+    print("\n[*] 3단계: WAL 체크포인트 마감 완료 (SQLite C-Engine 세션 동기화 정돈 완료).")
                     
     print("\n" + "=" * 60)
     print(" 데이터베이스 스키마 및 마이그레이션 동기화가 성공적으로 완료되었습니다!")

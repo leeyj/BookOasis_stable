@@ -42,12 +42,14 @@ class ReadingHistoryService:
             merged.sort(key=lambda item: str(item.get('last_read_at') or ''), reverse=True)
             return merged
 
-        # 1. Redis 캐시 확인
+        # 1. Redis 캐시 확인 (구형 캐시에 metadata_locked 없으면 DB 재조회)
         cache_key = f"cache:history:{db_type}:{user_id}"
         cached_data = redis_get(cache_key)
         if cached_data:
             try:
-                return apply_live_progress(json.loads(cached_data))
+                parsed = json.loads(cached_data)
+                if parsed and isinstance(parsed, list) and (len(parsed) == 0 or 'metadata_locked' in parsed[0]):
+                    return apply_live_progress(parsed)
             except Exception:
                 pass
 
@@ -76,6 +78,7 @@ class ReadingHistoryService:
                 'is_completed': r['is_completed'] or 0,
                 'is_favorite' : r['is_favorite'] or 0,
                 'last_read_at': r['last_read_at'],
+                'metadata_locked': r.get('metadata_locked', 0),
             }
             for r in rows
         ]
@@ -93,12 +96,14 @@ class ReadingHistoryService:
 
     @staticmethod
     def get_recently_added(db_type, user_id=None, role=None):
-        # 1. Redis 캐시 확인
+        # 1. Redis 캐시 확인 (구형 캐시에 metadata_locked 없으면 DB 재조회)
         cache_key = f"cache:recent_added:{db_type}:{user_id}:{role}"
         cached_data = redis_get(cache_key)
         if cached_data:
             try:
-                return json.loads(cached_data)
+                parsed = json.loads(cached_data)
+                if parsed and isinstance(parsed, list) and (len(parsed) == 0 or 'metadata_locked' in parsed[0]):
+                    return parsed
             except Exception:
                 pass
 
@@ -118,6 +123,7 @@ class ReadingHistoryService:
                 'total_pages' : r['total_pages'] or 0,
                 'is_favorite' : r['is_favorite'] or 0,
                 'created_at'  : r['created_at'],
+                'metadata_locked': r.get('metadata_locked', 0),
             }
             for r in rows
         ]

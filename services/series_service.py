@@ -68,6 +68,7 @@ def _build_series_entries(db_type, rows):
 
         latest_added = max((b['created_at'] for b in books if b['created_at']), default='')
         any_favorite = 1 if any((b['is_favorite'] or 0) == 1 for b in books) else 0
+        any_locked = 1 if any((b.get('metadata_locked') or 0) == 1 for b in books) else 0
         author = next((b['author'] for b in books if b['author']), '')
         genre = next((b['genre'] for b in books if b['genre']), '')
         tags = next((b['tags'] for b in books if b['tags']), '')
@@ -81,6 +82,7 @@ def _build_series_entries(db_type, rows):
             'book_count': len(books),
             'cover_image': get_cover_image_with_t(final_cover, updated_at),
             'is_favorite': any_favorite,
+            'metadata_locked': any_locked,
             'latest_added': latest_added,
             'representative_book_id': representative['id'],
             'library_id': lib_id,

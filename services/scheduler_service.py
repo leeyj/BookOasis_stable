@@ -128,8 +128,8 @@ class SchedulerService:
                     # 1. 큐에 적재 전 중복 인큐 방지를 위해 상태를 일단 ready로 업데이트
                     SchedulerRepository.update_library_scan_status(db_type, lib_id, 'ready')
                     
-                    # 2. 스캔 큐에 인큐
-                    enqueue_scan_job(db_type, db_path, lib_id, phys_path, force=False)
+                    # 2. 스캔 큐에 인큐 (Auto-Resume 최우선 재적재)
+                    enqueue_scan_job(db_type, db_path, lib_id, phys_path, force=False, force_requeue=True)
                     
             except Exception as e:
                 print(f"[Scheduler ERROR] Failed to auto-resume interrupted jobs for {db_type}: {e}")
@@ -247,7 +247,7 @@ class SchedulerService:
             print(f"[Scheduler] Job removal failed: ID={job_id}, Error: {e}")
 
 
-def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initial_add_scan=False):
+def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initial_add_scan=False, trigger_type='manual', is_cron=False, **kwargs):
     """실제 스케줄에 맞춰 구동될 래핑 헬퍼 함수 (진행 및 내역 상세 로깅 보강)"""
     import database
     from tools.scanner import scan_library
@@ -624,9 +624,19 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
         raise
 
 
-def enqueue_scan_job(db_type, db_path, library_id, physical_path, force=False):
+def enqueue_scan_job(db_type, db_path, library_id, physical_path, force=False, force_requeue=False, trigger_type='cron'):
     from services.scanner_queue import scanner_queue
-    scanner_queue.enqueue('library_scan', db_type=db_type, db_path=db_path, library_id=library_id, physical_path=physical_path, force=force)
+    scanner_queue.enqueue(
+        'library_scan',
+        db_type=db_type,
+        db_path=db_path,
+        library_id=library_id,
+        physical_path=physical_path,
+        force=force,
+        force_requeue=force_requeue,
+        trigger_type=trigger_type,
+        is_cron=(trigger_type == 'cron')
+    )
 
 def run_lazy_scanner_job():
     """백그라운드 스캐너 작업을 큐에 적재"""

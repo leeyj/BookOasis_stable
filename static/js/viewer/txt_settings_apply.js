@@ -93,14 +93,24 @@ export function applyTxtSettingsCore(ctx) {
       scrollWrapper.style.marginBottom = '40px';
       scrollWrapper.style.marginLeft = 'auto';
       scrollWrapper.style.marginRight = 'auto';
-      scrollWrapper.style.padding = '0';
-
+      scrollWrapper.style.paddingTop = '0';
       const pageStep = localStorage.getItem('comic_page_step') || '1';
-      const pageGap = pageStep === '2' ? 40 : 0;
-      if (pageStep === '2') {
-        scrollWrapper.style.maxWidth = `${Math.min(targetWidth, 1600)}px`;
+      const removeCenterGap = (localStorage.getItem('remove_2page_center_gap') === '1');
+      const pageGap = pageStep === '2' ? (removeCenterGap ? 0 : 40) : 0;
+
+      const isMobileView = (window.innerWidth <= 768);
+      if (isMobileView) {
+        scrollWrapper.style.paddingLeft = `${padLeft}px`;
+        scrollWrapper.style.paddingRight = `${padRight}px`;
+        scrollWrapper.style.maxWidth = '100%';
       } else {
-        scrollWrapper.style.maxWidth = `${Math.min(targetWidth, 800)}px`;
+        scrollWrapper.style.paddingLeft = '0';
+        scrollWrapper.style.paddingRight = '0';
+        if (pageStep === '2') {
+          scrollWrapper.style.maxWidth = `${Math.min(targetWidth, 1600)}px`;
+        } else {
+          scrollWrapper.style.maxWidth = `${Math.min(targetWidth, 800)}px`;
+        }
       }
 
       const wrapperWidth = Math.max(1, Math.floor(scrollWrapper.clientWidth));
@@ -187,10 +197,28 @@ export function applyTxtSettingsCore(ctx) {
         if (ok) {
           snapTxtPageScrollLeft(scrollWrapper);
           saveDetailPosition();
-          console.log('[Viewer-Txt] 모드 전환 앵커 복원 성공');
+          console.log('[Viewer-Txt] 모드 전환 앵커 1차 복원 수행 완료');
         }
-        setPendingRestoreTimer(null);
-        if (container) container.style.pointerEvents = '';
+        
+        // ── iOS WebKit Reflow 지연 방어: 2차 래치(Latch) 재검증 ──
+        setTimeout(() => {
+          if (scrollMode === 'scroll') {
+            const currentScrollTop = scrollWrapper ? scrollWrapper.scrollTop : 0;
+            // 1차 복원이 실패했거나 offsetTop 미계산으로 scrollTop 이 0에 불과한 경우 재조정
+            if (!ok || currentScrollTop === 0) {
+              const reOk = restoreTxtAnchorInfo(preservedAnchor);
+              if (!reOk || (scrollWrapper && scrollWrapper.scrollTop === 0)) {
+                const targetChunk = contentArea.querySelector(`.txt-scroll-chunk[data-idx="${getCurrentChunkIdx()}"]`);
+                if (targetChunk && targetChunk.offsetTop > 0) {
+                  scrollWrapper.scrollTop = Math.max(0, targetChunk.offsetTop - 20);
+                  console.log(`[Viewer-Txt][iOS SafeGuard] 2차 래치로 챕터 오프셋(${targetChunk.offsetTop}) 복원완료`);
+                }
+              }
+            }
+          }
+          setPendingRestoreTimer(null);
+          if (container) container.style.pointerEvents = '';
+        }, 120);
       }, 150);
       setPendingRestoreTimer(timerId);
       restored = true;
@@ -204,7 +232,7 @@ export function applyTxtSettingsCore(ctx) {
             scrollWrapper.scrollTop = Math.max(0, targetChunk.offsetTop - 20);
             console.log(`[Viewer-Txt] 챕터 오프셋 기준으로 스크롤 정렬 완료 (scrollTop = ${scrollWrapper.scrollTop})`);
           } else {
-            const ratio = getCurrentChunkIdx() / getChunkCount();
+            const ratio = getCurrentChunkIdx() / Math.max(1, getChunkCount());
             scrollWrapper.scrollTop = scrollWrapper.scrollHeight * ratio;
           }
           if (container) container.style.pointerEvents = '';

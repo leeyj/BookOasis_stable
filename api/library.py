@@ -74,7 +74,10 @@ def get_media_list():
             series_list = series_list[:limit]
         return jsonify({'success': True, 'series': series_list, 'has_more': has_more})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        err_msg = str(e)
+        if 'malformed' in err_msg.lower() or 'locked' in err_msg.lower():
+            err_msg = '스캔 작업으로 데이터베이스가 잠시 바쁩니다. 잠시 후 다시 시도해 주세요.'
+        return jsonify({'success': False, 'error': err_msg}), 500
 
 @library_bp.route('/api/media/all-list', methods=['GET'])
 @login_required
@@ -709,4 +712,38 @@ def download_book(book_id):
     except Exception as e:
         import traceback
         print(f"[Download API] 오류:\n{traceback.format_exc()}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@library_bp.route('/api/media/unlock-metadata', methods=['POST'])
+@login_required
+def unlock_media_metadata():
+    """도서 및 시리즈 메타데이터 잠금 해제 (metadata_locked = 0)"""
+    db_type = request.form.get('type', 'general')
+    series_name = request.form.get('series_name')
+    library_id = request.form.get('library_id')
+    book_id = request.form.get('book_id')
+
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+
+    try:
+        from repositories.sqlite.book_repository import BookRepository
+        success = BookRepository.unlock_media_metadata(
+            db_type=db_type,
+            series_name=series_name,
+            library_id=library_id,
+            book_id=book_id
+        )
+        if success:
+            try:
+                from utils.redis_helper import redis_del_by_pattern
+                redis_del_by_pattern(f"cache:history:{db_type}:*")
+                redis_del_by_pattern(f"cache:recent_added:{db_type}:*")
+            except Exception:
+                pass
+            return jsonify({'success': True, 'message': '메타데이터 잠금이 해제되었습니다.'})
+        else:
+            return jsonify({'success': False, 'error': '해당 도서/시리즈를 찾을 수 없거나 이미 해제되었습니다.'}), 404
+    except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

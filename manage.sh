@@ -267,12 +267,8 @@ stop() {
         
         for WP in $W_PIDS; do
             if check_pid_alive "$WP"; then
-                if [ "$FORCE_RESTART" = "true" ]; then
-                    kill -9 "$WP"
-                else
-                    echo "[!] 남아있는 스캐너 워커 프로세스는 강제 종료하지 않습니다."
-                    return 1
-                fi
+                echo "[!] 스캐너 워커 프로세스 강제 사살 (PID: $WP)"
+                kill -9 "$WP" >/dev/null 2>&1 || true
             fi
         done
     fi

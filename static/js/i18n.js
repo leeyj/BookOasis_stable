@@ -94,7 +94,7 @@ const i18n = {
         for (const [vKey, vVal] of Object.entries(variables)) {
             result = result.replace(new RegExp(`{${vKey}}`, 'g'), vVal);
         }
-        return result;
+        return result.replace(/\\n/g, '\n');
     },
 
     /**

@@ -29,11 +29,31 @@ def start_scanner_worker_process():
     print(f"[Scanner-Process] Started daemon worker process (PID: {_worker_process.pid})")
 
 
+def is_scanner_worker_running_os():
+    """OS 수준에서 scanner_worker.py 프로세스가 실제로 동작 중인지 검사합니다."""
+    try:
+        import psutil
+        current_pid = os.getpid()
+        for proc in psutil.process_iter(['pid', 'cmdline']):
+            try:
+                cmd = proc.info.get('cmdline')
+                if cmd and proc.info['pid'] != current_pid and any('scanner_worker.py' in str(arg) for arg in cmd):
+                    return True
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                pass
+    except Exception:
+        pass
+    return False
+
+
 def ensure_scanner_worker_running():
     """독립 스캐너 워커 프로세스가 실행 중인지 확인하고 필요 시 출발시킵니다."""
     global _worker_process
-    if _worker_process is None or _worker_process.poll() is not None:
-        start_scanner_worker_process()
+    if _worker_process is not None and _worker_process.poll() is None:
+        return
+    if is_scanner_worker_running_os():
+        return
+    start_scanner_worker_process()
 
 
 
@@ -44,6 +64,13 @@ if not IS_WORKER:
     from flask import Flask, request, jsonify
     from database import init_databases
     from api import api_bp
+    from repositories.sqlite.scanner_queue_repository import ScannerQueueRepository
+
+    # 부팅 시점 유령 태스크 및 고착 스캔 상태 정화
+    try:
+        ScannerQueueRepository.startup_cleanup_ghost_tasks()
+    except Exception as _e:
+        print(f"[Core-Startup Warning] Failed to cleanup ghost tasks: {_e}")
 
     # Set template and static folders relative to this script
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))

@@ -2,7 +2,7 @@
 """
 tools/import_category.py
 ------------------------------------------------
-BookOasis 카테고리(라이브러리) 메타데이터 및 커버 이미지 가져오기 (Import) CLI 도구
+BookOasis 카테고리(라이브러리) 메타데이터 및 커버 이미지 가져오기 (Import) & 기존 카테고리 병합 (Merge) CLI 도구
 (단일 및 다중 물리 디렉토리 경로 Multi-path 완벽 지원)
 """
 
@@ -38,13 +38,33 @@ def parse_target_paths(raw_args):
         raw_args = [raw_args]
 
     for item in raw_args:
-        # 쉼표(,), 세미콜론(;), 줄바꿈(\n) 단위로 파싱
         parts = item.replace('\r', '').replace(';', '\n').replace(',', '\n').split('\n')
         for sub in parts:
             cleaned = sub.strip()
             if cleaned:
                 result.append(os.path.abspath(cleaned))
     return result
+
+def get_all_existing_libraries():
+    """모든 DB(General 및 Adult)의 기존 카테고리 목록을 수집합니다."""
+    libraries = []
+    for db_type in ['general', 'adult']:
+        try:
+            conn = get_db_connection(db_type)
+            cur = conn.cursor()
+            cur.execute("SELECT id, name, physical_path FROM libraries ORDER BY id ASC")
+            rows = cur.fetchall()
+            for r in rows:
+                libraries.append({
+                    'db_type': db_type,
+                    'id': r['id'],
+                    'name': r['name'],
+                    'physical_path': r['physical_path']
+                })
+            conn.close()
+        except Exception:
+            pass
+    return libraries
 
 def inspect_package(input_path):
     if not os.path.exists(input_path):
@@ -82,12 +102,25 @@ def inspect_package(input_path):
     for idx, rp in enumerate(root_paths):
         print(f"    [{idx}] {rp}")
     print("==========================================================")
-    print(f"👉 Import Recommendation:")
-    print(f"   Please provide {orig_root_count} target path(s) (-p) when importing this package!")
+    print(f"👉 Import Recommendations:")
+    print(f"   1) 신규 카테고리로 가져오기:")
+    print(f"      python tools/import_category.py -i \"{input_path}\" -p \"/path/to/target\" -n \"새 이름\"")
+    print(f"   2) 기존 카테고리에 병합(Merge)하기:")
+    print(f"      python tools/import_category.py -i \"{input_path}\" --merge-to <카테고리ID 또는 이름> -p \"/path/to/target\"")
     print("==========================================================")
 
+    # 기존 DB 카테고리 목록 안내 (병합 참조용)
+    existing_libs = get_all_existing_libraries()
+    if existing_libs:
+        print("\n📂 [Existing DB Categories Available for Merging (--merge-to)]")
+        print("----------------------------------------------------------")
+        for el in existing_libs:
+            paths_short = (el['physical_path'] or '').replace('\n', ' | ')
+            print(f"  • [{el['db_type'].upper()}] ID {el['id']:<3} | 이름: '{el['name']}' (경로: {paths_short})")
+        print("----------------------------------------------------------")
 
-def import_category(input_path, target_paths_raw, db_type=None, name=None):
+
+def import_category(input_path, target_paths_raw, db_type=None, name=None, merge_to=None):
     if not os.path.exists(input_path):
         print(f"[!] Error: Import package not found at '{input_path}'")
         sys.exit(1)
@@ -112,30 +145,97 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None):
         sys.exit(1)
 
     target_db_type = db_type if db_type else manifest.get('db_type', 'general')
-    target_lib_name = name if name else metadata.get('library', {}).get('name', 'Imported Library')
-
     lib_info = metadata.get('library', {})
     orig_root_paths = lib_info.get('physical_paths', [])
     orig_root_count = manifest.get('root_paths_count', len(orig_root_paths))
-    print(f"[+] Package Metadata:")
-    print(f"    - Original Name: {manifest.get('library_name')}")
-    print(f"    - Original Root Paths Count: {orig_root_count} entries")
-    if orig_root_paths:
-        for idx, rp in enumerate(orig_root_paths):
-            print(f"      [{idx}] {rp}")
+
+    conn = get_db_connection(target_db_type)
+    cursor = conn.cursor()
+
+    is_merge_mode = False
+    target_library_id = None
+    target_lib_name = None
+
+    # 1. 병합(Merge) 모드 판별 및 기존 카테고리 검색
+    if merge_to is not None and str(merge_to).strip():
+        is_merge_mode = True
+        merge_target_str = str(merge_to).strip()
+        
+        # ID로 검색 시도
+        if merge_target_str.isdigit():
+            cursor.execute("SELECT id, name, physical_path FROM libraries WHERE id = ?", (int(merge_target_str),))
+            existing_lib = cursor.fetchone()
+        else:
+            existing_lib = None
+
+        # 이름으로 검색 시도
+        if not existing_lib:
+            cursor.execute("SELECT id, name, physical_path FROM libraries WHERE name = ?", (merge_target_str,))
+            existing_lib = cursor.fetchone()
+
+        if not existing_lib:
+            print(f"[!] Error: Target category '{merge_to}' for merging not found in '{target_db_type}' DB.")
+            print(f"    Available categories in '{target_db_type}' DB:")
+            cursor.execute("SELECT id, name FROM libraries ORDER BY id ASC")
+            for row in cursor.fetchall():
+                print(f"      - ID {row['id']}: {row['name']}")
+            conn.close()
+            sys.exit(1)
+
+        target_library_id = existing_lib['id']
+        target_lib_name = existing_lib['name']
+        print(f"[🔗 MERGE MODE] Merging package into existing category: ID {target_library_id} ('{target_lib_name}')")
+
+        # 기존 카테고리의 physical_path에 신규 target_paths 추가 및 통합 (중복 제거)
+        existing_paths = [p.strip() for p in (existing_lib['physical_path'] or '').split('\n') if p.strip()]
+        merged_paths = existing_paths.copy()
+        for tp in target_paths:
+            if tp not in merged_paths:
+                merged_paths.append(tp)
+        
+        updated_physical_path = "\n".join(merged_paths)
+        cursor.execute("UPDATE libraries SET physical_path = ? WHERE id = ?", (updated_physical_path, target_library_id))
+        conn.commit()
+        print(f"[+] Updated library physical paths: {len(existing_paths)} existing -> {len(merged_paths)} merged entries.")
+
+    else:
+        # 신규 카테고리 생성 모드 (이름 중복 방지 처리)
+        target_lib_name = name if name else metadata.get('library', {}).get('name', 'Imported Library')
+        cursor.execute("SELECT id FROM libraries WHERE name = ?", (target_lib_name,))
+        existing_lib = cursor.fetchone()
+        if existing_lib:
+            target_lib_name = f"{target_lib_name} (Imported {datetime.datetime.now().strftime('%H%M%S')})"
+            print(f"[!] Library name collision detected. Renamed new category to: '{target_lib_name}'")
+
+        db_physical_path = "\n".join(target_paths)
+        cursor.execute("""
+            INSERT INTO libraries (name, physical_path, cron_schedule, icon, color, hide_cover)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            target_lib_name,
+            db_physical_path,
+            lib_info.get('cron_schedule'),
+            lib_info.get('icon', 'fa-book'),
+            lib_info.get('color', '#94a3b8'),
+            lib_info.get('hide_cover', 0)
+        ))
+        target_library_id = cursor.lastrowid
+        conn.commit()
+        print(f"[+] Created new library in DB (ID: {target_library_id}, Name: '{target_lib_name}')")
+
+    print(f"[+] Package Import Configuration:")
+    print(f"    - Mode: {'MERGE INTO EXISTING CATEGORY' if is_merge_mode else 'CREATE NEW CATEGORY'}")
+    print(f"    - Target Category: ID {target_library_id} ('{target_lib_name}')")
     print(f"    - Target DB Type: {target_db_type}")
-    print(f"    - Target Category Name: {target_lib_name}")
     print(f"    - Target Physical Paths ({len(target_paths)} provided):")
     for idx, tp in enumerate(target_paths):
         print(f"      [{idx}] {tp}")
-    print(f"      (💡 Tip: [웹 UI의 카테고리 관리에서 입력하는 경로] <─── 100% 동일 ───> [-p 옵션 경로])")
-    print(f"      (예시: -p \"/volume1/mnt/GDDRIVE/READING/만화/완결A\")")
 
     if orig_root_count > len(target_paths):
-        print(f"[!] Warning: Package has {orig_root_count} root paths, but only {len(target_paths)} target paths provided.")
+        print(f"[!] Warning: Package has {orig_root_count} original root paths, but only {len(target_paths)} target paths provided.")
         print(f"    Unmatched index items will fall back to target path [0]: {target_paths[0]}")
 
-    # 1. 대상 디렉터리 존재 검사 및 자동 생성
+    # 2. 대상 디렉터리 존재 검사 및 자동 생성
     for tp in target_paths:
         if not os.path.exists(tp):
             try:
@@ -144,37 +244,9 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None):
             except Exception as e:
                 print(f"[!] Error creating target directory '{tp}': {e}")
 
-    conn = get_db_connection(target_db_type)
-    cursor = conn.cursor()
-
-    # 2. 카테고리(libraries) 생성 (이름 중복 방지 처리)
-    cursor.execute("SELECT id FROM libraries WHERE name = ?", (target_lib_name,))
-    existing_lib = cursor.fetchone()
-    if existing_lib:
-        target_lib_name = f"{target_lib_name} (Imported {datetime.datetime.now().strftime('%H%M%S')})"
-        print(f"[!] Library name collision detected. Renamed category to: '{target_lib_name}'")
-
-    db_physical_path = "\n".join(target_paths)
-    lib_meta = metadata.get('library', {})
-
-    cursor.execute("""
-        INSERT INTO libraries (name, physical_path, cron_schedule, icon, color, hide_cover)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (
-        target_lib_name,
-        db_physical_path,
-        lib_meta.get('cron_schedule'),
-        lib_meta.get('icon', 'fa-book'),
-        lib_meta.get('color', '#94a3b8'),
-        lib_meta.get('hide_cover', 0)
-    ))
-    new_library_id = cursor.lastrowid
-    conn.commit()
-    print(f"[+] Created new library in DB (ID: {new_library_id})")
-
-    # 3. 커버 이미지 복원 (신규 library_id 폴더 하위로 정형화)
+    # 3. 커버 이미지 복원 (target_library_id 폴더 하위로 복원)
     covers_dir = os.path.join(BASE_DIR, 'covers')
-    lib_covers_dir = os.path.join(covers_dir, str(new_library_id))
+    lib_covers_dir = os.path.join(covers_dir, str(target_library_id))
     os.makedirs(lib_covers_dir, exist_ok=True)
 
     extracted_covers = 0
@@ -190,11 +262,12 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None):
 
     print(f"[+] Extracted {extracted_covers} cover images to '{lib_covers_dir}'.")
 
-    # 4. 도서(books) 및 offset 데이터 일괄 복원 (root_index 기준 매핑)
+    # 4. 도서(books) 및 offset 데이터 복원 (root_index 기준 매핑)
     books_list = metadata.get('books', [])
     offsets_dict = metadata.get('offsets', {})
 
     imported_books_count = 0
+    skipped_duplicate_books_count = 0
     imported_offsets_count = 0
 
     for idx, b in enumerate(books_list):
@@ -203,22 +276,28 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None):
             continue
 
         root_idx = b.get('root_index', 0)
-        # root_index에 매칭되는 target_path 선택
         if root_idx < len(target_paths):
             selected_target_root = target_paths[root_idx]
         else:
             selected_target_root = target_paths[0]
 
-        # OS 패스 구분자에 맞춰 신규 절대 경로 합성
         clean_rel = rel_path.replace('/', os.sep).replace('\\', os.sep)
         new_file_path = os.path.normpath(os.path.join(selected_target_root, clean_rel))
 
         cover_img = b.get('cover_image', '')
         if cover_img:
             filename = os.path.basename(cover_img)
-            cover_img = f"{new_library_id}/{filename}"
+            cover_img = f"{target_library_id}/{filename}"
 
         now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # 만약 동일 file_path가 이미 DB에 존재하는지 사전 검사
+        cursor.execute("SELECT id FROM books WHERE file_path = ?", (new_file_path,))
+        dup_book = cursor.fetchone()
+        if dup_book:
+            skipped_duplicate_books_count += 1
+            print(f"[!] Skipping duplicate file path: '{new_file_path}' (Existing Book ID: {dup_book['id']})")
+            continue
 
         try:
             cursor.execute("""
@@ -229,7 +308,7 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None):
                     created_at, metadata_locked, file_mtime, file_size
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                new_library_id,
+                target_library_id,
                 b.get('title', 'Unknown Title'),
                 b.get('series_name'),
                 b.get('author'),
@@ -277,6 +356,7 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None):
                     imported_offsets_count += 1
 
         except sqlite3.IntegrityError:
+            skipped_duplicate_books_count += 1
             print(f"[!] Warning: Skipping duplicate book file: {new_file_path}")
             continue
         except Exception as b_err:
@@ -287,25 +367,48 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None):
     conn.close()
 
     print("==========================================================")
-    print(f"✨ Category Import Successfully Completed!")
-    print(f"   - New Library ID: {new_library_id}")
+    print(f"✨ Category Import / Merge Successfully Completed!")
+    print(f"   - Import Mode: {'Merged into Category ID ' + str(target_library_id) if is_merge_mode else 'Created New Category ID ' + str(target_library_id)}")
     print(f"   - Library Name: {target_lib_name}")
-    print(f"   - Physical Paths ({len(target_paths)} entries):")
+    print(f"   - Target Physical Paths ({len(target_paths)} entries):")
     for tp in target_paths:
         print(f"     * {tp}")
-    print(f"   - Imported Books: {imported_books_count} / {len(books_list)}")
+    print(f"   - Imported Books: {imported_books_count} / {len(books_list)} (Skipped Duplicates: {skipped_duplicate_books_count})")
     print(f"   - Imported Book Offsets: {imported_offsets_count} items")
     print(f"   - Restored Covers: {extracted_covers} files")
     print("==========================================================")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="BookOasis Category Import CLI Tool (Multi-path Supported)")
+    parser = argparse.ArgumentParser(
+        description="BookOasis Category Import & Merge CLI Tool (Multi-path & Docker Supported)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+사용 예시 (Usage Examples):
+
+1. 패키지 내용 및 기존 DB 카테고리 미리보기 검사 (Inspect):
+   python tools/import_category.py -i 백업파일.oasis.zip --info
+
+2. 신규 카테고리로 가져오기 (Import as New Category):
+   python tools/import_category.py -i 백업파일.oasis.zip -p "/volume1/mnt/만화" -n "이관된 만화함"
+
+3. 기존 카테고리에 병합(Merge)하기 (Category Merge into Existing):
+   # 카테고리 ID로 병합
+   python tools/import_category.py -i 백업파일.oasis.zip --merge-to 15 -p "/volume1/mnt/만화B"
+
+   # 카테고리 이름으로 병합
+   python tools/import_category.py -i 백업파일.oasis.zip --merge-to "판타지 소설" -p "/volume1/mnt/소설B"
+
+4. 도커(Docker) 환경 실행 예시:
+   docker exec -it bookoasis python tools/import_category.py -i /app/covers/백업.oasis.zip --merge-to 15 -p "/volume1/mnt/만화B"
+"""
+    )
     parser.add_argument("-i", "--input", type=str, required=True, help="Path to input .oasis.zip package")
-    parser.add_argument("-p", "--target-path", action="append", default=None, help="New target physical path(s). Can be specified multiple times or separated by comma/newline")
+    parser.add_argument("-p", "--target-path", action="append", default=None, help="New target physical path(s). Can be specified multiple times (-p path1 -p path2) or comma-separated")
     parser.add_argument("-d", "--db", choices=['general', 'adult'], default=None, help="Target DB type (default: from package manifest)")
-    parser.add_argument("-n", "--name", type=str, default=None, help="New category name (default: from package manifest)")
-    parser.add_argument("--info", "--inspect", action="store_true", help="Inspect package metadata and physical path requirements without importing")
+    parser.add_argument("-n", "--name", type=str, default=None, help="New category name when creating new category")
+    parser.add_argument("-m", "--merge-to", type=str, default=None, help="Merge package into existing category (by Category ID or Category Name) instead of creating a new category")
+    parser.add_argument("--info", "--inspect", action="store_true", help="Inspect package metadata, root path info, and list existing DB categories for merging")
 
     args = parser.parse_args()
 
@@ -315,10 +418,10 @@ def main():
 
     if not args.target_path:
         print("[!] Error: At least one target physical path (--target-path / -p) is required when importing.")
-        print(f"    (Tip: Run 'python {sys.argv[0]} -i \"{args.input}\" --info' to inspect package requirements)")
+        print(f"    (Tip: Run 'python {sys.argv[0]} -i \"{args.input}\" --info' to inspect package & DB requirements)")
         sys.exit(1)
 
-    import_category(input_path=args.input, target_paths_raw=args.target_path, db_type=args.db, name=args.name)
+    import_category(input_path=args.input, target_paths_raw=args.target_path, db_type=args.db, name=args.name, merge_to=args.merge_to)
 
 
 if __name__ == '__main__':

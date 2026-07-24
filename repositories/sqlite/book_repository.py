@@ -203,7 +203,7 @@ class BookRepository:
         if library_id and library_id not in ('all', 'history', 'favorite', 'home'):
             # 요약 설명이 채워진 것을 먼저 매칭
             query1 = f"""
-                SELECT author, isbn, publisher, link, score, summary, genre, tags
+                SELECT author, isbn, publisher, link, score, summary, genre, tags, COALESCE(metadata_locked, 0) AS metadata_locked
                 FROM books
                 WHERE series_name = ? AND library_id = ? AND COALESCE(is_deleted, 0) = 0{perm_clause}
                   AND (summary IS NOT NULL AND summary != '')
@@ -213,7 +213,7 @@ class BookRepository:
             row = cursor.fetchone()
             if not row:
                 query2 = f"""
-                    SELECT author, isbn, publisher, link, score, summary, genre, tags
+                    SELECT author, isbn, publisher, link, score, summary, genre, tags, COALESCE(metadata_locked, 0) AS metadata_locked
                     FROM books WHERE series_name = ? AND library_id = ? AND COALESCE(is_deleted, 0) = 0{perm_clause}
                     LIMIT 1
                 """
@@ -221,7 +221,7 @@ class BookRepository:
                 row = cursor.fetchone()
         else:
             query1 = f"""
-                SELECT author, isbn, publisher, link, score, summary, genre, tags
+                SELECT author, isbn, publisher, link, score, summary, genre, tags, COALESCE(metadata_locked, 0) AS metadata_locked
                 FROM books
                 WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0{perm_clause}
                   AND (summary IS NOT NULL AND summary != '')
@@ -231,7 +231,7 @@ class BookRepository:
             row = cursor.fetchone()
             if not row:
                 query2 = f"""
-                    SELECT author, isbn, publisher, link, score, summary, genre, tags
+                    SELECT author, isbn, publisher, link, score, summary, genre, tags, COALESCE(metadata_locked, 0) AS metadata_locked
                     FROM books WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0{perm_clause}
                     LIMIT 1
                 """
@@ -252,7 +252,7 @@ class BookRepository:
                 SELECT b.id, b.title, b.file_format, b.total_pages, b.has_offsets, b.cover_image, b.cover_updated_at,
                        b.file_path, p.pages_read, p.is_completed,
                        CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
-                       b.library_id, p.last_read_at
+                       b.library_id, p.last_read_at, COALESCE(b.metadata_locked, 0) AS metadata_locked
                 FROM books b
                 LEFT JOIN user_progress p ON b.id = p.book_id AND p.user_id = ?
                 LEFT JOIN user_favorites uf ON b.id = uf.book_id AND uf.user_id = ?
@@ -264,7 +264,7 @@ class BookRepository:
                 SELECT b.id, b.title, b.file_format, b.total_pages, b.has_offsets, b.cover_image, b.cover_updated_at,
                        b.file_path, p.pages_read, p.is_completed,
                        CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
-                       b.library_id, p.last_read_at
+                       b.library_id, p.last_read_at, COALESCE(b.metadata_locked, 0) AS metadata_locked
                 FROM books b
                 LEFT JOIN user_progress p ON b.id = p.book_id AND p.user_id = ?
                 LEFT JOIN user_favorites uf ON b.id = uf.book_id AND uf.user_id = ?
@@ -304,6 +304,41 @@ class BookRepository:
                     cover_updated_at = CURRENT_TIMESTAMP
                 WHERE series_name = ?
             """, (author, isbn, publisher, summary, link, genre, tags, series_name))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    @staticmethod
+    def unlock_media_metadata(db_type, series_name=None, library_id=None, book_id=None):
+        """도서/시리즈 메타데이터 잠금 해제 (metadata_locked = 0)"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            where = []
+            params = []
+            if book_id is not None and str(book_id).strip() != '':
+                where.append("id = ?")
+                params.append(int(book_id))
+            if series_name:
+                where.append("series_name = ?")
+                params.append(series_name)
+            if library_id is not None and str(library_id).strip() != '':
+                where.append("(library_id = ? OR CAST(library_id AS TEXT) = ?)")
+                try:
+                    lib_id_val = int(library_id)
+                except (ValueError, TypeError):
+                    lib_id_val = library_id
+                params.extend([lib_id_val, str(library_id)])
+            
+            if not where:
+                return False
+            
+            sql = f"UPDATE books SET metadata_locked = 0 WHERE {' AND '.join(where)}"
+            cursor.execute(sql, params)
             conn.commit()
             return cursor.rowcount > 0
         except Exception as e:

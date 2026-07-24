@@ -218,6 +218,11 @@ function loadViewerSettings() {
   const cPadLeft = localStorage.getItem('comic_padding_left') || '0';
   const cPadRight = localStorage.getItem('comic_padding_right') || '0';
 
+  const removeGapInput = document.getElementById('setting-remove-2page-center-gap');
+  if (removeGapInput) {
+    removeGapInput.checked = (localStorage.getItem('remove_2page_center_gap') === '1');
+  }
+
   const topInput = document.getElementById('setting-viewer-padding-top');
   const bottomInput = document.getElementById('setting-viewer-padding-bottom');
   const leftInput = document.getElementById('setting-viewer-padding-left');
@@ -268,6 +273,12 @@ function submitViewerSettings(event) {
   console.log('[Settings-Viewer] submitViewerSettings triggered');
   if (event) event.preventDefault();
   try {
+    const removeGapInput = document.getElementById('setting-remove-2page-center-gap');
+    if (removeGapInput) {
+      localStorage.setItem('remove_2page_center_gap', removeGapInput.checked ? '1' : '0');
+      console.log(`[Settings-Viewer] Saved remove_2page_center_gap: ${removeGapInput.checked ? '1' : '0'}`);
+    }
+
     const padTop = document.getElementById('setting-viewer-padding-top').value;
     const padBottom = document.getElementById('setting-viewer-padding-bottom').value;
     const padLeft = document.getElementById('setting-viewer-padding-left').value;

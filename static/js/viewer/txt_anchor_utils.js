@@ -72,6 +72,24 @@ export function getTxtAnchorInfoByMode({
   const cleanText = isEpub ? stripHtml(rawChunk) : rawChunk.replace(/\s+/g, ' ').trim();
   if (cleanText.length === 0) return null;
 
+  // 1순위: 화면 뷰포트 내 실제 가시 엘리먼트 텍스트 캡처 (iOS Safari scrollLeft 읽기 오류 방어)
+  try {
+    const rect = scrollWrapper.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 3;
+    const elemAtPoint = document.elementFromPoint(centerX, centerY);
+    if (elemAtPoint && contentArea.contains(elemAtPoint)) {
+      const visibleTxt = (elemAtPoint.textContent || '').replace(/\s+/g, ' ').trim();
+      const meaningful = _findMeaningfulAnchor(visibleTxt, 0, 30);
+      if (meaningful && meaningful.replace(/\s/g, '').length >= 5) {
+        return {
+          chunkIdx: currentChunkIdx,
+          anchorText: meaningful,
+        };
+      }
+    }
+  } catch (e) {}
+
   const maxScroll = scrollWrapper.scrollWidth - scrollWrapper.clientWidth;
   const ratio = maxScroll > 0 ? scrollWrapper.scrollLeft / maxScroll : 0;
   const startIndex = Math.floor(cleanText.length * ratio);

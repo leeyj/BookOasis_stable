@@ -1,4 +1,14 @@
 # CHANGELOG
+## v1.3.8
+- 카테고리 내보내기/들여오기 구현 | implement category import/export function
+- /docs/guide_category_migration.md 참조 | refer to /docs/guide_category_migration.md
+- 스캐너 안정화 보완 | scanner stabilization complement
+- 메타정보 수정시 자물쇠 아이콘 노출 | lock icon display when editing metadata
+- 진행중인 스캔 취소 기능 추가 | add cancel scan function
+- 모바일 뷰에서 화면잠금시 읽은 페이지 저장 보강 | improve save read page when screen lock in mobile view
+- 스캔 히스토리 테이블 분리 | split scan history table
+
+
 ## v1.3.7
 - 이 시리즈 재스캔 오류 긴급 복구 | recover series re-scan error
 ---

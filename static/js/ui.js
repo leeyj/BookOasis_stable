@@ -9,20 +9,20 @@ import { stripLeadingBracketTags } from './series_display.js';
 // 지연 로딩을 위한 단일 싱글톤 IntersectionObserver 인스턴스
 const lazyImageObserver = ('IntersectionObserver' in window)
   ? new IntersectionObserver((entries, observer) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          const lazyImage = entry.target;
-          if (lazyImage.dataset.src) {
-            lazyImage.src = lazyImage.dataset.src;
-            lazyImage.removeAttribute('data-src');
-          }
-          observer.unobserve(lazyImage);
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        const lazyImage = entry.target;
+        if (lazyImage.dataset.src) {
+          lazyImage.src = lazyImage.dataset.src;
+          lazyImage.removeAttribute('data-src');
         }
-      });
-    }, {
-      rootMargin: '200px 0px',
-      threshold: 0.01
-    })
+        observer.unobserve(lazyImage);
+      }
+    });
+  }, {
+    rootMargin: '200px 0px',
+    threshold: 0.01
+  })
   : null;
 
 
@@ -127,7 +127,7 @@ export function createBookCard(item, options = {}) {
   });
   const useLazyLoad = options.lazyLoad !== false;
   const shouldHideCover = !!state.currentLibraryHideCovers;
-  
+
   // 1. 공통 카드 클릭 핸들러 (아이콘 및 별 클릭 분기)
   card.onclick = (e) => {
     if (e.target.closest('.btn-resume-series') || e.target.closest('.btn-card-fav-toggle')) {
@@ -150,7 +150,7 @@ export function createBookCard(item, options = {}) {
   // 3. 서브 텍스트 메타정보 결정
   let subTextHtml = '';
   if (item.pages_read > 0 && options.showProgress) {
-    subTextHtml = `<p style="font-size:0.75rem; color:#94a3b8; margin:0.25rem 0 0 0;">${i18n.t('dashboard.continue_reading', {pages: item.pages_read})}</p>`;
+    subTextHtml = `<p style="font-size:0.75rem; color:#94a3b8; margin:0.25rem 0 0 0;">${i18n.t('dashboard.continue_reading', { pages: item.pages_read })}</p>`;
   } else if (options.isNew) {
     subTextHtml = `<p style="font-size:0.75rem; color:#94a3b8; margin:0.25rem 0 0 0;">${i18n.t('dashboard.new_arrival')}</p>`;
   }
@@ -169,12 +169,23 @@ export function createBookCard(item, options = {}) {
   const imgSrc = shouldHideCover ? fallbackCoverSrc : (useLazyLoad ? lazyPlaceholder : coverSrc);
   const imgDataSrcAttr = (!shouldHideCover && useLazyLoad) ? `data-src="${coverSrc}"` : '';
 
+  // 5. 메타데이터 잠금 배지 구성 (커버 좌측 하단 녹색 자물쇠 아이콘)
+  let lockedBadgeHtml = '';
+  if (item.metadata_locked === 1 || item.metadata_locked === '1') {
+    lockedBadgeHtml = `
+      <div class="book-card-locked-badge" title="메타데이터 잠김 (수동 편집됨)" style="position: absolute; bottom: 8px; left: 8px; z-index: 5; background: rgba(0, 0, 0, 0.65); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.4); width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.4); backdrop-filter: blur(2px);">
+        <i class="fa-solid fa-lock" style="font-size: 0.7rem;"></i>
+      </div>
+    `;
+  }
+
   card.innerHTML = `
     <div class="book-card-cover">
       <div class="book-card-overlay"></div>
       <img src="${imgSrc}" ${imgDataSrcAttr} alt="${displayTitle}" decoding="async" loading="lazy">
       ${badgeHtml}
       ${favBtnHtml}
+      ${lockedBadgeHtml}
 
       <button class="btn-resume-series" title="${options.actionTitle || '읽기'}">
         <i class="fa-solid fa-book-open"></i>
@@ -227,7 +238,7 @@ export function createBookCard(item, options = {}) {
   card.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     // book_id가 존재하는 경우에만 실행 (시리즈 카드인 경우 대리 book_id 설정 가능)
     const targetBookId = item.id || item.representative_book_id || null;
     if (typeof window.showBookContextMenu === 'function') {
@@ -390,7 +401,7 @@ window.toggleCardFavoriteEvent = async (event, name, bookId, nextStatus) => {
     event.stopPropagation();
     event.preventDefault();
   }
-  
+
   // 즉시 UI 피드백 반영 (Optimistic Update)
   const btn = event.currentTarget || event.target.closest('.btn-card-fav-toggle');
   let originalClass = '';
@@ -416,7 +427,7 @@ window.toggleCardFavoriteEvent = async (event, name, bookId, nextStatus) => {
   } else {
     res = await window.toggleSeriesFavoriteAction(name, nextStatus);
   }
-  
+
   if (res && res.success) {
     const statusText = nextStatus === 1 ? '등록' : '해제';
     showToast(`"${name}" 즐겨찾기가 ${statusText}되었습니다.`, 'success');
@@ -480,15 +491,15 @@ function syncSystemTickerLayout() {
 
 export function startSystemStatusPolling() {
   if (statusIntervalId) return;
-  
+
   const poll = async () => {
     try {
       const res = await fetch(`/api/system/status?type=${state.currentLibraryType}`);
       const data = await res.json();
-      
+
       const footer = document.getElementById('system-ticker-footer');
       const contentEl = document.getElementById('system-ticker-content');
-      
+
       if (data.success && data.is_active && data.tasks && data.tasks.length > 0) {
         const textMessage = data.tasks.join("   |   ");
         if (footer && contentEl) {
@@ -496,12 +507,12 @@ export function startSystemStatusPolling() {
           if (lastTickerContent !== textMessage) {
             contentEl.innerText = textMessage;
             lastTickerContent = textMessage;
-            
+
             // marquee 애니메이션 속도를 글자 길이에 맞춰 동적 조절
             const duration = Math.max(15, Math.min(60, textMessage.length * 0.35));
             contentEl.style.animationDuration = `${duration}s`;
           }
-          
+
           if (footer.style.display === 'none') {
             footer.style.display = 'flex';
             document.body.classList.add('has-system-ticker');
@@ -519,7 +530,7 @@ export function startSystemStatusPolling() {
           document.documentElement.style.setProperty('--system-ticker-left', '0px');
           lastTickerContent = '';
           console.log('[SystemTicker] 🤫 백그라운드 태스크가 없어 속보 푸터 바 은닉.');
-          
+
           // 스캔 완료 시 보관함 리스트 실시간 자동 갱신
           if (state.currentLibraryId === 'home') {
             if (typeof window.loadDashboardData === 'function') window.loadDashboardData();
@@ -534,7 +545,7 @@ export function startSystemStatusPolling() {
       console.error('[SystemTicker] 상태 조회 실패:', err);
     }
   };
-  
+
   // 최초 1회 즉시 실행 후 5초 주기 폴링
   poll();
   statusIntervalId = setInterval(poll, 5000);
