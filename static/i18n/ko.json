@@ -366,6 +366,7 @@
     "error_txt_load": "로드 실패",
     "txt_empty": "텍스트 내용이 비어있습니다.",
     "txt_chunk_info": "{current} / {total} (청크)",
+    "chapter_fallback": "{num}장",
     "loading_epub_title": "도서를 불러오는 중...",
     "loading_epub_sub": "EPUB 도서 파일을 읽어오고 있습니다.<br>잠시만 기다려 주세요.",
     "error_epub_title": "도서 파일을 불러오지 못했습니다.",

@@ -971,6 +971,7 @@
 }
 
 #txt-scroll-wrapper.scroll-mode-page .txt-content {
+    width: 100%;
     height: 100%;
     margin: 0;
     padding: 0;
@@ -979,7 +980,9 @@
 
 /* 개별 청크 단위 및 브라우저 가로 열에도 스냅 장착 */
 #txt-scroll-wrapper.scroll-mode-page .txt-chunk {
+    height: 100%;
     box-sizing: border-box;
+    break-inside: avoid;
 }
 
 #media-viewer-modal .txt-reader-theme-light {

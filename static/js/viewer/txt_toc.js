@@ -369,7 +369,10 @@ export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
     });
   } else {
     txtChunks.forEach((_, idx) => {
-      ul.appendChild(buildItem(`청크 ${idx + 1}`, idx, '', 0));
+      const fallbackTitle = (window.i18n && typeof window.i18n.t === 'function')
+        ? window.i18n.t('viewer.chapter_fallback', { num: idx + 1 })
+        : `${idx + 1}장`;
+      ul.appendChild(buildItem(fallbackTitle, idx, '', 0));
     });
   }
 

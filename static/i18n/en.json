@@ -366,6 +366,7 @@
     "error_txt_load": "Load failed",
     "txt_empty": "Text content is empty.",
     "txt_chunk_info": "{current} / {total} (chunk)",
+    "chapter_fallback": "Chapter {num}",
     "loading_epub_title": "Loading book...",
     "loading_epub_sub": "Reading EPUB file.<br>Please wait a moment.",
     "error_epub_title": "Failed to load book files.",

@@ -127,6 +127,16 @@ class TextEpubContentService:
                     if toc_id and toc_id in manifest_items:
                         ncx_href = manifest_items[toc_id]
 
+                # 비표준 EPUB 대응: ncx나 nav가 manifest 속성에 명시되지 않은 경우 확장자 및 파일명 fallback 감지
+                if not ncx_href and not nav_href:
+                    for item_id, href in manifest_items.items():
+                        lower_href = href.lower()
+                        if lower_href.endswith('.ncx') or 'toc' in lower_href:
+                            ncx_href = href
+                            break
+                        elif 'nav' in lower_href and (lower_href.endswith('.xhtml') or lower_href.endswith('.html')):
+                            nav_href = href
+
                 spine_itemrefs = []
                 if spine is not None:
                     for itemref in spine.findall('./itemref'):
@@ -172,28 +182,32 @@ class TextEpubContentService:
                                     href = a.get('href')
                                     text = a.get_text().strip()
                                     idx, anchor = resolve_toc_item(href, nav_href)
+                                    fallback_num = (idx + 1) if idx >= 0 else (len(toc_list) + 1)
+                                    title_text = text if text else f"{fallback_num}장"
                                     toc_list.append({
-                                        'title': text,
+                                        'title': title_text,
                                         'chapter_idx': idx,
                                         'anchor': anchor,
                                         'level': 1
                                     })
-                    elif ncx_href:
+                    if not toc_list and ncx_href:
                         ncx_full_path = posixpath.join(opf_dir, ncx_href) if opf_dir else ncx_href
                         ncx_data = zf.read(ncx_full_path).decode('utf-8', errors='ignore')
                         soup = BeautifulSoup(ncx_data, 'xml')
-                        navmap = soup.find('navMap')
+                        navmap = soup.find(re.compile(r'navmap', re.I))
                         if navmap:
                             def parse_navpoint(element, level):
-                                for np in element.find_all('navPoint', recursive=False):
-                                    navlabel = np.find('navLabel')
-                                    text_elem = navlabel.find('text') if navlabel else None
-                                    title = text_elem.get_text().strip() if text_elem else 'Chapter'
-                                    content_elem = np.find('content')
+                                for np in element.find_all(re.compile(r'navpoint', re.I), recursive=False):
+                                    navlabel = np.find(re.compile(r'navlabel', re.I))
+                                    text_elem = navlabel.find(re.compile(r'text', re.I)) if navlabel else None
+                                    title = text_elem.get_text().strip() if text_elem else ''
+                                    content_elem = np.find(re.compile(r'content', re.I))
                                     src = content_elem.get('src') if content_elem else None
                                     idx, anchor = resolve_toc_item(src, ncx_href)
+                                    fallback_num = (idx + 1) if idx >= 0 else (len(toc_list) + 1)
+                                    title_text = title if title else f"{fallback_num}장"
                                     toc_list.append({
-                                        'title': title,
+                                        'title': title_text,
                                         'chapter_idx': idx,
                                         'anchor': anchor,
                                         'level': level,

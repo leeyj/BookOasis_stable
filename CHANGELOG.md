@@ -1,4 +1,6 @@
 # CHANGELOG
+## v1.3.9
+- epub 모바일 뷰에서 오른쪽 영역에 글자가 잘리는 현상 수정 | Fix text truncation on the right side in mobile epub view
 ## v1.3.8
 - 카테고리 내보내기/들여오기 구현 | implement category import/export function
 - /docs/guide_category_migration.md 참조 | refer to /docs/guide_category_migration.md
@@ -7,7 +9,8 @@
 - 진행중인 스캔 취소 기능 추가 | add cancel scan function
 - 모바일 뷰에서 화면잠금시 읽은 페이지 저장 보강 | improve save read page when screen lock in mobile view
 - 스캔 히스토리 테이블 분리 | split scan history table
-
+- 서비스 시작/재시작시 큐 테이블 초기화 구현 | implement queue table reset on service start/restart
+- 이제 중간 자동 재개는 지원되지 않습니다 | from now on, mid-way auto resume is not supported
 
 ## v1.3.7
 - 이 시리즈 재스캔 오류 긴급 복구 | recover series re-scan error

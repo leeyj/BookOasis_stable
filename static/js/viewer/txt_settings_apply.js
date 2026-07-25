@@ -98,18 +98,20 @@ export function applyTxtSettingsCore(ctx) {
       const removeCenterGap = (localStorage.getItem('remove_2page_center_gap') === '1');
       const pageGap = pageStep === '2' ? (removeCenterGap ? 0 : 40) : 0;
 
+      scrollWrapper.style.paddingLeft = '0';
+      scrollWrapper.style.paddingRight = '0';
+
       const isMobileView = (window.innerWidth <= 768);
+      const safeTargetWidth = Math.max(260, targetWidth);
       if (isMobileView) {
-        scrollWrapper.style.paddingLeft = `${padLeft}px`;
-        scrollWrapper.style.paddingRight = `${padRight}px`;
+        scrollWrapper.style.width = `${safeTargetWidth}px`;
         scrollWrapper.style.maxWidth = '100%';
       } else {
-        scrollWrapper.style.paddingLeft = '0';
-        scrollWrapper.style.paddingRight = '0';
+        scrollWrapper.style.width = '100%';
         if (pageStep === '2') {
-          scrollWrapper.style.maxWidth = `${Math.min(targetWidth, 1600)}px`;
+          scrollWrapper.style.maxWidth = `${Math.min(safeTargetWidth, 1600)}px`;
         } else {
-          scrollWrapper.style.maxWidth = `${Math.min(targetWidth, 800)}px`;
+          scrollWrapper.style.maxWidth = `${Math.min(safeTargetWidth, 800)}px`;
         }
       }
 
@@ -120,7 +122,11 @@ export function applyTxtSettingsCore(ctx) {
 
       contentArea.style.columnCount = pageStep === '2' ? '2' : '1';
       contentArea.style.columnGap = `${pageGap}px`;
-      contentArea.style.columnWidth = `${singleColWidth}px`;
+      if (pageStep === '2') {
+        contentArea.style.columnWidth = `calc((100% - ${pageGap}px) / 2)`;
+      } else {
+        contentArea.style.columnWidth = '100%';
+      }
       contentArea.style.columnFill = 'auto';
       contentArea.style.height = '100%';
 
@@ -132,6 +138,7 @@ export function applyTxtSettingsCore(ctx) {
       container.classList.remove('scroll-mode-page');
 
       scrollWrapper.style.height = '100%';
+      scrollWrapper.style.width = '';
       scrollWrapper.style.maxWidth = '850px';
       scrollWrapper.style.marginLeft = 'auto';
       scrollWrapper.style.marginRight = 'auto';
@@ -157,6 +164,16 @@ export function applyTxtSettingsCore(ctx) {
     }
 
     applyFontFamily(contentArea, fontFamily);
+
+    if (scrollMode === 'page' && document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => {
+        requestAnimationFrame(() => {
+          if (scrollWrapper && scrollWrapper.classList.contains('scroll-mode-page')) {
+            snapTxtPageScrollLeft(scrollWrapper);
+          }
+        });
+      });
+    }
 
     setCurrentChunkIdx(savedChunkIdx);
     renderCurrentChunk(true);

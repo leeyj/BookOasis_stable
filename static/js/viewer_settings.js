@@ -114,6 +114,12 @@ export function loadAndApplyCustomFont(fontName, fontUrl, element) {
     if (element) {
       element.style.fontFamily = `'${fontFaceName}', sans-serif`;
     }
+    requestAnimationFrame(() => {
+      const wrapper = document.getElementById('txt-scroll-wrapper');
+      if (wrapper && wrapper.classList.contains('scroll-mode-page')) {
+        import('./viewer/txt_page_utils.js').then(m => m.snapTxtPageScrollLeft(wrapper));
+      }
+    });
     return fontFaceName;
   }).catch(err => {
     console.error(`[Viewer-Settings] Failed to load custom font: ${fontName}`, err);
