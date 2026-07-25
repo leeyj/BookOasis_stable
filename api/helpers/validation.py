@@ -9,9 +9,9 @@ MAX_LIBRARY_PATHS = 20
 MAX_LIBRARY_PATH_LINE_LENGTH = 1024
 MAX_LIBRARY_PATH_TEXT_LENGTH = 8192
 
-def validate_library_paths(physical_path):
+def validate_library_paths(physical_path, category_type='local'):
     """
-    물리 경로 검증 (여러 개 지원)
+    물리 경로 또는 원격 링크 검증 (여러 개 지원)
     반환: (target_paths 리스트, 오류메시지 또는 None)
     """
     raw_text = str(physical_path or '').replace('\r', '')
@@ -29,6 +29,20 @@ def validate_library_paths(physical_path):
     if too_long_paths:
         return None, f'각 경로는 최대 {MAX_LIBRARY_PATH_LINE_LENGTH}자까지 허용됩니다.'
     
+    if category_type == 'gdrive':
+        # 구글 드라이브 카테고리는 API Key가 반드시 필요합니다.
+        import os
+        from dotenv import load_dotenv
+        load_dotenv()
+        api_key = os.getenv('GDRIVE_API_KEY') or os.getenv('GDRIVE_API') or os.getenv('GOOGLE_API_KEY')
+        if not api_key:
+            return None, (
+                '구글 드라이브 카테고리를 등록하려면 Google Drive API Key가 필요합니다.\n'
+                '서버의 .env 파일에 GDRIVE_API_KEY=<발급받은_키> 를 추가한 후 다시 시도해 주세요.\n'
+                '(Google Cloud Console → API 및 서비스 → 사용자 인증 정보 → API 키 생성)'
+            )
+        return target_paths, None
+
     invalid_paths = [p for p in target_paths if not os.path.exists(p)]
     if invalid_paths:
         error_msg = _t('api.err_invalid_paths', paths='\n'.join(invalid_paths))

@@ -12,15 +12,30 @@
                 <input type="text" id="library-form-name" name="name" required maxlength="25" data-i18n-placeholder="modal.category_name_placeholder" placeholder="예: 판타지 소설, 코믹스 등">
             </div>
             <div class="library-form-group">
-                <label for="library-form-path" data-i18n="modal.category_path_label">서버 물리 경로 (엔터로 여러 개 입력 가능)</label>
+                <label data-i18n="modal.category_type_label">카테고리 유형</label>
+                <div class="category-type-selector" style="display: flex; gap: 0.5rem; margin-top: 0.4rem;">
+                    <button type="button" class="category-type-btn active" data-type="local" onclick="selectCategoryType('local')">
+                        <i class="fa-solid fa-folder"></i> <span data-i18n="modal.type_local">로컬 / 마운트 경로</span>
+                    </button>
+                    <button type="button" class="category-type-btn" data-type="gdrive" onclick="selectCategoryType('gdrive')" hidden aria-hidden="true" style="display: none !important;">
+                        <i class="fa-brands fa-google-drive" style="color: #4285F4;"></i> <span data-i18n="modal.type_gdrive">구글 드라이브 공유 링크</span>
+                    </button>
+                </div>
+                <input type="hidden" id="library-form-category-type" name="category_type" value="local">
+            </div>
+            <div class="library-form-group">
+                <label for="library-form-path" id="library-form-path-label" data-i18n="modal.category_path_label">서버 물리 경로 (엔터로 여러 개 입력 가능)</label>
                 <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
                     <textarea id="library-form-path" name="physical_path" required rows="3" maxlength="8192" data-i18n-placeholder="modal.category_path_placeholder" placeholder="예: C:\library\fantasy&#10;/home/user/manga" style="flex: 1;"></textarea>
                     <button type="button" id="btn-browse-paths" class="btn-browse-paths" onclick="openPathBrowser()" style="padding: 0.5rem 1rem; background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.5); color: #a855f7; border-radius: 4px; cursor: pointer; font-weight: 600; white-space: nowrap; align-self: flex-start; transition: all 0.2s;" onmouseenter="this.style.background='rgba(168, 85, 247, 0.3)'" onmouseleave="this.style.background='rgba(168, 85, 247, 0.2)'" title="찾아보기">
                         <i class="fa-solid fa-folder-open"></i> 찾아보기
                     </button>
+                    <button type="button" id="btn-test-gdrive-links" class="btn-test-gdrive-links" onclick="testGDriveLinks()" style="display: none; padding: 0.5rem 1rem; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.5); color: #60a5fa; border-radius: 4px; cursor: pointer; font-weight: 600; white-space: nowrap; align-self: flex-start; transition: all 0.2s;" onmouseenter="this.style.background='rgba(59, 130, 246, 0.3)'" onmouseleave="this.style.background='rgba(59, 130, 246, 0.2)'" title="링크 연결 테스트">
+                        <i class="fa-solid fa-bolt"></i> <span data-i18n="modal.btn_test_gdrive_link">연결 테스트</span>
+                    </button>
                 </div>
             </div>
-            <div class="library-form-group-row">
+            <div class="library-form-group-row" id="library-form-remote-row">
                 <input type="checkbox" id="library-form-remote" name="is_remote">
                 <label for="library-form-remote" data-i18n="modal.remote_drive_label">원격 드라이브 (VFS 마운트 / rclone 등)</label>
             </div>
@@ -29,6 +44,33 @@
                 <label for="library-form-hide-cover">이 카테고리 커버 감추기</label>
             </div>
 <style>
+.category-type-btn {
+    flex: 1;
+    padding: 0.55rem 0.8rem;
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    color: #94a3b8;
+    cursor: pointer;
+    font-size: 0.86rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    transition: all 0.2s;
+}
+.category-type-btn:hover {
+    background: rgba(168, 85, 247, 0.15);
+    border-color: rgba(168, 85, 247, 0.4);
+    color: #a855f7;
+}
+.category-type-btn.active {
+    background: rgba(168, 85, 247, 0.25);
+    border-color: #a855f7;
+    color: #fff;
+    box-shadow: 0 0 8px rgba(168, 85, 247, 0.3);
+}
 .icon-option {
     display: flex;
     justify-content: center;
@@ -72,6 +114,37 @@
 }
 </style>
 <script>
+function selectCategoryType(type) {
+    if (type === 'gdrive') type = 'local';
+
+    document.querySelectorAll('.category-type-selector .category-type-btn').forEach(el => el.classList.remove('active'));
+    const btn = document.querySelector(`.category-type-selector .category-type-btn[data-type="${type}"]`);
+    if (btn) btn.classList.add('active');
+
+    document.getElementById('library-form-category-type').value = type;
+
+    const pathLabel = document.getElementById('library-form-path-label');
+    const pathTextarea = document.getElementById('library-form-path');
+    const btnBrowse = document.getElementById('btn-browse-paths');
+    const btnTest = document.getElementById('btn-test-gdrive-links');
+    const remoteRow = document.getElementById('library-form-remote-row');
+    const rcloneGroup = document.getElementById('library-form-rclone-url-group');
+
+    if (type === 'gdrive') {
+        if (pathLabel) pathLabel.textContent = (window.i18n && i18n.t('modal.gdrive_path_label')) || '구글 드라이브 공유 폴더 링크 (엔터로 여러 개 입력 가능)';
+        if (pathTextarea) pathTextarea.placeholder = (window.i18n && i18n.t('modal.gdrive_path_placeholder')) || '예: https://drive.google.com/drive/folders/1A2B3C4D5E6F7G8H9I';
+        if (btnBrowse) btnBrowse.style.display = 'none';
+        if (btnTest) btnTest.style.display = 'inline-flex';
+        if (remoteRow) remoteRow.style.display = 'none';
+        if (rcloneGroup) rcloneGroup.style.display = 'none';
+    } else {
+        if (pathLabel) pathLabel.textContent = (window.i18n && i18n.t('modal.category_path_label')) || '서버 물리 경로 (엔터로 여러 개 입력 가능)';
+        if (pathTextarea) pathTextarea.placeholder = '예: C:\\library\\fantasy\n/home/user/manga';
+        if (btnBrowse) btnBrowse.style.display = 'inline-flex';
+        if (btnTest) btnTest.style.display = 'none';
+        if (remoteRow) remoteRow.style.display = 'flex';
+    }
+}
 function selectIconOption(element) {
     document.querySelectorAll('.category-icon-selector .icon-option').forEach(el => el.classList.remove('active'));
     element.classList.add('active');

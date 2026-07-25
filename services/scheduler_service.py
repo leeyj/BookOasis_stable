@@ -357,11 +357,11 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
         from repositories.scheduler_repository import SchedulerRepository
         row_chk = SchedulerRepository.get_library_vfs_config(db_type, library_id)
         
-        # 원격 경로가 있는지 확인
-        from utils.drive_helper import is_remote_path
+        # 원격 경로가 있는지 확인 (rclone VFS 마운트 경로 전용, 구글 드라이브 웹 링크 제외)
+        from utils.drive_helper import is_remote_path, is_gdrive_url
         target_paths_raw = [p.strip() for p in str(physical_path).replace('\r', '').split('\n') if p.strip()]
         target_paths = list(dict.fromkeys(target_paths_raw))
-        has_remote_paths = any(is_remote_path(p) for p in target_paths)
+        has_remote_paths = any(is_remote_path(p) and not is_gdrive_url(p) for p in target_paths)
         
         # VFS 설정이 활성화되었거나, 원격 경로가 있으면 VFS 갱신 강제 수행
         should_vfs_refresh = (row_chk and row_chk['vfs_refresh_before_scan'] == 1) or has_remote_paths

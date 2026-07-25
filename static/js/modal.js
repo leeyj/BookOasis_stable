@@ -3,6 +3,7 @@ import { state } from './state.js';
 import * as api from './api.js';
 import { switchActiveView } from './view_manager.js';
 import { renderDetailHeader, renderVolumesList, renderRecommendList } from './detail_render.js';
+import { updateCurrentCategoryIndicator } from './category_indicator.js';
 
 // 그리드 뷰 → 상세 뷰 전환
 export async function openBookDetail(event, seriesName, libraryId, representativeBookId = null, displayTitle = '') {
@@ -54,6 +55,7 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
       state.detailLibraryId = actualLibraryId;
       state.detailRepresentativeBookId = representativeBookId || (books.length > 0 ? books[0].id : null);
       state.detailDisplayTitle = safeDisplayTitle;
+      updateCurrentCategoryIndicator(actualLibraryId);
 
       // 컴포넌트 렌더러 모듈 호출
       const headerHtml = renderDetailHeader(meta, books, safeSeriesName, actualLibraryId, safeDisplayTitle);
@@ -171,6 +173,8 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
 
 // 상세 뷰 → 그리드 뷰/대시보드 복귀
 export function goBackToList(triggerBack = true) {
+  updateCurrentCategoryIndicator(state.currentLibraryId);
+
   const targetScroll = (state.scrollPositions && (
     state.scrollPositions['last_pos'] ?? 
     state.scrollPositions[state.currentLibraryId]

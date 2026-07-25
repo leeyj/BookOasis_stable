@@ -361,6 +361,10 @@ export function triggerAddLibrary() {
   const hideCoverEl = document.getElementById('library-form-hide-cover');
   if (hideCoverEl) hideCoverEl.checked = false;
 
+  if (typeof window.selectCategoryType === 'function') {
+    window.selectCategoryType('local');
+  }
+
   // 체크박스 변경 감지 바인딩 (최초 1회)
   if (remoteEl && !remoteEl.dataset.listenerBound) {
     remoteEl.dataset.listenerBound = 'true';
@@ -378,6 +382,33 @@ export function triggerAddLibrary() {
   title.innerText = i18n.t('category.add_title');
   modal.style.display = 'flex';
 }
+
+export function testGDriveLinks() {
+  const pathEl = document.getElementById('library-form-path');
+  const linksStr = pathEl ? pathEl.value : '';
+  if (!linksStr.trim()) {
+    showToast('테스트할 구글 드라이브 공유 링크를 입력해 주세요.', 'warning');
+    return;
+  }
+  showToast('구글 드라이브 링크 연결 테스트 중...', 'info');
+  fetch('/api/category/test-gdrive-links', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ links: linksStr }),
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        showToast(`✅ ${data.message}`, 'success');
+      } else {
+        showToast(`❌ ${data.error || '연결 실패'}`, 'error');
+      }
+    })
+    .catch(err => {
+      showToast(`❌ 네트워크 오류: ${err.message}`, 'error');
+    });
+}
+window.testGDriveLinks = testGDriveLinks;
 
 export async function triggerEditLibrary() {
   if (!currentTargetLibrary || currentTargetLibrary.type === 'system') return;
@@ -407,6 +438,11 @@ export async function triggerEditLibrary() {
   
   const pathVal = document.querySelector(`[data-id="${id}"]`).dataset.path || '';
   document.getElementById('library-form-path').value = pathVal;
+
+  const categoryTypeVal = document.querySelector(`[data-id="${id}"]`)?.dataset?.categoryType || 'local';
+  if (typeof window.selectCategoryType === 'function') {
+    window.selectCategoryType(categoryTypeVal);
+  }
 
   const isRemoteVal = document.querySelector(`[data-id="${id}"]`).dataset.remote || '0';
   const remoteEl = document.getElementById('library-form-remote');

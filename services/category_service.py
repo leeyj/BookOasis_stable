@@ -2,6 +2,34 @@
 import database
 from repositories.category_repository import CategoryRepository
 
+
+def apply_running_scan_status(libraries, db_type, queue_status):
+    """큐에서 실행 중인 스캔을 라이브러리 상태 목록에 우선 반영한다."""
+    running = (queue_status or {}).get('running')
+    if not running or running.get('type') not in ('library_scan', 'cover_scan'):
+        return libraries
+
+    kwargs = running.get('kwargs') or {}
+    if str(kwargs.get('db_type', 'general')) != str(db_type):
+        return libraries
+
+    try:
+        running_library_id = int(kwargs.get('library_id'))
+    except (TypeError, ValueError):
+        return libraries
+
+    for library in libraries:
+        try:
+            is_running_library = int(library.get('id')) == running_library_id
+        except (TypeError, ValueError):
+            is_running_library = False
+        if is_running_library:
+            library['scan_status'] = 'scanning'
+            break
+
+    return libraries
+
+
 class CategoryService:
     @staticmethod
     def get_libraries(db_type, user_id=None, role=None):

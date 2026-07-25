@@ -112,9 +112,14 @@ def scan_library(db_path, library_id, physical_path, force=False, skip_vfs_refre
     print(f"[Scanner-WakeUp] mode={'aggressive' if use_aggressive_warmup else 'normal'} (remote={is_remote}, setting={hdd_aggressive_warmup})")
 
     # ── [HDD/NAS Wake-up & Path Validation] ──
+    from utils.drive_helper import is_gdrive_url
     failed_paths = []
     
     for path in target_paths:
+        if is_gdrive_url(path):
+            print(f"[Scanner-WakeUp] 구글 드라이브 웹 공유 링크 감지: '{path}'. 로컬 디스크 Wake-up 검사를 우회합니다.")
+            continue
+
         path_accessible = False
         last_error_msg = ""
         for attempt in range(1, max_attempts + 1):

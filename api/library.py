@@ -747,3 +747,32 @@ def unlock_media_metadata():
             return jsonify({'success': False, 'error': '해당 도서/시리즈를 찾을 수 없거나 이미 해제되었습니다.'}), 404
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@library_bp.route('/api/category/test-gdrive-links', methods=['POST'])
+@login_required
+def test_gdrive_links_api():
+    """구글 드라이브 공유 링크 테스트 엔드포인트"""
+    data = request.get_json() or {}
+    links = data.get('links', '')
+    if not links.strip():
+        return jsonify({'success': False, 'error': '테스트할 구글 드라이브 공유 링크를 입력해 주세요.'})
+    
+    import re
+    folder_ids = []
+    for line in links.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        match = re.search(r'folders/([a-zA-Z0-9_-]+)', line)
+        if match:
+            folder_ids.append(match.group(1))
+        elif re.match(r'^[a-zA-Z0-9_-]{20,}$', line):
+            folder_ids.append(line)
+            
+    if not folder_ids:
+        return jsonify({'success': False, 'error': '유효한 구글 드라이브 폴더 링크나 ID를 찾지 못했습니다.'})
+        
+    return jsonify({
+        'success': True,
+        'message': f'{len(folder_ids)}개의 구글 드라이브 공유 폴더 ID가 감지되었습니다. (정상 감지)'
+    })

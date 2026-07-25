@@ -6,7 +6,7 @@ import sqlite3
 import threading
 from flask import Blueprint, request, jsonify
 from apscheduler.triggers.cron import CronTrigger
-from services.category_service import CategoryService
+from services.category_service import CategoryService, apply_running_scan_status
 from services.scheduler_service import run_scan_job, SchedulerService
 from api.auth import admin_required
 from utils.i18n import _t
@@ -24,8 +24,9 @@ def add_media_library():
     db_type = request.form.get('type', 'general')
     name = request.form.get('name', '').strip()
     physical_path = request.form.get('physical_path', '').strip()
+    category_type = request.form.get('category_type', 'local').strip() or 'local'
     
-    target_paths, error = validate_library_paths(physical_path)
+    target_paths, error = validate_library_paths(physical_path, category_type)
     if error:
         return jsonify({'success': False, 'error': error}), 400
     
@@ -69,8 +70,9 @@ def edit_media_library():
     library_id = request.form.get('id')
     name = request.form.get('name', '').strip()
     physical_path = request.form.get('physical_path', '').strip()
+    category_type = request.form.get('category_type', 'local').strip() or 'local'
     
-    target_paths, error = validate_library_paths(physical_path)
+    target_paths, error = validate_library_paths(physical_path, category_type)
     if error:
         return jsonify({'success': False, 'error': error}), 400
     
@@ -148,6 +150,8 @@ def get_libraries_schedules():
     try:
         rows = CategoryRepository.get_all_libraries(db_type)
         libraries = [_format_library_row(r) for r in rows]
+        from services.scanner_queue import scanner_queue
+        libraries = apply_running_scan_status(libraries, db_type, scanner_queue.get_queue_status())
         return jsonify({'success': True, 'libraries': libraries})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

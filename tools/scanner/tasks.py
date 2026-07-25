@@ -44,23 +44,28 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
     dir_mtime = None
     meta_mtime = None
     
-    try:
-        dir_mtime = os.path.getmtime(root)
-        meta_mtimes_list = []
-        if has_yaml:
-            yaml_file = next(f for f in files if f.lower() == 'kavita.yaml')
-            meta_mtimes_list.append(os.path.getmtime(join_canonical(root, yaml_file)))
-        if has_xml:
-            xml_file = next(f for f in files if f.lower() == 'info.xml')
-            meta_mtimes_list.append(os.path.getmtime(join_canonical(root, xml_file)))
-        
-        if meta_mtimes_list:
-            meta_mtime = max(meta_mtimes_list)
-        else:
-            meta_mtime = 0.0
-    except Exception as e:
-        print(f"[Scanner-DEBUG-Task] ⚠️ Failed to get mtime for folder '{root}': {e}")
-        dir_mtime = None
+    if is_remote or root.startswith(('gdrive:', 'gdrive://')):
+        is_remote = True
+        dir_mtime = 0.0
+        meta_mtime = 0.0
+    else:
+        try:
+            dir_mtime = os.path.getmtime(root)
+            meta_mtimes_list = []
+            if has_yaml:
+                yaml_file = next(f for f in files if f.lower() == 'kavita.yaml')
+                meta_mtimes_list.append(os.path.getmtime(join_canonical(root, yaml_file)))
+            if has_xml:
+                xml_file = next(f for f in files if f.lower() == 'info.xml')
+                meta_mtimes_list.append(os.path.getmtime(join_canonical(root, xml_file)))
+            
+            if meta_mtimes_list:
+                meta_mtime = max(meta_mtimes_list)
+            else:
+                meta_mtime = 0.0
+        except Exception as e:
+            print(f"[Scanner-DEBUG-Task] ⚠️ Failed to get mtime for folder '{root}': {e}")
+            dir_mtime = None
 
     # 2. Early skip if files are unchanged (mtime & size match DB cache)
     skipped_files = set()

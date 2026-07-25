@@ -142,7 +142,37 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
 
     print(f"[Scanner] Scanning physical folder tree...")
     folder_count = 0
+    from utils.drive_helper import is_gdrive_url
     for t_path in target_paths:
+        if is_gdrive_url(t_path):
+            print(f"[Scanner] 구글 드라이브 원격 링크 카테고리 스캔 시작: {t_path}")
+            from utils.drive_helper import fetch_gdrive_folder_files, extract_gdrive_folder_id
+            g_files = fetch_gdrive_folder_files(t_path)
+            folder_id = extract_gdrive_folder_id(t_path) or 'gdrive_root'
+            
+            grouped_files = {}
+            for item in g_files:
+                fname = item.get('name')
+                if not fname:
+                    continue
+                rel_f = item.get('rel_folder', '')
+                if rel_f:
+                    v_root = canonical_path(f"gdrive://{folder_id}/{rel_f}")
+                else:
+                    v_root = canonical_path(f"gdrive://{folder_id}")
+                
+                if v_root not in grouped_files:
+                    grouped_files[v_root] = []
+                grouped_files[v_root].append(fname)
+                
+            for v_root, fnames in grouped_files.items():
+                for fn in fnames:
+                    found_file_paths.add(join_canonical(v_root, fn))
+                tasks.append((v_root, fnames, t_path))
+                
+            print(f"[Scanner] 구글 드라이브 원격 도서 총 {len(g_files)}개 ({len(grouped_files)}개 폴더) 감지 완료!")
+            continue
+
         if not os.path.exists(t_path):
             print(f"[Scanner] Warning: Path does not exist, skipping: {t_path}")
             continue

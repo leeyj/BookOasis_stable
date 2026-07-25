@@ -2,6 +2,7 @@
 import { state } from './state.js';
 import * as api from './api.js';
 import { openBookDetail, goBackToList } from './modal.js';
+import { updateCurrentCategoryIndicator } from './category_indicator.js';
 import { openReader, closeMediaViewer, toggleFullscreenViewer, setComicFitMode, changeFontSize, toggleReaderTheme, initKeyboardListener, nextComicPage, prevComicPage, nextPdfPage, prevPdfPage, epubPrevPage, epubNextPage, prevTxtPage, nextTxtPage } from './viewer.js';
 import { switchActiveView } from './view_manager.js';
 
@@ -293,38 +294,6 @@ export function switchLibraryType(type) {
   }
   loadLibraries();
   selectCategory('home');
-}
-
-function getSystemCategoryLabel(id) {
-  if (!window.i18n || typeof window.i18n.t !== 'function') return String(id || '');
-  if (id === 'home') return window.i18n.t('header.title') || '도서 보관함';
-  if (id === 'history') return window.i18n.t('category.history') || '최근 읽은 도서';
-  if (id === 'favorite') return window.i18n.t('category.favorite') || '즐겨찾기';
-  if (id === 'plugins') return window.i18n.t('category.plugins') || '플러그인 데스크';
-  if (id === 'all') return window.i18n.t('category.all') || '전체 도서 목록';
-  if (id === 'settings') return window.i18n.t('sidebar.settings') || '환경설정';
-  return String(id || '');
-}
-
-function updateCurrentCategoryIndicator(id, activeItem) {
-  const indicator = document.getElementById('current-category-indicator');
-  if (!indicator) return;
-
-  let label = '';
-  if (activeItem && activeItem.dataset && activeItem.dataset.type === 'custom') {
-    label = String(activeItem.dataset.name || '').trim();
-  }
-  if (!label && ['home', 'history', 'favorite', 'plugins', 'all', 'settings'].includes(String(id))) {
-    label = getSystemCategoryLabel(id);
-  }
-  if (!label && activeItem) {
-    const fallbackText = String(activeItem.textContent || '').replace(/\s+/g, ' ').trim();
-    label = fallbackText;
-  }
-  if (!label) label = String(id || '');
-
-  indicator.textContent = label;
-  indicator.title = label;
 }
 
 // 카테고리 선택 처리

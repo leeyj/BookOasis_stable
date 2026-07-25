@@ -9,6 +9,8 @@ venv/
 ENV/
 deploy.py
 test/
+client_secret_*.json
+gdrive_*.json
 
 # Project Specific Data (DB & Cache)
 db/*.db

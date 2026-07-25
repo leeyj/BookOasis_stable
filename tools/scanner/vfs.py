@@ -7,7 +7,7 @@ import json
 import base64
 import time
 import database
-from utils.drive_helper import is_remote_path, get_rclone_refresh_dirs
+from utils.drive_helper import is_remote_path, is_gdrive_url, get_rclone_refresh_dirs
 
 
 def _is_connection_refused_error(err):
@@ -50,7 +50,7 @@ def trigger_vfs_refresh(db_path, library_id, physical_path):
     """Refresh rclone cache before starting scan if remote mount path (VFS)."""
     target_paths_raw = [p.strip() for p in str(physical_path).replace('\r', '').split('\n') if p.strip()]
     target_paths = list(dict.fromkeys(target_paths_raw))
-    remote_paths = list(dict.fromkeys([p for p in target_paths if is_remote_path(p)]))
+    remote_paths = list(dict.fromkeys([p for p in target_paths if is_remote_path(p) and not is_gdrive_url(p)]))
     
     if not remote_paths:
         return

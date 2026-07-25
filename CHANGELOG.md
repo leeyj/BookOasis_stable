@@ -1,4 +1,7 @@
 # CHANGELOG
+## v1.4.0
+- 홈 화면에서 도서선택시 카테고리 업데이트 | Update category when selecting a book on the home screen
+- 스캔시 간헐적으로 준비중으로 표시되는 버그 수정 | Bug where status intermittently shows "Preparing" during scanning
 ## v1.3.9
 - epub 모바일 뷰에서 오른쪽 영역에 글자가 잘리는 현상 수정 | Fix text truncation on the right side in mobile epub view
 ## v1.3.8
