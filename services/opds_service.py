@@ -40,6 +40,24 @@ def _build_fallback_cover_href(title: str, file_format: str = 'text') -> str:
     return f"/covers/fallback?title={safe_title}&format={safe_format}"
 
 
+def _get_search_format_info(file_path: str, file_format: str = ''):
+    raw_format = str(file_format or '').strip().lower()
+    if not raw_format:
+        raw_format = os.path.splitext(file_path or '')[1].lower().lstrip('.')
+
+    if raw_format in ('zip', 'cbz', 'cbr', 'imgdir'):
+        return '만화', raw_format.upper()
+    if raw_format == 'epub':
+        return 'EPUB', 'EPUB'
+    if raw_format == 'pdf':
+        return 'PDF', 'PDF'
+    if raw_format in ('txt', 'text'):
+        return '텍스트', 'TXT'
+    if raw_format in ('audiobook', 'mp3', 'm4a', 'm4b', 'flac', 'ogg', 'opus'):
+        return '오디오북', raw_format.upper()
+    return (raw_format.upper() or '파일'), (raw_format.upper() or 'FILE')
+
+
 def _extract_title_from_path(file_path: str) -> str:
     if not file_path:
         return ''
@@ -203,6 +221,7 @@ def search_books_entries(db_type: str, query: str, download_prefix: str, urn_pre
     
     entries = []
     for b in books:
+        format_label, format_term = _get_search_format_info(b['file_path'], b.get('file_format', ''))
         desc = b['summary'] or ""
         if not desc:
             meta = []
@@ -211,13 +230,16 @@ def search_books_entries(db_type: str, query: str, download_prefix: str, urn_pre
             if b['author']:
                 meta.append(f"저자: {b['author']}")
             desc = " / ".join(meta) if meta else "상세 설명 없음"
+        desc = f"형식: {format_label} · {desc}"
         ext = os.path.splitext(b['file_path'] or '')[1].lower().replace('.', '') or 'text'
         stream_href = _build_stream_href(b['file_path'], db_type, b['id'], is_app_opds)
             
         entries.append({
             'id': f"urn:{urn_prefix}:search:{b['id']}",
-            'title': b['title'],
+            'title': f"[{format_label}] {b['title']}",
             'summary': desc,
+            'format_label': format_label,
+            'format_term': format_term,
             'type': 'acquisition',
             'href': f"{download_prefix}/{b['id']}",
             'stream_href': stream_href,

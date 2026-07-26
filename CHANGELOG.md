@@ -1,6 +1,15 @@
 # CHANGELOG
+## v1.4.4
+- pdf도 가운데 여백 설정 값 적용 | pdf apply center gap setting
+- pdf 뷰어에서 2장 보기 모드시 가운데 여백 끄기 적용시 그림자 제거 | pdf viewer, remove box-shadow when 2-page view without center gap
+- pdf 뷰에서 진척도 저장이 안되는 이슈 해소 | Fix progress save issue in pdf viewer
 ## v1.4.3
 - 도서상세리스트에 "안 읽은 것만" 필터시 오류 수정 | Fix error when filtering to show "Only unread" in the book detail list 
+- 스캐줄 설정 목록에 표시방법 수정 | Fix display method in Scan settings list
+ *보라색도트 : 크론설정됨 | Purple dot: Cron job set
+ *붉은색도트 : 크론설정 안됨. | Cron job not set
+ -OPDS에 검색시 접두사 추가 | Add prefix during search on OPDS
+
 ## v1.4.2
 - 신규 카테고리 등록 오류 수정 | Fix error in registering new categories
 - 도서상세리스트에 정렬 및 완독 미표시 기능 추가 | Add sorting and completion mark functions to the book detail list

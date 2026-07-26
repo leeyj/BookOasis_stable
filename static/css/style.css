@@ -1,3 +1,71 @@
+.schedule-settings-table {
+    min-width: 900px;
+    table-layout: fixed;
+}
+
+.schedule-path-cell {
+    padding: 1rem;
+    min-width: 0;
+}
+
+.schedule-path-toggle {
+    display: block;
+    width: 100%;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    background: transparent;
+    color: #94a3b8;
+    font-family: monospace;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.schedule-path-toggle[data-expanded="true"] {
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
+.schedule-path-toggle:hover,
+.schedule-path-toggle:focus-visible {
+    color: #c4b5fd;
+}
+
+.schedule-scan-info {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    cursor: help;
+}
+
+.schedule-cron-dot {
+    width: 8px;
+    height: 8px;
+    flex: 0 0 8px;
+    border-radius: 50%;
+}
+
+.schedule-cron-dot.enabled {
+    background: #a855f7;
+    box-shadow: 0 0 7px rgba(168, 85, 247, 0.65);
+}
+
+.schedule-cron-dot.disabled {
+    background: #ef4444;
+    box-shadow: 0 0 7px rgba(239, 68, 68, 0.45);
+}
+
+.schedule-scan-time {
+    color: #cbd5e1;
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
 /* ======================================================== */
 /* 🛡️ 나의 서포터 메인 스타일시트 패키지 허브 (style.css) */
 /* ======================================================== */

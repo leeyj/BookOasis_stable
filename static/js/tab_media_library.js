@@ -476,4 +476,22 @@ export function handleLibrarySearchAction() {
 }
 window.handleLibrarySearchAction = handleLibrarySearchAction;
 
+export async function handleLibrarySearchKeydown(event) {
+  if (event.key !== 'Enter' || event.isComposing) return;
+  event.preventDefault();
+  event.stopPropagation();
+
+  const searchInput = event.currentTarget;
+  const query = searchInput.value.trim();
+  if (!query) return;
+
+  state.searchQuery = query.toLowerCase();
+  if (state.currentLibraryId === 'home') {
+    selectCategory('all');
+  } else {
+    await loadBooksList(false);
+  }
+}
+window.handleLibrarySearchKeydown = handleLibrarySearchKeydown;
+
 export { loadLibraries };

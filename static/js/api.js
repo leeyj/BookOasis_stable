@@ -13,8 +13,8 @@ export async function fetchBooksList({type, libraryId, page, limit, append, sear
 }
 
 export async function fetchAllBooksList(type, libraryId) {
-  const url = `/api/media/all-list?type=${type}&library_id=${libraryId}`;
-  const res = await fetch(url);
+  const url = `/api/media/all-list?type=${type}&library_id=${libraryId}&_=${Date.now()}`;
+  const res = await fetch(url, {cache: 'no-store'});
   return res.json();
 }
 

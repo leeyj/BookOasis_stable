@@ -190,7 +190,8 @@ class OpdsRepository:
 
             cursor.execute(
                 f"""
-                SELECT b.id, b.title, b.series_name, b.author, b.file_path, b.cover_image, b.summary
+                  SELECT b.id, b.title, b.series_name, b.author, b.file_path, b.file_format,
+                      b.cover_image, b.summary
                 FROM books b
                 WHERE {where_sql}
                 ORDER BY b.title ASC, b.id ASC

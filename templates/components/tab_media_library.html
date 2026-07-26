@@ -82,7 +82,7 @@
 
             <div class="library-search-center" style="display: flex; gap: 0.5rem; align-items: center;">
                 <input type="text" id="library-search" class="form-control input-sm" placeholder="제목, 시리즈, 작가 검색..."
-                    oninput="filterBooks()">
+                    oninput="filterBooks()" onkeydown="handleLibrarySearchKeydown(event)">
                 <button id="btn-library-search-action" class="btn-toggle" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; flex-shrink: 0;" onclick="handleLibrarySearchAction()" data-i18n="common.search">검색</button>
             </div>
 

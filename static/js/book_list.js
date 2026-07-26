@@ -48,6 +48,13 @@ function getSearchableSeriesName(item) {
   return stripLeadingBracketTags(item && item.series_name ? item.series_name : '').toLowerCase();
 }
 
+function matchesSearchQuery(item, query) {
+  return getSearchableSeriesName(item).includes(query) ||
+    String(item && item.representative_title ? item.representative_title : '').toLowerCase().includes(query) ||
+    String(item && item.title ? item.title : '').toLowerCase().includes(query) ||
+    String(item && item.author ? item.author : '').toLowerCase().includes(query);
+}
+
 
 // 1. 도서 시리즈 목록 로드
 export async function loadBooksList(isAppend = false) {
@@ -86,10 +93,7 @@ export async function loadBooksList(isAppend = false) {
 
   // 1) 검색 필터링
   if (state.searchQuery) {
-    filtered = filtered.filter(item => 
-      (getSearchableSeriesName(item).includes(state.searchQuery)) ||
-      (item.author && item.author.toLowerCase().includes(state.searchQuery))
-    );
+    filtered = filtered.filter(item => matchesSearchQuery(item, state.searchQuery));
   }
 
   // 1-1) 장르 다중 필터링 (AND 결합)
@@ -205,10 +209,7 @@ export function filterBooks() {
   
   let filtered = [...state.allBooksData];
   if (state.searchQuery) {
-    filtered = filtered.filter(item => 
-      (getSearchableSeriesName(item).includes(state.searchQuery)) ||
-      (item.author && item.author.toLowerCase().includes(state.searchQuery))
-    );
+    filtered = filtered.filter(item => matchesSearchQuery(item, state.searchQuery));
   }
 
   // 1-1) 장르 다중 필터링 (AND 결합)
@@ -290,10 +291,7 @@ export function toggleLibrarySort() {
   
   let filtered = [...state.allBooksData];
   if (state.searchQuery) {
-    filtered = filtered.filter(item => 
-      (getSearchableSeriesName(item).includes(state.searchQuery)) ||
-      (item.author && item.author.toLowerCase().includes(state.searchQuery))
-    );
+    filtered = filtered.filter(item => matchesSearchQuery(item, state.searchQuery));
   }
 
   sortBooksList(filtered, newSort);

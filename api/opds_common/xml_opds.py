@@ -41,6 +41,11 @@ def build_opds_standard_xml(request, title: str, entries: list, start_path: str,
         ]
         if entry.get('summary'):
             lines.append(f'    <summary>{escape_xml(entry["summary"])}</summary>')
+        if entry.get('format_term'):
+            lines.append(
+                f'    <category term="{escape_xml(entry["format_term"])}" '
+                f'label="{escape_xml(entry.get("format_label", entry["format_term"]))}"/>'
+            )
 
         href = f"{base_url}{entry['href']}"
         if entry['type'] == 'navigation':

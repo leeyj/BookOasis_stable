@@ -12,6 +12,73 @@ function buildStatusBadge(scanStatus) {
   return `<span class="badge-scan-status ready">${i18n.t('settings.status_ready')}</span>`;
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function parseScanDate(value) {
+  const raw = String(value || '').trim();
+  if (!raw || raw === '-') return null;
+  const parsed = new Date(raw.includes('T') ? raw : raw.replace(' ', 'T'));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatLastScan(value) {
+  const scannedAt = parseScanDate(value);
+  if (!scannedAt) {
+    return {
+      relative: i18n.t('settings.scan_never') || '기록 없음',
+      exact: i18n.t('settings.scan_never') || '기록 없음'
+    };
+  }
+
+  const elapsedMinutes = Math.max(0, Math.floor((Date.now() - scannedAt.getTime()) / 60000));
+  let relative;
+  if (elapsedMinutes < 1) {
+    relative = i18n.t('settings.scan_just_now') || '방금 전';
+  } else if (elapsedMinutes < 60) {
+    relative = i18n.t('settings.scan_minutes_ago', {count: elapsedMinutes});
+  } else if (elapsedMinutes < 1440) {
+    relative = i18n.t('settings.scan_hours_ago', {count: Math.floor(elapsedMinutes / 60)});
+  } else {
+    relative = i18n.t('settings.scan_days_ago', {count: Math.floor(elapsedMinutes / 1440)});
+  }
+
+  const pad = value => String(value).padStart(2, '0');
+  const exact = `${pad(scannedAt.getMonth() + 1)}.${pad(scannedAt.getDate())} ${pad(scannedAt.getHours())}:${pad(scannedAt.getMinutes())}`;
+  return {relative, exact};
+}
+
+function compactPath(path) {
+  const normalized = String(path || '').replace(/\\/g, '/');
+  const segments = normalized.split('/').filter(Boolean);
+  if (segments.length <= 3) return normalized;
+  return `…/${segments.slice(-3).join('/')}`;
+}
+
+function buildCompactPaths(physicalPath) {
+  return String(physicalPath || '').split(/\r?\n/).filter(Boolean).map(path => {
+    const fullPath = escapeHtml(path.trim());
+    const shortPath = escapeHtml(compactPath(path.trim()));
+    return `<button type="button" class="schedule-path-toggle" data-expanded="false" data-short-path="${shortPath}" data-full-path="${fullPath}" title="${fullPath}" onclick="toggleSchedulePath(this)">${shortPath}</button>`;
+  }).join('');
+}
+
+function buildLastScanInfo(lastScannedAt, cronSchedule = '') {
+  const scanInfo = formatLastScan(lastScannedAt);
+  const hasSchedule = String(cronSchedule || '').trim().length > 0;
+  const scheduleLabel = hasSchedule
+    ? i18n.t('settings.scan_schedule_enabled')
+    : i18n.t('settings.scan_schedule_disabled');
+  const tooltip = `${scheduleLabel} · ${scanInfo.exact}`;
+  return `<span class="schedule-scan-info" title="${escapeHtml(tooltip)}" aria-label="${escapeHtml(tooltip)}"><span class="schedule-cron-dot ${hasSchedule ? 'enabled' : 'disabled'}" aria-hidden="true"></span><span class="schedule-scan-time">${escapeHtml(scanInfo.relative)}</span></span>`;
+}
+
 function buildScheduleRow(lib) {
   const statusBadge = buildStatusBadge(lib.scan_status);
   const cleanName = lib.name.replace(/'/g, "\\'");
@@ -22,8 +89,9 @@ function buildScheduleRow(lib) {
   return `
     <tr data-library-id="${lib.id}" style="border-bottom: 1px solid rgba(255,255,255,0.05); hover: background: rgba(255,255,255,0.02);">
       <td style="padding: 1rem; font-weight: 600; color: #fff;">${lib.name}</td>
-      <td style="padding: 1rem; color: #94a3b8; font-family: monospace; font-size: 0.8rem; white-space: pre-line;">${lib.physical_path}</td>
+      <td class="schedule-path-cell">${buildCompactPaths(lib.physical_path)}</td>
       <td data-role="schedule-status" style="padding: 1rem; text-align: center;">${statusBadge}</td>
+      <td data-role="schedule-scan-info" style="padding: 1rem; text-align: center;">${buildLastScanInfo(lastScannedAt, lib.cron_schedule)}</td>
       <td style="padding: 1rem; text-align: center;">
         <button class="btn-toggle" style="white-space: nowrap; padding: 0.3rem 0.6rem; font-size: 0.75rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.2rem;" onclick="openScanSettingsModal(${lib.id}, '${cleanName}', ${lib.is_remote}, '${cleanRcloneRcUrl}', '${cleanCronSchedule}', ${lib.vfs_refresh_before_scan || 0})" title="상세 설정">
           <i class="fa-solid fa-gear"></i> ${i18n.t('settings.col_config') || '설정'}
@@ -42,23 +110,23 @@ function buildScheduleRow(lib) {
 export async function loadLibrarySchedules() {
   const container = document.getElementById('settings-libraries-list');
   if (!container) return;
-  container.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:2rem; color:#a855f7;"><i class="fa-solid fa-circle-notch fa-spin fa-2x"></i><br><span style="display:inline-block; margin-top:0.5rem;">${i18n.t('settings.loading_schedules')}</span></td></tr>`;
+  container.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:2rem; color:#a855f7;"><i class="fa-solid fa-circle-notch fa-spin fa-2x"></i><br><span style="display:inline-block; margin-top:0.5rem;">${i18n.t('settings.loading_schedules')}</span></td></tr>`;
   
   try {
     const data = await api.fetchLibrarySchedules(state.currentLibraryType);
     if (data.success) {
       if (data.libraries.length === 0) {
-        container.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:2rem; color:#94a3b8;">${i18n.t('settings.no_categories')}</td></tr>`;
+        container.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:2rem; color:#94a3b8;">${i18n.t('settings.no_categories')}</td></tr>`;
         return;
       }
 
       container.innerHTML = data.libraries.map(buildScheduleRow).join('');
     } else {
-      container.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:2rem; color:#ef4444;">${i18n.t('settings.fetch_failed')}: ${data.error}</td></tr>`;
+      container.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:2rem; color:#ef4444;">${i18n.t('settings.fetch_failed')}: ${data.error}</td></tr>`;
     }
   } catch (e) {
     console.error('스케줄 조회 에러:', e);
-    container.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:2rem; color:#ef4444;">${i18n.t('settings.server_error')}</td></tr>`;
+    container.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:2rem; color:#ef4444;">${i18n.t('settings.server_error')}</td></tr>`;
   }
 }
 
@@ -91,6 +159,12 @@ export async function refreshLibraryScheduleStatuses() {
         statusCell.innerHTML = nextStatusHtml;
       }
 
+      const scanInfoCell = row.querySelector('[data-role="schedule-scan-info"]');
+      const nextScanInfoHtml = buildLastScanInfo(lib.last_scanned_at || '-', lib.cron_schedule);
+      if (scanInfoCell && scanInfoCell.innerHTML !== nextScanInfoHtml) {
+        scanInfoCell.innerHTML = nextScanInfoHtml;
+      }
+
       const actionButton = row.querySelector('[data-role="schedule-action"]');
       if (actionButton) {
         actionButton.dataset.lastScannedAt = lib.last_scanned_at || '-';
@@ -104,6 +178,13 @@ export async function refreshLibraryScheduleStatuses() {
   }
 }
 window.refreshLibraryScheduleStatuses = refreshLibraryScheduleStatuses;
+
+export function toggleSchedulePath(button) {
+  const expanded = button.dataset.expanded === 'true';
+  button.dataset.expanded = String(!expanded);
+  button.textContent = expanded ? button.dataset.shortPath : button.dataset.fullPath;
+}
+window.toggleSchedulePath = toggleSchedulePath;
 
 // 스케줄 저장 (모달 등에서 범용 호출 가능한 헬퍼)
 export async function saveLibrarySchedule(libraryId, cronVal, vfsRefresh, rcloneRcVal, name = '') {

@@ -112,6 +112,13 @@ export function renderPdfPage() {
     pagesToRender = [pdfCurrentPage];
   }
 
+  const removeCenterGap = (localStorage.getItem('remove_2page_center_gap') === '1');
+  if (removeCenterGap) {
+    renderArea.style.gap = '0px';
+  } else {
+    renderArea.style.gap = '10px';
+  }
+
   // 실제 PDF 렌더 영역 기준으로 가용 뷰포트를 계산해 후단 CSS 축소(뭉개짐)를 방지한다.
   const areaRect = renderArea.getBoundingClientRect();
   const areaStyle = window.getComputedStyle(renderArea);
@@ -131,10 +138,14 @@ export function renderPdfPage() {
   const availableHeight = innerHeight;
 
   // 페이지 배열 순회하며 캔버스 생성 및 순차 비동기 렌더링 개시
-  pagesToRender.forEach(pageNum => {
+    pagesToRender.forEach(pageNum => {
     const canvas = document.createElement('canvas');
     canvas.className = 'pdf-canvas-element';
-    canvas.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
+    if (removeCenterGap) {
+      canvas.style.boxShadow = 'none';
+    } else {
+      canvas.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
+    }
     canvas.style.display = 'block';
     renderArea.appendChild(canvas);
 
@@ -183,6 +194,11 @@ export function renderPdfPage() {
   });
 
   updatePdfPageInfo();
+
+  // 렌더링 시점에 바로 진행도를 한 번 기록하여 한두 페이지만 읽고 닫았을 때 유실(무시)되는 현상 방지
+  if (state.activeBookId && pdfTotalPages > 0) {
+    saveProgress(state.activeBookId, pdfCurrentPage - 1, pdfTotalPages);
+  }
 }
 
 export function updatePdfPageInfo() {

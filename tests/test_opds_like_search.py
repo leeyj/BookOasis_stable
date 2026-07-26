@@ -17,6 +17,7 @@ def _create_search_db(path):
             series_name TEXT,
             author TEXT,
             file_path TEXT,
+            file_format TEXT,
             cover_image TEXT,
             summary TEXT,
             library_id INTEGER,

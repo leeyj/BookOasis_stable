@@ -26,8 +26,8 @@ class SeriesRepository:
 
         if search_query:
             like = f"%{search_query}%"
-            where.append("(b.series_name LIKE ? OR b.author LIKE ?)")
-            params.extend([like, like])
+            where.append("(b.series_name LIKE ? OR b.title LIKE ? OR b.author LIKE ?)")
+            params.extend([like, like, like])
 
         # 일반 사용자는 허용된 카테고리만 필터링
         if role != 'admin' and user_id:
