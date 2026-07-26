@@ -25,9 +25,8 @@ function applyDetailVolumeView() {
   let visibleCount = 0;
   cards.forEach(card => {
     list.appendChild(card);
-    const pagesRead = Math.max(0, Number(card.dataset.pagesRead) || 0);
-    const isUnread = pagesRead < 1 && card.dataset.isCompleted !== '1';
-    const visible = !detailVolumeViewState.unreadOnly || isUnread;
+    const isNotCompleted = card.dataset.isCompleted !== '1';
+    const visible = !detailVolumeViewState.unreadOnly || isNotCompleted;
     card.style.display = visible ? '' : 'none';
     if (visible) visibleCount += 1;
   });

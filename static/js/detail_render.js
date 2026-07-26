@@ -300,7 +300,7 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId, dbType
   orderedBooks.forEach(b => {
     const pagesRead = Math.max(0, Number(b.pages_read) || 0);
     const isCompletedValue = Number(b.is_completed) === 1;
-    const isUnread = pagesRead < 1 && !isCompletedValue;
+    const isNotCompleted = !isCompletedValue;
     const fmt = (b.file_format || '').toLowerCase();
     const pathText = b.file_path || '';
     const imgdirPathDisplay = pathText.replace(/[\\/]__folder__\.imgdir$/i, '');
@@ -393,7 +393,7 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId, dbType
       : `<button class="btn-read" onclick="openReader(${b.id}, '${(b.file_format || '').replace(/'/g, "\\'")}', '${(rawDisplayTitle || '').replace(/'/g, "\\'")}', ${b.pages_read}, ${b.total_pages})">${readBtnText}</button>`;
 
     volumesHtml += `
-      <div class="volume-card" data-book-id="${b.id}" data-pages-read="${pagesRead}" data-is-completed="${isCompletedValue ? 1 : 0}" data-page-missing="${noOffsets ? 1 : 0}" style="${unreadOnly && !isUnread ? 'display: none;' : ''}" oncontextmenu="event.preventDefault(); event.stopPropagation(); if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(event.clientX, event.clientY, ${b.id}, '${(rawDisplayTitle || '').replace(/'/g, "\\'")}', true);" ontouchstart="window.handleLongPressTouchStart(event, (x, y) => { if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(x, y, ${b.id}, '${(rawDisplayTitle || '').replace(/'/g, "\\\\'")}', true); })" ontouchmove="window.handleLongPressTouchMove(event)" ontouchend="window.handleLongPressTouchEnd(event)" ontouchcancel="window.handleLongPressTouchEnd(event)">
+      <div class="volume-card" data-book-id="${b.id}" data-pages-read="${pagesRead}" data-is-completed="${isCompletedValue ? 1 : 0}" data-page-missing="${noOffsets ? 1 : 0}" style="${unreadOnly && !isNotCompleted ? 'display: none;' : ''}" oncontextmenu="event.preventDefault(); event.stopPropagation(); if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(event.clientX, event.clientY, ${b.id}, '${(rawDisplayTitle || '').replace(/'/g, "\\'")}', true);" ontouchstart="window.handleLongPressTouchStart(event, (x, y) => { if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(x, y, ${b.id}, '${(rawDisplayTitle || '').replace(/'/g, "\\\\'")}', true); })" ontouchmove="window.handleLongPressTouchMove(event)" ontouchend="window.handleLongPressTouchEnd(event)" ontouchcancel="window.handleLongPressTouchEnd(event)">
         <img class="volume-thumb" src="${volCoverSrc}" alt="cover"
              onerror="if(this.src.indexOf('/covers/fallback')===-1 &amp;&amp; !this.src.startsWith('data:image/svg+xml')){this.src='${volumeFallbackCoverSrc}';}else{this.onerror=null; this.src='${buildTextCoverDataUri({ title: b.title || rawDisplayTitle, format: b.file_format, seed: b.id })}';}">
         <div class="volume-info">

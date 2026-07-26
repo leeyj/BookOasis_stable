@@ -1,4 +1,6 @@
 # CHANGELOG
+## v1.4.3
+- 도서상세리스트에 "안 읽은 것만" 필터시 오류 수정 | Fix error when filtering to show "Only unread" in the book detail list 
 ## v1.4.2
 - 신규 카테고리 등록 오류 수정 | Fix error in registering new categories
 - 도서상세리스트에 정렬 및 완독 미표시 기능 추가 | Add sorting and completion mark functions to the book detail list
