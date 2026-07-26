@@ -3,31 +3,80 @@
 scanner_queue_repository.py – 백그라운드 스캐너 작업 대기열(scanner_tasks) 삽입, 처리, 갱신 트랜잭션 전담 데이터 액세스 레이어
 """
 import datetime
+import json
 import database
 
 class ScannerQueueRepository:
     @staticmethod
     def startup_cleanup_ghost_tasks():
         """
-        스캐너 워커 단독 재시작 시 기존 대기열(pending)을 지우지 않고 보존하며,
-        중단되었던 태스크(running/exit_pending)를 pending으로 복원하여 1순위로 이어서 수행하게 합니다.
+        프로세스가 종료된 running/exit_pending 태스크만 pending으로 복원합니다.
+        웹 프로세스만 재시작된 경우 살아 있는 스캐너 작업은 그대로 보존합니다.
         """
+        import os
         conn = database.get_connection('general')
         cursor = conn.cursor()
         try:
-            # 1. 중단된 running/exit_pending 태스크를 pending으로 복원 (큐 지우지 않음!)
             cursor.execute(
-                "UPDATE scanner_tasks SET status = 'pending', stage = '워커 재기동 후 자동 이어서 수행' WHERE status IN ('running', 'exit_pending')"
+                "SELECT id, worker_pid, task_type, kwargs FROM scanner_tasks WHERE status IN ('running', 'exit_pending')"
             )
-            restored_count = cursor.rowcount
+            restored_count = 0
+            interrupted_libraries = []
+            for row in cursor.fetchall():
+                pid = row['worker_pid']
+                is_alive = False
+                if pid:
+                    try:
+                        import psutil
+                        is_alive = psutil.pid_exists(pid)
+                    except ImportError:
+                        try:
+                            os.kill(pid, 0)
+                            is_alive = True
+                        except (OSError, ProcessLookupError, ValueError):
+                            pass
 
-            # 2. scanning 상태였던 카테고리를 interrupted로 안전 변경
-            cursor.execute("UPDATE libraries SET scan_status = 'interrupted' WHERE scan_status = 'scanning'")
-            cursor.execute("UPDATE libraries SET scan_status = 'ready' WHERE scan_status = 'cancelling'")
+                if is_alive:
+                    continue
+
+                cursor.execute(
+                    """
+                    UPDATE scanner_tasks
+                    SET status = 'pending', stage = '워커 재기동 후 자동 이어서 수행', worker_pid = NULL
+                    WHERE id = ? AND status IN ('running', 'exit_pending')
+                    """,
+                    (row['id'],)
+                )
+                restored_count += cursor.rowcount
+
+                if row['task_type'] == 'library_scan' and row['kwargs']:
+                    try:
+                        kwargs = json.loads(row['kwargs'])
+                        interrupted_libraries.append((kwargs.get('db_type', 'general'), kwargs.get('library_id')))
+                    except (TypeError, ValueError, json.JSONDecodeError):
+                        pass
 
             conn.commit()
 
-            print(f"[Queue-Startup] 🔄 Restored {restored_count} interrupted tasks to pending for Auto-Resume on worker restart.")
+            for db_type, library_id in interrupted_libraries:
+                if library_id is None:
+                    continue
+                try:
+                    library_conn = database.get_connection(db_type)
+                    library_cursor = library_conn.cursor()
+                    library_cursor.execute(
+                        "UPDATE libraries SET scan_status = 'interrupted' WHERE id = ? AND scan_status = 'scanning'",
+                        (library_id,)
+                    )
+                    library_conn.commit()
+                except Exception as library_error:
+                    print(f"[Queue-Startup WARNING] Failed to mark library {library_id} interrupted: {library_error}")
+                finally:
+                    if 'library_conn' in locals():
+                        library_conn.close()
+                        del library_conn
+
+            print(f"[Queue-Startup] Restored {restored_count} stale tasks to pending for auto-resume.")
             return restored_count
         except Exception as e:
             conn.rollback()
@@ -256,14 +305,18 @@ class ScannerQueueRepository:
 
     @staticmethod
     def cancel_task(task_key, now_str):
-        """특정 태스크 취소 (pending 및 running 상태 모두 취소 처리 및 libraries.scan_status 갱신)"""
-        import json
+        """특정 대기 태스크를 취소하고 이력으로 이동합니다."""
         conn = database.get_connection('general')
         cursor = conn.cursor()
         try:
-            # 1. 취소 대상 태스크 정보 조회
             cursor.execute(
-                "SELECT id, task_type, kwargs, status FROM scanner_tasks WHERE task_key = ? AND status IN ('pending', 'running')",
+                """
+                SELECT id, task_type, kwargs, enqueue_at, started_at
+                FROM scanner_tasks
+                WHERE task_key = ? AND status IN ('pending', 'exit_pending')
+                ORDER BY id DESC
+                LIMIT 1
+                """,
                 (task_key,)
             )
             row = cursor.fetchone()
@@ -271,59 +324,30 @@ class ScannerQueueRepository:
                 return False
 
             task_id = row['id']
-            task_type = row['task_type']
-            kwargs_str = row['kwargs']
-
-            # 2. scanner_tasks 상태를 cancelled 로 갱신
             cursor.execute(
-                "UPDATE scanner_tasks SET status = 'cancelled', finished_at = ? WHERE id = ?",
+                """
+                UPDATE scanner_tasks
+                SET status = 'cancelled', finished_at = ?
+                WHERE id = ? AND status IN ('pending', 'exit_pending')
+                """,
                 (now_str, task_id)
             )
             success = cursor.rowcount > 0
-
-            # 3. library_scan 인 경우 해당 라이브러리의 scan_status를 'cancelling'으로 변경하여 진행 중인 스캐너 엔진 즉시 중단 유도
-            if task_type == 'library_scan' and kwargs_str:
-                try:
-                    kwargs = json.loads(kwargs_str)
-                    lib_id = kwargs.get('library_id')
-                    db_type = kwargs.get('db_type', 'general')
-                    if lib_id:
-                        import time
-                        for lib_attempt in range(1, 6):
-                            try:
-                                lib_conn = database.get_connection(db_type)
-                                lib_cur = lib_conn.cursor()
-                                lib_cur.execute("PRAGMA busy_timeout = 10000;")
-                                lib_cur.execute("UPDATE libraries SET scan_status = 'cancelling' WHERE id = ?", (lib_id,))
-                                lib_conn.commit()
-                                lib_conn.close()
-                                break
-                            except Exception as lib_retry_err:
-                                if lib_attempt < 5:
-                                    time.sleep(0.3 * lib_attempt)
-                                else:
-                                    print(f"[Queue-Cancel Warning] Failed to update library scan_status to cancelling: {lib_retry_err}")
-                except Exception as lib_err:
-                    print(f"[Queue-Cancel Warning] Parse error in cancel task kwargs: {lib_err}")
-
             conn.commit()
+            if not success:
+                return False
 
-            # 4. 영구 scan_history 테이블에 취소 이력 저장
             try:
-                cursor.execute("SELECT enqueue_at, started_at FROM scanner_tasks WHERE id = ?", (task_id,))
-                t_row = cursor.fetchone()
-                enq_at = t_row['enqueue_at'] if t_row else now_str
-                str_at = t_row['started_at'] if t_row else now_str
                 ScannerQueueRepository.record_scan_history(
-                    task_type, task_key, 'cancelled', kwargs_str,
-                    enq_at, str_at, now_str, "User cancelled scan from queue UI"
+                    row['task_type'], task_key, 'cancelled', row['kwargs'],
+                    row['enqueue_at'], row['started_at'], now_str, "User cancelled pending scan from queue UI"
                 )
                 cursor.execute("DELETE FROM scanner_tasks WHERE id = ?", (task_id,))
                 conn.commit()
-            except Exception:
-                pass
+            except Exception as history_error:
+                print(f"[Queue-Cancel Warning] Failed to archive cancelled task: {history_error}")
 
-            return success
+            return True
         except Exception as e:
             conn.rollback()
             raise e

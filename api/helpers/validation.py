@@ -31,7 +31,6 @@ def validate_library_paths(physical_path, category_type='local'):
     
     if category_type == 'gdrive':
         # 구글 드라이브 카테고리는 API Key가 반드시 필요합니다.
-        import os
         from dotenv import load_dotenv
         load_dotenv()
         api_key = os.getenv('GDRIVE_API_KEY') or os.getenv('GDRIVE_API') or os.getenv('GOOGLE_API_KEY')

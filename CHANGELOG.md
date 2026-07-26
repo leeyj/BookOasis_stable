@@ -1,4 +1,11 @@
 # CHANGELOG
+## v1.4.2
+- 신규 카테고리 등록 오류 수정 | Fix error in registering new categories
+- 도서상세리스트에 정렬 및 완독 미표시 기능 추가 | Add sorting and completion mark functions to the book detail list
+- OPDS 검색 기능 활성화 | enable the opds search
+## v1.4.1
+- 불필요 파일 삭제 | remove temp files
+
 ## v1.4.0
 - 홈 화면에서 도서선택시 카테고리 업데이트 | Update category when selecting a book on the home screen
 - 스캔시 간헐적으로 준비중으로 표시되는 버그 수정 | Bug where status intermittently shows "Preparing" during scanning

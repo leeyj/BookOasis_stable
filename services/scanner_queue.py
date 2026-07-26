@@ -25,6 +25,10 @@ class ScannerQueue:
         except:
             print(f"[Queue] {message}")
 
+    def _invalidate_status_cache(self):
+        self._cached_status = None
+        self._cached_status_time = 0.0
+
     def _get_task_key(self, task_type, kwargs):
         if task_type == 'lazy_scan':
             return 'lazy_scan'
@@ -162,6 +166,13 @@ class ScannerQueue:
             from repositories.scanner_queue_repository import ScannerQueueRepository
             now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             count = ScannerQueueRepository.clear_pending_tasks(now_str)
+            if count:
+                self._invalidate_status_cache()
+                try:
+                    from utils.redis_helper import redis_del
+                    redis_del("queue:scanner")
+                except Exception as redis_error:
+                    self.log(f"Redis queue clear failed (ignored): {redis_error}")
             self.log(f"Queue cleared. Cancelled {count} pending items in DB.")
             return count
         except Exception as e:
@@ -177,6 +188,12 @@ class ScannerQueue:
             now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             success = ScannerQueueRepository.cancel_task(task_key, now_str)
             if success:
+                self._invalidate_status_cache()
+                try:
+                    from utils.redis_helper import redis_lrem
+                    redis_lrem("queue:scanner", task_key)
+                except Exception as redis_error:
+                    self.log(f"Redis pending task removal failed (ignored): {redis_error}")
                 self.log(f"Pending task '{task_key}' cancelled successfully in DB.")
             return success
         except Exception as e:

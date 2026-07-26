@@ -320,19 +320,15 @@ class BookRepository:
         try:
             where = []
             params = []
-            if book_id is not None and str(book_id).strip() != '':
-                where.append("id = ?")
-                params.append(int(book_id))
             if series_name:
                 where.append("series_name = ?")
                 params.append(series_name)
-            if library_id is not None and str(library_id).strip() != '':
-                where.append("(library_id = ? OR CAST(library_id AS TEXT) = ?)")
-                try:
-                    lib_id_val = int(library_id)
-                except (ValueError, TypeError):
-                    lib_id_val = library_id
-                params.extend([lib_id_val, str(library_id)])
+                if library_id is not None and str(library_id).strip() != '':
+                    where.append("CAST(library_id AS TEXT) = ?")
+                    params.append(str(library_id))
+            elif book_id is not None and str(book_id).strip() != '':
+                where.append("id = ?")
+                params.append(int(book_id))
             
             if not where:
                 return False

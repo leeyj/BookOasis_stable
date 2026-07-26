@@ -289,9 +289,18 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
   `;
 }
 
-export function renderVolumesList(books, safeSeriesName, actualLibraryId, dbType = 'general') {
+export function renderVolumesList(books, safeSeriesName, actualLibraryId, dbType = 'general', viewOptions = {}) {
+  const unreadOnly = viewOptions.unreadOnly === true;
+  const sortOrder = viewOptions.sortOrder === 'newest' ? 'newest' : 'oldest';
+  const orderedBooks = [...books].sort((left, right) => {
+    const difference = Number(left.id || 0) - Number(right.id || 0);
+    return sortOrder === 'newest' ? -difference : difference;
+  });
   let volumesHtml = '';
-  books.forEach(b => {
+  orderedBooks.forEach(b => {
+    const pagesRead = Math.max(0, Number(b.pages_read) || 0);
+    const isCompletedValue = Number(b.is_completed) === 1;
+    const isUnread = pagesRead < 1 && !isCompletedValue;
     const fmt = (b.file_format || '').toLowerCase();
     const pathText = b.file_path || '';
     const imgdirPathDisplay = pathText.replace(/[\\/]__folder__\.imgdir$/i, '');
@@ -306,11 +315,11 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId, dbType
     }
     const imageDisplayTitle = stripLeadingBracketTags(rawDisplayTitle);
 
-    const progressPercent = b.total_pages > 0 ? Math.round((b.pages_read / b.total_pages) * 100) : 0;
-    const progressText = b.pages_read > 0
-      ? `${b.pages_read}p / ${b.total_pages}p (${progressPercent}%)`
+    const progressPercent = b.total_pages > 0 ? Math.round((pagesRead / b.total_pages) * 100) : 0;
+    const progressText = pagesRead > 0
+      ? `${pagesRead}p / ${b.total_pages}p (${progressPercent}%)`
       : '미독';
-    const readBtnText = b.pages_read > 0
+    const readBtnText = pagesRead > 0
       ? `<i class="fa-solid fa-play"></i> ${i18n.t('detail.btn_resume')}`
       : `<i class="fa-solid fa-play"></i> ${i18n.t('detail.btn_start')}`;
     const volumeFallbackCoverSrc = buildFallbackCoverUrl({
@@ -324,7 +333,7 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId, dbType
       format: b.file_format,
       seed: b.id || b.file_path || `${safeSeriesName}:${imageDisplayTitle}`
     });
-    const isCompleted = b.is_completed
+    const isCompleted = isCompletedValue
       ? `<span class="vol-badge-completed">${i18n.t('detail.badge_completed')}</span>`
       : '';
 
@@ -384,7 +393,7 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId, dbType
       : `<button class="btn-read" onclick="openReader(${b.id}, '${(b.file_format || '').replace(/'/g, "\\'")}', '${(rawDisplayTitle || '').replace(/'/g, "\\'")}', ${b.pages_read}, ${b.total_pages})">${readBtnText}</button>`;
 
     volumesHtml += `
-      <div class="volume-card" data-book-id="${b.id}" data-page-missing="${noOffsets ? 1 : 0}" oncontextmenu="event.preventDefault(); event.stopPropagation(); if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(event.clientX, event.clientY, ${b.id}, '${(rawDisplayTitle || '').replace(/'/g, "\\'")}', true);" ontouchstart="window.handleLongPressTouchStart(event, (x, y) => { if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(x, y, ${b.id}, '${(rawDisplayTitle || '').replace(/'/g, "\\\\'")}', true); })" ontouchmove="window.handleLongPressTouchMove(event)" ontouchend="window.handleLongPressTouchEnd(event)" ontouchcancel="window.handleLongPressTouchEnd(event)">
+      <div class="volume-card" data-book-id="${b.id}" data-pages-read="${pagesRead}" data-is-completed="${isCompletedValue ? 1 : 0}" data-page-missing="${noOffsets ? 1 : 0}" style="${unreadOnly && !isUnread ? 'display: none;' : ''}" oncontextmenu="event.preventDefault(); event.stopPropagation(); if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(event.clientX, event.clientY, ${b.id}, '${(rawDisplayTitle || '').replace(/'/g, "\\'")}', true);" ontouchstart="window.handleLongPressTouchStart(event, (x, y) => { if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(x, y, ${b.id}, '${(rawDisplayTitle || '').replace(/'/g, "\\\\'")}', true); })" ontouchmove="window.handleLongPressTouchMove(event)" ontouchend="window.handleLongPressTouchEnd(event)" ontouchcancel="window.handleLongPressTouchEnd(event)">
         <img class="volume-thumb" src="${volCoverSrc}" alt="cover"
              onerror="if(this.src.indexOf('/covers/fallback')===-1 &amp;&amp; !this.src.startsWith('data:image/svg+xml')){this.src='${volumeFallbackCoverSrc}';}else{this.onerror=null; this.src='${buildTextCoverDataUri({ title: b.title || rawDisplayTitle, format: b.file_format, seed: b.id })}';}">
         <div class="volume-info">
@@ -412,13 +421,25 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId, dbType
 
   return `
     <div class="volumes-section">
-      <h4 class="volumes-section-title">
-        <i class="fa-solid fa-layer-group"></i> ${i18n.t('dashboard.single_book_list')}
-        <span class="vol-count-badge">${i18n.t('dashboard.book_unit', {count: books.length})}</span>
-      </h4>
+      <div class="volumes-section-toolbar">
+        <h4 class="volumes-section-title">
+          <i class="fa-solid fa-layer-group"></i> ${i18n.t('dashboard.single_book_list')}
+          <span class="vol-count-badge">${i18n.t('dashboard.book_unit', {count: books.length})}</span>
+        </h4>
+        <div class="volume-list-controls" aria-label="${i18n.t('detail.list_controls')}">
+          <button type="button" class="volume-filter-btn${unreadOnly ? ' active' : ''}" data-detail-unread-filter aria-pressed="${unreadOnly}" onclick="toggleDetailUnreadFilter()">
+            ${i18n.t('detail.unread_only')}
+          </button>
+          <div class="volume-sort-control" role="group" aria-label="${i18n.t('detail.sort_order')}">
+            <button type="button" class="volume-sort-btn${sortOrder === 'oldest' ? ' active' : ''}" data-detail-sort="oldest" aria-pressed="${sortOrder === 'oldest'}" onclick="setDetailVolumeSort('oldest')">${i18n.t('detail.sort_oldest')}</button>
+            <button type="button" class="volume-sort-btn${sortOrder === 'newest' ? ' active' : ''}" data-detail-sort="newest" aria-pressed="${sortOrder === 'newest'}" onclick="setDetailVolumeSort('newest')">${i18n.t('detail.sort_newest')}</button>
+          </div>
+        </div>
+      </div>
       <div class="volumes-list">
         ${volumesHtml}
       </div>
+      <div class="volumes-empty-filter" style="display: none;">${i18n.t('detail.no_unread_books')}</div>
     </div>
   `;
 }

@@ -759,16 +759,6 @@ def init_databases():
         except Exception as migration_err:
             print(f"[DB-Migration ERROR] libraries is_remote auto-detection fallback failed: {migration_err}")
 
-        # 서버 재시작 시 중단된 스캔 카테고리를 interrupted로 전환하고 태스크를 pending으로 복원 (Auto-Resume 보장)
-        try:
-            cursor.execute("UPDATE libraries SET scan_status = 'ready' WHERE scan_status = 'cancelling'")
-            cursor.execute("UPDATE libraries SET scan_status = 'interrupted' WHERE scan_status = 'scanning'")
-            cursor.execute("UPDATE scanner_tasks SET status = 'pending', stage = '재시작 후 자동 이어서 수행' WHERE status IN ('running', 'exit_pending')")
-            conn.commit()
-            print("[DB-Migration] 🔄 Interrupted scan status preserved for Auto-Resume on startup.")
-        except Exception as reset_err:
-            print(f"[DB-Migration ERROR] Scan status reset failed: {reset_err}")
-
         conn.close()
 
 # DB 튜닝 레이어 서비스 위임 (하위 호환성 유지)

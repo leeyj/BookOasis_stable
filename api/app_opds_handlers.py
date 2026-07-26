@@ -305,11 +305,23 @@ class AppOpdsHandlers:
         if not self._check_auth_cached(is_adult=is_adult):
             return self._unauthorized()
 
+        current_user = self._get_current_user(is_adult=is_adult)
+        if not current_user:
+            return self._unauthorized()
+
         page, page_size, offset = self._get_page_params()
         if is_adult:
-            entries, total = search_books_entries('adult', query, '/app-opds/download/adult', 'app:adult', limit=page_size, offset=offset)
+            entries, total = search_books_entries(
+                'adult', query, '/app-opds/download/adult', 'app:adult',
+                limit=page_size, offset=offset,
+                user_id=current_user['id'], role=current_user['role']
+            )
         else:
-            entries, total = search_books_entries('general', query, '/app-opds/download/general', 'app:general', limit=page_size, offset=offset)
+            entries, total = search_books_entries(
+                'general', query, '/app-opds/download/general', 'app:general',
+                limit=page_size, offset=offset,
+                user_id=current_user['id'], role=current_user['role']
+            )
 
         next_link = None
         if offset + page_size < total:

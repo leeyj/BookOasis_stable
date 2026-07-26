@@ -4,6 +4,10 @@ opds_repository.py – OPDS 피드(navigation/acquisition) 데이터 조회를 �
 """
 import database
 
+
+def _escape_like(term):
+    return str(term).replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+
 class OpdsRepository:
     @staticmethod
     def get_library_list(db_type):
@@ -150,33 +154,54 @@ class OpdsRepository:
         return [dict(row) for row in rows]
 
     @staticmethod
-    def search_books_like(db_type, query, limit, offset):
-        """LIKE 기반 도서 통합 검색"""
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        like_query = f"%{query}%"
-        cursor.execute(
-            """
-            SELECT COUNT(*) AS total FROM books
-            WHERE (title LIKE ? OR series_name LIKE ? OR author LIKE ?) AND COALESCE(is_deleted, 0) = 0
-            """,
-            (like_query, like_query, like_query)
-        )
-        total = cursor.fetchone()['total']
+    def search_books_like(db_type, query, limit, offset, user_id=None, role=None):
+        """일반 테이블만 사용하는 다중 검색어 AND 검색."""
+        terms = [term for term in str(query or '').split() if term][:10]
+        if not terms:
+            return [], 0
 
-        cursor.execute(
-            """
-            SELECT id, title, series_name, author, file_path, cover_image, summary
-            FROM books
-            WHERE (title LIKE ? OR series_name LIKE ? OR author LIKE ?) AND COALESCE(is_deleted, 0) = 0
-            ORDER BY title ASC, id ASC
-            LIMIT ? OFFSET ?
-            """,
-            (like_query, like_query, like_query, limit, offset)
-        )
-        rows = cursor.fetchall()
-        conn.close()
-        return [dict(row) for row in rows], total
+        where = ["COALESCE(b.is_deleted, 0) = 0"]
+        params = []
+        for term in terms:
+            like_query = f"%{_escape_like(term)}%"
+            where.append(
+                "(COALESCE(b.title, '') LIKE ? ESCAPE '\\' "
+                "OR COALESCE(b.series_name, '') LIKE ? ESCAPE '\\' "
+                "OR COALESCE(b.author, '') LIKE ? ESCAPE '\\')"
+            )
+            params.extend([like_query, like_query, like_query])
+
+        if role != 'admin' and user_id is not None:
+            where.append(
+                "EXISTS (SELECT 1 FROM user_category_permissions p "
+                "WHERE p.library_id = b.library_id AND p.user_id = ? AND p.has_access = 1)"
+            )
+            params.append(int(user_id))
+
+        where_sql = ' AND '.join(where)
+        conn = database.get_connection(db_type)
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"SELECT COUNT(*) AS total FROM books b WHERE {where_sql}",
+                tuple(params)
+            )
+            total = cursor.fetchone()['total']
+
+            cursor.execute(
+                f"""
+                SELECT b.id, b.title, b.series_name, b.author, b.file_path, b.cover_image, b.summary
+                FROM books b
+                WHERE {where_sql}
+                ORDER BY b.title ASC, b.id ASC
+                LIMIT ? OFFSET ?
+                """,
+                tuple(params + [limit, offset])
+            )
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows], total
+        finally:
+            conn.close()
 
 
 

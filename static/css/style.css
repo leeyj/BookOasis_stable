@@ -1292,6 +1292,73 @@ body.has-system-ticker .library-sidebar {
     border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 
+.volumes-section-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem;
+    flex-wrap: wrap;
+    padding-bottom: 0.7rem;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.volumes-section-toolbar .volumes-section-title {
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+.volume-list-controls,
+.volume-sort-control {
+    display: inline-flex;
+    align-items: center;
+}
+
+.volume-list-controls {
+    gap: 0.6rem;
+}
+
+.volume-filter-btn,
+.volume-sort-btn {
+    min-height: 32px;
+    padding: 0.35rem 0.7rem;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: rgba(15, 23, 42, 0.55);
+    color: #94a3b8;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.volume-filter-btn {
+    border-radius: 16px;
+}
+
+.volume-sort-btn:first-child {
+    border-radius: 16px 0 0 16px;
+}
+
+.volume-sort-btn:last-child {
+    margin-left: -1px;
+    border-radius: 0 16px 16px 0;
+}
+
+.volume-filter-btn:hover,
+.volume-sort-btn:hover,
+.volume-filter-btn.active,
+.volume-sort-btn.active {
+    border-color: #34d399;
+    background: rgba(16, 185, 129, 0.16);
+    color: #6ee7b7;
+}
+
+.volumes-empty-filter {
+    padding: 2rem 1rem;
+    color: #94a3b8;
+    text-align: center;
+    border: 1px dashed rgba(148, 163, 184, 0.25);
+    border-radius: 8px;
+}
+
 .vol-count-badge {
     background: rgba(168, 85, 247, 0.25);
     color: #c084fc;

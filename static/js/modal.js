@@ -5,6 +5,58 @@ import { switchActiveView } from './view_manager.js';
 import { renderDetailHeader, renderVolumesList, renderRecommendList } from './detail_render.js';
 import { updateCurrentCategoryIndicator } from './category_indicator.js';
 
+const detailVolumeViewState = {
+  key: '',
+  unreadOnly: false,
+  sortOrder: 'oldest'
+};
+
+function applyDetailVolumeView() {
+  const section = document.querySelector('.volumes-section');
+  if (!section) return;
+
+  const list = section.querySelector('.volumes-list');
+  const cards = Array.from(section.querySelectorAll('.volume-card'));
+  cards.sort((left, right) => {
+    const difference = Number(left.dataset.bookId || 0) - Number(right.dataset.bookId || 0);
+    return detailVolumeViewState.sortOrder === 'newest' ? -difference : difference;
+  });
+
+  let visibleCount = 0;
+  cards.forEach(card => {
+    list.appendChild(card);
+    const pagesRead = Math.max(0, Number(card.dataset.pagesRead) || 0);
+    const isUnread = pagesRead < 1 && card.dataset.isCompleted !== '1';
+    const visible = !detailVolumeViewState.unreadOnly || isUnread;
+    card.style.display = visible ? '' : 'none';
+    if (visible) visibleCount += 1;
+  });
+
+  const unreadButton = section.querySelector('[data-detail-unread-filter]');
+  if (unreadButton) {
+    unreadButton.classList.toggle('active', detailVolumeViewState.unreadOnly);
+    unreadButton.setAttribute('aria-pressed', String(detailVolumeViewState.unreadOnly));
+  }
+  section.querySelectorAll('[data-detail-sort]').forEach(button => {
+    const active = button.dataset.detailSort === detailVolumeViewState.sortOrder;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+
+  const empty = section.querySelector('.volumes-empty-filter');
+  if (empty) empty.style.display = visibleCount === 0 ? 'block' : 'none';
+}
+
+export function toggleDetailUnreadFilter() {
+  detailVolumeViewState.unreadOnly = !detailVolumeViewState.unreadOnly;
+  applyDetailVolumeView();
+}
+
+export function setDetailVolumeSort(sortOrder) {
+  detailVolumeViewState.sortOrder = sortOrder === 'newest' ? 'newest' : 'oldest';
+  applyDetailVolumeView();
+}
+
 // 그리드 뷰 → 상세 뷰 전환
 export async function openBookDetail(event, seriesName, libraryId, representativeBookId = null, displayTitle = '') {
   const detailView = document.getElementById('book-detail-view');
@@ -57,9 +109,22 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
       state.detailDisplayTitle = safeDisplayTitle;
       updateCurrentCategoryIndicator(actualLibraryId);
 
+      const detailViewKey = `${state.currentLibraryType || 'general'}:${actualLibraryId}:${safeSeriesName}`;
+      if (detailVolumeViewState.key !== detailViewKey) {
+        detailVolumeViewState.key = detailViewKey;
+        detailVolumeViewState.unreadOnly = false;
+        detailVolumeViewState.sortOrder = 'oldest';
+      }
+
       // 컴포넌트 렌더러 모듈 호출
       const headerHtml = renderDetailHeader(meta, books, safeSeriesName, actualLibraryId, safeDisplayTitle);
-      const volumesSectionHtml = renderVolumesList(books, safeSeriesName, actualLibraryId, state.currentLibraryType || 'general');
+      const volumesSectionHtml = renderVolumesList(
+        books,
+        safeSeriesName,
+        actualLibraryId,
+        state.currentLibraryType || 'general',
+        detailVolumeViewState
+      );
 
       detailView.innerHTML = `
         <button class="btn-back-to-list" onclick="goBackToList()">
@@ -635,3 +700,5 @@ export async function handleUnlockMetadataEvent(event, seriesName, libraryId, bo
 window.showGlobalLoadingSpinner = showGlobalLoadingSpinner;
 window.hideGlobalLoadingSpinner = hideGlobalLoadingSpinner;
 window.handleUnlockMetadataEvent = handleUnlockMetadataEvent;
+window.toggleDetailUnreadFilter = toggleDetailUnreadFilter;
+window.setDetailVolumeSort = setDetailVolumeSort;

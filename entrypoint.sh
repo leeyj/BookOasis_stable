@@ -176,13 +176,26 @@ start_worker_after_health() {
             echo "[Entrypoint] Web health timeout. Starting scanner worker anyway..."
         fi
 
-        if [ -n "$run_as_user" ]; then
-                gosu "$run_as_user" python3 tools/scanner_worker.py > /app/logs/media_server_worker.log 2>&1
-        else
-            python3 tools/scanner_worker.py > /app/logs/media_server_worker.log 2>&1
-        fi
+        while true; do
+            echo "[Entrypoint] Starting scanner worker process..."
+            if [ -n "$run_as_user" ]; then
+                if gosu "$run_as_user" python3 tools/scanner_worker.py >> /app/logs/media_server_worker.log 2>&1; then
+                    worker_exit_code=0
+                else
+                    worker_exit_code=$?
+                fi
+            else
+                if python3 tools/scanner_worker.py >> /app/logs/media_server_worker.log 2>&1; then
+                    worker_exit_code=0
+                else
+                    worker_exit_code=$?
+                fi
+            fi
+            echo "[Entrypoint] Scanner worker exited (code: $worker_exit_code). Restarting in 2 seconds..."
+            sleep 2
+        done
     ) &
-        WORKER_PID=$!
+    WORKER_PID=$!
 }
 
 echo "[Entrypoint] 데이터 디렉토리 권한 확인 중..."

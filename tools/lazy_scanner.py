@@ -156,7 +156,8 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
             
             if target_book_id is not None:
                 cursor.execute("""
-                    SELECT id, file_path, series_name, file_format, cover_image, library_id, total_pages, has_offsets
+                    SELECT id, file_path, series_name, file_format, cover_image, library_id, total_pages, has_offsets,
+                           COALESCE(metadata_locked, 0) AS metadata_locked
                     FROM books WHERE id = ?
                 """, (target_book_id,))
             else:
@@ -166,7 +167,8 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
                 # 3. ZIP/CBZ 포맷 중 페이지 수(total_pages)=0 이거나 오프셋(has_offsets)=0 인 경우
                 # 위 스캔 후보 도서만 DB 인덱스 레벨에서 1차 선별하여 퍼포먼스 극대화
                 cursor.execute("""
-                    SELECT id, file_path, series_name, file_format, cover_image, library_id, total_pages, has_offsets
+                    SELECT id, file_path, series_name, file_format, cover_image, library_id, total_pages, has_offsets,
+                           COALESCE(metadata_locked, 0) AS metadata_locked
                     FROM books
                     WHERE LOWER(file_path) NOT LIKE '%.txt'
                       AND (
@@ -210,6 +212,13 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
                 if file_format in ('zip', 'cbz'):
                     if book['total_pages'] == 0 or book['has_offsets'] == 0:
                         offset_missing = True
+
+                metadata_locked = int(book['metadata_locked'] or 0) == 1
+                if metadata_locked and cover_missing:
+                    if not offset_missing:
+                        print(f"[Lazy-Scanner] 메타데이터 잠금으로 커버 자동 갱신 스킵: {os.path.basename(file_path)}")
+                        continue
+                    cover_missing = False
 
                 if not cover_missing and not offset_missing:
                     # 커버도 있고 오프셋도 있음 → 완전히 처리된 도서, 스킵
@@ -439,7 +448,7 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
                                         publisher = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), publisher) ELSE publisher END,
                                         summary = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), summary) ELSE summary END,
                                         release_date = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), release_date) ELSE release_date END
-                                    WHERE id = ?
+                                    WHERE id = ? AND COALESCE(metadata_locked, 0) = 0
                                 """, (
                                     cover_image_path,
                                     comicinfo_meta.get('author', ''),
@@ -453,10 +462,14 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
                                     UPDATE books SET
                                         cover_image = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN ? ELSE cover_image END,
                                         cover_updated_at = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN CURRENT_TIMESTAMP ELSE cover_updated_at END
-                                    WHERE id = ?
+                                    WHERE id = ? AND COALESCE(metadata_locked, 0) = 0
                                 """, (cover_image_path, book_id))
+                            cover_updated = cursor.rowcount > 0
                             conn.commit()
-                            print(f"[Lazy-Scanner] 표지 추출 및 DB 업데이트 완료: {cover_image_path}")
+                            if cover_updated:
+                                print(f"[Lazy-Scanner] 표지 추출 및 DB 업데이트 완료: {cover_image_path}")
+                            else:
+                                print(f"[Lazy-Scanner] 메타데이터 잠금으로 추출 커버 DB 반영 스킵: {filename}")
 
                             # ── 오프셋 저장 및 total_pages 갱신 ──
                             if offsets_data:

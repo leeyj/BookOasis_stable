@@ -737,9 +737,9 @@ def unlock_media_metadata():
         )
         if success:
             try:
-                from utils.redis_helper import redis_del_by_pattern
-                redis_del_by_pattern(f"cache:history:{db_type}:*")
-                redis_del_by_pattern(f"cache:recent_added:{db_type}:*")
+                from utils.redis_helper import redis_delete_pattern
+                redis_delete_pattern(f"cache:history:{db_type}:*")
+                redis_delete_pattern(f"cache:recent_added:{db_type}:*")
             except Exception:
                 pass
             return jsonify({'success': True, 'message': '메타데이터 잠금이 해제되었습니다.'})

@@ -194,15 +194,11 @@ def get_recently_read_entries(db_type: str, download_prefix: str, urn_prefix: st
     return entries
 
 
-def _build_fts_match_query(query: str) -> str:
-    terms = [term.strip() for term in re.split(r'\s+', str(query or '').strip()) if term.strip()]
-    if not terms:
-        return ''
-    return ' AND '.join(f'"{term.replace(chr(34), chr(34) * 2)}"*' for term in terms)
-
-
-def search_books_entries(db_type: str, query: str, download_prefix: str, urn_prefix: str, limit: int = 100, offset: int = 0):
-    books, total = OpdsRepository.search_books_like(db_type, query, limit, offset)
+def search_books_entries(db_type: str, query: str, download_prefix: str, urn_prefix: str,
+                         limit: int = 100, offset: int = 0, user_id=None, role=None):
+    books, total = OpdsRepository.search_books_like(
+        db_type, query, limit, offset, user_id=user_id, role=role
+    )
     is_app_opds = 'app' in urn_prefix
     
     entries = []

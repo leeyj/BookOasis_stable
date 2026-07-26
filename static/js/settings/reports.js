@@ -82,6 +82,8 @@ export async function loadScanHistory() {
         statusBadge = `<span style="color: #38bdf8; font-weight: 600;"><i class="fa-solid fa-circle-notch fa-spin"></i> 스캔중</span>`;
       } else if (item.status === 'failed') {
         statusBadge = `<span style="color: #f87171; font-weight: 600;"><i class="fa-solid fa-triangle-exclamation"></i> 실패</span>`;
+      } else if (item.status === 'cancelled' || item.status === 'canceled') {
+        statusBadge = `<span style="color: #f59e0b; font-weight: 600;"><i class="fa-solid fa-ban"></i> 취소</span>`;
       }
 
       const startedAt = item.started_at || item.enqueue_at || '-';

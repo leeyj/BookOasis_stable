@@ -582,7 +582,9 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                 except Exception:
                     pass
                 cleanup_jsonl_file()
-                os._exit(0)
+                worker_script = os.path.join(MEDIA_SERVER_DIR, 'tools', 'scanner_worker.py')
+                print(f"[Scanner-Memory] Restarting worker process for auto-resume: {worker_script}", flush=True)
+                os.execv(sys.executable, [sys.executable, worker_script])
 
         # Final flush for any remaining data at the end of the loop
         print(

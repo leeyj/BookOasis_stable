@@ -115,6 +115,17 @@ def redis_lpush(key: str, value: str) -> bool:
         logger.warning(f"[Redis] redis_lpush failed for key '{key}': {e}")
         return False
 
+def redis_lrem(key: str, value: str) -> int:
+    """Redis List에서 일치하는 값을 모두 제거합니다."""
+    client = get_redis_client()
+    if not client:
+        return 0
+    try:
+        return int(client.lrem(make_key(key), 0, value))
+    except Exception as e:
+        logger.warning(f"[Redis] redis_lrem failed for key '{key}': {e}")
+        return 0
+
 def redis_brpop(key: str, timeout: int = 3) -> str:
     """Redis List의 오른쪽에서 값을 블로킹으로 꺼내옵니다. (Timeout 단위: 초)"""
     global _client

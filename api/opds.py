@@ -548,8 +548,6 @@ def opds_download_book(db_type: str, book_id: int):
 
 @opds_bp.route('/opds/search', methods=['GET'])
 def opds_search():
-    return jsonify({'success': False, 'error': 'OPDS search is temporarily disabled'}), 503
-
     query = request.args.get('q') or request.args.get('query') or ''
 
     if not query:
@@ -568,11 +566,16 @@ def opds_search():
         return Response(xml, mimetype='application/opensearchdescription+xml; charset=utf-8')
 
     # 실제 검색 요청: 인증 필요
-    if not _check_auth(is_adult=False):
+    auth_user = _get_authenticated_user(is_adult=False)
+    if not auth_user:
         return _unauthorized()
 
     page, page_size, offset = _get_page_params()
-    entries, total = search_books_entries('general', query, '/opds/download/general', 'general', limit=page_size, offset=offset)
+    entries, total = search_books_entries(
+        'general', query, '/opds/download/general', 'general',
+        limit=page_size, offset=offset,
+        user_id=auth_user['id'], role=auth_user['role']
+    )
     
     next_link = None
     if offset + page_size < total:
@@ -584,8 +587,6 @@ def opds_search():
 
 @opds_bp.route('/opds-adult/search', methods=['GET'])
 def opds_adult_search():
-    return jsonify({'success': False, 'error': 'OPDS search is temporarily disabled'}), 503
-
     query = request.args.get('q') or request.args.get('query') or ''
 
     if not query:
@@ -603,11 +604,16 @@ def opds_adult_search():
         return Response(xml, mimetype='application/opensearchdescription+xml; charset=utf-8')
 
     # 실제 검색 요청: 인증 필요 (성인 admin 권한)
-    if not _check_auth(is_adult=True):
+    auth_user = _get_authenticated_user(is_adult=True)
+    if not auth_user:
         return _unauthorized()
 
     page, page_size, offset = _get_page_params()
-    entries, total = search_books_entries('adult', query, '/opds/download/adult', 'adult', limit=page_size, offset=offset)
+    entries, total = search_books_entries(
+        'adult', query, '/opds/download/adult', 'adult',
+        limit=page_size, offset=offset,
+        user_id=auth_user['id'], role=auth_user['role']
+    )
     
     next_link = None
     if offset + page_size < total:

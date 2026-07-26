@@ -333,7 +333,9 @@ def get_cover_image(filename):
 
     def _send_cover(path):
         # 304 빠른 반환 (디스크 I/O 지연 5초 방지)
-        etag_val = hashlib.md5(str(path).encode('utf-8')).hexdigest()[:16]
+        stat = path.stat()
+        etag_source = f"{path}:{stat.st_mtime_ns}:{stat.st_size}"
+        etag_val = hashlib.md5(etag_source.encode('utf-8')).hexdigest()[:16]
         if_none_match = request.headers.get('If-None-Match')
         if if_none_match and (if_none_match == etag_val or if_none_match == f'"{etag_val}"'):
             res = Response(status=304)
