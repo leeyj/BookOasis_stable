@@ -1,5 +1,23 @@
 // settings_trash.js - 휴지통(삭제 관리) 클라이언트 처리 로직
 
+// ── 전체 화면 잠금 오버레이 제어 ────────────────────────────────
+function _showTrashOverlay(msg) {
+    const overlay = document.getElementById('trash-loading-overlay');
+    const msgEl   = document.getElementById('trash-loading-overlay-msg');
+    if (!overlay) return;
+    if (msgEl && msg) msgEl.textContent = msg;
+    overlay.style.display = 'flex';
+}
+
+function _hideTrashOverlay() {
+    const overlay = document.getElementById('trash-loading-overlay');
+    if (overlay) overlay.style.display = 'none';
+}
+
+// 외부(emptyTrashAll 등)에서 이미 호출하던 전역 함수도 연결
+window.showGlobalLoadingSpinner = _showTrashOverlay;
+window.hideGlobalLoadingSpinner = _hideTrashOverlay;
+
 // 전역 탭 변경 감지기 등에서 호출될 수 있도록 로드 함수 노출
 function loadTrashList() {
     const dbType = document.getElementById('trash-db-type').value;
@@ -116,6 +134,9 @@ function deleteTrashBooks(bookIds) {
     if (!confirm(`선택한 ${bookIds.length}권의 도서를 DB에서 영구 삭제하시겠습니까?\n이 작업은 되돌릴 수 없으며 독서 진척도 정보도 함께 삭제됩니다.`)) {
         return;
     }
+
+    // 오버레이 표시 — 삭제 완료 전 다른 클릭 차단
+    _showTrashOverlay(`선택한 ${bookIds.length}권의 도서 데이터를 DB에서 영구 삭제 중입니다.\n잠시만 기다려 주세요.`);
     
     fetch('/api/admin/trash/empty', {
         method: 'POST',
@@ -124,6 +145,7 @@ function deleteTrashBooks(bookIds) {
     })
     .then(res => res.json())
     .then(data => {
+        _hideTrashOverlay();
         if (data.success) {
             alert(data.message);
             loadTrashList();
@@ -131,7 +153,10 @@ function deleteTrashBooks(bookIds) {
             alert('삭제 실패: ' + data.error);
         }
     })
-    .catch(err => alert('오류: ' + err.message));
+    .catch(err => {
+        _hideTrashOverlay();
+        alert('오류: ' + err.message);
+    });
 }
 
 function emptyTrashAll() {
@@ -141,10 +166,9 @@ function emptyTrashAll() {
     if (!confirm(`주의! 현재 ${dbLabel} 데이터베이스 휴지통 내의 모든 도서 데이터를 영구 삭제하시겠습니까?\n이 작업은 모든 읽기 상태와 기록을 완전히 삭제하며 되돌릴 수 없습니다.`)) {
         return;
     }
-    
-    if (typeof window.showGlobalLoadingSpinner === 'function') {
-        window.showGlobalLoadingSpinner(`휴지통 내의 모든 도서 및 표지 데이터를 영구 삭제 중입니다...\n잠시만 기다려 주세요.`);
-    }
+
+    // 오버레이 표시 — 비우기 완료 전 다른 클릭 차단
+    _showTrashOverlay(`휴지통 내의 모든 도서 및 표지 데이터를 영구 삭제 중입니다.\n잠시만 기다려 주세요.`);
 
     fetch('/api/admin/trash/empty', {
         method: 'POST',
@@ -153,9 +177,7 @@ function emptyTrashAll() {
     })
     .then(res => res.json())
     .then(data => {
-        if (typeof window.hideGlobalLoadingSpinner === 'function') {
-            window.hideGlobalLoadingSpinner();
-        }
+        _hideTrashOverlay();
         if (data.success) {
             alert(data.message);
             loadTrashList();
@@ -164,9 +186,7 @@ function emptyTrashAll() {
         }
     })
     .catch(err => {
-        if (typeof window.hideGlobalLoadingSpinner === 'function') {
-            window.hideGlobalLoadingSpinner();
-        }
+        _hideTrashOverlay();
         alert('오류: ' + err.message);
     });
 }
@@ -204,3 +224,4 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 });
+

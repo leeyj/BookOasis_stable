@@ -157,10 +157,13 @@ export function renderPdfPage() {
       const scaleY = availableHeight / unscaledViewport.height;
       const scale = Math.min(scaleX, scaleY);
 
-      // DPR 오버샘플링 적용 (실제 DPR 우선, 과도한 메모리 사용을 막기 위해 상한 적용)
+      // DPR 오버샘플링 적용 (텍스트 뭉개짐 방지를 위해 해상도 상향)
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       const rawDpr = window.devicePixelRatio || 1;
-      const dpr = Math.min(isMobile ? 2.0 : 2.5, Math.max(rawDpr, isMobile ? 1.25 : 1.5));
+      
+      // Acrobat 수준의 쨍한 화면을 위해 오버샘플링 배수를 높임 (PC 최대 4.0, 모바일 최대 2.5)
+      // 저해상도 모니터에서도 선명하게 보이도록 기본 하한값을 크게 설정
+      const dpr = Math.min(isMobile ? 2.5 : 4.0, Math.max(rawDpr * 2.0, isMobile ? 2.0 : 3.0));
       const viewport = page.getViewport({ scale: scale * dpr });
       
       canvas.width = viewport.width;

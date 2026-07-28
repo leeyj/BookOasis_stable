@@ -85,7 +85,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
   const missingPageBannerHtml = missingPageCount > 0 ? `
       <div class="vol-warn-banner" style="margin-top: 1rem;">
         <i class="fa-solid fa-triangle-exclamation"></i>
-        <span>${i18n.t('detail.warn_series_missing_pages', {count: missingPageCount})}</span>
+        <span>${i18n.t('detail.warn_series_missing_pages', { count: missingPageCount })}</span>
         <button class="btn-rescan-book" onclick="rescanMissingBooks(event, '${safeSeriesName.replace(/'/g, "\\'")}', '${actualLibraryId}')">
           <i class="fa-solid fa-rotate"></i> ${i18n.t('detail.btn_rescan_all')}
         </button>
@@ -99,7 +99,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
   // ── [이어서 읽기 책 탐색 알고리즘] ──
   let continueTarget = null;
   let continueReason = 'first'; // 'in-progress', 'recent', 'first'
-  
+
   if (books && books.length > 0) {
     // 1순위: 읽는 중인 책 ( pages_read > 0 이며 is_completed = 0 )
     // 그 중 가장 최근 읽은 시간(last_read_at)이 최신인 책
@@ -109,7 +109,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
       continueTarget = inProgressBooks[0];
       continueReason = 'in-progress';
     }
-    
+
     // 2순위: 완료 상태를 포함하여 최근 읽은 기록(last_read_at)이 존재하는 최신 도서
     if (!continueTarget) {
       const readBooks = books.filter(b => b.last_read_at);
@@ -119,7 +119,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
         continueReason = 'recent';
       }
     }
-    
+
     // 3순위: 아무 기록도 없으면 리스트의 첫 번째 도서
     if (!continueTarget) {
       continueTarget = books[0];
@@ -133,7 +133,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
     let btnColor = '#7c3aed';
     let btnBorder = '#a855f7';
     let iconClass = 'fa-solid fa-play';
-    
+
     // 진행도 퍼센트 구하기
     let progressPercent = 0;
     if (continueTarget.pages_read > 0) {
@@ -144,7 +144,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
         progressPercent = Math.round((continueTarget.pages_read / continueTarget.total_pages) * 100);
       }
     }
-    
+
     let tooltipTitle = '';
     if (continueReason === 'in-progress') {
       btnLabel = i18n.t('detail.continue_reading') || '이어서 읽기';
@@ -163,7 +163,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
       btnBorder = '#34d399';
       iconClass = 'fa-solid fa-book-open-reader';
     }
-    
+
     continueBtnHtml = `
       <button class="ridi-link-btn" style="margin: 0; background: ${btnColor}; border-color: ${btnBorder}; font-weight: bold; color: #fff; display: inline-flex; align-items: center; gap: 0.3rem;" 
               title="${tooltipTitle.replace(/"/g, '&quot;')}"
@@ -292,79 +292,163 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
 export function renderVolumesList(books, safeSeriesName, actualLibraryId, dbType = 'general', viewOptions = {}) {
   const unreadOnly = viewOptions.unreadOnly === true;
   const sortOrder = viewOptions.sortOrder === 'newest' ? 'newest' : 'oldest';
+  const gridMode = viewOptions.gridMode === true || state.detailVolumeGridView === true;
+
   const orderedBooks = [...books].sort((left, right) => {
-    const difference = Number(left.id || 0) - Number(right.id || 0);
-    return sortOrder === 'newest' ? -difference : difference;
+    const titleL = (left.title || '').toLowerCase();
+    const titleR = (right.title || '').toLowerCase();
+    const cmp = titleL.localeCompare(titleR, undefined, { numeric: true, sensitivity: 'base' });
+    return sortOrder === 'newest' ? -cmp : cmp;
   });
+
   let volumesHtml = '';
-  orderedBooks.forEach(b => {
-    const pagesRead = Math.max(0, Number(b.pages_read) || 0);
-    const isCompletedValue = Number(b.is_completed) === 1;
-    const isNotCompleted = !isCompletedValue;
-    const fmt = (b.file_format || '').toLowerCase();
-    const pathText = b.file_path || '';
-    const imgdirPathDisplay = pathText.replace(/[\\/]__folder__\.imgdir$/i, '');
-    const pathDisplay = fmt === 'imgdir' ? imgdirPathDisplay : pathText;
-    let rawDisplayTitle = b.title || '';
-    if (fmt === 'imgdir' && (!rawDisplayTitle || rawDisplayTitle === '__folder__')) {
-      const normalized = (pathDisplay || '').replace(/\\/g, '/').replace(/\/+$/, '');
-      const segments = normalized.split('/').filter(Boolean);
-      if (segments.length > 0) {
-        rawDisplayTitle = segments[segments.length - 1];
+
+  if (gridMode) {
+    // ── 그리드 모드: 커버 + 제목만 ──────────────────────────────
+    orderedBooks.forEach(b => {
+      const pagesRead = Math.max(0, Number(b.pages_read) || 0);
+      const totalPages = Math.max(1, Number(b.total_pages) || 1);
+      const isCompletedValue = Number(b.is_completed) === 1;
+      const fmt = (b.file_format || '').toLowerCase();
+      let rawDisplayTitle = b.title || '';
+      const pathText = b.file_path || '';
+      const imgdirPathDisplay = pathText.replace(/[\\/]__folder__\.imgdir$/i, '');
+      const pathDisplay = fmt === 'imgdir' ? imgdirPathDisplay : pathText;
+      if (fmt === 'imgdir' && (!rawDisplayTitle || rawDisplayTitle === '__folder__')) {
+        const normalized = (pathDisplay || '').replace(/\\/g, '/').replace(/\/+$/, '');
+        rawDisplayTitle = normalized.split('/').pop() || '';
       }
-    }
-    const imageDisplayTitle = stripLeadingBracketTags(rawDisplayTitle);
 
-    const progressPercent = b.total_pages > 0 ? Math.round((pagesRead / b.total_pages) * 100) : 0;
-    const progressText = pagesRead > 0
-      ? `${pagesRead}p / ${b.total_pages}p (${progressPercent}%)`
-      : '미독';
-    const readBtnText = pagesRead > 0
-      ? `<i class="fa-solid fa-play"></i> ${i18n.t('detail.btn_resume')}`
-      : `<i class="fa-solid fa-play"></i> ${i18n.t('detail.btn_start')}`;
-    const volumeFallbackCoverSrc = buildFallbackCoverUrl({
-      title: imageDisplayTitle,
-      format: b.file_format,
-      seed: b.id || b.file_path || `${safeSeriesName}:${imageDisplayTitle}`
-    });
-    const volCoverSrc = getBookCoverSrc({
-      coverImage: b.cover_image,
-      title: imageDisplayTitle,
-      format: b.file_format,
-      seed: b.id || b.file_path || `${safeSeriesName}:${imageDisplayTitle}`
-    });
-    const isCompleted = isCompletedValue
-      ? `<span class="vol-badge-completed">${i18n.t('detail.badge_completed')}</span>`
-      : '';
+      const imageDisplayTitle = stripLeadingBracketTags(rawDisplayTitle);
+      const volCoverSrc = getBookCoverSrc({
+        coverImage: b.cover_image,
+        title: imageDisplayTitle,
+        format: b.file_format,
+        seed: b.id || b.file_path || `${safeSeriesName}:${imageDisplayTitle}`
+      });
+      const volumeFallbackCoverSrc = buildFallbackCoverUrl({ id: b.id, title: imageDisplayTitle, format: b.file_format, seed: b.id });
+      const progressPercent = totalPages > 0 ? Math.min(100, Math.round((pagesRead / totalPages) * 100)) : 0;
+      const isNotCompleted = !isCompletedValue;
 
-    const isFav = b.is_favorite === 1;
-    const favIconClass = isFav ? 'fa-solid fa-star' : 'fa-regular fa-star';
-    const favIconColor = isFav ? '#eab308' : '#64748b';
-    const favBtnHtml = `
+      volumesHtml += `
+        <div class="vol-grid-card${!isCompletedValue && pagesRead === 0 ? ' unread-card' : ''}"
+             data-book-id="${b.id}"
+             data-title="${(rawDisplayTitle || '').replace(/"/g, '&quot;')}"
+             data-pages-read="${pagesRead}"
+             data-is-completed="${isCompletedValue ? 1 : 0}"
+             style="${unreadOnly && !isNotCompleted ? 'display: none;' : ''}"
+             onclick="openReader(${b.id}, '${(b.file_format || '').replace(/'/g, "\\'")}', '${(rawDisplayTitle || '').replace(/'/g, "\\'")}', ${b.pages_read}, ${b.total_pages})"
+             oncontextmenu="event.preventDefault(); event.stopPropagation(); if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(event.clientX, event.clientY, ${b.id}, '${(rawDisplayTitle || '').replace(/'/g, "\\'")}', true);"
+             ontouchstart="window.handleLongPressTouchStart(event, (x, y) => { if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(x, y, ${b.id}, '${(rawDisplayTitle || '').replace(/'/g, "\\\\\\\\\\'")}', true); })"
+             ontouchmove="window.handleLongPressTouchMove(event)"
+             ontouchend="window.handleLongPressTouchEnd(event)"
+             ontouchcancel="window.handleLongPressTouchEnd(event)">
+          ${isCompletedValue ? '<span class="vol-grid-completed-badge">완독</span>' : ''}
+          <img class="vol-grid-thumb" src="${volCoverSrc}" alt="cover"
+               onerror="if(this.src.indexOf('/covers/fallback')===-1 && !this.src.startsWith('data:image/svg+xml')){this.src='${volumeFallbackCoverSrc}';}else{this.onerror=null; this.src='${buildTextCoverDataUri({ title: b.title || rawDisplayTitle, format: b.file_format, seed: b.id })}';}">
+          ${pagesRead > 0 && !isCompletedValue ? `
+          <div class="vol-grid-progress">
+            <div class="vol-grid-progress-bar" style="width: ${progressPercent}%"></div>
+          </div>` : ''}
+          <span class="vol-grid-title">${rawDisplayTitle}</span>
+        </div>
+      `;
+    });
+
+    return `
+    <div class="volumes-section">
+      <div class="volumes-section-toolbar">
+        <h4 class="volumes-section-title">
+          <i class="fa-solid fa-layer-group"></i> ${i18n.t('dashboard.single_book_list')}
+          <span class="vol-count-badge">${i18n.t('dashboard.book_unit', { count: books.length })}</span>
+        </h4>
+        <div class="volume-list-controls" aria-label="${i18n.t('detail.list_controls')}">
+          <button type="button" class="volume-filter-btn${unreadOnly ? ' active' : ''}" data-detail-unread-filter aria-pressed="${unreadOnly}" onclick="toggleDetailUnreadFilter()">
+            ${i18n.t('detail.unread_only')}
+          </button>
+          <div class="volume-sort-control" role="group" aria-label="${i18n.t('detail.sort_order')}">
+            <button type="button" class="volume-sort-btn${sortOrder === 'oldest' ? ' active' : ''}" data-detail-sort="oldest" aria-pressed="${sortOrder === 'oldest'}" onclick="setDetailVolumeSort('oldest')">${i18n.t('detail.sort_oldest')}</button>
+            <button type="button" class="volume-sort-btn${sortOrder === 'newest' ? ' active' : ''}" data-detail-sort="newest" aria-pressed="${sortOrder === 'newest'}" onclick="setDetailVolumeSort('newest')">${i18n.t('detail.sort_newest')}</button>
+          </div>
+        </div>
+      </div>
+      <div class="volumes-list-grid">
+        ${volumesHtml}
+      </div>
+      <div class="volumes-empty-filter" style="display: none;">${i18n.t('detail.no_unread_books')}</div>
+    </div>
+  `;
+  } else {
+    // ── 리스트 모드: 기존과 동일 ─────────────────────────────────
+    orderedBooks.forEach(b => {
+      const pagesRead = Math.max(0, Number(b.pages_read) || 0);
+      const isCompletedValue = Number(b.is_completed) === 1;
+      const isNotCompleted = !isCompletedValue;
+      const fmt = (b.file_format || '').toLowerCase();
+      const pathText = b.file_path || '';
+      const imgdirPathDisplay = pathText.replace(/[\\/]__folder__\.imgdir$/i, '');
+      const pathDisplay = fmt === 'imgdir' ? imgdirPathDisplay : pathText;
+      let rawDisplayTitle = b.title || '';
+      if (fmt === 'imgdir' && (!rawDisplayTitle || rawDisplayTitle === '__folder__')) {
+        const normalized = (pathDisplay || '').replace(/\\/g, '/').replace(/\/+$/, '');
+        const segments = normalized.split('/').filter(Boolean);
+        if (segments.length > 0) {
+          rawDisplayTitle = segments[segments.length - 1];
+        }
+      }
+
+      const imageDisplayTitle = stripLeadingBracketTags(rawDisplayTitle);
+
+      const progressPercent = b.total_pages > 0 ? Math.round((pagesRead / b.total_pages) * 100) : 0;
+      const progressText = pagesRead > 0
+        ? `${pagesRead}p / ${b.total_pages}p (${progressPercent}%)`
+        : '미독';
+      const readBtnText = pagesRead > 0
+        ? `<i class="fa-solid fa-play"></i> ${i18n.t('detail.btn_resume')}`
+        : `<i class="fa-solid fa-play"></i> ${i18n.t('detail.btn_start')}`;
+      const volumeFallbackCoverSrc = buildFallbackCoverUrl({
+        title: imageDisplayTitle,
+        format: b.file_format,
+        seed: b.id || b.file_path || `${safeSeriesName}:${imageDisplayTitle}`
+      });
+      const volCoverSrc = getBookCoverSrc({
+        coverImage: b.cover_image,
+        title: imageDisplayTitle,
+        format: b.file_format,
+        seed: b.id || b.file_path || `${safeSeriesName}:${imageDisplayTitle}`
+      });
+      const isCompleted = isCompletedValue
+        ? `<span class="vol-badge-completed">${i18n.t('detail.badge_completed')}</span>`
+        : '';
+
+      const isFav = b.is_favorite === 1;
+      const favIconClass = isFav ? 'fa-solid fa-star' : 'fa-regular fa-star';
+      const favIconColor = isFav ? '#eab308' : '#64748b';
+      const favBtnHtml = `
       <button class="btn-fav-toggle" onclick="toggleBookFavorite(event, ${b.id}, ${isFav ? 0 : 1}, '${safeSeriesName.replace(/'/g, "\\'")}', '${actualLibraryId}')" style="background:none; border:none; color:${favIconColor}; cursor:pointer; font-size:1.1rem; padding:0 0.5rem; display:inline-flex; align-items:center;" title="${i18n.t('detail.toggle_fav_book')}">
         <i class="${favIconClass}"></i>
       </button>
     `;
 
-    const noCover = !b.cover_image;
-    const isTextFormat = ['txt', 'text'].includes((b.file_format || '').toLowerCase());
-    const isZipFormat = ['zip', 'cbz'].includes((b.file_format || '').toLowerCase());
-    
-    // 원격 경로 여부 판단 (gdrive, rclone, vfs, google_drive, onedrive, sharepoint, nas_share, webdav 등)
-    const filePathLower = (b.file_path || '').toLowerCase();
-    const remoteKeywords = ['gdrive', 'rclone', 'vfs', 'google_drive', 'onedrive', 'sharepoint', 'nas_share', 'webdav'];
-    const isRemoteFile = remoteKeywords.some(keyword => filePathLower.includes(keyword));
-    
-    // 원격 파일은 백그라운드 오프셋 조회를 하지 않으므로 warn_no_offset 경고창 노출 대상에서 제외합니다.
-    const noOffsets = isZipFormat && !isRemoteFile && (b.total_pages === 0 || b.has_offsets === 0);
-    const noCoverWarn = noCover && !isTextFormat;
-    const noCoverInfo = noCover && isTextFormat;
-    const needsWarn = noCoverWarn || noOffsets;
+      const noCover = !b.cover_image;
+      const isTextFormat = ['txt', 'text'].includes((b.file_format || '').toLowerCase());
+      const isZipFormat = ['zip', 'cbz'].includes((b.file_format || '').toLowerCase());
 
-    let warnTexts = [];
-    if (noCoverWarn) warnTexts.push(i18n.t('detail.warn_no_cover'));
-    if (noOffsets) warnTexts.push(i18n.t('detail.warn_no_offset'));
-    const warnBannerHtml = needsWarn ? `
+      // 원격 경로 여부 판단 (gdrive, rclone, vfs, google_drive, onedrive, sharepoint, nas_share, webdav 등)
+      const filePathLower = (b.file_path || '').toLowerCase();
+      const remoteKeywords = ['gdrive', 'rclone', 'vfs', 'google_drive', 'onedrive', 'sharepoint', 'nas_share', 'webdav'];
+      const isRemoteFile = remoteKeywords.some(keyword => filePathLower.includes(keyword));
+
+      // 원격 파일은 백그라운드 오프셋 조회를 하지 않으므로 warn_no_offset 경고창 노출 대상에서 제외합니다.
+      const noOffsets = isZipFormat && !isRemoteFile && (b.total_pages === 0 || b.has_offsets === 0);
+      const noCoverWarn = noCover && !isTextFormat;
+      const noCoverInfo = noCover && isTextFormat;
+      const needsWarn = noCoverWarn || noOffsets;
+
+      let warnTexts = [];
+      if (noCoverWarn) warnTexts.push(i18n.t('detail.warn_no_cover'));
+      if (noOffsets) warnTexts.push(i18n.t('detail.warn_no_offset'));
+      const warnBannerHtml = needsWarn ? `
       <div class="vol-warn-banner">
         <i class="fa-solid fa-triangle-exclamation"></i>
         <span>${warnTexts.join(' · ')}</span>
@@ -374,26 +458,26 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId, dbType
       </div>
     ` : '';
 
-    const infoBannerHtml = (noCoverInfo && state.showTxtNoCoverInfoBanner !== false) ? `
+      const infoBannerHtml = (noCoverInfo && state.showTxtNoCoverInfoBanner !== false) ? `
       <div class="vol-warn-banner" style="border-color: rgba(59, 130, 246, 0.35); background: rgba(30, 58, 138, 0.22); color: #93c5fd;">
         <i class="fa-solid fa-circle-info"></i>
         <span>기본 커버 사용 중 (TXT)</span>
       </div>
     ` : '';
 
-    // epub/pdf/txt 포맷은 이어보기(절반) + 다운로드 버튼을 나란히 표시
-    const isDownloadable = ['epub', 'pdf', 'txt', 'text'].includes(fmt);
-    const readBtnHtml = isDownloadable
-      ? `<div class="btn-read-row">
+      // epub/pdf/txt 포맷은 이어보기(절반) + 다운로드 버튼을 나란히 표시
+      const isDownloadable = ['epub', 'pdf', 'txt', 'text'].includes(fmt);
+      const readBtnHtml = isDownloadable
+        ? `<div class="btn-read-row">
            <button class="btn-read" onclick="openReader(${b.id}, '${(b.file_format || '').replace(/'/g, "\\'")}', '${(rawDisplayTitle || '').replace(/'/g, "\\'")}', ${b.pages_read}, ${b.total_pages})">${readBtnText}</button>
            <a class="btn-download" href="/api/media/books/${b.id}/download?type=${dbType}" download title="${i18n.t('detail.btn_download')}">
              <i class="fa-solid fa-download"></i> ${i18n.t('detail.btn_download')}
            </a>
          </div>`
-      : `<button class="btn-read" onclick="openReader(${b.id}, '${(b.file_format || '').replace(/'/g, "\\'")}', '${(rawDisplayTitle || '').replace(/'/g, "\\'")}', ${b.pages_read}, ${b.total_pages})">${readBtnText}</button>`;
+        : `<button class="btn-read" onclick="openReader(${b.id}, '${(b.file_format || '').replace(/'/g, "\\'")}', '${(rawDisplayTitle || '').replace(/'/g, "\\'")}', ${b.pages_read}, ${b.total_pages})">${readBtnText}</button>`;
 
-    volumesHtml += `
-      <div class="volume-card" data-book-id="${b.id}" data-pages-read="${pagesRead}" data-is-completed="${isCompletedValue ? 1 : 0}" data-page-missing="${noOffsets ? 1 : 0}" style="${unreadOnly && !isNotCompleted ? 'display: none;' : ''}" oncontextmenu="event.preventDefault(); event.stopPropagation(); if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(event.clientX, event.clientY, ${b.id}, '${(rawDisplayTitle || '').replace(/'/g, "\\'")}', true);" ontouchstart="window.handleLongPressTouchStart(event, (x, y) => { if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(x, y, ${b.id}, '${(rawDisplayTitle || '').replace(/'/g, "\\\\'")}', true); })" ontouchmove="window.handleLongPressTouchMove(event)" ontouchend="window.handleLongPressTouchEnd(event)" ontouchcancel="window.handleLongPressTouchEnd(event)">
+      volumesHtml += `
+      <div class="volume-card" data-book-id="${b.id}" data-title="${(rawDisplayTitle || '').replace(/"/g, '&quot;')}" data-pages-read="${pagesRead}" data-is-completed="${isCompletedValue ? 1 : 0}" data-page-missing="${noOffsets ? 1 : 0}" style="${unreadOnly && !isNotCompleted ? 'display: none;' : ''}" oncontextmenu="event.preventDefault(); event.stopPropagation(); if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(event.clientX, event.clientY, ${b.id}, '${(rawDisplayTitle || '').replace(/'/g, "\\'")}', true);" ontouchstart="window.handleLongPressTouchStart(event, (x, y) => { if (typeof window.showBookContextMenu === 'function') window.showBookContextMenu(x, y, ${b.id}, '${(rawDisplayTitle || '').replace(/'/g, "\\\\\\'")}', true); })" ontouchmove="window.handleLongPressTouchMove(event)" ontouchend="window.handleLongPressTouchEnd(event)" ontouchcancel="window.handleLongPressTouchEnd(event)">
         <img class="volume-thumb" src="${volCoverSrc}" alt="cover"
              onerror="if(this.src.indexOf('/covers/fallback')===-1 &amp;&amp; !this.src.startsWith('data:image/svg+xml')){this.src='${volumeFallbackCoverSrc}';}else{this.onerror=null; this.src='${buildTextCoverDataUri({ title: b.title || rawDisplayTitle, format: b.file_format, seed: b.id })}';}">
         <div class="volume-info">
@@ -407,7 +491,7 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId, dbType
           <span class="volume-path" style="font-size: 0.72rem; color: #64748b; word-break: break-all; margin-top: 0.15rem; display: block;">(${pathDisplay})</span>
           <div class="volume-meta-row">
             <span class="vol-meta"><i class="fa-regular fa-file"></i> ${b.total_pages}p</span>
-            <span class="vol-meta"><i class="fa-regular fa-clock"></i> ${i18n.t('detail.time_est', {minutes: Math.max(1, Math.ceil(b.total_pages / 40))})}</span>
+            <span class="vol-meta"><i class="fa-regular fa-clock"></i> ${i18n.t('detail.time_est', { minutes: Math.max(1, Math.ceil(b.total_pages / 40)) })}</span>
           </div>
           <div class="volume-progress-bar-wrap">
             <div class="volume-progress-bar" style="width: ${progressPercent}%"></div>
@@ -417,14 +501,14 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId, dbType
         ${readBtnHtml}
       </div>
     `;
-  });
+    });
 
-  return `
+    return `
     <div class="volumes-section">
       <div class="volumes-section-toolbar">
         <h4 class="volumes-section-title">
           <i class="fa-solid fa-layer-group"></i> ${i18n.t('dashboard.single_book_list')}
-          <span class="vol-count-badge">${i18n.t('dashboard.book_unit', {count: books.length})}</span>
+          <span class="vol-count-badge">${i18n.t('dashboard.book_unit', { count: books.length })}</span>
         </h4>
         <div class="volume-list-controls" aria-label="${i18n.t('detail.list_controls')}">
           <button type="button" class="volume-filter-btn${unreadOnly ? ' active' : ''}" data-detail-unread-filter aria-pressed="${unreadOnly}" onclick="toggleDetailUnreadFilter()">
@@ -442,6 +526,7 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId, dbType
       <div class="volumes-empty-filter" style="display: none;">${i18n.t('detail.no_unread_books')}</div>
     </div>
   `;
+  }
 }
 
 export function renderRecommendList(recommends, seriesName) {
@@ -455,7 +540,7 @@ export function renderRecommendList(recommends, seriesName) {
           <button class="btn-apply-meta" data-source-id="${rec.id}" style="padding: 0.2rem 0.6rem; font-size: 0.72rem; font-weight: 700; color: #fff; background: #7c3aed; border: none; border-radius: 4px; cursor: pointer; transition: background 0.2s;">${i18n.t('detail.btn_apply_meta')}</button>
         </div>
         <div style="font-size: 0.72rem; color: #94a3b8;">
-          <span>${i18n.t('detail.text_author', {author: rec.author})}</span> | <span>${i18n.t('detail.text_publisher', {publisher: rec.publisher})}</span>
+          <span>${i18n.t('detail.text_author', { author: rec.author })}</span> | <span>${i18n.t('detail.text_publisher', { publisher: rec.publisher })}</span>
         </div>
         <p style="margin: 0.2rem 0 0 0; font-size: 0.72rem; color: #cbd5e1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; line-height: 1.4;">${rec.summary}</p>
       </div>

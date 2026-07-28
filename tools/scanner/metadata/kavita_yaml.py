@@ -2,6 +2,7 @@
 import html
 import os
 import re
+import textwrap
 import threading
 import time
 
@@ -9,7 +10,8 @@ import yaml
 
 TARGET_FILENAME = 'kavita.yaml'
 
-HTML_TAG_RE = re.compile(r'<[^>]*>')
+# 실제 HTML 태그만 매칭 (알파벳/슬래시/!로 시작) — 한국어 꺾쇠 표현 <책 제목> 보호
+HTML_TAG_RE = re.compile(r'<[a-zA-Z/!][^>]*>')
 
 
 class NetworkCircuitBreaker:
@@ -186,6 +188,29 @@ def parse_kavita_yaml(folder_path, files=None, is_remote=False):
         parsed_ok = True
     except Exception:
         pass
+
+    # 1-b. 파싱 실패 시 들여쓰기(indent) 제거 후 재시도
+    #      일부 kavita.yaml 생성 도구가 두 번째 줄부터 공통 들여쓰기를 넣는 경우 대응
+    #      (예: 첫 줄 'Name: ...' 들여쓰기 없음, 이후 줄 '    Person: ...' 4칸 들여쓰기)
+    if not parsed_ok:
+        try:
+            lines = raw_content.splitlines()
+            # 두 번째 줄 이후의 비어있지 않은 줄에서 최소 들여쓰기 계산
+            rest_lines = lines[1:] if len(lines) > 1 else []
+            rest_non_empty = [ln for ln in rest_lines if ln.strip()]
+            if rest_non_empty:
+                min_indent = min(len(ln) - len(ln.lstrip()) for ln in rest_non_empty)
+                if min_indent > 0:
+                    # 첫 번째 줄은 그대로 유지, 두 번째 줄부터만 들여쓰기 제거
+                    stripped_lines = [lines[0]] + [
+                        ln[min_indent:] if ln.strip() else ln
+                        for ln in rest_lines
+                    ]
+                    dedented = '\n'.join(stripped_lines)
+                    data = yaml.load(dedented, Loader=SafeLoader) or {}
+                    parsed_ok = True
+        except Exception:
+            pass
 
     # 2. 원본 파싱 실패 시, 오탈자(- Key: Value) 보정 후 2차 시도
     normalized_dash_lines = False

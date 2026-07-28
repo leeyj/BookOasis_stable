@@ -107,10 +107,13 @@ class ReadingHistoryService:
             except Exception:
                 pass
 
-        if user_id and role != 'admin':
-            rows = ReadingProgressRepository.fetch_recently_added_by_user(db_type, user_id)
-        else:
+        if role == 'admin':
+            # 관리자: 전체 카테고리 도서 조회
             rows = ReadingProgressRepository.fetch_recently_added_all(db_type, user_id)
+        else:
+            # 일반 유저 또는 user_id=None: 권한 있는 카테고리만 조회
+            # user_id=None이면 user_category_permissions JOIN 매칭 없음 → 빈 목록 반환
+            rows = ReadingProgressRepository.fetch_recently_added_by_user(db_type, user_id)
             
         result = [
             {

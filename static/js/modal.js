@@ -15,16 +15,21 @@ function applyDetailVolumeView() {
   const section = document.querySelector('.volumes-section');
   if (!section) return;
 
-  const list = section.querySelector('.volumes-list');
-  const cards = Array.from(section.querySelectorAll('.volume-card'));
+  // 리스트 모드(.volumes-list + .volume-card) 또는 그리드 모드(.volumes-list-grid + .vol-grid-card) 모두 지원
+  const list = section.querySelector('.volumes-list') || section.querySelector('.volumes-list-grid');
+  const cards = Array.from(section.querySelectorAll('.volume-card, .vol-grid-card'));
+
   cards.sort((left, right) => {
-    const difference = Number(left.dataset.bookId || 0) - Number(right.dataset.bookId || 0);
-    return detailVolumeViewState.sortOrder === 'newest' ? -difference : difference;
+    // data-title 기반 자연 정렬 (파일명 순서 기준)
+    const titleA = left.dataset.title || '';
+    const titleB = right.dataset.title || '';
+    const cmp = titleA.localeCompare(titleB, 'ko', { numeric: true, sensitivity: 'base' });
+    return detailVolumeViewState.sortOrder === 'newest' ? -cmp : cmp;
   });
 
   let visibleCount = 0;
   cards.forEach(card => {
-    list.appendChild(card);
+    if (list) list.appendChild(card);
     const isNotCompleted = card.dataset.isCompleted !== '1';
     const visible = !detailVolumeViewState.unreadOnly || isNotCompleted;
     card.style.display = visible ? '' : 'none';
@@ -45,6 +50,7 @@ function applyDetailVolumeView() {
   const empty = section.querySelector('.volumes-empty-filter');
   if (empty) empty.style.display = visibleCount === 0 ? 'block' : 'none';
 }
+
 
 export function toggleDetailUnreadFilter() {
   detailVolumeViewState.unreadOnly = !detailVolumeViewState.unreadOnly;

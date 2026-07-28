@@ -46,6 +46,9 @@ export function applySettingsToUI(settings) {
   if (settings.TTS_WAKE_LOCK !== undefined) {
     state.ttsWakeLock = (settings.TTS_WAKE_LOCK === '1');
   }
+  if (settings.DETAIL_VOLUME_GRID_VIEW !== undefined) {
+    state.detailVolumeGridView = (settings.DETAIL_VOLUME_GRID_VIEW === '1');
+  }
 
   applySidebarTopControlsSetting(state.sidebarTopControls === true);
 }
@@ -149,6 +152,11 @@ export async function loadGeneralSettings() {
       const hddAggressiveWarmupEl = document.getElementById('setting-hdd-aggressive-warmup');
       if (hddAggressiveWarmupEl) {
         hddAggressiveWarmupEl.checked = (s.HDD_AGGRESSIVE_WARMUP === '1');
+      }
+
+      const detailVolumeGridViewEl = document.getElementById('setting-detail-volume-grid-view');
+      if (detailVolumeGridViewEl) {
+        detailVolumeGridViewEl.checked = (s.DETAIL_VOLUME_GRID_VIEW === '1');
       }
 
       // 프록시 헤더 인증 (SSO) 설정
@@ -297,6 +305,7 @@ export async function submitGeneralSettings(event) {
   const timezone = document.getElementById('setting-timezone')?.value || 'UTC';
   const ttsEnabled = document.getElementById('setting-tts-enabled')?.checked ? '1' : '0';
   const ttsWakeLock = document.getElementById('setting-tts-wake-lock')?.checked ? '1' : '0';
+  const detailVolumeGridView = document.getElementById('setting-detail-volume-grid-view')?.checked ? '1' : '0';
   
   try {
     // 🌟 단축키 설정 영구 저장 및 활성화
@@ -334,7 +343,8 @@ export async function submitGeneralSettings(event) {
       api.updateSystemSetting('PROXY_HEADER_AUTH', proxyAuth),
       api.updateSystemSetting('RCLONE_RC_URL', rcloneRcUrl),
       api.updateSystemSetting('TTS_ENABLED', ttsEnabled),
-      api.updateSystemSetting('TTS_WAKE_LOCK', ttsWakeLock)
+      api.updateSystemSetting('TTS_WAKE_LOCK', ttsWakeLock),
+      api.updateSystemSetting('DETAIL_VOLUME_GRID_VIEW', detailVolumeGridView)
     ];
     
     const results = await Promise.all(promises);
@@ -361,7 +371,8 @@ export async function submitGeneralSettings(event) {
         SHOW_SIDEBAR_CATEGORY_ALL: showSidebarCategoryAll,
         HDD_AGGRESSIVE_WARMUP: hddAggressiveWarmup,
         TTS_ENABLED: ttsEnabled,
-        TTS_WAKE_LOCK: ttsWakeLock
+        TTS_WAKE_LOCK: ttsWakeLock,
+        DETAIL_VOLUME_GRID_VIEW: detailVolumeGridView
       });
       loadGeneralSettings();
       if (typeof window.loadLibraries === 'function') {

@@ -239,7 +239,11 @@ class ReadingProgressRepository:
 
     @staticmethod
     def fetch_recently_added_by_user(db_type, user_id):
-        """일반 유저 권한 카테고리에 한해 최근 추가된 도서 목록 조회"""
+        """일반 유저 권한 카테고리에 한해 최근 추가된 도서 목록 조회.
+        user_id=None인 경우 user_category_permissions에 매칭 행이 없으므로 빈 목록 반환.
+        """
+        # user_id=None 이면 매칭 불가한 값(-1)으로 치환 → 권한 행 없음 → 빈 결과
+        safe_user_id = int(user_id) if user_id is not None else -1
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         cursor.execute("""
@@ -257,7 +261,7 @@ class ReadingProgressRepository:
             WHERE COALESCE(b.is_deleted, 0) = 0 AND p.user_id = ? AND p.has_access = 1
             ORDER BY b.created_at DESC, b.id DESC
             LIMIT 20
-        """, (user_id, user_id))
+        """, (safe_user_id, safe_user_id))
         rows = cursor.fetchall()
         conn.close()
         return [dict(row) for row in rows]

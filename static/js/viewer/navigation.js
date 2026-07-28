@@ -236,8 +236,24 @@ export function nextComicPage() {
     }
   } else {
     const step = Settings.getComicPageStep ? Settings.getComicPageStep() : 1;
-    const nextPage = Math.min(Renderer.getComicCurrentPage() + step, Renderer.getComicTotalPages() - 1);
-    if (Renderer.getComicCurrentPage() < Renderer.getComicTotalPages() - 1 && nextPage !== Renderer.getComicCurrentPage()) {
+    const totalPages = Renderer.getComicTotalPages();
+    const currentPage = Renderer.getComicCurrentPage();
+
+    // RTL 2장 보기: displayPage = min(currentPage + 1, totalPages - 1)
+    // displayPage가 이미 마지막 페이지이면 → 마지막 화면 → 다음 권
+    const isRtlTwoPage = (step === 2) && (Settings.getComicReadingDirection
+      ? Settings.getComicReadingDirection() === 'rtl'
+      : false);
+    if (isRtlTwoPage) {
+      const displayPage = Math.min(currentPage + 1, totalPages - 1);
+      if (displayPage >= totalPages - 1) {
+        import('../viewer_next_episode.js').then(m => m.handleNextEpisode(state.activeBookId));
+        return;
+      }
+    }
+
+    const nextPage = Math.min(currentPage + step, totalPages - 1);
+    if (currentPage < totalPages - 1 && nextPage !== currentPage) {
       Renderer.setComicCurrentPage(nextPage);
       Renderer.loadComicPage();
     } else {
@@ -245,6 +261,7 @@ export function nextComicPage() {
     }
   }
 }
+
 
 export function prevComicPage() {
   const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';

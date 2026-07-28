@@ -1,4 +1,10 @@
 # CHANGELOG
+## v1.4.5
+- 대시보드 최신 추가 도서에 권한 없는 카테고리 도서가 노출되는 결함 조치 | Fix display of books in unauthorized categories in the latest added books on the dashboard
+- 도서 리스트 정렬기준을 도서명으로 수정 | Fix the sorting criteria of the book list to book title
+- 2장 보기 에서 왼쪽으로 진행시 다음권 진행 안되는 현상 수정 | Fix next book not proceeding when advancing to the next book in 2-page view
+- 도서 상세리스트에서 그리드 뷰 보기 기능 추가 | detail list change grid view<->list view improved
+
 ## v1.4.4
 - pdf도 가운데 여백 설정 값 적용 | pdf apply center gap setting
 - pdf 뷰어에서 2장 보기 모드시 가운데 여백 끄기 적용시 그림자 제거 | pdf viewer, remove box-shadow when 2-page view without center gap

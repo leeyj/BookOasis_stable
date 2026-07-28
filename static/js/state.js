@@ -30,6 +30,8 @@ export const state = {
   sidebarTopControls: false,
   showSidebarCategoryAll: true,
   hddAggressiveWarmup: false,
+  detailVolumeGridView: false,      // 도서 상세 목록 그리드 보기 (기본값: 리스트)
+
   detailSeriesName: '',
   detailLibraryId: null,
   detailRepresentativeBookId: null,
