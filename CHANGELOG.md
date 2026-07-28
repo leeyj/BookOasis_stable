@@ -1,4 +1,7 @@
 # CHANGELOG
+## v1.4.6
+- 환경설정 버그 수정(태그 누락 수정) | fix the bug
+
 ## v1.4.5
 - 대시보드 최신 추가 도서에 권한 없는 카테고리 도서가 노출되는 결함 조치 | Fix display of books in unauthorized categories in the latest added books on the dashboard
 - 도서 리스트 정렬기준을 도서명으로 수정 | Fix the sorting criteria of the book list to book title
