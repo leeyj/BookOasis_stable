@@ -132,6 +132,10 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
         renderEpubToc(tocList);
 
         let startIdx = initialPageIdx;
+        if (totalChapters > 0 && startIdx >= totalChapters) {
+          startIdx = Math.round((startIdx / 100) * Math.max(0, totalChapters - 1));
+        }
+
         let serverEpubSession = null;
         try {
           const stateRes = await fetch(`/api/media/progress-state?db_type=${state.currentLibraryType}&book_id=${bookId}`);
@@ -143,21 +147,21 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
           }
         } catch (_) {}
 
-        const savedPosStr = localStorage.getItem(`viewer_last_pos_${bookId}`);
-        if (savedPosStr) {
-          try {
-            const pos = JSON.parse(savedPosStr);
-            if (pos && pos.chunkIdx !== undefined) {
-              startIdx = pos.chunkIdx;
-            }
-          } catch(e) {}
-        }
-
         if (serverEpubSession) {
           if (Number.isFinite(serverEpubSession.index)) {
             startIdx = Number(serverEpubSession.index);
           } else if (Number.isFinite(serverEpubSession.percent)) {
             startIdx = Math.round((Number(serverEpubSession.percent) / 100) * Math.max(0, totalChapters - 1));
+          }
+        } else {
+          const savedPosStr = localStorage.getItem(`viewer_last_pos_${bookId}`);
+          if (savedPosStr) {
+            try {
+              const pos = JSON.parse(savedPosStr);
+              if (pos && pos.chunkIdx !== undefined && pos.chunkIdx < totalChapters) {
+                startIdx = pos.chunkIdx;
+              }
+            } catch(e) {}
           }
         }
 

@@ -2,8 +2,63 @@
 from flask import json
 import os
 import importlib
-import sys
+import subprocess
+import hashlib
 from plugins.metadata.base import BaseMetadataProvider
+
+def _get_core_requirements():
+    return {'flask', 'pillow', 'pymupdf', 'psutil', 'redis', 'requests', 'rclone'}
+
+def ensure_plugin_dependencies(plugin_dir):
+    """
+    플러그인 폴더 내 requirements.txt 감지 시 libs/ 폴더로 pip install --target libs/ 수행
+    MD5 해시 Caching으로 변경 없을 시 fast-path (0.001초) 스킵
+    """
+    req_file = os.path.join(plugin_dir, 'requirements.txt')
+    if not os.path.isfile(req_file):
+        return
+
+    libs_dir = os.path.join(plugin_dir, 'libs')
+    os.makedirs(libs_dir, exist_ok=True)
+
+    if libs_dir not in sys.path:
+        sys.path.insert(0, libs_dir)
+
+    try:
+        with open(req_file, 'rb') as f:
+            content = f.read()
+    except Exception as e:
+        print(f"[Plugin-Deps] Failed to read {req_file}: {e}")
+        return
+
+    current_hash = hashlib.md5(content).hexdigest()
+    hash_file = os.path.join(plugin_dir, '.installed_req_hash')
+
+    if os.path.isfile(hash_file):
+        try:
+            with open(hash_file, 'r', encoding='utf-8') as hf:
+                if hf.read().strip() == current_hash:
+                    return
+        except Exception:
+            pass
+
+    print(f"[Plugin-Deps] Installing dependencies from {req_file} to {libs_dir}...")
+    try:
+        cmd = [
+            sys.executable, '-m', 'pip', 'install',
+            '--target', libs_dir,
+            '-r', req_file,
+            '--quiet', '--no-warn-script-location'
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        if res.returncode == 0:
+            with open(hash_file, 'w', encoding='utf-8') as hf:
+                hf.write(current_hash)
+            print(f"[Plugin-Deps] Successfully installed dependencies for {os.path.basename(plugin_dir)}")
+        else:
+            print(f"[Plugin-Deps Error] pip install failed: {res.stderr}")
+    except Exception as e:
+        print(f"[Plugin-Deps Error] Failed to execute pip install for {plugin_dir}: {e}")
 
 class MetadataFactory:
     _instance = None

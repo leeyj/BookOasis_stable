@@ -102,6 +102,9 @@ class ReadingProgressService:
                     old_pages = db_row['pages_read']
                     old_completed = 1 if db_row['is_completed'] == 1 else 0
 
+            if old_completed == 1:
+                is_completed = 1
+
             delta = max(0, pages_read - old_pages)
 
             progress_payload = {
@@ -125,6 +128,9 @@ class ReadingProgressService:
             # ── 레디스가 없으면 기존 SQLite 트랜잭션 구동 ──
             row = ReadingProgressRepository.get_progress_only(db_type, book_id, user_id)
             old_completed = 1 if (row and row['is_completed'] == 1) else 0
+
+            if old_completed == 1:
+                is_completed = 1
 
             if not row:
                 ReadingProgressRepository.insert_empty_progress(db_type, book_id, user_id, now_str)

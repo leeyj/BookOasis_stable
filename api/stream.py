@@ -421,7 +421,14 @@ def list_custom_fonts():
 def save_viewer_progress():
     """만화, TXT, EPUB, PDF 공통 독서 진행률 API 기록 엔드포인트"""
     try:
-        data = request.json or {}
+        data = request.get_json(force=True, silent=True)
+        if not data and request.data:
+            try:
+                import json as _json
+                data = _json.loads(request.data.decode('utf-8'))
+            except Exception:
+                data = {}
+        data = data or {}
         db_type = data.get('db_type', 'general')
         if not check_adult_permission(db_type):
             return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403

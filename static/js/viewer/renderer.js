@@ -116,7 +116,11 @@ function fetchImageWithWorker(url) {
   });
 }
 
+let isInitializingProgress = false;
+
 export async function initRenderer(bookId, pagesRead, totalPages) {
+  isInitializingProgress = true;
+
   // 이전 도서 캐시 및 DOM 상태 완전 초기화 (도서간 이미지 교차 오염 방지)
   clearComicViewer();
   clearBlobCache();
@@ -152,6 +156,8 @@ export async function initRenderer(bookId, pagesRead, totalPages) {
   Settings.initScrollWidth(); // 저장된 스크롤 너비 복원
   applyComicFitMode();
   loadComicPage();
+
+  isInitializingProgress = false;
 }
 
 
@@ -612,7 +618,9 @@ export function loadComicPage() {
     });
 
     updatePageInfo();
-    saveProgress(state.activeBookId, comicCurrentPage, comicTotalPages);
+    if (!isInitializingProgress) {
+      saveProgress(state.activeBookId, comicCurrentPage, comicTotalPages);
+    }
   }
 }
 

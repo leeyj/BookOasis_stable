@@ -4,6 +4,7 @@ import { ComicViewer, clearComicViewer } from '../viewer_comic.js';
 import { TxtViewer } from '../viewer_txt.js';
 import { PdfViewer, clearPdfViewer } from '../viewer_pdf.js';
 import { tryAutoFullscreenOnOpen, exitFullscreenIfNeeded } from './fullscreen_controller.js';
+import { flushProgress } from '../viewer_progress.js';
 
 let deps = {
   loadCustomFontsList: () => {},
@@ -159,9 +160,9 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false) {
   }
 
   // 뷰어 닫기 시점에 대기 중인 독서 진행도(pendingProgress)를 즉시 동기 반영(Flush)
-  import('../viewer_progress.js').then((m) => {
-    if (m.flushProgress) m.flushProgress();
-  }).catch(() => {});
+  try {
+    flushProgress();
+  } catch (e) {}
 
   exitFullscreenIfNeeded();
 

@@ -7,9 +7,10 @@ import { getComicPageStep, getComicReadingDirection } from './viewer_comic.js';
 export let pdfDoc = null;
 export let pdfCurrentPage = 1;
 export let pdfTotalPages = 0;
-let currentRenderTasks = [];
+let isInitializingPdfProgress = false;
 
 export async function initPdfViewer(bookId, pagesRead, totalPages) {
+  isInitializingPdfProgress = true;
   console.log(`[Viewer-Pdf] initPdfViewer - PDF 렌더링 요청: bookId=${bookId}, pagesRead=${pagesRead}, totalPages=${totalPages}`);
   
   document.getElementById('pdf-viewer-container').style.display = 'flex';
@@ -64,8 +65,10 @@ export async function initPdfViewer(bookId, pagesRead, totalPages) {
       pdfTotalPages = doc.numPages; 
       hideViewerLoading();
       renderPdfPage(); 
+      isInitializingPdfProgress = false;
     })
     .catch(err => { 
+      isInitializingPdfProgress = false;
       hideViewerLoading();
       showViewerError(i18n.t("viewer.error_pdf_title"), err.message);
     });
@@ -199,7 +202,7 @@ export function renderPdfPage() {
   updatePdfPageInfo();
 
   // 렌더링 시점에 바로 진행도를 한 번 기록하여 한두 페이지만 읽고 닫았을 때 유실(무시)되는 현상 방지
-  if (state.activeBookId && pdfTotalPages > 0) {
+  if (!isInitializingPdfProgress && state.activeBookId && pdfTotalPages > 0) {
     saveProgress(state.activeBookId, pdfCurrentPage - 1, pdfTotalPages);
   }
 }

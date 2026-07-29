@@ -1,4 +1,6 @@
 # CHANGELOG
+## v1.4.8
+- 플러그인 로드 오류 수정 | fix plugin load error
 ## v1.4.7
 - 컨텍스트 메뉴 개편 | context menu reorganize
 - 모바일 전체화면 버튼 추가 | add mobile full screen button
