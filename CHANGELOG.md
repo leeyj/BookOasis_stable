@@ -1,4 +1,12 @@
 # CHANGELOG
+## v1.4.7
+- 컨텍스트 메뉴 개편 | context menu reorganize
+- 모바일 전체화면 버튼 추가 | add mobile full screen button
+- blob 캐시 불일치로인한 다른도서가 보이는 결함 조치 | fix the blob cache cross book leak bug
+- 플러그인 자동 의존성 설치 기능 추가 | add plugin auto dependency install function
+- 스캔 제외 패턴 설정 기능 추가 | add scan ignore patterns function
+- 뒤로가기시 카테고리 선택영역 이탈 결함 조치 | fix the back button off-screen bug in mobile
+
 ## v1.4.6
 - 환경설정 버그 수정(태그 누락 수정) | fix the bug
 

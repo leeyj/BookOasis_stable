@@ -696,11 +696,30 @@ def init_databases():
                 ('RCLONE_RC_URL', 'http://localhost:5572'),
                 ('LAZY_SCAN_MAX_FILE_SIZE_MB', '300'),
                 ('LAZY_SCAN_MAX_BATCH_SIZE_MB', '1024'),
+                ('SCAN_IGNORE_PATTERNS', "@eaDir/\n#recycle/\n*.tmp\n*.sample.cbz\n.DS_Store\nThumbs.db\ndesktop.ini"),
             ]
             for k, v in default_settings:
                 cursor.execute("SELECT value FROM settings WHERE key = ?", (k,))
                 if not cursor.fetchone():
                     cursor.execute("INSERT INTO settings (key, value) VALUES (?, ?)", (k, v))
+            
+            # 기존 DB의 SCAN_IGNORE_PATTERNS 값 중 @eaDir, #recycle 끝에 /가 없는 구형 설정 자동 마이그레이션
+            cursor.execute("SELECT value FROM settings WHERE key = 'SCAN_IGNORE_PATTERNS'")
+            sig_row = cursor.fetchone()
+            if sig_row and sig_row[0]:
+                curr_val = sig_row[0]
+                new_lines = []
+                changed = False
+                for line in curr_val.splitlines():
+                    stripped = line.strip()
+                    if stripped in ('@eaDir', '#recycle', '.git', '.svn'):
+                        new_lines.append(stripped + '/')
+                        changed = True
+                    else:
+                        new_lines.append(line)
+                if changed:
+                    cursor.execute("UPDATE settings SET value = ? WHERE key = 'SCAN_IGNORE_PATTERNS'", ('\n'.join(new_lines),))
+
             conn.commit()
 
             # 초기 admin 계정 시딩

@@ -117,6 +117,10 @@ function fetchImageWithWorker(url) {
 }
 
 export async function initRenderer(bookId, pagesRead, totalPages) {
+  // 이전 도서 캐시 및 DOM 상태 완전 초기화 (도서간 이미지 교차 오염 방지)
+  clearComicViewer();
+  clearBlobCache();
+
   // 뷰어 초기화가 시작되는 즉시 로딩 오버레이를 화면에 노출합니다.
   showViewerLoading('Loading...', 'Preparing pages');
 
@@ -581,9 +585,11 @@ export function loadComicPage() {
         showViewerError('Error', 'Failed to load image');
       };
 
-      // 🌟 Blob 캐시 맵에서 Object URL을 즉시 히트하여 브라우저 대기 및 지연 제거
-      if (blobCacheMap.has(pageIndex)) {
-        imgEl.src = blobCacheMap.get(pageIndex);
+      // 🌟 Blob 캐시 맵에서 Object URL을 즉시 히트하여 브라우저 대기 및 지연 제거 (BookId 바인딩)
+      const currentBookId = state.currentBookId || (window.state ? window.state.currentBookId : null);
+      const cacheKey = `${currentBookId}_${pageIndex}`;
+      if (blobCacheMap.has(cacheKey)) {
+        imgEl.src = blobCacheMap.get(cacheKey);
       } else {
         const url = FileLoader.getPageStreamUrl(pageIndex);
         fetch(url)
@@ -592,8 +598,10 @@ export function loadComicPage() {
             return res.blob();
           })
           .then((blob) => {
+            const activeBookId = state.currentBookId || (window.state ? window.state.currentBookId : null);
+            if (activeBookId !== currentBookId) return;
             const objUrl = URL.createObjectURL(blob);
-            blobCacheMap.set(pageIndex, objUrl);
+            blobCacheMap.set(cacheKey, objUrl);
             imgEl.src = objUrl;
           })
           .catch((err) => {
@@ -654,7 +662,8 @@ async function startSequentialPreload(pageList) {
     }
 
     // 범위 검사 및 이미 캐싱된 것은 패스
-    if (nextIdx >= comicTotalPages || nextIdx < 0 || blobCacheMap.has(nextIdx)) {
+    const cacheKey = `${currentBookId}_${nextIdx}`;
+    if (nextIdx >= comicTotalPages || nextIdx < 0 || blobCacheMap.has(cacheKey)) {
       continue;
     }
 
@@ -671,7 +680,7 @@ async function startSequentialPreload(pageList) {
         }
 
         const objectUrl = URL.createObjectURL(blob);
-        blobCacheMap.set(nextIdx, objectUrl);
+        blobCacheMap.set(cacheKey, objectUrl);
       }
     } catch (e) {
       console.error(`[Preload-Blob Fail] Page ${nextIdx}:`, e);

@@ -41,7 +41,16 @@ plugins/metadata/
     index.html      # optional: custom settings UI
     style.css       # optional: custom settings styles
     script.js       # optional: custom settings initializer
+    requirements.txt # optional: list of 3rd-party python dependencies
 ```
+
+### Python 3rd-Party Dependency Auto-Installer (`requirements.txt`)
+
+If a plugin requires external Python packages (e.g., `httpx`, `gspread`, `feedparser`), simply include a `requirements.txt` file at the plugin root.
+
+- **Isolated Auto-Installation**: When the media server detects the plugin, it automatically installs packages listed in `requirements.txt` into an isolated `libs/` directory inside the plugin folder (`pip install --target libs/`) and injects it into `sys.path`.
+- **MD5 Hash Caching**: Tracks MD5 hashes of `requirements.txt`. If unchanged, skipping re-installation takes 0.001 seconds.
+- **Core Package Guard**: Core system dependencies are protected from being overridden to ensure system stability.
 
 ### Version File Contract for Auto-Update Support (Required)
 

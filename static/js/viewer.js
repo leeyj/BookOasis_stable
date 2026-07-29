@@ -398,6 +398,54 @@ window.toggleComicPageStep = function () {
   }
 };
 
+window.syncComicCenterGapButton = function () {
+  const btn = document.getElementById('btn-comic-center-gap');
+  const label = document.getElementById('comic-center-gap-label');
+  if (!btn) return;
+
+  const isGapRemoved = (localStorage.getItem('remove_2page_center_gap') === '1');
+  btn.classList.toggle('active', isGapRemoved);
+
+  if (label) {
+    if (isGapRemoved) {
+      label.setAttribute('data-i18n', 'viewer.center_gap_hide');
+      label.textContent = window.i18n ? window.i18n.t('viewer.center_gap_hide') : '중앙 여백 감춤';
+    } else {
+      label.setAttribute('data-i18n', 'viewer.center_gap_show');
+      label.textContent = window.i18n ? window.i18n.t('viewer.center_gap_show') : '중앙 여백';
+    }
+  }
+};
+
+window.toggleComicCenterGap = function () {
+  const current = localStorage.getItem('remove_2page_center_gap') === '1';
+  const nextVal = current ? '0' : '1';
+  localStorage.setItem('remove_2page_center_gap', nextVal);
+  console.log(`[Viewer] Toggled remove_2page_center_gap to ${nextVal}`);
+
+  syncComicCenterGapButton();
+
+  const removeGapInput = document.getElementById('setting-remove-2page-center-gap');
+  if (removeGapInput) {
+    removeGapInput.checked = (nextVal === '1');
+  }
+
+  if (document.getElementById('pdf-viewer-container').style.display !== 'none') {
+    if (typeof window.applyPdfFitMode === 'function') {
+      window.applyPdfFitMode();
+    }
+  } else if (document.getElementById('comic-viewer-container').style.display !== 'none') {
+    import('./viewer_comic.js').then(m => {
+      const load = m.loadComicPage;
+      if (typeof load === 'function') load();
+    });
+  } else if (document.getElementById('txt-viewer-container').style.display !== 'none') {
+    applyTxtSettings();
+  } else if (document.getElementById('epub-viewer-container').style.display !== 'none') {
+    applyEpubSettings({ preservePagePosition: true });
+  }
+};
+
 // 최초 로드 시 사용자 폰트 사전 로딩
 loadCustomFontsList();
 

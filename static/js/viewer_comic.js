@@ -74,7 +74,7 @@ export const ComicViewer = {
     clearComicViewer();
   },
   prevPage() {
-    const isRtl = localStorage.getItem('comic_reading_direction') === 'rtl';
+    const isRtl = Settings.getComicReadingDirection ? Settings.getComicReadingDirection() === 'rtl' : localStorage.getItem('comic_reading_direction') === 'rtl';
     if (isRtl) {
       nextComicPage();
     } else {
@@ -82,7 +82,7 @@ export const ComicViewer = {
     }
   },
   nextPage() {
-    const isRtl = localStorage.getItem('comic_reading_direction') === 'rtl';
+    const isRtl = Settings.getComicReadingDirection ? Settings.getComicReadingDirection() === 'rtl' : localStorage.getItem('comic_reading_direction') === 'rtl';
     if (isRtl) {
       prevComicPage();
     } else {

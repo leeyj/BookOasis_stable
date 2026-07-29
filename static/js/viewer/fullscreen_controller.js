@@ -54,17 +54,43 @@ export function exitFullscreenIfNeeded() {
   }
 }
 
+export function isMobileDevice() {
+  const ua = (navigator.userAgent || navigator.vendor || window.opera || '').toLowerCase();
+  const isAndroid = /android/i.test(ua);
+  const isIOS = /iphone|ipad|ipod/i.test(ua);
+  const isMobileUA = isAndroid || isIOS || /mobile|tablet/i.test(ua);
+  const hasTouch = (navigator.maxTouchPoints || 0) > 0 || 'ontouchstart' in window;
+  const isNarrow = window.innerWidth <= 1024;
+  return isMobileUA || (hasTouch && isNarrow);
+}
+
 export function syncViewerFullscreenState() {
   const modal = getViewerModal();
   const icon = getFullscreenIcon();
+  const mobileIcon = document.getElementById('overlay-mobile-fullscreen-icon');
+  const mobileLabel = document.getElementById('overlay-mobile-fullscreen-label');
+  const mobileBtn = document.getElementById('btn-overlay-fullscreen-mobile');
   if (!modal) return;
 
-  if (isViewerInFullscreen()) {
+  if (mobileBtn) {
+    mobileBtn.style.display = isMobileDevice() ? 'inline-flex' : 'none';
+  }
+
+  const inFullscreen = isViewerInFullscreen();
+  if (inFullscreen) {
     modal.classList.add('fullscreen-mode');
     if (icon) icon.className = 'fa-solid fa-compress';
+    if (mobileIcon) mobileIcon.className = 'fa-solid fa-compress';
+    if (mobileLabel) mobileLabel.setAttribute('data-i18n', 'viewer.exit_fullscreen');
   } else {
     modal.classList.remove('fullscreen-mode');
     if (icon) icon.className = 'fa-solid fa-expand';
+    if (mobileIcon) mobileIcon.className = 'fa-solid fa-expand';
+    if (mobileLabel) mobileLabel.setAttribute('data-i18n', 'viewer.fullscreen');
+  }
+
+  if (window.i18n && typeof window.i18n.translateDOM === 'function') {
+    window.i18n.translateDOM(modal);
   }
 }
 

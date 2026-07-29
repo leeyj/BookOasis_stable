@@ -192,5 +192,6 @@ export function commitViewerPadding() {
 
 // 윈도우 전역 함수 매핑
 window.toggleViewerPaddingPanel = toggleViewerPaddingPanel;
+window.initViewerPaddingPanel = initViewerPaddingPanel;
 window.applyViewerPaddingRealtime = applyViewerPaddingRealtime;
 window.commitViewerPadding = commitViewerPadding;

@@ -232,17 +232,20 @@ async function initTabMediaLibrary() {
   initLibrarySearchShortcut();
 
 
-  // 브라우저 뒤로가기/앞으로가기 버튼 감지하여 뷰 라우팅 복원 처리
+  // 브라우저 및 모바일 하단 OS 뒤로가기/앞으로가기 버튼 감지하여 뷰 라우팅 및 레이아웃 복원
   window.addEventListener('popstate', (event) => {
     console.log('[History] popstate 이벤트 감지:', window.location.hash, event.state);
     
     // 1. 현재 뷰어가 열려있다면 무조건 닫기 (목적지가 뷰어가 아닐 때만)
     const viewerModal = document.getElementById('media-viewer-modal');
+    let viewerWasOpen = false;
     if (viewerModal && viewerModal.style.display === 'flex') {
       if (!event.state || event.state.view !== 'viewer') {
         closeMediaViewer(false); 
+        viewerWasOpen = true;
+      } else {
+        return;
       }
-      return;
     }
     
     // 2. 목적지 상태가 상세 뷰(detail)인 경우
@@ -258,7 +261,6 @@ async function initTabMediaLibrary() {
     }
 
     if (event.state && event.state.view === 'category' && event.state.libraryId) {
-      // 현재 이미 같은 카테고리 그리드 DOM이 형성되어 있다면 selectCategory(재조회)를 생략하여 무한 스크롤 카드 및 스크롤 위치 보존
       if (state.currentLibraryId !== event.state.libraryId) {
         selectCategory(event.state.libraryId, true);
       }
@@ -266,6 +268,19 @@ async function initTabMediaLibrary() {
       if (state.currentLibraryId !== 'home') {
         selectCategory('home', true);
       }
+    }
+
+    // 4. 모바일 백 버튼으로 뷰어 종료 시 뷰포트 레이아웃 및 상단 카테고리 헤더 리플로우 보장
+    if (viewerWasOpen) {
+      document.body.style.cssText = '';
+      document.documentElement.style.cssText = '';
+      const savedPos = (state.scrollPositions && (state.scrollPositions['last_pos'] ?? state.scrollPositions[state.currentLibraryId])) || 0;
+      window.scrollTo(0, savedPos);
+      document.documentElement.scrollTop = savedPos;
+      document.body.scrollTop = savedPos;
+      requestAnimationFrame(() => {
+        window.dispatchEvent(new Event('resize'));
+      });
     }
   });
 }

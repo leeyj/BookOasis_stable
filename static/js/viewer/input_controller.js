@@ -26,45 +26,60 @@ function callDep(name, ...args) {
   return undefined;
 }
 
+function handleViewerKeydown(e) {
+  const viewerModal = document.getElementById('media-viewer-modal');
+  if (!viewerModal || viewerModal.style.display !== 'flex') return;
+
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT' || e.target.isContentEditable)) {
+    return;
+  }
+
+  switch (e.key) {
+    case 'f':
+    case 'F':
+      e.preventDefault();
+      callDep('toggleFullscreenViewer');
+      break;
+    case 'Escape': {
+      const inFullscreen = !!(
+        viewerModal.classList.contains('fullscreen-mode') ||
+        (typeof _deps.isViewerInFullscreen === 'function' && _deps.isViewerInFullscreen())
+      );
+      if (inFullscreen) {
+        callDep('toggleFullscreenViewer');
+      } else {
+        callDep('closeMediaViewer');
+      }
+      break;
+    }
+    case 'ArrowRight':
+    case ' ':
+      e.preventDefault();
+      callDep('nextPage');
+      break;
+    case 'ArrowLeft':
+      e.preventDefault();
+      callDep('prevPage');
+      break;
+    default:
+      break;
+  }
+}
+
 export function initKeyboardListener() {
   if (keyboardListenerInitialized) return;
   keyboardListenerInitialized = true;
 
-  document.addEventListener('keydown', (e) => {
-    const viewerModal = document.getElementById('media-viewer-modal');
-    if (!viewerModal || viewerModal.style.display !== 'flex') return;
+  document.addEventListener('keydown', handleViewerKeydown);
 
-    switch (e.key) {
-      case 'f':
-      case 'F':
-        e.preventDefault();
-        callDep('toggleFullscreenViewer');
-        break;
-      case 'Escape': {
-        const inFullscreen = !!(
-          viewerModal.classList.contains('fullscreen-mode') ||
-          (typeof _deps.isViewerInFullscreen === 'function' && _deps.isViewerInFullscreen())
-        );
-        if (inFullscreen) {
-          callDep('toggleFullscreenViewer');
-        } else {
-          callDep('closeMediaViewer');
-        }
-        break;
-      }
-      case 'ArrowRight':
-      case ' ':
-        e.preventDefault();
-        callDep('nextPage');
-        break;
-      case 'ArrowLeft':
-        e.preventDefault();
-        callDep('prevPage');
-        break;
-      default:
-        break;
+  // Attach keydown listener bridge to iframe document (for EPUB etc)
+  document.addEventListener('click', () => {
+    const iframe = document.querySelector('#epub-render-area iframe');
+    if (iframe && iframe.contentDocument && !iframe.contentDocument.__keyboardBridgeInited) {
+      iframe.contentDocument.__keyboardBridgeInited = true;
+      iframe.contentDocument.addEventListener('keydown', handleViewerKeydown);
     }
-  });
+  }, true);
 
   initWheelListener();
   initViewerClickToggle();

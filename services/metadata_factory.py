@@ -80,6 +80,11 @@ class MetadataFactory:
 
     @classmethod
     def _import_provider_module_and_class(cls, provider_name):
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        plugin_dir = os.path.join(base_dir, 'plugins', 'metadata', provider_name)
+        if os.path.isdir(plugin_dir):
+            ensure_plugin_dependencies(plugin_dir)
+
         candidate_modules = [
             f"plugins.metadata.{provider_name}",
             f"plugins.metadata.{provider_name}.{provider_name}",

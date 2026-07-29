@@ -18,7 +18,11 @@ graph TD
     Thread_Config --> Load_Checkpoint[scanner_progress 체크포인트 로드]
     Load_Checkpoint --> Walk_Dirs[물리 폴더 트리 탐색 os.walk]
     
-    Walk_Dirs --> Move_Detect{도서 이동 감지?}
+    Walk_Dirs --> Ignore_Filter{IgnoreFilter 스캔 예외 필터}
+    Ignore_Filter -- "예외 디렉토리" --> Prune_Dirs[dirs[:] in-place 제거 및 하위 탐색 차단]
+    Ignore_Filter -- "일반 디렉토리" --> Move_Detect{도서 이동 감지?}
+    Prune_Dirs --> Move_Detect
+    
     Move_Detect -- "예" --> Update_Path[DB 경로 업데이트 및 기록 유지]
     Move_Detect -- "아니오" --> Task_Distribute[폴더 단위 태스크 분배]
     Update_Path --> Task_Distribute
@@ -69,6 +73,12 @@ graph TD
   - 전체 라이브러리 스캔이 에러 없이 완전히 끝나면 해당 라이브러리의 체크포인트 데이터를 일괄 청소합니다.
 * **실시간 조기 취소**:
   - 폴더 한 루프를 끝낼 때마다 DB의 `libraries.scan_status`를 읽어 `'cancelling'` 상태인지 판단하며, 감지 시 즉시 안전 종료합니다.
+
+### ④ 스캔 예외 필터링 (IgnoreFilter & .bookoasisignore)
+* **동작 원리**:
+  - `tools/scanner/ignore_filter.py` 모듈이 전역 DB 설정(`SCAN_IGNORE_PATTERNS`) 및 폴더별 `.bookoasisignore` 파티션 파일을 실시간으로 처리합니다.
+  - 끝에 `/`가 붙은 패턴(예: `@eaDir/`, `#recycle/`, `.git/`)은 **디렉토리 전용 와일드카드**로 인식되며, `os.walk()` 시 `dirs[:] = [d for d in dirs if d not in ignored]` 방식으로 in-place 제거하여 하위 디렉토리 트리의 물리적 탐색을 사전에 완전 차단합니다.
+  - 파일 와일드카드 패턴(예: `*.tmp`, `*.sample.cbz`, `Thumbs.db`)은 파일 목록 순회 시 무시 처리되며, 무시된 디렉토리/파일은 `[Scanner-Ignore]` 명칭으로 로그에 기록됩니다.
 
 ### ④ 도서 이동(Path 변경) 자동 감지 및 히스토리 보존
 * **문제 해결**: 파일의 경로가 바뀌거나 상위 폴더 이름이 수정될 때 새 도서로 인식해 기존 독서 완료 내역과 통계가 날아가는 것을 방지합니다.

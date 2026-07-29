@@ -127,7 +127,7 @@
                                             <input type="checkbox" id="setting-detail-volume-grid-view" name="DETAIL_VOLUME_GRID_VIEW" style="cursor: pointer; accent-color: #a855f7; width: 1.1rem; height: 1.1rem; margin: 0;">
                                             <label for="setting-detail-volume-grid-view" style="cursor: pointer; font-weight: 700; color: #fff; font-size: 0.9rem; margin: 0;">도서 상세 목록 그리드로 보기 <span style="color: #64748b; font-weight: 400; font-size: 0.8rem;">(커버+제목 그리드 형태)</span></label>
                                         </div>
-
+                                    </div>
                                 </div>
                             </div>
 
@@ -187,6 +187,15 @@
                                             <option value="1" data-i18n="settings.log_dev">로그 실시간 출력 및 파일 기록 (개발 모드)</option>
                                             <option value="0" data-i18n="settings.log_prod">로그 출력 감추기 (운영 권장 / 용량 절약 모드)</option>
                                         </select>
+                                    </div>
+
+                                    <!-- 스캔 제외 패턴 설정 (Scan Ignore Patterns) -->
+                                    <div class="library-form-group">
+                                        <label for="setting-scan-ignore-patterns" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                            <i class="fa-solid fa-filter-circle-xmark" style="color: #ef4444; margin-right: 0.3rem;"></i> <span data-i18n="settings.scan_ignore_patterns_label">스캔 제외 패턴 (Scan Ignore Patterns)</span>
+                                        </label>
+                                        <textarea id="setting-scan-ignore-patterns" name="SCAN_IGNORE_PATTERNS" rows="5" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; font-family: monospace; font-size: 0.85rem; line-height: 1.4; resize: vertical;" placeholder="@eaDir&#10;#recycle&#10;*.tmp&#10;*.sample.cbz"></textarea>
+                                        <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0; line-height: 1.5;" data-i18n="settings.scan_ignore_patterns_desc">도서 스캔 시 제외할 <strong>파일 및 디렉토리 패턴을 한 줄에 하나씩</strong> 입력하세요.<br><strong>디렉토리는 끝에 /</strong>를 붙여 명시할 수 있습니다. (예: <code>@eaDir/</code>, <code>#recycle/</code>, <code>*.tmp</code>, <code>*.sample.cbz</code>)<br>폴더 내 <strong>.bookoasisignore 파일</strong>로도 개별 설정 가능합니다.</p>
                                     </div>
 
                                     <!-- HDD 적극 웜업 설정 -->

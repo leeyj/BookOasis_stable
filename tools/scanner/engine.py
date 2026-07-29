@@ -142,6 +142,12 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
 
     print(f"[Scanner] Scanning physical folder tree...")
     folder_count = 0
+    from tools.scanner.ignore_filter import IgnoreFilter
+    cursor.execute("SELECT value FROM settings WHERE key = 'SCAN_IGNORE_PATTERNS'")
+    ignore_row = cursor.fetchone()
+    ignore_patterns_str = ignore_row['value'] if ignore_row else None
+    ignore_filter = IgnoreFilter(ignore_patterns_str)
+
     from utils.drive_helper import is_gdrive_url
     for t_path in target_paths:
         if is_gdrive_url(t_path):
@@ -156,6 +162,9 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                 if not fname:
                     continue
                 rel_f = item.get('rel_folder', '')
+                if ignore_filter.should_ignore_file(fname, parent_path=rel_f) or ignore_filter.should_ignore_dir(rel_f):
+                    continue
+
                 if rel_f:
                     v_root = canonical_path(f"gdrive://{folder_id}/{rel_f}")
                 else:
@@ -178,6 +187,25 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
             continue
         for root, dirs, files in os.walk(t_path, onerror=_walk_onerror):
             root = canonical_path(root)
+
+            # Local .bookoasisignore 파일 체크
+            local_ig = os.path.join(root, '.bookoasisignore')
+            if os.path.exists(local_ig):
+                ignore_filter.load_ignore_file(local_ig, base_dir=root)
+
+            # 디렉토리 조기 차단 (In-place dirs 제거로 하위 탐색 물리 차단) 및 스킵 로그 출력
+            ignored_dirs = [d for d in dirs if ignore_filter.should_ignore_dir(d, parent_path=root)]
+            for d in ignored_dirs:
+                print(f"[Scanner-Ignore] 🚫 스캔 예외 디렉토리 하위 탐색 차단: {os.path.join(root, d)}")
+            dirs[:] = [d for d in dirs if d not in ignored_dirs]
+
+            # 파일 수준 필터링 및 스킵 로그 출력
+            ignored_files = [f for f in files if ignore_filter.should_ignore_file(f, parent_path=root)]
+            for f in ignored_files:
+                if f.lower() != '.bookoasisignore':
+                    print(f"[Scanner-Ignore] 🚫 스캔 예외 파일 무시: {os.path.join(root, f)}")
+            files = [f for f in files if f not in ignored_files]
+
             media_files = [f for f in files if f.lower().endswith(SUPPORTED_FORMATS)]
             image_files = [f for f in files if f.lower().endswith(SUPPORTED_IMAGE_FORMATS)]
             has_imgdir_candidate = bool(image_files) and not media_files

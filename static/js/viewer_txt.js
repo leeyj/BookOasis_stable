@@ -68,7 +68,7 @@ export const txtRuntimeState = {
 
 import { showViewerLoading, hideViewerLoading, showViewerError, showToast } from './view_manager.js';
 import { saveProgress } from './viewer_progress.js';
-import { initPageStep, initReadingDirection } from './viewer/reader_settings.js';
+import { initPageStep, initReadingDirection, getComicReadingDirection } from './viewer/reader_settings.js';
 import { getTxtPageAdvanceWidth, snapTxtPageScrollLeft } from './viewer/txt_page_utils.js';
 import { chunkText, formatTxtToHtml, stripHtml } from './viewer/txt_text_utils.js';
 import { renderTxtChunkView, applyTxtParagraphStyles } from './viewer/txt_render.js';
@@ -973,10 +973,20 @@ export const TxtViewer = {
     if (tocContainer) tocContainer.remove();
   },
   prevPage() {
-    prevTxtPage();
+    const isRtl = getComicReadingDirection() === 'rtl';
+    if (isRtl) {
+      nextTxtPage();
+    } else {
+      prevTxtPage();
+    }
   },
   nextPage() {
-    nextTxtPage();
+    const isRtl = getComicReadingDirection() === 'rtl';
+    if (isRtl) {
+      prevTxtPage();
+    } else {
+      nextTxtPage();
+    }
   },
   jumpTo(target) {
     if (target === 'first') {

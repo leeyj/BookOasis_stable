@@ -42,7 +42,16 @@ plugins/metadata/
     index.html      # 선택: 설정 화면 커스텀 UI
     style.css       # 선택: 설정 화면 커스텀 스타일
     script.js       # 선택: 설정 화면 커스텀 스크립트
+    requirements.txt # 선택: 플러그인 전용 파이썬 외부 라이브러리 자동 설치 목록
 ```
+
+### 파이썬 외부 종속 패키지 자동 설치 (`requirements.txt` 지원)
+
+플러그인 구동에 외부 파이썬 3rd-party 라이브러리(예: `httpx`, `gspread`, `feedparser` 등)가 필요할 경우, 플러그인 루트에 `requirements.txt` 파일을 포함시킬 수 있습니다.
+
+- **자동 격리 설치**: 미디어 서버가 플러그인을 탐지할 때 `requirements.txt`를 감지하여 해당 플러그인 폴더 내 `libs/` 격리 디렉토리에 자동 설치(`pip install --target libs/`) 후 `sys.path`에 동적 주입합니다.
+- **캐싱 및 0초 로딩**: `requirements.txt` 파일의 MD5 해시를 추적하여 내용 변경이 없을 경우 재설치를 수행하지 않고 0.001초 만에 로드합니다.
+- **코어 안전장치**: 코어 시스템 라이브러리와 중복되는 패키지는 시스템 안정성을 위해 자동으로 최우선 보호됩니다.
 
 ### 자동 업데이트 지원용 버전 파일 규격 (필수)
 

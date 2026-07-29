@@ -3,6 +3,7 @@ import * as Renderer from './renderer.js';
 import * as Settings from './reader_settings.js';
 import { saveProgress } from '../viewer_progress.js';
 import { state } from '../state.js'; // window.state 대신 ES 모듈 import 사용
+import { syncViewerFullscreenState, isMobileDevice } from './fullscreen_controller.js';
 
 function isViewerDebugEnabled() {
   const v = String(localStorage.getItem('DEBUG_VIEWER') || '').toLowerCase();
@@ -26,6 +27,28 @@ export function comicSliderChange(slider, val) {
   Renderer.loadComicPage();
 }
 
+export function switchViewerOverlayTab(tabName) {
+  const allowedTabs = ['nav', 'layout', 'style', 'margin'];
+  if (!allowedTabs.includes(tabName)) tabName = 'nav';
+
+  allowedTabs.forEach(t => {
+    const btn = document.getElementById(`tab-btn-${t}`);
+    const content = document.getElementById(`overlay-tab-${t}`);
+    if (btn) btn.classList.toggle('active', t === tabName);
+    if (content) content.classList.toggle('active', t === tabName);
+  });
+
+  localStorage.setItem('viewer_active_overlay_tab', tabName);
+
+  if (tabName === 'margin' && typeof window.initViewerPaddingPanel === 'function') {
+    window.initViewerPaddingPanel();
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.switchViewerOverlayTab = switchViewerOverlayTab;
+}
+
 export function toggleComicOverlay() {
   console.log('[Viewer-Nav] toggleComicOverlay() called');
   const menu = document.getElementById('comic-overlay-menu');
@@ -36,11 +59,25 @@ export function toggleComicOverlay() {
   const epubNavBar = document.querySelector('.epub-nav-bar');
   const floatingCloseBtn = document.querySelector('.floating-close-btn');
 
-  // ── 스크롤 모드에서 오버레이 위치 보정 ────────────────────────────────
-  // scroll-mode-active 클래스가 붙으면 viewer-modal이 직접 스크롤되므로
-  // position:fixed 엘리먼트가 문서 최상단에 고정되어 버린다.
-  // viewerModal.scrollTop을 오버레이 top에 더해 현재 뷰포트 기준으로 보정한다.
   if (isOpening) {
+    syncViewerFullscreenState();
+    if (typeof window.syncComicCenterGapButton === 'function') {
+      window.syncComicCenterGapButton();
+    }
+
+    const fmt = (state.currentViewerFormat || '').toLowerCase();
+    const styleTabBtn = document.getElementById('tab-btn-style');
+    const isTxtOrEpub = (fmt === 'txt' || fmt === 'epub');
+    if (styleTabBtn) {
+      styleTabBtn.style.display = isTxtOrEpub ? 'flex' : 'none';
+    }
+
+    let activeTab = localStorage.getItem('viewer_active_overlay_tab') || 'nav';
+    if (!isTxtOrEpub && activeTab === 'style') {
+      activeTab = 'nav';
+    }
+    switchViewerOverlayTab(activeTab);
+
     const viewerModal = document.getElementById('media-viewer-modal');
     const isScrollActive = viewerModal && viewerModal.classList.contains('scroll-mode-active');
     const offset = isScrollActive ? viewerModal.scrollTop : 0;
@@ -86,7 +123,7 @@ export function toggleComicOverlay() {
   menu.style.display = isOpening ? 'flex' : 'none';
   if (pdfNavBar) pdfNavBar.style.display = isOpening ? 'flex' : 'none';
   if (epubNavBar) epubNavBar.style.display = isOpening ? 'flex' : 'none';
-  if (floatingCloseBtn) floatingCloseBtn.style.display = isOpening ? 'flex' : 'none';
+  if (floatingCloseBtn) floatingCloseBtn.style.display = 'none';
 
   document.dispatchEvent(new CustomEvent('viewer-overlay-visibility-changed', {
     detail: {

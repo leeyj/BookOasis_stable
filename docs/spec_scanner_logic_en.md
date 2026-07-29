@@ -74,5 +74,11 @@ graph TD
   - Reconstructs the target URL by stripping user credentials to prevent parsing anomalies within the standard Python `urllib.request` library.
   - Ensures password security by masking credential segments as `****:****` in console warnings and scanner logs during exception handling.
 
+### ⑪ Scan Ignore Patterns & .bookoasisignore Filter
+* **Mechanism**:
+  - `tools/scanner/ignore_filter.py` processes global DB settings (`SCAN_IGNORE_PATTERNS`) and per-directory `.bookoasisignore` files.
+  - Trailing `/` patterns (e.g. `@eaDir/`, `#recycle/`, `.git/`) are matched as **directory-only wildcards**, pruned in-place (`dirs[:] = [d for d in dirs if d not in ignored]`) during `os.walk()`, preventing physical subfolder traversal.
+  - File wildcards (e.g. `*.tmp`, `*.sample.cbz`, `Thumbs.db`) filter out matching file entries during directory traversal and are explicitly logged with `[Scanner-Ignore]`.
+
 ---
-*Last Updated: 2026-07-05*
+*Last Updated: 2026-07-29*

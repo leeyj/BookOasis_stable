@@ -483,37 +483,119 @@
 }
 
 .overlay-close-btn {
-    background: rgba(239, 68, 68, 0.2);
-    border: 1px solid rgba(239, 68, 68, 0.4);
+    background: rgba(239, 68, 68, 0.25);
+    border: 1px solid rgba(239, 68, 68, 0.5);
     color: #fca5a5;
-    padding: 0.35rem 0.8rem;
-    font-size: 0.8rem;
+    padding: 0.3rem 0.75rem;
+    font-size: 0.95rem;
     font-weight: 700;
-    border-radius: 4px;
+    border-radius: 6px;
     cursor: pointer;
-    transition: all 0.2s;
+    line-height: 1;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.2);
 }
 
 .overlay-close-btn:hover {
     background: #ef4444;
-    color: #fff;
+    border-color: #f87171;
+    color: #ffffff;
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.6);
+    transform: scale(1.05);
 }
 
 .overlay-controls-panel {
-    background: rgba(15, 23, 42, 0.85);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
+    background: rgba(10, 25, 47, 0.92);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    border-radius: 10px;
     padding: 0.8rem 1.2rem;
     display: flex;
     flex-direction: column;
-    /* 2행 레이아웃 */
     gap: 0.6rem;
     align-self: center;
     max-width: 95vw;
     box-sizing: border-box;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 10px 30px rgba(2, 132, 199, 0.25), 0 0 15px rgba(59, 130, 246, 0.15);
     animation: zoomIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 📌 뷰어 오버레이 탭 헤더 및 콘텐츠 */
+.overlay-tab-nav {
+    display: flex;
+    gap: 6px;
+    border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.4rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.overlay-tab-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #94a3b8;
+    padding: 0.35rem 0.85rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.overlay-tab-btn:hover {
+    background: rgba(59, 130, 246, 0.15);
+    color: #e0f2fe;
+    border-color: rgba(59, 130, 246, 0.4);
+}
+
+.overlay-tab-btn.active {
+    background: linear-gradient(135deg, #2563eb, #0284c7);
+    color: #ffffff;
+    border-color: #38bdf8;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+}
+
+.overlay-tab-content {
+    display: none;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.overlay-tab-content.active {
+    display: flex;
+}
+
+.overlay-select {
+    background: #0f172a;
+    color: #f8fafc;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    padding: 0.35rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.overlay-select:focus, .overlay-select:hover {
+    border-color: #38bdf8;
+}
+
+.overlay-margin-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.2rem 0.4rem;
+}
+
+.overlay-slider {
+    width: 100%;
+    cursor: pointer;
+    accent-color: #3b82f6;
 }
 
 /* 오버레이 컨트롤 패널 각 행 */
@@ -528,12 +610,11 @@
 /* 너비 조절 행 — 스크롤 모드에서만 표시 */
 .overlay-width-row {
     display: none;
-    /* JS로 스크롤 모드 시만 show */
     flex-wrap: wrap;
     gap: 0.6rem;
     align-items: center;
     justify-content: center;
-    border-top: 1px solid rgba(255, 255, 255, 0.07);
+    border-top: 1px solid rgba(59, 130, 246, 0.15);
     padding-top: 0.4rem;
 }
 
@@ -551,7 +632,7 @@
 
 /* 너비 현재값 배지 */
 .overlay-width-value {
-    color: #d8b4fe;
+    color: #38bdf8;
     font-size: 0.75rem;
     font-weight: 700;
     min-width: 38px;
@@ -580,9 +661,9 @@
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: #a855f7;
+    background: #3b82f6;
     cursor: pointer;
-    box-shadow: 0 0 6px rgba(168, 85, 247, 0.55);
+    box-shadow: 0 0 6px rgba(59, 130, 246, 0.65);
     transition: transform 0.15s;
 }
 
@@ -594,10 +675,10 @@
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: #a855f7;
+    background: #3b82f6;
     cursor: pointer;
     border: none;
-    box-shadow: 0 0 6px rgba(168, 85, 247, 0.55);
+    box-shadow: 0 0 6px rgba(59, 130, 246, 0.65);
 }
 
 .btn-overlay-action {
@@ -616,8 +697,8 @@
 }
 
 .btn-overlay-action:hover {
-    background: rgba(168, 85, 247, 0.2);
-    border-color: #a855f7;
+    background: rgba(59, 130, 246, 0.25);
+    border-color: #3b82f6;
     color: #fff;
 }
 
@@ -642,8 +723,9 @@
 }
 
 .btn-overlay-fit.active {
-    background: #a855f7;
+    background: linear-gradient(135deg, #2563eb, #0284c7);
     color: #fff;
+    box-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
 }
 
 .overlay-footer {

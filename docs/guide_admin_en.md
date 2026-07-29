@@ -68,6 +68,19 @@ The Scanner is the core engine that synchronizes the file system and database th
 * **Cancel**: If you press the 'Cancel' button while a scan task is running, the scanner safely finishes processing up to the current folder unit and then voluntarily terminates the task.
 * **Checkpoint Mechanism**: Even if an error or forced termination occurs during a scan, the records of already completed folders remain intact in `scanner_progress`, so the next scan will automatically resume from the remaining parts.
 
+### ⑤ Scan Ignore Patterns & .bookoasisignore Setup
+You can exclude specific files or directories from being scanned, such as Synology NAS thumbnail folders (`@eaDir/`), recycle bins (`#recycle/`), or temporary files (`*.tmp`, `*.sample.cbz`).
+
+* **Global Ignore Patterns (Admin Settings)**:
+  - Enter patterns line by line under **[Settings ⚙️] -> [General Settings] -> "Scan Ignore Patterns"**.
+  - **Directory Patterns**: Must end with `/` (e.g., `@eaDir/`, `#recycle/`, `.git/`, `.svn/`).
+  - **File Patterns**: Enter filenames with wildcards (e.g., `*.tmp`, `*.sample.cbz`, `Thumbs.db`, `.DS_Store`, `desktop.ini`).
+* **Per-Folder Custom Setup (`.bookoasisignore`)**:
+  - Place a `.bookoasisignore` file inside a specific directory to apply custom ignore rules to that folder and its subdirectories.
+* **Scan Logs & Trash Synchronization**:
+  - Excluded directories are immediately blocked from physical subfolder traversal and explicitly logged in `media_server.log` (`[Scanner-Ignore]`).
+  - Previously registered items that become ignored are safely moved to the Trash (Soft Delete).
+
 ---
 
 ## 5. System and Plugin Setup

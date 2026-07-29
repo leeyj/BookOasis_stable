@@ -171,20 +171,30 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false) {
   }
 
   if (!isTransitioning) {
+    const menu = document.getElementById('comic-overlay-menu');
+    let savedScrollY = 0;
+    if (menu && menu.dataset.iosBodyLock === 'true') {
+      savedScrollY = parseInt(menu.dataset.savedBodyScrollY || '0', 10);
+      menu.dataset.iosBodyLock = 'false';
+    }
+
     viewerModal.classList.remove('fullscreen-mode');
     viewerModal.style.display = 'none';
-    document.getElementById('fullscreen-icon').className = 'fa-solid fa-expand';
-    document.body.style.removeProperty('overflow');
-    document.body.style.removeProperty('position');
-    document.body.style.removeProperty('top');
-    document.body.style.removeProperty('width');
-    document.documentElement.style.removeProperty('overflow');
+    const fullscreenIcon = document.getElementById('fullscreen-icon');
+    if (fullscreenIcon) fullscreenIcon.className = 'fa-solid fa-expand';
 
-    document.body.style.overflow = '';
-    document.body.style.position = '';
-    document.body.style.top = '';
-    document.body.style.width = '';
-    document.documentElement.style.overflow = '';
+    // body 및 documentElement 인라인 스크롤 락 스타일 완전 소거
+    document.body.style.cssText = '';
+    document.documentElement.style.cssText = '';
+
+    if (savedScrollY > 0) {
+      window.scrollTo(0, savedScrollY);
+    }
+
+    // 모바일 브라우저 뷰포트 레이아웃 재계산 및 카테고리 헤더 리플로우 유도
+    requestAnimationFrame(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
   }
 
   if (activeViewerInstance && typeof activeViewerInstance.destroy === 'function') {
