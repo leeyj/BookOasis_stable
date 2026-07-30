@@ -1,4 +1,7 @@
 # CHANGELOG
+## v1.4.9
+- 태그 누락 버그 수정 | fix the tag missing bug
+
 ## v1.4.8
 - 플러그인 로드 오류 수정 | fix plugin load error
 ## v1.4.7

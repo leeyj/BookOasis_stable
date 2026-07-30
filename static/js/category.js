@@ -93,6 +93,26 @@ export async function loadLibraries() {
           html += `<li class="menu-item ${isActive}" data-type="custom" data-id="${lib.id}" data-name="${safeName}" data-path="${safePath}" data-remote="${lib.is_remote || 0}" data-rclone-url="${safeRclone}" data-icon="${safeIcon}" data-color="${safeColor}" data-hide-cover="${hideCover}" ${draggableAttr} onclick="selectCategory('${lib.id}')"><i class="fa-solid ${safeIcon}" style="color: ${safeColor};"></i> ${safeName}</li>`;
         });
       }
+
+      // 동적 카테고리 레벨 플러그인 탭 주입
+      try {
+        const catPluginRes = await fetch(`/api/media/category-plugins?type=${state.currentLibraryType}`);
+        if (catPluginRes.ok) {
+          const catPluginData = await catPluginRes.json();
+          if (catPluginData.success && catPluginData.category_plugins && catPluginData.category_plugins.length > 0) {
+            catPluginData.category_plugins.forEach(cp => {
+              const catId = cp.category_id;
+              const isActive = String(state.currentLibraryId) === String(catId) ? 'active' : '';
+              const safeTitle = escapeHtml(cp.title || cp.name);
+              const safeIcon = escapeHtml(cp.icon || 'fa-puzzle-piece');
+              html += `<li class="menu-item ${isActive}" data-type="plugin" id="category-${catId}" data-id="${catId}" data-plugin-id="${cp.id}" onclick="selectCategory('${catId}')"><i class="${safeIcon}" style="color: #38bdf8;"></i> ${safeTitle}</li>`;
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('[Category] Failed to fetch category plugins:', e);
+      }
+
       sidebar.innerHTML = html;
       const activeItem = document.getElementById(`category-${state.currentLibraryId}`) || sidebar.querySelector(`[data-id="${state.currentLibraryId}"]`);
       state.currentLibraryHideCovers = !!(activeItem && activeItem.dataset && activeItem.dataset.type === 'custom' && activeItem.dataset.hideCover === '1');

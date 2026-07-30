@@ -17,8 +17,7 @@ def get_permissions():
         users = [dict(row) for row in cursor_g.fetchall()]
         conn_g.close()
 
-        # 2. 카테고리(libraries) 목록 조회
-        # 일반 라이브러리 목록만 수집 (성인도서 권한관리는 계정별 'has_adult_access'로 단일 통제하므로 제외)
+        # 2. 카테고리(libraries) 목록 및 카테고리 레벨 플러그인 목록 수집
         categories = []
         
         # 일반 DB 카테고리
@@ -29,7 +28,24 @@ def get_permissions():
             categories.append({'id': r['id'], 'name': r['name'], 'db_type': 'general'})
         conn_gen.close()
 
-        # 3. 사용자별 카테고리 권한 정보 조회 (일반 DB만 조회)
+        # 카테고리 레벨 플러그인 목록 수집
+        try:
+            from services.metadata_factory import MetadataFactory
+            providers = MetadataFactory.get_available_providers()
+            for p in providers:
+                if p.get('enabled') and p.get('category_tab'):
+                    cat_tab = p.get('category_tab')
+                    title = cat_tab.get('title') if isinstance(cat_tab, dict) else p.get('name')
+                    cat_id = f"plugin_{p['id']}"
+                    categories.append({
+                        'id': cat_id,
+                        'name': f"🧩 {title}",
+                        'db_type': 'plugin'
+                    })
+        except Exception as p_err:
+            print(f"[PermissionRoutes] Failed to fetch plugin categories: {p_err}")
+
+        # 3. 사용자별 카테고리 권한 정보 조회 (일반 DB 및 플러그인 권한)
         permissions = {}
         conn = database.get_connection('general')
         cursor = conn.cursor()
@@ -41,7 +57,23 @@ def get_permissions():
             if uid not in permissions:
                 permissions[uid] = {}
             permissions[uid][key] = bool(r['has_access'])
+
+        # 플러그인 카테고리 권한 조회 (settings 테이블의 PERM_CATEGORY_{uid}_{cat_id})
+        cursor.execute("SELECT key, value FROM settings WHERE key LIKE 'PERM_CATEGORY_%'")
+        perm_rows = cursor.fetchall()
         conn.close()
+
+        perm_map = {r['key']: r['value'] for r in perm_rows}
+        for u in users:
+            uid = str(u['id'])
+            if uid not in permissions:
+                permissions[uid] = {}
+            for cat in categories:
+                if cat['db_type'] == 'plugin':
+                    key_perm = f"PERM_CATEGORY_{uid}_{cat['id']}"
+                    val = perm_map.get(key_perm, '1')
+                    perm_matrix_key = f"plugin_{cat['id']}"
+                    permissions[uid][perm_matrix_key] = (val == '1')
 
         return jsonify({
             'success': True,
@@ -60,21 +92,33 @@ def update_permission():
     user_id = data.get('user_id')
     library_id = data.get('library_id')
     has_access = 1 if data.get('has_access') else 0
-    target_db = data.get('target_db', 'general') # 'general' or 'adult'
+    target_db = data.get('target_db', 'general') # 'general' or 'plugin'
 
     if not user_id or not library_id:
         return jsonify({'success': False, 'error': 'user_id와 library_id는 필수 항목입니다.'}), 400
 
     try:
-        conn = database.get_connection(target_db)
-        cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO user_category_permissions (user_id, library_id, has_access)
-            VALUES (?, ?, ?)
-            ON CONFLICT(user_id, library_id) DO UPDATE SET has_access = excluded.has_access
-        """, (user_id, library_id, has_access))
-        conn.commit()
-        conn.close()
+        if target_db == 'plugin' or str(library_id).startswith('plugin_'):
+            conn = database.get_connection('general')
+            cursor = conn.cursor()
+            key_perm = f"PERM_CATEGORY_{user_id}_{library_id}"
+            cursor.execute("""
+                INSERT INTO settings (key, value)
+                VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
+            """, (key_perm, str(has_access)))
+            conn.commit()
+            conn.close()
+        else:
+            conn = database.get_connection(target_db)
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO user_category_permissions (user_id, library_id, has_access)
+                VALUES (?, ?, ?)
+                ON CONFLICT(user_id, library_id) DO UPDATE SET has_access = excluded.has_access
+            """, (user_id, library_id, has_access))
+            conn.commit()
+            conn.close()
         return jsonify({'success': True, 'message': '권한 정보가 업데이트되었습니다.'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

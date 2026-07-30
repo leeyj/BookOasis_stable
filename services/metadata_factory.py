@@ -6,6 +6,9 @@ import subprocess
 import hashlib
 from plugins.metadata.base import BaseMetadataProvider
 
+class SecurityError(PermissionError):
+    pass
+
 def _get_core_requirements():
     return {'flask', 'pillow', 'pymupdf', 'psutil', 'redis', 'requests', 'rclone'}
 
@@ -161,27 +164,61 @@ class MetadataFactory:
         raise ImportError(f"Provider '{provider_name}' module load failed.")
 
     @classmethod
-    def _load_plugin_ui_bundle(cls, provider_name):
+    def _validate_safe_plugin_path(cls, plugin_dir, target_filename):
+        """
+        보안 검증: plugins/metadata/{plugin_id} 디렉토리 상위 탈출(../) 및 외부 심볼릭링크 접근 원천 차단
+        """
+        abs_plugin_dir = os.path.abspath(plugin_dir)
+        target_path = os.path.abspath(os.path.join(abs_plugin_dir, target_filename))
+
+        # Path Traversal (../) 및 절대경로 외부 탈출 검증
+        if not target_path.startswith(abs_plugin_dir + os.sep) and target_path != abs_plugin_dir:
+            raise SecurityError(f"[SecurityAlert] Path traversal attempt blocked: {target_filename}")
+
+        # 심볼릭링크 외부 주입 차단
+        if os.path.islink(target_path):
+            real_path = os.path.realpath(target_path)
+            if not real_path.startswith(abs_plugin_dir + os.sep):
+                raise SecurityError(f"[SecurityAlert] Symlink traversal attempt blocked: {target_filename}")
+
+        return target_path
+
+    @classmethod
+    def _load_plugin_ui_bundle(cls, provider_name, target='view'):
+        """
+        플러그인 UI 번들 서빙 (target='view' | 'settings')
+        - target='view': index.html, style.css, script.js (카테고리 메인 뷰포트용)
+        - target='settings': settings.html, settings.css, settings.js (환경설정 탭 커스텀 폼용)
+        """
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         plugin_dir = os.path.join(base_dir, 'plugins', 'metadata', provider_name)
         if not os.path.isdir(plugin_dir):
             return None
 
         bundle = {}
-        file_map = {
-            'html': 'index.html',
-            'css': 'style.css',
-            'js': 'script.js',
-        }
+        if target == 'settings':
+            file_map = {
+                'html': 'settings.html',
+                'css': 'settings.css',
+                'js': 'settings.js',
+            }
+        else:
+            file_map = {
+                'html': 'index.html',
+                'css': 'style.css',
+                'js': 'script.js',
+            }
 
         for key, file_name in file_map.items():
-            file_path = os.path.join(plugin_dir, file_name)
-            if os.path.isfile(file_path):
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
+            try:
+                safe_file_path = cls._validate_safe_plugin_path(plugin_dir, file_name)
+                if os.path.isfile(safe_file_path):
+                    with open(safe_file_path, 'r', encoding='utf-8') as f:
                         bundle[key] = f.read()
-                except Exception as e:
-                    print(f"[MetadataFactory] Plugin UI asset load failed ({provider_name}/{file_name}): {e}")
+            except SecurityError as se:
+                print(f"[MetadataFactory SecurityAlert] {se}")
+            except Exception as e:
+                print(f"[MetadataFactory] Plugin UI asset load failed ({provider_name}/{file_name}): {e}")
 
         return bundle if bundle else None
 
@@ -372,6 +409,7 @@ class MetadataFactory:
                 p_searchable = getattr(target_class, 'is_searchable', True)
                 p_schema = getattr(target_class, 'config_schema', [])
                 p_widget = getattr(target_class, 'dashboard_widget', None)
+                p_category_tab = getattr(target_class, 'category_tab', None)
                 p_update_manifest = getattr(target_class, 'update_manifest', None)
 
                 enabled_key = f"PLUGIN_ENABLED_{p_id}"
@@ -393,8 +431,17 @@ class MetadataFactory:
                     'config_schema': p_schema,
                     'config': config_data,
                     'dashboard_widget': p_widget,
+                    'category_tab': p_category_tab,
                     'update_manifest': p_update_manifest,
                 }
+
+                settings_ui = cls._load_plugin_ui_bundle(p_id, target='settings')
+                if settings_ui:
+                    provider_item['settings_ui'] = settings_ui
+
+                view_ui = cls._load_plugin_ui_bundle(p_id, target='view')
+                if view_ui:
+                    provider_item['ui'] = view_ui
 
                 providers.append(provider_item)
             except Exception as e:

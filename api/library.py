@@ -554,6 +554,70 @@ def get_dashboard_widget_data_api(plugin_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@library_bp.route('/api/media/category-plugins', methods=['GET'])
+def get_category_plugins_api():
+    """사이드바 및 뷰포트에 마운트할 활성화된 카테고리 레벨 플러그인 목록을 반환합니다."""
+    db_type = request.args.get('type', 'general').strip()
+    user_id = session.get('user_id')
+    user_role = session.get('role', 'user')
+
+    try:
+        from services.metadata_factory import MetadataFactory
+        import database
+        providers = MetadataFactory.get_available_providers()
+
+        # 일반 사용자의 경우 settings 테이블의 PERM_CATEGORY_{uid}_plugin_{id} 권한 체크
+        perm_map = {}
+        if user_id and user_role != 'admin':
+            conn = database.get_connection('general')
+            cursor = conn.cursor()
+            cursor.execute("SELECT key, value FROM settings WHERE key LIKE ?", (f"PERM_CATEGORY_{user_id}_plugin_%",))
+            perm_map = {r['key']: r['value'] for r in cursor.fetchall()}
+            conn.close()
+
+        active_category_plugins = []
+        for p in providers:
+            if not p.get('enabled'):
+                continue
+            cat_tab = p.get('category_tab')
+            if not isinstance(cat_tab, dict):
+                continue
+
+            plugin_cat_id = f"plugin_{p.get('id')}"
+            if user_id and user_role != 'admin':
+                perm_key = f"PERM_CATEGORY_{user_id}_{plugin_cat_id}"
+                if perm_map.get(perm_key) == '0':
+                    continue
+
+            active_category_plugins.append({
+                'id': p.get('id'),
+                'name': p.get('name'),
+                'category_id': plugin_cat_id,
+                'title': cat_tab.get('title') or p.get('name'),
+                'icon': cat_tab.get('icon') or 'fa-solid fa-puzzle-piece',
+                'order': int(cat_tab.get('order') or 50),
+                'ui': p.get('ui')
+            })
+
+        active_category_plugins.sort(key=lambda x: x['order'])
+        return jsonify({'success': True, 'category_plugins': active_category_plugins}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@library_bp.route('/api/media/plugins/<plugin_id>/ui', methods=['GET'])
+def get_plugin_ui_bundle_api(plugin_id):
+    """특정 플러그인의 풀페이지 UI 번들(index.html, style.css, script.js)을 반환합니다."""
+    try:
+        from services.metadata_factory import MetadataFactory
+        bundle = MetadataFactory._load_plugin_ui_bundle(plugin_id)
+        if not bundle:
+            return jsonify({'success': False, 'error': 'UI bundle not found'}), 404
+        return jsonify({'success': True, 'plugin_id': plugin_id, 'bundle': bundle}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @library_bp.route('/api/media/context-menu/book/plugins', methods=['POST'])
 @login_required
 def get_book_context_menu_plugin_items_api():

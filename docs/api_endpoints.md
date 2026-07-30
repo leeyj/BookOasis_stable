@@ -565,6 +565,206 @@ BookOasis는 외부 수신 서버로 도서 이벤트를 `POST` 전송할 수 �
     * 해당 클릭 훅은 무시되며, 카드 본문의 타이틀 링크(`<a>` 태그의 아웃링크)를 통해 기존처럼 외부 탭으로 안전하게 이동합니다.
   * 플러그인 개발 및 커스텀 이벤트를 위해, 위젯 카드 엘리먼트(`div.plugin-item-card`)에 `data-series-name`, `data-library-id`, `data-book-id`, `data-file-format` 속성이 항상 자동으로 주입됩니다.
 
+---
+
+## 🧩 8. 플러그인 & 듀얼 UI 아키텍처 API (`plugins` / `metadata_factory`)
+
+### `[GET]` `/api/media/category-plugins`
+* **설명**: 사이드바 및 뷰포트에 마운트할 활성화된 카테고리 레벨 플러그인 목록을 반환합니다. (일반 사용자의 경우 권한이 차단된 플러그인은 자동 필터링됨)
+* **쿼리 파라미터**:
+  * `type` (string, 선택): DB 구분 (`general` / `adult`)
+* **응답 예시 (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "category_plugins": [
+      {
+        "id": "stats_dashboard",
+        "name": "통계 대시보드 위젯",
+        "category_id": "plugin_stats_dashboard",
+        "title": "독서 통계 센터",
+        "icon": "fa-solid fa-chart-column",
+        "order": 90
+      }
+    ]
+  }
+  ```
+
+---
+
+### `[GET]` `/api/media/plugins/<plugin_id>/ui`
+* **설명**: 듀얼 UI 서빙 사양에 따라 플러그인의 HTML5, CSS, JS 번들 템플릿 자원을 서빙합니다.
+* **URL 파라미터**:
+  * `plugin_id` (string, 필수): 플러그인 고유 ID (예: `stats_dashboard`)
+* **쿼리 파라미터**:
+  * `target` (string, 선택): 서빙 뷰 타겟 (`view` = 카테고리 풀페이지 뷰 (`index.html`), `settings` = 환경설정 카드 폼 (`settings.html`), 기본값: `view`)
+* **응답 예시 (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "ui": {
+      "html": "<div class=\"stats-view-container\">...</div>",
+      "css": "/* style.css */",
+      "js": "/* script.js */"
+    }
+  }
+  ```
+
+---
+
+### `[GET]` `/api/media/dashboard/widgets/<plugin_id>/data`
+* **설명**: 플러그인의 대시보드 미니 위젯 및 카테고리 풀페이지 전용 동적 쿼리 데이터(`stats`, `items`)를 조회합니다.
+* **쿼리 파라미터**:
+  * `type` (string, 선택): DB 구분 (`general` / `adult`, 기본값: `general`)
+  * `limit` (integer, 선택): 위젯 아이템 노출 개수 (기본값: `3`)
+
+---
+
+### `[GET]` `/api/media/metadata/plugins/manage`
+* **설명**: 관리자 환경설정 탭에서 전체 등록된 플러그인 및 샘플 업데이트 상태 목록을 조회합니다.
+* **권한**: `@admin_required`
+
+---
+
+### `[POST]` `/api/media/metadata/plugins/toggle`
+* **설명**: 특정 플러그인의 활성화/비활성화 상태를 설정하고 영구 반영합니다.
+* **권한**: `@admin_required`
+* **요청 파라미터**:
+  ```json
+  {
+    "plugin_id": "stats_dashboard",
+    "enabled": true
+  }
+  ```
+
+---
+
+### `[POST]` `/api/media/metadata/plugins/save-config`
+* **설명**: 플러그인 환경설정 카드 폼에서 변경된 스키마 설정값(`config_schema`)을 저장합니다.
+* **권한**: `@admin_required`
+
+---
+
+## 🛡️ 9. 사용자 권한 관리 & 휴지통 API (`permissions` / `trash`)
+
+### `[GET]` `/api/admin/permissions`
+* **설명**: 전체 사용자 계정 목록 및 물리 카테고리/플러그인 접근 권한 매트릭스 정보를 조회합니다.
+* **권한**: `@admin_required`
+* **응답 예시 (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "users": [{"id": 1, "username": "admin", "role": "admin", "has_adult_access": 1}],
+    "categories": [
+      {"id": 1, "name": "일반 소설", "db_type": "general"},
+      {"id": "plugin_stats_dashboard", "name": "🧩 독서 통계 센터", "db_type": "plugin"}
+    ],
+    "permissions": {
+      "1": {"general_1": true, "plugin_plugin_stats_dashboard": true}
+    }
+  }
+  ```
+
+---
+
+### `[POST]` `/api/admin/permissions/update`
+* **설명**: 특정 사용자 계정의 라이브러리 카테고리 또는 플러그인 접근 권한 토글을 개별 변경합니다.
+* **권한**: `@admin_required`
+* **요청 파라미터**:
+  ```json
+  {
+    "user_id": 2,
+    "library_id": "plugin_stats_dashboard",
+    "has_access": true,
+    "target_db": "plugin"
+  }
+  ```
+
+---
+
+### `[POST]` `/api/admin/permissions/update-adult`
+* **설명**: 특정 사용자 계정의 성인 서재 접근 허용 여부를 글로벌 변경합니다.
+* **권한**: `@admin_required`
+
+---
+
+### `[GET]` `/api/admin/trash`
+* **설명**: 소프트 삭제(`is_deleted = 1`) 처리되어 휴지통에 보관된 도서 메타데이터 목록을 조회합니다.
+* **권한**: `@admin_required`
+
+---
+
+### `[POST]` `/api/admin/trash/restore`
+* **설명**: 휴지통에 보관된 선택 도서들을 정상 복구합니다.
+* **권한**: `@admin_required`
+
+---
+
+### `[POST]` `/api/admin/trash/empty`
+* **설명**: 휴지통에 보관된 도서 메타데이터 및 연결 파일을 영구 삭제합니다.
+* **권한**: `@admin_required`
+
+---
+
+## ⚡ 10. 스캐너 & 비동기 작업 큐 API (`scan` / `system`)
+
+### `[POST]` `/api/media/libraries/<int:library_id>/scan`
+* **설명**: 지정한 라이브러리 카테고리의 풀 비동기 스캔 작업을 백그라운드 큐에 등록합니다.
+* **권한**: `@admin_required`
+
+---
+
+### `[POST]` `/api/media/libraries/<int:library_id>/cancel-scan`
+* **설명**: 진행 중이거나 대기 중인 특정 라이브러리의 스캔 작업을 즉시 취소합니다.
+* **권한**: `@admin_required`
+
+---
+
+### `[POST]` `/api/media/libraries/scan-all`
+* **설명**: 등록된 전체 카테고리 서재에 대해 일괄 스캔을 백그라운드 큐에 스케줄링합니다.
+* **권한**: `@admin_required`
+
+---
+
+### `[GET]` `/api/media/system/queue`
+* **설명**: 백그라운드 스캐너 작업 큐의 대기/진행/완료 Task 상태 목록 및 진행률을 실시간 조회합니다.
+
+---
+
+### `[POST]` `/api/media/system/queue/clear`
+* **설명**: 대기 중인 모든 백그라운드 작업을 취소하고 큐를 초기화합니다.
+* **권한**: `@admin_required`
+
+---
+
+## 📖 11. 뷰어 스트리밍 & 보조 API (`stream` / `library`)
+
+### `[GET]` `/api/media/txt`
+* **설명**: TXT 소설 파일의 특정 청크/인덱스 텍스트를 JSON으로 스트리밍 서빙합니다.
+* **쿼리 파라미터**: `id` (book_id), `chunk` (chunk_index), `type` (general/adult)
+
+---
+
+### `[GET]` `/api/media/epub/meta`, `/api/media/epub/chapter`, `/api/media/epub-image`
+* **설명**: EPUB 전자책의 목차(TOC)/CFI 메타, 개별 장(Chapter) HTML 및 내장 이미지를 부분 서빙합니다.
+
+---
+
+### `[GET]` `/api/media/pdf`
+* **설명**: PDF 도서의 바이너리 문서 스트림 또는 렌더링용 바이트 버퍼를 서빙합니다.
+
+---
+
+### `[GET]` `/covers/<path:filename>`
+* **설명**: 추출된 도서 표지 이미지 파일 또는 고유 커버 썸네일을 보안 검증 후 정적 서빙합니다.
+
+---
+
+### `[POST]` `/api/media/unread`
+* **설명**: 해당 도서의 독서 진척도(`user_progress`) 및 읽기 기록을 '안읽음' 상태로 초기화합니다.
+* **요청 파라미터**: `book_id` (integer), `db_type` (string)
+
+
 
 
 

@@ -131,6 +131,9 @@
 
         <!-- ===== 환경설정 뷰 (설정 선택 시 표시) ===== -->
         {% include "components/views/library_settings.html" %}
+
+        <!-- ===== 카테고리 레벨 플러그인 전용 풀페이지 뷰 ===== -->
+        <div id="library-plugin-custom-view" class="library-view-container" style="display: none;"></div>
     </div>
 
     {% include "components/media_viewer.html" %}
@@ -217,5 +220,6 @@
             <div id="system-ticker-content" class="ticker-content" data-i18n="system.ticker_default_msg">현재 백그라운드 작업이 구동 중입니다.</div>
         </div>
     </div>
+</div>
 
-    <script type="module" src="{{ url_for('static', filename='js/tab_media_library.js') }}?v=1.4.7"></script>
+<script type="module" src="{{ url_for('static', filename='js/tab_media_library.js') }}?v=1.4.7"></script>

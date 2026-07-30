@@ -14,23 +14,60 @@ export function switchActiveView(viewName) {
   const detailView = document.getElementById('book-detail-view');
   const settingsView = document.getElementById('library-settings-view');
   const pluginsView = document.getElementById('library-plugins-view');
+  const customPluginView = document.getElementById('library-plugin-custom-view');
   const btnSort = document.getElementById('btn-lib-sort');
 
   console.log(`[View-Manager] Switching view to: ${viewName} (Current category: ${state.currentLibraryId})`);
 
-  // 1. 모든 메인 뷰 컨테이너 숨김 초기화
+  const libraryHeader = document.querySelector('.library-header');
+  const searchCenter = document.querySelector('.library-search-center');
+  const libraryControls = document.querySelector('.library-controls');
+  const activeFilterBar = document.getElementById('active-filter-bar');
+
+  // 1. 모든 메인 뷰 컨테이너 숨김 초기화 (자식 뷰 겹침 방지 보장)
+  const mainContent = document.querySelector('.library-main-content');
+  if (mainContent) {
+    Array.from(mainContent.children).forEach(child => {
+      if (child.classList.contains('library-header') || child.id === 'active-filter-bar') return;
+      child.style.display = 'none';
+    });
+  }
+
   if (dashboardView) dashboardView.style.display = 'none';
   if (gridView) gridView.style.display = 'none';
   if (detailView) detailView.style.display = 'none';
   if (settingsView) settingsView.style.display = 'none';
   if (pluginsView) pluginsView.style.display = 'none';
+  if (customPluginView) customPluginView.style.display = 'none';
   
   unmountIndexScrollbar();
+
+  // 상단 검색바/필터 컨트롤 숨김 조율
+  if (viewName === 'plugin_custom' || viewName === 'settings' || viewName === 'plugins') {
+    if (searchCenter) searchCenter.style.display = 'none';
+    if (libraryControls) libraryControls.style.display = 'none';
+    if (activeFilterBar) activeFilterBar.style.display = 'none';
+    if (viewName === 'plugin_custom' && libraryHeader) {
+      libraryHeader.style.display = 'none';
+    }
+  } else {
+    if (libraryHeader) libraryHeader.style.display = 'grid';
+    if (searchCenter) searchCenter.style.display = 'flex';
+    if (libraryControls) libraryControls.style.display = 'flex';
+  }
 
   // 2. 요청한 뷰 영역만 선택 활성화 및 정렬 버튼 조율
   switch (viewName) {
     case 'dashboard':
       if (dashboardView) dashboardView.style.display = 'flex';
+      if (btnSort) btnSort.style.display = 'none';
+      break;
+
+    case 'plugin_custom':
+      if (customPluginView) {
+        customPluginView.style.display = 'block';
+        customPluginView.style.width = '100%';
+      }
       if (btnSort) btnSort.style.display = 'none';
       break;
       

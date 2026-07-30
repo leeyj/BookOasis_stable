@@ -23,7 +23,7 @@ export async function loadPluginsSettings() {
       data.plugins.forEach(p => {
         const schema = p.config_schema || [];
         const config = p.config || {};
-        const hasCustomUi = !!(p.ui && p.ui.html);
+        const hasCustomSettingsUi = !!(p.settings_ui && p.settings_ui.html);
         const updateManifest = p.update_manifest || null;
         const showSampleUpdateButton = !!(
           updateManifest &&
@@ -53,22 +53,22 @@ export async function loadPluginsSettings() {
               
               <!-- 설정값 동적 폼 -->
               <form class="plugin-config-form" data-plugin-id="${p.id}" style="display: flex; flex-direction: column; gap: 1.2rem;">
-                  ${hasCustomUi ? `
-                  <div class="plugin-ui-root" data-plugin-ui-root="${p.id}" data-plugin-config='${escapeHtmlAttr(JSON.stringify(config))}'>
-                    ${p.ui.html}
+                  ${hasCustomSettingsUi ? `
+                  <div class="plugin-settings-ui-root" data-plugin-settings-root="${p.id}" data-plugin-config='${escapeHtmlAttr(JSON.stringify(config))}'>
+                    ${p.settings_ui.html}
                   </div>
-                  ` : schema.map(f => {
+                  ` : (schema.length > 0 ? schema.map(f => {
                     const curVal = config[f.key];
                     return renderSchemaField(f, curVal);
-                  }).join('')}
+                  }).join('') : '<p style="font-size: 0.82rem; color: #94a3b8; margin: 0;">이 플러그인은 별도의 추가 설정값이 필요하지 않습니다.</p>')}
 
-                  ${(hasCustomUi || schema.length > 0) ? `
+                  ${(hasCustomSettingsUi || schema.length > 0) ? `
                   <div style="margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1rem;">
                       <button type="submit" class="btn-submit" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1.2rem; font-size: 0.82rem;">
                           <i class="fa-regular fa-floppy-disk"></i> 설정 저장
                       </button>
                   </div>
-                  ` : '<p style="font-size: 0.82rem; color: #94a3b8; margin: 0;">이 플러그인은 별도의 추가 설정값이 필요하지 않습니다.</p>'}
+                  ` : ''}
 
                   ${showSampleUpdateButton ? `
                   <div style="margin-top: 0.4rem; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 0.9rem; display: flex; flex-direction: column; gap: 0.5rem;">
@@ -84,10 +84,9 @@ export async function loadPluginsSettings() {
       });
       container.innerHTML = html;
 
-            // 폴더 기반 커스텀 UI/style/script 지원
-            injectPluginCustomStyles(data.plugins);
-            applyConfigValues(container, data.plugins);
-            initPluginCustomScripts(container, data.plugins);
+      injectPluginSettingsStyles(data.plugins);
+      applyConfigValues(container, data.plugins);
+      initPluginSettingsScripts(container, data.plugins);
       
       // 토글 스위치 스타일링을 위한 CSS 헤드 인젝트 (최초 1회)
       injectToggleSwitchCSS();
@@ -176,18 +175,18 @@ function renderSchemaField(f, curVal) {
   `;
 }
 
-function injectPluginCustomStyles(plugins) {
+function injectPluginSettingsStyles(plugins) {
   plugins.forEach((p) => {
-    if (!p.ui || !p.ui.css) return;
-    const styleId = `plugin-custom-style-${p.id}`;
+    if (!p.settings_ui || !p.settings_ui.css) return;
+    const styleId = `plugin-settings-style-${p.id}`;
     const existing = document.getElementById(styleId);
     if (existing) {
-      existing.textContent = p.ui.css;
+      existing.textContent = p.settings_ui.css;
       return;
     }
     const style = document.createElement('style');
     style.id = styleId;
-    style.textContent = p.ui.css;
+    style.textContent = p.settings_ui.css;
     document.head.appendChild(style);
   });
 }
@@ -209,13 +208,13 @@ function applyConfigValues(container, plugins) {
   });
 }
 
-function initPluginCustomScripts(container, plugins) {
+function initPluginSettingsScripts(container, plugins) {
   plugins.forEach((p) => {
-    if (!p.ui || !p.ui.js) return;
-    const root = container.querySelector(`[data-plugin-ui-root="${p.id}"]`);
+    if (!p.settings_ui || !p.settings_ui.js) return;
+    const root = container.querySelector(`[data-plugin-settings-root="${p.id}"]`);
     if (!root || root.dataset.pluginScriptInited === '1') return;
     try {
-      const fn = new Function('window', 'pluginId', 'root', 'config', p.ui.js);
+      const fn = new Function('window', 'pluginId', 'root', 'config', p.settings_ui.js);
       fn(window, p.id, root, p.config || {});
       root.dataset.pluginScriptInited = '1';
     } catch (e) {

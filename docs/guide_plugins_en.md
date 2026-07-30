@@ -34,47 +34,43 @@ Folder-based layout is recommended.
 
 ```text
 plugins/metadata/
-  my_widget/
+  my_plugin/
     __init__.py
-    my_widget.py
-        VERSION         # required for auto-update support
-    index.html      # optional: custom settings UI
-    style.css       # optional: custom settings styles
-    script.js       # optional: custom settings initializer
-    requirements.txt # optional: list of 3rd-party python dependencies
+    my_plugin.py
+    VERSION            # Required: version file for auto-update
+    index.html         # Category Full-Page View UI template
+    style.css          # Category Full-Page View CSS
+    script.js          # Category Full-Page View JS
+    settings.html      # Optional: Custom Settings Form UI (defaults to config_schema)
+    settings.css       # Optional: Custom Settings Form CSS
+    settings.js        # Optional: Custom Settings Form JS
+    requirements.txt   # Optional: 3rd-party python dependencies
 ```
 
-### Python 3rd-Party Dependency Auto-Installer (`requirements.txt`)
+### 🔒 Security & Directory Constraints (Strict Protections)
 
-If a plugin requires external Python packages (e.g., `httpx`, `gspread`, `feedparser`), simply include a `requirements.txt` file at the plugin root.
+BookOasis media server enforces strict **runtime security constraints**:
 
-- **Isolated Auto-Installation**: When the media server detects the plugin, it automatically installs packages listed in `requirements.txt` into an isolated `libs/` directory inside the plugin folder (`pip install --target libs/`) and injects it into `sys.path`.
-- **MD5 Hash Caching**: Tracks MD5 hashes of `requirements.txt`. If unchanged, skipping re-installation takes 0.001 seconds.
-- **Core Package Guard**: Core system dependencies are protected from being overridden to ensure system stability.
+1. **Path Traversal Protection (`../` Blocked)**:
+   - When serving UI templates or static assets, any attempt to break out of the directory using `../` or `..\` is detected and blocked by `MetadataFactory`, raising a `SecurityError`.
+   - Template resources are strictly isolated within `plugins/metadata/{plugin_id}/`.
+2. **Symlink Restrictions**:
+   - Symlinks pointing to paths outside the plugin directory (such as `/etc/passwd` or system files) are forbidden and rejected.
+3. **Package & Core Protection**:
+   - Packages specified in `requirements.txt` are installed into an isolated `libs/` subfolder. Attempts to overwrite core framework packages (`Flask`, `PyMuPDF`, `Pillow`, etc.) are automatically blocked.
+4. **Unrestricted HTML5 Tags & XSS Mitigation Rules**:
+   - Full HTML5 tags (`<canvas>`, `<svg>`, `<table>`, `<form>`, `<input>`, `<button>`) and custom CSS/JS are allowed in `index.html`.
+   - Developers must sanitize external 3rd-party API responses before rendering to prevent XSS.
 
-### Version File Contract for Auto-Update Support (Required)
+### 🎨 Dual-UI Serving Architecture
 
-To be eligible for GitHub-based plugin auto-update support, each plugin must include a `VERSION` file at the plugin root with the key below.
+BookOasis plugins support dual UI bundles tailored to specific views:
 
-```json
-{
-    "plugin version": "1.0.0"
-}
-```
-
-Policy:
-
-- Key name must be exactly `plugin version` (with a space)
-- SemVer format is recommended (`MAJOR.MINOR.PATCH`)
-- If missing, the plugin is excluded from auto-update support
-- Legacy key (`plugin_version`) may be parsed for backward compatibility, but new/official plugins must use `plugin version`
-
-Legacy single-file modules are still loadable, but new development should use folder-based modules.
-
-Quick start template:
-
-- Copy `plugins/metadata/__template_dashboard_plugin.py`
-- Rename module/class/id to your plugin identity
+1. **Category-Level Full-Page View UI (`index.html`, `style.css`, `script.js`)**:
+   - Rendered in full-page viewport when clicking the plugin's category item in the left sidebar.
+2. **Admin Settings Form UI (`settings.html`, `settings.css`, `settings.js`)**:
+   - Rendered inside the plugin configuration card under **[Settings ⚙️] -> [Plugin Settings]**.
+   - If `settings.html` is omitted, BookOasis automatically generates standard form inputs from the plugin's `config_schema` array.
 
 ---
 
@@ -87,9 +83,29 @@ Recommended class attributes:
 - `id` (str): plugin identifier
 - `name` (str): display name
 - `is_searchable` (bool): show in manual metadata search modal
-- `config_schema` (list): settings form schema
-- `dashboard_widget` (dict or None): dashboard widget metadata (common desk card or exclusive full-screen tab configurations)
+- `config_schema` (list): settings form schema (used for auto-generated form)
+- `dashboard_widget` (dict or None): dashboard widget metadata
+- `category_tab` (dict or None): category-level plugin manifest (`title`, `icon`, `order`)
 - `update_manifest` (dict or None): plugin-owned update declaration contract
+
+### Category-Level Plugins Specification
+To promote a plugin beyond a dashboard widget into a **First-Class Citizen Category Menu in the Left Sidebar** with full-page custom UI:
+
+```python
+class MyCategoryPlugin(BaseMetadataProvider):
+    id = "my_category_plugin"
+    name = "My Custom Library"
+    is_searchable = False
+
+    category_tab = {
+        "title": "My Custom Library",
+        "icon": "fa-solid fa-chart-line",
+        "order": 80
+    }
+```
+
+#### UI Template Tag Specification (Full HTML5 Support)
+Category-level plugin UI templates (`index.html`, `style.css`, `script.js`) enjoy **100% unrestricted HTML5 tags (`<canvas>`, `<svg>`, `<table>`, `<form>`, `<input>`, `<button>`) and custom CSS/JS execution**.
 
 Required methods:
 

@@ -35,47 +35,43 @@
 
 ```text
 plugins/metadata/
-  my_widget/
+  my_plugin/
     __init__.py
-    my_widget.py
-        VERSION         # 필수(자동 업데이트 지원 대상인 경우)
-    index.html      # 선택: 설정 화면 커스텀 UI
-    style.css       # 선택: 설정 화면 커스텀 스타일
-    script.js       # 선택: 설정 화면 커스텀 스크립트
-    requirements.txt # 선택: 플러그인 전용 파이썬 외부 라이브러리 자동 설치 목록
+    my_plugin.py
+    VERSION            # 필수: 자동 업데이트 지원 대상 버전 파일
+    index.html         # 카테고리 풀페이지 뷰 UI 템플릿
+    style.css          # 카테고리 풀페이지 뷰 CSS
+    script.js          # 카테고리 풀페이지 뷰 JS
+    settings.html      # 선택: 환경설정 탭 전용 커스텀 폼 UI (미작성 시 config_schema 사용)
+    settings.css       # 선택: 환경설정 커스텀 폼 CSS
+    settings.js        # 선택: 환경설정 커스텀 폼 JS
+    requirements.txt   # 선택: 플러그인 전용 파이썬 외부 라이브러리 자동 설치 목록
 ```
 
-### 파이썬 외부 종속 패키지 자동 설치 (`requirements.txt` 지원)
+### 🔒 보안 및 디렉토리 접근 제약 사항 (Strict Security Protections)
 
-플러그인 구동에 외부 파이썬 3rd-party 라이브러리(예: `httpx`, `gspread`, `feedparser` 등)가 필요할 경우, 플러그인 루트에 `requirements.txt` 파일을 포함시킬 수 있습니다.
+북오아시스 미디어 서버는 서버 및 시스템 안전성을 보장하기 위해 플러그인에 다음과 같은 **강력한 런타임 보안 제약 장치**를 적용합니다.
 
-- **자동 격리 설치**: 미디어 서버가 플러그인을 탐지할 때 `requirements.txt`를 감지하여 해당 플러그인 폴더 내 `libs/` 격리 디렉토리에 자동 설치(`pip install --target libs/`) 후 `sys.path`에 동적 주입합니다.
-- **캐싱 및 0초 로딩**: `requirements.txt` 파일의 MD5 해시를 추적하여 내용 변경이 없을 경우 재설치를 수행하지 않고 0.001초 만에 로드합니다.
-- **코어 안전장치**: 코어 시스템 라이브러리와 중복되는 패키지는 시스템 안정성을 위해 자동으로 최우선 보호됩니다.
+1. **상위 디렉토리 이탈 차단 (Path Traversal Protection)**:
+   - 플러그인 UI 번들 서빙 및 정적 자원 로딩 시 `../` 또는 `..\`를 포함한 상위 디렉토리 이탈 시도가 감지되면 백엔드 `MetadataFactory`가 즉시 `SecurityError` 예외를 발생시키고 로딩을 거부합니다.
+   - 모든 템플릿 자원은 해당 플러그인의 루트 디렉토리 `plugins/metadata/{plugin_id}/` 내부로 엄격히 제한됩니다.
+2. **외부 심볼릭 링크 접근 차단 (Symlink Restriction)**:
+   - 플러그인 폴더 외부의 시스템 중요 파일(예: `/etc/passwd`, 시스템 파일 등)을 가리키는 외부 심볼릭 링크 파일은 런타임 검증에 의해 접근이 차단됩니다.
+3. **독립 패키지 격리 및 코어 최우선 보호 (Package Isolation)**:
+   - `requirements.txt`로 설치되는 외부 패키지는 해당 플러그인 전용 `libs/` 폴더에 격리 설치되며, 북오아시스 코어 주요 라이브러리(`Flask`, `PyMuPDF`, `Pillow` 등)의 버전을 덮어쓰거나 오염시키는 행위는 코어 보호 엔진에 의해 자동 차단됩니다.
+4. **HTML5 풀 태그 지원 및 동적 데이터 XSS 방어 규칙**:
+   - 카테고리 뷰 UI(`index.html`)에서는 `<canvas>`, `<svg>`, `<table>`, `<form>`, `<input>`, `<button>` 등 모든 HTML5 태그와 커스텀 CSS/JS가 100% 허용됩니다.
+   - 단, 외부 3rd-party API나 사용자 입력값을 뷰포트에 동적 삽입할 경우 `textContent`나 안전한 에스케이프 기능을 사용하여 XSS 공격이 발생하지 않도록 개발자가 방어 코드를 작성해야 합니다.
 
-### 자동 업데이트 지원용 버전 파일 규격 (필수)
+### 🎨 듀얼 UI (Dual-UI) 서빙 아키텍처
 
-GitHub 기반 플러그인 자동 업데이트 지원 대상으로 등록하려면, 플러그인 루트에 `VERSION` 파일을 두고 아래 키를 반드시 포함해야 합니다.
+BookOasis 플러그인은 화면 목적에 따라 2가지 독립된 UI 번들을 분리 서빙합니다.
 
-```json
-{
-    "plugin version": "1.0.0"
-}
-```
-
-정책:
-
-- 키 이름은 반드시 `plugin version` (공백 포함)
-- 값은 SemVer 형식 권장 (`MAJOR.MINOR.PATCH`)
-- 이 값이 없으면 자동 업데이트 지원 대상에서 제외
-- 구 키(`plugin_version`)는 하위 호환 파싱 대상이지만 신규/공식 규약은 `plugin version`만 사용
-
-구 방식(단일 파일)도 하위 호환으로 로드되지만, 신규 개발은 폴더 기반을 권장합니다.
-
-빠른 시작 템플릿:
-
-- `plugins/metadata/__template_dashboard_plugin.py`를 복사해 시작
-- 파일/폴더명, 클래스명, `id`를 실제 플러그인 이름으로 변경
+1. **카테고리 레벨 풀페이지 UI (`index.html`, `style.css`, `script.js`)**:
+   - 좌측 사이드바의 플러그인 카테고리 클릭 시 메인 화면 영역 전체에 마운트되는 대형 풀 뷰포트 UI입니다.
+2. **환경설정 탭 커스텀 폼 UI (`settings.html`, `settings.css`, `settings.js`)**:
+   - 관리자 [환경설정 ⚙️] -> [플러그인 설정] 탭 카드 내부에 표시되는 전용 커스텀 입력 폼 UI입니다.
+   - `settings.html`이 존재하지 않을 경우, 플러그인 클래스의 `config_schema` 파이썬 배열을 기반으로 입체적인 설정 폼이 자동 생성됩니다.
 
 ---
 
@@ -88,9 +84,29 @@ GitHub 기반 플러그인 자동 업데이트 지원 대상으로 등록하려�
 - `id` (str): 고유 식별자
 - `name` (str): UI 표시명
 - `is_searchable` (bool): 수동 메타데이터 검색 모달 노출 여부
-- `config_schema` (list): 설정 폼 스키마
+- `config_schema` (list): 설정 폼 스키마 (기본 자동 생성 폼용)
 - `dashboard_widget` (dict 또는 None): 대시보드 위젯 메타 (공통 데스크 카드 또는 단독 탭 뷰 구성 정보)
+- `category_tab` (dict 또는 None): 카테고리 레벨 플러그인 매니페스트 (사이드바 카테고리 1등 시민 메뉴 등록 정보: `title`, `icon`, `order`)
 - `update_manifest` (dict 또는 None): 플러그인 내부 업데이트 선언 계약
+
+### 카테고리 레벨 플러그인 (Category-Level Plugins) 규격
+플러그인이 대시보드 위젯 수준을 넘어 **좌측 사이드바의 1등 시민(First-class Citizen) 카테고리 메뉴**로 등록되어 풀페이지 커스텀 UI를 제공하려면 `category_tab`을 선언합니다.
+
+```python
+class MyCategoryPlugin(BaseMetadataProvider):
+    id = "my_category_plugin"
+    name = "나만의 커스텀 서재"
+    is_searchable = False
+
+    category_tab = {
+        "title": "나만의 커스텀 서재",
+        "icon": "fa-solid fa-chart-line",
+        "order": 80
+    }
+```
+
+#### UI 템플릿 태그 규격 (HTML5 풀 지원)
+카테고리 레벨 플러그인의 `index.html`, `style.css`, `script.js` 템플릿 화면에서는 **`<canvas>`, `<svg>`, `<table>`, `<form>`, `<input>`, `<button>` 등 모든 HTML5 태그와 CSS, JS가 100% 제약 없이 자유롭게 허용**됩니다.
 
 필수 메서드:
 

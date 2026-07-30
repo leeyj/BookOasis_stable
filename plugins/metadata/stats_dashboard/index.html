@@ -1,0 +1,85 @@
+<div class="stats-plugin-container">
+  <div class="stats-header-banner">
+    <div class="stats-title-group">
+      <h2><i class="fa-solid fa-chart-column"></i> 독서 통계 센터</h2>
+      <p class="stats-subtitle">라이브러리의 독서 진행률, 주간/월간 독서 활동 및 미디어 포맷별 분석 리포트입니다.</p>
+    </div>
+    <div class="stats-filter-actions">
+      <button class="stats-btn active" data-type="general"><i class="fa-solid fa-book"></i> 일반 서재</button>
+      <button class="stats-btn" data-type="adult"><i class="fa-solid fa-lock"></i> 성인 서재</button>
+    </div>
+  </div>
+
+  <div class="stats-cards-grid">
+    <div class="stats-card">
+      <div class="stats-card-icon blue"><i class="fa-solid fa-book-open"></i></div>
+      <div class="stats-card-info">
+        <span class="stats-card-label">총 보유 도서</span>
+        <h3 class="stats-card-value" id="stats-val-books">-</h3>
+      </div>
+    </div>
+    <div class="stats-card">
+      <div class="stats-card-icon purple"><i class="fa-solid fa-layer-group"></i></div>
+      <div class="stats-card-info">
+        <span class="stats-card-label">총 시리즈</span>
+        <h3 class="stats-card-value" id="stats-val-series">-</h3>
+      </div>
+    </div>
+    <div class="stats-card">
+      <div class="stats-card-icon green"><i class="fa-solid fa-fire"></i></div>
+      <div class="stats-card-info">
+        <span class="stats-card-label">주간 독서 (페이지)</span>
+        <h3 class="stats-card-value" id="stats-val-week-pages">-</h3>
+      </div>
+    </div>
+    <div class="stats-card">
+      <div class="stats-card-icon orange"><i class="fa-solid fa-circle-check"></i></div>
+      <div class="stats-card-info">
+        <span class="stats-card-label">월간 완독 도서</span>
+        <h3 class="stats-card-value" id="stats-val-month-completed">-</h3>
+      </div>
+    </div>
+  </div>
+
+  <div class="stats-main-panels">
+    <div class="stats-panel">
+      <div class="stats-panel-header">
+        <h3><i class="fa-solid fa-clock-rotate-left"></i> 주간 독서 활동 요약</h3>
+      </div>
+      <div class="stats-panel-body">
+        <div class="stats-progress-bar-container">
+          <div class="stats-progress-label-row">
+            <span>주간 독서 목표 달성도 (100페이지 기준)</span>
+            <span id="stats-goal-percent">0%</span>
+          </div>
+          <div class="stats-progress-track">
+            <div class="stats-progress-fill" id="stats-goal-fill" style="width: 0%"></div>
+          </div>
+        </div>
+        <p class="stats-panel-note" id="stats-activity-note">독서 활동 데이터를 불러오는 중입니다...</p>
+      </div>
+    </div>
+
+    <div class="stats-panel">
+      <div class="stats-panel-header">
+        <h3><i class="fa-solid fa-pie-chart"></i> 미디어 포맷 분석</h3>
+      </div>
+      <div class="stats-panel-body">
+        <div class="stats-format-list" id="stats-format-list">
+          <div class="stats-format-item">
+            <span class="fmt-name"><i class="fa-solid fa-file-zipper"></i> ZIP / CBZ 만화</span>
+            <span class="fmt-count" id="fmt-val-zip">-</span>
+          </div>
+          <div class="stats-format-item">
+            <span class="fmt-name"><i class="fa-solid fa-book-bookmark"></i> EPUB / TXT 소설</span>
+            <span class="fmt-count" id="fmt-val-epub">-</span>
+          </div>
+          <div class="stats-format-item">
+            <span class="fmt-name"><i class="fa-solid fa-file-pdf"></i> PDF 문서</span>
+            <span class="fmt-count" id="fmt-val-pdf">-</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

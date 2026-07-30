@@ -311,6 +311,38 @@ export function switchLibraryType(type) {
   selectCategory('home');
 }
 
+async function mountCategoryPluginUI(pluginId) {
+  const container = document.getElementById('library-plugin-custom-view');
+  if (!container) return;
+
+  switchActiveView('plugin_custom');
+  container.innerHTML = '<div style="padding: 2rem; text-align: center; color: #94a3b8;"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><p style="margin-top: 0.8rem;">플러그인 UI 로딩 중...</p></div>';
+
+  try {
+    const res = await fetch(`/api/media/plugins/${pluginId}/ui`);
+    if (!res.ok) throw new Error('UI bundle not found');
+    const data = await res.json();
+    if (!data.success || !data.bundle) throw new Error(data.error || 'Failed to load bundle');
+
+    const bundle = data.bundle;
+    let html = bundle.html || '<p>UI가 정의되지 않았습니다.</p>';
+
+    if (bundle.css) {
+      html = `<style>${bundle.css}</style>` + html;
+    }
+
+    container.innerHTML = html;
+
+    if (bundle.js) {
+      const scriptEl = document.createElement('script');
+      scriptEl.textContent = bundle.js;
+      container.appendChild(scriptEl);
+    }
+  } catch (e) {
+    container.innerHTML = `<div style="padding: 2rem; text-align: center; color: #ef4444;"><i class="fa-solid fa-triangle-exclamation fa-2x"></i><p style="margin-top: 0.8rem;">플러그인 화면을 불러오지 못했습니다: ${e.message}</p></div>`;
+  }
+}
+
 // 카테고리 선택 처리
 export function selectCategory(id, skipHistory = false) {
   window.scrollTo(0, 0);
@@ -351,6 +383,9 @@ export function selectCategory(id, skipHistory = false) {
   } else if (id === 'plugins') {
     switchActiveView('plugins');
     loadDashboardPlugins();
+  } else if (id.startsWith('plugin_')) {
+    const pluginId = id.replace('plugin_', '');
+    mountCategoryPluginUI(pluginId);
   } else {
     switchActiveView('grid');
     if (id === 'history') {
