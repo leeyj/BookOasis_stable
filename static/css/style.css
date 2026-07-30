@@ -937,12 +937,15 @@ body.has-system-ticker .library-sidebar {
 
 .book-card-title {
     margin: 0;
-    font-size: 0.88rem;
+    font-size: 0.8rem;
     font-weight: 700;
     color: #f1f5f9;
-    white-space: nowrap;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
+    word-break: break-all;
 }
 
 /* 로딩 스피너 */

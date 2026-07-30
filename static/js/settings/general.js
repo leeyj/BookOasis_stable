@@ -49,6 +49,9 @@ export function applySettingsToUI(settings) {
   if (settings.DETAIL_VOLUME_GRID_VIEW !== undefined) {
     state.detailVolumeGridView = (settings.DETAIL_VOLUME_GRID_VIEW === '1');
   }
+  if (settings.COLLAPSE_DETAIL_GENRE_TAGS !== undefined) {
+    state.collapseDetailGenreTags = (settings.COLLAPSE_DETAIL_GENRE_TAGS === '1');
+  }
 
   applySidebarTopControlsSetting(state.sidebarTopControls === true);
 }
@@ -160,6 +163,11 @@ export async function loadGeneralSettings() {
       const detailVolumeGridViewEl = document.getElementById('setting-detail-volume-grid-view');
       if (detailVolumeGridViewEl) {
         detailVolumeGridViewEl.checked = (s.DETAIL_VOLUME_GRID_VIEW === '1');
+      }
+
+      const collapseDetailGenreTagsEl = document.getElementById('setting-collapse-detail-genre-tags');
+      if (collapseDetailGenreTagsEl) {
+        collapseDetailGenreTagsEl.checked = (s.COLLAPSE_DETAIL_GENRE_TAGS === '1');
       }
 
       // 프록시 헤더 인증 (SSO) 설정
@@ -310,6 +318,7 @@ export async function submitGeneralSettings(event) {
   const ttsEnabled = document.getElementById('setting-tts-enabled')?.checked ? '1' : '0';
   const ttsWakeLock = document.getElementById('setting-tts-wake-lock')?.checked ? '1' : '0';
   const detailVolumeGridView = document.getElementById('setting-detail-volume-grid-view')?.checked ? '1' : '0';
+  const collapseDetailGenreTags = document.getElementById('setting-collapse-detail-genre-tags')?.checked ? '1' : '0';
   
   try {
     // 🌟 단축키 설정 영구 저장 및 활성화
@@ -349,7 +358,8 @@ export async function submitGeneralSettings(event) {
       api.updateSystemSetting('RCLONE_RC_URL', rcloneRcUrl),
       api.updateSystemSetting('TTS_ENABLED', ttsEnabled),
       api.updateSystemSetting('TTS_WAKE_LOCK', ttsWakeLock),
-      api.updateSystemSetting('DETAIL_VOLUME_GRID_VIEW', detailVolumeGridView)
+      api.updateSystemSetting('DETAIL_VOLUME_GRID_VIEW', detailVolumeGridView),
+      api.updateSystemSetting('COLLAPSE_DETAIL_GENRE_TAGS', collapseDetailGenreTags)
     ];
     
     const results = await Promise.all(promises);
@@ -377,7 +387,8 @@ export async function submitGeneralSettings(event) {
         HDD_AGGRESSIVE_WARMUP: hddAggressiveWarmup,
         TTS_ENABLED: ttsEnabled,
         TTS_WAKE_LOCK: ttsWakeLock,
-        DETAIL_VOLUME_GRID_VIEW: detailVolumeGridView
+        DETAIL_VOLUME_GRID_VIEW: detailVolumeGridView,
+        COLLAPSE_DETAIL_GENRE_TAGS: collapseDetailGenreTags
       });
       loadGeneralSettings();
       if (typeof window.loadLibraries === 'function') {

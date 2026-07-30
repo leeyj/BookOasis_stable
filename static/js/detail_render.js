@@ -1,7 +1,7 @@
 // detail_render.js – 도서 상세 화면의 HTML 템플릿 생성기
 import { buildFallbackCoverUrl, getBookCoverSrc, buildTextCoverDataUri } from './cover_fallback.js';
 import { state } from './state.js';
-import { stripLeadingBracketTags } from './series_display.js';
+import { stripLeadingBracketTags, middleTruncateTitle } from './series_display.js';
 
 function normalizeMetadataToken(token) {
   if (!token) return '';
@@ -58,21 +58,87 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
     ? `<a href="${meta.link}" target="_blank" class="ridi-link-btn">${i18n.t('detail.ridi_link')}</a>`
     : '';
 
-  const genresHtml = (meta.genre || '')
+  const genresArr = (meta.genre || '')
     .split(',')
     .map(g => normalizeMetadataToken(g))
     .filter(g => g)
-    .filter((g, idx, arr) => arr.indexOf(g) === idx)
-    .map(g => `<span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center;" onclick="window.quickFilterByGenre('${g.replace(/'/g, "\\'")}')"><i class="fa-solid fa-tag" style="font-size: 0.7rem; margin-right: 0.2rem;"></i>${g}</span>`)
-    .join('');
+    .filter((g, idx, arr) => arr.indexOf(g) === idx);
 
-  const tagsHtml = (meta.tags || '')
+  const tagsArr = (meta.tags || '')
     .split(',')
     .map(t => normalizeMetadataToken(t))
     .filter(t => t)
-    .filter((t, idx, arr) => arr.indexOf(t) === idx)
-    .map(t => `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center;" onclick="window.quickFilterByTag('${t.replace(/'/g, "\\'")}')"><i class="fa-solid fa-hashtag" style="font-size: 0.7rem; margin-right: 0.2rem;"></i>${t}</span>`)
-    .join('');
+    .filter((t, idx, arr) => arr.indexOf(t) === idx);
+
+  const shouldCollapse = state.collapseDetailGenreTags === true;
+
+  // 장르 행 구성
+  let genreRowHtml = '';
+  if (genresArr.length > 0) {
+    const visibleGenres = shouldCollapse ? genresArr.slice(0, 1) : genresArr;
+    const hiddenGenres = shouldCollapse ? genresArr.slice(1) : [];
+
+    const visibleItemsHtml = visibleGenres.map(g => `
+      <span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center;" onclick="window.quickFilterByGenre('${g.replace(/'/g, "\\'")}')">
+        <i class="fa-solid fa-tag" style="font-size: 0.7rem; margin-right: 0.2rem;"></i>${g}
+      </span>
+    `).join('');
+
+    const hiddenItemsHtml = hiddenGenres.map(g => `
+      <span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center;" onclick="window.quickFilterByGenre('${g.replace(/'/g, "\\'")}')">
+        <i class="fa-solid fa-tag" style="font-size: 0.7rem; margin-right: 0.2rem;"></i>${g}
+      </span>
+    `).join('');
+
+    const toggleBtnHtml = hiddenGenres.length > 0 ? `
+      <span class="badge collapse-toggle-btn" onclick="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';" style="background: rgba(59, 130, 246, 0.25); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.5); font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; font-weight: bold;" title="클릭하여 전체 장르 펼치기">
+        +${hiddenGenres.length}
+      </span>
+      <span class="hidden-genres-wrap" style="display: none; gap: 0.4rem; flex-wrap: wrap;">${hiddenItemsHtml}</span>
+    ` : '';
+
+    genreRowHtml = `
+      <div class="detail-genre-row" style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+        <span style="font-size: 0.8rem; font-weight: 700; color: #94a3b8; margin-right: 0.2rem;">장르:</span>
+        ${visibleItemsHtml}
+        ${toggleBtnHtml}
+      </div>
+    `;
+  }
+
+  // 태그 행 구성
+  let tagRowHtml = '';
+  if (tagsArr.length > 0) {
+    const visibleTags = shouldCollapse ? tagsArr.slice(0, 1) : tagsArr;
+    const hiddenTags = shouldCollapse ? tagsArr.slice(1) : [];
+
+    const visibleItemsHtml = visibleTags.map(t => `
+      <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center;" onclick="window.quickFilterByTag('${t.replace(/'/g, "\\'")}')">
+        <i class="fa-solid fa-hashtag" style="font-size: 0.7rem; margin-right: 0.2rem;"></i>${t}
+      </span>
+    `).join('');
+
+    const hiddenItemsHtml = hiddenTags.map(t => `
+      <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center;" onclick="window.quickFilterByTag('${t.replace(/'/g, "\\'")}')">
+        <i class="fa-solid fa-hashtag" style="font-size: 0.7rem; margin-right: 0.2rem;"></i>${t}
+      </span>
+    `).join('');
+
+    const toggleBtnHtml = hiddenTags.length > 0 ? `
+      <span class="badge collapse-toggle-btn" onclick="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';" style="background: rgba(16, 185, 129, 0.25); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.5); font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; font-weight: bold;" title="클릭하여 전체 태그 펼치기">
+        +${hiddenTags.length}
+      </span>
+      <span class="hidden-tags-wrap" style="display: none; gap: 0.4rem; flex-wrap: wrap;">${hiddenItemsHtml}</span>
+    ` : '';
+
+    tagRowHtml = `
+      <div class="detail-tag-row" style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+        <span style="font-size: 0.8rem; font-weight: 700; color: #94a3b8; margin-right: 0.2rem;">태그:</span>
+        ${visibleItemsHtml}
+        ${toggleBtnHtml}
+      </div>
+    `;
+  }
 
   const missingPageBooks = books.filter(b => {
     const isZip = ['zip', 'cbz'].includes((b.file_format || '').toLowerCase());
@@ -222,9 +288,9 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
           <span class="meta-item"><i class="fa-solid fa-building"></i> ${meta.publisher || '-'}</span>
           <span class="meta-item"><i class="fa-solid fa-book-open"></i> ${books.length}권</span>
         </div>
-        <div class="detail-meta-tags" style="display: flex; gap: 0.4rem; margin-top: 0.5rem; margin-bottom: 0.8rem; flex-wrap: wrap;">
-          ${genresHtml}
-          ${tagsHtml}
+        <div class="detail-meta-tags" style="display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.5rem; margin-bottom: 0.8rem;">
+          ${genreRowHtml}
+          ${tagRowHtml}
         </div>
         ${missingPageBannerHtml}
         <div class="detail-score">${stars}</div>
@@ -355,7 +421,7 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId, dbType
           <div class="vol-grid-progress">
             <div class="vol-grid-progress-bar" style="width: ${progressPercent}%"></div>
           </div>` : ''}
-          <span class="vol-grid-title">${rawDisplayTitle}</span>
+          <span class="vol-grid-title" title="${(rawDisplayTitle || '').replace(/"/g, '&quot;')}">${rawDisplayTitle}</span>
         </div>
       `;
     });

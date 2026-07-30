@@ -1,4 +1,9 @@
 # CHANGELOG
+## v1.5.2
+- 제목을 2줄로 출력 | title display 2 lines
+- 장르/태그 출력 방식 변경 | genre/tag display change
+- 장르/태그 접기/펼치기 기능 추가 | genre/tag collapse/expand function
+
 ## v1.5.1
 - 읽지 않는 상태 변경시 최근 읽은도서에서 없어지지 않는 버그 수정 | fix the bug that does not disappear from recently read books when changing the status to unread
 

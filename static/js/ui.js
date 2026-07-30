@@ -4,7 +4,7 @@ import { openBookDetail } from './modal.js';
 import { openReader } from './viewer.js';
 import { showToast } from './view_manager.js';
 import { buildFallbackCoverUrl, getBookCoverSrc, buildTextCoverDataUri } from './cover_fallback.js';
-import { stripLeadingBracketTags } from './series_display.js';
+import { stripLeadingBracketTags, middleTruncateTitle } from './series_display.js';
 
 // 지연 로딩을 위한 단일 싱글톤 IntersectionObserver 인스턴스
 const lazyImageObserver = ('IntersectionObserver' in window)

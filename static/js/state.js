@@ -31,6 +31,7 @@ export const state = {
   showSidebarCategoryAll: true,
   hddAggressiveWarmup: false,
   detailVolumeGridView: false,      // 도서 상세 목록 그리드 보기 (기본값: 리스트)
+  collapseDetailGenreTags: false,   // 태그/장르 축소 (기본값: 해제)
 
   detailSeriesName: '',
   detailLibraryId: null,

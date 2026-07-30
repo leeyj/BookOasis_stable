@@ -344,7 +344,8 @@ async function mountCategoryPluginUI(pluginId) {
 }
 
 // 카테고리 선택 처리
-export function selectCategory(id, skipHistory = false) {
+export function selectCategory(rawId, skipHistory = false) {
+  const id = String(rawId || '');
   window.scrollTo(0, 0);
   state.currentLibraryId = id;
   
