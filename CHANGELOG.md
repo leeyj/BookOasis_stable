@@ -1,4 +1,7 @@
 # CHANGELOG
+## v1.5.1
+- 읽지 않는 상태 변경시 최근 읽은도서에서 없어지지 않는 버그 수정 | fix the bug that does not disappear from recently read books when changing the status to unread
+
 ## v1.5.0
 - alias 도입(도서명 출력방식, 썸네일 표시등) | implement alias function (title display, thumbnail etc.)
 - pdf 로드 오류 수정 | fix pdf load error

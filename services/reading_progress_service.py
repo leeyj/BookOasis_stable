@@ -80,8 +80,11 @@ class ReadingProgressService:
         redis_client = get_redis_client()
         
         # 1. 사용자의 최근 읽은 도서 캐시 무효화 (대시보드 실시간 반영)
-        from utils.redis_helper import redis_del
-        redis_del(f"cache:history:{db_type}:{user_id}")
+        try:
+            from utils.redis_helper import redis_delete_pattern
+            redis_delete_pattern(f"cache:history*:{db_type}:{user_id}")
+        except Exception:
+            pass
 
         if redis_client:
             cache_key = make_key(f"user:progress:{db_type}:{user_id}:{book_id}")
@@ -288,7 +291,11 @@ class ReadingProgressService:
     def mark_unread(db_type: str, book_id, user_id=1):
         ReadingProgressRepository.delete_user_progress_by_book(db_type, book_id, user_id)
 
-        redis_del(f"cache:history:{db_type}:{user_id}")
+        try:
+            from utils.redis_helper import redis_delete_pattern
+            redis_delete_pattern(f"cache:history*:{db_type}:{user_id}")
+        except Exception:
+            pass
 
         redis_client = get_redis_client()
         if not redis_client:
