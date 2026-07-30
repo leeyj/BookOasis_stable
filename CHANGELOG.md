@@ -1,4 +1,8 @@
 # CHANGELOG
+## v1.5.0
+- alias 도입(도서명 출력방식, 썸네일 표시등) | implement alias function (title display, thumbnail etc.)
+- pdf 로드 오류 수정 | fix pdf load error
+- 최근추가한도서 및 최근 본 도서에 권한이 없는 도서가 표시되는 결함 조치 | fix the display of books in unauthorized categories in the latest added books and recently viewed books
 ## v1.4.9
 - 태그 누락 버그 수정 | fix the tag missing bug
 

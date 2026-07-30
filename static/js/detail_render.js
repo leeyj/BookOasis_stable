@@ -205,7 +205,8 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
       <!-- 뷰어 모드 (일반 노출) -->
       <div id="detail-header-meta-view" class="detail-header-meta">
         <h3 class="book-detail-title" style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
-          ${visibleTitle}
+          ${meta.series_alias || visibleTitle}
+          ${meta.series_alias ? `<span style="font-size: 0.85rem; color: #94a3b8; font-weight: normal;">(${visibleTitle})</span>` : ''}
           <button class="btn-fav-toggle" onclick="toggleSeriesFavorite(event, '${safeSeriesName.replace(/'/g, "\\'")}', ${isSeriesFav ? 1 : 0}, '${actualLibraryId}')" style="background:none; border:none; color:${seriesFavIconColor}; cursor:pointer; font-size:1.4rem; display:inline-flex; align-items:center;" title="${i18n.t('detail.toggle_fav_series')}">
             <i class="${seriesFavIconClass}"></i>
           </button>
@@ -215,7 +216,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
           ${unlockBtnHtml}
         </h3>
         <div class="detail-meta">
-          <span class="badge">${visibleTitle}</span>
+          <span class="badge">${meta.series_alias || visibleTitle}</span>
           <span class="meta-item"><i class="fa-solid fa-pen-nib"></i> ${meta.author || '-'}</span>
           <span class="meta-item"><i class="fa-solid fa-barcode"></i> ${meta.isbn || '-'}</span>
           <span class="meta-item"><i class="fa-solid fa-building"></i> ${meta.publisher || '-'}</span>
@@ -243,6 +244,10 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
       <div id="detail-header-meta-edit" class="detail-header-meta" style="display: none;">
         <h3 class="book-detail-title" style="margin-bottom: 0.5rem; font-size: 1.3rem;">${i18n.t('detail.edit_title')} <span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal; margin-left: 0.5rem;">${i18n.t('detail.edit_subtitle')}</span></h3>
         <div class="edit-meta-form-group">
+          <div class="edit-meta-row-item">
+            <label>시리즈 별칭 (Alias)</label>
+            <input type="text" id="edit-series-alias-input" class="edit-meta-input" value="${meta.series_alias || ''}" placeholder="기본 폴더명 대신 표시할 제목">
+          </div>
           <div class="edit-meta-row-item">
             <label>${i18n.t('detail.label_author')}</label>
             <input type="text" id="edit-author-input" class="edit-meta-input" value="${meta.author === '-' ? '' : meta.author}">
@@ -310,7 +315,7 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId, dbType
       const totalPages = Math.max(1, Number(b.total_pages) || 1);
       const isCompletedValue = Number(b.is_completed) === 1;
       const fmt = (b.file_format || '').toLowerCase();
-      let rawDisplayTitle = b.title || '';
+      let rawDisplayTitle = b.title_alias || b.title || '';
       const pathText = b.file_path || '';
       const imgdirPathDisplay = pathText.replace(/[\\/]__folder__\.imgdir$/i, '');
       const pathDisplay = fmt === 'imgdir' ? imgdirPathDisplay : pathText;

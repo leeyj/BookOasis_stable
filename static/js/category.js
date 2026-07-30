@@ -979,4 +979,61 @@ if (typeof window !== 'undefined') {
   window.triggerMoveLibrary = triggerMoveLibrary;
 }
 
+export function selectCategoryType(type) {
+    if (type === 'gdrive') type = 'local';
+
+    document.querySelectorAll('.category-type-selector .category-type-btn').forEach(el => el.classList.remove('active'));
+    const btn = document.querySelector(`.category-type-selector .category-type-btn[data-type="${type}"]`);
+    if (btn) btn.classList.add('active');
+
+    const typeInput = document.getElementById('library-form-category-type');
+    if (typeInput) typeInput.value = type;
+
+    const pathLabel = document.getElementById('library-form-path-label');
+    const pathTextarea = document.getElementById('library-form-path');
+    const btnBrowse = document.getElementById('btn-browse-paths');
+    const btnTest = document.getElementById('btn-test-gdrive-links');
+    const remoteRow = document.getElementById('library-form-remote-row');
+    const rcloneGroup = document.getElementById('library-form-rclone-url-group');
+
+    if (type === 'gdrive') {
+        if (pathLabel) pathLabel.textContent = (window.i18n && i18n.t('modal.gdrive_path_label')) || '구글 드라이브 공유 폴더 링크 (엔터로 여러 개 입력 가능)';
+        if (pathTextarea) pathTextarea.placeholder = (window.i18n && i18n.t('modal.gdrive_path_placeholder')) || '예: https://drive.google.com/drive/folders/1A2B3C4D5E6F7G8H9I';
+        if (btnBrowse) btnBrowse.style.display = 'none';
+        if (btnTest) btnTest.style.display = 'inline-flex';
+        if (remoteRow) remoteRow.style.display = 'none';
+        if (rcloneGroup) rcloneGroup.style.display = 'none';
+    } else {
+        if (pathLabel) pathLabel.textContent = (window.i18n && i18n.t('modal.category_path_label')) || '서버 물리 경로 (엔터로 여러 개 입력 가능)';
+        if (pathTextarea) pathTextarea.placeholder = '예: C:\\library\\fantasy\n/home/user/manga';
+        if (btnBrowse) btnBrowse.style.display = 'inline-flex';
+        if (btnTest) btnTest.style.display = 'none';
+        if (remoteRow) remoteRow.style.display = 'flex';
+    }
+}
+if (typeof window !== 'undefined') {
+  window.selectCategoryType = selectCategoryType;
+}
+
+export function selectIconOption(element) {
+    document.querySelectorAll('.category-icon-selector .icon-option').forEach(el => el.classList.remove('active'));
+    element.classList.add('active');
+    const iconInput = document.getElementById('library-form-icon');
+    if (iconInput) iconInput.value = element.dataset.icon;
+}
+if (typeof window !== 'undefined') {
+  window.selectIconOption = selectIconOption;
+}
+
+export function selectColorOption(element) {
+    document.querySelectorAll('.category-color-selector .color-option').forEach(el => el.classList.remove('active'));
+    element.classList.add('active');
+    const colorInput = document.getElementById('library-form-color');
+    if (colorInput) colorInput.value = element.dataset.color;
+}
+if (typeof window !== 'undefined') {
+  window.selectColorOption = selectColorOption;
+}
+
+
 

@@ -11,7 +11,7 @@ class MetadataRepository:
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT author, publisher, score, summary, tags, genre, cover_image, is_favorite 
+            SELECT author, publisher, score, summary, tags, genre, cover_image, is_favorite, title, title_alias, series_name, series_alias
             FROM books WHERE id = ?
             """,
             (book_id,)
@@ -21,18 +21,18 @@ class MetadataRepository:
         return dict(row) if row else None
 
     @staticmethod
-    def update_book_metadata(db_type, book_id, author, publisher, score, summary, tags, genre):
+    def update_book_metadata(db_type, book_id, author, publisher, score, summary, tags, genre, title_alias=None):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
             cursor.execute(
                 """
                 UPDATE books SET
-                    author = ?, publisher = ?, score = ?, summary = ?, tags = ?, genre = ?,
+                    author = ?, publisher = ?, score = ?, summary = ?, tags = ?, genre = ?, title_alias = ?,
                     metadata_locked = 1
                 WHERE id = ?
                 """,
-                (author, publisher, score, summary, tags, genre, book_id)
+                (author, publisher, score, summary, tags, genre, title_alias, book_id)
             )
             conn.commit()
             return cursor.rowcount > 0

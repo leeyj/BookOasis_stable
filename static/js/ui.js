@@ -49,6 +49,12 @@ function normalizeBookTitle(item) {
 }
 
 function resolveCardDisplayTitle(item, showVolumeCount) {
+  if (item.series_alias) {
+    return item.series_alias;
+  }
+  if (item.display_name) {
+    return item.display_name;
+  }
   const rawNormalizedTitle = String(normalizeBookTitle(item) || '').trim();
   const rawRepresentativeTitle = String(item.representative_title || '').trim();
   const rawSeriesName = String(item.series_name || '').trim();

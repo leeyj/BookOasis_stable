@@ -42,13 +42,13 @@ class ReadingHistoryService:
             merged.sort(key=lambda item: str(item.get('last_read_at') or ''), reverse=True)
             return merged
 
-        # 1. Redis 캐시 확인 (구형 캐시에 metadata_locked 없으면 DB 재조회)
-        cache_key = f"cache:history:{db_type}:{user_id}"
+        # 1. Redis 캐시 확인 (구형 캐시에 series_alias 없으면 DB 재조회)
+        cache_key = f"cache:history:v2:{db_type}:{user_id}"
         cached_data = redis_get(cache_key)
         if cached_data:
             try:
                 parsed = json.loads(cached_data)
-                if parsed and isinstance(parsed, list) and (len(parsed) == 0 or 'metadata_locked' in parsed[0]):
+                if parsed and isinstance(parsed, list) and (len(parsed) == 0 or 'series_alias' in parsed[0]):
                     return apply_live_progress(parsed)
             except Exception:
                 pass
@@ -70,7 +70,9 @@ class ReadingHistoryService:
                 'id'          : r['id'],
                 'library_id'  : r['library_id'],
                 'title'       : r['title'],
+                'title_alias' : r.get('title_alias', '') or '',
                 'series_name' : r['series_name'] or '기타 단행본',
+                'series_alias': r.get('series_alias', '') or '',
                 'cover_image' : get_cover_image_with_t(r['cover_image'], r['cover_updated_at']),
                 'file_format' : r['file_format'],
                 'pages_read'  : r['pages_read']  or 0,
@@ -96,13 +98,13 @@ class ReadingHistoryService:
 
     @staticmethod
     def get_recently_added(db_type, user_id=None, role=None):
-        # 1. Redis 캐시 확인 (구형 캐시에 metadata_locked 없으면 DB 재조회)
-        cache_key = f"cache:recent_added:{db_type}:{user_id}:{role}"
+        # 1. Redis 캐시 확인 (구형 캐시에 series_alias 없으면 DB 재조회)
+        cache_key = f"cache:recent_added:v2:{db_type}:{user_id}:{role}"
         cached_data = redis_get(cache_key)
         if cached_data:
             try:
                 parsed = json.loads(cached_data)
-                if parsed and isinstance(parsed, list) and (len(parsed) == 0 or 'metadata_locked' in parsed[0]):
+                if parsed and isinstance(parsed, list) and (len(parsed) == 0 or 'series_alias' in parsed[0]):
                     return parsed
             except Exception:
                 pass
@@ -120,7 +122,9 @@ class ReadingHistoryService:
                 'id'          : r['id'],
                 'library_id'  : r['library_id'],
                 'title'       : r['title'],
+                'title_alias' : r.get('title_alias', '') or '',
                 'series_name' : r['series_name'] or '기타 단행본',
+                'series_alias': r.get('series_alias', '') or '',
                 'cover_image' : get_cover_image_with_t(r['cover_image'], r['cover_updated_at']),
                 'file_format' : r['file_format'],
                 'total_pages' : r['total_pages'] or 0,

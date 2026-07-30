@@ -213,7 +213,7 @@ class ReadingProgressRepository:
         cursor = conn.cursor()
 
         base_select = """
-            SELECT b.id, b.library_id, b.title, b.series_name, b.cover_image, b.cover_updated_at, b.file_format,
+            SELECT b.id, b.library_id, b.title, b.title_alias, b.series_name, b.series_alias, b.cover_image, b.cover_updated_at, b.file_format,
                    p.pages_read, b.total_pages, p.last_read_at,
                    CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
                    p.is_completed, COALESCE(b.metadata_locked, 0) AS metadata_locked
@@ -247,7 +247,7 @@ class ReadingProgressRepository:
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT b.id, b.library_id, b.title, b.series_name, b.cover_image, b.cover_updated_at, b.file_format, b.total_pages, b.created_at,
+            SELECT b.id, b.library_id, b.title, b.title_alias, b.series_name, b.series_alias, b.cover_image, b.cover_updated_at, b.file_format, b.total_pages, b.created_at,
                    CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite, COALESCE(b.metadata_locked, 0) AS metadata_locked
             FROM books b
             INNER JOIN (
@@ -272,7 +272,7 @@ class ReadingProgressRepository:
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT b.id, b.library_id, b.title, b.series_name, b.cover_image, b.cover_updated_at, b.file_format, b.total_pages, b.created_at,
+            SELECT b.id, b.library_id, b.title, b.title_alias, b.series_name, b.series_alias, b.cover_image, b.cover_updated_at, b.file_format, b.total_pages, b.created_at,
                    CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite, COALESCE(b.metadata_locked, 0) AS metadata_locked
             FROM books b
             INNER JOIN (

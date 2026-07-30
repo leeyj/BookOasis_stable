@@ -51,6 +51,9 @@ class BookDetailService:
             except (ValueError, TypeError):
                 pass
 
+        if series_name:
+            series_name = BookRepository.resolve_series_name_by_alias(db_type, series_name, perm_clause, perm_params)
+
         if not library_id or library_id in ('all', 'history', 'favorite', 'home'):
             resolved_lib_id = BookRepository.resolve_series_library_id(db_type, series_name, perm_clause, perm_params)
             if resolved_lib_id:
@@ -94,6 +97,8 @@ class BookDetailService:
             return row[key] if row and row[key] else default
 
         meta = {
+            'series_name': series_name,
+            'series_alias': _val(meta_row, 'series_alias', ''),
             'author'   : _val(meta_row, 'author',    '-'),
             'isbn'     : _val(meta_row, 'isbn',      ''),
             'publisher': _val(meta_row, 'publisher', '-'),
@@ -121,6 +126,7 @@ class BookDetailService:
             books_list.append({
                 'id'          : b['id'],
                 'title'       : clean_title,
+                'title_alias' : b.get('title_alias', '') or '',
                 'file_format' : b['file_format'],
                 'total_pages' : total_pages,
                 'has_offsets' : b['has_offsets'] or 0,
@@ -148,7 +154,7 @@ class BookDetailService:
         return meta, books_list
 
     @staticmethod
-    def update_media_detail(db_type, series_name, author, isbn, publisher, summary, link, genre='', tags='', cover_file=None):
+    def update_media_detail(db_type, series_name, author, isbn, publisher, summary, link, genre='', tags='', cover_file=None, series_alias=None):
         import hashlib
         
         # 1. 해당 시리즈에 속한 도서의 library_id와 대표 book 레코드 1개 조회
@@ -175,7 +181,7 @@ class BookDetailService:
                 print(f"[BookDetailService] 시리즈 대표 표지 수동 업로드 완료: {dest_path}")
             
             # 3. 시리즈 메타 정보 일괄 업데이트
-            BookRepository.update_media_detail(db_type, series_name, author, isbn, publisher, summary, link, genre, tags)
+            BookRepository.update_media_detail(db_type, series_name, author, isbn, publisher, summary, link, genre, tags, series_alias=series_alias)
             return True, f'"{series_name}" 메타정보가 성공적으로 수정되었습니다.'
         except Exception as e:
             print(f"[BookDetailService] 메타정보 수정 에러: {e}")

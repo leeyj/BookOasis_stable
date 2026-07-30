@@ -126,7 +126,8 @@ def get_media_detail():
 def edit_media_detail():
     """시리즈 메타정보 수동 수정 및 표지 업로드"""
     db_type     = request.form.get('type', 'general')
-    series_name = request.form.get('series', '').strip()
+    series_name  = request.form.get('series', '').strip()
+    series_alias = request.form.get('series_alias', '').strip()
     author      = request.form.get('author', '').strip()
     isbn        = request.form.get('isbn', '').strip()
     publisher   = request.form.get('publisher', '').strip()
@@ -150,9 +151,80 @@ def edit_media_detail():
             link=link,
             genre=genre,
             tags=tags,
-            cover_file=cover_file
+            cover_file=cover_file,
+            series_alias=series_alias
         )
+        if success:
+            try:
+                from utils.redis_helper import redis_delete_pattern
+                redis_delete_pattern(f"cache:history*:{db_type}:*")
+                redis_delete_pattern(f"cache:recent_added*:{db_type}:*")
+            except Exception:
+                pass
         return jsonify({'success': success, 'message': message if success else None, 'error': message if not success else None})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@library_bp.route('/api/media/series/alias', methods=['POST', 'PATCH'])
+@admin_required
+def update_series_alias():
+    """시리즈 전용 표시 별칭(series_alias) 수정 API"""
+    data = request.get_json(silent=True) or request.form
+    db_type      = data.get('type', 'general')
+    series_name  = data.get('series', '').strip()
+    series_alias = data.get('series_alias', '').strip()
+
+    if not series_name:
+        return jsonify({'success': False, 'error': _t('api.err_series_name_required')}), 400
+
+    try:
+        from repositories.sqlite.book_repository import BookRepository
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE books
+            SET series_alias = ?,
+                metadata_locked = 1
+            WHERE series_name = ?
+        """, (series_alias if series_alias else None, series_name))
+        conn.commit()
+        conn.close()
+        try:
+            from utils.redis_helper import redis_delete_pattern
+            redis_delete_pattern(f"cache:history*:{db_type}:*")
+            redis_delete_pattern(f"cache:recent_added*:{db_type}:*")
+        except Exception:
+            pass
+        return jsonify({'success': True, 'message': f'"{series_name}" 시리즈 별칭이 수정되었습니다.', 'series_alias': series_alias})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@library_bp.route('/api/media/books/<int:book_id>/alias', methods=['POST', 'PATCH'])
+@admin_required
+def update_book_alias(book_id):
+    """단일 권수/도서 전용 표시 별칭(title_alias) 수정 API"""
+    data = request.get_json(silent=True) or request.form
+    db_type     = data.get('type', 'general')
+    title_alias = data.get('title_alias', '').strip()
+
+    try:
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE books
+            SET title_alias = ?,
+                metadata_locked = 1
+            WHERE id = ?
+        """, (title_alias if title_alias else None, book_id))
+        conn.commit()
+        conn.close()
+        try:
+            from utils.redis_helper import redis_delete_pattern
+            redis_delete_pattern(f"cache:history*:{db_type}:*")
+            redis_delete_pattern(f"cache:recent_added*:{db_type}:*")
+        except Exception:
+            pass
+        return jsonify({'success': True, 'message': f'도서(ID: {book_id}) 별칭이 수정되었습니다.', 'title_alias': title_alias})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -802,8 +874,8 @@ def unlock_media_metadata():
         if success:
             try:
                 from utils.redis_helper import redis_delete_pattern
-                redis_delete_pattern(f"cache:history:{db_type}:*")
-                redis_delete_pattern(f"cache:recent_added:{db_type}:*")
+                redis_delete_pattern(f"cache:history*:{db_type}:*")
+                redis_delete_pattern(f"cache:recent_added*:{db_type}:*")
             except Exception:
                 pass
             return jsonify({'success': True, 'message': '메타데이터 잠금이 해제되었습니다.'})

@@ -185,13 +185,15 @@
 * **비고**: `books[].is_favorite` 값은 로그인한 현재 사용자 기준입니다. (계정별 분리)
 * **쿼리 스트링**:
   * `type` (string, 필수): `general` / `adult`
-  * `series` (string, 필수): 시리즈 명
+  * `series` (string, 필수): 시리즈 명 (원본 `series_name` 또는 설정된 별칭 `series_alias` 수용 가능)
   * `library_id` (integer/string, 필수): 카테고리 ID (특정 ID 또는 `'all'`, `'home'` 등)
 * **응답 예시 (200 OK)**:
   ```json
   {
     "success": true,
     "meta": {
+      "series_name": "나 혼자만 레벨업",
+      "series_alias": "나혼렙 별칭",
       "author": "추공",
       "isbn": "9791167771234",
       "publisher": "디앤씨미디어",
@@ -206,6 +208,7 @@
       {
         "id": 198,
         "title": "평범한 연애는 할 수 없어 01권 (리디)#198",
+        "title_alias": "1권 별칭",
         "file_format": "imgdir",
         "total_pages": 192,
         "has_offsets": 1,
@@ -229,6 +232,7 @@
   | :--- | :--- | :--- | :--- |
   | `type` | string | 필수 | DB 스코프 (`general` 또는 `adult`) |
   | `series` | string | 필수 | 수정 대상 시리즈명 |
+  | `series_alias` | string | 선택 | 시리즈 표시 별칭(Alias) |
   | `author` | string | 선택 | 저자 |
   | `isbn` | string | 선택 | ISBN |
   | `publisher` | string | 선택 | 출판사 |
@@ -237,6 +241,27 @@
   | `genre` | string | 선택 | 장르(쉼표 구분) |
   | `tags` | string | 선택 | 태그(쉼표 구분) |
   | `cover_image` | file | 선택 | 표지 이미지 파일 |
+
+### `[POST/PATCH]` `/api/media/series/alias`
+* **설명**: 특정 시리즈 전용 표시 별칭(`series_alias`)을 수정/삭제합니다. (관리자 전용)
+* **권한**: `@admin_required`
+* **Content-Type**: `application/json` 또는 `application/x-www-form-urlencoded`
+* **요청 파라미터**:
+  | 파라미터명 | 타입 | 필수여부 | 설명 |
+  | :--- | :--- | :--- | :--- |
+  | `type` | string | 선택 | DB 스코프 (기본값: `general`) |
+  | `series` | string | 필수 | 원본 시리즈명 (`series_name`) |
+  | `series_alias` | string | 선택 | 설정할 표시 별칭 (빈 값이면 기본 폴더명으로 원복) |
+
+### `[POST/PATCH]` `/api/media/books/{book_id}/alias`
+* **설명**: 단일 권수/도서 전용 표시 별칭(`title_alias`)을 수정/삭제합니다. (관리자 전용)
+* **권한**: `@admin_required`
+* **Content-Type**: `application/json` 또는 `application/x-www-form-urlencoded`
+* **요청 파라미터**:
+  | 파라미터명 | 타입 | 필수여부 | 설명 |
+  | :--- | :--- | :--- | :--- |
+  | `type` | string | 선택 | DB 스코프 (기본값: `general`) |
+  | `title_alias` | string | 선택 | 설정할 도서 표시 별칭 (빈 값이면 원본 제목으로 원복) |
 
 ### `[POST]` `/api/media/books/{book_id}/apply-metadata`
 * **설명**: 메타데이터 검색(플러그인) 결과를 선택해 단일 도서에 적용합니다. (관리자 전용)

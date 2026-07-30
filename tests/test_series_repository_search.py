@@ -17,7 +17,9 @@ class SeriesRepositorySearchTest(unittest.TestCase):
             CREATE TABLE books (
                 id INTEGER PRIMARY KEY,
                 series_name TEXT,
+                series_alias TEXT,
                 title TEXT,
+                title_alias TEXT,
                 author TEXT,
                 file_path TEXT,
                 file_format TEXT,

@@ -72,12 +72,15 @@ def _build_series_entries(db_type, rows):
         author = next((b['author'] for b in books if b['author']), '')
         genre = next((b['genre'] for b in books if b['genre']), '')
         tags = next((b['tags'] for b in books if b['tags']), '')
+        series_alias = next((b['series_alias'] for b in books if b.get('series_alias')), '')
         series_key = hashlib.md5(f"{lib_id}|{series_name}|{comp_dir}".encode('utf-8')).hexdigest()[:16]
 
         entries.append({
             'series_key': f"{lib_id}:{series_key}",
             'series_name': series_name,
-            'representative_title': representative['title'] or '',
+            'series_alias': series_alias,
+            'display_name': series_alias if series_alias else series_name,
+            'representative_title': representative.get('title_alias') or representative['title'] or '',
             'author': author,
             'book_count': len(books),
             'cover_image': get_cover_image_with_t(final_cover, updated_at),

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
-from repositories.book_repository import BookRepository
+from repositories import BookRepository
 from utils.sort_helper import natural_sort_key
 from utils.cover_helper import get_cover_image_with_t
 

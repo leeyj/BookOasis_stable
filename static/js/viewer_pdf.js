@@ -8,6 +8,7 @@ export let pdfDoc = null;
 export let pdfCurrentPage = 1;
 export let pdfTotalPages = 0;
 let isInitializingPdfProgress = false;
+let currentRenderTasks = [];
 
 export async function initPdfViewer(bookId, pagesRead, totalPages) {
   isInitializingPdfProgress = true;

@@ -1,0 +1,34 @@
+---
+title: Task - sqlite_schema_order_bugfix
+project: BookOasis
+category: history
+date: 2026-07-05
+type: task
+---
+- [x] tab_media_library.html에 mobile.css 로드 구문 추가
+- [x] static/css/mobile.css 신규 생성 및 모바일 스타일 추가
+- [x] 미디어 쿼리 타겟을 1200px로 상향 조정 (tab_media_library.html 및 mobile.css)
+- [x] 햄버거 메뉴 버튼 추가 및 사이드바 토글 기능 개발 (HTML, CSS, JS)
+- [x] 환경설정 탭 가로 스크롤 대응 및 설정 테이블 반응형 스타일 추가 (mobile.css)
+- [x] 도서 상세 뷰 반응형 레이아웃 튜닝 (좌|우 배치를 위|아래 세로 배치로 변경)
+- [x] 단행본(볼륨) 리스트 카드 반응형 세로 레이아웃 및 파일 경로 숨김 추가 (mobile.css)
+- [x] 단행본 읽기(이어보기) 버튼 텍스트 및 아이콘 중앙 정렬 적용 (mobile.css)
+- [x] 데스크톱용 사이드바 접기/펼치기(토글) 햄버거 버튼 추가 및 상태 기억 기능 개발 (HTML, CSS, JS)
+- [x] 데스크톱 접힘 상태(.collapsed)가 모바일 뷰(<= 1200px)에서 오작동하지 않도록 CSS 예외 처리 추가 (mobile.css)
+- [x] mobile.css 내 불필요한 !important 제거 및 명시도 기반 리팩토링 수행
+- [x] 만화 뷰어 닫기 시 이전 렌더링 이미지 및 타이머를 초기화하는 clearComicViewer 구현 (renderer.js, viewer_comic.js, viewer.js)
+- [x] docs/bug/20260704_bugfix_comic_viewer_ghosting.md 버그 문서 작성
+- [x] 핫스팟 레이어(#common-viewer-hotspot)에 모바일 터치 스크롤 허용용 pointer-events 제어 및 본체 탭 연동 토글 브릿지 구현 (viewer.js)
+- [x] docs/bug/20260704_bugfix_comic_touch_scroll.md 버그 문서 작성
+- [x] iOS Safari 호환성을 위해 스크롤 모드 시 핫스팟 레이어의 pointer-events 대신 display: none 전환 처리 (viewer.js)
+- [x] iOS Safari 이미지 드래그로 인한 스크롤 묵살 방지 패치 및 관성 스크롤 스타일 부여 (tab_media_library_viewer.css)
+- [x] 대시보드 신규 추가 도서 목록에서 시리즈 단위로 그룹화하여 묶어 보여주는 기능 개선 (reading_history_service.py)
+- [x] docs/bug/20260704_bugfix_dashboard_recently_added_grouped.md 문서 작성
+- [x] 도서 우클릭 컨텍스트 메뉴에 '읽지 않은 상태로 변경 (0%)' 기능 추가 및 연동 (api/stream.py, static/js/api.js, templates/components/context_menus.html, static/js/book_context_menu.js, static/js/tab_media_library.js, i18n json)
+- [x] docs/bug/20260704_feature_context_menu_unread_0.md 문서 작성
+- [x] scanner.log 및 lazy_scanner.log의 자동 10MB 기준 zip 아카이빙 로직 연동 (utils/logger.py, tools/scanner/logger.py, tools/lazy_scanner.py)
+- [x] docs/bug/20260704_feature_logs_archiving.md 문서 작성
+- [x] APScheduler 기본 타임존을 한국 표준시(Asia/Seoul)로 고정하여 크론 실행 지연 문제 픽스 (services/scheduler_service.py)
+- [x] lazy_scanner.py 기동 시 SQLite 락 대기 방지용 1초 타임아웃 부여 (tools/lazy_scanner.py)
+- [x] docs/bug/20260704_bugfix_scheduler_timezone_kst.md 문서 작성
+- [x] docs/workflow.md에 작업 내역 기록 및 collect_docs.py 실행

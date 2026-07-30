@@ -40,7 +40,7 @@ class SeriesRepository:
             params.append(user_id)
 
         sql = f"""
-            SELECT b.id, b.series_name, b.title, b.author, b.file_path, b.file_format,
+            SELECT b.id, b.series_name, b.series_alias, b.title, b.title_alias, b.author, b.file_path, b.file_format,
                    b.cover_image, b.cover_updated_at,
                    CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
                    b.created_at,

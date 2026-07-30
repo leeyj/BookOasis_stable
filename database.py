@@ -473,6 +473,8 @@ def init_databases():
         is_deleted INTEGER DEFAULT 0,
         deleted_at DATETIME DEFAULT NULL,
         metadata_locked INTEGER DEFAULT 0,
+        series_alias TEXT,
+        title_alias TEXT,
         file_mtime REAL DEFAULT 0.0,
         file_size INTEGER DEFAULT 0
     );

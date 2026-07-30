@@ -1,0 +1,22 @@
+---
+title: Walkthrough - genre_tag_removal
+project: BookOasis
+category: history
+date: 2026-06-28
+type: walkthrough
+---
+# 장르/태그 필터 기능 완전 제거 결과 보고 (Walkthrough)
+
+## 변경 사항
+- **[tab_media_library.html](file:///c:/project/media_server/templates/components/tab_media_library.html)**:
+  - 좌측 사이드바 영역에 자리하고 있던 장르 및 태그 필터 트리거 엘리먼트들을 제거하였습니다.
+  - 마우스 드래그를 통해 화면 상에 떠돌던 장르 및 태그 플로팅 모달창 구조(`#genre-modal`, `#tag-modal`)의 마크업 코드를 완전히 삭제했습니다.
+- **[category.js](file:///c:/project/media_server/static/js/category.js) & [tab_media_library.js](file:///c:/project/media_server/static/js/tab_media_library.js)**:
+  - 탭/라이브러리 전환이나 동적 로딩 시 사용되지 않는 `loadGenresAndTags` 및 `updateSidebarFilterActiveStates` 함수의 임포트와 호출 구문을 완벽하게 제거하여 불필요한 결합을 해소했습니다.
+- **[genre_tag_filter.js](file:///c:/project/media_server/static/js/genre_tag_filter.js)**:
+  - 장르/태그 동작 스크립트 모듈 파일 내의 모든 바인딩 및 연산 로직을 비우고, 임포트 호출에 대비한 최소한의 빈 껍데기 함수만 유지하도록 정리했습니다.
+
+## 수동 검증 방법
+1. 브라우저에서 미디어 서버 대시보드에 재접속합니다.
+2. 좌측 카테고리 사이드바 하단 및 전체 화면 내에서 장르/태그와 관련된 UI 요소가 깔끔하게 보이지 않는 것을 확인합니다.
+3. 브라우저 개발자 도구(F12) 콘솔 탭을 확인하여, 관련 모듈 연동 해제 과정에서 발생할 수 있는 자바스크립트 Import나 Reference 관련 에러가 일절 검출되지 않는지 재차 검증합니다.

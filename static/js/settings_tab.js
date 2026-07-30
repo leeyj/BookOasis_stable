@@ -4,6 +4,7 @@ import { loadPluginsSettings } from './settings/plugins.js';
 import { initReportsTab, loadReportList, loadReportDetail } from './settings/reports.js?v=1.4.2';
 import { loadUsersList } from './settings/users.js';
 import { loadPermissionsMatrix } from './settings/permissions.js';
+import { loadQueueStatus } from './settings/queue.js';
 
 export {
   applySettingsToUI,
