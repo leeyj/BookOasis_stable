@@ -4,10 +4,9 @@
 
 /* 1. 기본 전체 레이아웃 조정 (Flex 방향 변경) */
 .main-wrapper {
-    height: calc(100vh - 20px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
-    height: calc(100dvh - 20px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
-    min-height: calc(100vh - 20px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
-    min-height: calc(100dvh - 20px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    margin: 10px !important; /* 모바일: 여백 축소 */
 }
 
 .media-library-container {

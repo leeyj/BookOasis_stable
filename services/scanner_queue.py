@@ -374,6 +374,8 @@ def _process_lazy_scan(sq):
             stderr=subprocess.PIPE,
             text=True
         )
+        stdout_data = ""
+        stderr_data = ""
         try:
             stdout_data, stderr_data = active_subprocess.communicate(timeout=7200)
             returncode = active_subprocess.returncode
@@ -385,6 +387,24 @@ def _process_lazy_scan(sq):
                 for line in stderr_data.splitlines():
                     if line.strip():
                         sq.log(f"[Lazy-Scanner-Err] {line}")
+        except subprocess.TimeoutExpired as te:
+            sq.log(f"⏱️ Lazy-Scanner subprocess timed out (7200s): {te}")
+            try:
+                active_subprocess.kill()
+                outs, errs = active_subprocess.communicate()
+                if outs:
+                    stdout_data = (stdout_data or "") + outs
+                    for line in outs.splitlines():
+                        if line.strip():
+                            sq.log(f"[Lazy-Scanner-Out] {line}")
+                if errs:
+                    stderr_data = (stderr_data or "") + errs
+                    for line in errs.splitlines():
+                        if line.strip():
+                            sq.log(f"[Lazy-Scanner-Err] {line}")
+            except Exception as kill_err:
+                sq.log(f"[Lazy-Scanner] Error while terminating timed out process: {kill_err}")
+            returncode = -1
         except Exception as pe:
             sq.log(f"Subprocess wait error: {pe}")
             try:

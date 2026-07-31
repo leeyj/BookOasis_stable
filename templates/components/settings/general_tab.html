@@ -20,6 +20,22 @@
                                 </div>
                                 <div style="display: flex; flex-direction: column; gap: 1.25rem;">
 
+                                    <!-- 대시보드 테마 선택 -->
+                                    <div class="library-form-group">
+                                        <label for="setting-dashboard-theme" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                            <i class="fa-solid fa-palette" style="color: #a855f7; margin-right: 0.3rem;"></i> <span data-i18n="settings.dashboard_theme_label">대시보드 테마 설정</span>
+                                        </label>
+                                        <select id="setting-dashboard-theme" name="DASHBOARD_THEME" onchange="changeDashboardTheme(this.value)" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; cursor: pointer;">
+                                            <option value="purple" data-i18n="settings.theme_purple">🟣 퍼플 (BookOasis 시그니처 기본)</option>
+                                            <option value="dark" data-i18n="settings.theme_dark">🌙 클래식 다크 (OLED Black)</option>
+                                            <option value="light" data-i18n="settings.theme_light">☀️ 모던 라이트 (Clean White)</option>
+                                            <option value="sepia" data-i18n="settings.theme_sepia">📜 클래식 세피아 (Warm Sepia)</option>
+                                            <option value="blue" data-i18n="settings.theme_blue">🌊 딥 블루 (Midnight Navy)</option>
+                                            <option value="epaper" data-i18n="settings.theme_epaper">📖 E-Paper 전용 (전자종이 흑백 고대비)</option>
+                                        </select>
+                                        <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;" data-i18n="settings.dashboard_theme_desc">메인 보관함 및 대시보드 전체 색상 테마를 취향에 맞춰 변경합니다. (E-Paper 테마는 전자책 리더기용 고대비 무그림자 지원)</p>
+                                    </div>
+
                                     <!-- 도서 카드 너비 슬라이더 -->
                                     <div class="library-form-group">
                                         <label for="setting-thumbnail-width" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">

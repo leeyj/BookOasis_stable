@@ -67,23 +67,479 @@
 }
 
 /* ======================================================== */
-/* 🛡️ 나의 서포터 메인 스타일시트 패키지 허브 (style.css) */
+/* 🎨 DASHBOARD THEME SYSTEM (data-app-theme)               */
 /* ======================================================== */
+:root, [data-app-theme="purple"] {
+    --app-bg-main: #0f172a;
+    --app-bg-sidebar: rgba(15, 23, 42, 0.95);
+    --app-bg-card: rgba(30, 41, 59, 0.6);
+    --app-bg-card-hover: rgba(30, 41, 59, 0.85);
+    --app-text-primary: #f8fafc;
+    --app-text-muted: #94a3b8;
+    --app-text-secondary: #cbd5e1;
+    --app-accent: #a855f7;
+    --app-accent-hover: #c084fc;
+    --app-border: rgba(255, 255, 255, 0.1);
+    --app-border-light: rgba(255, 255, 255, 0.05);
+    --app-input-bg: rgba(15, 23, 42, 0.6);
+    --app-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    --app-blur: blur(10px);
+}
 
-/* --------------------------------------------------------
-   1. LAYOUT & SYSTEM STRUCTURE (기존 tab_media_library_layout.css)
-   -------------------------------------------------------- */
+[data-app-theme="dark"] {
+    --app-bg-main: #121212;
+    --app-bg-sidebar: #1e1e1e;
+    --app-bg-card: #242424;
+    --app-bg-card-hover: #2e2e2e;
+    --app-text-primary: #f1f5f9;
+    --app-text-muted: #a0a0a0;
+    --app-text-secondary: #d1d5db;
+    --app-accent: #38bdf8;
+    --app-accent-hover: #7dd3fc;
+    --app-border: #333333;
+    --app-border-light: #2a2a2a;
+    --app-input-bg: #1a1a1a;
+    --app-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --app-blur: none;
+}
+
+[data-app-theme="light"] {
+    --app-bg-main: #f1f5f9;
+    --app-bg-sidebar: #ffffff;
+    --app-bg-card: #ffffff;
+    --app-bg-card-hover: #f8fafc;
+    --app-text-primary: #0f172a;
+    --app-text-muted: #475569;
+    --app-text-secondary: #334155;
+    --app-accent: #6366f1;
+    --app-accent-hover: #4f46e5;
+    --app-border: #cbd5e1;
+    --app-border-light: #e2e8f0;
+    --app-input-bg: #f8fafc;
+    --app-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    --app-blur: none;
+}
+
+[data-app-theme="light"] .sidebar-title,
+[data-app-theme="light"] .sidebar-menu .menu-item,
+[data-app-theme="light"] .section-title,
+[data-app-theme="light"] .settings-tab-btn,
+[data-app-theme="light"] label,
+[data-app-theme="light"] h1,
+[data-app-theme="light"] h2,
+[data-app-theme="light"] h3,
+[data-app-theme="light"] h4,
+[data-app-theme="light"] h5,
+[data-app-theme="light"] p,
+[data-app-theme="light"] span,
+[data-app-theme="light"] div {
+    color: var(--app-text-primary);
+}
+
+[data-app-theme="light"] .sidebar-menu .menu-item {
+    color: #475569 !important;
+}
+
+[data-app-theme="light"] .sidebar-menu .menu-item:hover {
+    background: rgba(99, 102, 241, 0.08) !important;
+    color: #4f46e5 !important;
+}
+
+[data-app-theme="light"] .sidebar-menu .menu-item.active {
+    background: #eef2ff !important;
+    color: #4f46e5 !important;
+    border-color: #a5b4fc !important;
+}
+
+[data-app-theme="light"] .settings-tab-btn {
+    background: #e2e8f0 !important;
+    color: #475569 !important;
+    border-color: #cbd5e1 !important;
+}
+
+[data-app-theme="light"] .settings-tab-btn.active {
+    background: #6366f1 !important;
+    color: #ffffff !important;
+}
+
+[data-app-theme="light"] select,
+[data-app-theme="light"] input[type="text"],
+[data-app-theme="light"] input[type="number"],
+[data-app-theme="light"] input[type="password"],
+[data-app-theme="light"] textarea {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    border: 1px solid #cbd5e1 !important;
+}
+
+[data-app-theme="light"] div[style*="background: rgba(30, 41, 59"],
+[data-app-theme="light"] div[style*="background: rgba(15, 23, 42"] {
+    background: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.04) !important;
+}
+
+[data-app-theme="light"] .book-card {
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-app-theme="light"] .book-card-info {
+    background: #f8fafc !important;
+}
+
+[data-app-theme="light"] .book-card-title {
+    color: #0f172a !important;
+}
+
+[data-app-theme="light"] .book-card-author,
+[data-app-theme="light"] .book-card-meta,
+[data-app-theme="light"] .book-card-subinfo {
+    color: #475569 !important;
+}
+
+[data-app-theme="light"] .library-modal-content {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15) !important;
+}
+
+[data-app-theme="light"] .library-modal-header h3,
+[data-app-theme="light"] .library-modal-content label,
+[data-app-theme="light"] .library-modal-content p,
+[data-app-theme="light"] .library-modal-content span,
+[data-app-theme="light"] .library-modal-content div {
+    color: #0f172a !important;
+}
+
+[data-app-theme="light"] label,
+[data-app-theme="light"] .library-form-group label,
+[data-app-theme="light"] .library-form-group-row label,
+[data-app-theme="light"] .section-title,
+[data-app-theme="light"] h1,
+[data-app-theme="light"] h2,
+[data-app-theme="light"] h3,
+[data-app-theme="light"] h4,
+[data-app-theme="light"] h5,
+[data-app-theme="light"] [style*="color: #fff"],
+[data-app-theme="light"] [style*="color:#fff"] {
+    color: #0f172a !important;
+}
+
+[data-app-theme="light"] p,
+[data-app-theme="light"] .settings-tab-content p,
+[data-app-theme="light"] [style*="color: #94a3b8"],
+[data-app-theme="light"] [style*="color:#94a3b8"],
+[data-app-theme="light"] [style*="color: #cbd5e1"],
+[data-app-theme="light"] [style*="color:#cbd5e1"],
+[data-app-theme="light"] [style*="color: #64748b"],
+[data-app-theme="light"] [style*="color:#64748b"] {
+    color: #475569 !important;
+}
+
+[data-app-theme="sepia"] {
+    --app-bg-main: #fbf0d9;
+    --app-bg-sidebar: #f4e4c1;
+    --app-bg-card: #f4e4c1;
+    --app-bg-card-hover: #ede0c4;
+    --app-text-primary: #3b2a1a;
+    --app-text-muted: #6b5744;
+    --app-text-secondary: #4a3828;
+    --app-accent: #b45309;
+    --app-accent-hover: #d97706;
+    --app-border: #e6d3ad;
+    --app-border-light: #ebdcc0;
+    --app-input-bg: #fdf7eb;
+    --app-shadow: 0 4px 12px rgba(67, 52, 34, 0.08);
+    --app-blur: none;
+}
+
+[data-app-theme="sepia"] label,
+[data-app-theme="sepia"] .library-form-group label,
+[data-app-theme="sepia"] .library-form-group-row label,
+[data-app-theme="sepia"] .section-title,
+[data-app-theme="sepia"] h1,
+[data-app-theme="sepia"] h2,
+[data-app-theme="sepia"] h3,
+[data-app-theme="sepia"] h4,
+[data-app-theme="sepia"] h5,
+[data-app-theme="sepia"] [style*="color: #fff"],
+[data-app-theme="sepia"] [style*="color:#fff"] {
+    color: #3b2a1a !important;
+}
+
+[data-app-theme="sepia"] p,
+[data-app-theme="sepia"] .settings-tab-content p,
+[data-app-theme="sepia"] [style*="color: #94a3b8"],
+[data-app-theme="sepia"] [style*="color:#94a3b8"],
+[data-app-theme="sepia"] [style*="color: #cbd5e1"],
+[data-app-theme="sepia"] [style*="color:#cbd5e1"],
+[data-app-theme="sepia"] [style*="color: #64748b"],
+[data-app-theme="sepia"] [style*="color:#64748b"] {
+    color: #6b5744 !important;
+}
+
+[data-app-theme="sepia"] select,
+[data-app-theme="sepia"] input[type="text"],
+[data-app-theme="sepia"] input[type="number"],
+[data-app-theme="sepia"] input[type="password"] {
+    background-color: var(--app-input-bg) !important;
+    color: var(--app-text-primary) !important;
+    border-color: var(--app-border) !important;
+}
+
+[data-app-theme="sepia"] .library-modal-content {
+    background: #f4e4c1 !important;
+    color: #3b2a1a !important;
+    border: 1px solid #e6d3ad !important;
+    box-shadow: 0 20px 50px rgba(67, 52, 34, 0.2) !important;
+}
+
+[data-app-theme="sepia"] .library-modal-header h3,
+[data-app-theme="sepia"] .library-modal-content label,
+[data-app-theme="sepia"] .library-modal-content p,
+[data-app-theme="sepia"] .library-modal-content span,
+[data-app-theme="sepia"] .library-modal-content div {
+    color: #3b2a1a !important;
+}
+
+[data-app-theme="sepia"] .settings-table th,
+[data-app-theme="sepia"] .settings-table tr td,
+[data-app-theme="sepia"] .schedule-path-toggle,
+[data-app-theme="sepia"] .schedule-scan-time {
+    color: #3b2a1a !important;
+}
+
+[data-app-theme="sepia"] .settings-table thead tr {
+    background: #ede0c4 !important;
+    color: #3b2a1a !important;
+}
+
+[data-app-theme="sepia"] .settings-table thead th {
+    color: #3b2a1a !important;
+}
+
+[data-app-theme="sepia"] .book-card {
+    background: #f4e4c1 !important;
+    border: 1px solid #e6d3ad !important;
+    box-shadow: 0 4px 12px rgba(67, 52, 34, 0.08) !important;
+}
+
+[data-app-theme="sepia"] .book-card-info {
+    background: #ede0c4 !important;
+}
+
+[data-app-theme="sepia"] .book-card-title {
+    color: #3b2a1a !important;
+}
+
+[data-app-theme="sepia"] .book-card-author,
+[data-app-theme="sepia"] .book-card-meta,
+[data-app-theme="sepia"] .book-card-subinfo {
+    color: #6b5744 !important;
+}
+
+[data-app-theme="blue"] {
+    --app-bg-main: #0a192f;
+    --app-bg-sidebar: #112240;
+    --app-bg-card: #112240;
+    --app-bg-card-hover: #1d3557;
+    --app-text-primary: #e6f1ff;
+    --app-text-muted: #8892b0;
+    --app-text-secondary: #ccd6f6;
+    --app-accent: #64ffda;
+    --app-accent-hover: #a5f3fc;
+    --app-border: rgba(100, 255, 218, 0.2);
+    --app-border-light: rgba(100, 255, 218, 0.08);
+    --app-input-bg: #071324;
+    --app-shadow: 0 10px 30px -10px rgba(2, 12, 27, 0.7);
+    --app-blur: blur(8px);
+}
+
+[data-app-theme="epaper"] {
+    --app-bg-main: #f4f4f4;
+    --app-bg-sidebar: #ffffff;
+    --app-bg-card: #ffffff;
+    --app-bg-card-hover: #e8e8e8;
+    --app-text-primary: #000000;
+    --app-text-muted: #222222;
+    --app-text-secondary: #111111;
+    --app-accent: #000000;
+    --app-accent-hover: #333333;
+    --app-border: #000000;
+    --app-border-light: #444444;
+    --app-input-bg: #ffffff;
+    --app-shadow: none;
+    --app-blur: none;
+}
+
+[data-app-theme="epaper"] * {
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    transition: none !important;
+}
+
+/* e-paper 테마: 썸네일(이미지) 제외 모든 요소를 흑백으로 표시 */
+[data-app-theme="epaper"] body,
+[data-app-theme="epaper"] .main-wrapper,
+[data-app-theme="epaper"] .media-library-container,
+[data-app-theme="epaper"] .library-sidebar,
+[data-app-theme="epaper"] .library-main-content {
+    filter: grayscale(1);
+}
+
+/* 썸네일 이미지는 컬러 유지 (grayscale 예외) */
+[data-app-theme="epaper"] .book-card-cover img,
+[data-app-theme="epaper"] .dashboard-book-card img,
+[data-app-theme="epaper"] .dashboard-row-container img {
+    filter: none !important;
+}
+
+[data-app-theme="epaper"] .sidebar-title,
+[data-app-theme="epaper"] .sidebar-menu .menu-item,
+[data-app-theme="epaper"] .section-title,
+[data-app-theme="epaper"] .settings-tab-btn,
+[data-app-theme="epaper"] label,
+[data-app-theme="epaper"] h1,
+[data-app-theme="epaper"] h2,
+[data-app-theme="epaper"] h3,
+[data-app-theme="epaper"] h4,
+[data-app-theme="epaper"] h5,
+[data-app-theme="epaper"] p,
+[data-app-theme="epaper"] span,
+[data-app-theme="epaper"] div,
+[data-app-theme="epaper"] [style*="color: #fff"],
+[data-app-theme="epaper"] [style*="color:#fff"],
+[data-app-theme="epaper"] [style*="color: #94a3b8"],
+[data-app-theme="epaper"] [style*="color:#94a3b8"],
+[data-app-theme="epaper"] [style*="color: #cbd5e1"],
+[data-app-theme="epaper"] [style*="color:#cbd5e1"],
+[data-app-theme="epaper"] [style*="color: #64748b"],
+[data-app-theme="epaper"] [style*="color:#64748b"] {
+    color: #000000 !important;
+}
+
+[data-app-theme="epaper"] .sidebar-menu .menu-item {
+    color: #000000 !important;
+    border: 1px solid transparent;
+}
+
+[data-app-theme="epaper"] .sidebar-menu .menu-item:hover {
+    background: #e0e0e0 !important;
+    color: #000000 !important;
+}
+
+[data-app-theme="epaper"] .sidebar-menu .menu-item.active {
+    background: #000000 !important;
+    color: #ffffff !important;
+    border: 1px solid #000000 !important;
+}
+
+[data-app-theme="epaper"] .sidebar-menu .menu-item.active * {
+    color: #ffffff !important;
+}
+
+[data-app-theme="epaper"] .settings-tab-btn {
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: 1px solid #000000 !important;
+}
+
+[data-app-theme="epaper"] .settings-tab-btn.active {
+    background: #000000 !important;
+    color: #ffffff !important;
+}
+
+[data-app-theme="epaper"] select,
+[data-app-theme="epaper"] input[type="text"],
+[data-app-theme="epaper"] input[type="number"],
+[data-app-theme="epaper"] input[type="password"],
+[data-app-theme="epaper"] textarea {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    border: 2px solid #000000 !important;
+}
+
+[data-app-theme="epaper"] div[style*="background: rgba(30, 41, 59"],
+[data-app-theme="epaper"] div[style*="background: rgba(15, 23, 42"] {
+    background: #ffffff !important;
+    border: 1px solid #000000 !important;
+}
+
+[data-app-theme="epaper"] .book-card {
+    background: #ffffff !important;
+    border: 1px solid #000000 !important;
+}
+
+[data-app-theme="epaper"] .book-card-info {
+    background: #ffffff !important;
+    border-top: 1px solid #000000 !important;
+}
+
+[data-app-theme="epaper"] .book-card-title {
+    color: #000000 !important;
+}
+
+[data-app-theme="epaper"] .book-card-author,
+[data-app-theme="epaper"] .book-card-meta,
+[data-app-theme="epaper"] .book-card-subinfo {
+    color: #222222 !important;
+}
+
+[data-app-theme="epaper"] .library-modal-content {
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: 2px solid #000000 !important;
+}
+
+[data-app-theme="epaper"] .library-modal-header h3,
+[data-app-theme="epaper"] .library-modal-content label,
+[data-app-theme="epaper"] .library-modal-content p,
+[data-app-theme="epaper"] .library-modal-content span,
+[data-app-theme="epaper"] .library-modal-content div {
+    color: #000000 !important;
+}
+
+[data-app-theme="epaper"] .settings-table th,
+[data-app-theme="epaper"] .settings-table tr td,
+[data-app-theme="epaper"] .schedule-path-toggle,
+[data-app-theme="epaper"] .schedule-scan-time {
+    color: #000000 !important;
+}
+
+[data-app-theme="epaper"] .settings-table thead tr {
+    background: #e0e0e0 !important;
+    border-bottom: 2px solid #000000 !important;
+}
+
+[data-app-theme="epaper"] .settings-table thead th {
+    color: #000000 !important;
+}
+
+html {
+    overflow: hidden;
+}
+
+body {
+    background-color: var(--app-bg-main);
+    color: var(--app-text-primary);
+    overflow: hidden;
+    overscroll-behavior: none;
+}
 
 .main-wrapper {
-    width: 100%;
-    margin: 0 auto;
-    background: rgba(30, 41, 59, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    /* body padding 대신 margin으로 여백 확보 (flex padding-bottom 버그 회피) */
+    margin: 20px;
+    background: var(--app-bg-card);
+    border: 1px solid var(--app-border);
     border-radius: 12px;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-    height: calc(100vh - 40px);
-    min-height: calc(100vh - 40px);
+    backdrop-filter: var(--app-blur);
+    box-shadow: var(--app-shadow);
+    flex: 1 1 0%;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -96,7 +552,8 @@
     gap: 1.2rem;
     color: #e2e8f0;
     width: 100%;
-    height: 100%;
+    flex: 1 1 0%;
+    min-height: 0;
     box-sizing: border-box;
     overflow: hidden;
 }
@@ -105,14 +562,13 @@
 .library-sidebar {
     width: 220px;
     min-width: 220px;
+    flex-shrink: 0;
     border-right: 1px solid rgba(255, 255, 255, 0.08);
-    padding-right: 1.5rem;
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    position: sticky;
-    top: 20px;
     height: 100%;
+    min-height: 0;
     overflow-y: auto;
     background: transparent;
     border-radius: 0;
@@ -274,17 +730,16 @@
 
 /* 우측 메인 콘텐츠 스타일 */
 .library-main-content {
-    flex-grow: 1;
+    flex: 1 1 0%;
     min-width: 0;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-    padding-bottom: calc(2.5rem + env(safe-area-inset-bottom, 0px));
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    will-change: scroll-position;
-    transform: translate3d(0, 0, 0);
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+    box-sizing: border-box;
 }
 
 body.has-system-ticker .library-main-content {
@@ -1614,13 +2069,14 @@ body.has-system-ticker .library-sidebar {
 /* 실시간 뉴스 티커 푸터 바 */
 .system-ticker-footer {
     position: fixed;
-    bottom: 0;
-    left: var(--system-ticker-left, 0px);
-    width: calc(100% - var(--system-ticker-left, 0px));
+    bottom: 20px; /* main-wrapper margin: 20px 에 맞춤 */
+    left: var(--system-ticker-left, 20px);
+    width: calc(100% - var(--system-ticker-left, 20px) - 20px);
     height: 30px;
     background: rgba(15, 23, 42, 0.98);
     border-top: 1px solid rgba(168, 85, 247, 0.35);
     border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5), 0 0 10px rgba(168, 85, 247, 0.15);
     z-index: 9999;
     display: flex;

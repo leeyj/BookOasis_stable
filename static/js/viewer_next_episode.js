@@ -85,7 +85,7 @@ export function handleNextEpisode(currentBookId) {
   if (isComic) {
     const elapsed = Date.now() - nextEpisodeArmTime;
     const diff = userInteractionSerial - nextEpisodeArmInteractionSerial;
-    console.log(`[Viewer-Next] Checking comic next episode conditions. Elapsed: ${elapsed}ms (req: >=800ms), Serial Diff: ${diff} (req: >=3), Direction: ${lastScrollDirection}`);
+    console.log(`[Viewer-Next] Checking comic next episode conditions. Elapsed: ${elapsed}ms, Serial Diff: ${diff}, Direction: ${lastScrollDirection}`);
     
     // 위로 스크롤 시 다음권 진행 취소
     if (lastScrollDirection === 'up') {
@@ -93,12 +93,16 @@ export function handleNextEpisode(currentBookId) {
       return;
     }
 
-    if (diff < 3 || elapsed < 800) {
+    // 키보드 입력이거나 1회 이상 유저 인터랙션이 발생했거나 300ms 이상 경과 시 즉시 진행 허용
+    if (diff < 1 && elapsed < 300) {
       return;
     }
     console.log(`[Viewer-Next] All conditions met! Triggering next episode.`);
   } else {
-    if (userInteractionSerial <= nextEpisodeArmInteractionSerial) {
+    // 키보드/터치 동작 등 신규 인터랙션 발생 시 즉시 진행
+    const elapsed = Date.now() - nextEpisodeArmTime;
+    const diff = userInteractionSerial - nextEpisodeArmInteractionSerial;
+    if (diff < 1 && elapsed < 300) {
       return;
     }
   }

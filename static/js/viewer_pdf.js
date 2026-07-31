@@ -245,11 +245,15 @@ export function prevPdfPage() {
 }
 
 export function nextPdfPage() {
-  if (pdfDoc && pdfCurrentPage < pdfTotalPages) {
-    const step = (typeof getComicPageStep === 'function') ? getComicPageStep() : 1;
-    pdfCurrentPage = Math.min(pdfTotalPages, pdfCurrentPage + step);
-    renderPdfPage();
-    saveProgress(state.activeBookId, pdfCurrentPage - 1, pdfTotalPages);
+  if (pdfDoc) {
+    if (pdfCurrentPage < pdfTotalPages) {
+      const step = (typeof getComicPageStep === 'function') ? getComicPageStep() : 1;
+      pdfCurrentPage = Math.min(pdfTotalPages, pdfCurrentPage + step);
+      renderPdfPage();
+      saveProgress(state.activeBookId, pdfCurrentPage - 1, pdfTotalPages);
+    } else {
+      import('./viewer_next_episode.js').then(m => m.handleNextEpisode(state.activeBookId));
+    }
   }
 }
 

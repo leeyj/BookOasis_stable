@@ -11,8 +11,24 @@ function applySidebarTopControlsSetting(enabled) {
   sidebarContent.classList.toggle('sidebar-controls-top', !!enabled);
 }
 
+export function changeDashboardTheme(themeName) {
+  if (!themeName) themeName = 'purple';
+  localStorage.setItem('app_dashboard_theme', themeName);
+  document.documentElement.setAttribute('data-app-theme', themeName);
+}
+
+if (typeof window !== 'undefined') {
+  window.changeDashboardTheme = changeDashboardTheme;
+}
+
 // 설정값을 CSS 변수 및 메모리 상태에 적용하는 헬퍼 함수
 export function applySettingsToUI(settings) {
+  const savedTheme = localStorage.getItem('app_dashboard_theme') || 'purple';
+  changeDashboardTheme(savedTheme);
+  const themeSelect = document.getElementById('setting-dashboard-theme');
+  if (themeSelect) {
+    themeSelect.value = savedTheme;
+  }
   if (settings.BOOK_THUMBNAIL_WIDTH) {
     const width = parseInt(settings.BOOK_THUMBNAIL_WIDTH, 10) || 160;
     const height = Math.round(width * 1.375); // 160:220 비율 유지

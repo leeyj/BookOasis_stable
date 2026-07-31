@@ -1,4 +1,22 @@
 # CHANGELOG
+## v1.5.4
+- 키보드 방향키(또는 스페이스바)를 통한 다음 권 이동 지원 | support keyboard directional keys(or space bar) to move to the next volume
+- lazy 스캐너 타임아웃시 에러 표시 강화[bug: #2] | Improve error display when lazy scanner times out[bug: #2]
+- 테마 변경 기능 지원(환경설정->일반설정) | apply the theme
+
+## v1.5.3
+- 코드 안정화 | code stabilization
+- 뷰어 txt 관련 코드 구조 개선 | viewer txt code structure improvement
+- 진행도 동기화를 비동기로 구조 개선 | progress sync improvement
+- EPUB 뷰어에서 진행도 저장 안되는 결함 조치 | fix epub viewer progress save issue
+- 도서 상세 뷰에서 진행도 표시 업데이트 안되는 결함 조치 | fix book details progress display update issue
+- 테마 변경기능추가(다크,화이트,세피아,epaper,블랙) | theme change function added(dark, white, sepia, epaper, black)
+- 썸네일 크기 반영 안되는 버그 수정 | fix thumbnail size not reflected
+- 플러그인 자동 실행시 플러그인이 없으면 오류나는 현상 조치 | fix the error that occurs when the plugin is not found when the plugin is automatically executed
+- 플러그인 설정시 자동으로 저장 안되는 버그 수정 | fix the bug that the plugin settings are not saved automatically
+- 도커설정에 plugin 디렉토리 추가 | add plugin directory to docker settings
+- 도서상세에서 진행중으로 표시되지만 진행도가 0인 경우 읽은 도서로 업데이트(48시간 기준) | Update to read book if progress is 0 but status shows as in progress (based on 48 hours)
+
 ## v1.5.2
 - 제목을 2줄로 출력 | title display 2 lines
 - 장르/태그 출력 방식 변경 | genre/tag display change

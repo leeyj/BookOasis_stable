@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+    <script>
+        (function() {
+            try {
+                var theme = localStorage.getItem('app_dashboard_theme') || 'purple';
+                document.documentElement.setAttribute('data-app-theme', theme);
+            } catch (e) {}
+        })();
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -35,7 +43,6 @@
         }
     </script>
     <!-- 프리미엄 커스텀 CSS -->
-    <!-- 미디어 라이브러리 전용 CSS (tab_media_library.html에서 로드됨) -->
     
     <style>
         :root {
@@ -47,17 +54,23 @@
             --boe-copyright-whisper-a17f3c9: rgba(148, 163, 184, 0.72);
         }
 
+        /* html 요소에도 overflow: hidden 필수 */
+        html {
+            overflow: hidden;
+        }
+
         body {
             background-image: radial-gradient(circle at 15% 50%, var(--bg-glow-1), transparent 25%),
                 radial-gradient(circle at 85% 30%, var(--bg-glow-2), transparent 25%);
             background-attachment: fixed;
-            background-color: #0f172a; /* Fallback for style.css var(--color-bg) */
+            background-color: #0f172a;
             color: #f8fafc;
             margin: 0;
-            padding: 20px;
-            min-height: 100vh;
-            box-sizing: border-box;
+            height: 100vh;          /* flex 자식의 높이 기준점 필수 */
             overflow: hidden;
+            overscroll-behavior: none;
+            display: flex;
+            flex-direction: column;
         }
     </style>
     <script>
