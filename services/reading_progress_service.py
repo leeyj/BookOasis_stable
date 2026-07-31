@@ -1,6 +1,8 @@
-# -*- coding: utf-8 -*-
 import json
 import logging
+import threading
+import time
+import atexit
 from datetime import datetime
 
 from repositories.sqlite.reading_progress_repository import ReadingProgressRepository
@@ -11,10 +13,49 @@ from services.webhook_dispatcher import (
 )
 from utils.redis_helper import get_redis_client, make_key, redis_del, redis_acquire_lock, redis_release_lock
 
+logger = logging.getLogger("bookoasis")
+
+class InMemoryProgressBuffer:
+    """Thread-safe 파이썬 인메모리 버퍼 (Redis 미사용 / DB 동시 쓰기 락 방지용)"""
+    _lock = threading.Lock()
+    _buffer = {}  # key: "db_type:user_id:book_id" -> payload dict
+
+    @classmethod
+    def set(cls, db_type: str, user_id, book_id, payload: dict):
+        key = f"{db_type}:{user_id}:{book_id}"
+        with cls._lock:
+            cls._buffer[key] = payload
+
+    @classmethod
+    def get(cls, db_type: str, user_id, book_id):
+        key = f"{db_type}:{user_id}:{book_id}"
+        with cls._lock:
+            val = cls._buffer.get(key)
+            return dict(val) if val else None
+
+    @classmethod
+    def delete(cls, db_type: str, user_id, book_id):
+        key = f"{db_type}:{user_id}:{book_id}"
+        with cls._lock:
+            cls._buffer.pop(key, None)
+
+    @classmethod
+    def pop_all(cls):
+        with cls._lock:
+            data = dict(cls._buffer)
+            cls._buffer.clear()
+            return data
+
+    @classmethod
+    def count(cls):
+        with cls._lock:
+            return len(cls._buffer)
+
+
 class ReadingProgressService:
     @staticmethod
     def record_progress(db_type: str, book_id, page_idx: int, total_pages: int, user_id=1, epub_session=None):
-        """독서 진행률 및 활동 로그 기록 (EPUB 및 TXT도 실제 챕터 단위를 그대로 사용)"""
+        """독서 진행률 및 활동 로그 기록 (0ms 메모리 버퍼링 및 비동기 배치 DB 저장을 통한 SQLite Lock 완벽 방지)"""
         book_row = ReadingProgressRepository.get_book_for_progress(db_type, book_id)
 
         try:
@@ -76,22 +117,25 @@ class ReadingProgressService:
         )
         last_epub_updated_at = now_str if has_epub_pointer_update else None
 
-        # ── [레디스 캐시 분기 가드] ──
-        redis_client = get_redis_client()
-        
-        # 1. 사용자의 최근 읽은 도서 캐시 무효화 (대시보드 실시간 반영)
+        # 사용자의 최근 읽은 도서 캐시 무효화 (대시보드 실시간 반영)
         try:
             from utils.redis_helper import redis_delete_pattern
             redis_delete_pattern(f"cache:history*:{db_type}:{user_id}")
         except Exception:
             pass
 
-        if redis_client:
+        redis_client = get_redis_client()
+        old_pages = 0
+        old_completed = 0
+
+        # 기존 펜딩된 메모리/레디스 버퍼나 DB에서 이전 진행 상태 확인
+        mem_data = InMemoryProgressBuffer.get(db_type, user_id, book_id)
+        if mem_data:
+            old_pages = mem_data.get('pages_read', 0)
+            old_completed = mem_data.get('is_completed', 0)
+        elif redis_client:
             cache_key = make_key(f"user:progress:{db_type}:{user_id}:{book_id}")
             cached_data_str = redis_client.get(cache_key)
-            old_pages = 0
-            old_completed = 0
-
             if cached_data_str:
                 try:
                     cached_data = json.loads(cached_data_str)
@@ -99,63 +143,39 @@ class ReadingProgressService:
                     old_completed = cached_data.get('is_completed', 0)
                 except Exception:
                     pass
-            else:
-                db_row = ReadingProgressRepository.get_progress_only(db_type, book_id, user_id)
-                if db_row:
-                    old_pages = db_row['pages_read']
-                    old_completed = 1 if db_row['is_completed'] == 1 else 0
+        if old_pages == 0 and old_completed == 0:
+            db_row = ReadingProgressRepository.get_progress_only(db_type, book_id, user_id)
+            if db_row:
+                old_pages = db_row['pages_read']
+                old_completed = 1 if db_row['is_completed'] == 1 else 0
 
-            if old_completed == 1:
-                is_completed = 1
+        if old_completed == 1:
+            is_completed = 1
 
-            delta = max(0, pages_read - old_pages)
+        delta = max(0, pages_read - old_pages)
 
-            progress_payload = {
-                'pages_read': pages_read,
-                'is_completed': is_completed,
-                'last_read_at': now_str,
-                'last_epub_cfi': last_epub_cfi,
-                'last_epub_href': last_epub_href,
-                'last_epub_spine_index': last_epub_spine_index,
-                'last_epub_percent': last_epub_percent,
-                'last_epub_fingerprint': last_epub_fingerprint,
-                'last_epub_updated_at': last_epub_updated_at,
-                'delta': delta
-            }
+        progress_payload = {
+            'pages_read': pages_read,
+            'is_completed': is_completed,
+            'last_read_at': now_str,
+            'last_epub_cfi': last_epub_cfi,
+            'last_epub_href': last_epub_href,
+            'last_epub_spine_index': last_epub_spine_index,
+            'last_epub_percent': last_epub_percent,
+            'last_epub_fingerprint': last_epub_fingerprint,
+            'last_epub_updated_at': last_epub_updated_at,
+            'delta': delta
+        }
 
-            # Redis 캐시 기록 및 펜딩 큐 등록
+        if redis_client:
+            # 1. Redis 환경: Redis 캐시 기록 및 펜딩 큐 등록
+            cache_key = make_key(f"user:progress:{db_type}:{user_id}:{book_id}")
             redis_client.set(cache_key, json.dumps(progress_payload))
             pending_sync_key = make_key("sync:progress:pending")
             redis_client.sadd(pending_sync_key, f"{db_type}:{user_id}:{book_id}")
         else:
-            # ── 레디스가 없으면 기존 SQLite 트랜잭션 구동 ──
-            row = ReadingProgressRepository.get_progress_only(db_type, book_id, user_id)
-            old_completed = 1 if (row and row['is_completed'] == 1) else 0
-
-            if old_completed == 1:
-                is_completed = 1
-
-            if not row:
-                ReadingProgressRepository.insert_empty_progress(db_type, book_id, user_id, now_str)
-                delta = pages_read
-            else:
-                old_pages = row['pages_read']
-                delta = max(0, pages_read - old_pages)
-
-            if has_epub_pointer_update:
-                ReadingProgressRepository.update_progress_full(
-                    db_type, book_id, user_id, pages_read, is_completed, now_str,
-                    last_epub_cfi, last_epub_href, last_epub_spine_index,
-                    last_epub_percent, last_epub_fingerprint, last_epub_updated_at
-                )
-            else:
-                ReadingProgressRepository.update_progress_simple(
-                    db_type, book_id, user_id, pages_read, is_completed, now_str
-                )
-
-            if delta > 0:
-                today_str = datetime.now().strftime('%Y-%m-%d')
-                ReadingProgressRepository.update_or_insert_reading_log(db_type, book_id, user_id, delta, today_str)
+            # 2. Non-Redis 환경: 파이썬 인메모리 버퍼에 0ms 즉시 기록 (DB 락 방지)
+            InMemoryProgressBuffer.set(db_type, user_id, book_id, progress_payload)
 
         # 표준 이벤트 웹훅(book.read / book.finish) 발행
         try:
@@ -236,24 +256,36 @@ class ReadingProgressService:
         last_epub_fingerprint = row['last_epub_fingerprint']
         last_epub_updated_at = row['last_epub_updated_at']
 
-        # ── [레디스 캐시 리드 병합 가드] ──
-        redis_client = get_redis_client()
-        if redis_client:
-            cache_key = make_key(f"user:progress:{db_type}:{user_id}:{book_id}")
-            cached_data_str = redis_client.get(cache_key)
-            if cached_data_str:
-                try:
-                    cached_data = json.loads(cached_data_str)
-                    pages_read = cached_data.get('pages_read', pages_read)
-                    last_read_at = cached_data.get('last_read_at', last_read_at)
-                    last_epub_cfi = cached_data.get('last_epub_cfi', last_epub_cfi)
-                    last_epub_href = cached_data.get('last_epub_href', last_epub_href)
-                    last_epub_spine_index = cached_data.get('last_epub_spine_index', last_epub_spine_index)
-                    last_epub_percent = cached_data.get('last_epub_percent', last_epub_percent)
-                    last_epub_fingerprint = cached_data.get('last_epub_fingerprint', last_epub_fingerprint)
-                    last_epub_updated_at = cached_data.get('last_epub_updated_at', last_epub_updated_at)
-                except Exception:
-                    pass
+        # 1. 인메모리 버퍼 펜딩 데이터 우선 병합 (Read Merge)
+        mem_data = InMemoryProgressBuffer.get(db_type, user_id, book_id)
+        if mem_data:
+            pages_read = mem_data.get('pages_read', pages_read)
+            last_read_at = mem_data.get('last_read_at', last_read_at)
+            last_epub_cfi = mem_data.get('last_epub_cfi', last_epub_cfi)
+            last_epub_href = mem_data.get('last_epub_href', last_epub_href)
+            last_epub_spine_index = mem_data.get('last_epub_spine_index', last_epub_spine_index)
+            last_epub_percent = mem_data.get('last_epub_percent', last_epub_percent)
+            last_epub_fingerprint = mem_data.get('last_epub_fingerprint', last_epub_fingerprint)
+            last_epub_updated_at = mem_data.get('last_epub_updated_at', last_epub_updated_at)
+        else:
+            # 2. 레디스 캐시 데이터 병합 가드
+            redis_client = get_redis_client()
+            if redis_client:
+                cache_key = make_key(f"user:progress:{db_type}:{user_id}:{book_id}")
+                cached_data_str = redis_client.get(cache_key)
+                if cached_data_str:
+                    try:
+                        cached_data = json.loads(cached_data_str)
+                        pages_read = cached_data.get('pages_read', pages_read)
+                        last_read_at = cached_data.get('last_read_at', last_read_at)
+                        last_epub_cfi = cached_data.get('last_epub_cfi', last_epub_cfi)
+                        last_epub_href = cached_data.get('last_epub_href', last_epub_href)
+                        last_epub_spine_index = cached_data.get('last_epub_spine_index', last_epub_spine_index)
+                        last_epub_percent = cached_data.get('last_epub_percent', last_epub_percent)
+                        last_epub_fingerprint = cached_data.get('last_epub_fingerprint', last_epub_fingerprint)
+                        last_epub_updated_at = cached_data.get('last_epub_updated_at', last_epub_updated_at)
+                    except Exception:
+                        pass
 
         # 로드 시점에는 DB를 변경하지 않고, 응답 값만 비파괴 정규화
         if file_format == 'epub':
@@ -290,6 +322,7 @@ class ReadingProgressService:
     @staticmethod
     def mark_unread(db_type: str, book_id, user_id=1):
         ReadingProgressRepository.delete_user_progress_by_book(db_type, book_id, user_id)
+        InMemoryProgressBuffer.delete(db_type, user_id, book_id)
 
         try:
             from utils.redis_helper import redis_delete_pattern
@@ -313,60 +346,71 @@ class ReadingProgressService:
 
     @staticmethod
     def flush_progress_cache():
-        """Redis 캐시에 쌓여 있는 비동기 진행률 데이터를 SQLite DB 파일에 동기화(Flush)합니다."""
-        redis_client = get_redis_client()
-        if not redis_client:
-            return 0
+        """인메모리 버퍼 및 Redis 캐시에 쌓여 있는 비동기 진행률 데이터를 SQLite DB 파일에 동기화(Flush)합니다."""
+        items_dict = {}
 
-        pending_key = make_key("sync:progress:pending")
-        pending_items = redis_client.smembers(pending_key)
-        if not pending_items:
+        # 1. 인메모리 버퍼 펜딩 수집
+        mem_batch = InMemoryProgressBuffer.pop_all()
+        for key_str, payload in mem_batch.items():
+            items_dict[key_str] = payload
+
+        # 2. Redis 펜딩 수집 (Redis 활성화 시)
+        redis_client = get_redis_client()
+        if redis_client:
+            pending_key = make_key("sync:progress:pending")
+            pending_items = redis_client.smembers(pending_key)
+            if pending_items:
+                for item in pending_items:
+                    item_str = item.decode('utf-8') if isinstance(item, bytes) else item
+                    parts = item_str.split(':')
+                    if len(parts) >= 3:
+                        db_type, user_id, book_id = parts[0], parts[1], parts[2]
+                        cache_key = make_key(f"user:progress:{db_type}:{user_id}:{book_id}")
+                        cached_data_str = redis_client.get(cache_key)
+                        if cached_data_str:
+                            try:
+                                data = json.loads(cached_data_str)
+                                items_dict[item_str] = data
+                            except Exception:
+                                pass
+                        redis_client.srem(pending_key, item)
+
+        if not items_dict:
             return 0
 
         logger_db = logging.getLogger("bookoasis")
-        logger_db.info(f"[Redis Cache Flush] Starting sync for {len(pending_items)} items...")
+        logger_db.info(f"[Progress Batch Flush] Starting sync for {len(items_dict)} items...")
 
         import database
         synced_count = 0
 
         # db_type 별로 아이템 그룹화
         items_by_db = {}
-        for item in pending_items:
-            item_str = item.decode('utf-8') if isinstance(item, bytes) else item
-            parts = item_str.split(':')
+        for item_key, payload in items_dict.items():
+            parts = item_key.split(':')
             if len(parts) < 3:
                 continue
             db_type = parts[0]
             if db_type not in items_by_db:
                 items_by_db[db_type] = []
-            items_by_db[db_type].append(item_str)
+            items_by_db[db_type].append((item_key, payload))
 
         for db_type, db_items in items_by_db.items():
             lock_token = None
             try:
-                # 단일 db_type에 대해 락 획득 시도 (대기 시간 5.0초)
-                lock_token = redis_acquire_lock(f"lock:db_write:{db_type}", ttl=90, wait_timeout=5.0)
-                if not lock_token:
-                    logger_db.info(f"[Redis Cache Flush] DB write gate busy for db_type={db_type}; deferred {len(db_items)} items")
-                    continue
+                if redis_client:
+                    lock_token = redis_acquire_lock(f"lock:db_write:{db_type}", ttl=90, wait_timeout=5.0)
+                    if not lock_token:
+                        logger_db.info(f"[Progress Batch Flush] DB write gate busy for db_type={db_type}; deferred {len(db_items)} items")
+                        continue
 
-                logger_db.info(f"[Redis Cache Flush] DB write gate acquired for db_type={db_type}; processing {len(db_items)} items...")
-                
                 conn = database.get_connection(db_type)
                 cursor = conn.cursor()
                 try:
-                    for item in db_items:
-                        parts = item.split(':')
+                    for item_key, data in db_items:
+                        parts = item_key.split(':')
                         user_id, book_id = parts[1], parts[2]
-                        
-                        cache_key = make_key(f"user:progress:{db_type}:{user_id}:{book_id}")
-                        cached_data_str = redis_client.get(cache_key)
-                        if not cached_data_str:
-                            redis_client.srem(pending_key, item)
-                            continue
-                            
                         try:
-                            data = json.loads(cached_data_str)
                             pages_read = data.get('pages_read')
                             is_completed = data.get('is_completed')
                             last_read_at = data.get('last_read_at')
@@ -377,7 +421,7 @@ class ReadingProgressService:
                             last_epub_fingerprint = data.get('last_epub_fingerprint')
                             last_epub_updated_at = data.get('last_epub_updated_at')
                             delta = data.get('delta', 0)
-                            
+
                             # 1. user_progress 테이블 반영
                             cursor.execute(
                                 "SELECT pages_read, is_completed FROM user_progress WHERE book_id = ? AND user_id = ?",
@@ -395,7 +439,7 @@ class ReadingProgressService:
                                     """,
                                     (book_id, user_id, 0, 0, last_read_at, None, None, None, 0, None, None),
                                 )
-                            
+
                             cursor.execute(
                                 """
                                 UPDATE user_progress
@@ -418,7 +462,7 @@ class ReadingProgressService:
                                     user_id,
                                 ),
                             )
-                            
+
                             # 2. 일일 활동 로그 반영
                             if delta > 0:
                                 today_str = datetime.now().strftime('%Y-%m-%d')
@@ -437,28 +481,54 @@ class ReadingProgressService:
                                         "INSERT INTO user_reading_log (book_id, user_id, pages_read_delta, duration_seconds, read_date) VALUES (?,?,?,60,?)",
                                         (book_id, user_id, delta, today_str),
                                     )
-                                    
-                            redis_client.srem(pending_key, item)
+
                             synced_count += 1
                         except Exception as e:
-                            logger_db.error(f"[Redis Cache Flush ERROR] Failed to sync progress for item {item}: {e}")
-                    
+                            logger_db.error(f"[Progress Batch Flush ERROR] Failed to sync progress for item {item_key}: {e}")
+
                     conn.commit()
                 except Exception as db_err:
                     try:
                         conn.rollback()
                     except Exception:
                         pass
-                    logger_db.error(f"[Redis Cache Flush ERROR] Database transaction failed for db_type={db_type}: {db_err}")
+                    logger_db.error(f"[Progress Batch Flush ERROR] Database transaction failed for db_type={db_type}: {db_err}")
                 finally:
                     try:
                         conn.close()
                     except Exception:
                         pass
             finally:
-                if lock_token:
+                if lock_token and redis_client:
                     redis_release_lock(f"lock:db_write:{db_type}", lock_token)
-                    logger_db.info(f"[Redis Cache Flush] DB write gate released for db_type={db_type}")
 
-        logger_db.info(f"[Redis Cache Flush] Finished sync. {synced_count} items merged to SQLite.")
+        logger_db.info(f"[Progress Batch Flush] Finished sync. {synced_count} items merged to SQLite.")
         return synced_count
+
+
+# ── 비동기 백그라운드 워커 스레드 ──
+_inmemory_worker_started = False
+_inmemory_worker_lock = threading.Lock()
+
+def start_inmemory_flush_worker():
+    global _inmemory_worker_started
+    with _inmemory_worker_lock:
+        if _inmemory_worker_started:
+            return
+        _inmemory_worker_started = True
+
+    def worker_loop():
+        while True:
+            try:
+                time.sleep(2)
+                ReadingProgressService.flush_progress_cache()
+            except Exception as e:
+                logger.error(f"[Progress Worker] Flush loop exception: {e}")
+
+    t = threading.Thread(target=worker_loop, daemon=True, name="ProgressInmemoryFlushWorker")
+    t.start()
+    logger.info("[Progress Worker] In-memory progress flush worker started (interval=2s)")
+
+# 모듈 초기화 시 워커 가동 및 프로세스 종료 시 Safety Flush 자동 등록
+start_inmemory_flush_worker()
+atexit.register(ReadingProgressService.flush_progress_cache)

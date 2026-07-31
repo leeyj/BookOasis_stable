@@ -92,7 +92,14 @@ class CategoryRepository:
             cursor.execute("DELETE FROM user_favorites WHERE book_id IN (SELECT id FROM books WHERE library_id = ?)", (library_id,))
             cursor.execute("DELETE FROM books WHERE library_id = ?", (library_id,))
             
-            # 3. 라이브러리 레코드 소거
+            # 3. 라이브러리 레코드 및 스캔 캐시(scanner_progress, folder_mtimes) 소거
+            cursor.execute("SELECT physical_path FROM libraries WHERE id = ?", (library_id,))
+            lib_row = cursor.fetchone()
+            if lib_row and lib_row['physical_path']:
+                phys_path = lib_row['physical_path'].rstrip('/\\')
+                cursor.execute("DELETE FROM folder_mtimes WHERE folder_path = ? OR folder_path LIKE ?", (phys_path, phys_path + '/%'))
+            
+            cursor.execute("DELETE FROM scanner_progress WHERE library_id = ?", (str(library_id),))
             cursor.execute("DELETE FROM libraries WHERE id = ?", (library_id,))
             conn.commit()
         except Exception as e:

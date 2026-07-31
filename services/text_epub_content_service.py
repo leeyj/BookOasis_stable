@@ -74,7 +74,7 @@ class TextEpubContentService:
         if not os.path.exists(file_path):
             return None, 'File not found'
 
-        redis_cache_key = f"cache:epub:meta:book:{book_id}" if book_id else None
+        redis_cache_key = f"cache:epub:meta:book:{db_type}:{book_id}" if book_id else None
         if redis_cache_key:
             try:
                 from utils.redis_helper import redis_get
@@ -257,7 +257,7 @@ class TextEpubContentService:
         if not os.path.exists(file_path):
             return None, 'File not found'
 
-        redis_cache_key = f"cache:epub:ch:book:{book_id}:{chapter_idx}" if book_id else None
+        redis_cache_key = f"cache:epub:ch:book:{db_type}:{book_id}:{chapter_idx}" if book_id else None
         if redis_cache_key:
             try:
                 from utils.redis_helper import redis_get

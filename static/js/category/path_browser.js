@@ -1,0 +1,231 @@
+// path_browser.js – 서버 물리 경로 탐색 모달 및 원격 경로/GDrive 연결 테스트
+
+const MAX_LIBRARY_PATHS = 20;
+const MAX_LIBRARY_PATH_LINE_LENGTH = 1024;
+const MAX_LIBRARY_PATH_TEXT_LENGTH = 8192;
+const MAX_PATH_BROWSER_INPUT_LENGTH = 1024;
+
+let pathBrowserCurrentPath = '';
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+export function testGDriveLinks() {
+  const pathEl = document.getElementById('library-form-path');
+  const linksStr = pathEl ? pathEl.value : '';
+  if (!linksStr.trim()) {
+    if (typeof window.showToast === 'function') {
+      window.showToast('테스트할 구글 드라이브 공유 링크를 입력해 주세요.', 'warning');
+    } else {
+      alert('테스트할 구글 드라이브 공유 링크를 입력해 주세요.');
+    }
+    return;
+  }
+  if (typeof window.showToast === 'function') {
+    window.showToast('구글 드라이브 링크 연결 테스트 중...', 'info');
+  }
+  fetch('/api/category/test-gdrive-links', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ links: linksStr }),
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        if (typeof window.showToast === 'function') {
+          window.showToast(`✅ ${data.message}`, 'success');
+        } else {
+          alert(`✅ ${data.message}`);
+        }
+      } else {
+        if (typeof window.showToast === 'function') {
+          window.showToast(`❌ ${data.error || '연결 실패'}`, 'error');
+        } else {
+          alert(`❌ ${data.error || '연결 실패'}`);
+        }
+      }
+    })
+    .catch(err => {
+      if (typeof window.showToast === 'function') {
+        window.showToast(`❌ 네트워크 오류: ${err.message}`, 'error');
+      } else {
+        alert(`❌ 네트워크 오류: ${err.message}`);
+      }
+    });
+}
+
+export function openPathBrowser() {
+  const modal = document.getElementById('path-browser-modal');
+  if (!modal) return;
+  
+  // 초기 경로 설정
+  pathBrowserCurrentPath = '';
+  
+  modal.style.display = 'flex';
+  refreshPathBrowser();
+}
+
+export function closePathBrowser() {
+  const modal = document.getElementById('path-browser-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+export async function refreshPathBrowser() {
+  const inputEl = document.getElementById('path-browser-input');
+  if (inputEl) {
+    const candidatePath = inputEl.value.trim();
+    if (candidatePath.length > MAX_PATH_BROWSER_INPUT_LENGTH) {
+      alert(`경로 입력은 최대 ${MAX_PATH_BROWSER_INPUT_LENGTH}자까지 허용됩니다.`);
+      return;
+    }
+    pathBrowserCurrentPath = candidatePath || pathBrowserCurrentPath;
+  }
+  
+  await loadPathBrowserItems();
+}
+
+export async function loadPathBrowserItems() {
+  const listEl = document.getElementById('path-browser-list');
+  const inputEl = document.getElementById('path-browser-input');
+  
+  if (!listEl) return;
+  
+  // UI 업데이트
+  if (inputEl) inputEl.value = pathBrowserCurrentPath;
+  listEl.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 2rem;">로딩 중...</div>';
+  
+  try {
+    const params = new URLSearchParams();
+    params.append('path', pathBrowserCurrentPath);
+    
+    const response = await fetch(`/api/media/browse-paths?${params.toString()}`);
+    const data = await response.json();
+    
+    if (!data.success) {
+      listEl.innerHTML = `<div style="color: #ef4444; padding: 1rem;">오류: ${data.error || '알 수 없는 오류'}</div>`;
+      return;
+    }
+    
+    const items = data.items || [];
+    pathBrowserCurrentPath = data.currentPath || '';
+    if (inputEl) inputEl.value = pathBrowserCurrentPath;
+    
+    if (items.length === 0) {
+      listEl.innerHTML = '<div style="color: #94a3b8; padding: 1rem; text-align: center;">하위 디렉토리가 없습니다.</div>';
+      return;
+    }
+    
+    // 디렉토리 목록 렌더링
+    listEl.innerHTML = '';
+    items.forEach(item => {
+      const itemEl = document.createElement('div');
+      itemEl.style.cssText = `
+        padding: 0.6rem 0.8rem;
+        cursor: pointer;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        transition: background 0.2s;
+      `;
+      itemEl.onmouseenter = () => itemEl.style.background = 'rgba(168, 85, 247, 0.1)';
+      itemEl.onmouseleave = () => itemEl.style.background = 'none';
+      itemEl.onclick = () => {
+        pathBrowserCurrentPath = item.path;
+        loadPathBrowserItems();
+      };
+      
+      const icon = item.name === '..' ? 'fa-arrow-up' : 'fa-folder';
+      itemEl.innerHTML = `
+        <i class="fa-solid ${icon}" style="color: #a855f7; flex-shrink: 0;"></i>
+        <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(item.name)}</span>
+      `;
+      listEl.appendChild(itemEl);
+    });
+    
+  } catch (error) {
+    console.error('[PathBrowser] 경로 탐색 오류:', error);
+    listEl.innerHTML = `<div style="color: #ef4444; padding: 1rem;">오류: ${error.message || '경로를 불러올 수 없습니다.'}</div>`;
+  }
+}
+
+export function selectPathFromBrowser() {
+  const pathEl = document.getElementById('library-form-path');
+  if (!pathEl) return;
+  
+  if (!pathBrowserCurrentPath) {
+    alert('경로를 선택하세요.');
+    return;
+  }
+  
+  // 기존 경로 가져오기
+  const existing = pathEl.value.trim();
+  let newPaths = existing ? existing.split('\n').map(p => p.trim()).filter(p => p) : [];
+  
+  // 중복 체크
+  if (!newPaths.includes(pathBrowserCurrentPath)) {
+    newPaths.push(pathBrowserCurrentPath);
+  }
+
+  if (newPaths.length > MAX_LIBRARY_PATHS) {
+    alert(`경로는 최대 ${MAX_LIBRARY_PATHS}개까지 입력할 수 있습니다.`);
+    return;
+  }
+  if (newPaths.some(p => p.length > MAX_LIBRARY_PATH_LINE_LENGTH)) {
+    alert(`각 경로는 최대 ${MAX_LIBRARY_PATH_LINE_LENGTH}자까지 허용됩니다.`);
+    return;
+  }
+  const joined = newPaths.join('\n');
+  if (joined.length > MAX_LIBRARY_PATH_TEXT_LENGTH) {
+    alert(`경로 입력 길이는 최대 ${MAX_LIBRARY_PATH_TEXT_LENGTH}자까지 허용됩니다.`);
+    return;
+  }
+  
+  pathEl.value = joined;
+  
+  // 경로가 rclone/원격 마운트인지 자동 감지하여 is_remote 체크박스 업데이트
+  detectAndUpdateRemoteFlag(pathBrowserCurrentPath);
+  
+  closePathBrowser();
+}
+
+export function detectAndUpdateRemoteFlag(path) {
+  const isRemoteCheckbox = document.getElementById('library-form-remote');
+  if (!isRemoteCheckbox) return;
+  
+  const pathLower = path.toLowerCase();
+  const isLikelyRemote = 
+    pathLower.includes('rclone') ||
+    pathLower.includes('gdrive') ||
+    pathLower.includes('onedrive') ||
+    pathLower.includes('nas') ||
+    pathLower.includes('network') ||
+    pathLower.includes('vfs') ||
+    /^[a-z]:\\\\?rclone/i.test(path) ||  // Windows: C:\rclone
+    /^\/mnt\/(rclone|gdrive)/i.test(path); // Linux: /mnt/rclone
+  
+  isRemoteCheckbox.checked = isLikelyRemote;
+  isRemoteCheckbox.dispatchEvent(new Event('change'));
+}
+
+export function updateRemoteWarning() {
+  const remoteCheckbox = document.getElementById('library-form-remote');
+  const warningEl = document.getElementById('library-form-remote-warning');
+  if (!warningEl || !remoteCheckbox) return;
+  
+  if (remoteCheckbox.checked) {
+    warningEl.style.display = 'block';
+  } else {
+    warningEl.style.display = 'none';
+  }
+}
+
+export function enableVFSCheckForRemote() {
+  console.log('[VFS] Remote path selected - VFS should be enabled in scan settings');
+}

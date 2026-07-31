@@ -184,9 +184,15 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false) {
     const fullscreenIcon = document.getElementById('fullscreen-icon');
     if (fullscreenIcon) fullscreenIcon.className = 'fa-solid fa-expand';
 
-    // body 및 documentElement 인라인 스크롤 락 스타일 완전 소거
-    document.body.style.cssText = '';
-    document.documentElement.style.cssText = '';
+    // body 및 documentElement 인라인 스크롤 락 스타일만 안전 소거 (CSS 변수 유실 방지)
+    document.body.style.removeProperty('overflow');
+    document.documentElement.style.removeProperty('overflow');
+
+    if (state.systemSettings) {
+      import('../settings/general.js').then(m => {
+        if (m.applySettingsToUI) m.applySettingsToUI(state.systemSettings);
+      }).catch(() => {});
+    }
 
     if (savedScrollY > 0) {
       window.scrollTo(0, savedScrollY);

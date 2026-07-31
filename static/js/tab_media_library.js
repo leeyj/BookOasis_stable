@@ -293,7 +293,7 @@ if (window.i18nReady) {
 }
 
 // 라이브러리 타입 스위칭 (일반/성인)
-export function switchLibraryType(type) {
+export async function switchLibraryType(type) {
   if (type === 'adult' && !canAccessAdultLibrary()) {
     state.currentLibraryType = 'general';
     return;
@@ -307,6 +307,7 @@ export function switchLibraryType(type) {
   } else {
     document.getElementById('btn-lib-adult').classList.add('active');
   }
+  await loadInitialSystemSettings();
   loadLibraries();
   selectCategory('home');
 }

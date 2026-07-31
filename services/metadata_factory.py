@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-from flask import json
+import sys
 import os
 import importlib
 import subprocess
 import hashlib
+from flask import json
 from plugins.metadata.base import BaseMetadataProvider
 
 class SecurityError(PermissionError):

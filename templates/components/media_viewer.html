@@ -140,6 +140,14 @@
                                 <option value="gothic">나눔고딕</option>
                                 <option value="pretendard">Pretendard</option>
                             </select>
+                            <select id="viewer-theme-select" onchange="onViewerThemeChange(this.value)" class="overlay-select" title="배경색 선택">
+                                <option value="epaper">E-Paper (순백/순검정)</option>
+                                <option value="white">화이트 (순백)</option>
+                                <option value="sepia">세피아 (미색)</option>
+                                <option value="light">라이트 (회색)</option>
+                                <option value="dark">다크 (기본)</option>
+                                <option value="black">블랙 (OLED)</option>
+                            </select>
                             <select id="viewer-line-height-select" onchange="onViewerLineHeightChange(this.value)" class="overlay-select" title="행간 조절">
                                 <option value="1.4">행간 1.4</option>
                                 <option value="1.6">행간 1.6</option>
@@ -156,7 +164,7 @@
                             </select>
                             <button onclick="changeFontSize(-1)" class="btn-overlay-fit" data-i18n-title="viewer.font_smaller" title="글자 작게">A-</button>
                             <button onclick="changeFontSize(1)" class="btn-overlay-fit" data-i18n-title="viewer.font_larger" title="글자 크게">A+</button>
-                            <button onclick="toggleTheme()" class="btn-overlay-fit" data-i18n-title="viewer.toggle_theme" title="배경 테마 전환"><i class="fa-solid fa-circle-half-stroke"></i></button>
+                            <button onclick="toggleTheme()" class="btn-overlay-fit" data-i18n-title="viewer.toggle_theme" title="배경 테마 순환 전환"><i class="fa-solid fa-circle-half-stroke"></i> <span id="viewer-theme-label">다크</span></button>
                         </div>
                     </div>
                 </div>

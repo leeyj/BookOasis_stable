@@ -140,7 +140,7 @@ class StreamPageService:
             return cached
 
         # ─── Redis 캐시 조회 ───
-        redis_cache_key = f"cache:stream:book:{book_id}:page:{page_idx}" if book_id else None
+        redis_cache_key = f"cache:stream:book:{db_type}:{book_id}:page:{page_idx}" if book_id else None
         if redis_cache_key:
             try:
                 from utils.redis_helper import redis_get

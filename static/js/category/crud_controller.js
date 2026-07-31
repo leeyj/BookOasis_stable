@@ -1,0 +1,459 @@
+// crud_controller.js – 카테고리 생성/수정/삭제, 스캔/중단, 보관함 이관 및 폼 UI 조작
+import { state } from '../state.js';
+import * as api from '../api.js';
+import { selectCategory } from '../tab_media_library.js';
+import { currentTargetLibrary } from './context_menu.js';
+import { updateRemoteWarning, enableVFSCheckForRemote } from './path_browser.js';
+
+const MAX_LIBRARY_NAME_LENGTH = 25;
+const MAX_LIBRARY_PATHS = 20;
+const MAX_LIBRARY_PATH_LINE_LENGTH = 1024;
+const MAX_LIBRARY_PATH_TEXT_LENGTH = 8192;
+
+export function triggerAddLibrary() {
+  const modal = document.getElementById('library-form-modal');
+  const title = document.getElementById('library-modal-title');
+  const form = document.getElementById('library-crud-form');
+  
+  if (!modal || !form) return;
+  form.reset();
+  document.getElementById('library-form-id').value = '';
+  const remoteEl = document.getElementById('library-form-remote');
+  if (remoteEl) {
+    remoteEl.checked = false;
+    remoteEl.dispatchEvent(new Event('change'));
+  }
+
+  // 이동 버튼 숨김
+  const moveBtn = document.getElementById('library-form-move-btn');
+  if (moveBtn) moveBtn.style.display = 'none';
+
+  // Rclone RC URL 초기화 및 숨김
+  const rcloneUrlEl = document.getElementById('library-form-rclone-url');
+  if (rcloneUrlEl) rcloneUrlEl.value = '';
+  const rcloneGroup = document.getElementById('library-form-rclone-url-group');
+  if (rcloneGroup) rcloneGroup.style.display = 'none';
+
+  // 아이콘 및 컬러 칩 초기화
+  const iconInput = document.getElementById('library-form-icon');
+  if (iconInput) iconInput.value = 'fa-book';
+  document.querySelectorAll('.category-icon-selector .icon-option').forEach(el => {
+    if (el.dataset.icon === 'fa-book') el.classList.add('active');
+    else el.classList.remove('active');
+  });
+  const colorInput = document.getElementById('library-form-color');
+  if (colorInput) colorInput.value = '#94a3b8';
+  document.querySelectorAll('.category-color-selector .color-option').forEach(el => {
+    if (el.dataset.color === '#94a3b8') el.classList.add('active');
+    else el.classList.remove('active');
+  });
+
+  const hideCoverEl = document.getElementById('library-form-hide-cover');
+  if (hideCoverEl) hideCoverEl.checked = false;
+
+  selectCategoryType('local');
+
+  // 체크박스 변경 감지 바인딩 (최초 1회)
+  if (remoteEl && !remoteEl.dataset.listenerBound) {
+    remoteEl.dataset.listenerBound = 'true';
+    remoteEl.addEventListener('change', (e) => {
+      if (rcloneGroup) rcloneGroup.style.display = e.target.checked ? 'block' : 'none';
+      updateRemoteWarning();
+      if (e.target.checked) {
+        enableVFSCheckForRemote();
+      }
+    });
+  }
+
+  title.innerText = i18n.t('category.add_title');
+  modal.style.display = 'flex';
+}
+
+export async function triggerEditLibrary() {
+  if (!currentTargetLibrary || currentTargetLibrary.type === 'system') return;
+  
+  const modal = document.getElementById('library-form-modal');
+  const title = document.getElementById('library-modal-title');
+  const form = document.getElementById('library-crud-form');
+  
+  if (!modal || !form) return;
+
+  // 이동 버튼 노출 및 텍스트 갱신
+  const moveBtn = document.getElementById('library-form-move-btn');
+  if (moveBtn) {
+    moveBtn.style.display = 'block';
+    if (state.currentLibraryType === 'general') {
+      moveBtn.innerText = '성인도서로 이동';
+    } else {
+      moveBtn.innerText = '일반도서로 이동';
+    }
+  }
+  
+  const id = currentTargetLibrary.id;
+  const name = currentTargetLibrary.name;
+ 
+  document.getElementById('library-form-id').value = id;
+  document.getElementById('library-form-name').value = name;
+  
+  const pathVal = document.querySelector(`[data-id="${id}"]`)?.dataset?.path || '';
+  document.getElementById('library-form-path').value = pathVal;
+
+  const categoryTypeVal = document.querySelector(`[data-id="${id}"]`)?.dataset?.categoryType || 'local';
+  selectCategoryType(categoryTypeVal);
+
+  const isRemoteVal = document.querySelector(`[data-id="${id}"]`)?.dataset?.remote || '0';
+  const remoteEl = document.getElementById('library-form-remote');
+  if (remoteEl) remoteEl.checked = (isRemoteVal === '1');
+
+  // Rclone RC URL 바인딩 및 표시 토글
+  const rcloneUrlVal = document.querySelector(`[data-id="${id}"]`)?.dataset?.rcloneUrl || '';
+  const rcloneUrlEl = document.getElementById('library-form-rclone-url');
+  if (rcloneUrlEl) rcloneUrlEl.value = rcloneUrlVal;
+
+  const rcloneGroup = document.getElementById('library-form-rclone-url-group');
+  if (rcloneGroup) {
+    rcloneGroup.style.display = (isRemoteVal === '1') ? 'block' : 'none';
+  }
+
+  // 아이콘 및 컬러 칩 데이터 바인딩
+  const iconVal = document.querySelector(`[data-id="${id}"]`)?.dataset?.icon || 'fa-book';
+  const colorVal = document.querySelector(`[data-id="${id}"]`)?.dataset?.color || '#94a3b8';
+  
+  const iconInput = document.getElementById('library-form-icon');
+  if (iconInput) iconInput.value = iconVal;
+  document.querySelectorAll('.category-icon-selector .icon-option').forEach(el => {
+    if (el.dataset.icon === iconVal) el.classList.add('active');
+    else el.classList.remove('active');
+  });
+
+  const colorInput = document.getElementById('library-form-color');
+  if (colorInput) colorInput.value = colorVal;
+  document.querySelectorAll('.category-color-selector .color-option').forEach(el => {
+    if (el.dataset.color === colorVal) el.classList.add('active');
+    else el.classList.remove('active');
+  });
+
+  const hideCoverVal = document.querySelector(`[data-id="${id}"]`)?.dataset?.hideCover || '0';
+  const hideCoverEl = document.getElementById('library-form-hide-cover');
+  if (hideCoverEl) hideCoverEl.checked = (hideCoverVal === '1');
+
+  // 체크박스 변경 감지 바인딩 (최초 1회)
+  if (remoteEl && !remoteEl.dataset.listenerBound) {
+    remoteEl.dataset.listenerBound = 'true';
+    remoteEl.addEventListener('change', (e) => {
+      if (rcloneGroup) rcloneGroup.style.display = e.target.checked ? 'block' : 'none';
+      updateRemoteWarning();
+      if (e.target.checked) {
+        enableVFSCheckForRemote();
+      }
+    });
+  }
+
+  updateRemoteWarning();
+
+  title.innerText = i18n.t('category.edit_title', {id: id});
+  modal.style.display = 'flex';
+}
+
+export async function triggerDeleteLibrary() {
+  if (!currentTargetLibrary || currentTargetLibrary.type === 'system') return;
+  const confirmDel = confirm(i18n.t('category.delete_confirm', {name: currentTargetLibrary.name}));
+  if (!confirmDel) return;
+
+  const formData = new FormData();
+  formData.append('type', state.currentLibraryType);
+  formData.append('id', currentTargetLibrary.id);
+
+  if (typeof window.showGlobalLoadingSpinner === 'function') {
+    window.showGlobalLoadingSpinner(`'${currentTargetLibrary.name}' 카테고리와 관련 도서 데이터를 안전하게 삭제 중입니다...\n잠시만 기다려 주세요.`);
+  }
+
+  try {
+    const data = await api.deleteLibrary(formData);
+    if (data.success) {
+      if (typeof window.hideGlobalLoadingSpinner === 'function') {
+        window.hideGlobalLoadingSpinner();
+      }
+      alert(data.message);
+      if (typeof window.loadLibraries === 'function') {
+        await window.loadLibraries();
+      }
+      
+      if (String(state.currentLibraryId) === String(currentTargetLibrary.id)) {
+        selectCategory('history');
+      }
+    } else {
+      if (typeof window.hideGlobalLoadingSpinner === 'function') {
+        window.hideGlobalLoadingSpinner();
+      }
+      alert(i18n.t('category.delete_fail', {error: data.error}));
+    }
+  } catch (e) {
+    if (typeof window.hideGlobalLoadingSpinner === 'function') {
+      window.hideGlobalLoadingSpinner();
+    }
+    console.error('삭제 API 호출 오류:', e);
+    alert(i18n.t('category.server_error'));
+  }
+}
+
+export async function triggerScanLibrary(force = false) {
+  if (!currentTargetLibrary || currentTargetLibrary.type === 'system') return;
+  const id = currentTargetLibrary.id;
+  const name = currentTargetLibrary.name;
+  const modeText = force ? i18n.t('category.force_scan_started', {name: name}) : i18n.t('category.scan_started', {name: name});
+
+  try {
+    const data = await api.triggerLibraryScan(state.currentLibraryType, id, force);
+    if (data.success) {
+      if (typeof window.showToast === 'function') {
+        window.showToast(modeText, 'success');
+      } else {
+        alert(`${modeText} : ${data.message}`);
+      }
+    } else {
+      alert(i18n.t('category.scan_fail', {error: data.error}));
+    }
+  } catch (e) {
+    console.error('스캔 요청 중 오류 발생:', e);
+    alert(i18n.t('category.server_error'));
+  }
+}
+
+export async function triggerScanLibraryCovers() {
+  if (!currentTargetLibrary || currentTargetLibrary.type === 'system') return;
+  const id = currentTargetLibrary.id;
+  const name = currentTargetLibrary.name;
+
+  try {
+    const data = await api.triggerLibraryCoversScan(state.currentLibraryType, id);
+    if (data.success) {
+      if (typeof window.showToast === 'function') {
+        window.showToast(i18n.t('category.cover_scan_started', {name: name}), 'success');
+      } else {
+        alert(`${i18n.t('category.cover_scan_started', {name: name})} : ${data.message}`);
+      }
+    } else {
+      alert(i18n.t('category.scan_fail', {error: data.error}));
+    }
+  } catch (e) {
+    console.error('스캔 요청 중 오류 발생:', e);
+    alert(i18n.t('category.server_error'));
+  }
+}
+
+export async function triggerCancelScanLibrary() {
+  if (!currentTargetLibrary || currentTargetLibrary.type === 'system') return;
+  const id = currentTargetLibrary.id;
+  const name = currentTargetLibrary.name;
+
+  try {
+    const data = await api.cancelLibraryScan(state.currentLibraryType, id);
+    if (data.success) {
+      if (typeof window.showToast === 'function') {
+        window.showToast(i18n.t('category.cancel_scan_req', {name: name}), 'info');
+      } else {
+        alert(data.message);
+      }
+    } else {
+      alert(i18n.t('category.cancel_fail', {error: data.error}));
+    }
+  } catch (e) {
+    console.error('중단 요청 중 오류 발생:', e);
+    alert(i18n.t('category.server_error'));
+  }
+}
+
+export function closeLibraryModal() {
+  const modal = document.getElementById('library-form-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+export async function submitLibraryForm(event) {
+  event.preventDefault();
+  const form = document.getElementById('library-crud-form');
+  const formData = new FormData(form);
+
+  const name = String(formData.get('name') || '').trim();
+  const physicalPathRaw = String(formData.get('physical_path') || '').replace(/\r/g, '');
+  const targetPaths = physicalPathRaw.split('\n').map(p => p.trim()).filter(Boolean);
+
+  if (!name) {
+    alert(i18n.t('category.name_required'));
+    return;
+  }
+  if (name.length > MAX_LIBRARY_NAME_LENGTH) {
+    alert(`카테고리 이름은 최대 ${MAX_LIBRARY_NAME_LENGTH}자까지 입력할 수 있습니다.`);
+    return;
+  }
+  if (physicalPathRaw.length > MAX_LIBRARY_PATH_TEXT_LENGTH) {
+    alert(`경로 입력 길이는 최대 ${MAX_LIBRARY_PATH_TEXT_LENGTH}자까지 허용됩니다.`);
+    return;
+  }
+  if (targetPaths.length > MAX_LIBRARY_PATHS) {
+    alert(`경로는 최대 ${MAX_LIBRARY_PATHS}개까지 입력할 수 있습니다.`);
+    return;
+  }
+  if (targetPaths.some(p => p.length > MAX_LIBRARY_PATH_LINE_LENGTH)) {
+    alert(`각 경로는 최대 ${MAX_LIBRARY_PATH_LINE_LENGTH}자까지 허용됩니다.`);
+    return;
+  }
+
+  formData.append('type', state.currentLibraryType);
+  
+  const isRemoteChecked = document.getElementById('library-form-remote')?.checked;
+  formData.set('is_remote', isRemoteChecked ? '1' : '0');
+  const hideCoverChecked = document.getElementById('library-form-hide-cover')?.checked;
+  formData.set('hide_cover', hideCoverChecked ? '1' : '0');
+
+  const id = formData.get('id');
+  const isEdit = !!id;
+
+  try {
+    const submitBtn = document.getElementById('library-form-submit-btn');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerText = i18n.t('category.processing');
+    }
+
+    let result;
+    if (isEdit) {
+      result = await api.editLibrary(formData);
+    } else {
+      result = await api.addLibrary(formData);
+    }
+
+    if (result.success) {
+      alert(result.message);
+      closeLibraryModal();
+      if (typeof window.loadLibraries === 'function') {
+        await window.loadLibraries();
+      }
+      if (isEdit && String(state.currentLibraryId) === String(id)) {
+        selectCategory(String(id), true);
+      }
+    } else {
+      alert(i18n.t('category.save_error', {error: result.error}));
+    }
+  } catch (e) {
+    console.error('라이브러리 저장 실패:', e);
+    alert(i18n.t('category.save_server_error'));
+  } finally {
+    const submitBtn = document.getElementById('library-form-submit-btn');
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerText = i18n.t('category.save');
+    }
+  }
+}
+
+export async function triggerMoveLibrary() {
+  if (!currentTargetLibrary || currentTargetLibrary.type === 'system') return;
+  
+  const fromType = state.currentLibraryType;
+  const toType = (fromType === 'general') ? 'adult' : 'general';
+  
+  const targetLabel = (toType === 'general') ? '일반도서' : '성인도서';
+  const confirmMsg = `정말로 이 카테고리를 [${targetLabel}] 보관함으로 이동하시겠습니까?\n이동하는 동안 데이터베이스 정밀 이전 작업을 위해 전체 화면이 잠시 잠깁니다.`;
+  if (!confirm(confirmMsg)) return;
+  
+  const modal = document.getElementById('library-form-modal');
+  if (modal) modal.style.display = 'none';
+  
+  const dimmer = document.getElementById('migration-dimmer-modal');
+  if (dimmer) dimmer.style.display = 'flex';
+  
+  const formData = new FormData();
+  formData.append('id', currentTargetLibrary.id);
+  formData.append('from_type', fromType);
+  formData.append('to_type', toType);
+  
+  const preventClose = (e) => {
+    e.preventDefault();
+    e.returnValue = '';
+  };
+  window.addEventListener('beforeunload', preventClose);
+  
+  try {
+    const response = await fetch('/api/media/libraries/move', {
+      method: 'POST',
+      body: formData
+    });
+    const data = await response.json();
+    
+    if (data.success) {
+      alert(data.message || '카테고리가 성공적으로 이동되었습니다.');
+      
+      state.currentLibraryType = toType;
+      
+      document.querySelectorAll('.btn-toggle').forEach(btn => btn.classList.remove('active'));
+      if (toType === 'general') {
+        const btnGen = document.getElementById('btn-lib-general');
+        if (btnGen) btnGen.classList.add('active');
+      } else {
+        const btnAd = document.getElementById('btn-lib-adult');
+        if (btnAd) btnAd.classList.add('active');
+      }
+      
+      if (typeof window.loadLibraries === 'function') {
+        await window.loadLibraries();
+      }
+      selectCategory('home');
+    } else {
+      alert('이동 실패: ' + (data.error || '알 수 없는 오류'));
+    }
+  } catch (e) {
+    console.error('이관 API 오류:', e);
+    alert('서버 통신 실패 또는 타임아웃이 발생했습니다.');
+  } finally {
+    window.removeEventListener('beforeunload', preventClose);
+    if (dimmer) dimmer.style.display = 'none';
+  }
+}
+
+export function selectCategoryType(type) {
+  if (type === 'gdrive') type = 'local';
+
+  document.querySelectorAll('.category-type-selector .category-type-btn').forEach(el => el.classList.remove('active'));
+  const btn = document.querySelector(`.category-type-selector .category-type-btn[data-type="${type}"]`);
+  if (btn) btn.classList.add('active');
+
+  const typeInput = document.getElementById('library-form-category-type');
+  if (typeInput) typeInput.value = type;
+
+  const pathLabel = document.getElementById('library-form-path-label');
+  const pathTextarea = document.getElementById('library-form-path');
+  const btnBrowse = document.getElementById('btn-browse-paths');
+  const btnTest = document.getElementById('btn-test-gdrive-links');
+  const remoteRow = document.getElementById('library-form-remote-row');
+  const rcloneGroup = document.getElementById('library-form-rclone-url-group');
+
+  if (type === 'gdrive') {
+      if (pathLabel) pathLabel.textContent = (window.i18n && i18n.t('modal.gdrive_path_label')) || '구글 드라이브 공유 폴더 링크 (엔터로 여러 개 입력 가능)';
+      if (pathTextarea) pathTextarea.placeholder = (window.i18n && i18n.t('modal.gdrive_path_placeholder')) || '예: https://drive.google.com/drive/folders/1A2B3C4D5E6F7G8H9I';
+      if (btnBrowse) btnBrowse.style.display = 'none';
+      if (btnTest) btnTest.style.display = 'inline-flex';
+      if (remoteRow) remoteRow.style.display = 'none';
+      if (rcloneGroup) rcloneGroup.style.display = 'none';
+  } else {
+      if (pathLabel) pathLabel.textContent = (window.i18n && i18n.t('modal.category_path_label')) || '서버 물리 경로 (엔터로 여러 개 입력 가능)';
+      if (pathTextarea) pathTextarea.placeholder = '예: C:\\library\\fantasy\n/home/user/manga';
+      if (btnBrowse) btnBrowse.style.display = 'inline-flex';
+      if (btnTest) btnTest.style.display = 'none';
+      if (remoteRow) remoteRow.style.display = 'flex';
+  }
+}
+
+export function selectIconOption(element) {
+  document.querySelectorAll('.category-icon-selector .icon-option').forEach(el => el.classList.remove('active'));
+  element.classList.add('active');
+  const iconInput = document.getElementById('library-form-icon');
+  if (iconInput) iconInput.value = element.dataset.icon;
+}
+
+export function selectColorOption(element) {
+  document.querySelectorAll('.category-color-selector .color-option').forEach(el => el.classList.remove('active'));
+  element.classList.add('active');
+  const colorInput = document.getElementById('library-form-color');
+  if (colorInput) colorInput.value = element.dataset.color;
+}

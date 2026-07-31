@@ -10,7 +10,7 @@ PGID=${PGID:-0}
 # NAS(Synology, QNAP 등) 환경에서 bind mount 시
 # 디렉토리가 read-only로 마운트되는 경우를 사전에 감지합니다.
 # ─────────────────────────────────────────────────────────
-DATA_DIRS="/app/db /app/covers /app/cache /app/logs"
+DATA_DIRS="/app/db /app/covers /app/cache /app/logs /app/plugins"
 
 # ── Graceful Shutdown을 위한 시그널 트랩 ──
 WEB_PID=0
@@ -293,7 +293,7 @@ if [ "$PUID" -ne 0 ]; then
     fi
 
     # 데이터 저장용 폴더들의 소유권을 media_user로 변경
-    chown -R media_user:media_group /app/db /app/covers /app/cache /app/logs 2>/dev/null || true
+    chown -R media_user:media_group /app/db /app/covers /app/cache /app/logs /app/plugins 2>/dev/null || true
     
     # ── 도커 내부 스캐너 워커 프로세스 지연 기동 (웹 health 이후) ──
     echo "[Entrypoint] Worker launch scheduled (after web health) as media_user..."

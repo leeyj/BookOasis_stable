@@ -31,7 +31,7 @@ export async function epubPrevPage() {}
 export async function epubNextPage() {}
 export async function applyEpubSettings(options) {}
 export async function changeEpubScrollMode(scrollMode) {}
-import { updateFontSize, toggleTheme, updateLineHeight, updateParagraphSpacing } from './viewer_settings.js';
+import { THEMES, updateFontSize, toggleTheme, setViewerTheme, updateLineHeight, updateParagraphSpacing } from './viewer_settings.js';
 
 // 사용자 정의 폰트 목록 로드 및 드롭다운 바인딩
 export function loadCustomFontsList() {
@@ -80,9 +80,13 @@ export function loadCustomFontsList() {
           const savedFont = localStorage.getItem('viewer_font_family') || 'batang';
           select.value = savedFont;
         }
+        syncViewerThemeUI();
       }
     })
-    .catch(err => console.error("[Viewer-Fonts] Failed to fetch custom fonts list:", err));
+    .catch(err => {
+      console.error("[Viewer-Fonts] Failed to fetch custom fonts list:", err);
+      syncViewerThemeUI();
+    });
 }
 
 // 이전 페이지 통합 조율
@@ -169,8 +173,24 @@ export function changeFontSize(dir) {
   }
 }
 
+export function syncViewerThemeUI() {
+  const currentTheme = localStorage.getItem('viewer_theme') || 'dark';
+  const themeObj = THEMES[currentTheme] || THEMES.dark;
+
+  const select = document.getElementById('viewer-theme-select');
+  if (select) {
+    select.value = currentTheme;
+  }
+
+  const label = document.getElementById('viewer-theme-label');
+  if (label) {
+    label.textContent = themeObj.label || '다크';
+  }
+}
+
 export function toggleReaderTheme() {
   toggleTheme();
+  syncViewerThemeUI();
   const activeViewerInstance = getActiveViewerInstance();
   if (activeViewerInstance && typeof activeViewerInstance.applySettings === 'function') {
     activeViewerInstance.applySettings();
@@ -181,6 +201,21 @@ export function toggleReaderTheme() {
 }
 
 // HTML 인라인 이벤트 연동을 위해 글로벌 윈도우 객체에 바인딩
+window.toggleTheme = toggleReaderTheme;
+
+window.onViewerThemeChange = function (value) {
+  console.log(`[Viewer-Core] Background theme changed to: ${value}`);
+  setViewerTheme(value);
+  syncViewerThemeUI();
+  const activeViewerInstance = getActiveViewerInstance();
+  if (activeViewerInstance && typeof activeViewerInstance.applySettings === 'function') {
+    activeViewerInstance.applySettings();
+  } else {
+    applyTxtSettings();
+    applyEpubSettings();
+  }
+};
+
 window.onViewerFontChange = function (value) {
   console.log(`[Viewer-Core] Font family changed to: ${value}`);
   localStorage.setItem('viewer_font_family', value);

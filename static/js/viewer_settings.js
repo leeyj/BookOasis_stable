@@ -2,19 +2,53 @@
 import { state } from './state.js';
 
 export const THEMES = {
+  epaper: {
+    name: 'epaper',
+    label: 'E-Paper',
+    background: '#ffffff',
+    text: '#000000',
+    heading: '#000000',
+    className: 'txt-reader-theme-epaper'
+  },
+  white: {
+    name: 'white',
+    label: '화이트',
+    background: '#ffffff',
+    text: '#111111',
+    heading: '#000000',
+    className: 'txt-reader-theme-white'
+  },
+  sepia: {
+    name: 'sepia',
+    label: '세피아',
+    background: '#f4ecd8',
+    text: '#3b2e2b',
+    heading: '#2a1f1c',
+    className: 'txt-reader-theme-sepia'
+  },
+  light: {
+    name: 'light',
+    label: '라이트',
+    background: '#e2e8f0',
+    text: '#0f172a',
+    heading: '#020617',
+    className: 'txt-reader-theme-light'
+  },
   dark: {
     name: 'dark',
+    label: '다크',
     background: '#0f172a',
     text: '#e2e8f0',
     heading: '#f8fafc',
     className: 'txt-reader-theme-dark'
   },
-  light: {
-    name: 'light',
-    background: '#e2e8f0',
-    text: '#0f172a',
-    heading: '#020617',
-    className: 'txt-reader-theme-light'
+  black: {
+    name: 'black',
+    label: '블랙',
+    background: '#000000',
+    text: '#e2e8f0',
+    heading: '#ffffff',
+    className: 'txt-reader-theme-black'
   }
 };
 
@@ -56,10 +90,18 @@ export function updateFontSize(dir) {
   return size;
 }
 
-// 3. 테마 토글 액션
+// 3. 테마 지정 및 토글 액션
+export function setViewerTheme(themeKey) {
+  const selectedTheme = THEMES[themeKey] ? themeKey : 'dark';
+  localStorage.setItem('viewer_theme', selectedTheme);
+  return THEMES[selectedTheme];
+}
+
 export function toggleTheme() {
+  const order = ['dark', 'epaper', 'white', 'sepia', 'light', 'black'];
   const current = localStorage.getItem('viewer_theme') || 'dark';
-  const next = current === 'dark' ? 'light' : 'dark';
+  const currentIndex = order.indexOf(current);
+  const next = order[(currentIndex + 1) % order.length];
   localStorage.setItem('viewer_theme', next);
   return THEMES[next];
 }

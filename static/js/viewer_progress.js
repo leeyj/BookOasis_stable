@@ -131,20 +131,33 @@ export function flushProgress(useBeacon = false) {
   });
 }
 
-// ── 페이지 이탈 / 탭 전환 시 진행률 즉시 전송 ──
-// 서버 재시작 등으로 인한 진행률 유실을 방지합니다.
-// pagehide: 페이지 닫기/뒤로가기/PWA 종료 시 (iOS Safari에서 beforeunload보다 안정적)
+function prepareActiveViewerSnapshot() {
+  try {
+    import('./viewer/lifecycle_controller.js').then(m => {
+      const instance = m.getActiveViewerInstance ? m.getActiveViewerInstance() : null;
+      if (instance && typeof instance.prepareForClose === 'function') {
+        instance.prepareForClose();
+      }
+    }).catch(() => {});
+  } catch (e) {}
+}
+
+// ── 페이지 이탈 / 탭 전환 / 화면 잠금 시 진행률 즉시 전송 ──
+// 서버 재시작 및 앱 백그라운드 전환으로 인한 진행률 유실 방지
 window.addEventListener('pagehide', () => {
+  prepareActiveViewerSnapshot();
   flushProgress(true);
 });
 
 window.addEventListener('beforeunload', () => {
+  prepareActiveViewerSnapshot();
   flushProgress(true);
 });
 
-// visibilitychange: 탭 전환/화면 꺼짐/앱 백그라운드 전환 시
+// visibilitychange: 모바일 화면 잠금 / 홈 화면 나가기 / 앱 백그라운드 전환 시
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
+    prepareActiveViewerSnapshot();
     flushProgress(true);
   }
 });
