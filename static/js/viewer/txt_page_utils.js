@@ -28,3 +28,26 @@ export function snapTxtPageScrollLeft(scrollWrapper) {
   const snapped = Math.min(maxScroll, Math.max(0, Math.round(scrollWrapper.scrollLeft / stepWidth) * stepWidth));
   scrollWrapper.scrollLeft = snapped;
 }
+
+export function applyTxtTwoPageTrailingSpacer(scrollWrapper, contentArea) {
+  if (!scrollWrapper || !contentArea) return;
+
+  const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
+  const pageStep = localStorage.getItem('comic_page_step') || '1';
+  if (scrollMode !== 'page' || pageStep !== '2') return;
+
+  // Recalculate from a clean baseline to avoid oscillation across repeated renders.
+  contentArea.style.paddingRight = '0px';
+
+  const stepWidth = getTxtPageAdvanceWidth(scrollWrapper);
+  if (!Number.isFinite(stepWidth) || stepWidth <= 0) return;
+
+  const maxScroll = Math.max(0, scrollWrapper.scrollWidth - scrollWrapper.clientWidth);
+  const spreadRatio = maxScroll / stepWidth;
+  const spreadFraction = spreadRatio - Math.floor(spreadRatio);
+  const hasOddTailPage = Math.abs(spreadFraction - 0.5) < 0.12;
+
+  if (hasOddTailPage) {
+    contentArea.style.paddingRight = `${Math.round(stepWidth / 2)}px`;
+  }
+}

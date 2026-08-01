@@ -1,353 +1,329 @@
-# Metadata Provider Plugin Guide (메타데이터 프로바이더 플러그인 개발 가이드)
+# 🧩 Metadata Provider Plugin Guide (메타데이터 프로바이더 플러그인 개발 가이드)
 
-This directory is designed for pluggable metadata providers. You can create a new plugin to support metadata search in other countries (e.g., USA, Japan, etc.) or add new UI widgets without modifying the core system.
+이 문서는 BookOasis 미디어 서버에서 코어 소스코드 수정 없이 메타데이터 프로바이더, 대시보드 위젯, 카테고리 레벨 커스텀 뷰포트, 그리고 이벤트 웹훅 플러그인을 추가하는 **최신 1.0.7+ 규격**을 설명합니다.
 
-이 디렉토리는 플러그형 메타데이터 프로바이더를 위해 설계되었습니다. 코어 소스코드를 수정하지 않고도 외부 API(예: Google Books, Amazon 등)를 연동하는 새 플러그인을 개발하여 붙일 수 있습니다.
+> 💡 **참고**: 스캐너 로컬 파서 개발은 [스캐너 파서 개발 가이드](../../docs/guide_scanner_parser.md)를 참조하십시오.
 
 ---
 
-## How to Create a New Plugin (새 플러그인 추가 방법)
+## 1. 핵심 원칙 (Core Principles)
 
-### 1. Create a provider module (프로바이더 모듈 생성)
-You can use either legacy single-file style or folder-based style.
+- **독립성 (Loose Coupling)**: 북오아시스 코어는 플러그인 고유 이름, 고유 라우트, 내부 함수명을 직접 알지 않고 공통 계약(Contract)만을 이용해 동적으로 연동됩니다.
+- **자폐성 (Self-containment)**: 플러그인 확장은 `plugins/metadata/{plugin_id}/` 디렉토리 내부의 코드 및 자원만으로 완결되어야 합니다.
+- **독립 렌더링**: 코어는 각 플러그인의 비즈니스 로직에 관여하지 않습니다.
 
-다음 2가지 방식 중 하나를 사용할 수 있습니다.
+### 📊 호환성 매트릭스 (코어 ↔ 플러그인 계약)
 
-- Legacy single-file: `plugins/metadata/google.py`
-- Folder-based (recommended): `plugins/metadata/google/google.py`
+| 코어 버전 범위 | 필수 계약 | 선택 계약 | 비고 |
+| :--- | :--- | :--- | :--- |
+| **1.0.0 ~ 1.0.4** | `search`, `apply` | `dashboard_widget`, `get_dashboard_data` | 폴더 기반/단일 파일 호환 지원 |
+| **1.0.5 ~ 1.0.6** | `search`, `apply` | `get_context_menu_items`, `run_context_menu_action`, `update_manifest` | 도서 컨텍스트 메뉴 & 원격 자동 업데이트 지원 |
+| **1.0.7+ (현재)** | `search`, `apply` | `category_tab`, `on_scan_new_books_detected`, `dispatch_webhook`, `update_manifest` | 1등 시민 메뉴, 듀얼 UI, 8종 테마 및 표준 이벤트 웹훅 병행 지원 |
 
-For folder-based plugins, this loader also supports optional UI assets:
+---
 
-- `plugins/metadata/google/index.html` (custom settings UI)
-- `plugins/metadata/google/style.css` (plugin-specific styles)
-- `plugins/metadata/google/script.js` (optional initializer script)
+## 2. 디렉토리 구조 규격 (Directory Structure Spec)
 
-### 1-1. Auto-Update Version Contract (자동 업데이트 버전 계약)
+권장 방식은 **폴더 기반 디렉토리 구조**입니다.
 
-GitHub 기반 플러그인 자동 업데이트 지원 대상으로 등록하려면, 플러그인 루트에 `VERSION` 파일을 추가하고 아래 JSON 키를 반드시 포함해야 합니다.
+```text
+plugins/metadata/
+  my_plugin/
+    __init__.py
+    my_plugin.py
+    VERSION            # 필수: 자동 업데이트 지원 대상 버전 파일
+    index.html         # 카테고리 레벨 풀페이지 뷰 UI 템플릿
+    style.css          # 카테고리 풀페이지 뷰 CSS
+    script.js          # 카테고리 풀페이지 뷰 JS
+    settings.html      # 선택: 환경설정 탭 전용 커스텀 폼 UI (미작성 시 config_schema 사용)
+    settings.css       # 선택: 환경설정 커스텀 폼 CSS
+    settings.js        # 선택: 환경설정 커스텀 폼 JS
+    requirements.txt   # 선택: 플러그인 전용 파이썬 외부 라이브러리 자동 설치 목록
+```
 
-```json
-{
-    "plugin version": "1.0.0"
+### 🔒 런타임 보안 및 디렉토리 접근 제약 사항 (Strict Security Protections)
+
+북오아시스 미디어 서버는 서버 및 시스템 안전성을 보장하기 위해 플러그인에 다음과 같은 **강력한 런타임 보안 제약 장치**를 적용합니다.
+
+1. **상위 디렉토리 이탈 차단 (Path Traversal Protection)**:
+   - 플러그인 UI 번들 서빙 및 정적 자원 로딩 시 `../` 또는 `..\`를 포함한 상위 디렉토리 이탈 시도가 감지되면 백엔드 `MetadataFactory`가 즉시 `SecurityError` 예외를 발생시키고 로딩을 거부합니다.
+   - 모든 템플릿 자원은 해당 플러그인의 루트 디렉토리 `plugins/metadata/{plugin_id}/` 내부로 엄격히 제한됩니다.
+2. **외부 심볼릭 링크 접근 차단 (Symlink Restriction)**:
+   - 플러그인 폴더 외부의 시스템 중요 파일(예: `/etc/passwd`, 시스템 파일 등)을 가리키는 외부 심볼릭 링크 파일은 런타임 검증에 의해 접근이 차단됩니다.
+3. **독립 패키지 격리 및 코어 최우선 보호 (Package Isolation)**:
+   - `requirements.txt`로 설치되는 외부 패키지는 해당 플러그인 전용 `libs/` 폴더에 격리 설치되며, 북오아시스 코어 주요 라이브러리(`Flask`, `PyMuPDF`, `Pillow` 등)의 버전을 덮어쓰거나 오염시키는 행위는 코어 보호 엔진에 의해 자동 차단됩니다.
+4. **HTML5 풀 태그 지원 및 동적 데이터 XSS 방어 규칙**:
+   - 카테고리 뷰 UI(`index.html`)에서는 `<canvas>`, `<svg>`, `<table>`, `<form>`, `<input>`, `<button>` 등 모든 HTML5 태그와 커스텀 CSS/JS가 100% 허용됩니다.
+   - 단, 외부 3rd-party API나 사용자 입력값을 뷰포트에 동적 삽입할 경우 `textContent`나 안전한 에스케이프 기능을 사용하여 XSS 공격이 발생하지 않도록 개발자가 방어 코드를 작성해야 합니다.
+
+### 🎨 듀얼 UI (Dual-UI) 서빙 아키텍처
+
+BookOasis 플러그인은 화면 목적에 따라 2가지 독립된 UI 번들을 분리 서빙합니다.
+
+1. **카테고리 레벨 풀페이지 UI (`index.html`, `style.css`, `script.js`)**:
+   - 좌측 사이드바의 플러그인 카테고리 클릭 시 메인 화면 영역 전체에 마운트되는 대형 풀 뷰포트 UI입니다.
+2. **환경설정 탭 커스텀 폼 UI (`settings.html`, `settings.css`, `settings.js`)**:
+   - 관리자 [환경설정 ⚙️] -> [플러그인 설정] 탭 카드 내부에 표시되는 전용 커스텀 입력 폼 UI입니다.
+   - `settings.html`이 존재하지 않을 경우, 플러그인 클래스의 `config_schema` 파이썬 배열을 기반으로 입체적인 설정 폼이 자동 생성됩니다.
+
+---
+
+## 3. 플러그인 클래스 기본 계약 (Class Contract)
+
+모든 플러그인 클래스는 `plugins/metadata/base.py`에 정의된 `BaseMetadataProvider`를 상속받아야 합니다.
+클래스 이름은 `{파일명의CamelCase}MetadataProvider` 형태를 권장합니다. (예: `GoogleMetadataProvider`)
+
+```python
+from plugins.metadata.base import BaseMetadataProvider
+
+class MyPluginMetadataProvider(BaseMetadataProvider):
+    id = "my_plugin"
+    name = "나의 커스텀 플러그인"
+    is_searchable = True
+```
+
+필수/권장 속성:
+- `id` (str): 고유 식별자 (파일명 및 폴더명과 동일)
+- `name` (str): 사용자에게 보여질 플러그인 이름
+- `is_searchable` (bool): 도서 수동 매칭 검색 모달 노출 여부
+- `config_schema` (list): 환경설정 폼 정의 배열
+- `dashboard_widget` (dict 또는 None): 대시보드 위젯 구성 정보
+- `category_tab` (dict 또는 None): 좌측 사이드바 1등 시민 카테고리 메뉴 등록 정보 (`title`, `icon`, `order`)
+- `update_manifest` (dict 또는 None): 원격 자동 업데이트 선언 계약
+
+### 🌟 카테고리 레벨 플러그인 (`category_tab`) 규격
+플러그인이 대시보드 위젯 수준을 넘어 **좌측 사이드바의 1등 시민(First-class Citizen) 카테고리 메뉴**로 등록되어 풀페이지 커스텀 UI를 제공하려면 `category_tab`을 선언합니다.
+
+```python
+category_tab = {
+    "title": "독서 통계 센터",
+    "icon": "fa-solid fa-chart-pie",
+    "order": 80
 }
 ```
 
-- 키 이름은 정확히 `plugin version` (공백 포함)
-- 값은 SemVer 형식 권장 (`MAJOR.MINOR.PATCH`)
-- 누락 시 자동 업데이트 지원 대상에서 제외됨
+---
 
-### 2. Implement the provider class (프로바이더 클래스 구현)
-Your class must inherit from `BaseMetadataProvider` defined in [base.py](base.py).
-The class name must follow this pattern: `{CamelCaseFileName}MetadataProvider`.
+## 4. 설정 UI 및 `config_schema` 복합 저장 규격
 
-작성할 클래스는 반드시 `plugins/metadata/base.py`에 정의된 `BaseMetadataProvider`를 상속받아야 합니다.
-클래스 이름은 `{파일명의CamelCase}MetadataProvider` 형태를 권장합니다. (예: `GoogleMetadataProvider`)
+웹 UI(환경설정 > 플러그인 설정)에 노출할 폼 구조를 `config_schema`에 정의합니다. 입력된 값들은 단일 JSON 객체로 직렬화되어 DB에 저장됩니다.
 
-하위 호환을 위해 기존 방식(`Aladin_newMetadataProvider`)도 여전히 로드됩니다.
+지원 필드 타입:
+- `text`, `password`, `number`: 기본적인 입력 폼
+- `checkbox`: 불리언(True/False) 스위치 폼
+- `select`: 드롭다운 선택 폼 (`options` 배열 필수)
 
-### 3. Define UI & Configuration Properties (UI 및 설정 속성 정의)
-To make your plugin configurable from the Web UI (Settings > Plugin Settings), define the following class attributes:
-
-웹 UI(환경설정 > 플러그인 설정)에 플러그인이 노출되고 구성될 수 있도록 다음 속성을 정의해야 합니다:
-- `id` (str): Unique identifier (usually the same as the filename). / 고유 식별자 (보통 파일명과 동일하게 설정)
-- `name` (str): The plugin name displayed to users. / 사용자에게 보여질 플러그인 이름
-- `is_searchable` (bool): Whether to show this plugin in the manual metadata matching search modal. / 도서 수동 매칭 검색 모달에 이 플러그인을 노출할지 여부
-- `config_schema` (list): Defines the specification of fields to be inputted in the UI. / UI에서 입력받을 필드들의 규격을 정의합니다.
-
-#### 💡 Complex Configuration Storage & Retrieval (JSON Serialization) / 복잡한 설정 값 저장 및 불러오기
-This system serializes the form data defined in `config_schema` into a **single JSON string and stores it in the DB**. Therefore, no matter how complex the data structure is (such as dropdowns, boolean checkboxes, multiple inputs, etc.), it can be stored and retrieved without data loss.
-
-이 시스템은 `config_schema`에 정의된 폼 데이터를 **단일 JSON 문자열로 직렬화하여 DB에 저장**합니다. 따라서 단순 텍스트뿐만 아니라 드롭다운, 불리언 체크박스, 다중 입력 등 아무리 복잡한 데이터 구조라도 손실 없이 저장하고 불러올 수 있습니다.
-
-**Supported `type` kinds and examples (지원되는 `type` 종류 및 예시):**
-- `text`, `password`, `number`: Basic text and number input forms / 기본적인 텍스트 및 숫자 입력 폼
-- `checkbox`: Boolean (True/False) switch form / 불리언(True/False) 스위치 폼
-- `select`: Dropdown selection form (Requires adding an `options` array) / 드롭다운 선택 폼 (이 경우 `options` 배열 추가 필요)
-
-**Complex Form Definition Example (복잡한 폼 정의 예시):**
 ```python
 config_schema = [
-    {"key": "API_KEY", "label": "API Token", "type": "password", "required": True},
-    {"key": "MAX_RETRIES", "label": "Max Retries", "type": "number", "default": 3},
-    {"key": "ENABLE_PROXY", "label": "Enable Proxy", "type": "checkbox", "default": False},
-    {"key": "SERVER_REGION", "label": "Server Region", "type": "select", "options": [
-        {"value": "us-east", "label": "US East"},
-        {"value": "ap-northeast", "label": "Asia Pacific (Seoul)"}
+    {"key": "API_KEY", "label": "API 토큰", "type": "password", "required": True},
+    {"key": "MAX_RETRIES", "label": "재시도 횟수", "type": "number", "default": 3},
+    {"key": "ENABLE_PROXY", "label": "프록시 활성화", "type": "checkbox", "default": False},
+    {"key": "REGION", "label": "서버 지역", "type": "select", "options": [
+        {"value": "kr", "label": "한국 (Seoul)"},
+        {"value": "us", "label": "미국 (US East)"}
     ]}
 ]
 ```
-If defined as above, the frontend automatically renders the composite form, and upon saving, it is converted into a JSON object like `{"API_KEY": "...", "MAX_RETRIES": 3, "ENABLE_PROXY": false, "SERVER_REGION": "ap-northeast"}` and safely stored as a string in the `value` column of the `settings` table. When retrieving, you can restore it directly into a Python dictionary using `json.loads()`.
-
-위와 같이 정의하면 프론트엔드가 자동으로 복합 폼을 렌더링하며, 저장 시 `{"API_KEY": "...", "MAX_RETRIES": 3, "ENABLE_PROXY": false, "SERVER_REGION": "ap-northeast"}` 형태의 예쁜 JSON 객체로 변환되어 `settings` 테이블의 `value` 컬럼에 문자열로 안전하게 저장됩니다. 불러올 때는 템플릿의 `json.loads()`를 통해 파이썬 딕셔너리로 바로 복원하여 꺼내 쓸 수 있습니다.
-
-### 4. Implement required methods (필수 메서드 구현)
-You need to implement the following two methods:
-- `search(self, db_type, query)`: Search external API and return a list of dictionaries.
-- `apply(self, db_type, book_id, item_data)`: Download covers and update the database.
-
-### 5. Dashboard Widget Contract (대시보드 위젯 계약)
-If you want to expose a plugin widget on the plugins desk category screen, implement the contract below.
-
-플러그인 카테고리 화면에 플러그인 위젯을 표시하려면 아래 계약을 구현하세요.
-
-- Class attribute `dashboard_widget` (dict)
-    - Keys: `title`, `subtitle`, `provider`, `icon`, `limit`
-    - `all_desk_tab` (bool, Optional):
-        - `True`: Renders the plugin as an exclusive full-screen tab instead of a grid card on the common desk.
-        - `False` (or omitted): Renders the plugin inside the **[Common Desk]** responsive grid. Cards in the common desk support drag-and-drop sorting via `Sortable.js` (layout order preserved in `localStorage`).
-        - `True` 설정 시, 공통 데스크의 그리드 카드로 들어가지 않고 상단에 전용 탭이 동적으로 추가되어 100% 가로폭 단독 화면으로 렌더링됩니다.
-        - `False` (혹은 생략) 시, **[공통 데스크]** 반응형 그리드에 카드로 배치되며 `Sortable.js`를 이용한 마우스 드래그 정렬을 기본 지원합니다. (정렬 순서는 `localStorage`에 자동 영구 저장)
-    - `supported_types` (list, Optional):
-        - Example: `["general", "adult"]`
-        - Specifies which library database types (general/adult) this widget is allowed to render on. If omitted, the widget displays on both libraries by default.
-        - 노출을 허용할 보관함 DB 타입의 리스트입니다. 생략 시 기본적으로 일반 도서와 성인 도서 화면 둘 다 노출됩니다.
-- Method `get_dashboard_data(self, db_type, limit=10)`
-    - Must return JSON-like dict in this shape:
-        - Success: `{'success': True, 'items': [...]}`
-        - Failure: `{'success': False, 'error': '...'}`
-
-Important:
-- The core no longer knows plugin-specific names or routes.
-- The core only discovers `dashboard_widget` metadata and calls `get_dashboard_data`.
-- Therefore, plugin-specific helper names (e.g. `_fetch_new_releases`) should remain internal/private.
-
-Quick start template:
-- Copy `plugins/metadata/__template_dashboard_plugin.py`
-- Rename to your plugin file/folder module (for example `plugins/metadata/my_widget/my_widget.py`)
-- Update class name, `id`, `name`, `config_schema`, `dashboard_widget`, and `_fetch_items()`
-- Restart server and enable plugin in Settings > Plugin Settings
 
 ---
 
-## HTML Rendering Policy (HTML 렌더링 정책)
+## 5. 대시보드 위젯 및 공통 데스크 계약 (`dashboard_widget`)
 
-플러그인이 반환하는 데이터 필드 중 일부는 **제한적 HTML 태그**를 허용합니다.
-
-### ✅ HTML 허용 필드 (sanitizePluginHtml 적용)
-
-| 필드 | 적용 위치 | 설명 |
-|------|-----------|------|
-| `description` | `search()` 반환값, `get_dashboard_data()` items | 책 소개 등 서술형 텍스트 |
-| `metric`, `value` | `get_dashboard_data()` metric 아이템 | 통계 수치, 레이블 |
-| `subtitle` | `dashboard_widget` 속성 | 위젯 부제목 |
-
-### 허용 태그 목록
-
-```html
-<b>, <i>, <em>, <strong>, <br>, <span style="color|font-*|text-decoration">,
-<a href="https://...">, <ul>, <ol>, <li>, <p>, <small>, <mark>, <code>
-```
-
-### ❌ HTML 차단 필드 (escapeHtml 완전 이스케이프 유지)
-
-| 필드 | 이유 |
-|------|------|
-| `title`, `author`, `publisher`, `pubDate` | 고유명사로, HTML 렌더링 불필요 |
-| `id`, `name`, `icon` | 시스템 식별자 |
-
-### 차단되는 XSS 벡터
-
-- `<script>`, `<iframe>`, `<object>`, `<embed>`, `<form>`, `<svg>` 등 위험 태그
-- `onclick`, `onerror`, `onload` 등 `on*` 이벤트 속성
-- `javascript:` 프로토콜
-- `<span>` style 속성 중 `color`, `font-weight`, `font-style`, `font-size`, `text-decoration` 외 속성
-
-### 예시: description에 HTML 사용
+독립된 **[플러그인]** 카테고리 화면에 위젯 카드를 노출하거나 단독 탭으로 렌더링하려면 `dashboard_widget`를 선언하고 `get_dashboard_data()`를 구현하십시오.
 
 ```python
-def search(self, db_type, query):
-    return [{
-        'title': '어린왕자',          # ← escapeHtml (태그 불허)
-        'author': '생텍쥐페리',        # ← escapeHtml (태그 불허)
-        'description': '사막에서 만난 <b>어린왕자</b>의 이야기.<br>별과 장미, 그리고 <em>우정</em>에 대하여.',  # ← sanitize (허용)
-        ...
-    }]
+dashboard_widget = {
+    "title": "신간 정보 위젯",
+    "subtitle": "최신 외부 API 신간 목록",
+    "provider": "MyAPI",
+    "icon": "fa-solid fa-book-open",
+    "limit": 10,
+    "all_desk_tab": True,  # (선택) True 시 공통 데스크 카드가 아닌 단독 전체화면 탭으로 동적 렌더링됨
+    "supported_types": ["general"]  # (선택) 일반/성인 보관함 노출 구별
+}
+
+def get_dashboard_data(self, db_type, limit=10):
+    return {'success': True, 'items': [...]}
 ```
 
 ---
 
-## Example Template (최신 예시 템플릿)
+## 6. 도서 컨텍스트 메뉴 & 웹훅 알림 확장 계약
 
-다음은 UI 연동 및 DB 설정값 불러오기가 모두 포함된 완벽한 미국 Google Books API 플러그인 예시입니다.
+### 📌 컨텍스트 메뉴 확장 (`get_context_menu_items`)
+
+도서 카드(대시보드/목록/상세 공통) 우클릭 컨텍스트 메뉴에 커스텀 메뉴 항목을 추가할 수 있습니다.
 
 ```python
-# -*- coding: utf-8 -*-
-import os
-import json
-import database
-from plugins.metadata.base import BaseMetadataProvider
-
-class GoogleMetadataProvider(BaseMetadataProvider):
-    """
-    US Google Books API Metadata Provider Example.
-    """
-    id = "google"
-    name = "구글 도서 검색"
-    is_searchable = True
-    config_schema = [
+def get_context_menu_items(self, db_type, context):
+    return [
         {
-            "key": "GOOGLE_API_KEY", 
-            "label": "Google API Key", 
-            "type": "text", 
-            "required": True, 
-            "description": "구글 도서 검색 API를 사용하기 위한 인증 키입니다."
+            'id': 'open_vendor_search',
+            'label': '외부 사이트에서 책 제목 검색',
+            'icon': 'fa-solid fa-up-right-from-square'
         }
     ]
 
-    def _get_api_key(self, db_type):
-        """웹 UI에서 사용자가 입력하여 DB에 저장된 API Key를 불러오는 헬퍼 메서드"""
-        api_key = None
-        try:
-            conn = database.get_connection(db_type)
-            cursor = conn.cursor()
-            cursor.execute("SELECT value FROM settings WHERE key = 'PLUGIN_CONFIG_google'")
-            row = cursor.fetchone()
-            if row and row['value']:
-                config = json.loads(row['value'])
-                api_key = config.get('GOOGLE_API_KEY')
-            conn.close()
-        except Exception:
-            pass
-        return api_key
+def run_context_menu_action(self, db_type, action_id, context):
+    book_title = context.get('book_title', '')
+    return {
+        'success': True,
+        'message': '외부 검색 페이지를 새 탭으로 엽니다.',
+        'open_url': f'https://search.example.com?q={book_title}'
+    }
+```
 
-    def search(self, db_type, query):
-        api_key = self._get_api_key(db_type)
-        if not api_key:
-            return [] # API 키가 없으면 검색 중단
-            
-        if not query:
-            return []
-        
-        # TODO: Implement Google Books API request here using `api_key`.
-        # Format the results into the following structure:
-        results = [
-            {
-                'title': 'Example Book Title',
-                'author': 'Author Name',
-                'publisher': 'Publisher Name',
-                'pubDate': '2026-01-01',
-                'cover': 'https://example.com/cover.jpg',
-                'description': 'This is a description of the book.',
-                'link': 'https://books.google.com/example'
-            }
-        ]
-        return results
+### 🔔 신규 도서 감지 웹훅 이벤트 (`on_scan_new_books_detected`)
 
-    def apply(self, db_type, book_id, item_data):
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        
-        try:
-            # 1. Fetch current details
-            cursor.execute("SELECT file_path, library_id FROM books WHERE id = ?", (book_id,))
-            book = cursor.fetchone()
-            if not book:
-                conn.close()
-                return False, '도서를 찾을 수 없습니다.'
-                
-            # 2. Download and Save cover image
-            cover_filename = None
-            if item_data.get('cover'):
-                # 이미지 다운로드 및 로컬 캐싱 로직 구현...
-                pass
-                
-            # 3. Update database
-            cursor.execute("""
-                UPDATE books
-                SET author = ?, publisher = ?, summary = ?, link = ?,
-                    cover_image = COALESCE(NULLIF(?, ''), cover_image),
-                    cover_updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            """, (
-                item_data.get('author', ''),
-                item_data.get('publisher', ''),
-                item_data.get('description', ''),
-                item_data.get('link', ''),
-                cover_filename,
-                book_id
-            ))
-            
-            conn.commit()
-            conn.close()
-            return True, f'"{item_data.get("title")}" 메타데이터가 적용되었습니다!'
-        except Exception as e:
-            if conn:
-                conn.close()
-            return False, f'Error: {str(e)}'
+스캐너가 라이브러리 스캔을 완료하고 신규 도서를 감지했을 때 코어로부터 직접 이벤트를 전달받아 Discord, Slack, Telegram 등으로 웹훅을 전송할 수 있습니다.
+
+---
+
+## 7. 🎨 Dashboard Theme System Integration & UI Inheritance (대시보드 테마 시스템 연동 및 UI 상속 가이드)
+
+BookOasis supports 8 dashboard custom themes (`purple`, `dark`, `light`, `sepia`, `blue`, `aquamarine`, `ironman`, `epaper`).
+BookOasis는 8종의 대시보드 커스텀 테마를 지원합니다. 플러그인 UI가 사용자의 대시보드 테마 변경에 100% 실시간으로 연동되어 일관된 디자인을 유지하도록 개발 시 아래 전역 CSS 변수를 사용하세요.
+
+### 🎨 Global CSS Design Tokens (전역 CSS 디자인 토큰 변수)
+
+All plugin UI/HTML/CSS templates should use the global CSS variables below instead of hardcoded colors (e.g. `#ffffff`, `#1e293b`).
+모든 플러그인 UI/HTML/CSS 작성 시 하드코딩된 색상 대신 아래 전역 변수를 사용하면 테마 변경 시 자동으로 전용 색조로 전환됩니다.
+
+| CSS 변수 (Custom Property) | Description (설명 및 용도) | Usage Example (추천 사용 예시) |
+| :--- | :--- | :--- |
+| `var(--app-bg-main)` | Main background color / 메인 배경색 | 메인 컨테이너 배경 |
+| `var(--app-bg-sidebar)` | Sidebar & header background / 사이드바·상단바 배경 | 헤더, 사이드바 영역 |
+| `var(--app-bg-card)` | Card & container box background / 카드·박스 배경 | 위젯 카드, 테이블, 폼 박스 |
+| `var(--app-bg-card-hover)` | Card hover background / 카드 호버 배경 | 마우스 오버 반응 효과 |
+| `var(--app-text-primary)` | Primary text color / 기본 텍스트 색상 | 주요 제목, 본문 글씨 |
+| `var(--app-text-muted)` | Muted text color / 보조 텍스트 색상 | 설명문, 타임스탬프, 캡션 |
+| `var(--app-text-secondary)` | Secondary text color / 강조 보조 텍스트 | 서브 타이틀, 하이라이트 글씨 |
+| `var(--app-accent)` | Theme accent color / 테마 메인 강조 색상 | 주요 버튼, 활성 탭, 뱃지 |
+| `var(--app-accent-hover)` | Accent hover color / 강조 색상 호버 | 버튼 마우스 오버 시 |
+| `var(--app-border)` | Primary border color / 기본 테두리 색상 | 카드/입력창 테두리 |
+| `var(--app-border-light)` | Light border color / 은은한 구분선 색상 | 항목 간 구분선(`border-bottom`) |
+| `var(--app-input-bg)` | Input form background / 입력창 배경색 | `input`, `select`, `textarea` |
+
+---
+
+### 💻 Theme Integration Example Code (테마 연동 실전 예시 코드)
+
+#### 1) HTML (`index.html`) & CSS (`style.css`) 예시
+
+```html
+<!-- plugins/metadata/my_plugin/index.html -->
+<div class="my-plugin-card">
+    <div class="my-plugin-header">
+        <h4 class="my-plugin-title">플러그인 대시보드 위젯</h4>
+        <span class="my-plugin-badge">ACTIVE</span>
+    </div>
+    <p class="my-plugin-desc">현재 선택된 대시보드 테마와 100% 동기화되어 디자인이 변경됩니다.</p>
+    <button class="my-plugin-btn">실행하기</button>
+</div>
+```
+
+```css
+/* plugins/metadata/my_plugin/style.css */
+.my-plugin-card {
+    background: var(--app-bg-card);
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    padding: 1.25rem;
+    box-shadow: var(--app-shadow, 0 4px 12px rgba(0,0,0,0.1));
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.my-plugin-card:hover {
+    background: var(--app-bg-card-hover);
+}
+
+.my-plugin-title {
+    color: var(--app-text-primary);
+    font-size: 1.1rem;
+    margin: 0;
+}
+
+.my-plugin-desc {
+    color: var(--app-text-muted);
+    font-size: 0.88rem;
+}
+
+.my-plugin-btn {
+    background: var(--app-accent);
+    color: #ffffff;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.my-plugin-btn:hover {
+    background: var(--app-accent-hover);
+}
+```
+
+#### 2) JavaScript (`script.js`) & Dynamic Theme Event Listener (실시간 테마 감지)
+
+```javascript
+// plugins/metadata/my_plugin/script.js
+
+function getCurrentTheme() {
+    return document.documentElement.getAttribute('data-app-theme') || 'purple';
+}
+
+const themeObserver = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'data-app-theme') {
+            const newTheme = getCurrentTheme();
+            console.log(`[MyPlugin] 테마 변경 감지됨: ${newTheme}`);
+            onThemeChanged(newTheme);
+        }
+    });
+});
+
+themeObserver.observe(document.documentElement, { attributes: true });
+
+function onThemeChanged(themeName) {
+    // 차트 또는 커스텀 JS 그래픽 색상 재설정 로직
+}
+```
+
+#### 3) External iframe Plugin Theme Synchronization (iframe 기반 독립 플러그인 테마 수신)
+
+```javascript
+// iframe 내부 플러그인 JS 코드 예시
+window.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'BOOKOASIS_THEME_CHANGE') {
+        const currentTheme = event.data.theme;
+        document.documentElement.setAttribute('data-app-theme', currentTheme);
+    }
+});
 ```
 
 ---
 
-## How to Enable the Plugin (플러그인 활성화 방법)
+## 8. 구현 예시 코드 & DB 게이트웨이 활용
 
-In the past, you had to modify `METADATA_PROVIDER` in the `.env` file, but in the latest architecture, everything is controlled from the Web Browser UI.
+### 💾 안전한 DB 액세스 (`self.get_db_gateway()`)
 
-과거에는 `.env` 파일의 `METADATA_PROVIDER`를 수정해야 했으나, 최신 아키텍처에서는 웹 브라우저 UI에서 모든 것을 제어합니다.
-
-1. Write the code and save it in the `plugins/metadata/` folder. (코드를 작성하여 `plugins/metadata/` 폴더에 저장합니다.)
-2. Restart the media server. (미디어 서버를 재시작합니다.)
-3. Access the **Settings > Plugin Settings** tab in the Web UI, and your written plugin will be automatically displayed. (웹 UI의 **환경설정 > 플러그인 설정** 탭에 접속하면 작성하신 플러그인이 자동으로 표시됩니다.)
-4. **Enable (ON)** the plugin in that tab, enter configuration values like API Keys, and save. (해당 탭에서 플러그인을 **활성화(ON)**하고 API Key 등의 설정값을 입력한 뒤 저장합니다.)
-
-If your plugin provides `index.html` and `style.css`, the plugin settings tab will render that custom UI automatically. (`index.html`, `style.css`가 있으면 설정 탭에서 플러그인 전용 UI가 자동 렌더링됩니다.)
-5. Plugins with `is_searchable = True` will automatically be added as a dropdown option in the "Manual Metadata Matching" search modal on the book details page. (`is_searchable = True`인 플러그인들은 도서 상세 보기의 "수동 메타데이터 매칭" 검색 모달에 드롭다운 옵션으로 자동 추가됩니다.)
-
-### Sample: Naver Book Search Context Menu (샘플: 네이버 도서 검색 컨텍스트 메뉴)
-
-If you only want to add a quick external search action for the current book, use the context menu contract. This is a good starter example for community plugins because it does not require any external API key.
-
-현재 도서에 대해 외부 검색만 빠르게 열고 싶다면 컨텍스트 메뉴 계약을 사용하세요. 이 방식은 API 키가 필요 없어서 커뮤니티 샘플로 적합합니다.
-
-Example file:
-
-- `plugins/metadata/naver_book/naver_book.py`
-
-Key behavior:
-
-- Reads `book_id` and `book_title` from the context payload
-- Optionally loads the latest `title` and `author` from DB via `self.get_db_gateway(db_type)`
-- Returns `open_url` to open `https://book.naver.com/search/search.naver?query=...`
-
-핵심 동작:
-
-- 컨텍스트 payload의 `book_id`, `book_title`을 읽습니다.
-- 필요하면 `self.get_db_gateway(db_type)`로 DB에서 최신 `title`/`author`를 다시 읽습니다.
-- `open_url`을 반환하여 `https://book.naver.com/search/search.naver?query=...`를 새 탭으로 엽니다.
-
-Recommended pattern:
+플러그인 내부에서 `import database`를 직접 호출하는 대신, Base Class가 제공하는 게이트웨이를 사용하십시오.
 
 ```python
-class NaverBookMetadataProvider(BaseMetadataProvider):
-    id = "naver_book"
-    name = "네이버 도서 검색"
-    is_searchable = False
-
-    def search(self, db_type, query):
-        return []
-
-    def apply(self, db_type, book_id, item_data):
-        return False, "..."
-
-    def get_context_menu_items(self, db_type, context):
-        return [{"id": "open_naver_book_search", "label": "네이버 도서에서 검색", "icon": "fa-solid fa-book-open"}]
-
-    def run_context_menu_action(self, db_type, action_id, context):
-        ...
+def _get_total_books(self, db_type):
+    gateway = self.get_db_gateway(db_type)
+    row = gateway.fetch_one("SELECT COUNT(*) AS cnt FROM books WHERE COALESCE(is_deleted, 0) = 0")
+    return int((row["cnt"] if row else 0) or 0)
 ```
 
 ---
 
-### 💡 Tip: Handling iframe Security Constraints (iframe 보안 제약 사항 처리 팁)
-When displaying external web content inside a custom plugin dashboard via `<iframe>`, you may encounter loading failures due to security policies.
-커스텀 플러그인 화면에서 `<iframe>`을 이용해 외부 웹 사이트를 렌더링할 때, 보안 헤더 제약으로 인해 페이지 로딩이 실패할 수 있습니다.
+## 9. 💡 Tip: iframe 외부 연동 시 보안 제약 사항 안내
 
-1. **X-Frame-Options / CSP (Content Security Policy)**:
-   - Many websites set `X-Frame-Options: SAMEORIGIN` or `Content-Security-Policy: frame-ancestors` headers (e.g. Google, Naver, GitHub) to prevent clickjacking. These sites **cannot** be rendered inside an iframe directly.
-   - 클릭재킹 방지를 위해 `X-Frame-Options: SAMEORIGIN` 등이 선언된 메이저 웹 사이트들은 브라우저 수준에서 iframe 렌더링이 차단됩니다.
-   - **Solution**: Implement a reverse proxy route in your plugin's python backend to fetch the HTML, strip out the restrictive headers, and return it to the frontend iframe. Or, simply use `target="_blank"` to open it in a new tab.
-   - **해결책**: 플러그인 파이썬 백엔드에서 외부 웹페이지를 `requests` 등으로 읽어 들여 헤더를 거르고 중계해주는 Proxy API를 만들거나, `target="_blank"` 속성을 사용해 새 창으로 링크아웃 처리하십시오.
+독립된 플러그인 화면에서 `<iframe>`을 사용해 외부 웹 서비스를 끌어오고자 할 때는 브라우저 보안 제약에 유의해야 합니다.
 
-2. **Mixed Content**:
-   - If the BookOasis server runs on HTTPS, any iframe URL must also use `https://`. Unencrypted `http://` resources will be blocked by browsers.
-   - BookOasis 미디어 서버가 HTTPS 프로토콜로 작동하고 있는 경우, iframe의 src 주소 역시 반드시 `https://` 보안 통신 주소여야 로드됩니다. (`http://`는 Mixed Content 차단 대상)
-
+1. **X-Frame-Options / CSP 차단**:
+   - `X-Frame-Options: SAMEORIGIN` 또는 `Content-Security-Policy` 헤더를 통해 프레임 삽입을 차단하는 메이저 웹 사이트(예: Google, Naver 등)는 iframe으로 직접 로드가 불가능합니다.
+   - **해결 방안**: 플러그인 파이썬 백엔드(Python)에서 `requests`로 웹 콘텐츠를 가져온 뒤 보안 헤더를 제거하여 반환하는 Proxy API를 구축하거나, `target="_blank"` 속성을 사용하여 새 창/새 탭으로 링크아웃 처리하십시오.
+2. **Mixed Content 차단**:
+   - BookOasis 웹 서비스가 SSL(HTTPS) 환경에서 제공되는 경우, iframe 내부의 URL 역시 반드시 `https://` 보안 통신 주소여야 합니다. (`http://` 주소는 브라우저에 의해 자동 차단됨)

@@ -95,6 +95,8 @@
     "theme_light": "☀️ Modern Light (Clean White)",
     "theme_sepia": "📜 Classic Sepia (Warm Sepia)",
     "theme_blue": "🌊 Deep Blue (Midnight Navy)",
+    "theme_aquamarine": "🌊 Aqua Orange (Kavita Aquamarine)",
+    "theme_ironman": "🤖 Iron Red (Iron Crimson & Gold)",
     "theme_epaper": "📖 E-Paper Dedicated (E-Reader High Contrast)",
     "plugins_title": "Extension Features & Plugins",
     "plugins_subtitle": "Manage activation toggles and details configurations for loaded dynamic plugins.",

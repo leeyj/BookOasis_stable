@@ -69,7 +69,7 @@ export const txtRuntimeState = {
 import { showViewerLoading, hideViewerLoading, showViewerError, showToast } from './view_manager.js';
 import { saveProgress } from './viewer_progress.js';
 import { initPageStep, initReadingDirection, getComicReadingDirection } from './viewer/reader_settings.js';
-import { getTxtPageAdvanceWidth, snapTxtPageScrollLeft } from './viewer/txt_page_utils.js';
+import { getTxtPageAdvanceWidth, snapTxtPageScrollLeft, applyTxtTwoPageTrailingSpacer } from './viewer/txt_page_utils.js';
 import { chunkText, formatTxtToHtml, stripHtml } from './viewer/txt_text_utils.js';
 import { renderTxtChunkView, applyTxtParagraphStyles } from './viewer/txt_render.js';
 import { getTxtAnchorInfoByMode, restoreTxtAnchorInfoByMode } from './viewer/txt_anchor_utils.js';
@@ -570,6 +570,7 @@ function showTxtRestoreLoadingToast(msg = null) {
 
 function renderCurrentChunk(initMode = false) {
   const contentArea = document.getElementById('txt-content-area');
+  const scrollWrapper = document.getElementById('txt-scroll-wrapper');
   if (!contentArea) return;
 
   const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
@@ -604,6 +605,7 @@ function renderCurrentChunk(initMode = false) {
   if (!rendered) return;
 
   applyDynamicParagraphStyles();
+  applyTxtTwoPageTrailingSpacer(scrollWrapper, contentArea);
   updateTxtSeekBar();
   syncActiveEpubToc();
   saveProgress(state.activeBookId, currentChunkIdx, txtChunks.length);

@@ -73,6 +73,128 @@ BookOasis 플러그인은 화면 목적에 따라 2가지 독립된 UI 번들을
    - 관리자 [환경설정 ⚙️] -> [플러그인 설정] 탭 카드 내부에 표시되는 전용 커스텀 입력 폼 UI입니다.
    - `settings.html`이 존재하지 않을 경우, 플러그인 클래스의 `config_schema` 파이썬 배열을 기반으로 입체적인 설정 폼이 자동 생성됩니다.
 
+### 🎨 대시보드 테마 시스템 연동 및 UI 상속 가이드 (Dashboard Theme Integration & UI Inheritance)
+
+BookOasis supports 8 dashboard custom themes (`purple`, `dark`, `light`, `sepia`, `blue`, `aquamarine`, `ironman`, `epaper`).
+BookOasis는 8종의 대시보드 커스텀 테마를 지원합니다. 플러그인 UI가 사용자의 대시보드 테마 변경에 100% 실시간으로 연동되어 일관된 디자인을 유지하도록 아래 전역 CSS 변수를 사용하세요.
+
+#### 🎨 Global CSS Design Tokens (전역 CSS 디자인 토큰 변수)
+
+All plugin UI/HTML/CSS templates should use the global CSS variables below instead of hardcoded colors (e.g. `#ffffff`, `#1e293b`).
+모든 플러그인 UI/HTML/CSS 작성 시 하드코딩된 색상 대신 아래 전역 변수를 사용하면 테마 변경 시 자동으로 전용 색조로 전환됩니다.
+
+| CSS 변수 (Custom Property) | Description (설명 및 용도) | Usage Example (추천 사용 예시) |
+| :--- | :--- | :--- |
+| `var(--app-bg-main)` | Main background color / 메인 배경색 | 메인 컨테이너 배경 |
+| `var(--app-bg-sidebar)` | Sidebar & header background / 사이드바·상단바 배경 | 헤더, 사이드바 영역 |
+| `var(--app-bg-card)` | Card & container box background / 카드·박스 배경 | 위젯 카드, 테이블, 폼 박스 |
+| `var(--app-bg-card-hover)` | Card hover background / 카드 호버 배경 | 마우스 오버 반응 효과 |
+| `var(--app-text-primary)` | Primary text color / 기본 텍스트 색상 | 주요 제목, 본문 글씨 |
+| `var(--app-text-muted)` | Muted text color / 보조 텍스트 색상 | 설명문, 타임스탬프, 캡션 |
+| `var(--app-text-secondary)` | Secondary text color / 강조 보조 텍스트 | 서브 타이틀, 하이라이트 글씨 |
+| `var(--app-accent)` | Theme accent color / 테마 메인 강조 색상 | 주요 버튼, 활성 탭, 뱃지 |
+| `var(--app-accent-hover)` | Accent hover color / 강조 색상 호버 | 버튼 마우스 오버 시 |
+| `var(--app-border)` | Primary border color / 기본 테두리 색상 | 카드/입력창 테두리 |
+| `var(--app-border-light)` | Light border color / 은은한 구분선 색상 | 항목 간 구분선(`border-bottom`) |
+| `var(--app-input-bg)` | Input form background / 입력창 배경색 | `input`, `select`, `textarea` |
+
+#### 💻 Theme Integration Example Code (테마 연동 실전 예시 코드)
+
+##### 1) HTML (`index.html`) & CSS (`style.css`) Sample
+
+```html
+<!-- plugins/metadata/my_plugin/index.html -->
+<div class="my-plugin-card">
+    <div class="my-plugin-header">
+        <h4 class="my-plugin-title">플러그인 대시보드 위젯 (Plugin Dashboard Widget)</h4>
+        <span class="my-plugin-badge">ACTIVE</span>
+    </div>
+    <p class="my-plugin-desc">현재 선택된 대시보드 테마와 100% 동기화되어 디자인이 변경됩니다.</p>
+    <button class="my-plugin-btn">실행하기</button>
+</div>
+```
+
+```css
+/* plugins/metadata/my_plugin/style.css */
+.my-plugin-card {
+    background: var(--app-bg-card);
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    padding: 1.25rem;
+    box-shadow: var(--app-shadow, 0 4px 12px rgba(0,0,0,0.1));
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.my-plugin-card:hover {
+    background: var(--app-bg-card-hover);
+}
+
+.my-plugin-title {
+    color: var(--app-text-primary);
+    font-size: 1.1rem;
+    margin: 0;
+}
+
+.my-plugin-desc {
+    color: var(--app-text-muted);
+    font-size: 0.88rem;
+}
+
+.my-plugin-btn {
+    background: var(--app-accent);
+    color: #ffffff;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.my-plugin-btn:hover {
+    background: var(--app-accent-hover);
+}
+```
+
+##### 2) JavaScript (`script.js`) & Dynamic Theme Event Listener
+
+```javascript
+// plugins/metadata/my_plugin/script.js
+
+// Get active dashboard theme identifier / 현재 적용된 대시보드 테마 식별자 가져오기
+function getCurrentTheme() {
+    return document.documentElement.getAttribute('data-app-theme') || 'purple';
+}
+
+// Observe dynamic theme attribute changes / 테마 변경 동적 감지 (HTML data-app-theme 모니터링)
+const themeObserver = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'data-app-theme') {
+            const newTheme = getCurrentTheme();
+            console.log(`[MyPlugin] Theme changed: ${newTheme}`);
+            onThemeChanged(newTheme);
+        }
+    });
+});
+
+themeObserver.observe(document.documentElement, { attributes: true });
+
+function onThemeChanged(themeName) {
+    // Re-render chart or canvas elements if needed / 필요 시 차트나 캔버스 재그리기
+}
+```
+
+##### 3) External iframe Plugin Theme Synchronization (iframe 독립 플러그인 테마 수신)
+
+```javascript
+// Inside iframe plugin JS code / iframe 내부 플러그인 수신 코드
+window.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'BOOKOASIS_THEME_CHANGE') {
+        const currentTheme = event.data.theme; // e.g. 'ironman', 'aquamarine'
+        document.documentElement.setAttribute('data-app-theme', currentTheme);
+    }
+});
+```
+
 ---
 
 ## 3. 플러그인 클래스 기본 계약

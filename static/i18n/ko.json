@@ -95,6 +95,8 @@
     "theme_light": "☀️ 모던 라이트 (Clean White)",
     "theme_sepia": "📜 클래식 세피아 (Warm Sepia)",
     "theme_blue": "🌊 딥 블루 (Midnight Navy)",
+    "theme_aquamarine": "🌊 아쿠아 오렌지 (Kavita Aquamarine)",
+    "theme_ironman": "🤖 아이언 레드 (Iron Crimson & Gold)",
     "theme_epaper": "📖 E-Paper 전용 (전자종이 흑백 고대비)",
     "plugins_title": "확장 기능 및 플러그인 관리",
     "plugins_subtitle": "서버에 로드된 동적 플러그인의 활성화 여부(ON/OFF) 및 상세 환경설정 값을 일괄 관리합니다.",

@@ -1,9 +1,13 @@
 # CHANGELOG
+## v1.5.5
+- 홀수 페이지에서 마지막 이전 장이 중복표시되는 오류 수정 | fix the issue that the last previous chapter is displayed repeatedly on an odd page
+- 테마 수정 및 추가(아이언맨, 아쿠아마린, 블루) | theme fix and add(ironman, aquamarine, blue)
+- 플러그인에 테마 연동 지원 | support theme integration in plugins
+
 ## v1.5.4
 - 키보드 방향키(또는 스페이스바)를 통한 다음 권 이동 지원 | support keyboard directional keys(or space bar) to move to the next volume
 - lazy 스캐너 타임아웃시 에러 표시 강화[bug: #2] | Improve error display when lazy scanner times out[bug: #2]
-- 테마 변경 기능 지원(환경설정->일반설정) | apply the theme
-
+- 테마 기능 추가(환경설정-> 일반설정) | add theme function(settings->general settings)
 ## v1.5.3
 - 코드 안정화 | code stabilization
 - 뷰어 txt 관련 코드 구조 개선 | viewer txt code structure improvement

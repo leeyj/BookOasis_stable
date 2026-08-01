@@ -29,11 +29,11 @@
     position: relative !important;
     top: 0 !important;
     border-right: none;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+    border-bottom: 1px solid var(--app-border-light);
     padding: 0.8rem 0.75rem !important;
     gap: 0.35rem;
     overflow: hidden;
-    background: rgba(15, 23, 42, 0.9);
+    background: var(--app-bg-sidebar);
     border-radius: 8px;
     box-sizing: border-box;
 }
@@ -47,7 +47,7 @@
     pointer-events: auto !important;
     overflow: visible !important;
     border-right: none;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+    border-bottom: 1px solid var(--app-border-light);
 }
 
 .sidebar-header-wrapper {
@@ -95,7 +95,7 @@
     margin: 0 !important;
     padding: 0.45rem 0 0 0 !important;
     justify-content: flex-start !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    border-top: 1px solid var(--app-border-light);
 }
 
 .sidebar-collapsible-content.show > div:first-child {
@@ -124,13 +124,13 @@
     padding: 0.6rem 0.8rem;
     font-size: 0.9rem;
     justify-content: flex-start;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--app-border);
+    background: var(--app-bg-card);
 }
 
 .sidebar-menu .menu-item:hover {
-    border-color: rgba(255, 255, 255, 0.24);
-    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--app-accent);
+    background: var(--app-bg-card-hover);
 }
 
 .sidebar-menu .menu-item.active {
@@ -140,7 +140,7 @@
 /* 프로필 및 로그아웃 영역 재배치 */
 .sidebar-settings-wrap {
     margin-top: 1rem !important; /* HTML 인라인 margin-top 오버라이드 */
-    border-top: 1px solid rgba(255, 255, 255, 0.16);
+    border-top: 1px solid var(--app-border-light);
     padding-top: 1rem;
 }
 
