@@ -10,6 +10,9 @@
                 <button class="settings-tab-btn" onclick="switchSettingsTab('viewer')">
                     <i class="fa-solid fa-book-open"></i> <span data-i18n="settings.tab_viewer">뷰어 설정</span>
                 </button>
+                <button class="settings-tab-btn" onclick="switchSettingsTab('keys')">
+                    <i class="fa-solid fa-keyboard"></i> <span data-i18n="settings.tab_keys">키 설정</span>
+                </button>
                 <button class="settings-tab-btn" onclick="switchSettingsTab('plugins')">
                     <i class="fa-solid fa-plug"></i> <span data-i18n="settings.tab_plugins">플러그인 설정</span>
                 </button>
@@ -19,7 +22,7 @@
                 <button class="settings-tab-btn" onclick="switchSettingsTab('trash')">
                     <i class="fa-solid fa-trash-can"></i> <span data-i18n="settings.tab_trash">삭제 관리</span>
                 </button>
-                 <button class="settings-tab-btn" id="settings-tab-btn-users" onclick="switchSettingsTab('users')" style="display: none;">
+                <button class="settings-tab-btn" id="settings-tab-btn-users" onclick="switchSettingsTab('users')" style="display: none;">
                     <i class="fa-solid fa-users"></i> <span data-i18n="settings.tab_users">사용자 관리</span>
                 </button>
                 <button class="settings-tab-btn" id="settings-tab-btn-permissions" onclick="switchSettingsTab('permissions')" style="display: none;">
@@ -46,6 +49,9 @@
 
             <!-- 2.5 뷰어 설정 탭 -->
             {% include "components/settings/viewer_tab.html" %}
+
+            <!-- 2.8 단축키 및 물리 키 설정 탭 -->
+            {% include "components/settings/keys_tab.html" %}
 
             <!-- 3. 플러그인 설정 탭 -->
             {% include "components/settings/plugins_tab.html" %}

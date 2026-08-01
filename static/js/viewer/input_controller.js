@@ -34,35 +34,51 @@ function handleViewerKeydown(e) {
     return;
   }
 
-  switch (e.key) {
-    case 'f':
-    case 'F':
-      e.preventDefault();
+  // 커스텀 매핑 키 (기본값 + localStorage 커스텀 지정키)
+  const customNextKeys = (localStorage.getItem('custom_key_next') || 'ArrowRight,Space,PageDown,VolumeDown,ChannelDown,AudioVolumeDown').split(',').map(k => k.trim().toLowerCase());
+  const customPrevKeys = (localStorage.getItem('custom_key_prev') || 'ArrowLeft,PageUp,VolumeUp,ChannelUp,AudioVolumeUp').split(',').map(k => k.trim().toLowerCase());
+  const customCloseKeys = (localStorage.getItem('custom_key_close') || 'Escape').split(',').map(k => k.trim().toLowerCase());
+  const customDashboardKeys = (localStorage.getItem('custom_key_dashboard') || 'Home').split(',').map(k => k.trim().toLowerCase());
+
+  const currentKey = (e.key || '').toLowerCase();
+
+  if (e.key === 'f' || e.key === 'F') {
+    e.preventDefault();
+    callDep('toggleFullscreenViewer');
+    return;
+  }
+
+  if (customCloseKeys.includes(currentKey)) {
+    const inFullscreen = !!(
+      viewerModal.classList.contains('fullscreen-mode') ||
+      (typeof _deps.isViewerInFullscreen === 'function' && _deps.isViewerInFullscreen())
+    );
+    e.preventDefault();
+    if (inFullscreen) {
       callDep('toggleFullscreenViewer');
-      break;
-    case 'Escape': {
-      const inFullscreen = !!(
-        viewerModal.classList.contains('fullscreen-mode') ||
-        (typeof _deps.isViewerInFullscreen === 'function' && _deps.isViewerInFullscreen())
-      );
-      if (inFullscreen) {
-        callDep('toggleFullscreenViewer');
-      } else {
-        callDep('closeMediaViewer');
-      }
-      break;
+    } else {
+      callDep('closeMediaViewer');
     }
-    case 'ArrowRight':
-    case ' ':
-      e.preventDefault();
-      callDep('nextPage');
-      break;
-    case 'ArrowLeft':
-      e.preventDefault();
-      callDep('prevPage');
-      break;
-    default:
-      break;
+    return;
+  }
+
+  if (customDashboardKeys.includes(currentKey) || (e.altKey && (e.key === 'Home' || e.key === 'home'))) {
+    e.preventDefault();
+    callDep('closeMediaViewer');
+    if (typeof window.showDashboardView === 'function') window.showDashboardView();
+    return;
+  }
+
+  if (customNextKeys.includes(currentKey) || e.key === ' ' || e.key === 'ArrowRight') {
+    e.preventDefault();
+    callDep('nextPage');
+    return;
+  }
+
+  if (customPrevKeys.includes(currentKey) || e.key === 'ArrowLeft') {
+    e.preventDefault();
+    callDep('prevPage');
+    return;
   }
 }
 
@@ -223,10 +239,14 @@ export function initViewerClickToggle() {
   if (!viewerBody || viewerClickToggleInited) return;
   viewerClickToggleInited = true;
 
-  const TAP_THRESHOLD = 10;
+  const TAP_THRESHOLD = 15;
+  const SWIPE_MIN_DISTANCE = 40;
+  const SWIPE_MAX_TIME = 600;
+
   let touchStartX = null;
   let touchStartY = null;
-  let touchStartClientX = null;
+  let touchStartTime = 0;
+  let isMultiTouch = false;
   let lastTouchEndTime = 0;
 
   document.addEventListener(
@@ -235,19 +255,10 @@ export function initViewerClickToggle() {
       if (e.touches.length === 1) {
         touchStartX = e.touches[0].clientX;
         touchStartY = e.touches[0].clientY;
-        touchStartClientX = e.touches[0].clientX;
-      }
-    },
-    { passive: true }
-  );
-
-  document.addEventListener(
-    'touchmove',
-    (e) => {
-      if (touchStartX === null) return;
-      const dx = Math.abs(e.touches[0].clientX - touchStartX);
-      const dy = Math.abs(e.touches[0].clientY - touchStartY);
-      if (dx > TAP_THRESHOLD || dy > TAP_THRESHOLD) {
+        touchStartTime = Date.now();
+        isMultiTouch = false;
+      } else {
+        isMultiTouch = true;
         touchStartX = null;
         touchStartY = null;
       }
@@ -256,17 +267,33 @@ export function initViewerClickToggle() {
   );
 
   document.addEventListener(
+    'touchmove',
+    (e) => {
+      if (e.touches.length > 1) {
+        isMultiTouch = true;
+      }
+    },
+    { passive: true }
+  );
+
+  document.addEventListener(
     'touchend',
     (e) => {
-      if (touchStartX === null) return;
+      if (touchStartX === null || isMultiTouch) return;
+      if (!e.changedTouches || e.changedTouches.length === 0) return;
 
-      const endX = touchStartClientX;
+      const endX = e.changedTouches[0].clientX;
+      const endY = e.changedTouches[0].clientY;
+      const duration = Date.now() - touchStartTime;
+
+      const diffX = touchStartX - endX; // 양수: Swipe Left(👈), 음수: Swipe Right(👉)
+      const diffY = touchStartY - endY;
+
+      const startX = touchStartX;
+      const startY = touchStartY;
+
       touchStartX = null;
       touchStartY = null;
-      touchStartClientX = null;
-
-      const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
-      if (scrollMode !== 'scroll') return;
 
       const target = e.target || document.elementFromPoint(endX, window.innerHeight / 2);
       if (!target) return;
@@ -287,13 +314,45 @@ export function initViewerClickToggle() {
       const viewerModal = document.getElementById('media-viewer-modal');
       if (!viewerModal || viewerModal.style.display !== 'flex') return;
 
-      const width = window.innerWidth;
-      console.log(`[Viewer-Touch-Toggle] touchend tap: endX=${endX}, width=${width}, ratio=${endX / width}`);
+      const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
+      const absX = Math.abs(diffX);
+      const absY = Math.abs(diffY);
 
-      if (endX >= width * 0.3 && endX <= width * 0.7) {
-        console.log('[Viewer-Touch-Toggle] Triggering toggleComicOverlay() from touchend');
+      // 📱 1) 스와이프 제스처 처리 (페이지 모드일 때 수평 스와이프)
+      if (scrollMode === 'page' && absX >= SWIPE_MIN_DISTANCE && absX > absY * 1.2 && duration <= SWIPE_MAX_TIME) {
+        const isComic = state.currentViewerFormat === 'zip' || state.currentViewerFormat === 'cbz';
+        const isRtl = isComic && (localStorage.getItem('comic_reading_direction') === 'rtl');
+
         lastTouchEndTime = Date.now();
-        callDep('toggleComicOverlay');
+
+        if (diffX > 0) {
+          // 👈 Swipe Left (오른쪽에서 왼쪽으로 쓸어넘김)
+          console.log(`[Viewer-Touch-Swipe] Swipe Left detected (diffX=${diffX}, isRtl=${isRtl})`);
+          if (isRtl) {
+            callDep('prevPage');
+          } else {
+            callDep('nextPage');
+          }
+        } else {
+          // 👉 Swipe Right (왼쪽에서 오른쪽으로 쓸어넘김)
+          console.log(`[Viewer-Touch-Swipe] Swipe Right detected (diffX=${diffX}, isRtl=${isRtl})`);
+          if (isRtl) {
+            callDep('nextPage');
+          } else {
+            callDep('prevPage');
+          }
+        }
+        return;
+      }
+
+      // 📱 2) 단순 탭(Tap) 오버레이 토글 처리
+      if (absX < TAP_THRESHOLD && absY < TAP_THRESHOLD) {
+        const width = window.innerWidth;
+        if (endX >= width * 0.3 && endX <= width * 0.7) {
+          console.log('[Viewer-Touch-Toggle] Triggering toggleComicOverlay() from touchend tap');
+          lastTouchEndTime = Date.now();
+          callDep('toggleComicOverlay');
+        }
       }
     },
     { passive: true }

@@ -1,0 +1,190 @@
+<!-- 키 설정 탭 (Key Settings & Hardware Button Mapping) -->
+<div id="settings-tab-keys" class="settings-tab-content" style="display: none; flex-direction: column; gap: 1.5rem; width: 100%; padding-bottom: 6rem;">
+    <div class="settings-card" style="background: var(--app-bg-card); border: 1px solid var(--app-border); border-radius: 12px; padding: 1.5rem; box-shadow: var(--app-shadow, 0 4px 12px rgba(0,0,0,0.08));">
+        <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 1.2rem; border-bottom: 1px solid var(--app-border-light); padding-bottom: 1rem;">
+            <i class="fa-solid fa-keyboard" style="color: var(--app-accent); font-size: 1.4rem;"></i>
+            <div>
+                <h3 style="margin: 0; color: var(--app-text-primary); font-size: 1.15rem; font-weight: 700;" data-i18n="settings.key_tab_title">단축키 및 물리 버튼 매핑 설정</h3>
+                <p style="margin: 0.2rem 0 0 0; color: var(--app-text-muted); font-size: 0.85rem;" data-i18n="settings.key_tab_desc">키보드 단축키 및 E-ink 이북 리더기의 하드웨어 물리 버튼(볼륨키, 페이지 버튼 등)을 원하는 대로 지정할 수 있습니다.</p>
+                <div style="margin-top: 0.4rem; font-size: 0.8rem; color: var(--app-accent); font-weight: 600; display: flex; align-items: center; gap: 0.4rem;">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <span data-i18n="settings.key_direction_note">"왼쪽➔오른쪽 넘김" 기준이며, 읽는 방향 변경 시 반대로 전환되어 직관적으로 동작합니다.</span>
+                </div>
+            </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 1.2rem;">
+            <!-- 1. 다음 페이지 / 다음 권 -->
+            <div class="library-form-group">
+                <label style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                    <i class="fa-solid fa-circle-arrow-right" style="color: var(--app-accent); margin-right: 0.3rem;"></i>
+                    <span data-i18n="settings.key_next_label">다음 페이지 / 다음 권</span>
+                </label>
+                <div class="shortcut-controls-wrap" style="display: flex; gap: 0.5rem; max-width: 580px; width: 100%;">
+                    <input type="text" id="setting-key-next-display" readonly style="flex: 1; background: var(--app-bg-sidebar); border: 1px solid var(--app-border); color: var(--app-accent); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; font-family: monospace; font-weight: bold; text-align: center; cursor: default;" value="ArrowRight, Space, PageDown, VolumeDown">
+                    <button type="button" class="btn-toggle btn-record-key" data-target="next" style="background: var(--app-accent); color: #fff; border: none; padding: 0.6rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.3rem; height: 38px;">
+                        <i class="fa-solid fa-microphone"></i> <span data-i18n="settings.btn_record">기록 시작</span>
+                    </button>
+                    <button type="button" class="btn-toggle btn-reset-key" data-target="next" style="background: var(--app-bg-card-hover); border: 1px solid var(--app-border); color: var(--app-text-primary); padding: 0.6rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.3rem; height: 38px;">
+                        <span data-i18n="settings.btn_reset">초기화</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 2. 이전 페이지 -->
+            <div class="library-form-group">
+                <label style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                    <i class="fa-solid fa-circle-arrow-left" style="color: var(--app-accent); margin-right: 0.3rem;"></i>
+                    <span data-i18n="settings.key_prev_label">이전 페이지</span>
+                </label>
+                <div class="shortcut-controls-wrap" style="display: flex; gap: 0.5rem; max-width: 580px; width: 100%;">
+                    <input type="text" id="setting-key-prev-display" readonly style="flex: 1; background: var(--app-bg-sidebar); border: 1px solid var(--app-border); color: var(--app-accent); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; font-family: monospace; font-weight: bold; text-align: center; cursor: default;" value="ArrowLeft, PageUp, VolumeUp">
+                    <button type="button" class="btn-toggle btn-record-key" data-target="prev" style="background: var(--app-accent); color: #fff; border: none; padding: 0.6rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.3rem; height: 38px;">
+                        <i class="fa-solid fa-microphone"></i> <span data-i18n="settings.btn_record">기록 시작</span>
+                    </button>
+                    <button type="button" class="btn-toggle btn-reset-key" data-target="prev" style="background: var(--app-bg-card-hover); border: 1px solid var(--app-border); color: var(--app-text-primary); padding: 0.6rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.3rem; height: 38px;">
+                        <span data-i18n="settings.btn_reset">초기화</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 3. 뷰어 닫기 -->
+            <div class="library-form-group">
+                <label style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                    <i class="fa-solid fa-xmark" style="color: var(--app-accent); margin-right: 0.3rem;"></i>
+                    <span data-i18n="settings.key_close_label">뷰어 닫기</span>
+                </label>
+                <div class="shortcut-controls-wrap" style="display: flex; gap: 0.5rem; max-width: 580px; width: 100%;">
+                    <input type="text" id="setting-key-close-display" readonly style="flex: 1; background: var(--app-bg-sidebar); border: 1px solid var(--app-border); color: var(--app-accent); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; font-family: monospace; font-weight: bold; text-align: center; cursor: default;" value="Escape">
+                    <button type="button" class="btn-toggle btn-record-key" data-target="close" style="background: var(--app-accent); color: #fff; border: none; padding: 0.6rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.3rem; height: 38px;">
+                        <i class="fa-solid fa-microphone"></i> <span data-i18n="settings.btn_record">기록 시작</span>
+                    </button>
+                    <button type="button" class="btn-toggle btn-reset-key" data-target="close" style="background: var(--app-bg-card-hover); border: 1px solid var(--app-border); color: var(--app-text-primary); padding: 0.6rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.3rem; height: 38px;">
+                        <span data-i18n="settings.btn_reset">초기화</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 4. 대시보드 이동 -->
+            <div class="library-form-group">
+                <label style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                    <i class="fa-solid fa-house" style="color: var(--app-accent); margin-right: 0.3rem;"></i>
+                    <span data-i18n="settings.key_dashboard_label">대시보드 이동</span>
+                </label>
+                <div class="shortcut-controls-wrap" style="display: flex; gap: 0.5rem; max-width: 580px; width: 100%;">
+                    <input type="text" id="setting-key-dashboard-display" readonly style="flex: 1; background: var(--app-bg-sidebar); border: 1px solid var(--app-border); color: var(--app-accent); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; font-family: monospace; font-weight: bold; text-align: center; cursor: default;" value="Home">
+                    <button type="button" class="btn-toggle btn-record-key" data-target="dashboard" style="background: var(--app-accent); color: #fff; border: none; padding: 0.6rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.3rem; height: 38px;">
+                        <i class="fa-solid fa-microphone"></i> <span data-i18n="settings.btn_record">기록 시작</span>
+                    </button>
+                    <button type="button" class="btn-toggle btn-reset-key" data-target="dashboard" style="background: var(--app-bg-card-hover); border: 1px solid var(--app-border); color: var(--app-text-primary); padding: 0.6rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.3rem; height: 38px;">
+                        <span data-i18n="settings.btn_reset">초기화</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 5. 도서관 검색 단축키 (이관된 항목) -->
+            <div class="library-form-group">
+                <label style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                    <i class="fa-solid fa-magnifying-glass" style="color: var(--app-accent); margin-right: 0.3rem;"></i>
+                    <span data-i18n="settings.search_shortcut_label">도서관 검색 단축키 설정</span>
+                </label>
+                <div class="shortcut-controls-wrap" style="display: flex; gap: 0.5rem; max-width: 580px; width: 100%;">
+                    <input type="text" id="setting-search-shortcut-display" readonly style="flex: 1; background: var(--app-bg-sidebar); border: 1px solid var(--app-border); color: var(--app-accent); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; font-family: monospace; font-weight: bold; text-align: center; cursor: default;" placeholder="Alt + ` (기본값)">
+                    <button type="button" id="btn-record-shortcut" class="btn-toggle" style="background: var(--app-accent); color: #fff; border: none; padding: 0.6rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.3rem; height: 38px;">
+                        <i class="fa-solid fa-microphone"></i> <span data-i18n="settings.btn_record">기록 시작</span>
+                    </button>
+                    <button type="button" id="btn-reset-shortcut" class="btn-toggle" style="background: var(--app-bg-card-hover); border: 1px solid var(--app-border); color: var(--app-text-primary); padding: 0.6rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.3rem; height: 38px;">
+                        <span data-i18n="settings.btn_reset">초기화</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const defaultKeyMap = {
+        next: 'ArrowRight, Space, PageDown, VolumeDown',
+        prev: 'ArrowLeft, PageUp, VolumeUp',
+        close: 'Escape',
+        dashboard: 'Home'
+    };
+
+    function updateDisplayValues() {
+        ['next', 'prev', 'close', 'dashboard'].forEach(target => {
+            const input = document.getElementById(`setting-key-${target}-display`);
+            if (!input) return;
+            const saved = localStorage.getItem(`custom_key_${target}`);
+            input.value = saved ? saved : defaultKeyMap[target];
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        updateDisplayValues();
+    });
+    updateDisplayValues();
+
+    let recordingTarget = null;
+    let recordingHandler = null;
+
+    document.querySelectorAll('.btn-record-key').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const target = e.currentTarget.dataset.target;
+            const displayInput = document.getElementById(`setting-key-${target}-display`);
+            if (!displayInput) return;
+
+            if (recordingTarget === target) {
+                // 이미 기록 중이면 중단
+                stopRecording();
+                return;
+            }
+
+            stopRecording();
+            recordingTarget = target;
+            displayInput.value = '원하는 물리 키나 단축키를 눌러주세요...';
+            displayInput.style.color = '#fbbf24';
+            e.currentTarget.style.background = '#dc2626';
+
+            recordingHandler = (evt) => {
+                evt.preventDefault();
+                evt.stopPropagation();
+
+                const keyName = evt.key;
+                if (!keyName) return;
+
+                console.log(`[Key-Settings] Captured key for ${target}: ${keyName}`);
+                localStorage.setItem(`custom_key_${target}`, keyName);
+
+                stopRecording();
+                updateDisplayValues();
+            };
+
+            window.addEventListener('keydown', recordingHandler, true);
+        });
+    });
+
+    document.querySelectorAll('.btn-reset-key').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const target = e.currentTarget.dataset.target;
+            localStorage.removeItem(`custom_key_${target}`);
+            updateDisplayValues();
+        });
+    });
+
+    function stopRecording() {
+        if (recordingHandler) {
+            window.removeEventListener('keydown', recordingHandler, true);
+            recordingHandler = null;
+        }
+        document.querySelectorAll('.btn-record-key').forEach(btn => {
+            btn.style.background = 'var(--app-accent)';
+        });
+        document.querySelectorAll('[id^="setting-key-"]').forEach(input => {
+            input.style.color = 'var(--app-accent)';
+        });
+        recordingTarget = null;
+        updateDisplayValues();
+    }
+})();
+</script>

@@ -189,9 +189,13 @@ async function initTabMediaLibrary() {
   restoreDesktopSidebarState();
   initSidebarInteractions();
 
+  const initialHash = window.location.hash || '';
+  const isDetailDeepLink = initialHash.startsWith('#detail');
+
   state.currentLibraryId = 'home';
   loadLibraries();
-  selectCategory('home');
+  // #detail 딥링크 진입 시 history.pushState로 해시가 #library=home으로 덮어씌워지는 현상 차단
+  selectCategory('home', isDetailDeepLink);
   updateSortButtonUI();
 
   // 플로팅 필터 모달 초기화
@@ -202,7 +206,7 @@ async function initTabMediaLibrary() {
 
   // URL 해시 파라미터 파싱 헬퍼
   function getHashParams() {
-    const hash = window.location.hash;
+    const hash = window.location.hash || initialHash;
     if (!hash || !hash.includes('?')) return {};
     const queryString = hash.split('?')[1];
     const params = {};
@@ -216,7 +220,7 @@ async function initTabMediaLibrary() {
 
   // 새로고침 시 URL 해시 기반 상세 화면 자동 재진입
   const hashParams = getHashParams();
-  if (window.location.hash.startsWith('#detail') && hashParams.series) {
+  if ((initialHash.startsWith('#detail') || window.location.hash.startsWith('#detail')) && hashParams.series) {
     const restoreSeries = hashParams.series;
     const restoreLibraryId = hashParams.libraryId || 'all';
     const restoreRepBookId = hashParams.repBookId || null;

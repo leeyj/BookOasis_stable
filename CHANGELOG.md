@@ -1,4 +1,9 @@
 # CHANGELOG
+## v1.5.7
+- 키설정 기능 추가(환경설정->키 설정)(베타) | add keyboard settings function(settings->key settings)(beta)
+- 모바일 뷰어 스와이프(Swipe Left/Right) 터치 제스처 지원(베타) | add mobile swipe gesture function(beta)
+- /#detail? 주소 접근시 홈 화면으로 복귀되는 현상 수정 | fix detail page restore to home screen issue
+
 ## v1.5.6
 - 키보드로 다음 권 이동 버그 수정 | fix keyboard next volume bug
 - 읽기 방향에 따른 다음 권 이동 버그 수정 | fix reading direction next volume bug
