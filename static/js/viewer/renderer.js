@@ -567,6 +567,7 @@ export function loadComicPage() {
           pairContainer.style.visibility = 'visible';
           hideViewerLoading();
 
+
           if (comicCurrentPage === 0 && expectedLoads === 1) {
             const aspectRatio = imageElements[0].naturalWidth / imageElements[0].naturalHeight;
             if (aspectRatio < 0.7) {

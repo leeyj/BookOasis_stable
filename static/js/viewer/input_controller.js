@@ -40,15 +40,48 @@ function handleViewerKeydown(e) {
   const customCloseKeys = (localStorage.getItem('custom_key_close') || 'Escape').split(',').map(k => k.trim().toLowerCase());
   const customDashboardKeys = (localStorage.getItem('custom_key_dashboard') || 'Home').split(',').map(k => k.trim().toLowerCase());
 
-  const currentKey = (e.key || '').toLowerCase();
+  const rawKey = (e.key || '').toLowerCase();
+  const codeKey = (e.code || '').toLowerCase();
 
-  if (e.key === 'f' || e.key === 'F') {
+  // 스페이스바, 화살표, 페이지키, 엔터 등 이중 교차 검증
+  const isSpaceKey = rawKey === ' ' || rawKey === 'space' || codeKey === 'space';
+  const isArrowRight = rawKey === 'arrowright' || codeKey === 'arrowright';
+  const isArrowLeft = rawKey === 'arrowleft' || codeKey === 'arrowleft';
+  const isPageDown = rawKey === 'pagedown' || codeKey === 'pagedown';
+  const isPageUp = rawKey === 'pageup' || codeKey === 'pageup';
+  const isEscapeKey = rawKey === 'escape' || codeKey === 'escape';
+  const isEnterKey = rawKey === 'enter' || rawKey === 'return' || codeKey === 'enter';
+
+  // [다음 편 이어서 보기 모달] 노출 중 물리키 및 단축키 핸들링
+  const nextModal = document.getElementById('viewer-next-episode-modal');
+  if (nextModal && nextModal.style.display !== 'none' && nextModal.style.display !== '') {
+    const confirmBtn = document.getElementById('viewer-next-episode-confirm-btn');
+    const cancelBtn = document.getElementById('viewer-next-episode-cancel-btn');
+
+    if (isEscapeKey || customCloseKeys.includes(rawKey) || customCloseKeys.includes(codeKey)) {
+      e.preventDefault();
+      if (cancelBtn) cancelBtn.click();
+      return;
+    }
+
+    const isNavKeyHit = isEnterKey || isSpaceKey || isArrowRight || isArrowLeft || isPageDown || isPageUp ||
+                        customNextKeys.some(k => k === rawKey || k === codeKey || (k === 'space' && isSpaceKey)) ||
+                        customPrevKeys.some(k => k === rawKey || k === codeKey || (k === 'space' && isSpaceKey));
+
+    if (isNavKeyHit && confirmBtn) {
+      e.preventDefault();
+      confirmBtn.click();
+      return;
+    }
+  }
+
+  if (e.key === 'f' || e.key === 'F' || codeKey === 'keyf') {
     e.preventDefault();
     callDep('toggleFullscreenViewer');
     return;
   }
 
-  if (customCloseKeys.includes(currentKey)) {
+  if (isEscapeKey || customCloseKeys.includes(rawKey) || customCloseKeys.includes(codeKey)) {
     const inFullscreen = !!(
       viewerModal.classList.contains('fullscreen-mode') ||
       (typeof _deps.isViewerInFullscreen === 'function' && _deps.isViewerInFullscreen())
@@ -62,20 +95,26 @@ function handleViewerKeydown(e) {
     return;
   }
 
-  if (customDashboardKeys.includes(currentKey) || (e.altKey && (e.key === 'Home' || e.key === 'home'))) {
+  if (customDashboardKeys.includes(rawKey) || customDashboardKeys.includes(codeKey) || (e.altKey && (rawKey === 'home' || codeKey === 'home'))) {
     e.preventDefault();
     callDep('closeMediaViewer');
     if (typeof window.showDashboardView === 'function') window.showDashboardView();
     return;
   }
 
-  if (customNextKeys.includes(currentKey) || e.key === ' ' || e.key === 'ArrowRight') {
+  const isNextHit = customNextKeys.some(k => k === rawKey || k === codeKey || (k === 'space' && isSpaceKey)) ||
+                    isSpaceKey || isArrowRight || isPageDown;
+
+  const isPrevHit = customPrevKeys.some(k => k === rawKey || k === codeKey || (k === 'space' && isSpaceKey)) ||
+                    isArrowLeft || isPageUp;
+
+  if (isNextHit) {
     e.preventDefault();
     callDep('nextPage');
     return;
   }
 
-  if (customPrevKeys.includes(currentKey) || e.key === 'ArrowLeft') {
+  if (isPrevHit) {
     e.preventDefault();
     callDep('prevPage');
     return;
@@ -303,7 +342,6 @@ export function initViewerClickToggle() {
         target.closest('#epub-toc-btn') ||
         target.closest('.viewer-controls') ||
         target.closest('.floating-close-btn') ||
-        target.closest('#common-viewer-hotspot') ||
         target.closest('button') ||
         target.closest('input') ||
         target.closest('select')

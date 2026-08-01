@@ -5,11 +5,17 @@ import { switchActiveView } from '../view_manager.js';
 import { renderDetailHeader, renderVolumesList, renderRecommendList } from '../detail_render.js';
 import { updateCurrentCategoryIndicator } from '../category_indicator.js';
 import { detailVolumeViewState } from './volume_controller.js';
+import { encodeDetailParams } from '../url_obfuscator.js';
 
 // 그리드 뷰 → 상세 뷰 전환
 export async function openBookDetail(event, seriesName, libraryId, representativeBookId = null, displayTitle = '') {
   const detailView = document.getElementById('book-detail-view');
   if (!detailView) return;
+
+  // 현재 탭에서의 상세 뷰 활성 세션 기록 (새 탭 진입 보안 구분을 위함)
+  try {
+    sessionStorage.setItem('bookoasis_tab_session', 'active');
+  } catch (e) {}
 
   const safeSeriesName = seriesName || '';
   const safeDisplayTitle = String(displayTitle || '').trim() || safeSeriesName;
@@ -151,10 +157,17 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
         }
       }
 
-      // 히스토리 해시가 #detail이 아닌 경우 상태 푸시, 이미 #detail인데 상태가 유실된 경우 상태 보정 (URL에 상세 정보 쿼리파라미터 포함)
+// 히스토리 해시가 #detail이 아닌 경우 상태 푸시, 이미 #detail인데 상태가 유실된 경우 상태 보정 (난독화된 URL 토큰 사용)
       const repIdForHistory = state.detailRepresentativeBookId || '';
       const displayTitleForHistory = state.detailDisplayTitle || '';
-      const detailHash = `#detail?series=${encodeURIComponent(safeSeriesName)}&libraryId=${actualLibraryId}${repIdForHistory ? `&repBookId=${encodeURIComponent(repIdForHistory)}` : ''}${displayTitleForHistory ? `&displayTitle=${encodeURIComponent(displayTitleForHistory)}` : ''}`;
+      const obfuscatedQuery = encodeDetailParams({
+        series: safeSeriesName,
+        libraryId: actualLibraryId,
+        repBookId: repIdForHistory || null,
+        displayTitle: displayTitleForHistory || null
+      });
+      const detailHash = `#detail?${obfuscatedQuery}`;
+
       if (!window.location.hash.startsWith('#detail')) {
         history.pushState({ view: 'detail', series: safeSeriesName, libraryId: actualLibraryId, repBookId: repIdForHistory || null, displayTitle: displayTitleForHistory || null }, '', detailHash);
       } else {

@@ -155,3 +155,6 @@ function syncScrollWidthUI() {
   if (slider) slider.value = comicScrollWidth;
   if (label)  label.textContent = `${comicScrollWidth}px`;
 }
+
+
+

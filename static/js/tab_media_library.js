@@ -28,6 +28,7 @@ import { switchSettingsTab, loadInitialSystemSettings, loadGeneralSettings, subm
 // 장르 및 태그 플로팅 필터 모달 임포트
 import { initFloatingFilter, toggleFilterModal } from './genre_tag_filter.js';
 import { initSidebarInteractions, restoreDesktopSidebarState } from './sidebar_manager.js';
+import { decodeDetailParams } from './url_obfuscator.js';
 import './viewer/viewer_padding.js';
 
 function canAccessAdultLibrary() {
@@ -192,10 +193,34 @@ async function initTabMediaLibrary() {
   const initialHash = window.location.hash || '';
   const isDetailDeepLink = initialHash.startsWith('#detail');
 
+  // 보안 검증: 동일 탭에서의 새로고침(reload)이거나 기존 탭 세션이 있는 경우에만 상세 뷰 복원 허용
+  const navType = (performance && performance.getEntriesByType && performance.getEntriesByType('navigation')[0]) ? performance.getEntriesByType('navigation')[0].type : '';
+  const isReload = navType === 'reload';
+  let hasTabSession = false;
+  try {
+    hasTabSession = sessionStorage.getItem('bookoasis_tab_session') === 'active';
+  } catch (e) {}
+
   state.currentLibraryId = 'home';
   loadLibraries();
-  // #detail 딥링크 진입 시 history.pushState로 해시가 #library=home으로 덮어씌워지는 현상 차단
-  selectCategory('home', isDetailDeepLink);
+
+  if (isDetailDeepLink) {
+    if (isReload || hasTabSession) {
+      const restored = decodeDetailParams(initialHash);
+      if (restored && restored.series) {
+        console.log('[Security-History] 동일 탭 새로고침 감지 - 상세 뷰 복원:', restored.series);
+        openBookDetail(null, restored.series, restored.libraryId || 'all', restored.repBookId || null, restored.displayTitle || '');
+      } else {
+        selectCategory('home', true);
+      }
+    } else {
+      console.warn('[Security-History] 신규 탭 붙여넣기 진입 차단 - 대시보드(홈)로 안내 및 해시 소거');
+      selectCategory('home', true);
+      history.replaceState({ view: 'category', libraryId: 'home' }, '', '#library=home');
+    }
+  } else {
+    selectCategory('home');
+  }
   updateSortButtonUI();
 
   // 플로팅 필터 모달 초기화
@@ -203,33 +228,6 @@ async function initTabMediaLibrary() {
 
   // IntersectionObserver 기반 무한 스크롤 초기화
   initInfiniteScrollObserver();
-
-  // URL 해시 파라미터 파싱 헬퍼
-  function getHashParams() {
-    const hash = window.location.hash || initialHash;
-    if (!hash || !hash.includes('?')) return {};
-    const queryString = hash.split('?')[1];
-    const params = {};
-    const pairs = queryString.split('&');
-    for (const pair of pairs) {
-      const [key, val] = pair.split('=');
-      if (key) params[key] = decodeURIComponent(val || '');
-    }
-    return params;
-  }
-
-  // 새로고침 시 URL 해시 기반 상세 화면 자동 재진입
-  const hashParams = getHashParams();
-  if ((initialHash.startsWith('#detail') || window.location.hash.startsWith('#detail')) && hashParams.series) {
-    const restoreSeries = hashParams.series;
-    const restoreLibraryId = hashParams.libraryId || 'all';
-    const restoreRepBookId = hashParams.repBookId || null;
-    const restoreDisplayTitle = hashParams.displayTitle || '';
-    console.log('[History] 해시 주소 기반 복원 감지 - 상세 뷰 복구:', restoreSeries);
-    setTimeout(() => {
-      openBookDetail(null, restoreSeries, restoreLibraryId, restoreRepBookId, restoreDisplayTitle);
-    }, 150);
-  }
 
   // 키보드 단축키
   initKeyboardListener();
@@ -256,6 +254,12 @@ async function initTabMediaLibrary() {
     if (event.state && event.state.view === 'detail') {
       openBookDetail(null, event.state.series, event.state.libraryId, event.state.repBookId || null, event.state.displayTitle || '');
       return;
+    } else if (window.location.hash.startsWith('#detail')) {
+      const restored = decodeDetailParams(window.location.hash);
+      if (restored && restored.series) {
+        openBookDetail(null, restored.series, restored.libraryId || 'all', restored.repBookId || null, restored.displayTitle || '');
+        return;
+      }
     }
     
     // 3. 목적지가 목록(카테고리) 뷰인 경우 (현재 상세 뷰가 떠 있다면 먼저 닫음)

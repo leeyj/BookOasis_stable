@@ -257,6 +257,7 @@ export function markAsCompleted() {
   }
 }
 
+
 export function nextComicPage() {
   const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
   if (scrollMode === 'scroll') {

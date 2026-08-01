@@ -258,6 +258,13 @@ function showNextEpisodeModal(nextBook) {
 
   // 모달 활성화
   modal.style.display = 'flex';
+  nextEpisodeModalOpen = true;
+
+  if (confirmBtn) {
+    setTimeout(() => {
+      try { confirmBtn.focus(); } catch (err) {}
+    }, 50);
+  }
 
   // 버튼 이벤트 연결 (기존 리스너 중복 방지를 위한 단일화)
   confirmBtn.onclick = () => {
