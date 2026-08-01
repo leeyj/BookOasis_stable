@@ -1,4 +1,7 @@
 # CHANGELOG
+## v1.5.6
+- 키보드로 다음 권 이동 버그 수정 | fix keyboard next volume bug
+- 읽기 방향에 따른 다음 권 이동 버그 수정 | fix reading direction next volume bug
 ## v1.5.5
 - 홀수 페이지에서 마지막 이전 장이 중복표시되는 오류 수정 | fix the issue that the last previous chapter is displayed repeatedly on an odd page
 - 테마 수정 및 추가(아이언맨, 아쿠아마린, 블루) | theme fix and add(ironman, aquamarine, blue)

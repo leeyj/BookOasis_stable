@@ -27,9 +27,21 @@ function bindUserInteractionTracker() {
         clearNextEpisodeArm();
       }
     } else if (event && event.type === 'keydown') {
-      if (event.key === 'ArrowDown' || event.key === 'ArrowRight' || event.key === ' ') {
+      const isComic = state.currentViewerFormat === 'zip' || state.currentViewerFormat === 'cbz';
+      const isRtl = isComic && (localStorage.getItem('comic_reading_direction') === 'rtl');
+      
+      const key = event.key;
+      const isNextKey = isRtl
+        ? (key === 'ArrowLeft' || key === 'ArrowDown' || key === ' ' || key === 'PageDown')
+        : (key === 'ArrowRight' || key === 'ArrowDown' || key === ' ' || key === 'PageDown');
+        
+      const isPrevKey = isRtl
+        ? (key === 'ArrowRight' || key === 'ArrowUp' || key === 'PageUp')
+        : (key === 'ArrowLeft' || key === 'ArrowUp' || key === 'PageUp');
+
+      if (isNextKey) {
         lastScrollDirection = 'down';
-      } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+      } else if (isPrevKey) {
         lastScrollDirection = 'up';
         clearNextEpisodeArm();
       }

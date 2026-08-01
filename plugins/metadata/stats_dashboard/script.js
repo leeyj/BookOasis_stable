@@ -3,6 +3,22 @@
 
   let currentType = 'general';
 
+  // 🎨 테마 변경 실시간 감지 (MutationObserver - 가이드 문서 표준)
+  function getCurrentTheme() {
+    return document.documentElement.getAttribute('data-app-theme') || 'purple';
+  }
+
+  const themeObserver = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === 'attributes' && mutation.attributeName === 'data-app-theme') {
+        const newTheme = getCurrentTheme();
+        console.log(`[Stats-Dashboard-Plugin] Theme changed to: ${newTheme}`);
+      }
+    });
+  });
+
+  themeObserver.observe(document.documentElement, { attributes: true });
+
   function fetchStatsData(type) {
     fetch(`/api/media/dashboard/widgets/stats_dashboard/data?type=${type}`)
       .then(res => res.json())

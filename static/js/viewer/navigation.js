@@ -276,17 +276,13 @@ export function nextComicPage() {
     const totalPages = Renderer.getComicTotalPages();
     const currentPage = Renderer.getComicCurrentPage();
 
-    // RTL 2장 보기: displayPage = min(currentPage + 1, totalPages - 1)
-    // displayPage가 이미 마지막 페이지이면 → 마지막 화면 → 다음 권
-    const isRtlTwoPage = (step === 2) && (Settings.getComicReadingDirection
-      ? Settings.getComicReadingDirection() === 'rtl'
-      : false);
-    if (isRtlTwoPage) {
-      const displayPage = Math.min(currentPage + 1, totalPages - 1);
-      if (displayPage >= totalPages - 1) {
-        import('../viewer_next_episode.js').then(m => m.handleNextEpisode(state.activeBookId));
-        return;
-      }
+    // 두쪽 보기(step === 2)일 때 화면에 노출 중인 마지막 페이지 인덱스
+    const displayEndPage = (step === 2) ? Math.min(currentPage + 1, totalPages - 1) : currentPage;
+
+    // 이미 마지막 페이지까지 노출 중인 경우 다음 권 불러오기 발동
+    if (displayEndPage >= totalPages - 1) {
+      import('../viewer_next_episode.js').then(m => m.handleNextEpisode(state.activeBookId));
+      return;
     }
 
     const nextPage = Math.min(currentPage + step, totalPages - 1);
