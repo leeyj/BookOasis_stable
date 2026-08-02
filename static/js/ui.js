@@ -299,8 +299,18 @@ export function renderHistoryGrid(booksList) {
   container.innerHTML = '';
   const fragment = document.createDocumentFragment();
   booksList.forEach(item => {
+    const isSeriesHistory = (parseInt(item.book_count, 10) || 0) > 1;
     const normalizedTitle = stripLeadingBracketTags(normalizeBookTitle(item));
-    const card = createBookCard(item, {
+    const card = createBookCard(item, isSeriesHistory ? {
+      showVolumeCount: true,
+      actionTitle: '이어읽기',
+      onPrimaryClick: (e) => openBookDetail(e, item.series_name || normalizedTitle, item.library_id, item.representative_book_id, item.series_alias || item.series_name || normalizedTitle),
+      onActionClick: (e) => {
+        if (typeof window.resumeSeries === 'function') {
+          window.resumeSeries(e, item.series_name, item.library_id, item.representative_book_id);
+        }
+      }
+    } : {
       showProgress: true,
       actionTitle: '이어읽기',
       onPrimaryClick: (e) => openBookDetail(e, item.series_name || normalizedTitle, item.library_id, item.id),
@@ -363,8 +373,19 @@ export function renderDashboardHistory(booksList) {
   container.innerHTML = '';
   const fragment = document.createDocumentFragment();
   booksList.forEach(item => {
+    const isSeriesHistory = (parseInt(item.book_count, 10) || 0) > 1;
     const normalizedTitle = stripLeadingBracketTags(normalizeBookTitle(item));
-    const card = createBookCard(item, {
+    const card = createBookCard(item, isSeriesHistory ? {
+      showVolumeCount: true,
+      lazyLoad: false,
+      actionTitle: '이어읽기',
+      onPrimaryClick: (e) => openBookDetail(e, item.series_name || normalizedTitle, item.library_id, item.representative_book_id, item.series_alias || item.series_name || normalizedTitle),
+      onActionClick: (e) => {
+        if (typeof window.resumeSeries === 'function') {
+          window.resumeSeries(e, item.series_name, item.library_id, item.representative_book_id);
+        }
+      }
+    } : {
       showProgress: true,
       lazyLoad: false,
       actionTitle: '이어읽기',

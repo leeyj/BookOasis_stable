@@ -453,8 +453,8 @@
     height: 100dvh;
     /* iOS Safari 17+, Chrome 108+: URL bar 포함 동적 뷰포트 */
     z-index: 10003;
-    pointer-events: none;
-    /* 뒷배경 이벤트 차단 방지 */
+    pointer-events: auto;
+    /* iOS Safari에서 빈 배경 터치도 오버레이 닫기 대상으로 받기 위해 auto 유지 */
     display: flex;
     flex-direction: column;
     justify-content: space-between;

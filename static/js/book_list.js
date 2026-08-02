@@ -168,7 +168,11 @@ export async function loadReadingHistory() {
     if (data.success) {
       let books = data.books || [];
       if (state.hideCompletedInHistory) {
-        books = books.filter(b => !(b.is_completed === 1 || (b.total_pages > 0 && b.pages_read >= b.total_pages)));
+        books = books.filter(b => {
+          const isCompleted = (b.is_completed === 1 || (b.total_pages > 0 && b.pages_read >= b.total_pages));
+          const hasUnfinishedSiblings = Number(b.has_unfinished_siblings || 0) === 1;
+          return !isCompleted || hasUnfinishedSiblings;
+        });
       }
       renderHistoryGrid(books);
     } else {

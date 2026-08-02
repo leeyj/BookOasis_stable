@@ -216,7 +216,21 @@ class ReadingProgressRepository:
             SELECT b.id, b.library_id, b.title, b.title_alias, b.series_name, b.series_alias, b.cover_image, b.cover_updated_at, b.file_format,
                    p.pages_read, b.total_pages, p.last_read_at,
                    CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
-                   p.is_completed, COALESCE(b.metadata_locked, 0) AS metadata_locked
+                                     p.is_completed,
+                                     CASE WHEN EXISTS (
+                                             SELECT 1
+                                             FROM books b2
+                                             LEFT JOIN user_progress p2 ON b2.id = p2.book_id AND p2.user_id = p.user_id
+                                             WHERE COALESCE(b2.is_deleted, 0) = 0
+                                                 AND b2.library_id = b.library_id
+                                                 AND COALESCE(NULLIF(b2.series_name, ''), CAST(b2.id AS TEXT)) = COALESCE(NULLIF(b.series_name, ''), CAST(b.id AS TEXT))
+                                                 AND (
+                                                     p2.book_id IS NULL
+                                                     OR COALESCE(p2.is_completed, 0) = 0
+                                                     OR (COALESCE(b2.total_pages, 0) > 0 AND COALESCE(p2.pages_read, 0) < COALESCE(b2.total_pages, 0))
+                                                 )
+                                     ) THEN 1 ELSE 0 END AS has_unfinished_siblings,
+                                     COALESCE(b.metadata_locked, 0) AS metadata_locked
             FROM user_progress p
             JOIN books b ON p.book_id = b.id
             JOIN user_category_permissions ucp ON b.library_id = ucp.library_id AND ucp.user_id = p.user_id AND ucp.has_access = 1
@@ -225,8 +239,22 @@ class ReadingProgressRepository:
         """
         if hide_completed:
             base_select += """
-              AND COALESCE(p.is_completed, 0) = 0
-              AND NOT (b.total_pages > 0 AND p.pages_read >= b.total_pages)
+                            AND NOT (
+                                (COALESCE(p.is_completed, 0) = 1 OR (COALESCE(b.total_pages, 0) > 0 AND COALESCE(p.pages_read, 0) >= COALESCE(b.total_pages, 0)))
+                                AND NOT EXISTS (
+                                    SELECT 1
+                                    FROM books b2
+                                    LEFT JOIN user_progress p2 ON b2.id = p2.book_id AND p2.user_id = p.user_id
+                                    WHERE COALESCE(b2.is_deleted, 0) = 0
+                                        AND b2.library_id = b.library_id
+                                        AND COALESCE(NULLIF(b2.series_name, ''), CAST(b2.id AS TEXT)) = COALESCE(NULLIF(b.series_name, ''), CAST(b.id AS TEXT))
+                                        AND (
+                                            p2.book_id IS NULL
+                                            OR COALESCE(p2.is_completed, 0) = 0
+                                            OR (COALESCE(b2.total_pages, 0) > 0 AND COALESCE(p2.pages_read, 0) < COALESCE(b2.total_pages, 0))
+                                        )
+                                )
+                            )
             """
         base_select += """
             ORDER BY p.last_read_at DESC

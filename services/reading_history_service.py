@@ -31,6 +31,64 @@ def _merge_live_progress_from_redis(db_type, user_id, item):
 
     return item
 
+
+def _history_group_key(item):
+    series_name = str(item.get('series_name') or '').strip()
+    if series_name:
+      return (item.get('library_id'), series_name)
+    return (item.get('library_id'), f"__single__:{item.get('id')}")
+
+
+def _group_history_items(items):
+    groups = {}
+    order = []
+
+    for item in items or []:
+        key = _history_group_key(item)
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append(dict(item))
+
+    grouped = []
+    for key in order:
+        group_items = groups[key]
+        group_items.sort(key=lambda item: str(item.get('last_read_at') or ''), reverse=True)
+        current = group_items[0]
+
+        if len(group_items) <= 1:
+            grouped.append({
+                **current,
+                'book_count': 1,
+                'representative_book_id': current.get('id'),
+                'representative_title': current.get('title_alias') or current.get('title') or '',
+            })
+            continue
+
+        grouped.append({
+            'id': current.get('id'),
+            'library_id': current.get('library_id'),
+            'title': current.get('title'),
+            'title_alias': current.get('title_alias', '') or '',
+            'series_name': current.get('series_name') or '기타 단행본',
+            'series_alias': current.get('series_alias', '') or '',
+            'cover_image': current.get('cover_image'),
+            'file_format': current.get('file_format'),
+            'pages_read': current.get('pages_read') or 0,
+            'total_pages': current.get('total_pages') or 0,
+            'is_completed': current.get('is_completed') or 0,
+            'has_unfinished_siblings': 1 if any((item.get('has_unfinished_siblings') or 0) == 1 for item in group_items) else 0,
+            'is_favorite': 1 if any((item.get('is_favorite') or 0) == 1 for item in group_items) else 0,
+            'last_read_at': current.get('last_read_at'),
+            'metadata_locked': 1 if any((item.get('metadata_locked') or 0) == 1 for item in group_items) else 0,
+            'book_count': len(group_items),
+            'representative_book_id': current.get('id'),
+            'representative_title': current.get('title_alias') or current.get('title') or '',
+        })
+
+    grouped.sort(key=lambda item: str(item.get('last_read_at') or ''), reverse=True)
+    return grouped
+
 class ReadingHistoryService:
     @staticmethod
     def get_history(db_type, user_id=1):
@@ -43,13 +101,13 @@ class ReadingHistoryService:
             return merged
 
         # 1. Redis 캐시 확인 (구형 캐시에 series_alias 없으면 DB 재조회)
-        cache_key = f"cache:history:v2:{db_type}:{user_id}"
+        cache_key = f"cache:history:v4:{db_type}:{user_id}"
         cached_data = redis_get(cache_key)
         if cached_data:
             try:
                 parsed = json.loads(cached_data)
-                if parsed and isinstance(parsed, list) and (len(parsed) == 0 or 'series_alias' in parsed[0]):
-                    return apply_live_progress(parsed)
+                if parsed and isinstance(parsed, list) and (len(parsed) == 0 or ('series_alias' in parsed[0] and 'book_count' in parsed[0])):
+                    return parsed
             except Exception:
                 pass
 
@@ -78,6 +136,7 @@ class ReadingHistoryService:
                 'pages_read'  : r['pages_read']  or 0,
                 'total_pages' : r['total_pages'] or 0,
                 'is_completed': r['is_completed'] or 0,
+                'has_unfinished_siblings': r.get('has_unfinished_siblings', 0) or 0,
                 'is_favorite' : r['is_favorite'] or 0,
                 'last_read_at': r['last_read_at'],
                 'metadata_locked': r.get('metadata_locked', 0),
@@ -86,6 +145,7 @@ class ReadingHistoryService:
         ]
 
         result = apply_live_progress(result)
+        result = _group_history_items(result)
 
         # 2. Redis 캐시 세팅 (3600초=1시간 만료 설정)
         try:
