@@ -60,6 +60,7 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
       state.detailLibraryId = actualLibraryId;
       state.detailRepresentativeBookId = representativeBookId || (books.length > 0 ? books[0].id : null);
       state.detailDisplayTitle = safeDisplayTitle;
+      state.detailMeta = meta;
       updateCurrentCategoryIndicator(actualLibraryId);
 
       const detailViewKey = `${state.currentLibraryType || 'general'}:${actualLibraryId}:${safeSeriesName}`;

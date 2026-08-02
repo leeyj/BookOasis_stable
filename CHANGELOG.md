@@ -1,4 +1,12 @@
 # CHANGELOG
+## v1.6.2
+- 일반사용자도 테마변경 지원 | general users can change theme
+- 오디오북 기능 추가(beta) | support audiobook session(beta)
+- 상세설명 접기/펼치기 추가 | short / extend the summary
+- 카테고리 가져오기/내보내기에 오디오 세션 추가 | category import/export support
+** 주의사항: DB 마이그레이션이 진행되므로 업데이트중 강제종료하시거나 강제재시작하시면 DB에 손상이 있을 수 있습니다.
+
+
 ## v1.6.1
 - (iOS) 터치영역 오류 수정 | fix touch area bug
 - 최근 읽은 도서 개념 수립(series) | fix readed lib (series)

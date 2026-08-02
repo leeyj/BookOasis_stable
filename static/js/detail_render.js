@@ -199,6 +199,8 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
     let btnColor = '#7c3aed';
     let btnBorder = '#a855f7';
     let iconClass = 'fa-solid fa-play';
+    const continueFmt = String(continueTarget.file_format || '').toLowerCase();
+    const isAudioContext = state.currentLibraryType === 'audiobook' || ['audiobook', 'mp3', 'm4a', 'm4b', 'flac', 'aac', 'wav', 'ogg', 'opus', 'wma'].includes(continueFmt);
 
     // 진행도 퍼센트 구하기
     let progressPercent = 0;
@@ -223,7 +225,9 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
       btnColor = '#6d28d9';
       btnBorder = '#8b5cf6';
     } else {
-      btnLabel = i18n.t('detail.start_reading') || '첫 권부터 읽기';
+      btnLabel = isAudioContext
+        ? (i18n.t('detail.start_listening') || '처음부터 듣기')
+        : (i18n.t('detail.start_reading') || '첫 권부터 읽기');
       tooltipTitle = continueTarget.title;
       btnColor = '#10b981';
       btnBorder = '#34d399';
@@ -240,6 +244,11 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
   }
 
   const isLocked = Number(meta && meta.metadata_locked) === 1 || (books && books.some(b => Number(b.metadata_locked) === 1));
+  const summaryText = meta.summary || i18n.t('detail.no_description');
+  const summaryLineBreaks = (String(summaryText).match(/\n/g) || []).length;
+  const shouldShowSummaryToggle = String(summaryText).length > 260 || summaryLineBreaks >= 5;
+  const summaryToggleLabelMore = i18n.t('detail.summary_more') || '더보기';
+  const summaryToggleLabelLess = i18n.t('detail.summary_less') || '접기';
   const detailLockedBadgeHtml = isLocked ? `
     <div class="book-card-locked-badge" title="메타데이터 잠김 (수동 편집됨)" style="position: absolute; bottom: 8px; left: 8px; z-index: 5; background: rgba(0, 0, 0, 0.65); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.4); width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.4); backdrop-filter: blur(2px);">
       <i class="fa-solid fa-lock" style="font-size: 0.7rem;"></i>
@@ -258,8 +267,8 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
            ondragover="event.preventDefault(); this.style.borderColor='#a855f7';" 
            ondragleave="this.style.borderColor='rgba(255,255,255,0.08)';" 
            ondrop="handleCoverDrop(event); this.style.borderColor='rgba(255,255,255,0.08)';">
-           <img class="detail-cover-sm" id="detail-cover-img-preview" src="${coverSrc}" alt="Cover"
-              onerror="if(this.src.indexOf('/covers/fallback')===-1 && !this.src.startsWith('data:image/svg+xml')){this.src='${headerFallbackCoverSrc}';}else{this.onerror=null; this.src='${buildTextCoverDataUri({ title: visibleTitle, format: 'text', seed: actualLibraryId })}';}">
+           <img class="detail-cover-sm" id="detail-cover-img-preview" src="${coverSrc}" alt="Cover" data-title="${(visibleTitle || '').replace(/"/g, '&quot;')}" data-format="${headerFormat}"
+              onerror="window.handleCoverError(this)">
         ${detailLockedBadgeHtml}
         <div class="cover-upload-overlay" id="cover-upload-overlay-btn" onclick="triggerCoverUpload(event)">
           <i class="fa-solid fa-camera"></i>
@@ -294,7 +303,14 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
         </div>
         ${missingPageBannerHtml}
         <div class="detail-score">${stars}</div>
-        <p class="book-summary-text">${meta.summary || i18n.t('detail.no_description')}</p>
+        <div class="book-summary-wrap${shouldShowSummaryToggle ? ' has-toggle' : ''}">
+          <p class="book-summary-text${shouldShowSummaryToggle ? ' is-collapsed' : ''}">${summaryText}</p>
+          ${shouldShowSummaryToggle ? `
+          <button class="book-summary-toggle" type="button"
+            aria-expanded="false"
+            onclick="(function(btn){const wrap=btn.closest('.book-summary-wrap');if(!wrap)return;const p=wrap.querySelector('.book-summary-text');if(!p)return;const expanded=p.classList.toggle('is-expanded');p.classList.toggle('is-collapsed', !expanded);wrap.classList.toggle('summary-expanded', expanded);btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');btn.textContent=expanded?'${summaryToggleLabelLess}':'${summaryToggleLabelMore}';})(this)">${summaryToggleLabelMore}</button>
+          ` : ''}
+        </div>
         ${linkHtml}
         
         <!-- 버튼: 이어서 읽기 및 메타정보 찾기 -->
@@ -374,6 +390,131 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId, dbType
 
   let volumesHtml = '';
 
+  const toClock = (totalSec) => {
+    const sec = Math.max(0, Math.floor(Number(totalSec) || 0));
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  };
+
+  const toSizeMB = (bytes) => {
+    const n = Number(bytes) || 0;
+    if (n <= 0) return '-';
+    return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
+  const isAudiobook = (state.currentLibraryType === 'audiobook') || (books && books.length > 0 && (books[0].audiobook_id || (books[0].file_format || '').toLowerCase() === 'm4a'));
+
+  if (isAudiobook) {
+    orderedBooks.sort((a, b) => {
+      const tnA = Number(a.track_number) || 0;
+      const tnB = Number(b.track_number) || 0;
+      if (tnA !== tnB) return tnA - tnB;
+      return (a.title || '').localeCompare(b.title || '', undefined, { numeric: true });
+    });
+
+    let chapterRowsHtml = '';
+    let trackRowsHtml = '';
+    let runningStartSec = 0;
+    let totalBytes = 0;
+    const aid = orderedBooks[0]?.audiobook_id || (state.detailMeta ? state.detailMeta.id : orderedBooks[0]?.id);
+
+    orderedBooks.forEach((b, idx) => {
+      const rawTitle = String(b.title || '');
+      const cleanTitle = rawTitle.replace(/^\s*\[\s*\d+\s*\]\s*/, '').trim() || rawTitle;
+      const durSec = Number(b.duration) || 0;
+      const durationText = b.time_str || toClock(durSec);
+      const startText = toClock(runningStartSec);
+      runningStartSec += durSec;
+
+      const fileSize = Number(b.file_size) || 0;
+      totalBytes += fileSize;
+      const codec = String(b.file_format || '-').toLowerCase();
+      const kbps = durSec > 0 ? Math.round((fileSize * 8 / 1000) / durSec) : 0;
+
+      chapterRowsHtml += `
+        <tr onclick="window.openAudioPlayer(${aid}, ${b.id}, 0)">
+          <td class="ab-col-play"><button class="ab-play-mini" onclick="event.stopPropagation(); window.openAudioPlayer(${aid}, ${b.id}, 0)"><i class="fa-solid fa-play"></i></button></td>
+          <td class="ab-col-id">${idx}</td>
+          <td class="ab-col-title">${cleanTitle}</td>
+          <td class="ab-col-time">${startText}</td>
+          <td class="ab-col-time">${durationText}</td>
+        </tr>
+      `;
+
+      trackRowsHtml += `
+        <tr onclick="window.openAudioPlayer(${aid}, ${b.id}, 0)">
+          <td class="ab-col-play"><button class="ab-play-mini" onclick="event.stopPropagation(); window.openAudioPlayer(${aid}, ${b.id}, 0)"><i class="fa-solid fa-play"></i></button></td>
+          <td class="ab-col-id">${idx + 1}</td>
+          <td class="ab-col-title">${rawTitle}</td>
+          <td class="ab-col-codec">${codec}</td>
+          <td class="ab-col-time">${kbps > 0 ? `${kbps} KB` : '-'}</td>
+          <td class="ab-col-size">${toSizeMB(fileSize)}</td>
+          <td class="ab-col-time">${durationText}</td>
+        </tr>
+      `;
+    });
+
+    const totalDurationText = toClock(runningStartSec);
+
+    return `
+      <div class="volumes-section ab-volumes-shell" style="margin-top: 1.2rem;">
+        <div class="ab-tab-header">
+          <button class="ab-tab-btn active" data-target="chapters" onclick="(function(btn){const root=btn.closest('.ab-volumes-shell');root.querySelectorAll('.ab-tab-btn').forEach(b=>b.classList.remove('active'));root.querySelectorAll('.ab-tab-pane').forEach(p=>p.classList.remove('active'));btn.classList.add('active');root.querySelector('.ab-tab-pane[data-pane=chapters]').classList.add('active');})(this)">챕터 <span>${orderedBooks.length}</span></button>
+          <button class="ab-tab-btn" data-target="tracks" onclick="(function(btn){const root=btn.closest('.ab-volumes-shell');root.querySelectorAll('.ab-tab-btn').forEach(b=>b.classList.remove('active'));root.querySelectorAll('.ab-tab-pane').forEach(p=>p.classList.remove('active'));btn.classList.add('active');root.querySelector('.ab-tab-pane[data-pane=tracks]').classList.add('active');})(this)">오디오 트랙 <span>${orderedBooks.length}</span></button>
+          <button class="ab-tab-btn" data-target="detail" onclick="(function(btn){const root=btn.closest('.ab-volumes-shell');root.querySelectorAll('.ab-tab-btn').forEach(b=>b.classList.remove('active'));root.querySelectorAll('.ab-tab-pane').forEach(p=>p.classList.remove('active'));btn.classList.add('active');root.querySelector('.ab-tab-pane[data-pane=detail]').classList.add('active');})(this)">세부사항</button>
+        </div>
+
+        <div class="ab-tab-pane active" data-pane="chapters">
+          <div class="ab-table-wrap">
+            <table class="ab-detail-table">
+              <thead>
+                <tr>
+                  <th class="ab-col-play"></th>
+                  <th class="ab-col-id">Id</th>
+                  <th>제목</th>
+                  <th class="ab-col-time">시작</th>
+                  <th class="ab-col-time">기간</th>
+                </tr>
+              </thead>
+              <tbody>${chapterRowsHtml}</tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="ab-tab-pane" data-pane="tracks">
+          <div class="ab-table-wrap">
+            <table class="ab-detail-table">
+              <thead>
+                <tr>
+                  <th class="ab-col-play"></th>
+                  <th class="ab-col-id">#</th>
+                  <th>파일 이름</th>
+                  <th class="ab-col-codec">코덱</th>
+                  <th class="ab-col-time">비트레이트</th>
+                  <th class="ab-col-size">크기</th>
+                  <th class="ab-col-time">기간</th>
+                </tr>
+              </thead>
+              <tbody>${trackRowsHtml}</tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="ab-tab-pane" data-pane="detail">
+          <div class="ab-stats-grid">
+            <div class="ab-stat-card"><span class="k">총 트랙</span><strong>${orderedBooks.length}</strong></div>
+            <div class="ab-stat-card"><span class="k">총 재생시간</span><strong>${totalDurationText}</strong></div>
+            <div class="ab-stat-card"><span class="k">총 크기</span><strong>${toSizeMB(totalBytes)}</strong></div>
+            <div class="ab-stat-card"><span class="k">평균 길이</span><strong>${orderedBooks.length > 0 ? toClock(Math.round(runningStartSec / orderedBooks.length)) : '-'}</strong></div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   if (gridMode) {
     // ── 그리드 모드: 커버 + 제목만 ──────────────────────────────
     orderedBooks.forEach(b => {
@@ -415,8 +556,17 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId, dbType
              ontouchend="window.handleLongPressTouchEnd(event)"
              ontouchcancel="window.handleLongPressTouchEnd(event)">
           ${isCompletedValue ? '<span class="vol-grid-completed-badge">완독</span>' : ''}
-          <img class="vol-grid-thumb" src="${volCoverSrc}" alt="cover"
-               onerror="if(this.src.indexOf('/covers/fallback')===-1 && !this.src.startsWith('data:image/svg+xml')){this.src='${volumeFallbackCoverSrc}';}else{this.onerror=null; this.src='${buildTextCoverDataUri({ title: b.title || rawDisplayTitle, format: b.file_format, seed: b.id })}';}">
+          <div class="vol-grid-thumb-container" style="position: relative; width: 100%; aspect-ratio: 1 / 1.45; overflow: hidden; border-radius: 8px;">
+            <img class="vol-grid-thumb" src="${volCoverSrc}" alt="cover" data-title="${(imageDisplayTitle || '').replace(/"/g, '&quot;')}" data-format="${b.file_format || 'text'}"
+                 onerror="window.handleCoverError(this)" style="width: 100%; height: 100%; object-fit: cover;">
+            <a class="vol-grid-download-btn"
+               href="/api/media/books/${b.id}/download?type=${dbType}"
+               download
+               title="${i18n.t('detail.btn_download') || '다운로드'}"
+               onclick="event.stopPropagation();">
+              <i class="fa-solid fa-download"></i>
+            </a>
+          </div>
           ${pagesRead > 0 && !isCompletedValue ? `
           <div class="vol-grid-progress">
             <div class="vol-grid-progress-bar" style="width: ${progressPercent}%"></div>

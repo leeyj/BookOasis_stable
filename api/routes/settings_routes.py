@@ -29,6 +29,8 @@ SETTING_VALUE_LIMITS = {
 def get_system_settings():
     """모든 시스템 설정값 조회"""
     db_type = request.args.get('type', 'general')
+    if db_type == 'audiobook':
+        db_type = 'general'
     try:
         settings = SettingsService.get_all(db_type)
         return jsonify({'success': True, 'settings': settings})

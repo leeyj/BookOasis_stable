@@ -27,6 +27,16 @@ export function getActiveViewerInstance() {
 export function openReader(bookId, format, title, pagesRead, totalPages) {
   console.log(`[Viewer-Core] openReader 시작 - Book ID: ${bookId}, Format: ${format}, Title: ${title}`);
 
+  const fmt = String(format || '').toLowerCase();
+  const audioFormats = ['mp3', 'm4b', 'm4a', 'flac', 'aac', 'wav', 'ogg', 'opus', 'audiobook'];
+  if (audioFormats.includes(fmt) || state.currentLibraryType === 'audiobook') {
+    if (typeof window.openAudioPlayer === 'function') {
+      const audiobookId = (state.detailMeta && state.detailMeta.id) ? state.detailMeta.id : bookId;
+      window.openAudioPlayer(audiobookId, bookId, pagesRead);
+      return;
+    }
+  }
+
   import('../viewer_next_episode.js').then((m) => {
     if (m.clearNextEpisodeArm) {
       console.log('[Viewer-Core] Resetting next episode arming state for new reader session');
@@ -45,7 +55,6 @@ export function openReader(bookId, format, title, pagesRead, totalPages) {
   viewerModal.style.display = 'flex';
   document.getElementById('viewer-title-text').textContent = title;
 
-  const fmt = String(format || '').toLowerCase();
   // 플랫폼/포맷 정책 기반 자동 전체화면 분기 (수동 전체화면 버튼은 별도로 유지)
   if (shouldAutoFullscreenForFormat(fmt)) {
     tryAutoFullscreenOnOpen();

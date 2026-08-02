@@ -1511,7 +1511,7 @@ body.has-system-ticker .library-sidebar {
 }
 
 .book-card-info {
-    padding: 0.8rem;
+    padding: 0.75rem 0.75rem 0.5rem 0.75rem;
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
@@ -1811,6 +1811,62 @@ body.has-system-ticker .library-sidebar {
     white-space: pre-wrap;
 }
 
+.book-summary-wrap {
+    margin-top: 0.1rem;
+    position: relative;
+}
+
+.book-summary-text.is-collapsed {
+    display: -webkit-box;
+    -webkit-line-clamp: 5;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.book-summary-wrap.has-toggle .book-summary-text.is-collapsed {
+    padding-bottom: 2.2rem;
+    mask-image: linear-gradient(to bottom, #000 72%, rgba(0, 0, 0, 0.55) 90%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, #000 72%, rgba(0, 0, 0, 0.55) 90%, transparent 100%);
+}
+
+.book-summary-text.is-expanded {
+    display: block;
+}
+
+.book-summary-toggle {
+    border: none;
+    background: transparent;
+    color: #cbd5e1;
+    border-radius: 0;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 0.12rem 0.22rem;
+    cursor: pointer;
+    line-height: 1.1;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.book-summary-wrap.has-toggle .book-summary-toggle {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 0.62rem;
+}
+
+.book-summary-wrap.summary-expanded .book-summary-toggle {
+    position: static;
+    transform: none;
+    margin-top: 0.48rem;
+    margin-left: auto;
+    margin-right: auto;
+    display: block;
+}
+
+.book-summary-toggle:hover {
+    color: #f8fafc;
+}
+
 /* 표지 수동 업로드 컨테이너 및 오버레이 */
 .detail-cover-container {
     position: relative;
@@ -2027,6 +2083,177 @@ body.has-system-ticker .library-sidebar {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+}
+
+/* Audiobook detail tabs/table UX */
+.ab-volumes-shell {
+    background: rgba(15, 23, 42, 0.36);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 0.9rem;
+}
+
+.ab-tab-header {
+    display: flex;
+    gap: 0.45rem;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: 0.7rem;
+    margin-bottom: 0.8rem;
+}
+
+.ab-tab-btn {
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    background: rgba(15, 23, 42, 0.55);
+    color: #94a3b8;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 0.34rem 0.72rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    transition: all 0.2s ease;
+}
+
+.ab-tab-btn span {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    line-height: 1.25rem;
+    text-align: center;
+    font-size: 0.74rem;
+    color: #e2e8f0;
+}
+
+.ab-tab-btn.active,
+.ab-tab-btn:hover {
+    border-color: rgba(56, 189, 248, 0.6);
+    background: rgba(56, 189, 248, 0.14);
+    color: #67e8f9;
+}
+
+.ab-tab-pane {
+    display: none;
+}
+
+.ab-tab-pane.active {
+    display: block;
+}
+
+.ab-table-wrap {
+    overflow-x: auto;
+}
+
+.ab-detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    background: rgba(15, 23, 42, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.ab-detail-table thead tr {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.ab-detail-table th,
+.ab-detail-table td {
+    padding: 0.52rem 0.62rem;
+    font-size: 0.84rem;
+    line-height: 1.32;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: #e2e8f0;
+}
+
+.ab-detail-table th {
+    text-align: left;
+    color: #cbd5e1;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.ab-detail-table tbody tr {
+    cursor: pointer;
+    transition: background 0.18s ease;
+}
+
+.ab-detail-table tbody tr:hover {
+    background: rgba(56, 189, 248, 0.08);
+}
+
+.ab-col-play {
+    width: 2.4rem;
+    text-align: center;
+}
+
+.ab-col-id {
+    width: 3.1rem;
+    text-align: center;
+    color: #93c5fd;
+}
+
+.ab-col-time,
+.ab-col-size,
+.ab-col-codec {
+    width: 7.4rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
+.ab-col-codec {
+    text-transform: lowercase;
+}
+
+.ab-col-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ab-play-mini {
+    width: 1.7rem;
+    height: 1.7rem;
+    border-radius: 999px;
+    border: 1px solid rgba(56, 189, 248, 0.45);
+    color: #67e8f9;
+    background: rgba(56, 189, 248, 0.12);
+    cursor: pointer;
+}
+
+.ab-play-mini:hover {
+    background: rgba(56, 189, 248, 0.24);
+}
+
+.ab-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem;
+}
+
+.ab-stat-card {
+    background: rgba(15, 23, 42, 0.44);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 0.7rem 0.8rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.ab-stat-card .k {
+    color: #94a3b8;
+    font-size: 0.75rem;
+}
+
+.ab-stat-card strong {
+    color: #f8fafc;
+    font-size: 1.02rem;
 }
 
 /* 볼륨 카드: Kavita 스타일 - 가로 레이아웃 */
@@ -2526,6 +2753,35 @@ body.has-system-ticker .library-sidebar {
   border-radius: 5px;
   background: rgba(30, 41, 59, 0.6);
   display: block;
+}
+
+/* 그리드 카드 다운로드 퀵 버튼 */
+.vol-grid-download-btn {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  z-index: 5;
+  background: rgba(15, 23, 42, 0.85);
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(4px);
+}
+.vol-grid-download-btn:hover {
+  background: #3b82f6 !important;
+  color: #ffffff !important;
+  border-color: #60a5fa !important;
+  transform: scale(1.12);
+  box-shadow: 0 6px 14px rgba(59, 130, 246, 0.45);
 }
 
 /* 그리드 카드 제목 */

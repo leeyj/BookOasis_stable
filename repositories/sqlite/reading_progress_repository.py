@@ -212,6 +212,24 @@ class ReadingProgressRepository:
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
 
+        if db_type == 'audiobook':
+            cursor.execute("""
+                SELECT a.id, a.library_id, a.title, '' AS title_alias, a.title AS series_name, '' AS series_alias,
+                       CASE WHEN a.poster LIKE 'http%' THEN a.poster ELSE '/api/media/audiobooks/' || a.id || '/cover' END AS cover_image,
+                       a.updated_at AS cover_updated_at, 'audiobook' AS file_format,
+                       COALESCE(p.current_time, 0) AS pages_read, a.total_tracks AS total_pages, a.total_tracks AS total_tracks,
+                       COALESCE(a.is_favorite, 0) AS is_favorite, COALESCE(p.is_completed, 0) AS is_completed,
+                       0 AS has_unfinished_siblings, p.last_listened_at AS last_read_at, 0 AS metadata_locked
+                FROM audiobooks a
+                JOIN audiobook_progress p ON a.id = p.audiobook_id
+                WHERE p.user_id = ? AND COALESCE(a.is_deleted, 0) = 0
+                ORDER BY p.last_listened_at DESC
+                LIMIT ?
+            """, (user_id, limit))
+            rows = cursor.fetchall()
+            conn.close()
+            return [dict(row) for row in rows]
+
         base_select = """
             SELECT b.id, b.library_id, b.title, b.title_alias, b.series_name, b.series_alias, b.cover_image, b.cover_updated_at, b.file_format,
                    p.pages_read, b.total_pages, p.last_read_at,
@@ -270,6 +288,25 @@ class ReadingProgressRepository:
         """일반 유저 권한 카테고리에 한해 최근 추가된 도서 목록 조회.
         user_id=None인 경우 user_category_permissions에 매칭 행이 없으므로 빈 목록 반환.
         """
+        if db_type == 'audiobook':
+            safe_user_id = int(user_id) if user_id is not None else -1
+            conn = database.get_connection(db_type)
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT a.id, a.library_id, a.title, '' AS title_alias, a.title AS series_name, '' AS series_alias,
+                       CASE WHEN a.poster LIKE 'http%' THEN a.poster ELSE '/api/media/audiobooks/' || a.id || '/cover' END AS cover_image,
+                       a.updated_at AS cover_updated_at, 'audiobook' AS file_format, a.total_tracks AS total_pages, a.total_tracks AS total_tracks, a.created_at,
+                       COALESCE(a.is_favorite, 0) AS is_favorite, 0 AS metadata_locked
+                FROM audiobooks a
+                JOIN user_category_permissions p ON a.library_id = p.library_id
+                WHERE COALESCE(a.is_deleted, 0) = 0 AND p.user_id = ? AND p.has_access = 1
+                ORDER BY a.created_at DESC, a.id DESC
+                LIMIT 20
+            """, (safe_user_id,))
+            rows = cursor.fetchall()
+            conn.close()
+            return [dict(row) for row in rows]
+
         # user_id=None 이면 매칭 불가한 값(-1)으로 치환 → 권한 행 없음 → 빈 결과
         safe_user_id = int(user_id) if user_id is not None else -1
         conn = database.get_connection(db_type)
@@ -297,6 +334,23 @@ class ReadingProgressRepository:
     @staticmethod
     def fetch_recently_added_all(db_type, user_id):
         """어드민 등 제한 없이 최근 추가된 도서 목록 전체 조회"""
+        if db_type == 'audiobook':
+            conn = database.get_connection(db_type)
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT a.id, a.library_id, a.title, '' AS title_alias, a.title AS series_name, '' AS series_alias,
+                       CASE WHEN a.poster LIKE 'http%' THEN a.poster ELSE '/api/media/audiobooks/' || a.id || '/cover' END AS cover_image,
+                       a.updated_at AS cover_updated_at, 'audiobook' AS file_format, a.total_tracks AS total_pages, a.total_tracks AS total_tracks, a.created_at,
+                       COALESCE(a.is_favorite, 0) AS is_favorite, 0 AS metadata_locked
+                FROM audiobooks a
+                WHERE COALESCE(a.is_deleted, 0) = 0
+                ORDER BY a.created_at DESC, a.id DESC
+                LIMIT 20
+            """)
+            rows = cursor.fetchall()
+            conn.close()
+            return [dict(row) for row in rows]
+
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         cursor.execute("""

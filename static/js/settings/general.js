@@ -5,6 +5,38 @@ import * as api from '../api.js';
 let tempShortcut = null;
 let isRecordingShortcut = false;
 
+function isAdminUser() {
+  return !!(window.currentUser && window.currentUser.role === 'admin');
+}
+
+function applyNonAdminGeneralSettingsMode() {
+  const form = document.getElementById('settings-general-form');
+  if (!form) return;
+
+  const allowedIds = new Set([
+    'setting-dashboard-theme',
+    'setting-show-dashboard-insights'
+  ]);
+
+  const controls = form.querySelectorAll('input, select, textarea, button');
+  controls.forEach((el) => {
+    if (!el || !el.id) {
+      if (el && el.type === 'submit') {
+        el.disabled = true;
+        el.title = '관리자 권한에서만 저장 가능합니다.';
+      }
+      return;
+    }
+
+    if (!allowedIds.has(el.id)) {
+      el.disabled = true;
+      if (!el.title) {
+        el.title = '관리자 권한에서만 변경 가능합니다.';
+      }
+    }
+  });
+}
+
 function applySidebarTopControlsSetting(enabled) {
   const sidebarContent = document.getElementById('sidebar-collapsible-content');
   if (!sidebarContent) return;
@@ -106,6 +138,13 @@ export async function loadInitialSystemSettings() {
 
 // 일반 환경설정 로드
 export async function loadGeneralSettings() {
+  if (!isAdminUser()) {
+    // 일반 사용자는 로컬 UI 설정(테마/대시보드 위젯 표시)만 사용한다.
+    applySettingsToUI({});
+    applyNonAdminGeneralSettingsMode();
+    return;
+  }
+
   try {
     const data = await api.fetchSystemSettings(state.currentLibraryType);
     if (data.success && data.settings) {
@@ -324,6 +363,14 @@ function initShortcutRecorderEvents() {
 export async function submitGeneralSettings(event) {
   if (event) {
     event.preventDefault();
+  }
+
+  if (!isAdminUser()) {
+    applySettingsToUI({});
+    if (typeof window.showToast === 'function') {
+      window.showToast('테마와 대시보드 표시 설정은 즉시 적용되었습니다.', 'info');
+    }
+    return;
   }
   
   const thumbWidth = document.getElementById('setting-thumbnail-width')?.value || '160';

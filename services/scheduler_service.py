@@ -110,8 +110,8 @@ class SchedulerService:
         from repositories.scheduler_repository import SchedulerRepository
         
         print("[Scheduler] Checking for interrupted scan jobs to auto-resume...")
-        for db_type in ['general', 'adult']:
-            db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
+        for db_type in ['general', 'adult', 'audiobook']:
+            db_path = database.get_db_path(db_type)
             if not os.path.exists(db_path):
                 continue
                 
@@ -170,8 +170,8 @@ class SchedulerService:
         except Exception as e:
             print(f"[Scheduler] Error removing job: {e}")
 
-        for db_type in ['general', 'adult']:
-            db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
+        for db_type in ['general', 'adult', 'audiobook']:
+            db_path = database.get_db_path(db_type)
             if not os.path.exists(db_path):
                 continue
                 

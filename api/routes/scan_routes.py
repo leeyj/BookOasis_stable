@@ -10,6 +10,13 @@ import database
 
 scan_bp = Blueprint('scan', __name__)
 
+def get_db_path_for_scan(db_type):
+    if db_type == 'adult':
+        return database.DB_ADULT_PATH
+    elif db_type == 'audiobook':
+        return database.DB_AUDIOBOOK_PATH
+    return database.DB_GENERAL_PATH
+
 @scan_bp.route('/api/media/books/<int:book_id>/scan', methods=['POST'])
 @admin_required
 def scan_single_book_api(book_id):
@@ -42,9 +49,12 @@ def trigger_library_scan(library_id):
             return jsonify({'success': False, 'error': _t('api.err_library_not_found')}), 404
         
         physical_path = row['physical_path']
-        db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
+        db_path = get_db_path_for_scan(db_type)
         
-        print(f"[API-ScanTrigger] 🚀 User requested scan for library_id={library_id}, db_type={db_type}, path='{physical_path}', force={force}")
+        print(
+            f"[API-ScanTrigger] 🚀 User requested scan for library_id={library_id}, "
+            f"db_type={db_type}, path='{physical_path}', force_raw='{force_val}', force={force}"
+        )
         
         from services.scanner_queue import scanner_queue
         enqueued = scanner_queue.enqueue('library_scan', db_type=db_type, db_path=db_path, 
@@ -92,7 +102,7 @@ def trigger_library_cover_scan(library_id):
             return jsonify({'success': False, 'error': _t('api.err_library_not_found')}), 404
         
         physical_path = row['physical_path']
-        db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
+        db_path = get_db_path_for_scan(db_type)
         
         from services.scanner_queue import scanner_queue
         enqueued = scanner_queue.enqueue('cover_scan', db_type=db_type, db_path=db_path, 
@@ -124,7 +134,7 @@ def trigger_all_libraries_scan():
         if not rows:
             return jsonify({'success': False, 'error': _t('api.err_no_libraries')}), 404
         
-        db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
+        db_path = get_db_path_for_scan(db_type)
         from services.scanner_queue import scanner_queue
         
         enqueued_count = 0

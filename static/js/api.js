@@ -192,7 +192,8 @@ export async function updateLibrarySchedule(type, libraryId, cronSchedule, vfsRe
 }
 
 export async function fetchSystemSettings(type) {
-  const res = await fetch(`/api/media/settings?type=${type}`);
+  const normalizedType = (type === 'audiobook') ? 'general' : type;
+  const res = await fetch(`/api/media/settings?type=${normalizedType}`);
   return res.json();
 }
 

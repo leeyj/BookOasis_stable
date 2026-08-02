@@ -386,8 +386,9 @@ def startup_db_sanity_check():
     - 메인 DB 파일 자체의 손상은 경고 로그만 출력하고 서버 기동은 계속합니다.
     """
     db_map = {
-        'general': DB_GENERAL_PATH,
-        'adult'  : DB_ADULT_PATH,
+        'general'  : DB_GENERAL_PATH,
+        'adult'    : DB_ADULT_PATH,
+        'audiobook': DB_AUDIOBOOK_PATH,
     }
     for db_type, db_path in db_map.items():
         if not os.path.exists(db_path):
@@ -426,7 +427,7 @@ def startup_db_sanity_check():
 
 
 def init_databases():
-    """두 데이터베이스(일반, 성인)의 테이블 스키마 초기화"""
+    """세 데이터베이스(일반, 성인, 오디오북)의 테이블 스키마 초기화"""
     schema = """
     CREATE TABLE IF NOT EXISTS libraries (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -486,6 +487,57 @@ def init_databases():
         title_alias TEXT,
         file_mtime REAL DEFAULT 0.0,
         file_size INTEGER DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS audiobooks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        library_id INTEGER REFERENCES libraries(id),
+        title TEXT NOT NULL,
+        sort_title TEXT,
+        author TEXT,
+        publisher TEXT,
+        code TEXT,
+        poster TEXT,
+        premiered TEXT,
+        ratings REAL DEFAULT 0.0,
+        author_intro TEXT,
+        description TEXT,
+        folder_name TEXT NOT NULL,
+        folder_path TEXT NOT NULL UNIQUE,
+        total_duration REAL DEFAULT 0.0,
+        total_tracks INTEGER DEFAULT 1,
+        file_type TEXT DEFAULT 'multi',
+        is_favorite INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0,
+        deleted_at DATETIME DEFAULT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS audiobook_tracks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        audiobook_id INTEGER REFERENCES audiobooks(id) ON DELETE CASCADE,
+        track_number INTEGER NOT NULL,
+        track_code TEXT,
+        filename TEXT NOT NULL,
+        file_path TEXT NOT NULL UNIQUE,
+        file_mtime REAL DEFAULT 0.0,
+        file_size INTEGER DEFAULT 0,
+        duration REAL DEFAULT 0.0,
+        format TEXT DEFAULT 'mp3'
+    );
+
+    CREATE TABLE IF NOT EXISTS audiobook_progress (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        audiobook_id INTEGER REFERENCES audiobooks(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL DEFAULT 1,
+        current_track_id INTEGER REFERENCES audiobook_tracks(id),
+        current_time REAL DEFAULT 0.0,
+        total_progress_pct REAL DEFAULT 0.0,
+        playback_rate REAL DEFAULT 1.0,
+        is_completed INTEGER DEFAULT 0,
+        last_listened_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(audiobook_id, user_id)
     );
 
     CREATE TABLE IF NOT EXISTS user_progress (
@@ -595,6 +647,9 @@ def init_databases():
     """
 
     indexes_schema = """
+    CREATE INDEX IF NOT EXISTS idx_audiobook_tracks_audiobook_id ON audiobook_tracks(audiobook_id);
+    CREATE INDEX IF NOT EXISTS idx_audiobooks_library_id ON audiobooks(library_id);
+    CREATE INDEX IF NOT EXISTS idx_audiobooks_title ON audiobooks(title);
     CREATE INDEX IF NOT EXISTS idx_book_offsets_book_id ON book_offsets(book_id);
     CREATE INDEX IF NOT EXISTS idx_book_offsets_book_page ON book_offsets(book_id, page_idx);
     CREATE INDEX IF NOT EXISTS idx_books_series_name ON books(series_name);
@@ -615,7 +670,7 @@ def init_databases():
     # 기동 전 WAL/SHM 무결성 자동 검증 및 정리
     startup_db_sanity_check()
 
-    for db_type in ['general', 'adult']:
+    for db_type in ['general', 'adult', 'audiobook']:
         conn = get_connection(db_type)
         cursor = conn.cursor()
         cursor.executescript(schema)

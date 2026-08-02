@@ -118,17 +118,23 @@ export function createBookCard(item, options = {}) {
   card.className = 'book-card';
   card.dataset.bookId = item.id || item.representative_book_id || '';
 
+  const isAudiobook = (item.file_format === 'audiobook') || 
+                      (typeof state !== 'undefined' && state && state.currentLibraryType === 'audiobook') || 
+                      item.total_tracks !== undefined || 
+                      item.audiobook_id !== undefined;
+  const coverFormat = isAudiobook ? 'audiobook' : item.file_format;
+
   const rawSeriesName = String(item.series_name || '').trim();
   const displayTitle = resolveCardDisplayTitle(item, options.showVolumeCount);
   const fallbackCoverSrc = buildFallbackCoverUrl({
     title: displayTitle,
-    format: item.file_format,
+    format: coverFormat,
     seed: item.id || item.representative_book_id || item.file_path || displayTitle
   });
   const coverSrc = getBookCoverSrc({
     coverImage: item.cover_image,
     title: displayTitle,
-    format: item.file_format,
+    format: coverFormat,
     seed: item.id || item.representative_book_id || item.file_path || displayTitle
   });
   const useLazyLoad = options.lazyLoad !== false;
@@ -146,16 +152,23 @@ export function createBookCard(item, options = {}) {
 
   // 2. 뱃지 정보 결정
   let badgeHtml = '';
-  if (options.showProgress && item.total_pages > 0) {
-    const progressPercent = Math.round((item.pages_read / item.total_pages) * 100);
-    badgeHtml = `<span class="book-badge-count" style="background-color: #a855f7;">${progressPercent}%</span>`;
-  } else if (options.showVolumeCount && item.book_count !== undefined) {
-    badgeHtml = `<span class="book-badge-count">${item.book_count}${i18n.t('dashboard.unit_books')}</span>`;
+  if (!isAudiobook) {
+    if (options.showProgress && item.total_pages > 0) {
+      const progressPercent = Math.round((item.pages_read / item.total_pages) * 100);
+      badgeHtml = `<span class="book-badge-count" style="background-color: #a855f7;">${progressPercent}%</span>`;
+    } else if (options.showVolumeCount && item.book_count !== undefined) {
+      badgeHtml = `<span class="book-badge-count">${item.book_count}${i18n.t('dashboard.unit_books')}</span>`;
+    }
   }
 
   // 3. 서브 텍스트 메타정보 결정
   let subTextHtml = '';
-  if (item.pages_read > 0 && options.showProgress) {
+  if (isAudiobook) {
+    const chapters = (item.total_tracks !== undefined && Number(item.total_tracks) > 0) 
+      ? Number(item.total_tracks) 
+      : ((item.book_count !== undefined && Number(item.book_count) > 0) ? Number(item.book_count) : (Number(item.total_pages) || 1));
+    subTextHtml = `<p style="font-size:0.82rem; color:#38bdf8; font-weight:600; margin-top:auto; padding-top:0.2rem; margin-bottom:-0.15rem; display:flex; align-items:center; gap:0.35rem;"><i class="fa-solid fa-headphones"></i> ${chapters}</p>`;
+  } else if (item.pages_read > 0 && options.showProgress) {
     subTextHtml = `<p style="font-size:0.75rem; color:#94a3b8; margin:0.25rem 0 0 0;">${i18n.t('dashboard.continue_reading', { pages: item.pages_read })}</p>`;
   } else if (options.isNew) {
     subTextHtml = `<p style="font-size:0.75rem; color:#94a3b8; margin:0.25rem 0 0 0;">${i18n.t('dashboard.new_arrival')}</p>`;
@@ -212,7 +225,7 @@ export function createBookCard(item, options = {}) {
         return;
       }
       imgEl.onerror = null;
-      const svgUri = buildTextCoverDataUri({ title: item.title, format: item.file_format, seed: item.id });
+      const svgUri = buildTextCoverDataUri({ title: item.title, format: coverFormat, seed: item.id });
       imgEl.setAttribute('src', svgUri);
     };
   }

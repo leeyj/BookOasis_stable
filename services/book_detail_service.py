@@ -8,6 +8,89 @@ from utils.cover_helper import get_cover_image_with_t, resolve_series_cover
 class BookDetailService:
     @staticmethod
     def get_media_detail(db_type, series_name, library_id='all', user_id=1, role=None, restrict_same_directory=True, representative_book_id=None):
+        if db_type == 'audiobook':
+            import database
+            conn = database.get_connection('audiobook')
+            cursor = conn.cursor()
+            
+            audiobook_row = None
+            if representative_book_id:
+                try:
+                    cursor.execute("SELECT * FROM audiobooks WHERE id = ? AND COALESCE(is_deleted, 0) = 0", (int(representative_book_id),))
+                    audiobook_row = cursor.fetchone()
+                except Exception:
+                    pass
+            
+            if not audiobook_row and series_name:
+                cursor.execute("SELECT * FROM audiobooks WHERE (title = ? OR folder_name = ?) AND COALESCE(is_deleted, 0) = 0", (series_name, series_name))
+                audiobook_row = cursor.fetchone()
+
+            if not audiobook_row:
+                cursor.execute("SELECT * FROM audiobooks WHERE COALESCE(is_deleted, 0) = 0 ORDER BY id ASC LIMIT 1")
+                audiobook_row = cursor.fetchone()
+
+            if not audiobook_row:
+                conn.close()
+                return {'series_name': series_name, 'author': '-', 'publisher': '-', 'summary': '등록된 오디오북이 없습니다.', 'cover_image': ''}, []
+
+            aid = audiobook_row['id']
+            
+            # 사용자 진행도
+            cursor.execute("SELECT * FROM audiobook_progress WHERE audiobook_id = ? AND user_id = ?", (aid, user_id))
+            prog_row = cursor.fetchone()
+            current_track_id = prog_row['current_track_id'] if prog_row else None
+            current_time = prog_row['current_time'] if prog_row else 0.0
+
+            # 트랙 목록
+            cursor.execute("SELECT * FROM audiobook_tracks WHERE audiobook_id = ? ORDER BY track_number ASC", (aid,))
+            track_rows = cursor.fetchall()
+
+            meta = {
+                'id': aid,
+                'series_name': audiobook_row['title'],
+                'series_alias': '',
+                'author': audiobook_row['author'] or '-',
+                'publisher': audiobook_row['publisher'] or '-',
+                'code': audiobook_row['code'] or '',
+                'ratings': audiobook_row['ratings'] or 0.0,
+                'summary': audiobook_row['description'] or audiobook_row['author_intro'] or '등록된 설명이 없습니다.',
+                'cover_image': f"/api/media/audiobooks/{aid}/cover",
+                'total_duration': audiobook_row['total_duration'] or 0.0,
+                'total_tracks': audiobook_row['total_tracks'] or len(track_rows),
+                'file_type': audiobook_row['file_type'] or 'multi',
+                'is_favorite': audiobook_row['is_favorite'] or 0,
+                'current_track_id': current_track_id,
+                'current_time': current_time,
+                'metadata_locked': 0
+            }
+
+            books_list = []
+            for t in track_rows:
+                dur_sec = t['duration'] or 0.0
+                mins = int(dur_sec // 60)
+                secs = int(dur_sec % 60)
+                time_str = f"{mins:02d}:{secs:02d}"
+
+                books_list.append({
+                    'id': t['id'],
+                    'audiobook_id': aid,
+                    'track_number': t['track_number'],
+                    'track_code': t['track_code'] or str(t['track_number']),
+                    'title': t['filename'],
+                    'file_format': t['format'] or 'mp3',
+                    'duration': dur_sec,
+                    'time_str': time_str,
+                    'file_size': t['file_size'] or 0,
+                    'file_path': t['file_path'],
+                    'total_pages': mins if mins > 0 else 1,
+                    'cover_image': meta['cover_image'],
+                    'is_completed': 1 if prog_row and prog_row['is_completed'] else 0,
+                    'is_favorite': meta['is_favorite'],
+                })
+
+            conn.close()
+            return meta, books_list
+
         enforce_permission = (role != 'admin' and bool(user_id))
 
         # 권한 제어 절 정보 결정

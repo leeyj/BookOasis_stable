@@ -100,7 +100,8 @@ if not IS_WORKER:
 
     @app.context_processor
     def inject_feature_flags():
-        audiobook_enabled = os.environ.get('AUDIOBOOK', 'false').strip().lower() == 'true'
+        # 오디오북 기능은 기본 상시 활성화 정책으로 전환
+        audiobook_enabled = True
         return dict(audiobook_enabled=audiobook_enabled)
 
     @app.errorhandler(413)

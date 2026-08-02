@@ -96,8 +96,8 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
     
     conn = None
     try:
-        db_types = ['general', 'adult']
-        if target_db_type in ('general', 'adult'):
+        db_types = ['general', 'adult', 'audiobook']
+        if target_db_type in ('general', 'adult', 'audiobook'):
             db_types = [target_db_type]
 
         # ── 최대 스캔 허용 파일 크기(MB) 및 세션 누적 제한(MB) 설정 로드 ──
@@ -140,7 +140,7 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
                     print("[Lazy-Scanner] 🛑 용량 한도 달성으로 DB 순회를 중단하고 차기 서브-배치로 이관합니다.")
                 break
 
-            db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
+            db_path = database.get_db_path(db_type)
             if not os.path.exists(db_path):
                 continue
                 

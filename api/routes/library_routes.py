@@ -17,6 +17,14 @@ import database
 library_bp = Blueprint('library', __name__)
 MAX_LIBRARY_NAME_LENGTH = 25
 
+def get_db_path_for_scan(db_type):
+    """db_type에 대응하는 스캔 대상 데이터베이스 파일 경로 반환"""
+    if db_type == 'adult':
+        return database.DB_ADULT_PATH
+    elif db_type == 'audiobook':
+        return database.DB_AUDIOBOOK_PATH
+    return database.DB_GENERAL_PATH
+
 @library_bp.route('/api/media/libraries/add', methods=['POST'])
 @admin_required
 def add_media_library():
@@ -51,7 +59,7 @@ def add_media_library():
     
     # 즉시 스캔 비동기 수행
     try:
-        db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
+        db_path = get_db_path_for_scan(db_type)
         from services.scanner_queue import scanner_queue
         scanner_queue.enqueue('library_scan', db_type=db_type, db_path=db_path, 
                              library_id=library_id, physical_path=physical_path, force=False,
@@ -110,7 +118,7 @@ def edit_media_library():
         is_path_changed = (old_path != new_path)
         
         if is_path_changed:
-            db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
+            db_path = get_db_path_for_scan(db_type)
             from services.scanner_queue import scanner_queue
             scanner_queue.enqueue('library_scan', db_type=db_type, db_path=db_path, 
                                  library_id=int(library_id), physical_path=physical_path, force=False, trigger_type='manual', is_cron=False)
@@ -185,8 +193,7 @@ def update_library_schedule(library_id):
         if not row:
             return jsonify({'success': False, 'error': _t('api.err_library_not_found')}), 404
         
-        import database
-        db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
+        db_path = get_db_path_for_scan(db_type)
         
         if cron_val:
             success = SchedulerService.register_job(db_type, db_path, library_id, row['physical_path'], cron_val)

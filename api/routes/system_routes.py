@@ -293,7 +293,7 @@ def trigger_scan_via_webhook():
         
     # 3. 백그라운드 스캔 대기열 주입 (스캐너 워커 필수 인자 포함)
     try:
-        db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
+        db_path = database.get_db_path(db_type)
         from services.scanner_queue import scanner_queue
         enqueued = scanner_queue.enqueue(
             'library_scan',

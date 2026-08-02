@@ -54,6 +54,76 @@ class StatsDashboardMetadataProvider(BaseMetadataProvider):
         week_start = self._week_start().strftime("%Y-%m-%d %H:%M:%S")
         month_start = self._month_start().strftime("%Y-%m-%d %H:%M:%S")
 
+        if db_type == 'audiobook':
+            totals = gateway.fetch_one(
+                """
+                SELECT
+                    COUNT(*) AS total_books,
+                    COUNT(DISTINCT title) AS total_series
+                FROM audiobooks
+                WHERE COALESCE(is_deleted, 0) = 0
+                """
+            )
+            weekly_listen = gateway.fetch_one(
+                """
+                SELECT COALESCE(SUM(p.current_time), 0) AS week_listen_sec
+                FROM audiobook_progress p
+                JOIN audiobooks a ON a.id = p.audiobook_id
+                WHERE COALESCE(a.is_deleted, 0) = 0
+                  AND p.last_listened_at >= ?
+                """,
+                (week_start,),
+            )
+            monthly_completed = gateway.fetch_one(
+                """
+                SELECT COUNT(DISTINCT p.audiobook_id) AS monthly_completed
+                FROM audiobook_progress p
+                JOIN audiobooks a ON a.id = p.audiobook_id
+                WHERE COALESCE(a.is_deleted, 0) = 0
+                  AND p.last_listened_at >= ?
+                  AND COALESCE(p.is_completed, 0) = 1
+                """,
+                (month_start,),
+            )
+            weekly_completed = gateway.fetch_one(
+                """
+                SELECT COUNT(DISTINCT p.audiobook_id) AS weekly_completed
+                FROM audiobook_progress p
+                JOIN audiobooks a ON a.id = p.audiobook_id
+                WHERE COALESCE(a.is_deleted, 0) = 0
+                  AND p.last_listened_at >= ?
+                  AND COALESCE(p.is_completed, 0) = 1
+                """,
+                (week_start,),
+            )
+            format_rows = gateway.fetch_all(
+                """
+                SELECT LOWER(COALESCE(format, '')) AS fmt, COUNT(*) AS cnt
+                FROM audiobook_tracks
+                GROUP BY LOWER(COALESCE(format, ''))
+                """
+            ) or []
+            fmt_map = {'m4b_m4a': 0, 'mp3': 0, 'other': 0}
+            for row in format_rows:
+                fmt = str(row['fmt'] if isinstance(row, dict) else row[0] or '').lower()
+                cnt = int(row['cnt'] if isinstance(row, dict) else row[1] or 0)
+                if fmt in ('m4b', 'm4a', 'aac'):
+                    fmt_map['m4b_m4a'] += cnt
+                elif fmt == 'mp3':
+                    fmt_map['mp3'] += cnt
+                else:
+                    fmt_map['other'] += cnt
+
+            return {
+                "total_books": int((totals["total_books"] if totals else 0) or 0),
+                "total_series": int((totals["total_series"] if totals else 0) or 0),
+                "week_listen_sec": float((weekly_listen["week_listen_sec"] if weekly_listen else 0) or 0),
+                "month_completed_books": int((monthly_completed["monthly_completed"] if monthly_completed else 0) or 0),
+                "weekly_completed": int((weekly_completed["weekly_completed"] if weekly_completed else 0) or 0),
+                "monthly_completed": int((monthly_completed["monthly_completed"] if monthly_completed else 0) or 0),
+                "format_counts": fmt_map,
+            }
+
         # 1. 총 보유 도서 및 총 시리즈 수
         totals = gateway.fetch_one(
             """

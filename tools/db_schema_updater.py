@@ -72,7 +72,7 @@ def run_schema_update():
         schema_text = None
         indexes_text = None
     
-    for db_key, db_path in [('general', DB_GENERAL_PATH), ('adult', DB_ADULT_PATH)]:
+    for db_key, db_path in [('general', DB_GENERAL_PATH), ('adult', DB_ADULT_PATH), ('audiobook', DB_AUDIOBOOK_PATH)]:
         if not os.path.exists(db_path):
             continue
             

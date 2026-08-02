@@ -30,6 +30,7 @@ import { initFloatingFilter, toggleFilterModal } from './genre_tag_filter.js';
 import { initSidebarInteractions, restoreDesktopSidebarState } from './sidebar_manager.js';
 import { decodeDetailParams } from './url_obfuscator.js';
 import './viewer/viewer_padding.js';
+import './audio_player.js';
 
 function canAccessAdultLibrary() {
   const user = state.currentUser || window.currentUser || {};
@@ -204,7 +205,7 @@ async function initTabMediaLibrary() {
       // 일반 사용자는 어드민 전용 탭 숨김 처리
       document.querySelectorAll('.settings-tab-btn').forEach(btn => {
         const onclickAttr = btn.getAttribute('onclick') || '';
-        if (onclickAttr.includes("'schedule'") || onclickAttr.includes("'queue'") || onclickAttr.includes("'general'") || onclickAttr.includes("'plugins'") || onclickAttr.includes("'reports'")) {
+        if (onclickAttr.includes("'schedule'") || onclickAttr.includes("'queue'") || onclickAttr.includes("'plugins'") || onclickAttr.includes("'reports'")) {
           btn.style.display = 'none';
         }
       });
@@ -227,8 +228,67 @@ async function initTabMediaLibrary() {
   restoreDesktopSidebarState();
   initSidebarInteractions();
 
+function parseMediaTypeFromUrl() {
+  try {
+    const searchParams = new URLSearchParams(window.location.search);
+    const qType = searchParams.get('type') || searchParams.get('media') || searchParams.get('db_type');
+    if (qType) {
+      const parsed = normalizeMediaType(qType);
+      if (parsed) return parsed;
+    }
+  } catch (e) {}
+
+  try {
+    const rawHash = (window.location.hash || '').trim();
+    if (rawHash) {
+      const cleanHash = rawHash.replace(/^#/, '');
+      if (cleanHash.includes('=')) {
+        const hashParams = new URLSearchParams(cleanHash);
+        const hType = hashParams.get('type') || hashParams.get('media') || hashParams.get('db_type');
+        if (hType) {
+          const parsed = normalizeMediaType(hType);
+          if (parsed) return parsed;
+        }
+      }
+      const lowerHash = cleanHash.toLowerCase();
+      if (lowerHash.includes('audiobook') || lowerHash.includes('audio')) return 'audiobook';
+      if (lowerHash.includes('adult') || lowerHash.includes('r18')) return 'adult';
+      if (lowerHash.includes('general') || lowerHash.includes('book')) return 'general';
+    }
+  } catch (e) {}
+
+  return null;
+}
+
+function normalizeMediaType(val) {
+  if (!val) return null;
+  val = String(val).toLowerCase().trim();
+  if (['audiobook', 'audio', 'sound'].includes(val)) return 'audiobook';
+  if (['adult', 'r18'].includes(val)) return 'adult';
+  if (['general', 'book', 'books', 'normal'].includes(val)) return 'general';
+  return null;
+}
+
   const initialHash = window.location.hash || '';
   const isDetailDeepLink = initialHash.startsWith('#detail');
+
+  // URL 딥링크 미디어 탭 파싱 (예: #library=home&type=audiobook)
+  const targetMediaType = parseMediaTypeFromUrl();
+  if (targetMediaType) {
+    if (targetMediaType === 'adult' && !canAccessAdultLibrary()) {
+      state.currentLibraryType = 'general';
+    } else {
+      state.currentLibraryType = targetMediaType;
+    }
+    document.querySelectorAll('#library-type-toggle-group .btn-toggle').forEach(btn => btn.classList.remove('active'));
+    if (state.currentLibraryType === 'general') {
+      document.getElementById('btn-lib-general')?.classList.add('active');
+    } else if (state.currentLibraryType === 'adult') {
+      document.getElementById('btn-lib-adult')?.classList.add('active');
+    } else if (state.currentLibraryType === 'audiobook') {
+      document.getElementById('btn-lib-audiobook')?.classList.add('active');
+    }
+  }
 
   // 보안 검증: 동일 탭에서의 새로고침(reload)이거나 기존 탭 세션이 있는 경우에만 상세 뷰 복원 허용
   const navType = (performance && performance.getEntriesByType && performance.getEntriesByType('navigation')[0]) ? performance.getEntriesByType('navigation')[0].type : '';
@@ -253,10 +313,11 @@ async function initTabMediaLibrary() {
     } else {
       console.warn('[Security-History] 신규 탭 붙여넣기 진입 차단 - 대시보드(홈)로 안내 및 해시 소거');
       selectCategory('home', true);
-      history.replaceState({ view: 'category', libraryId: 'home' }, '', '#library=home');
+      const curType = state.currentLibraryType || 'general';
+      history.replaceState({ view: 'category', libraryId: 'home', type: curType }, '', `#library=home&type=${curType}`);
     }
   } else {
-    selectCategory('home');
+    selectCategory('home', true);
   }
   updateSortButtonUI();
 
@@ -360,24 +421,36 @@ if (window.i18nReady) {
   document.addEventListener('i18nReady', initTabMediaLibrary);
 }
 
-// 라이브러리 타입 스위칭 (일반/성인)
+// 라이브러리 타입 스위칭 (일반/성인/오디오북)
 export async function switchLibraryType(type) {
   if (type === 'adult' && !canAccessAdultLibrary()) {
     state.currentLibraryType = 'general';
-    return;
+    type = 'general';
   }
 
   window.scrollTo(0, 0);
   state.currentLibraryType = type;
-  document.querySelectorAll('.btn-toggle').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('#library-type-toggle-group .btn-toggle').forEach(btn => btn.classList.remove('active'));
   if (type === 'general') {
-    document.getElementById('btn-lib-general').classList.add('active');
-  } else {
-    document.getElementById('btn-lib-adult').classList.add('active');
+    document.getElementById('btn-lib-general')?.classList.add('active');
+  } else if (type === 'adult') {
+    document.getElementById('btn-lib-adult')?.classList.add('active');
+  } else if (type === 'audiobook') {
+    document.getElementById('btn-lib-audiobook')?.classList.add('active');
   }
+
+  // 주소창 URL 해시 갱신 (예: #library=home&type=audiobook)
+  if (!window.location.hash.startsWith('#detail') && !window.location.hash.startsWith('#viewer')) {
+    const curLibId = state.currentLibraryId || 'home';
+    const newHash = `#library=${curLibId}&type=${type}`;
+    try {
+      history.replaceState({ view: 'category', libraryId: curLibId, type: type }, '', newHash);
+    } catch (e) {}
+  }
+
   await loadInitialSystemSettings();
   loadLibraries();
-  selectCategory('home');
+  selectCategory('home', true);
 }
 
 async function mountCategoryPluginUI(pluginId) {
@@ -417,10 +490,11 @@ export function selectCategory(rawId, skipHistory = false) {
   const id = String(rawId || '');
   window.scrollTo(0, 0);
   state.currentLibraryId = id;
+  const curType = state.currentLibraryType || 'general';
   
   // 브라우저 히스토리에 카테고리 이동 기록 남기기 (SPA 뒤로가기 지원)
   if (!skipHistory) {
-    history.pushState({ view: 'category', libraryId: id }, '', `#library=${id}`);
+    history.pushState({ view: 'category', libraryId: id, type: curType }, '', `#library=${id}&type=${curType}`);
   }
   
   // 장르 및 태그 필터 초기화

@@ -9,6 +9,14 @@ const COVER_THEMES = [
 
 const SVG_CACHE = new Map();
 
+function isAudiobookContext() {
+  return Boolean(
+    window.location.hash.includes('audiobook') ||
+    document.querySelector('.media-tab.active[data-type="audiobook"]') ||
+    document.getElementById('audio-player-modal')?.style.display === 'block'
+  );
+}
+
 function hashString(value) {
   const text = String(value || '');
   let hash = 2166136261;
@@ -32,13 +40,22 @@ function normalizeTitle(title) {
   return String(title || '').replace(/\s+/g, ' ').trim() || 'Untitled';
 }
 
+const AUDIOBOOK_THEME = {
+  bgStart: '#1e3a8a',
+  bgEnd: '#0f172a',
+  border: '#38bdf8',
+  line: '#7dd3fc',
+  accent: '#60a5fa'
+};
+
 function formatLabel(format) {
   const key = String(format || 'text').toLowerCase();
+  if ((key === 'text' || !key) && isAudiobookContext()) return 'AUDIO';
   if (key === 'cbz' || key === 'zip') return 'COMIC';
   if (key === 'epub') return 'EPUB';
   if (key === 'pdf') return 'PDF';
   if (key === 'imgdir') return 'IMG';
-  if (key === 'audiobook') return 'AUDIO';
+  if (['audiobook', 'audio', 'm4a', 'm4b', 'mp3', 'aac', 'flac', 'ogg', 'wma'].includes(key)) return 'AUDIO';
   return 'TEXT';
 }
 
@@ -69,13 +86,13 @@ export function buildTextCoverDataUri({ title, format, seed } = {}) {
   }
 
   const hash = hashString(seed || normalizedTitle);
-  const theme = COVER_THEMES[hash % COVER_THEMES.length];
+  const theme = (label === 'AUDIO') ? AUDIOBOOK_THEME : COVER_THEMES[hash % COVER_THEMES.length];
   const lines = splitTitleLines(normalizedTitle, 9, 3);
 
   const lineYStart = lines.length === 1 ? 250 : lines.length === 2 ? 222 : 202;
   const lineGap = 48;
   const titleLinesSvg = lines
-    .map((line, idx) => `<text x=\"210\" y=\"${lineYStart + idx * lineGap}\" text-anchor=\"middle\" fill=\"#f8fafc\" font-family=\"'Noto Sans KR', 'Pretendard', sans-serif\" font-size=\"42\" font-weight=\"700\">${escapeXml(line)}</text>`)
+    .map((line, idx) => `<text x="210" y="${lineYStart + idx * lineGap}" text-anchor="middle" fill="#f8fafc" font-family="sans-serif" font-size="42" font-weight="700">${escapeXml(line)}</text>`)
     .join('');
 
   const svg = `
@@ -91,7 +108,7 @@ export function buildTextCoverDataUri({ title, format, seed } = {}) {
   <rect x=\"28\" y=\"22\" width=\"364\" height=\"556\" rx=\"14\" fill=\"none\" stroke=\"${theme.border}\" stroke-width=\"3.2\" opacity=\"0.95\" />
   <rect x=\"48\" y=\"52\" width=\"324\" height=\"4\" rx=\"2\" fill=\"${theme.line}\" opacity=\"0.92\" />
   ${titleLinesSvg}
-  <text x=\"210\" y=\"500\" text-anchor=\"middle\" fill=\"#dbe3ea\" font-family=\"'JetBrains Mono', monospace\" font-size=\"28\" letter-spacing=\"4\" opacity=\"0.88\">${label}</text>
+  <text x="210" y="500" text-anchor="middle" fill="#dbe3ea" font-family="monospace" font-size="28" letter-spacing="4" opacity="0.88">${label}</text>
 </svg>`;
 
   const dataUri = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
@@ -113,7 +130,11 @@ export function buildFallbackCoverUrl({ title, format, seed } = {}) {
 
 export function getBookCoverSrc({ coverImage, title, format, seed } = {}) {
   if (coverImage && typeof coverImage === 'string') {
-    let clean = coverImage.trim().replace(/^[\/\\]+/, '');
+    let clean = coverImage.trim();
+    if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('/api/') || clean.startsWith('/covers/')) {
+      return clean;
+    }
+    clean = clean.replace(/^[\/\\]+/, '');
     if (clean.toLowerCase().startsWith('covers/')) {
       clean = clean.substring(7).replace(/^[\/\\]+/, '');
     }
@@ -123,3 +144,20 @@ export function getBookCoverSrc({ coverImage, title, format, seed } = {}) {
   }
   return buildFallbackCoverUrl({ title, format, seed });
 }
+
+export function handleCoverError(img, title = '', format = '') {
+  if (!img || img.dataset.fallbackApplied === 'true') return;
+  img.dataset.fallbackApplied = 'true';
+  const altTitle = title || img.getAttribute('alt') || img.dataset.title || 'Book';
+  let fmt = format || img.dataset.format || 'text';
+
+  // 현재 미디어 탭이 오디오북이거나 주소창 해시에 audiobook이 포함된 경우 'audiobook' 포맷으로 자동 승격
+  const audiobookCtx = isAudiobookContext();
+  if ((fmt === 'text' || !fmt) && audiobookCtx) {
+    fmt = 'audiobook';
+  }
+
+  img.src = buildTextCoverDataUri({ title: altTitle, format: fmt });
+}
+window.handleCoverError = handleCoverError;
+window.buildTextCoverDataUri = buildTextCoverDataUri;

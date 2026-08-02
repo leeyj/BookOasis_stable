@@ -483,6 +483,78 @@ body {
     justify-content: center;
 }
 
+/* 오디오북 상세 탭/테이블 모바일 최적화 */
+.ab-volumes-shell {
+    padding: 0.75rem;
+}
+
+.ab-tab-header {
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.55rem;
+    margin-bottom: 0.65rem;
+}
+
+.ab-tab-header::-webkit-scrollbar {
+    height: 4px;
+}
+
+.ab-tab-header::-webkit-scrollbar-thumb {
+    background: rgba(56, 189, 248, 0.35);
+    border-radius: 999px;
+}
+
+.ab-tab-btn {
+    flex: 0 0 auto;
+    font-size: 0.76rem;
+    padding: 0.3rem 0.62rem;
+}
+
+.ab-tab-btn span {
+    min-width: 1.15rem;
+    height: 1.15rem;
+    line-height: 1.15rem;
+    font-size: 0.7rem;
+}
+
+.ab-detail-table {
+    min-width: 560px;
+}
+
+.ab-detail-table th,
+.ab-detail-table td {
+    padding: 0.46rem 0.52rem;
+    font-size: 0.79rem;
+}
+
+.ab-col-play {
+    width: 2.1rem;
+}
+
+.ab-col-id {
+    width: 2.7rem;
+}
+
+.ab-col-time,
+.ab-col-size,
+.ab-col-codec {
+    width: 6rem;
+}
+
+.ab-stats-grid {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+}
+
+.ab-stat-card {
+    padding: 0.62rem 0.68rem;
+}
+
+.ab-stat-card strong {
+    font-size: 0.95rem;
+}
+
 /* 9. iOS Safari 세로 스크롤 모드 전용 뷰어 오버플로우 릴리즈 (모달 자체 스크롤 활성화) */
 .viewer-modal.scroll-mode-active {
     overflow-y: auto !important;
@@ -585,5 +657,48 @@ body {
         flex: 1 1 auto;
         justify-content: center;
         white-space: nowrap;
+    }
+
+    /* 챕터 탭: 시작 시간 컬럼 숨기고 제목 가독성 우선 */
+    .ab-tab-pane[data-pane="chapters"] .ab-detail-table {
+        min-width: 460px;
+    }
+
+    .ab-tab-pane[data-pane="chapters"] .ab-detail-table th:nth-child(4),
+    .ab-tab-pane[data-pane="chapters"] .ab-detail-table td:nth-child(4) {
+        display: none;
+    }
+
+    /* 오디오 트랙 탭: 코덱/비트레이트는 모바일에서 축약 */
+    .ab-tab-pane[data-pane="tracks"] .ab-detail-table {
+        min-width: 520px;
+    }
+
+    .ab-tab-pane[data-pane="tracks"] .ab-detail-table th:nth-child(4),
+    .ab-tab-pane[data-pane="tracks"] .ab-detail-table td:nth-child(4),
+    .ab-tab-pane[data-pane="tracks"] .ab-detail-table th:nth-child(5),
+    .ab-tab-pane[data-pane="tracks"] .ab-detail-table td:nth-child(5) {
+        display: none;
+    }
+}
+
+@media screen and (max-width: 430px) {
+    .ab-volumes-shell {
+        padding: 0.62rem;
+    }
+
+    .ab-tab-btn {
+        font-size: 0.73rem;
+        padding: 0.28rem 0.58rem;
+    }
+
+    .ab-tab-pane[data-pane="tracks"] .ab-detail-table {
+        min-width: 460px;
+    }
+
+    /* 초소형 화면에서는 크기 컬럼도 축약 */
+    .ab-tab-pane[data-pane="tracks"] .ab-detail-table th:nth-child(6),
+    .ab-tab-pane[data-pane="tracks"] .ab-detail-table td:nth-child(6) {
+        display: none;
     }
 }

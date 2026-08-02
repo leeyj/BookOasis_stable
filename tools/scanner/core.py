@@ -18,6 +18,7 @@ from utils.drive_helper import is_remote_path
 DB_DIR = os.path.join(MEDIA_SERVER_DIR, 'db')
 DB_GENERAL_PATH = os.path.join(DB_DIR, 'media_general.db')
 DB_ADULT_PATH = os.path.join(DB_DIR, 'media_adult.db')
+DB_AUDIOBOOK_PATH = os.path.join(DB_DIR, 'media_audiobook.db')
 
 
 def _is_hdd_aggressive_warmup_enabled(db_type):
@@ -102,14 +103,14 @@ def scan_library(db_path, library_id, physical_path, force=False, skip_vfs_refre
     if not target_paths:
         raise ValueError("스캔 경로 정보가 입력되지 않았습니다.")
 
-    db_type = 'adult' if 'adult' in os.path.basename(db_path) else 'general'
+    db_type = 'audiobook' if 'audiobook' in os.path.basename(db_path) else ('adult' if 'adult' in os.path.basename(db_path) else 'general')
     is_remote = any(is_remote_path(p) for p in target_paths)
     hdd_aggressive_warmup = _is_hdd_aggressive_warmup_enabled(db_type)
     use_aggressive_warmup = bool(hdd_aggressive_warmup and not is_remote)
     max_attempts = 6 if use_aggressive_warmup else 3
     retry_delay_sec = 3.0 if use_aggressive_warmup else 1.0
 
-    print(f"[Scanner-WakeUp] mode={'aggressive' if use_aggressive_warmup else 'normal'} (remote={is_remote}, setting={hdd_aggressive_warmup})")
+    print(f"[Scanner-WakeUp] db_type={db_type}, mode={'aggressive' if use_aggressive_warmup else 'normal'} (remote={is_remote}, setting={hdd_aggressive_warmup})")
 
     # ── [HDD/NAS Wake-up & Path Validation] ──
     from utils.drive_helper import is_gdrive_url
@@ -149,6 +150,14 @@ def scan_library(db_path, library_id, physical_path, force=False, skip_vfs_refre
 
     if not skip_vfs_refresh:
         trigger_vfs_refresh(db_path, library_id, physical_path)
+
+    if db_type == 'audiobook':
+        print(f"[Scanner-Audiobook] 🎧 Triggering audiobook dedicated scanner pipeline for library_id={library_id}...")
+        from services.audiobook_scanner import scan_audiobook_library
+        for target_p in target_paths:
+            scan_audiobook_library(target_p, library_id=library_id, force=force)
+        print(f"[Scanner-Audiobook] 🎧 Audiobook scan completed for library_id={library_id}")
+        return
 
     threads_to_use = 1 if is_remote else MAX_SCANNER_THREADS
 
@@ -250,3 +259,19 @@ def run_sync_scanner():
                     pass
         for lib in libs:
             scan_library(DB_ADULT_PATH, lib['id'], lib['physical_path'])
+
+    if os.path.exists(DB_AUDIOBOOK_PATH):
+        conn = None
+        try:
+            conn = database.get_connection('audiobook')
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, name, physical_path FROM libraries")
+            libs = cursor.fetchall()
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+        for lib in libs:
+            scan_library(DB_AUDIOBOOK_PATH, lib['id'], lib['physical_path'])

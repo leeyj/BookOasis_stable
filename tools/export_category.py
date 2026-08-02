@@ -22,7 +22,7 @@ if BASE_DIR not in sys.path:
 import database
 
 def get_db_connection(db_type):
-    db_path = database.DB_ADULT_PATH if db_type == 'adult' else database.DB_GENERAL_PATH
+    db_path = database.get_db_path(db_type)
     if not os.path.exists(db_path):
         raise FileNotFoundError(f"Database file not found at: {db_path}")
     conn = sqlite3.connect(db_path)
@@ -78,76 +78,167 @@ def export_single_category(db_type, library_id, output_path=None):
     for idx, rp in enumerate(root_paths):
         print(f"    [{idx}] {rp}")
 
-    # 2. 도서 목록 조회 (is_deleted가 1인 항목 제외)
-    cursor.execute("SELECT * FROM books WHERE library_id = ? AND (is_deleted IS NULL OR is_deleted = 0)", (library_id,))
-    book_rows = cursor.fetchall()
-    books = [dict(r) for r in book_rows]
-    print(f"[+] Found {len(books)} books in library.")
-
-    # 3. root_index 판별, relative_path 계산 및 offset 수집
+    # 2) 카테고리 타입별 데이터 수집
     books_payload = []
     offsets_payload = {}
+    audiobooks_payload = []
+    audiobook_tracks_payload = []
+    audiobook_progress_payload = []
     cover_files_to_pack = set()
 
-    for idx, b in enumerate(books):
-        book_id = b['id']
-        abs_file_path = b['file_path']
+    if db_type == 'audiobook':
+        cursor.execute("SELECT * FROM audiobooks WHERE library_id = ? AND (is_deleted IS NULL OR is_deleted = 0)", (library_id,))
+        audiobook_rows = cursor.fetchall()
+        audiobooks = [dict(r) for r in audiobook_rows]
+        print(f"[+] Found {len(audiobooks)} audiobooks in library.")
 
-        matched_root_idx = 0
-        rel_path = None
+        for idx, ab in enumerate(audiobooks):
+            audiobook_id = ab['id']
+            abs_folder_path = ab.get('folder_path', '')
 
-        norm_f_path = os.path.normpath(abs_file_path).lower()
+            matched_root_idx = 0
+            rel_folder_path = None
+            norm_folder_path = os.path.normpath(abs_folder_path).lower() if abs_folder_path else ''
 
-        for r_idx, r_path in enumerate(root_paths):
-            norm_r_path = os.path.normpath(r_path).lower()
-            if norm_f_path.startswith(norm_r_path):
-                matched_root_idx = r_idx
-                try:
-                    rel_path = os.path.relpath(abs_file_path, r_path).replace('\\', '/')
-                except ValueError:
-                    rel_path = os.path.basename(abs_file_path)
-                break
-
-        if rel_path is None:
-            base_ref = root_paths[0] if root_paths else ""
-            try:
-                rel_path = os.path.relpath(abs_file_path, base_ref).replace('\\', '/')
-            except ValueError:
-                rel_path = os.path.basename(abs_file_path)
-
-        b_copy = dict(b)
-        b_copy['root_index'] = matched_root_idx
-        b_copy['relative_path'] = rel_path
-        books_payload.append(b_copy)
-
-        # 커버 이미지 파일 수집
-        cover_img = b.get('cover_image')
-        if cover_img:
-            clean_cover = str(cover_img).replace('\\', '/').lstrip('/')
-            cover_candidates = []
-            if os.path.isabs(cover_img):
-                cover_candidates.append(cover_img)
-
-            cover_candidates.append(os.path.join(BASE_DIR, clean_cover))
-            cover_candidates.append(os.path.join(BASE_DIR, 'covers', clean_cover))
-            if clean_cover.startswith('covers/'):
-                unprefixed = clean_cover[7:]
-                cover_candidates.append(os.path.join(BASE_DIR, 'covers', unprefixed))
-                cover_candidates.append(os.path.join(BASE_DIR, unprefixed))
-            cover_candidates.append(os.path.join(BASE_DIR, 'covers', str(library_id), os.path.basename(clean_cover)))
-            cover_candidates.append(os.path.join(BASE_DIR, 'covers', os.path.basename(clean_cover)))
-
-            for cand in cover_candidates:
-                norm_cand = os.path.normpath(cand)
-                if os.path.exists(norm_cand) and os.path.isfile(norm_cand):
-                    cover_files_to_pack.add(norm_cand)
+            for r_idx, r_path in enumerate(root_paths):
+                norm_r_path = os.path.normpath(r_path).lower()
+                if norm_folder_path.startswith(norm_r_path):
+                    matched_root_idx = r_idx
+                    try:
+                        rel_folder_path = os.path.relpath(abs_folder_path, r_path).replace('\\', '/')
+                    except ValueError:
+                        rel_folder_path = os.path.basename(abs_folder_path)
                     break
 
-        # offset 데이터 수집
-        cursor.execute("SELECT page_idx, filename, local_header_offset, compress_size, file_size, compress_type FROM book_offsets WHERE book_id = ?", (book_id,))
-        offset_rows = cursor.fetchall()
-        if offset_rows:
-            offsets_payload[idx] = [dict(o) for o in offset_rows]
+            if rel_folder_path is None:
+                base_ref = root_paths[0] if root_paths else ""
+                try:
+                    rel_folder_path = os.path.relpath(abs_folder_path, base_ref).replace('\\', '/')
+                except ValueError:
+                    rel_folder_path = os.path.basename(abs_folder_path)
+
+            ab_copy = dict(ab)
+            ab_copy['root_index'] = matched_root_idx
+            ab_copy['relative_folder_path'] = rel_folder_path
+            audiobooks_payload.append(ab_copy)
+
+            poster = ab.get('poster')
+            if poster and not str(poster).startswith(('http://', 'https://')):
+                clean_cover = str(poster).replace('\\', '/').lstrip('/')
+                cover_candidates = []
+                if os.path.isabs(poster):
+                    cover_candidates.append(poster)
+                cover_candidates.append(os.path.join(BASE_DIR, clean_cover))
+                cover_candidates.append(os.path.join(BASE_DIR, 'covers', clean_cover))
+                cover_candidates.append(os.path.join(BASE_DIR, 'covers', str(library_id), os.path.basename(clean_cover)))
+                cover_candidates.append(os.path.join(BASE_DIR, 'covers', os.path.basename(clean_cover)))
+
+                for cand in cover_candidates:
+                    norm_cand = os.path.normpath(cand)
+                    if os.path.exists(norm_cand) and os.path.isfile(norm_cand):
+                        cover_files_to_pack.add(norm_cand)
+                        break
+
+            cursor.execute(
+                "SELECT * FROM audiobook_tracks WHERE audiobook_id = ? ORDER BY track_number ASC, id ASC",
+                (audiobook_id,)
+            )
+            track_rows = cursor.fetchall()
+            for tr in track_rows:
+                trd = dict(tr)
+                track_path = trd.get('file_path', '')
+                rel_track_path = None
+                selected_root = root_paths[matched_root_idx] if root_paths and matched_root_idx < len(root_paths) else ''
+                if track_path:
+                    if selected_root:
+                        try:
+                            rel_track_path = os.path.relpath(track_path, selected_root).replace('\\', '/')
+                        except Exception:
+                            rel_track_path = os.path.basename(track_path)
+                    else:
+                        rel_track_path = os.path.basename(track_path)
+                else:
+                    rel_track_path = ''
+
+                trd['audiobook_export_index'] = idx
+                trd['root_index'] = matched_root_idx
+                trd['relative_path'] = rel_track_path
+                audiobook_tracks_payload.append(trd)
+
+            cursor.execute("SELECT * FROM audiobook_progress WHERE audiobook_id = ?", (audiobook_id,))
+            prog_rows = cursor.fetchall()
+            if prog_rows:
+                track_num_map = {int(dict(t).get('id')): int(dict(t).get('track_number') or 0) for t in track_rows}
+                for pr in prog_rows:
+                    pd = dict(pr)
+                    pd['audiobook_export_index'] = idx
+                    curr_tid = pd.get('current_track_id')
+                    pd['current_track_number'] = track_num_map.get(int(curr_tid), 0) if curr_tid else 0
+                    audiobook_progress_payload.append(pd)
+    else:
+        # 일반/성인 도서 내보내기
+        cursor.execute("SELECT * FROM books WHERE library_id = ? AND (is_deleted IS NULL OR is_deleted = 0)", (library_id,))
+        book_rows = cursor.fetchall()
+        books = [dict(r) for r in book_rows]
+        print(f"[+] Found {len(books)} books in library.")
+
+        for idx, b in enumerate(books):
+            book_id = b['id']
+            abs_file_path = b['file_path']
+
+            matched_root_idx = 0
+            rel_path = None
+
+            norm_f_path = os.path.normpath(abs_file_path).lower()
+
+            for r_idx, r_path in enumerate(root_paths):
+                norm_r_path = os.path.normpath(r_path).lower()
+                if norm_f_path.startswith(norm_r_path):
+                    matched_root_idx = r_idx
+                    try:
+                        rel_path = os.path.relpath(abs_file_path, r_path).replace('\\', '/')
+                    except ValueError:
+                        rel_path = os.path.basename(abs_file_path)
+                    break
+
+            if rel_path is None:
+                base_ref = root_paths[0] if root_paths else ""
+                try:
+                    rel_path = os.path.relpath(abs_file_path, base_ref).replace('\\', '/')
+                except ValueError:
+                    rel_path = os.path.basename(abs_file_path)
+
+            b_copy = dict(b)
+            b_copy['root_index'] = matched_root_idx
+            b_copy['relative_path'] = rel_path
+            books_payload.append(b_copy)
+
+            cover_img = b.get('cover_image')
+            if cover_img:
+                clean_cover = str(cover_img).replace('\\', '/').lstrip('/')
+                cover_candidates = []
+                if os.path.isabs(cover_img):
+                    cover_candidates.append(cover_img)
+
+                cover_candidates.append(os.path.join(BASE_DIR, clean_cover))
+                cover_candidates.append(os.path.join(BASE_DIR, 'covers', clean_cover))
+                if clean_cover.startswith('covers/'):
+                    unprefixed = clean_cover[7:]
+                    cover_candidates.append(os.path.join(BASE_DIR, 'covers', unprefixed))
+                    cover_candidates.append(os.path.join(BASE_DIR, unprefixed))
+                cover_candidates.append(os.path.join(BASE_DIR, 'covers', str(library_id), os.path.basename(clean_cover)))
+                cover_candidates.append(os.path.join(BASE_DIR, 'covers', os.path.basename(clean_cover)))
+
+                for cand in cover_candidates:
+                    norm_cand = os.path.normpath(cand)
+                    if os.path.exists(norm_cand) and os.path.isfile(norm_cand):
+                        cover_files_to_pack.add(norm_cand)
+                        break
+
+            cursor.execute("SELECT page_idx, filename, local_header_offset, compress_size, file_size, compress_type FROM book_offsets WHERE book_id = ?", (book_id,))
+            offset_rows = cursor.fetchall()
+            if offset_rows:
+                offsets_payload[idx] = [dict(o) for o in offset_rows]
 
     conn.close()
 
@@ -171,13 +262,17 @@ def export_single_category(db_type, library_id, output_path=None):
 
     # 5. 매니페스트 및 메타데이터 작성
     manifest = {
-        "export_version": "1.2",
+        "export_version": "1.3",
         "created_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "db_type": db_type,
+        "media_kind": "audiobook" if db_type == 'audiobook' else "book",
         "library_id": library_id,
         "library_name": lib_name,
         "root_paths_count": len(root_paths),
         "books_count": len(books_payload),
+        "audiobooks_count": len(audiobooks_payload),
+        "audiobook_tracks_count": len(audiobook_tracks_payload),
+        "audiobook_progress_count": len(audiobook_progress_payload),
         "covers_count": len(cover_files_to_pack)
     }
 
@@ -192,7 +287,10 @@ def export_single_category(db_type, library_id, output_path=None):
             "hide_cover": library.get('hide_cover', 0)
         },
         "books": books_payload,
-        "offsets": offsets_payload
+        "offsets": offsets_payload,
+        "audiobooks": audiobooks_payload,
+        "audiobook_tracks": audiobook_tracks_payload,
+        "audiobook_progress": audiobook_progress_payload
     }
 
     # 6. ZIP 패키징 (이미지 파일 재압축으로 인한 CPU 점유를 막기 위해 ZIP_STORED 단순 묶음 적용)
@@ -217,7 +315,12 @@ def export_single_category(db_type, library_id, output_path=None):
     print(f"✨ Category Export Successfully Completed!")
     print(f"   - Export File: {final_output_path} ({file_size_mb:.2f} MB)")
     print(f"   - Category Name: {lib_name} (ID: {library_id})")
-    print(f"   - Total Books: {len(books_payload)} items")
+    if db_type == 'audiobook':
+        print(f"   - Total Audiobooks: {len(audiobooks_payload)} items")
+        print(f"   - Total Tracks: {len(audiobook_tracks_payload)} items")
+        print(f"   - Total Progress Rows: {len(audiobook_progress_payload)} items")
+    else:
+        print(f"   - Total Books: {len(books_payload)} items")
     print(f"   - Total Covers Packed: {len(cover_files_to_pack)} files")
     print("==========================================================")
     return True
@@ -245,7 +348,7 @@ def export_categories(db_type, raw_library_ids, output_path=None):
 
 def main():
     parser = argparse.ArgumentParser(description="BookOasis Category Export CLI Tool (Multi-path & Batch Export Supported)")
-    parser.add_argument("-d", "--db", choices=['general', 'adult'], default='general', help="Target Database (general or adult)")
+    parser.add_argument("-d", "--db", choices=['general', 'adult', 'audiobook'], default='general', help="Target Database (general, adult, audiobook)")
     parser.add_argument("-l", "--library-id", nargs='+', required=True, help="Library ID(s) to export. Multiple IDs or comma-separated supported (e.g. -l 15 18 21)")
     parser.add_argument("-o", "--output", type=str, default=None, help="Output .oasis.zip file or destination directory path")
 
