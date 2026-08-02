@@ -1,5 +1,6 @@
 // input_controller.js - keyboard/wheel/hotspot/click input handlers for viewer
 import { state } from '../state.js';
+import { shouldUseAndroidHotspotTouchFallback } from './platform_profile.js';
 
 let _deps = {
   toggleFullscreenViewer: null,
@@ -171,6 +172,43 @@ export function initKeyboardListener() {
 export function initWheelListener() {
   const hotspot = document.getElementById('common-viewer-hotspot');
   if (!hotspot) return;
+
+  if (shouldUseAndroidHotspotTouchFallback() && !hotspot.dataset.androidTapBound) {
+    hotspot.dataset.androidTapBound = '1';
+
+    hotspot.addEventListener(
+      'touchend',
+      (e) => {
+        const viewerModal = document.getElementById('media-viewer-modal');
+        if (!viewerModal || viewerModal.style.display !== 'flex') return;
+
+        const target = e.target;
+        if (!target || typeof target.closest !== 'function') return;
+
+        // Android 일부 환경에서 onclick/click 합성이 누락되는 케이스를 우회한다.
+        if (target.closest('.center-zone')) {
+          e.preventDefault();
+          e.stopPropagation();
+          callDep('toggleComicOverlay');
+          return;
+        }
+
+        if (target.closest('.left-zone')) {
+          e.preventDefault();
+          e.stopPropagation();
+          callDep('prevPage');
+          return;
+        }
+
+        if (target.closest('.right-zone')) {
+          e.preventDefault();
+          e.stopPropagation();
+          callDep('nextPage');
+        }
+      },
+      { passive: false }
+    );
+  }
 
   hotspot.addEventListener(
     'contextmenu',

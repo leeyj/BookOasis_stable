@@ -378,7 +378,7 @@
 .floating-close-btn {
     display: flex;
     position: fixed;
-    top: calc(40px + env(safe-area-inset-top, 0px));
+    top: calc(56px + env(safe-area-inset-top, 0px));
     right: calc(20px + env(safe-area-inset-right, 0px));
     background: rgba(15, 23, 42, 0.7);
     border: 1px solid rgba(255, 255, 255, 0.15);

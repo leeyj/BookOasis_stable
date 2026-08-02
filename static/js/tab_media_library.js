@@ -59,6 +59,43 @@ function focusLibrarySearchInput() {
   searchInput.select();
 }
 
+function recoverTopCategoryUiAfterBack() {
+  const isMobileLayout = window.matchMedia('(max-width: 1200px)').matches;
+  if (!isMobileLayout) return;
+
+  const libraryHeader = document.querySelector('.library-header');
+  const searchCenter = document.querySelector('.library-search-center');
+  const libraryControls = document.querySelector('.library-controls');
+  const sidebarCollapsible = document.getElementById('sidebar-collapsible-content');
+
+  if (libraryHeader) libraryHeader.style.display = 'grid';
+  if (searchCenter) searchCenter.style.display = 'block';
+  if (libraryControls) libraryControls.style.display = 'flex';
+
+  // 사용자 권한 상태를 유지하면서 타입 토글 표시 복구
+  applyLibraryTypeToggleVisibility();
+
+  // hidden 속성/클래스가 어긋난 경우를 보정
+  if (sidebarCollapsible) {
+    const isOpen = sidebarCollapsible.classList.contains('show');
+    sidebarCollapsible.hidden = !isOpen;
+  }
+
+  // 헤더가 화면 위로 밀린 경우 상단 기준으로 스크롤 보정
+  const mainContent = document.querySelector('.library-main-content');
+  if (libraryHeader && mainContent) {
+    const headerRect = libraryHeader.getBoundingClientRect();
+    if (headerRect.bottom <= 0 || headerRect.top < -12) {
+      mainContent.scrollTop = 0;
+      window.scrollTo(0, 0);
+    }
+  }
+
+  requestAnimationFrame(() => {
+    window.dispatchEvent(new Event('resize'));
+  });
+}
+
 let searchShortcutConfig = { ctrlKey: false, altKey: true, shiftKey: false, metaKey: false, key: '`', code: 'Backquote', display: 'Alt + `' };
 
 export function applySearchShortcutSetting() {
@@ -241,6 +278,7 @@ async function initTabMediaLibrary() {
     // 1. 현재 뷰어가 열려있다면 무조건 닫기 (목적지가 뷰어가 아닐 때만)
     const viewerModal = document.getElementById('media-viewer-modal');
     let viewerWasOpen = false;
+    let handledDetailNavigation = false;
     if (viewerModal && viewerModal.style.display === 'flex') {
       if (!event.state || event.state.view !== 'viewer') {
         closeMediaViewer(false); 
@@ -253,28 +291,33 @@ async function initTabMediaLibrary() {
     // 2. 목적지 상태가 상세 뷰(detail)인 경우
     if (event.state && event.state.view === 'detail') {
       openBookDetail(null, event.state.series, event.state.libraryId, event.state.repBookId || null, event.state.displayTitle || '');
-      return;
+      handledDetailNavigation = true;
     } else if (window.location.hash.startsWith('#detail')) {
       const restored = decodeDetailParams(window.location.hash);
       if (restored && restored.series) {
         openBookDetail(null, restored.series, restored.libraryId || 'all', restored.repBookId || null, restored.displayTitle || '');
-        return;
+        handledDetailNavigation = true;
       }
-    }
-    
-    // 3. 목적지가 목록(카테고리) 뷰인 경우 (현재 상세 뷰가 떠 있다면 먼저 닫음)
-    const detailView = document.getElementById('book-detail-view');
-    if (detailView && detailView.style.display !== 'none') {
-      goBackToList(false);
     }
 
-    if (event.state && event.state.view === 'category' && event.state.libraryId) {
-      if (state.currentLibraryId !== event.state.libraryId) {
-        selectCategory(event.state.libraryId, true);
+    let landedOnCategoryLikeView = false;
+    if (!handledDetailNavigation) {
+      // 3. 목적지가 목록(카테고리) 뷰인 경우 (현재 상세 뷰가 떠 있다면 먼저 닫음)
+      const detailView = document.getElementById('book-detail-view');
+      if (detailView && detailView.style.display !== 'none') {
+        goBackToList(false);
       }
-    } else if (!event.state && (window.location.hash === '' || window.location.hash.startsWith('#library='))) {
-      if (state.currentLibraryId !== 'home') {
-        selectCategory('home', true);
+
+      if (event.state && event.state.view === 'category' && event.state.libraryId) {
+        landedOnCategoryLikeView = true;
+        if (state.currentLibraryId !== event.state.libraryId) {
+          selectCategory(event.state.libraryId, true);
+        }
+      } else if (!event.state && (window.location.hash === '' || window.location.hash.startsWith('#library='))) {
+        landedOnCategoryLikeView = true;
+        if (state.currentLibraryId !== 'home') {
+          selectCategory('home', true);
+        }
       }
     }
 
@@ -283,12 +326,29 @@ async function initTabMediaLibrary() {
       document.body.style.cssText = '';
       document.documentElement.style.cssText = '';
       const savedPos = (state.scrollPositions && (state.scrollPositions['last_pos'] ?? state.scrollPositions[state.currentLibraryId])) || 0;
-      window.scrollTo(0, savedPos);
-      document.documentElement.scrollTop = savedPos;
-      document.body.scrollTop = savedPos;
-      requestAnimationFrame(() => {
-        window.dispatchEvent(new Event('resize'));
-      });
+
+      // 주 스크롤 컨테이너는 .library-main-content 이므로,
+      // window/document 스크롤 복원은 상단 카테고리 영역을 화면 밖으로 밀어낼 수 있다.
+      const mainContent = document.querySelector('.library-main-content');
+      if (mainContent) {
+        mainContent.scrollTop = savedPos;
+      }
+
+      // 상단 카테고리/헤더가 항상 보이도록 문서 스크롤은 0으로 고정
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }
+
+    // 모바일 뒤로가기 이후 상단 카테고리/검색 헤더 표시 복구
+    recoverTopCategoryUiAfterBack();
+
+    // 일부 모바일 브라우저는 popstate 직후 비동기 렌더에서 display/hidden 상태를 다시 덮어쓴다.
+    // 카테고리 뷰 복귀로 판별된 경우 한 번 더 지연 복구를 수행한다.
+    if (landedOnCategoryLikeView) {
+      setTimeout(() => {
+        recoverTopCategoryUiAfterBack();
+      }, 120);
     }
   });
 }

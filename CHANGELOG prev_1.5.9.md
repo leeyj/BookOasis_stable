@@ -1,0 +1,362 @@
+# CHANGELOG
+## v1.6.0
+- (Android) 롱프레스 컨텍스트 메뉴 미노출 회귀 수정(iOS suppress 범위 분리) | fix Android long-press context menu regression by scoping iOS suppress logic
+- (Android) 도서 뷰어 중앙 터치 메뉴 호출 안정화(핫스팟 touchend 폴백 추가) | improve Android viewer center-tap menu reliability with hotspot touchend fallback
+- (mobile/iOS) EPUB/TXT 자동 전체화면 진입 제외로 전체화면 종료 후 첫 페이지 강제 이동 회귀 차단(수동 전체화면 유지) | prevent first-page jump after fullscreen exit by skipping auto-fullscreen for EPUB/TXT (manual fullscreen still available)
+- (mobile) EPUB 이어읽기 시작점 복원 보강: progress-state no-store 조회 및 epub_session index/percent 우선순위 보정으로 첫 페이지 시작 회귀 차단 | harden EPUB resume on mobile by no-store progress-state fetch and index/percent precedence fix
+- (mobile) EPUB/TXT 페이지↔스크롤 전환 시 위치 복원 보강: 앵커 복원 실패 시 전환 직전 뷰포트 비율(top/left ratio)로 폴백 복원 | preserve position across page↔scroll switch using viewport-ratio fallback when anchor restore misses
+- (refactor) 뷰어 플랫폼 분기 전략 모듈화(platform_profile): input/fullscreen/lifecycle의 iOS/Android 판단 로직을 공통 프로파일로 이관 | modularize viewer platform strategy via platform_profile for iOS/Android decision paths
+- (mobile) 카테고리→검색→상세→뒤로가기 동선에서 상단 카테고리/검색 영역이 사라지는 문제 수정(메인 스크롤 컨테이너 기준 복원) | fix mobile back navigation header/category disappearance by restoring the main scroll container
+
+
+## v1.5.9
+- 고정위젯 추가(독서 정보 제공 ) | add fixed widget (reading information)
+- (iOS,android 공통)-epub-페이지 모드일때 다음장 넘어가지 못하는 현상 수정 | fix iOS-epub-page mode next chapter bug
+- (iOS) 컨텍스트 메뉴 닫히지 않는 형상 수정 | fix context menu not closing bug
+- (web) 홈 대시보드 간격 조정(스크롤 방지) | adjust spacing(prevent scroll)
+
+## v1.5.8
+- /#detail? 주소를 난독화 적용 | add obfuscation function to /#detail? address
+- 키보드 이동 버그 수정 | fix keyboard navigation bug
+- 다음권 이동시 방향키 또는 스페이스로 이동 가능 | add direction key or space bar to move to the next volume
+
+## v1.5.7
+- 키설정 기능 추가(환경설정->키 설정)(베타) | add keyboard settings function(settings->key settings)(beta)
+- 모바일 뷰어 스와이프(Swipe Left/Right) 터치 제스처 지원(베타) | add mobile swipe gesture function(beta)
+- /#detail? 주소 접근시 홈 화면으로 복귀되는 현상 수정 | fix detail page restore to home screen issue
+
+## v1.5.6
+- 키보드로 다음 권 이동 버그 수정 | fix keyboard next volume bug
+- 읽기 방향에 따른 다음 권 이동 버그 수정 | fix reading direction next volume bug
+## v1.5.5
+- 홀수 페이지에서 마지막 이전 장이 중복표시되는 오류 수정 | fix the issue that the last previous chapter is displayed repeatedly on an odd page
+- 테마 수정 및 추가(아이언맨, 아쿠아마린, 블루) | theme fix and add(ironman, aquamarine, blue)
+- 플러그인에 테마 연동 지원 | support theme integration in plugins
+
+## v1.5.4
+- 키보드 방향키(또는 스페이스바)를 통한 다음 권 이동 지원 | support keyboard directional keys(or space bar) to move to the next volume
+- lazy 스캐너 타임아웃시 에러 표시 강화[bug: #2] | Improve error display when lazy scanner times out[bug: #2]
+- 테마 기능 추가(환경설정-> 일반설정) | add theme function(settings->general settings)
+## v1.5.3
+- 코드 안정화 | code stabilization
+- 뷰어 txt 관련 코드 구조 개선 | viewer txt code structure improvement
+- 진행도 동기화를 비동기로 구조 개선 | progress sync improvement
+- EPUB 뷰어에서 진행도 저장 안되는 결함 조치 | fix epub viewer progress save issue
+- 도서 상세 뷰에서 진행도 표시 업데이트 안되는 결함 조치 | fix book details progress display update issue
+- 테마 변경기능추가(다크,화이트,세피아,epaper,블랙) | theme change function added(dark, white, sepia, epaper, black)
+- 썸네일 크기 반영 안되는 버그 수정 | fix thumbnail size not reflected
+- 플러그인 자동 실행시 플러그인이 없으면 오류나는 현상 조치 | fix the error that occurs when the plugin is not found when the plugin is automatically executed
+- 플러그인 설정시 자동으로 저장 안되는 버그 수정 | fix the bug that the plugin settings are not saved automatically
+- 도커설정에 plugin 디렉토리 추가 | add plugin directory to docker settings
+- 도서상세에서 진행중으로 표시되지만 진행도가 0인 경우 읽은 도서로 업데이트(48시간 기준) | Update to read book if progress is 0 but status shows as in progress (based on 48 hours)
+
+## v1.5.2
+- 제목을 2줄로 출력 | title display 2 lines
+- 장르/태그 출력 방식 변경 | genre/tag display change
+- 장르/태그 접기/펼치기 기능 추가 | genre/tag collapse/expand function
+
+## v1.5.1
+- 읽지 않는 상태 변경시 최근 읽은도서에서 없어지지 않는 버그 수정 | fix the bug that does not disappear from recently read books when changing the status to unread
+
+## v1.5.0
+- alias 도입(도서명 출력방식, 썸네일 표시등) | implement alias function (title display, thumbnail etc.)
+- pdf 로드 오류 수정 | fix pdf load error
+- 최근추가한도서 및 최근 본 도서에 권한이 없는 도서가 표시되는 결함 조치 | fix the display of books in unauthorized categories in the latest added books and recently viewed books
+## v1.4.9
+- 태그 누락 버그 수정 | fix the tag missing bug
+
+## v1.4.8
+- 플러그인 로드 오류 수정 | fix plugin load error
+## v1.4.7
+- 컨텍스트 메뉴 개편 | context menu reorganize
+- 모바일 전체화면 버튼 추가 | add mobile full screen button
+- blob 캐시 불일치로인한 다른도서가 보이는 결함 조치 | fix the blob cache cross book leak bug
+- 플러그인 자동 의존성 설치 기능 추가 | add plugin auto dependency install function
+- 스캔 제외 패턴 설정 기능 추가 | add scan ignore patterns function
+- 뒤로가기시 카테고리 선택영역 이탈 결함 조치 | fix the back button off-screen bug in mobile
+
+## v1.4.6
+- 환경설정 버그 수정(태그 누락 수정) | fix the bug
+
+## v1.4.5
+- 대시보드 최신 추가 도서에 권한 없는 카테고리 도서가 노출되는 결함 조치 | Fix display of books in unauthorized categories in the latest added books on the dashboard
+- 도서 리스트 정렬기준을 도서명으로 수정 | Fix the sorting criteria of the book list to book title
+- 2장 보기 에서 왼쪽으로 진행시 다음권 진행 안되는 현상 수정 | Fix next book not proceeding when advancing to the next book in 2-page view
+- 도서 상세리스트에서 그리드 뷰 보기 기능 추가 | detail list change grid view<->list view improved
+
+## v1.4.4
+- pdf도 가운데 여백 설정 값 적용 | pdf apply center gap setting
+- pdf 뷰어에서 2장 보기 모드시 가운데 여백 끄기 적용시 그림자 제거 | pdf viewer, remove box-shadow when 2-page view without center gap
+- pdf 뷰에서 진척도 저장이 안되는 이슈 해소 | Fix progress save issue in pdf viewer
+
+## v1.4.3
+- 도서상세리스트에 "안 읽은 것만" 필터시 오류 수정 | Fix error when filtering to show "Only unread" in the book detail list 
+- 스캐줄 설정 목록에 표시방법 수정 | Fix display method in Scan settings list
+ *보라색도트 : 크론설정됨 | Purple dot: Cron job set
+ *붉은색도트 : 크론설정 안됨. | Cron job not set
+ -OPDS에 검색시 접두사 추가 | Add prefix during search on OPDS
+
+## v1.4.2
+- 신규 카테고리 등록 오류 수정 | Fix error in registering new categories
+- 도서상세리스트에 정렬 및 완독 미표시 기능 추가 | Add sorting and completion mark functions to the book detail list
+- OPDS 검색 기능 활성화 | enable the opds search
+## v1.4.1
+- 불필요 파일 삭제 | remove temp files
+
+## v1.4.0
+- 홈 화면에서 도서선택시 카테고리 업데이트 | Update category when selecting a book on the home screen
+- 스캔시 간헐적으로 준비중으로 표시되는 버그 수정 | Bug where status intermittently shows "Preparing" during scanning
+## v1.3.9
+- epub 모바일 뷰에서 오른쪽 영역에 글자가 잘리는 현상 수정 | Fix text truncation on the right side in mobile epub view
+## v1.3.8
+- 카테고리 내보내기/들여오기 구현 | implement category import/export function
+- /docs/guide_category_migration.md 참조 | refer to /docs/guide_category_migration.md
+- 스캐너 안정화 보완 | scanner stabilization complement
+- 메타정보 수정시 자물쇠 아이콘 노출 | lock icon display when editing metadata
+- 진행중인 스캔 취소 기능 추가 | add cancel scan function
+- 모바일 뷰에서 화면잠금시 읽은 페이지 저장 보강 | improve save read page when screen lock in mobile view
+- 스캔 히스토리 테이블 분리 | split scan history table
+- 서비스 시작/재시작시 큐 테이블 초기화 구현 | implement queue table reset on service start/restart
+- 이제 중간 자동 재개는 지원되지 않습니다 | from now on, mid-way auto resume is not supported
+
+## v1.3.7
+- 이 시리즈 재스캔 오류 긴급 복구 | recover series re-scan error
+---
+## v1.3.6
+- 카테고리 내보내기/들이기 추가(tools/import_category,export_category.py) | Add category import/export function (tools/import_category,export_category.py)
+  * 상세 사용방법은 /docs/guide_category_migration.md 참조 | For detailed usage instructions, refer to /docs/guide_category_migration.md
+- 휴지통 비우기, 카테고리 대량 삭제시 작업 차단 로딩 모달 표시 | Add loading overlay when emptying trash or bulk deleting categories
+- 뷰어에서 삭제된 도서 404 감지시 안전 퇴장 처리 | Add safe exit processing when detecting deleted books in the viewer
+- 스캔완료시 완료 표시 안되는 현상 수정 | Fix scan completion not being displayed
+- 스캔건수가 0건 인경우 DB Flush 로 인한 경합 해소 | Fix DB flush contention when scan count is 0
+- 스캔 완료 후 웹훅/플러그인 호출 로직 비동기화 | Asynchronous webhook/plugin calling logic after scan completion
+
+## v1.3.5
+- api/webhook에 인증예외 추가 | Add authentication exception to api/webhook
+- 도서상세리스트에 뒤로가기시 현재 위치 찾아가게 변경 | Fix back button position memory when navigating from Book Details to Dashboard
+- iOS(사파리) 에서 뷰어 버벅임 현상 해소 | Fix viewer stuttering issue in iOS (Safari)
+- 스캔워커와 Redis간 통신 절단시 재연결 로직 추가 | Add reconnect logic when communication between scan worker and Redis is cut off
+## v1.3.4
+- 동적 SVG 커버 API Nginx 프록시 우치 라우팅 설정 보완 & 프론트엔드 onerror 2차 Fallback inline SVG 적용 (구형 펼쳐진 책 사진 이미지 완전 노출 차단) | Fix Nginx fallback cover route bypass & frontend fallback to inline SVG data URI
+- EPUB/TXT 뷰어 레이아웃 최적화 (스크롤 모드 본문 850px 중앙 정렬 제한 & 2장 보기 모드 1600px 시원한 펼침 지원) | Optimize EPUB/TXT viewer layout (Limit scroll mode width to 850px & Expand 2-page view width to 1600px)
+---
+## v1.3.3
+- 스캔 완료 후 웹 대기열(Queue) 고착 및 다음 스캔 미진행 버그 수정 (웹훅/플러그인 비동기화 및 try-finally 큐 상태 반영) | Fix scan queue status hang & block after scan completion (Async webhook dispatch & try-finally queue status update)
+- 스캐너 큐 및 라이브러리 스캔 상태 전이 명세서(Specification) 수립 및 고착 방지 검증 완료 | Established Scanner Queue State Transition Specification & deadlock prevention audit (`spec_scanner_queue_state_transitions.md`)
+- 대시보드->도서 상세리스트 에서 뒤로가기시 이전위치로 복원 | Fix back button position memory when navigating from Dashboard to Book Details
+---
+## v1.3.2
+- 최근읽은도서 반영 안되는 현상 수정 | Fix latest read books reflection issue
+- FTS5 완전배제로 안정성 강화 | remove the vtable(FTS5)
+- OPDS 호환 추가 보완(문리더,panels) | OPDS compatibility additional support (Moon+ Reader, Panels)
+- 타치요미 익스텐션 업데이트(develop by hejerd) | Update Tachiyomi extension (developed by hejerd)
+---
+## v1.3.1
+- lazy 스캔시 간헐적 오동작 수정 | Fix intermittent misbehavior during lazy scan
+- 전체스캔시 간헐적 오동작 수정 | Fix intermittent misbehavior during full scan
+- db lock 경합으로인한 메타데이터 파싱시 오류 수정 | Fix metadata parsing errors due to db lock contention
+- 대시보드 스캔 진행상태 표시 오류 수정 | Fix scan progress display errors on dashboard
+- 대기열 관리 ui에서 스캔 진행상태 표시 오류 수정 | Fix scan progress display errors on queue management ui
+- 토스트 메시지 표시 오류 수정 | Fix toast message display errors
+- 성인전용 OPDS 피드 주소(/opds-adult) 하위 하이퍼링크 규격화 및 별칭 라우트 호환 조치 | Fix for OPDS adult feed address (/opds-adult) sub-hyperlink standardization and alias route compatibility
+- UI 편의성 개선(환경설정->일반설정 그룹화) | UI convenience improvement (environment settings -> general settings grouping)
+- 카테고리 선택 ui 개선 | Category selection UI improvement
+- "전체보기" 카테고리 감추기 기능추가 | Add "View All" category hide function
+- curl 호출 방식 개선 | curl call improvement
+- yaml 파서 에러 수정 | yaml parser error fix
+- 스캐줄 변경시 에러 수정 | error fix for change scheduler registers
+
+## v1.3.0
+- lazy 스캐너 안정성 강화 | Improve lazy scanner stability
+- txt, pdf, epub 다운로드 기능 추가 | Add download function for txt, pdf, epub
+
+## v1.2.9
+- lazy 스캐너의 1회당 처리 용량 설정 기능 추가 | Added lazy scanner max file size limit
+** 램 기준 1~2G (2048MB) / 4G(4096MB) / 8G 이상(10240MB)
+- entrypoint.sh / mange.sh 내 프로세스 실행순서 변경 | entrypoint.sh / manage.sh in process step change
+
+## v1.2.8
+- lazy 스캐너 최대 파일 크기 제한 기능 추가 | Added lazy scanner max file size limit
+** 램 기준 1~2G (~150M) / 4G(250MB) / 8G 이상(300~500M)
+- 모바일 epub 뷰어 스크롤 버벅임 및 전체화면 강제 종료 결함 수정 | Fixed mobile EPUB viewer scroll jank and fullscreen forced exit bug
+- 모바일 epub 뷰어 폰트 크기 변경시 전체 페이지 리렌더링 수정 | Fixed mobile EPUB viewer font size change full page relayout bug
+- epub 뷰어 전환(스크롤<->페이지)시 화면 차단 기능 추가 | Added screen blocking function when switching epub viewer (scroll <-> page)
+- epub 뷰어 전환시 간헐적으로 페이지 제대로 찾아가지 못하는 현상 수정 | Fixed epub viewer occasionally failing to navigate to the correct page when switching views
+
+## v1.2.7
+- 스캔시 변동없는 폴더(도서)는 DB 스캔 진행률(scanner_progress) 테이블 업데이트 로직 제외 | Exclude DB scan progress(scanner_progress) table update logic for folders (books) with no changes during scanning
+- 스캔시 Redis 참조 못하는 버그 수정 | Fix bug where Redis could not be referenced during scanning
+- 스캔시 과도한 DB 엑세스 부하 90% 이상 감소 | Reduced excessive DB access load by over 90% during scanning
+## v1.2.6
+- EPUB/PDF/TXT/ZIP 종료 후 최근 읽은 도서 및 이어읽기 위치 반영 개선 | Improved recent-history and resume-position updates after closing EPUB/PDF/TXT/ZIP viewers
+- TXT 0% 구간 재오픈 시 이전 위치로 되감기던 문제 수정 | Fixed TXT reopening regression that could restore an older position while progress still showed 0%
+- 최근 읽은 도서 캐시에 Redis 최신 진행률 병합 적용 | Merged live Redis progress into recent-history cache responses
+
+## v1.2.5
+- 모바일 뷰에서 카테고리 선택시 ui 겹침현상 수정 | Fix overlapping UI issue when selecting a category on mobile view
+- 읽지않음으로 변경 기능 버그 수정 | Fix bug for switching to "Unread"
+- 카테고리 삭제시 즐겨찾기 항목있어도 삭제 | Delete category even if there are bookmark items
+---
+## v1.2.4 
+- FTS 가상 테이블 제거(opds 검색기능 차단) | Removed FTS virtual table (disabling OPDS search functionality)
+- 시작/재시작시 오류 수정 | Fixed errors occurring at startup/restart
+- DB 무결성 검증 로직 강화 | Strengthened DB integrity verification logic
+
+
+## v1.2.3
+- 서비스 재시작시 DB 무결성 검증 강화 | Enhanced DB integrity verification during service restart
+- DB 복구 프로세스 안정성 및 무결성 강화 | Improved stability and integrity of the DB recovery process
+- Redis 도입범위 확대(스캔대게열,도서읽은범위,도서읽은 책) | Expanded Redis implementation scope (Scan queue, Book read range, Book read range)
+- 모바일 뷰에서 카테고리 선택시 ui 불편사항 수정 | Fixed UI inconvenience when selecting a category in mobile view
+
+
+## v1.2.2
+- 서비스 재시작시 스캔 대기열 초기화 이슈 수정 | Fixed issue where scan queue was reset during service restart
+- 도서상세리스트에  재스캔 버튼 추가 및 기능 연동 | Added rescan button to book detail list and linked functionality
+
+## v1.2.1
+- Redis 도입 | Redis implementation
+ * 도커사용자는 자동 적용 / 네이티브 사용자는 .env에 REDIS_URL=redis://redis_ip:6379/0 추가 및 Redis 서버 구동 필요 | Docker users automatically apply / Native users need to add REDIS_URL=redis://redis_ip:6379/0 to .env and run Redis server
+- Redis를 사용하지 않는 경우, DB Lock 발생시 recovery 1회만 진행 | If Redis is not used, only one recovery will be performed when DB Lock occurs
+- Redis 적용 범위(도서 진행현황,대시보드, 스캔 상태) | Redis scope (book progress, dashboard, scan status)
+- 도커 컴포즈에 레디스 관련 내용 추가 | added redis related content to docker compose
+
+## v1.2.0
+- bash 환경변수 추가(manage.sh) | Add bash environment variables(manage.sh)
+
+## v1.1.9
+- 스트림 GET(`/api/media/stream`)을 읽기 전용으로 정리하여 프리패치 호출이 진행률을 갱신하지 않도록 수정 | fixed the issue where prefetch calls would not update the progress
+- 스트림/TXT/PDF/EPUB 파일 조회 경로에 카테고리 권한(`user_category_permissions`) 검사와 삭제 도서 제외 조건을 서비스 레벨에 중앙화 | Centralized category permission checks and deleted book exclusions for stream/TXT/PDF/EPUB file access in the service level
+- 스캐너 경로 정규화 유틸(`canonical_path`, `join_canonical`)을 도입해 Windows 경로 혼용으로 인한 이동/삭제 오탐 가능성 완화 | Introduced canonical path utilities to mitigate misidentification of move/delete operations caused by mixed Windows paths
+- 스캐너 실패 전파 보강: `run_scan_job` 실패 재전파 및 lazy scanner 비정상 종료코드 검증으로 큐 `completed` 오판정 방지 | scanner scan_job failure re-transmission and lazy scanner abnormal termination code validation to prevent queue completed misjudgment
+- SQLite 연결 초기화 시 `PRAGMA foreign_keys=ON` 적용으로 참조 무결성 강제 | SQLite connection initialization `PRAGMA foreign_keys=ON` applied for forced referential integrity
+- 단일 PDF 재스캔에서 `db_type` 인자 누락을 보강하여 격리 스캔이 요청 DB 범위(`general`/`adult`)를 정확히 따르도록 수정 | Reinforced `db_type` argument for single PDF rescan to ensure isolated scans accurately follow the requested DB range (`general`/`adult`)
+- 휴지통 비우기 시 표지 파일 물리 삭제를 참조수 0인 경우로 제한하여 공유 커버 오삭제 방지 | Trash cleanup now only physically deletes cover files when the reference count is 0 to prevent accidental deletion of shared covers
+- 스캐너 폴더 순회 부분 실패(`os.walk` 경고) 시 해당 회차의 move/delete 동기화를 건너뛰는 안전 가드 추가 | Added safety guard to skip move/delete synchronization for episodes when folder traversal fails (`os.walk` warning)
+- 도커 엔트리포인트에서 웹 health 확인 후 워커를 지연 기동하도록 변경하고, `manage.sh start`에서도 웹 기동 실패 시 워커 단독 기동을 차단 | Docker entrypoint now delays worker startup after web health check, and `manage.sh start` blocks standalone worker startup if web startup fails
+- 프로세스 종료 시그널(SIGTERM/SIGINT)이 도커 컨테이너에 전달될 때 하위 프로세스(Web/Worker)에 즉시 전파되지 않던 문제를 해결하고, 최대 15초간의 Graceful Shutdown 대기 로직 구현 | Fixed issue where process termination signals (SIGTERM/SIGINT) were not propagated to child processes (Web/Worker) in Docker containers; implemented a Graceful Shutdown waiting logic of up to 15 seconds
+
+## v1.1.8
+- 스캔 상태 표시 개선: 대기열(pending)만 있을 때는 '동작중'으로 표시하지 않도록 조정
+- EPUB 스크롤 모드에서 초기 스크롤 직후 첫 목차 이동이 빗나가던 문제 안정화(초기 복원 타이머 충돌 방지)
+- EPUB 목차 챕터 이동 시 이전 페이지 오프셋이 남아 다음 화 2페이지로 열리던 문제 수정(챕터 시작점 강제)
+- EPUB 목차에서 상위 챕터 항목 클릭 시 anchor 오프셋을 무시하고 챕터 시작점으로 이동하도록 보강(하위 소제목 anchor는 유지)
+- VFS 로그 용어 정리: enabled/should_refresh 대신 flag_enabled/effective_refresh로 분리 표기
+
+
+## v1.1.5
+- 스캔 완료 후 간헐적으로 대기상태에 머무르는 현상 수정 | Issue where the system remains in an intermittent idle state after scanning completion
+- 모바일 뷰에서 뒤로가기/닫기시 즉시 상태저장 안되는 현상 수정 | Issue where the status is not immediately saved upon back navigation or closing on mobile view
+- VFS 갱신시 우선순위 조정 및 로그 표시 상태 수정 | Priority adjustment and log status correction during VFS updates
+- DB lock 상태 발견시 방어로직 개선(기존 2회 ->5회 및 6회차부터 로그에 기록) | Improved defense logic when DB lock status is detected (increased retries from 2 to 5, then 6, with logging from the 6th attempt)
+- 스캐너 메모리 임계값 설정 조회 안정화(db_type 반영, 캐시/로그 스로틀 추가) | Stabilized scanner memory-threshold settings reads (db_type-aware lookup, cache and log throttling)
+
+## v1.1.4
+- epub에서, 목차선택시 정상적으로 이동하지 않는 현상 수정 | Fixed issue where selection in the EPUB table of contents did not navigate correctly
+- epub에서, 목차 부분 스크롤 안되는 현상 수정 | Fixed issue where scrolling within the EPUB table of contents area was not working
+- epub에서, 하단 여백이 제대로 적용되지 않는 현상 수정(전체화면 제외) | Fixed issue where bottom margins were not applied correctly in EPUB view (except in fullscreen mode)
+- epub,txt에서 스크롤 모드일때 처음으로가 동작하지 않는 현상 수정(iOS)| Scroll mode not working on the first page in epub and txt formats(iOS).
+-epub에서, 목차 이동후 다시 원복되는 현상 수정(공통) | Issue where EPUB content was reverted after moving through the table of contents(common)
+-epub에서, 기기간 이동시 이어서 읽기 동기화 기능 개선 | Improved synchronization for continuous reading during period navigation in EPUB format
+* 제약사항: 읽던 책을 닫아야 정상적으로 동기화 됩니다. | Synchronization for continuous reading during period navigation now requires closing the book being read
+
+## v1.1.3
+- DB 복구시 인덱스 재빌드 과정 추가 | added index rebuild process during db recovery
+
+## v1.1.2
+- 일반/성인 도서 전환시 디바운스 추가 | debounce added for general/adult toggle
+- DB 복구 툴 추가(/tools/db_recovery.py) | added db recovery tool
+
+## v1.1.1
+- 도서 스캔 및 엔드포인트에 ISBN 정보 추가 | add ISBN info
+- 워커 구동 안정화 및 DB경합 이슈 완화 | worker restart issue fix
+- 기존 카테고리에 신규 경로 추가시 간헐적으로 발생하는 스캔 오류 수정 | Fix scan error when adding new path to existing category
+- 대시보드 튕김 현상(DB lock, Worker timeout) 개선 | Fix dashboard crash(DB lock, Worker timeout)
+- 로컬 스캔시 HDD의 스핀-업 시간 개선 | improvehdd spin-up time for local scan
+## v1.1.0
+- 워커 구동 방식 변경(웹,스캐너 분리) | worker process separated(web, scanner)
+- 도커 이미지내 plugin VOLUME 삭제 | remove plugin volume from docker image
+- 모바일 크롬에서 닫기/목차 버튼 겹침 버그 수정 | Mobile browser button overlap fix
+- 모바일 크롬에서 하단 영역 가려짐 현상 개선 | Mobile browser bottom area display fix
+- 모바일 크롬에서 캐시로 인한 뷰어 화면 미갱신 버그 수정 | Mobile browser cache miss fix
+- ymal 오류시에 경고리포트 남김 |
+- 로컬 고속 스캔 시 발생하던 일시적 DB 경합(persistent contention) 재시도(최대 3회, 2.0s/4.0s)로 실패 오탐 완화 확인 | Verified mitigation of false scan failures on fast local scans via transient DB contention retry (up to 3 attempts with 2.0s/4.0s backoff)
+
+## v1.0.9
+- 모바일 헤더 줄바꿈 개선: 도서보관함+카테고리는 1줄 유지, 전체 권수는 다음 줄 표시 | Mobile header wrap fix: title+category stay on one line, total count moves to next line
+- EPUB 전체화면에서 목차(목록보기) 아이콘이 보이지 않던 문제 수정 | Fixed EPUB TOC button visibility in fullscreen mode
+- EPUB 목차 패널 자동 노출/클릭 불가(z-index·터치 이벤트) 수정 및 TOC 점프 정확도 개선(스크롤 모드 위치 보정, 앵커 id 보존) | Fixed EPUB TOC auto-open/click issues and improved TOC jump accuracy (scroll-mode targeting, anchor id preservation)
+
+
+## v1.0.8
+- 추가 안정화
+- 즐겨찾기를 계정별로 분리 저장하도록 변경 (사용자별 독립) | Favorites are now isolated per account
+
+
+## v1.0.7
+- 최신,과거추가순일때 초성바로가기 감춤 | Data_desc,Data_asc sort-> hide quickmatch
+- 카테고리->기본커버로 보이게 하기 추가 | default cover view logic add
+- 스케줄 설정 모달에 스케줄 도우미 추가(매일/평일/주말/요일/매월) | Added easy schedule helper in scan settings modal (preset to Cron)
+- 도서 완독 후 중간으로 이동시 버그 수정 | Fixed navigation bug after completing a book read
+- 모바일 뷰어 전체화면 API 연동(지원 환경에서 하단 시스템바 최소화) | Connected viewer fullscreen API to minimize mobile system navigation bar where supported
+- 모바일 뷰어 진입시 자동 전체화면 시도 추가(지원 환경) | Added automatic fullscreen attempt on mobile viewer open where supported
+- viewer.js 입력 계층 분리(키보드/휠/핫스팟/클릭 토글) | Split viewer input layer into input_controller (keyboard/wheel/hotspot/click)
+- viewer.js 시크바/라이프사이클 분리 및 파사드 축소 | Split viewer seekbar/lifecycle into controllers and reduced viewer.js to facade
+- 일부 하드코딩된 텍스트를 언어팩으로 분리 | Moved hardcoded strings to a separate language pack module
+- 디스크 웜업 설정 추가(환경설정->일반설정) | Added disk warm-up settings (Settings > General)
+- 환경설정 및 사용자 계정 위치 조절 기능 추가 | Added ability to adjust positions of environment settings and user accounts
+
+## v1.0.6
+- 대시보드 버전 1.0.6으로 상향 | Bumped dashboard version to 1.0.6
+- OWASP 기준 보안 충족(보안 패치) | patch to OWASP guide.
+- 원격 디렉토리 인식 구조 개선(루트마운트 외 폴더마운트도 지원) | Improved remote directory detection to support both root mounts and subfolder mounts
+- 웹훅 엔드포인트 추가(문서 참조) | add webhook end_point(check md)
+---
+## v1.0.5
+- 선택한 카테고리 하이라이트 추가 | Added selected category highlight
+- docker entrypoint.sh 에 logs 폴더 권한 변경 추가 | Added logs folder permission update in docker entrypoint.sh
+- 기본 관리자 삭제 지원(단, 다른 관리자권한이 있는 경우) | Allowed deleting the default admin account only when another admin exists
+- opds에 즐겨찾기 추가 | Added favorites to OPDS
+- 대시보드에서 0-001등 잘못표기되는 오류 수정(시리즈 이름으로 통일) | Fixed incorrect labels like 0-001 on dashboard by unifying to series name display
+- 성인도서 권한이 없는 경우 전환버튼 감춤 | Hid the general/adult library switch for users without adult permission
+- epub의 경우, 목차 아이콘 기본 감춤 | Hid the EPUB TOC icon by default
+- epub의 경우, 목차에 현재 챕터 하이라이트 됨 | Added current chapter highlight in EPUB TOC
+- txt의 경우, 목차 제거 | remove the txt TOC icon by default
+- 웹훅 플러그인 예제 추가(beta) | add webhook sample plugin
+- 플러그인 자동 업데이트 지원(beta, 문서 참조) | plugin auto update suppport(beta, check the md)
+
+---
+## v1.0.4
+### fxed
+- 기본 커버를 제목 조합으로 변경 | Change default cover to title and author combination
+- 대시보드에서 도서권수 표시 오류 수정 | Fix incorrect book count display on dashboard
+- 대시보드에서 종종 잘못된 커버 표시 오류 수정 | Fix intermittent incorrect cover display on dashboard
+- TXT 커버 이미지 미검출 경고를 분리하고 단계별로 표시하도록 개선 | Split missing-cover warnings for TXT and display them by severity level
+
+### added
+- 환경설정 -> 일반설정에 TXT 무커버 안내 배너 표시/숨김 옵션 추가 | Added a toggle in Settings > General to show or hide the TXT no-cover info banner
+---
+## v1.0.3
+- 도커이미지 지원 | support docker image update
+
+## v1.0.2
+### fixed
+- 문리더등 호환 패치 및 검색 지원 | Monnreader support,(search..)
+- 스캔시 시리즈이름 오류 정정 로직 추가 | scanner fixed series name update error
+- .dockerignore 추가
+
+### improved
+- DB 컬럼 추가(books.metadata_locked) | add columm(books.metadata_locked)
+  * 재시작시 자동 추가, 사용자가 수정한 메타정보는 스킵함 | restart auto upgrade, user edited metadata is skip the scanner
+
+## v1.0.1
+### added
+- OPDS내 검색버튼 연동 | OPDS search button integration
+- epub,txt의 처음으로,완독처리 이벤트 연결 | epub, txt book events connection
+- 플러그인 내 html 일부 허용(plugin_README.MD 참조) | plugins allow some html
+
+## v1.0.0
+### added
+- 릴리즈 전환(정식 버전) | release transition(official version)
+- PWA등 닫기버튼 위치 조정 | Close button position adjustment for PWA etc
+- 종료시 안전한 DB 저장 로직 추가 | Add graceful shutdown logic for safe DB storage

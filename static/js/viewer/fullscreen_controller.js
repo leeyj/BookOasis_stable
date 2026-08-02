@@ -1,4 +1,5 @@
 // fullscreen_controller.js - viewer fullscreen and mobile auto-fullscreen helpers
+import { getViewerPlatformProfile, shouldShowMobileFullscreenButton } from './platform_profile.js';
 
 let _fullscreenSyncBound = false;
 
@@ -19,10 +20,7 @@ export function isViewerInFullscreen() {
 }
 
 export function isLikelyMobileViewerContext() {
-  const narrowViewport = window.matchMedia && window.matchMedia('(max-width: 1024px)').matches;
-  const coarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-  const hasTouchPoints = (navigator.maxTouchPoints || 0) > 0;
-  return !!(narrowViewport && (coarsePointer || hasTouchPoints));
+  return !!getViewerPlatformProfile().isLikelyMobileContext;
 }
 
 export function tryAutoFullscreenOnOpen(modal = null) {
@@ -55,13 +53,7 @@ export function exitFullscreenIfNeeded() {
 }
 
 export function isMobileDevice() {
-  const ua = (navigator.userAgent || navigator.vendor || window.opera || '').toLowerCase();
-  const isAndroid = /android/i.test(ua);
-  const isIOS = /iphone|ipad|ipod/i.test(ua);
-  const isMobileUA = isAndroid || isIOS || /mobile|tablet/i.test(ua);
-  const hasTouch = (navigator.maxTouchPoints || 0) > 0 || 'ontouchstart' in window;
-  const isNarrow = window.innerWidth <= 1024;
-  return isMobileUA || (hasTouch && isNarrow);
+  return !!getViewerPlatformProfile().isMobileDevice;
 }
 
 export function syncViewerFullscreenState() {
@@ -73,7 +65,7 @@ export function syncViewerFullscreenState() {
   if (!modal) return;
 
   if (mobileBtn) {
-    mobileBtn.style.display = isMobileDevice() ? 'inline-flex' : 'none';
+    mobileBtn.style.display = shouldShowMobileFullscreenButton() ? 'inline-flex' : 'none';
   }
 
   const inFullscreen = isViewerInFullscreen();

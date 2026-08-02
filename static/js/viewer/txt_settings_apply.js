@@ -41,6 +41,7 @@ export function applyTxtSettingsCore(ctx) {
   const previousMode = options.previousMode || (scrollWrapper.classList.contains('scroll-mode-page') ? 'page' : 'scroll');
   const { theme, fontSize, fontFamily, scrollMode, lineHeight } = getViewerSettings();
   const isModeSwitch = previousMode !== scrollMode;
+  let preservedViewport = null;
 
   // ── 앵커 캡처: DOM이 아직 이전 모드 상태일 때 즉시 수행해야 정확함 ──
   // runApply() 내부(double-rAF 후)에 두면 DOM이 이미 바뀌어 위치가 틀림
@@ -58,6 +59,18 @@ export function applyTxtSettingsCore(ctx) {
     if (typeof showRestoreLoadingToast === 'function') {
       showRestoreLoadingToast('보기 모드 전환 중...');
     }
+
+    // 앵커 복원이 실패하더라도 모드 전환 직전의 실제 뷰포트 비율을 기준으로 복원한다.
+    if (previousMode === 'scroll') {
+      const maxScrollTop = Math.max(0, scrollWrapper.scrollHeight - scrollWrapper.clientHeight);
+      const topRatio = maxScrollTop > 0 ? (scrollWrapper.scrollTop / maxScrollTop) : 0;
+      preservedViewport = { mode: 'scroll', topRatio: Math.max(0, Math.min(1, topRatio)) };
+    } else {
+      const maxScrollLeft = Math.max(0, scrollWrapper.scrollWidth - scrollWrapper.clientWidth);
+      const leftRatio = maxScrollLeft > 0 ? (scrollWrapper.scrollLeft / maxScrollLeft) : 0;
+      preservedViewport = { mode: 'page', leftRatio: Math.max(0, Math.min(1, leftRatio)) };
+    }
+
     console.log('[Viewer-Txt] 앵커 캡처 완료 (전환 전):', preservedAnchor);
   }
 
@@ -243,18 +256,42 @@ export function applyTxtSettingsCore(ctx) {
     if (!restored) {
       if (scrollMode === 'scroll') {
         setTimeout(() => {
-          const targetChunk = contentArea.querySelector(`.txt-scroll-chunk[data-idx="${getCurrentChunkIdx()}"]`);
-          if (targetChunk) {
-            scrollWrapper.scrollTop = Math.max(0, targetChunk.offsetTop - 20);
-            console.log(`[Viewer-Txt] 챕터 오프셋 기준으로 스크롤 정렬 완료 (scrollTop = ${scrollWrapper.scrollTop})`);
+          const maxScrollTop = Math.max(0, scrollWrapper.scrollHeight - scrollWrapper.clientHeight);
+          if (isModeSwitch && preservedViewport) {
+            let ratio = 0;
+            if (preservedViewport.mode === 'scroll') {
+              ratio = preservedViewport.topRatio || 0;
+            } else {
+              ratio = preservedViewport.leftRatio || 0;
+            }
+            scrollWrapper.scrollTop = maxScrollTop * ratio;
+            console.log(`[Viewer-Txt] 모드 전환 비율 복원 적용 (scrollTop ratio=${ratio.toFixed(4)})`);
           } else {
-            const ratio = getCurrentChunkIdx() / Math.max(1, getChunkCount());
-            scrollWrapper.scrollTop = scrollWrapper.scrollHeight * ratio;
+            const targetChunk = contentArea.querySelector(`.txt-scroll-chunk[data-idx="${getCurrentChunkIdx()}"]`);
+            if (targetChunk) {
+              scrollWrapper.scrollTop = Math.max(0, targetChunk.offsetTop - 20);
+              console.log(`[Viewer-Txt] 챕터 오프셋 기준으로 스크롤 정렬 완료 (scrollTop = ${scrollWrapper.scrollTop})`);
+            } else {
+              const ratio = getCurrentChunkIdx() / Math.max(1, getChunkCount());
+              scrollWrapper.scrollTop = scrollWrapper.scrollHeight * ratio;
+            }
           }
           if (container) container.style.pointerEvents = '';
         }, 150);
       } else {
-        scrollWrapper.scrollLeft = 0;
+        if (isModeSwitch && preservedViewport) {
+          const maxScrollLeft = Math.max(0, scrollWrapper.scrollWidth - scrollWrapper.clientWidth);
+          let ratio = 0;
+          if (preservedViewport.mode === 'scroll') {
+            ratio = preservedViewport.topRatio || 0;
+          } else {
+            ratio = preservedViewport.leftRatio || 0;
+          }
+          scrollWrapper.scrollLeft = maxScrollLeft * ratio;
+          console.log(`[Viewer-Txt] 모드 전환 비율 복원 적용 (scrollLeft ratio=${ratio.toFixed(4)})`);
+        } else {
+          scrollWrapper.scrollLeft = 0;
+        }
         snapTxtPageScrollLeft(scrollWrapper);
         if (container) container.style.pointerEvents = '';
       }

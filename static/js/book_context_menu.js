@@ -18,6 +18,16 @@ let lastEventX = 0;
 let lastEventY = 0;
 let cachedSearchPlugins = null;
 
+function isIOSDevice() {
+  const ua = navigator.userAgent || '';
+  const platform = navigator.platform || '';
+  const maxTouchPoints = navigator.maxTouchPoints || 0;
+  // iPadOS desktop UA 대응: MacIntel + touch
+  return /iphone|ipad|ipod/i.test(ua) || (platform === 'MacIntel' && maxTouchPoints > 1);
+}
+
+const isIOS = isIOSDevice();
+
 export function invalidateMetadataPluginsCache() {
   cachedSearchPlugins = null;
   // metadata_search.js 등 외부 모듈 캐시 무효화가 필요한 경우 트리거
@@ -470,13 +480,15 @@ document.addEventListener('pointerdown', (event) => {
 
 // iOS Safari: touchstart 단계에서도 메뉴 외부 터치 시 suppress 설정
 // (touchend보다 먼저 발생하므로 롱프레스 타이머 등록 전에 suppress 가드를 세울 수 있음)
-document.addEventListener('touchstart', (event) => {
-  if (!isBookContextMenuOpen()) return;
-  if (shouldIgnoreBookMenuDismiss(event)) return;
-  // 메뉴가 열린 상태에서 외부 터치 → 즉시 suppress 시작
-  contextMenuSuppressUntil = Date.now() + 600;
-  dismissPointerGuardUntil = Date.now() + 600;
-}, { passive: true });
+if (isIOS) {
+  document.addEventListener('touchstart', (event) => {
+    if (!isBookContextMenuOpen()) return;
+    if (shouldIgnoreBookMenuDismiss(event)) return;
+    // 메뉴가 열린 상태에서 외부 터치 → 즉시 suppress 시작
+    contextMenuSuppressUntil = Date.now() + 600;
+    dismissPointerGuardUntil = Date.now() + 600;
+  }, { passive: true });
+}
 
 document.addEventListener('touchend', (event) => {
   if (blockUnderlyingBookCardInteraction(event)) return;
@@ -503,7 +515,7 @@ window.handleLongPressTouchStart = function(event, callback) {
     return;
   }
   // iOS Safari: 메뉴가 최근 표시됐던 직후에도 추가 suppress (동일 터치 이벤트 여파 방지)
-  if (Date.now() - menuLastShownAt < 700) {
+  if (isIOS && (Date.now() - menuLastShownAt < 700)) {
     clearLongPressTimer();
     return;
   }

@@ -84,6 +84,39 @@ import {
 } from './viewer/txt_navigation.js';
 import { renderEpubTocPanel, jumpToTxtTocChapter, highlightEpubTocChapter } from './viewer/txt_toc.js';
 
+function clampNumber(value, min, max) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return min;
+  return Math.max(min, Math.min(max, num));
+}
+
+function pickEpubStartIndex(totalChapters, initialPageIdx, serverEpubSession) {
+  const maxIdx = Math.max(0, Number(totalChapters || 0) - 1);
+  let resolved = 0;
+
+  // EPUB pages_read는 0~100 정규화 값이므로 항상 퍼센트로 해석한다.
+  const initialPercent = clampNumber(initialPageIdx, 0, 100);
+  resolved = Math.round((initialPercent / 100) * maxIdx);
+
+  if (!serverEpubSession || maxIdx <= 0) return Math.max(0, Math.min(maxIdx, resolved));
+
+  const idxRaw = serverEpubSession.index;
+  const percentRaw = serverEpubSession.percent;
+  const hasValidIndex = Number.isFinite(Number(idxRaw));
+  const hasValidPercent = Number.isFinite(Number(percentRaw));
+  const percent = hasValidPercent ? clampNumber(percentRaw, 0, 100) : null;
+  const idx = hasValidIndex ? clampNumber(idxRaw, 0, maxIdx) : null;
+
+  // index=0은 초기값/미설정으로 들어올 수 있어 percent가 유효하면 percent를 우선한다.
+  if (percent !== null && (idx === null || (idx === 0 && percent > 0))) {
+    resolved = Math.round((percent / 100) * maxIdx);
+  } else if (idx !== null) {
+    resolved = idx;
+  }
+
+  return Math.max(0, Math.min(maxIdx, resolved));
+}
+
 function syncActiveEpubToc(scrollIntoView = false) {
   if ((state.currentViewerFormat || '').toLowerCase() !== 'epub') return;
   highlightEpubTocChapter(currentChunkIdx, { scrollIntoView });
@@ -131,14 +164,13 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
         const tocList = meta.toc || [];
         renderEpubToc(tocList);
 
-        let startIdx = initialPageIdx;
-        if (totalChapters > 0 && startIdx >= totalChapters) {
-          startIdx = Math.round((startIdx / 100) * Math.max(0, totalChapters - 1));
-        }
+        let startIdx = pickEpubStartIndex(totalChapters, initialPageIdx, null);
 
         let serverEpubSession = null;
         try {
-          const stateRes = await fetch(`/api/media/progress-state?db_type=${state.currentLibraryType}&book_id=${bookId}`);
+          const stateRes = await fetch(`/api/media/progress-state?db_type=${state.currentLibraryType}&book_id=${bookId}&_ts=${Date.now()}`, {
+            cache: 'no-store'
+          });
           if (stateRes.ok) {
             const stateData = await stateRes.json();
             if (stateData && stateData.success && stateData.state && stateData.state.epub_session) {
@@ -148,11 +180,7 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
         } catch (_) {}
 
         if (serverEpubSession) {
-          if (Number.isFinite(serverEpubSession.index)) {
-            startIdx = Number(serverEpubSession.index);
-          } else if (Number.isFinite(serverEpubSession.percent)) {
-            startIdx = Math.round((Number(serverEpubSession.percent) / 100) * Math.max(0, totalChapters - 1));
-          }
+          startIdx = pickEpubStartIndex(totalChapters, initialPageIdx, serverEpubSession);
         } else {
           const savedPosStr = localStorage.getItem(`viewer_last_pos_${bookId}`);
           if (savedPosStr) {
@@ -242,7 +270,9 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
       let serverEpubSession = null;
       let serverPagesRead = 0;
       try {
-        const stateRes = await fetch(`/api/media/progress-state?db_type=${state.currentLibraryType}&book_id=${bookId}`);
+        const stateRes = await fetch(`/api/media/progress-state?db_type=${state.currentLibraryType}&book_id=${bookId}&_ts=${Date.now()}`, {
+          cache: 'no-store'
+        });
         if (stateRes.ok) {
           const stateData = await stateRes.json();
           if (stateData && stateData.success && stateData.state) {
@@ -273,12 +303,7 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
       }
 
       if (isEpub && serverEpubSession) {
-        if (Number.isFinite(serverEpubSession.index)) {
-          startIdx = Number(serverEpubSession.index);
-        } else if (Number.isFinite(serverEpubSession.percent)) {
-          const byPercent = Math.round((Number(serverEpubSession.percent) / 100) * Math.max(0, txtChunks.length - 1));
-          startIdx = byPercent;
-        }
+        startIdx = pickEpubStartIndex(txtChunks.length, serverPagesRead > 0 ? serverPagesRead : startIdx, serverEpubSession);
 
         // Fallback backup pointer: text fingerprint match.
         const fp = String(serverEpubSession.fingerprint || '').trim();

@@ -200,6 +200,9 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
 export function goBackToList(triggerBack = true) {
   updateCurrentCategoryIndicator(state.currentLibraryId);
 
+  const isMobileLayout = window.matchMedia('(max-width: 1200px)').matches;
+  const avoidDocumentScrollRestore = !triggerBack && isMobileLayout;
+
   const targetScroll = (state.scrollPositions && (
     state.scrollPositions['last_pos'] ?? 
     state.scrollPositions[state.currentLibraryId]
@@ -215,9 +218,17 @@ export function goBackToList(triggerBack = true) {
 
   // 상세에서 돌아올 때 저장된 스크롤 위치가 있으면 즉시 및 렌더 후 다중 복원
   const doScroll = (pos) => {
-    window.scrollTo(0, pos);
-    document.documentElement.scrollTop = pos;
-    document.body.scrollTop = pos;
+    if (avoidDocumentScrollRestore) {
+      // 모바일 OS back(popstate) 경로에서는 문서 스크롤을 올리지 않고,
+      // 실제 리스트 컨테이너만 복원해 상단 카테고리 UI 이탈을 방지한다.
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    } else {
+      window.scrollTo(0, pos);
+      document.documentElement.scrollTop = pos;
+      document.body.scrollTop = pos;
+    }
     const mainContent = document.querySelector('.library-main-content');
     if (mainContent) mainContent.scrollTop = pos;
     const gridView = document.getElementById('books-grid-view');

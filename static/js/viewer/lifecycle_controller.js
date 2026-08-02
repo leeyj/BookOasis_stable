@@ -4,6 +4,7 @@ import { ComicViewer, clearComicViewer } from '../viewer_comic.js';
 import { TxtViewer } from '../viewer_txt.js';
 import { PdfViewer, clearPdfViewer } from '../viewer_pdf.js';
 import { tryAutoFullscreenOnOpen, exitFullscreenIfNeeded } from './fullscreen_controller.js';
+import { shouldAutoFullscreenForFormat } from './platform_profile.js';
 import { flushProgress } from '../viewer_progress.js';
 
 let deps = {
@@ -44,7 +45,11 @@ export function openReader(bookId, format, title, pagesRead, totalPages) {
   viewerModal.style.display = 'flex';
   document.getElementById('viewer-title-text').textContent = title;
 
-  tryAutoFullscreenOnOpen();
+  const fmt = String(format || '').toLowerCase();
+  // 플랫폼/포맷 정책 기반 자동 전체화면 분기 (수동 전체화면 버튼은 별도로 유지)
+  if (shouldAutoFullscreenForFormat(fmt)) {
+    tryAutoFullscreenOnOpen();
+  }
 
   if (window.location.hash !== '#viewer') {
     history.pushState({ view: 'viewer', bookId, libraryId: state.currentLibraryId }, '', '#viewer');
@@ -104,7 +109,6 @@ export function openReader(bookId, format, title, pagesRead, totalPages) {
   if (widthSlider) widthSlider.value = savedScrollWidth;
   if (widthLabel) widthLabel.textContent = `${savedScrollWidth}px`;
 
-  const fmt = format.toLowerCase();
   state.currentViewerFormat = fmt;
 
   if (activeViewerInstance && typeof activeViewerInstance.destroy === 'function') {
