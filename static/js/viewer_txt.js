@@ -979,20 +979,10 @@ export const TxtViewer = {
     if (tocContainer) tocContainer.remove();
   },
   prevPage() {
-    const isRtl = getComicReadingDirection() === 'rtl';
-    if (isRtl) {
-      nextTxtPage();
-    } else {
-      prevTxtPage();
-    }
+    prevTxtPage();
   },
   nextPage() {
-    const isRtl = getComicReadingDirection() === 'rtl';
-    if (isRtl) {
-      prevTxtPage();
-    } else {
-      nextTxtPage();
-    }
+    nextTxtPage();
   },
   jumpTo(target) {
     if (target === 'first') {

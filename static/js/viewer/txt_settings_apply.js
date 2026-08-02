@@ -120,13 +120,12 @@ export function applyTxtSettingsCore(ctx) {
         ? Math.max(1, Math.floor((wrapperWidth - pageGap) / 2))
         : Math.max(1, wrapperWidth);
 
-      contentArea.style.columnCount = pageStep === '2' ? '2' : '1';
+      // WebKit(iOS)에서 %/calc 기반 columnWidth + fixed columnCount 조합은
+      // 페이지 컬럼이 1개로 축소되어 탭 시 챕터 단위 점프로 오인될 수 있다.
+      // 픽셀 기반 columnWidth를 사용해 실제 페이지 컬럼 폭을 고정한다.
+      contentArea.style.columnCount = 'auto';
       contentArea.style.columnGap = `${pageGap}px`;
-      if (pageStep === '2') {
-        contentArea.style.columnWidth = `calc((100% - ${pageGap}px) / 2)`;
-      } else {
-        contentArea.style.columnWidth = '100%';
-      }
+      contentArea.style.columnWidth = `${singleColWidth}px`;
       contentArea.style.columnFill = 'auto';
       contentArea.style.height = '100%';
 

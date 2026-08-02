@@ -100,6 +100,9 @@
                 <div id="library-type-toggle-group" class="library-toggle-group">
                     <button class="btn-toggle active" id="btn-lib-general" onclick="switchLibraryType('general')" data-i18n="header.general_books">일반 도서</button>
                     <button class="btn-toggle" id="btn-lib-adult" onclick="switchLibraryType('adult')" data-i18n="header.adult_books">성인 도서</button>
+                    {% if audiobook_enabled %}
+                    <button class="btn-toggle" id="btn-lib-audiobook" onclick="switchLibraryType('audiobook')" data-i18n="header.audiobooks">오디오북</button>
+                    {% endif %}
                 </div>
             </div>
         </div>

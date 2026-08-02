@@ -98,6 +98,11 @@ if not IS_WORKER:
     # 블루프린트 등록
     app.register_blueprint(api_bp)
 
+    @app.context_processor
+    def inject_feature_flags():
+        audiobook_enabled = os.environ.get('AUDIOBOOK', 'false').strip().lower() == 'true'
+        return dict(audiobook_enabled=audiobook_enabled)
+
     @app.errorhandler(413)
     def handle_request_entity_too_large(_error):
         if request.path.startswith('/api/'):

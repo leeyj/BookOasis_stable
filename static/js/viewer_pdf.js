@@ -313,20 +313,10 @@ export const PdfViewer = {
     if (pane) pane.style.display = 'none';
   },
   prevPage() {
-    const isRtl = (typeof getComicReadingDirection === 'function') ? getComicReadingDirection() === 'rtl' : false;
-    if (isRtl) {
-      nextPdfPage();
-    } else {
-      prevPdfPage();
-    }
+    prevPdfPage();
   },
   nextPage() {
-    const isRtl = (typeof getComicReadingDirection === 'function') ? getComicReadingDirection() === 'rtl' : false;
-    if (isRtl) {
-      prevPdfPage();
-    } else {
-      nextPdfPage();
-    }
+    nextPdfPage();
   },
   jumpTo(target) {
     if (target === 'first') {

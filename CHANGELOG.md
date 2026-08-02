@@ -1,7 +1,13 @@
 # CHANGELOG
+## v1.5.9
+- 고정위젯 추가(독서 정보 제공 ) | add fixed widget (reading information)
+- (iOS,android 공통)-epub-페이지 모드일때 다음장 넘어가지 못하는 현상 수정 | fix iOS-epub-page mode next chapter bug
+- (iOS) 컨텍스트 메뉴 닫히지 않는 형상 수정 | fix context menu not closing bug
+- (web) 홈 대시보드 간격 조정(스크롤 방지) | adjust spacing(prevent scroll)
 ## v1.5.8
 - /#detail? 주소를 난독화 적용 | add obfuscation function to /#detail? address
-
+- 키보드 이동 버그 수정 | fix keyboard navigation bug
+- 다음권 이동시 방향키 또는 스페이스로 이동 가능 | add direction key or space bar to move to the next volume
 
 ## v1.5.7
 - 키설정 기능 추가(환경설정->키 설정)(베타) | add keyboard settings function(settings->key settings)(beta)

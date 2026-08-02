@@ -18,10 +18,22 @@
     "no_library_books": "No registered books in library.",
     "loading_books": "Loading book list..."
   },
+
   "dashboard": {
     "recent_title": "Recent Readings",
     "new_books_title": "New Arrivals",
     "plugin_desk_title": "Plugin Desk",
+    "insights_streak": "Reading Streak",
+    "insights_days_suffix": "days streak",
+    "insights_currently_reading": "Currently Reading",
+    "insights_progress": "Progress",
+    "insights_no_currently": "No books currently being read.",
+    "insights_reading_goal": "Reading Goal",
+    "insights_achieved": "Achieved!",
+    "insights_genre_breakdown": "Genre Breakdown",
+    "insights_ratio": "Ratio",
+    "insights_no_genre": "No reading genre records for this year.",
+    "insights_edit_prompt": "Enter your annual reading goal for 2026:",
     "aladin_new_title": "Aladin's New Books",
     "aladin_provided": "Provided by",
     "aladin_loading": "Loading new books...",
@@ -60,6 +72,8 @@
     "tab_plugins": "Plugin Settings",
     "tab_reports": "Scan Reports",
     "tab_trash": "Delete Management",
+    "show_dashboard_insights": "Show Dashboard Reading Insights Widget",
+    "show_dashboard_insights_desc": "Displays reading streak, currently reading, reading goals, and genre breakdown widgets at the top of the dashboard.",
     "key_tab_title": "Shortcut & Hardware Key Mapping",
     "key_tab_desc": "Customize keyboard shortcuts and E-ink e-reader hardware buttons (volume keys, page flip buttons, etc.).",
     "key_direction_note": "Based on 'Left to Right' flip by default; automatically flips when reading direction changes for intuitive operation.",
@@ -236,7 +250,6 @@
     "general_scanner_fail": "Scanner start failed: {error}",
     "btn_scan_all": "Scan All",
     "tab_queue": "Scan Queue Status",
-    "tab_viewer": "Viewer Settings",
     "viewer_settings_title": "Viewer Settings",
     "viewer_settings_subtitle": "Optimize geometric padding of Text(Novel) and Comic/PDF viewers to match your mobile or tablet screen.",
     "viewer_novel_section": "Novel/Text Viewer Padding (EPUB, TXT)",
@@ -267,14 +280,15 @@
     "logout_title": "Log Out"
   },
   "header": {
+    "general_books": "General Books",
+    "adult_books": "Adult Books",
+    "audiobooks": "Audiobooks",
     "title": "Library",
     "filter": "Filter",
     "filter_title": "Open Genre/Tag Filter",
     "sort_title": "Change Sort Criteria",
     "sort_asc": "Alphabetical Ascending",
-    "search_placeholder": "Search title, series, author...... (Shortcut: {shortcut})",
-    "general_books": "General Books",
-    "adult_books": "Adult Books"
+    "search_placeholder": "Search title, series, author...... (Shortcut: {shortcut})"
   },
   "detail": {
     "back_to_list": "Back to List",

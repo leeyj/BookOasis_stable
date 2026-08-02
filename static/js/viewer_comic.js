@@ -74,20 +74,10 @@ export const ComicViewer = {
     clearComicViewer();
   },
   prevPage() {
-    const isRtl = Settings.getComicReadingDirection ? Settings.getComicReadingDirection() === 'rtl' : localStorage.getItem('comic_reading_direction') === 'rtl';
-    if (isRtl) {
-      nextComicPage();
-    } else {
-      prevComicPage();
-    }
+    prevComicPage();
   },
   nextPage() {
-    const isRtl = Settings.getComicReadingDirection ? Settings.getComicReadingDirection() === 'rtl' : localStorage.getItem('comic_reading_direction') === 'rtl';
-    if (isRtl) {
-      prevComicPage();
-    } else {
-      nextComicPage();
-    }
+    nextComicPage();
   },
   jumpTo(target) {
     if (target === 'first') {

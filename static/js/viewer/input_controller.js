@@ -102,21 +102,48 @@ function handleViewerKeydown(e) {
     return;
   }
 
-  const isNextHit = customNextKeys.some(k => k === rawKey || k === codeKey || (k === 'space' && isSpaceKey)) ||
-                    isSpaceKey || isArrowRight || isPageDown;
+  const isRtl = (typeof window.Settings !== 'undefined' && typeof window.Settings.getComicReadingDirection === 'function')
+    ? window.Settings.getComicReadingDirection() === 'rtl'
+    : localStorage.getItem('comic_reading_direction') === 'rtl';
 
-  const isPrevHit = customPrevKeys.some(k => k === rawKey || k === codeKey || (k === 'space' && isSpaceKey)) ||
-                    isArrowLeft || isPageUp;
+  // 1. 스페이스바, PageDown, 커스텀 Next 키는 읽는 방향에 상관없이 무조건 '다음 스토리 내용(nextPage)'
+  const isForwardAction = isSpaceKey || isPageDown ||
+                          customNextKeys.some(k => k === rawKey || k === codeKey || (k === 'space' && isSpaceKey));
 
-  if (isNextHit) {
+  // 2. PageUp, 커스텀 Prev 키는 읽는 방향에 상관없이 무조건 '이전 스토리 내용(prevPage)'
+  const isBackwardAction = isPageUp ||
+                           customPrevKeys.some(k => k === rawKey || k === codeKey || (k === 'space' && isSpaceKey));
+
+  if (isForwardAction) {
     e.preventDefault();
     callDep('nextPage');
     return;
   }
 
-  if (isPrevHit) {
+  if (isBackwardAction) {
     e.preventDefault();
     callDep('prevPage');
+    return;
+  }
+
+  // 3. 화살표 키 (LTR / RTL 시각적 책장 방향 분기)
+  if (isArrowRight) {
+    e.preventDefault();
+    if (isRtl) {
+      callDep('prevPage'); // RTL(일본만화): 오른쪽 화살표는 이전 내용
+    } else {
+      callDep('nextPage'); // LTR(일반도서): 오른쪽 화살표는 다음 내용
+    }
+    return;
+  }
+
+  if (isArrowLeft) {
+    e.preventDefault();
+    if (isRtl) {
+      callDep('nextPage'); // RTL(일본만화): 왼쪽 화살표는 다음 내용
+    } else {
+      callDep('prevPage'); // LTR(일반도서): 왼쪽 화살표는 이전 내용
+    }
     return;
   }
 }
@@ -278,6 +305,25 @@ export function initViewerClickToggle() {
   if (!viewerBody || viewerClickToggleInited) return;
   viewerClickToggleInited = true;
 
+  const OVERLAY_INTERACTIVE_SELECTOR = 'button, input, select, textarea, label, a, [role="button"], [data-overlay-keep-open]';
+
+  function handleOverlayBlankTap(target) {
+    if (!target || typeof target.closest !== 'function') return false;
+    const overlayMenu = document.getElementById('comic-overlay-menu');
+    if (!overlayMenu || overlayMenu.style.display !== 'flex') return false;
+
+    const inOverlayMenu = target.closest('#comic-overlay-menu');
+    if (!inOverlayMenu) return false;
+
+    const isInteractive = !!target.closest(OVERLAY_INTERACTIVE_SELECTOR);
+    if (!isInteractive) {
+      callDep('toggleComicOverlay', { source: 'overlay-blank-tap' });
+    }
+
+    // 오버레이 내부 터치는 여기서 모두 소비해 하단 핫스팟 토글과 중복되지 않게 한다.
+    return true;
+  }
+
   const TAP_THRESHOLD = 15;
   const SWIPE_MIN_DISTANCE = 40;
   const SWIPE_MAX_TIME = 600;
@@ -336,8 +382,13 @@ export function initViewerClickToggle() {
 
       const target = e.target || document.elementFromPoint(endX, window.innerHeight / 2);
       if (!target) return;
+
+      if (handleOverlayBlankTap(target)) {
+        lastTouchEndTime = Date.now();
+        return;
+      }
+
       if (
-        target.closest('#comic-overlay-menu') ||
         target.closest('#epub-toc-container') ||
         target.closest('#epub-toc-btn') ||
         target.closest('.viewer-controls') ||
@@ -401,10 +452,13 @@ export function initViewerClickToggle() {
     if (e.pointerType === 'touch') return;
     if (Date.now() - lastTouchEndTime < 500) return;
 
+    if (handleOverlayBlankTap(e.target)) {
+      return;
+    }
+
     console.log('[Viewer-Click-Toggle] Mouse click detected. Target:', e.target);
 
     if (
-      e.target.closest('#comic-overlay-menu') ||
       e.target.closest('#epub-toc-container') ||
       e.target.closest('#epub-toc-btn') ||
       e.target.closest('.viewer-controls') ||

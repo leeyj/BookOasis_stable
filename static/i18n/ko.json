@@ -18,10 +18,22 @@
     "no_library_books": "보관함에 등록된 도서가 없습니다.",
     "loading_books": "도서 목록을 불러오는 중..."
   },
+
   "dashboard": {
     "recent_title": "최근 읽은 도서",
     "new_books_title": "신규 추가 도서",
     "plugin_desk_title": "플러그인 데스크",
+    "insights_streak": "연속 독서 일수",
+    "insights_days_suffix": "일 연속",
+    "insights_currently_reading": "현재 읽는 중",
+    "insights_progress": "진행률",
+    "insights_no_currently": "현재 진행 중인 도서가 없습니다.",
+    "insights_reading_goal": "연간 목표",
+    "insights_achieved": "달성 중!",
+    "insights_genre_breakdown": "선호 장르 통계",
+    "insights_ratio": "비율",
+    "insights_no_genre": "올해 독서 장르 기록이 없습니다.",
+    "insights_edit_prompt": "2026년 연간 완독 목표 권수를 입력하세요:",
     "aladin_new_title": "알라딘 오늘의 신간",
     "aladin_provided": "제공",
     "aladin_loading": "신간 정보를 불러오는 중...",
@@ -60,6 +72,8 @@
     "tab_plugins": "플러그인 설정",
     "tab_reports": "스캔 리포트",
     "tab_trash": "삭제 관리",
+    "show_dashboard_insights": "대시보드 독서 통계 위젯 표시",
+    "show_dashboard_insights_desc": "대시보드 상단에 연속 독서 일수, 진행 중 도서, 독서 목표 및 장르 통계 카드를 노출합니다.",
     "key_tab_title": "단축키 및 물리 버튼 매핑 설정",
     "key_tab_desc": "키보드 단축키 및 E-ink 이북 리더기의 하드웨어 물리 버튼(볼륨키, 페이지 버튼 등)을 원하는 대로 지정할 수 있습니다.",
     "key_direction_note": "\"왼쪽➔오른쪽 넘김\" 기준이며, 읽는 방향 변경 시 반대로 전환되어 직관적으로 동작합니다.",
@@ -236,7 +250,6 @@
     "general_scanner_fail": "스캐너 기동 실패: {error}",
     "btn_scan_all": "일괄 스캔",
     "tab_queue": "스캔 예약 조회",
-    "tab_viewer": "뷰어 설정",
     "viewer_settings_title": "뷰어 상세 설정",
     "viewer_settings_subtitle": "텍스트(소설)와 만화/PDF 뷰어의 기하학적 여백을 본인의 모바일/태블릿 화면에 맞게 최적화합니다.",
     "viewer_novel_section": "소설/텍스트 뷰어 여백 (EPUB, TXT)",
@@ -267,14 +280,15 @@
     "logout_title": "로그아웃"
   },
   "header": {
+    "general_books": "일반 도서",
+    "adult_books": "성인 도서",
+    "audiobooks": "오디오북",
     "title": "도서 보관함",
     "filter": "필터",
     "filter_title": "장르/태그 필터 열기",
     "sort_title": "정렬 조건 변경",
     "sort_asc": "가나다 오름차순",
-    "search_placeholder": "제목,시리즈,작가 검색...... (단축키: {shortcut})",
-    "general_books": "일반 도서",
-    "adult_books": "성인 도서"
+    "search_placeholder": "제목,시리즈,작가 검색...... (단축키: {shortcut})"
   },
   "detail": {
     "back_to_list": "목록으로 돌아가기",

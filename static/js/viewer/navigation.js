@@ -15,6 +15,14 @@ function viewerDebugLog(...args) {
   console.log(...args);
 }
 
+let overlayReopenGuardUntil = 0;
+const OVERLAY_REOPEN_GUARD_MS = 420;
+
+export function suppressOverlayReopenFor(ms = OVERLAY_REOPEN_GUARD_MS) {
+  const guardMs = Math.max(0, Number(ms) || 0);
+  overlayReopenGuardUntil = Date.now() + guardMs;
+}
+
 export function comicSliderInput(slider, val) {
   Renderer.showSeekbarTooltip(slider, val);
   const badge = document.getElementById('comic-overlay-page-info');
@@ -54,6 +62,11 @@ export function toggleComicOverlay() {
   const menu = document.getElementById('comic-overlay-menu');
   if (!menu) return;
   const isOpening = (menu.style.display === 'none');
+
+  if (isOpening && Date.now() < overlayReopenGuardUntil) {
+    viewerDebugLog('[Viewer-Nav] open suppressed by reopen guard');
+    return;
+  }
 
   const pdfNavBar = document.querySelector('.pdf-nav-bar');
   const epubNavBar = document.querySelector('.epub-nav-bar');
@@ -104,6 +117,8 @@ export function toggleComicOverlay() {
       epubNavBar.style.bottom = 'auto';
     }
   } else {
+    suppressOverlayReopenFor();
+
     // 닫을 때 스타일 초기화 (다른 모드 전환 대비)
     menu.style.top = '';
     if (pdfNavBar) { pdfNavBar.style.top = ''; pdfNavBar.style.bottom = ''; }

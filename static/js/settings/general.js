@@ -17,8 +17,19 @@ export function changeDashboardTheme(themeName) {
   document.documentElement.setAttribute('data-app-theme', themeName);
 }
 
+export function toggleDashboardInsightsSetting(enabled) {
+  const isShow = !!enabled;
+  localStorage.setItem('show_dashboard_insights', isShow ? '1' : '0');
+  
+  const container = document.querySelector('.dashboard-insights-container');
+  const divider = document.getElementById('dashboard-insights-divider');
+  if (container) container.style.display = isShow ? 'block' : 'none';
+  if (divider) divider.style.display = isShow ? 'block' : 'none';
+}
+
 if (typeof window !== 'undefined') {
   window.changeDashboardTheme = changeDashboardTheme;
+  window.toggleDashboardInsightsSetting = toggleDashboardInsightsSetting;
 }
 
 // 설정값을 CSS 변수 및 메모리 상태에 적용하는 헬퍼 함수
@@ -29,6 +40,13 @@ export function applySettingsToUI(settings) {
   if (themeSelect) {
     themeSelect.value = savedTheme;
   }
+
+  const isShowInsights = (localStorage.getItem('show_dashboard_insights') !== '0');
+  const insightsChk = document.getElementById('setting-show-dashboard-insights');
+  if (insightsChk) {
+    insightsChk.checked = isShowInsights;
+  }
+  toggleDashboardInsightsSetting(isShowInsights);
   if (settings.BOOK_THUMBNAIL_WIDTH) {
     const width = parseInt(settings.BOOK_THUMBNAIL_WIDTH, 10) || 160;
     const height = Math.round(width * 1.375); // 160:220 비율 유지

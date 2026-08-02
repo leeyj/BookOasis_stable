@@ -20,6 +20,11 @@ export async function loadDashboardData() {
   }
   
   try {
+    // 0. 독서 동기부여 위젯 로드
+    if (typeof window.loadDashboardInsights === 'function') {
+      window.loadDashboardInsights(state.currentLibraryType);
+    }
+
     // 1. 최근 읽은 도서 조회
     const historyData = await api.fetchReadingHistory(state.currentLibraryType);
     if (historyData.success) {

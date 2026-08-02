@@ -13,6 +13,7 @@ os.makedirs(DB_DIR, exist_ok=True)
 
 DB_GENERAL_PATH = os.path.join(DB_DIR, 'media_general.db')
 DB_ADULT_PATH = os.path.join(DB_DIR, 'media_adult.db')
+DB_AUDIOBOOK_PATH = os.path.join(DB_DIR, 'media_audiobook.db')
 SQLITE_BUSY_TIMEOUT_MS = int(os.environ.get('SQLITE_BUSY_TIMEOUT_MS', '60000') or '60000')
 
 class PooledConnection(sqlite3.Connection):
@@ -186,9 +187,17 @@ class SQLiteConnectionPool:
             self.allocated = max(0, self.allocated - closed_count)
         print(f"[DB-Shutdown] 커넥션 {closed_count}개 정리 완료: {self.db_path}")
 
-_pools = {'general': None, 'adult': None}
+_pools = {'general': None, 'adult': None, 'audiobook': None}
 _pools_lock = threading.Lock()
 _shutdown_in_progress = False
+
+def get_db_path(db_type='general'):
+    """db_type에 따른 데이터베이스 파일 경로 반환"""
+    if db_type == 'adult':
+        return DB_ADULT_PATH
+    elif db_type == 'audiobook':
+        return DB_AUDIOBOOK_PATH
+    return DB_GENERAL_PATH
 
 _cached_pool_size = None
 _pool_size_cache_lock = threading.Lock()
@@ -251,7 +260,7 @@ def _get_pool_size_raw():
 def get_connection(db_type='general', wait_timeout=30.0):
     """SQLite 데이터베이스 연결 반환 (커넥션 풀 적용)"""
     global _pools
-    db_path = DB_ADULT_PATH if db_type == 'adult' else DB_GENERAL_PATH
+    db_path = get_db_path(db_type)
     
     pool_size = _get_pool_size_raw()
     

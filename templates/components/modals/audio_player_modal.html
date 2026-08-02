@@ -1,0 +1,52 @@
+<!-- ===== 오디오북 전용 바닐라 JS 오디오 플레이어 모달 ===== -->
+<div id="audio-player-modal" class="modal-overlay" style="display: none; z-index: 1200; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(20px);">
+    <div class="audio-player-container" style="max-width: 520px; width: 90%; background: rgba(30, 41, 59, 0.85); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 20px; padding: 2rem; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); display: flex; flex-direction: column; align-items: center; position: relative;">
+        <!-- 닫기 버튼 -->
+        <button onclick="closeAudioPlayerModal()" style="position: absolute; top: 1.2rem; right: 1.2rem; background: none; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer; transition: color 0.2s;" onhover="this.style.color='#fff';">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+
+        <!-- 앨범 커버 아트워크 -->
+        <div class="audio-cover-wrapper" style="width: 220px; height: 220px; border-radius: 16px; overflow: hidden; box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4); margin-bottom: 1.5rem; background: #0f172a; display: flex; align-items: center; justify-content: center;">
+            <img id="audio-player-cover" src="" alt="Audiobook Cover" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+            <i id="audio-player-cover-placeholder" class="fa-solid fa-headphones" style="font-size: 4rem; color: #64748b;"></i>
+        </div>
+
+        <!-- 오디오북 정보 -->
+        <h3 id="audio-player-title" style="color: #ffffff; font-size: 1.2rem; font-weight: 700; margin: 0 0 0.4rem 0; text-align: center;">오디오북 제목</h3>
+        <p id="audio-player-author" style="color: #94a3b8; font-size: 0.9rem; margin: 0 0 0.8rem 0; text-align: center;">저자 / 아티스트</p>
+        <span id="audio-player-chapter-title" style="color: #38bdf8; font-size: 0.82rem; font-weight: 600; background: rgba(56, 189, 248, 0.1); padding: 0.2rem 0.6rem; border-radius: 12px; margin-bottom: 1.5rem;">CHAPTER 1</span>
+
+        <!-- 타임라인 & 슬라이더 -->
+        <div style="width: 100%; margin-bottom: 1.5rem;">
+            <input type="range" id="audio-player-seekbar" min="0" max="100" value="0" style="width: 100%; accent-color: #38bdf8; cursor: pointer;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.78rem; color: #94a3b8; margin-top: 0.3rem;">
+                <span id="audio-player-current-time">0:00</span>
+                <span id="audio-player-duration">-0:00</span>
+            </div>
+        </div>
+
+        <!-- 재생 컨트롤 라인 -->
+        <div style="display: flex; align-items: center; justify-content: center; gap: 1.2rem; margin-bottom: 1.5rem;">
+            <button onclick="audioPlayerSkip(-15)" title="15초 뒤로" style="background: none; border: none; color: #cbd5e1; font-size: 1.2rem; cursor: pointer;">
+                <i class="fa-solid fa-rotate-left"></i> <span style="font-size: 0.75rem;">15</span>
+            </button>
+            <button id="btn-audio-play-toggle" onclick="toggleAudioPlay()" style="width: 60px; height: 60px; border-radius: 50%; background: #38bdf8; border: none; color: #0f172a; font-size: 1.6rem; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);">
+                <i class="fa-solid fa-play" style="margin-left: 3px;"></i>
+            </button>
+            <button onclick="audioPlayerSkip(15)" title="15초 앞으로" style="background: none; border: none; color: #cbd5e1; font-size: 1.2rem; cursor: pointer;">
+                <i class="fa-solid fa-rotate-right"></i> <span style="font-size: 0.75rem;">15</span>
+            </button>
+        </div>
+
+        <!-- 부가 컨트롤 (배속, 챕터 목록) -->
+        <div style="display: flex; align-items: center; gap: 1.5rem; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 1rem; width: 100%; justify-content: center;">
+            <button onclick="cycleAudioSpeed()" style="background: none; border: none; color: #94a3b8; font-size: 0.85rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.3rem;">
+                <i class="fa-solid fa-gauge-high"></i> <span id="audio-player-speed-label">1.0x</span>
+            </button>
+            <button onclick="toggleAudioChapterList()" style="background: none; border: none; color: #94a3b8; font-size: 0.85rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.3rem;">
+                <i class="fa-solid fa-list-ul"></i> <span>목차/챕터</span>
+            </button>
+        </div>
+    </div>
+</div>

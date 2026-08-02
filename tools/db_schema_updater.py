@@ -14,6 +14,7 @@ try:
     from database import (
         DB_GENERAL_PATH,
         DB_ADULT_PATH,
+        DB_AUDIOBOOK_PATH,
         init_databases,
         get_connection,
         auto_migrate_schema,
@@ -31,7 +32,8 @@ def run_schema_update():
     # 1. DB 파일 존재 및 경로 확인
     db_paths = {
         '일반 DB (media_general)': DB_GENERAL_PATH,
-        '성인 DB (media_adult)': DB_ADULT_PATH
+        '성인 DB (media_adult)': DB_ADULT_PATH,
+        '오디오북 DB (media_audiobook)': DB_AUDIOBOOK_PATH
     }
     
     for db_name, db_path in db_paths.items():
