@@ -1,5 +1,6 @@
 # CHANGELOG
 ## v1.6.3
+- (security/policy) 상세 딥링크 새 탭 차단 정책을 해제하고 탭/세션 조건 없이 `#detail?...` 주소 복원을 허용 | remove new-tab detail deep-link blocking policy and always allow `#detail?...` restoration regardless of tab/session state
 - (mobile/epub) 일시 통신 장애 후 페이지↔스크롤 모드 재전환 시 `챕터 불러오는 중...` placeholder가 고착되는 문제 수정: 가시 범위 챕터 자동 재요청 및 모드 전환 직후 윈도우 하이드레이션 복구 로직 추가 | fix sticky `Loading chapter...` placeholders after transient network failures when re-switching EPUB page↔scroll modes by adding visible-range auto-refetch and post-switch window hydration
 - (mobile/audiobook) 오디오북 플레이어 하단 영역 잘림 수정: safe-area 하단 패딩 및 100dvh 기반 레이아웃/스크롤 보정으로 작은 화면(iOS/Android)에서 재생 컨트롤 가시성 복원 | fix mobile audiobook player bottom clipping by applying safe-area bottom padding and 100dvh-based layout/scroll adjustments for small iOS/Android screens
 - (scanner/VFS) 카테고리의 원격 드라이브 체크를 해제한 경우 스캔 중 rclone VFS refresh/RC 통신을 시도하지 않도록 조정 | skip rclone VFS refresh/RC communication during scans when the category's remote-drive checkbox is turned off

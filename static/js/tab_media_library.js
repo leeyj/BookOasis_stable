@@ -360,32 +360,19 @@ function normalizeMediaType(val) {
     applyLibraryTypeButtonState(state.currentLibraryType || 'general');
   }
 
-  // 보안 검증: 동일 탭에서의 새로고침(reload)이거나 기존 탭 세션이 있는 경우에만 상세 뷰 복원 허용
-  const navType = (performance && performance.getEntriesByType && performance.getEntriesByType('navigation')[0]) ? performance.getEntriesByType('navigation')[0].type : '';
-  const isReload = navType === 'reload';
-  let hasTabSession = false;
-  try {
-    hasTabSession = sessionStorage.getItem('bookoasis_tab_session') === 'active';
-  } catch (e) {}
+  // 상세 딥링크는 진입 탭/세션 여부와 무관하게 복원 허용
 
   const initialLibraryId = parseLibraryIdFromUrl() || 'home';
   state.currentLibraryId = initialLibraryId;
   loadLibraries();
 
   if (isDetailDeepLink) {
-    if (isReload || hasTabSession) {
-      const restored = decodeDetailParams(initialHash);
-      if (restored && restored.series) {
-        console.log('[Security-History] 동일 탭 새로고침 감지 - 상세 뷰 복원:', restored.series);
-        openBookDetail(null, restored.series, restored.libraryId || 'all', restored.repBookId || null, restored.displayTitle || '');
-      } else {
-        selectCategory(initialLibraryId, true);
-      }
+    const restored = decodeDetailParams(initialHash);
+    if (restored && restored.series) {
+      console.log('[History] 상세 딥링크 복원:', restored.series);
+      openBookDetail(null, restored.series, restored.libraryId || 'all', restored.repBookId || null, restored.displayTitle || '');
     } else {
-      console.warn('[Security-History] 신규 탭 붙여넣기 진입 차단 - 대시보드(홈)로 안내 및 해시 소거');
-      selectCategory('home', true);
-      const curType = state.currentLibraryType || 'general';
-      history.replaceState({ view: 'category', libraryId: 'home', type: curType }, '', `#library=home&type=${curType}`);
+      selectCategory(initialLibraryId, true);
     }
   } else {
     selectCategory(initialLibraryId, true);
