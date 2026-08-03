@@ -73,7 +73,10 @@ class SchedulerRepository:
         """라이브러리의 VFS 사전 갱신 옵션 및 RC URL 설정 조회"""
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
-        cursor.execute("SELECT vfs_refresh_before_scan, rclone_rc_url FROM libraries WHERE id = ?", (library_id,))
+        cursor.execute(
+            "SELECT is_remote, vfs_refresh_before_scan, rclone_rc_url FROM libraries WHERE id = ?",
+            (library_id,)
+        )
         row = cursor.fetchone()
         conn.close()
         return dict(row) if row else None

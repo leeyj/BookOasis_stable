@@ -251,7 +251,7 @@ export async function loadGeneralSettings() {
       const comicDelayEl = document.getElementById('setting-comic-loading-delay');
       if (comicDelayEl) {
         const delayStr = localStorage.getItem('comic_loading_delay');
-        comicDelayEl.value = (delayStr !== null) ? parseInt(delayStr, 10) : '300';
+        comicDelayEl.value = (delayStr !== null) ? parseInt(delayStr, 10) : '700';
       }
       
       const ttsEnabledEl = document.getElementById('setting-tts-enabled');
@@ -386,7 +386,7 @@ export async function submitGeneralSettings(event) {
   const recentBooks = document.getElementById('setting-recent-books-limit')?.value || '30';
   const sysMem = document.getElementById('setting-system-mem-limit')?.value || '1536';
   const procRss = document.getElementById('setting-process-rss-limit')?.value || '2048';
-  const comicDelay = document.getElementById('setting-comic-loading-delay')?.value || '300';
+  const comicDelay = document.getElementById('setting-comic-loading-delay')?.value || '700';
   const hideCompleted = document.getElementById('setting-hide-completed-in-history')?.checked ? '1' : '0';
   const tagFilterScopeAll = document.getElementById('setting-tag-filter-scope-all')?.checked ? '1' : '0';
   const showTxtNoCoverInfoBanner = document.getElementById('setting-show-txt-no-cover-info-banner')?.checked ? '1' : '0';

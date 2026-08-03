@@ -8,6 +8,7 @@ import * as FileLoader from './fileloader.js';
 export let comicCurrentPage = 0;
 export let comicTotalPages = 0;
 let comicLoadingTimer = null;
+let comicLoadTraceSeq = 0;
 let observer = null;
 let isScrollingToTarget = false;
 let scrollProgressHandler = null;
@@ -23,6 +24,27 @@ const activePreloadSet = new Set();
 const blobCacheMap = new Map();
 let currentPreloadQueue = [];
 let isPreloading = false;
+
+function createComicLoadTrace(details = {}) {
+  const traceId = ++comicLoadTraceSeq;
+  const startedAt = (typeof performance !== 'undefined' && typeof performance.now === 'function')
+    ? performance.now()
+    : Date.now();
+  const prefix = `[Viewer-Comic][LoadTrace#${traceId}]`;
+
+  console.log(`${prefix} start`, details);
+
+  return {
+    traceId,
+    log(step, extra = {}) {
+      const now = (typeof performance !== 'undefined' && typeof performance.now === 'function')
+        ? performance.now()
+        : Date.now();
+      const elapsedMs = Math.round(now - startedAt);
+      console.log(`${prefix} ${step} +${elapsedMs}ms`, extra);
+    }
+  };
+}
 
 function clearBlobCache() {
   blobCacheMap.forEach((objectUrl) => {
@@ -268,6 +290,14 @@ export function loadComicPage() {
   const wrapper = document.querySelector('.comic-image-wrapper');
   if (!wrapper) return;
 
+  const loadTrace = createComicLoadTrace({
+    bookId: state.currentBookId,
+    activeBookId: state.activeBookId,
+    currentPage: comicCurrentPage,
+    totalPages: comicTotalPages,
+    scrollMode
+  });
+
   if (scrollProgressHandler) {
     wrapper.removeEventListener('scroll', scrollProgressHandler);
     scrollProgressHandler = null;
@@ -282,6 +312,7 @@ export function loadComicPage() {
 
   if (scrollMode === 'scroll') {
     showViewerLoading('Loading...');
+    loadTrace.log('scroll-mode loading overlay shown');
 
     wrapper.innerHTML = '';
     const fragment = document.createDocumentFragment();
@@ -293,17 +324,22 @@ export function loadComicPage() {
       const url = img.dataset.src;
       img.dataset.loaded = '1';
 
+      loadTrace.log('scroll image fetch start', { index: img.dataset.index, url });
+
       const handleImgLoad = () => {
+        loadTrace.log('scroll image loaded', { index: img.dataset.index });
         img.style.opacity = '1';
         img.style.minHeight = '0';
         if (!firstLoaded) {
           firstLoaded = true;
+          loadTrace.log('scroll initial image visible');
           hideViewerLoading();
         }
       };
 
       img.onload = handleImgLoad;
       img.onerror = () => {
+        loadTrace.log('scroll image load failed', { index: img.dataset.index });
         console.error(`[Viewer-Comic] Scroll image load failed: page_idx=${img.dataset.index}`);
         img.style.opacity = '1';
         img.style.minHeight = '0';
@@ -503,6 +539,7 @@ export function loadComicPage() {
 
   } else {
     const pageIndices = getComicPageIndices();
+    loadTrace.log('page-mode render start', { pageIndices });
 
     if (comicLoadingTimer) {
       clearTimeout(comicLoadingTimer);
@@ -510,25 +547,34 @@ export function loadComicPage() {
     }
 
     const delayStr = localStorage.getItem('comic_loading_delay');
-    const delay = (delayStr !== null) ? parseInt(delayStr, 10) : 300;
+    const delay = (delayStr !== null) ? parseInt(delayStr, 10) : 700;
+
+    let loadedCount = 0;
+    const expectedLoads = pageIndices.length;
+    const hasTwoPageSpread = expectedLoads > 1;
+    let earlyPreloadTriggered = false;
+    const imageElements = [];
 
     // 기존 페이지 페어 요소가 이미 렌더링되어 떠 있는지 확인합니다.
     const hasExistingPair = !!wrapper.querySelector('.comic-page-pair');
+    loadTrace.log('page-mode loading timer scheduled', {
+      delay,
+      hasExistingPair,
+      pageIndices
+    });
     if (!hasExistingPair) {
       // 최초 기동 시에는 즉시 로딩을 보여줍니다.
       comicLoadingTimer = setTimeout(() => {
+        loadTrace.log('page-mode loading overlay shown');
         showViewerLoading('Loading...', 'Preparing pages');
       }, delay);
     } else {
       // 기존에 떠 있는 페이지가 있을 경우에는 백그라운드 다운로드가 지정 시간보다 지체될 때만 지연 노출되도록 타이머 마진을 늘려줍니다.
       comicLoadingTimer = setTimeout(() => {
+        loadTrace.log('page-mode loading overlay shown (existing pair)');
         showViewerLoading('Loading...', 'Preparing pages');
-      }, delay + 100);
+      }, delay + 400);
     }
-
-    let loadedCount = 0;
-    const expectedLoads = pageIndices.length;
-    const imageElements = [];
 
     pageIndices.forEach((pageIndex, index) => {
       const imgEl = document.createElement('img');
@@ -544,6 +590,16 @@ export function loadComicPage() {
       imgEl.onload = () => {
         loadedCount += 1;
         imageElements[index] = imgEl;
+        loadTrace.log('page image loaded', {
+          pageIndex,
+          loadedCount,
+          expectedLoads
+        });
+        if (!earlyPreloadTriggered && hasTwoPageSpread && loadedCount === 1) {
+          earlyPreloadTriggered = true;
+          loadTrace.log('page-mode early preload triggered', { pageIndex });
+          preloadNextPages();
+        }
         if (loadedCount === expectedLoads) {
           if (comicLoadingTimer) {
             clearTimeout(comicLoadingTimer);
@@ -565,7 +621,12 @@ export function loadComicPage() {
             }
           });
           pairContainer.style.visibility = 'visible';
+          loadTrace.log('page images committed to DOM', {
+            pageIndices,
+            expectedLoads
+          });
           hideViewerLoading();
+          loadTrace.log('page-mode loading overlay hidden');
 
 
           if (comicCurrentPage === 0 && expectedLoads === 1) {
@@ -577,13 +638,16 @@ export function loadComicPage() {
             }
           }
 
-          preloadNextPages();
+          if (!earlyPreloadTriggered) {
+            preloadNextPages();
+          }
         }
       };
 
       imgEl.onerror = () => {
         if (_errorFired) return; // Worker fallback 재시도 시 중복 onerror 방지
         _errorFired = true;
+        loadTrace.log('page image load failed', { pageIndex });
         console.error(`[Viewer-Comic] Image load failed: page_idx=${pageIndex}`);
         if (comicLoadingTimer) {
           clearTimeout(comicLoadingTimer);
@@ -596,12 +660,15 @@ export function loadComicPage() {
       const currentBookId = state.currentBookId || (window.state ? window.state.currentBookId : null);
       const cacheKey = `${currentBookId}_${pageIndex}`;
       if (blobCacheMap.has(cacheKey)) {
+        loadTrace.log('page image cache hit', { pageIndex, cacheKey });
         imgEl.src = blobCacheMap.get(cacheKey);
       } else {
         const url = FileLoader.getPageStreamUrl(pageIndex);
+        loadTrace.log('page image fetch start', { pageIndex, cacheKey, url });
         fetch(url)
           .then((res) => {
             if (!res.ok) throw new Error('Fetch fail');
+            loadTrace.log('page image fetch response', { pageIndex, status: res.status });
             return res.blob();
           })
           .then((blob) => {
@@ -609,10 +676,12 @@ export function loadComicPage() {
             if (activeBookId !== currentBookId) return;
             const objUrl = URL.createObjectURL(blob);
             blobCacheMap.set(cacheKey, objUrl);
+            loadTrace.log('page image blob ready', { pageIndex, blobSize: blob.size });
             imgEl.src = objUrl;
           })
           .catch((err) => {
             // fetch 에러 시 원본 뷰어 스트림 경로로 폴백 복구
+            loadTrace.log('page image fetch failed, fallback to stream url', { pageIndex, error: String(err) });
             imgEl.src = url;
           });
       }
@@ -622,6 +691,7 @@ export function loadComicPage() {
     if (!isInitializingProgress) {
       saveProgress(state.activeBookId, comicCurrentPage, comicTotalPages);
     }
+    loadTrace.log('page-mode render setup complete');
   }
 }
 
