@@ -133,18 +133,34 @@ function bindPermissionEvents() {
   // 개별 카테고리 권한 토글 이벤트
   document.querySelectorAll('.permission-chk-category').forEach(chk => {
     chk.addEventListener('change', async (e) => {
-      const userId = e.target.getAttribute('data-user-id');
-      const libraryId = e.target.getAttribute('data-library-id');
+      const userIdRaw = e.target.getAttribute('data-user-id');
+      const libraryIdRaw = e.target.getAttribute('data-library-id');
       const dbType = e.target.getAttribute('data-db-type');
       const hasAccess = e.target.checked;
+
+      const parsedUserId = parseInt(userIdRaw, 10);
+      if (!Number.isFinite(parsedUserId)) {
+        alert('변경에 실패했습니다: user_id 값이 올바르지 않습니다.');
+        e.target.checked = !hasAccess;
+        return;
+      }
+
+      let payloadLibraryId;
+      if (dbType === 'plugin') {
+        // 플러그인 권한 ID는 문자열(plugin_xxx) 형태이므로 숫자 변환 금지
+        payloadLibraryId = (libraryIdRaw || '').trim();
+      } else {
+        const parsedLibraryId = parseInt(libraryIdRaw, 10);
+        payloadLibraryId = Number.isFinite(parsedLibraryId) ? parsedLibraryId : null;
+      }
 
       try {
         const res = await fetch('/api/admin/permissions/update', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            user_id: parseInt(userId),
-            library_id: parseInt(libraryId),
+            user_id: parsedUserId,
+            library_id: payloadLibraryId,
             has_access: hasAccess,
             target_db: dbType
           })

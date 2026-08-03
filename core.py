@@ -1,6 +1,10 @@
 import os
 import sys
+import json
+import time
+import hashlib
 import subprocess
+from urllib.parse import urlencode
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -95,6 +99,130 @@ if not IS_WORKER:
         import secrets
         app.secret_key = secrets.token_hex(32)
 
+    def _load_release_version():
+        """VERSION 파일의 dashboard 값을 읽어 릴리스 식별자로 사용."""
+        default_version = 'dev'
+        version_path = os.path.join(BASE_DIR, 'VERSION')
+        try:
+            if not os.path.exists(version_path):
+                return default_version
+            with open(version_path, 'r', encoding='utf-8') as vf:
+                for raw_line in vf:
+                    line = raw_line.strip()
+                    if not line.startswith('"dashboard"'):
+                        continue
+                    parts = line.split(':', 1)
+                    if len(parts) != 2:
+                        continue
+                    value = parts[1].strip().rstrip(',').strip().strip('"').strip("'")
+                    return value or default_version
+        except Exception as ve:
+            print(f"[Core-Version Warning] failed to load VERSION dashboard key: {ve}")
+        return default_version
+
+    app.config['RELEASE_VERSION'] = _load_release_version()
+
+    def _env_flag(name, default=False):
+        raw = os.environ.get(name)
+        if raw is None:
+            return default
+        return str(raw).strip().lower() in ('1', 'true', 'yes', 'on')
+
+    def _env_int(name, default, min_value=0, max_value=1000000):
+        raw = os.environ.get(name)
+        if raw is None:
+            return default
+        try:
+            value = int(str(raw).strip())
+        except ValueError:
+            return default
+        return max(min_value, min(max_value, value))
+
+    def _build_csp_policy(report_path='/api/security/csp-report'):
+        override = os.environ.get('SECURITY_CSP_POLICY', '').strip()
+        if override:
+            return override
+
+        directives = [
+            "default-src 'self'",
+            "base-uri 'self'",
+            "object-src 'none'",
+            "frame-ancestors 'self'",
+            "img-src 'self' data: blob: https:",
+            "font-src 'self' data: https:",
+            "style-src 'self' 'unsafe-inline' https:",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:",
+            "connect-src 'self' https: ws: wss:",
+            "frame-src 'self' https:",
+            "media-src 'self' data: blob: https:",
+            "worker-src 'self' blob:",
+            "manifest-src 'self'",
+            f"report-uri {report_path}",
+        ]
+        return '; '.join(directives)
+
+    app.config['SECURITY_CSP_ENABLED'] = _env_flag('SECURITY_CSP_ENABLED', True)
+    app.config['SECURITY_CSP_REPORT_ONLY'] = _env_flag('SECURITY_CSP_REPORT_ONLY', True)
+    app.config['SECURITY_CSP_ENFORCE'] = _env_flag('SECURITY_CSP_ENFORCE', False)
+    app.config['SECURITY_CSP_LOG_REPORTS'] = _env_flag('SECURITY_CSP_LOG_REPORTS', True)
+    app.config['SECURITY_CSP_REPORT_PATH'] = '/api/security/csp-report'
+    app.config['SECURITY_CSP_REPORT_FILE'] = os.environ.get(
+        'SECURITY_CSP_REPORT_FILE',
+        os.path.join(BASE_DIR, 'logs', 'csp_reports.jsonl')
+    ).strip()
+    app.config['SECURITY_CSP_REPORT_RATE_LIMIT_PER_MIN'] = _env_int(
+        'SECURITY_CSP_REPORT_RATE_LIMIT_PER_MIN',
+        120,
+        min_value=1,
+        max_value=20000
+    )
+    app.config['SECURITY_CSP_REPORT_DEDUP_WINDOW_SEC'] = _env_int(
+        'SECURITY_CSP_REPORT_DEDUP_WINDOW_SEC',
+        30,
+        min_value=0,
+        max_value=3600
+    )
+    app.config['SECURITY_CSP_POLICY'] = _build_csp_policy(app.config['SECURITY_CSP_REPORT_PATH'])
+    app.config['SECURITY_CSP_REPORT_STATE'] = {
+        'minute_bucket': int(time.time() // 60),
+        'count_in_bucket': 0,
+        'suppressed_in_bucket': 0,
+        'last_seen_by_fingerprint': {},
+    }
+
+    def _append_csp_report_file(entry):
+        report_file = (app.config.get('SECURITY_CSP_REPORT_FILE') or '').strip()
+        if not report_file:
+            return
+        try:
+            os.makedirs(os.path.dirname(report_file), exist_ok=True)
+            with open(report_file, 'a', encoding='utf-8') as fp:
+                fp.write(json.dumps(entry, ensure_ascii=False) + '\n')
+        except Exception as file_err:
+            print(f"[CSP-REPORT-WARN] failed to write report file: {file_err}")
+
+    @app.context_processor
+    def inject_asset_helpers():
+        def static_asset_url(filename, **kwargs):
+            from flask import url_for
+            params = dict(kwargs or {})
+            params.setdefault('v', app.config.get('RELEASE_VERSION', 'dev'))
+            return url_for('static', filename=filename, **params)
+
+        def append_release_version(url):
+            if not url:
+                return url
+            if 'v=' in url:
+                return url
+            sep = '&' if '?' in url else '?'
+            return f"{url}{sep}{urlencode({'v': app.config.get('RELEASE_VERSION', 'dev')})}"
+
+        return {
+            'release_version': app.config.get('RELEASE_VERSION', 'dev'),
+            'static_asset_url': static_asset_url,
+            'append_release_version': append_release_version,
+        }
+
     # 블루프린트 등록
     app.register_blueprint(api_bp)
 
@@ -110,18 +238,135 @@ if not IS_WORKER:
             return jsonify({'success': False, 'error': 'Request payload too large'}), 413
         return 'Request payload too large', 413
 
+    @app.route('/api/security/csp-report', methods=['POST'])
+    def csp_report_receiver():
+        """CSP 위반 리포트를 수집합니다. (Report-Only 단계 관측용)"""
+        payload = request.get_json(silent=True)
+        if payload is None:
+            raw = (request.get_data(cache=False, as_text=True) or '').strip()
+            if raw:
+                try:
+                    payload = json.loads(raw)
+                except Exception:
+                    payload = {'raw': raw[:2000]}
+
+        report = {}
+        if isinstance(payload, dict):
+            if isinstance(payload.get('csp-report'), dict):
+                report = payload.get('csp-report') or {}
+            elif isinstance(payload.get('body'), dict):
+                report = payload.get('body') or {}
+            else:
+                report = payload
+
+        if not isinstance(report, dict):
+            report = {'raw': str(report)[:1000]}
+
+        now_ts = int(time.time())
+        log_line = {
+            'ts': now_ts,
+            'effective_directive': report.get('effective-directive') or report.get('violated-directive'),
+            'violated_directive': report.get('violated-directive'),
+            'blocked_uri': report.get('blocked-uri'),
+            'source_file': report.get('source-file'),
+            'line_number': report.get('line-number'),
+            'column_number': report.get('column-number'),
+            'document_uri': report.get('document-uri'),
+            'user_agent': request.headers.get('User-Agent', ''),
+            'referer': request.headers.get('Referer', ''),
+        }
+
+        # 동일 리포트 반복 스팸을 줄이기 위해 핵심 필드 기반 지문 + dedup window 적용
+        fp_source = '|'.join([
+            str(log_line.get('effective_directive') or ''),
+            str(log_line.get('violated_directive') or ''),
+            str(log_line.get('blocked_uri') or ''),
+            str(log_line.get('source_file') or ''),
+            str(log_line.get('line_number') or ''),
+            str(log_line.get('document_uri') or ''),
+        ])
+        fingerprint = hashlib.sha1(fp_source.encode('utf-8', errors='ignore')).hexdigest()
+
+        state = app.config.get('SECURITY_CSP_REPORT_STATE') or {}
+        minute_bucket = int(now_ts // 60)
+        prev_bucket = state.get('minute_bucket', minute_bucket)
+        if minute_bucket != prev_bucket:
+            suppressed_prev = int(state.get('suppressed_in_bucket', 0) or 0)
+            if suppressed_prev > 0:
+                summary = {
+                    'ts': now_ts,
+                    'type': 'csp_report_suppressed_summary',
+                    'minute_bucket': prev_bucket,
+                    'suppressed_count': suppressed_prev,
+                }
+                _append_csp_report_file(summary)
+                if app.config.get('SECURITY_CSP_LOG_REPORTS', True):
+                    print(f"[CSP-REPORT] {json.dumps(summary, ensure_ascii=False)}")
+            state['minute_bucket'] = minute_bucket
+            state['count_in_bucket'] = 0
+            state['suppressed_in_bucket'] = 0
+
+        dedup_window = int(app.config.get('SECURITY_CSP_REPORT_DEDUP_WINDOW_SEC', 30) or 0)
+        last_seen = state.get('last_seen_by_fingerprint', {})
+        last_seen_ts = int(last_seen.get(fingerprint, 0) or 0)
+        if dedup_window > 0 and now_ts - last_seen_ts < dedup_window:
+            state['suppressed_in_bucket'] = int(state.get('suppressed_in_bucket', 0) or 0) + 1
+            app.config['SECURITY_CSP_REPORT_STATE'] = state
+            return ('', 204)
+
+        per_min_limit = int(app.config.get('SECURITY_CSP_REPORT_RATE_LIMIT_PER_MIN', 120) or 120)
+        if int(state.get('count_in_bucket', 0) or 0) >= per_min_limit:
+            state['suppressed_in_bucket'] = int(state.get('suppressed_in_bucket', 0) or 0) + 1
+            app.config['SECURITY_CSP_REPORT_STATE'] = state
+            return ('', 204)
+
+        last_seen[fingerprint] = now_ts
+        if len(last_seen) > 2000:
+            cutoff_ts = now_ts - max(dedup_window, 60)
+            last_seen = {k: v for k, v in last_seen.items() if int(v) >= cutoff_ts}
+        state['last_seen_by_fingerprint'] = last_seen
+        state['count_in_bucket'] = int(state.get('count_in_bucket', 0) or 0) + 1
+        app.config['SECURITY_CSP_REPORT_STATE'] = state
+
+        _append_csp_report_file(log_line)
+        if app.config.get('SECURITY_CSP_LOG_REPORTS', True):
+            try:
+                print(f"[CSP-REPORT] {json.dumps(log_line, ensure_ascii=False)}")
+            except Exception:
+                print(f"[CSP-REPORT] {str(log_line)}")
+
+        return ('', 204)
+
     @app.after_request
     def add_fingerprint_headers(response):
         response.headers['X-Powered-By'] = 'BookOasis Engine'
         response.headers['X-BookOasis-Engine'] = 'BookOasis Engine v1.0'
-        response.headers['X-BookOasis-Version'] = '1.0'
+        response.headers['X-BookOasis-Version'] = app.config.get('RELEASE_VERSION', 'dev')
         response.headers['X-BookOasis-License'] = 'AGPLv3'
         response.headers['X-BookOasis-Signature'] = 'boe-core-a17f3c9'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+
+        csp_enabled = app.config.get('SECURITY_CSP_ENABLED', True)
+        csp_policy = app.config.get('SECURITY_CSP_POLICY', '')
+        if csp_enabled and csp_policy:
+            if app.config.get('SECURITY_CSP_ENFORCE', False):
+                response.headers['Content-Security-Policy'] = csp_policy
+            elif app.config.get('SECURITY_CSP_REPORT_ONLY', True):
+                response.headers['Content-Security-Policy-Report-Only'] = csp_policy
+
+        if request.path in ('/', '/login'):
+            response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+            response.headers['Pragma'] = 'no-cache'
+            response.headers['Expires'] = '0'
+            return response
         is_cacheable_path = request.path.startswith('/static/lib/') or request.path.startswith('/static/fonts/')
         is_cacheable_ext = any(request.path.endswith(ext) for ext in ['.woff', '.woff2', '.ttf', '.eot', '.png', '.jpg', '.jpeg', '.svg', '.ico'])
         if request.path.startswith('/static/') and (is_cacheable_path or is_cacheable_ext):
             response.cache_control.max_age = 31536000
             response.cache_control.public = True
+            response.cache_control.immutable = True
         return response
 
     # 앱 기동 시 DB 초기화 수행

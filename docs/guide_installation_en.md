@@ -60,6 +60,7 @@ However, the following are still recommended to be managed via `.env`:
 - **Inbound scan webhook token**: external poller-triggered scans (`WEBHOOK_TOKEN`)
 - **Outbound standard event webhook**: delivery for `book.new/read/finish` (`WEBHOOK_EVENT_*`)
 - **Redis In-Memory Cache (Optional & Recommended)**: Safely intercepts write operations to prevent SQLite database corruption. (`REDIS_URL`)
+- **Staged CSP hardening (recommended)**: observe violations first, then move to blocking mode. (`SECURITY_CSP_*`)
 
 **Hybrid (Fallback) Architecture:**
 BookOasis automatically falls back to SQLite-direct write mode if a Redis connection is unavailable or if `REDIS_URL` is omitted, ensuring backwards compatibility without mandatory configuration.
@@ -82,7 +83,25 @@ WEBHOOK_EVENT_SECRET=change_me
 # If sharing an existing Redis server on native OS, assign a different DB index (e.g., /9) to prevent collisions.
 # All BookOasis keys will be automatically prefixed with 'bookoasis:' to secure namespacing.
 REDIS_URL=redis://127.0.0.1:6379/9
+
+# (Optional) Staged CSP rollout: observe (Report-Only) -> block (Enforce)
+SECURITY_CSP_ENABLED=true
+SECURITY_CSP_REPORT_ONLY=true
+SECURITY_CSP_ENFORCE=false
+SECURITY_CSP_LOG_REPORTS=true
+# (Optional) CSP report operational safeguards
+# Per-minute cap and duplicate-report dedup window
+SECURITY_CSP_REPORT_FILE=./logs/csp_reports.jsonl
+SECURITY_CSP_REPORT_RATE_LIMIT_PER_MIN=120
+SECURITY_CSP_REPORT_DEDUP_WINDOW_SEC=30
 ```
+
+**Recommended CSP transition:**
+1. Start with `SECURITY_CSP_REPORT_ONLY=true` and `SECURITY_CSP_ENFORCE=false`
+2. Review `[CSP-REPORT]` violations in server logs
+3. Refine policy, then switch to `SECURITY_CSP_ENFORCE=true`
+
+For detailed gates and rollback steps, see the [CSP rollout checklist](./checklist_csp_rollout_en.md).
 
 For payload contract details and format constraints (EPUB/TXT `totalPages` may be nullable), see [API Endpoints Specification](./api_endpoints.md#-6-외부-연동-및-자동화용-웹훅-api-webhook).
 

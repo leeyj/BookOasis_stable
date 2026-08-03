@@ -150,22 +150,14 @@ export function createBookCard(item, options = {}) {
     }
   };
 
-  // 2. 뱃지 정보 결정
-  let badgeHtml = '';
-  if (!isAudiobook) {
-    if (options.showProgress && item.total_pages > 0) {
-      const progressPercent = Math.round((item.pages_read / item.total_pages) * 100);
-      badgeHtml = `<span class="book-badge-count" style="background-color: #a855f7;">${progressPercent}%</span>`;
-    } else if (options.showVolumeCount && item.book_count !== undefined) {
-      badgeHtml = `<span class="book-badge-count">${item.book_count}${i18n.t('dashboard.unit_books')}</span>`;
-    }
-  }
+  // 썸네일 상단 오버레이 메타(진행률/권수 배지)는 중복 노출 방지를 위해 숨김 처리
+  const badgeHtml = '';
 
-  // 3. 서브 텍스트 메타정보 결정
+  // 제목 하단 메타 텍스트는 유지 (이어읽기/신규/오디오 정보)
   let subTextHtml = '';
   if (isAudiobook) {
-    const chapters = (item.total_tracks !== undefined && Number(item.total_tracks) > 0) 
-      ? Number(item.total_tracks) 
+    const chapters = (item.total_tracks !== undefined && Number(item.total_tracks) > 0)
+      ? Number(item.total_tracks)
       : ((item.book_count !== undefined && Number(item.book_count) > 0) ? Number(item.book_count) : (Number(item.total_pages) || 1));
     subTextHtml = `<p style="font-size:0.82rem; color:#38bdf8; font-weight:600; margin-top:auto; padding-top:0.2rem; margin-bottom:-0.15rem; display:flex; align-items:center; gap:0.35rem;"><i class="fa-solid fa-headphones"></i> ${chapters}</p>`;
   } else if (item.pages_read > 0 && options.showProgress) {

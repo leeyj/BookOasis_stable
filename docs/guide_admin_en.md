@@ -54,6 +54,7 @@ A Library is a unit that binds books in a physical directory to a specific libra
 * **Target Physical Path**: The absolute path on the server where the book files are stored (e.g., `D:\Manga` or `/home/user/books`).
 * **Is Remote**: Check this if it's a remote storage like Google Drive mounted via Rclone VFS.
   * *When checked: Skips detailed offset analysis inside compressed files and automatic temporary cover extraction to prevent network bottlenecks.*
+  * *When unchecked: the scanner will not attempt remote VFS refreshes (RC / `vfs/refresh`) during scans.*
 * **Is Adult**: When checked, the library is only revealed to accounts with the adult authentication flag assigned.
 * **VFS Refresh before scan**: Specifies whether to call the Rclone API to refresh the cache right before scanning to sync the latest remote drive state.
 

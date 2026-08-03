@@ -702,3 +702,95 @@ body {
         display: none;
     }
 }
+
+/* 15. 모바일 오디오북 플레이어 하단 잘림 보정 (safe-area + 동적 뷰포트) */
+@media screen and (max-width: 900px) {
+    #audio-player-modal.audio-player-modal {
+        height: 100vh !important;
+        height: 100dvh !important;
+        overflow: hidden !important;
+    }
+
+    #audio-player-modal .audio-player-shell {
+        height: 100% !important;
+        min-height: 100vh;
+        min-height: 100dvh;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+        justify-content: flex-start !important;
+        gap: 1rem;
+        padding-top: calc(0.9rem + env(safe-area-inset-top, 0px)) !important;
+        padding-right: 1rem !important;
+        padding-left: 1rem !important;
+        padding-bottom: calc(0.9rem + env(safe-area-inset-bottom, 0px)) !important;
+    }
+
+    #audio-player-modal .audio-player-header {
+        height: auto !important;
+        min-height: 44px;
+    }
+
+    #audio-player-modal .audio-player-center-stage {
+        flex: 0 0 auto !important;
+        max-width: 100% !important;
+        padding-top: 0.25rem;
+    }
+
+    #audio-player-modal .audio-cover-stage {
+        width: min(58vw, 280px) !important;
+        height: min(58vw, 280px) !important;
+        margin-bottom: 1.2rem !important;
+    }
+
+    #audio-player-modal .audio-player-controls {
+        margin: 0 auto calc(0.2rem + env(safe-area-inset-bottom, 0px)) auto !important;
+        gap: 1rem !important;
+        padding-bottom: 0.1rem;
+    }
+
+    #audio-player-modal .audio-player-utility-row {
+        padding-top: 0.75rem !important;
+    }
+
+    #audio-player-modal .audio-chapter-drawer {
+        height: min(68%, 520px) !important;
+        padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px)) !important;
+    }
+}
+
+@media screen and (max-width: 430px) {
+    #audio-player-modal .audio-cover-stage {
+        width: min(60vw, 240px) !important;
+        height: min(60vw, 240px) !important;
+    }
+
+    #audio-player-modal #btn-audio-play-toggle {
+        width: 60px !important;
+        height: 60px !important;
+        font-size: 1.45rem !important;
+    }
+
+    #audio-player-modal .audio-player-controls {
+        max-width: 100% !important;
+    }
+}
+
+@media screen and (max-height: 740px) and (max-width: 900px) {
+    #audio-player-modal .audio-cover-stage {
+        width: min(44vw, 210px) !important;
+        height: min(44vw, 210px) !important;
+        margin-bottom: 0.85rem !important;
+    }
+
+    #audio-player-modal #audio-player-title {
+        font-size: 1.2rem !important;
+    }
+
+    #audio-player-modal #audio-player-author {
+        margin-bottom: 0.55rem !important;
+    }
+
+    #audio-player-modal .audio-player-controls {
+        gap: 0.75rem !important;
+    }
+}

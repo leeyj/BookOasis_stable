@@ -12,6 +12,7 @@ This is the central technical documentation and task history archive portal for 
 
 * **사용자 및 어드민 가이드 (Guides)**:
   - [설치 가이드 (guide_installation.md)](./guide_installation.md) / [English (guide_installation_en.md)](./guide_installation_en.md): 설치 요구사항, 빠른 구동법, 리버스 프록시 연동 / Prerequisites, startup bat files, and reverse proxy configs.
+  - [CSP 단계 전환 체크리스트 (checklist_csp_rollout.md)](./checklist_csp_rollout.md) / [English (checklist_csp_rollout_en.md)](./checklist_csp_rollout_en.md): Report-Only 관측에서 Enforce 전환까지 운영 점검/롤백 절차 / Operational gates and rollback path for CSP rollout.
   - [마이그레이션 가이드 (migration_guide.md)](./migration_guide.md) / [English (migration_guide_en.md)](./migration_guide_en.md): Kavita에서 BookOasis로의 완벽 이사 / Seamless migration from Kavita to BookOasis.
   - [관리자 가이드 (guide_admin.md)](./guide_admin.md) / [English (guide_admin_en.md)](./guide_admin_en.md): 사용자 권한 제어, 라이브러리 추가, 백그라운드 스캐너 제어 / User privileges, library additions, and background task controls.
   - [OPDS 연동 가이드 (guide_opds.md)](./guide_opds.md) / [English (guide_opds_en.md)](./guide_opds_en.md): 모바일 앱 연동 및 Basic Auth 셋업 / Mobile reader sync and Basic Auth configs.

@@ -60,6 +60,7 @@ pip install -r requirements.txt
 - **인바운드 스캔 웹훅 토큰**: 외부 폴러 연동 (`WEBHOOK_TOKEN`)
 - **아웃바운드 표준 이벤트 웹훅**: `book.new/read/finish` 전송 (`WEBHOOK_EVENT_*`)
 - **Redis 인메모리 캐시 연동 (선택 및 권장)**: SQLite 파일의 실시간 쓰기 부하를 제어해 손상을 방지합니다. (`REDIS_URL`)
+- **CSP 단계적 보안 적용 (권장)**: 초기에는 차단 없이 위반을 관측하고 이후 차단 모드로 전환합니다. (`SECURITY_CSP_*`)
 
 **하이브리드(Fallback) 설계:**
 BookOasis는 레디스 연결 실패 시 또는 환경변수 부재 시 **자동으로 기존의 SQLite 직접 쓰기 모드로 우회(Fallback)**하므로, 레디스 설치나 기동 없이도 기존과 완전히 똑같이 실행 가능합니다.
@@ -82,7 +83,25 @@ WEBHOOK_EVENT_SECRET=change_me
 # 기존에 사용 중인 로컬/외부 레디스 자원이 있는 경우 데이터 충돌을 막기 위해 DB 번호를 다르게 지정하십시오. (예: /9)
 # 모든 데이터 키 앞에는 'bookoasis:' 접두사가 강제 지정되므로 네임스페이스가 격리됩니다.
 REDIS_URL=redis://127.0.0.1:6379/9
+
+# (선택) CSP 단계 적용: 관측(Report-Only) -> 차단(Enforce)
+SECURITY_CSP_ENABLED=true
+SECURITY_CSP_REPORT_ONLY=true
+SECURITY_CSP_ENFORCE=false
+SECURITY_CSP_LOG_REPORTS=true
+# (선택) CSP 리포트 운영 안정화
+# 분당 수집량 제한 및 중복 리포트 dedup 윈도우 설정
+SECURITY_CSP_REPORT_FILE=./logs/csp_reports.jsonl
+SECURITY_CSP_REPORT_RATE_LIMIT_PER_MIN=120
+SECURITY_CSP_REPORT_DEDUP_WINDOW_SEC=30
 ```
+
+**CSP 권장 전환 순서:**
+1. `SECURITY_CSP_REPORT_ONLY=true`, `SECURITY_CSP_ENFORCE=false` 상태로 먼저 운영
+2. 서버 로그의 `[CSP-REPORT]` 위반 항목을 정리
+3. 정책 보정 후 `SECURITY_CSP_ENFORCE=true`로 차단 모드 전환
+
+상세 점검표는 [CSP 단계 전환 체크리스트](./checklist_csp_rollout.md)를 참고하십시오.
 
 표준 이벤트 웹훅 페이로드 계약과 포맷 제약(EPUB/TXT `totalPages` nullable)은 [API 엔드포인트 명세](./api_endpoints.md#-6-외부-연동-및-자동화용-웹훅-api-webhook)를 참고하십시오.
 

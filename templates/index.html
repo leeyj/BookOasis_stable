@@ -17,15 +17,15 @@
     <meta name="theme-color" content="#090d16">
     <title>BookOasis - 도서 보관함</title>
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logo.png') }}?sig=boe-favicon-a17f3c9">
+    <link rel="icon" type="image/png" href="{{ static_asset_url('images/logo.png', sig='boe-favicon-a17f3c9') }}">
     <!-- FontAwesome 아이콘 패키지 추가 (Local) -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='lib/font-awesome/css/all.min.css') }}">
+    <link rel="stylesheet" href="{{ static_asset_url('lib/font-awesome/css/all.min.css') }}">
     <!-- i18n 다국어 지원 엔진 -->
-    <script src="{{ url_for('static', filename='js/i18n.js') }}"></script>
+    <script src="{{ static_asset_url('js/i18n.js') }}"></script>
     <!-- Marked.js (Markdown 파서) -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <!-- 외부 라이브러리 (로컬 다운로드 버전) -->
-    <script src="/static/lib/Sortable.min.js"></script>
+    <script src="{{ static_asset_url('lib/Sortable.min.js') }}"></script>
     <script>
         window.currentUser = {
             id: Number({{ session.get('user_id', 0) | tojson }}),
@@ -85,7 +85,7 @@
     {% include "components/modals/audio_player_modal.html" %}
 </div>
 
-<script type="module" src="/static/js/dashboard_insights.js"></script>
+<script type="module" src="{{ static_asset_url('js/dashboard_insights.js') }}"></script>
 
 <script>
     // 페이지 로드 시 다국어 초기화 및 렌더링 실행

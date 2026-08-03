@@ -94,14 +94,15 @@ def update_permission():
     has_access = 1 if data.get('has_access') else 0
     target_db = data.get('target_db', 'general') # 'general' or 'plugin'
 
-    if not user_id or not library_id:
+    if user_id is None or library_id is None or str(library_id).strip() == '':
         return jsonify({'success': False, 'error': 'user_id와 library_id는 필수 항목입니다.'}), 400
 
     try:
         if target_db == 'plugin' or str(library_id).startswith('plugin_'):
+            safe_library_id = str(library_id).strip()
             conn = database.get_connection('general')
             cursor = conn.cursor()
-            key_perm = f"PERM_CATEGORY_{user_id}_{library_id}"
+            key_perm = f"PERM_CATEGORY_{user_id}_{safe_library_id}"
             cursor.execute("""
                 INSERT INTO settings (key, value)
                 VALUES (?, ?)

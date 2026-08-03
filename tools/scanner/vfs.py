@@ -63,7 +63,7 @@ def trigger_vfs_refresh(db_path, library_id, physical_path):
         try:
             conn = database.get_connection(db_type)
             cursor = conn.cursor()
-            cursor.execute("SELECT vfs_refresh_before_scan, rclone_rc_url FROM libraries WHERE id = ?", (library_id,))
+            cursor.execute("SELECT is_remote, vfs_refresh_before_scan, rclone_rc_url FROM libraries WHERE id = ?", (library_id,))
             row = cursor.fetchone()
         except Exception as e:
             print(f"[Scanner-VFS Warning] Failed to fetch library info: {e}")
@@ -74,6 +74,10 @@ def trigger_vfs_refresh(db_path, library_id, physical_path):
                     conn.close()
                 except Exception:
                     pass
+
+        if not row or row['is_remote'] != 1:
+            print(f"[Scanner-VFS] VFS refresh skipped: remote drive flag is disabled for library {library_id}.")
+            return
             
         if not row or row['vfs_refresh_before_scan'] != 1:
             return

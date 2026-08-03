@@ -1,4 +1,17 @@
 # CHANGELOG
+## v1.6.3
+- (mobile/epub) 일시 통신 장애 후 페이지↔스크롤 모드 재전환 시 `챕터 불러오는 중...` placeholder가 고착되는 문제 수정: 가시 범위 챕터 자동 재요청 및 모드 전환 직후 윈도우 하이드레이션 복구 로직 추가 | fix sticky `Loading chapter...` placeholders after transient network failures when re-switching EPUB page↔scroll modes by adding visible-range auto-refetch and post-switch window hydration
+- (mobile/audiobook) 오디오북 플레이어 하단 영역 잘림 수정: safe-area 하단 패딩 및 100dvh 기반 레이아웃/스크롤 보정으로 작은 화면(iOS/Android)에서 재생 컨트롤 가시성 복원 | fix mobile audiobook player bottom clipping by applying safe-area bottom padding and 100dvh-based layout/scroll adjustments for small iOS/Android screens
+- (scanner/VFS) 카테고리의 원격 드라이브 체크를 해제한 경우 스캔 중 rclone VFS refresh/RC 통신을 시도하지 않도록 조정 | skip rclone VFS refresh/RC communication during scans when the category's remote-drive checkbox is turned off
+- 캐시 무효화 자동화: `VERSION.dashboard` 기반 정적 자산 버전 파라미터 자동 주입(`static_asset_url`) 및 릴리스 헤더 동기화 | Cache busting automation: inject release-based asset version from `VERSION.dashboard` and sync release header
+- 캐시 정책 정비: `/` 및 `/login` HTML은 no-store, 정적 폰트/이미지/라이브러리 자산은 immutable 장기 캐시 적용 | Cache policy split: no-store for `/` and `/login` HTML, immutable long cache for static font/image/library assets
+- CSP 1단계 도입: `Content-Security-Policy-Report-Only` 헤더와 `/api/security/csp-report` 리포트 수집 엔드포인트 추가(환경변수 토글 지원) | CSP phase-1 added: `Content-Security-Policy-Report-Only` header and `/api/security/csp-report` endpoint with env toggles
+- CSP 리포트 운영 안정화: 전용 JSONL 파일(`logs/csp_reports.jsonl`) 분리 저장 및 분당 수집량 제한/동일 이벤트 dedup 윈도우 적용 | CSP report operations hardened: dedicated JSONL file (`logs/csp_reports.jsonl`) with per-minute cap and duplicate-event dedup window
+- 기본 보안 헤더 강화: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` 기본 적용 | Baseline security headers hardened: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`
+- 플러그인 권한 오류 수정 | Fix plugin permission error
+- 각 세션별로 배경색 차별 | identified session color(genaral,adult,audiobook)
+
+
 ## v1.6.2
 - 일반사용자도 테마변경 지원 | general users can change theme
 - 오디오북 기능 추가(beta) | support audiobook session(beta)

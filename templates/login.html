@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BookOasis - 로그인</title>
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="/static/images/logo.png">
+    <link rel="icon" type="image/png" href="{{ static_asset_url('images/logo.png') }}">
     <!-- FontAwesome -->
-    <link rel="stylesheet" href="/static/lib/font-awesome/css/all.min.css">
-    <link rel="stylesheet" href="/static/css/login.css">
+    <link rel="stylesheet" href="{{ static_asset_url('lib/font-awesome/css/all.min.css') }}">
+    <link rel="stylesheet" href="{{ static_asset_url('css/login.css') }}">
     <!-- i18n 다국어 지원 엔진 -->
-    <script src="/static/js/i18n.js"></script>
+    <script src="{{ static_asset_url('js/i18n.js') }}"></script>
 </head>
 <body>
 
@@ -19,7 +19,7 @@
     <!-- 1. 로그인 폼 카드 -->
     <div id="login-card" class="auth-card">
         <div class="auth-header">
-            <span class="auth-logo"><img src="/static/images/logo.png" alt="BookOasis" style="width: 4rem; height: 4rem; object-fit: contain; border-radius: 8px;"></span>
+            <span class="auth-logo"><img src="{{ static_asset_url('images/logo.png') }}" alt="BookOasis" style="width: 4rem; height: 4rem; object-fit: contain; border-radius: 8px;"></span>
             <h2 class="auth-title" data-i18n="login.title">BookOasis</h2>
             <p class="auth-subtitle" data-i18n="login.subtitle">북오아시스 미디어 서재 로그인</p>
         </div>
@@ -79,7 +79,7 @@
     </div>
 </div>
 
-<script src="/static/js/login.js"></script>
+<script src="{{ static_asset_url('js/login.js') }}"></script>
 <script>
     // 페이지 로드 시 다국어 초기화 및 렌더링
     document.addEventListener('DOMContentLoaded', async () => {

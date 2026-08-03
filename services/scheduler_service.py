@@ -363,16 +363,19 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
         target_paths = list(dict.fromkeys(target_paths_raw))
         has_remote_paths = any(is_remote_path(p) and not is_gdrive_url(p) for p in target_paths)
         
-        # VFS 설정이 활성화되었거나, 원격 경로가 있으면 VFS 갱신 강제 수행
-        should_vfs_refresh = (row_chk and row_chk['vfs_refresh_before_scan'] == 1) or has_remote_paths
+        library_is_remote = bool(row_chk and row_chk.get('is_remote') == 1)
+
+        # 원격 드라이브로 명시된 라이브러리에서만 VFS 갱신을 허용한다.
+        # 체크 해제(is_remote=0) 시에는 경로 판별 결과와 무관하게 RC 통신을 시도하지 않는다.
+        should_vfs_refresh = library_is_remote and ((row_chk and row_chk['vfs_refresh_before_scan'] == 1) or has_remote_paths)
         vfs_flag_enabled = bool(row_chk and row_chk['vfs_refresh_before_scan'] == 1)
         print(
-            f"[Scanner-Trigger] VFS decision: flag_enabled={vfs_flag_enabled}, "
+            f"[Scanner-Trigger] VFS decision: remote_flag={library_is_remote}, flag_enabled={vfs_flag_enabled}, "
             f"has_remote_paths={has_remote_paths}, effective_refresh={should_vfs_refresh}, "
             f"target_paths={target_paths}"
         )
         write_scan_log(
-            f"VFS 판단: flag_enabled={vfs_flag_enabled}, has_remote_paths={has_remote_paths}, "
+            f"VFS 판단: remote_flag={library_is_remote}, flag_enabled={vfs_flag_enabled}, has_remote_paths={has_remote_paths}, "
             f"effective_refresh={should_vfs_refresh}, target_paths={target_paths}"
         )
         
@@ -544,8 +547,12 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
                 print(f"[Scanner-Trigger ERROR] Error during VFS refresh: {e_vfs}")
                 write_scan_log(f"VFS 새로고침 오류: {e_vfs}")
         else:
-            print("[Scanner-Trigger] VFS refresh skipped: disabled and no remote paths detected.")
-            write_scan_log("VFS 새로고침 건너뜀: 비활성 상태이며 원격 경로가 감지되지 않았습니다.")
+            if not library_is_remote:
+                print("[Scanner-Trigger] VFS refresh skipped: remote drive flag is disabled.")
+                write_scan_log("VFS 새로고침 건너뜀: 원격 드라이브 설정이 비활성화되어 있습니다.")
+            else:
+                print("[Scanner-Trigger] VFS refresh skipped: disabled and no remote paths detected.")
+                write_scan_log("VFS 새로고침 건너뜀: 비활성 상태이며 원격 경로가 감지되지 않았습니다.")
     except Exception as db_err:
         print(f"[Scanner-Trigger] VFS 옵션 DB 조회 Error: {db_err}")
     
