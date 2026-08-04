@@ -57,15 +57,23 @@ def _group_history_items(items):
         current = group_items[0]
 
         if len(group_items) <= 1:
-            grouped.append({
+            payload = {
                 **current,
                 'book_count': 1,
                 'representative_book_id': current.get('id'),
                 'representative_title': current.get('title_alias') or current.get('title') or '',
+            }
+            current_total_tracks = int(current.get('total_tracks') or 0)
+            if current_total_tracks > 0:
+                payload['total_tracks'] = current_total_tracks
+            grouped.append({
+                **payload,
             })
             continue
 
-        grouped.append({
+        group_total_tracks = max((int(item.get('total_tracks') or 0) for item in group_items), default=0)
+
+        grouped_item = {
             'id': current.get('id'),
             'library_id': current.get('library_id'),
             'title': current.get('title'),
@@ -84,7 +92,10 @@ def _group_history_items(items):
             'book_count': len(group_items),
             'representative_book_id': current.get('id'),
             'representative_title': current.get('title_alias') or current.get('title') or '',
-        })
+        }
+        if group_total_tracks > 0:
+            grouped_item['total_tracks'] = group_total_tracks
+        grouped.append(grouped_item)
 
     grouped.sort(key=lambda item: str(item.get('last_read_at') or ''), reverse=True)
     return grouped
@@ -101,13 +112,26 @@ class ReadingHistoryService:
             return merged
 
         # 1. Redis 캐시 확인 (구형 캐시에 series_alias 없으면 DB 재조회)
-        cache_key = f"cache:history:v4:{db_type}:{user_id}"
+        cache_key = f"cache:history:v6:{db_type}:{user_id}"
         cached_data = redis_get(cache_key)
         if cached_data:
             try:
                 parsed = json.loads(cached_data)
-                if parsed and isinstance(parsed, list) and (len(parsed) == 0 or ('series_alias' in parsed[0] and 'book_count' in parsed[0])):
-                    return parsed
+                if parsed and isinstance(parsed, list):
+                    if len(parsed) == 0:
+                        return parsed
+
+                    first = parsed[0]
+                    has_base_fields = ('series_alias' in first and 'book_count' in first)
+                    if not has_base_fields:
+                        pass
+                    elif db_type == 'audiobook':
+                        # v5 오디오북 캐시는 total_tracks 필드가 필수이다.
+                        # 구버전 캐시(v4 등)는 해당 필드가 없어 카드 수치가 1로 폴백될 수 있다.
+                        if 'total_tracks' in first:
+                            return parsed
+                    else:
+                        return parsed
             except Exception:
                 pass
 
@@ -140,6 +164,7 @@ class ReadingHistoryService:
                 'is_favorite' : r['is_favorite'] or 0,
                 'last_read_at': r['last_read_at'],
                 'metadata_locked': r.get('metadata_locked', 0),
+                **({'total_tracks': (r.get('total_tracks', 0) or 0)} if db_type == 'audiobook' else {}),
             }
             for r in rows
         ]

@@ -1,0 +1,31 @@
+<div class="pr-plugin-container">
+  <div class="pr-header-banner">
+    <div class="pr-title-group">
+      <h2><i class="fa-solid fa-image"></i> Pixiv 랭킹</h2>
+      <p class="pr-subtitle">설정된 모드/콘텐츠 기준 픽시브 랭킹을 보여줍니다.</p>
+    </div>
+    <div class="pr-actions">
+      <select class="pr-select" id="pr-content-select">
+        <option value="all">종합</option>
+        <option value="illust">일러스트</option>
+        <option value="ugoira">우고이라</option>
+        <option value="manga">만화</option>
+      </select>
+      <select class="pr-select" id="pr-mode-select">
+        <option value="daily">일간</option>
+        <option value="weekly">주간</option>
+        <option value="monthly">월간</option>
+        <option value="rookie">신인</option>
+        <option value="original">오리지널</option>
+        <option value="daily_ai">AI생성</option>
+        <option value="male">남자에게 인기</option>
+        <option value="female">여자에게 인기</option>
+      </select>
+      <button class="pr-btn" id="pr-refresh-btn"><i class="fa-solid fa-rotate"></i> 새로고침</button>
+    </div>
+  </div>
+
+  <div class="pr-status" id="pr-status">불러오는 중...</div>
+
+  <div class="pr-grid" id="pr-grid"></div>
+</div>

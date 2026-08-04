@@ -83,24 +83,46 @@ class CategoryService:
         if not lib:
             raise ValueError("삭제하려는 카테고리를 찾을 수 없습니다.")
 
+        from services.scanner_queue import scanner_queue
+        q_status = scanner_queue.get_queue_status() or {}
+
+        def _is_target_scan_task(task_item):
+            if not task_item:
+                return False
+            if task_item.get('type') not in ('library_scan', 'cover_scan'):
+                return False
+            kwargs = task_item.get('kwargs', {}) or {}
+            try:
+                return (
+                    kwargs.get('db_type') == db_type and
+                    int(kwargs.get('library_id', 0)) == int(library_id)
+                )
+            except (TypeError, ValueError):
+                return False
+
+        running = q_status.get('running')
+        has_running_scan = _is_target_scan_task(running)
+        has_pending_scan = any(_is_target_scan_task(item) for item in q_status.get('pending', []))
+        has_active_scan_task = has_running_scan or has_pending_scan
+
         # [제약 조건] 스캔 상태 검증: 현재 카테고리가 스캔 중인 경우 삭제 차단
         if lib.get("scan_status") in ("scanning", "cancelling"):
-            raise ValueError("현재 카테고리가 스캔 진행 중입니다. 스캔이 완료된 후 삭제해 주세요.")
+            if has_active_scan_task:
+                raise ValueError("현재 카테고리가 스캔 진행 중입니다. 스캔이 완료된 후 삭제해 주세요.")
+            # 실제 큐에 활성 작업이 없으면 stale 상태로 판단하여 자동 복구
+            try:
+                CategoryRepository.update_library_scan_status(db_type, library_id, 'ready')
+                lib['scan_status'] = 'ready'
+            except Exception:
+                # 상태 복구에 실패한 경우에는 보수적으로 삭제를 차단
+                raise ValueError("카테고리 스캔 상태 복구에 실패했습니다. 잠시 후 다시 시도해 주세요.")
 
         # [제약 조건] 스캐너 큐 상태 검증: 현재 카테고리 스캔 작업이 실행/대기 중인 경우 삭제 차단
-        from services.scanner_queue import scanner_queue
-        q_status = scanner_queue.get_queue_status()
-        running = q_status.get('running')
-        if running and running.get('type') in ('library_scan', 'cover_scan'):
-            kwargs = running.get('kwargs', {})
-            if kwargs.get('db_type') == db_type and int(kwargs.get('library_id', 0)) == int(library_id):
-                raise ValueError("현재 카테고리에 대한 백그라운드 스캔이 진행 중입니다. 스캔 완료 후 다시 시도해 주세요.")
+        if has_running_scan:
+            raise ValueError("현재 카테고리에 대한 백그라운드 스캔이 진행 중입니다. 스캔 완료 후 다시 시도해 주세요.")
 
-        for item in q_status.get('pending', []):
-            if item.get('type') in ('library_scan', 'cover_scan'):
-                kwargs = item.get('kwargs', {})
-                if kwargs.get('db_type') == db_type and int(kwargs.get('library_id', 0)) == int(library_id):
-                    raise ValueError("현재 카테고리에 대한 스캔 작업이 대기열에 존재합니다. 스캔 완료 또는 취소 후 다시 시도해 주세요.")
+        if has_pending_scan:
+            raise ValueError("현재 카테고리에 대한 스캔 작업이 대기열에 존재합니다. 스캔 완료 또는 취소 후 다시 시도해 주세요.")
 
         gate_token = None
         try:
@@ -141,24 +163,45 @@ class CategoryService:
         if not lib:
             raise ValueError("이전할 원본 카테고리를 찾을 수 없습니다.")
             
-        # [제약 조건] 스캔 상태 검증: 현재 카테고리가 스캔 중인 경우 이전 차단
-        if lib["scan_status"] == "scanning":
-            raise ValueError("현재 카테고리가 백그라운드 스캔 중입니다. 스캔이 완료된 후 다시 시도해 주세요.")
-            
         # [제약 조건] 스캐너 큐 상태 검증: 현재 카테고리 스캔 작업이 실행/대기 중인 경우 이전 차단
         from services.scanner_queue import scanner_queue
         q_status = scanner_queue.get_queue_status()
+
+        def _is_target_scan_task(task_item):
+            if not task_item:
+                return False
+            if task_item.get('type') not in ('library_scan', 'cover_scan'):
+                return False
+            kwargs = task_item.get('kwargs', {}) or {}
+            try:
+                return (
+                    kwargs.get('db_type') == from_type and
+                    int(kwargs.get('library_id', 0)) == int(library_id)
+                )
+            except (TypeError, ValueError):
+                return False
+
         running = q_status.get('running')
-        if running and running.get('type') in ('library_scan', 'cover_scan'):
-            kwargs = running.get('kwargs', {})
-            if kwargs.get('db_type') == from_type and int(kwargs.get('library_id', 0)) == int(library_id):
-                raise ValueError("현재 카테고리에 대한 백그라운드 스캔이 진행 중입니다. 완료 후 다시 시도해 주세요.")
-                
-        for item in q_status.get('pending', []):
-            if item.get('type') in ('library_scan', 'cover_scan'):
-                kwargs = item.get('kwargs', {})
-                if kwargs.get('db_type') == from_type and int(kwargs.get('library_id', 0)) == int(library_id):
-                    raise ValueError("현재 카테고리에 대한 스캔 작업이 큐에서 대기 중입니다. 완료 후 다시 시도해 주세요.")
+        has_running_scan = _is_target_scan_task(running)
+        has_pending_scan = any(_is_target_scan_task(item) for item in q_status.get('pending', []))
+        has_active_scan_task = has_running_scan or has_pending_scan
+
+        # [제약 조건] 스캔 상태 검증: scan_status가 scanning/cancelling이어도
+        # 실제 큐에 활성 작업이 없으면 stale 상태로 보고 자동 복구한다.
+        if lib.get("scan_status") in ("scanning", "cancelling"):
+            if has_active_scan_task:
+                raise ValueError("현재 카테고리가 백그라운드 스캔 중입니다. 스캔이 완료된 후 다시 시도해 주세요.")
+            try:
+                CategoryRepository.update_library_scan_status(from_type, library_id, 'ready')
+                lib['scan_status'] = 'ready'
+            except Exception:
+                raise ValueError("카테고리 스캔 상태 복구에 실패했습니다. 잠시 후 다시 시도해 주세요.")
+
+        if has_running_scan:
+            raise ValueError("현재 카테고리에 대한 백그라운드 스캔이 진행 중입니다. 완료 후 다시 시도해 주세요.")
+
+        if has_pending_scan:
+            raise ValueError("현재 카테고리에 대한 스캔 작업이 큐에서 대기 중입니다. 완료 후 다시 시도해 주세요.")
                     
         # 2. 목적지 DB의 카테고리명 중복 검증
         if CategoryRepository.check_duplicate_name(to_type, lib["name"]):

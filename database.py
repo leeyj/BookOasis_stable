@@ -831,18 +831,10 @@ def init_databases():
             conn.commit()
         except Exception as seed_err:
             print(f"[DB-Migration ERROR] user_category_permissions seeding failed: {seed_err}")
-        # 기존 라이브러리에 대한 원격 드라이브 자동 판별 보정
-        try:
-            cursor.execute("SELECT id, physical_path, is_remote FROM libraries")
-            libs = cursor.fetchall()
-            for lib in libs:
-                if lib['is_remote'] == 0:
-                    from utils.drive_helper import is_remote_path
-                    if is_remote_path(lib['physical_path']):
-                        cursor.execute("UPDATE libraries SET is_remote = 1 WHERE id = ?", (lib['id'],))
-            conn.commit()
-        except Exception as migration_err:
-            print(f"[DB-Migration ERROR] libraries is_remote auto-detection fallback failed: {migration_err}")
+        # 주의: is_remote 는 운영자가 UI에서 관리하는 의도값이다.
+        # 과거에는 서버 기동 시 physical_path 기반 자동 판별로 0 -> 1 보정을 수행했지만,
+        # SMB/CIFS/NFS 같은 NAS 마운트나 사용자가 수동 해제한 라이브러리까지 다시 체크되는
+        # 부작용이 있어 더 이상 startup 단계에서 덮어쓰지 않는다.
 
         conn.close()
 

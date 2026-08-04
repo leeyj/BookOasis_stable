@@ -1,0 +1,66 @@
+<div class="pr-settings-panel">
+  <div class="pr-settings-title">Pixiv 랭킹 설정</div>
+  <div class="pr-settings-desc">Pixiv 랭킹을 대시보드에 표시하기 위한 로그인 세션 및 기본값 설정입니다.</div>
+
+  <details class="pr-settings-section">
+    <summary>설정 펼치기 (클릭)</summary>
+    <div class="pr-settings-body">
+
+      <!-- 픽시브 로그인 세션 -->
+      <div class="pr-settings-field">
+        <label for="pr-phpsessid">Pixiv 로그인 세션</label>
+        <div class="pr-input-container">
+          <input id="pr-phpsessid" type="password" name="PHPSESSID" placeholder="PHPSESSID 값을 입력하세요" />
+          <p class="hint">로그인 상태의 브라우저 개발자도구 &gt; Application/저장공간 &gt; 쿠키에서 PHPSESSID 값을 확인해 입력하세요.</p>
+        </div>
+      </div>
+
+      <!-- 랭킹 모드 기본값 -->
+      <div class="pr-settings-field">
+        <label for="pr-mode">랭킹 모드</label>
+        <div class="pr-input-container">
+          <select id="pr-mode" name="MODE">
+            <option value="daily">일간 (daily)</option>
+            <option value="weekly">주간 (weekly)</option>
+            <option value="monthly">월간 (monthly)</option>
+            <option value="rookie">신인 (rookie)</option>
+            <option value="original">오리지널 (original)</option>
+            <option value="daily_ai">AI생성 (daily_ai)</option>
+            <option value="male">남자에게 인기 (male)</option>
+            <option value="female">여자에게 인기 (female)</option>
+          </select>
+          <p class="hint">기본 랭킹 모드입니다. 풀페이지 탭 화면 상단 드롭다운으로 요청 시점에 덮어쓸 수 있습니다.</p>
+        </div>
+      </div>
+
+      <!-- 콘텐츠 타입 기본값 -->
+      <div class="pr-settings-field">
+        <label for="pr-content">콘텐츠 타입</label>
+        <div class="pr-input-container">
+          <select id="pr-content" name="CONTENT">
+            <option value="all">종합 (all)</option>
+            <option value="illust">일러스트 (illust)</option>
+            <option value="ugoira">우고이라 (ugoira)</option>
+            <option value="manga">만화 (manga)</option>
+          </select>
+          <p class="hint">기본 콘텐츠 타입입니다. 풀페이지 탭 화면 상단 드롭다운으로 요청 시점에 덮어쓸 수 있습니다.</p>
+        </div>
+      </div>
+
+      <!-- 표시 개수 -->
+      <div class="pr-settings-field">
+        <label for="pr-limit">표시 개수</label>
+        <div class="pr-input-container">
+          <select id="pr-limit" name="LIMIT">
+            <option value="10">10개</option>
+            <option value="20">20개</option>
+            <option value="30">30개</option>
+            <option value="50">50개 (최대)</option>
+          </select>
+          <p class="hint">대시보드 카드와 풀페이지 탭에 한 번에 보여줄 랭킹 개수입니다. 픽시브가 한 번에 최대 50개까지 제공합니다.</p>
+        </div>
+      </div>
+
+    </div>
+  </details>
+</div>

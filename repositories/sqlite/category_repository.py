@@ -84,6 +84,19 @@ class CategoryRepository:
                 cursor.execute("DELETE FROM series WHERE library_id = ?", (library_id,))
             except Exception:
                 pass
+
+            # 1-1. 오디오북 종속 데이터 정리
+            # libraries.id를 audiobooks.library_id가 참조하므로,
+            # 라이브러리 삭제 전에 오디오북 하위 데이터를 먼저 제거해야 FK 오류를 방지할 수 있다.
+            cursor.execute(
+                "DELETE FROM audiobook_progress WHERE audiobook_id IN (SELECT id FROM audiobooks WHERE library_id = ?)",
+                (library_id,)
+            )
+            cursor.execute(
+                "DELETE FROM audiobook_tracks WHERE audiobook_id IN (SELECT id FROM audiobooks WHERE library_id = ?)",
+                (library_id,)
+            )
+            cursor.execute("DELETE FROM audiobooks WHERE library_id = ?", (library_id,))
             
             # 2. 관련 도서 종속 데이터 초고속 서브쿼리 일괄 소거
             cursor.execute("DELETE FROM book_offsets WHERE book_id IN (SELECT id FROM books WHERE library_id = ?)", (library_id,))

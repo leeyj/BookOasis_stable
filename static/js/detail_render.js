@@ -234,10 +234,14 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
       iconClass = 'fa-solid fa-book-open-reader';
     }
 
+    const continueOnClick = isAudioContext
+      ? `window.openAudioPlayer(${(meta && meta.id) ? meta.id : (continueTarget.audiobook_id || continueTarget.id)}, ${continueTarget.id}, ${continueTarget.pages_read || 0})`
+      : `window.openReader(${continueTarget.id}, '${continueTarget.file_format}', '${continueTarget.title.replace(/'/g, "\\'")}', ${continueTarget.pages_read || 0}, ${continueTarget.total_pages || 0})`;
+
     continueBtnHtml = `
       <button class="ridi-link-btn" style="margin: 0; background: ${btnColor}; border-color: ${btnBorder}; font-weight: bold; color: #fff; display: inline-flex; align-items: center; gap: 0.3rem;" 
               title="${tooltipTitle.replace(/"/g, '&quot;')}"
-              onclick="window.openReader(${continueTarget.id}, '${continueTarget.file_format}', '${continueTarget.title.replace(/'/g, "\\'")}', ${continueTarget.pages_read || 0}, ${continueTarget.total_pages || 0})">
+              onclick="${continueOnClick}">
         <i class="${iconClass}"></i> ${btnLabel}
       </button>
     `;

@@ -1,0 +1,136 @@
+/* 패널 기본 */
+.pr-settings-panel {
+    padding: 0.4rem 0.2rem;
+}
+
+.pr-settings-title {
+    color: #f1f5f9;
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 0.3rem;
+}
+
+.pr-settings-desc {
+    color: #94a3b8;
+    font-size: 0.82rem;
+    line-height: 1.4;
+    margin-bottom: 0.9rem;
+}
+
+/* 평소엔 접혀 있다가 클릭 시에만 펼쳐지는 설정 영역 */
+.pr-settings-section {
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    padding: 0.2rem 0.9rem;
+    background: rgba(15, 23, 42, 0.4);
+}
+
+.pr-settings-section summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 0.7rem 0;
+    color: #e2e8f0;
+    font-weight: 700;
+    font-size: 0.88rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    user-select: none;
+}
+
+.pr-settings-section summary::-webkit-details-marker {
+    display: none;
+}
+
+.pr-settings-section summary::before {
+    content: "▶";
+    font-size: 0.7rem;
+    color: #94a3b8;
+    transition: transform 0.15s ease;
+}
+
+.pr-settings-section[open] summary::before {
+    transform: rotate(90deg);
+}
+
+.pr-settings-section[open] summary {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.pr-settings-body {
+    padding: 0.9rem 0 0.6rem 0;
+}
+
+/* 기존 .ubs-plugin-field와 동일한 라벨-입력 좌우 배치 패턴 */
+.pr-settings-field {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 2rem;
+    margin-bottom: 1rem;
+}
+
+.pr-settings-field label {
+    width: 180px;
+    flex-shrink: 0;
+    color: #e2e8f0;
+    font-weight: 700;
+    font-size: 0.86rem;
+    padding-top: 0.6rem;
+}
+
+.pr-input-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    flex: 1;
+    max-width: 520px;
+    min-width: 250px;
+}
+
+.pr-settings-field input[type="text"],
+.pr-settings-field input[type="password"],
+.pr-settings-field select {
+    width: 100%;
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #fff;
+    padding: 0.6rem 0.8rem;
+    border-radius: 6px;
+    outline: none;
+    font-size: 0.85rem;
+    box-sizing: border-box;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.pr-settings-field select {
+    cursor: pointer;
+}
+
+.pr-settings-field input:focus,
+.pr-settings-field select:focus {
+    border-color: rgba(139, 92, 246, 0.6);
+    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.15);
+}
+
+.pr-settings-field .hint {
+    margin: 0;
+    color: #94a3b8;
+    font-size: 0.76rem;
+    line-height: 1.4;
+}
+
+/* 반응형: 좁은 화면에서는 위아래 배치 */
+@media (max-width: 600px) {
+    .pr-settings-field {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    .pr-settings-field label {
+        width: 100%;
+        padding-top: 0;
+    }
+    .pr-input-container {
+        max-width: 100%;
+    }
+}

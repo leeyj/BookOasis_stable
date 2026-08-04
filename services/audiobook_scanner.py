@@ -469,6 +469,7 @@ def scan_and_save_audiobook_folder(folder_path, library_id=None):
     conn = get_connection('audiobook')
     cursor = conn.cursor()
     started_at = time.perf_counter()
+    parse_elapsed_sec = 0.0
 
     try:
         normalized_folder_path = os.path.normpath(folder_path)
@@ -541,11 +542,13 @@ def scan_and_save_audiobook_folder(folder_path, library_id=None):
                     'format': str(r['format'] or '')
                 }
 
+        parse_started_at = time.perf_counter()
         result = parse_audiobook_folder(
             folder_path,
             existing_track_cache=existing_track_cache,
             remote_fast_path=remote_fast_path
         )
+        parse_elapsed_sec = time.perf_counter() - parse_started_at
         if not result:
             return None
 
@@ -695,11 +698,37 @@ def scan_and_save_audiobook_folder(folder_path, library_id=None):
         conn.commit()
         elapsed_sec = time.perf_counter() - started_at
         elapsed_ms = int(elapsed_sec * 1000)
+        parse_elapsed_ms = int(parse_elapsed_sec * 1000)
+        db_elapsed_sec = max(0.0, elapsed_sec - parse_elapsed_sec)
+        db_elapsed_ms = int(db_elapsed_sec * 1000)
+
+        duration_resolution_mode = 'mixed'
+        if len(tracks) > 0 and duration_cache_hits == len(tracks) and metadata_duration_hits == 0 and file_probe_hits == 0:
+            duration_resolution_mode = 'cache_only'
+        elif file_probe_hits > 0 and metadata_duration_hits == 0 and duration_cache_hits == 0:
+            duration_resolution_mode = 'file_probe_only'
+        elif metadata_duration_hits > 0 and file_probe_hits == 0 and duration_cache_hits == 0:
+            duration_resolution_mode = 'metadata_only'
+        elif file_probe_hits > 0:
+            duration_resolution_mode = 'probe_mixed'
+        elif metadata_duration_hits > 0:
+            duration_resolution_mode = 'metadata_mixed'
+        elif duration_cache_hits > 0:
+            duration_resolution_mode = 'cache_mixed'
+
+        db_changed = (meta_updated + track_inserts + track_updates + track_deletes) > 0
+        db_change_mode = 'changed' if db_changed else 'unchanged'
+        scan_workload = 'cache_verify' if (duration_resolution_mode == 'cache_only' and not db_changed) else 'normal'
+
         print(
             "[AudiobookScanner][BOOK_PROCESSED] "
             f"audiobook_id={audiobook_id} "
             f"title={meta['title']} "
             f"tracks={len(tracks)} "
+            f"timing_scope=single_folder "
+            f"scan_workload={scan_workload} "
+            f"duration_resolution_mode={duration_resolution_mode} "
+            f"db_change_mode={db_change_mode} "
             f"remote_fast_path={remote_fast_path} "
             f"duration_cache_hits={duration_cache_hits} "
             f"metadata_track_duration_mode={metadata_track_duration_mode} "
@@ -711,6 +740,10 @@ def scan_and_save_audiobook_folder(folder_path, library_id=None):
             f"db_track_updated={track_updates} "
             f"db_track_deleted={track_deletes} "
             f"duration_sec={meta['total_duration']:.1f} "
+            f"parse_elapsed_sec={parse_elapsed_sec:.3f} "
+            f"parse_elapsed_ms={parse_elapsed_ms} "
+            f"db_elapsed_sec={db_elapsed_sec:.3f} "
+            f"db_elapsed_ms={db_elapsed_ms} "
             f"elapsed_sec={elapsed_sec:.3f} "
             f"elapsed_ms={elapsed_ms} "
             f"folder_path={meta['folder_path']}"

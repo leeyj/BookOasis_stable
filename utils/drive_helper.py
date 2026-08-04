@@ -6,6 +6,7 @@ MEDIA_SERVER_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 _REMOTE_FS_TYPES = ('fuse.rclone', 'rclone', 'cifs', 'nfs', 'nfs4', 'davfs', 'smbfs', 'fuse', 'sshfs')
+_RCLONE_VFS_FS_TYPES = ('fuse.rclone', 'rclone')
 
 
 def _decode_mount_token(token):
@@ -60,17 +61,27 @@ def _is_same_or_subpath(path, root):
         return path_norm == root_norm or path_norm.startswith(root_norm + os.sep)
 
 
-def _find_best_remote_mount_point(path):
-    """Find the longest matching remote mount point that contains path."""
+def _find_best_mount_point(path, fs_type_markers):
+    """Find the longest matching mount point that contains path for the given fs type markers."""
     best = ''
     for mount_point, fstype in _iter_mounts() or []:
         if mount_point == '/':
             continue
-        if not any(t in fstype for t in _REMOTE_FS_TYPES):
+        if not any(t in fstype for t in fs_type_markers):
             continue
         if _is_same_or_subpath(path, mount_point) and len(mount_point) > len(best):
             best = mount_point
     return best
+
+
+def _find_best_remote_mount_point(path):
+    """Find the longest matching generic remote/network mount point that contains path."""
+    return _find_best_mount_point(path, _REMOTE_FS_TYPES)
+
+
+def _find_best_rclone_mount_point(path):
+    """Find the longest matching rclone VFS mount point that contains path."""
+    return _find_best_mount_point(path, _RCLONE_VFS_FS_TYPES)
 
 import re
 import json
@@ -305,6 +316,32 @@ def is_remote_path(path):
 
     return False
 
+
+def is_rclone_vfs_path(path):
+    """
+    Return True only for paths that are likely backed by rclone VFS/RC refresh.
+    SMB/CIFS/NFS/NAS mounts are remote, but they are not valid rclone RC refresh targets.
+    """
+    if not path:
+        return False
+
+    if is_gdrive_url(path):
+        return False
+
+    path = os.path.abspath(path)
+    system = platform.system().lower()
+
+    if system in ('linux', 'darwin'):
+        try:
+            if _find_best_rclone_mount_point(path):
+                return True
+        except Exception as e:
+            print(f"[is_rclone_vfs_path] Linux mounts 체크 실패: {e}")
+
+    path_lower = path.lower()
+    rclone_keywords = ('gdrive', 'rclone', 'vfs', 'google_drive', 'onedrive', 'sharepoint', 'webdav')
+    return any(keyword in path_lower for keyword in rclone_keywords)
+
 def get_rclone_relative_path(path):
     """
     로컬 물리 경로(절대 경로)를 rclone이 내부적으로 인지하는 
@@ -325,7 +362,7 @@ def get_rclone_relative_path(path):
     # 2. Linux/Unix: /mnt/gdrive/Library/Fantasy -> Library/Fantasy
     elif system in ('linux', 'darwin'):
         try:
-            mount_point = _find_best_remote_mount_point(path)
+            mount_point = _find_best_rclone_mount_point(path)
         except Exception as e:
             print(f"[get_rclone_relative_path] Linux mounts 파싱 실패: {e}")
             mount_point = ''

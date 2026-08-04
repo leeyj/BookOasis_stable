@@ -1,6 +1,14 @@
 # CHANGELOG
+## v1.6.6
+- 카테고리 삭제불가 수정 | fix category deleted
+- (scanner/VFS) SMB/CIFS/NFS 마운트 경로를 rclone VFS 대상으로 오인해 RC refresh를 시도하던 문제 수정 | stop treating SMB/CIFS/NFS mounts as rclone VFS refresh targets
+- (category) 서버 재기동 시 경로 기반 자동 판별로 원격 드라이브 체크가 다시 켜지던 문제 수정 | preserve remote-drive checkbox across restarts without startup auto-overwrite
+- pixiv 플러그인 추가(develop by 유메미루) | add plugun(pixiv, develop by 유메미루)
+- 대시보드에서 오디오트렉 오기 수정 | fix audiobook dashboard track count
 ## v1.6.5
 - (긴급) 스캔시 is_remote 값 참조 무시되는 현상 수정 | (warning) fix error the scanner was is_remote() value
+- zip 파일 로딩 로직 최적화 | tune processing zip loaded
+
 ## v1.6.4
 - (security/policy) 상세 딥링크 새 탭 차단 정책을 해제하고 탭/세션 조건 없이 `#detail?...` 주소 복원을 허용 | remove new-tab detail deep-link blocking policy and always allow `#detail?...` restoration regardless of tab/session state
 

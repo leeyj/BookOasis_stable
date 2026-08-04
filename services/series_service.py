@@ -73,6 +73,9 @@ def _build_series_entries(db_type, rows):
         genre = next((b['genre'] for b in books if b['genre']), '')
         tags = next((b['tags'] for b in books if b['tags']), '')
         series_alias = next((b['series_alias'] for b in books if b.get('series_alias')), '')
+        total_tracks = 0
+        if db_type == 'audiobook':
+            total_tracks = max((int(b.get('total_tracks') or 0) for b in books), default=0)
         series_key = hashlib.md5(f"{lib_id}|{series_name}|{comp_dir}".encode('utf-8')).hexdigest()[:16]
 
         entries.append({
@@ -83,6 +86,7 @@ def _build_series_entries(db_type, rows):
             'representative_title': representative.get('title_alias') or representative['title'] or '',
             'author': author,
             'book_count': len(books),
+            'total_tracks': total_tracks,
             'cover_image': get_cover_image_with_t(final_cover, updated_at),
             'is_favorite': any_favorite,
             'metadata_locked': any_locked,

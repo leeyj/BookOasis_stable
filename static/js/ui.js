@@ -118,10 +118,13 @@ export function createBookCard(item, options = {}) {
   card.className = 'book-card';
   card.dataset.bookId = item.id || item.representative_book_id || '';
 
-  const isAudiobook = (item.file_format === 'audiobook') || 
-                      (typeof state !== 'undefined' && state && state.currentLibraryType === 'audiobook') || 
-                      item.total_tracks !== undefined || 
-                      item.audiobook_id !== undefined;
+  const fmt = String(item.file_format || '').toLowerCase();
+  const hasTrackCount = Number(item.total_tracks || 0) > 0;
+  const isAudiobook = (
+    ['audiobook', 'audio', 'mp3', 'm4a', 'm4b', 'flac', 'aac', 'wav', 'ogg', 'opus'].includes(fmt) ||
+    hasTrackCount ||
+    item.audiobook_id !== undefined
+  );
   const coverFormat = isAudiobook ? 'audiobook' : item.file_format;
 
   const rawSeriesName = String(item.series_name || '').trim();

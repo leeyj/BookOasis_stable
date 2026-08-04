@@ -1,14 +1,14 @@
 // api.js – 서버와 통신하는 함수들
 export async function fetchLibraries(type) {
-  const res = await fetch(`/api/media/libraries?type=${type}`);
+  const res = await fetch(`/api/media/libraries?type=${type}&_=${Date.now()}`, {cache: 'no-store'});
   return res.json();
 }
 
 export async function fetchBooksList({type, libraryId, page, limit, append, search, sort}) {
   const searchQuery = search ? `&search=${encodeURIComponent(search)}` : '';
   const sortQuery = sort ? `&sort=${sort}` : '';
-  const url = `/api/media/list?type=${type}&library_id=${libraryId}&page=${page}&limit=${limit}${searchQuery}${sortQuery}`;
-  const res = await fetch(url);
+  const url = `/api/media/list?type=${type}&library_id=${libraryId}&page=${page}&limit=${limit}${searchQuery}${sortQuery}&_=${Date.now()}`;
+  const res = await fetch(url, {cache: 'no-store'});
   return res.json();
 }
 
@@ -19,7 +19,7 @@ export async function fetchAllBooksList(type, libraryId) {
 }
 
 export async function fetchReadingHistory(type) {
-  const res = await fetch(`/api/media/history?type=${type}`);
+  const res = await fetch(`/api/media/history?type=${type}&_=${Date.now()}`, {cache: 'no-store'});
   return res.json();
 }
 
@@ -28,7 +28,8 @@ export async function fetchMediaDetail(type, libraryId, series, representativeBo
   if (representativeBookId) {
     url += `&representative_book_id=${encodeURIComponent(representativeBookId)}`;
   }
-  const res = await fetch(url);
+  url += `&_=${Date.now()}`;
+  const res = await fetch(url, {cache: 'no-store'});
   return res.json();
 }
 

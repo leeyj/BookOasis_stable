@@ -8,6 +8,8 @@ let sleepMinutes = 0;
 const audioSpeeds = [1.0, 1.25, 1.5, 1.75, 2.0, 0.75];
 const sleepOptions = [0, 15, 30, 45, 60];
 let currentSleepIndex = 0;
+let lastObservedProgressKey = '';
+let lastFlushedProgressKey = '';
 
 export async function openAudioPlayer(audiobookId, trackIdOrTitle = null, startTime = 0) {
   try {
@@ -86,6 +88,8 @@ export function openAudioPlayerModal(audioData, targetTrackId = null, startTime 
 
   modal.style.display = 'block';
   document.body.style.overflow = 'hidden';
+  lastObservedProgressKey = '';
+  lastFlushedProgressKey = '';
 
   if (!audioInstance) {
     audioInstance = new Audio();
@@ -129,6 +133,13 @@ function initAudioEvents() {
     if (seekbar && dur > 0 && !seekbar.dataset.isDragging) {
       seekbar.value = (cur / dur) * 100;
     }
+
+    scheduleProgressSnapshot();
+  };
+
+  audioInstance.onpause = () => {
+    if (!audioInstance || audioInstance.ended) return;
+    saveProgress(false, { useBeacon: true, force: true });
   };
 
   audioInstance.onended = () => {
@@ -185,6 +196,7 @@ export function toggleAudioPlay(forcePlay = null) {
 export function playPrevTrack() {
   if (!currentAudiobookData || !currentAudiobookData.tracks) return;
   if (currentTrackIndex > 0) {
+    saveProgress(false, { useBeacon: false, force: true });
     currentTrackIndex--;
     openAudioPlayerModal(currentAudiobookData, currentAudiobookData.tracks[currentTrackIndex].id, 0);
   } else {
@@ -195,6 +207,7 @@ export function playPrevTrack() {
 export function playNextTrack() {
   if (!currentAudiobookData || !currentAudiobookData.tracks) return;
   if (currentTrackIndex < currentAudiobookData.tracks.length - 1) {
+    saveProgress(false, { useBeacon: false, force: true });
     currentTrackIndex++;
     openAudioPlayerModal(currentAudiobookData, currentAudiobookData.tracks[currentTrackIndex].id, 0);
   }
@@ -203,6 +216,7 @@ export function playNextTrack() {
 export function audioPlayerSkip(seconds = 15) {
   if (!audioInstance) return;
   audioInstance.currentTime = Math.max(0, Math.min(audioInstance.duration || 0, audioInstance.currentTime + seconds));
+  scheduleProgressSnapshot();
 }
 
 export function cycleAudioSpeed() {
@@ -308,21 +322,68 @@ export function cycleSleepTimer() {
 }
 
 function saveProgress(isCompleted = false) {
+  return saveProgressInternal(isCompleted, { useBeacon: false, force: false });
+}
+
+function scheduleProgressSnapshot() {
+  const payload = buildProgressPayload(false);
+  if (!payload) return;
+  const progressKey = buildProgressKey(payload);
+  lastObservedProgressKey = progressKey;
+}
+
+function buildProgressPayload(isCompleted = false) {
   if (!currentAudiobookData || !currentAudiobookData.meta || !audioInstance) return;
   const meta = currentAudiobookData.meta;
   const tracks = currentAudiobookData.tracks || [];
   const track = tracks[currentTrackIndex];
   if (!track) return;
 
-  fetch(`/api/media/audiobooks/${meta.id}/progress`, {
+  return {
+    current_track_id: track.id,
+    current_time: audioInstance.currentTime || 0,
+    playback_rate: audioSpeeds[currentAudioSpeedIndex],
+    is_completed: isCompleted
+  };
+}
+
+function buildProgressKey(payload) {
+  const seconds = Math.floor(Number(payload.current_time || 0));
+  return [payload.current_track_id, seconds, payload.playback_rate, payload.is_completed ? 1 : 0].join(':');
+}
+
+function saveProgressInternal(isCompleted = false, options = {}) {
+  const payload = buildProgressPayload(isCompleted);
+  if (!payload) return Promise.resolve(null);
+
+  const { useBeacon = false, force = false } = options;
+  const progressKey = buildProgressKey(payload);
+  if (!force && progressKey === lastFlushedProgressKey) {
+    return Promise.resolve(true);
+  }
+  lastObservedProgressKey = progressKey;
+  lastFlushedProgressKey = progressKey;
+
+  const meta = currentAudiobookData.meta;
+  const url = `/api/media/audiobooks/${meta.id}/progress`;
+
+  if (useBeacon && typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+    try {
+      const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+      const sent = navigator.sendBeacon(url, blob);
+      if (sent) {
+        return Promise.resolve(true);
+      }
+    } catch (e) {
+      console.warn('[AudioPlayer] Progress beacon failed, falling back to fetch:', e);
+    }
+  }
+
+  return fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      current_track_id: track.id,
-      current_time: audioInstance.currentTime || 0,
-      playback_rate: audioSpeeds[currentAudioSpeedIndex],
-      is_completed: isCompleted
-    })
+    body: JSON.stringify(payload),
+    keepalive: true
   }).catch(e => console.warn('[AudioPlayer] Progress save failed:', e));
 }
 
@@ -412,3 +473,23 @@ window.selectChapterTrack = selectChapterTrack;
 window.toggleVolumePopover = toggleVolumePopover;
 window.setAudioVolume = setAudioVolume;
 window.cycleSleepTimer = cycleSleepTimer;
+
+function flushAudioProgressForLifecycle(useBeacon = false) {
+  const modal = document.getElementById('audio-player-modal');
+  if (!modal || modal.style.display !== 'block') return;
+  saveProgressInternal(false, { useBeacon, force: true });
+}
+
+window.addEventListener('pagehide', () => {
+  flushAudioProgressForLifecycle(true);
+});
+
+window.addEventListener('beforeunload', () => {
+  flushAudioProgressForLifecycle(true);
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    flushAudioProgressForLifecycle(true);
+  }
+});

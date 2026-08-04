@@ -31,8 +31,9 @@ export function openReader(bookId, format, title, pagesRead, totalPages) {
   const audioFormats = ['mp3', 'm4b', 'm4a', 'flac', 'aac', 'wav', 'ogg', 'opus', 'audiobook'];
   if (audioFormats.includes(fmt) || state.currentLibraryType === 'audiobook') {
     if (typeof window.openAudioPlayer === 'function') {
-      const audiobookId = (state.detailMeta && state.detailMeta.id) ? state.detailMeta.id : bookId;
-      window.openAudioPlayer(audiobookId, bookId, pagesRead);
+      // 오디오북 공통 진입점에서는 전달받은 bookId를 작품 ID로 취급한다.
+      // (트랙 단위 재생 진입은 상세/이어보기에서 openAudioPlayer를 직접 호출)
+      window.openAudioPlayer(bookId, null, pagesRead);
       return;
     }
   }

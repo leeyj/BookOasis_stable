@@ -336,7 +336,7 @@ def run_scanner_worker_loop():
                 try:
                     from utils.redis_helper import redis_delete_pattern
                     target_db = kwargs.get('db_type', 'general')
-                    redis_delete_pattern(f"cache:recent_added:{target_db}:*")
+                    redis_delete_pattern(f"cache:recent_added*:{target_db}:*")
                 except Exception as cache_err:
                     sq.log(f"Failed to invalidate recently_added cache: {cache_err}")
 

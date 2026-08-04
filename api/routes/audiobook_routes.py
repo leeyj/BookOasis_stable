@@ -9,6 +9,11 @@ from flask import Blueprint, request, Response, jsonify, session
 from api.auth import login_required
 import database
 
+try:
+    import requests
+except Exception:
+    requests = None
+
 audiobook_bp = Blueprint('audiobook_api', __name__)
 
 def _send_audio_range_response(file_path):
@@ -78,8 +83,14 @@ def get_audiobook_cover(aid):
     if row and row['poster']:
         poster_path = row['poster']
         if poster_path.startswith(('http://', 'https://')):
-            from flask import redirect
-            return redirect(poster_path)
+            if requests is not None:
+                try:
+                    remote_res = requests.get(poster_path, timeout=5)
+                    if remote_res.ok and remote_res.content:
+                        remote_type = remote_res.headers.get('Content-Type', '').split(';')[0].strip() or 'image/jpeg'
+                        return Response(remote_res.content, mimetype=remote_type)
+                except Exception:
+                    pass
         if os.path.exists(poster_path):
             ext = os.path.splitext(poster_path)[1].lstrip('.').lower()
             mimetype = 'image/jpeg' if ext in ('jpg', 'jpeg') else f'image/{ext}'
@@ -115,7 +126,14 @@ def audiobook_progress_api(aid):
     cursor = conn.cursor()
 
     if request.method == 'POST':
-        data = request.get_json(silent=True) or {}
+        data = request.get_json(force=True, silent=True)
+        if not data and request.data:
+            try:
+                import json as _json
+                data = _json.loads(request.data.decode('utf-8'))
+            except Exception:
+                data = {}
+        data = data or {}
         track_id = data.get('current_track_id')
         current_time = float(data.get('current_time', 0.0))
         playback_rate = float(data.get('playback_rate', 1.0))
@@ -138,6 +156,14 @@ def audiobook_progress_api(aid):
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             """, (aid, user_id, track_id, current_time, total_pct, playback_rate, is_completed))
             conn.commit()
+
+            # 최근 읽은 도서 캐시를 즉시 무효화하여 대시보드 반영 지연(최대 1시간)을 방지
+            try:
+                from utils.redis_helper import redis_delete_pattern
+                redis_delete_pattern(f"cache:history*:{'audiobook'}:{user_id}")
+            except Exception:
+                pass
+
             return jsonify({'success': True})
         except Exception as e:
             conn.rollback()

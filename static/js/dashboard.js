@@ -30,7 +30,13 @@ export async function loadDashboardData() {
     if (historyData.success) {
       let books = historyData.books || [];
       if (state.hideCompletedInHistory) {
-        books = books.filter(b => !(b.is_completed === 1 || (b.total_pages > 0 && b.pages_read >= b.total_pages)));
+        books = books.filter(b => {
+          const fmt = String(b.file_format || '').toLowerCase();
+          const isAudiobook = fmt === 'audiobook' || fmt === 'audio';
+          return isAudiobook
+            ? (b.is_completed !== 1)
+            : !(b.is_completed === 1 || (b.total_pages > 0 && b.pages_read >= b.total_pages));
+        });
       }
       renderDashboardHistory(books);
 
@@ -39,7 +45,7 @@ export async function loadDashboardData() {
     }
 
     // 2. 신규 추가 도서 조회
-    const newRes = await fetch(`/api/media/recently-added?type=${state.currentLibraryType}`);
+    const newRes = await fetch(`/api/media/recently-added?type=${state.currentLibraryType}&_=${Date.now()}`, {cache: 'no-store'});
     const newData = await newRes.json();
     if (newData.success) {
       renderDashboardRecentlyAdded(newData.books);

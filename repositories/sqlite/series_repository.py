@@ -39,10 +39,11 @@ class SeriesRepository:
             sql = f"""
                 SELECT a.id, a.title AS series_name, '' AS series_alias, a.title, '' AS title_alias,
                        a.author, a.folder_path AS file_path, 'audiobook' AS file_format,
-                       CASE WHEN a.poster LIKE 'http%' THEN a.poster ELSE '/api/media/audiobooks/' || a.id || '/cover' END AS cover_image,
+                      '/api/media/audiobooks/' || a.id || '/cover' AS cover_image,
                        a.updated_at AS cover_updated_at,
                        COALESCE(a.is_favorite, 0) AS is_favorite,
-                       a.created_at, '' AS genre, '' AS tags, a.library_id, 0 AS metadata_locked
+                       a.created_at, '' AS genre, '' AS tags, a.library_id, 0 AS metadata_locked,
+                       COALESCE(a.total_tracks, 0) AS total_tracks
                 FROM audiobooks a
                 WHERE {' AND '.join(where)}
                 ORDER BY a.library_id ASC, a.title ASC, a.id ASC

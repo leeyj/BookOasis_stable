@@ -215,7 +215,7 @@ class ReadingProgressRepository:
         if db_type == 'audiobook':
             cursor.execute("""
                 SELECT a.id, a.library_id, a.title, '' AS title_alias, a.title AS series_name, '' AS series_alias,
-                       CASE WHEN a.poster LIKE 'http%' THEN a.poster ELSE '/api/media/audiobooks/' || a.id || '/cover' END AS cover_image,
+                       '/api/media/audiobooks/' || a.id || '/cover' AS cover_image,
                        a.updated_at AS cover_updated_at, 'audiobook' AS file_format,
                        COALESCE(p.current_time, 0) AS pages_read, a.total_tracks AS total_pages, a.total_tracks AS total_tracks,
                        COALESCE(a.is_favorite, 0) AS is_favorite, COALESCE(p.is_completed, 0) AS is_completed,
@@ -294,7 +294,7 @@ class ReadingProgressRepository:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT a.id, a.library_id, a.title, '' AS title_alias, a.title AS series_name, '' AS series_alias,
-                       CASE WHEN a.poster LIKE 'http%' THEN a.poster ELSE '/api/media/audiobooks/' || a.id || '/cover' END AS cover_image,
+                       '/api/media/audiobooks/' || a.id || '/cover' AS cover_image,
                        a.updated_at AS cover_updated_at, 'audiobook' AS file_format, a.total_tracks AS total_pages, a.total_tracks AS total_tracks, a.created_at,
                        COALESCE(a.is_favorite, 0) AS is_favorite, 0 AS metadata_locked
                 FROM audiobooks a
@@ -339,7 +339,7 @@ class ReadingProgressRepository:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT a.id, a.library_id, a.title, '' AS title_alias, a.title AS series_name, '' AS series_alias,
-                       CASE WHEN a.poster LIKE 'http%' THEN a.poster ELSE '/api/media/audiobooks/' || a.id || '/cover' END AS cover_image,
+                       '/api/media/audiobooks/' || a.id || '/cover' AS cover_image,
                        a.updated_at AS cover_updated_at, 'audiobook' AS file_format, a.total_tracks AS total_pages, a.total_tracks AS total_tracks, a.created_at,
                        COALESCE(a.is_favorite, 0) AS is_favorite, 0 AS metadata_locked
                 FROM audiobooks a

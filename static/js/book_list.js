@@ -169,7 +169,11 @@ export async function loadReadingHistory() {
       let books = data.books || [];
       if (state.hideCompletedInHistory) {
         books = books.filter(b => {
-          const isCompleted = (b.is_completed === 1 || (b.total_pages > 0 && b.pages_read >= b.total_pages));
+          const fmt = String(b.file_format || '').toLowerCase();
+          const isAudiobook = fmt === 'audiobook' || fmt === 'audio';
+          const isCompleted = isAudiobook
+            ? (b.is_completed === 1)
+            : (b.is_completed === 1 || (b.total_pages > 0 && b.pages_read >= b.total_pages));
           const hasUnfinishedSiblings = Number(b.has_unfinished_siblings || 0) === 1;
           return !isCompleted || hasUnfinishedSiblings;
         });
@@ -352,6 +356,15 @@ export async function resumeSeries(e, seriesName, libraryId, representativeBookI
       // 3. 만약 모든 책을 다 완독했거나 없다면 시리즈 내의 첫 번째 도서
       if (!targetBook) {
         targetBook = data.books[0];
+      }
+
+      // 오디오북은 상세 API가 트랙 목록을 반환하므로,
+      // 트랙 ID와 작품 ID를 분리해서 플레이어를 직접 연다.
+      if (state.currentLibraryType === 'audiobook' && typeof window.openAudioPlayer === 'function') {
+        const resolvedAudiobookId = (data.meta && data.meta.id) ? data.meta.id : (targetBook.audiobook_id || representativeBookId || targetBook.id);
+        const startTime = Number(targetBook.pages_read) || 0;
+        window.openAudioPlayer(resolvedAudiobookId, targetBook.id, startTime);
+        return;
       }
       
       console.log(`[Resume-Series] 이어보기 도서 선정 성공: ${targetBook.title} (ID: ${targetBook.id}, p.${targetBook.pages_read})`);
