@@ -494,6 +494,7 @@ def init_databases():
         library_id INTEGER REFERENCES libraries(id),
         title TEXT NOT NULL,
         sort_title TEXT,
+        web_id TEXT,
         author TEXT,
         publisher TEXT,
         code TEXT,

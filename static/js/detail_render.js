@@ -253,6 +253,10 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
   const shouldShowSummaryToggle = String(summaryText).length > 260 || summaryLineBreaks >= 5;
   const summaryToggleLabelMore = i18n.t('detail.summary_more') || '더보기';
   const summaryToggleLabelLess = i18n.t('detail.summary_less') || '접기';
+  const isAudiobookContext = state.currentLibraryType === 'audiobook';
+  const identifierLabel = 'ISBN(WEB_ID)';
+  const identifierValue = isAudiobookContext ? (meta.web_id || '-') : (meta.isbn || '-');
+  const identifierEditValue = isAudiobookContext ? (meta.web_id || '') : (meta.isbn || '');
   const detailLockedBadgeHtml = isLocked ? `
     <div class="book-card-locked-badge" title="메타데이터 잠김 (수동 편집됨)" style="position: absolute; bottom: 8px; left: 8px; z-index: 5; background: rgba(0, 0, 0, 0.65); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.4); width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.4); backdrop-filter: blur(2px);">
       <i class="fa-solid fa-lock" style="font-size: 0.7rem;"></i>
@@ -297,7 +301,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
         <div class="detail-meta">
           <span class="badge">${meta.series_alias || visibleTitle}</span>
           <span class="meta-item"><i class="fa-solid fa-pen-nib"></i> ${meta.author || '-'}</span>
-          <span class="meta-item"><i class="fa-solid fa-barcode"></i> ${meta.isbn || '-'}</span>
+          <span class="meta-item"><i class="fa-solid fa-barcode"></i> ${identifierLabel}: ${identifierValue}</span>
           <span class="meta-item"><i class="fa-solid fa-building"></i> ${meta.publisher || '-'}</span>
           <span class="meta-item"><i class="fa-solid fa-book-open"></i> ${books.length}권</span>
         </div>
@@ -339,8 +343,8 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
             <input type="text" id="edit-author-input" class="edit-meta-input" value="${meta.author === '-' ? '' : meta.author}">
           </div>
           <div class="edit-meta-row-item">
-            <label>ISBN</label>
-            <input type="text" id="edit-isbn-input" class="edit-meta-input" value="${meta.isbn || ''}">
+            <label>${identifierLabel}</label>
+            <input type="text" id="edit-isbn-input" class="edit-meta-input" value="${identifierEditValue}">
           </div>
           <div class="edit-meta-row-item">
             <label>${i18n.t('detail.label_publisher')}</label>

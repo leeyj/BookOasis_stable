@@ -316,11 +316,22 @@ export async function submitLibraryForm(event) {
       submitBtn.innerText = i18n.t('category.processing');
     }
 
-    let result;
-    if (isEdit) {
-      result = await api.editLibrary(formData);
-    } else {
-      result = await api.addLibrary(formData);
+    const submitRequest = async (payload) => {
+      if (isEdit) {
+        return api.editLibrary(payload);
+      }
+      return api.addLibrary(payload);
+    };
+
+    let result = await submitRequest(formData);
+
+    if (result && result.needs_confirmation) {
+      const confirmMsg = result.confirm_message || result.error || i18n.t('category.save_error', {error: ''});
+      if (!confirm(confirmMsg)) {
+        return;
+      }
+      formData.set('confirm_media_mismatch', '1');
+      result = await submitRequest(formData);
     }
 
     if (result.success) {

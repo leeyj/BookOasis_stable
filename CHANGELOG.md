@@ -1,8 +1,16 @@
 # CHANGELOG
+## v1.6.7
+- 도서/오디오북 경로 불일치 등록시 경고 후 확인 추가 | add warning confirm on mismatched book/audiobook path registration
+- 오디오 쿼리 레포지토리 분리 | extract audiobook queries into repository layer
+- 장르별 ISBN/WEB_ID 저장 및 수정 추가 | add ISBN/WEB_ID save and edit by media type
+
 ## v1.6.6
 - 카테고리 삭제불가 수정 | fix category deleted
 - (scanner/VFS) SMB/CIFS/NFS 마운트 경로를 rclone VFS 대상으로 오인해 RC refresh를 시도하던 문제 수정 | stop treating SMB/CIFS/NFS mounts as rclone VFS refresh targets
 - (category) 서버 재기동 시 경로 기반 자동 판별로 원격 드라이브 체크가 다시 켜지던 문제 수정 | preserve remote-drive checkbox across restarts without startup auto-overwrite
+- (category) 카테고리 타입과 실제 미디어 경로가 어긋날 때 즉시 차단 대신 경고 후 사용자 확인을 거치도록 조정 | replace hard block with warning-and-confirm flow for obvious category/media path mismatches
+- (audiobook) 메타파일 없이 단일 `.m4a` 트랙만 있는 폴더도 오디오북 파서가 인식하도록 회귀 테스트 보강 | add regression coverage for metadata-free single `.m4a` audiobook folder detection
+- (refactor/audiobook) 오디오북 상세 조회 및 메타 수정 SQL을 서비스에서 분리해 `repositories/sqlite/audiobook_repository.py`로 이관 | extract audiobook detail/update SQL from service layer into `repositories/sqlite/audiobook_repository.py`
 - pixiv 플러그인 추가(develop by 유메미루) | add plugun(pixiv, develop by 유메미루)
 - 대시보드에서 오디오트렉 오기 수정 | fix audiobook dashboard track count
 ## v1.6.5

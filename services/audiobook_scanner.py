@@ -264,6 +264,7 @@ def parse_audiobook_folder(folder_path, existing_track_cache=None, remote_fast_p
         'author': '',
         'publisher': '',
         'code': '',
+        'web_id': '',
         'poster': '',
         'premiered': '',
         'ratings': 0.0,
@@ -287,6 +288,7 @@ def parse_audiobook_folder(folder_path, existing_track_cache=None, remote_fast_p
                 meta['description'] = str(data.get('description', '')).strip()
                 meta['premiered'] = str(data.get('publishedDate', '') or data.get('publishedYear', '')).strip()
                 meta['isbn'] = str(data.get('isbn', '')).strip()
+                meta['web_id'] = str(data.get('web_id', '')).strip()
 
                 authors_list = data.get('authors', [])
                 narrators_list = data.get('narrators', [])
@@ -320,6 +322,7 @@ def parse_audiobook_folder(folder_path, existing_track_cache=None, remote_fast_p
                 meta['author'] = str(json_data.get('author', '')).strip()
                 meta['publisher'] = str(json_data.get('publisher', '')).strip()
                 meta['code'] = str(json_data.get('code', '')).strip()
+                meta['web_id'] = str(json_data.get('web_id', '')).strip()
                 meta['poster'] = str(json_data.get('poster', '')).strip()
                 meta['premiered'] = str(json_data.get('premiered', '')).strip()
                 meta['author_intro'] = str(json_data.get('author_intro', '')).strip()
@@ -491,7 +494,7 @@ def scan_and_save_audiobook_folder(folder_path, library_id=None):
         # 기존 오디오북 확인
         cursor.execute(
             """
-            SELECT id, library_id, title, author, publisher, code, poster,
+            SELECT id, library_id, title, web_id, author, publisher, code, poster,
                    premiered, ratings, author_intro, description,
                    folder_name, total_duration, total_tracks, file_type
             FROM audiobooks
@@ -562,13 +565,13 @@ def scan_and_save_audiobook_folder(folder_path, library_id=None):
 
         if row:
             existing_meta = (
-                row['library_id'], row['title'], row['author'], row['publisher'],
+                row['library_id'], row['title'], row['web_id'], row['author'], row['publisher'],
                 row['code'], row['poster'], row['premiered'], float(row['ratings'] or 0.0),
                 row['author_intro'], row['description'], row['folder_name'],
                 float(row['total_duration'] or 0.0), int(row['total_tracks'] or 0), row['file_type']
             )
             incoming_meta = (
-                library_id, meta['title'], meta['author'], meta['publisher'],
+                library_id, meta['title'], meta['web_id'], meta['author'], meta['publisher'],
                 meta['code'], meta['poster'], meta['premiered'], float(meta['ratings'] or 0.0),
                 meta['author_intro'], meta['description'], meta['folder_name'],
                 float(meta['total_duration'] or 0.0), int(meta['total_tracks'] or 0), meta['file_type']
@@ -578,6 +581,7 @@ def scan_and_save_audiobook_folder(folder_path, library_id=None):
                     UPDATE audiobooks SET
                         library_id = ?,
                         title = ?,
+                        web_id = ?,
                         author = ?,
                         publisher = ?,
                         code = ?,
@@ -593,7 +597,7 @@ def scan_and_save_audiobook_folder(folder_path, library_id=None):
                         updated_at = CURRENT_TIMESTAMP
                     WHERE id = ?
                 """, (
-                    library_id, meta['title'], meta['author'], meta['publisher'],
+                    library_id, meta['title'], meta['web_id'], meta['author'], meta['publisher'],
                     meta['code'], meta['poster'], meta['premiered'], meta['ratings'],
                     meta['author_intro'], meta['description'], meta['folder_name'],
                     meta['total_duration'], meta['total_tracks'], meta['file_type'],
@@ -603,12 +607,12 @@ def scan_and_save_audiobook_folder(folder_path, library_id=None):
         else:
             cursor.execute("""
                 INSERT INTO audiobooks (
-                    library_id, title, author, publisher, code, poster,
+                    library_id, title, web_id, author, publisher, code, poster,
                     premiered, ratings, author_intro, description,
                     folder_name, folder_path, total_duration, total_tracks, file_type
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                library_id, meta['title'], meta['author'], meta['publisher'],
+                library_id, meta['title'], meta['web_id'], meta['author'], meta['publisher'],
                 meta['code'], meta['poster'], meta['premiered'], meta['ratings'],
                 meta['author_intro'], meta['description'], meta['folder_name'],
                 meta['folder_path'], meta['total_duration'], meta['total_tracks'],

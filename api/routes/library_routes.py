@@ -10,7 +10,7 @@ from services.category_service import CategoryService, apply_running_scan_status
 from services.scheduler_service import run_scan_job, SchedulerService
 from api.auth import admin_required
 from utils.i18n import _t
-from api.helpers.validation import validate_library_paths, parse_remote_flag, normalize_rclone_url
+from api.helpers.validation import validate_library_paths, validate_library_media_compatibility, detect_library_media_mismatch, parse_remote_flag, normalize_rclone_url
 from repositories.category_repository import CategoryRepository
 import database
 
@@ -37,6 +37,16 @@ def add_media_library():
     target_paths, error = validate_library_paths(physical_path, category_type)
     if error:
         return jsonify({'success': False, 'error': error}), 400
+    mismatch = detect_library_media_mismatch(db_type, target_paths)
+    confirm_override = request.form.get('confirm_media_mismatch', '0') in ('1', 'true', 'True', 'on')
+    if mismatch and not confirm_override:
+        return jsonify({
+            'success': False,
+            'error': mismatch['message'],
+            'needs_confirmation': True,
+            'confirm_message': mismatch['confirm_message'],
+            'mismatch_kind': mismatch['kind']
+        }), 409
     
     if not name:
         return jsonify({'success': False, 'error': _t('api.err_name_required')}), 400
@@ -83,6 +93,16 @@ def edit_media_library():
     target_paths, error = validate_library_paths(physical_path, category_type)
     if error:
         return jsonify({'success': False, 'error': error}), 400
+    mismatch = detect_library_media_mismatch(db_type, target_paths)
+    confirm_override = request.form.get('confirm_media_mismatch', '0') in ('1', 'true', 'True', 'on')
+    if mismatch and not confirm_override:
+        return jsonify({
+            'success': False,
+            'error': mismatch['message'],
+            'needs_confirmation': True,
+            'confirm_message': mismatch['confirm_message'],
+            'mismatch_kind': mismatch['kind']
+        }), 409
     
     if not library_id or not name:
         return jsonify({'success': False, 'error': '필수 매개변수가 누락되었습니다.'}), 400

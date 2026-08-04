@@ -11,6 +11,7 @@ if DBMS == "postgres" or DBMS == "postgresql":
     # 향후 postgres 폴더 구조를 갖출 때 임포트할 예비 레이어
     # 현재는 sqlite 버전을 폴백으로 반환
     from repositories.sqlite import (
+        audiobook_repository,
         book_offset_repository,
         book_repository,
         book_scan_repository,
@@ -29,6 +30,7 @@ if DBMS == "postgres" or DBMS == "postgresql":
     )
 else:
     from repositories.sqlite import (
+        audiobook_repository,
         book_offset_repository,
         book_repository,
         book_scan_repository,
@@ -47,6 +49,7 @@ else:
     )
 
 # 하위 호환성을 위해 sys.modules에 매핑하여 기존 'from repositories.xxx_repository import ...' 임포트 완벽 지원
+sys.modules['repositories.audiobook_repository'] = audiobook_repository
 sys.modules['repositories.book_offset_repository'] = book_offset_repository
 sys.modules['repositories.book_repository'] = book_repository
 sys.modules['repositories.book_scan_repository'] = book_scan_repository
@@ -64,6 +67,7 @@ sys.modules['repositories.trash_repository'] = trash_repository
 sys.modules['repositories.user_repository'] = user_repository
 
 # 직속 임포트 노출 지원 (from repositories import BookRepository)
+AudiobookRepository = audiobook_repository.AudiobookRepository
 BookOffsetRepository = book_offset_repository.BookOffsetRepository
 BookRepository = book_repository.BookRepository
 BookScanRepository = book_scan_repository.BookScanRepository

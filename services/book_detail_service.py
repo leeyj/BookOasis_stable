@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 # pyrefly: ignore [missing-import]
+from repositories.audiobook_repository import AudiobookRepository
 from repositories.book_repository import BookRepository 
 from utils.sort_helper import natural_sort_key
 from utils.cover_helper import get_cover_image_with_t, resolve_series_cover
@@ -9,47 +10,39 @@ class BookDetailService:
     @staticmethod
     def get_media_detail(db_type, series_name, library_id='all', user_id=1, role=None, restrict_same_directory=True, representative_book_id=None):
         if db_type == 'audiobook':
-            import database
-            conn = database.get_connection('audiobook')
-            cursor = conn.cursor()
-            
             audiobook_row = None
             if representative_book_id:
                 try:
-                    cursor.execute("SELECT * FROM audiobooks WHERE id = ? AND COALESCE(is_deleted, 0) = 0", (int(representative_book_id),))
-                    audiobook_row = cursor.fetchone()
+                    audiobook_row = AudiobookRepository.get_audiobook_by_id(int(representative_book_id))
                 except Exception:
                     pass
             
             if not audiobook_row and series_name:
-                cursor.execute("SELECT * FROM audiobooks WHERE (title = ? OR folder_name = ?) AND COALESCE(is_deleted, 0) = 0", (series_name, series_name))
-                audiobook_row = cursor.fetchone()
+                audiobook_row = AudiobookRepository.get_audiobook_by_series_or_folder_name(series_name)
 
             if not audiobook_row:
-                cursor.execute("SELECT * FROM audiobooks WHERE COALESCE(is_deleted, 0) = 0 ORDER BY id ASC LIMIT 1")
-                audiobook_row = cursor.fetchone()
+                audiobook_row = AudiobookRepository.get_first_audiobook()
 
             if not audiobook_row:
-                conn.close()
                 return {'series_name': series_name, 'author': '-', 'publisher': '-', 'summary': '등록된 오디오북이 없습니다.', 'cover_image': ''}, []
 
             aid = audiobook_row['id']
             
             # 사용자 진행도
-            cursor.execute("SELECT * FROM audiobook_progress WHERE audiobook_id = ? AND user_id = ?", (aid, user_id))
-            prog_row = cursor.fetchone()
+            prog_row = AudiobookRepository.get_audiobook_progress(aid, user_id)
             current_track_id = prog_row['current_track_id'] if prog_row else None
             current_time = prog_row['current_time'] if prog_row else 0.0
 
             # 트랙 목록
-            cursor.execute("SELECT * FROM audiobook_tracks WHERE audiobook_id = ? ORDER BY track_number ASC", (aid,))
-            track_rows = cursor.fetchall()
+            track_rows = AudiobookRepository.get_audiobook_tracks(aid)
 
             meta = {
                 'id': aid,
                 'series_name': audiobook_row['title'],
                 'series_alias': '',
                 'author': audiobook_row['author'] or '-',
+                'isbn': '',
+                'web_id': audiobook_row['web_id'] or '',
                 'publisher': audiobook_row['publisher'] or '-',
                 'code': audiobook_row['code'] or '',
                 'ratings': audiobook_row['ratings'] or 0.0,
@@ -88,7 +81,6 @@ class BookDetailService:
                     'is_favorite': meta['is_favorite'],
                 })
 
-            conn.close()
             return meta, books_list
 
         enforce_permission = (role != 'admin' and bool(user_id))
@@ -184,6 +176,7 @@ class BookDetailService:
             'series_alias': _val(meta_row, 'series_alias', ''),
             'author'   : _val(meta_row, 'author',    '-'),
             'isbn'     : _val(meta_row, 'isbn',      ''),
+            'web_id'   : '',
             'publisher': _val(meta_row, 'publisher', '-'),
             'link'     : _val(meta_row, 'link',       ''),
             'score'    : _val(meta_row, 'score',       0),
@@ -239,6 +232,25 @@ class BookDetailService:
     @staticmethod
     def update_media_detail(db_type, series_name, author, isbn, publisher, summary, link, genre='', tags='', cover_file=None, series_alias=None):
         import hashlib
+
+        if db_type == 'audiobook':
+            try:
+                if cover_file:
+                    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    covers_dir = os.path.join(base_dir, 'covers')
+                    target_covers_dir = os.path.join(covers_dir, 'audiobook')
+                    os.makedirs(target_covers_dir, exist_ok=True)
+
+                    series_hash = hashlib.md5(series_name.encode('utf-8')).hexdigest()
+                    cover_filename = f"audiobook_series_{series_hash}.jpg"
+                    dest_path = os.path.join(target_covers_dir, cover_filename)
+                    cover_file.save(dest_path)
+
+                AudiobookRepository.update_media_detail(series_name, author, isbn, publisher, summary)
+                return True, f'"{series_name}" 메타정보가 성공적으로 수정되었습니다.'
+            except Exception as e:
+                print(f"[BookDetailService] 오디오북 메타정보 수정 에러: {e}")
+                return False, f'DB 업데이트 오류: {str(e)}'
         
         # 1. 해당 시리즈에 속한 도서의 library_id와 대표 book 레코드 1개 조회
         # pyrefly: ignore [missing-import]
