@@ -93,7 +93,7 @@ function initCategoryModalDelegation() {
 
   document.addEventListener('click', (event) => {
     const target = event && event.target && typeof event.target.closest === 'function'
-      ? event.target.closest('[data-role="library-modal-close"], [data-role="library-category-type"], [data-role="library-open-path-browser"], [data-role="library-test-gdrive"], [data-role="library-icon-option"], [data-role="library-color-option"], [data-role="library-move"], [data-role="path-browser-close"], [data-role="path-browser-refresh"], [data-role="path-browser-select"]')
+      ? event.target.closest('[data-role="library-modal-close"], [data-role="library-category-type"], [data-role="library-open-path-browser"], [data-role="library-test-gdrive"], [data-role="library-icon-option"], [data-role="library-color-option"], [data-role="library-move"], [data-role="library-form-submit"], [data-role="path-browser-close"], [data-role="path-browser-refresh"], [data-role="path-browser-select"]')
       : null;
     if (!target) return;
 
@@ -107,6 +107,10 @@ function initCategoryModalDelegation() {
     if (role === 'library-icon-option') return selectIconOption(target);
     if (role === 'library-color-option') return selectColorOption(target);
     if (role === 'library-move') return triggerMoveLibrary();
+    if (role === 'library-form-submit') {
+      console.log('[Category-Modal] [저장] 버튼 클릭 이벤트 감지됨');
+      return submitLibraryForm(event);
+    }
     if (role === 'path-browser-close') return closePathBrowser();
     if (role === 'path-browser-refresh') return refreshPathBrowser();
     if (role === 'path-browser-select') return selectPathFromBrowser();
@@ -115,6 +119,9 @@ function initCategoryModalDelegation() {
   document.addEventListener('submit', (event) => {
     const form = event && event.target;
     if (!form || form.id !== 'library-crud-form') return;
+    event.preventDefault();
+    event.stopPropagation();
+    console.log('[Category-Modal] library-crud-form submit 이벤트 가로챔 완료');
     submitLibraryForm(event);
   }, true);
 

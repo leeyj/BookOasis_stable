@@ -3,6 +3,7 @@ import { state } from '../state.js';
 import * as api from '../api.js';
 import { selectCategory } from '../tab_media_library.js';
 import { bindSidebarContextMenu } from './context_menu.js';
+import { triggerAddLibrary } from './crud_controller.js';
 
 function isCurrentUserAdmin() {
   const user = state.currentUser || window.currentUser || {};
@@ -20,27 +21,46 @@ function escapeHtml(str) {
 
 function initDynamicSidebarDelegation() {
   if (window.__dynamicSidebarDelegationBound) return;
+  console.log('[Category-Delegation] initDynamicSidebarDelegation() 바인딩 완료');
 
   document.addEventListener('click', (event) => {
-    const target = event && event.target && typeof event.target.closest === 'function'
-      ? event.target.closest('[data-role="sidebar-category-dynamic"], [data-role="sidebar-pin-categories"], [data-role="sidebar-add-library"]')
-      : null;
-    if (!target) return;
+    const rawTarget = event && event.target && typeof event.target.closest === 'function' ? event.target : null;
+    if (!rawTarget) return;
 
-    event.preventDefault();
-    event.stopPropagation();
+    const addBtn = rawTarget.closest('[data-role="sidebar-add-library"]');
+    if (addBtn) {
+      console.log('[Category-Delegation] + (카테고리 추가) 버튼 감지됨:', addBtn, 'rawTarget:', rawTarget);
+      event.preventDefault();
+      event.stopPropagation();
+      if (typeof triggerAddLibrary === 'function') {
+        console.log('[Category-Delegation] triggerAddLibrary() 모듈 함수 직접 호출');
+        triggerAddLibrary();
+      } else if (typeof window.triggerAddLibrary === 'function') {
+        console.log('[Category-Delegation] window.triggerAddLibrary() 전역 함수 호출');
+        window.triggerAddLibrary();
+      } else {
+        console.error('[Category-Delegation] Error: triggerAddLibrary 함수를 찾을 수 없습니다!');
+      }
+      return;
+    }
 
-    const role = target.getAttribute('data-role');
-    if (role === 'sidebar-pin-categories') {
+    const pinBtn = rawTarget.closest('[data-role="sidebar-pin-categories"]');
+    if (pinBtn) {
+      console.log('[Category-Delegation] 핀 고정 버튼 감지됨:', pinBtn);
+      event.preventDefault();
+      event.stopPropagation();
       toggleCategoryOrderPin();
       return;
     }
-    if (role === 'sidebar-add-library') {
-      window.triggerAddLibrary?.();
+
+    const dynamicItem = rawTarget.closest('[data-role="sidebar-category-dynamic"]');
+    if (dynamicItem) {
+      const catId = dynamicItem.getAttribute('data-category-id') || dynamicItem.getAttribute('data-id') || 'home';
+      console.log('[Category-Delegation] 동적 카테고리 항목 클릭 감지됨:', catId, dynamicItem);
+      event.preventDefault();
+      event.stopPropagation();
+      selectCategory(catId);
       return;
-    }
-    if (role === 'sidebar-category-dynamic') {
-      selectCategory(target.getAttribute('data-category-id') || target.getAttribute('data-id') || 'home');
     }
   }, true);
 

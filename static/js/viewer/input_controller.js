@@ -272,7 +272,7 @@ export function initWheelListener() {
       }
 
       // 3. Page-turn mode routes wheel events to prev/next actions.
-      if (scrollMode === 'page' || (isComic && !isComicWidth) || isPdf || isTxt || isEpub) {
+      if (scrollMode === 'page' || (isComic && !isComicWidth)) {
         e.preventDefault();
         if (wheelLock) return;
 
@@ -313,8 +313,9 @@ export function syncHotspotPointerEvents() {
   const isComic = fmt === 'zip' || fmt === 'cbz';
   const isTxt = fmt === 'txt';
   const isEpub = fmt === 'epub';
+  const isPdf = fmt === 'pdf';
 
-  const isScrollActive = scrollMode === 'scroll' && (isComic || isTxt || isEpub);
+  const isScrollActive = scrollMode === 'scroll' && (isComic || isTxt || isEpub || isPdf);
 
   console.log(
     `[syncHotspotPointerEvents] format=${fmt}, scrollMode=${scrollMode}, isScrollActive=${isScrollActive}, isEpub=${isEpub}`

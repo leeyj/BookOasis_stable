@@ -332,6 +332,15 @@ window.setScrollMode = function (mode) {
     }).catch(err => console.warn('[Viewer-Core] Failed to import viewer_comic:', err));
   }
 
+  // PDF 뷰어가 활성화되어 있는 경우, 스크롤 모드를 적용하여 다시 렌더링
+  if (document.getElementById('pdf-viewer-container').style.display !== 'none') {
+    import('./viewer_pdf.js').then(m => {
+      if (typeof m.renderPdfPage === 'function') {
+        m.renderPdfPage();
+      }
+    }).catch(err => console.warn('[Viewer-Core] Failed to import viewer_pdf:', err));
+  }
+
   // 다음 프레임에서 실제 렌더링 (banner가 화면에 그려진 뒤 실행)
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {

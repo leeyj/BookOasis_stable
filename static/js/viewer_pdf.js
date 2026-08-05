@@ -95,117 +95,197 @@ export function renderPdfPage() {
   if (!renderArea) return;
   renderArea.innerHTML = ''; // 캔버스 영역 소거
 
-  // 리더 설정으로부터 보기 모드(1장/2장)와 정렬 방향(LTR/RTL) 획득
-  const step = (typeof getComicPageStep === 'function') ? getComicPageStep() : 1;
-  const direction = (typeof getComicReadingDirection === 'function') ? getComicReadingDirection() : 'ltr';
+  const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
 
-  let pagesToRender = [];
-  if (step === 2) {
-    let p1 = pdfCurrentPage;
-    let p2 = pdfCurrentPage + 1;
-    if (p2 <= pdfTotalPages) {
-      if (direction === 'rtl') {
-        pagesToRender = [p2, p1];
-      } else {
-        pagesToRender = [p1, p2];
-      }
-    } else {
-      pagesToRender = [p1];
-    }
-  } else {
-    pagesToRender = [pdfCurrentPage];
-  }
+  if (scrollMode === 'scroll') {
+    // ── 1. 연속 세로 스크롤 모드 (Continuous Vertical Scroll) ──
+    renderArea.style.overflowY = 'auto';
+    renderArea.style.overflowX = 'hidden';
+    renderArea.style.flexDirection = 'column';
+    renderArea.style.justifyContent = 'flex-start';
+    renderArea.style.alignItems = 'center';
+    renderArea.style.height = '100%';
+    renderArea.style.width = '100%';
+    renderArea.style.padding = '20px 10px';
+    renderArea.style.gap = '20px';
 
-  const removeCenterGap = (localStorage.getItem('remove_2page_center_gap') === '1');
-  if (removeCenterGap) {
-    renderArea.style.gap = '0px';
-  } else {
-    renderArea.style.gap = '10px';
-  }
+    const areaRect = renderArea.getBoundingClientRect();
+    const storedWidth = parseInt(localStorage.getItem('comic_scroll_width') || '800', 10);
+    const availableWidth = Math.max(300, Math.min(areaRect.width - 20, storedWidth));
 
-  // 실제 PDF 렌더 영역 기준으로 가용 뷰포트를 계산해 후단 CSS 축소(뭉개짐)를 방지한다.
-  const areaRect = renderArea.getBoundingClientRect();
-  const areaStyle = window.getComputedStyle(renderArea);
-  const padLeft = parseFloat(areaStyle.paddingLeft || '0') || 0;
-  const padRight = parseFloat(areaStyle.paddingRight || '0') || 0;
-  const padTop = parseFloat(areaStyle.paddingTop || '0') || 0;
-  const padBottom = parseFloat(areaStyle.paddingBottom || '0') || 0;
-  const gapPx = pagesToRender.length === 2 ? (parseFloat(areaStyle.columnGap || areaStyle.gap || '0') || 0) : 0;
-
-  const innerWidth = Math.max(1, areaRect.width - padLeft - padRight);
-  const innerHeight = Math.max(1, areaRect.height - padTop - padBottom);
-
-  // 2장 보기 상태인 경우 개별 가용 가로 길이를 정확히 반분한다.
-  const availableWidth = pagesToRender.length === 2
-    ? Math.max(1, (innerWidth - gapPx) / 2)
-    : innerWidth;
-  const availableHeight = innerHeight;
-
-  // 페이지 배열 순회하며 캔버스 생성 및 순차 비동기 렌더링 개시
-    pagesToRender.forEach(pageNum => {
-    const canvas = document.createElement('canvas');
-    canvas.className = 'pdf-canvas-element';
-    if (removeCenterGap) {
-      canvas.style.boxShadow = 'none';
-    } else {
+    // 전체 페이지에 대한 Canvas 요소를 세로로 배열
+    for (let pageNum = 1; pageNum <= pdfTotalPages; pageNum++) {
+      const canvas = document.createElement('canvas');
+      canvas.className = 'pdf-canvas-element pdf-scroll-page';
+      canvas.dataset.pageNum = pageNum;
       canvas.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
+      canvas.style.display = 'block';
+      canvas.style.marginBottom = '20px';
+      renderArea.appendChild(canvas);
+
+      renderSinglePdfCanvas(pageNum, canvas, availableWidth, null);
     }
-    canvas.style.display = 'block';
-    renderArea.appendChild(canvas);
 
-    pdfDoc.getPage(pageNum).then(page => {
-      const ctx = canvas.getContext('2d');
-      const unscaledViewport = page.getViewport({ scale: 1.0 });
+    // 스크롤 시 현재 보는 페이지 탐지 및 진행도 자동 반영
+    if (!renderArea._pdfScrollBound) {
+      renderArea._pdfScrollBound = true;
+      let scrollTimer = null;
+      renderArea.addEventListener('scroll', () => {
+        if (scrollTimer) clearTimeout(scrollTimer);
+        scrollTimer = setTimeout(() => {
+          if (!pdfDoc || pdfTotalPages <= 0) return;
+          const canvases = renderArea.querySelectorAll('.pdf-scroll-page');
+          const areaTop = renderArea.getBoundingClientRect().top;
+          let activePage = pdfCurrentPage;
 
-      const scaleX = availableWidth / unscaledViewport.width;
-      const scaleY = availableHeight / unscaledViewport.height;
-      const scale = Math.min(scaleX, scaleY);
+          for (let i = 0; i < canvases.length; i++) {
+            const rect = canvases[i].getBoundingClientRect();
+            if (rect.top - areaTop <= renderArea.clientHeight / 2 && rect.bottom - areaTop >= 50) {
+              activePage = parseInt(canvases[i].dataset.pageNum, 10) || activePage;
+            }
+          }
 
-      // DPR 오버샘플링 적용 (텍스트 뭉개짐 방지를 위해 해상도 상향)
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      const rawDpr = window.devicePixelRatio || 1;
-      
-      // Acrobat 수준의 쨍한 화면을 위해 오버샘플링 배수를 높임 (PC 최대 4.0, 모바일 최대 2.5)
-      // 저해상도 모니터에서도 선명하게 보이도록 기본 하한값을 크게 설정
-      const dpr = Math.min(isMobile ? 2.5 : 4.0, Math.max(rawDpr * 2.0, isMobile ? 2.0 : 3.0));
-      const viewport = page.getViewport({ scale: scale * dpr });
-      
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      canvas.style.width = `${viewport.width / dpr}px`;
-      canvas.style.height = `${viewport.height / dpr}px`;
-      canvas.style.flex = '0 0 auto';
-
-      if (ctx) {
-        ctx.imageSmoothingEnabled = true;
-        if (typeof ctx.imageSmoothingQuality !== 'undefined') {
-          ctx.imageSmoothingQuality = 'high';
-        }
-      }
-
-      const renderCtx = { canvasContext: ctx, viewport };
-      const renderTask = page.render(renderCtx);
-      currentRenderTasks.push(renderTask);
-
-      renderTask.promise.then(() => {
-        // 태스크 목록에서 완료된 것 자원 정리
-        currentRenderTasks = currentRenderTasks.filter(t => t !== renderTask);
-      }).catch(err => {
-        if (err.name !== 'RenderingCancelledException' && err.name !== 'RenderingCancelled') {
-          console.error(`[Viewer-Pdf] Page ${pageNum} rendering error:`, err);
-        }
+          if (activePage !== pdfCurrentPage) {
+            pdfCurrentPage = activePage;
+            updatePdfPageInfo();
+            if (state.activeBookId && pdfTotalPages > 0) {
+              saveProgress(state.activeBookId, pdfCurrentPage - 1, pdfTotalPages);
+            }
+          }
+        }, 80);
       });
-    }).catch(err => {
-      console.error(`[Viewer-Pdf] getPage failed for page ${pageNum}:`, err);
+    }
+
+    // 초기 활성 페이지로 스크롤 위치 이동
+    requestAnimationFrame(() => {
+      const targetCvs = renderArea.querySelector(`.pdf-scroll-page[data-page-num="${pdfCurrentPage}"]`);
+      if (targetCvs) {
+        targetCvs.scrollIntoView({ block: 'start' });
+      }
     });
-  });
+
+  } else {
+    // ── 2. 페이지 넘김 모드 (1장/2장 화면 맞춤) ──
+    renderArea.style.overflow = 'hidden';
+    renderArea.style.flexDirection = 'row';
+    renderArea.style.justifyContent = 'center';
+    renderArea.style.alignItems = 'center';
+    renderArea.style.height = '100%';
+    renderArea.style.width = '100%';
+    renderArea.style.padding = '10px';
+
+    const step = (typeof getComicPageStep === 'function') ? getComicPageStep() : 1;
+    const direction = (typeof getComicReadingDirection === 'function') ? getComicReadingDirection() : 'ltr';
+
+    let pagesToRender = [];
+    if (step === 2) {
+      let p1 = pdfCurrentPage;
+      let p2 = pdfCurrentPage + 1;
+      if (p2 <= pdfTotalPages) {
+        if (direction === 'rtl') {
+          pagesToRender = [p2, p1];
+        } else {
+          pagesToRender = [p1, p2];
+        }
+      } else {
+        pagesToRender = [p1];
+      }
+    } else {
+      pagesToRender = [pdfCurrentPage];
+    }
+
+    const removeCenterGap = (localStorage.getItem('remove_2page_center_gap') === '1');
+    if (removeCenterGap) {
+      renderArea.style.gap = '0px';
+    } else {
+      renderArea.style.gap = '10px';
+    }
+
+    const areaRect = renderArea.getBoundingClientRect();
+    const areaStyle = window.getComputedStyle(renderArea);
+    const padLeft = parseFloat(areaStyle.paddingLeft || '0') || 0;
+    const padRight = parseFloat(areaStyle.paddingRight || '0') || 0;
+    const padTop = parseFloat(areaStyle.paddingTop || '0') || 0;
+    const padBottom = parseFloat(areaStyle.paddingBottom || '0') || 0;
+    const gapPx = pagesToRender.length === 2 ? (parseFloat(areaStyle.columnGap || areaStyle.gap || '0') || 0) : 0;
+
+    const innerWidth = Math.max(1, areaRect.width - padLeft - padRight);
+    const innerHeight = Math.max(1, areaRect.height - padTop - padBottom);
+
+    const availableWidth = pagesToRender.length === 2
+      ? Math.max(1, (innerWidth - gapPx) / 2)
+      : innerWidth;
+    const availableHeight = innerHeight;
+
+    pagesToRender.forEach(pageNum => {
+      const canvas = document.createElement('canvas');
+      canvas.className = 'pdf-canvas-element';
+      if (removeCenterGap) {
+        canvas.style.boxShadow = 'none';
+      } else {
+        canvas.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
+      }
+      canvas.style.display = 'block';
+      renderArea.appendChild(canvas);
+
+      renderSinglePdfCanvas(pageNum, canvas, availableWidth, availableHeight);
+    });
+  }
 
   updatePdfPageInfo();
 
-  // 렌더링 시점에 바로 진행도를 한 번 기록하여 한두 페이지만 읽고 닫았을 때 유실(무시)되는 현상 방지
   if (!isInitializingPdfProgress && state.activeBookId && pdfTotalPages > 0) {
     saveProgress(state.activeBookId, pdfCurrentPage - 1, pdfTotalPages);
   }
+}
+
+// 개별 PDF 페이지 캔버스 렌더링 헬퍼
+function renderSinglePdfCanvas(pageNum, canvas, availWidth, availHeight) {
+  pdfDoc.getPage(pageNum).then(page => {
+    const ctx = canvas.getContext('2d');
+    const unscaledViewport = page.getViewport({ scale: 1.0 });
+
+    let scale;
+    if (availHeight && availHeight > 0) {
+      const scaleX = availWidth / unscaledViewport.width;
+      const scaleY = availHeight / unscaledViewport.height;
+      scale = Math.min(scaleX, scaleY);
+    } else {
+      scale = availWidth / unscaledViewport.width;
+    }
+
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const rawDpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(isMobile ? 2.5 : 4.0, Math.max(rawDpr * 2.0, isMobile ? 2.0 : 3.0));
+    const viewport = page.getViewport({ scale: scale * dpr });
+    
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    canvas.style.width = `${viewport.width / dpr}px`;
+    canvas.style.height = `${viewport.height / dpr}px`;
+    canvas.style.flex = '0 0 auto';
+
+    if (ctx) {
+      ctx.imageSmoothingEnabled = true;
+      if (typeof ctx.imageSmoothingQuality !== 'undefined') {
+        ctx.imageSmoothingQuality = 'high';
+      }
+    }
+
+    const renderCtx = { canvasContext: ctx, viewport };
+    const renderTask = page.render(renderCtx);
+    currentRenderTasks.push(renderTask);
+
+    renderTask.promise.then(() => {
+      currentRenderTasks = currentRenderTasks.filter(t => t !== renderTask);
+    }).catch(err => {
+      if (err.name !== 'RenderingCancelledException' && err.name !== 'RenderingCancelled') {
+        console.error(`[Viewer-Pdf] Page ${pageNum} rendering error:`, err);
+      }
+    });
+  }).catch(err => {
+    console.error(`[Viewer-Pdf] getPage failed for page ${pageNum}:`, err);
+  });
 }
 
 export function updatePdfPageInfo() {

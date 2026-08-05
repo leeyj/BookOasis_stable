@@ -114,15 +114,15 @@
                         </button>
                     </div>
 
-                    <!-- 이미지 너비 조절 슬라이더 (스크롤 모드일 때만 표시) -->
+                    <!-- 이미지/PDF 너비 조절 슬라이더 (스크롤 모드일 때만 표시) -->
                     <div class="overlay-width-row" id="overlay-width-row">
-                        <span class="overlay-width-label" data-i18n="viewer.image_width">이미지 너비:</span>
+                        <span class="overlay-width-label" data-i18n="viewer.image_width">크기 (너비):</span>
                         <input
                             type="range"
                             id="comic-scroll-width-slider"
                             class="comic-scroll-width-slider"
-                            min="600"
-                            max="900"
+                            min="400"
+                            max="1400"
                             step="50"
                             value="800"
                             data-role="viewer-action-input" data-action="comic-scroll-width"

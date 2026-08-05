@@ -127,11 +127,24 @@ export function getScrollWidth() {
 }
 
 export function setScrollWidth(px) {
-  const clamped = Math.round(Math.max(600, Math.min(900, Number(px))) / 50) * 50;
+  const clamped = Math.round(Math.max(300, Math.min(1600, Number(px))) / 50) * 50;
   comicScrollWidth = clamped;
   localStorage.setItem('comic_scroll_width', String(clamped));
   applyScrollWidth();
   syncScrollWidthUI();
+
+  // PDF 뷰어가 활성화되어 있는 경우 PDF 재렌더링
+  if (typeof document !== 'undefined') {
+    const pdfPane = document.getElementById('pdf-viewer-container');
+    if (pdfPane && pdfPane.style.display !== 'none') {
+      import('../viewer_pdf.js').then(m => {
+        if (typeof m.renderPdfPage === 'function') {
+          m.renderPdfPage();
+        }
+      }).catch(err => console.warn('[reader_settings] Failed to trigger PDF re-render:', err));
+    }
+  }
+
   return clamped;
 }
 
@@ -144,7 +157,7 @@ export function applyScrollWidth() {
 
 export function initScrollWidth() {
   const saved = parseInt(localStorage.getItem('comic_scroll_width'), 10);
-  comicScrollWidth = (saved >= 600 && saved <= 900) ? Math.round(saved / 50) * 50 : 800;
+  comicScrollWidth = (saved >= 300 && saved <= 1600) ? Math.round(saved / 50) * 50 : 800;
   applyScrollWidth();
   syncScrollWidthUI();
 }

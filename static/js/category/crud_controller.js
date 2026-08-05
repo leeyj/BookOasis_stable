@@ -11,11 +11,16 @@ const MAX_LIBRARY_PATH_LINE_LENGTH = 1024;
 const MAX_LIBRARY_PATH_TEXT_LENGTH = 8192;
 
 export function triggerAddLibrary() {
+  console.log('[Category-CRUD] triggerAddLibrary() 진입');
   const modal = document.getElementById('library-form-modal');
   const title = document.getElementById('library-modal-title');
   const form = document.getElementById('library-crud-form');
   
-  if (!modal || !form) return;
+  console.log('[Category-CRUD] modal 검색 결과:', modal, 'form 검색 결과:', form);
+  if (!modal || !form) {
+    console.error('[Category-CRUD] Error: library-form-modal 또는 library-crud-form 엘리먼트를 찾을 수 없습니다.');
+    return;
+  }
   form.reset();
   document.getElementById('library-form-id').value = '';
   const remoteEl = document.getElementById('library-form-remote');
@@ -65,7 +70,10 @@ export function triggerAddLibrary() {
     });
   }
 
-  title.innerText = i18n.t('category.add_title');
+  if (title) {
+    title.innerText = (window.i18n && typeof i18n.t === 'function') ? i18n.t('category.add_title') : '카테고리 추가';
+  }
+  console.log('[Category-CRUD] modal.style.display를 flex로 변경합니다. (이전값: ' + modal.style.display + ')');
   modal.style.display = 'flex';
 }
 
@@ -270,7 +278,11 @@ export function closeLibraryModal() {
 }
 
 export async function submitLibraryForm(event) {
-  event.preventDefault();
+  if (event) {
+    event.preventDefault();
+    if (typeof event.stopPropagation === 'function') event.stopPropagation();
+  }
+  console.log('[Category-CRUD] submitLibraryForm() 진입 완료. (페이지 새로고침 방지 적용)');
   const form = document.getElementById('library-crud-form');
   const formData = new FormData(form);
 
@@ -324,6 +336,7 @@ export async function submitLibraryForm(event) {
     };
 
     let result = await submitRequest(formData);
+    console.log('[Category-CRUD] API 저장 응답 결과:', result);
 
     if (result && result.needs_confirmation) {
       const confirmMsg = result.confirm_message || result.error || i18n.t('category.save_error', {error: ''});
@@ -332,9 +345,11 @@ export async function submitLibraryForm(event) {
       }
       formData.set('confirm_media_mismatch', '1');
       result = await submitRequest(formData);
+      console.log('[Category-CRUD] 미디어 미스매치 확정 후 API 재요청 결과:', result);
     }
 
     if (result.success) {
+      console.log('[Category-CRUD] 카테고리 저장 성공! alert 표시 후 모달을 닫고 목록을 새로고침합니다.');
       alert(result.message);
       closeLibraryModal();
       if (typeof window.loadLibraries === 'function') {
@@ -344,6 +359,7 @@ export async function submitLibraryForm(event) {
         selectCategory(String(id), true);
       }
     } else {
+      console.error('[Category-CRUD] 카테고리 저장 실패:', result.error);
       alert(i18n.t('category.save_error', {error: result.error}));
     }
   } catch (e) {

@@ -19,7 +19,7 @@ export async function loadPluginsSettings() {
     const data = await api.fetchMetadataPluginsForManagement();
     console.log('[Plugins-Settings] API 응답 데이터 수신 완료:', data);
     if (data.success && data.plugins && data.plugins.length > 0) {
-      let html = '';
+      container.innerHTML = '';
       data.plugins.forEach(p => {
         const schema = p.config_schema || [];
         const config = p.config || {};
@@ -30,14 +30,17 @@ export async function loadPluginsSettings() {
           updateManifest.enabled &&
           updateManifest.show_sample_update_button
         );
+
+        const card = document.createElement('div');
+        card.className = 'plugin-card';
+        card.style.cssText = 'background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.2rem;';
         
         // 플러그인별 카드 및 폼 템플릿 구성
-        html += `
-          <div class="plugin-card" style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.2rem;">
+        card.innerHTML = `
               <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 0.8rem; flex-wrap: wrap; gap: 0.8rem;">
                   <div>
-                      <h4 style="margin: 0; color: #fff; font-size: 1.05rem; font-weight: 700;">${p.name}</h4>
-                      <span style="font-size: 0.75rem; color: #94a3b8;">플러그인 고유 ID: ${p.id}</span>
+                      <h4 style="margin: 0; color: #fff; font-size: 1.05rem; font-weight: 700;">${escapeHtmlText(p.name)}</h4>
+                      <span style="font-size: 0.75rem; color: #94a3b8;">플러그인 고유 ID: ${escapeHtmlText(p.id)}</span>
                   </div>
                   <!-- ON/OFF 활성화 토글 -->
                   <div style="display: flex; align-items: center; gap: 0.6rem;">
@@ -79,10 +82,9 @@ export async function loadPluginsSettings() {
                   </div>
                   ` : ''}
               </form>
-          </div>
         `;
+        container.appendChild(card);
       });
-      container.innerHTML = html;
 
       injectPluginSettingsStyles(data.plugins);
       applyConfigValues(container, data.plugins);

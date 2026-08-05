@@ -1,6 +1,14 @@
 // context_menu.js – 카테고리 사이드바 우클릭 및 모바일 롱터치 컨텍스트 메뉴
 import { state } from '../state.js';
 import { bindFloatingMenuOutsideClose, hideAllContextMenus, positionMenuAtPoint } from '../context_menu_manager.js';
+import {
+  triggerAddLibrary,
+  triggerEditLibrary,
+  triggerDeleteLibrary,
+  triggerScanLibrary,
+  triggerScanLibraryCovers,
+  triggerCancelScanLibrary
+} from './crud_controller.js';
 
 export let currentTargetLibrary = null; // 우클릭 대상 저장
 let suppressSidebarClickUntil = 0;
@@ -186,13 +194,13 @@ export function bindSidebarContextMenu() {
       event.preventDefault();
       hideAllContextMenus();
       const action = actionEl.getAttribute('data-action');
-      if (action === 'scan') return window.triggerScanLibrary?.(false);
-      if (action === 'force-scan') return window.triggerScanLibrary?.(true);
-      if (action === 'scan-covers') return window.triggerScanLibraryCovers?.();
-      if (action === 'cancel-scan') return window.triggerCancelScanLibrary?.();
-      if (action === 'add') return window.triggerAddLibrary?.();
-      if (action === 'edit') return window.triggerEditLibrary?.();
-      if (action === 'delete') return window.triggerDeleteLibrary?.();
+      if (action === 'scan') return triggerScanLibrary ? triggerScanLibrary(false) : window.triggerScanLibrary?.(false);
+      if (action === 'force-scan') return triggerScanLibrary ? triggerScanLibrary(true) : window.triggerScanLibrary?.(true);
+      if (action === 'scan-covers') return triggerScanLibraryCovers ? triggerScanLibraryCovers() : window.triggerScanLibraryCovers?.();
+      if (action === 'cancel-scan') return triggerCancelScanLibrary ? triggerCancelScanLibrary() : window.triggerCancelScanLibrary?.();
+      if (action === 'add') return triggerAddLibrary ? triggerAddLibrary() : window.triggerAddLibrary?.();
+      if (action === 'edit') return triggerEditLibrary ? triggerEditLibrary() : window.triggerEditLibrary?.();
+      if (action === 'delete') return triggerDeleteLibrary ? triggerDeleteLibrary() : window.triggerDeleteLibrary?.();
     }, true);
     window.__libraryContextActionBound = true;
   }
