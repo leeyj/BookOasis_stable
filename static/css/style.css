@@ -2491,16 +2491,18 @@ body.has-system-ticker .library-sidebar {
 /* 실시간 뉴스 티커 푸터 바 */
 .system-ticker-footer {
     position: fixed;
-    bottom: 20px; /* main-wrapper margin: 20px 에 맞춤 */
-    left: var(--system-ticker-left, 20px);
-    width: calc(100% - var(--system-ticker-left, 20px) - 20px);
-    height: 30px;
-    background: rgba(15, 23, 42, 0.98);
-    border-top: 1px solid rgba(168, 85, 247, 0.35);
-    border-top-left-radius: 8px;
-    border-top-right-radius: 8px;
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5), 0 0 10px rgba(168, 85, 247, 0.15);
-    z-index: 9999;
+    bottom: 0px;
+    left: var(--system-ticker-left, 0px);
+    width: calc(100% - var(--system-ticker-left, 0px));
+    height: 32px;
+    background: rgba(15, 23, 42, 0.96);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-top: 1px solid rgba(168, 85, 247, 0.45);
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.6), 0 0 12px rgba(168, 85, 247, 0.25);
+    z-index: 10000;
     display: flex;
     align-items: center;
     box-sizing: border-box;

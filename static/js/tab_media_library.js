@@ -445,6 +445,14 @@ function normalizeMediaType(val) {
 
   if (isDetailDeepLink) {
     const restored = decodeDetailParams(initialHash);
+    if (restored && restored.type) {
+      if (restored.type === 'adult' && !canAccessAdultLibrary()) {
+        applyLibraryTypeButtonState('general');
+      } else {
+        applyLibraryTypeButtonState(restored.type);
+      }
+      loadLibraries();
+    }
     if (restored && restored.series) {
       console.log('[History] 상세 딥링크 복원:', restored.series);
       openBookDetail(null, restored.series, restored.libraryId || 'all', restored.repBookId || null, restored.displayTitle || '');
@@ -491,10 +499,19 @@ function normalizeMediaType(val) {
     
     // 2. 목적지 상태가 상세 뷰(detail)인 경우
     if (event.state && event.state.view === 'detail') {
+      const targetType = event.state.type || state.currentLibraryType || 'general';
+      if (state.currentLibraryType !== targetType) {
+        applyLibraryTypeButtonState(targetType);
+        loadLibraries();
+      }
       openBookDetail(null, event.state.series, event.state.libraryId, event.state.repBookId || null, event.state.displayTitle || '');
       handledDetailNavigation = true;
     } else if (window.location.hash.startsWith('#detail')) {
       const restored = decodeDetailParams(window.location.hash);
+      if (restored && restored.type && state.currentLibraryType !== restored.type) {
+        applyLibraryTypeButtonState(restored.type);
+        loadLibraries();
+      }
       if (restored && restored.series) {
         openBookDetail(null, restored.series, restored.libraryId || 'all', restored.repBookId || null, restored.displayTitle || '');
         handledDetailNavigation = true;

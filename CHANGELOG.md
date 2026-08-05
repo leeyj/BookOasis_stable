@@ -1,4 +1,8 @@
 # CHANGELOG
+## v1.7.4
+- (detail/navigation) 상세 뷰에서 목록 돌아가기 및 브라우저 뒤로가기 시 미디어 탭(오디오북/성인/일반) 유실 및 엉뚱한 화면 로딩 결함 수정 | fix media tab loss and wrong view navigation on detail back button
+- (system/ticker) 백그라운드 스캔 및 대기열 실행 중 하단 속보 푸터 바(system-ticker-footer) 미노출 결함 수정 및 화면 하단 고정 | fix system ticker scan status footer display & pin to bottom
+
 ## v1.7.3
 - (audio/transcode) 브라우저 미지원 오디오 포맷(WMA, AC3 등) FFmpeg 실시간 트랜스코딩 엔진 및 DB 재생시간 Fallback 구축 | on-the-fly ffmpeg audio transcoding & duration fallback
 - (detail/warn) 시리즈 상세 상단 경고 띠 total_pages=0 조건 제거 및 오프셋 미생성 전용 한정 | remove total_pages=0 from missing page warning banner

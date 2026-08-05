@@ -171,21 +171,22 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
         }
       }
 
-// 히스토리 해시가 #detail이 아닌 경우 상태 푸시, 이미 #detail인데 상태가 유실된 경우 상태 보정 (난독화된 URL 토큰 사용)
       const repIdForHistory = state.detailRepresentativeBookId || '';
       const displayTitleForHistory = state.detailDisplayTitle || '';
+      const currentType = state.currentLibraryType || 'general';
       const obfuscatedQuery = encodeDetailParams({
         series: safeSeriesName,
         libraryId: actualLibraryId,
         repBookId: repIdForHistory || null,
-        displayTitle: displayTitleForHistory || null
+        displayTitle: displayTitleForHistory || null,
+        type: currentType
       });
       const detailHash = `#detail?${obfuscatedQuery}`;
 
       if (!window.location.hash.startsWith('#detail')) {
-        history.pushState({ view: 'detail', series: safeSeriesName, libraryId: actualLibraryId, repBookId: repIdForHistory || null, displayTitle: displayTitleForHistory || null }, '', detailHash);
+        history.pushState({ view: 'detail', type: currentType, series: safeSeriesName, libraryId: actualLibraryId, repBookId: repIdForHistory || null, displayTitle: displayTitleForHistory || null }, '', detailHash);
       } else {
-        history.replaceState({ view: 'detail', series: safeSeriesName, libraryId: actualLibraryId, repBookId: repIdForHistory || null, displayTitle: displayTitleForHistory || null }, '', detailHash);
+        history.replaceState({ view: 'detail', type: currentType, series: safeSeriesName, libraryId: actualLibraryId, repBookId: repIdForHistory || null, displayTitle: displayTitleForHistory || null }, '', detailHash);
       }
 
       if (!isAlreadyOpen) {

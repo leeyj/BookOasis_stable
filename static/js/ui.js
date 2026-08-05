@@ -513,6 +513,9 @@ function syncSystemTickerLayout() {
   const footer = document.getElementById('system-ticker-footer');
   if (!root || !footer) return;
 
+  footer.style.zIndex = '10000';
+  footer.style.bottom = '0px';
+
   // 모바일/태블릿에서는 전체 폭 유지, 데스크톱에서만 사이드바 영역을 비웁니다.
   if (window.innerWidth <= 1200) {
     root.style.setProperty('--system-ticker-left', '0px');

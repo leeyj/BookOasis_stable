@@ -100,9 +100,8 @@ def get_system_status():
             is_active = True
             running_tasks.append("데이터베이스 파일 물리 파편화 압축 정리 및 인덱스 정밀 튜닝 실행 중...")
 
-        # 실제 '동작 중' 표시는 running/tuning 기준으로만 활성화한다.
-        # pending만 남아있는 경우는 대기 상태로 간주한다.
-        is_active = bool(has_running or tuning_active)
+        # 실행 중인 스캔 태스크, 대기열(pending) 태스크, DB 튜닝 작업 중 하나라도 존재하면 활성화
+        is_active = bool(has_running or has_pending or tuning_active)
 
         return jsonify({
             'success': True,

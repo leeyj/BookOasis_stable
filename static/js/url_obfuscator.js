@@ -13,7 +13,8 @@ export function encodeDetailParams(params) {
       s: params.series || '',
       l: params.libraryId || 'all',
       r: params.repBookId || null,
-      d: params.displayTitle || null
+      d: params.displayTitle || null,
+      t: params.type || null
     };
     
     const jsonStr = JSON.stringify(payload);
@@ -28,7 +29,7 @@ export function encodeDetailParams(params) {
   } catch (e) {
     console.error('[URL-Obfuscator] Encode failed:', e);
     // Fallback: 인코딩 실패 시 명시적 파라미터 사용
-    return `series=${encodeURIComponent(params.series || '')}&libraryId=${encodeURIComponent(params.libraryId || 'all')}`;
+    return `series=${encodeURIComponent(params.series || '')}&libraryId=${encodeURIComponent(params.libraryId || 'all')}&type=${encodeURIComponent(params.type || '')}`;
   }
 }
 
@@ -36,7 +37,7 @@ export function encodeDetailParams(params) {
  * URL 해시 또는 쿼리 스트링에서 파라미터 객체를 디코딩하여 복원합니다.
  * 기존 ?series=... 명시적 파라미터도 100% 하위 호환합니다.
  * @param {string} hashString window.location.hash
- * @returns {Object} { series, libraryId, repBookId, displayTitle }
+ * @returns {Object} { series, libraryId, repBookId, displayTitle, type }
  */
 export function decodeDetailParams(hashString) {
   if (!hashString || !hashString.includes('?')) return {};
@@ -67,7 +68,8 @@ export function decodeDetailParams(hashString) {
         series: payload.s || '',
         libraryId: payload.l || 'all',
         repBookId: payload.r || null,
-        displayTitle: payload.d || null
+        displayTitle: payload.d || null,
+        type: payload.t || null
       };
     } catch (e) {
       console.warn('[URL-Obfuscator] Token decode failed, fallbacking:', e);
@@ -79,12 +81,14 @@ export function decodeDetailParams(hashString) {
   const libraryId = urlParams.get('libraryId') ? decodeURIComponent(urlParams.get('libraryId')) : 'all';
   const repBookId = urlParams.get('repBookId') ? decodeURIComponent(urlParams.get('repBookId')) : null;
   const displayTitle = urlParams.get('displayTitle') ? decodeURIComponent(urlParams.get('displayTitle')) : null;
+  const type = urlParams.get('type') ? decodeURIComponent(urlParams.get('type')) : null;
 
   return {
     series,
     libraryId,
     repBookId,
-    displayTitle
+    displayTitle,
+    type
   };
 }
 
