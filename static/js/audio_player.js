@@ -166,6 +166,30 @@ export function openAudioPlayerModal(audioData, targetTrackId = null, startTime 
   renderChapterList();
 }
 
+function getEffectiveTrackDuration() {
+  if (audioInstance && Number.isFinite(audioInstance.duration) && audioInstance.duration > 0 && audioInstance.duration !== Infinity) {
+    return audioInstance.duration;
+  }
+  if (currentAudiobookData && currentAudiobookData.tracks && currentAudiobookData.tracks[currentTrackIndex]) {
+    const track = currentAudiobookData.tracks[currentTrackIndex];
+    if (Number.isFinite(Number(track.duration)) && Number(track.duration) > 0) {
+      return Number(track.duration);
+    }
+    if (Number.isFinite(Number(track.total_duration)) && Number(track.total_duration) > 0) {
+      return Number(track.total_duration);
+    }
+    if (track.time_str && typeof track.time_str === 'string') {
+      const parts = track.time_str.split(':').map(p => parseInt(p, 10));
+      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        return parts[0] * 60 + parts[1];
+      } else if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+        return parts[0] * 3600 + parts[1] * 60 + parts[2];
+      }
+    }
+  }
+  return 0;
+}
+
 function initAudioEvents() {
   if (!audioInstance) return;
 
@@ -177,14 +201,14 @@ function initAudioEvents() {
   audioInstance.ontimeupdate = () => {
     if (!audioInstance) return;
     const cur = audioInstance.currentTime || 0;
-    const dur = audioInstance.duration || 0;
-    const remain = Math.max(0, dur - cur);
+    const effDur = getEffectiveTrackDuration();
+    const remain = Math.max(0, effDur - cur);
 
     if (currentTimeEl) currentTimeEl.textContent = formatTime(cur);
-    if (durationEl) durationEl.textContent = dur > 0 ? `-${formatTime(remain)}` : '-0:00';
+    if (durationEl) durationEl.textContent = effDur > 0 ? `-${formatTime(remain)}` : '-0:00';
 
-    if (seekbar && dur > 0 && !seekbar.dataset.isDragging) {
-      seekbar.value = (cur / dur) * 100;
+    if (seekbar && effDur > 0 && !seekbar.dataset.isDragging) {
+      seekbar.value = Math.min(100, Math.max(0, (cur / effDur) * 100));
     }
 
     scheduleProgressSnapshot();
@@ -210,9 +234,10 @@ function initAudioEvents() {
       seekbar.dataset.isDragging = 'true';
     };
     seekbar.onchange = () => {
-      if (audioInstance && audioInstance.duration) {
+      const effDur = getEffectiveTrackDuration();
+      if (audioInstance && effDur > 0) {
         const pct = parseFloat(seekbar.value) / 100;
-        audioInstance.currentTime = pct * audioInstance.duration;
+        audioInstance.currentTime = pct * effDur;
       }
       delete seekbar.dataset.isDragging;
     };
@@ -295,7 +320,10 @@ export function playNextTrack() {
 
 export function audioPlayerSkip(seconds = 15) {
   if (!audioInstance) return;
-  audioInstance.currentTime = Math.max(0, Math.min(audioInstance.duration || 0, audioInstance.currentTime + seconds));
+  const effDur = getEffectiveTrackDuration();
+  const maxTime = effDur > 0 ? effDur : (Number.isFinite(audioInstance.duration) ? audioInstance.duration : 0);
+  const targetTime = Math.max(0, audioInstance.currentTime + seconds);
+  audioInstance.currentTime = maxTime > 0 ? Math.min(maxTime, targetTime) : targetTime;
   scheduleProgressSnapshot();
 }
 
@@ -476,7 +504,7 @@ function saveProgressInternal(isCompleted = false, options = {}) {
 }
 
 function formatTime(sec) {
-  if (!sec || isNaN(sec)) return '0:00';
+  if (!sec || !Number.isFinite(sec) || sec < 0) return '0:00';
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
   return `${m}:${s < 10 ? '0' : ''}${s}`;

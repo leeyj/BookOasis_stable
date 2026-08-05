@@ -63,7 +63,7 @@ export function renderVolumeList(orderedBooks, safeSeriesName, actualLibraryId, 
     const filePathLower = (book.file_path || '').toLowerCase();
     const remoteKeywords = ['gdrive', 'rclone', 'vfs', 'google_drive', 'onedrive', 'sharepoint', 'nas_share', 'webdav'];
     const isRemoteFile = remoteKeywords.some((keyword) => filePathLower.includes(keyword));
-    const noOffsets = isZipFormat && !isRemoteFile && (book.total_pages === 0 || book.has_offsets === 0);
+    const noOffsets = isZipFormat && !isRemoteFile && (book.has_offsets === 0);
     const noCoverWarn = noCover && !isTextFormat;
     const noCoverInfo = noCover && isTextFormat;
     const needsWarn = noCoverWarn || noOffsets;

@@ -1,4 +1,8 @@
 # CHANGELOG
+## v1.7.3
+- (audio/transcode) 브라우저 미지원 오디오 포맷(WMA, AC3 등) FFmpeg 실시간 트랜스코딩 엔진 및 DB 재생시간 Fallback 구축 | on-the-fly ffmpeg audio transcoding & duration fallback
+- (detail/warn) 시리즈 상세 상단 경고 띠 total_pages=0 조건 제거 및 오프셋 미생성 전용 한정 | remove total_pages=0 from missing page warning banner
+
 ## v1.7.2
 - pdf 메모리 최적화 및 가상화 렌더링 | pdf virtual rendering
 - pdf 스크롤 모드 실시간 페이지 크기(너비) 조절 기능 구축 | pdf scroll mode width control

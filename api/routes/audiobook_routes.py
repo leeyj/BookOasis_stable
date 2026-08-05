@@ -5,6 +5,8 @@ audiobook_routes.py – 오디오북 전용 MP3 오디오 스트리밍 및 재�
 import os
 import re
 import sqlite3
+import subprocess
+import shutil
 from flask import Blueprint, request, Response, jsonify, session
 from api.auth import login_required, check_adult_permission
 import database
@@ -15,6 +17,53 @@ except Exception:
     requests = None
 
 audiobook_bp = Blueprint('audiobook_api', __name__)
+
+UNSUPPORTED_BROWSER_AUDIO_EXTS = {'wma', 'ape', 'dts', 'ac3', 'ra', 'ram', 'au', 'voc', 'wv'}
+
+def _stream_transcoded_audio(file_path):
+    """FFmpeg를 이용하여 브라우저 미지원 오디오 포맷을 audio/mpeg (MP3) 스트림으로 온더플라이 변환 서빙"""
+    ffmpeg_path = shutil.which('ffmpeg')
+    if not ffmpeg_path:
+        return None
+
+    cmd = [
+        ffmpeg_path,
+        '-i', file_path,
+        '-vn',
+        '-f', 'mp3',
+        '-acodec', 'libmp3lame',
+        '-ab', '192k',
+        '-ar', '44100',
+        'pipe:1'
+    ]
+    try:
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    except Exception as err:
+        print(f"[Audio-Transcode] FFmpeg spawn error: {err}")
+        return None
+
+    def generate():
+        try:
+            while True:
+                chunk = proc.stdout.read(1024 * 64)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            try:
+                proc.terminate()
+            except Exception:
+                pass
+
+    rv = Response(
+        generate(),
+        200,
+        mimetype='audio/mpeg',
+        content_type='audio/mpeg',
+        direct_passthrough=True
+    )
+    rv.headers.add('Cache-Control', 'no-cache, no-transform')
+    return rv
 
 
 def _iter_file_chunks(file_path, start=0, length=None, chunk_size=1024 * 256):
@@ -46,10 +95,18 @@ def _send_audio_range_response(file_path):
     if not os.path.exists(file_path):
         return jsonify({'success': False, 'error': 'Audio file not found'}), 404
 
+    ext = os.path.splitext(file_path)[1].lstrip('.').lower()
+
+    # 브라우저 미지원 포맷일 경우 FFmpeg 온더플라이 트랜스코딩 수행
+    if ext in UNSUPPORTED_BROWSER_AUDIO_EXTS:
+        transcoded = _stream_transcoded_audio(file_path)
+        if transcoded:
+            print(f"[Audio-Transcode] On-the-fly MP3 transcoding served for {ext}: {file_path}")
+            return transcoded
+
     file_size = os.path.getsize(file_path)
     range_header = request.headers.get('Range', None)
 
-    ext = os.path.splitext(file_path)[1].lstrip('.').lower()
     mimetype_map = {
         'mp3': 'audio/mpeg',
         'm4a': 'audio/mp4',
