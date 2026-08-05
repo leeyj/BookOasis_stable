@@ -122,6 +122,8 @@ function syncFitUI() {
 // 스크롤 모드 이미지 너비 설정 (600~900px, 50px 단위)
 // ──────────────────────────────────────────────────
 
+let pdfRenderDebounceTimer = null;
+
 export function getScrollWidth() {
   return comicScrollWidth;
 }
@@ -133,14 +135,22 @@ export function setScrollWidth(px) {
   applyScrollWidth();
   syncScrollWidthUI();
 
-  // PDF 뷰어가 활성화되어 있는 경우 PDF 재렌더링
+  // PDF 뷰어가 활성화되어 있는 경우
   if (typeof document !== 'undefined') {
     const pdfPane = document.getElementById('pdf-viewer-container');
     if (pdfPane && pdfPane.style.display !== 'none') {
       import('../viewer_pdf.js').then(m => {
-        if (typeof m.renderPdfPage === 'function') {
-          m.renderPdfPage();
+        // 1. 실시간 CSS 리사이징 (드래그 중 즉시 60fps)
+        if (typeof m.updatePdfCanvasCssWidth === 'function') {
+          m.updatePdfCanvasCssWidth(clamped);
         }
+        // 2. 디바운스 후 고해상도 PDF.js 재렌더링
+        if (pdfRenderDebounceTimer) clearTimeout(pdfRenderDebounceTimer);
+        pdfRenderDebounceTimer = setTimeout(() => {
+          if (typeof m.renderPdfPage === 'function') {
+            m.renderPdfPage();
+          }
+        }, 300);
       }).catch(err => console.warn('[reader_settings] Failed to trigger PDF re-render:', err));
     }
   }
