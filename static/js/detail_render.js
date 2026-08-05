@@ -234,8 +234,10 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
       iconClass = 'fa-solid fa-book-open-reader';
     }
 
+    const resumeTrackId = (meta && meta.current_track_id) ? meta.current_track_id : continueTarget.id;
+    const resumeStartTime = (meta && Number(meta.current_time) > 0) ? Number(meta.current_time) : (continueTarget.pages_read || 0);
     const continueOnClick = isAudioContext
-      ? `window.openAudioPlayer(${(meta && meta.id) ? meta.id : (continueTarget.audiobook_id || continueTarget.id)}, ${continueTarget.id}, ${continueTarget.pages_read || 0})`
+      ? `window.openAudioPlayer(${(meta && meta.id) ? meta.id : (continueTarget.audiobook_id || continueTarget.id)}, ${resumeTrackId}, ${resumeStartTime})`
       : `window.openReader(${continueTarget.id}, '${continueTarget.file_format}', '${continueTarget.title.replace(/'/g, "\\'")}', ${continueTarget.pages_read || 0}, ${continueTarget.total_pages || 0})`;
 
     continueBtnHtml = `

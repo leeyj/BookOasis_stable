@@ -300,6 +300,48 @@ server {
 
 ---
 
+## 🎧 Audiobook Streaming Stability Guide (Nginx / Cloudflare)
+
+Even when audiobook scanning is successful (`BOOK_PROCESSED`, `duration_sec > 0`), playback may still fail or show `0:00` if Range requests are transformed by a proxy/CDN layer or if cache behavior is incorrect.
+
+### Recommended settings
+
+1. **Add a Cloudflare cache-bypass rule (recommended)**
+  - Path example:
+    - `/api/media/audiobooks/*/tracks/*/stream`
+  - Cache Level: Bypass
+  - Exclude audio stream URLs from transformation/optimization features (Transform/Minify/Polish, etc.)
+
+2. **Disable buffering for streaming paths on Nginx (recommended)**
+  - If you already use `proxy_buffering off;` under `location /`, keep it enabled.
+  - If you split streaming into a dedicated location, keep the same policy there.
+
+```nginx
+location ~ ^/api/media/audiobooks/.*/tracks/.*/stream$ {
+   proxy_pass http://bookoasis_backend;
+   proxy_http_version 1.1;
+   proxy_set_header Host $http_host;
+   proxy_set_header X-Real-IP $remote_addr;
+   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+   proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+
+   # Prevent audio buffering delays and stream stalls
+   proxy_buffering off;
+
+   # Support long listening sessions
+   proxy_read_timeout 3600;
+   proxy_send_timeout 3600;
+}
+```
+
+### Quick troubleshooting checklist
+
+- In browser DevTools Network, verify stream requests return `206 Partial Content`.
+- If stream requests repeatedly return `404`, check runtime file access path/mount status first (before assuming DB metadata is wrong).
+- A failed playback attempt can be followed by a `current_time=0` progress save, so confirm stream status codes before repeated retry tests.
+
+---
+
 ## Caddy Configuration Guide
 
 If you use Caddy as your reverse proxy instead of Nginx, you can configure your Caddyfile as follows to optimize and connect. Caddy automatically issues and manages SSL certificates (HTTPS) and natively supports WebSockets and reverse proxy header passing.

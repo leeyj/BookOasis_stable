@@ -16,6 +16,29 @@ except Exception:
 
 audiobook_bp = Blueprint('audiobook_api', __name__)
 
+
+def _iter_file_chunks(file_path, start=0, length=None, chunk_size=1024 * 256):
+    """Yield file content in chunks to avoid loading large audio files into memory."""
+    remaining = length
+    with open(file_path, 'rb') as f:
+        if start > 0:
+            f.seek(start)
+
+        while True:
+            if remaining is None:
+                data = f.read(chunk_size)
+            else:
+                if remaining <= 0:
+                    break
+                data = f.read(min(chunk_size, remaining))
+
+            if not data:
+                break
+
+            yield data
+            if remaining is not None:
+                remaining -= len(data)
+
 def _send_audio_range_response(file_path):
     """
     MP3 오디오 파일 Range Request (206 Partial Content) 스트리밍 서빙
@@ -52,23 +75,38 @@ def _send_audio_range_response(file_path):
         if byte2 is None or byte2 >= file_size:
             byte2 = file_size - 1
 
+        if byte1 >= file_size:
+            rv = Response(status=416)
+            rv.headers.add('Content-Range', f'bytes */{file_size}')
+            rv.headers.add('Accept-Ranges', 'bytes')
+            rv.headers.add('Cache-Control', 'no-transform')
+            return rv
+
         length = byte2 - byte1 + 1
 
-        with open(file_path, 'rb') as f:
-            f.seek(byte1)
-            data = f.read(length)
-
-        rv = Response(data, 206, mimetype=mimetype, content_type=mimetype, direct_passthrough=True)
+        rv = Response(
+            _iter_file_chunks(file_path, start=byte1, length=length),
+            206,
+            mimetype=mimetype,
+            content_type=mimetype,
+            direct_passthrough=True
+        )
         rv.headers.add('Content-Range', f'bytes {byte1}-{byte2}/{file_size}')
         rv.headers.add('Accept-Ranges', 'bytes')
         rv.headers.add('Content-Length', str(length))
+        rv.headers.add('Cache-Control', 'no-transform')
         return rv
     else:
-        with open(file_path, 'rb') as f:
-            data = f.read(1024 * 1024 * 4) # 첫 4MB 조각 서빙
-        rv = Response(data, 200, mimetype=mimetype, content_type=mimetype, direct_passthrough=True)
+        rv = Response(
+            _iter_file_chunks(file_path),
+            200,
+            mimetype=mimetype,
+            content_type=mimetype,
+            direct_passthrough=True
+        )
         rv.headers.add('Accept-Ranges', 'bytes')
         rv.headers.add('Content-Length', str(file_size))
+        rv.headers.add('Cache-Control', 'no-transform')
         return rv
 
 @audiobook_bp.route('/api/media/audiobooks/<int:aid>/cover', methods=['GET'])

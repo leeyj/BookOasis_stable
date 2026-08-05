@@ -18,6 +18,7 @@ let txtPageSnapInProgress = false;
 let txtPendingRestoreTimer = null;
 let txtRestoreToastAt = 0;
 const epubChapterFetchInFlight = new Set();
+const epubChapterRetryState = new Map();
 
 // Phase-1 runtime state object for incremental modularization.
 export const txtRuntimeState = {
@@ -64,6 +65,7 @@ export const txtRuntimeState = {
     fullText = '';
     txtScrollPreloadTriggered = false;
     txtScrollNextEpisodeTriggered = false;
+    epubChapterRetryState.clear();
   }
 };
 
@@ -142,6 +144,11 @@ function requestEpubChapterContent(chapterIdx, options = {}) {
     return Promise.resolve(null);
   }
 
+  const retryState = epubChapterRetryState.get(idx) || { attempts: 0, lastAttemptAt: 0 };
+  retryState.attempts += 1;
+  retryState.lastAttemptAt = Date.now();
+  epubChapterRetryState.set(idx, retryState);
+
   epubChapterFetchInFlight.add(idx);
   if (txtChunks[idx] === null) {
     txtChunks[idx] = 'LOADING_PENDING';
@@ -152,6 +159,7 @@ function requestEpubChapterContent(chapterIdx, options = {}) {
     .then(d => {
       const content = (d && d.content) ? d.content : '<p>내용이 없습니다.</p>';
       txtChunks[idx] = content;
+      epubChapterRetryState.delete(idx);
       if (updateDom) {
         const contentArea = document.getElementById('txt-content-area');
         if (contentArea) {
@@ -170,6 +178,45 @@ function requestEpubChapterContent(chapterIdx, options = {}) {
     });
 }
 
+function getVisibleEpubPlaceholderIndexes(maxCount = 10) {
+  const contentArea = document.getElementById('txt-content-area');
+  const scrollWrapper = document.getElementById('txt-scroll-wrapper');
+  if (!contentArea || !scrollWrapper) return [];
+
+  const wrapperTop = scrollWrapper.scrollTop;
+  const wrapperBottom = wrapperTop + scrollWrapper.clientHeight;
+  const indexes = [];
+
+  for (const node of contentArea.querySelectorAll('.txt-scroll-chunk[data-idx]')) {
+    const idx = parseInt(node.getAttribute('data-idx') || '-1', 10);
+    if (!Number.isFinite(idx) || idx < 0) continue;
+
+    const isPlaceholder = !!node.querySelector('.epub-ch-loading') || txtChunks[idx] === null || txtChunks[idx] === 'LOADING_PENDING';
+    if (!isPlaceholder) continue;
+
+    const top = node.offsetTop;
+    const bottom = top + node.offsetHeight;
+    const isNearViewport = bottom >= wrapperTop - 200 && top <= wrapperBottom + 200;
+    if (isNearViewport) {
+      indexes.push(idx);
+      if (indexes.length >= maxCount) break;
+    }
+  }
+
+  return indexes;
+}
+
+function scheduleVisibleEpubPlaceholderRecovery(delays = [50, 180, 450]) {
+  if ((state.currentViewerFormat || '').toLowerCase() !== 'epub') return;
+  if (!Array.isArray(delays) || delays.length === 0) return;
+
+  delays.forEach(delay => {
+    setTimeout(() => {
+      retryVisibleEpubPlaceholders(10);
+    }, delay);
+  });
+}
+
 function hydrateEpubChapterWindow(centerIdx, radius = 10) {
   const center = parseInt(centerIdx, 10);
   if (!Number.isFinite(center) || txtChunks.length === 0) return;
@@ -183,18 +230,14 @@ function hydrateEpubChapterWindow(centerIdx, radius = 10) {
 }
 
 function retryVisibleEpubPlaceholders(maxCount = 8) {
-  const contentArea = document.getElementById('txt-content-area');
-  if (!contentArea) return;
-  const nodes = contentArea.querySelectorAll('.txt-scroll-chunk[data-idx] .epub-ch-loading');
-  let requested = 0;
-  for (const node of nodes) {
-    if (requested >= maxCount) break;
-    const parentChunk = node.closest('.txt-scroll-chunk');
-    if (!parentChunk) continue;
-    const idx = parseInt(parentChunk.getAttribute('data-idx') || '-1', 10);
-    if (!Number.isFinite(idx) || idx < 0) continue;
-    requested += 1;
-    requestEpubChapterContent(idx);
+  const candidateIndexes = getVisibleEpubPlaceholderIndexes(maxCount);
+  for (const idx of candidateIndexes) {
+    const retryState = epubChapterRetryState.get(idx) || { attempts: 0, lastAttemptAt: 0 };
+    const now = Date.now();
+    const minRetryDelay = retryState.attempts <= 1 ? 0 : retryState.attempts === 2 ? 250 : 800;
+    if (retryState.lastAttemptAt && now - retryState.lastAttemptAt < minRetryDelay) continue;
+    if (retryState.attempts >= 5) continue;
+    requestEpubChapterContent(idx, { force: true, updateDom: true });
   }
 }
 
@@ -204,6 +247,7 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
   const contentArea = document.getElementById('txt-content-area');
   if (!pane || !contentArea) return;
   pane.style.display = 'block';
+  epubChapterRetryState.clear();
   
   // 뷰어 여백(Padding) 설정 동적 적용
   import('./viewer/viewer_padding.js').then(m => {
@@ -657,9 +701,7 @@ function renderCurrentChunk(initMode = false) {
   // 모드 재전환 시 placeholder가 남아도 가시 범위 챕터를 즉시 재요청해 자동 복구한다.
   if (isEpub && scrollMode === 'scroll') {
     hydrateEpubChapterWindow(currentChunkIdx, 12);
-    setTimeout(() => {
-      retryVisibleEpubPlaceholders(10);
-    }, 50);
+    scheduleVisibleEpubPlaceholderRecovery();
   }
 
   updateTxtSeekBar();

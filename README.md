@@ -300,6 +300,48 @@ server {
 
 ---
 
+## 🎧 오디오북 스트리밍 안정화 가이드 (Nginx / Cloudflare)
+
+오디오북 스캔이 정상(`BOOK_PROCESSED`, `duration_sec > 0`)이어도, 앞단 프록시/CDN에서 Range 요청이 변형되거나 캐시가 잘못 적용되면 재생이 멈추거나 `0:00`으로 보일 수 있습니다.
+
+### 권장 설정
+
+1. **Cloudflare 캐시 우회 규칙 추가 (권장)**
+  - 경로 예시:
+    - `/api/media/audiobooks/*/tracks/*/stream`
+  - Cache Level: Bypass
+  - Performance/Optimization 계열에서 오디오 스트림 URL에 대한 변환(Transform/Minify/Polish 등)이 적용되지 않도록 제외
+
+2. **Nginx에서 스트리밍 경로 버퍼링 비활성화 (권장)**
+  - 전체 `location /`에 `proxy_buffering off;`를 사용 중이라면 그대로 유지
+  - 별도 location을 분리하는 경우 아래처럼 동일 정책 유지
+
+```nginx
+location ~ ^/api/media/audiobooks/.*/tracks/.*/stream$ {
+   proxy_pass http://bookoasis_backend;
+   proxy_http_version 1.1;
+   proxy_set_header Host $http_host;
+   proxy_set_header X-Real-IP $remote_addr;
+   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+   proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+
+   # 오디오 스트리밍 지연/끊김 방지
+   proxy_buffering off;
+
+   # 장시간 청취 세션 대응
+   proxy_read_timeout 3600;
+   proxy_send_timeout 3600;
+}
+```
+
+### 빠른 점검 체크리스트
+
+- 브라우저 개발자도구 Network에서 스트림 요청 상태 코드가 `206 Partial Content`인지 확인
+- 스트림 요청이 반복 `404`라면 DB 경로가 아니라 실행 중인 웹 프로세스의 실제 파일 접근 경로/마운트 상태를 우선 점검
+- 재생 실패 직후 `current_time=0` 저장이 들어갈 수 있으므로, 원인 파악 전에는 실패 재생 반복 테스트를 피하고 스트림 응답 코드부터 확인
+
+---
+
 ## Caddy 설정 가이드
 
 Nginx 대신 Caddy를 리버스 프록시로 사용하는 경우 아래와 같이 Caddyfile을 구성하여 최적화 및 연동을 진행할 수 있습니다. Caddy는 자동으로 SSL 인증서(HTTPS)를 발급 및 관리해주며, WebSocket과 리버스 프록시 헤더 처리를 기본 내장하고 있습니다.

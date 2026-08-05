@@ -362,8 +362,11 @@ export async function resumeSeries(e, seriesName, libraryId, representativeBookI
       // 트랙 ID와 작품 ID를 분리해서 플레이어를 직접 연다.
       if (state.currentLibraryType === 'audiobook' && typeof window.openAudioPlayer === 'function') {
         const resolvedAudiobookId = (data.meta && data.meta.id) ? data.meta.id : (targetBook.audiobook_id || representativeBookId || targetBook.id);
-        const startTime = Number(targetBook.pages_read) || 0;
-        window.openAudioPlayer(resolvedAudiobookId, targetBook.id, startTime);
+        const resumeTrackId = (data.meta && data.meta.current_track_id) ? data.meta.current_track_id : targetBook.id;
+        const startTime = (data.meta && Number(data.meta.current_time) > 0)
+          ? Number(data.meta.current_time)
+          : (Number(targetBook.pages_read) || 0);
+        window.openAudioPlayer(resolvedAudiobookId, resumeTrackId, startTime);
         return;
       }
       

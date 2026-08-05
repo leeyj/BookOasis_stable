@@ -10,6 +10,8 @@ const sleepOptions = [0, 15, 30, 45, 60];
 let currentSleepIndex = 0;
 let lastObservedProgressKey = '';
 let lastFlushedProgressKey = '';
+let lastAutoSaveAtMs = 0;
+const AUDIO_PROGRESS_AUTO_SAVE_MS = 10000;
 
 export async function openAudioPlayer(audiobookId, trackIdOrTitle = null, startTime = 0) {
   try {
@@ -90,6 +92,7 @@ export function openAudioPlayerModal(audioData, targetTrackId = null, startTime 
   document.body.style.overflow = 'hidden';
   lastObservedProgressKey = '';
   lastFlushedProgressKey = '';
+  lastAutoSaveAtMs = 0;
 
   if (!audioInstance) {
     audioInstance = new Audio();
@@ -135,6 +138,7 @@ function initAudioEvents() {
     }
 
     scheduleProgressSnapshot();
+    maybeAutoSaveProgress();
   };
 
   audioInstance.onpause = () => {
@@ -330,6 +334,14 @@ function scheduleProgressSnapshot() {
   if (!payload) return;
   const progressKey = buildProgressKey(payload);
   lastObservedProgressKey = progressKey;
+}
+
+function maybeAutoSaveProgress() {
+  if (!audioInstance || audioInstance.paused || audioInstance.ended) return;
+  const now = Date.now();
+  if ((now - lastAutoSaveAtMs) < AUDIO_PROGRESS_AUTO_SAVE_MS) return;
+  lastAutoSaveAtMs = now;
+  saveProgressInternal(false, { useBeacon: false, force: false });
 }
 
 function buildProgressPayload(isCompleted = false) {
