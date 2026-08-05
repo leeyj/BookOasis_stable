@@ -23,22 +23,22 @@
         <div class="sidebar-collapsible-content" id="sidebar-collapsible-content" style="display: flex; flex-direction: column; justify-content: space-between; flex: 1; width: 100%;">
             <div style="margin-top: 1rem;">
                 <ul class="sidebar-menu" id="sidebar-categories">
-                    <li class="menu-item active" id="category-home" onclick="selectCategory('home')"><i
+                        <li class="menu-item active" id="category-home" data-role="sidebar-category-static" data-category-id="home"><i
                             class="fa-solid fa-house"></i> <span data-i18n="sidebar.home">Home</span></li>
-                    <li class="menu-item" id="category-history" onclick="selectCategory('history')"><i
+                        <li class="menu-item" id="category-history" data-role="sidebar-category-static" data-category-id="history"><i
                             class="fa-solid fa-clock-rotate-left"></i> <span data-i18n="sidebar.recent_books">최근 읽은 도서</span></li>
-                    <li class="menu-item" id="category-favorite" onclick="selectCategory('favorite')"><i
+                        <li class="menu-item" id="category-favorite" data-role="sidebar-category-static" data-category-id="favorite"><i
                             class="fa-solid fa-star" style="color: #eab308;"></i> <span data-i18n="sidebar.favorite">즐겨찾기</span></li>
-                    <li class="menu-item" id="category-plugins" onclick="selectCategory('plugins')"><i
+                        <li class="menu-item" id="category-plugins" data-role="sidebar-category-static" data-category-id="plugins"><i
                             class="fa-solid fa-puzzle-piece" style="color: #38bdf8;"></i> <span data-i18n="sidebar.plugins">플러그인</span></li>
-                    <li class="menu-item" id="category-all" onclick="selectCategory('all')"><i
+                        <li class="menu-item" id="category-all" data-role="sidebar-category-static" data-category-id="all"><i
                             class="fa-solid fa-layer-group"></i> <span data-i18n="sidebar.view_all">전체보기</span></li>
                 </ul>
             </div>
             <div class="sidebar-settings-wrap"
                 style="padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.05); margin-top: auto; display: flex; flex-direction: column; gap: 0.8rem;">
                 <ul class="sidebar-menu">
-                    <li class="menu-item" id="category-settings" onclick="selectCategory('settings')"><i
+                        <li class="menu-item" id="category-settings" data-role="sidebar-category-static" data-category-id="settings"><i
                             class="fa-solid fa-gear"></i> <span data-i18n="sidebar.settings">환경설정</span></li>
                 </ul>
                 <!-- 사용자 프로필 및 로그아웃 단추 -->
@@ -49,8 +49,7 @@
                         <span id="session-username-display"
                             style="font-size: 0.82rem; color: #cbd5e1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">-</span>
                     </div>
-                    <a href="/logout" data-i18n-title="sidebar.logout_title" title="로그아웃" style="color: #ef4444; font-size: 0.88rem; transition: color 0.2s;"
-                        onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='#ef4444'"><i
+                    <a href="/logout" data-i18n-title="sidebar.logout_title" title="로그아웃" class="ui-hover-logout-link" style="color: #ef4444; font-size: 0.88rem; transition: color 0.2s;"><i
                             class="fa-solid fa-power-off"></i></a>
                 </div>
             </div>
@@ -71,7 +70,7 @@
         <div class="library-header">
             <div class="library-title-wrap">
                 <!-- 데스크톱 전용 사이드바 토글 버튼 -->
-                <button id="btn-sidebar-toggle-desktop" class="btn-sidebar-toggle-desktop" onclick="toggleDesktopSidebar()" title="사이드바 접기/펼치기" style="background: transparent; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer; padding: 0.4rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; outline: none; margin-right: 0.2rem;">
+                <button id="btn-sidebar-toggle-desktop" class="btn-sidebar-toggle-desktop" data-role="desktop-sidebar-toggle" title="사이드바 접기/펼치기" style="background: transparent; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer; padding: 0.4rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; outline: none; margin-right: 0.2rem;">
                     <i class="fa-solid fa-bars"></i>
                 </button>
                 <h2 class="library-title" style="display: flex; align-items: center; margin: 0;">
@@ -81,26 +80,25 @@
             </div>
 
             <div class="library-search-center" style="display: flex; gap: 0.5rem; align-items: center;">
-                <input type="text" id="library-search" class="form-control input-sm" placeholder="제목, 시리즈, 작가 검색..."
-                    oninput="filterBooks()" onkeydown="handleLibrarySearchKeydown(event)">
-                <button id="btn-library-search-action" class="btn-toggle" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; flex-shrink: 0;" onclick="handleLibrarySearchAction()" data-i18n="common.search">검색</button>
+                <input type="text" id="library-search" data-role="library-search-input" class="form-control input-sm" placeholder="제목, 시리즈, 작가 검색...">
+                <button id="btn-library-search-action" data-role="library-search-action" class="btn-toggle" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; flex-shrink: 0;" data-i18n="common.search">검색</button>
             </div>
 
             <div class="library-controls">
-                <button id="btn-open-filter" class="btn-toggle"
+                <button id="btn-open-filter" data-role="library-open-filter" class="btn-toggle"
                     style="margin-right: 0.5rem; padding: 0.4rem 0.8rem; display: flex; align-items: center; gap: 0.3rem;"
-                    onclick="toggleFilterModal()" data-i18n-title="header.filter_title" title="장르/태그 필터 열기">
+                    data-i18n-title="header.filter_title" title="장르/태그 필터 열기">
                     <i class="fa-solid fa-filter"></i> <span data-i18n="header.filter">필터</span>
                 </button>
-                <button id="btn-lib-sort" class="btn-toggle"
+                <button id="btn-lib-sort" data-role="library-sort-toggle" class="btn-toggle"
                     style="margin-right: 0.5rem; padding: 0.4rem 0.8rem; display: none; align-items: center; gap: 0.3rem;"
-                    onclick="toggleLibrarySort()" data-i18n-title="header.sort_title" title="정렬 조건 변경">
+                    data-i18n-title="header.sort_title" title="정렬 조건 변경">
                     <i class="fa-solid fa-sort-alpha-down"></i> <span data-i18n="header.sort_asc">가나다 오름차순</span>
                 </button>
                 <div id="library-type-toggle-group" class="library-toggle-group">
-                    <button class="btn-toggle active" id="btn-lib-general" onclick="switchLibraryType('general')" data-i18n="header.general_books">일반 도서</button>
-                    <button class="btn-toggle" id="btn-lib-adult" onclick="switchLibraryType('adult')" data-i18n="header.adult_books">성인 도서</button>
-                    <button class="btn-toggle" id="btn-lib-audiobook" onclick="switchLibraryType('audiobook')" data-i18n="header.audiobooks">오디오북</button>
+                    <button class="btn-toggle active" id="btn-lib-general" data-role="library-type-toggle" data-library-type="general" data-i18n="header.general_books">일반 도서</button>
+                    <button class="btn-toggle" id="btn-lib-adult" data-role="library-type-toggle" data-library-type="adult" data-i18n="header.adult_books">성인 도서</button>
+                    <button class="btn-toggle" id="btn-lib-audiobook" data-role="library-type-toggle" data-library-type="audiobook" data-i18n="header.audiobooks">오디오북</button>
                 </div>
             </div>
         </div>
@@ -113,7 +111,7 @@
             <div id="active-filter-badges" class="active-filter-badges">
                 <!-- JS에서 동적으로 뱃지 렌더링 -->
             </div>
-            <button id="btn-active-filter-reset" class="btn-active-filter-reset" onclick="resetAllFilters()" title="모든 필터 해제">
+            <button id="btn-active-filter-reset" data-role="library-filter-reset" class="btn-active-filter-reset" title="모든 필터 해제">
                 <i class="fa-solid fa-rotate-left"></i> <span data-i18n="filter.reset_all">전체 해제</span>
             </button>
         </div>

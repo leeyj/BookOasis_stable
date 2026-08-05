@@ -66,6 +66,40 @@
     white-space: nowrap;
 }
 
+.ui-hover-insights-edit-btn:hover {
+    color: #a855f7 !important;
+    background: rgba(168, 85, 247, 0.15) !important;
+}
+
+.ui-hover-audio-scale:hover {
+    transform: scale(1.1);
+}
+
+.ui-hover-audio-color:hover {
+    color: #fff !important;
+}
+
+.ui-hover-audio-play:hover {
+    transform: scale(1.06);
+    box-shadow: 0 12px 30px rgba(255,255,255,0.4) !important;
+}
+
+.ui-hover-library-browse:hover {
+    background: rgba(168, 85, 247, 0.3) !important;
+}
+
+.ui-hover-library-gdrive:hover {
+    background: rgba(59, 130, 246, 0.3) !important;
+}
+
+.ui-hover-library-move:hover {
+    background: rgba(245, 158, 11, 0.3) !important;
+}
+
+.ui-hover-logout-link:hover {
+    color: #f87171 !important;
+}
+
 /* ======================================================== */
 /* 🎨 DASHBOARD THEME SYSTEM (data-app-theme)               */
 /* ======================================================== */

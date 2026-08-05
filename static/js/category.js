@@ -87,3 +87,38 @@ if (typeof window !== 'undefined') {
   window.refreshPathBrowser = refreshPathBrowser;
   window.selectPathFromBrowser = selectPathFromBrowser;
 }
+
+function initCategoryModalDelegation() {
+  if (typeof document === 'undefined' || window.__categoryModalDelegationBound) return;
+
+  document.addEventListener('click', (event) => {
+    const target = event && event.target && typeof event.target.closest === 'function'
+      ? event.target.closest('[data-role="library-modal-close"], [data-role="library-category-type"], [data-role="library-open-path-browser"], [data-role="library-test-gdrive"], [data-role="library-icon-option"], [data-role="library-color-option"], [data-role="library-move"], [data-role="path-browser-close"], [data-role="path-browser-refresh"], [data-role="path-browser-select"]')
+      : null;
+    if (!target) return;
+
+    event.preventDefault();
+
+    const role = target.getAttribute('data-role');
+    if (role === 'library-modal-close') return closeLibraryModal();
+    if (role === 'library-category-type') return selectCategoryType(target.getAttribute('data-type') || 'local');
+    if (role === 'library-open-path-browser') return openPathBrowser();
+    if (role === 'library-test-gdrive') return testGDriveLinks();
+    if (role === 'library-icon-option') return selectIconOption(target);
+    if (role === 'library-color-option') return selectColorOption(target);
+    if (role === 'library-move') return triggerMoveLibrary();
+    if (role === 'path-browser-close') return closePathBrowser();
+    if (role === 'path-browser-refresh') return refreshPathBrowser();
+    if (role === 'path-browser-select') return selectPathFromBrowser();
+  }, true);
+
+  document.addEventListener('submit', (event) => {
+    const form = event && event.target;
+    if (!form || form.id !== 'library-crud-form') return;
+    submitLibraryForm(event);
+  }, true);
+
+  window.__categoryModalDelegationBound = true;
+}
+
+initCategoryModalDelegation();

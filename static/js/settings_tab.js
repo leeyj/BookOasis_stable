@@ -21,6 +21,23 @@ export {
   submitViewerSettings
 };
 
+function initSettingsTabDelegation() {
+  if (window.__settingsTabDelegationBound) return;
+
+  document.addEventListener('click', (event) => {
+    const btn = event && event.target && typeof event.target.closest === 'function'
+      ? event.target.closest('.settings-tab-btn[data-settings-tab]')
+      : null;
+    if (!btn) return;
+
+    event.preventDefault();
+    const tabId = btn.getAttribute('data-settings-tab') || 'about';
+    switchSettingsTab(tabId);
+  }, true);
+
+  window.__settingsTabDelegationBound = true;
+}
+
 function refreshScheduleTabData() {
   if (window.refreshLibraryScheduleStatuses) {
     window.refreshLibraryScheduleStatuses();
@@ -47,6 +64,7 @@ function setAboutVersionLoadError(dashEl, latestEl, stateEl, messageKey, fallbac
 
 // 환경설정 내부 탭 전환 함수
 export function switchSettingsTab(tabId) {
+  initSettingsTabDelegation();
   // 일반 사용자는 어드민 전용 탭에 접근하지 못하도록 차단 및 'about'으로 우회
   const isAdmin = window.currentUser && window.currentUser.role === 'admin';
   const adminOnlyTabs = ['schedule', 'plugins', 'reports', 'users', 'permissions', 'trash'];
@@ -79,7 +97,7 @@ export function switchSettingsTab(tabId) {
   
   // 4. 활성화된 버튼 표시
   const activeBtn = Array.from(document.querySelectorAll('.settings-tab-btn')).find(btn => {
-    return btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(`'${tabId}'`);
+    return btn.getAttribute('data-settings-tab') === tabId;
   });
   if (activeBtn) {
     activeBtn.classList.add('active');
@@ -316,4 +334,26 @@ function submitViewerSettings(event) {
   } catch (e) {
     console.error('[Settings-Viewer] Error occurred inside submitViewerSettings:', e);
   }
+}
+
+if (!window.__viewerSettingsDelegationBound) {
+  document.addEventListener('submit', (event) => {
+    const form = event && event.target;
+    if (!form || form.id !== 'settings-viewer-form') return;
+    submitViewerSettings(event);
+  }, true);
+
+  document.addEventListener('input', (event) => {
+    const target = event && event.target;
+    if (!target || !(target.matches instanceof Function)) return;
+    if (!target.matches('[data-role="viewer-padding-range"]')) return;
+
+    const labelId = target.getAttribute('data-target-label');
+    const labelEl = labelId ? document.getElementById(labelId) : null;
+    if (labelEl) {
+      labelEl.innerText = target.value;
+    }
+  }, true);
+
+  window.__viewerSettingsDelegationBound = true;
 }

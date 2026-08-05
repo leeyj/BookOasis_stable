@@ -8,7 +8,7 @@
                         <p style="font-size: 0.82rem; color: #94a3b8; margin: 0.4rem 0 0 0;" data-i18n="settings.general_subtitle">북오아시스 미디어 서버의 전반적인 환경설정을 직접 관리할 수 있습니다.</p>
                     </div>
                     <div style="background: rgba(30, 41, 59, 0.25); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 1.5rem; backdrop-filter: blur(10px); color: #cbd5e1;">
-                        <form id="settings-general-form" onsubmit="submitGeneralSettings(event)" style="display: flex; flex-direction: column; gap: 2rem;">
+                        <form id="settings-general-form" style="display: flex; flex-direction: column; gap: 2rem;">
 
                             <!-- ============================================================ -->
                             <!-- 🎨 1. 화면 및 뷰어 환경 설정 (UI & Viewer Settings)          -->
@@ -25,7 +25,7 @@
                                         <label for="setting-dashboard-theme" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
                                             <i class="fa-solid fa-palette" style="color: #a855f7; margin-right: 0.3rem;"></i> <span data-i18n="settings.dashboard_theme_label">대시보드 테마 설정</span>
                                         </label>
-                                        <select id="setting-dashboard-theme" name="DASHBOARD_THEME" onchange="changeDashboardTheme(this.value)" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; cursor: pointer;">
+                                        <select id="setting-dashboard-theme" name="DASHBOARD_THEME" data-role="general-dashboard-theme" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; cursor: pointer;">
                                             <option value="purple" data-i18n="settings.theme_purple">🟣 퍼플 (BookOasis 시그니처 기본)</option>
                                             <option value="dark" data-i18n="settings.theme_dark">🌙 클래식 다크 (OLED Black)</option>
                                             <option value="light" data-i18n="settings.theme_light">☀️ 모던 라이트 (Clean White)</option>
@@ -41,7 +41,7 @@
                                      <!-- 대시보드 독서 통계 위젯 표시 체크박스 -->
                                      <div class="library-form-group">
                                          <label for="setting-show-dashboard-insights" style="font-weight: 700; color: #fff; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
-                                             <input type="checkbox" id="setting-show-dashboard-insights" name="SHOW_DASHBOARD_INSIGHTS" checked onchange="toggleDashboardInsightsSetting(this.checked)" style="width: 18px; height: 18px; cursor: pointer; accent-color: #a855f7;">
+                                             <input type="checkbox" id="setting-show-dashboard-insights" name="SHOW_DASHBOARD_INSIGHTS" data-role="general-dashboard-insights" checked style="width: 18px; height: 18px; cursor: pointer; accent-color: #a855f7;">
                                              <i class="fa-solid fa-chart-line" style="color: #38bdf8; margin-right: 0.2rem;"></i> <span data-i18n="settings.show_dashboard_insights">대시보드 독서 통계 위젯 표시</span>
                                          </label>
                                          <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.3rem 0 0 1.8rem;" data-i18n="settings.show_dashboard_insights_desc">대시보드 상단에 연속 독서 일수, 진행 중 도서, 독서 목표 및 장르 통계 카드를 노출합니다.</p>
@@ -52,7 +52,7 @@
                                         <label for="setting-thumbnail-width" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
                                             <i class="fa-solid fa-image" style="color: #a855f7; margin-right: 0.3rem;"></i> <span data-i18n="settings.thumb_width_label">보관함 도서 카드 너비</span>: <span id="setting-thumbnail-width-val" style="color: #c084fc;">160</span>px
                                         </label>
-                                        <input type="range" id="setting-thumbnail-width" name="BOOK_THUMBNAIL_WIDTH" min="120" max="240" step="10" value="160" style="width: 100%; max-width: 480px; cursor: pointer; accent-color: #a855f7;" oninput="document.getElementById('setting-thumbnail-width-val').innerText = this.value">
+                                        <input type="range" id="setting-thumbnail-width" name="BOOK_THUMBNAIL_WIDTH" min="120" max="240" step="10" value="160" data-role="general-thumbnail-width" style="width: 100%; max-width: 480px; cursor: pointer; accent-color: #a855f7;">
                                         <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;" data-i18n="settings.thumb_width_desc">보관함의 도서 커버 크기를 120px ~ 240px 범위 내에서 본인 모니터 해상도에 최적화하여 조절합니다.</p>
                                     </div>
 
@@ -164,7 +164,7 @@
                                         </label>
                                         <div style="display: flex; gap: 0.5rem; align-items: center; max-width: 480px; width: 100%; flex-wrap: wrap;">
                                             <input type="text" id="setting-lazy-scan-cron" name="LAZY_SCAN_CRON" value="0 3 * * *" style="flex: 1; min-width: 200px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;" required>
-                                            <button type="button" onclick="triggerLazyScanNow()" class="btn-toggle" style="background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%); color: #fff; border: none; padding: 0.6rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.3rem; height: 38px;">
+                                            <button type="button" data-role="general-lazy-scan-now" class="btn-toggle" style="background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%); color: #fff; border: none; padding: 0.6rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.3rem; height: 38px;">
                                                 <i class="fa-solid fa-play"></i> <span data-i18n="settings.btn_run_now">지금 실행</span>
                                             </button>
                                         </div>

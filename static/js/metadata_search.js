@@ -8,6 +8,25 @@ let currentSeriesName = null;
 let isSeriesMode = false;
 let cachedPlugins = null; // 플러그인 캐시
 
+function initMetadataSearchDelegation() {
+  if (window.__metadataSearchDelegationBound) return;
+
+  document.addEventListener('click', (event) => {
+    const target = event && event.target && typeof event.target.closest === 'function'
+      ? event.target.closest('[data-role="metadata-modal-close"], [data-role="metadata-search-submit"]')
+      : null;
+    if (!target) return;
+
+    event.preventDefault();
+    const role = target.getAttribute('data-role');
+    if (role === 'metadata-modal-close') return closeMetadataSearchModal();
+    if (role === 'metadata-search-submit') return performMetadataSearch();
+  }, true);
+
+  window.__metadataSearchDelegationBound = true;
+}
+initMetadataSearchDelegation();
+
 export function invalidateSearchModalPluginsCache() {
   cachedPlugins = null;
 }

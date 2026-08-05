@@ -2,7 +2,25 @@
 let permissionSessionData = null;
 let activePermissionSession = 'general';
 
+function initPermissionDelegation() {
+  if (window.__permissionDelegationBound) return;
+
+  document.addEventListener('click', (event) => {
+    const tabButton = event && event.target && typeof event.target.closest === 'function'
+      ? event.target.closest('.permission-session-tab[data-permission-session]')
+      : null;
+    if (!tabButton) return;
+
+    event.preventDefault();
+    const sessionId = tabButton.getAttribute('data-permission-session') || 'general';
+    switchPermissionSessionTab(sessionId);
+  }, true);
+
+  window.__permissionDelegationBound = true;
+}
+
 export async function loadPermissionsMatrix() {
+  initPermissionDelegation();
   const generalHeaderRow = document.getElementById('permissions-table-header');
   const generalBody = document.getElementById('permissions-table-body');
   const adultBody = document.getElementById('permissions-adult-table-body');

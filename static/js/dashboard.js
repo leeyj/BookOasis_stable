@@ -166,7 +166,7 @@ export async function loadDashboardPlugins(requestToken = null) {
         // 탭 버튼 생성
         if (tabsContainer) {
           const tabBtnHtml = `
-            <button class="settings-tab-btn plugin-dynamic-tab-btn" id="tab-btn-${widgetId}" onclick="switchPluginsViewTab('${widgetId}')">
+            <button class="settings-tab-btn plugin-dynamic-tab-btn" id="tab-btn-${widgetId}" data-role="plugins-view-tab" data-plugin-tab="${widgetId}">
               <i class="${iconClass}"></i> <span>${title}</span>
             </button>
           `;
@@ -241,6 +241,37 @@ export function switchPluginsViewTab(tabId) {
 }
 window.switchPluginsViewTab = switchPluginsViewTab;
 
+if (!window.__pluginsViewTabDelegationBound) {
+  document.addEventListener('click', (event) => {
+    const target = event && event.target && typeof event.target.closest === 'function'
+      ? event.target.closest('[data-role="plugins-view-tab"], [data-role="dashboard-widget-item"]')
+      : null;
+    if (!target) return;
+
+    event.preventDefault();
+    if (target.getAttribute('data-role') === 'plugins-view-tab') {
+      switchPluginsViewTab(target.getAttribute('data-plugin-tab') || 'common-desk');
+      return;
+    }
+
+    const action = target.getAttribute('data-item-action');
+    if (action === 'open-reader' && typeof window.openReader === 'function') {
+      const bookId = Number.parseInt(target.getAttribute('data-book-id') || '', 10);
+      const pagesRead = Number.parseInt(target.getAttribute('data-pages-read') || '0', 10) || 0;
+      const totalPages = Number.parseInt(target.getAttribute('data-total-pages') || '0', 10) || 0;
+      if (Number.isFinite(bookId) && bookId > 0) {
+        window.openReader(bookId, target.getAttribute('data-file-format') || '', target.getAttribute('data-book-title') || '', pagesRead, totalPages);
+      }
+      return;
+    }
+
+    if (action === 'open-detail' && typeof window.openBookDetail === 'function') {
+      window.openBookDetail(event, target.getAttribute('data-series-name') || '', target.getAttribute('data-library-id') || null);
+    }
+  }, true);
+  window.__pluginsViewTabDelegationBound = true;
+}
+
 async function loadDashboardWidgetData(pluginId, limit, contentId, requestToken) {
   if (requestToken !== pluginsLoadToken) return;
 
@@ -290,10 +321,10 @@ async function loadDashboardWidgetData(pluginId, limit, contentId, requestToken)
         let cursorStyle = '';
         if (!isExternal) {
             if (rawBookId && rawFileFormat) {
-                clickAttr = `onclick="if(window.openReader) { window.openReader(${rawBookId}, '${rawFileFormat}', '${rawTitle.replace(/'/g, "\\'")}', ${rawPagesRead}, ${rawTotalPages}); event.preventDefault(); }"`;
+            clickAttr = `data-role="dashboard-widget-item" data-item-action="open-reader" data-book-id="${rawBookId}" data-file-format="${escapeHtml(rawFileFormat)}" data-book-title="${escapeHtml(rawTitle)}" data-pages-read="${rawPagesRead}" data-total-pages="${rawTotalPages}"`;
                 cursorStyle = 'cursor: pointer;';
             } else if (rawSeriesName) {
-                clickAttr = `onclick="if(window.openBookDetail) { window.openBookDetail(event, '${rawSeriesName.replace(/'/g, "\\'")}', ${rawLibraryId ? `'${rawLibraryId}'` : 'null'}); event.preventDefault(); }"`;
+            clickAttr = `data-role="dashboard-widget-item" data-item-action="open-detail" data-series-name="${escapeHtml(rawSeriesName)}" data-library-id="${escapeHtml(rawLibraryId)}"`;
                 cursorStyle = 'cursor: pointer;';
             }
         }

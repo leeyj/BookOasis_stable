@@ -6,6 +6,19 @@ import { renderDetailHeader, renderVolumesList, renderRecommendList } from '../d
 import { updateCurrentCategoryIndicator } from '../category_indicator.js';
 import { detailVolumeViewState } from './volume_controller.js';
 import { encodeDetailParams } from '../url_obfuscator.js';
+import { bindDetailInteractions } from './interactions.js';
+
+bindDetailInteractions();
+
+if (!document.body.dataset.detailBackDelegated) {
+  document.body.dataset.detailBackDelegated = '1';
+  document.addEventListener('click', (event) => {
+    const backButton = event.target.closest('[data-role="detail-back-to-list"]');
+    if (!backButton) return;
+    event.preventDefault();
+    goBackToList();
+  });
+}
 
 // 그리드 뷰 → 상세 뷰 전환
 export async function openBookDetail(event, seriesName, libraryId, representativeBookId = null, displayTitle = '') {
@@ -42,7 +55,7 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
 
   // 로딩 표시
   detailView.innerHTML = `
-    <button class="btn-back-to-list" onclick="goBackToList()">
+    <button class="btn-back-to-list" data-role="detail-back-to-list">
       <i class="fa-solid fa-arrow-left"></i> ${i18n.t('modal.go_back')}
     </button>
     <div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('modal.loading_detail')}</div>
@@ -81,7 +94,7 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
       );
 
       detailView.innerHTML = `
-        <button class="btn-back-to-list" onclick="goBackToList()">
+        <button class="btn-back-to-list" data-role="detail-back-to-list">
           <i class="fa-solid fa-arrow-left"></i> ${i18n.t('modal.go_back')}
         </button>
         ${headerHtml}
@@ -180,7 +193,7 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
       }
     } else {
       detailView.innerHTML = `
-        <button class="btn-back-to-list" onclick="goBackToList()">
+        <button class="btn-back-to-list" data-role="detail-back-to-list">
           <i class="fa-solid fa-arrow-left"></i> ${i18n.t('modal.go_back')}
         </button>
         <div class="loading-spinner">${i18n.t('modal.load_detail_fail', {error: data.error || ''})}</div>
@@ -189,7 +202,7 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
   } catch (e) {
     console.error('[detail] openBookDetail 에러:', e);
     detailView.innerHTML = `
-      <button class="btn-back-to-list" onclick="goBackToList()">
+      <button class="btn-back-to-list" data-role="detail-back-to-list">
         <i class="fa-solid fa-arrow-left"></i> ${i18n.t('modal.go_back')}
       </button>
       <div class="loading-spinner">${i18n.t('modal.load_detail_error')}</div>

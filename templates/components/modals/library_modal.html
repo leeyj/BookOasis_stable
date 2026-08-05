@@ -3,9 +3,9 @@
     <div class="library-modal-content">
         <div class="library-modal-header">
             <h3 id="library-modal-title" data-i18n="modal.add_category">카테고리 추가</h3>
-            <span class="library-modal-close" onclick="closeLibraryModal()">&times;</span>
+            <span class="library-modal-close" data-role="library-modal-close">&times;</span>
         </div>
-        <form id="library-crud-form" onsubmit="submitLibraryForm(event)">
+        <form id="library-crud-form">
             <input type="hidden" id="library-form-id" name="id">
             <div class="library-form-group">
                 <label for="library-form-name" data-i18n="modal.category_name_label">카테고리 이름</label>
@@ -14,10 +14,10 @@
             <div class="library-form-group">
                 <label data-i18n="modal.category_type_label">카테고리 유형</label>
                 <div class="category-type-selector" style="display: flex; gap: 0.5rem; margin-top: 0.4rem;">
-                    <button type="button" class="category-type-btn active" data-type="local" onclick="selectCategoryType('local')">
+                    <button type="button" class="category-type-btn active" data-role="library-category-type" data-type="local">
                         <i class="fa-solid fa-folder"></i> <span data-i18n="modal.type_local">로컬 / 마운트 경로</span>
                     </button>
-                    <button type="button" class="category-type-btn" data-type="gdrive" onclick="selectCategoryType('gdrive')" hidden aria-hidden="true" style="display: none !important;">
+                    <button type="button" class="category-type-btn" data-role="library-category-type" data-type="gdrive" hidden aria-hidden="true" style="display: none !important;">
                         <i class="fa-brands fa-google-drive" style="color: #4285F4;"></i> <span data-i18n="modal.type_gdrive">구글 드라이브 공유 링크</span>
                     </button>
                 </div>
@@ -27,10 +27,10 @@
                 <label for="library-form-path" id="library-form-path-label" data-i18n="modal.category_path_label">서버 물리 경로 (엔터로 여러 개 입력 가능)</label>
                 <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
                     <textarea id="library-form-path" name="physical_path" required rows="3" maxlength="8192" data-i18n-placeholder="modal.category_path_placeholder" placeholder="예: C:\library\fantasy&#10;/home/user/manga" style="flex: 1;"></textarea>
-                    <button type="button" id="btn-browse-paths" class="btn-browse-paths" onclick="openPathBrowser()" style="padding: 0.5rem 1rem; background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.5); color: #a855f7; border-radius: 4px; cursor: pointer; font-weight: 600; white-space: nowrap; align-self: flex-start; transition: all 0.2s;" onmouseenter="this.style.background='rgba(168, 85, 247, 0.3)'" onmouseleave="this.style.background='rgba(168, 85, 247, 0.2)'" title="찾아보기">
+                    <button type="button" id="btn-browse-paths" class="btn-browse-paths ui-hover-library-browse" data-role="library-open-path-browser" style="padding: 0.5rem 1rem; background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.5); color: #a855f7; border-radius: 4px; cursor: pointer; font-weight: 600; white-space: nowrap; align-self: flex-start; transition: all 0.2s;" title="찾아보기">
                         <i class="fa-solid fa-folder-open"></i> 찾아보기
                     </button>
-                    <button type="button" id="btn-test-gdrive-links" class="btn-test-gdrive-links" onclick="testGDriveLinks()" style="display: none; padding: 0.5rem 1rem; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.5); color: #60a5fa; border-radius: 4px; cursor: pointer; font-weight: 600; white-space: nowrap; align-self: flex-start; transition: all 0.2s;" onmouseenter="this.style.background='rgba(59, 130, 246, 0.3)'" onmouseleave="this.style.background='rgba(59, 130, 246, 0.2)'" title="링크 연결 테스트">
+                    <button type="button" id="btn-test-gdrive-links" class="btn-test-gdrive-links ui-hover-library-gdrive" data-role="library-test-gdrive" style="display: none; padding: 0.5rem 1rem; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.5); color: #60a5fa; border-radius: 4px; cursor: pointer; font-weight: 600; white-space: nowrap; align-self: flex-start; transition: all 0.2s;" title="링크 연결 테스트">
                         <i class="fa-solid fa-bolt"></i> <span data-i18n="modal.btn_test_gdrive_link">연결 테스트</span>
                     </button>
                 </div>
@@ -123,18 +123,18 @@
             <div class="library-form-group" style="margin-top: 1rem;">
                 <label data-i18n="modal.category_icon_label">카테고리 아이콘</label>
                 <div class="category-icon-selector" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem; margin-top: 0.4rem;">
-                    <div class="icon-option active" data-icon="fa-book" onclick="selectIconOption(this)"><i class="fa-solid fa-book"></i></div>
-                    <div class="icon-option" data-icon="fa-book-open" onclick="selectIconOption(this)"><i class="fa-solid fa-book-open"></i></div>
-                    <div class="icon-option" data-icon="fa-bookmark" onclick="selectIconOption(this)"><i class="fa-solid fa-bookmark"></i></div>
-                    <div class="icon-option" data-icon="fa-images" onclick="selectIconOption(this)"><i class="fa-solid fa-images"></i></div>
-                    <div class="icon-option" data-icon="fa-masks-theater" onclick="selectIconOption(this)"><i class="fa-solid fa-masks-theater"></i></div>
-                    <div class="icon-option" data-icon="fa-newspaper" onclick="selectIconOption(this)"><i class="fa-solid fa-newspaper"></i></div>
-                    <div class="icon-option" data-icon="fa-file-lines" onclick="selectIconOption(this)"><i class="fa-solid fa-file-lines"></i></div>
-                    <div class="icon-option" data-icon="fa-pen-nib" onclick="selectIconOption(this)"><i class="fa-solid fa-pen-nib"></i></div>
-                    <div class="icon-option" data-icon="fa-compass" onclick="selectIconOption(this)"><i class="fa-solid fa-compass"></i></div>
-                    <div class="icon-option" data-icon="fa-music" onclick="selectIconOption(this)"><i class="fa-solid fa-music"></i></div>
-                    <div class="icon-option" data-icon="fa-film" onclick="selectIconOption(this)"><i class="fa-solid fa-film"></i></div>
-                    <div class="icon-option" data-icon="fa-star" onclick="selectIconOption(this)"><i class="fa-solid fa-star"></i></div>
+                    <div class="icon-option active" data-role="library-icon-option" data-icon="fa-book"><i class="fa-solid fa-book"></i></div>
+                    <div class="icon-option" data-role="library-icon-option" data-icon="fa-book-open"><i class="fa-solid fa-book-open"></i></div>
+                    <div class="icon-option" data-role="library-icon-option" data-icon="fa-bookmark"><i class="fa-solid fa-bookmark"></i></div>
+                    <div class="icon-option" data-role="library-icon-option" data-icon="fa-images"><i class="fa-solid fa-images"></i></div>
+                    <div class="icon-option" data-role="library-icon-option" data-icon="fa-masks-theater"><i class="fa-solid fa-masks-theater"></i></div>
+                    <div class="icon-option" data-role="library-icon-option" data-icon="fa-newspaper"><i class="fa-solid fa-newspaper"></i></div>
+                    <div class="icon-option" data-role="library-icon-option" data-icon="fa-file-lines"><i class="fa-solid fa-file-lines"></i></div>
+                    <div class="icon-option" data-role="library-icon-option" data-icon="fa-pen-nib"><i class="fa-solid fa-pen-nib"></i></div>
+                    <div class="icon-option" data-role="library-icon-option" data-icon="fa-compass"><i class="fa-solid fa-compass"></i></div>
+                    <div class="icon-option" data-role="library-icon-option" data-icon="fa-music"><i class="fa-solid fa-music"></i></div>
+                    <div class="icon-option" data-role="library-icon-option" data-icon="fa-film"><i class="fa-solid fa-film"></i></div>
+                    <div class="icon-option" data-role="library-icon-option" data-icon="fa-star"><i class="fa-solid fa-star"></i></div>
                 </div>
                 <input type="hidden" id="library-form-icon" name="icon" value="fa-book">
             </div>
@@ -142,21 +142,21 @@
             <div class="library-form-group" style="margin-top: 1rem;">
                 <label data-i18n="modal.category_color_label">카테고리 색상</label>
                 <div class="category-color-selector" style="display: flex; gap: 0.6rem; margin-top: 0.4rem; flex-wrap: wrap;">
-                    <div class="color-option active" data-color="#94a3b8" style="background-color: #94a3b8;" onclick="selectColorOption(this)"></div>
-                    <div class="color-option" data-color="#a855f7" style="background-color: #a855f7;" onclick="selectColorOption(this)"></div>
-                    <div class="color-option" data-color="#3b82f6" style="background-color: #3b82f6;" onclick="selectColorOption(this)"></div>
-                    <div class="color-option" data-color="#10b981" style="background-color: #10b981;" onclick="selectColorOption(this)"></div>
-                    <div class="color-option" data-color="#f59e0b" style="background-color: #f59e0b;" onclick="selectColorOption(this)"></div>
-                    <div class="color-option" data-color="#ef4444" style="background-color: #ef4444;" onclick="selectColorOption(this)"></div>
-                    <div class="color-option" data-color="#ec4899" style="background-color: #ec4899;" onclick="selectColorOption(this)"></div>
-                    <div class="color-option" data-color="#06b6d4" style="background-color: #06b6d4;" onclick="selectColorOption(this)"></div>
+                    <div class="color-option active" data-role="library-color-option" data-color="#94a3b8" style="background-color: #94a3b8;"></div>
+                    <div class="color-option" data-role="library-color-option" data-color="#a855f7" style="background-color: #a855f7;"></div>
+                    <div class="color-option" data-role="library-color-option" data-color="#3b82f6" style="background-color: #3b82f6;"></div>
+                    <div class="color-option" data-role="library-color-option" data-color="#10b981" style="background-color: #10b981;"></div>
+                    <div class="color-option" data-role="library-color-option" data-color="#f59e0b" style="background-color: #f59e0b;"></div>
+                    <div class="color-option" data-role="library-color-option" data-color="#ef4444" style="background-color: #ef4444;"></div>
+                    <div class="color-option" data-role="library-color-option" data-color="#ec4899" style="background-color: #ec4899;"></div>
+                    <div class="color-option" data-role="library-color-option" data-color="#06b6d4" style="background-color: #06b6d4;"></div>
                 </div>
                 <input type="hidden" id="library-form-color" name="color" value="#94a3b8">
             </div>
             
             <div class="library-modal-footer">
-                <button type="button" class="btn-cancel" onclick="closeLibraryModal()" data-i18n="common.cancel">취소</button>
-                <button type="button" class="btn-move" id="library-form-move-btn" style="display: none; background: rgba(245, 158, 11, 0.2); border: 1px solid rgba(245, 158, 11, 0.5); color: #f59e0b; padding: 0.5rem 1rem; border-radius: 4px; font-weight: 600; cursor: pointer; transition: all 0.2s;" onmouseenter="this.style.background='rgba(245, 158, 11, 0.3)'" onmouseleave="this.style.background='rgba(245, 158, 11, 0.2)'" onclick="triggerMoveLibrary()">이동</button>
+                <button type="button" class="btn-cancel" data-role="library-modal-close" data-i18n="common.cancel">취소</button>
+                <button type="button" class="btn-move ui-hover-library-move" id="library-form-move-btn" data-role="library-move" style="display: none; background: rgba(245, 158, 11, 0.2); border: 1px solid rgba(245, 158, 11, 0.5); color: #f59e0b; padding: 0.5rem 1rem; border-radius: 4px; font-weight: 600; cursor: pointer; transition: all 0.2s;">이동</button>
                 <button type="submit" class="btn-submit" id="library-form-submit-btn" data-i18n="common.save">저장</button>
             </div>
         </form>
@@ -168,14 +168,14 @@
     <div class="library-modal-content" style="width: 90%; max-width: 600px; max-height: 70vh; display: flex; flex-direction: column;">
         <div class="library-modal-header">
             <h3 style="margin: 0;">경로 탐색</h3>
-            <span class="library-modal-close" onclick="closePathBrowser()">&times;</span>
+            <span class="library-modal-close" data-role="path-browser-close">&times;</span>
         </div>
         
         <!-- 현재 경로 표시 및 입력 -->
         <div style="padding: 0.8rem; background: rgba(168, 85, 247, 0.05); border-bottom: 1px solid rgba(168, 85, 247, 0.2); display: flex; gap: 0.5rem; align-items: center;">
             <label style="flex-shrink: 0; color: #a855f7; font-weight: 600;">경로:</label>
             <input type="text" id="path-browser-input" value="" maxlength="1024" style="flex: 1; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; padding: 0.5rem 0.8rem; border-radius: 4px; font-size: 0.85rem;" placeholder="경로를 입력하거나 아래에서 선택하세요">
-            <button type="button" onclick="refreshPathBrowser()" style="padding: 0.5rem 0.8rem; background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.5); color: #a855f7; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">
+            <button type="button" data-role="path-browser-refresh" style="padding: 0.5rem 0.8rem; background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.5); color: #a855f7; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">
                 <i class="fa-solid fa-rotate"></i> 새로고침
             </button>
         </div>
@@ -187,8 +187,8 @@
         
         <!-- 하단 버튼 -->
         <div style="padding: 0.8rem; display: flex; gap: 0.5rem; justify-content: flex-end;">
-            <button type="button" class="btn-cancel" onclick="closePathBrowser()" style="padding: 0.5rem 1rem; background: rgba(100, 116, 139, 0.2); border: 1px solid rgba(100, 116, 139, 0.5); color: #cbd5e1; border-radius: 4px; cursor: pointer;">취소</button>
-            <button type="button" onclick="selectPathFromBrowser()" style="padding: 0.5rem 1rem; background: #a855f7; border: 1px solid #a855f7; color: #fff; border-radius: 4px; cursor: pointer; font-weight: 600;">선택</button>
+            <button type="button" class="btn-cancel" data-role="path-browser-close" style="padding: 0.5rem 1rem; background: rgba(100, 116, 139, 0.2); border: 1px solid rgba(100, 116, 139, 0.5); color: #cbd5e1; border-radius: 4px; cursor: pointer;">취소</button>
+            <button type="button" data-role="path-browser-select" style="padding: 0.5rem 1rem; background: #a855f7; border: 1px solid #a855f7; color: #fff; border-radius: 4px; cursor: pointer; font-weight: 600;">선택</button>
         </div>
     </div>
 </div>

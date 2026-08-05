@@ -1,7 +1,14 @@
 // context_menu.js – 카테고리 사이드바 우클릭 및 모바일 롱터치 컨텍스트 메뉴
 import { state } from '../state.js';
+import { bindFloatingMenuOutsideClose, hideAllContextMenus, positionMenuAtPoint } from '../context_menu_manager.js';
 
 export let currentTargetLibrary = null; // 우클릭 대상 저장
+let suppressSidebarClickUntil = 0;
+
+function isCurrentUserAdmin() {
+  const user = state.currentUser || window.currentUser || {};
+  return String(user.role || '').trim().toLowerCase() === 'admin';
+}
 
 export function setCurrentTargetLibrary(val) {
   currentTargetLibrary = val;
@@ -11,14 +18,37 @@ export function bindSidebarContextMenu() {
   const sidebar = document.querySelector('.library-sidebar');
   const contextMenu = document.getElementById('library-context-menu');
 
+  if (!sidebar || sidebar.dataset.sidebarContextBound === '1') {
+    return;
+  }
+  sidebar.dataset.sidebarContextBound = '1';
+
   if (sidebar) {
+    // 우클릭 직후 발생하는 click/onClick 전파로 카테고리 전환이 일어나는 것을 차단
+    sidebar.addEventListener('click', (e) => {
+      if (Date.now() < suppressSidebarClickUntil) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof e.stopImmediatePropagation === 'function') {
+          e.stopImmediatePropagation();
+        }
+      }
+    }, true);
+
     sidebar.addEventListener('contextmenu', (e) => {
-      const isAdmin = state.currentUser && state.currentUser.role === 'admin';
-      if (!isAdmin) return;
-      
-      e.preventDefault();
-      
+      const isAdmin = isCurrentUserAdmin();
       const menuItem = e.target.closest('.menu-item');
+      if (!isAdmin) {
+        return;
+      }
+      
+      suppressSidebarClickUntil = Date.now() + 700;
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof e.stopImmediatePropagation === 'function') {
+        e.stopImmediatePropagation();
+      }
+
       if (menuItem) {
         const type = menuItem.dataset.type;
         const id = menuItem.dataset.id;
@@ -73,7 +103,7 @@ export function bindSidebarContextMenu() {
     });
 
     sidebar.addEventListener('touchstart', (e) => {
-      const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+      const isAdmin = isCurrentUserAdmin();
       if (!isAdmin) return;
 
       const menuItem = e.target.closest('.menu-item');
@@ -84,6 +114,7 @@ export function bindSidebarContextMenu() {
         
         if (typeof window.handleLongPressTouchStart === 'function') {
           window.handleLongPressTouchStart(e, (x, y) => {
+            suppressSidebarClickUntil = Date.now() + 900;
             currentTargetLibrary = { id, name, type };
 
             if (type === 'system') {
@@ -138,35 +169,35 @@ export function bindSidebarContextMenu() {
     });
   }
 
-  // 문서 클릭 시 컨텍스트 메뉴 닫기
-  document.addEventListener('click', () => {
-    if (contextMenu) contextMenu.style.display = 'none';
+  // 문서 클릭 시 컨텍스트 메뉴 닫기 (중복 바인딩 방지)
+  bindFloatingMenuOutsideClose(contextMenu, {
+    eventTypes: ['click'],
+    capture: true,
+    shouldIgnoreEvent: () => Date.now() < suppressSidebarClickUntil,
   });
+
+  if (!window.__libraryContextActionBound) {
+    document.addEventListener('click', (event) => {
+      const actionEl = event && event.target && typeof event.target.closest === 'function'
+        ? event.target.closest('[data-role="library-context-action"]')
+        : null;
+      if (!actionEl) return;
+
+      event.preventDefault();
+      hideAllContextMenus();
+      const action = actionEl.getAttribute('data-action');
+      if (action === 'scan') return window.triggerScanLibrary?.(false);
+      if (action === 'force-scan') return window.triggerScanLibrary?.(true);
+      if (action === 'scan-covers') return window.triggerScanLibraryCovers?.();
+      if (action === 'cancel-scan') return window.triggerCancelScanLibrary?.();
+      if (action === 'add') return window.triggerAddLibrary?.();
+      if (action === 'edit') return window.triggerEditLibrary?.();
+      if (action === 'delete') return window.triggerDeleteLibrary?.();
+    }, true);
+    window.__libraryContextActionBound = true;
+  }
 }
 
 export function showContextMenu(x, y) {
-  const contextMenu = document.getElementById('library-context-menu');
-  if (!contextMenu) return;
-  
-  // 임시 표시하여 높이 측정
-  contextMenu.style.display = 'block';
-  const menuHeight = contextMenu.offsetHeight || 180;
-  const menuWidth = contextMenu.offsetWidth || 160;
-  
-  // 뷰포트 경계 검사 및 조정
-  let targetY = y + window.scrollY;
-  let targetX = x + window.scrollX;
-  
-  if (y + menuHeight > window.innerHeight) {
-    targetY = (y - menuHeight) + window.scrollY;
-    // 음수가 되지 않도록 최소 한계 보정
-    if (targetY < window.scrollY) targetY = window.scrollY;
-  }
-  
-  if (x + menuWidth > window.innerWidth) {
-    targetX = (x - menuWidth) + window.scrollX;
-  }
-  
-  contextMenu.style.left = `${targetX}px`;
-  contextMenu.style.top = `${targetY}px`;
+  positionMenuAtPoint('library-context-menu', x, y, { zIndex: 20050 });
 }

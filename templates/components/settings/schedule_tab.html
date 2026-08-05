@@ -7,7 +7,7 @@
             <p style="font-size: 0.82rem; color: #94a3b8; margin: 0.4rem 0 0 0;" data-i18n="settings.schedule_subtitle">각 카테고리의 동기화 스캔 스케줄(Cron) 주기를 일괄 관리하고 즉시 실행할 수 있습니다.</p>
             <p style="font-size: 0.76rem; color: #64748b; margin: 0.3rem 0 0 0;" data-i18n="settings.schedule_rclone_tip">💡 Tip! : Rclone RC 통신에 ID/비밀번호가 필요한 경우 http://id:password@localhost:5572 형식으로 등록하면 됩니다.</p>
         </div>
-        <button type="button" onclick="runAllLibrariesScanNow(false)" class="btn-toggle" style="background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%); color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; height: 36px; font-size: 0.85rem; box-shadow: 0 4px 12px rgba(168,85,247,0.25);">
+        <button type="button" data-role="schedule-scan-all" class="btn-toggle" style="background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%); color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; height: 36px; font-size: 0.85rem; box-shadow: 0 4px 12px rgba(168,85,247,0.25);">
             <i class="fa-solid fa-play"></i> <span data-i18n="settings.btn_scan_all">일괄 스캔</span>
         </button>
     </div>
@@ -36,7 +36,7 @@
     <div class="library-modal-content" style="max-width: 480px;">
         <div class="library-modal-header">
             <h3 id="scan-settings-modal-title" style="margin: 0; color: #fff; font-size: 1.25rem;"><i class="fa-solid fa-gears" style="color: #a855f7; margin-right: 0.5rem;"></i> 카테고리 설정</h3>
-            <span class="library-modal-close" onclick="closeScanSettingsModal()">&times;</span>
+            <span class="library-modal-close" data-role="schedule-modal-close">&times;</span>
         </div>
         <div style="display: flex; flex-direction: column; gap: 1.2rem; color: #cbd5e1;">
             <input type="hidden" id="scan-settings-library-id">
@@ -59,7 +59,7 @@
                     <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.55rem;">
                         <div>
                             <label for="scan-settings-helper-mode" style="display:block; margin-bottom: 0.3rem; font-size: 0.76rem; color: #cbd5e1;">반복 유형</label>
-                            <select id="scan-settings-helper-mode" class="form-control" onchange="onCronHelperModeChange()" style="width: 100%; box-sizing: border-box; background: rgba(15,23,42,0.62); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 0.45rem 0.6rem; border-radius: 6px;">
+                            <select id="scan-settings-helper-mode" data-role="schedule-helper-mode" class="form-control" style="width: 100%; box-sizing: border-box; background: rgba(15,23,42,0.62); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 0.45rem 0.6rem; border-radius: 6px;">
                                 <option value="custom">직접 입력</option>
                                 <option value="daily">매일</option>
                                 <option value="weekdays">평일</option>
@@ -70,13 +70,13 @@
                         </div>
                         <div>
                             <label for="scan-settings-helper-time" style="display:block; margin-bottom: 0.3rem; font-size: 0.76rem; color: #cbd5e1;">실행 시간</label>
-                            <input type="time" id="scan-settings-helper-time" value="03:00" oninput="updateCronHelperSummary()" class="form-control" style="width: 100%; box-sizing: border-box; background: rgba(15,23,42,0.62); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 0.45rem 0.6rem; border-radius: 6px;">
+                            <input type="time" id="scan-settings-helper-time" value="03:00" data-role="schedule-helper-time" class="form-control" style="width: 100%; box-sizing: border-box; background: rgba(15,23,42,0.62); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 0.45rem 0.6rem; border-radius: 6px;">
                         </div>
                     </div>
 
                     <div id="scan-settings-helper-weekday-wrap" style="display:none; margin-top: 0.55rem;">
                         <label for="scan-settings-helper-weekday" style="display:block; margin-bottom: 0.3rem; font-size: 0.76rem; color: #cbd5e1;">요일</label>
-                        <select id="scan-settings-helper-weekday" class="form-control" onchange="updateCronHelperSummary()" style="width: 100%; box-sizing: border-box; background: rgba(15,23,42,0.62); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 0.45rem 0.6rem; border-radius: 6px;">
+                        <select id="scan-settings-helper-weekday" data-role="schedule-helper-weekday" class="form-control" style="width: 100%; box-sizing: border-box; background: rgba(15,23,42,0.62); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 0.45rem 0.6rem; border-radius: 6px;">
                             <option value="0">일요일</option>
                             <option value="1">월요일</option>
                             <option value="2">화요일</option>
@@ -89,13 +89,13 @@
 
                     <div id="scan-settings-helper-monthday-wrap" style="display:none; margin-top: 0.55rem;">
                         <label for="scan-settings-helper-monthday" style="display:block; margin-bottom: 0.3rem; font-size: 0.76rem; color: #cbd5e1;">일자(1~31)</label>
-                        <input type="number" id="scan-settings-helper-monthday" value="1" min="1" max="31" oninput="updateCronHelperSummary()" class="form-control" style="width: 100%; box-sizing: border-box; background: rgba(15,23,42,0.62); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 0.45rem 0.6rem; border-radius: 6px;">
+                        <input type="number" id="scan-settings-helper-monthday" value="1" min="1" max="31" data-role="schedule-helper-monthday" class="form-control" style="width: 100%; box-sizing: border-box; background: rgba(15,23,42,0.62); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 0.45rem 0.6rem; border-radius: 6px;">
                     </div>
 
                     <div id="scan-settings-helper-summary" style="margin-top: 0.55rem; font-size: 0.76rem; color: #93c5fd; min-height: 1.1rem;"></div>
 
                     <div style="display:flex; justify-content:flex-end; margin-top: 0.6rem;">
-                        <button type="button" class="btn-toggle" onclick="applyCronHelperToInput()" style="padding: 0.33rem 0.75rem; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 0.3rem;">
+                        <button type="button" class="btn-toggle" data-role="schedule-apply-helper" style="padding: 0.33rem 0.75rem; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 0.3rem;">
                             <i class="fa-solid fa-wand-magic-sparkles"></i> Cron에 적용
                         </button>
                     </div>
@@ -108,8 +108,8 @@
             </div>
         </div>
         <div class="library-modal-footer" style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 1rem;">
-            <button type="button" class="btn-toggle" onclick="closeScanSettingsModal()" style="padding: 0.4rem 1rem;">취소</button>
-            <button type="button" class="btn-toggle active" onclick="saveScanSettingsFromModal()" style="padding: 0.4rem 1rem;">저장</button>
+            <button type="button" class="btn-toggle" data-role="schedule-modal-close" style="padding: 0.4rem 1rem;">취소</button>
+            <button type="button" class="btn-toggle active" data-role="schedule-modal-save" style="padding: 0.4rem 1rem;">저장</button>
         </div>
     </div>
 </div>

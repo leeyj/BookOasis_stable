@@ -174,7 +174,7 @@ export function createBookCard(item, options = {}) {
   const favIconClass = isFav ? 'fa-solid fa-star' : 'fa-regular fa-star';
   const favoriteTargetName = rawSeriesName || displayTitle;
   const favBtnHtml = `
-    <button class="btn-card-fav-toggle ${isFav ? 'active' : ''}" title="즐겨찾기 토글" onclick="toggleCardFavoriteEvent(event, '${favoriteTargetName.replace(/'/g, "\\'")}', ${item.id || 'null'}, ${isFav ? 0 : 1})">
+    <button class="btn-card-fav-toggle ${isFav ? 'active' : ''}" title="즐겨찾기 토글" data-role="card-favorite-toggle" data-favorite-name="${favoriteTargetName.replace(/"/g, '&quot;')}" data-book-id="${item.id || ''}" data-next-status="${isFav ? 0 : 1}">
       <i class="${favIconClass}"></i>
     </button>
   `;
@@ -246,6 +246,19 @@ export function createBookCard(item, options = {}) {
       e.preventDefault();
       options.onActionClick(e, item);
     };
+  }
+
+  const favBtn = card.querySelector('[data-role="card-favorite-toggle"]');
+  if (favBtn) {
+    favBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const nextStatus = Number.parseInt(favBtn.getAttribute('data-next-status') || '0', 10) || 0;
+      const bookIdRaw = favBtn.getAttribute('data-book-id') || '';
+      const parsedBookId = Number.parseInt(bookIdRaw, 10);
+      const bookId = Number.isFinite(parsedBookId) ? parsedBookId : null;
+      toggleCardFavoriteEvent(e, favBtn.getAttribute('data-favorite-name') || '', bookId, nextStatus);
+    });
   }
 
   // 우클릭 컨텍스트 메뉴 바인딩 (이 책 스캔용)

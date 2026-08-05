@@ -5,7 +5,81 @@ const MAX_USERNAME_LENGTH = 128;
 const MAX_PASSWORD_LENGTH = 256;
 const MIN_PASSWORD_LENGTH = 4;
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function initUsersDelegation() {
+  if (window.__usersDelegationBound) return;
+
+  document.addEventListener('click', (event) => {
+    const target = event && event.target && typeof event.target.closest === 'function'
+      ? event.target.closest('[data-role="users-add"], [data-role="user-delete"], [data-role="user-reset-password"], [data-role="user-change-password"], [data-role="user-modal-close"], [data-role="user-reset-modal-close"], [data-role="admin-pwd-modal-close"]')
+      : null;
+    if (!target) return;
+
+    event.preventDefault();
+
+    const role = target.getAttribute('data-role');
+    if (role === 'users-add') {
+      openAddUserModal();
+      return;
+    }
+    if (role === 'user-modal-close') {
+      closeUserModal();
+      return;
+    }
+    if (role === 'user-reset-modal-close') {
+      closeResetPwdModal();
+      return;
+    }
+    if (role === 'admin-pwd-modal-close') {
+      closeAdminChangePwdModal();
+      return;
+    }
+
+    const userId = Number.parseInt(target.getAttribute('data-user-id') || '', 10);
+    if (!Number.isFinite(userId) || userId <= 0) return;
+
+    if (role === 'user-delete') {
+      deleteUser(userId, String(target.getAttribute('data-username') || ''));
+      return;
+    }
+    if (role === 'user-reset-password') {
+      openResetPwdModal(userId);
+      return;
+    }
+    if (role === 'user-change-password') {
+      openAdminChangePwdModal(userId);
+    }
+  }, true);
+
+  document.addEventListener('submit', (event) => {
+    const form = event && event.target;
+    if (!form) return;
+    if (form.id === 'user-crud-form') {
+      submitUserForm(event);
+      return;
+    }
+    if (form.id === 'user-reset-pwd-form') {
+      submitResetPwdForm(event);
+      return;
+    }
+    if (form.id === 'admin-change-pwd-form') {
+      submitAdminChangePwdForm(event);
+    }
+  }, true);
+
+  window.__usersDelegationBound = true;
+}
+
 export async function loadUsersList() {
+  initUsersDelegation();
   const tbody = document.getElementById('settings-users-list');
   if (!tbody) return;
 
@@ -28,13 +102,14 @@ export async function loadUsersList() {
 
         const myUserId = Number(window.currentUser?.id || 0);
         const isSelf = Number(user.id) === myUserId;
+        const safeUsernameAttr = escapeHtml(user.username || '');
         const deleteBtn = isSelf
           ? `<span style="color:#64748b; font-size:0.8rem; display:inline-flex; align-items:center; justify-content:center; height:32px; padding:0 0.5rem;">${window.i18n ? window.i18n.t('settings.user_cannot_delete') : '삭제불가'}</span>`
-          : `<button onclick="deleteUser(${user.id}, '${user.username}')" class="btn-settings-action" style="background:#ef4444; color:#fff; border:none; padding:0.4rem 0.75rem; border-radius:6px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:0.3rem; height:32px; white-space:nowrap;"><i class="fa-solid fa-trash-can"></i> ${window.i18n ? window.i18n.t('settings.user_delete') : '삭제'}</button>`;
+          : `<button data-role="user-delete" data-user-id="${user.id}" data-username="${safeUsernameAttr}" class="btn-settings-action" style="background:#ef4444; color:#fff; border:none; padding:0.4rem 0.75rem; border-radius:6px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:0.3rem; height:32px; white-space:nowrap;"><i class="fa-solid fa-trash-can"></i> ${window.i18n ? window.i18n.t('settings.user_delete') : '삭제'}</button>`;
 
         const resetPwdBtn = user.role === 'admin'
-          ? `<button onclick="openAdminChangePwdModal(${user.id})" class="btn-settings-action" style="background:#3b82f6; color:#fff; border:none; padding:0.4rem 0.75rem; border-radius:6px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:0.3rem; height:32px; white-space:nowrap;"><i class="fa-solid fa-key"></i> ${window.i18n ? window.i18n.t('settings.admin_change_pwd') : '비번 변경'}</button>`
-          : `<button onclick="openResetPwdModal(${user.id})" class="btn-settings-action" style="background:#f59e0b; color:#fff; border:none; padding:0.4rem 0.75rem; border-radius:6px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:0.3rem; height:32px; white-space:nowrap;"><i class="fa-solid fa-unlock-keyhole"></i> ${window.i18n ? window.i18n.t('settings.user_reset_pwd') : '초기 비번 재설정'}</button>`;
+          ? `<button data-role="user-change-password" data-user-id="${user.id}" class="btn-settings-action" style="background:#3b82f6; color:#fff; border:none; padding:0.4rem 0.75rem; border-radius:6px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:0.3rem; height:32px; white-space:nowrap;"><i class="fa-solid fa-key"></i> ${window.i18n ? window.i18n.t('settings.admin_change_pwd') : '비번 변경'}</button>`
+          : `<button data-role="user-reset-password" data-user-id="${user.id}" class="btn-settings-action" style="background:#f59e0b; color:#fff; border:none; padding:0.4rem 0.75rem; border-radius:6px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:0.3rem; height:32px; white-space:nowrap;"><i class="fa-solid fa-unlock-keyhole"></i> ${window.i18n ? window.i18n.t('settings.user_reset_pwd') : '초기 비번 재설정'}</button>`;
 
         return `
           <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">

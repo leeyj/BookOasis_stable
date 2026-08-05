@@ -1,37 +1,37 @@
         <div id="library-settings-view" class="library-view-container" style="display: none; flex-direction: column; gap: 1rem;">
             <!-- 탭 헤더 영역 -->
             <div class="settings-tabs">
-                <button class="settings-tab-btn active" onclick="switchSettingsTab('schedule')">
+                <button class="settings-tab-btn active" data-settings-tab="schedule">
                     <i class="fa-solid fa-calendar-days"></i> <span data-i18n="settings.tab_schedule">스캔 스케줄 &amp; 대기열</span>
                 </button>
-                <button class="settings-tab-btn" onclick="switchSettingsTab('general')">
+                <button class="settings-tab-btn" data-settings-tab="general">
                     <i class="fa-solid fa-sliders"></i> <span data-i18n="settings.tab_general">일반 설정</span>
                 </button>
-                <button class="settings-tab-btn" onclick="switchSettingsTab('viewer')">
+                <button class="settings-tab-btn" data-settings-tab="viewer">
                     <i class="fa-solid fa-book-open"></i> <span data-i18n="settings.tab_viewer">뷰어 설정</span>
                 </button>
-                <button class="settings-tab-btn" onclick="switchSettingsTab('keys')">
+                <button class="settings-tab-btn" data-settings-tab="keys">
                     <i class="fa-solid fa-keyboard"></i> <span data-i18n="settings.tab_keys">키 설정</span>
                 </button>
-                <button class="settings-tab-btn" onclick="switchSettingsTab('plugins')">
+                <button class="settings-tab-btn" data-settings-tab="plugins">
                     <i class="fa-solid fa-plug"></i> <span data-i18n="settings.tab_plugins">플러그인 설정</span>
                 </button>
-                <button class="settings-tab-btn" onclick="switchSettingsTab('reports')">
+                <button class="settings-tab-btn" data-settings-tab="reports">
                     <i class="fa-solid fa-triangle-exclamation"></i> <span data-i18n="settings.tab_reports">스캔 리포트</span>
                 </button>
-                <button class="settings-tab-btn" onclick="switchSettingsTab('trash')">
+                <button class="settings-tab-btn" data-settings-tab="trash">
                     <i class="fa-solid fa-trash-can"></i> <span data-i18n="settings.tab_trash">삭제 관리</span>
                 </button>
-                <button class="settings-tab-btn" id="settings-tab-btn-users" onclick="switchSettingsTab('users')" style="display: none;">
+                <button class="settings-tab-btn" id="settings-tab-btn-users" data-settings-tab="users" style="display: none;">
                     <i class="fa-solid fa-users"></i> <span data-i18n="settings.tab_users">사용자 관리</span>
                 </button>
-                <button class="settings-tab-btn" id="settings-tab-btn-permissions" onclick="switchSettingsTab('permissions')" style="display: none;">
+                <button class="settings-tab-btn" id="settings-tab-btn-permissions" data-settings-tab="permissions" style="display: none;">
                     <i class="fa-solid fa-user-shield"></i> <span data-i18n="settings.tab_permissions">권한 관리</span>
                 </button>
-                <button class="settings-tab-btn" onclick="switchSettingsTab('about')">
+                <button class="settings-tab-btn" data-settings-tab="about">
                     <i class="fa-solid fa-circle-info"></i> <span data-i18n="settings.tab_about">이 S/W는...</span>
                 </button>
-                <button class="settings-tab-btn" onclick="switchSettingsTab('changelog')">
+                <button class="settings-tab-btn" data-settings-tab="changelog">
                     <i class="fa-solid fa-clock-rotate-left"></i> <span data-i18n="settings.tab_changelog">업데이트 내역</span>
                 </button>
             </div>

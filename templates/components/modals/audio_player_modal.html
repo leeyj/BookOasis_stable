@@ -10,7 +10,7 @@
         <!-- 상단 헤더 툴바 -->
         <div class="audio-player-header" style="display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 1200px; margin: 0 auto; height: 50px;">
             <div style="display: flex; align-items: center; gap: 1rem;">
-                <button onclick="closeAudioPlayerModal()" title="닫기" style="background: none; border: none; color: #e2e8f0; font-size: 1.4rem; cursor: pointer; padding: 0.5rem; display: flex; align-items: center; justify-content: center; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1.0)'">
+                <button data-role="audio-player-action" data-action="close" class="ui-hover-audio-scale" title="닫기" style="background: none; border: none; color: #e2e8f0; font-size: 1.4rem; cursor: pointer; padding: 0.5rem; display: flex; align-items: center; justify-content: center; transition: transform 0.2s;">
                     <i class="fa-solid fa-chevron-down"></i>
                 </button>
                 <div style="display: flex; flex-direction: column;">
@@ -21,10 +21,10 @@
 
             <!-- 우측 보조 버튼 -->
             <div style="display: flex; align-items: center; gap: 1.2rem;">
-                <button onclick="toggleAudioBookmark()" title="북마크" style="background: none; border: none; color: #94a3b8; font-size: 1.1rem; cursor: pointer;">
+                <button data-role="audio-player-action" data-action="bookmark" title="북마크" style="background: none; border: none; color: #94a3b8; font-size: 1.1rem; cursor: pointer;">
                     <i class="fa-regular fa-bookmark"></i>
                 </button>
-                <button onclick="toggleAudioFullscreen()" title="전체화면" style="background: none; border: none; color: #94a3b8; font-size: 1.1rem; cursor: pointer;">
+                <button data-role="audio-player-action" data-action="fullscreen" title="전체화면" style="background: none; border: none; color: #94a3b8; font-size: 1.1rem; cursor: pointer;">
                     <i class="fa-solid fa-expand"></i>
                 </button>
             </div>
@@ -67,29 +67,29 @@
             <!-- 중앙 메인 5버튼 재생 컨트롤러 -->
             <div style="display: flex; align-items: center; justify-content: center; gap: 1.8rem; width: 100%;">
                 <!-- 이전 트랙 -->
-                <button onclick="playPrevTrack()" title="이전 트랙" style="background: none; border: none; color: #cbd5e1; font-size: 1.25rem; cursor: pointer; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#cbd5e1'">
+                <button data-role="audio-player-action" data-action="prev-track" class="ui-hover-audio-color" title="이전 트랙" style="background: none; border: none; color: #cbd5e1; font-size: 1.25rem; cursor: pointer; transition: color 0.2s;">
                     <i class="fa-solid fa-backward-step"></i>
                 </button>
 
                 <!-- 15초 뒤로 -->
-                <button onclick="audioPlayerSkip(-15)" title="15초 뒤로" style="background: none; border: none; color: #f1f5f9; font-size: 1.5rem; cursor: pointer; position: relative; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; transition: transform 0.15s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1.0)'">
+                <button data-role="audio-player-action" data-action="skip" data-value="-15" class="ui-hover-audio-scale" title="15초 뒤로" style="background: none; border: none; color: #f1f5f9; font-size: 1.5rem; cursor: pointer; position: relative; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; transition: transform 0.15s;">
                     <i class="fa-solid fa-rotate-left" style="font-size: 1.5rem; opacity: 0.85;"></i>
                     <span style="position: absolute; top: 53%; left: 49%; transform: translate(-50%, -50%); font-size: 0.55rem; font-weight: 900; color: #ffffff; pointer-events: none; font-family: monospace;">15</span>
                 </button>
 
                 <!-- 메인 화이트 원형 재생/일시정지 버튼 -->
-                <button id="btn-audio-play-toggle" onclick="toggleAudioPlay()" title="재생/일시정지" style="width: 68px; height: 68px; border-radius: 50%; background: #ffffff; border: none; color: #0f172a; font-size: 1.7rem; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 25px rgba(255, 255, 255, 0.25); transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='scale(1.06)'; this.style.boxShadow='0 12px 30px rgba(255,255,255,0.4)'" onmouseout="this.style.transform='scale(1.0)'; this.style.boxShadow='0 10px 25px rgba(255,255,255,0.25)'">
+                <button id="btn-audio-play-toggle" data-role="audio-player-action" data-action="toggle-play" class="ui-hover-audio-play" title="재생/일시정지" style="width: 68px; height: 68px; border-radius: 50%; background: #ffffff; border: none; color: #0f172a; font-size: 1.7rem; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 25px rgba(255, 255, 255, 0.25); transition: transform 0.2s, box-shadow 0.2s;">
                     <i class="fa-solid fa-play" style="margin-left: 4px;"></i>
                 </button>
 
                 <!-- 15초 앞으로 -->
-                <button onclick="audioPlayerSkip(15)" title="15초 앞으로" style="background: none; border: none; color: #f1f5f9; font-size: 1.5rem; cursor: pointer; position: relative; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; transition: transform 0.15s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1.0)'">
+                <button data-role="audio-player-action" data-action="skip" data-value="15" class="ui-hover-audio-scale" title="15초 앞으로" style="background: none; border: none; color: #f1f5f9; font-size: 1.5rem; cursor: pointer; position: relative; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; transition: transform 0.15s;">
                     <i class="fa-solid fa-rotate-right" style="font-size: 1.5rem; opacity: 0.85;"></i>
                     <span style="position: absolute; top: 53%; left: 51%; transform: translate(-50%, -50%); font-size: 0.55rem; font-weight: 900; color: #ffffff; pointer-events: none; font-family: monospace;">15</span>
                 </button>
 
                 <!-- 다음 트랙 -->
-                <button onclick="playNextTrack()" title="다음 트랙" style="background: none; border: none; color: #cbd5e1; font-size: 1.25rem; cursor: pointer; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#cbd5e1'">
+                <button data-role="audio-player-action" data-action="next-track" class="ui-hover-audio-color" title="다음 트랙" style="background: none; border: none; color: #cbd5e1; font-size: 1.25rem; cursor: pointer; transition: color 0.2s;">
                     <i class="fa-solid fa-forward-step"></i>
                 </button>
             </div>
@@ -97,13 +97,13 @@
             <!-- 하단 프리미엄 유틸리티 툴바 (Speed, Chapters, Volume, Sleep) -->
             <div class="audio-player-utility-row" style="display: flex; align-items: center; justify-content: space-around; width: 100%; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.08);">
                 <!-- 배속 -->
-                <button onclick="cycleAudioSpeed()" style="background: none; border: none; color: #94a3b8; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 0.3rem;">
+                <button data-role="audio-player-action" data-action="cycle-speed" style="background: none; border: none; color: #94a3b8; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 0.3rem;">
                     <span id="audio-player-speed-label" style="font-size: 0.95rem; font-weight: 800; color: #f8fafc;">1x</span>
                     <span style="font-size: 0.72rem; color: #64748b;">Speed</span>
                 </button>
 
                 <!-- 챕터/목차 -->
-                <button onclick="toggleAudioChapterDrawer()" style="background: none; border: none; color: #94a3b8; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 0.3rem;">
+                <button data-role="audio-player-action" data-action="toggle-chapters" style="background: none; border: none; color: #94a3b8; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 0.3rem;">
                     <i class="fa-solid fa-book-open" style="font-size: 1.1rem; color: #f8fafc;"></i>
                     <span style="font-size: 0.72rem; color: #64748b;">Chapters</span>
                 </button>
@@ -111,17 +111,17 @@
                 <!-- 음량 컨트롤 (항상 표시) -->
                 <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.35rem; min-width: 140px;">
                     <div style="display: flex; align-items: center; gap: 0.5rem; width: 100%;">
-                        <button onclick="setAudioVolume(0)" title="음소거" style="background: none; border: none; color: #f8fafc; font-size: 1rem; cursor: pointer; padding: 0; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;">
+                        <button data-role="audio-player-action" data-action="set-volume" data-value="0" title="음소거" style="background: none; border: none; color: #f8fafc; font-size: 1rem; cursor: pointer; padding: 0; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;">
                             <i id="audio-player-vol-icon" class="fa-solid fa-volume-high"></i>
                         </button>
-                        <input type="range" id="audio-volume-slider" min="0" max="1" step="0.05" value="1" style="flex: 1; height: 4px; appearance: none; background: rgba(255,255,255,0.2); border-radius: 999px; outline: none; cursor: pointer; accent-color: #38bdf8;" oninput="setAudioVolume(this.value)">
+                        <input type="range" id="audio-volume-slider" data-role="audio-player-input" data-action="set-volume" min="0" max="1" step="0.05" value="1" style="flex: 1; height: 4px; appearance: none; background: rgba(255,255,255,0.2); border-radius: 999px; outline: none; cursor: pointer; accent-color: #38bdf8;">
                         <span id="audio-volume-value" style="font-size: 0.72rem; font-weight: 700; color: #94a3b8; min-width: 36px; text-align: right;">100%</span>
                     </div>
                     <span style="font-size: 0.72rem; color: #64748b;">Volume</span>
                 </div>
 
                 <!-- 취침 타이머 -->
-                <button onclick="cycleSleepTimer()" style="background: none; border: none; color: #94a3b8; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 0.3rem;">
+                <button data-role="audio-player-action" data-action="cycle-sleep" style="background: none; border: none; color: #94a3b8; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 0.3rem;">
                     <i class="fa-regular fa-moon" style="font-size: 1.1rem; color: #f8fafc;"></i>
                     <span id="audio-sleep-label" style="font-size: 0.72rem; color: #64748b;">Sleep</span>
                 </button>
@@ -134,7 +134,7 @@
     <div id="audio-chapter-drawer" class="audio-chapter-drawer" style="position: absolute; bottom: 0; left: 0; right: 0; height: 60%; background: #0f172a; border-top: 1px solid rgba(255,255,255,0.15); border-radius: 24px 24px 0 0; z-index: 100; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); display: flex; flex-direction: column; padding: 1.5rem; box-shadow: 0 -20px 40px rgba(0,0,0,0.6);">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.8rem;">
             <h3 style="margin: 0; font-size: 1.1rem; color: #ffffff; font-weight: 700;"><i class="fa-solid fa-list-ul" style="color: #38bdf8; margin-right: 0.5rem;"></i> 트랙 / 목차</h3>
-            <button onclick="toggleAudioChapterDrawer()" style="background: none; border: none; color: #94a3b8; font-size: 1.3rem; cursor: pointer;"><i class="fa-solid fa-xmark"></i></button>
+            <button data-role="audio-player-action" data-action="toggle-chapters" style="background: none; border: none; color: #94a3b8; font-size: 1.3rem; cursor: pointer;"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div id="audio-chapter-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem; padding-right: 0.3rem;">
             <!-- JS 동적 생성 -->

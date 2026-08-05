@@ -1,7 +1,13 @@
 # CHANGELOG
+## v1.7.0
+- (audiobook/delete) 오디오북 삭제 FK 오류 방지(진행도/트랙 정합성 보강) | prevent audiobook delete FK errors by tightening progress/track integrity
+- 코드 안정화 | Stabilize the code
+- 컨텍스트 메뉴 호출 버그 수정 | bug fix submenu call function
+
 ## v1.6.9
 - (permissions/audiobook) 권한관리 탭을 세션별(일반/성인/오디오북) 서브탭으로 분리하고 사용자 접근 플래그에 오디오북 권한을 추가 | split permissions management into session-specific tabs (general/adult/audiobook) and add audiobook access flag to user permissions
 - requestments.txt 업데이트 | update requestments.txt
+
 
 ## v1.6.8
 - (audiobook/resume) 모바일→PC 이어듣기 복원 개선: 상세/목록 이어듣기에서 서버 저장 트랙/시간(`current_track_id`, `current_time`)을 우선 사용하고 재생 중 10초 주기 진행도 저장 추가 | improve mobile→PC audiobook resume by prioritizing server track/time (`current_track_id`, `current_time`) in continue flows and adding 10s in-play autosave

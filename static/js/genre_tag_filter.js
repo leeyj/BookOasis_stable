@@ -387,6 +387,18 @@ function setTranslate(xPos, yPos, el) {
     el.style.transform = "translate3d(" + xPos + "px, " + yPos + "px, 0)";
 }
 
+if (!document.body.dataset.activeFilterRemoveDelegated) {
+    document.body.dataset.activeFilterRemoveDelegated = '1';
+    document.addEventListener('click', (event) => {
+        const removeButton = event.target.closest('[data-role="active-filter-remove"]');
+        if (!removeButton) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        removeActiveFilterItem(removeButton.dataset.filterType, removeButton.dataset.filterValue || '');
+    });
+}
+
 // 기존 사이드바 필터 토글 호환용 스텁 함수
 export function updateSidebarFilterActiveStates() {}
 
@@ -413,13 +425,13 @@ export function updateActiveFilterBar() {
     selectedGenres.forEach(genre => {
         html += `<span class="active-filter-item">
             <i class="fa-solid fa-list-ul"></i> ${genre}
-            <span class="filter-remove-btn" onclick="removeActiveFilterItem('genre', '${genre}')"><i class="fa-solid fa-xmark"></i></span>
+            <span class="filter-remove-btn" data-role="active-filter-remove" data-filter-type="genre" data-filter-value="${String(genre).replace(/"/g, '&quot;')}"><i class="fa-solid fa-xmark"></i></span>
         </span>`;
     });
     selectedTags.forEach(tag => {
         html += `<span class="active-filter-item">
             <i class="fa-solid fa-tag"></i> ${tag}
-            <span class="filter-remove-btn" onclick="removeActiveFilterItem('tag', '${tag}')"><i class="fa-solid fa-xmark"></i></span>
+            <span class="filter-remove-btn" data-role="active-filter-remove" data-filter-type="tag" data-filter-value="${String(tag).replace(/"/g, '&quot;')}"><i class="fa-solid fa-xmark"></i></span>
         </span>`;
     });
 

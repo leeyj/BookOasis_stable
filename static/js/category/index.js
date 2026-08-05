@@ -4,6 +4,11 @@ import * as api from '../api.js';
 import { selectCategory } from '../tab_media_library.js';
 import { bindSidebarContextMenu } from './context_menu.js';
 
+function isCurrentUserAdmin() {
+  const user = state.currentUser || window.currentUser || {};
+  return String(user.role || '').trim().toLowerCase() === 'admin';
+}
+
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;')
@@ -13,7 +18,37 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;');
 }
 
+function initDynamicSidebarDelegation() {
+  if (window.__dynamicSidebarDelegationBound) return;
+
+  document.addEventListener('click', (event) => {
+    const target = event && event.target && typeof event.target.closest === 'function'
+      ? event.target.closest('[data-role="sidebar-category-dynamic"], [data-role="sidebar-pin-categories"], [data-role="sidebar-add-library"]')
+      : null;
+    if (!target) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const role = target.getAttribute('data-role');
+    if (role === 'sidebar-pin-categories') {
+      toggleCategoryOrderPin();
+      return;
+    }
+    if (role === 'sidebar-add-library') {
+      window.triggerAddLibrary?.();
+      return;
+    }
+    if (role === 'sidebar-category-dynamic') {
+      selectCategory(target.getAttribute('data-category-id') || target.getAttribute('data-id') || 'home');
+    }
+  }, true);
+
+  window.__dynamicSidebarDelegationBound = true;
+}
+
 export async function loadLibraries() {
+  initDynamicSidebarDelegation();
   window.loadLibraries = loadLibraries;
   const sidebar = document.getElementById('sidebar-categories');
   if (!sidebar) return;
@@ -26,28 +61,28 @@ export async function loadLibraries() {
         : "color: #94a3b8; transform: rotate(45deg);";
       const pinTitle = isPinned ? i18n.t('category.pin_pinned') : i18n.t('category.pin_unpinned');
       
-      const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+      const isAdmin = isCurrentUserAdmin();
       const addBtnHtml = isAdmin 
-        ? `<button onclick="event.stopPropagation(); triggerAddLibrary();" style="background: none; border: none; color: #a855f7; cursor: pointer; padding: 0.2rem 0.4rem; font-size: 0.9rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; transition: background 0.2s;" onmouseenter="this.style.background='rgba(168, 85, 247, 0.15)'" onmouseleave="this.style.background='none'" title="${i18n.t('category.add_new_tooltip')}">
+        ? `<button data-role="sidebar-add-library" style="background: none; border: none; color: #a855f7; cursor: pointer; padding: 0.2rem 0.4rem; font-size: 0.9rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px;" title="${i18n.t('category.add_new_tooltip')}">
             <i class="fa-solid fa-plus"></i>
           </button>`
         : '';
       
-      let html = `<li class="menu-item ${state.currentLibraryId === 'home' ? 'active' : ''}" data-type="system" id="category-home" data-id="home" onclick="selectCategory('home')" style="display: flex; justify-content: space-between; align-items: center; box-sizing: border-box;">
+      let html = `<li class="menu-item ${state.currentLibraryId === 'home' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-home" data-id="home" data-category-id="home" style="display: flex; justify-content: space-between; align-items: center; box-sizing: border-box;">
         <span style="display: inline-flex; align-items: center; gap: 0.6rem;"><i class="fa-solid fa-house"></i> ${i18n.t('category.home')}</span>
         <div style="display: inline-flex; align-items: center; gap: 0.4rem;">
-          <button id="btn-pin-categories" onclick="event.stopPropagation(); window.toggleCategoryOrderPin();" style="background: none; border: none; cursor: pointer; padding: 0.2rem 0.4rem; font-size: 0.9rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; transition: all 0.2s; ${pinBtnStyle}" title="${pinTitle}">
+          <button id="btn-pin-categories" data-role="sidebar-pin-categories" style="background: none; border: none; cursor: pointer; padding: 0.2rem 0.4rem; font-size: 0.9rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; ${pinBtnStyle}" title="${pinTitle}">
             <i class="fa-solid fa-thumbtack"></i>
           </button>
           ${addBtnHtml}
         </div>
       </li>`;
 
-      html += `<li class="menu-item ${state.currentLibraryId === 'history' ? 'active' : ''}" data-type="system" id="category-history" data-id="history" onclick="selectCategory('history')"><i class="fa-solid fa-clock-rotate-left"></i> ${i18n.t('category.history')}</li>`;
-      html += `<li class="menu-item ${state.currentLibraryId === 'favorite' ? 'active' : ''}" data-type="system" id="category-favorite" data-id="favorite" onclick="selectCategory('favorite')"><i class="fa-solid fa-star" style="color: #eab308;"></i> ${i18n.t('category.favorite')}</li>`;
-      html += `<li class="menu-item ${state.currentLibraryId === 'plugins' ? 'active' : ''}" data-type="system" id="category-plugins" data-id="plugins" onclick="selectCategory('plugins')"><i class="fa-solid fa-puzzle-piece" style="color: #38bdf8;"></i> ${i18n.t('category.plugins')}</li>`;
+      html += `<li class="menu-item ${state.currentLibraryId === 'history' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-history" data-id="history" data-category-id="history"><i class="fa-solid fa-clock-rotate-left"></i> ${i18n.t('category.history')}</li>`;
+      html += `<li class="menu-item ${state.currentLibraryId === 'favorite' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-favorite" data-id="favorite" data-category-id="favorite"><i class="fa-solid fa-star" style="color: #eab308;"></i> ${i18n.t('category.favorite')}</li>`;
+      html += `<li class="menu-item ${state.currentLibraryId === 'plugins' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-plugins" data-id="plugins" data-category-id="plugins"><i class="fa-solid fa-puzzle-piece" style="color: #38bdf8;"></i> ${i18n.t('category.plugins')}</li>`;
       if (state.showSidebarCategoryAll !== false) {
-        html += `<li class="menu-item ${state.currentLibraryId === 'all' ? 'active' : ''}" data-type="system" id="category-all" data-id="all" onclick="selectCategory('all')"><i class="fa-solid fa-layer-group"></i> ${i18n.t('category.all')}</li>`;
+        html += `<li class="menu-item ${state.currentLibraryId === 'all' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-all" data-id="all" data-category-id="all"><i class="fa-solid fa-layer-group"></i> ${i18n.t('category.all')}</li>`;
       }
       
       if (data.libraries && data.libraries.length > 0) {
@@ -76,7 +111,7 @@ export async function loadLibraries() {
           const safeIcon    = escapeHtml(lib.icon || 'fa-book');
           const safeColor   = escapeHtml(lib.color || '#94a3b8');
           const hideCover = Number(lib.hide_cover || 0) ? 1 : 0;
-          html += `<li class="menu-item ${isActive}" data-type="custom" data-id="${lib.id}" data-name="${safeName}" data-path="${safePath}" data-remote="${lib.is_remote || 0}" data-rclone-url="${safeRclone}" data-icon="${safeIcon}" data-color="${safeColor}" data-hide-cover="${hideCover}" ${draggableAttr} onclick="selectCategory('${lib.id}')"><i class="fa-solid ${safeIcon}" style="color: ${safeColor};"></i> ${safeName}</li>`;
+          html += `<li class="menu-item ${isActive}" data-type="custom" data-role="sidebar-category-dynamic" data-id="${lib.id}" data-category-id="${lib.id}" data-name="${safeName}" data-path="${safePath}" data-remote="${lib.is_remote || 0}" data-rclone-url="${safeRclone}" data-icon="${safeIcon}" data-color="${safeColor}" data-hide-cover="${hideCover}" ${draggableAttr}><i class="fa-solid ${safeIcon}" style="color: ${safeColor};"></i> ${safeName}</li>`;
         });
       }
 
@@ -91,7 +126,7 @@ export async function loadLibraries() {
               const isActive = String(state.currentLibraryId) === String(catId) ? 'active' : '';
               const safeTitle = escapeHtml(cp.title || cp.name);
               const safeIcon = escapeHtml(cp.icon || 'fa-puzzle-piece');
-              html += `<li class="menu-item ${isActive}" data-type="plugin" id="category-${catId}" data-id="${catId}" data-plugin-id="${cp.id}" onclick="selectCategory('${catId}')"><i class="${safeIcon}" style="color: #38bdf8;"></i> ${safeTitle}</li>`;
+              html += `<li class="menu-item ${isActive}" data-type="plugin" data-role="sidebar-category-dynamic" id="category-${catId}" data-id="${catId}" data-category-id="${catId}" data-plugin-id="${cp.id}"><i class="${safeIcon}" style="color: #38bdf8;"></i> ${safeTitle}</li>`;
             });
           }
         }
@@ -124,7 +159,7 @@ export function toggleCategoryOrderPin() {
 }
 
 export function bindDragAndDropEvents(isEnabled) {
-  const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+  const isAdmin = isCurrentUserAdmin();
   if (!isAdmin) {
     isEnabled = false;
   }

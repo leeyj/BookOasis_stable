@@ -88,9 +88,20 @@ class CategoryRepository:
             # 1-1. 오디오북 종속 데이터 정리
             # libraries.id를 audiobooks.library_id가 참조하므로,
             # 라이브러리 삭제 전에 오디오북 하위 데이터를 먼저 제거해야 FK 오류를 방지할 수 있다.
+            # progress.current_track_id FK는 기본 RESTRICT 동작이므로,
+            # 다른 audiobook_id 행이 동일 track_id를 잘못 참조하는 경우까지 선제 정리한다.
             cursor.execute(
-                "DELETE FROM audiobook_progress WHERE audiobook_id IN (SELECT id FROM audiobooks WHERE library_id = ?)",
-                (library_id,)
+                """
+                DELETE FROM audiobook_progress
+                WHERE audiobook_id IN (SELECT id FROM audiobooks WHERE library_id = ?)
+                   OR current_track_id IN (
+                       SELECT t.id
+                       FROM audiobook_tracks t
+                       JOIN audiobooks a ON a.id = t.audiobook_id
+                       WHERE a.library_id = ?
+                   )
+                """,
+                (library_id, library_id)
             )
             cursor.execute(
                 "DELETE FROM audiobook_tracks WHERE audiobook_id IN (SELECT id FROM audiobooks WHERE library_id = ?)",

@@ -6,8 +6,46 @@ let currentReportErrors = [];
 let currentReportPage = 1;
 const ITEMS_PER_PAGE = 50;
 
+function initReportsDelegation() {
+  if (window.__reportsDelegationBound) return;
+
+  document.addEventListener('click', (event) => {
+    const target = event && event.target && typeof event.target.closest === 'function'
+      ? event.target.closest('[data-role="reports-history-refresh"], [data-role="report-page"]')
+      : null;
+    if (!target) return;
+
+    event.preventDefault();
+    const role = target.getAttribute('data-role');
+    if (role === 'reports-history-refresh') {
+      loadScanHistory();
+      return;
+    }
+    const page = Number.parseInt(target.getAttribute('data-page') || '', 10);
+    if (role === 'report-page' && Number.isFinite(page)) {
+      currentReportPage = page;
+      renderReportPage();
+    }
+  }, true);
+
+  document.addEventListener('change', (event) => {
+    const target = event && event.target;
+    if (!target) return;
+    if (target.matches && target.matches('[data-role="reports-library-select"]')) {
+      loadReportList();
+      return;
+    }
+    if (target.matches && target.matches('[data-role="reports-file-select"]')) {
+      loadReportDetail();
+    }
+  }, true);
+
+  window.__reportsDelegationBound = true;
+}
+
 // 스캔 에러 리포트 탭 초기화 및 라이브러리 목록 적재
 export async function initReportsTab() {
+  initReportsDelegation();
   console.log('[Reports] initReportsTab() 호출');
   const libSelect = document.getElementById('report-library-select');
   const fileSelect = document.getElementById('report-file-select');
@@ -305,7 +343,7 @@ function renderReportPage() {
     let paginationHtml = '';
     
     if (currentReportPage > 1) {
-      paginationHtml += `<button onclick="window.changeReportPage(${currentReportPage - 1})" class="btn-toggle" style="padding: 0.4rem 0.8rem; background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.1); color: #cbd5e1; border-radius: 4px; cursor: pointer;">이전</button>`;
+      paginationHtml += `<button data-role="report-page" data-page="${currentReportPage - 1}" class="btn-toggle" style="padding: 0.4rem 0.8rem; background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.1); color: #cbd5e1; border-radius: 4px; cursor: pointer;">이전</button>`;
     }
     
     const maxPagesToShow = 5;
@@ -320,18 +358,13 @@ function renderReportPage() {
       const isActive = i === currentReportPage 
         ? 'background: #a855f7; color: #fff; border: 1px solid #a855f7;' 
         : 'background: rgba(30, 41, 59, 0.6); color: #cbd5e1; border: 1px solid rgba(255,255,255,0.1);';
-      paginationHtml += `<button onclick="window.changeReportPage(${i})" class="btn-toggle" style="padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; ${isActive}">${i}</button>`;
+      paginationHtml += `<button data-role="report-page" data-page="${i}" class="btn-toggle" style="padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; ${isActive}">${i}</button>`;
     }
     
     if (currentReportPage < totalPages) {
-      paginationHtml += `<button onclick="window.changeReportPage(${currentReportPage + 1})" class="btn-toggle" style="padding: 0.4rem 0.8rem; background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.1); color: #cbd5e1; border-radius: 4px; cursor: pointer;">다음</button>`;
+      paginationHtml += `<button data-role="report-page" data-page="${currentReportPage + 1}" class="btn-toggle" style="padding: 0.4rem 0.8rem; background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.1); color: #cbd5e1; border-radius: 4px; cursor: pointer;">다음</button>`;
     }
     
     paginationContainer.innerHTML = paginationHtml;
   }
 }
-
-window.changeReportPage = function(page) {
-  currentReportPage = page;
-  renderReportPage();
-};

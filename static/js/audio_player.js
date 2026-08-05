@@ -13,6 +13,56 @@ let lastFlushedProgressKey = '';
 let lastAutoSaveAtMs = 0;
 const AUDIO_PROGRESS_AUTO_SAVE_MS = 10000;
 
+function initAudioPlayerDelegation() {
+  if (window.__audioPlayerDelegationBound) return;
+
+  document.addEventListener('click', (event) => {
+    const target = event && event.target && typeof event.target.closest === 'function'
+      ? event.target.closest('[data-role="audio-player-action"], [data-role="audio-chapter-track"]')
+      : null;
+    if (!target) return;
+
+    event.preventDefault();
+
+    if (target.getAttribute('data-role') === 'audio-chapter-track') {
+      const trackId = Number.parseInt(target.getAttribute('data-track-id') || '', 10);
+      if (Number.isFinite(trackId) && trackId > 0) {
+        selectChapterTrack(trackId);
+      }
+      return;
+    }
+
+    const action = target.getAttribute('data-action');
+    const rawValue = target.getAttribute('data-value');
+    if (action === 'close') return closeAudioPlayerModal();
+    if (action === 'bookmark') return toggleAudioBookmark();
+    if (action === 'fullscreen') return toggleAudioFullscreen();
+    if (action === 'prev-track') return playPrevTrack();
+    if (action === 'next-track') return playNextTrack();
+    if (action === 'skip') return audioPlayerSkip(Number.parseFloat(rawValue || '0') || 0);
+    if (action === 'toggle-play') return toggleAudioPlay();
+    if (action === 'cycle-speed') return cycleAudioSpeed();
+    if (action === 'toggle-chapters') return toggleAudioChapterDrawer();
+    if (action === 'set-volume') return setAudioVolume(rawValue);
+    if (action === 'cycle-sleep') return cycleSleepTimer();
+  }, true);
+
+  document.addEventListener('input', (event) => {
+    const target = event && event.target;
+    if (!target || !(target.matches instanceof Function)) return;
+    if (!target.matches('[data-role="audio-player-input"]')) return;
+
+    const action = target.getAttribute('data-action');
+    if (action === 'set-volume') {
+      setAudioVolume(target.value);
+    }
+  }, true);
+
+  window.__audioPlayerDelegationBound = true;
+}
+
+initAudioPlayerDelegation();
+
 export async function openAudioPlayer(audiobookId, trackIdOrTitle = null, startTime = 0) {
   try {
     const res = await fetch(`/api/media/detail?type=audiobook&representative_book_id=${audiobookId}`);
@@ -181,6 +231,32 @@ export function closeAudioPlayerModal() {
   if (drawer) drawer.style.transform = 'translateY(100%)';
 }
 
+export function toggleAudioBookmark() {
+  const msg = '오디오북 북마크 기능은 준비 중입니다.';
+  if (typeof window.showToast === 'function') {
+    window.showToast(msg, 'info');
+  } else {
+    alert(msg);
+  }
+}
+
+export async function toggleAudioFullscreen() {
+  const modal = document.getElementById('audio-player-modal');
+  if (!modal) return;
+
+  try {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+      return;
+    }
+    if (typeof modal.requestFullscreen === 'function') {
+      await modal.requestFullscreen();
+    }
+  } catch (err) {
+    console.warn('[AudioPlayer] Fullscreen toggle failed:', err);
+  }
+}
+
 export function toggleAudioPlay(forcePlay = null) {
   if (!audioInstance) return;
   const btn = document.getElementById('btn-audio-play-toggle');
@@ -251,7 +327,7 @@ function renderChapterList() {
     const playIcon = isPlaying ? '<i class="fa-solid fa-volume-high" style="color: #38bdf8;"></i>' : `<span style="font-size: 0.8rem; color: #64748b;">${t.track_number || (idx + 1)}</span>`;
 
     return `
-      <div onclick="selectChapterTrack(${t.id})" style="display: flex; align-items: center; justify-content: space-between; padding: 0.8rem 1rem; border-radius: 12px; cursor: pointer; transition: all 0.2s; ${activeStyle}">
+      <div data-role="audio-chapter-track" data-track-id="${t.id}" style="display: flex; align-items: center; justify-content: space-between; padding: 0.8rem 1rem; border-radius: 12px; cursor: pointer; transition: all 0.2s; ${activeStyle}">
         <div style="display: flex; align-items: center; gap: 0.9rem; overflow: hidden;">
           ${playIcon}
           <span style="font-size: 0.9rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${t.title}</span>
@@ -475,6 +551,8 @@ window.addEventListener('keydown', (e) => {
 window.openAudioPlayer = openAudioPlayer;
 window.openAudioPlayerModal = openAudioPlayerModal;
 window.closeAudioPlayerModal = closeAudioPlayerModal;
+window.toggleAudioBookmark = toggleAudioBookmark;
+window.toggleAudioFullscreen = toggleAudioFullscreen;
 window.toggleAudioPlay = toggleAudioPlay;
 window.playPrevTrack = playPrevTrack;
 window.playNextTrack = playNextTrack;

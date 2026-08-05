@@ -5,6 +5,48 @@ import * as api from '../api.js';
 let tempShortcut = null;
 let isRecordingShortcut = false;
 
+function initGeneralDelegation() {
+  if (window.__generalDelegationBound) return;
+
+  document.addEventListener('submit', (event) => {
+    const form = event && event.target;
+    if (!form || form.id !== 'settings-general-form') return;
+    submitGeneralSettings(event);
+  }, true);
+
+  document.addEventListener('click', (event) => {
+    const target = event && event.target && typeof event.target.closest === 'function'
+      ? event.target.closest('[data-role="general-lazy-scan-now"]')
+      : null;
+    if (!target) return;
+    event.preventDefault();
+    triggerLazyScanNow();
+  }, true);
+
+  document.addEventListener('change', (event) => {
+    const target = event && event.target;
+    if (!target) return;
+    if (target.matches && target.matches('[data-role="general-dashboard-theme"]')) {
+      changeDashboardTheme(target.value);
+      return;
+    }
+    if (target.matches && target.matches('[data-role="general-dashboard-insights"]')) {
+      toggleDashboardInsightsSetting(target.checked);
+    }
+  }, true);
+
+  document.addEventListener('input', (event) => {
+    const target = event && event.target;
+    if (!target) return;
+    if (target.matches && target.matches('[data-role="general-thumbnail-width"]')) {
+      const valueEl = document.getElementById('setting-thumbnail-width-val');
+      if (valueEl) valueEl.innerText = target.value;
+    }
+  }, true);
+
+  window.__generalDelegationBound = true;
+}
+
 function isAdminUser() {
   return !!(window.currentUser && window.currentUser.role === 'admin');
 }
@@ -138,6 +180,7 @@ export async function loadInitialSystemSettings() {
 
 // 일반 환경설정 로드
 export async function loadGeneralSettings() {
+  initGeneralDelegation();
   if (!isAdminUser()) {
     // 일반 사용자는 로컬 UI 설정(테마/대시보드 위젯 표시)만 사용한다.
     applySettingsToUI({});

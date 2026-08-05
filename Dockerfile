@@ -12,6 +12,7 @@ WORKDIR /app
 # 4. Install System Dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    ffmpeg \
     gosu \
     && rm -rf /var/lib/apt/lists/*
 

@@ -18,8 +18,46 @@ function _hideTrashOverlay() {
 window.showGlobalLoadingSpinner = _showTrashOverlay;
 window.hideGlobalLoadingSpinner = _hideTrashOverlay;
 
+function initTrashDelegation() {
+    if (window.__trashDelegationBound) return;
+
+    document.addEventListener('click', (event) => {
+        const target = event && event.target && typeof event.target.closest === 'function'
+            ? event.target.closest('[data-role="trash-restore-selected"], [data-role="trash-delete-selected"], [data-role="trash-empty-all"], [data-role="trash-restore-single"], [data-role="trash-delete-single"]')
+            : null;
+        if (!target) return;
+
+        event.preventDefault();
+
+        const role = target.getAttribute('data-role');
+        if (role === 'trash-restore-selected') return restoreSelectedTrash();
+        if (role === 'trash-delete-selected') return deleteSelectedTrash();
+        if (role === 'trash-empty-all') return emptyTrashAll();
+
+        const bookId = Number.parseInt(target.getAttribute('data-book-id') || '', 10);
+        if (!Number.isFinite(bookId) || bookId <= 0) return;
+        if (role === 'trash-restore-single') return restoreSingleTrash(bookId);
+        if (role === 'trash-delete-single') return deleteSingleTrash(bookId);
+    }, true);
+
+    document.addEventListener('change', (event) => {
+        const target = event && event.target;
+        if (!target) return;
+        if (target.matches && target.matches('[data-role="trash-db-type"]')) {
+            loadTrashList();
+            return;
+        }
+        if (target.matches && target.matches('[data-role="trash-select-all"]')) {
+            toggleAllTrashCheckboxes(target);
+        }
+    }, true);
+
+    window.__trashDelegationBound = true;
+}
+
 // 전역 탭 변경 감지기 등에서 호출될 수 있도록 로드 함수 노출
 function loadTrashList() {
+    initTrashDelegation();
     const dbType = document.getElementById('trash-db-type').value;
     const body = document.getElementById('trash-list-body');
     const emptyState = document.getElementById('trash-empty-state');
@@ -57,8 +95,8 @@ function loadTrashList() {
                     <td style="padding: 0.75rem 1rem;"><span style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.25); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.75rem;">${escapeHtml(item.library_name)}</span></td>
                     <td style="padding: 0.75rem 1rem; color: #64748b; font-size: 0.8rem;">${item.deleted_at || '-'}</td>
                     <td style="padding: 0.75rem 1rem; text-align: center; display: flex; justify-content: center; gap: 0.35rem;">
-                        <button class="btn btn-secondary" onclick="restoreSingleTrash(${item.id})" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px;">복구</button>
-                        <button class="btn btn-danger-outline" onclick="deleteSingleTrash(${item.id})" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px;">삭제</button>
+                        <button class="btn btn-secondary" data-role="trash-restore-single" data-book-id="${item.id}" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px;">복구</button>
+                        <button class="btn btn-danger-outline" data-role="trash-delete-single" data-book-id="${item.id}" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px;">삭제</button>
                     </td>
                 </tr>
             `).join('');

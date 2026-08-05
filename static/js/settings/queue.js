@@ -2,7 +2,44 @@
 
 window.queueRefreshInterval = null;
 
+function initQueueDelegation() {
+    if (window.__queueDelegationBound) return;
+
+    document.addEventListener('click', (event) => {
+        const target = event && event.target && typeof event.target.closest === 'function'
+            ? event.target.closest('[data-role="queue-clear"], [data-role="queue-refresh"], [data-role="queue-cancel-running"], [data-role="queue-cancel-waiting"]')
+            : null;
+        if (!target) return;
+
+        event.preventDefault();
+
+        const role = target.getAttribute('data-role');
+        if (role === 'queue-clear') {
+            clearQueue();
+            return;
+        }
+        if (role === 'queue-refresh') {
+            loadQueueStatus();
+            return;
+        }
+        if (role === 'queue-cancel-running') {
+            const libId = Number.parseInt(target.getAttribute('data-library-id') || '', 10);
+            if (!Number.isFinite(libId) || libId <= 0) return;
+            cancelRunningScan(libId, String(target.getAttribute('data-db-type') || 'general'));
+            return;
+        }
+        if (role === 'queue-cancel-waiting') {
+            const taskId = String(target.getAttribute('data-task-id') || '').trim();
+            if (!taskId) return;
+            cancelWaitingScan(taskId);
+        }
+    }, true);
+
+    window.__queueDelegationBound = true;
+}
+
 export async function loadQueueStatus() {
+    initQueueDelegation();
     try {
         const response = await fetch(`/api/media/system/queue?_ts=${Date.now()}`, { cache: 'no-store' });
         if (!response.ok) throw new Error('API Response Error');
@@ -69,7 +106,7 @@ function getQueueCancelButton(task, t) {
         const libId = task.kwargs.library_id;
         const dbType = task.kwargs.db_type || 'general';
         return `
-            <button class="action-btn" onclick="cancelRunningScan(${libId}, '${dbType}')" style="margin-left: 8px; padding: 2px 6px; background-color: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 4px; color: #fca5a5; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;">
+            <button class="action-btn" data-role="queue-cancel-running" data-library-id="${libId}" data-db-type="${dbType}" style="margin-left: 8px; padding: 2px 6px; background-color: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 4px; color: #fca5a5; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;">
                 <i class="fa-solid fa-circle-stop"></i> ${t('queue.btn_cancel') || '취소'}
             </button>
         `;
@@ -77,7 +114,7 @@ function getQueueCancelButton(task, t) {
 
     if (task.role === 'pending' && task.key) {
         return `
-            <button class="action-btn" onclick="cancelWaitingScan('${task.key}')" style="margin-left: 8px; padding: 2px 6px; background-color: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 4px; color: #fca5a5; font-size: 0.72rem; cursor: pointer; transition: all 0.2s; white-space: nowrap;">
+            <button class="action-btn" data-role="queue-cancel-waiting" data-task-id="${String(task.key).replace(/"/g, '&quot;')}" style="margin-left: 8px; padding: 2px 6px; background-color: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 4px; color: #fca5a5; font-size: 0.72rem; cursor: pointer; transition: all 0.2s; white-space: nowrap;">
                 ${t('queue.btn_cancel') || '취소'}
             </button>
         `;

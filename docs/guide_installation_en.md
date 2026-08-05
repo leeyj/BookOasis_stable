@@ -50,6 +50,18 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
+### ②-1 Recommended Accuracy Add-on for Audiobook Duration (0:00 cases)
+The audiobook scanner first computes duration via parser libraries (`mutagen`, `tinytag`). If the result is `0.0`, it performs a second-pass direct file probe using `ffprobe`.
+
+* **Native installs (Windows/Linux/macOS)**:
+    * Installing `ffmpeg` (includes `ffprobe`) is recommended.
+    * Without `ffmpeg`, the service still runs, but recovery rate for some WMA/special formats may be lower (more `0:00` cases).
+
+* **Docker users**:
+    * The latest project `Dockerfile` already includes `ffmpeg`.
+    * For source-build path, rebuild image to apply: `docker compose up --build`
+    * For GHCR image path, `pull` the latest tag and restart containers.
+
 ### ③ Environment Variables Setup (Optional)
 
 Complex `.env` settings from older versions (plugin activation flags, API keys, etc.) are deprecated. Most operational settings are now managed in the DB via the Web UI's **[Settings > Plugin Settings]** tab. So in many cases, you can run BookOasis without a `.env` file.

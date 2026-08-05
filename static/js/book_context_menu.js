@@ -4,6 +4,7 @@ import * as api from './api.js';
 import { openBookDetail } from './modal.js';
 import { loadBooksList, loadReadingHistory } from './book_list.js';
 import { loadDashboardData } from './dashboard.js';
+import { hideFloatingMenu, isFloatingMenuOpen, positionMenuAtPoint } from './context_menu_manager.js';
 
 let currentTargetBook = null;
 let contextMenuSuppressUntil = 0;
@@ -17,6 +18,7 @@ let menuOpenedByTouchUntil = 0;
 let lastEventX = 0;
 let lastEventY = 0;
 let cachedSearchPlugins = null;
+let suppressBookCardClickUntil = 0;
 
 function isIOSDevice() {
   const ua = navigator.userAgent || '';
@@ -136,25 +138,7 @@ function renderPluginContextMenuItems(items) {
 function adjustMenuPosition(x, y) {
   const bookMenu = document.getElementById('book-context-menu');
   if (!bookMenu || bookMenu.style.display === 'none') return;
-
-  const menuHeight = bookMenu.offsetHeight || 180;
-  const menuWidth = bookMenu.offsetWidth || 160;
-
-  let targetX = x + window.scrollX;
-  let targetY = y + window.scrollY;
-
-  if (y + menuHeight > window.innerHeight) {
-    targetY = (y - menuHeight) + window.scrollY;
-    if (targetY < window.scrollY) targetY = window.scrollY;
-  }
-
-  if (x + menuWidth > window.innerWidth) {
-    targetX = (x - menuWidth) + window.scrollX;
-    if (targetX < window.scrollX) targetX = window.scrollX;
-  }
-
-  bookMenu.style.left = `${targetX}px`;
-  bookMenu.style.top = `${targetY}px`;
+  positionMenuAtPoint(bookMenu, x, y, { zIndex: 20060 });
 }
 
 async function loadPluginContextMenuItems() {
@@ -164,20 +148,11 @@ async function loadPluginContextMenuItems() {
   }
 
   const seq = ++contextMenuLoadSeq;
-  console.log('[BookContextMenu] loading plugin items', {
-    seq,
-    bookId: currentTargetBook.id,
-    title: currentTargetBook.title,
-    isVolumeDetail: currentTargetBook.isVolumeDetail,
-    libraryId: state.currentLibraryId,
-  });
   try {
     const payload = buildCurrentContextPayload();
-    console.log('[BookContextMenu] request payload', payload);
     const res = await api.fetchBookContextMenuPluginItems(state.currentLibraryType, payload);
     if (seq !== contextMenuLoadSeq) return;
 
-    console.log('[BookContextMenu] response', res);
     if (res && res.success) {
       renderPluginContextMenuItems(res.items || []);
       return;
@@ -200,13 +175,11 @@ function clearLongPressTimer() {
 }
 
 function isBookContextMenuOpen() {
-  const bookMenu = document.getElementById('book-context-menu');
-  return !!bookMenu && bookMenu.style.display !== 'none';
+  return isFloatingMenuOpen('book-context-menu');
 }
 
 function hideBookContextMenu({ suppressMs = 0, clearTarget = true } = {}) {
-  const bookMenu = document.getElementById('book-context-menu');
-  if (bookMenu) bookMenu.style.display = 'none';
+  hideFloatingMenu('book-context-menu');
   if (clearTarget) currentTargetBook = null;
   menuOpenedByTouchUntil = 0;
   contextMenuLoadSeq += 1;
@@ -260,13 +233,8 @@ export function showBookContextMenu(x, y, bookId, bookTitle, isVolumeDetail = fa
   }
 
   // 임시 표시하여 실제 메뉴 크기 측정
-  bookMenu.style.display = 'block';
-  adjustMenuPosition(x, y);
+  positionMenuAtPoint(bookMenu, x, y, { zIndex: 20060 });
   
-  // 다른 메뉴 닫기
-  const libMenu = document.getElementById('library-context-menu');
-  if (libMenu) libMenu.style.display = 'none';
-
   loadPluginContextMenuItems();
 }
 
@@ -439,6 +407,52 @@ export { triggerSearchMetadataAction as triggerSearchAladinMetadataAction };
 window.showBookContextMenu = showBookContextMenu;
 window.closeBookContextMenu = closeBookContextMenu;
 
+function resolveBookContextTarget(event) {
+  if (!event || !event.target || typeof event.target.closest !== 'function') return null;
+
+  const card = event.target.closest('.book-card, .vol-grid-card, .volume-card, .plugin-item-card');
+  if (!card) return null;
+
+  const rawId = card.getAttribute('data-book-id') || card.dataset?.bookId || card.dataset?.id || '';
+  const parsedId = Number.parseInt(String(rawId), 10);
+  if (!Number.isFinite(parsedId) || parsedId <= 0) return null;
+
+  const title = (card.getAttribute('data-title') || card.dataset?.title || '').trim() || '도서';
+  const isVolumeDetail = card.classList.contains('vol-grid-card') || card.classList.contains('volume-card');
+  return { id: parsedId, title, isVolumeDetail };
+}
+
+// 카드별 개별 바인딩 누락/재렌더 타이밍 이슈가 있어도 우클릭 메뉴를 보장한다.
+document.addEventListener('contextmenu', (event) => {
+  const target = resolveBookContextTarget(event);
+  if (!target) return;
+
+  suppressBookCardClickUntil = Date.now() + 700;
+
+  event.preventDefault();
+  event.stopPropagation();
+  if (typeof event.stopImmediatePropagation === 'function') {
+    event.stopImmediatePropagation();
+  }
+
+  showBookContextMenu(event.clientX, event.clientY, target.id, target.title, target.isVolumeDetail);
+}, true);
+
+// 우클릭 직후 브라우저/플랫폼별 합성 click으로 상세 열기(onclick)가 발동하는 케이스 차단
+document.addEventListener('click', (event) => {
+  if (Date.now() >= suppressBookCardClickUntil) return;
+  const card = event && event.target && typeof event.target.closest === 'function'
+    ? event.target.closest('.book-card, .vol-grid-card, .volume-card, .plugin-item-card')
+    : null;
+  if (!card) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+  if (typeof event.stopImmediatePropagation === 'function') {
+    event.stopImmediatePropagation();
+  }
+}, true);
+
 // 도서 우클릭 메뉴 클릭 이외 시 닫기 핸들러 추가
 function shouldIgnoreBookMenuDismiss(event) {
   const bookMenu = document.getElementById('book-context-menu');
@@ -583,4 +597,26 @@ if (bookMenuEl) {
       }, 0);
     }
   }, true);
+}
+
+if (!window.__bookContextActionBound) {
+  document.addEventListener('click', (event) => {
+    const target = event && event.target && typeof event.target.closest === 'function'
+      ? event.target.closest('[data-role="book-context-action"], [data-role="book-context-close"]')
+      : null;
+    if (!target) return;
+
+    event.preventDefault();
+    const role = target.getAttribute('data-role');
+    if (role === 'book-context-close') {
+      closeBookContextMenu();
+      return;
+    }
+
+    const action = target.getAttribute('data-action');
+    if (action === 'scan') return window.triggerScanSingleBook?.();
+    if (action === 'search-meta') return window.triggerSearchAladinMetadata?.();
+    if (action === 'mark-unread') return window.triggerMarkAsUnread?.();
+  }, true);
+  window.__bookContextActionBound = true;
 }

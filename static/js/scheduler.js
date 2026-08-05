@@ -1,6 +1,7 @@
 // scheduler.js – 라이브러리 스케줄 목록 로딩 및 관리 UI 전용 모듈
 import { state } from './state.js';
 import * as api from './api.js';
+import { bindFloatingMenuOutsideClose, hideFloatingMenu, positionMenuAtElement } from './context_menu_manager.js';
 
 function buildStatusBadge(scanStatus) {
   if (scanStatus === 'scanning') {
@@ -65,7 +66,7 @@ function buildCompactPaths(physicalPath) {
   return String(physicalPath || '').split(/\r?\n/).filter(Boolean).map(path => {
     const fullPath = escapeHtml(path.trim());
     const shortPath = escapeHtml(compactPath(path.trim()));
-    return `<button type="button" class="schedule-path-toggle" data-expanded="false" data-short-path="${shortPath}" data-full-path="${fullPath}" title="${fullPath}" onclick="toggleSchedulePath(this)">${shortPath}</button>`;
+    return `<button type="button" class="schedule-path-toggle" data-role="schedule-path-toggle" data-expanded="false" data-short-path="${shortPath}" data-full-path="${fullPath}" title="${fullPath}">${shortPath}</button>`;
   }).join('');
 }
 
@@ -84,6 +85,9 @@ function buildScheduleRow(lib) {
   const cleanName = lib.name.replace(/'/g, "\\'");
   const cleanRcloneRcUrl = (lib.rclone_rc_url || '').replace(/'/g, "\\'");
   const cleanCronSchedule = (lib.cron_schedule || '').replace(/'/g, "\\'");
+  const safeNameAttr = escapeHtml(lib.name || '');
+  const safeRcloneRcUrlAttr = escapeHtml(lib.rclone_rc_url || '');
+  const safeCronScheduleAttr = escapeHtml(lib.cron_schedule || '');
   const lastScannedAt = lib.last_scanned_at || '-';
 
   return `
@@ -93,12 +97,12 @@ function buildScheduleRow(lib) {
       <td data-role="schedule-status" style="padding: 1rem; text-align: center;">${statusBadge}</td>
       <td data-role="schedule-scan-info" style="padding: 1rem; text-align: center;">${buildLastScanInfo(lastScannedAt, lib.cron_schedule)}</td>
       <td style="padding: 1rem; text-align: center;">
-        <button class="btn-toggle" style="white-space: nowrap; padding: 0.3rem 0.6rem; font-size: 0.75rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.2rem;" onclick="openScanSettingsModal(${lib.id}, '${cleanName}', ${lib.is_remote}, '${cleanRcloneRcUrl}', '${cleanCronSchedule}', ${lib.vfs_refresh_before_scan || 0})" title="상세 설정">
+        <button class="btn-toggle" data-role="schedule-config" data-library-id="${lib.id}" data-library-name="${safeNameAttr}" data-is-remote="${lib.is_remote || 0}" data-rclone-rc-url="${safeRcloneRcUrlAttr}" data-cron-schedule="${safeCronScheduleAttr}" data-vfs-refresh="${lib.vfs_refresh_before_scan || 0}" style="white-space: nowrap; padding: 0.3rem 0.6rem; font-size: 0.75rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.2rem;" title="상세 설정">
           <i class="fa-solid fa-gear"></i> ${i18n.t('settings.col_config') || '설정'}
         </button>
       </td>
       <td style="padding: 1rem; text-align: center;">
-        <button class="btn-toggle active" data-role="schedule-action" data-last-scanned-at="${lastScannedAt}" style="white-space: nowrap; padding: 0.3rem 0.6rem; font-size: 0.75rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.2rem;" onclick="showScheduleActionMenu(event, ${lib.id}, '${cleanName}')" title="작업 메뉴 열기">
+        <button class="btn-toggle active" data-role="schedule-action" data-library-id="${lib.id}" data-library-name="${escapeHtml(lib.name)}" data-last-scanned-at="${lastScannedAt}" style="white-space: nowrap; padding: 0.3rem 0.6rem; font-size: 0.75rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.2rem;" title="작업 메뉴 열기">
           ${i18n.t('settings.col_action') || '작업'} <i class="fa-solid fa-chevron-down" style="font-size: 0.65rem;"></i>
         </button>
       </td>
@@ -106,8 +110,122 @@ function buildScheduleRow(lib) {
   `;
 }
 
+function initScheduleActionDelegation() {
+  if (window.__scheduleActionDelegationBound) return;
+
+  document.addEventListener('click', (event) => {
+    const configBtn = event && event.target && typeof event.target.closest === 'function'
+      ? event.target.closest('button[data-role="schedule-config"]')
+      : null;
+    if (configBtn) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (typeof event.stopImmediatePropagation === 'function') {
+        event.stopImmediatePropagation();
+      }
+
+      const libraryId = Number.parseInt(configBtn.dataset.libraryId || '', 10);
+      if (!Number.isFinite(libraryId) || libraryId <= 0) return;
+      openScanSettingsModal(
+        libraryId,
+        String(configBtn.dataset.libraryName || '').trim(),
+        Number.parseInt(configBtn.dataset.isRemote || '0', 10) || 0,
+        String(configBtn.dataset.rcloneRcUrl || ''),
+        String(configBtn.dataset.cronSchedule || ''),
+        Number.parseInt(configBtn.dataset.vfsRefresh || '0', 10) || 0
+      );
+      return;
+    }
+
+    const btn = event && event.target && typeof event.target.closest === 'function'
+      ? event.target.closest('button[data-role="schedule-action"]')
+      : null;
+    if (btn) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (typeof event.stopImmediatePropagation === 'function') {
+        event.stopImmediatePropagation();
+      }
+
+      const libraryId = Number.parseInt(btn.dataset.libraryId || '', 10);
+      const libraryName = String(btn.dataset.libraryName || '').trim();
+      if (!Number.isFinite(libraryId) || libraryId <= 0) return;
+
+      showScheduleActionMenuFromButton(btn, libraryId, libraryName);
+      return;
+    }
+
+    const pathBtn = event && event.target && typeof event.target.closest === 'function'
+      ? event.target.closest('[data-role="schedule-path-toggle"]')
+      : null;
+    if (pathBtn) {
+      event.preventDefault();
+      toggleSchedulePath(pathBtn);
+      return;
+    }
+
+    const staticAction = event && event.target && typeof event.target.closest === 'function'
+      ? event.target.closest('[data-role="schedule-scan-all"], [data-role="schedule-apply-helper"], [data-role="schedule-modal-close"], [data-role="schedule-modal-save"]')
+      : null;
+    if (!staticAction) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === 'function') {
+      event.stopImmediatePropagation();
+    }
+
+    const actionRole = staticAction.getAttribute('data-role');
+    if (actionRole === 'schedule-scan-all') {
+      runAllLibrariesScanNow(false);
+      return;
+    }
+    if (actionRole === 'schedule-apply-helper') {
+      applyCronHelperToInput();
+      return;
+    }
+    if (actionRole === 'schedule-modal-close') {
+      closeScanSettingsModal();
+      return;
+    }
+    if (actionRole === 'schedule-modal-save') {
+      saveScanSettingsFromModal();
+    }
+  }, true);
+
+  document.addEventListener('change', (event) => {
+    const target = event && event.target;
+    if (!target || !(target.matches instanceof Function)) return;
+
+    if (target.matches('[data-role="schedule-helper-mode"]')) {
+      onCronHelperModeChange();
+      return;
+    }
+    if (target.matches('[data-role="schedule-helper-weekday"]')) {
+      updateCronHelperSummary();
+    }
+  }, true);
+
+  document.addEventListener('input', (event) => {
+    const target = event && event.target;
+    if (!target || !(target.matches instanceof Function)) return;
+
+    if (target.matches('[data-role="schedule-helper-time"], [data-role="schedule-helper-monthday"]')) {
+      updateCronHelperSummary();
+    }
+  }, true);
+
+  window.__scheduleActionDelegationBound = true;
+
+  bindFloatingMenuOutsideClose('schedule-action-context-menu', {
+    eventTypes: ['click'],
+    capture: true,
+  });
+}
+
 // 환경설정 (스케줄 관리) 리스트 로드 및 렌더링
 export async function loadLibrarySchedules() {
+  initScheduleActionDelegation();
   const container = document.getElementById('settings-libraries-list');
   if (!container) return;
   container.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:2rem; color:#a855f7;"><i class="fa-solid fa-circle-notch fa-spin fa-2x"></i><br><span style="display:inline-block; margin-top:0.5rem;">${i18n.t('settings.loading_schedules')}</span></td></tr>`;
@@ -436,14 +554,31 @@ export function applyCronHelperToInput() {
 window.applyCronHelperToInput = applyCronHelperToInput;
 
 export function showScheduleActionMenu(event, libraryId, name) {
-  event.stopPropagation();
+  const evt = event || window.event;
+  if (evt && typeof evt.stopPropagation === 'function') {
+    evt.stopPropagation();
+  }
+
+  const anchor = evt && evt.currentTarget ? evt.currentTarget : null;
+  if (!anchor) return;
+  showScheduleActionMenuFromButton(anchor, libraryId, name);
+}
+
+export function showScheduleActionMenuFromButton(anchorEl, libraryId, name) {
+  if (!anchorEl) return;
+
+  if (typeof anchorEl.blur === 'function') {
+    // 모바일/터치 환경에서 포커스 잔상으로 재클릭이 씹히는 케이스를 줄인다.
+    anchorEl.blur();
+  }
+
   activeLibraryId = libraryId;
   activeLibraryName = name;
 
   const menu = document.getElementById('schedule-action-context-menu');
   if (!menu) return;
 
-  const lastScannedAt = event.currentTarget?.dataset?.lastScannedAt || '-';
+  const lastScannedAt = anchorEl.dataset?.lastScannedAt || '-';
 
   const lastScanEl = document.getElementById('schedule-action-last-scan');
   if (lastScanEl) {
@@ -458,35 +593,19 @@ export function showScheduleActionMenu(event, libraryId, name) {
 
   document.getElementById('schedule-action-scan').onclick = () => {
     runLibraryScanNow(activeLibraryId, activeLibraryName, false);
-    menu.style.display = 'none';
+    hideFloatingMenu(menu);
   };
   document.getElementById('schedule-action-force').onclick = () => {
     runLibraryScanNow(activeLibraryId, activeLibraryName, true);
-    menu.style.display = 'none';
+    hideFloatingMenu(menu);
   };
   document.getElementById('schedule-action-close').onclick = () => {
-    menu.style.display = 'none';
+    hideFloatingMenu(menu);
   };
 
-  const rect = event.currentTarget.getBoundingClientRect();
-  menu.style.display = 'block';
-  
-  const menuHeight = menu.offsetHeight || 180;
-  const menuWidth = menu.offsetWidth || 200;
-  
-  let targetY = rect.bottom + window.scrollY;
-  let targetX = rect.left + window.scrollX;
-
-  if (rect.bottom + menuHeight > window.innerHeight) {
-    targetY = (rect.top - menuHeight) + window.scrollY;
-  }
-  if (rect.left + menuWidth > window.innerWidth) {
-    targetX = (rect.right - menuWidth) + window.scrollX;
-  }
-
-  menu.style.left = `${targetX}px`;
-  menu.style.top = `${targetY}px`;
+  positionMenuAtElement(menu, anchorEl, { zIndex: 20070 });
 }
+window.showScheduleActionMenuFromButton = showScheduleActionMenuFromButton;
 window.showScheduleActionMenu = showScheduleActionMenu;
 
 // 모달 다이얼로그 제어 함수 추가
@@ -564,10 +683,3 @@ export async function saveScanSettingsFromModal() {
 }
 window.saveScanSettingsFromModal = saveScanSettingsFromModal;
 
-// 바깥 클릭 시 메뉴 닫기 핸들러
-document.addEventListener('click', (e) => {
-  const menu = document.getElementById('schedule-action-context-menu');
-  if (menu && !menu.contains(e.target)) {
-    menu.style.display = 'none';
-  }
-});

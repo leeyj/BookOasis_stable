@@ -78,6 +78,81 @@ function focusLibrarySearchInput() {
   searchInput.select();
 }
 
+function initLibraryShellDelegation() {
+  if (window.__libraryShellDelegationBound) return;
+
+  document.addEventListener('click', (event) => {
+    const target = event && event.target && typeof event.target.closest === 'function'
+      ? event.target.closest('[data-role="sidebar-category-static"], [data-role="desktop-sidebar-toggle"], [data-role="library-search-action"], [data-role="library-open-filter"], [data-role="library-sort-toggle"], [data-role="library-type-toggle"], [data-role="library-filter-reset"], [data-role="detail-back-to-list"]')
+      : null;
+    if (!target) return;
+
+    event.preventDefault();
+
+    const role = target.getAttribute('data-role');
+    if (role === 'sidebar-category-static') {
+      return selectCategory(target.getAttribute('data-category-id') || 'home');
+    }
+    if (role === 'desktop-sidebar-toggle') {
+      return toggleDesktopSidebar();
+    }
+    if (role === 'library-search-action') {
+      return handleLibrarySearchAction();
+    }
+    if (role === 'library-open-filter') {
+      return toggleFilterModal();
+    }
+    if (role === 'library-sort-toggle') {
+      return toggleLibrarySort();
+    }
+    if (role === 'library-type-toggle') {
+      return switchLibraryType(target.getAttribute('data-library-type') || 'general');
+    }
+    if (role === 'library-filter-reset') {
+      return window.resetAllFilters?.();
+    }
+    if (role === 'detail-back-to-list') {
+      return goBackToList();
+    }
+  }, true);
+
+  document.addEventListener('input', (event) => {
+    const target = event && event.target;
+    if (!target) return;
+    if (target.matches && target.matches('[data-role="library-search-input"]')) {
+      filterBooks();
+    }
+  }, true);
+
+  document.addEventListener('keydown', (event) => {
+    const target = event && event.target;
+    if (!target) return;
+    if (target.matches && target.matches('[data-role="library-search-input"]')) {
+      handleLibrarySearchKeydown(event);
+    }
+  }, true);
+
+  window.__libraryShellDelegationBound = true;
+}
+
+function initDashboardNavDelegation() {
+  if (window.__dashboardNavDelegationBound) return;
+
+  document.addEventListener('click', (event) => {
+    const btn = event && event.target && typeof event.target.closest === 'function'
+      ? event.target.closest('[data-role="dashboard-row-nav"]')
+      : null;
+    if (!btn) return;
+
+    event.preventDefault();
+    const row = btn.getAttribute('data-row') || 'history';
+    const dir = btn.getAttribute('data-dir') || 'left';
+    scrollDashboardRow(row, dir);
+  }, true);
+
+  window.__dashboardNavDelegationBound = true;
+}
+
 function recoverTopCategoryUiAfterBack() {
   const isMobileLayout = window.matchMedia('(max-width: 1200px)').matches;
   if (!isMobileLayout) return;
@@ -235,6 +310,8 @@ function initLibraryTypeHotkeys() {
 
 // 초기화 함수 분리
 async function initTabMediaLibrary() {
+  initLibraryShellDelegation();
+  initDashboardNavDelegation();
   // 로그인 사용자 세션 연동
   if (window.currentUser) {
     state.currentUser = window.currentUser;

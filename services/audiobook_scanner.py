@@ -4,6 +4,7 @@ import json
 import re
 import sqlite3
 import struct
+import subprocess
 import time
 from database import get_connection
 from utils.drive_helper import is_remote_path
@@ -87,7 +88,49 @@ def get_audio_duration_and_size(file_path, file_size=None, remote_fast_path=Fals
     if file_path.lower().endswith('.mp3'):
         duration = estimate_mp3_duration(file_path, file_size)
 
+    # 4. duration이 0.0으로 남으면 ffprobe를 사용한 직접 파일 열기 폴백을 시도합니다.
+    if duration <= 0.0:
+        ffprobe_duration = _probe_duration_with_ffprobe(file_path)
+        if ffprobe_duration > 0.0:
+            duration = ffprobe_duration
+
     return duration, file_size
+
+
+def _probe_duration_with_ffprobe(file_path):
+    """
+    ffprobe를 사용해 파일을 직접 열어 duration을 확인합니다.
+    ffprobe가 없거나 파싱 실패 시 0.0을 반환합니다.
+    """
+    try:
+        cmd = [
+            'ffprobe',
+            '-v', 'error',
+            '-show_entries', 'format=duration',
+            '-of', 'default=noprint_wrappers=1:nokey=1',
+            file_path,
+        ]
+        completed = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        if completed.returncode != 0:
+            return 0.0
+
+        raw = (completed.stdout or '').strip()
+        if not raw:
+            return 0.0
+
+        parsed = float(raw)
+        if parsed > 0.0:
+            return parsed
+    except Exception:
+        pass
+    return 0.0
 
 
 def estimate_mp3_duration(file_path, file_size, remote_fast_path=False):

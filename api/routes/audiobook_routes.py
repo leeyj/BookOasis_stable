@@ -211,6 +211,23 @@ def audiobook_progress_api(aid):
         playback_rate = float(data.get('playback_rate', 1.0))
         is_completed = 1 if data.get('is_completed') else 0
 
+        # 현재 오디오북에 속하지 않는 track_id가 저장되지 않도록 방어한다.
+        if track_id is not None:
+            try:
+                track_id_int = int(track_id)
+            except (TypeError, ValueError):
+                conn.close()
+                return jsonify({'success': False, 'error': 'Invalid current_track_id'}), 400
+
+            cursor.execute(
+                "SELECT 1 FROM audiobook_tracks WHERE id = ? AND audiobook_id = ?",
+                (track_id_int, aid)
+            )
+            if not cursor.fetchone():
+                conn.close()
+                return jsonify({'success': False, 'error': 'Track does not belong to audiobook'}), 400
+            track_id = track_id_int
+
         # 총 진행율 계산
         total_pct = 0.0
         try:

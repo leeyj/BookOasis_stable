@@ -1,6 +1,27 @@
 // static/js/dashboard_insights.js - 대시보드 독서 동기부여 위젯 컨트롤러 (Compact & Slim)
 import { getBookCoverSrc, buildFallbackCoverUrl } from './cover_fallback.js';
 
+if (!window.__dashboardInsightsDelegationBound) {
+  document.addEventListener('click', (event) => {
+    const target = event && event.target && typeof event.target.closest === 'function'
+      ? event.target.closest('[data-role="reading-goal-edit"], [data-role="currently-reading-book"]')
+      : null;
+    if (!target) return;
+
+    event.preventDefault();
+    const role = target.getAttribute('data-role');
+    if (role === 'reading-goal-edit') {
+      window.openEditReadingGoalModal?.();
+      return;
+    }
+    const bookId = Number.parseInt(target.getAttribute('data-book-id') || '', 10);
+    if (role === 'currently-reading-book' && Number.isFinite(bookId) && bookId > 0) {
+      window.openBookViewer?.(bookId);
+    }
+  }, true);
+  window.__dashboardInsightsDelegationBound = true;
+}
+
 export async function loadDashboardInsights(libraryType = 'general') {
   try {
     const isShow = (localStorage.getItem('show_dashboard_insights') !== '0');
@@ -58,7 +79,7 @@ export async function loadDashboardInsights(libraryType = 'general') {
           });
 
           return `
-            <div class="currently-book-item" onclick="openBookViewer(${book.id})" style="display: flex; align-items: center; gap: 0.5rem; background: rgba(15, 23, 42, 0.4); padding: 0.35rem 0.5rem; border-radius: 8px; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='rgba(56, 189, 248, 0.15)'" onmouseout="this.style.background='rgba(15, 23, 42, 0.4)'">
+            <div class="currently-book-item ui-hover-currently-book" data-role="currently-reading-book" data-book-id="${book.id}" style="display: flex; align-items: center; gap: 0.5rem; background: rgba(15, 23, 42, 0.4); padding: 0.35rem 0.5rem; border-radius: 8px; cursor: pointer; transition: background 0.2s;">
               <img src="${coverSrc}" onerror="this.onerror=null; this.src='${fallbackSrc}';" alt="Cover" style="width: 26px; height: 36px; object-fit: cover; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
               <div style="flex: 1; min-width: 0;">
                 <div style="font-size: 0.78rem; font-weight: 700; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(book.title)}</div>

@@ -3,9 +3,9 @@
     <div class="library-modal-content" style="max-width: 400px;">
         <div class="library-modal-header">
             <h3><span data-i18n="modal.add_user">사용자 추가</span></h3>
-            <span class="library-modal-close" onclick="closeUserModal()">&times;</span>
+            <span class="library-modal-close" data-role="user-modal-close">&times;</span>
         </div>
-        <form id="user-crud-form" onsubmit="submitUserForm(event)">
+        <form id="user-crud-form">
             <div class="library-form-group">
                 <label for="user-form-username" data-i18n="modal.username_label">사용자 아이디 (로그인용)</label>
                 <input type="text" id="user-form-username" name="username" required maxlength="128" data-i18n-placeholder="modal.username_placeholder" placeholder="예: reading_fan">
@@ -27,7 +27,7 @@
             </div>
             <div class="library-form-group" style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem;">
             <div class="library-modal-footer">
-                <button type="button" class="btn-cancel" onclick="closeUserModal()" data-i18n="common.cancel">취소</button>
+                <button type="button" class="btn-cancel" data-role="user-modal-close" data-i18n="common.cancel">취소</button>
                 <button type="submit" class="btn-submit" id="user-form-submit-btn" data-i18n="common.save">등록</button>
             </div>
         </form>
@@ -39,9 +39,9 @@
     <div class="library-modal-content" style="max-width: 400px;">
         <div class="library-modal-header">
             <h3><span data-i18n="modal.reset_pwd_title">비밀번호 강제 재설정</span></h3>
-            <span class="library-modal-close" onclick="closeResetPwdModal()">&times;</span>
+            <span class="library-modal-close" data-role="user-reset-modal-close">&times;</span>
         </div>
-        <form id="user-reset-pwd-form" onsubmit="submitResetPwdForm(event)">
+        <form id="user-reset-pwd-form">
             <input type="hidden" id="reset-pwd-user-id" name="user_id">
             <input type="hidden" id="reset-pwd-role" name="role" value="user">
             <p style="margin: 0 0 0.8rem 0; padding: 0.65rem 0.75rem; border-radius: 6px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); color: #fcd34d; font-size: 0.82rem; line-height: 1.45;">
@@ -53,7 +53,7 @@
                 <input type="password" id="reset-pwd-new" name="new_password" required maxlength="256" data-i18n-placeholder="modal.new_password_placeholder" placeholder="새 비밀번호 입력">
             </div>
             <div class="library-modal-footer">
-                <button type="button" class="btn-cancel" onclick="closeResetPwdModal()" data-i18n="common.cancel">취소</button>
+                <button type="button" class="btn-cancel" data-role="user-reset-modal-close" data-i18n="common.cancel">취소</button>
                 <button type="submit" class="btn-submit" data-i18n="common.save">저장</button>
             </div>
         </form>
@@ -65,9 +65,9 @@
     <div class="library-modal-content" style="max-width: 400px;">
         <div class="library-modal-header">
             <h3><span data-i18n="modal.change_pwd_title">관리자 비밀번호 변경</span></h3>
-            <span class="library-modal-close" onclick="closeAdminChangePwdModal()">&times;</span>
+            <span class="library-modal-close" data-role="admin-pwd-modal-close">&times;</span>
         </div>
-        <form id="admin-change-pwd-form" onsubmit="submitAdminChangePwdForm(event)">
+        <form id="admin-change-pwd-form">
             <input type="hidden" id="change-pwd-admin-id" name="user_id">
             <input type="hidden" id="change-pwd-role" name="role" value="admin">
             <div class="library-form-group">
@@ -79,7 +79,7 @@
                 <input type="password" id="change-pwd-new" name="new_password" required maxlength="256" data-i18n-placeholder="modal.new_password_placeholder" placeholder="새 비밀번호 입력">
             </div>
             <div class="library-modal-footer">
-                <button type="button" class="btn-cancel" onclick="closeAdminChangePwdModal()" data-i18n="common.cancel">취소</button>
+                <button type="button" class="btn-cancel" data-role="admin-pwd-modal-close" data-i18n="common.cancel">취소</button>
                 <button type="submit" class="btn-submit" data-i18n="common.save">저장</button>
             </div>
         </form>

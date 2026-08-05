@@ -267,6 +267,18 @@ function bindPluginEvents() {
   const container = document.getElementById('settings-plugins-container');
   if (!container) return;
 
+  if (!window.__pluginsStaticDelegationBound) {
+    document.addEventListener('click', (event) => {
+      const guide = event && event.target && typeof event.target.closest === 'function'
+        ? event.target.closest('[data-role="plugins-contrib-guide"]')
+        : null;
+      if (!guide) return;
+      event.preventDefault();
+      alert('준비 중인 기여 항목입니다. GitHub 기여 가이드를 확인해 주세요!');
+    }, true);
+    window.__pluginsStaticDelegationBound = true;
+  }
+
   // 1. 활성/비활성 스위치 토글 이벤트
   container.querySelectorAll('.plugin-toggle-checkbox').forEach(chk => {
     chk.addEventListener('change', async (e) => {

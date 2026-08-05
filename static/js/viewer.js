@@ -484,6 +484,67 @@ window.toggleComicCenterGap = function () {
 // 최초 로드 시 사용자 폰트 사전 로딩
 loadCustomFontsList();
 
+function initMediaViewerDelegation() {
+  if (window.__mediaViewerDelegationBound) return;
+
+  document.addEventListener('click', (event) => {
+    const target = event && event.target && typeof event.target.closest === 'function'
+      ? event.target.closest('[data-role="viewer-action"]')
+      : null;
+    if (!target) return;
+
+    event.preventDefault();
+    const action = target.getAttribute('data-action');
+    const value = target.getAttribute('data-value');
+
+    if (action === 'close') return closeMediaViewer();
+    if (action === 'font-size') return changeFontSize(Number.parseInt(value || '0', 10) || 0);
+    if (action === 'toggle-reader-theme') return toggleReaderTheme();
+    if (action === 'comic-fit') return setComicFitMode(value || 'height');
+    if (action === 'toggle-fullscreen') return toggleFullscreenViewer();
+    if (action === 'prev-page') return prevPage();
+    if (action === 'next-page') return nextPage();
+    if (action === 'toggle-overlay') return toggleComicOverlay();
+    if (action === 'overlay-tab') return window.switchViewerOverlayTab?.(value || 'nav');
+    if (action === 'jump-first') return viewerJumpToFirst();
+    if (action === 'jump-last') return viewerJumpToLast();
+    if (action === 'mark-completed') return markAsCompleted();
+    if (action === 'scroll-mode') return window.setScrollMode?.(value || 'page');
+    if (action === 'toggle-page-step') return window.toggleComicPageStep?.();
+    if (action === 'toggle-center-gap') return window.toggleComicCenterGap?.();
+    if (action === 'toggle-reading-direction') return window.toggleComicReadingDirection?.();
+    if (action === 'toggle-theme-cycle') return window.toggleTheme?.();
+    if (action === 'toggle-padding-panel') return window.toggleViewerPaddingPanel?.();
+  }, true);
+
+  document.addEventListener('input', (event) => {
+    const target = event && event.target;
+    if (!target || !(target.matches instanceof Function)) return;
+    if (!target.matches('[data-role="viewer-action-input"]')) return;
+
+    const action = target.getAttribute('data-action');
+    if (action === 'comic-scroll-width') {
+      window.setComicScrollWidth?.(target.value);
+    }
+  }, true);
+
+  document.addEventListener('change', (event) => {
+    const target = event && event.target;
+    if (!target || !(target.matches instanceof Function)) return;
+    if (!target.matches('[data-role="viewer-action-change"]')) return;
+
+    const action = target.getAttribute('data-action');
+    if (action === 'font-family') return window.onViewerFontChange?.(target.value);
+    if (action === 'theme') return window.onViewerThemeChange?.(target.value);
+    if (action === 'line-height') return window.onViewerLineHeightChange?.(target.value);
+    if (action === 'paragraph-spacing') return window.onViewerParagraphSpacingChange?.(target.value);
+  }, true);
+
+  window.__mediaViewerDelegationBound = true;
+}
+
+initMediaViewerDelegation();
+
 
 
 

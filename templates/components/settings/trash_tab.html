@@ -3,19 +3,19 @@
     <div class="trash-header-container" style="display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06); padding: 0.75rem 1rem; border-radius: 8px;">
         <div style="display: flex; align-items: center; gap: 0.75rem;">
             <label style="font-size: 0.875rem; color: #94a3b8; font-weight: 500;">DB 선택:</label>
-            <select id="trash-db-type" onchange="loadTrashList()" style="background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc; padding: 0.35rem 1.5rem 0.35rem 0.75rem; border-radius: 6px; font-size: 0.875rem; outline: none; cursor: pointer;">
+            <select id="trash-db-type" data-role="trash-db-type" style="background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc; padding: 0.35rem 1.5rem 0.35rem 0.75rem; border-radius: 6px; font-size: 0.875rem; outline: none; cursor: pointer;">
                 <option value="general">일반 도서 DB</option>
                 <option value="adult">성인 도서 DB</option>
             </select>
         </div>
         <div class="trash-header-buttons" style="display: flex; gap: 0.5rem;">
-            <button class="btn btn-secondary" onclick="restoreSelectedTrash()" style="display: flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.8rem; font-size: 0.825rem; border-radius: 6px;">
+            <button class="btn btn-secondary" data-role="trash-restore-selected" style="display: flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.8rem; font-size: 0.825rem; border-radius: 6px;">
                 <i class="fa-solid fa-rotate-left"></i> 선택 복구
             </button>
-            <button class="btn btn-danger-outline" onclick="deleteSelectedTrash()" style="display: flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.8rem; font-size: 0.825rem; border-radius: 6px;">
+            <button class="btn btn-danger-outline" data-role="trash-delete-selected" style="display: flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.8rem; font-size: 0.825rem; border-radius: 6px;">
                 <i class="fa-solid fa-trash"></i> 선택 삭제
             </button>
-            <button class="btn btn-danger" onclick="emptyTrashAll()" style="display: flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.8rem; font-size: 0.825rem; border-radius: 6px; background: #ef4444; border: none;">
+            <button class="btn btn-danger" data-role="trash-empty-all" style="display: flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.8rem; font-size: 0.825rem; border-radius: 6px; background: #ef4444; border: none;">
                 <i class="fa-solid fa-dumpster-fire"></i> 휴지통 비우기
             </button>
         </div>
@@ -28,7 +28,7 @@
                 <thead>
                     <tr style="background: rgba(255, 255, 255, 0.02); border-bottom: 1px solid rgba(255, 255, 255, 0.06); position: sticky; top: 0; z-index: 1;">
                         <th style="padding: 0.75rem 1rem; width: 40px; text-align: center;">
-                            <input type="checkbox" id="trash-select-all" onchange="toggleAllTrashCheckboxes(this)" style="cursor: pointer; width: 15px; height: 15px; accent-color: #3b82f6;">
+                            <input type="checkbox" id="trash-select-all" data-role="trash-select-all" style="cursor: pointer; width: 15px; height: 15px; accent-color: #3b82f6;">
                         </th>
                         <th style="padding: 0.75rem 1rem; font-weight: 600; color: #94a3b8;">도서명</th>
                         <th style="padding: 0.75rem 1rem; font-weight: 600; color: #94a3b8;">원래 경로</th>

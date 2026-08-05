@@ -12,7 +12,7 @@
         </div>
         <div
             style="background: rgba(30, 41, 59, 0.25); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 1.5rem; backdrop-filter: blur(10px); color: #cbd5e1;">
-            <form id="settings-viewer-form" onsubmit="submitViewerSettings(event)"
+            <form id="settings-viewer-form"
                 style="display: flex; flex-direction: column; gap: 1.5rem;">
 
                 <!-- 좌우 2-컬럼 그리드 레이아웃 -->
@@ -36,9 +36,8 @@
                                     data-i18n="settings.padding_top_label">상단 여백 (Padding Top)</span>: <span
                                     id="setting-viewer-padding-top-val" style="color: #c084fc;">40</span>px
                             </label>
-                            <input type="range" id="setting-viewer-padding-top" min="0" max="200" step="5" value="40"
-                                style="width: 100%; box-sizing: border-box; cursor: pointer; accent-color: #a855f7;"
-                                oninput="document.getElementById('setting-viewer-padding-top-val').innerText = this.value">
+                            <input type="range" id="setting-viewer-padding-top" data-role="viewer-padding-range" data-target-label="setting-viewer-padding-top-val" min="0" max="200" step="5" value="40"
+                                style="width: 100%; box-sizing: border-box; cursor: pointer; accent-color: #a855f7;">
                             <p style="font-size: 0.76rem; color: #94a3b8; margin: 0.3rem 0 0 0;"
                                 data-i18n="settings.padding_top_desc">뷰어 상단 영역의 내부 여백 크기입니다. 노치나 카메라 홀 침범을 피할 때 사용합니다.
                             </p>
@@ -53,9 +52,8 @@
                                     data-i18n="settings.padding_bottom_label">하단 여백 (Padding Bottom)</span>: <span
                                     id="setting-viewer-padding-bottom-val" style="color: #c084fc;">60</span>px
                             </label>
-                            <input type="range" id="setting-viewer-padding-bottom" min="0" max="200" step="5" value="60"
-                                style="width: 100%; box-sizing: border-box; cursor: pointer; accent-color: #a855f7;"
-                                oninput="document.getElementById('setting-viewer-padding-bottom-val').innerText = this.value">
+                            <input type="range" id="setting-viewer-padding-bottom" data-role="viewer-padding-range" data-target-label="setting-viewer-padding-bottom-val" min="0" max="200" step="5" value="60"
+                                style="width: 100%; box-sizing: border-box; cursor: pointer; accent-color: #a855f7;">
                             <p style="font-size: 0.76rem; color: #94a3b8; margin: 0.3rem 0 0 0;"
                                 data-i18n="settings.padding_bottom_desc">뷰어 하단 영역의 내부 여백 크기입니다. 모바일 기기의 소프트홈바/네비게이션바
                                 오버랩을 막는 데 매우 유용합니다.</p>
@@ -70,9 +68,8 @@
                                     data-i18n="settings.padding_left_label">좌측 여백 (Padding Left)</span>: <span
                                     id="setting-viewer-padding-left-val" style="color: #c084fc;">20</span>px
                             </label>
-                            <input type="range" id="setting-viewer-padding-left" min="0" max="200" step="5" value="20"
-                                style="width: 100%; box-sizing: border-box; cursor: pointer; accent-color: #a855f7;"
-                                oninput="document.getElementById('setting-viewer-padding-left-val').innerText = this.value">
+                            <input type="range" id="setting-viewer-padding-left" data-role="viewer-padding-range" data-target-label="setting-viewer-padding-left-val" min="0" max="200" step="5" value="20"
+                                style="width: 100%; box-sizing: border-box; cursor: pointer; accent-color: #a855f7;">
                         </div>
 
                         <!-- 4. 소설 우측 여백 -->
@@ -84,9 +81,8 @@
                                     data-i18n="settings.padding_right_label">우측 여백 (Padding Right)</span>: <span
                                     id="setting-viewer-padding-right-val" style="color: #c084fc;">20</span>px
                             </label>
-                            <input type="range" id="setting-viewer-padding-right" min="0" max="200" step="5" value="20"
-                                style="width: 100%; box-sizing: border-box; cursor: pointer; accent-color: #a855f7;"
-                                oninput="document.getElementById('setting-viewer-padding-right-val').innerText = this.value">
+                            <input type="range" id="setting-viewer-padding-right" data-role="viewer-padding-range" data-target-label="setting-viewer-padding-right-val" min="0" max="200" step="5" value="20"
+                                style="width: 100%; box-sizing: border-box; cursor: pointer; accent-color: #a855f7;">
                         </div>
                     </div>
 
