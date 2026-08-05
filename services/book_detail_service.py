@@ -235,6 +235,7 @@ class BookDetailService:
 
         if db_type == 'audiobook':
             try:
+                cover_image_url = None
                 if cover_file:
                     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                     covers_dir = os.path.join(base_dir, 'covers')
@@ -245,21 +246,22 @@ class BookDetailService:
                     cover_filename = f"audiobook_series_{series_hash}.jpg"
                     dest_path = os.path.join(target_covers_dir, cover_filename)
                     cover_file.save(dest_path)
+                    cover_image_url = f"/api/media/covers/audiobook/{cover_filename}"
 
-                AudiobookRepository.update_media_detail(series_name, author, isbn, publisher, summary)
+                AudiobookRepository.update_media_detail(series_name, author, isbn, publisher, summary, cover_image_url=cover_image_url)
                 return True, f'"{series_name}" 메타정보가 성공적으로 수정되었습니다.'
             except Exception as e:
                 print(f"[BookDetailService] 오디오북 메타정보 수정 에러: {e}")
                 return False, f'DB 업데이트 오류: {str(e)}'
         
         # 1. 해당 시리즈에 속한 도서의 library_id와 대표 book 레코드 1개 조회
-        # pyrefly: ignore [missing-import]
-        from repositories.book_repository import BookRepository 
+        from repositories.sqlite.book_repository import BookRepository 
         library_id = BookRepository.resolve_series_library_id(db_type, series_name, '', [])
         if library_id is None:
             return False, '해당 시리즈에 속한 도서를 찾을 수 없습니다.'
         
         try:
+            cover_image_url = None
             # 2. 커버 이미지 파일 업로드 처리
             if cover_file:
                 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -273,10 +275,11 @@ class BookDetailService:
                 dest_path = os.path.join(target_covers_dir, cover_filename)
                 
                 cover_file.save(dest_path)
-                print(f"[BookDetailService] 시리즈 대표 표지 수동 업로드 완료: {dest_path}")
+                cover_image_url = f"/api/media/covers/{library_id}/{cover_filename}"
+                print(f"[BookDetailService] 시리즈 대표 표지 수동 업로드 완료: {dest_path} -> {cover_image_url}")
             
             # 3. 시리즈 메타 정보 일괄 업데이트
-            BookRepository.update_media_detail(db_type, series_name, author, isbn, publisher, summary, link, genre, tags, series_alias=series_alias)
+            BookRepository.update_media_detail(db_type, series_name, author, isbn, publisher, summary, link, genre, tags, series_alias=series_alias, cover_image_url=cover_image_url)
             return True, f'"{series_name}" 메타정보가 성공적으로 수정되었습니다.'
         except Exception as e:
             print(f"[BookDetailService] 메타정보 수정 에러: {e}")

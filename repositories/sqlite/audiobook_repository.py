@@ -66,22 +66,37 @@ class AudiobookRepository:
         return [dict(row) for row in rows]
 
     @staticmethod
-    def update_media_detail(series_name, author, web_id, publisher, summary):
+    def update_media_detail(series_name, author, web_id, publisher, summary, cover_image_url=None):
         conn = database.get_connection('audiobook')
         cursor = conn.cursor()
         try:
-            cursor.execute(
-                """
-                UPDATE audiobooks
-                SET author = ?,
-                    web_id = ?,
-                    publisher = ?,
-                    description = ?,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE title = ? OR folder_name = ?
-                """,
-                (author, web_id, publisher, summary, series_name, series_name)
-            )
+            if cover_image_url:
+                cursor.execute(
+                    """
+                    UPDATE audiobooks
+                    SET author = ?,
+                        web_id = ?,
+                        publisher = ?,
+                        description = ?,
+                        cover_image = ?,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE title = ? OR folder_name = ?
+                    """,
+                    (author, web_id, publisher, summary, cover_image_url, series_name, series_name)
+                )
+            else:
+                cursor.execute(
+                    """
+                    UPDATE audiobooks
+                    SET author = ?,
+                        web_id = ?,
+                        publisher = ?,
+                        description = ?,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE title = ? OR folder_name = ?
+                    """,
+                    (author, web_id, publisher, summary, series_name, series_name)
+                )
             conn.commit()
             return cursor.rowcount > 0
         except Exception as e:

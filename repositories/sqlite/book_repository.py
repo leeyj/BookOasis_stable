@@ -300,24 +300,41 @@ class BookRepository:
         return row['latest_updated'] if row else None
 
     @staticmethod
-    def update_media_detail(db_type, series_name, author, isbn, publisher, summary, link, genre, tags, series_alias=None):
+    def update_media_detail(db_type, series_name, author, isbn, publisher, summary, link, genre, tags, series_alias=None, cover_image_url=None):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
-            cursor.execute("""
-                UPDATE books
-                SET author = ?,
-                    isbn = ?,
-                    publisher = ?,
-                    summary = ?,
-                    link = ?,
-                    genre = ?,
-                    tags = ?,
-                    series_alias = ?,
-                    metadata_locked = 1,
-                    cover_updated_at = CURRENT_TIMESTAMP
-                WHERE series_name = ?
-            """, (author, isbn, publisher, summary, link, genre, tags, series_alias, series_name))
+            if cover_image_url:
+                cursor.execute("""
+                    UPDATE books
+                    SET author = ?,
+                        isbn = ?,
+                        publisher = ?,
+                        summary = ?,
+                        link = ?,
+                        genre = ?,
+                        tags = ?,
+                        series_alias = ?,
+                        cover_image = ?,
+                        metadata_locked = 1,
+                        cover_updated_at = CURRENT_TIMESTAMP
+                    WHERE series_name = ?
+                """, (author, isbn, publisher, summary, link, genre, tags, series_alias, cover_image_url, series_name))
+            else:
+                cursor.execute("""
+                    UPDATE books
+                    SET author = ?,
+                        isbn = ?,
+                        publisher = ?,
+                        summary = ?,
+                        link = ?,
+                        genre = ?,
+                        tags = ?,
+                        series_alias = ?,
+                        metadata_locked = 1,
+                        cover_updated_at = CURRENT_TIMESTAMP
+                    WHERE series_name = ?
+                """, (author, isbn, publisher, summary, link, genre, tags, series_alias, series_name))
             conn.commit()
             return cursor.rowcount > 0
         except Exception as e:

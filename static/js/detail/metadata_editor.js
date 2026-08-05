@@ -112,6 +112,7 @@ export async function saveManualMetadata(seriesName) {
   try {
     const res = await api.editMediaDetail(formData);
     if (res.success) {
+      if (fileInput) fileInput.value = '';
       if (typeof window.showToast === 'function') {
         window.showToast(res.message || i18n.t('modal.meta_updated'), 'success');
       } else {

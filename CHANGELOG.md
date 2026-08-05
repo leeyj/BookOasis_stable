@@ -1,4 +1,7 @@
 # CHANGELOG
+## v1.7.6
+- (detail/cover) 메타정보 수동 편집 시 업로드된 신규 표지 이미지가 DB(cover_image)에 미반영되던 결함 수정 | fix cover image upload database update failure in manual metadata editor
+
 ## v1.7.5
 - (category/spinner) 하단 속보 푸터 바 전면 제거 및 카테고리 항목/상단 헤더 실시간 뺑글이 스피너(fa-spin) 애니메이션 연동 | remove bottom ticker footer & add category scan spinner animation
 - (card/subtext) 도서 카드 하단 불필요한 "신규 추가" 반복 서브텍스트 전면 소거 | remove redundant 'new arrival' subtext from book cards
