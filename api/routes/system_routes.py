@@ -107,6 +107,7 @@ def get_system_status():
             'success': True,
             'is_active': is_active,
             'tasks': running_tasks,
+            'raw_status': status,
             'has_running': has_running,
             'has_pending': has_pending,
             'pending_count': len(pending)

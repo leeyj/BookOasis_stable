@@ -335,11 +335,13 @@ class ReadingProgressService:
             return
 
         progress_key = make_key(f"user:progress:{db_type}:{user_id}:{book_id}")
+        audio_progress_key = make_key(f"user:audiobook_progress:{user_id}:{book_id}")
         pending_key = make_key("sync:progress:pending")
         pending_member = f"{db_type}:{user_id}:{book_id}"
 
         try:
             redis_client.delete(progress_key)
+            redis_client.delete(audio_progress_key)
             redis_client.srem(pending_key, pending_member)
         except Exception as e:
             logger.warning(f"[Redis] mark_unread cache invalidation failed for {pending_member}: {e}")

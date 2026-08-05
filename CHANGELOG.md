@@ -1,4 +1,9 @@
 # CHANGELOG
+## v1.7.5
+- (category/spinner) 하단 속보 푸터 바 전면 제거 및 카테고리 항목/상단 헤더 실시간 뺑글이 스피너(fa-spin) 애니메이션 연동 | remove bottom ticker footer & add category scan spinner animation
+- (card/subtext) 도서 카드 하단 불필요한 "신규 추가" 반복 서브텍스트 전면 소거 | remove redundant 'new arrival' subtext from book cards
+- (audiobook/unread) 오디오북 "읽지 않은 상태로 변경" 액션 시 audiobook_progress 레코드 미삭제 및 최근 읽은 도서 목록 잔존 결함 수정 | fix audiobook mark unread db record deletion & history removal
+
 ## v1.7.4
 - (detail/navigation) 상세 뷰에서 목록 돌아가기 및 브라우저 뒤로가기 시 미디어 탭(오디오북/성인/일반) 유실 및 엉뚱한 화면 로딩 결함 수정 | fix media tab loss and wrong view navigation on detail back button
 - (system/ticker) 백그라운드 스캔 및 대기열 실행 중 하단 속보 푸터 바(system-ticker-footer) 미노출 결함 수정 및 화면 하단 고정 | fix system ticker scan status footer display & pin to bottom

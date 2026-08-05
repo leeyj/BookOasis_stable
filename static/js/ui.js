@@ -165,8 +165,6 @@ export function createBookCard(item, options = {}) {
     subTextHtml = `<p style="font-size:0.82rem; color:#38bdf8; font-weight:600; margin-top:auto; padding-top:0.2rem; margin-bottom:-0.15rem; display:flex; align-items:center; gap:0.35rem;"><i class="fa-solid fa-headphones"></i> ${chapters}</p>`;
   } else if (item.pages_read > 0 && options.showProgress) {
     subTextHtml = `<p style="font-size:0.75rem; color:#94a3b8; margin:0.25rem 0 0 0;">${i18n.t('dashboard.continue_reading', { pages: item.pages_read })}</p>`;
-  } else if (options.isNew) {
-    subTextHtml = `<p style="font-size:0.75rem; color:#94a3b8; margin:0.25rem 0 0 0;">${i18n.t('dashboard.new_arrival')}</p>`;
   }
 
   // 4. 즐겨찾기 버튼 구성
@@ -502,43 +500,105 @@ window.toggleCardFavoriteEvent = async (event, name, bookId, nextStatus) => {
 
 /**
  * ────────────────────────────────────────────────────────
- * 📌 시스템 상태 뉴스 티커 폴링 관리 루틴
+ * 📌 백그라운드 스캔 상태 폴링 및 카테고리 스피너 제어 루틴
  * ────────────────────────────────────────────────────────
  */
 let statusIntervalId = null;
-let lastTickerContent = '';
+let wasScanningPrevious = false;
+let lastActiveLibIds = new Set();
+let lastIsHeaderScanning = false;
+let scanLatchTimerMap = new Map();
 
-function syncSystemTickerLayout() {
-  const root = document.documentElement;
-  const footer = document.getElementById('system-ticker-footer');
-  if (!root || !footer) return;
-
-  footer.style.zIndex = '10000';
-  footer.style.bottom = '0px';
-
-  // 모바일/태블릿에서는 전체 폭 유지, 데스크톱에서만 사이드바 영역을 비웁니다.
-  if (window.innerWidth <= 1200) {
-    root.style.setProperty('--system-ticker-left', '0px');
-    return;
+function applyCategoryScanSpinnersState() {
+  const headerSpinner = document.getElementById('header-category-scan-spinner');
+  if (headerSpinner) {
+    headerSpinner.style.display = lastIsHeaderScanning ? 'inline-block' : 'none';
   }
 
-  const sidebar = document.querySelector('.library-sidebar');
-  if (sidebar) {
-    const isCollapsed = sidebar.classList.contains('collapsed');
-    const sidebarRect = sidebar.getBoundingClientRect();
-    const sidebarWidth = Math.max(0, sidebarRect.width || 0);
+  document.querySelectorAll('li[data-role="sidebar-category-dynamic"]').forEach(li => {
+    const libId = li.getAttribute('data-category-id') || li.getAttribute('data-id');
+    const sp = li.querySelector('.category-scan-spinner');
+    if (sp) {
+      const isScanning = libId && lastActiveLibIds.has(String(libId));
+      sp.style.display = isScanning ? 'inline-block' : 'none';
+    }
+  });
+}
 
-    // 사이드바가 보이는 상태에서는 우측 끝에 티커를 딱 붙입니다.
-    if (!isCollapsed && sidebarWidth > 8) {
-      const left = Math.max(0, Math.round(sidebarRect.right));
-      root.style.setProperty('--system-ticker-left', `${left}px`);
-      return;
+function updateCategoryScanSpinners(data) {
+  const now = Date.now();
+  const currentActiveLibIds = new Set();
+  let isGlobalOrCurrentLibScanning = false;
+
+  if (data && data.success && data.is_active) {
+    wasScanningPrevious = true;
+
+    const checkTask = (t) => {
+      if (!t) return;
+      const taskType = t.type || t.task_type;
+      const kwargs = t.kwargs || {};
+      const libId = kwargs.library_id;
+
+      if (taskType === 'lazy_scan') {
+        isGlobalOrCurrentLibScanning = true;
+      } else if (libId !== undefined && libId !== null) {
+        currentActiveLibIds.add(String(libId));
+        if (String(state.currentLibraryId) === String(libId)) {
+          isGlobalOrCurrentLibScanning = true;
+        }
+      } else {
+        isGlobalOrCurrentLibScanning = true;
+      }
+    };
+
+    if (data.raw_status) {
+      if (data.raw_status.running) checkTask(data.raw_status.running);
+      if (Array.isArray(data.raw_status.pending)) {
+        data.raw_status.pending.forEach(checkTask);
+      }
+    }
+
+    if (currentActiveLibIds.size === 0 && data.tasks && data.tasks.length > 0) {
+      isGlobalOrCurrentLibScanning = true;
+    }
+
+    currentActiveLibIds.forEach(libId => {
+      scanLatchTimerMap.set(libId, now);
+    });
+  } else {
+    if (wasScanningPrevious) {
+      wasScanningPrevious = false;
+      scanLatchTimerMap.clear();
+      console.log('[ScanSpinner] 🏁 백그라운드 스캔 완수. 리스트 자동 갱신');
+      if (state.currentLibraryId === 'home') {
+        if (typeof window.loadDashboardData === 'function') window.loadDashboardData();
+      } else if (state.currentLibraryId === 'history') {
+        if (typeof window.loadReadingHistory === 'function') window.loadReadingHistory();
+      } else if (state.currentLibraryId !== 'settings') {
+        if (typeof window.loadBooksList === 'function') window.loadBooksList(false);
+      }
     }
   }
 
-  // 사이드바가 접힌 상태면 전체 폭 사용
-  root.style.setProperty('--system-ticker-left', '0px');
+  // 3초 유예(Latch) 타임 이내 항목 유지하여 태스크 전환 순간 미세 깜빡임 완벽 방지
+  const effectiveActiveLibIds = new Set();
+  scanLatchTimerMap.forEach((ts, libId) => {
+    if (now - ts < 3000) {
+      effectiveActiveLibIds.add(libId);
+    } else {
+      scanLatchTimerMap.delete(libId);
+    }
+  });
+
+  lastActiveLibIds = effectiveActiveLibIds;
+  lastIsHeaderScanning = isGlobalOrCurrentLibScanning || effectiveActiveLibIds.has(String(state.currentLibraryId));
+
+  applyCategoryScanSpinnersState();
 }
+
+window.addEventListener('library:categories-rendered', () => {
+  applyCategoryScanSpinnersState();
+});
 
 export function startSystemStatusPolling() {
   if (statusIntervalId) return;
@@ -547,59 +607,15 @@ export function startSystemStatusPolling() {
     try {
       const res = await fetch(`/api/system/status?type=${state.currentLibraryType}`);
       const data = await res.json();
-
-      const footer = document.getElementById('system-ticker-footer');
-      const contentEl = document.getElementById('system-ticker-content');
-
-      if (data.success && data.is_active && data.tasks && data.tasks.length > 0) {
-        const textMessage = data.tasks.join("   |   ");
-        if (footer && contentEl) {
-          // 상태가 변경되었거나 새로운 텍스트일 때만 DOM 조작
-          if (lastTickerContent !== textMessage) {
-            contentEl.innerText = textMessage;
-            lastTickerContent = textMessage;
-
-            // marquee 애니메이션 속도를 글자 길이에 맞춰 동적 조절
-            const duration = Math.max(15, Math.min(60, textMessage.length * 0.35));
-            contentEl.style.animationDuration = `${duration}s`;
-          }
-
-          if (footer.style.display === 'none') {
-            footer.style.display = 'flex';
-            document.body.classList.add('has-system-ticker');
-            syncSystemTickerLayout();
-            console.log('[SystemTicker] 📢 백그라운드 활성 태스크 감지로 속보 푸터 바 활성화.');
-          } else {
-            // 사이드바 접힘/펼침 등 레이아웃 변화에 맞춰 주기적으로 동기화
-            syncSystemTickerLayout();
-          }
-        }
-      } else {
-        if (footer && footer.style.display !== 'none') {
-          footer.style.display = 'none';
-          document.body.classList.remove('has-system-ticker');
-          document.documentElement.style.setProperty('--system-ticker-left', '0px');
-          lastTickerContent = '';
-          console.log('[SystemTicker] 🤫 백그라운드 태스크가 없어 속보 푸터 바 은닉.');
-
-          // 스캔 완료 시 보관함 리스트 실시간 자동 갱신
-          if (state.currentLibraryId === 'home') {
-            if (typeof window.loadDashboardData === 'function') window.loadDashboardData();
-          } else if (state.currentLibraryId === 'history') {
-            if (typeof window.loadReadingHistory === 'function') window.loadReadingHistory();
-          } else if (state.currentLibraryId !== 'settings') {
-            if (typeof window.loadBooksList === 'function') window.loadBooksList(false);
-          }
-        }
-      }
+      updateCategoryScanSpinners(data);
     } catch (err) {
-      console.error('[SystemTicker] 상태 조회 실패:', err);
+      console.error('[ScanSpinner] 상태 조회 실패:', err);
     }
   };
 
-  // 최초 1회 즉시 실행 후 5초 주기 폴링
+  // 최초 1회 즉시 실행 후 2초 주기 반응형 폴링
   poll();
-  statusIntervalId = setInterval(poll, 5000);
+  statusIntervalId = setInterval(poll, 2000);
 }
 
 window.addEventListener('resize', () => {

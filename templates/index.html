@@ -86,14 +86,6 @@
     {% include "components/modals/audio_player_modal.html" %}
 </div>
 
-<!-- 실시간 시스템 작업 뉴스 티커 푸터 바 (전역 최상위 레이어 배치로 overflow:hidden 잘림 방지) -->
-<div id="system-ticker-footer" class="system-ticker-footer" style="display: none;">
-    <div class="ticker-title"><i class="fa-solid fa-bullhorn"></i> <span data-i18n="system.ticker_title">시스템 속보</span></div>
-    <div class="ticker-wrap">
-        <div id="system-ticker-content" class="ticker-content" data-i18n="system.ticker_default_msg">현재 백그라운드 작업이 구동 중입니다.</div>
-    </div>
-</div>
-
 <script type="module" src="{{ static_asset_url('js/dashboard_insights.js') }}"></script>
 
 <script>

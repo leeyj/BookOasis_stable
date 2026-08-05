@@ -222,7 +222,7 @@ class ReadingProgressRepository:
                        0 AS has_unfinished_siblings, p.last_listened_at AS last_read_at, 0 AS metadata_locked
                 FROM audiobooks a
                 JOIN audiobook_progress p ON a.id = p.audiobook_id
-                WHERE p.user_id = ? AND COALESCE(a.is_deleted, 0) = 0
+                WHERE p.user_id = ? AND COALESCE(a.is_deleted, 0) = 0 AND (COALESCE(p.current_time, 0) > 0 OR COALESCE(p.is_completed, 0) = 1)
                 ORDER BY p.last_listened_at DESC
                 LIMIT ?
             """, (user_id, limit))
@@ -378,8 +378,11 @@ class ReadingProgressRepository:
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
-            cursor.execute("DELETE FROM user_progress WHERE book_id = ? AND user_id = ?", (book_id, user_id))
-            cursor.execute("DELETE FROM user_reading_log WHERE book_id = ? AND user_id = ?", (book_id, user_id))
+            if db_type == 'audiobook':
+                cursor.execute("DELETE FROM audiobook_progress WHERE audiobook_id = ? AND user_id = ?", (book_id, user_id))
+            else:
+                cursor.execute("DELETE FROM user_progress WHERE book_id = ? AND user_id = ?", (book_id, user_id))
+                cursor.execute("DELETE FROM user_reading_log WHERE book_id = ? AND user_id = ?", (book_id, user_id))
             conn.commit()
             return True
         except Exception as e:
