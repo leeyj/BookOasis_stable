@@ -1,4 +1,16 @@
 # CHANGELOG
+## v1.7.2
+- pdf 메모리 최적화 및 가상화 렌더링 | pdf virtual rendering
+- pdf 스크롤 모드 실시간 페이지 크기(너비) 조절 기능 구축 | pdf scroll mode width control
+- pdf 스크롤 모드 휠/터치 핫스팟 간섭 제거 및 네이티브 세로 스크롤 조치 | pdf scroll mode clean scroll
+- pdf 스크롤 모드 연속 세로 스크롤 모드 구축 및 연동 | pdf scroll mode continuous vertical scroll
+
+## v1.7.1
+- pdf 버그 수정 | bugfix pdf viewer
+- 카테고리 편집 저장 버튼 동작 오류 수정 | bugfix save button in category edit modal
+- 플러그인 html 오류(inlinehtml) 수정 | bugfix plugin inlinehtml
+- 카테고리 삭제/생성 오류 수정 | bugifx category new/delete 
+
 ## v1.7.0
 - (audiobook/delete) 오디오북 삭제 FK 오류 방지(진행도/트랙 정합성 보강) | prevent audiobook delete FK errors by tightening progress/track integrity
 - 코드 안정화 | Stabilize the code
