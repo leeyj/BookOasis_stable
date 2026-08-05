@@ -11,7 +11,7 @@ class UserRepository:
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, username, password_hash, role, is_default_password, has_adult_access FROM users WHERE username = ?", 
+            "SELECT id, username, password_hash, role, is_default_password, has_adult_access, has_audiobook_access FROM users WHERE username = ?", 
             (username,)
         )
         row = cursor.fetchone()
@@ -24,7 +24,7 @@ class UserRepository:
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, username, password_hash, role, is_default_password, has_adult_access FROM users WHERE id = ?", 
+            "SELECT id, username, password_hash, role, is_default_password, has_adult_access, has_audiobook_access FROM users WHERE id = ?", 
             (user_id,)
         )
         row = cursor.fetchone()
@@ -37,7 +37,7 @@ class UserRepository:
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, username, role, is_default_password, has_adult_access, created_at FROM users ORDER BY id ASC"
+            "SELECT id, username, role, is_default_password, has_adult_access, has_audiobook_access, created_at FROM users ORDER BY id ASC"
         )
         rows = cursor.fetchall()
         conn.close()
@@ -54,14 +54,14 @@ class UserRepository:
         return int(row['cnt']) if row else 0
 
     @staticmethod
-    def add_user(db_type, username, password_hash, role, has_adult_access):
+    def add_user(db_type, username, password_hash, role, has_adult_access, has_audiobook_access=1):
         """신규 사용자 등록 및 카테고리 권한 기본 매핑 시딩"""
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
             cursor.execute(
-                "INSERT INTO users (username, password_hash, role, is_default_password, has_adult_access) VALUES (?, ?, ?, 1, ?)", 
-                (username, password_hash, role, has_adult_access)
+                "INSERT INTO users (username, password_hash, role, is_default_password, has_adult_access, has_audiobook_access) VALUES (?, ?, ?, 1, ?, ?)", 
+                (username, password_hash, role, has_adult_access, has_audiobook_access)
             )
             user_id = cursor.lastrowid
             

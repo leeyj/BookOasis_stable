@@ -124,7 +124,7 @@ def admin_required(f):
 
 def check_adult_permission(db_type):
     if db_type == 'adult':
-        # 어드민은 패스, 일반 유저는 세션의 has_adult_access 권한으로 판별
+        # 어드민은 패스, 일반 유저는 세션의 adult 접근 권한으로 판별
         if session.get('role') == 'admin':
             return True
         if session.get('has_adult_access') == 1:
@@ -183,6 +183,7 @@ def check_authentication():
                         session['role'] = user['role']
                         session['is_default_password'] = user['is_default_password']
                         session['has_adult_access'] = user['has_adult_access']
+                        session['has_audiobook_access'] = user.get('has_audiobook_access', 1)
         
     # 1. 미로그인 시 차단
     if 'user_id' not in session:
@@ -238,6 +239,7 @@ def login():
             session['role'] = user['role']
             session['is_default_password'] = user['is_default_password']
             session['has_adult_access'] = user['has_adult_access']
+            session['has_audiobook_access'] = user.get('has_audiobook_access', 1)
             
             return jsonify({
                 'success': True,
@@ -310,6 +312,7 @@ def add_user():
     password = data.get('password', '').strip()
     role = data.get('role', 'user').strip()
     has_adult_access = 1 if data.get('has_adult_access', True) else 0
+    has_audiobook_access = 1 if data.get('has_audiobook_access', True) else 0
 
     length_error = _validate_username_password_lengths(username, password)
     if length_error:
@@ -326,7 +329,7 @@ def add_user():
     try:
         # 동기화를 위해 두 데이터베이스에 모두 사용자 추가
         for db_type in ['general', 'adult']:
-            UserRepository.add_user(db_type, username, password_hash, role, has_adult_access)
+            UserRepository.add_user(db_type, username, password_hash, role, has_adult_access, has_audiobook_access)
     except Exception as e:
         if 'UNIQUE' in str(e):
             return jsonify({'success': False, 'error': _t('api.username_exists')}), 409

@@ -1,117 +1,153 @@
 // static/js/settings/permissions.js – 권한 관리 탭 모듈
-import { state } from '../state.js';
+let permissionSessionData = null;
+let activePermissionSession = 'general';
 
 export async function loadPermissionsMatrix() {
-  const headerRow = document.getElementById('permissions-table-header');
-  const tbody = document.getElementById('permissions-table-body');
-  if (!headerRow || !tbody) return;
+  const generalHeaderRow = document.getElementById('permissions-table-header');
+  const generalBody = document.getElementById('permissions-table-body');
+  const adultBody = document.getElementById('permissions-adult-table-body');
+  const audiobookHeaderRow = document.getElementById('permissions-audiobook-table-header');
+  const audiobookBody = document.getElementById('permissions-audiobook-table-body');
+  if (!generalHeaderRow || !generalBody || !adultBody || !audiobookHeaderRow || !audiobookBody) return;
 
   const tLoading = window.i18n ? window.i18n.t('common.loading') : '불러오는 중...';
   const tError = window.i18n ? window.i18n.t('common.error') : '오류';
-  const tCategoryCol = window.i18n ? window.i18n.t('settings.perm_col_category') : '카테고리 이름 (DB 구분)';
-  const tAdultAllow = window.i18n ? window.i18n.t('settings.perm_adult_allow') : '성인도서 접근 허용';
-  const tAdultBadge = window.i18n ? window.i18n.t('settings.perm_badge_adult') : '성인';
-  const tGeneralBadge = window.i18n ? window.i18n.t('settings.perm_badge_general') : '일반';
 
-  headerRow.innerHTML = `<th style="padding:1rem; text-align:center;">${tLoading}</th>`;
-  tbody.innerHTML = '';
+  generalHeaderRow.innerHTML = `<th style="padding:1rem; text-align:center;">${tLoading}</th>`;
+  audiobookHeaderRow.innerHTML = `<th style="padding:1rem; text-align:center;">${tLoading}</th>`;
+  generalBody.innerHTML = '';
+  adultBody.innerHTML = '';
+  audiobookBody.innerHTML = '';
 
   try {
     const res = await fetch('/api/admin/permissions');
     const data = await res.json();
 
     if (!data.success) {
-      headerRow.innerHTML = `<th style="padding:1rem; color:#ef4444;">${tError}: ${data.error}</th>`;
+      generalHeaderRow.innerHTML = `<th style="padding:1rem; color:#ef4444;">${tError}: ${data.error}</th>`;
+      audiobookHeaderRow.innerHTML = `<th style="padding:1rem; color:#ef4444;">${tError}: ${data.error}</th>`;
       return;
     }
 
-    const { users, categories, permissions } = data;
+    permissionSessionData = data;
+    renderSessionTabs(data.sessions || []);
 
-    // 1. Header 렌더링 (구조: [카테고리 (유형)] | [성인도서 허용] | [User 1] | [User 2] ...)
-    let headerHTML = `
-      <th style="padding:1rem; width:25%;">${tCategoryCol}</th>
-    `;
-    users.forEach(user => {
-      headerHTML += `
-        <th style="padding:1rem; text-align:center; min-width:100px;">
-          <div style="font-weight:700; color:#fff;">${user.username}</div>
-          <div style="font-size:0.75rem; color:#94a3b8;">(${user.role})</div>
-        </th>
-      `;
-    });
-    headerRow.innerHTML = headerHTML;
+    const users = data.users || [];
+    const generalMatrix = data.matrices?.general || { categories: [], permissions: {} };
+    const audiobookMatrix = data.matrices?.audiobook || { categories: [], permissions: {} };
 
-    // 2. Body 렌더링 - 1행: 성인도서 권한 제어 행
-    let adultRowHTML = `
-      <tr style="border-bottom:1px solid rgba(255,255,255,0.08); background:rgba(168,85,247,0.05);">
-        <td style="padding:1rem; font-weight:700; color:#c084fc;">
-          <i class="fa-solid fa-hand-holding-hand" style="margin-right:0.5rem;"></i>[${tAdultAllow}]
-        </td>
-    `;
-    users.forEach(user => {
-      const isChecked = user.has_adult_access === 1 ? 'checked' : '';
-      // admin은 언제나 변경 불가능하고 항상 체크
-      const isDisabled = user.username === 'admin' ? 'disabled' : '';
-      adultRowHTML += `
-        <td style="padding:1rem; text-align:center;">
-          <input type="checkbox" class="permission-chk-adult" data-user-id="${user.id}" ${isChecked} ${isDisabled}
-                 style="cursor:pointer; width:1.2rem; height:1.2rem; accent-color:#a855f7;">
-        </td>
-      `;
-    });
-    adultRowHTML += `</tr>`;
+    renderMatrixHeader(generalHeaderRow, users);
+    renderMatrixHeader(audiobookHeaderRow, users);
+    generalBody.innerHTML = renderMatrixBody(users, generalMatrix.categories, generalMatrix.permissions, 'general');
+    audiobookBody.innerHTML = renderMatrixBody(users, audiobookMatrix.categories, audiobookMatrix.permissions, 'audiobook');
+    adultBody.innerHTML = renderAdultBody(users);
 
-    // 3. Body 렌더링 - 카테고리별 접근 제어 행들
-    let categoriesHTML = '';
-    categories.forEach(cat => {
-      let rowHTML = `
-        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-          <td style="padding:1rem; color:#fff;">
-            <i class="fa-solid fa-folder" style="color:#94a3b8; margin-right:0.5rem;"></i>${cat.name}
-          </td>
-      `;
-
-      users.forEach(user => {
-        const key = `${cat.db_type}_${cat.id}`;
-        const hasPerm = permissions[user.id] && permissions[user.id][key] !== undefined 
-          ? permissions[user.id][key] 
-          : true; // 기본값 허용
-        
-        const isChecked = hasPerm ? 'checked' : '';
-        const isDisabled = user.username === 'admin' ? 'disabled' : '';
-
-        rowHTML += `
-          <td style="padding:1rem; text-align:center;">
-            <input type="checkbox" class="permission-chk-category" 
-                   data-user-id="${user.id}" data-library-id="${cat.id}" data-db-type="${cat.db_type}" 
-                   ${isChecked} ${isDisabled}
-                   style="cursor:pointer; width:1.1rem; height:1.1rem; accent-color:#10b981;">
-          </td>
-        `;
-      });
-      rowHTML += `</tr>`;
-      categoriesHTML += rowHTML;
-    });
-
-    tbody.innerHTML = adultRowHTML + categoriesHTML;
-
-    // 4. 이벤트 바인딩
     bindPermissionEvents();
-
+    switchPermissionSessionTab(activePermissionSession);
   } catch (err) {
     const tServerErr = window.i18n ? window.i18n.t('settings.users_server_error') : '서버 요청 중 오류가 발생했습니다.';
-    headerRow.innerHTML = `<th style="padding:1rem; color:#ef4444;">${tServerErr}</th>`;
+    generalHeaderRow.innerHTML = `<th style="padding:1rem; color:#ef4444;">${tServerErr}</th>`;
+    audiobookHeaderRow.innerHTML = `<th style="padding:1rem; color:#ef4444;">${tServerErr}</th>`;
     console.error(err);
   }
 }
 
+function renderSessionTabs(sessions) {
+  const sessionTitleMap = new Map((sessions || []).map(session => [session.id, session.title]));
+  document.querySelectorAll('.permission-session-tab').forEach(btn => {
+    const sessionId = btn.getAttribute('data-permission-session');
+    if (sessionTitleMap.has(sessionId)) {
+      btn.textContent = sessionTitleMap.get(sessionId);
+    }
+  });
+}
+
+function renderMatrixHeader(headerRow, users) {
+  let headerHTML = '<th style="padding:1rem; width:25%;">카테고리 이름</th>';
+  users.forEach(user => {
+    headerHTML += `
+      <th style="padding:1rem; text-align:center; min-width:100px;">
+        <div style="font-weight:700; color:#fff;">${user.username}</div>
+        <div style="font-size:0.75rem; color:#94a3b8;">(${user.role})</div>
+      </th>
+    `;
+  });
+  headerRow.innerHTML = headerHTML;
+}
+
+function renderMatrixBody(users, categories, permissions, targetDb) {
+  return (categories || []).map(cat => {
+    let rowHTML = `
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+        <td style="padding:1rem; color:#fff;">
+          <i class="fa-solid fa-folder" style="color:#94a3b8; margin-right:0.5rem;"></i>${cat.name}
+        </td>
+    `;
+
+    users.forEach(user => {
+      const key = `${targetDb}_${cat.id}`;
+      const hasPerm = permissions[user.id] && permissions[user.id][key] !== undefined
+        ? permissions[user.id][key]
+        : true;
+      const isDisabled = user.username === 'admin' ? 'disabled' : '';
+      const accentColor = targetDb === 'audiobook' ? '#10b981' : '#10b981';
+
+      rowHTML += `
+        <td style="padding:1rem; text-align:center;">
+          <input type="checkbox" class="permission-chk-category"
+                 data-user-id="${user.id}" data-library-id="${cat.id}" data-db-type="${targetDb}"
+                 ${hasPerm ? 'checked' : ''} ${isDisabled}
+                 style="cursor:pointer; width:1.1rem; height:1.1rem; accent-color:${accentColor};">
+        </td>
+      `;
+    });
+
+    rowHTML += `</tr>`;
+    return rowHTML;
+  }).join('');
+}
+
+function renderAdultBody(users) {
+  return users.map(user => {
+    const isChecked = user.has_adult_access === 1 ? 'checked' : '';
+    const isDisabled = user.username === 'admin' ? 'disabled' : '';
+    return `
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+        <td style="padding:0.9rem 1rem; color:#fff; font-weight:700;">${user.username}</td>
+        <td style="padding:0.9rem 1rem; text-align:center; color:#94a3b8;">${user.role}</td>
+        <td style="padding:0.9rem 1rem; text-align:center;">
+          <label style="display:inline-flex; align-items:center; gap:0.5rem; color:#c084fc; font-weight:700;">
+            <input type="checkbox" class="permission-chk-adult" data-user-id="${user.id}" ${isChecked} ${isDisabled}
+                   style="cursor:pointer; width:1.2rem; height:1.2rem; accent-color:#a855f7;">
+            <span>성인 서재 접근 허용</span>
+          </label>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+export function switchPermissionSessionTab(sessionId) {
+  activePermissionSession = sessionId || 'general';
+
+  document.querySelectorAll('.permission-session-tab').forEach(btn => {
+    const isActive = btn.getAttribute('data-permission-session') === activePermissionSession;
+    btn.classList.toggle('active', isActive);
+    btn.style.background = isActive ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.03)';
+    btn.style.color = isActive ? '#fff' : '#cbd5e1';
+  });
+
+  document.querySelectorAll('.permission-session-panel').forEach(panel => {
+    panel.style.display = panel.id === `permission-session-${activePermissionSession}` ? 'block' : 'none';
+  });
+}
+
 function bindPermissionEvents() {
-  // 성인도서 권한 토글 이벤트
   document.querySelectorAll('.permission-chk-adult').forEach(chk => {
     chk.addEventListener('change', async (e) => {
       const userId = e.target.getAttribute('data-user-id');
       const hasAdultAccess = e.target.checked;
-      
+
       try {
         const res = await fetch('/api/admin/permissions/update-adult', {
           method: 'POST',
@@ -121,7 +157,7 @@ function bindPermissionEvents() {
         const data = await res.json();
         if (!data.success) {
           alert('변경에 실패했습니다: ' + data.error);
-          e.target.checked = !hasAdultAccess; // 복원
+          e.target.checked = !hasAdultAccess;
         }
       } catch (err) {
         alert('네트워크 오류가 발생했습니다.');
@@ -130,7 +166,6 @@ function bindPermissionEvents() {
     });
   });
 
-  // 개별 카테고리 권한 토글 이벤트
   document.querySelectorAll('.permission-chk-category').forEach(chk => {
     chk.addEventListener('change', async (e) => {
       const userIdRaw = e.target.getAttribute('data-user-id');
@@ -147,7 +182,6 @@ function bindPermissionEvents() {
 
       let payloadLibraryId;
       if (dbType === 'plugin') {
-        // 플러그인 권한 ID는 문자열(plugin_xxx) 형태이므로 숫자 변환 금지
         payloadLibraryId = (libraryIdRaw || '').trim();
       } else {
         const parsedLibraryId = parseInt(libraryIdRaw, 10);
@@ -178,5 +212,5 @@ function bindPermissionEvents() {
   });
 }
 
-// 글로벌 바인딩
 window.loadPermissionsMatrix = loadPermissionsMatrix;
+window.switchPermissionSessionTab = switchPermissionSessionTab;

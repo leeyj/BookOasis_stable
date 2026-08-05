@@ -6,7 +6,7 @@ import os
 import re
 import sqlite3
 from flask import Blueprint, request, Response, jsonify, session
-from api.auth import login_required
+from api.auth import login_required, check_adult_permission
 import database
 
 try:
@@ -96,6 +96,7 @@ def _send_audio_range_response(file_path):
         rv.headers.add('Content-Length', str(length))
         rv.headers.add('Cache-Control', 'no-transform')
         return rv
+
     else:
         rv = Response(
             _iter_file_chunks(file_path),
@@ -109,9 +110,36 @@ def _send_audio_range_response(file_path):
         rv.headers.add('Cache-Control', 'no-transform')
         return rv
 
+
+def _has_audiobook_library_access(aid):
+    user_id = session.get('user_id')
+    role = session.get('role')
+    if role == 'admin':
+        return True
+    if not user_id:
+        return False
+
+    conn = database.get_connection('audiobook')
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT library_id FROM audiobooks WHERE id = ?", (aid,))
+        row = cursor.fetchone()
+        if not row:
+            return False
+        cursor.execute(
+            "SELECT 1 FROM user_category_permissions WHERE user_id = ? AND library_id = ? AND has_access = 1",
+            (user_id, row['library_id'])
+        )
+        return cursor.fetchone() is not None
+    finally:
+        conn.close()
+
 @audiobook_bp.route('/api/media/audiobooks/<int:aid>/cover', methods=['GET'])
 def get_audiobook_cover(aid):
     """오디오북 대표 앨범 포스터 이미지 서빙"""
+    if not _has_audiobook_library_access(aid):
+        return jsonify({'success': False, 'error': '오디오북 접근 권한이 없습니다.'}), 403
+
     conn = database.get_connection('audiobook')
     cursor = conn.cursor()
     cursor.execute("SELECT poster, title FROM audiobooks WHERE id = ?", (aid,))
@@ -145,6 +173,9 @@ def get_audiobook_cover(aid):
 @login_required
 def stream_audiobook_track(aid, tid):
     """오디오북 특정 트랙 MP3 오디오 스트리밍"""
+    if not _has_audiobook_library_access(aid):
+        return jsonify({'success': False, 'error': '오디오북 접근 권한이 없습니다.'}), 403
+
     conn = database.get_connection('audiobook')
     cursor = conn.cursor()
     cursor.execute("SELECT file_path FROM audiobook_tracks WHERE id = ? AND audiobook_id = ?", (tid, aid))
@@ -159,6 +190,9 @@ def stream_audiobook_track(aid, tid):
 @audiobook_bp.route('/api/media/audiobooks/<int:aid>/progress', methods=['GET', 'POST'])
 @login_required
 def audiobook_progress_api(aid):
+    if not _has_audiobook_library_access(aid):
+        return jsonify({'success': False, 'error': '오디오북 접근 권한이 없습니다.'}), 403
+
     user_id = session.get('user_id', 1)
     conn = database.get_connection('audiobook')
     cursor = conn.cursor()

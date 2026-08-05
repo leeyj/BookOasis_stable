@@ -5,30 +5,16 @@ from api.auth import admin_required
 
 permission_bp = Blueprint('permission', __name__)
 
-@permission_bp.route('/api/admin/permissions', methods=['GET'])
-@admin_required
-def get_permissions():
-    """사용자 목록, 전체 카테고리(libraries) 목록 및 카테고리별 접근 권한 현황 조회"""
-    try:
-        # 1. 사용자 목록 조회 (general DB 기준)
-        conn_g = database.get_connection('general')
-        cursor_g = conn_g.cursor()
-        cursor_g.execute("SELECT id, username, role, has_adult_access FROM users ORDER BY id ASC")
-        users = [dict(row) for row in cursor_g.fetchall()]
-        conn_g.close()
 
-        # 2. 카테고리(libraries) 목록 및 카테고리 레벨 플러그인 목록 수집
-        categories = []
-        
-        # 일반 DB 카테고리
-        conn_gen = database.get_connection('general')
-        cursor_gen = conn_gen.cursor()
-        cursor_gen.execute("SELECT id, name FROM libraries ORDER BY name ASC")
-        for r in cursor_gen.fetchall():
-            categories.append({'id': r['id'], 'name': r['name'], 'db_type': 'general'})
-        conn_gen.close()
+def _fetch_library_permissions(db_type, include_plugins=False):
+    categories = []
+    conn = database.get_connection(db_type)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, name FROM libraries ORDER BY name ASC")
+    for row in cursor.fetchall():
+        categories.append({'id': row['id'], 'name': row['name'], 'db_type': db_type})
 
-        # 카테고리 레벨 플러그인 목록 수집
+    if include_plugins and db_type == 'general':
         try:
             from services.metadata_factory import MetadataFactory
             providers = MetadataFactory.get_available_providers()
@@ -36,50 +22,91 @@ def get_permissions():
                 if p.get('enabled') and p.get('category_tab'):
                     cat_tab = p.get('category_tab')
                     title = cat_tab.get('title') if isinstance(cat_tab, dict) else p.get('name')
-                    cat_id = f"plugin_{p['id']}"
                     categories.append({
-                        'id': cat_id,
+                        'id': f"plugin_{p['id']}",
                         'name': f"🧩 {title}",
                         'db_type': 'plugin'
                     })
         except Exception as p_err:
             print(f"[PermissionRoutes] Failed to fetch plugin categories: {p_err}")
 
-        # 3. 사용자별 카테고리 권한 정보 조회 (일반 DB 및 플러그인 권한)
-        permissions = {}
-        conn = database.get_connection('general')
-        cursor = conn.cursor()
-        cursor.execute("SELECT user_id, library_id, has_access FROM user_category_permissions")
-        for r in cursor.fetchall():
-            uid = str(r['user_id'])
-            lid = str(r['library_id'])
-            key = f"general_{lid}"
-            if uid not in permissions:
-                permissions[uid] = {}
-            permissions[uid][key] = bool(r['has_access'])
+    permissions = {}
+    cursor.execute("SELECT user_id, library_id, has_access FROM user_category_permissions")
+    for row in cursor.fetchall():
+        uid = str(row['user_id'])
+        lid = str(row['library_id'])
+        if uid not in permissions:
+            permissions[uid] = {}
+        permissions[uid][f"{db_type}_{lid}"] = bool(row['has_access'])
 
-        # 플러그인 카테고리 권한 조회 (settings 테이블의 PERM_CATEGORY_{uid}_{cat_id})
+    if include_plugins and db_type == 'general':
         cursor.execute("SELECT key, value FROM settings WHERE key LIKE 'PERM_CATEGORY_%'")
         perm_rows = cursor.fetchall()
-        conn.close()
-
         perm_map = {r['key']: r['value'] for r in perm_rows}
-        for u in users:
-            uid = str(u['id'])
-            if uid not in permissions:
-                permissions[uid] = {}
+        cursor.execute("SELECT id FROM users ORDER BY id ASC")
+        user_rows = [r['id'] for r in cursor.fetchall()]
+        for uid in user_rows:
+            uid_str = str(uid)
+            if uid_str not in permissions:
+                permissions[uid_str] = {}
             for cat in categories:
                 if cat['db_type'] == 'plugin':
-                    key_perm = f"PERM_CATEGORY_{uid}_{cat['id']}"
+                    key_perm = f"PERM_CATEGORY_{uid_str}_{cat['id']}"
                     val = perm_map.get(key_perm, '1')
-                    perm_matrix_key = f"plugin_{cat['id']}"
-                    permissions[uid][perm_matrix_key] = (val == '1')
+                    permissions[uid_str][f"{db_type}_{cat['id']}"] = (val == '1')
+
+    conn.close()
+    return categories, permissions
+
+@permission_bp.route('/api/admin/permissions', methods=['GET'])
+@admin_required
+def get_permissions():
+    """사용자 목록, 세션별 카테고리/접근 권한 현황 조회"""
+    try:
+        # 1. 사용자 목록 조회 (general DB 기준)
+        conn_g = database.get_connection('general')
+        cursor_g = conn_g.cursor()
+        cursor_g.execute("SELECT id, username, role, has_adult_access, has_audiobook_access FROM users ORDER BY id ASC")
+        users = [dict(row) for row in cursor_g.fetchall()]
+        conn_g.close()
+
+        general_categories, general_permissions = _fetch_library_permissions('general', include_plugins=True)
+        audiobook_categories, audiobook_permissions = _fetch_library_permissions('audiobook', include_plugins=False)
 
         return jsonify({
             'success': True,
             'users': users,
-            'categories': categories,
-            'permissions': permissions
+            'sessions': [
+                {
+                    'id': 'general',
+                    'title': '일반 도서',
+                    'subtitle': '일반 카테고리와 플러그인 권한',
+                    'kind': 'matrix'
+                },
+                {
+                    'id': 'adult',
+                    'title': '성인 서재',
+                    'subtitle': '성인 도서 DB 접근 권한',
+                    'kind': 'switch',
+                    'field': 'has_adult_access'
+                },
+                {
+                    'id': 'audiobook',
+                    'title': '오디오북 서재',
+                    'subtitle': '오디오북 카테고리 권한',
+                    'kind': 'matrix'
+                }
+            ],
+            'matrices': {
+                'general': {
+                    'categories': general_categories,
+                    'permissions': general_permissions,
+                },
+                'audiobook': {
+                    'categories': audiobook_categories,
+                    'permissions': audiobook_permissions,
+                }
+            }
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

@@ -635,6 +635,7 @@ def init_databases():
         role TEXT DEFAULT 'user',
         is_default_password INTEGER DEFAULT 1,
         has_adult_access INTEGER DEFAULT 1,
+        has_audiobook_access INTEGER DEFAULT 1,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -794,7 +795,7 @@ def init_databases():
             if cursor.fetchone()[0] == 0:
                 from werkzeug.security import generate_password_hash
                 admin_hash = generate_password_hash('admin')
-                cursor.execute("INSERT INTO users (username, password_hash, role, is_default_password, has_adult_access) VALUES ('admin', ?, 'admin', 1, 1)", (admin_hash,))
+                cursor.execute("INSERT INTO users (username, password_hash, role, is_default_password, has_adult_access, has_audiobook_access) VALUES ('admin', ?, 'admin', 1, 1, 1)", (admin_hash,))
                 conn.commit()
                 print(f"[DB-Migration] {db_type} DB - admin/admin initial account created")
 

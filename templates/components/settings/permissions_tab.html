@@ -6,21 +6,55 @@
                 <i class="fa-solid fa-user-shield" style="color: #a855f7; margin-right: 0.5rem;"></i> <span data-i18n="settings.perm_title">사용자별 카테고리 접근 권한 관리</span>
             </h3>
             <p style="font-size: 0.82rem; color: #94a3b8; margin: 0.4rem 0 0 0;" data-i18n="settings.perm_subtitle">
-                각 사용자별로 접근 가능한 도서 카테고리를 체크박스로 구성하며, 성인도서(adult) DB의 전체 접근 제어 권한도 함께 관리합니다.
+                세션별로 권한을 분리해 일반 도서 카테고리, 성인 서재, 오디오북 카테고리 접근 권한을 각각 관리합니다.
             </p>
         </div>
 
-        <div class="settings-table-wrapper" style="background: rgba(30, 41, 59, 0.25); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; overflow-x: auto; backdrop-filter: blur(10px);">
-            <table class="settings-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; min-width: 600px;">
-                <thead>
-                    <tr style="background: rgba(15, 23, 42, 0.4); border-bottom: 1px solid rgba(255,255,255,0.08); color: #94a3b8;" id="permissions-table-header">
-                        <!-- 동적으로 로드되는 Header: 사용자 계정명 나열 -->
-                    </tr>
-                </thead>
-                <tbody id="permissions-table-body">
-                    <!-- 동적으로 로드되는 Body: 카테고리별로 각 사용자 체크박스 매핑 -->
-                </tbody>
-            </table>
+        <div class="permission-session-tabs" id="permission-session-tabs" style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem;">
+            <button type="button" class="permission-session-tab active" data-permission-session="general" onclick="switchPermissionSessionTab('general')" style="padding:0.55rem 0.9rem; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(168,85,247,0.18); color:#fff; font-weight:700; cursor:pointer;">일반 도서</button>
+            <button type="button" class="permission-session-tab" data-permission-session="adult" onclick="switchPermissionSessionTab('adult')" style="padding:0.55rem 0.9rem; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.03); color:#cbd5e1; font-weight:700; cursor:pointer;">성인 서재</button>
+            <button type="button" class="permission-session-tab" data-permission-session="audiobook" onclick="switchPermissionSessionTab('audiobook')" style="padding:0.55rem 0.9rem; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.03); color:#cbd5e1; font-weight:700; cursor:pointer;">오디오북 카테고리</button>
+        </div>
+
+        <div id="permission-session-general" class="permission-session-panel" style="display:block;">
+            <div class="settings-table-wrapper" style="background: rgba(30, 41, 59, 0.25); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; overflow-x: auto; backdrop-filter: blur(10px);">
+                <table class="settings-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; min-width: 600px;">
+                    <thead>
+                        <tr style="background: rgba(15, 23, 42, 0.4); border-bottom: 1px solid rgba(255,255,255,0.08); color: #94a3b8;" id="permissions-table-header">
+                            <!-- 동적으로 로드되는 Header: 사용자 계정명 나열 -->
+                        </tr>
+                    </thead>
+                    <tbody id="permissions-table-body">
+                        <!-- 동적으로 로드되는 Body: 카테고리별로 각 사용자 체크박스 매핑 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="permission-session-adult" class="permission-session-panel" style="display:none;">
+            <div class="settings-table-wrapper" style="background: rgba(30, 41, 59, 0.25); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; overflow-x: auto; backdrop-filter: blur(10px);">
+                <table class="settings-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; min-width: 600px;">
+                    <thead>
+                        <tr style="background: rgba(15, 23, 42, 0.4); border-bottom: 1px solid rgba(255,255,255,0.08); color: #94a3b8;">
+                            <th style="padding:1rem; width:40%;">사용자</th>
+                            <th style="padding:1rem; width:20%; text-align:center;">역할</th>
+                            <th style="padding:1rem; width:40%; text-align:center;">성인 서재 접근 허용</th>
+                        </tr>
+                    </thead>
+                    <tbody id="permissions-adult-table-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="permission-session-audiobook" class="permission-session-panel" style="display:none;">
+            <div class="settings-table-wrapper" style="background: rgba(30, 41, 59, 0.25); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; overflow-x: auto; backdrop-filter: blur(10px);">
+                <table class="settings-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; min-width: 600px;">
+                    <thead>
+                        <tr style="background: rgba(15, 23, 42, 0.4); border-bottom: 1px solid rgba(255,255,255,0.08); color: #94a3b8;" id="permissions-audiobook-table-header"></tr>
+                    </thead>
+                    <tbody id="permissions-audiobook-table-body"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>

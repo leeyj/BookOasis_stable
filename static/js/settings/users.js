@@ -66,6 +66,8 @@ export function openAddUserModal() {
     document.getElementById('user-form-username').value = '';
     document.getElementById('user-form-password').value = '';
     document.getElementById('user-form-role').value = 'user';
+    const adultAccess = document.getElementById('user-form-adult-access');
+    if (adultAccess) adultAccess.checked = true;
   }
 }
 

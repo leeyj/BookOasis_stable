@@ -1,8 +1,13 @@
 # CHANGELOG
+## v1.6.9
+- (permissions/audiobook) 권한관리 탭을 세션별(일반/성인/오디오북) 서브탭으로 분리하고 사용자 접근 플래그에 오디오북 권한을 추가 | split permissions management into session-specific tabs (general/adult/audiobook) and add audiobook access flag to user permissions
+- requestments.txt 업데이트 | update requestments.txt
+
 ## v1.6.8
 - (audiobook/resume) 모바일→PC 이어듣기 복원 개선: 상세/목록 이어듣기에서 서버 저장 트랙/시간(`current_track_id`, `current_time`)을 우선 사용하고 재생 중 10초 주기 진행도 저장 추가 | improve mobile→PC audiobook resume by prioritizing server track/time (`current_track_id`, `current_time`) in continue flows and adding 10s in-play autosave
 - (audiobook/stream) 리버스 프록시/Cloudflare 환경 재생 안정화: Range/비-Range 응답을 청크 스트리밍으로 통일하고 무효 Range(416) 처리 및 `no-transform` 헤더 추가 | harden audiobook streaming behind reverse proxy/Cloudflare by chunked Range/non-Range responses, invalid Range(416) handling, and `no-transform` header
 - epub,txt 뷰에서 재로딩 로직 보강 | Strengthen reload logic in epub and txt viewer
+
 
 ## v1.6.7
 - 도서/오디오북 경로 불일치 등록시 경고 후 확인 추가 | add warning confirm on mismatched book/audiobook path registration
