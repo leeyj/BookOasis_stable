@@ -105,7 +105,9 @@ CREATE TABLE IF NOT EXISTS books (
     title_alias VARCHAR(500),
     file_mtime DOUBLE DEFAULT 0.0,
     file_size BIGINT DEFAULT 0,
-    UNIQUE KEY uq_books_file_path (file_path(500))
+    UNIQUE KEY uq_books_file_path (file_path(500)),
+    INDEX idx_books_lib_del_series (library_id, is_deleted, series_name(255), id),
+    INDEX idx_books_lib_del_title (library_id, is_deleted, title(255), id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS audiobooks (
@@ -132,7 +134,8 @@ CREATE TABLE IF NOT EXISTS audiobooks (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     is_deleted INT DEFAULT 0,
     deleted_at DATETIME DEFAULT NULL,
-    UNIQUE KEY uq_audiobooks_folder_path (folder_path(500))
+    UNIQUE KEY uq_audiobooks_folder_path (folder_path(500)),
+    INDEX idx_audiobooks_lib_del (library_id, is_deleted, title(255), id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS audiobook_tracks (

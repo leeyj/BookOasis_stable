@@ -17,12 +17,12 @@ class SeriesRepository:
             if favorite_only:
                 where.append("a.is_favorite = 1")
             if library_id and library_id != 'all':
-                where.append("(a.library_id = ? OR CAST(a.library_id AS TEXT) = ?)")
                 try:
                     lib_id_val = int(library_id)
                 except (ValueError, TypeError):
                     lib_id_val = library_id
-                params.extend([lib_id_val, str(library_id)])
+                where.append("a.library_id = ?")
+                params.append(lib_id_val)
             if search_query:
                 like = f"%{search_query}%"
                 where.append("(a.title LIKE ? OR a.author LIKE ? OR a.description LIKE ?)")
@@ -56,12 +56,12 @@ class SeriesRepository:
                 where.append("uf.book_id IS NOT NULL")
 
             if library_id and library_id != 'all':
-                where.append("(b.library_id = ? OR CAST(b.library_id AS TEXT) = ?)")
                 try:
                     lib_id_val = int(library_id)
                 except (ValueError, TypeError):
                     lib_id_val = library_id
-                params.extend([lib_id_val, str(library_id)])
+                where.append("b.library_id = ?")
+                params.append(lib_id_val)
 
             if search_query:
                 like = f"%{search_query}%"

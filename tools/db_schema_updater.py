@@ -37,6 +37,29 @@ except ImportError as e:
     print(f"[오류] database.py 모듈을 임포트할 수 없습니다: {e}")
     sys.exit(1)
 
+def _ensure_mariadb_indexes():
+    """기존 MariaDB 데이터베이스에 대용량 초고속 쿼리용 복합 인덱스 자동 보강"""
+    from tools.migrator_sqlite_to_mariadb import connect_mariadb, DB_MAP
+    indexes_to_create = [
+        ('media_general', 'books', 'idx_books_lib_del_series', 'CREATE INDEX idx_books_lib_del_series ON books (library_id, is_deleted, series_name(255), id)'),
+        ('media_general', 'books', 'idx_books_lib_del_title', 'CREATE INDEX idx_books_lib_del_title ON books (library_id, is_deleted, title(255), id)'),
+        ('media_adult', 'books', 'idx_books_lib_del_series', 'CREATE INDEX idx_books_lib_del_series ON books (library_id, is_deleted, series_name(255), id)'),
+        ('media_adult', 'books', 'idx_books_lib_del_title', 'CREATE INDEX idx_books_lib_del_title ON books (library_id, is_deleted, title(255), id)'),
+        ('media_audiobook', 'audiobooks', 'idx_audiobooks_lib_del', 'CREATE INDEX idx_audiobooks_lib_del ON audiobooks (library_id, is_deleted, title(255), id)'),
+    ]
+    for db_name, tbl, idx_name, sql in indexes_to_create:
+        try:
+            conn = connect_mariadb(db_name)
+            cur = conn.cursor()
+            cur.execute(f"SHOW INDEX FROM `{tbl}` WHERE Key_name = %s", (idx_name,))
+            if not cur.fetchone():
+                cur.execute(sql)
+                conn.commit()
+                print(f"  [+] MariaDB 고속 복합 인덱스 생성 완료: `{db_name}`.`{tbl}`.{idx_name}")
+            conn.close()
+        except Exception:
+            pass
+
 def run_schema_update():
     print("=" * 60)
     print(" 데이터베이스 최신 스키마 강제 업데이트 및 동기화 도구")
@@ -48,7 +71,8 @@ def run_schema_update():
         try:
             from tools.migrator_sqlite_to_mariadb import ensure_mariadb_databases
             ensure_mariadb_databases(reset=False)
-            print("[+] MariaDB 데이터베이스 및 스키마 검사 완료.")
+            _ensure_mariadb_indexes()
+            print("[+] MariaDB 데이터베이스, 스키마 및 고속 복합 인덱스 검사 완료.")
         except Exception as ex:
             print(f"[!] MariaDB 스키마 검사 중 경고: {ex}")
         return

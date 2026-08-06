@@ -1,4 +1,7 @@
 # CHANGELOG
+## v1.8.0
+- 대용량 쿼리 최적화 | fix query 
+
 ## v1.7.9
 - 쿼리문 오타 수정 | fix query 
 ## v1.7.8
