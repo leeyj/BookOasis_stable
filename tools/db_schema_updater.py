@@ -85,8 +85,11 @@ def run_schema_update():
     if engine in ('mariadb', 'mysql'):
         print("[+] MariaDB 데이터베이스 엔진 모드 구동")
         try:
-            from tools.migrator_sqlite_to_mariadb import ensure_mariadb_databases
+            from tools.migrator_sqlite_to_mariadb import ensure_mariadb_databases, init_schema, DB_MAP
             ensure_mariadb_databases(reset=False)
+            for db_type, config in DB_MAP.items():
+                dbname = config['mariadb_db']
+                init_schema(db_type, dbname)
             _ensure_mariadb_indexes()
             _ensure_mariadb_scan_history_schema()
             print("[+] MariaDB 데이터베이스, 스키마 및 고속 복합 인덱스 검사 완료.")

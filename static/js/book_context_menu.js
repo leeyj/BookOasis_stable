@@ -599,6 +599,15 @@ if (bookMenuEl) {
   }, true);
 }
 
+export function triggerAddToCollectionAction() {
+  if (!currentTargetBook || !currentTargetBook.id) return;
+  const { id, title } = currentTargetBook;
+  import('./tab_collections.js').then((colls) => {
+    colls.openAddToCollectionModal({ book_id: id, title: title });
+  });
+}
+window.triggerAddToCollectionAction = triggerAddToCollectionAction;
+
 if (!window.__bookContextActionBound) {
   document.addEventListener('click', (event) => {
     const target = event && event.target && typeof event.target.closest === 'function'
@@ -614,9 +623,10 @@ if (!window.__bookContextActionBound) {
     }
 
     const action = target.getAttribute('data-action');
-    if (action === 'scan') return window.triggerScanSingleBook?.();
-    if (action === 'search-meta') return window.triggerSearchAladinMetadata?.();
-    if (action === 'mark-unread') return window.triggerMarkAsUnread?.();
+    if (action === 'scan') return window.triggerScanSingleBookAction?.();
+    if (action === 'search-meta') return window.triggerSearchMetadataAction?.();
+    if (action === 'add-to-collection') return window.triggerAddToCollectionAction?.();
+    if (action === 'mark-unread') return window.triggerMarkAsUnreadAction?.();
   }, true);
   window.__bookContextActionBound = true;
 }

@@ -37,7 +37,7 @@ def _is_db_locked_error(exc):
         return False
 
 
-def _commit_with_retry(conn, context_label, max_attempts=6):
+def _commit_with_retry(conn, context_label, max_attempts=12):
     last_exc = None
     for attempt in range(1, max_attempts + 1):
         try:
@@ -339,8 +339,8 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
             print(f"[Scanner-DB] Flush skipped: 0 pending items (is_final={is_final})")
             return True
 
-        max_attempts = 15 if is_final else 6
-        lock_timeout = 10.0 if is_final else 1.0
+        max_attempts = 20 if is_final else 15
+        lock_timeout = 10.0 if is_final else 5.0
         for attempt in range(1, max_attempts + 1):
             gate_token = None
             try:
@@ -418,6 +418,8 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     f"[Scanner ERROR] Flush failed after attempt {attempt}/{max_attempts}: {e} "
                     f"ins={len(pending_inserts)} upd={len(pending_updates)} folders={len(pending_folders)}"
                 )
+                if not is_final:
+                    break
                 return False
             finally:
                 if gate_token:
@@ -425,6 +427,13 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                         redis_release_lock(f"lock:db_write:{db_type}", gate_token)
                     except Exception:
                         pass
+
+        if not is_final:
+            print(
+                f"[Scanner-DB] ⚠️ Mid-scan flush deferred due to lock contention after {max_attempts} attempts. "
+                f"Holding pending items ({len(pending_inserts)} ins, {len(pending_updates)} upd, {len(pending_folders)} folders) for next checkpoint."
+            )
+            return True
 
         return False
 

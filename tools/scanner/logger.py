@@ -36,8 +36,12 @@ def scanner_print_control(db_path):
                 end = kwargs.get('end', '\n')
                 message = sep.join(map(str, args)) + end
                 timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                formatted_message = f"[{timestamp}] {message}"
+                if not message.strip().startswith('[202'):
+                    formatted_message = f"[{timestamp}] {message}"
+                else:
+                    formatted_message = message
                 zip_logger.write(formatted_message)
+                original_print(formatted_message, end='', flush=True)
             except Exception:
                 pass
         builtins.print = custom_print

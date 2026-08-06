@@ -124,6 +124,10 @@ class CategoryRepository:
                 cursor.execute("DELETE FROM folder_mtimes WHERE folder_path = ? OR folder_path LIKE ?", (phys_path, phys_path + '/%'))
             
             cursor.execute("DELETE FROM scanner_progress WHERE library_id = ?", (str(library_id),))
+            try:
+                cursor.execute("DELETE FROM scanner_tasks WHERE task_key LIKE ?", (f"%_{library_id}",))
+            except Exception:
+                pass
             cursor.execute("DELETE FROM libraries WHERE id = ?", (library_id,))
             conn.commit()
         except Exception as e:

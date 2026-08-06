@@ -286,6 +286,8 @@ class MariadbCursorWrapper:
         s = sql
         # Replace ? with %s
         s = s.replace('?', '%s')
+        # Replace AUTOINCREMENT with AUTO_INCREMENT for MariaDB
+        s = re.sub(r'(?i)\bAUTOINCREMENT\b', 'AUTO_INCREMENT', s)
         # Replace INSERT OR REPLACE WITH REPLACE INTO
         s = re.sub(r'(?i)\bINSERT\s+OR\s+REPLACE\s+INTO\b', 'REPLACE INTO', s)
         # Replace INSERT OR IGNORE WITH INSERT IGNORE
@@ -294,9 +296,14 @@ class MariadbCursorWrapper:
         s = re.sub(r"(?i)strftime\('%Y-%m',\s*([^)]+)\)", r"DATE_FORMAT(\1, '%%Y-%%m')", s)
         s = re.sub(r"(?i)strftime\('%Y',\s*([^)]+)\)", r"DATE_FORMAT(\1, '%%Y')", s)
         
-        # Escape MariaDB reserved keywords `key` and `value`
-        s = re.sub(r'(?i)(?<!`)\bkey\b(?!`)', '`key`', s)
+        # Escape MariaDB reserved keywords `key` and `value` (exclude PRIMARY/FOREIGN/UNIQUE KEY syntax)
+        s = re.sub(r'(?i)(?<!PRIMARY\s)(?<!FOREIGN\s)(?<!UNIQUE\s)(?<!`)\bkey\b(?!`)(?!\s*\()', '`key`', s)
         s = re.sub(r'(?i)(?<!`)\bvalue\b(?!`)', '`value`', s)
+
+        # Convert SQLite ON CONFLICT(...) DO UPDATE SET to MariaDB ON DUPLICATE KEY UPDATE
+        s = re.sub(r'(?i)\bON\s+CONFLICT\s*\([^)]*\)\s*DO\s+UPDATE\s+SET\b', 'ON DUPLICATE KEY UPDATE', s)
+        # Convert SQLite EXCLUDED.col or excluded.col to MariaDB VALUES(col)
+        s = re.sub(r'(?i)\bEXCLUDED\.(\w+)\b', r'VALUES(\1)', s)
 
         # Convert SQLite CAST(x AS TEXT) to MariaDB CONCAT(x, '') to prevent collation mismatch (Error 1267)
         s = re.sub(r'(?i)\bCAST\s*\((.*?)\s+AS\s+TEXT\)', r"CONCAT(\1, '')", s)
@@ -315,12 +322,13 @@ class MariadbCursorWrapper:
 
     def execute(self, sql, params=None):
         converted_sql = self._convert_sql(sql)
-        res = self._cursor.execute(converted_sql, params)
-        return res
+        self._cursor.execute(converted_sql, params)
+        return self
 
     def executemany(self, sql, seq_of_params):
         converted_sql = self._convert_sql(sql)
-        return self._cursor.executemany(converted_sql, seq_of_params)
+        self._cursor.executemany(converted_sql, seq_of_params)
+        return self
 
     def executescript(self, script):
         if not script:
@@ -613,12 +621,25 @@ def auto_migrate_schema(conn, schema_text):
     """실제 DB 테이블의 스키마와 정의된 스키마를 비교하여 결손된 컬럼이 있으면 ALTER TABLE을 동적으로 자동 실행"""
     table_cols = parse_schema_columns(schema_text)
     cursor = conn.cursor()
+    is_mariadb = hasattr(conn, '_conn') or type(conn).__name__.startswith('Mariadb') or type(conn).__name__.startswith('PooledMariaDB')
     
     for table_name, cols in table_cols.items():
         # 1. 해당 테이블의 실존 컬럼 정보 조회
         try:
-            cursor.execute(f"PRAGMA table_info({table_name})")
-            existing_cols = {row['name'].lower() for row in cursor.fetchall()}
+            if is_mariadb:
+                cursor.execute(f"SHOW COLUMNS FROM `{table_name}`")
+                rows = cursor.fetchall()
+                existing_cols = set()
+                for r in rows:
+                    if isinstance(r, dict) or hasattr(r, 'get'):
+                        val = r.get('Field') or r.get('field') or r.get('COLUMN_NAME') or r.get('name')
+                        if val:
+                            existing_cols.add(str(val).lower())
+                    else:
+                        existing_cols.add(str(r[0]).lower())
+            else:
+                cursor.execute(f"PRAGMA table_info({table_name})")
+                existing_cols = {row['name'].lower() for row in cursor.fetchall()}
         except Exception as e:
             print(f"[DB-Migration Warning] Failed to get info for table {table_name} (may be before table creation): {e}")
             continue
@@ -669,6 +690,9 @@ def startup_db_sanity_check():
     - integrity_check 실패 또는 WAL 파일 손상 감지 시 WAL/SHM 파일을 자동 제거합니다.
     - 메인 DB 파일 자체의 손상은 경고 로그만 출력하고 서버 기동은 계속합니다.
     """
+    engine = os.environ.get('DB_ENGINE', os.environ.get('DBMS', 'sqlite')).lower()
+    if engine in ('mariadb', 'mysql'):
+        return
     db_map = {
         'general'  : DB_GENERAL_PATH,
         'adult'    : DB_ADULT_PATH,
@@ -930,6 +954,29 @@ def init_databases():
         has_access INTEGER DEFAULT 1,
         UNIQUE(user_id, library_id)
     );
+
+    CREATE TABLE IF NOT EXISTS collections (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT DEFAULT NULL,
+        color TEXT DEFAULT '#7c3aed',
+        cover_image TEXT DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS collection_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+        book_id INTEGER DEFAULT NULL REFERENCES books(id) ON DELETE CASCADE,
+        series_name TEXT DEFAULT NULL,
+        audiobook_id INTEGER DEFAULT NULL REFERENCES audiobooks(id) ON DELETE CASCADE,
+        sort_order INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(collection_id, book_id),
+        UNIQUE(collection_id, series_name),
+        UNIQUE(collection_id, audiobook_id)
+    );
     """
 
     indexes_schema = """
@@ -951,6 +998,8 @@ def init_databases():
     CREATE INDEX IF NOT EXISTS idx_user_favorites_user_book ON user_favorites(user_id, book_id);
     CREATE INDEX IF NOT EXISTS idx_user_favorites_book ON user_favorites(book_id);
     CREATE INDEX IF NOT EXISTS idx_user_category_permissions_lookup ON user_category_permissions(user_id, library_id, has_access);
+    CREATE INDEX IF NOT EXISTS idx_collections_user ON collections(user_id);
+    CREATE INDEX IF NOT EXISTS idx_collection_items_coll ON collection_items(collection_id);
     """
     
     # 기동 전 WAL/SHM 무결성 자동 검증 및 정리
@@ -970,32 +1019,58 @@ def init_databases():
         
         # [마이그레이션] user_progress 중복 레코드 정리 및 고유 인덱스 설정 준비
         try:
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user_progress'")
-            if cursor.fetchone():
+            is_mariadb = hasattr(conn, '_conn') or type(conn).__name__.startswith('Mariadb') or type(conn).__name__.startswith('PooledMariaDB')
+            if is_mariadb:
+                cursor.execute("SHOW TABLES LIKE 'user_progress'")
+                has_user_progress = bool(cursor.fetchone())
+            else:
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user_progress'")
+                has_user_progress = bool(cursor.fetchone())
+
+            if has_user_progress:
                 # 1. 중복 레코드 삭제 (가장 최근 것 1개만 남김)
-                cursor.execute("""
-                    DELETE FROM user_progress
-                    WHERE id NOT IN (
-                        SELECT MAX(id)
-                        FROM user_progress
-                        GROUP BY book_id, user_id
-                    )
-                """)
+                if is_mariadb:
+                    cursor.execute("""
+                        DELETE up1 FROM user_progress up1
+                        INNER JOIN user_progress up2 
+                        ON up1.book_id = up2.book_id AND up1.user_id = up2.user_id
+                        WHERE up1.id < up2.id
+                    """)
+                else:
+                    cursor.execute("""
+                        DELETE FROM user_progress
+                        WHERE id NOT IN (
+                            SELECT MAX(id)
+                            FROM user_progress
+                            GROUP BY book_id, user_id
+                        )
+                    """)
                 conn.commit()
 
                 # 2. 기존 일반 인덱스가 있다면 삭제하여 UNIQUE로 변경 가능하도록 준비
-                cursor.execute("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_user_progress_book_user'")
-                if cursor.fetchone():
-                    cursor.execute("PRAGMA index_list('user_progress')")
-                    is_unique = False
-                    for idx in cursor.fetchall():
-                        if idx['name'] == 'idx_user_progress_book_user' and idx['unique'] == 1:
-                            is_unique = True
-                            break
-                    if not is_unique:
-                        cursor.execute("DROP INDEX idx_user_progress_book_user")
-                        conn.commit()
-                        print(f"[DB-Migration] {db_type} DB - Dropped non-unique index idx_user_progress_book_user")
+                if is_mariadb:
+                    cursor.execute("SHOW INDEX FROM user_progress WHERE Key_name = 'idx_user_progress_book_user'")
+                    idx_rows = cursor.fetchall()
+                    if idx_rows:
+                        first_row = idx_rows[0]
+                        non_unique = first_row.get('Non_unique', 1) if isinstance(first_row, dict) else 1
+                        if non_unique == 1:
+                            cursor.execute("DROP INDEX idx_user_progress_book_user ON user_progress")
+                            conn.commit()
+                            print(f"[DB-Migration] {db_type} MariaDB - Dropped non-unique index idx_user_progress_book_user")
+                else:
+                    cursor.execute("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_user_progress_book_user'")
+                    if cursor.fetchone():
+                        cursor.execute("PRAGMA index_list('user_progress')")
+                        is_unique = False
+                        for idx in cursor.fetchall():
+                            if idx['name'] == 'idx_user_progress_book_user' and idx['unique'] == 1:
+                                is_unique = True
+                                break
+                        if not is_unique:
+                            cursor.execute("DROP INDEX idx_user_progress_book_user")
+                            conn.commit()
+                            print(f"[DB-Migration] {db_type} DB - Dropped non-unique index idx_user_progress_book_user")
         except Exception as dup_err:
             print(f"[DB-Migration ERROR] user_progress duplicates cleanup failed: {dup_err}")
         

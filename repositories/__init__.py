@@ -16,6 +16,7 @@ if DBMS == "postgres" or DBMS == "postgresql":
         book_repository,
         book_scan_repository,
         category_repository,
+        collection_repository,
         db_tuning_repository,
         metadata_repository,
         opds_repository,
@@ -35,6 +36,7 @@ else:
         book_repository,
         book_scan_repository,
         category_repository,
+        collection_repository,
         db_tuning_repository,
         metadata_repository,
         opds_repository,
@@ -54,6 +56,7 @@ sys.modules['repositories.book_offset_repository'] = book_offset_repository
 sys.modules['repositories.book_repository'] = book_repository
 sys.modules['repositories.book_scan_repository'] = book_scan_repository
 sys.modules['repositories.category_repository'] = category_repository
+sys.modules['repositories.collection_repository'] = collection_repository
 sys.modules['repositories.db_tuning_repository'] = db_tuning_repository
 sys.modules['repositories.metadata_repository'] = metadata_repository
 sys.modules['repositories.opds_repository'] = opds_repository
@@ -72,6 +75,7 @@ BookOffsetRepository = book_offset_repository.BookOffsetRepository
 BookRepository = book_repository.BookRepository
 BookScanRepository = book_scan_repository.BookScanRepository
 CategoryRepository = category_repository.CategoryRepository
+CollectionRepository = collection_repository.CollectionRepository
 DbTuningRepository = db_tuning_repository.DbTuningRepository
 MetadataRepository = metadata_repository.MetadataRepository
 OpdsRepository = opds_repository.OpdsRepository

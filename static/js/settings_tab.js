@@ -1,7 +1,7 @@
 // settings_tab.js - 환경설정 제어 통합 엔트리포인트 및 프록시 모듈
 import { applySettingsToUI, loadInitialSystemSettings, loadGeneralSettings, submitGeneralSettings } from './settings/general.js';
 import { loadPluginsSettings } from './settings/plugins.js';
-import { initReportsTab, loadReportList, loadReportDetail } from './settings/reports.js?v=1.4.2';
+import { initReportsTab, loadReportList, loadReportDetail } from './settings/reports.js';
 import { loadUsersList } from './settings/users.js';
 import { loadPermissionsMatrix } from './settings/permissions.js';
 import { loadQueueStatus } from './settings/queue.js';

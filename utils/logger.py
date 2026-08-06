@@ -3,6 +3,9 @@ import sys
 import os
 import datetime
 import zipfile
+import re
+
+TIMESTAMP_REGEX = re.compile(r'^(?:\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]|\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})')
 
 class ZipRotatingLogger:
     def __init__(self, filepath, max_bytes):
@@ -14,6 +17,7 @@ class ZipRotatingLogger:
         self._current_size = 0
         if os.path.exists(filepath):
             self._current_size = os.path.getsize(filepath)
+        self._at_line_start = True
 
     def _rotate(self):
         if not os.path.exists(self.filepath):
@@ -38,9 +42,29 @@ class ZipRotatingLogger:
             return
         
         try:
-            msg_bytes = msg.encode('utf-8', errors='replace')
-        except AttributeError:
-            msg_bytes = str(msg).encode('utf-8', errors='replace')
+            msg_str = str(msg)
+        except Exception:
+            msg_str = repr(msg)
+
+        now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        formatted_parts = []
+        lines = msg_str.split('\n')
+        for i, line in enumerate(lines):
+            is_last = (i == len(lines) - 1)
+            if self._at_line_start and line.strip():
+                if not TIMESTAMP_REGEX.match(line.strip()):
+                    line = f"[{now_str}] {line}"
+            formatted_parts.append(line)
+            if not is_last:
+                formatted_parts.append('\n')
+                self._at_line_start = True
+            else:
+                if line:
+                    self._at_line_start = False
+
+        final_msg = "".join(formatted_parts)
+        msg_bytes = final_msg.encode('utf-8', errors='replace')
             
         if self._current_size + len(msg_bytes) > self.max_bytes:
             self._rotate()
@@ -54,6 +78,15 @@ class ZipRotatingLogger:
 
     def flush(self):
         pass
+
+def print_msg(msg):
+    """Timestamped print helper"""
+    now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    msg_str = str(msg)
+    if not TIMESTAMP_REGEX.match(msg_str.strip()):
+        print(f"[{now_str}] {msg_str}")
+    else:
+        print(msg_str)
 
 def setup_rotating_logger():
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

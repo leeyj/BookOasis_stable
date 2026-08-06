@@ -1,4 +1,15 @@
 # CHANGELOG
+## v1.8.3
+- (scanner) 대용량 라이브러리 스캔 시 중간 플러시 DB 경합(`Scanner flush failed due to persistent DB contention`) 원천 방지 및 Redis 락 대기 타임아웃/재시도 상향 (`lock_timeout`: 5초, `max_attempts`: 15회), 미획득 시 펜딩 데이터 유예(deferral) 보강 | fix scanner mid-scan flush DB write contention & add lock timeout retry with pending buffer deferral
+- (mariaDB) 스캐너 배치 플러시 `ON CONFLICT(file_path) DO UPDATE SET EXCLUDED...` 1064 SQL 구문 오류 자동 변환 (`ON DUPLICATE KEY UPDATE` & `VALUES(...)`) | fix MariaDB scanner bulk insert ON CONFLICT EXCLUDED 1064 SQL syntax error
+- (mariaDB) 기동 시 마이그레이션 경고(`PRAGMA table_info` ➔ `SHOW COLUMNS FROM`) 및 `sqlite_master` 1146 에러, `user_progress` 중복 정리 쿼리 MariaDB 호환 개편 | fix MariaDB startup schema auto-migration warnings & sqlite_master 1146 errors
+- (mariaDB) `MariadbCursorWrapper.execute()` 커서 체이닝(`cursor.execute(...).fetchone()`) 지원 및 MariaDB 모드 시 SQLite 전용 `PRAGMA integrity_check` 자가 치유(Self-Healing) 오작동 수정 | fix cursor method chaining & prevent false DB self-healing recovery triggers in MariaDB mode
+- (log) 스캐너 로그(`scanner.log`) 및 미디어 서버 통합 로그(`media_server.log`)의 전 출력 라인에 `[YYYY-MM-DD HH:MM:SS]` 실시간 타임스탬프 자동 부착 지원 | add automatic timestamp enrichment for scanner & media_server logger
+- (collection) 사용자별 맞춤 컬렉션(Collection) 시스템 구축 (DB 영역 격리 권한 안전, 카테고리/폴더 독립 묶음, 카드 우클릭 [➕ 컬렉션에 추가] 모달 지원) | per-user custom collection system support with cross-category grouping & context menu
+- (refactor) tab_media_library.js 887라인 거대 코어 구조를 전용 서브 모듈(`library_type_toggle.js`, `search_shortcut_manager.js`)로 컴포넌트화 및 오케스트레이션 슬림화 | refactor tab_media_library.js monolithic architecture into clean modular sub-components
+- (refactor) api/library.py 900라인 모놀리식 백엔드 라우터를 3개 도메인별 블루프린트(`library_routes`, `book_routes`, `plugin_routes`)로 구조적 모듈화 분리 | refactor api/library.py into modular domain-driven route blueprints
+- (refactor) viewer_txt.js 1,178라인 뷰어 엔진에서 EPUB 챕터 비동기 로더 및 이미지 사전로더를 `epub_loader.js` 서브 모듈로 분리 | refactor viewer_txt.js into modular sub-component epub_loader.js
+
 ## v1.8.2
 - 브라우저 뒤로가기 버튼 / 모바일 슬라이드 뒤로가기 제스처(`popstate`) 실행 시 뷰어 읽기 진행도 유실 방지 수술 (sendBeacon 및 즉시 flush 훅 탑재) | save reading progress on browser back button & mobile back gesture
 - 오디오북 접근 권한(`has_audiobook_access`) 업데이트 백엔드 지원 누락 및 관리자 권한 API 라우트 추가 (`update-audiobook` 엔드포인트 수술 완료로 오디오북 탭 정상 표시 보장) | fix audiobook permission update & tab visibility

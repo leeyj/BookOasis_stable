@@ -139,6 +139,11 @@ class CategoryService:
                 print(f"[CategoryService ERROR] Bulk report file removal failed: {e}")
 
             CategoryRepository.delete_library(db_type, library_id)
+            try:
+                from utils.redis_helper import redis_del
+                redis_del(f"status:scan:stage:library_scan_{db_type}_{library_id}")
+            except Exception:
+                pass
         finally:
             if gate_token:
                 try:

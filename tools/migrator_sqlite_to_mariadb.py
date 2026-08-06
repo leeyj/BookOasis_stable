@@ -255,6 +255,31 @@ CREATE TABLE IF NOT EXISTS user_category_permissions (
     has_access INT DEFAULT 1,
     UNIQUE KEY uq_user_cat_perm (user_id, library_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS collections (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT DEFAULT NULL,
+    color VARCHAR(50) DEFAULT '#7c3aed',
+    cover_image TEXT DEFAULT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_collections_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS collection_items (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    collection_id BIGINT NOT NULL,
+    book_id BIGINT DEFAULT NULL,
+    series_name VARCHAR(500) DEFAULT NULL,
+    audiobook_id BIGINT DEFAULT NULL,
+    sort_order INT DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_coll_book (collection_id, book_id),
+    UNIQUE KEY uq_coll_series (collection_id, series_name(255)),
+    UNIQUE KEY uq_coll_audiobook (collection_id, audiobook_id),
+    INDEX idx_collection_items_coll (collection_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 """
 
 

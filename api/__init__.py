@@ -17,6 +17,7 @@ from api.admin    import admin_bp
 from api.auth     import auth_bp
 from api.dashboard_insights import dashboard_insights_bp
 from api.routes.audiobook_routes import audiobook_bp
+from api.routes.collection_routes import collection_bp
 
 # 통합 Blueprint (URL prefix 없음 – 각 모듈이 전체 경로를 직접 정의)
 api_bp = Blueprint('media_api', __name__)
@@ -30,3 +31,4 @@ api_bp.register_blueprint(admin_bp)
 api_bp.register_blueprint(auth_bp)
 api_bp.register_blueprint(dashboard_insights_bp)
 api_bp.register_blueprint(audiobook_bp)
+api_bp.register_blueprint(collection_bp)

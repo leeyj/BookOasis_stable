@@ -73,7 +73,11 @@ const i18n = {
      * @param {string} key - 점(.) 구분자로 연결된 번역 키 (예: 'login.title')
      * @param {object} variables - 템플릿 문자열 보간용 변수 객체
      */
-    t(key, variables = {}) {
+    t(key, variables = {}, fallback = null) {
+        if (typeof variables === 'string') {
+            fallback = variables;
+            variables = {};
+        }
         const keys = key.split('.');
         let value = this.dictionary;
         
@@ -81,15 +85,14 @@ const i18n = {
             if (value && value[k] !== undefined) {
                 value = value[k];
             } else {
-                return key; // 키가 사전에 없으면 키 자체를 반환
+                return fallback || key;
             }
         }
 
         if (typeof value !== 'string') {
-            return key;
+            return fallback || key;
         }
 
-        // 변수 보간 처리 {variable}
         let result = value;
         for (const [vKey, vVal] of Object.entries(variables)) {
             result = result.replace(new RegExp(`{${vKey}}`, 'g'), vVal);
