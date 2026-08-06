@@ -60,6 +60,22 @@ def _ensure_mariadb_indexes():
         except Exception:
             pass
 
+    # Ensure file_path / folder_path columns use utf8mb4_bin for case-sensitive unique key matching
+    col_collations = [
+        ('media_general', 'books', 'file_path', 'VARCHAR(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL'),
+        ('media_adult', 'books', 'file_path', 'VARCHAR(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL'),
+        ('media_audiobook', 'audiobooks', 'folder_path', 'VARCHAR(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL'),
+    ]
+    for db_name, tbl, col_name, col_def in col_collations:
+        try:
+            conn = connect_mariadb(db_name)
+            cur = conn.cursor()
+            cur.execute(f"ALTER TABLE `{tbl}` MODIFY COLUMN `{col_name}` {col_def}")
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+
 def run_schema_update():
     print("=" * 60)
     print(" 데이터베이스 최신 스키마 강제 업데이트 및 동기화 도구")
@@ -72,6 +88,7 @@ def run_schema_update():
             from tools.migrator_sqlite_to_mariadb import ensure_mariadb_databases
             ensure_mariadb_databases(reset=False)
             _ensure_mariadb_indexes()
+            _ensure_mariadb_scan_history_schema()
             print("[+] MariaDB 데이터베이스, 스키마 및 고속 복합 인덱스 검사 완료.")
         except Exception as ex:
             print(f"[!] MariaDB 스키마 검사 중 경고: {ex}")
@@ -192,6 +209,58 @@ def run_schema_update():
     print(" 데이터베이스 스키마 및 마이그레이션 동기화가 성공적으로 완료되었습니다!")
     print(" 서비스를 재시작해 주시기 바랍니다.")
     print("=" * 60)
+
+def _ensure_mariadb_scan_history_schema():
+    """MariaDB 모드에서 scan_history 및 scanner_tasks 테이블 생성 및 AUTO_INCREMENT 컬럼 보완"""
+    for db_type in ['general', 'adult', 'audiobook']:
+        conn = None
+        try:
+            conn = database.get_connection(db_type)
+            cursor = conn.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS scan_history (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    task_type VARCHAR(100) NOT NULL,
+                    task_key VARCHAR(255),
+                    status VARCHAR(50) NOT NULL,
+                    kwargs TEXT,
+                    enqueue_at VARCHAR(50),
+                    started_at VARCHAR(50),
+                    finished_at VARCHAR(50),
+                    error_message TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS scanner_tasks (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    task_type VARCHAR(100) NOT NULL,
+                    task_key VARCHAR(255),
+                    status VARCHAR(50) NOT NULL DEFAULT 'pending',
+                    kwargs TEXT,
+                    error_message TEXT,
+                    enqueue_at VARCHAR(50),
+                    started_at VARCHAR(50),
+                    finished_at VARCHAR(50),
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+            """)
+            # id 컬럼에 AUTO_INCREMENT가 없을 경우를 위한 안전 보완 구문
+            try:
+                cursor.execute("ALTER TABLE scan_history MODIFY COLUMN id INT AUTO_INCREMENT;")
+            except Exception:
+                pass
+            try:
+                cursor.execute("ALTER TABLE scanner_tasks MODIFY COLUMN id INT AUTO_INCREMENT;")
+            except Exception:
+                pass
+            conn.commit()
+        except Exception as e:
+            print(f"[!] MariaDB scan_history 스키마 보완 경고 ({db_type}): {e}")
+        finally:
+            if conn:
+                conn.close()
 
 if __name__ == '__main__':
     run_schema_update()

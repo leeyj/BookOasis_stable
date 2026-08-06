@@ -142,8 +142,13 @@ function prepareActiveViewerSnapshot() {
   } catch (e) {}
 }
 
-// ── 페이지 이탈 / 탭 전환 / 화면 잠금 시 진행률 즉시 전송 ──
-// 서버 재시작 및 앱 백그라운드 전환으로 인한 진행률 유실 방지
+// ── 페이지 이탈 / 뒤로가기(popstate) / 탭 전환 / 화면 잠금 시 진행률 즉시 전송 ──
+// SPA 브라우저 뒤로가기 버튼 / 모바일 슬라이드 뒤로가기 제스처 대응
+window.addEventListener('popstate', () => {
+  prepareActiveViewerSnapshot();
+  flushProgress(true);
+});
+
 window.addEventListener('pagehide', () => {
   prepareActiveViewerSnapshot();
   flushProgress(true);

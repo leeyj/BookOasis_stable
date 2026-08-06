@@ -203,6 +203,9 @@ class BookDetailService:
                 clean_title, _ = os.path.splitext(filename_with_ext)
                 
             total_pages = b['total_pages'] or 0
+            has_offsets_val = b.get('has_offsets', 0)
+            if total_pages > 0 or (b.get('file_format') or '').lower() not in ('zip', 'cbz'):
+                has_offsets_val = 1
 
             books_list.append({
                 'id'          : b['id'],
@@ -210,7 +213,7 @@ class BookDetailService:
                 'title_alias' : b.get('title_alias', '') or '',
                 'file_format' : b['file_format'],
                 'total_pages' : total_pages,
-                'has_offsets' : b['has_offsets'] or 0,
+                'has_offsets' : has_offsets_val,
                 'cover_image' : get_cover_image_with_t(b['cover_image'], b['cover_updated_at']),
                 'file_path'   : b['file_path'] or '',
                 'pages_read'  : b['pages_read']  or 0,

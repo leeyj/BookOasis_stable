@@ -451,6 +451,23 @@ class ScannerQueueRepository:
             conn.commit()
         except Exception as e:
             conn.rollback()
+            # MariaDB id 컬럼 AUTO_INCREMENT 누락으로 인한 에러일 경우 복구 시도
+            if "doesn't have a default value" in str(e) or "id" in str(e):
+                try:
+                    cursor.execute("ALTER TABLE scan_history MODIFY COLUMN id INT AUTO_INCREMENT;")
+                    conn.commit()
+                    cursor.execute(
+                        """
+                        INSERT INTO scan_history (task_type, task_key, status, kwargs, enqueue_at, started_at, finished_at, error_message)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (task_type, task_key, status, kwargs_str, enqueue_at, started_at, finished_at, error_message)
+                    )
+                    conn.commit()
+                    return
+                except Exception as retry_err:
+                    conn.rollback()
+                    print(f"[Queue-History Warning] Auto-recovery failed: {retry_err}")
             print(f"[Queue-History Warning] Failed to record scan_history: {e}")
         finally:
             conn.close()

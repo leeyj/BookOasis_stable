@@ -66,20 +66,25 @@ export async function loadDashboardInsights(libraryType = 'general') {
     if (currentlyContainer) {
       if (Array.isArray(data.currently_reading) && data.currently_reading.length > 0) {
         currentlyContainer.innerHTML = data.currently_reading.map(book => {
+          const detectedFmt = (book.file_format || book.format || '').toLowerCase();
+          const resolvedFmt = detectedFmt || (
+            (book.file_path || book.title || '').match(/\.(epub|pdf|mp3|m4a|m4b|flac|cbz|zip)$/i)?.[1]?.toLowerCase() || 'zip'
+          );
+
           const coverSrc = getBookCoverSrc({
             coverImage: book.cover_url || book.cover_image,
             title: book.title,
-            format: book.format,
+            format: resolvedFmt,
             seed: book.id
           });
           const fallbackSrc = buildFallbackCoverUrl({
             title: book.title,
-            format: book.format,
+            format: resolvedFmt,
             seed: book.id
           });
 
           return `
-            <div class="currently-book-item ui-hover-currently-book" data-role="currently-reading-book" data-book-id="${book.id}" style="display: flex; align-items: center; gap: 0.5rem; background: rgba(15, 23, 42, 0.4); padding: 0.35rem 0.5rem; border-radius: 8px; cursor: pointer; transition: background 0.2s;">
+            <div class="currently-book-item ui-hover-currently-book" data-role="currently-reading-book" data-book-id="${book.id}" data-file-format="${escapeHtml(resolvedFmt)}" data-book-title="${escapeHtml(book.title)}" data-pages-read="${book.current_page || book.pages_read || 0}" data-total-pages="${book.total_pages || 0}" style="display: flex; align-items: center; gap: 0.5rem; background: rgba(15, 23, 42, 0.4); padding: 0.35rem 0.5rem; border-radius: 8px; cursor: pointer; transition: background 0.2s;">
               <img src="${coverSrc}" onerror="this.onerror=null; this.src='${fallbackSrc}';" alt="Cover" style="width: 26px; height: 36px; object-fit: cover; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
               <div style="flex: 1; min-width: 0;">
                 <div style="font-size: 0.78rem; font-weight: 700; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(book.title)}</div>
@@ -194,6 +199,31 @@ window.loadDashboardInsights = function(libType) {
   const activeType = libType || window.currentLibraryType || 'general';
   loadDashboardInsights(activeType);
 };
+
+// ── 현재 읽는 중 카드 클릭 핸들러 등록 ──
+if (!window.__currentlyReadingClickBound) {
+  document.addEventListener('click', (e) => {
+    const item = e.target.closest('[data-role="currently-reading-book"]');
+    if (!item) return;
+
+    e.preventDefault();
+    const bookId = Number.parseInt(item.getAttribute('data-book-id') || '', 10);
+    const fileFormat = (item.getAttribute('data-file-format') || 'zip').toLowerCase();
+    const title = item.getAttribute('data-book-title') || '';
+    const pagesRead = Number.parseInt(item.getAttribute('data-pages-read') || '0', 10) || 0;
+    const totalPages = Number.parseInt(item.getAttribute('data-total-pages') || '0', 10) || 0;
+
+    const isAudio = fileFormat === 'audiobook' || fileFormat === 'audio';
+    if (isAudio && typeof window.openAudioPlayer === 'function') {
+      window.openAudioPlayer(bookId);
+    } else if (bookId && typeof window.openReader === 'function') {
+      window.openReader(bookId, fileFormat, title, pagesRead, totalPages);
+    } else if (typeof window.openBookViewer === 'function') {
+      window.openBookViewer(bookId);
+    }
+  });
+  window.__currentlyReadingClickBound = true;
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   const activeType = window.currentLibraryType || 'general';

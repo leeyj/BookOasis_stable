@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS books (
     series_name VARCHAR(500),
     author VARCHAR(500),
     isbn VARCHAR(100),
-    file_path TEXT NOT NULL,
+    file_path VARCHAR(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
     file_format VARCHAR(50) NOT NULL,
     total_pages INT NOT NULL DEFAULT 0,
     has_offsets INT DEFAULT 0,
@@ -118,39 +118,35 @@ CREATE TABLE IF NOT EXISTS audiobooks (
     web_id VARCHAR(100),
     author VARCHAR(500),
     publisher VARCHAR(255),
-    code VARCHAR(100),
-    poster TEXT,
-    premiered VARCHAR(100),
-    ratings DOUBLE DEFAULT 0.0,
-    author_intro TEXT,
+    reader VARCHAR(500),
     description TEXT,
-    folder_name VARCHAR(500) NOT NULL,
-    folder_path TEXT NOT NULL,
-    total_duration DOUBLE DEFAULT 0.0,
-    total_tracks INT DEFAULT 1,
-    file_type VARCHAR(50) DEFAULT 'multi',
+    folder_path VARCHAR(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    cover_image TEXT,
     is_favorite INT DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     is_deleted INT DEFAULT 0,
-    deleted_at DATETIME DEFAULT NULL,
+    total_tracks INT DEFAULT 0,
+    total_duration INT DEFAULT 0,
+    release_date VARCHAR(100),
+    series_name VARCHAR(500),
+    series_index DOUBLE DEFAULT 0,
+    metadata_locked INT DEFAULT 0,
     UNIQUE KEY uq_audiobooks_folder_path (folder_path(500)),
     INDEX idx_audiobooks_lib_del (library_id, is_deleted, title(255), id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS audiobook_tracks (
+CREATE TABLE IF NOT EXISTS tracks (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     audiobook_id BIGINT NOT NULL,
-    track_number INT NOT NULL,
-    track_code VARCHAR(100),
-    filename VARCHAR(500) NOT NULL,
-    file_path TEXT NOT NULL,
-    file_mtime DOUBLE DEFAULT 0.0,
+    track_number INT DEFAULT 0,
+    title VARCHAR(500) NOT NULL,
+    file_path VARCHAR(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    duration INT DEFAULT 0,
     file_size BIGINT DEFAULT 0,
-    duration DOUBLE DEFAULT 0.0,
-    format VARCHAR(50) DEFAULT 'mp3',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uq_tracks_file_path (file_path(500)),
-    INDEX idx_tracks_audiobook (audiobook_id)
+    INDEX idx_tracks_audiobook_id (audiobook_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS audiobook_progress (
@@ -215,6 +211,19 @@ CREATE TABLE IF NOT EXISTS settings (
     `key` VARCHAR(255) PRIMARY KEY,
     `value` TEXT,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS scan_history (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    task_type VARCHAR(100) NOT NULL,
+    task_key VARCHAR(255),
+    status VARCHAR(50) NOT NULL,
+    kwargs TEXT,
+    enqueue_at VARCHAR(50),
+    started_at VARCHAR(50),
+    finished_at VARCHAR(50),
+    error_message TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS scanner_progress (

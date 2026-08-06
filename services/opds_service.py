@@ -161,18 +161,33 @@ def get_favorite_entries(db_type: str, download_prefix: str, urn_prefix: str, us
     for i, b in enumerate(books):
         ext = os.path.splitext(b['file_path'] or '')[1].lower().replace('.', '') or 'text'
         stream_href = _build_stream_href(b['file_path'], db_type, b['id'], is_app_opds)
-        entries.append({
-            'id': f"urn:{urn_prefix}:favorite:{i}",
-            'title': b['title'],
-            'summary': '',
-            'type': 'acquisition',
-            'href': f"{download_prefix}/{b['id']}",
-            'stream_href': stream_href,
-            'mime': _guess_mime_type(b['file_path']),
-            'cover': b['cover_image'],
-            'cover_url': None if b['cover_image'] else _build_fallback_cover_href(b['title'], ext),
-            'cover_mime': 'image/svg+xml' if not b['cover_image'] else None,
-        })
+        cnt = int(b.get('book_count', 1) or 1)
+        if cnt > 1:
+            series_name = b['title']
+            feed_prefix = download_prefix.replace('/download', '/series')
+            entries.append({
+                'id': f"urn:{urn_prefix}:favorite:series:{i}",
+                'title': f"{series_name} ({cnt}권)",
+                'summary': f"총 {cnt}권 포함",
+                'type': 'navigation',
+                'href': f"{feed_prefix}/all/{_encode_url_segment(series_name)}",
+                'cover': b['cover_image'],
+                'cover_url': None if b['cover_image'] else _build_fallback_cover_href(series_name, 'text'),
+                'cover_mime': 'image/svg+xml' if not b['cover_image'] else None,
+            })
+        else:
+            entries.append({
+                'id': f"urn:{urn_prefix}:favorite:{i}",
+                'title': b['title'],
+                'summary': '',
+                'type': 'acquisition',
+                'href': f"{download_prefix}/{b['id']}",
+                'stream_href': stream_href,
+                'mime': _guess_mime_type(b['file_path']),
+                'cover': b['cover_image'],
+                'cover_url': None if b['cover_image'] else _build_fallback_cover_href(b['title'], ext),
+                'cover_mime': 'image/svg+xml' if not b['cover_image'] else None,
+            })
     return entries
 
 

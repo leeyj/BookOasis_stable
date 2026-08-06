@@ -48,7 +48,8 @@ def _iter_trusted_proxy_networks(raw_list):
 def _request_from_trusted_proxy():
     trusted_raw = _get_security_option('PROXY_HEADER_TRUSTED_IPS', '').strip()
     if not trusted_raw:
-        return True
+        # 보안 강화: 신뢰할 수 있는 IP 목록이 비어있으면 프록시 헤더 인증 거부
+        return False
 
     remote_addr = request.remote_addr
     if not remote_addr:
@@ -244,7 +245,9 @@ def login():
             return jsonify({
                 'success': True,
                 'role': user['role'],
-                'is_default_password': user['is_default_password']
+                'is_default_password': user['is_default_password'],
+                'has_adult_access': user.get('has_adult_access', 0),
+                'has_audiobook_access': user.get('has_audiobook_access', 1)
             })
         else:
             return jsonify({'success': False, 'error': _t('api.invalid_credentials')}), 401
@@ -280,7 +283,7 @@ def change_password():
     new_hash = generate_password_hash(new_password.strip())
     
     # 두 DB 모두 계정을 동기화하여 비밀번호 변경 반영 (세션 일치)
-    for db_type in ['general', 'adult']:
+    for db_type in ['general', 'adult', 'audiobook']:
         UserRepository.update_password(db_type, user_id, new_hash)
         
     session['is_default_password'] = 0
@@ -328,7 +331,7 @@ def add_user():
     
     try:
         # 동기화를 위해 두 데이터베이스에 모두 사용자 추가
-        for db_type in ['general', 'adult']:
+        for db_type in ['general', 'adult', 'audiobook']:
             UserRepository.add_user(db_type, username, password_hash, role, has_adult_access, has_audiobook_access)
     except Exception as e:
         if 'UNIQUE' in str(e):
@@ -359,7 +362,7 @@ def delete_user(target_user_id):
             }), 400
         
     # 두 데이터베이스 모두에서 삭제
-    for db_type in ['general', 'adult']:
+    for db_type in ['general', 'adult', 'audiobook']:
         UserRepository.delete_user(db_type, target_user_id)
         
     return jsonify({'success': True, 'message': _t('api.user_deleted_success')})
@@ -402,7 +405,7 @@ def reset_user_password(target_user_id):
         
     new_hash = generate_password_hash(new_password)
     
-    for db_type in ['general', 'adult']:
+    for db_type in ['general', 'adult', 'audiobook']:
         UserRepository.admin_reset_password(db_type, target_user_id, new_hash, set_default)
         
     return jsonify({'success': True, 'message': _t('api.password_changed_success')})

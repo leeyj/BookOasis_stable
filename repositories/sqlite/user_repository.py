@@ -192,3 +192,18 @@ class UserRepository:
             raise e
         finally:
             conn.close()
+
+    @staticmethod
+    def update_audiobook_access(db_type, user_id, has_audiobook_access):
+        """사용자별 오디오북 접근 권한 갱신"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("UPDATE users SET has_audiobook_access = ? WHERE id = ?", (has_audiobook_access, user_id))
+            conn.commit()
+            return True
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()

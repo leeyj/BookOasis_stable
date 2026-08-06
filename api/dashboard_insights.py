@@ -11,10 +11,19 @@ dashboard_insights_bp = Blueprint('dashboard_insights_api', __name__)
 @dashboard_insights_bp.route('/api/dashboard/insights', methods=['GET'])
 def get_dashboard_insights():
     try:
-        user_id = session.get('user_id', 1)
+        user_id = session.get('user_id')
+        if not user_id:
+            user_id = session.get('user_id', 1)
+
         db_type = request.args.get('library_type', 'general')
         if db_type not in ('general', 'adult', 'audiobook'):
             db_type = 'general'
+
+        if db_type == 'adult':
+            from api.auth import check_adult_permission
+            has_perm, err_resp = check_adult_permission()
+            if not has_perm:
+                return err_resp
 
         # 1. Currently Reading & 히스토리 도서 목록 (검증된 ReadingHistoryService 활용)
         currently_reading = []
@@ -28,17 +37,11 @@ def get_dashboard_insights():
                 
                 if not is_comp and pages_read > 0:
                     pct = int(min(99, round((pages_read / total_pages) * 100))) if total_pages > 0 else 10
-                    currently_reading.append({
-                        'id': b['id'],
-                        'title': b.get('title') or '제목 없음',
-                        'author': b.get('author') or b.get('series_name') or '저자 미상',
-                        'format': b.get('file_format') or '',
-                        'progress_pct': max(1, min(98, pct)),
-                        'current_page': pages_read,
-                        'total_pages': total_pages,
-                        'cover_image': b.get('cover_image') or '',
-                        'cover_url': b.get('cover_image') or f'/api/cover/{b["id"]}?type={db_type}'
-                    })
+                    item_dict = dict(b)
+                    item_dict['progress_pct'] = max(1, min(98, pct))
+                    item_dict['format'] = item_dict.get('file_format', '')
+                    item_dict['cover_url'] = b.get('cover_image') or f'/api/cover/{b["id"]}?type={db_type}'
+                    currently_reading.append(item_dict)
                     if len(currently_reading) >= 2:
                         break
         except Exception as e:

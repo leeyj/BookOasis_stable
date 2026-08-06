@@ -109,7 +109,10 @@ class SeriesRepository:
                        b.genre, b.tags, b.library_id, COALESCE(b.metadata_locked, 0) AS metadata_locked
                 FROM books b
                 INNER JOIN (
-                    SELECT MIN(id) AS rep_id
+                    SELECT COALESCE(
+                        MIN(CASE WHEN b2.cover_image IS NOT NULL AND b2.cover_image != '' THEN b2.id END),
+                        MIN(b2.id)
+                    ) AS rep_id
                     FROM books b2
                     WHERE {' AND '.join(sub_where)}
                     GROUP BY b2.library_id, COALESCE(NULLIF(b2.series_name, ''), b2.title)

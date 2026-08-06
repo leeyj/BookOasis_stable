@@ -1,4 +1,18 @@
 # CHANGELOG
+## v1.8.2
+- 브라우저 뒤로가기 버튼 / 모바일 슬라이드 뒤로가기 제스처(`popstate`) 실행 시 뷰어 읽기 진행도 유실 방지 수술 (sendBeacon 및 즉시 flush 훅 탑재) | save reading progress on browser back button & mobile back gesture
+- 오디오북 접근 권한(`has_audiobook_access`) 업데이트 백엔드 지원 누락 및 관리자 권한 API 라우트 추가 (`update-audiobook` 엔드포인트 수술 완료로 오디오북 탭 정상 표시 보장) | fix audiobook permission update & tab visibility
+- MariaDB 모드 스캔 완료 시 `scan_history` 이력 기록 실패 오류(`Field 'id' doesn't have a default value`) 수정 및 스키마 `AUTO_INCREMENT` 자동 치유 보완 | fix MariaDB scan_history AUTO_INCREMENT schema & self-healing record
+- OPDS 카탈로그 검색(Search) 기능 동작 불가 결함 수정 (`user_category_permissions` 기본 접근 권한 검사 오류 및 다양한 검색 파라미터 `q`, `searchTerm`, `keywords` 지원 확충) | fix OPDS catalog search functionality & parameter support
+- EPUB/텍스트 뷰어 PC 2페이지(양면 보기) 모드 시 마지막 홀수 페이지에서 다음 챕터로 진행 불가능하던 결함 수정 | fix PC 2-page mode EPUB chapter advance stuck issue
+- OPDS 카탈로그 '즐겨찾기' 낱권 나열 구조를 대표 시리즈 그룹핑 카탈로그로 개조 (시리즈 진입 시 하위 권수 목록 출력) | OPDS favorites feed series grouping & navigation feed support
+- 도서 카드 우클릭(마우스 2번 버튼) 시 컨텍스트 메뉴 미노출 및 엉뚱한 상세화면 이동 오류 수정 (좌클릭 `e.button === 0` 전용 분기 Enforce) | fix right-click context menu triggering detail navigation
+- 코드 감사 리포트 기반 보안 및 무결성 보완 (Proxy Header IP 검증 강화, 401 수신 시 로그인 자동 이동, Audiobook 유저/권한 동기화, Insights 성인 권한 검사) | security & stability fixes from audit report
+- 최근 읽은 도서 카드 클릭 역할 분담 원복 (썸네일/배경 ➔ 시리즈 상세화면 이동, 가운데 보라색 아이콘 ➔ 이어읽기 뷰어 오픈) | restore card click behavior separation
+- 대시보드 상단 '현재 읽는 중' 동기부여 위젯 카드 클릭 리스너 연결 및 뷰어 오픈 구현 | add click handler and attributes for currently reading insights widget
+- MariaDB 대표 시리즈 표지 이미지(cover_image) 최우선 선점 쿼리 적용 | prioritize books with valid cover_image for series representatives
+- MariaDB 마이그레이션/스키마 file_path 대소문자 구분(utf8mb4_bin) 콜레이션 적용 | set utf8mb4_bin collation for file_path to support case-sensitive paths
+
 ## v1.8.1
 - docker-compose.mariadb.yml 부팅 시 3개 미디어 DB 자동 생성 스크립트 보완 | auto-create 3 databases on MariaDB container startup
 - 특정 카테고리/전체보기 대표 시리즈 SQL 레벨 그룹핑 최적화 | optimize representative series grouping query for category & all-list

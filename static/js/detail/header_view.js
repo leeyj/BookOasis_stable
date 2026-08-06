@@ -145,7 +145,9 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
     const filePathLower = (book.file_path || '').toLowerCase();
     const remoteKeywords = ['gdrive', 'rclone', 'vfs', 'google_drive', 'onedrive', 'sharepoint', 'nas_share', 'webdav'];
     const isRemote = remoteKeywords.some((keyword) => filePathLower.includes(keyword));
-    return isZip && !isRemote && (book.has_offsets === 0);
+    const totalPages = Number(book.total_pages) || 0;
+    const hasOffsets = Number(book.has_offsets) || 0;
+    return isZip && !isRemote && (totalPages === 0 && hasOffsets === 0);
   });
   const missingPageCount = missingPageBooks.length;
   const missingPageBannerHtml = missingPageCount > 0 ? `

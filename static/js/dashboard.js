@@ -263,6 +263,7 @@ if (!window.__pluginsViewTabDelegationBound) {
       : null;
     if (!target) return;
 
+    console.log('[Dashboard-Delegation] Delegation target clicked:', target);
     event.preventDefault();
     if (target.getAttribute('data-role') === 'plugins-view-tab') {
       switchPluginsViewTab(target.getAttribute('data-plugin-tab') || 'common-desk');
@@ -274,6 +275,7 @@ if (!window.__pluginsViewTabDelegationBound) {
       const bookId = Number.parseInt(target.getAttribute('data-book-id') || '', 10);
       const pagesRead = Number.parseInt(target.getAttribute('data-pages-read') || '0', 10) || 0;
       const totalPages = Number.parseInt(target.getAttribute('data-total-pages') || '0', 10) || 0;
+      console.log('[Dashboard-Delegation] Delegated open-reader:', { bookId, pagesRead, totalPages });
       if (Number.isFinite(bookId) && bookId > 0) {
         window.openReader(bookId, target.getAttribute('data-file-format') || '', target.getAttribute('data-book-title') || '', pagesRead, totalPages);
       }
@@ -281,6 +283,7 @@ if (!window.__pluginsViewTabDelegationBound) {
     }
 
     if (action === 'open-detail' && typeof window.openBookDetail === 'function') {
+      console.log('[Dashboard-Delegation] Delegated open-detail:', target.getAttribute('data-series-name'));
       window.openBookDetail(event, target.getAttribute('data-series-name') || '', target.getAttribute('data-library-id') || null);
     }
   }, true);

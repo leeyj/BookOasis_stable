@@ -92,16 +92,23 @@ class OpdsRepository:
 
     @staticmethod
     def get_favorite_entries(db_type, user_id):
-        """즐겨찾기 등록 도서 목록 조회"""
+        """즐겨찾기 등록 도서 시리즈/단행본 대표 목록 조회 (시리즈 그룹핑)"""
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT b.id, b.title, b.file_path, b.cover_image
+            SELECT 
+                COALESCE(NULLIF(b.series_name, ''), b.title) AS series_group_name,
+                COALESCE(MIN(CASE WHEN b.cover_image IS NOT NULL AND b.cover_image != '' THEN b.id END), MIN(b.id)) AS id,
+                COALESCE(NULLIF(b.series_name, ''), b.title) AS title,
+                COUNT(b.id) AS book_count,
+                MIN(b.file_path) AS file_path,
+                MAX(b.cover_image) AS cover_image
             FROM books b
             JOIN user_favorites uf ON uf.book_id = b.id
             WHERE COALESCE(b.is_deleted, 0) = 0 AND uf.user_id = ?
-            ORDER BY b.title ASC, b.id ASC
+            GROUP BY COALESCE(NULLIF(b.series_name, ''), b.title)
+            ORDER BY series_group_name ASC
             LIMIT 200
             """
             ,
@@ -173,10 +180,10 @@ class OpdsRepository:
 
         if role != 'admin' and user_id is not None:
             where.append(
-                "EXISTS (SELECT 1 FROM user_category_permissions p "
-                "WHERE p.library_id = b.library_id AND p.user_id = ? AND p.has_access = 1)"
+                "(NOT EXISTS (SELECT 1 FROM user_category_permissions p WHERE p.user_id = ?) "
+                "OR EXISTS (SELECT 1 FROM user_category_permissions p WHERE p.library_id = b.library_id AND p.user_id = ? AND p.has_access = 1))"
             )
-            params.append(int(user_id))
+            params.extend([int(user_id), int(user_id)])
 
         where_sql = ' AND '.join(where)
         conn = database.get_connection(db_type)

@@ -72,8 +72,11 @@ export function nextTxtPageAction(ctx) {
 
   if (scrollMode === 'page') {
     ctx.snapTxtPageScrollLeft(scrollWrapper);
-    const maxScrollLeft = scrollWrapper.scrollWidth - scrollWrapper.clientWidth;
-    if (scrollWrapper.scrollLeft + 10 >= maxScrollLeft) {
+    const pageStepWidth = ctx.getTxtPageAdvanceWidth(scrollWrapper);
+    const maxScrollLeft = Math.max(0, scrollWrapper.scrollWidth - scrollWrapper.clientWidth);
+    const snapTolerance = Math.max(30, pageStepWidth * 0.4);
+
+    if (scrollWrapper.scrollLeft + snapTolerance >= maxScrollLeft) {
       if (ctx.getCurrentChunkIdx() < ctx.getChunkCount() - 1) {
         ctx.setCurrentChunkIdx(ctx.getCurrentChunkIdx() + 1);
         scrollWrapper.style.scrollBehavior = 'auto';
@@ -92,9 +95,8 @@ export function nextTxtPageAction(ctx) {
         ctx.handleNextEpisode();
       }
     } else {
-      const pageStepWidth = ctx.getTxtPageAdvanceWidth(scrollWrapper);
       const currentPageIdx = Math.round(scrollWrapper.scrollLeft / pageStepWidth);
-      const targetScrollLeft = (currentPageIdx + 1) * pageStepWidth;
+      const targetScrollLeft = Math.min(maxScrollLeft, (currentPageIdx + 1) * pageStepWidth);
       ctx.setTxtPageSnapInProgress(true);
       scrollWrapper.scrollTo({ left: targetScrollLeft, behavior: 'auto' });
       setTimeout(() => {

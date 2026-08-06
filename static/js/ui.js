@@ -143,13 +143,37 @@ export function createBookCard(item, options = {}) {
   const useLazyLoad = options.lazyLoad !== false;
   const shouldHideCover = !!state.currentLibraryHideCovers;
 
-  // 1. 공통 카드 클릭 핸들러 (아이콘 및 별 클릭 분기)
-  card.onclick = (e) => {
+  // 1. 공통 카드 클릭 핸들러 (아이콘 및 별 클릭 분기, Swiper/가로 스크롤 드래그 삼킴 안전대책)
+  let lastClickTime = 0;
+  const handlePrimaryClick = (e) => {
+    const now = Date.now();
+    if (now - lastClickTime < 200) return; // 중복 호출 방지
+    lastClickTime = now;
+
     if (e.target.closest('.btn-resume-series') || e.target.closest('.btn-card-fav-toggle')) {
       return;
     }
+    console.log('[BookCard] Triggering handlePrimaryClick!', item);
     if (typeof options.onPrimaryClick === 'function') {
       options.onPrimaryClick(e, item);
+    }
+  };
+
+  card.onclick = handlePrimaryClick;
+
+  let pointerStartX = 0;
+  let pointerStartY = 0;
+  card.onpointerdown = (e) => {
+    if (e.button !== 0) return;
+    pointerStartX = e.clientX;
+    pointerStartY = e.clientY;
+  };
+  card.onpointerup = (e) => {
+    if (e.button !== 0) return;
+    const diffX = Math.abs(e.clientX - pointerStartX);
+    const diffY = Math.abs(e.clientY - pointerStartY);
+    if (diffX < 8 && diffY < 8) {
+      handlePrimaryClick(e);
     }
   };
 
@@ -394,22 +418,32 @@ export function renderDashboardHistory(booksList) {
   booksList.forEach(item => {
     const isSeriesHistory = (parseInt(item.book_count, 10) || 0) > 1;
     const normalizedTitle = stripLeadingBracketTags(normalizeBookTitle(item));
-    const card = createBookCard(item, isSeriesHistory ? {
-      showVolumeCount: true,
-      lazyLoad: false,
-      actionTitle: '이어읽기',
-      onPrimaryClick: (e) => openBookDetail(e, item.series_name || normalizedTitle, item.library_id, item.representative_book_id, item.series_alias || item.series_name || normalizedTitle),
-      onActionClick: (e) => {
-        if (typeof window.resumeSeries === 'function') {
-          window.resumeSeries(e, item.series_name, item.library_id, item.representative_book_id);
-        }
-      }
-    } : {
+    const targetSeriesName = item.series_name || item.title || normalizedTitle;
+    const targetLibraryId = item.library_id || null;
+    const targetBookId = item.book_id || item.id || item.representative_book_id;
+    const fileFormat = (item.file_format || '').toLowerCase();
+    const isAudio = fileFormat === 'audiobook' || fileFormat === 'audio';
+
+    const card = createBookCard(item, {
       showProgress: true,
       lazyLoad: false,
       actionTitle: '이어읽기',
-      onPrimaryClick: (e) => openBookDetail(e, item.series_name || normalizedTitle, item.library_id, item.id),
-      onActionClick: () => openReader(item.id, item.file_format, normalizedTitle, item.pages_read, item.total_pages)
+      onPrimaryClick: (e) => {
+        console.log('[Dashboard-ReadingHistory] Card Primary Clicked (Opening Detail):', { targetSeriesName, targetLibraryId, targetBookId });
+        if (typeof window.openBookDetail === 'function') {
+          window.openBookDetail(e, targetSeriesName, targetLibraryId, targetBookId, item.series_alias || targetSeriesName);
+        }
+      },
+      onActionClick: (e) => {
+        console.log('[Dashboard-ReadingHistory] Card Action Clicked (Opening Reader):', { targetBookId, targetSeriesName, fileFormat });
+        if (isAudio && typeof window.openAudioPlayer === 'function') {
+          window.openAudioPlayer(targetBookId);
+        } else if (targetBookId && fileFormat && typeof window.openReader === 'function') {
+          window.openReader(targetBookId, fileFormat, normalizedTitle, item.pages_read || 0, item.total_pages || 0);
+        } else if (typeof window.resumeSeries === 'function') {
+          window.resumeSeries(e, targetSeriesName, targetLibraryId, targetBookId);
+        }
+      }
     });
     fragment.appendChild(card);
   });

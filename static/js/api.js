@@ -1,6 +1,16 @@
 // api.js – 서버와 통신하는 함수들
+async function safeFetch(url, options = {}) {
+  const res = await fetch(url, options);
+  if (res.status === 401) {
+    console.warn('[API] 401 Unauthorized received. Redirecting to /login');
+    window.location.href = '/login';
+    throw new Error('Unauthorized');
+  }
+  return res;
+}
+
 export async function fetchLibraries(type) {
-  const res = await fetch(`/api/media/libraries?type=${type}&_=${Date.now()}`, {cache: 'no-store'});
+  const res = await safeFetch(`/api/media/libraries?type=${type}&_=${Date.now()}`, {cache: 'no-store'});
   return res.json();
 }
 
@@ -8,7 +18,7 @@ export async function fetchBooksList({type, libraryId, page, limit, append, sear
   const searchQuery = search ? `&search=${encodeURIComponent(search)}` : '';
   const sortQuery = sort ? `&sort=${sort}` : '';
   const url = `/api/media/list?type=${type}&library_id=${libraryId}&page=${page}&limit=${limit}${searchQuery}${sortQuery}&_=${Date.now()}`;
-  const res = await fetch(url, {cache: 'no-store'});
+  const res = await safeFetch(url, {cache: 'no-store'});
   return res.json();
 }
 

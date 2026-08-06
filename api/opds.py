@@ -545,7 +545,7 @@ def opds_download_book(db_type: str, book_id: int):
 
 @opds_bp.route('/opds/search', methods=['GET'])
 def opds_search():
-    query = request.args.get('q') or request.args.get('query') or ''
+    query = request.args.get('q') or request.args.get('query') or request.args.get('searchTerm') or request.args.get('searchTerms') or request.args.get('keywords') or ''
 
     if not query:
         # OpenSearch Description 문서: 인증 없이 허용
@@ -584,7 +584,7 @@ def opds_search():
 
 @opds_bp.route('/opds-adult/search', methods=['GET'])
 def opds_adult_search():
-    query = request.args.get('q') or request.args.get('query') or ''
+    query = request.args.get('q') or request.args.get('query') or request.args.get('searchTerm') or request.args.get('searchTerms') or request.args.get('keywords') or ''
 
     if not query:
         # OpenSearch Description 문서: 인증 없이 허용

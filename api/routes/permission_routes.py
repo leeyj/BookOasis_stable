@@ -140,8 +140,28 @@ def update_adult_permission():
 
     try:
         # 양쪽 DB 모두 사용자 권한 동기화 업데이트
-        for db_type in ['general', 'adult']:
+        for db_type in ['general', 'adult', 'audiobook']:
             UserRepository.update_adult_access(db_type, user_id, has_adult_access)
         return jsonify({'success': True, 'message': '성인 도서 접근 권한이 변경되었습니다.'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@permission_bp.route('/api/admin/permissions/update-audiobook', methods=['POST'])
+@admin_required
+def update_audiobook_permission():
+    """사용자별 오디오북 접근 권한 토글 업데이트"""
+    data = request.get_json() or {}
+    user_id = data.get('user_id')
+    has_audiobook_access = 1 if data.get('has_audiobook_access') else 0
+
+    if not user_id:
+        return jsonify({'success': False, 'error': 'user_id는 필수 항목입니다.'}), 400
+
+    try:
+        # 3개 DB 모두 사용자 오디오북 권한 동기화 업데이트
+        for db_type in ['general', 'adult', 'audiobook']:
+            UserRepository.update_audiobook_access(db_type, user_id, has_audiobook_access)
+        return jsonify({'success': True, 'message': '오디오북 접근 권한이 변경되었습니다.'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
