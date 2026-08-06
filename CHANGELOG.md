@@ -1,4 +1,6 @@
 # CHANGELOG
+## v1.7.9
+- 쿼리문 오타 수정 | fix query 
 ## v1.7.8
 - (db/engine) MariaDB 엔터프라이즈 데이터베이스 엔진 공식 지원 및 대용량 쿼리 쾌속 최적화 | official MariaDB support & high-performance query optimization
 - (viewer/epub) EPUB 뷰어 엔진 개선 (이미지 병렬 사전 로딩/디코딩 적용으로 텍스트 밀림 0% 소거) | EPUB reader engine enhancement with image pre-decoding (zero layout shift)

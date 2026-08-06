@@ -39,7 +39,7 @@ class SeriesRepository:
             sql = f"""
                 SELECT a.id, a.title AS series_name, '' AS series_alias, a.title, '' AS title_alias,
                        a.author, a.folder_path AS file_path, 'audiobook' AS file_format,
-                      '/api/media/audiobooks/' || a.id || '/cover' AS cover_image,
+                       CONCAT('/api/media/audiobooks/', a.id, '/cover') AS cover_image,
                        a.updated_at AS cover_updated_at,
                        COALESCE(a.is_favorite, 0) AS is_favorite,
                        a.created_at, '' AS genre, '' AS tags, a.library_id, 0 AS metadata_locked,

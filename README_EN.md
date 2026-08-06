@@ -148,6 +148,31 @@ This drastically minimizes SQLite disk write operations, preventing database cor
 
 ---
 
+## 🗄️ Database Selection Guide (SQLite vs MariaDB)
+
+In addition to the default file-based **SQLite** engine, BookOasis officially supports the **MariaDB** enterprise database engine for large-scale libraries (100,000+ books) and multi-user / high-concurrency environments.
+
+### 📊 Engine Comparison
+| Feature / Characteristic | SQLite (Default) | MariaDB (Optional / Recommended) |
+|---|---|---|
+| **Setup & Startup** | Zero configuration (File DB) | Docker Compose or External MariaDB |
+| **Target Scale** | Personal / Medium (under 50k books) | Large / Enterprise (100k+ books, heavy scanning) |
+| **Concurrency & I/O** | File-level lock (Redis recommended) | Row-level locking for fast distributed I/O |
+| **Data Integrity** | Single file storage | Full DB transactions, auto-recovery & verification |
+
+### 🚀 Switching to MariaDB
+1. **Docker Users (Automated)**
+   - Add `DB_ENGINE=mariadb` and connection details to `docker-compose.override.yml`. Upon container startup, required databases (`media_general`, `media_adult`, `media_audiobook`) and schemas are created automatically.
+   - Detailed Guide: [Docker MariaDB Migration Guide (docs/move_to_mariadb.md)](./docs/move_to_mariadb.md)
+
+2. **1-Click Data Migration (SQLite ➔ MariaDB)**
+   - Migrate all existing books, audiobook progress, favorites, and user accounts from SQLite to MariaDB without data loss in one command:
+   ```bash
+   python tools/migrator_sqlite_to_mariadb.py
+   ```
+
+---
+
 ## 🔑 Initial Login Credentials
 - When logging in for the first time after server startup, use the following default administrator account:
   - **Username (ID)**: `admin`

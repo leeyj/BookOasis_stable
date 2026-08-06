@@ -27,23 +27,23 @@ def resolve_series_cover(series_name, lib_id, db_cover, covers_dir, conn=None, c
     """시리즈 대표 커버의 물리적 실존을 카테고리별 분할 구조에 맞추어 검사하고,
     유실된 경우 실존하는 다른 도서 커버로 대체(Fallback) - 순수 파이썬 In-Memory Dict 초고속 연동
     """
-    series_hash = hashlib.md5(series_name.encode('utf-8')).hexdigest()
+    series_hash = hashlib.md5(str(series_name or '').encode('utf-8')).hexdigest()
     cache_key = f"{db_type}:{lib_id}:{series_hash}"
 
     # 1. 순수 파이썬 In-Memory Dict 룩업 (0.000001초 소요)
     cached_cover = _SERIES_COVER_MEM_CACHE.get(cache_key)
     if cached_cover:
-        cached_path = os.path.join(covers_dir, cached_cover)
+        cached_path = os.path.join(covers_dir, str(cached_cover))
         if os.path.exists(cached_path) and os.path.getsize(cached_path) > 0:
-            return cached_cover
+            return str(cached_cover)
 
     # 카테고리 분할 경로
     series_cover_name = f"{lib_id}/series_{series_hash}.jpg" if lib_id is not None else f"series_{series_hash}.jpg"
-    series_cover_path = os.path.join(covers_dir, series_cover_name)
+    series_cover_path = os.path.join(covers_dir, str(series_cover_name))
     
     # 구형 레거시 경로
     legacy_series_cover_name = f"series_{series_hash}.jpg"
-    legacy_series_cover_path = os.path.join(covers_dir, legacy_series_cover_name)
+    legacy_series_cover_path = os.path.join(covers_dir, str(legacy_series_cover_name))
 
     resolved_cover = None
 
@@ -53,35 +53,43 @@ def resolve_series_cover(series_name, lib_id, db_cover, covers_dir, conn=None, c
         elif os.path.exists(legacy_series_cover_path) and os.path.getsize(legacy_series_cover_path) > 0:
             resolved_cover = legacy_series_cover_name
 
-    if not resolved_cover:
-        db_cover_path = os.path.join(covers_dir, db_cover) if db_cover else None
+    if not resolved_cover and db_cover:
+        db_cover_str = str(db_cover)
+        db_cover_path = os.path.join(covers_dir, db_cover_str)
         if db_cover_path and os.path.exists(db_cover_path) and os.path.getsize(db_cover_path) > 0:
-            resolved_cover = db_cover
+            resolved_cover = db_cover_str
 
     # Fallback 탐색
     if not resolved_cover:
         if candidates_rows is not None:
             for cand in candidates_rows:
-                cand_cover = cand['cover_image']
+                cand_cover = cand.get('cover_image')
                 if cand_cover:
-                    cand_path = os.path.join(covers_dir, cand_cover)
+                    cand_cover_str = str(cand_cover)
+                    cand_path = os.path.join(covers_dir, cand_cover_str)
                     if os.path.exists(cand_path) and os.path.getsize(cand_path) > 0:
-                        resolved_cover = cand_cover
+                        resolved_cover = cand_cover_str
                         break
         else:
             from repositories.book_repository import BookRepository
             try:
                 candidates = BookRepository.get_series_cover_candidates(db_type, series_name, lib_id)
                 for cand in candidates:
-                    cand_cover = cand['cover_image']
-                    cand_path = os.path.join(covers_dir, cand_cover)
-                    if os.path.exists(cand_path) and os.path.getsize(cand_path) > 0:
-                        resolved_cover = cand_cover
-                        break
+                    cand_cover = cand.get('cover_image')
+                    if cand_cover:
+                        cand_cover_str = str(cand_cover)
+                        cand_path = os.path.join(covers_dir, cand_cover_str)
+                        if os.path.exists(cand_path) and os.path.getsize(cand_path) > 0:
+                            resolved_cover = cand_cover_str
+                            break
             except Exception as e:
                 print(f"[resolve_series_cover WARNING] Failed to fetch cover candidates: {e}")
 
-    final_cover = resolved_cover or db_cover
+    final_cover = resolved_cover or (str(db_cover) if db_cover else '')
+    if final_cover:
+        cleaned_final = final_cover.strip().rstrip('/\\')
+        if not cleaned_final or '.' not in os.path.basename(cleaned_final):
+            final_cover = ''
 
     # 2. 파이썬 메모리 Dict에 저장
     if final_cover:

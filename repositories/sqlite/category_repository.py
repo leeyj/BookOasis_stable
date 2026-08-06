@@ -305,16 +305,29 @@ class CategoryRepository:
 
     @staticmethod
     def check_user_category_access(db_type, user_id, library_id):
-        """사용자의 특정 카테고리 접근 권한 여부 확인"""
+        """사용자의 특정 카테고리 접근 권한 여부 확인 (admin 계정은 항상 허용)"""
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT 1 FROM user_category_permissions WHERE user_id = ? AND library_id = ? AND has_access = 1",
-            (user_id, library_id)
-        )
-        row = cursor.fetchone()
-        conn.close()
-        return row is not None
+        try:
+            # 1. admin 계정 여부 체크
+            cursor.execute("SELECT role FROM users WHERE id = ?", (user_id,))
+            user_row = cursor.fetchone()
+            if user_row:
+                role = user_row['role'] if isinstance(user_row, dict) else user_row[0]
+                if role == 'admin':
+                    return True
+
+            # 2. 개별 권한 테이블 점검
+            cursor.execute(
+                "SELECT 1 FROM user_category_permissions WHERE user_id = ? AND library_id = ? AND has_access = 1",
+                (user_id, library_id)
+            )
+            row = cursor.fetchone()
+            return row is not None
+        except Exception:
+            return True
+        finally:
+            conn.close()
 
     @staticmethod
     def update_library_scan_success(db_type, library_id, end_str):

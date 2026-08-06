@@ -83,6 +83,7 @@ class SQLiteConnectionPool:
             if self.allocated < self.max_size:
                 conn = sqlite3.connect(self.db_path, timeout=30.0, factory=PooledConnection, check_same_thread=False)
                 try:
+                    conn.create_function("CONCAT", -1, lambda *args: "".join(str(a) if a is not None else "" for a in args))
                     conn.execute(f"PRAGMA busy_timeout = {max(1000, SQLITE_BUSY_TIMEOUT_MS)};")
                     conn.execute("PRAGMA synchronous = NORMAL;")
                     conn.execute("PRAGMA foreign_keys = ON;")
@@ -301,6 +302,8 @@ class MariadbCursorWrapper:
         s = re.sub(r'(?i)\bCAST\s*\((.*?)\s+AS\s+TEXT\)', r"CONCAT(\1, '')", s)
         # Convert SQLite RANDOM() to MariaDB RAND()
         s = re.sub(r'(?i)\bRANDOM\s*\(\s*\)', r'RAND()', s)
+        # Convert SQLite string concatenation ('str' || col || 'str') to MariaDB CONCAT(...)
+        s = re.sub(r"('(?:''|[^'])*')\s*\|\|\s*([a-zA-Z0-9_\.]+)\s*\|\|\s*('(?:''|[^'])*')", r"CONCAT(\1, \2, \3)", s)
         # current_time 은 MariaDB 예약 키워드(내장함수)이므로 컬럼명으로 쓸 때 백틱 이스케이프 필요
         # 단, VALUES(`current_time`) 이중 이스케이프 방지: 이미 백틱이 있는 경우 제외
         s = re.sub(r'(?<![`\w])current_time(?![`\w])', '`current_time`', s)

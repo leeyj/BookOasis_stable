@@ -149,6 +149,31 @@ BookOasis는 실시간 독서 진행도 저장 시 SQLite 파일에 바로 접�
 
 ---
 
+## 🗄️ 데이터베이스 선택 가이드 (SQLite vs MariaDB)
+
+BookOasis는 기본 파일 기반 **SQLite** 엔진 외에도, 10만 권 이상의 대규모 라이브러리 및 멀티 사용자/동시 접속 환경을 위한 **MariaDB** 엔터프라이즈 데이터베이스 엔진을 공식 지원합니다.
+
+### 📊 엔진 비교
+| 기능 / 특성 | SQLite (기본값) | MariaDB (선택/권장) |
+|---|---|---|
+| **설치 및 구동** | 설정 없이 즉시 구동 (파일 DB) | Docker Compose 또는 별도 MariaDB 연동 |
+| **적합한 규모** | 개인 / 중소형 라이브러리 (5만 권 이하) | 대규모 / 엔터프라이즈 (10만 권 이상, 대용량 스캔) |
+| **동시성 및 I/O** | 파일 락 기반 (Redis 캐시 권장) | 행 단위 락(Row-level lock) 고속 분산 처리 |
+| **데이터 안정성** | 단일 파일 보관 | DB 트랜잭션, 자동 복구, 무결성 검증 |
+
+### 🚀 MariaDB 모드로 전환하기
+1. **Docker 사용자 (자동/원클릭)**
+   - `docker-compose.override.yml`에 `DB_ENGINE=mariadb` 및 접속 정보를 추가한 뒤 컨테이너를 실행하면 필요한 데이터베이스(`media_general`, `media_adult`, `media_audiobook`) 및 스키마가 자동 구축됩니다.
+   - 상세 이관 안내: [Docker 사용자용 MariaDB 마이그레이션 가이드 (docs/move_to_mariadb.md)](./docs/move_to_mariadb.md)
+
+2. **1-Click 데이터 마이그레이션 (SQLite ➔ MariaDB)**
+   - 기존에 읽던 책, 오디오북 진행도, 즐겨찾기, 사용자 계정 등 기존 SQLite의 모든 데이터를 손실 없이 클릭 한 번으로 MariaDB로 이관할 수 있습니다.
+   ```bash
+   python tools/migrator_sqlite_to_mariadb.py
+   ```
+
+---
+
 ## 🔑 초기 로그인 및 계정 정보
 - 최초 서버 구동 후 로그인 시 아래의 관리자 계정을 사용하여 접속할 수 있습니다.
   - **사용자 이름(ID)**: `admin`

@@ -131,14 +131,15 @@ export function buildFallbackCoverUrl({ title, format, seed } = {}) {
 export function getBookCoverSrc({ coverImage, title, format, seed } = {}) {
   if (coverImage && typeof coverImage === 'string') {
     let clean = coverImage.trim();
-    if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('/api/') || clean.startsWith('/covers/')) {
+    if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('/api/')) {
       return clean;
     }
     clean = clean.replace(/^[\/\\]+/, '');
     if (clean.toLowerCase().startsWith('covers/')) {
       clean = clean.substring(7).replace(/^[\/\\]+/, '');
     }
-    if (clean) {
+    const filename = clean.split(/[\/\\]/).pop();
+    if (clean && !clean.endsWith('/') && !clean.endsWith('\\') && filename && filename.includes('.')) {
       return `/covers/${clean}`;
     }
   }
