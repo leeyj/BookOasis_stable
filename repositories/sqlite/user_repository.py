@@ -19,6 +19,22 @@ class UserRepository:
         return dict(row) if row else None
 
     @staticmethod
+    def get_user_favorite_book_ids(db_type, user_id):
+        """사용자의 즐겨찾기 도서 ID 세트 조회 (파이썬 인메모리 매핑용 초고속 조회)"""
+        if not user_id:
+            return set()
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT book_id FROM user_favorites WHERE user_id = ?", (user_id,))
+            rows = cursor.fetchall()
+            return {r['book_id'] for r in rows}
+        except Exception:
+            return set()
+        finally:
+            conn.close()
+
+    @staticmethod
     def find_by_id(db_type, user_id):
         """사용자 ID 기반 계정 정보 조회"""
         conn = database.get_connection(db_type)

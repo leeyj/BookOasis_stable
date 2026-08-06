@@ -279,8 +279,8 @@ class MariadbCursorWrapper:
         if not sql:
             return sql
         
-        # Ignore SQLite-specific PRAGMA commands in MariaDB
-        if sql.strip().upper().startswith('PRAGMA'):
+        # Ignore SQLite-specific PRAGMA commands and raw BEGIN in MariaDB (PyMySQL handles transactions via conn.commit())
+        if sql.strip().upper().startswith('PRAGMA') or sql.strip().upper() in ('BEGIN', 'BEGIN TRANSACTION', 'BEGIN WORK'):
             return "SELECT 1"
 
         s = sql
@@ -304,6 +304,9 @@ class MariadbCursorWrapper:
         s = re.sub(r'(?i)\bRANDOM\s*\(\s*\)', r'RAND()', s)
         # Convert SQLite string concatenation ('str' || col || 'str') to MariaDB CONCAT(...)
         s = re.sub(r"('(?:''|[^'])*')\s*\|\|\s*([a-zA-Z0-9_\.]+)\s*\|\|\s*('(?:''|[^'])*')", r"CONCAT(\1, \2, \3)", s)
+        # Convert SQLite datetime('now', ...) to MariaDB CURRENT_TIMESTAMP and DATE_SUB
+        s = re.sub(r"(?i)datetime\s*\(\s*'now'\s*,\s*'-(\d+)\s*days'\s*,?\s*.*?\)", r"DATE_SUB(NOW(), INTERVAL \1 DAY)", s)
+        s = re.sub(r"(?i)datetime\s*\(\s*'now'\s*,?\s*.*?\)", "CURRENT_TIMESTAMP", s)
         # current_time 은 MariaDB 예약 키워드(내장함수)이므로 컬럼명으로 쓸 때 백틱 이스케이프 필요
         # 단, VALUES(`current_time`) 이중 이스케이프 방지: 이미 백틱이 있는 경우 제외
         s = re.sub(r'(?<![`\w])current_time(?![`\w])', '`current_time`', s)
@@ -416,7 +419,10 @@ class MariaDBConnectionPool:
             database=dbname,
             charset='utf8mb4',
             autocommit=False,
-            cursorclass=pymysql.cursors.DictCursor
+            cursorclass=pymysql.cursors.DictCursor,
+            connect_timeout=10,
+            read_timeout=30,
+            write_timeout=30
         )
 
     def get_connection(self, wait_timeout=30.0):

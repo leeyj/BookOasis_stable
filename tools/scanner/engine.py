@@ -392,11 +392,12 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     f"remaining_ins={len(pending_inserts)} remaining_upd={len(pending_updates)} remaining_folders={len(pending_folders)}"
                 )
 
-                # 5. WAL checkpoint (PASSIVE) to merge journal into main DB without blocking or closing connections
-                try:
-                    conn.execute("PRAGMA wal_checkpoint(PASSIVE);")
-                except Exception as ckpt_err:
-                    print(f"[Scanner-DB] WAL checkpoint passive warning (ignored): {ckpt_err}")
+                # 5. WAL checkpoint (PASSIVE) for SQLite mode only
+                if hasattr(conn, 'execute') and not hasattr(conn, '_cursor'):
+                    try:
+                        conn.execute("PRAGMA wal_checkpoint(PASSIVE);")
+                    except Exception:
+                        pass
 
                 return True
             except Exception as e:
@@ -647,7 +648,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
         cursor.execute("""
             UPDATE libraries 
             SET scan_status = 'ready', 
-                last_scanned_at = datetime('now', 'localtime')
+                last_scanned_at = CURRENT_TIMESTAMP
             WHERE id = ?
         """, (library_id,))
         _commit_with_retry(conn, 'scan-end-cleanup')

@@ -95,11 +95,11 @@ class BookRepository:
         cursor = conn.cursor()
         if library_id and library_id not in ('all', 'favorite', 'history', 'home'):
             cursor.execute(
-                "SELECT DISTINCT tags FROM books WHERE library_id = ? AND tags IS NOT NULL AND tags != ''",
+                "SELECT DISTINCT tags FROM books WHERE library_id = ? AND (is_deleted = 0 OR is_deleted IS NULL) AND tags IS NOT NULL AND tags != ''",
                 (library_id,)
             )
         else:
-            cursor.execute("SELECT DISTINCT tags FROM books WHERE tags IS NOT NULL AND tags != ''")
+            cursor.execute("SELECT DISTINCT tags FROM books WHERE (is_deleted = 0 OR is_deleted IS NULL) AND tags IS NOT NULL AND tags != ''")
         rows = cursor.fetchall()
         conn.close()
         return [r[0] for r in rows if r[0]]
@@ -111,11 +111,11 @@ class BookRepository:
         cursor = conn.cursor()
         if library_id and library_id not in ('all', 'favorite', 'history', 'home'):
             cursor.execute(
-                "SELECT DISTINCT genre FROM books WHERE library_id = ? AND genre IS NOT NULL AND genre != ''",
+                "SELECT DISTINCT genre FROM books WHERE library_id = ? AND (is_deleted = 0 OR is_deleted IS NULL) AND genre IS NOT NULL AND genre != ''",
                 (library_id,)
             )
         else:
-            cursor.execute("SELECT DISTINCT genre FROM books WHERE genre IS NOT NULL AND genre != ''")
+            cursor.execute("SELECT DISTINCT genre FROM books WHERE (is_deleted = 0 OR is_deleted IS NULL) AND genre IS NOT NULL AND genre != ''")
         rows = cursor.fetchall()
         conn.close()
         return [r[0] for r in rows if r[0]]

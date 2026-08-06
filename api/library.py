@@ -44,6 +44,8 @@ def get_media_libraries():
 @login_required
 def get_media_list():
     """도서 보관함 시리즈 목록 조회 (무한 스크롤 페이지네이션 + 서버 검색)"""
+    import time
+    t_start = time.perf_counter()
     db_type    = request.args.get('type', 'general')
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
@@ -72,6 +74,8 @@ def get_media_list():
         has_more = len(series_list) > limit
         if has_more:
             series_list = series_list[:limit]
+        t_end = time.perf_counter()
+        print(f"[API-PROFILE] GET /api/media/list (type={db_type}, lib={library_id}, page={page}) -> TOTAL HTTP RESPONSE: {(t_end - t_start)*1000:.1f}ms")
         return jsonify({'success': True, 'series': series_list, 'has_more': has_more})
     except Exception as e:
         err_msg = str(e)
@@ -83,6 +87,8 @@ def get_media_list():
 @login_required
 def get_media_all_list():
     """Kavita 방식의 선로드를 위해 특정 라이브러리의 전체 시리즈 목록을 페이징 없이 경량 조회"""
+    import time
+    t_start = time.perf_counter()
     db_type    = request.args.get('type', 'general')
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
@@ -90,7 +96,14 @@ def get_media_all_list():
     user_id = session.get('user_id')
     role = session.get('role')
     try:
-        series_list = SeriesService.get_all_books_list(db_type, library_id, user_id=user_id, role=role)
+        series_list = SeriesService.get_all_books_list(
+            db_type,
+            library_id,
+            user_id=user_id,
+            role=role
+        )
+        t_end = time.perf_counter()
+        print(f"[API-PROFILE] GET /api/media/all-list (type={db_type}, lib={library_id}) -> TOTAL HTTP RESPONSE: {(t_end - t_start)*1000:.1f}ms")
         return jsonify({'success': True, 'series': series_list})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

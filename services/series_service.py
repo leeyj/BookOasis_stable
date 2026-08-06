@@ -116,51 +116,84 @@ def _sort_entries(entries, sort='asc'):
     entries.sort(key=lambda x: str(x.get('latest_added') or ''), reverse=True)
 
 
+_ALL_BOOKS_CACHE = {}
+_ALL_BOOKS_CACHE_TTL = 60.0  # 60초 인메모리 캐싱
+
 class SeriesService:
     @staticmethod
+    def invalidate_all_books_cache():
+        global _ALL_BOOKS_CACHE
+        _ALL_BOOKS_CACHE.clear()
+
+    @staticmethod
     def get_books_list(db_type, library_id, page, limit, search_query, sort='asc', user_id=None, role=None):
+        import time
+        t0 = time.perf_counter()
         library_id = _normalize_library_id(library_id)
         favorite_only = library_id == 'favorite'
-        if library_id in ('all', 'favorite', 'history', 'home'):
-            library_filter = None
-        else:
-            library_filter = library_id
 
+        offset = max(0, (page - 1) * limit)
+        sql_limit = (limit + 1) if (not search_query and sort in ('asc', 'desc')) else None
+        sql_offset = offset if (not search_query and sort in ('asc', 'desc')) else None
+
+        t1 = time.perf_counter()
         rows = SeriesRepository.fetch_books_for_grouping(
             db_type,
-            library_filter,
+            library_id,
             search_query=search_query or '',
             favorite_only=favorite_only,
             user_id=user_id,
-            role=role
+            role=role,
+            limit=sql_limit,
+            offset=sql_offset
         )
+        t2 = time.perf_counter()
 
         entries = _build_series_entries(db_type, rows)
-        _sort_entries(entries, sort=sort)
+        t3 = time.perf_counter()
 
-        offset = max(0, (page - 1) * limit)
-        paged = entries[offset:offset + limit + 1]
+        _sort_entries(entries, sort=sort)
+        t4 = time.perf_counter()
+
+        paged = entries if sql_limit is not None else entries[offset:offset + limit + 1]
+        
+        print(f"[PERF-PROFILE] get_books_list(lib={library_id}, page={page}) TOTAL: {(t4-t0)*1000:.1f}ms | SQL-Fetch({len(rows)}rows): {(t2-t1)*1000:.1f}ms | BuildSeries({len(entries)}entries): {(t3-t2)*1000:.1f}ms | Sort: {(t4-t3)*1000:.1f}ms")
         return paged
 
     @staticmethod
     def get_all_books_list(db_type, library_id, user_id=None, role=None):
         """Kavita 방식의 선로드를 위해 특정 라이브러리의 전체 시리즈 목록을 페이징 없이 경량 조회"""
+        import time
+        t0 = time.perf_counter()
         library_id = _normalize_library_id(library_id)
         favorite_only = library_id == 'favorite'
-        if library_id in ('all', 'favorite', 'history', 'home'):
-            library_filter = None
-        else:
-            library_filter = library_id
+        
+        now = time.time()
+        # 글로벌 인메모리 통캐시 (5분 간 전역 공유 - 0.0001초 응답)
+        cache_key = f"global:{db_type}:{library_id}"
+        if cache_key in _ALL_BOOKS_CACHE:
+            cache_ts, cached_entries = _ALL_BOOKS_CACHE[cache_key]
+            if now - cache_ts < 300.0:
+                print(f"[PERF-PROFILE] get_all_books_list(lib={library_id}) GLOBAL IN-MEMORY CACHE HIT! ({len(cached_entries)} entries) - {(time.perf_counter()-t0)*1000:.1f}ms")
+                return cached_entries
 
+        t1 = time.perf_counter()
         rows = SeriesRepository.fetch_books_for_grouping(
             db_type,
-            library_filter,
+            library_id,
             search_query='',
             favorite_only=favorite_only,
             user_id=user_id,
             role=role
         )
-        entries = _build_series_entries(db_type, rows)
-        _sort_entries(entries, sort='asc')
+        t2 = time.perf_counter()
 
+        entries = _build_series_entries(db_type, rows)
+        t3 = time.perf_counter()
+
+        _sort_entries(entries, sort='asc')
+        t4 = time.perf_counter()
+
+        _ALL_BOOKS_CACHE[cache_key] = (now, entries)
+        print(f"[PERF-PROFILE] get_all_books_list(lib={library_id}) TOTAL: {(t4-t0)*1000:.1f}ms | SQL-Fetch({len(rows)}rows): {(t2-t1)*1000:.1f}ms | BuildSeries({len(entries)}entries): {(t3-t2)*1000:.1f}ms | Sort: {(t4-t3)*1000:.1f}ms")
         return entries

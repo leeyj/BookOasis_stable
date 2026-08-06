@@ -87,7 +87,7 @@ def handle_deleted_books(cursor, db_books, deleted_paths, target_paths, found_fi
             book_id = norm_db_books[norm_dp]
             cursor.execute("""
                 UPDATE books 
-                SET is_deleted = 1, deleted_at = datetime('now', 'localtime') 
+                SET is_deleted = 1, deleted_at = CURRENT_TIMESTAMP 
                 WHERE id = ?
             """, (book_id,))
             print(f"[Scanner] File disappearance detected, set to trash: {dp}")

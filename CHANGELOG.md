@@ -1,4 +1,10 @@
 # CHANGELOG
+## v1.8.1
+- docker-compose.mariadb.yml 부팅 시 3개 미디어 DB 자동 생성 스크립트 보완 | auto-create 3 databases on MariaDB container startup
+- 특정 카테고리/전체보기 대표 시리즈 SQL 레벨 그룹핑 최적화 | optimize representative series grouping query for category & all-list
+- 스캔시 경고 메시지 보완 | fix warn message in scanner
+- mariadb 에러 보완 | fix mariadb error
+
 ## v1.8.0
 - 대용량 쿼리 최적화 | fix query 
 
