@@ -1,6 +1,9 @@
 # CHANGELOG
+## v1.7.7
+- (audio/volume) iOS(아이폰) WebKit 환경에서 HTML5 Audio 볼륨 속성 제한 우회를 위한 Web Audio API GainNode 자체 볼륨 연동 구축 | fix iOS Safari WebKit audio volume control using Web Audio GainNode
+- (audio/ui) 오디오북 플레이어 모바일 뷰 하단 툴바 볼륨 수치-Sleep 타이머 버튼 간 UI 겹침 레이아웃 개선 | fix audio player volume slider and sleep timer button UI overlap on mobile
 ## v1.7.6
-- (detail/cover) 메타정보 수동 편집 시 업로드된 신규 표지 이미지가 DB(cover_image)에 미반영되던 결함 수정 | fix cover image upload database update failure in manual metadata editor
+- (detail/cover) 메타정보 수동 편집 시 업로드된 신규 표지 이미지가 DB(cover_image)에 미반영되던 결함 및 In-Memory/Redis 캐시 무효화 누락 수정 | fix cover image upload database update & cache invalidation failure
 
 ## v1.7.5
 - (category/spinner) 하단 속보 푸터 바 전면 제거 및 카테고리 항목/상단 헤더 실시간 뺑글이 스피너(fa-spin) 애니메이션 연동 | remove bottom ticker footer & add category scan spinner animation

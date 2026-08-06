@@ -109,15 +109,14 @@
                 </button>
 
                 <!-- 음량 컨트롤 (항상 표시) -->
-                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.35rem; min-width: 140px;">
-                    <div style="display: flex; align-items: center; gap: 0.5rem; width: 100%;">
-                        <button data-role="audio-player-action" data-action="set-volume" data-value="0" title="음소거" style="background: none; border: none; color: #f8fafc; font-size: 1rem; cursor: pointer; padding: 0; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;">
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.35rem; flex: 1; max-width: 140px; margin: 0 0.3rem;">
+                    <div style="display: flex; align-items: center; gap: 0.4rem; width: 100%;">
+                        <button data-role="audio-player-action" data-action="set-volume" data-value="0" title="음소거" style="background: none; border: none; color: #f8fafc; font-size: 0.95rem; cursor: pointer; padding: 0; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                             <i id="audio-player-vol-icon" class="fa-solid fa-volume-high"></i>
                         </button>
-                        <input type="range" id="audio-volume-slider" data-role="audio-player-input" data-action="set-volume" min="0" max="1" step="0.05" value="1" style="flex: 1; height: 4px; appearance: none; background: rgba(255,255,255,0.2); border-radius: 999px; outline: none; cursor: pointer; accent-color: #38bdf8;">
-                        <span id="audio-volume-value" style="font-size: 0.72rem; font-weight: 700; color: #94a3b8; min-width: 36px; text-align: right;">100%</span>
+                        <input type="range" id="audio-volume-slider" data-role="audio-player-input" data-action="set-volume" min="0" max="1" step="0.05" value="1" style="flex: 1; width: 100%; height: 4px; appearance: none; background: rgba(255,255,255,0.2); border-radius: 999px; outline: none; cursor: pointer; accent-color: #38bdf8;">
                     </div>
-                    <span style="font-size: 0.72rem; color: #64748b;">Volume</span>
+                    <span style="font-size: 0.72rem; color: #64748b;">Volume <span id="audio-volume-value" style="font-size: 0.72rem; font-weight: 700; color: #38bdf8; margin-left: 2px;">100%</span></span>
                 </div>
 
                 <!-- 취침 타이머 -->

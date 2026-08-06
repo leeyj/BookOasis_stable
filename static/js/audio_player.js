@@ -13,6 +13,36 @@ let lastFlushedProgressKey = '';
 let lastAutoSaveAtMs = 0;
 const AUDIO_PROGRESS_AUTO_SAVE_MS = 10000;
 
+let audioCtx = null;
+let gainNode = null;
+let audioSourceNode = null;
+let currentVolumeValue = 1.0;
+
+function setupWebAudioGainNode(audioEl) {
+  if (!audioEl) return;
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    if (!audioCtx) {
+      audioCtx = new AudioContextClass();
+    }
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
+    }
+    if (!audioSourceNode && audioCtx && audioEl) {
+      audioSourceNode = audioCtx.createMediaElementSource(audioEl);
+      gainNode = audioCtx.createGain();
+      audioSourceNode.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      if (gainNode && gainNode.gain) {
+        gainNode.gain.value = currentVolumeValue;
+      }
+    }
+  } catch (e) {
+    console.warn('[AudioPlayer] Web Audio GainNode setup warning:', e);
+  }
+}
+
 function initAudioPlayerDelegation() {
   if (window.__audioPlayerDelegationBound) return;
 
@@ -284,6 +314,10 @@ export async function toggleAudioFullscreen() {
 
 export function toggleAudioPlay(forcePlay = null) {
   if (!audioInstance) return;
+  setupWebAudioGainNode(audioInstance);
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(() => {});
+  }
   const btn = document.getElementById('btn-audio-play-toggle');
   const shouldPlay = forcePlay !== null ? forcePlay : audioInstance.paused;
 
@@ -383,9 +417,18 @@ export function setAudioVolume(val) {
   let volume = parseFloat(val);
   if (isNaN(volume)) volume = 1;
   volume = Math.max(0, Math.min(1, volume));
+  currentVolumeValue = volume;
 
   if (audioInstance) {
-    audioInstance.volume = volume;
+    try {
+      audioInstance.volume = volume;
+    } catch (e) {}
+  }
+
+  // iOS Safari / WebKit 등 volume 속성 제한 브라우저 대비 Web Audio GainNode 제어
+  setupWebAudioGainNode(audioInstance);
+  if (gainNode && gainNode.gain) {
+    gainNode.gain.value = volume;
   }
 
   const slider = document.getElementById('audio-volume-slider');

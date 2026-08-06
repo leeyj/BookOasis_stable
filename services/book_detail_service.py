@@ -4,7 +4,8 @@ import os
 from repositories.audiobook_repository import AudiobookRepository
 from repositories.book_repository import BookRepository 
 from utils.sort_helper import natural_sort_key
-from utils.cover_helper import get_cover_image_with_t, resolve_series_cover
+from utils.cover_helper import get_cover_image_with_t, resolve_series_cover, invalidate_series_cover_cache
+from utils.redis_helper import redis_delete_pattern
 
 class BookDetailService:
     @staticmethod
@@ -249,6 +250,15 @@ class BookDetailService:
                     cover_image_url = f"/api/media/covers/audiobook/{cover_filename}"
 
                 AudiobookRepository.update_media_detail(series_name, author, isbn, publisher, summary, cover_image_url=cover_image_url)
+                
+                # In-Memory 및 Redis 캐시 파기
+                invalidate_series_cover_cache(db_type='audiobook', lib_id=None, series_name=series_name)
+                try:
+                    redis_delete_pattern("cache:history*:audiobook:*")
+                    redis_delete_pattern("cache:recent_added*:audiobook:*")
+                except Exception as cache_err:
+                    print(f"[BookDetailService WARNING] 오디오북 레디스 캐시 소거 실패: {cache_err}")
+
                 return True, f'"{series_name}" 메타정보가 성공적으로 수정되었습니다.'
             except Exception as e:
                 print(f"[BookDetailService] 오디오북 메타정보 수정 에러: {e}")
@@ -280,6 +290,16 @@ class BookDetailService:
             
             # 3. 시리즈 메타 정보 일괄 업데이트
             BookRepository.update_media_detail(db_type, series_name, author, isbn, publisher, summary, link, genre, tags, series_alias=series_alias, cover_image_url=cover_image_url)
+            
+            # 4. In-Memory 표지 캐시 및 Redis 캐시 무효화
+            invalidate_series_cover_cache(db_type=db_type, lib_id=library_id, series_name=series_name)
+            invalidate_series_cover_cache(db_type=db_type)
+            try:
+                redis_delete_pattern(f"cache:history*:{db_type}:*")
+                redis_delete_pattern(f"cache:recent_added*:{db_type}:*")
+            except Exception as cache_err:
+                print(f"[BookDetailService WARNING] 레디스 캐시 소거 실패: {cache_err}")
+
             return True, f'"{series_name}" 메타정보가 성공적으로 수정되었습니다.'
         except Exception as e:
             print(f"[BookDetailService] 메타정보 수정 에러: {e}")
