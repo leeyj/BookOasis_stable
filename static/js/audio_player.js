@@ -18,7 +18,16 @@ let gainNode = null;
 let audioSourceNode = null;
 let currentVolumeValue = 1.0;
 
+// iOS Safari 감지:
+// iOS는 createMediaElementSource()로 AudioContext에 연결하면
+// 화면 잠금 시 AudioContext가 강제 suspend되어 소리가 완전히 끊김.
+// iOS는 hardware 볼륨 버튼으로 제어하므로 GainNode 볼륨 조절의 실익도 없음.
+// → iOS에서는 AudioContext를 아예 사용하지 않아 화면 잠금 재생을 보장함.
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
 function setupWebAudioGainNode(audioEl) {
+  // iOS에서는 AudioContext 사용 자체를 차단 (화면 잠금 재생 보장)
+  if (IS_IOS) return;
   if (!audioEl) return;
   try {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -42,6 +51,7 @@ function setupWebAudioGainNode(audioEl) {
     console.warn('[AudioPlayer] Web Audio GainNode setup warning:', e);
   }
 }
+
 
 function initAudioPlayerDelegation() {
   if (window.__audioPlayerDelegationBound) return;
@@ -220,6 +230,16 @@ function getEffectiveTrackDuration() {
   return 0;
 }
 
+// iOS Safari AudioContext resume 헬퍼
+// iOS는 사용자 제스처 컨텍스트 내에서만 AudioContext.resume()을 허용함.
+// 잠금화면 재생 버튼 → MediaSession play → audio.play() → 'play'/'playing' 이벤트는
+// iOS가 사용자 액션으로 인정하므로, 이 시점에 resume해야 실제로 동작함.
+function resumeAudioContextIfNeeded() {
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(e => console.warn('[AudioPlayer] AudioContext resume failed:', e));
+  }
+}
+
 function initAudioEvents() {
   if (!audioInstance) return;
 
@@ -227,6 +247,12 @@ function initAudioEvents() {
   const seekbar = document.getElementById('audio-player-seekbar');
   const currentTimeEl = document.getElementById('audio-player-current-time');
   const durationEl = document.getElementById('audio-player-duration');
+
+  // iOS 핵심: play/playing 이벤트 시점에 AudioContext를 resume함.
+  // createMediaElementSource 연결 이후 AudioContext가 suspended이면 소리가 나지 않음.
+  // 잠금화면 → 재생 버튼 탭 → audio.play() → 'play' 이벤트 → resume 성공 (사용자 액션 컨텍스트)
+  audioInstance.addEventListener('play', resumeAudioContextIfNeeded);
+  audioInstance.addEventListener('playing', resumeAudioContextIfNeeded);
 
   audioInstance.ontimeupdate = () => {
     if (!audioInstance) return;
@@ -562,12 +588,21 @@ function initMediaSession(meta, track) {
       artwork: meta.cover_image ? [{ src: meta.cover_image }] : []
     });
 
+    // play 핸들러: toggleAudioPlay → audioInstance.play() → 'play' 이벤트 → resumeAudioContextIfNeeded 자동 연쇄
     navigator.mediaSession.setActionHandler('play', () => toggleAudioPlay(true));
     navigator.mediaSession.setActionHandler('pause', () => toggleAudioPlay(false));
-    navigator.mediaSession.setActionHandler('seekbackward', () => audioPlayerSkip(-15));
-    navigator.mediaSession.setActionHandler('seekforward', () => audioPlayerSkip(15));
+    navigator.mediaSession.setActionHandler('seekbackward', (details) => audioPlayerSkip(-(details.seekOffset ?? 15)));
+    navigator.mediaSession.setActionHandler('seekforward', (details) => audioPlayerSkip(details.seekOffset ?? 15));
     navigator.mediaSession.setActionHandler('previoustrack', () => playPrevTrack());
     navigator.mediaSession.setActionHandler('nexttrack', () => playNextTrack());
+    // 잠금화면 탐색바(seekto) 지원
+    try {
+      navigator.mediaSession.setActionHandler('seekto', (details) => {
+        if (audioInstance && details.seekTime != null) {
+          audioInstance.currentTime = details.seekTime;
+        }
+      });
+    } catch (e) { /* seekto 미지원 브라우저 무시 */ }
   }
 }
 
@@ -651,6 +686,13 @@ window.addEventListener('beforeunload', () => {
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
+    // 화면 잠금/탭 전환 시 진행도 즉시 저장
     flushAudioProgressForLifecycle(true);
+  } else if (document.visibilityState === 'visible') {
+    // iOS Safari는 화면 잠금 시 AudioContext를 강제 suspend 처리함.
+    // 화면 복귀 시 명시적으로 resume하지 않으면 소리가 끊긴 채 유지됨.
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(e => console.warn('[AudioPlayer] AudioContext resume failed on visibility restore:', e));
+    }
   }
 });

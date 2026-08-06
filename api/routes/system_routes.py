@@ -25,13 +25,10 @@ def get_library_name(db_type, lib_id):
         return _LIB_NAME_MEM_CACHE[cache_key]
 
     try:
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("SELECT name FROM libraries WHERE id = ?", (lib_id,))
-        row = cursor.fetchone()
-        conn.close()
-        if row:
-            name = row['name']
+        from repositories.category_repository import CategoryRepository
+        lib = CategoryRepository.get_library_by_id(db_type, lib_id)
+        if lib:
+            name = lib.get('name')
             _LIB_NAME_MEM_CACHE[cache_key] = name
             return name
     except Exception:
@@ -277,14 +274,11 @@ def trigger_scan_via_webhook():
     physical_path = None
     lib_name = None
     try:
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("SELECT physical_path, name FROM libraries WHERE id = ?", (lib_id_int,))
-        row = cursor.fetchone()
-        conn.close()
-        if row:
-            physical_path = row['physical_path']
-            lib_name = row['name']
+        from repositories.category_repository import CategoryRepository
+        lib_info = CategoryRepository.get_library_by_id(db_type, lib_id_int)
+        if lib_info:
+            physical_path = lib_info.get('physical_path')
+            lib_name = lib_info.get('name')
     except Exception as db_err:
         return jsonify({'success': False, 'error': f'Failed to query library info: {db_err}'}), 500
 

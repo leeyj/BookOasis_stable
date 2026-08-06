@@ -169,25 +169,16 @@ class AladinMetadataProvider(BaseMetadataProvider):
             publisher = item_data.get('publisher', '')
             link = item_data.get('link', '')
 
-            gateway.execute("""
-                UPDATE books
-                SET author = ?,
-                    isbn = ?,
-                    publisher = ?,
-                    summary = ?,
-                    link = ?,
-                    cover_image = COALESCE(NULLIF(?, ''), cover_image),
-                    cover_updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            """, (
-                author,
-                isbn,
-                publisher,
-                description,
-                link,
-                cover_filename,
-                book_id
-            ))
+            from repositories.metadata_repository import MetadataRepository
+            db_type = 'general'
+            try:
+                if hasattr(gateway, 'db_type') and gateway.db_type:
+                    db_type = gateway.db_type
+            except Exception:
+                pass
+            MetadataRepository.update_plugin_book_metadata(
+                db_type, book_id, author, isbn, publisher, description, link, cover_filename
+            )
 
             return True, f'"{title}" 메타데이터가 도서 정보에 성공적으로 반영되었습니다.'
         except Exception as e:

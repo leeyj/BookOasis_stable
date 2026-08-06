@@ -165,7 +165,26 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
   let continueTarget = null;
   let continueReason = 'first';
 
-  if (books && books.length > 0) {
+  const firstFmt = books.length > 0 ? String(books[0].file_format || '').toLowerCase() : '';
+  const isAudiobookLib = state.currentLibraryType === 'audiobook' || ['audiobook', 'mp3', 'm4a', 'm4b', 'flac', 'aac', 'wav', 'ogg', 'opus', 'wma'].includes(firstFmt);
+
+  let hasAudioProgress = false;
+  if (isAudiobookLib && meta) {
+    const curTime = Number(meta.current_time || 0);
+    const totalPct = Number(meta.total_progress_pct || 0);
+    if (curTime > 0 || totalPct > 0 || meta.current_track_id) {
+      hasAudioProgress = true;
+      continueReason = 'in-progress';
+      if (meta.current_track_id && books && books.length > 0) {
+        continueTarget = books.find((b) => Number(b.id) === Number(meta.current_track_id));
+      }
+      if (!continueTarget && books && books.length > 0) {
+        continueTarget = books[0];
+      }
+    }
+  }
+
+  if (!continueTarget && books && books.length > 0) {
     const inProgressBooks = books.filter((book) => book.pages_read > 0 && book.is_completed === 0);
     if (inProgressBooks.length > 0) {
       inProgressBooks.sort((left, right) => new Date(right.last_read_at || 0) - new Date(left.last_read_at || 0));
@@ -198,7 +217,9 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
     const isAudioContext = state.currentLibraryType === 'audiobook' || ['audiobook', 'mp3', 'm4a', 'm4b', 'flac', 'aac', 'wav', 'ogg', 'opus', 'wma'].includes(continueFmt);
 
     let progressPercent = 0;
-    if (continueTarget.pages_read > 0) {
+    if (hasAudioProgress && meta && Number(meta.total_progress_pct) > 0) {
+      progressPercent = Math.round(Number(meta.total_progress_pct));
+    } else if (continueTarget.pages_read > 0) {
       const format = (continueTarget.file_format || '').toLowerCase();
       if (format === 'epub') {
         progressPercent = continueTarget.pages_read;
@@ -209,15 +230,21 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
 
     let tooltipTitle = '';
     if (continueReason === 'in-progress') {
-      btnLabel = i18n.t('detail.continue_reading') || '이어서 읽기';
-      tooltipTitle = `${continueTarget.title} (${progressPercent}%)`;
+      btnLabel = isAudioContext
+        ? (i18n.t('detail.continue_listening') || '이어서 듣기')
+        : (i18n.t('detail.continue_reading') || '이어서 읽기');
+      tooltipTitle = `${continueTarget.title}${progressPercent > 0 ? ` (${progressPercent}%)` : ''}`;
       btnColor = '#8b5cf6';
       btnBorder = '#a78bfa';
+      iconClass = isAudioContext ? 'fa-solid fa-headphones' : 'fa-solid fa-play';
     } else if (continueReason === 'recent') {
-      btnLabel = i18n.t('detail.continue_reading') || '이어서 읽기';
+      btnLabel = isAudioContext
+        ? (i18n.t('detail.continue_listening') || '이어서 듣기')
+        : (i18n.t('detail.continue_reading') || '이어서 읽기');
       tooltipTitle = continueTarget.title;
       btnColor = '#6d28d9';
       btnBorder = '#8b5cf6';
+      iconClass = isAudioContext ? 'fa-solid fa-headphones' : 'fa-solid fa-play';
     } else {
       btnLabel = isAudioContext
         ? (i18n.t('detail.start_listening') || '처음부터 듣기')
@@ -225,7 +252,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
       tooltipTitle = continueTarget.title;
       btnColor = '#10b981';
       btnBorder = '#34d399';
-      iconClass = 'fa-solid fa-book-open-reader';
+      iconClass = isAudioContext ? 'fa-solid fa-headphones' : 'fa-solid fa-book-open-reader';
     }
 
     const resumeTrackId = (meta && meta.current_track_id) ? meta.current_track_id : continueTarget.id;

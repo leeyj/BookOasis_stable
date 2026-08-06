@@ -33,6 +33,8 @@ class BookDetailService:
             prog_row = AudiobookRepository.get_audiobook_progress(aid, user_id)
             current_track_id = prog_row['current_track_id'] if prog_row else None
             current_time = prog_row['current_time'] if prog_row else 0.0
+            total_progress_pct = prog_row['total_progress_pct'] if (prog_row and 'total_progress_pct' in prog_row) else 0.0
+            is_completed = prog_row['is_completed'] if (prog_row and 'is_completed' in prog_row) else 0
 
             # 트랙 목록
             track_rows = AudiobookRepository.get_audiobook_tracks(aid)
@@ -55,6 +57,8 @@ class BookDetailService:
                 'is_favorite': audiobook_row['is_favorite'] or 0,
                 'current_track_id': current_track_id,
                 'current_time': current_time,
+                'total_progress_pct': total_progress_pct,
+                'is_completed': is_completed,
                 'metadata_locked': 0
             }
 

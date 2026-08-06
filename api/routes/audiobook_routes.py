@@ -176,20 +176,12 @@ def _has_audiobook_library_access(aid):
     if not user_id:
         return False
 
-    conn = database.get_connection('audiobook')
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT library_id FROM audiobooks WHERE id = ?", (aid,))
-        row = cursor.fetchone()
-        if not row:
-            return False
-        cursor.execute(
-            "SELECT 1 FROM user_category_permissions WHERE user_id = ? AND library_id = ? AND has_access = 1",
-            (user_id, row['library_id'])
-        )
-        return cursor.fetchone() is not None
-    finally:
-        conn.close()
+    from repositories.audiobook_repository import AudiobookRepository
+    from repositories.category_repository import CategoryRepository
+    ab = AudiobookRepository.get_audiobook_by_id(aid)
+    if not ab or not ab.get('library_id'):
+        return False
+    return CategoryRepository.check_user_category_access('audiobook', user_id, ab['library_id'])
 
 @audiobook_bp.route('/api/media/audiobooks/<int:aid>/cover', methods=['GET'])
 def get_audiobook_cover(aid):
@@ -197,13 +189,10 @@ def get_audiobook_cover(aid):
     if not _has_audiobook_library_access(aid):
         return jsonify({'success': False, 'error': '오디오북 접근 권한이 없습니다.'}), 403
 
-    conn = database.get_connection('audiobook')
-    cursor = conn.cursor()
-    cursor.execute("SELECT poster, title FROM audiobooks WHERE id = ?", (aid,))
-    row = cursor.fetchone()
-    conn.close()
+    from repositories.audiobook_repository import AudiobookRepository
+    row = AudiobookRepository.get_audiobook_by_id(aid)
 
-    if row and row['poster']:
+    if row and row.get('poster'):
         poster_path = row['poster']
         if poster_path.startswith(('http://', 'https://')):
             if requests is not None:
@@ -221,7 +210,7 @@ def get_audiobook_cover(aid):
             return send_file(poster_path, mimetype=mimetype)
 
     # Fallback SVG 생성
-    title = row['title'] if row else 'Audiobook'
+    title = row.get('title') if row else 'Audiobook'
     from api.stream import _build_fallback_svg
     svg_data = _build_fallback_svg(title, file_format='audiobook', seed=str(aid))
     return Response(svg_data, mimetype='image/svg+xml')
@@ -233,13 +222,10 @@ def stream_audiobook_track(aid, tid):
     if not _has_audiobook_library_access(aid):
         return jsonify({'success': False, 'error': '오디오북 접근 권한이 없습니다.'}), 403
 
-    conn = database.get_connection('audiobook')
-    cursor = conn.cursor()
-    cursor.execute("SELECT file_path FROM audiobook_tracks WHERE id = ? AND audiobook_id = ?", (tid, aid))
-    row = cursor.fetchone()
-    conn.close()
+    from repositories.audiobook_repository import AudiobookRepository
+    row = AudiobookRepository.get_track_by_id_and_audiobook_id(tid, aid)
 
-    if not row or not row['file_path']:
+    if not row or not row.get('file_path'):
         return jsonify({'success': False, 'error': 'Track not found'}), 404
 
     return _send_audio_range_response(row['file_path'])
@@ -251,8 +237,7 @@ def audiobook_progress_api(aid):
         return jsonify({'success': False, 'error': '오디오북 접근 권한이 없습니다.'}), 403
 
     user_id = session.get('user_id', 1)
-    conn = database.get_connection('audiobook')
-    cursor = conn.cursor()
+    from repositories.audiobook_repository import AudiobookRepository
 
     if request.method == 'POST':
         data = request.get_json(force=True, silent=True)
@@ -273,35 +258,24 @@ def audiobook_progress_api(aid):
             try:
                 track_id_int = int(track_id)
             except (TypeError, ValueError):
-                conn.close()
                 return jsonify({'success': False, 'error': 'Invalid current_track_id'}), 400
 
-            cursor.execute(
-                "SELECT 1 FROM audiobook_tracks WHERE id = ? AND audiobook_id = ?",
-                (track_id_int, aid)
-            )
-            if not cursor.fetchone():
-                conn.close()
+            track_row = AudiobookRepository.get_track_by_id_and_audiobook_id(track_id_int, aid)
+            if not track_row:
                 return jsonify({'success': False, 'error': 'Track does not belong to audiobook'}), 400
             track_id = track_id_int
 
         # 총 진행율 계산
         total_pct = 0.0
         try:
-            cursor.execute("SELECT total_duration FROM audiobooks WHERE id = ?", (aid,))
-            ab_row = cursor.fetchone()
-            if ab_row and ab_row['total_duration'] > 0:
+            ab_row = AudiobookRepository.get_audiobook_by_id(aid)
+            if ab_row and ab_row.get('total_duration') and ab_row['total_duration'] > 0:
                 total_pct = min(100.0, (current_time / ab_row['total_duration']) * 100.0)
         except Exception:
             pass
 
         try:
-            cursor.execute("""
-                INSERT OR REPLACE INTO audiobook_progress (
-                    audiobook_id, user_id, current_track_id, current_time, total_progress_pct, playback_rate, is_completed, last_listened_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            """, (aid, user_id, track_id, current_time, total_pct, playback_rate, is_completed))
-            conn.commit()
+            AudiobookRepository.save_audiobook_progress(aid, user_id, track_id, current_time, total_pct, playback_rate, is_completed)
 
             # 최근 읽은 도서 캐시를 즉시 무효화하여 대시보드 반영 지연(최대 1시간)을 방지
             try:
@@ -312,12 +286,7 @@ def audiobook_progress_api(aid):
 
             return jsonify({'success': True})
         except Exception as e:
-            conn.rollback()
             return jsonify({'success': False, 'error': str(e)}), 500
-        finally:
-            conn.close()
     else:
-        cursor.execute("SELECT * FROM audiobook_progress WHERE audiobook_id = ? AND user_id = ?", (aid, user_id))
-        row = cursor.fetchone()
-        conn.close()
-        return jsonify({'success': True, 'progress': dict(row) if row else None})
+        progress_row = AudiobookRepository.get_audiobook_progress(aid, user_id)
+        return jsonify({'success': True, 'progress': progress_row})

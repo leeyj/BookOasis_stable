@@ -222,7 +222,13 @@ def shutdown_all_pools():
                 try:
                     pool.shutdown()
                 except Exception as e:
-                    print(f"[DB-Shutdown] {db_type} 풀 종료 중 오류: {e}")
+                    print(f"[DB-Shutdown] {db_type} SQLite 풀 종료 중 오류: {e}")
+        for db_type, pool in _mariadb_pools.items():
+            if pool is not None:
+                try:
+                    pool.shutdown()
+                except Exception as e:
+                    print(f"[DB-Shutdown] {db_type} MariaDB 풀 종료 중 오류: {e}")
     print("[DB-Shutdown] 모든 DB 커넥션 풀 종료 완료.")
 
 def _get_pool_size_raw():
@@ -257,8 +263,273 @@ def _get_pool_size_raw():
         _cached_pool_size = 5
     return 5
 
+class DictRow(dict):
+    """sqlite3.Row 호환 딕셔너리 서브클래스 (row['col'], row.get('col'), row[0] 인덱싱 지원)"""
+    def __getitem__(self, item):
+        if isinstance(item, int):
+            return list(self.values())[item]
+        return super().__getitem__(item)
+
+class MariadbCursorWrapper:
+    def __init__(self, raw_cursor):
+        self._cursor = raw_cursor
+
+    def _convert_sql(self, sql):
+        if not sql:
+            return sql
+        
+        # Ignore SQLite-specific PRAGMA commands in MariaDB
+        if sql.strip().upper().startswith('PRAGMA'):
+            return "SELECT 1"
+
+        s = sql
+        # Replace ? with %s
+        s = s.replace('?', '%s')
+        # Replace INSERT OR REPLACE WITH REPLACE INTO
+        s = re.sub(r'(?i)\bINSERT\s+OR\s+REPLACE\s+INTO\b', 'REPLACE INTO', s)
+        # Replace INSERT OR IGNORE WITH INSERT IGNORE
+        s = re.sub(r'(?i)\bINSERT\s+OR\s+IGNORE\s+INTO\b', 'INSERT IGNORE INTO', s)
+        # Replace SQLite strftime with MariaDB DATE_FORMAT (escape % as %% for PyMySQL query formatting)
+        s = re.sub(r"(?i)strftime\('%Y-%m',\s*([^)]+)\)", r"DATE_FORMAT(\1, '%%Y-%%m')", s)
+        s = re.sub(r"(?i)strftime\('%Y',\s*([^)]+)\)", r"DATE_FORMAT(\1, '%%Y')", s)
+        
+        # Escape MariaDB reserved keywords `key` and `value`
+        s = re.sub(r'(?i)(?<!`)\bkey\b(?!`)', '`key`', s)
+        s = re.sub(r'(?i)(?<!`)\bvalue\b(?!`)', '`value`', s)
+
+        # Convert SQLite CAST(x AS TEXT) to MariaDB CONCAT(x, '') to prevent collation mismatch (Error 1267)
+        s = re.sub(r'(?i)\bCAST\s*\((.*?)\s+AS\s+TEXT\)', r"CONCAT(\1, '')", s)
+        # Convert SQLite RANDOM() to MariaDB RAND()
+        s = re.sub(r'(?i)\bRANDOM\s*\(\s*\)', r'RAND()', s)
+        # current_time 은 MariaDB 예약 키워드(내장함수)이므로 컬럼명으로 쓸 때 백틱 이스케이프 필요
+        # 단, VALUES(`current_time`) 이중 이스케이프 방지: 이미 백틱이 있는 경우 제외
+        s = re.sub(r'(?<![`\w])current_time(?![`\w])', '`current_time`', s)
+        return s
+
+
+    def execute(self, sql, params=None):
+        converted_sql = self._convert_sql(sql)
+        res = self._cursor.execute(converted_sql, params)
+        return res
+
+    def executemany(self, sql, seq_of_params):
+        converted_sql = self._convert_sql(sql)
+        return self._cursor.executemany(converted_sql, seq_of_params)
+
+    def executescript(self, script):
+        if not script:
+            return
+        statements = [stmt.strip() for stmt in script.split(';') if stmt.strip()]
+        for stmt in statements:
+            try:
+                self.execute(stmt)
+            except Exception:
+                pass
+
+    def fetchone(self):
+        row = self._cursor.fetchone()
+        return DictRow(row) if row else None
+
+    def fetchall(self):
+        rows = self._cursor.fetchall()
+        return [DictRow(r) for r in rows] if rows else []
+
+    @property
+    def rowcount(self):
+        return self._cursor.rowcount
+
+    @property
+    def lastrowid(self):
+        return self._cursor.lastrowid
+
+    def close(self):
+        try:
+            return self._cursor.close()
+        except Exception:
+            pass
+
+class MariadbConnectionWrapper:
+    def __init__(self, raw_conn):
+        self._conn = raw_conn
+
+    def cursor(self):
+        return MariadbCursorWrapper(self._conn.cursor())
+
+    def executescript(self, script):
+        return self.cursor().executescript(script)
+
+    def commit(self):
+        return self._conn.commit()
+
+    def rollback(self):
+        try:
+            return self._conn.rollback()
+        except Exception:
+            pass
+
+    def close(self):
+        try:
+            return self._conn.close()
+        except Exception:
+            pass
+
+class PooledMariaDBConnectionWrapper(MariadbConnectionWrapper):
+    def __init__(self, raw_conn, pool):
+        super().__init__(raw_conn)
+        self._pool = pool
+        self._is_closed = False
+
+    def close(self):
+        if not self._is_closed:
+            self._is_closed = True
+            if self._pool:
+                self._pool.release(self._conn)
+            else:
+                super().close()
+
+class MariaDBConnectionPool:
+    """MariaDB 스레드 세이프 커넥션 풀 (DB_POOL_SIZE 연동)"""
+    def __init__(self, db_type, max_size=50):
+        self.db_type = db_type
+        self.max_size = max_size
+        self.pool = queue.Queue(maxsize=max_size)
+        self.lock = threading.Lock()
+        self.allocated = 0
+
+    def _create_raw_connection(self):
+        import pymysql
+        import pymysql.cursors
+        host = os.environ.get('MARIADB_HOST', '127.0.0.1')
+        port = int(os.environ.get('MARIADB_PORT', '3306') or '3306')
+        user = os.environ.get('MARIADB_USER', 'root')
+        password = os.environ.get('MARIADB_PASSWORD', '')
+        prefix = os.environ.get('MARIADB_DATABASE_PREFIX', 'media_')
+        dbname = f"{prefix}{self.db_type}"
+        return pymysql.connect(
+            host=host,
+            port=port,
+            user=user,
+            password=password,
+            database=dbname,
+            charset='utf8mb4',
+            autocommit=False,
+            cursorclass=pymysql.cursors.DictCursor
+        )
+
+    def get_connection(self, wait_timeout=30.0):
+        try:
+            conn = self.pool.get(block=True, timeout=0.01)
+            try:
+                conn.ping(reconnect=True)
+                return PooledMariaDBConnectionWrapper(conn, self)
+            except Exception:
+                with self.lock:
+                    self.allocated = max(0, self.allocated - 1)
+        except queue.Empty:
+            pass
+
+        with self.lock:
+            if self.allocated < self.max_size:
+                raw_conn = self._create_raw_connection()
+                self.allocated += 1
+                return PooledMariaDBConnectionWrapper(raw_conn, self)
+
+        try:
+            conn = self.pool.get(block=True, timeout=wait_timeout)
+            try:
+                conn.ping(reconnect=True)
+                return PooledMariaDBConnectionWrapper(conn, self)
+            except Exception:
+                with self.lock:
+                    self.allocated = max(0, self.allocated - 1)
+                raw_conn = self._create_raw_connection()
+                with self.lock:
+                    self.allocated += 1
+                return PooledMariaDBConnectionWrapper(raw_conn, self)
+        except queue.Empty:
+            raise TimeoutError(f"MariaDB 커넥션 풀 선점 시간 초과 ({wait_timeout}초)")
+
+    def release(self, raw_conn):
+        if raw_conn is None:
+            return
+        try:
+            raw_conn.rollback()
+            self.pool.put_nowait(raw_conn)
+        except Exception:
+            with self.lock:
+                self.allocated = max(0, self.allocated - 1)
+            try:
+                raw_conn.close()
+            except Exception:
+                pass
+
+    def resize(self, new_size):
+        with self.lock:
+            self.max_size = new_size
+            old_queue = self.pool
+            self.pool = queue.Queue(maxsize=new_size)
+            while not old_queue.empty():
+                try:
+                    conn = old_queue.get_nowait()
+                    if self.pool.full():
+                        try:
+                            conn.close()
+                        except Exception:
+                            pass
+                        self.allocated = max(0, self.allocated - 1)
+                    else:
+                        self.pool.put_nowait(conn)
+                except queue.Empty:
+                    break
+
+    def get_stats(self):
+        with self.lock:
+            allocated = self.allocated
+            max_size = self.max_size
+            idle = self.pool.qsize()
+        in_use = max(0, allocated - idle)
+        util_pct = (in_use / max_size * 100.0) if max_size > 0 else 0.0
+        return {
+            'allocated': allocated,
+            'idle': idle,
+            'in_use': in_use,
+            'max_size': max_size,
+            'utilization_pct': util_pct,
+        }
+
+    def shutdown(self):
+        with self.lock:
+            while not self.pool.empty():
+                try:
+                    conn = self.pool.get_nowait()
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+                except queue.Empty:
+                    break
+            self.allocated = 0
+
+_mariadb_pools = {'general': None, 'adult': None, 'audiobook': None}
+
+def get_mariadb_connection(db_type='general'):
+    pool_size = _get_pool_size_raw()
+    global _mariadb_pools
+    with _pools_lock:
+        pool = _mariadb_pools.get(db_type)
+        if pool is None:
+            pool = MariaDBConnectionPool(db_type, pool_size)
+            _mariadb_pools[db_type] = pool
+        elif pool.max_size != pool_size:
+            pool.resize(pool_size)
+    return pool.get_connection()
+
 def get_connection(db_type='general', wait_timeout=30.0):
-    """SQLite 데이터베이스 연결 반환 (커넥션 풀 적용)"""
+    """데이터베이스 연결 반환 (SQLite 커넥션 풀 또는 MariaDB 커넥션 풀 지원)"""
+    engine = os.environ.get('DB_ENGINE', os.environ.get('DBMS', 'sqlite')).lower()
+    if engine in ('mariadb', 'mysql'):
+        return get_mariadb_connection(db_type)
+
     global _pools
     db_path = get_db_path(db_type)
     
@@ -276,8 +547,12 @@ def get_connection(db_type='general', wait_timeout=30.0):
 
 def get_pool_stats(db_type='general'):
     """현재 커넥션 풀 상태 스냅샷을 반환합니다."""
+    engine = os.environ.get('DB_ENGINE', os.environ.get('DBMS', 'sqlite')).lower()
     with _pools_lock:
-        pool = _pools.get(db_type)
+        if engine in ('mariadb', 'mysql'):
+            pool = _mariadb_pools.get(db_type)
+        else:
+            pool = _pools.get(db_type)
 
     if pool is None:
         return {

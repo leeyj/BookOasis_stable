@@ -104,3 +104,71 @@ class AudiobookRepository:
             raise e
         finally:
             conn.close()
+
+    @staticmethod
+    def get_track_by_id_and_audiobook_id(track_id, audiobook_id):
+        """특정 트랙 ID 및 오디오북 ID 매칭 조회"""
+        conn = database.get_connection('audiobook')
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM audiobook_tracks WHERE id = ? AND audiobook_id = ?",
+            (track_id, audiobook_id)
+        )
+        row = cursor.fetchone()
+        conn.close()
+        return dict(row) if row else None
+
+    @staticmethod
+    def save_audiobook_progress(audiobook_id, user_id, current_track_id, current_time, total_pct, playback_rate, is_completed):
+        """오디오북 재생 진행률 업서트
+        - SQLite: INSERT OR REPLACE (database._convert_sql 미적용)
+        - MariaDB: _convert_sql이 INSERT OR REPLACE → REPLACE INTO, current_time → `current_time` 자동 변환
+        """
+        conn = database.get_connection('audiobook')
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                INSERT OR REPLACE INTO audiobook_progress (
+                    audiobook_id, user_id, current_track_id, current_time, total_progress_pct, playback_rate, is_completed, last_listened_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (audiobook_id, user_id, current_track_id, current_time, total_pct, playback_rate, is_completed))
+            conn.commit()
+            return True
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+
+    @staticmethod
+    def get_folder_paths(library_id=None):
+        """저장된 오디오북 폴더 경로 목록 조회"""
+        conn = database.get_connection('audiobook')
+        cursor = conn.cursor()
+        if library_id is not None:
+            cursor.execute("SELECT folder_path FROM audiobooks WHERE library_id = ?", (library_id,))
+        else:
+            cursor.execute("SELECT folder_path FROM audiobooks")
+        rows = cursor.fetchall()
+        conn.close()
+        return [r['folder_path'] for r in rows if r and r['folder_path']]
+
+    @staticmethod
+    def get_by_folder_path(folder_path):
+        """폴더 경로 기반 오디오북 상세 메타 조회"""
+        conn = database.get_connection('audiobook')
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT id, library_id, title, web_id, author, publisher, code, poster,
+                   premiered, ratings, author_intro, description,
+                   folder_name, total_duration, total_tracks, file_type
+            FROM audiobooks
+            WHERE folder_path = ?
+            """,
+            (folder_path,)
+        )
+        row = cursor.fetchone()
+        conn.close()
+        return dict(row) if row else None

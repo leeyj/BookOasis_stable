@@ -109,6 +109,35 @@ You can add custom fonts to be used in the web viewer (TXT/EPUB).
 
 * **Supported Formats**: `.ttf`, `.otf`, `.woff`, `.woff2`
 * **How to Add**:
+  1. Go to the `static/fonts/custom/` folder inside your server installation path (create it if it doesn't exist).
+  2. Copy your font files into the directory above.
+  3. Connect to BookOasis in your browser, open the reader, click font settings (A), and select your font from the dropdown list.
+
+---
+
+## 8. Database Administration & MariaDB Migration
+
+BookOasis officially supports **MariaDB / MySQL Enterprise Mode** alongside built-in SQLite.
+
+### ① SQLite vs MariaDB Selection Guide
+* **SQLite (Default)**: Embedded single-file DB. No installation required. Ideal for small-scale & single-user environments.
+* **MariaDB / MySQL (Recommended)**: Eliminates disk lock bottlenecks and corruption risks in high-concurrency / large library (tens to hundreds of thousands of books) setups.
+
+### ② MariaDB Setup (.env)
+```env
+DB_ENGINE=mariadb
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=your_mariadb_password
+```
+
+### ③ SQLite -> MariaDB One-Click Migration Tool
+Migrate all existing SQLite data (metadata, reading history, user permissions) to MariaDB with zero data loss:
+```bash
+python tools/migrator_sqlite_to_mariadb.py
+```
+* **How to Add**:
   1. Navigate to the `static/fonts/custom/` directory within your server's installation path. (Create the directory if it does not exist.)
   2. Upload (or copy) your font files into this directory.
   3. Access BookOasis in your browser, open the viewer, and check the font selection dropdown. The newly added fonts will automatically appear in the list.

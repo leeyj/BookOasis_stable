@@ -2,6 +2,7 @@
 import { state } from '../state.js';
 import * as api from '../api.js';
 import { selectCategory } from '../tab_media_library.js';
+import { updateCurrentCategoryIndicator } from '../category_indicator.js';
 import { bindSidebarContextMenu } from './context_menu.js';
 import { triggerAddLibrary } from './crud_controller.js';
 
@@ -157,6 +158,7 @@ export async function loadLibraries() {
       sidebar.innerHTML = html;
       const activeItem = document.getElementById(`category-${state.currentLibraryId}`) || sidebar.querySelector(`[data-id="${state.currentLibraryId}"]`);
       state.currentLibraryHideCovers = !!(activeItem && activeItem.dataset && activeItem.dataset.type === 'custom' && activeItem.dataset.hideCover === '1');
+      updateCurrentCategoryIndicator(state.currentLibraryId, activeItem);
       bindSidebarContextMenu();
       bindDragAndDropEvents(!isPinned);
 

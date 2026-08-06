@@ -317,8 +317,13 @@ class ReadingProgressRepository:
             FROM books b
             INNER JOIN (
                 SELECT MAX(id) as max_id
-                FROM books
-                WHERE COALESCE(is_deleted, 0) = 0
+                FROM (
+                    SELECT id, series_name
+                    FROM books
+                    WHERE COALESCE(is_deleted, 0) = 0
+                    ORDER BY id DESC
+                    LIMIT 1000
+                ) sub
                 GROUP BY CASE WHEN series_name IS NOT NULL AND series_name != '' THEN series_name ELSE CAST(id AS TEXT) END
             ) g ON b.id = g.max_id
             JOIN user_category_permissions p ON b.library_id = p.library_id
@@ -359,8 +364,13 @@ class ReadingProgressRepository:
             FROM books b
             INNER JOIN (
                 SELECT MAX(id) as max_id
-                FROM books
-                WHERE COALESCE(is_deleted, 0) = 0
+                FROM (
+                    SELECT id, series_name
+                    FROM books
+                    WHERE COALESCE(is_deleted, 0) = 0
+                    ORDER BY id DESC
+                    LIMIT 1000
+                ) sub
                 GROUP BY CASE WHEN series_name IS NOT NULL AND series_name != '' THEN series_name ELSE CAST(id AS TEXT) END
             ) g ON b.id = g.max_id
             LEFT JOIN user_favorites uf ON uf.book_id = b.id AND uf.user_id = ?
@@ -385,6 +395,138 @@ class ReadingProgressRepository:
                 cursor.execute("DELETE FROM user_reading_log WHERE book_id = ? AND user_id = ?", (book_id, user_id))
             conn.commit()
             return True
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    @staticmethod
+    def get_distinct_read_dates(db_type, user_id):
+        """특정 사용자가 책을 읽은 고유 날짜 목록 조회"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT DISTINCT DATE(p.last_read_at) as read_date
+            FROM user_progress p
+            JOIN books b ON p.book_id = b.id
+            JOIN user_category_permissions ucp ON b.library_id = ucp.library_id AND ucp.user_id = p.user_id AND ucp.has_access = 1
+            WHERE p.user_id = ? AND p.last_read_at IS NOT NULL AND COALESCE(b.is_deleted, 0) = 0
+            ORDER BY read_date DESC
+        """, (user_id,))
+        rows = cursor.fetchall()
+        conn.close()
+        return [r[0] for r in rows if r[0]]
+
+    @staticmethod
+    def get_completed_count_by_year(db_type, user_id, year_str):
+        """연간 완독 도서 수 조회"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM user_progress p
+            JOIN books b ON p.book_id = b.id
+            JOIN user_category_permissions ucp ON b.library_id = ucp.library_id AND ucp.user_id = p.user_id AND ucp.has_access = 1
+            WHERE p.user_id = ? AND (p.is_completed = 1 OR p.last_epub_percent >= 99) 
+              AND strftime('%Y', p.last_read_at) = ? AND COALESCE(b.is_deleted, 0) = 0
+        """, (user_id, str(year_str)))
+        row = cursor.fetchone()
+        conn.close()
+        return row[0] if row else 0
+
+    @staticmethod
+    def get_completed_count_by_month(db_type, user_id, year_month_str):
+        """월간 완독 도서 수 조회"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM user_progress p
+            JOIN books b ON p.book_id = b.id
+            JOIN user_category_permissions ucp ON b.library_id = ucp.library_id AND ucp.user_id = p.user_id AND ucp.has_access = 1
+            WHERE p.user_id = ? AND (p.is_completed = 1 OR p.last_epub_percent >= 99) 
+              AND strftime('%Y-%m', p.last_read_at) = ? AND COALESCE(b.is_deleted, 0) = 0
+        """, (user_id, year_month_str))
+        row = cursor.fetchone()
+        conn.close()
+        return row[0] if row else 0
+
+    @staticmethod
+    def batch_flush_progress_items(db_type, items):
+        """인메모리 버퍼 배치 항목을 DB에 일괄 반영"""
+        from datetime import datetime
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        synced_count = 0
+        try:
+            today_str = datetime.now().strftime('%Y-%m-%d')
+            for data in items:
+                book_id = data.get('book_id')
+                user_id = data.get('user_id')
+                pages_read = data.get('pages_read')
+                is_completed = data.get('is_completed')
+                last_read_at = data.get('last_read_at')
+                last_epub_cfi = data.get('last_epub_cfi')
+                last_epub_href = data.get('last_epub_href')
+                last_epub_spine_index = data.get('last_epub_spine_index')
+                last_epub_percent = data.get('last_epub_percent')
+                last_epub_fingerprint = data.get('last_epub_fingerprint')
+                last_epub_updated_at = data.get('last_epub_updated_at')
+                delta = data.get('delta', 0)
+
+                cursor.execute(
+                    "SELECT pages_read, is_completed FROM user_progress WHERE book_id = ? AND user_id = ?",
+                    (book_id, user_id),
+                )
+                row = cursor.fetchone()
+                if not row:
+                    cursor.execute(
+                        """
+                        INSERT OR IGNORE INTO user_progress (
+                            book_id, user_id, pages_read, is_completed, last_read_at,
+                            last_epub_cfi, last_epub_href, last_epub_spine_index,
+                            last_epub_percent, last_epub_fingerprint, last_epub_updated_at
+                        ) VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                        """,
+                        (book_id, user_id, 0, 0, last_read_at, None, None, None, 0, None, None),
+                    )
+
+                cursor.execute(
+                    """
+                    UPDATE user_progress
+                    SET pages_read=?, is_completed=?, last_read_at=?,
+                        last_epub_cfi=?, last_epub_href=?, last_epub_spine_index=?,
+                        last_epub_percent=?, last_epub_fingerprint=?, last_epub_updated_at=?
+                    WHERE book_id=? AND user_id=?
+                    """,
+                    (
+                        pages_read, is_completed, last_read_at,
+                        last_epub_cfi, last_epub_href, last_epub_spine_index,
+                        last_epub_percent, last_epub_fingerprint, last_epub_updated_at,
+                        book_id, user_id,
+                    ),
+                )
+
+                if delta > 0:
+                    cursor.execute(
+                        "SELECT id FROM user_reading_log WHERE book_id=? AND user_id=? AND read_date=?",
+                        (book_id, user_id, today_str),
+                    )
+                    log_row = cursor.fetchone()
+                    if log_row:
+                        cursor.execute(
+                            "UPDATE user_reading_log SET pages_read_delta=pages_read_delta+? WHERE id=?",
+                            (delta, log_row['id']),
+                        )
+                    else:
+                        cursor.execute(
+                            "INSERT INTO user_reading_log (book_id, user_id, pages_read_delta, duration_seconds, read_date) VALUES (?,?,?,60,?)",
+                            (book_id, user_id, delta, today_str),
+                        )
+                synced_count += 1
+            conn.commit()
+            return synced_count
         except Exception as e:
             conn.rollback()
             raise e

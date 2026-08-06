@@ -1022,6 +1022,20 @@
     height: 100%;
 }
 
+/* EPUB 본문 이미지 텍스트 밀림(CLS) 방지 및 사전 공간 예약 */
+#txt-scroll-wrapper img,
+#txt-render-area img,
+.txt-scroll-chunk img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 1.2rem auto;
+    border-radius: 6px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+    background: rgba(255, 255, 255, 0.03);
+    content-visibility: auto;
+}
+
 /* TXT 페이지 넘김 모드 */
 #media-viewer-modal #txt-scroll-wrapper.scroll-mode-page {
     display: block;

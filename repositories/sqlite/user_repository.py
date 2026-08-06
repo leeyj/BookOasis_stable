@@ -132,3 +132,47 @@ class UserRepository:
             raise e
         finally:
             conn.close()
+
+    @staticmethod
+    def get_all_category_permissions(db_type):
+        """전체 카테고리 사용자 접근 권한 조회"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id, library_id, has_access FROM user_category_permissions")
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+
+    @staticmethod
+    def update_category_permission(db_type, user_id, library_id, has_access):
+        """특정 사용자의 카테고리 접근 권한 업데이트 (UPSERT)"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                INSERT INTO user_category_permissions (user_id, library_id, has_access)
+                VALUES (?, ?, ?)
+                ON CONFLICT(user_id, library_id) DO UPDATE SET has_access = excluded.has_access
+            """, (user_id, library_id, has_access))
+            conn.commit()
+            return True
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    @staticmethod
+    def update_adult_access(db_type, user_id, has_adult_access):
+        """사용자별 성인도서 접근 권한 갱신"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("UPDATE users SET has_adult_access = ? WHERE id = ?", (has_adult_access, user_id))
+            conn.commit()
+            return True
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()

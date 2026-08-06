@@ -403,3 +403,43 @@ class BookRepository:
         conn.close()
         return [dict(row) for row in rows]
 
+    @staticmethod
+    def update_series_alias(db_type, series_name, series_alias):
+        """시리즈 표시 별칭 업데이트"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                UPDATE books
+                SET series_alias = ?,
+                    metadata_locked = 1
+                WHERE series_name = ?
+            """, (series_alias if series_alias else None, series_name))
+            conn.commit()
+            return True
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    @staticmethod
+    def update_book_alias(db_type, book_id, title_alias):
+        """단일 도서 표시 별칭 업데이트"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                UPDATE books
+                SET title_alias = ?,
+                    metadata_locked = 1
+                WHERE id = ?
+            """, (title_alias if title_alias else None, book_id))
+            conn.commit()
+            return True
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+

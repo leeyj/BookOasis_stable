@@ -530,8 +530,8 @@ def scan_and_save_audiobook_folder(folder_path, library_id=None):
 
         # library_id 유효성 확인 (libraries 테이블에 존재하는지 체크, 없으면 None)
         if library_id is not None:
-            cursor.execute("SELECT id FROM libraries WHERE id = ?", (library_id,))
-            if not cursor.fetchone():
+            from repositories.category_repository import CategoryRepository
+            if not CategoryRepository.get_library_by_id('audiobook', library_id):
                 library_id = None
 
         # 기존 오디오북 확인
@@ -819,16 +819,9 @@ def scan_audiobook_library(library_path, library_id=None, force=False):
     skip_existing = not force
     library_started_at = time.perf_counter()
 
-    conn = get_connection('audiobook')
-    cursor = conn.cursor()
-    try:
-        if library_id is not None:
-            cursor.execute("SELECT folder_path FROM audiobooks WHERE library_id = ?", (library_id,))
-        else:
-            cursor.execute("SELECT folder_path FROM audiobooks")
-        existing_folder_paths = {os.path.normpath(str(r['folder_path'])) for r in cursor.fetchall() if r and r['folder_path']}
-    finally:
-        conn.close()
+    from repositories.audiobook_repository import AudiobookRepository
+    raw_paths = AudiobookRepository.get_folder_paths(library_id)
+    existing_folder_paths = {os.path.normpath(str(p)) for p in raw_paths if p}
 
     print(
         "[AudiobookScanner][LIBRARY_SCAN_START] "

@@ -2,8 +2,9 @@
 from flask import Blueprint, jsonify, request, session
 import datetime
 from collections import Counter
-from database import get_connection
 from services.reading_history_service import ReadingHistoryService
+from repositories.settings_repository import SettingsRepository
+from repositories.reading_progress_repository import ReadingProgressRepository
 
 dashboard_insights_bp = Blueprint('dashboard_insights_api', __name__)
 
@@ -43,16 +44,12 @@ def get_dashboard_insights():
         except Exception as e:
             print(f"[Insights] Reading history error: {e}")
 
-        conn = get_connection(db_type)
-        cursor = conn.cursor()
-
         # DB settings 테이블에서 저장된 연간 목표 권수 읽기
         target_annual_books = 30
         try:
-            cursor.execute("SELECT value FROM settings WHERE key = 'ANNUAL_READING_GOAL'")
-            row = cursor.fetchone()
-            if row and str(row[0]).isdigit():
-                target_annual_books = max(1, int(row[0]))
+            val = SettingsRepository.get_value(db_type, 'ANNUAL_READING_GOAL')
+            if val and str(val).isdigit():
+                target_annual_books = max(1, int(val))
         except Exception as e:
             print(f"[Insights] Read ANNUAL_READING_GOAL error: {e}")
 
@@ -62,15 +59,7 @@ def get_dashboard_insights():
         today = datetime.date.today()
         
         try:
-            cursor.execute("""
-                SELECT DISTINCT DATE(p.last_read_at) as read_date
-                FROM user_progress p
-                JOIN books b ON p.book_id = b.id
-                JOIN user_category_permissions ucp ON b.library_id = ucp.library_id AND ucp.user_id = p.user_id AND ucp.has_access = 1
-                WHERE p.user_id = ? AND p.last_read_at IS NOT NULL AND COALESCE(b.is_deleted, 0) = 0
-                ORDER BY read_date DESC
-            """, (user_id,))
-            read_dates_set = set(row[0] for row in cursor.fetchall() if row[0])
+            read_dates_set = set(ReadingProgressRepository.get_distinct_read_dates(db_type, user_id))
 
             for i in range(7):
                 day_target = today - datetime.timedelta(days=(6 - i))
@@ -95,17 +84,7 @@ def get_dashboard_insights():
         completed_this_year = 0
         current_year = today.year
         try:
-            cursor.execute("""
-                SELECT COUNT(*)
-                FROM user_progress p
-                JOIN books b ON p.book_id = b.id
-                JOIN user_category_permissions ucp ON b.library_id = ucp.library_id AND ucp.user_id = p.user_id AND ucp.has_access = 1
-                WHERE p.user_id = ? AND (p.is_completed = 1 OR p.last_epub_percent >= 99) 
-                  AND strftime('%Y', p.last_read_at) = ? AND COALESCE(b.is_deleted, 0) = 0
-            """, (user_id, str(current_year)))
-            row = cursor.fetchone()
-            if row:
-                completed_this_year = row[0]
+            completed_this_year = ReadingProgressRepository.get_completed_count_by_year(db_type, user_id, str(current_year))
         except Exception as e:
             print(f"[Insights] Annual goal error: {e}")
 
@@ -115,17 +94,7 @@ def get_dashboard_insights():
         completed_this_month = 0
         current_month_str = today.strftime('%Y-%m')
         try:
-            cursor.execute("""
-                SELECT COUNT(*)
-                FROM user_progress p
-                JOIN books b ON p.book_id = b.id
-                JOIN user_category_permissions ucp ON b.library_id = ucp.library_id AND ucp.user_id = p.user_id AND ucp.has_access = 1
-                WHERE p.user_id = ? AND (p.is_completed = 1 OR p.last_epub_percent >= 99) 
-                  AND strftime('%Y-%m', p.last_read_at) = ? AND COALESCE(b.is_deleted, 0) = 0
-            """, (user_id, current_month_str))
-            row = cursor.fetchone()
-            if row:
-                completed_this_month = row[0]
+            completed_this_month = ReadingProgressRepository.get_completed_count_by_month(db_type, user_id, current_month_str)
         except Exception as e:
             print(f"[Insights] Monthly challenge error: {e}")
 
@@ -175,8 +144,6 @@ def get_dashboard_insights():
         except Exception as e:
             print(f"[Insights] Genre breakdown error: {e}")
 
-        conn.close()
-
         return jsonify({
             'success': True,
             'streak': {
@@ -219,14 +186,7 @@ def save_reading_goal():
 
         for dt in ('general', db_type):
             try:
-                conn = get_connection(dt)
-                cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT OR REPLACE INTO settings (key, value)
-                    VALUES ('ANNUAL_READING_GOAL', ?)
-                """, (str(target_val),))
-                conn.commit()
-                conn.close()
+                SettingsRepository.set_value(dt, 'ANNUAL_READING_GOAL', str(target_val))
             except Exception as e:
                 print(f"[Goal API Save Error] db: {dt}, err: {e}")
 

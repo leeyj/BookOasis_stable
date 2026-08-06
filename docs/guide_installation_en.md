@@ -16,7 +16,9 @@ This document is a comprehensive guide to installing the BookOasis media server 
 
 * **Operating System**: Windows 10/11, Linux (Ubuntu 20.04+ recommended), macOS
 * **Python**: 3.9 or higher recommended
-* **Database**: SQLite (Built-in Python library, no separate installation required)
+* **Database**: 
+  - **SQLite (Default)**: Built-in Python library, no separate DB server installation required.
+  - **MariaDB / MySQL (Enterprise Recommended)**: Eliminates disk lock bottlenecks and corruption risks in high-concurrency / large library environments.
 * **Cache Database (Optional)**: Redis (Strongly recommended to mitigate SQLite disk write bottlenecks and prevent database corruption during concurrent scan jobs)
 * **Network**: External communication support (for metadata plugins) and reverse proxy support
 
@@ -159,17 +161,22 @@ BOOKOASIS_ENABLE_EMBEDDED_WORKER=true gunicorn --workers 1 --bind 0.0.0.0:5930 -
 ```
 * In `manage.sh` mode, the web process embedded worker is disabled and the scanner worker is managed as a separate process.
 
-### 3) Easy Run via Docker
-If Docker is installed, you can quickly boot up the environment containerized without building from source.
+### 3) Docker Installation Guide (Docker Compose)
 
-**① Copy configuration template**
-Copy the provided override template file for your local environment configuration.
+Docker users can freely choose between **[SQLite Standalone Mode]** and **[MariaDB + Redis Combo Mode]** depending on your needs.
+
+---
+
+#### 🅰️ Option A: SQLite Standalone Mode (Single Container)
+Lightweight setup running a single container without a separate database server.
+
+**① Copy Configuration Template**
 ```bash
 cp docker-compose.override.example.yml docker-compose.override.yml
 ```
 
-**② Modify volume binding path**
-Open the generated `docker-compose.override.yml` and modify the host path to point to your actual book/comic library directory.
+**② Modify Volume Binding Path (`docker-compose.override.yml`)**
+Modify the host path to point to your actual book/comic library directory.
 ```yaml
 services:
   bookoasis:
@@ -177,16 +184,44 @@ services:
       - /path/to/your/comics:/data/comics:ro
 ```
 
-**③ Run Service (GHCR image-based)**
+**③ Run Service (GHCR Official Image Based)**
 ```bash
-# First run (use GHCR image, no local build)
+# Run container (uses GHCR image, no local build required)
 docker compose -f docker-compose.ghcr.yml -f docker-compose.override.yml up -d
 
 # For updates
 docker compose -f docker-compose.ghcr.yml -f docker-compose.override.yml pull
 docker compose -f docker-compose.ghcr.yml -f docker-compose.override.yml up -d
 ```
-* The default path uses GHCR images, so end users do not need to build Docker images locally.
+
+---
+
+#### 🅱️ Option B: MariaDB + Redis Combo Mode (Enterprise Recommended)
+Recommended mode running MariaDB and Redis containers together to eliminate database locks and disk bottlenecks in large-scale libraries.
+
+**① Run MariaDB Combo Compose**
+```bash
+docker compose -f docker-compose.mariadb.yml up -d
+```
+* Spawns `mariadb:10.11` and `redis:7-alpine` alongside `bookoasis`.
+* Data is stored persistently in `./mariadb_data`.
+
+---
+
+#### 💡 Docker Users with Existing External MariaDB / Redis
+If you already run a separate MariaDB server (e.g. Synology MariaDB package), you don't need to run `docker-compose.mariadb.yml`. Simply add database credentials under `environment:` in your **`docker-compose.override.yml`**:
+
+```yaml
+services:
+  bookoasis:
+    environment:
+      - DB_ENGINE=mariadb
+      - DB_HOST=192.168.0.100  # External MariaDB Server IP
+      - DB_PORT=3306
+      - DB_USER=bookoasis
+      - DB_PASSWORD=your_password
+```
+* 💡 Specifying credentials in `docker-compose.override.yml` ensures your personal DB settings are preserved across `git pull` updates without conflicts.
 * The container's internal port `5930` is bound to the host's `5930` port. If you wish to change the host port, modify the left-side port number in `docker-compose.ghcr.yml` like `ports: - "8080:5930"`.
 * The database (`db/`), cover cache (`covers/`), and cache folder (`cache/`) are mapped as persistent volumes in the project root directory.
 * In Docker mode, the entrypoint starts both the web service and scanner worker together.

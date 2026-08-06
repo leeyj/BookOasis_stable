@@ -59,21 +59,8 @@ def trigger_vfs_refresh(db_path, library_id, physical_path):
     print(f"[Scanner-VFS] Remote mount path detected: {remote_paths} - Checking cache status...")
     
     try:
-        conn = None
-        try:
-            conn = database.get_connection(db_type)
-            cursor = conn.cursor()
-            cursor.execute("SELECT is_remote, vfs_refresh_before_scan, rclone_rc_url FROM libraries WHERE id = ?", (library_id,))
-            row = cursor.fetchone()
-        except Exception as e:
-            print(f"[Scanner-VFS Warning] Failed to fetch library info: {e}")
-            return
-        finally:
-            if conn:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
+        from repositories.category_repository import CategoryRepository
+        row = CategoryRepository.get_library_by_id(db_type, library_id)
 
         if not row or row['is_remote'] != 1:
             print(f"[Scanner-VFS] VFS refresh skipped: remote drive flag is disabled for library {library_id}.")
@@ -86,22 +73,13 @@ def trigger_vfs_refresh(db_path, library_id, physical_path):
         if row['rclone_rc_url'] and row['rclone_rc_url'].strip():
             rc_urls = [u.strip().rstrip('/') for u in str(row['rclone_rc_url']).split(',') if u.strip()]
         else:
-            conn_s = None
             try:
-                conn_s = database.get_connection(db_type)
-                cursor_s = conn_s.cursor()
-                cursor_s.execute("SELECT value FROM settings WHERE key = 'RCLONE_RC_URL'")
-                row_s = cursor_s.fetchone()
-                if row_s and row_s['value']:
-                    rc_urls = [u.strip().rstrip('/') for u in str(row_s['value']).split(',') if u.strip()]
+                from repositories.settings_repository import SettingsRepository
+                val = SettingsRepository.get_value(db_type, 'RCLONE_RC_URL')
+                if val:
+                    rc_urls = [u.strip().rstrip('/') for u in str(val).split(',') if u.strip()]
             except Exception:
                 pass
-            finally:
-                if conn_s:
-                    try:
-                        conn_s.close()
-                    except Exception:
-                        pass
 
         # Deduplicate RC URLs while preserving order
         rc_urls = list(dict.fromkeys(rc_urls))

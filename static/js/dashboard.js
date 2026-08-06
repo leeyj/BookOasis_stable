@@ -5,29 +5,44 @@ import { renderDashboardHistory, renderDashboardRecentlyAdded } from './ui.js';
 
 let dashboardLoadToken = 0;
 let pluginsLoadToken = 0;
+let dashboardRowLastType = null;
 
 export async function loadDashboardData() {
   const requestToken = ++dashboardLoadToken;
+  const targetType = state.currentLibraryType || 'general';
   state.isLoading = true;
+
   const historyRow = document.getElementById('dashboard-history-row');
   const newRow = document.getElementById('dashboard-new-row');
-  // Keep existing cards visible on refresh to avoid noticeable image re-mount flicker.
-  if (historyRow && !historyRow.children.length) {
-    historyRow.innerHTML = '<div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> 최근 읽은 도서를 불러오는 중...</div>';
+
+  const isTypeSwitched = dashboardRowLastType !== targetType;
+  dashboardRowLastType = targetType;
+
+  // 탭 타입 전환 시 이전 탭의 카드를 즉시 지우고 로딩 스피너로 초기화 (1~2초 잔상 현상 방지)
+  if (isTypeSwitched || (historyRow && !historyRow.children.length)) {
+    if (historyRow) historyRow.innerHTML = '<div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> 최근 항목을 불러오는 중...</div>';
   }
-  if (newRow && !newRow.children.length) {
-    newRow.innerHTML = '<div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> 신규 도서를 불러오는 중...</div>';
+  if (isTypeSwitched || (newRow && !newRow.children.length)) {
+    if (newRow) newRow.innerHTML = '<div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> 신규 항목을 불러오는 중...</div>';
   }
   
   try {
     // 0. 독서 동기부여 위젯 로드
     if (typeof window.loadDashboardInsights === 'function') {
-      window.loadDashboardInsights(state.currentLibraryType);
+      window.loadDashboardInsights(targetType);
     }
 
-    // 1. 최근 읽은 도서 조회
-    const historyData = await api.fetchReadingHistory(state.currentLibraryType);
-    if (historyData.success) {
+    // 1. 최근 읽은 도서 & 신규 추가 도서 동시 병렬 요청 (Promise.all)
+    const historyPromise = api.fetchReadingHistory(targetType);
+    const recentlyAddedPromise = fetch(`/api/media/recently-added?type=${targetType}&_=${Date.now()}`, {cache: 'no-store'})
+      .then(res => res.json())
+      .catch(err => ({ success: false, error: String(err) }));
+
+    const [historyData, newData] = await Promise.all([historyPromise, recentlyAddedPromise]);
+    if (requestToken !== dashboardLoadToken) return;
+
+    // 최근 읽은 도서 렌더링
+    if (historyData && historyData.success) {
       let books = historyData.books || [];
       if (state.hideCompletedInHistory) {
         books = books.filter(b => {
@@ -39,26 +54,26 @@ export async function loadDashboardData() {
         });
       }
       renderDashboardHistory(books);
-
     } else {
-      if (historyRow) historyRow.innerHTML = `<div class="loading-spinner">히스토리 로드 실패: ${historyData.error || '오류'}</div>`;
+      if (historyRow) historyRow.innerHTML = `<div class="loading-spinner">히스토리 로드 실패: ${(historyData && historyData.error) || '오류'}</div>`;
     }
 
-    // 2. 신규 추가 도서 조회
-    const newRes = await fetch(`/api/media/recently-added?type=${state.currentLibraryType}&_=${Date.now()}`, {cache: 'no-store'});
-    const newData = await newRes.json();
-    if (newData.success) {
+    // 신규 추가 도서 렌더링
+    if (newData && newData.success) {
       renderDashboardRecentlyAdded(newData.books);
     } else {
-      if (newRow) newRow.innerHTML = `<div class="loading-spinner">신규 도서 로드 실패: ${newData.error || '오류'}</div>`;
+      if (newRow) newRow.innerHTML = `<div class="loading-spinner">신규 도서 로드 실패: ${(newData && newData.error) || '오류'}</div>`;
     }
     
   } catch (e) {
+    if (requestToken !== dashboardLoadToken) return;
     console.error('대시보드 데이터 로드 오류:', e);
     if (historyRow) historyRow.innerHTML = '<div class="loading-spinner">서버 연결 오류</div>';
     if (newRow) newRow.innerHTML = '<div class="loading-spinner">서버 연결 오류</div>';
   } finally {
-    state.isLoading = false;
+    if (requestToken === dashboardLoadToken) {
+      state.isLoading = false;
+    }
   }
 }
 

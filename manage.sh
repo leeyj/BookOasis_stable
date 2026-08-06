@@ -47,6 +47,12 @@ find_pids_by_pattern() {
 
 cd "$APP_DIR" || exit 1
 
+if [ -f "$APP_DIR/.env" ]; then
+    set -a
+    . "$APP_DIR/.env" 2>/dev/null || true
+    set +a
+fi
+
 wait_for_app_ready() {
     local health_url="http://127.0.0.1:5930/health"
     local attempt=0
@@ -90,32 +96,39 @@ start() {
     fi
 
     # ── [기동 전 DB 무결성 및 스키마 검사 가드] ──
-    echo "[*] 기동 전 데이터베이스 무결성(PRAGMA integrity_check) 검사 중..."
-    local db_ok=true
-    for db_name in "media_general.db" "media_adult.db"; do
-        local db_file="$APP_DIR/db/$db_name"
-        if [ -f "$db_file" ]; then
-            if command -v sqlite3 >/dev/null 2>&1; then
-                local res
-                res=$(sqlite3 "$db_file" "PRAGMA integrity_check;" 2>&1)
-                if [ "$res" != "ok" ]; then
-                    echo "[!] 경고: 데이터베이스 파일이 손상되었습니다: $db_name (오류: $res)"
-                    db_ok=false
+    local db_engine="${DB_ENGINE:-sqlite}"
+    db_engine=$(echo "$db_engine" | tr '[:upper:]' '[:lower:]')
+
+    if [ "$db_engine" = "mariadb" ] || [ "$db_engine" = "mysql" ]; then
+        echo "[+] MariaDB 엔터프라이즈 데이터베이스 엔진 모드로 가동합니다."
+    else
+        echo "[*] 기동 전 SQLite 데이터베이스 무결성(PRAGMA integrity_check) 검사 중..."
+        local db_ok=true
+        for db_name in "media_general.db" "media_adult.db"; do
+            local db_file="$APP_DIR/db/$db_name"
+            if [ -f "$db_file" ]; then
+                if command -v sqlite3 >/dev/null 2>&1; then
+                    local res
+                    res=$(sqlite3 "$db_file" "PRAGMA integrity_check;" 2>&1)
+                    if [ "$res" != "ok" ]; then
+                        echo "[!] 경고: 데이터베이스 파일이 손상되었습니다: $db_name (오류: $res)"
+                        db_ok=false
+                    fi
                 fi
             fi
-        fi
-    done
+        done
 
-    if [ "$db_ok" = false ]; then
-        echo "[!] 손상된 DB가 발견되어 자동 복구(db_recovery.py)를 가동합니다..."
-        if python3 tools/db_recovery.py --yes; then
-            echo "[+] 데이터베이스 자동 복구가 성공적으로 완료되었습니다."
+        if [ "$db_ok" = false ]; then
+            echo "[!] 손상된 DB가 발견되어 자동 복구(db_recovery.py)를 가동합니다..."
+            if python3 tools/db_recovery.py --yes; then
+                echo "[+] 데이터베이스 자동 복구가 성공적으로 완료되었습니다."
+            else
+                echo "[❌ 치명적 오류] 데이터베이스 자동 복구에 실패했습니다. 안전을 위해 서비스를 구동하지 않습니다."
+                return 1
+            fi
         else
-            echo "[❌ 치명적 오류] 데이터베이스 자동 복구에 실패했습니다. 안전을 위해 서비스를 구동하지 않습니다."
-            return 1
+            echo "[+] 데이터베이스 무결성 정상 확인."
         fi
-    else
-        echo "[+] 데이터베이스 무결성 정상 확인."
     fi
 
     # ── [최신 스키마 강제 동기화 의무화] ──

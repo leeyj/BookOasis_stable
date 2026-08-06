@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
 from flask import Blueprint, request, jsonify, session
-import database
 from api.auth import admin_required
+from repositories.category_repository import CategoryRepository
+from repositories.user_repository import UserRepository
+from repositories.settings_repository import SettingsRepository
 
 permission_bp = Blueprint('permission', __name__)
 
 
 def _fetch_library_permissions(db_type, include_plugins=False):
     categories = []
-    conn = database.get_connection(db_type)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, name FROM libraries ORDER BY name ASC")
-    for row in cursor.fetchall():
-        categories.append({'id': row['id'], 'name': row['name'], 'db_type': db_type})
+    raw_libs = CategoryRepository.get_all_libraries(db_type)
+    for lib in raw_libs:
+        categories.append({'id': lib['id'], 'name': lib['name'], 'db_type': db_type})
 
     if include_plugins and db_type == 'general':
         try:
@@ -31,8 +31,8 @@ def _fetch_library_permissions(db_type, include_plugins=False):
             print(f"[PermissionRoutes] Failed to fetch plugin categories: {p_err}")
 
     permissions = {}
-    cursor.execute("SELECT user_id, library_id, has_access FROM user_category_permissions")
-    for row in cursor.fetchall():
+    raw_perms = UserRepository.get_all_category_permissions(db_type)
+    for row in raw_perms:
         uid = str(row['user_id'])
         lid = str(row['library_id'])
         if uid not in permissions:
@@ -40,11 +40,8 @@ def _fetch_library_permissions(db_type, include_plugins=False):
         permissions[uid][f"{db_type}_{lid}"] = bool(row['has_access'])
 
     if include_plugins and db_type == 'general':
-        cursor.execute("SELECT key, value FROM settings WHERE key LIKE 'PERM_CATEGORY_%'")
-        perm_rows = cursor.fetchall()
-        perm_map = {r['key']: r['value'] for r in perm_rows}
-        cursor.execute("SELECT id FROM users ORDER BY id ASC")
-        user_rows = [r['id'] for r in cursor.fetchall()]
+        perm_map = SettingsRepository.get_settings_by_prefix(db_type, 'PERM_CATEGORY_')
+        user_rows = [u['id'] for u in UserRepository.get_all_users(db_type)]
         for uid in user_rows:
             uid_str = str(uid)
             if uid_str not in permissions:
@@ -55,7 +52,6 @@ def _fetch_library_permissions(db_type, include_plugins=False):
                     val = perm_map.get(key_perm, '1')
                     permissions[uid_str][f"{db_type}_{cat['id']}"] = (val == '1')
 
-    conn.close()
     return categories, permissions
 
 @permission_bp.route('/api/admin/permissions', methods=['GET'])
@@ -64,11 +60,7 @@ def get_permissions():
     """사용자 목록, 세션별 카테고리/접근 권한 현황 조회"""
     try:
         # 1. 사용자 목록 조회 (general DB 기준)
-        conn_g = database.get_connection('general')
-        cursor_g = conn_g.cursor()
-        cursor_g.execute("SELECT id, username, role, has_adult_access, has_audiobook_access FROM users ORDER BY id ASC")
-        users = [dict(row) for row in cursor_g.fetchall()]
-        conn_g.close()
+        users = UserRepository.get_all_users('general')
 
         general_categories, general_permissions = _fetch_library_permissions('general', include_plugins=True)
         audiobook_categories, audiobook_permissions = _fetch_library_permissions('audiobook', include_plugins=False)
@@ -127,26 +119,10 @@ def update_permission():
     try:
         if target_db == 'plugin' or str(library_id).startswith('plugin_'):
             safe_library_id = str(library_id).strip()
-            conn = database.get_connection('general')
-            cursor = conn.cursor()
             key_perm = f"PERM_CATEGORY_{user_id}_{safe_library_id}"
-            cursor.execute("""
-                INSERT INTO settings (key, value)
-                VALUES (?, ?)
-                ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
-            """, (key_perm, str(has_access)))
-            conn.commit()
-            conn.close()
+            SettingsRepository.set_value('general', key_perm, str(has_access))
         else:
-            conn = database.get_connection(target_db)
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO user_category_permissions (user_id, library_id, has_access)
-                VALUES (?, ?, ?)
-                ON CONFLICT(user_id, library_id) DO UPDATE SET has_access = excluded.has_access
-            """, (user_id, library_id, has_access))
-            conn.commit()
-            conn.close()
+            UserRepository.update_category_permission(target_db, user_id, library_id, has_access)
         return jsonify({'success': True, 'message': '권한 정보가 업데이트되었습니다.'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -165,11 +141,7 @@ def update_adult_permission():
     try:
         # 양쪽 DB 모두 사용자 권한 동기화 업데이트
         for db_type in ['general', 'adult']:
-            conn = database.get_connection(db_type)
-            cursor = conn.cursor()
-            cursor.execute("UPDATE users SET has_adult_access = ? WHERE id = ?", (has_adult_access, user_id))
-            conn.commit()
-            conn.close()
+            UserRepository.update_adult_access(db_type, user_id, has_adult_access)
         return jsonify({'success': True, 'message': '성인 도서 접근 권한이 변경되었습니다.'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

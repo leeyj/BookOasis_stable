@@ -406,100 +406,20 @@ class ReadingProgressService:
                         logger_db.info(f"[Progress Batch Flush] DB write gate busy for db_type={db_type}; deferred {len(db_items)} items")
                         continue
 
-                conn = database.get_connection(db_type)
-                cursor = conn.cursor()
                 try:
+                    raw_items = []
                     for item_key, data in db_items:
                         parts = item_key.split(':')
-                        user_id, book_id = parts[1], parts[2]
-                        try:
-                            pages_read = data.get('pages_read')
-                            is_completed = data.get('is_completed')
-                            last_read_at = data.get('last_read_at')
-                            last_epub_cfi = data.get('last_epub_cfi')
-                            last_epub_href = data.get('last_epub_href')
-                            last_epub_spine_index = data.get('last_epub_spine_index')
-                            last_epub_percent = data.get('last_epub_percent')
-                            last_epub_fingerprint = data.get('last_epub_fingerprint')
-                            last_epub_updated_at = data.get('last_epub_updated_at')
-                            delta = data.get('delta', 0)
+                        item_copy = dict(data)
+                        item_copy['user_id'] = parts[1]
+                        item_copy['book_id'] = parts[2]
+                        raw_items.append(item_copy)
 
-                            # 1. user_progress 테이블 반영
-                            cursor.execute(
-                                "SELECT pages_read, is_completed FROM user_progress WHERE book_id = ? AND user_id = ?",
-                                (book_id, user_id),
-                            )
-                            row = cursor.fetchone()
-                            if not row:
-                                cursor.execute(
-                                    """
-                                    INSERT OR IGNORE INTO user_progress (
-                                        book_id, user_id, pages_read, is_completed, last_read_at,
-                                        last_epub_cfi, last_epub_href, last_epub_spine_index,
-                                        last_epub_percent, last_epub_fingerprint, last_epub_updated_at
-                                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?)
-                                    """,
-                                    (book_id, user_id, 0, 0, last_read_at, None, None, None, 0, None, None),
-                                )
-
-                            cursor.execute(
-                                """
-                                UPDATE user_progress
-                                SET pages_read=?, is_completed=?, last_read_at=?,
-                                    last_epub_cfi=?, last_epub_href=?, last_epub_spine_index=?,
-                                    last_epub_percent=?, last_epub_fingerprint=?, last_epub_updated_at=?
-                                WHERE book_id=? AND user_id=?
-                                """,
-                                (
-                                    pages_read,
-                                    is_completed,
-                                    last_read_at,
-                                    last_epub_cfi,
-                                    last_epub_href,
-                                    last_epub_spine_index,
-                                    last_epub_percent,
-                                    last_epub_fingerprint,
-                                    last_epub_updated_at,
-                                    book_id,
-                                    user_id,
-                                ),
-                            )
-
-                            # 2. 일일 활동 로그 반영
-                            if delta > 0:
-                                today_str = datetime.now().strftime('%Y-%m-%d')
-                                cursor.execute(
-                                    "SELECT id FROM user_reading_log WHERE book_id=? AND user_id=? AND read_date=?",
-                                    (book_id, user_id, today_str),
-                                )
-                                log_row = cursor.fetchone()
-                                if log_row:
-                                    cursor.execute(
-                                        "UPDATE user_reading_log SET pages_read_delta=pages_read_delta+? WHERE id=?",
-                                        (delta, log_row['id']),
-                                    )
-                                else:
-                                    cursor.execute(
-                                        "INSERT INTO user_reading_log (book_id, user_id, pages_read_delta, duration_seconds, read_date) VALUES (?,?,?,60,?)",
-                                        (book_id, user_id, delta, today_str),
-                                    )
-
-                            synced_count += 1
-                        except Exception as e:
-                            logger_db.error(f"[Progress Batch Flush ERROR] Failed to sync progress for item {item_key}: {e}")
-
-                    conn.commit()
+                    from repositories.reading_progress_repository import ReadingProgressRepository
+                    synced = ReadingProgressRepository.batch_flush_progress_items(db_type, raw_items)
+                    synced_count += synced
                 except Exception as db_err:
-                    try:
-                        conn.rollback()
-                    except Exception:
-                        pass
                     logger_db.error(f"[Progress Batch Flush ERROR] Database transaction failed for db_type={db_type}: {db_err}")
-                finally:
-                    try:
-                        conn.close()
-                    except Exception:
-                        pass
             finally:
                 if lock_token and redis_client:
                     redis_release_lock(f"lock:db_write:{db_type}", lock_token)

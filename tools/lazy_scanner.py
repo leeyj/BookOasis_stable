@@ -33,18 +33,10 @@ def _collect_zip_offsets_safe(file_path):
 def setup_lazy_scanner_logging():
     write_log = True
     try:
-        db_path = os.path.join(MEDIA_SERVER_DIR, 'db', 'media_general.db')
-        if os.path.exists(db_path):
-            conn = sqlite3.connect(db_path, timeout=30.0)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute("SELECT value FROM settings WHERE key = 'SCANNER_WRITE_LOG'")
-            row = cursor.fetchone()
-            conn.close()
-            if row:
-                value = str(row['value']).strip()
-                if value == '0':
-                    write_log = False
+        from repositories.settings_repository import SettingsRepository
+        val = SettingsRepository.get_value('general', 'SCANNER_WRITE_LOG')
+        if val is not None and str(val).strip() == '0':
+            write_log = False
     except Exception:
         pass
 
@@ -104,18 +96,13 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
         max_size_mb = 300.0   # 개별 파일 안전 기본값 (300MB)
         max_batch_mb = 1024.0 # 세션 누적 안전 기본값 (1024MB = 1GB)
         try:
-            gen_db_path = os.path.join(MEDIA_SERVER_DIR, 'db', 'media_general.db')
-            if os.path.exists(gen_db_path):
-                _tmp_conn = sqlite3.connect(gen_db_path, timeout=30.0)
-                _tmp_conn.row_factory = sqlite3.Row
-                _tmp_cur = _tmp_conn.cursor()
-                _tmp_cur.execute("SELECT key, value FROM settings WHERE key IN ('LAZY_SCAN_MAX_FILE_SIZE_MB', 'LAZY_SCAN_MAX_BATCH_SIZE_MB')")
-                _rows = {r['key']: r['value'] for r in _tmp_cur.fetchall()}
-                _tmp_conn.close()
-                if 'LAZY_SCAN_MAX_FILE_SIZE_MB' in _rows:
-                    max_size_mb = float(str(_rows['LAZY_SCAN_MAX_FILE_SIZE_MB']).strip() or '300')
-                if 'LAZY_SCAN_MAX_BATCH_SIZE_MB' in _rows:
-                    max_batch_mb = float(str(_rows['LAZY_SCAN_MAX_BATCH_SIZE_MB']).strip() or '1024')
+            from repositories.settings_repository import SettingsRepository
+            size_val = SettingsRepository.get_value('general', 'LAZY_SCAN_MAX_FILE_SIZE_MB')
+            batch_val = SettingsRepository.get_value('general', 'LAZY_SCAN_MAX_BATCH_SIZE_MB')
+            if size_val is not None:
+                max_size_mb = float(str(size_val).strip() or '300')
+            if batch_val is not None:
+                max_batch_mb = float(str(batch_val).strip() or '1024')
         except Exception as _se:
             print(f"[Lazy-Scanner] 크기 설정 로드 실패 (기본 300MB/1024MB 적용): {_se}")
         

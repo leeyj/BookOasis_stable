@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # ============================================================
 #  BookOasis — Interactive Install Script
 #  지원 환경: Linux / macOS (bash/zsh)
@@ -151,6 +151,55 @@ else
 
     PYTHON_VERSION=$(python3 --version 2>&1)
     success "Python: $PYTHON_VERSION"
+
+    info "FFmpeg 설치 여부 확인 중..."
+    if command -v ffmpeg &>/dev/null; then
+        FFMPEG_VERSION=$(ffmpeg -version 2>&1 | head -n1 | cut -d' ' -f1-3)
+        success "FFmpeg: $FFMPEG_VERSION"
+    else
+        warn "FFmpeg가 설치되어 있지 않습니다."
+        echo -e "  ${DIM}(오디오 온더플라이 트랜스코딩 및 메타데이터 재생시간 추출에 권장)${RESET}"
+        echo ""
+
+        PKG_MANAGER=""
+        INSTALL_CMD=""
+        if command -v apt-get &>/dev/null; then
+            PKG_MANAGER="apt"
+            INSTALL_CMD="sudo apt-get update && sudo apt-get install -y ffmpeg"
+        elif command -v dnf &>/dev/null; then
+            PKG_MANAGER="dnf"
+            INSTALL_CMD="sudo dnf install -y ffmpeg"
+        elif command -v yum &>/dev/null; then
+            PKG_MANAGER="yum"
+            INSTALL_CMD="sudo yum install -y ffmpeg"
+        elif command -v pacman &>/dev/null; then
+            PKG_MANAGER="pacman"
+            INSTALL_CMD="sudo pacman -S --noconfirm ffmpeg"
+        elif command -v brew &>/dev/null; then
+            PKG_MANAGER="brew"
+            INSTALL_CMD="brew install ffmpeg"
+        fi
+
+        if [ -n "$INSTALL_CMD" ]; then
+            prompt "FFmpeg를 자동으로 설치하시겠습니까? (${PKG_MANAGER}) [Y/n]: "
+            read -r FF_CONFIRM
+            FF_CONFIRM="${FF_CONFIRM:-Y}"
+            if [[ "$FF_CONFIRM" =~ ^[Yy]$ ]]; then
+                info "FFmpeg 설치 명령 실행 중: $INSTALL_CMD"
+                if eval "$INSTALL_CMD"; then
+                    success "FFmpeg 설치 완료!"
+                else
+                    error "FFmpeg 자동 설치에 실패했습니다. 수동으로 설치해 주세요."
+                fi
+            else
+                info "FFmpeg 설치를 건너뜁니다."
+            fi
+        else
+            warn "시스템 패키지 관리자를 감지하지 못했습니다."
+            echo -e "  ${DIM}→ Ubuntu/Debian: sudo apt install ffmpeg${RESET}"
+            echo -e "  ${DIM}→ macOS: brew install ffmpeg${RESET}"
+        fi
+    fi
 fi
 
 # ────────────────────────────────────────────────────────────

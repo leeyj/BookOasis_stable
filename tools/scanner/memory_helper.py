@@ -20,14 +20,11 @@ def get_setting_float(key, default_value, db_type='general'):
     if cached and (now - cached['ts'] <= _SETTING_CACHE_TTL_SEC):
         return cached['value']
 
-    conn = None
     try:
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("SELECT value FROM settings WHERE key = ?", (key,))
-        row = cursor.fetchone()
-        if row and row['value']:
-            value = float(row['value'])
+        from repositories.settings_repository import SettingsRepository
+        val = SettingsRepository.get_value(db_type, key)
+        if val is not None and str(val).strip():
+            value = float(val)
             _setting_cache[cache_key] = {'value': value, 'ts': now}
             return value
     except Exception:
@@ -35,12 +32,6 @@ def get_setting_float(key, default_value, db_type='general'):
         if cached:
             _setting_cache[cache_key]['ts'] = now
             return cached['value']
-    finally:
-        if conn:
-            try:
-                conn.close()
-            except Exception:
-                pass
 
     _setting_cache[cache_key] = {'value': default_value, 'ts': now}
     return default_value

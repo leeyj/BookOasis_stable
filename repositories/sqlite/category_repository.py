@@ -304,6 +304,19 @@ class CategoryRepository:
             conn.close()
 
     @staticmethod
+    def check_user_category_access(db_type, user_id, library_id):
+        """사용자의 특정 카테고리 접근 권한 여부 확인"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT 1 FROM user_category_permissions WHERE user_id = ? AND library_id = ? AND has_access = 1",
+            (user_id, library_id)
+        )
+        row = cursor.fetchone()
+        conn.close()
+        return row is not None
+
+    @staticmethod
     def update_library_scan_success(db_type, library_id, end_str):
         """라이브러리 스캔 완료 상태 갱신"""
         conn = database.get_connection(db_type)

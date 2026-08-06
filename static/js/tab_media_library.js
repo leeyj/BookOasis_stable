@@ -388,6 +388,14 @@ function parseMediaTypeFromUrl() {
     }
   } catch (e) {}
 
+  try {
+    const savedType = localStorage.getItem('last_selected_library_type');
+    if (savedType) {
+      const parsed = normalizeMediaType(savedType);
+      if (parsed) return parsed;
+    }
+  } catch (e) {}
+
   return null;
 }
 
@@ -408,6 +416,11 @@ function parseLibraryIdFromUrl() {
         if (hLibrary) return String(hLibrary).trim();
       }
     }
+  } catch (e) {}
+
+  try {
+    const savedLib = localStorage.getItem('last_selected_library_id');
+    if (savedLib) return String(savedLib).trim();
   } catch (e) {}
 
   return null;
@@ -616,8 +629,11 @@ export async function switchLibraryType(type) {
     } catch (e) {}
   }
 
-  await loadInitialSystemSettings();
-  loadLibraries();
+  // 시스템 설정 및 사이드바 라이브러리 목록 병렬 요청 (Promise.all)
+  await Promise.all([
+    loadInitialSystemSettings(),
+    loadLibraries()
+  ]);
   selectCategory('home', true);
 }
 
@@ -660,6 +676,11 @@ export function selectCategory(rawId, skipHistory = false) {
   state.currentLibraryId = id;
   const curType = state.currentLibraryType || 'general';
   window.currentLibraryType = curType;
+
+  try {
+    localStorage.setItem('last_selected_library_id', id);
+    localStorage.setItem('last_selected_library_type', curType);
+  } catch (e) {}
   
   // 브라우저 히스토리에 카테고리 이동 기록 남기기 (SPA 뒤로가기 지원)
   if (!skipHistory) {

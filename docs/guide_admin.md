@@ -112,3 +112,31 @@ tags: [admin, guide, management]
   1. 서버의 설치 경로 내 `static/fonts/custom/` 폴더로 이동합니다. (해당 폴더가 없다면 새로 생성하세요.)
   2. 준비한 폰트 파일을 위 경로에 업로드(복사)합니다.
   3. 브라우저에서 북 오아시스에 접속한 뒤 뷰어를 열고, 폰트 설정(A)을 눌러 폰트 선택 드롭다운 메뉴를 확인하면 추가한 폰트가 자동으로 목록에 표시됩니다.
+
+---
+
+## 8. 데이터베이스 엔진 관리 및 MariaDB 마이그레이션
+
+북 오아시스는 기본 내장형 SQLite 외에도 **엔터프라이즈 모드인 MariaDB / MySQL**을 공식 지원합니다.
+
+### ① SQLite vs MariaDB 선택 가이드
+* **SQLite (기본값)**: 별도 설치 없이 단일 파일로 손쉽게 구동. 소규모 및 1인 사용자 환경에 적합.
+* **MariaDB / MySQL (권장)**: 대용량(수만~수십만 권 도서) 및 다중 스캐너/웹 동시 접속 환경에서 파일 락 병목 및 DB 손상 위험을 100% 소거하고 초고속 응답 보장.
+
+### ② MariaDB 설정 (.env)
+```env
+DB_ENGINE=mariadb
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=your_mariadb_password
+```
+
+### ③ SQLite -> MariaDB 원클릭 자동 마이그레이션
+기존 SQLite 데이터(도서 메타데이터, 독서 히스토리, 계정 권한 등)를 MariaDB로 손실 없이 100% 이전할 수 있는 마이그레이션 도구를 제공합니다:
+```bash
+python tools/migrator_sqlite_to_mariadb.py
+```
+* **마이그레이션 특징**:
+  - `media_general`, `media_adult`, `media_audiobook` 3개 독립 데이터베이스를 자동 생성 및 마이그레이션.
+  - 마이그레이션 후 스키마 검증 및 데이터 건수 자동 검증 수행.

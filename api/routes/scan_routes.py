@@ -39,16 +39,13 @@ def trigger_library_scan(library_id):
     force_val = request.form.get('force', 'false').lower()
     force = force_val in ('true', '1')
     try:
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("SELECT physical_path FROM libraries WHERE id = ?", (library_id,))
-        row = cursor.fetchone()
-        conn.close()
+        from repositories.category_repository import CategoryRepository
+        lib_info = CategoryRepository.get_library_by_id(db_type, library_id)
         
-        if not row:
+        if not lib_info:
             return jsonify({'success': False, 'error': _t('api.err_library_not_found')}), 404
         
-        physical_path = row['physical_path']
+        physical_path = lib_info['physical_path']
         db_path = get_db_path_for_scan(db_type)
         
         print(
@@ -77,11 +74,8 @@ def cancel_library_scan(library_id):
     """지정된 라이브러리 카테고리의 진행 중인 스캔을 중단하도록 플래그 갱신"""
     db_type = request.form.get('type', 'general')
     try:
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("UPDATE libraries SET scan_status = 'cancelling' WHERE id = ?", (library_id,))
-        conn.commit()
-        conn.close()
+        from repositories.category_repository import CategoryRepository
+        CategoryRepository.update_library_scan_status(db_type, library_id, 'cancelling')
         return jsonify({'success': True, 'message': _t('api.msg_scan_cancelling')})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -92,16 +86,13 @@ def trigger_library_cover_scan(library_id):
     """지정된 라이브러리 카테고리 표지 전용 즉시 비동기 스캔 실행"""
     db_type = request.form.get('type', 'general')
     try:
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("SELECT physical_path FROM libraries WHERE id = ?", (library_id,))
-        row = cursor.fetchone()
-        conn.close()
+        from repositories.category_repository import CategoryRepository
+        lib_info = CategoryRepository.get_library_by_id(db_type, library_id)
         
-        if not row:
+        if not lib_info:
             return jsonify({'success': False, 'error': _t('api.err_library_not_found')}), 404
         
-        physical_path = row['physical_path']
+        physical_path = lib_info['physical_path']
         db_path = get_db_path_for_scan(db_type)
         
         from services.scanner_queue import scanner_queue
@@ -125,11 +116,8 @@ def trigger_all_libraries_scan():
     force_val = request.form.get('force', 'false').lower()
     force = force_val in ('true', '1')
     try:
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, name, physical_path FROM libraries ORDER BY name ASC")
-        rows = cursor.fetchall()
-        conn.close()
+        from repositories.category_repository import CategoryRepository
+        rows = CategoryRepository.get_all_libraries(db_type)
         
         if not rows:
             return jsonify({'success': False, 'error': _t('api.err_no_libraries')}), 404

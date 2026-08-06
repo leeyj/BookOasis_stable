@@ -10,18 +10,8 @@ def get_basic_auth_user(username: str):
     if not username:
         return None
 
-    conn = database.get_connection('general')
-    try:
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT id, username, password_hash, role FROM users WHERE username = ?",
-            (username,)
-        )
-        row = cursor.fetchone()
-    finally:
-        conn.close()
-
-    return dict(row) if row else None
+    from repositories.user_repository import UserRepository
+    return UserRepository.find_by_username('general', username)
 
 
 def authenticate_basic_auth_user(username: str, password: str, require_admin: bool = False):

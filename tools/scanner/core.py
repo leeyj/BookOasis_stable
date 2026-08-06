@@ -22,22 +22,13 @@ DB_AUDIOBOOK_PATH = os.path.join(DB_DIR, 'media_audiobook.db')
 
 
 def _is_hdd_aggressive_warmup_enabled(db_type):
-    conn = None
     try:
-        conn = database.get_connection(db_type, wait_timeout=5.0)
-        cursor = conn.cursor()
-        cursor.execute("SELECT value FROM settings WHERE key = 'HDD_AGGRESSIVE_WARMUP'")
-        row = cursor.fetchone()
-        return bool(row and str(row['value']).strip() == '1')
+        from repositories.settings_repository import SettingsRepository
+        val = SettingsRepository.get_value(db_type, 'HDD_AGGRESSIVE_WARMUP')
+        return bool(val and str(val).strip() == '1')
     except Exception as e:
         print(f"[Scanner-WakeUp] HDD 웜업 설정 조회 실패, 기본값(OFF) 사용: {e}")
         return False
-    finally:
-        if conn:
-            try:
-                conn.close()
-            except Exception:
-                pass
 
 
 def _aggressive_warmup_path(path):
@@ -228,50 +219,18 @@ def run_sync_scanner():
     """Iterate all databases (general, adult) libraries and execute scan"""
     print("=== File System Sync Scanner Started ===")
     
+    from repositories.category_repository import CategoryRepository
     if os.path.exists(DB_GENERAL_PATH):
-        conn = None
-        try:
-            conn = database.get_connection('general')
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, name, physical_path FROM libraries")
-            libs = cursor.fetchall()
-        finally:
-            if conn:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
+        libs = CategoryRepository.get_all_libraries('general')
         for lib in libs:
             scan_library(DB_GENERAL_PATH, lib['id'], lib['physical_path'])
             
     if os.path.exists(DB_ADULT_PATH):
-        conn = None
-        try:
-            conn = database.get_connection('adult')
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, name, physical_path FROM libraries")
-            libs = cursor.fetchall()
-        finally:
-            if conn:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
+        libs = CategoryRepository.get_all_libraries('adult')
         for lib in libs:
             scan_library(DB_ADULT_PATH, lib['id'], lib['physical_path'])
 
     if os.path.exists(DB_AUDIOBOOK_PATH):
-        conn = None
-        try:
-            conn = database.get_connection('audiobook')
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, name, physical_path FROM libraries")
-            libs = cursor.fetchall()
-        finally:
-            if conn:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
+        libs = CategoryRepository.get_all_libraries('audiobook')
         for lib in libs:
             scan_library(DB_AUDIOBOOK_PATH, lib['id'], lib['physical_path'])

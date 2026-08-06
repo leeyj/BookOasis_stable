@@ -566,11 +566,8 @@ def app_opds_download_book(db_type: str, book_id: int):
     if not _check_auth_cached(is_adult=is_adult):
         return _unauthorized()
 
-    conn = database.get_connection(db_type)
-    cursor = conn.cursor()
-    cursor.execute("SELECT file_path FROM books WHERE id=?", (book_id,))
-    row = cursor.fetchone()
-    conn.close()
+    from repositories.book_repository import BookRepository
+    row = BookRepository.get_book_basic_info(db_type, book_id)
 
     if not row:
         return jsonify({'error': _t('api.err_book_not_found')}), 404

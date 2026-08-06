@@ -211,63 +211,86 @@ for dir in $DATA_DIRS; do
     chmod 755 "$dir" 2>/dev/null || true
 done
 
-# DB 디렉토리 실제 쓰기 가능 여부 테스트
-if ! touch /app/db/.write_test 2>/dev/null; then
-    echo ""
-    echo "=========================================================="
-    echo " [Entrypoint] ❌ 치명적 오류: /app/db 디렉토리에 쓰기 권한이 없습니다."
-    echo ""
-    echo " 호스트에서 아래 명령을 실행한 후 컨테이너를 재시작하세요:"
-    echo ""
-    echo "   chmod -R 755 <host_db_path>"
-    echo "   chmod 664 <host_db_path>/*.db 2>/dev/null || true"
-    echo ""
-    echo " Synology NAS 예시:"
-    echo "   chmod -R 755 /volume1/docker/BookOasis/db"
-    echo ""
-    echo " 또는 docker-compose.yml에 PUID/PGID를 설정하세요:"
-    echo "   environment:"
-    echo "     - PUID=1000"
-    echo "     - PGID=1000"
-    echo "=========================================================="
-    echo ""
-    exit 1
-fi
-rm -f /app/db/.write_test
+DB_ENGINE_LOWER=$(echo "${DB_ENGINE:-sqlite}" | tr '[:upper:]' '[:lower:]')
 
-# DB 파일 권한 보장 (파일이 있는 경우만)
-chmod 664 /app/db/*.db 2>/dev/null || true
-chmod 664 /app/db/*.db-wal 2>/dev/null || true
-chmod 664 /app/db/*.db-shm 2>/dev/null || true
-
-echo "[Entrypoint] ✅ 데이터 디렉토리 쓰기 권한 확인 완료"
-
-# ── [기동 전 DB 무결성 및 스키마 검사 가드] ──
-echo "[Entrypoint] 기동 전 데이터베이스 무결성(PRAGMA integrity_check) 검사 중..."
-db_ok=true
-for db_name in "media_general.db" "media_adult.db"; do
-    db_file="/app/db/$db_name"
-    if [ -f "$db_file" ]; then
-        if command -v sqlite3 >/dev/null 2>&1; then
-            res=$(sqlite3 "$db_file" "PRAGMA integrity_check;" 2>&1)
-            if [ "$res" != "ok" ]; then
-                echo "[Entrypoint] ⚠️  경고: 데이터베이스 파일이 손상되었습니다: $db_name (오류: $res)"
-                db_ok=false
-            fi
-        fi
-    fi
-done
-
-if [ "$db_ok" = false ]; then
-    echo "[Entrypoint] ⚠️  손상된 DB가 발견되어 자동 복구(db_recovery.py)를 가동합니다..."
-    if python3 tools/db_recovery.py --yes; then
-        echo "[Entrypoint] ✅ 데이터베이스 자동 복구가 성공적으로 완료되었습니다."
-    else
-        echo "[Entrypoint] ❌ 치명적 오류: 데이터베이스 자동 복구에 실패했습니다. 안전을 위해 서비스를 구동하지 않습니다."
+if [ "$DB_ENGINE_LOWER" = "mariadb" ] || [ "$DB_ENGINE_LOWER" = "mysql" ]; then
+    echo "[Entrypoint] 🚀 MariaDB 엔터프라이즈 데이터베이스 모드로 구동합니다."
+    echo "[Entrypoint] MariaDB 서버($MARIADB_HOST:${MARIADB_PORT:-3306}) 연결 가능 여부 대기 중..."
+    python3 - <<'PY' || true
+import os, time, sys, pymysql
+host = os.environ.get('MARIADB_HOST', '127.0.0.1')
+port = int(os.environ.get('MARIADB_PORT', '3306') or '3306')
+user = os.environ.get('MARIADB_USER', 'root')
+password = os.environ.get('MARIADB_PASSWORD', '')
+for i in range(60):
+    try:
+        conn = pymysql.connect(host=host, port=port, user=user, password=password, connect_timeout=2)
+        conn.close()
+        print(f"[Entrypoint] ✅ MariaDB 서버({host}:{port}) 연결 확인 완료.")
+        sys.exit(0)
+    except Exception as e:
+        time.sleep(1)
+print(f"[Entrypoint] ⚠️ MariaDB 서버({host}:{port}) 연결 대기 시간 초과. 서비스를 계속 기동합니다.")
+PY
+else
+    # DB 디렉토리 실제 쓰기 가능 여부 테스트
+    if ! touch /app/db/.write_test 2>/dev/null; then
+        echo ""
+        echo "=========================================================="
+        echo " [Entrypoint] ❌ 치명적 오류: /app/db 디렉토리에 쓰기 권한이 없습니다."
+        echo ""
+        echo " 호스트에서 아래 명령을 실행한 후 컨테이너를 재시작하세요:"
+        echo ""
+        echo "   chmod -R 755 <host_db_path>"
+        echo "   chmod 664 <host_db_path>/*.db 2>/dev/null || true"
+        echo ""
+        echo " Synology NAS 예시:"
+        echo "   chmod -R 755 /volume1/docker/BookOasis/db"
+        echo ""
+        echo " 또는 docker-compose.yml에 PUID/PGID를 설정하세요:"
+        echo "   environment:"
+        echo "     - PUID=1000"
+        echo "     - PGID=1000"
+        echo "=========================================================="
+        echo ""
         exit 1
     fi
-else
-    echo "[Entrypoint] ✅ 데이터베이스 무결성 정상 확인."
+    rm -f /app/db/.write_test
+
+    # DB 파일 권한 보장 (파일이 있는 경우만)
+    chmod 664 /app/db/*.db 2>/dev/null || true
+    chmod 664 /app/db/*.db-wal 2>/dev/null || true
+    chmod 664 /app/db/*.db-shm 2>/dev/null || true
+
+    echo "[Entrypoint] ✅ 데이터 디렉토리 쓰기 권한 확인 완료"
+
+    # ── [기동 전 DB 무결성 및 스키마 검사 가드] ──
+    echo "[Entrypoint] 기동 전 데이터베이스 무결성(PRAGMA integrity_check) 검사 중..."
+    db_ok=true
+    for db_name in "media_general.db" "media_adult.db"; do
+        db_file="/app/db/$db_name"
+        if [ -f "$db_file" ]; then
+            if command -v sqlite3 >/dev/null 2>&1; then
+                res=$(sqlite3 "$db_file" "PRAGMA integrity_check;" 2>&1)
+                if [ "$res" != "ok" ]; then
+                    echo "[Entrypoint] ⚠️  경고: 데이터베이스 파일이 손상되었습니다: $db_name (오류: $res)"
+                    db_ok=false
+                fi
+            fi
+        fi
+    done
+
+    if [ "$db_ok" = false ]; then
+        echo "[Entrypoint] ⚠️  손상된 DB가 발견되어 자동 복구(db_recovery.py)를 가동합니다..."
+        if python3 tools/db_recovery.py --yes; then
+            echo "[Entrypoint] ✅ 데이터베이스 자동 복구가 성공적으로 완료되었습니다."
+        else
+            echo "[Entrypoint] ❌ 치명적 오류: 데이터베이스 자동 복구에 실패했습니다. 안전을 위해 서비스를 구동하지 않습니다."
+            exit 1
+        fi
+    else
+        echo "[Entrypoint] ✅ 데이터베이스 무결성 정상 확인."
+    fi
 fi
 
 # ── [최신 스키마 강제 동기화 의무화] ──

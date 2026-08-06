@@ -1,7 +1,15 @@
 # CHANGELOG
+## v1.7.8
+- (db/engine) MariaDB 엔터프라이즈 데이터베이스 엔진 공식 지원 및 대용량 쿼리 쾌속 최적화 | official MariaDB support & high-performance query optimization
+- (viewer/epub) EPUB 뷰어 엔진 개선 (이미지 병렬 사전 로딩/디코딩 적용으로 텍스트 밀림 0% 소거) | EPUB reader engine enhancement with image pre-decoding (zero layout shift)
+- (ios/refresh) iOS(아이폰/아이패드) Safari 새로고침 시 카테고리 유실 및 오동작 수정 | fix iOS Safari refresh state restoration & category selection issue
+- (ios/audio) iOS 화면 잠금 시 Web AudioContext 강제 suspend 후 복귀 누락으로 오디오 끊기는 결함 수정 및 잠금화면 탐색바(seekto) 지원 추가 | fix iOS screen lock AudioContext auto-suspend & add lock screen seekto support
+
+
 ## v1.7.7
 - (audio/volume) iOS(아이폰) WebKit 환경에서 HTML5 Audio 볼륨 속성 제한 우회를 위한 Web Audio API GainNode 자체 볼륨 연동 구축 | fix iOS Safari WebKit audio volume control using Web Audio GainNode
 - (audio/ui) 오디오북 플레이어 모바일 뷰 하단 툴바 볼륨 수치-Sleep 타이머 버튼 간 UI 겹침 레이아웃 개선 | fix audio player volume slider and sleep timer button UI overlap on mobile
+
 ## v1.7.6
 - (detail/cover) 메타정보 수동 편집 시 업로드된 신규 표지 이미지가 DB(cover_image)에 미반영되던 결함 및 In-Memory/Redis 캐시 무효화 누락 수정 | fix cover image upload database update & cache invalidation failure
 

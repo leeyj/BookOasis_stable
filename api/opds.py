@@ -457,11 +457,8 @@ def opds_download_book(db_type: str, book_id: int):
 
 
     try:
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("SELECT file_path FROM books WHERE id=?", (book_id,))
-        row = cursor.fetchone()
-        conn.close()
+        from repositories.book_repository import BookRepository
+        row = BookRepository.get_book_basic_info(db_type, book_id)
     except Exception as db_err:
         print(f"[OPDS-Debug] ❌ DB 조회 에러: {db_err}\n{traceback.format_exc()}")
         return jsonify({'error': str(db_err)}), 500

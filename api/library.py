@@ -178,17 +178,8 @@ def update_series_alias():
         return jsonify({'success': False, 'error': _t('api.err_series_name_required')}), 400
 
     try:
-        from repositories.sqlite.book_repository import BookRepository
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("""
-            UPDATE books
-            SET series_alias = ?,
-                metadata_locked = 1
-            WHERE series_name = ?
-        """, (series_alias if series_alias else None, series_name))
-        conn.commit()
-        conn.close()
+        from repositories.book_repository import BookRepository
+        BookRepository.update_series_alias(db_type, series_name, series_alias)
         try:
             from utils.redis_helper import redis_delete_pattern
             redis_delete_pattern(f"cache:history*:{db_type}:*")
@@ -208,16 +199,8 @@ def update_book_alias(book_id):
     title_alias = data.get('title_alias', '').strip()
 
     try:
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("""
-            UPDATE books
-            SET title_alias = ?,
-                metadata_locked = 1
-            WHERE id = ?
-        """, (title_alias if title_alias else None, book_id))
-        conn.commit()
-        conn.close()
+        from repositories.book_repository import BookRepository
+        BookRepository.update_book_alias(db_type, book_id, title_alias)
         try:
             from utils.redis_helper import redis_delete_pattern
             redis_delete_pattern(f"cache:history*:{db_type}:*")
@@ -641,11 +624,8 @@ def get_category_plugins_api():
         # 일반 사용자의 경우 settings 테이블의 PERM_CATEGORY_{uid}_plugin_{id} 권한 체크
         perm_map = {}
         if user_id and user_role != 'admin':
-            conn = database.get_connection('general')
-            cursor = conn.cursor()
-            cursor.execute("SELECT key, value FROM settings WHERE key LIKE ?", (f"PERM_CATEGORY_{user_id}_plugin_%",))
-            perm_map = {r['key']: r['value'] for r in cursor.fetchall()}
-            conn.close()
+            from repositories.settings_repository import SettingsRepository
+            perm_map = SettingsRepository.get_settings_by_prefix('general', f"PERM_CATEGORY_{user_id}_plugin_")
 
         active_category_plugins = []
         for p in providers:
@@ -811,15 +791,8 @@ def download_book(book_id):
     ALLOWED_FORMATS = ('epub', 'pdf', 'txt')
 
     try:
-        import database
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT file_path, file_format FROM books WHERE id = ?",
-            (book_id,)
-        )
-        row = cursor.fetchone()
-        conn.close()
+        from repositories.book_repository import BookRepository
+        row = BookRepository.get_book_basic_info(db_type, book_id)
 
         if not row:
             return jsonify({'success': False, 'error': _t('api.err_book_not_found')}), 404

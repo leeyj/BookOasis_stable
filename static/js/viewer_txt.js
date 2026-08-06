@@ -125,6 +125,51 @@ function syncActiveEpubToc(scrollIntoView = false) {
   highlightEpubTocChapter(currentChunkIdx, { scrollIntoView });
 }
 
+function preloadEpubChapterImages(htmlContent, timeoutMs = 800) {
+  if (!htmlContent || typeof htmlContent !== 'string' || !htmlContent.includes('<img')) {
+    return Promise.resolve();
+  }
+
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(htmlContent, 'text/html');
+    const imgEls = Array.from(doc.querySelectorAll('img'));
+    if (!imgEls.length) return Promise.resolve();
+
+    const fetchPromises = imgEls.map(img => {
+      const src = img.getAttribute('src');
+      if (!src) return Promise.resolve();
+
+      return new Promise((resolve) => {
+        const preloader = new Image();
+        let settled = false;
+
+        const onDone = () => {
+          if (!settled) {
+            settled = true;
+            resolve();
+          }
+        };
+
+        preloader.onload = onDone;
+        preloader.onerror = onDone;
+
+        if ('decode' in preloader) {
+          preloader.src = src;
+          preloader.decode().then(onDone).catch(onDone);
+        } else {
+          preloader.src = src;
+        }
+      });
+    });
+
+    const timeoutPromise = new Promise(resolve => setTimeout(resolve, timeoutMs));
+    return Promise.race([Promise.all(fetchPromises), timeoutPromise]);
+  } catch (e) {
+    return Promise.resolve();
+  }
+}
+
 function requestEpubChapterContent(chapterIdx, options = {}) {
   const idx = parseInt(chapterIdx, 10);
   if (!Number.isFinite(idx) || idx < 0 || idx >= txtChunks.length) {
@@ -156,10 +201,14 @@ function requestEpubChapterContent(chapterIdx, options = {}) {
 
   return fetch(`/api/media/epub/chapter?db_type=${state.currentLibraryType}&book_id=${state.activeBookId}&chapter_idx=${idx}`)
     .then(r => r.json())
-    .then(d => {
+    .then(async d => {
       const content = (d && d.content) ? d.content : '<p>내용이 없습니다.</p>';
       txtChunks[idx] = content;
       epubChapterRetryState.delete(idx);
+
+      // 이미지 병렬 사전 로딩 및 메모리 디코딩 완료 후 DOM에 할당 (레이아웃 튐 0% 보장)
+      await preloadEpubChapterImages(content);
+
       if (updateDom) {
         const contentArea = document.getElementById('txt-content-area');
         if (contentArea) {

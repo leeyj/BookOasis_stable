@@ -9,6 +9,19 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
+# .env 파일 수동 로드 (.env에 정의된 DB_ENGINE 등 적용)
+env_file = os.path.join(PROJECT_ROOT, '.env')
+if os.path.exists(env_file):
+    with open(env_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#') and '=' in line:
+                k, v = line.split('=', 1)
+                k = k.strip()
+                v = v.strip().strip("'").strip('"')
+                if k not in os.environ:
+                    os.environ[k] = v
+
 try:
     import database
     from database import (
@@ -28,6 +41,17 @@ def run_schema_update():
     print("=" * 60)
     print(" 데이터베이스 최신 스키마 강제 업데이트 및 동기화 도구")
     print("=" * 60)
+
+    engine = os.environ.get('DB_ENGINE', os.environ.get('DBMS', 'sqlite')).lower()
+    if engine in ('mariadb', 'mysql'):
+        print("[+] MariaDB 데이터베이스 엔진 모드 구동")
+        try:
+            from tools.migrator_sqlite_to_mariadb import ensure_mariadb_databases
+            ensure_mariadb_databases(reset=False)
+            print("[+] MariaDB 데이터베이스 및 스키마 검사 완료.")
+        except Exception as ex:
+            print(f"[!] MariaDB 스키마 검사 중 경고: {ex}")
+        return
     
     # 1. DB 파일 존재 및 경로 확인
     db_paths = {

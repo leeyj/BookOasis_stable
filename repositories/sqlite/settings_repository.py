@@ -42,3 +42,13 @@ class SettingsRepository:
         rows = cursor.fetchall()
         conn.close()
         return {row['key']: row['value'] for row in rows}
+
+    @staticmethod
+    def get_settings_by_prefix(db_type, prefix):
+        """지정된 접두어로 시작하는 설정 키-값 딕셔너리 반환"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute("SELECT key, value FROM settings WHERE key LIKE ?", (f"{prefix}%",))
+        rows = cursor.fetchall()
+        conn.close()
+        return {row['key']: row['value'] for row in rows}

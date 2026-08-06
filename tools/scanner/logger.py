@@ -12,22 +12,12 @@ def scanner_print_control(db_path):
     conn = None
     try:
         db_type = 'adult' if 'adult' in os.path.basename(db_path) else 'general'
-        conn = database.get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.execute("SELECT value FROM settings WHERE key = 'SCANNER_WRITE_LOG'")
-        row = cursor.fetchone()
-        if row:
-            value = str(row['value']).strip()
-            if value == '0':
-                write_log = False
+        from repositories.settings_repository import SettingsRepository
+        val = SettingsRepository.get_value(db_type, 'SCANNER_WRITE_LOG')
+        if val is not None and str(val).strip() == '0':
+            write_log = False
     except Exception:
         pass
-    finally:
-        if conn:
-            try:
-                conn.close()
-            except Exception:
-                pass
 
     if not write_log:
         builtins.print = lambda *args, **kwargs: None

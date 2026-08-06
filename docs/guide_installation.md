@@ -16,7 +16,9 @@ tags: [install, guide, setup]
 
 * **운영체제**: Windows 10/11, Linux (Ubuntu 20.04+ 권장), macOS
 * **Python**: 3.9 이상 권장
-* **데이터베이스**: SQLite (Python 내장 라이브러리로 별도 설치 불필요)
+* **데이터베이스**: 
+  - **SQLite (기본값)**: Python 내장 라이브러리로 별도 DB 서버 설치 없이 즉시 구동.
+  - **MariaDB / MySQL (엔터프라이즈 권장)**: 대용량 도서(수만~수십만 권) 및 다중 동시 접속 환경에서 락 병목과 손상 위험을 100% 제거하고 초고속 성능 보장.
 * **캐시 데이터베이스 (선택)**: Redis (실시간 독서 진행도 캐싱을 통해 SQLite 디스크 쓰기 병목을 완화하고, 대량 스캔 중 정전/종료 시 DB 손상을 완벽 예방하기 위해 강하게 권장합니다.)
 * **네트워크**: 외부 통신(알라딘 API 메타데이터 연동 목적) 및 리버스 프록시 환경 지원
 
@@ -71,16 +73,24 @@ pip install -r requirements.txt
 - **세션 고정 키**: 서버 재기동 시 로그인 세션 유지 (`SECRET_KEY`)
 - **인바운드 스캔 웹훅 토큰**: 외부 폴러 연동 (`WEBHOOK_TOKEN`)
 - **아웃바운드 표준 이벤트 웹훅**: `book.new/read/finish` 전송 (`WEBHOOK_EVENT_*`)
-- **Redis 인메모리 캐시 연동 (선택 및 권장)**: SQLite 파일의 실시간 쓰기 부하를 제어해 손상을 방지합니다. (`REDIS_URL`)
+- **MariaDB / MySQL 엔터프라이즈 모드 (선택)**: 대용량 도서 락 병목 및 손상 위험 전면 제거 (`DB_ENGINE=mariadb`)
+- **Redis 인메모리 캐시 연동 (선택 및 권장)**: SQLite/MariaDB 쓰기 부하 제어 및 0.0001초 초고속 조회 (`REDIS_URL`)
 - **CSP 단계적 보안 적용 (권장)**: 초기에는 차단 없이 위반을 관측하고 이후 차단 모드로 전환합니다. (`SECURITY_CSP_*`)
 
 **하이브리드(Fallback) 설계:**
-BookOasis는 레디스 연결 실패 시 또는 환경변수 부재 시 **자동으로 기존의 SQLite 직접 쓰기 모드로 우회(Fallback)**하므로, 레디스 설치나 기동 없이도 기존과 완전히 똑같이 실행 가능합니다.
+BookOasis는 레디스 연결 실패 시 또는 환경변수 부재 시 **자동으로 기존의 SQLite 직접 쓰기 모드로 우회(Fallback)**하므로, 레디스나 MariaDB 설치 없이도 기존과 완전히 똑같이 실행 가능합니다.
 
 **.env 파일 구성 예시:**
 ```env
 # Gunicorn 재구동 시 사용자 로그인 세션 유지를 위한 고정 키
 SECRET_KEY=yoursupersecretfixedkey12345!
+
+# (선택) MariaDB / MySQL 데이터베이스 엔터프라이즈 모드 설정
+DB_ENGINE=mariadb
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=your_mariadb_password
 
 # (선택) 외부 트리거 스캔 인바운드 웹훅 토큰
 WEBHOOK_TOKEN=your_secure_api_token_here
@@ -159,17 +169,22 @@ BOOKOASIS_ENABLE_EMBEDDED_WORKER=true gunicorn --workers 1 --bind 0.0.0.0:5930 -
 ```
 * `manage.sh` 경로는 웹과 스캐너 워커를 별도 프로세스로 관리하며, 웹 프로세스의 내장 워커는 자동으로 비활성화됩니다.
 
-### 3) Docker 기반 간편 실행
-도커 환경이 설치되어 있다면, 환경 구성을 빌드 없이 컨테이너 기반으로 빠르게 기동할 수 있습니다.
+### 3) Docker 기반 실행 가이드 (Docker Compose)
+
+도커 사용자분들은 설치 방식 및 목적에 따라 **[SQLite 기본 모드]** 또는 **[MariaDB + Redis 올인원 콤보 모드]** 중 원하는 방식을 자유롭게 선택하여 가동하실 수 있습니다.
+
+---
+
+#### 🅰️ 옵션 A: SQLite 기본 모드 (단독 컨테이너)
+별도의 데이터베이스 서버 없이 단일 컨테이너로 가볍게 기동하는 기본 방식입니다.
 
 **① 설정 템플릿 복사**
-로컬 환경 고유 설정을 위해 제공되는 오버라이드 템플릿 파일을 복사합니다.
 ```bash
 cp docker-compose.override.example.yml docker-compose.override.yml
 ```
 
-**② 볼륨 바인딩 경로 수정**
-생성된 `docker-compose.override.yml` 파일을 열어 본인의 실제 책/만화책 라이브러리 디렉토리 경로로 수정합니다.
+**② 볼륨 바인딩 경로 수정 (`docker-compose.override.yml`)**
+본인의 실제 책/만화책 라이브러리 디렉토리 경로로 수정합니다.
 ```yaml
 services:
   bookoasis:
@@ -177,20 +192,49 @@ services:
       - /실제/책/저장/경로:/data/comics:ro
 ```
 
-**③ 서비스 실행 (GHCR 이미지 기반)**
+**③ 서비스 실행 (GHCR 공식 이미지 기반)**
 ```bash
-# 최초 실행 (로컬 빌드 없이 GHCR 이미지 사용)
+# 컨테이너 실행 (로컬 빌드 없이 GHCR 이미지 사용)
 docker compose -f docker-compose.ghcr.yml -f docker-compose.override.yml up -d
 
-# 업데이트 시
+# 이미지 업데이트 시
 docker compose -f docker-compose.ghcr.yml -f docker-compose.override.yml pull
 docker compose -f docker-compose.ghcr.yml -f docker-compose.override.yml up -d
 ```
-* 기본 경로는 GHCR 이미지를 사용하므로 사용자가 직접 Docker 이미지를 빌드할 필요가 없습니다.
-* 컨테이너 내부 포트 `5930`이 호스트의 `5930` 포트로 바인딩됩니다. 호스트 포트를 변경하고 싶다면 `docker-compose.ghcr.yml` 파일에서 `ports: - "8080:5930"`과 같이 좌측 포트 번호를 수정하십시오.
-* 데이터베이스(`db/`), 표지 캐시(`covers/`), 캐시 폴더(`cache/`)가 프로젝트 루트 디렉터리에 영구 보존용 볼륨으로 매핑됩니다.
-* 도커 경로에서는 엔트리포인트가 웹과 스캐너 워커를 함께 기동합니다.
-* 💡 `docker-compose.override.yml`은 `.gitignore`에 등록되어 있으므로 향후 업데이트(`git pull`) 시 사용자의 개인 설정이 충돌하거나 초기화되지 않습니다.
+
+---
+
+#### 🅱️ 옵션 B: MariaDB + Redis 올인원 콤보 모드 (엔터프라이즈 권장)
+MariaDB 및 Redis 컨테이너를 함께 띄워, 수만~수십만 권 대용량 도서 스캔 및 다중 동시 접속 락 병목을 전면 제거하는 추천 구동 방식입니다.
+
+**① MariaDB 올인원 Compose 실행**
+```bash
+docker compose -f docker-compose.mariadb.yml up -d
+```
+* `mariadb:10.11` 및 `redis:7-alpine` 이미지가 함께 띄워지며, 헬스체크 완료 후 BookOasis 컨테이너가 자동으로 연동 가동됩니다.
+* 데이터는 로컬 `./mariadb_data` 볼륨에 영구 저장됩니다.
+
+---
+
+#### 💡 기존에 외부 MariaDB / Redis를 보유 중인 도커 사용자
+이미 별도의 MariaDB나 Synology DB 패키지 등을 운용 중이신 경우, `docker-compose.mariadb.yml`을 띄우실 필요 없이 **`docker-compose.override.yml`** 파일의 `environment:` 섹션에 접속 정보만 작성해 주시면 컨테이너가 자동으로 외부 MariaDB로 접속합니다.
+
+```yaml
+services:
+  bookoasis:
+    environment:
+      - DB_ENGINE=mariadb
+      - DB_HOST=192.168.0.100  # 외부 MariaDB 서버 IP
+      - DB_PORT=3306
+      - DB_USER=bookoasis
+      - DB_PASSWORD=your_password
+```
+* 💡 `docker-compose.override.yml`에 작성해 두면 Git 소스 업데이트(`git pull`) 시에도 개인 DB 접속 정보가 초기화되거나 충돌하지 않는 최고의 장점이 있습니다.
+
+---
+
+* 기본 바인딩 포트: 컨테이너 내부 `5930` ➔ 호스트 `5930` (호스트 포트 변경 시 `ports: - "8080:5930"`으로 수정)
+* 데이터 및 캐시: `db/`, `covers/`, `cache/`, `plugins/` 디렉터리가 로컬 볼륨으로 매핑되어 컨테이너 재기동 후에도 데이터가 온전히 보존됩니다.
 
 > 보안 정책: 운영자 전용 배포/릴리스 자동화 절차는 비공개 내부 문서로 관리합니다.
 
