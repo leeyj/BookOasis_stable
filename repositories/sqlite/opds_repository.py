@@ -44,10 +44,23 @@ class OpdsRepository:
         """특정 라이브러리/시리즈 내 도서의 총 개수 조회"""
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT COUNT(*) AS total FROM books WHERE library_id=? AND series_name=? AND COALESCE(is_deleted, 0) = 0",
-            (lib_id, series_name)
-        )
+        is_all = not lib_id or str(lib_id).lower() in ('all', 'general', 'adult', '0')
+        if is_all:
+            if not series_name or series_name == '__empty_series__':
+                query = "SELECT COUNT(*) AS total FROM books WHERE (series_name = '' OR series_name IS NULL) AND COALESCE(is_deleted, 0) = 0"
+                params = ()
+            else:
+                query = "SELECT COUNT(*) AS total FROM books WHERE series_name=? AND COALESCE(is_deleted, 0) = 0"
+                params = (series_name,)
+        else:
+            if not series_name or series_name == '__empty_series__':
+                query = "SELECT COUNT(*) AS total FROM books WHERE library_id=? AND (series_name = '' OR series_name IS NULL) AND COALESCE(is_deleted, 0) = 0"
+                params = (lib_id,)
+            else:
+                query = "SELECT COUNT(*) AS total FROM books WHERE library_id=? AND series_name=? AND COALESCE(is_deleted, 0) = 0"
+                params = (lib_id, series_name)
+
+        cursor.execute(query, params)
         row = cursor.fetchone()
         conn.close()
         return row['total'] if row else 0
@@ -57,12 +70,23 @@ class OpdsRepository:
         """특정 라이브러리/시리즈 내 도서 목록 페이징 조회"""
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
-        query = (
-            "SELECT id, title, file_path, cover_image, summary FROM books "
-            "WHERE library_id=? AND series_name=? AND COALESCE(is_deleted, 0) = 0 "
-            "ORDER BY title ASC, id ASC "
-        )
-        params = [lib_id, series_name]
+        is_all = not lib_id or str(lib_id).lower() in ('all', 'general', 'adult', '0')
+        if is_all:
+            if not series_name or series_name == '__empty_series__':
+                where_clause = "WHERE (series_name = '' OR series_name IS NULL) AND COALESCE(is_deleted, 0) = 0"
+                params = []
+            else:
+                where_clause = "WHERE series_name=? AND COALESCE(is_deleted, 0) = 0"
+                params = [series_name]
+        else:
+            if not series_name or series_name == '__empty_series__':
+                where_clause = "WHERE library_id=? AND (series_name = '' OR series_name IS NULL) AND COALESCE(is_deleted, 0) = 0"
+                params = [lib_id]
+            else:
+                where_clause = "WHERE library_id=? AND series_name=? AND COALESCE(is_deleted, 0) = 0"
+                params = [lib_id, series_name]
+
+        query = f"SELECT id, title, file_path, cover_image, summary FROM books {where_clause} ORDER BY title ASC, id ASC "
         if limit is not None:
             query += "LIMIT ? OFFSET ?"
             params.extend([limit, offset])

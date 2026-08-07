@@ -41,6 +41,11 @@ services:
     image: mariadb:10.11
     container_name: bookoasis_mariadb
     restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_bin
+      - --tmp-table-size=256M
+      - --max-heap-table-size=256M
     environment:
       - MARIADB_ROOT_PASSWORD=root_pass
       - MARIADB_USER=bookoasis

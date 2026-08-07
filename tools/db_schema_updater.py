@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
+"""
+db_schema_updater.py - 데이터베이스 스키마 단일 관리(Single Source of Truth) 및 동기화 도구
+"""
 import os
 import sys
 import sqlite3
 import re
 
-# 프로젝트 루트 디렉토리를 sys.path에 추가하여 상위 모듈 임포트 가능하도록 설정
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-# .env 파일 수동 로드 (.env에 정의된 DB_ENGINE 등 적용)
 env_file = os.path.join(PROJECT_ROOT, '.env')
 if os.path.exists(env_file):
     with open(env_file, 'r', encoding='utf-8') as f:
@@ -37,9 +38,259 @@ except ImportError as e:
     print(f"[오류] database.py 모듈을 임포트할 수 없습니다: {e}")
     sys.exit(1)
 
+# ==============================================================================
+# MariaDB 중앙 스키마 정의 (Single Source of Truth)
+# ==============================================================================
+MARIADB_CENTRAL_SCHEMA = """
+CREATE TABLE IF NOT EXISTS libraries (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    physical_path TEXT NOT NULL,
+    cron_schedule VARCHAR(255) DEFAULT NULL,
+    last_scanned_at DATETIME DEFAULT NULL,
+    scan_status VARCHAR(50) DEFAULT 'ready',
+    is_remote INT DEFAULT 0,
+    vfs_refresh_before_scan INT DEFAULT 0,
+    rclone_rc_url TEXT DEFAULT NULL,
+    icon VARCHAR(100) DEFAULT 'fa-book',
+    color VARCHAR(50) DEFAULT '#94a3b8',
+    hide_cover INT DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS scanner_tasks (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    task_type VARCHAR(100) NOT NULL,
+    task_key VARCHAR(255) NOT NULL UNIQUE,
+    status VARCHAR(50) NOT NULL DEFAULT 'pending',
+    kwargs TEXT,
+    stage TEXT,
+    worker_pid INT DEFAULT NULL,
+    enqueue_at VARCHAR(50),
+    started_at VARCHAR(50),
+    finished_at VARCHAR(50),
+    error_message TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS books (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    library_id BIGINT,
+    title VARCHAR(500) NOT NULL,
+    series_name VARCHAR(500),
+    author VARCHAR(500),
+    isbn VARCHAR(100),
+    file_path TEXT NOT NULL,
+    file_format VARCHAR(50) NOT NULL,
+    total_pages INT NOT NULL DEFAULT 0,
+    has_offsets INT DEFAULT 0,
+    cover_image TEXT,
+    publisher VARCHAR(255),
+    link TEXT,
+    score INT,
+    release_date VARCHAR(100),
+    summary TEXT,
+    genre VARCHAR(255),
+    tags TEXT,
+    is_favorite INT DEFAULT 0,
+    cover_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    is_deleted INT DEFAULT 0,
+    deleted_at DATETIME DEFAULT NULL,
+    metadata_locked INT DEFAULT 0,
+    series_alias VARCHAR(500),
+    title_alias VARCHAR(500),
+    file_mtime DOUBLE DEFAULT 0.0,
+    file_size BIGINT DEFAULT 0,
+    UNIQUE KEY uq_books_file_path (file_path(500)),
+    INDEX idx_books_series_name (series_name(255)),
+    INDEX idx_books_series_alias (series_alias(255)),
+    INDEX idx_books_library_id (library_id),
+    INDEX idx_books_title (title(255))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS audiobooks (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    library_id BIGINT,
+    title VARCHAR(500) NOT NULL,
+    sort_title VARCHAR(500),
+    web_id VARCHAR(100),
+    author VARCHAR(500),
+    publisher VARCHAR(255),
+    code VARCHAR(255),
+    poster TEXT,
+    premiered VARCHAR(100),
+    ratings DOUBLE DEFAULT 0.0,
+    author_intro TEXT,
+    description TEXT,
+    folder_name VARCHAR(500) NOT NULL,
+    folder_path TEXT NOT NULL,
+    total_duration DOUBLE DEFAULT 0.0,
+    total_tracks INT DEFAULT 1,
+    file_type VARCHAR(50) DEFAULT 'multi',
+    is_favorite INT DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    is_deleted INT DEFAULT 0,
+    deleted_at DATETIME DEFAULT NULL,
+    UNIQUE KEY uq_audiobooks_folder_path (folder_path(500))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS audiobook_tracks (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    audiobook_id BIGINT NOT NULL,
+    track_number INT NOT NULL,
+    track_code VARCHAR(100),
+    title VARCHAR(500),
+    filename VARCHAR(500) NOT NULL,
+    file_path TEXT NOT NULL,
+    file_mtime DOUBLE DEFAULT 0.0,
+    file_size BIGINT DEFAULT 0,
+    duration DOUBLE DEFAULT 0.0,
+    format VARCHAR(50) DEFAULT 'mp3',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_tracks_file_path (file_path(500)),
+    INDEX idx_tracks_audiobook (audiobook_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS audiobook_progress (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    audiobook_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL DEFAULT 1,
+    current_track_id BIGINT,
+    `current_time` DOUBLE DEFAULT 0.0,
+    total_progress_pct DOUBLE DEFAULT 0.0,
+    playback_rate DOUBLE DEFAULT 1.0,
+    is_completed INT DEFAULT 0,
+    last_listened_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_audiobook_user_progress (audiobook_id, user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS user_progress (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    book_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    pages_read INT DEFAULT 0,
+    is_completed INT DEFAULT 0,
+    last_read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_epub_cfi TEXT,
+    last_epub_href TEXT,
+    last_epub_spine_index INT,
+    last_epub_percent INT DEFAULT 0,
+    last_epub_fingerprint VARCHAR(255),
+    last_epub_updated_at DATETIME,
+    UNIQUE KEY uq_user_book_progress (book_id, user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS user_reading_log (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    book_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    pages_read_delta INT NOT NULL,
+    duration_seconds INT DEFAULT 0,
+    read_date DATE DEFAULT (CURRENT_DATE)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS user_favorites (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    book_id BIGINT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_user_favorite (user_id, book_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS book_offsets (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    book_id BIGINT NOT NULL,
+    page_idx INT,
+    filename VARCHAR(500),
+    local_header_offset BIGINT,
+    compress_size BIGINT,
+    file_size BIGINT,
+    compress_type INT,
+    INDEX idx_offsets_book (book_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS settings (
+    `key` VARCHAR(255) PRIMARY KEY,
+    `value` TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS scan_history (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    task_type VARCHAR(100) NOT NULL,
+    task_key VARCHAR(255),
+    status VARCHAR(50) NOT NULL,
+    kwargs TEXT,
+    enqueue_at VARCHAR(50),
+    started_at VARCHAR(50),
+    finished_at VARCHAR(50),
+    error_message TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS scanner_progress (
+    library_id VARCHAR(100),
+    folder_path VARCHAR(500) PRIMARY KEY
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS folder_mtimes (
+    folder_path VARCHAR(500) PRIMARY KEY,
+    dir_mtime DOUBLE,
+    meta_mtime DOUBLE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS users (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(100) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(50) DEFAULT 'user',
+    is_default_password INT DEFAULT 1,
+    has_adult_access INT DEFAULT 1,
+    has_audiobook_access INT DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS user_category_permissions (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    library_id BIGINT NOT NULL,
+    has_access INT DEFAULT 1,
+    UNIQUE KEY uq_user_cat_perm (user_id, library_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS collections (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT DEFAULT NULL,
+    color VARCHAR(50) DEFAULT '#7c3aed',
+    cover_image TEXT DEFAULT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_collections_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS collection_items (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    collection_id BIGINT NOT NULL,
+    book_id BIGINT DEFAULT NULL,
+    series_name VARCHAR(500) DEFAULT NULL,
+    audiobook_id BIGINT DEFAULT NULL,
+    sort_order INT DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_coll_book (collection_id, book_id),
+    UNIQUE KEY uq_coll_series (collection_id, series_name(255)),
+    UNIQUE KEY uq_coll_audiobook (collection_id, audiobook_id),
+    INDEX idx_collection_items_coll (collection_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+"""
+
+
 def _ensure_mariadb_indexes():
     """기존 MariaDB 데이터베이스에 대용량 초고속 쿼리용 복합 인덱스 자동 보강"""
-    from tools.migrator_sqlite_to_mariadb import connect_mariadb, DB_MAP
+    from tools.migrator_sqlite_to_mariadb import connect_mariadb
     indexes_to_create = [
         ('media_general', 'books', 'idx_books_lib_del_series', 'CREATE INDEX idx_books_lib_del_series ON books (library_id, is_deleted, series_name(255), id)'),
         ('media_general', 'books', 'idx_books_lib_del_title', 'CREATE INDEX idx_books_lib_del_title ON books (library_id, is_deleted, title(255), id)'),
@@ -60,7 +311,6 @@ def _ensure_mariadb_indexes():
         except Exception:
             pass
 
-    # Ensure file_path / folder_path columns use utf8mb4_bin for case-sensitive unique key matching
     col_collations = [
         ('media_general', 'books', 'file_path', 'VARCHAR(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL'),
         ('media_adult', 'books', 'file_path', 'VARCHAR(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL'),
@@ -76,11 +326,12 @@ def _ensure_mariadb_indexes():
         except Exception:
             pass
 
+
 def _ensure_mariadb_columns():
     """기존 MariaDB 데이터베이스의 테이블에 누락된 필수 컬럼 자동 ALTER TABLE 보강"""
     from tools.migrator_sqlite_to_mariadb import connect_mariadb
-    
-    # 0. 구형 tracks 테이블 RENAME 처리
+
+    # 구형 tracks 테이블 RENAME 처리
     try:
         conn = connect_mariadb('media_audiobook')
         cur = conn.cursor()
@@ -117,6 +368,8 @@ def _ensure_mariadb_columns():
         ('media_adult', 'books', 'title_alias', 'VARCHAR(500)'),
         ('media_adult', 'books', 'file_mtime', 'DOUBLE DEFAULT 0.0'),
         ('media_adult', 'books', 'file_size', 'BIGINT DEFAULT 0'),
+        ('media_general', 'collections', 'updated_at', 'DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
+        ('media_adult', 'collections', 'updated_at', 'DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
     ]
 
     for db_name, tbl, col_name, col_def in required_columns:
@@ -131,6 +384,33 @@ def _ensure_mariadb_columns():
             conn.close()
         except Exception:
             pass
+
+
+def _ensure_mariadb_indexes():
+    required_indexes = [
+        ('media_general', 'books', 'idx_books_series_name', 'CREATE INDEX idx_books_series_name ON books (series_name(255))'),
+        ('media_general', 'books', 'idx_books_series_alias', 'CREATE INDEX idx_books_series_alias ON books (series_alias(255))'),
+        ('media_general', 'books', 'idx_books_library_id', 'CREATE INDEX idx_books_library_id ON books (library_id)'),
+        ('media_general', 'books', 'idx_books_title', 'CREATE INDEX idx_books_title ON books (title(255))'),
+        ('media_adult', 'books', 'idx_books_series_name', 'CREATE INDEX idx_books_series_name ON books (series_name(255))'),
+        ('media_adult', 'books', 'idx_books_series_alias', 'CREATE INDEX idx_books_series_alias ON books (series_alias(255))'),
+        ('media_adult', 'books', 'idx_books_library_id', 'CREATE INDEX idx_books_library_id ON books (library_id)'),
+        ('media_adult', 'books', 'idx_books_title', 'CREATE INDEX idx_books_title ON books (title(255))'),
+    ]
+
+    for db_name, tbl, idx_name, idx_sql in required_indexes:
+        try:
+            conn = connect_mariadb(db_name)
+            cur = conn.cursor()
+            cur.execute(f"SHOW INDEX FROM `{tbl}` WHERE Key_name = %s", (idx_name,))
+            if not cur.fetchone():
+                cur.execute(idx_sql)
+                conn.commit()
+                print(f"  [+] MariaDB 고속 성능 인덱스 생성 완료: `{db_name}`.`{tbl}`.{idx_name}")
+            conn.close()
+        except Exception:
+            pass
+
 
 def run_schema_update():
     print("=" * 60)
@@ -148,19 +428,18 @@ def run_schema_update():
                 init_schema(db_type, dbname)
             _ensure_mariadb_columns()
             _ensure_mariadb_indexes()
-            _ensure_mariadb_scan_history_schema()
             print("[+] MariaDB 데이터베이스, 스키마 및 고속 복합 인덱스 검사 완료.")
         except Exception as ex:
             print(f"[!] MariaDB 스키마 검사 중 경고: {ex}")
         return
-    
+
     # 1. DB 파일 존재 및 경로 확인
     db_paths = {
         '일반 DB (media_general)': DB_GENERAL_PATH,
         '성인 DB (media_adult)': DB_ADULT_PATH,
         '오디오북 DB (media_audiobook)': DB_AUDIOBOOK_PATH
     }
-    
+
     for db_name, db_path in db_paths.items():
         print(f"[*] {db_name} 경로 확인: {db_path}")
         if not os.path.exists(db_path):
@@ -169,77 +448,65 @@ def run_schema_update():
             size_mb = os.path.getsize(db_path) / (1024 * 1024)
             print(f"    -> [확인] DB 파일 존재함 (크기: {size_mb:.2f} MB)")
 
-    # 2. init_databases 실행하여 기본 테이블 생성 및 누락 컬럼 체크 자동 수행
     print("\n[*] 1단계: 데이터베이스 기본 초기화 및 기본 마이그레이션 실행 중...")
     try:
         init_databases()
         print(" -> [성공] 데이터베이스 기본 초기화 완료.")
     except Exception as e:
         print(f" -> [실패] 데이터베이스 초기화 중 오류 발생: {e}")
-        # 오류가 나더라도 개별 테이블 점검 및 강제 마이그레이션을 계속 시도합니다.
 
-    # 3. 개별 DB 강제 스키마 갱신 및 무결성 정비
     print("\n[*] 2단계: 개별 데이터베이스 강제 스키마 갱신 및 WAL 정리 시작...")
-    
-    # database.py의 schema 문자열 및 indexes_schema 가져오기
+
     try:
         with open(os.path.join(PROJECT_ROOT, 'database.py'), 'r', encoding='utf-8') as f:
             content = f.read()
-        
-        # schema = """ ... """ 부분 추출
+
         schema_match = re.search(r'schema\s*=\s*"""(.*?)"""', content, re.DOTALL)
         indexes_match = re.search(r'indexes_schema\s*=\s*"""(.*?)"""', content, re.DOTALL)
-        
+
         schema_text = schema_match.group(1) if schema_match else ""
         indexes_text = indexes_match.group(1) if indexes_match else ""
     except Exception as parse_err:
         print(f"[경고] database.py 파일 분석 실패: {parse_err}")
         schema_text = None
         indexes_text = None
-    
+
     for db_key, db_path in [('general', DB_GENERAL_PATH), ('adult', DB_ADULT_PATH), ('audiobook', DB_AUDIOBOOK_PATH)]:
         if not os.path.exists(db_path):
             continue
-            
+
         print(f"\n[+] {db_key.upper()} DB 상세 점검 및 마이그레이션:")
         conn = None
         try:
-            # 커넥션 풀을 우회하여 직접 파일 연결을 맺고 동기화 진행
             conn = sqlite3.connect(db_path, timeout=30.0)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            
-            # (1) PRAGMA 무결성 확인
+
             print(f"  - DB 연결 및 무결성 확인 중...")
             cursor.execute("PRAGMA integrity_check")
             integrity = cursor.fetchone()[0]
             print(f"    -> integrity_check 결과: {integrity}")
-            
+
             if integrity != 'ok':
                 print(f"    -> [경고] 무결성 이상이 감지되었습니다! 스키마 동기화에 영향이 있을 수 있습니다.")
-            
-            # (2) auto_migrate_schema를 통한 컬럼 추가 점검
+
             if schema_text:
                 print(f"  - 스키마 내 누락 컬럼 자동 탐지 및 추가 중...")
                 auto_migrate_schema(conn, schema_text)
                 conn.commit()
-            
-            # (3) 인덱스 생성 및 점검
+
             if indexes_text:
                 print(f"  - 스키마 내 누락 인덱스 자동 생성 중...")
-                # 개별 인덱스 생성 쿼리로 분할해서 실행
                 for query in indexes_text.split(';'):
                     query = query.strip()
                     if query:
                         try:
                             cursor.execute(query)
                         except sqlite3.OperationalError as idx_err:
-                            # 이미 있는 등의 에러는 무시
                             if "already exists" not in str(idx_err).lower():
                                 print(f"    -> 인덱스 생성 에러 ({query[:30]}...): {idx_err}")
                 conn.commit()
-            
-            # (4) 구형 FTS5 가상 테이블 디스크 정리
+
             print(f"  - 구형 FTS5 가상 테이블 및 그림자 세그먼트 정리 중...")
             try:
                 from database import cleanup_legacy_fts_index
@@ -247,13 +514,12 @@ def run_schema_update():
                 print(f"    -> 구형 FTS5 가상 테이블 정리 완료.")
             except Exception as fts_err:
                 print(f"    -> FTS5 정리 통과: {fts_err}")
-            
-            # (5) WAL 모드 트랜케이트 (체크포인트를 통해 WAL에 남아있는 모든 데이터를 DB 원본에 병합)
+
             print(f"  - WAL 체크포인트(TRUNCATE) 수행 중...")
             cursor.execute("PRAGMA wal_checkpoint(TRUNCATE)")
             conn.commit()
             print(f"    -> WAL 체크포인트 완료 및 임시 저널 파일 병합 완료.")
-            
+
         except Exception as db_err:
             print(f"  - [오류] {db_key.upper()} DB 작업 중 문제 발생: {db_err}")
             if conn:
@@ -261,66 +527,13 @@ def run_schema_update():
         finally:
             if conn:
                 conn.close()
-                
-    # 4. WAL 체크포인트 완료 후 SQLite C-Engine에 의한 임시 파일 안전 닫기 완료
+
     print("\n[*] 3단계: WAL 체크포인트 마감 완료 (SQLite C-Engine 세션 동기화 정돈 완료).")
-                    
+
     print("\n" + "=" * 60)
     print(" 데이터베이스 스키마 및 마이그레이션 동기화가 성공적으로 완료되었습니다!")
     print(" 서비스를 재시작해 주시기 바랍니다.")
     print("=" * 60)
-
-def _ensure_mariadb_scan_history_schema():
-    """MariaDB 모드에서 scan_history 및 scanner_tasks 테이블 생성 및 AUTO_INCREMENT 컬럼 보완"""
-    for db_type in ['general', 'adult', 'audiobook']:
-        conn = None
-        try:
-            conn = database.get_connection(db_type)
-            cursor = conn.cursor()
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS scan_history (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    task_type VARCHAR(100) NOT NULL,
-                    task_key VARCHAR(255),
-                    status VARCHAR(50) NOT NULL,
-                    kwargs TEXT,
-                    enqueue_at VARCHAR(50),
-                    started_at VARCHAR(50),
-                    finished_at VARCHAR(50),
-                    error_message TEXT,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-            """)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS scanner_tasks (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    task_type VARCHAR(100) NOT NULL,
-                    task_key VARCHAR(255),
-                    status VARCHAR(50) NOT NULL DEFAULT 'pending',
-                    kwargs TEXT,
-                    error_message TEXT,
-                    enqueue_at VARCHAR(50),
-                    started_at VARCHAR(50),
-                    finished_at VARCHAR(50),
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-            """)
-            # id 컬럼에 AUTO_INCREMENT가 없을 경우를 위한 안전 보완 구문
-            try:
-                cursor.execute("ALTER TABLE scan_history MODIFY COLUMN id INT AUTO_INCREMENT;")
-            except Exception:
-                pass
-            try:
-                cursor.execute("ALTER TABLE scanner_tasks MODIFY COLUMN id INT AUTO_INCREMENT;")
-            except Exception:
-                pass
-            conn.commit()
-        except Exception as e:
-            print(f"[!] MariaDB scan_history 스키마 보완 경고 ({db_type}): {e}")
-        finally:
-            if conn:
-                conn.close()
 
 if __name__ == '__main__':
     run_schema_update()

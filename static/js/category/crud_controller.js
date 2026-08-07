@@ -349,9 +349,13 @@ export async function submitLibraryForm(event) {
     }
 
     if (result.success) {
-      console.log('[Category-CRUD] 카테고리 저장 성공! alert 표시 후 모달을 닫고 목록을 새로고침합니다.');
-      alert(result.message);
+      console.log('[Category-CRUD] 카테고리 저장 성공! 모달을 즉시 닫고 목록을 새로고침합니다.');
       closeLibraryModal();
+      if (typeof showToast === 'function') {
+        showToast(result.message, 'success');
+      } else {
+        alert(result.message);
+      }
       if (typeof window.loadLibraries === 'function') {
         await window.loadLibraries();
       }
@@ -359,12 +363,14 @@ export async function submitLibraryForm(event) {
         selectCategory(String(id), true);
       }
     } else {
-      console.error('[Category-CRUD] 카테고리 저장 실패:', result.error);
-      alert(i18n.t('category.save_error', {error: result.error}));
+      console.error('[Category-CRUD] 카테고리 저장 실패:', result ? result.error : '알 수 없는 오류');
+      const errDetail = result && result.error ? result.error : '오류가 발생했습니다.';
+      alert(`[카테고리 저장 오류]\n${errDetail}`);
     }
   } catch (e) {
-    console.error('라이브러리 저장 실패:', e);
-    alert(i18n.t('category.save_server_error'));
+    console.error('라이브러리 저장 예외 발생:', e);
+    const errDetail = e && e.message ? e.message : String(e);
+    alert(`[서버 통신/저장 예외]\n${errDetail}`);
   } finally {
     const submitBtn = document.getElementById('library-form-submit-btn');
     if (submitBtn) {

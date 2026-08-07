@@ -90,7 +90,7 @@ def get_media_all_list():
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
     library_id = request.args.get('library_id')
-    user_id = session.get('user_id')
+    user_id = session.get('user_id', 1)
     role = session.get('role')
     try:
         series_list = SeriesService.get_all_books_list(

@@ -883,6 +883,41 @@ body {
     text-shadow: 0 0 8px rgba(240, 171, 252, 0.5);
 }
 
+/* 사이드바 "더 보기 / 접기" Plex 스타일 버튼 */
+.sidebar-menu .sidebar-more-btn {
+    color: #a78bfa;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    opacity: 0.85;
+    padding: 0.45rem 1rem;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    border: 1px solid transparent;
+    user-select: none;
+    margin-top: 0.1rem;
+}
+
+.sidebar-menu .sidebar-more-btn:hover {
+    opacity: 1;
+    background: rgba(167, 139, 250, 0.1);
+    border-color: rgba(167, 139, 250, 0.25);
+    color: #c4b5fd;
+}
+
+.sidebar-menu .sidebar-more-btn i {
+    font-size: 0.72rem;
+    transition: transform 0.18s ease;
+}
+
+.sidebar-menu .sidebar-more-btn:hover i {
+    transform: translateX(2px);
+}
+
 /* 사이드바 하단 고정 블록(설정/계정)의 상단 이동 옵션 */
 #sidebar-collapsible-content.sidebar-controls-top {
     justify-content: flex-start !important;

@@ -164,7 +164,12 @@ def get_favorite_entries(db_type: str, download_prefix: str, urn_prefix: str, us
         cnt = int(b.get('book_count', 1) or 1)
         if cnt > 1:
             series_name = b['title']
-            feed_prefix = download_prefix.replace('/download', '/series')
+            if '/download/general' in download_prefix:
+                feed_prefix = download_prefix.replace('/download/general', '/series')
+            elif '/download/adult' in download_prefix:
+                feed_prefix = download_prefix.replace('/download/adult', '/adult/series')
+            else:
+                feed_prefix = download_prefix.replace('/download', '/series')
             entries.append({
                 'id': f"urn:{urn_prefix}:favorite:series:{i}",
                 'title': f"{series_name} ({cnt}권)",

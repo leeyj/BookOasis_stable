@@ -6,6 +6,9 @@ import { updateCurrentCategoryIndicator } from '../category_indicator.js';
 import { bindSidebarContextMenu } from './context_menu.js';
 import { triggerAddLibrary } from './crud_controller.js';
 
+// 고정 포함 전체 15개 이상부터 "더 보기" 버튼 노출
+const SIDEBAR_MORE_THRESHOLD = 15;
+
 function isCurrentUserAdmin() {
   const user = state.currentUser || window.currentUser || {};
   return String(user.role || '').trim().toLowerCase() === 'admin';
@@ -18,6 +21,63 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+}
+
+/**
+ * Plex 스타일 사이드바 "더 보기" 제어
+ * - 총 카테고리 항목 수 >= SIDEBAR_MORE_THRESHOLD 일 때 (THRESHOLD-1)번째 항목 이후를 접어서 보여줌
+ * - 활성 카테고리가 숨겨지는 영역에 있으면 자동 전개
+ * - localStorage(sidebar_more_expanded)로 상태 기억
+ */
+export function applySidebarShowMore(sidebar, currentLibraryId) {
+  if (!sidebar) return;
+
+  // 기존 "더 보기" / "접기" 버튼 제거
+  sidebar.querySelectorAll('[data-role="sidebar-show-more"]').forEach(el => el.remove());
+
+  const items = Array.from(sidebar.querySelectorAll('li[data-role="sidebar-category-dynamic"]'));
+  const total = items.length;
+
+  if (total < SIDEBAR_MORE_THRESHOLD) {
+    // 15개 미만이면 모두 노출하고 종료
+    items.forEach(item => { item.style.display = ''; });
+    return;
+  }
+
+  const savedExpanded = localStorage.getItem('sidebar_more_expanded') === 'true';
+
+  // 활성 카테고리가 숨겨질 영역에 있으면 자동 전개
+  const activeItem = currentLibraryId
+    ? sidebar.querySelector(`[data-category-id="${currentLibraryId}"]`)
+    : null;
+  const activeIdx = activeItem ? items.indexOf(activeItem) : -1;
+  const forceExpand = activeIdx >= SIDEBAR_MORE_THRESHOLD - 1;
+
+  const expanded = savedExpanded || forceExpand;
+  const visibleCount = SIDEBAR_MORE_THRESHOLD - 1; // 14개까지 노출
+
+  items.forEach((item, idx) => {
+    item.style.display = (idx >= visibleCount && !expanded) ? 'none' : '';
+  });
+
+  // "더 보기" / "접기" 버튼 생성
+  const moreBtn = document.createElement('li');
+  moreBtn.className = 'menu-item sidebar-more-btn';
+  moreBtn.dataset.role = 'sidebar-show-more';
+  const hiddenCount = total - visibleCount;
+  if (expanded) {
+    moreBtn.innerHTML = `<i class="fa-solid fa-chevron-up"></i> <span>접기</span>`;
+    sidebar.appendChild(moreBtn);
+  } else {
+    moreBtn.innerHTML = `<span>더 보기 (${hiddenCount})</span> <i class="fa-solid fa-chevron-right"></i>`;
+    // visibleCount - 1번째 항목 바로 뒤에 삽입
+    const insertAfter = items[visibleCount - 1];
+    if (insertAfter && insertAfter.parentNode) {
+      insertAfter.after(moreBtn);
+    } else {
+      sidebar.appendChild(moreBtn);
+    }
+  }
 }
 
 function initDynamicSidebarDelegation() {
@@ -51,6 +111,18 @@ function initDynamicSidebarDelegation() {
       event.preventDefault();
       event.stopPropagation();
       toggleCategoryOrderPin();
+      return;
+    }
+
+    // 더 보기 / 접기 버튼 클릭 처리
+    const moreBtn = rawTarget.closest('[data-role="sidebar-show-more"]');
+    if (moreBtn) {
+      event.preventDefault();
+      event.stopPropagation();
+      const isExpanded = localStorage.getItem('sidebar_more_expanded') === 'true';
+      localStorage.setItem('sidebar_more_expanded', isExpanded ? 'false' : 'true');
+      const sidebarEl = document.getElementById('sidebar-categories');
+      applySidebarShowMore(sidebarEl, state.currentLibraryId);
       return;
     }
 
@@ -164,6 +236,7 @@ export async function loadLibraries() {
       }
 
       sidebar.innerHTML = html;
+      applySidebarShowMore(sidebar, state.currentLibraryId);
       const activeItem = document.getElementById(`category-${state.currentLibraryId}`) || sidebar.querySelector(`[data-id="${state.currentLibraryId}"]`);
       state.currentLibraryHideCovers = !!(activeItem && activeItem.dataset && activeItem.dataset.type === 'custom' && activeItem.dataset.hideCover === '1');
       updateCurrentCategoryIndicator(state.currentLibraryId, activeItem);

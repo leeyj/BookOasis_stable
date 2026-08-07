@@ -19,7 +19,9 @@ export function initInfiniteScrollObserver() {
     if (entry.isIntersecting) {
       const detailView = document.getElementById('book-detail-view');
       if (detailView && detailView.style.display !== 'none') return;
-      if (state.currentLibraryId === 'history' || state.currentLibraryId === 'home' || state.currentLibraryId === 'settings') return;
+      
+      const currentId = state.currentLibraryId || '';
+      if (['history', 'home', 'settings', 'collection', 'plugins'].includes(currentId) || currentId.startsWith('plugin_')) return;
       if (state.isLoading || !state.hasMore) return;
 
       console.log('[InfiniteScroll-Observer] Spinner intersected -> Loading next page...');

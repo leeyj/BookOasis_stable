@@ -1,4 +1,6 @@
 // api.js – 서버와 통신하는 함수들
+import { state } from './state.js';
+
 async function safeFetch(url, options = {}) {
   const res = await fetch(url, options);
   if (res.status === 401) {
@@ -62,7 +64,7 @@ export async function fetchStream(params) {
 }
 
 export async function addLibrary(formData) {
-  const res = await fetch('/api/media/libraries/add', {
+  const res = await safeFetch('/api/media/libraries/add', {
     method: 'POST',
     body: formData
   });
@@ -70,7 +72,7 @@ export async function addLibrary(formData) {
 }
 
 export async function editLibrary(formData) {
-  const res = await fetch('/api/media/libraries/edit', {
+  const res = await safeFetch('/api/media/libraries/edit', {
     method: 'POST',
     body: formData
   });
@@ -78,7 +80,7 @@ export async function editLibrary(formData) {
 }
 
 export async function deleteLibrary(formData) {
-  const res = await fetch('/api/media/libraries/delete', {
+  const res = await safeFetch('/api/media/libraries/delete', {
     method: 'POST',
     body: formData
   });
@@ -86,6 +88,7 @@ export async function deleteLibrary(formData) {
 }
 
 export async function toggleFavorite(type, bookId, isFavorite) {
+  console.log(`[Favorite-API] toggleFavorite 호출: type=${type}, bookId=${bookId}, isFavorite=${isFavorite}`);
   const formData = new FormData();
   formData.append('type', type);
   formData.append('is_favorite', isFavorite ? 1 : 0);
@@ -93,10 +96,13 @@ export async function toggleFavorite(type, bookId, isFavorite) {
     method: 'POST',
     body: formData
   });
-  return res.json();
+  const data = await res.json();
+  console.log(`[Favorite-API] toggleFavorite 서버 응답:`, data);
+  return data;
 }
 
 export async function toggleSeriesFavorite(type, seriesName, isFavorite) {
+  console.log(`[Favorite-API] toggleSeriesFavorite 호출: type=${type}, seriesName="${seriesName}", isFavorite=${isFavorite}`);
   const formData = new FormData();
   formData.append('type', type);
   formData.append('series_name', seriesName);
@@ -105,8 +111,18 @@ export async function toggleSeriesFavorite(type, seriesName, isFavorite) {
     method: 'POST',
     body: formData
   });
-  return res.json();
+  const data = await res.json();
+  console.log(`[Favorite-API] toggleSeriesFavorite 서버 응답:`, data);
+  return data;
 }
+
+window.toggleFavoriteAction = async function (bookId, isFavorite) {
+  return toggleFavorite(state.currentLibraryType || 'general', bookId, isFavorite);
+};
+
+window.toggleSeriesFavoriteAction = async function (seriesName, isFavorite) {
+  return toggleSeriesFavorite(state.currentLibraryType || 'general', seriesName, isFavorite);
+};
 
 export async function scanSingleBook(type, bookId) {
   const formData = new FormData();

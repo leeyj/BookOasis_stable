@@ -275,23 +275,26 @@ def opds_adult_library(lib_id: int):
     return _atom_response(xml)
 
 
-@opds_bp.route('/opds/series/<int:lib_id>/<string:series_name>', methods=['GET'])
-def opds_series_books(lib_id: int, series_name: str):
+@opds_bp.route('/opds/series/<string:lib_id>/<path:series_name>', methods=['GET'])
+@opds_bp.route('/opds/series/<path:series_name>', methods=['GET'])
+def opds_series_books(series_name: str, lib_id: str = 'all'):
     auth_user = _get_authenticated_user(is_adult=False)
     if not auth_user:
         return _unauthorized()
 
+    from urllib.parse import unquote
+    resolved_series_name = '' if series_name == '__empty_series__' else unquote(series_name)
     page, page_size, offset = _get_page_params()
-    cache_key = f'opds_series:general:{lib_id}:{series_name}:{page}:{page_size}'
+    cache_key = f'opds_series:general:{lib_id}:{resolved_series_name}:{page}:{page_size}'
     cached_xml = _get_cached_opds_response(cache_key)
 
-    entries, total = get_book_entries('general', lib_id, series_name, '/opds/download/general', 'general', limit=page_size, offset=offset)
+    entries, total = get_book_entries('general', lib_id, resolved_series_name, '/opds/download/general', 'general', limit=page_size, offset=offset)
     next_link = None
     if offset + page_size < total:
         next_link = build_external_request_url(request, {'page': page + 1, 'page_size': page_size})
 
     if cached_xml is None:
-        xml = _opds_xml('general', f"Series: {series_name}", entries, next_link=next_link)
+        xml = _opds_xml('general', f"Series: {resolved_series_name}", entries, next_link=next_link)
         _set_cached_opds_response(cache_key, xml)
     else:
         xml = cached_xml
@@ -310,24 +313,29 @@ def opds_series_books(lib_id: int, series_name: str):
 
 
 
-@opds_bp.route('/opds/adult/series/<int:lib_id>/<string:series_name>', methods=['GET'])
-@opds_bp.route('/opds-adult/series/<int:lib_id>/<string:series_name>', methods=['GET'])
-def opds_adult_series_books(lib_id: int, series_name: str):
+@opds_bp.route('/opds/adult/series/<string:lib_id>/<path:series_name>', methods=['GET'])
+@opds_bp.route('/opds-adult/series/<string:lib_id>/<path:series_name>', methods=['GET'])
+@opds_bp.route('/opds/adult/series/<path:series_name>', methods=['GET'])
+@opds_bp.route('/opds-adult/series/<path:series_name>', methods=['GET'])
+def opds_adult_series_books(series_name: str, lib_id: str = 'all'):
     if not _check_auth(is_adult=True):
         return _unauthorized()
 
+    from urllib.parse import unquote
+    resolved_series_name = '' if series_name == '__empty_series__' else unquote(series_name)
     page, page_size, offset = _get_page_params()
-    cache_key = f'opds_series:adult:{lib_id}:{series_name}:{page}:{page_size}'
+    cache_key = f'opds_series:adult:{lib_id}:{resolved_series_name}:{page}:{page_size}'
     cached_xml = _get_cached_opds_response(cache_key)
     if cached_xml is not None:
         return _atom_response(cached_xml)
 
-    entries, total = get_book_entries('adult', lib_id, series_name, '/opds/download/adult', 'adult', limit=page_size, offset=offset)
+    entries, total = get_book_entries('adult', lib_id, resolved_series_name, '/opds/download/adult', 'adult', limit=page_size, offset=offset)
     next_link = None
     if offset + page_size < total:
         next_link = build_external_request_url(request, {'page': page + 1, 'page_size': page_size})
-    xml = _opds_xml('adult', f"Adult Series: {series_name}", entries, is_adult=True, next_link=next_link)
+    xml = _opds_xml('adult', f"Adult Series: {resolved_series_name}", entries, is_adult=True, next_link=next_link)
     _set_cached_opds_response(cache_key, xml)
+    return _atom_response(xml)
     return _atom_response(xml)
 
 

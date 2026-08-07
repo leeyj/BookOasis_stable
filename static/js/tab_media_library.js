@@ -8,6 +8,7 @@ import { switchActiveView } from './view_manager.js';
 
 // category.js CRUD 임포트
 import { loadLibraries, triggerAddLibrary, triggerEditLibrary, triggerDeleteLibrary, closeLibraryModal, submitLibraryForm, triggerScanLibrary, triggerScanLibraryCovers, triggerCancelScanLibrary } from './category.js';
+import { applySidebarShowMore } from './category/index.js';
 
 // scheduler.js 임포트
 import { loadLibrarySchedules, saveLibrarySchedule, runLibraryScanNow } from './scheduler.js';
@@ -388,6 +389,9 @@ export function selectCategory(id, skipHistory = false) {
   }
   if (activeItem) {
     activeItem.classList.add('active');
+    // 활성 카테고리가 숨겨진 영역에 있는 경우 자동 전개
+    const sidebarEl = document.getElementById('sidebar-categories');
+    if (sidebarEl) applySidebarShowMore(sidebarEl, id);
   }
   state.currentLibraryHideCovers = !!(activeItem && activeItem.dataset && activeItem.dataset.type === 'custom' && activeItem.dataset.hideCover === '1');
   updateCurrentCategoryIndicator(id, activeItem);

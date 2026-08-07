@@ -317,7 +317,13 @@ class MariadbCursorWrapper:
             if m:
                 set_clause = m.group(1)
                 set_clause = re.sub(r'EXCLUDED\.([a-zA-Z0-9_]+)', r'VALUES(\1)', set_clause, flags=re.IGNORECASE)
-        # 4. MariaDB/MySQL 예약어 key / value 자동 백틱 이스케이프 보안책
+        # 4. SQLite datetime('now', ...) ➔ MariaDB NOW() / DATE_SUB(NOW(), INTERVAL x DAY) 자동 변환
+        if 'datetime(' in converted.lower() and 'now' in converted.lower():
+            import re
+            converted = re.sub(r"datetime\s*\(\s*'now'\s*,\s*'-(\d+)\s+days?'[^)]*\)", r"DATE_SUB(NOW(), INTERVAL \1 DAY)", converted, flags=re.IGNORECASE)
+            converted = re.sub(r"datetime\s*\(\s*'now'[^)]*\)", r"NOW()", converted, flags=re.IGNORECASE)
+
+        # 5. MariaDB/MySQL 예약어 key / value 자동 백틱 이스케이프 보안책
         if 'settings' in converted and '`key` ' not in converted:
             import re
             converted = re.sub(r'\bWHERE\s+key\b', 'WHERE `key`', converted, flags=re.IGNORECASE)
@@ -978,7 +984,8 @@ def init_databases():
         description TEXT DEFAULT NULL,
         color TEXT DEFAULT '#7c3aed',
         cover_image TEXT DEFAULT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS collection_items (
@@ -1002,6 +1009,7 @@ def init_databases():
     CREATE INDEX IF NOT EXISTS idx_book_offsets_book_id ON book_offsets(book_id);
     CREATE INDEX IF NOT EXISTS idx_book_offsets_book_page ON book_offsets(book_id, page_idx);
     CREATE INDEX IF NOT EXISTS idx_books_series_name ON books(series_name);
+    CREATE INDEX IF NOT EXISTS idx_books_series_alias ON books(series_alias);
     CREATE INDEX IF NOT EXISTS idx_books_library_id ON books(library_id);
     CREATE INDEX IF NOT EXISTS idx_books_is_favorite ON books(is_favorite);
     CREATE INDEX IF NOT EXISTS idx_books_created_at ON books(created_at);

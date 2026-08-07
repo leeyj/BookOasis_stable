@@ -171,9 +171,9 @@ class SeriesService:
         favorite_only = library_id == 'favorite'
         
         now = time.time()
-        # 글로벌 인메모리 통캐시 (5분 간 전역 공유 - 0.0001초 응답)
-        cache_key = f"global:{db_type}:{library_id}"
-        if cache_key in _ALL_BOOKS_CACHE:
+        # 즐겨찾기 카테고리는 유저별 개별 데이터이므로 글로벌 통캐시에서 제외하거나 유저 키 적용
+        cache_key = f"user:{user_id}:{db_type}:{library_id}" if favorite_only else f"global:{db_type}:{library_id}"
+        if not favorite_only and cache_key in _ALL_BOOKS_CACHE:
             cache_ts, cached_entries = _ALL_BOOKS_CACHE[cache_key]
             if now - cache_ts < 300.0:
                 print(f"[PERF-PROFILE] get_all_books_list(lib={library_id}) GLOBAL IN-MEMORY CACHE HIT! ({len(cached_entries)} entries) - {(time.perf_counter()-t0)*1000:.1f}ms")

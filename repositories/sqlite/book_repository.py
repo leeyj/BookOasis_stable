@@ -57,6 +57,7 @@ class BookRepository:
     @staticmethod
     def update_series_favorite(db_type, series_name, is_favorite, user_id):
         """특정 시리즈의 모든 도서 즐겨찾기 일괄 등록/해제"""
+        safe_user_id = int(user_id) if user_id is not None and int(user_id) > 0 else 1
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
@@ -66,19 +67,22 @@ class BookRepository:
                     INSERT OR IGNORE INTO user_favorites (user_id, book_id, created_at)
                     SELECT ?, id, CURRENT_TIMESTAMP
                     FROM books
-                    WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0
+                    WHERE (series_name = ? OR (COALESCE(series_name, '') = '' AND title = ?))
+                      AND COALESCE(is_deleted, 0) = 0
                     """,
-                    (user_id, series_name)
+                    (safe_user_id, series_name, series_name)
                 )
             else:
                 cursor.execute(
                     """
                     DELETE FROM user_favorites
                     WHERE user_id = ? AND book_id IN (
-                        SELECT id FROM books WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0
+                        SELECT id FROM books
+                        WHERE (series_name = ? OR (COALESCE(series_name, '') = '' AND title = ?))
+                          AND COALESCE(is_deleted, 0) = 0
                     )
                     """,
-                    (user_id, series_name)
+                    (safe_user_id, series_name, series_name)
                 )
             conn.commit()
             return True

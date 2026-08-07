@@ -222,18 +222,18 @@ class AppOpdsHandlers:
         self._set_cached_response(cache_key, xml)
         return self._atom_response(xml)
 
-    def handle_series_feed(self, is_adult: bool, lib_id: int, series_name: str):
+    def handle_series_feed(self, is_adult: bool, lib_id, series_name: str):
         if not self._check_auth_cached(is_adult=is_adult):
             return self._unauthorized()
 
+        from urllib.parse import unquote
+        resolved_series_name = '' if series_name == EMPTY_SERIES_TOKEN else unquote(series_name)
         db_type = 'adult' if is_adult else 'general'
         page, page_size, offset = self._get_page_params()
-        cache_key = f"app_opds_series:{db_type}:{lib_id}:{series_name}:{page}:{page_size}"
+        cache_key = f"app_opds_series:{db_type}:{lib_id}:{resolved_series_name}:{page}:{page_size}"
         cached_xml = self._get_cached_response(cache_key)
         if cached_xml is not None:
             return self._atom_response(cached_xml)
-
-        resolved_series_name = '' if series_name == EMPTY_SERIES_TOKEN else series_name
         if is_adult:
             entries, total = get_book_entries('adult', lib_id, resolved_series_name, '/app-opds/download/adult', 'app:adult', limit=page_size, offset=offset)
         else:

@@ -21,9 +21,8 @@ def get_dashboard_insights():
 
         if db_type == 'adult':
             from api.auth import check_adult_permission
-            has_perm, err_resp = check_adult_permission()
-            if not has_perm:
-                return err_resp
+            if not check_adult_permission('adult'):
+                return jsonify({'success': False, 'error': '성인 카테고리 접근 권한이 없습니다.'}), 403
 
         # 1. Currently Reading & 히스토리 도서 목록 (검증된 ReadingHistoryService 활용)
         currently_reading = []

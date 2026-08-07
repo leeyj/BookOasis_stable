@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 import os
+import datetime
+
+def _is_mariadb_mode():
+    engine = os.environ.get('DB_ENGINE', os.environ.get('DBMS', 'sqlite')).lower()
+    return engine in ('mariadb', 'mysql')
 
 def _normalize_path(path):
     if not path:
@@ -25,6 +30,7 @@ def detect_and_handle_book_movement(cursor, db_books, found_file_paths, db_meta_
     deleted_paths = deleted_paths - deleted_imgdir_paths
     new_paths = new_paths - new_imgdir_paths
 
+    ph = '%s' if _is_mariadb_mode() else '?'
     if deleted_paths and new_paths:
         del_basename_map = {}
         for dp in deleted_paths:
@@ -36,7 +42,7 @@ def detect_and_handle_book_movement(cursor, db_books, found_file_paths, db_meta_
             if basename in del_basename_map:
                 old_path, book_id = del_basename_map[basename]
                 # DB 저장 시에도 정규화된(슬래시 형태의) 경로를 사용하여 OS 이식성 보장
-                cursor.execute("UPDATE books SET file_path = ? WHERE id = ?", (np, book_id))
+                cursor.execute(f"UPDATE books SET file_path = {ph} WHERE id = {ph}", (np, book_id))
                 print(f"[Scanner-Move] 🚚 Book movement detection complete: '{old_path}' -> '{np}' (Existing ID {book_id} and reading history maintained)")
                 
                 # Update cache info in memory
@@ -58,6 +64,7 @@ def handle_deleted_books(cursor, db_books, deleted_paths, target_paths, found_fi
     """Transaction-safely soft delete books no longer found, and restore previously soft deleted books if found again"""
     norm_db_books = { _normalize_path(k): v for k, v in db_books.items() }
     norm_found_file_paths = { _normalize_path(p) for p in found_file_paths }
+    ph = '%s' if _is_mariadb_mode() else '?'
 
     # 0. 복구 처리 (기존에 is_deleted=1 상태였으나 물리적으로 다시 발견된 책 복구)
     if norm_found_file_paths:
@@ -65,12 +72,12 @@ def handle_deleted_books(cursor, db_books, deleted_paths, target_paths, found_fi
         if restore_paths:
             for i in range(0, len(restore_paths), 900):
                 chunk = restore_paths[i:i+900]
-                placeholders = ','.join(['?'] * len(chunk))
+                placeholders = ','.join([ph] * len(chunk))
                 cursor.execute(f"""
                     UPDATE books 
                     SET is_deleted = 0, deleted_at = NULL 
                     WHERE file_path IN ({placeholders}) AND is_deleted = 1
-                """, chunk)
+                """, tuple(chunk) if _is_mariadb_mode() else chunk)
 
     if not deleted_paths:
         return True
@@ -85,30 +92,32 @@ def handle_deleted_books(cursor, db_books, deleted_paths, target_paths, found_fi
         norm_dp = _normalize_path(dp)
         if norm_dp in norm_db_books:
             book_id = norm_db_books[norm_dp]
-            cursor.execute("""
+            cursor.execute(f"""
                 UPDATE books 
                 SET is_deleted = 1, deleted_at = CURRENT_TIMESTAMP 
-                WHERE id = ?
+                WHERE id = {ph}
             """, (book_id,))
             print(f"[Scanner] File disappearance detected, set to trash: {dp}")
             
     # 2. [대안 2 적용] 7일 이상 경과한 소프트 딜리트 도서들을 영구 하드 딜리트 (자동 비우기)
     try:
-        cursor.execute("""
+        cutoff = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')
+        cursor.execute(f"""
             SELECT id, cover_image FROM books
             WHERE COALESCE(is_deleted, 0) = 1
-              AND deleted_at <= datetime('now', '-7 days', 'localtime')
-        """)
+              AND deleted_at <= {ph}
+        """, (cutoff,))
         old_deleted_rows = cursor.fetchall()
         if old_deleted_rows:
             old_ids = [r['id'] for r in old_deleted_rows]
-            placeholders = ','.join(['?'] * len(old_ids))
+            placeholders = ','.join([ph] * len(old_ids))
+            params = tuple(old_ids) if _is_mariadb_mode() else old_ids
             
             # 연관 데이터 삭제
-            cursor.execute(f"DELETE FROM user_progress WHERE book_id IN ({placeholders})", old_ids)
-            cursor.execute(f"DELETE FROM user_reading_log WHERE book_id IN ({placeholders})", old_ids)
-            cursor.execute(f"DELETE FROM book_offsets WHERE book_id IN ({placeholders})", old_ids)
-            cursor.execute(f"DELETE FROM books WHERE id IN ({placeholders})", old_ids)
+            cursor.execute(f"DELETE FROM user_progress WHERE book_id IN ({placeholders})", params)
+            cursor.execute(f"DELETE FROM user_reading_log WHERE book_id IN ({placeholders})", params)
+            cursor.execute(f"DELETE FROM book_offsets WHERE book_id IN ({placeholders})", params)
+            cursor.execute(f"DELETE FROM books WHERE id IN ({placeholders})", params)
             
             # 커버 이미지 물리 파일 소거
             base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

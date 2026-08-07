@@ -53,6 +53,7 @@ class BookRepository:
 
     @staticmethod
     def update_series_favorite(db_type, series_name, is_favorite, user_id):
+        safe_user_id = int(user_id) if user_id is not None and int(user_id) > 0 else 1
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
@@ -62,19 +63,22 @@ class BookRepository:
                     INSERT IGNORE INTO user_favorites (user_id, book_id, created_at)
                     SELECT %s, id, CURRENT_TIMESTAMP
                     FROM books
-                    WHERE series_name = %s AND COALESCE(is_deleted, 0) = 0
+                    WHERE (series_name = %s OR (COALESCE(series_name, '') = '' AND title = %s))
+                      AND COALESCE(is_deleted, 0) = 0
                     """,
-                    (user_id, series_name)
+                    (safe_user_id, series_name, series_name)
                 )
             else:
                 cursor.execute(
                     """
                     DELETE FROM user_favorites
                     WHERE user_id = %s AND book_id IN (
-                        SELECT id FROM books WHERE series_name = %s AND COALESCE(is_deleted, 0) = 0
+                        SELECT id FROM books
+                        WHERE (series_name = %s OR (COALESCE(series_name, '') = '' AND title = %s))
+                          AND COALESCE(is_deleted, 0) = 0
                     )
                     """,
-                    (user_id, series_name)
+                    (safe_user_id, series_name, series_name)
                 )
             conn.commit()
             return True

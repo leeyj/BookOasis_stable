@@ -58,13 +58,26 @@ function matchesSearchQuery(item, query) {
 
 // 1. 도서 시리즈 목록 로드
 export async function loadBooksList(isAppend = false) {
-  if (state.isLoading) return;
+  const currentId = state.currentLibraryId || '';
+  if (['home', 'collection', 'settings', 'plugins'].includes(currentId) || currentId.startsWith('plugin_')) {
+    console.warn(`[Book-List] loadBooksList skipped: currentLibraryId=${currentId} is not a book list category.`);
+    return;
+  }
+
+  if (state.isLoading) {
+    console.warn('[Book-List] loadBooksList skipped: already loading');
+    return;
+  }
   
   const container = document.getElementById('books-list-container');
-  if (!container) return;
+  if (!container) {
+    console.warn('[Book-List] loadBooksList skipped: #books-list-container missing');
+    return;
+  }
   const spinner = document.getElementById('infinite-scroll-spinner');
 
   state.isLoading = true;
+  console.log(`[Book-List] loadBooksList 시작 - type=${state.currentLibraryType}, libraryId=${state.currentLibraryId}, isAppend=${isAppend}`);
   
   try {
     // append가 아닐 때는 최초 1회 전체 데이터를 가져옴
@@ -74,9 +87,12 @@ export async function loadBooksList(isAppend = false) {
       container.innerHTML = `<div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('book_list.loading')}</div>`;
       
       try {
+        console.log(`[Book-List] API fetchAllBooksList 호출: type=${state.currentLibraryType}, libraryId=${state.currentLibraryId}`);
         const data = await api.fetchAllBooksList(state.currentLibraryType, state.currentLibraryId);
+        console.log(`[Book-List] API fetchAllBooksList 응답:`, data);
         if (data.success) {
           state.allBooksData = data.series || [];
+          console.log(`[Book-List] 수신된 시리즈 개수: ${state.allBooksData.length}`);
         } else {
           container.innerHTML = `<div class="loading-spinner">${i18n.t('book_list.load_fail', {error: data.error || ''})}</div>`;
           return;

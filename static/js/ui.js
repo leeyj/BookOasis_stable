@@ -482,8 +482,10 @@ window.toggleCardFavoriteEvent = async (event, name, bookId, nextStatus) => {
     event.preventDefault();
   }
 
+  console.log(`[Favorite-Action] 카드 즐겨찾기 별 클릭: name="${name}", bookId=${bookId}, nextStatus=${nextStatus}, currentLibId=${state.currentLibraryId}`);
+
   // 즉시 UI 피드백 반영 (Optimistic Update)
-  const btn = event.currentTarget || event.target.closest('.btn-card-fav-toggle');
+  const btn = event.currentTarget || (event.target && event.target.closest ? event.target.closest('.btn-card-fav-toggle') : null);
   let originalClass = '';
   let originalActive = false;
   if (btn) {
@@ -503,10 +505,13 @@ window.toggleCardFavoriteEvent = async (event, name, bookId, nextStatus) => {
 
   let res;
   if (bookId && state.currentLibraryId === 'history') {
+    console.log(`[Favorite-Action] window.toggleFavoriteAction 호출 (bookId=${bookId}, status=${nextStatus})`);
     res = await window.toggleFavoriteAction(bookId, nextStatus);
   } else {
+    console.log(`[Favorite-Action] window.toggleSeriesFavoriteAction 호출 (name="${name}", status=${nextStatus})`);
     res = await window.toggleSeriesFavoriteAction(name, nextStatus);
   }
+  console.log(`[Favorite-Action] 토글 API 응답 결과:`, res);
 
   if (res && res.success) {
     const statusText = nextStatus === 1 ? '등록' : '해제';

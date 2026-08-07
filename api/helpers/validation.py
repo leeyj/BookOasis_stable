@@ -12,7 +12,7 @@ MAX_LIBRARY_PATH_TEXT_LENGTH = 8192
 _AUDIO_EXTENSIONS = ('.mp3', '.m4b', '.m4a', '.flac', '.aac', '.wav', '.ogg', '.opus', '.wma')
 _BOOKISH_EXTENSIONS = ('.zip', '.cbz', '.rar', '.cbr', '.epub', '.pdf', '.txt')
 
-def validate_library_paths(physical_path, category_type='local'):
+def validate_library_paths(physical_path, category_type='local', is_remote=0):
     """
     물리 경로 또는 원격 링크 검증 (여러 개 지원)
     반환: (target_paths 리스트, 오류메시지 또는 None)
@@ -32,20 +32,11 @@ def validate_library_paths(physical_path, category_type='local'):
     if too_long_paths:
         return None, f'각 경로는 최대 {MAX_LIBRARY_PATH_LINE_LENGTH}자까지 허용됩니다.'
     
-    if category_type == 'gdrive':
-        # 구글 드라이브 카테고리는 API Key가 반드시 필요합니다.
-        from dotenv import load_dotenv
-        load_dotenv()
-        api_key = os.getenv('GDRIVE_API_KEY') or os.getenv('GDRIVE_API') or os.getenv('GOOGLE_API_KEY')
-        if not api_key:
-            return None, (
-                '구글 드라이브 카테고리를 등록하려면 Google Drive API Key가 필요합니다.\n'
-                '서버의 .env 파일에 GDRIVE_API_KEY=<발급받은_키> 를 추가한 후 다시 시도해 주세요.\n'
-                '(Google Cloud Console → API 및 서비스 → 사용자 인증 정보 → API 키 생성)'
-            )
+    if category_type == 'gdrive' or is_remote:
         return target_paths, None
 
-    invalid_paths = [p for p in target_paths if not os.path.exists(p)]
+    from utils.drive_helper import is_remote_path
+    invalid_paths = [p for p in target_paths if not is_remote_path(p) and not os.path.exists(p)]
     if invalid_paths:
         error_msg = _t('api.err_invalid_paths', paths='\n'.join(invalid_paths))
         return None, error_msg
@@ -145,13 +136,19 @@ def _looks_like_book_root(path, max_depth=2, max_scanned_files=300):
     return book_file_count >= 3 and audio_file_count == 0
 
 
-def detect_library_media_mismatch(db_type, target_paths):
+def detect_library_media_mismatch(db_type, target_paths, is_remote=0):
     """
     Return structured mismatch info for obvious category/content mismatches.
     """
+    if is_remote:
+        return None
+
     normalized_db_type = str(db_type or 'general').strip().lower()
 
     for path in target_paths or []:
+        from utils.drive_helper import is_remote_path
+        if is_remote_path(path):
+            continue
         if normalized_db_type != 'audiobook' and _looks_like_audiobook_root(path):
             return {
                 'kind': 'audiobook_in_book_category',

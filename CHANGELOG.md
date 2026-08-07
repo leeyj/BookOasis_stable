@@ -1,4 +1,14 @@
 # CHANGELOG
+## v1.8.5
+- (favorite) 즐겨찾기 별 클릭 상세 콘솔 로그 추가 및 단권 도서/유저 ID 매칭 오류 수정 | fix favorite star toggle logging & single book user ID matching
+- (category) 카테고리 저장/수정 시 원격 VFS 탐색 os.path.exists 커널 블로킹 및 502 Bad Gateway 수정 | fix category edit VFS os.path.exists kernel hang & 502 Bad Gateway
+- (collection) 컬렉션 뷰 하단 무한 스크롤 도서 목록 중복 노출 가드 조건 추가 | fix collection view bottom infinite-scroll book list overlap
+- (mariaDB) MariaDB 스키마 DDL Single Source of Truth 통합, collections updated_at 컬럼 보강 및 series_alias 인덱스 추가 | unify MariaDB central DDL schema, add collections updated_at column & series_alias index
+- (mariaDB) docker-compose.mariadb.yml 임시 테이블 및 콜레이션 최적화 옵션 추가 | add MariaDB tmp-table-size & collation performance flags
+- (mariaDB) 성인도서 대시보드 통계 API 500 에러 수정 | fix adult dashboard 500 error
+- (mariaDB) 자동 휴지통 비우기 7일 기준 구문 MariaDB 호환성 수정 | fix auto-prune 7-day SQL 구문 for MariaDB
+- 좌측 메뉴 더보기 기능 추가 | add more button to left menu
+
 ## v1.8.4
 - 뒤로가기 오류 수정 | fix back button error
 - 쿼리 오류 수정 | fix query error

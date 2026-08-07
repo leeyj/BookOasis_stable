@@ -519,13 +519,17 @@ def app_opds_adult_library(lib_id: int):
     return _handlers.handle_library_feed(is_adult=True, lib_id=lib_id)
 
 
-@app_opds_bp.route('/app-opds/series/<int:lib_id>/<path:series_name>', methods=['GET'])
-def app_opds_series_books(lib_id: int, series_name: str):
+@app_opds_bp.route('/app-opds/series/<string:lib_id>/<path:series_name>', methods=['GET'])
+@app_opds_bp.route('/app-opds/series/<path:series_name>', methods=['GET'])
+def app_opds_series_books(series_name: str, lib_id: str = 'all'):
     return _handlers.handle_series_feed(is_adult=False, lib_id=lib_id, series_name=series_name)
 
 
-@app_opds_bp.route('/app-opds/adult/series/<int:lib_id>/<path:series_name>', methods=['GET'])
-def app_opds_adult_series_books(lib_id: int, series_name: str):
+@app_opds_bp.route('/app-opds/adult/series/<string:lib_id>/<path:series_name>', methods=['GET'])
+@app_opds_bp.route('/app-opds-adult/series/<string:lib_id>/<path:series_name>', methods=['GET'])
+@app_opds_bp.route('/app-opds/adult/series/<path:series_name>', methods=['GET'])
+@app_opds_bp.route('/app-opds-adult/series/<path:series_name>', methods=['GET'])
+def app_opds_adult_series_books(series_name: str, lib_id: str = 'all'):
     return _handlers.handle_series_feed(is_adult=True, lib_id=lib_id, series_name=series_name)
 
 

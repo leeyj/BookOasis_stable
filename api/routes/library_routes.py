@@ -30,10 +30,15 @@ def add_media_library():
     physical_path = request.form.get('physical_path', '').strip()
     category_type = request.form.get('category_type', 'local').strip() or 'local'
     
-    target_paths, error = validate_library_paths(physical_path, category_type)
+    raw_paths = [p.strip() for p in str(physical_path or '').replace('\r', '').split('\n') if p.strip()]
+    is_remote_val = request.form.get('is_remote')
+    is_remote = parse_remote_flag(is_remote_val, raw_paths)
+    
+    target_paths, error = validate_library_paths(physical_path, category_type, is_remote=is_remote)
     if error:
         return jsonify({'success': False, 'error': error}), 400
-    mismatch = detect_library_media_mismatch(db_type, target_paths)
+    
+    mismatch = detect_library_media_mismatch(db_type, target_paths, is_remote=is_remote)
     confirm_override = request.form.get('confirm_media_mismatch', '0') in ('1', 'true', 'True', 'on')
     if mismatch and not confirm_override:
         return jsonify({
@@ -61,6 +66,9 @@ def add_media_library():
     except sqlite3.IntegrityError:
         return jsonify({'success': False, 'error': _t('api.err_library_name_exists')}), 400
     except Exception as e:
+        err_str = str(e)
+        if 'Duplicate entry' in err_str or 'UNIQUE constraint' in err_str or '1062' in err_str:
+            return jsonify({'success': False, 'error': _t('api.err_library_name_exists')}), 400
         return jsonify({'success': False, 'error': str(e)}), 500
     
     # 즉시 스캔 비동기 수행
@@ -86,10 +94,15 @@ def edit_media_library():
     physical_path = request.form.get('physical_path', '').strip()
     category_type = request.form.get('category_type', 'local').strip() or 'local'
     
-    target_paths, error = validate_library_paths(physical_path, category_type)
+    raw_paths = [p.strip() for p in str(physical_path or '').replace('\r', '').split('\n') if p.strip()]
+    is_remote_val = request.form.get('is_remote')
+    is_remote = parse_remote_flag(is_remote_val, raw_paths)
+    
+    target_paths, error = validate_library_paths(physical_path, category_type, is_remote=is_remote)
     if error:
         return jsonify({'success': False, 'error': error}), 400
-    mismatch = detect_library_media_mismatch(db_type, target_paths)
+    
+    mismatch = detect_library_media_mismatch(db_type, target_paths, is_remote=is_remote)
     confirm_override = request.form.get('confirm_media_mismatch', '0') in ('1', 'true', 'True', 'on')
     if mismatch and not confirm_override:
         return jsonify({
@@ -105,8 +118,6 @@ def edit_media_library():
     if len(name) > MAX_LIBRARY_NAME_LENGTH:
         return jsonify({'success': False, 'error': f'카테고리 이름은 최대 {MAX_LIBRARY_NAME_LENGTH}자까지 허용됩니다.'}), 400
     
-    is_remote_val = request.form.get('is_remote')
-    is_remote = parse_remote_flag(is_remote_val, target_paths)
     hide_cover = 1 if request.form.get('hide_cover', '0') in ('1', 'true', 'True', 'on') else 0
     rclone_rc_url = normalize_rclone_url(request.form.get('rclone_rc_url'))
     icon = request.form.get('icon', 'fa-book').strip() or 'fa-book'
@@ -124,6 +135,9 @@ def edit_media_library():
     except sqlite3.IntegrityError:
         return jsonify({'success': False, 'error': _t('api.err_library_name_exists')}), 400
     except Exception as e:
+        err_str = str(e)
+        if 'Duplicate entry' in err_str or 'UNIQUE constraint' in err_str or '1062' in err_str:
+            return jsonify({'success': False, 'error': _t('api.err_library_name_exists')}), 400
         return jsonify({'success': False, 'error': str(e)}), 500
     
     # 즉시 스캔 비동기 수행 (경로가 변경된 경우에만)

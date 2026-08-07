@@ -195,6 +195,8 @@ def toggle_book_favorite(book_id):
 
     try:
         BookService.update_favorite(db_type, book_id, is_favorite, user_id=user_id)
+        from services.series_service import SeriesService
+        SeriesService.invalidate_all_books_cache()
         return jsonify({'success': True, 'message': _t('api.msg_favorite_updated')})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -218,6 +220,8 @@ def toggle_series_favorite_api():
 
     try:
         BookService.update_series_favorite(db_type, series_name, is_favorite, user_id=user_id)
+        from services.series_service import SeriesService
+        SeriesService.invalidate_all_books_cache()
         return jsonify({'success': True, 'message': _t('api.msg_series_favorite_updated')})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
