@@ -143,7 +143,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
     print(f"[Scanner] Scanning physical folder tree...")
     folder_count = 0
     from tools.scanner.ignore_filter import IgnoreFilter
-    cursor.execute("SELECT value FROM settings WHERE key = 'SCAN_IGNORE_PATTERNS'")
+    cursor.execute("SELECT `value` FROM settings WHERE `key` = 'SCAN_IGNORE_PATTERNS'")
     ignore_row = cursor.fetchone()
     ignore_patterns_str = ignore_row['value'] if ignore_row else None
     ignore_filter = IgnoreFilter(ignore_patterns_str)

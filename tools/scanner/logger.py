@@ -30,6 +30,15 @@ def scanner_print_control(db_path):
         # 10MB 기준 자동 zip 회전 아카이빙 로거 생성
         zip_logger = ZipRotatingLogger(log_file_path, 10 * 1024 * 1024)
         
+        # 스캐너 상세 로그를 scanner.log 전용 로거로 분리
+        # scanner.log에만 기록 – sys.stdout(=media_server.log)으로는 전달하지 않음
+        # 단, 고수준 요약 태그([Scanner-Trigger], [Queue], [Worker] 등)는 media_server.log에도 기록
+        SUMMARY_TAGS = (
+            '[Scanner-Trigger]', '[Scanner-VFS]', '[Queue]',
+            '[Worker-Acquire]', '[Worker]', '[Scanner-Progress]',
+            '[Scheduler]', '[Scheduler ERROR]',
+        )
+
         def custom_print(*args, **kwargs):
             try:
                 sep = kwargs.get('sep', ' ')
@@ -40,8 +49,11 @@ def scanner_print_control(db_path):
                     formatted_message = f"[{timestamp}] {message}"
                 else:
                     formatted_message = message
+                # scanner.log에 항상 기록
                 zip_logger.write(formatted_message)
-                original_print(formatted_message, end='', flush=True)
+                # media_server.log(sys.stdout)에는 고수준 요약 태그만 전달
+                if any(tag in formatted_message for tag in SUMMARY_TAGS):
+                    original_print(formatted_message, end='', flush=True)
             except Exception:
                 pass
         builtins.print = custom_print
@@ -50,6 +62,7 @@ def scanner_print_control(db_path):
         yield
     finally:
         builtins.print = original_print
+
 
 def scanner_print_control_decorator(func):
     def wrapper(db_path, *args, **kwargs):

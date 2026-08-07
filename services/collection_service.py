@@ -1,6 +1,6 @@
-from repositories.sqlite.collection_repository import CollectionRepository
-from repositories.sqlite.series_repository import SeriesRepository
-from repositories.sqlite.book_repository import BookRepository
+from repositories.collection_repository import CollectionRepository
+from repositories.series_repository import SeriesRepository
+from repositories.book_repository import BookRepository
 
 class CollectionService:
     @staticmethod

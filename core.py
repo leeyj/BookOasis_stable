@@ -68,7 +68,7 @@ if not IS_WORKER:
     from flask import Flask, request, jsonify
     from database import init_databases
     from api import api_bp
-    from repositories.sqlite.scanner_queue_repository import ScannerQueueRepository
+    from repositories.scanner_queue_repository import ScannerQueueRepository
 
     # 부팅 시점 유령 태스크 및 고착 스캔 상태 정화
     try:

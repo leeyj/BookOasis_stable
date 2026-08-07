@@ -192,8 +192,18 @@ _pools = {'general': None, 'adult': None, 'audiobook': None}
 _pools_lock = threading.Lock()
 _shutdown_in_progress = False
 
+MARIADB_DB_PREFIX = 'mariadb:media_'
+
+def is_mariadb_mode():
+    """현재 DB 엔진이 MariaDB/MySQL인지 확인"""
+    engine = os.environ.get('DB_ENGINE', os.environ.get('DBMS', 'sqlite')).lower()
+    return engine in ('mariadb', 'mysql')
+
 def get_db_path(db_type='general'):
-    """db_type에 따른 데이터베이스 파일 경로 반환"""
+    """db_type에 따른 데이터베이스 파일 경로(SQLite) 또는 MariaDB 식별자 문자열 반환"""
+    # MariaDB 모드이면 파일 경로 대신 식별자 문자열 반환 (로그/큐 등에서 SQLite 경로 혼선 방지)
+    if is_mariadb_mode():
+        return f"{MARIADB_DB_PREFIX}{db_type}"
     if db_type == 'adult':
         return DB_ADULT_PATH
     elif db_type == 'audiobook':
@@ -246,7 +256,7 @@ def _get_pool_size_raw():
         cursor = conn.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='settings'")
         if cursor.fetchone():
-            cursor.execute("SELECT value FROM settings WHERE key = 'DB_POOL_SIZE'")
+            cursor.execute("SELECT `value` FROM settings WHERE `key` = 'DB_POOL_SIZE'")
             row = cursor.fetchone()
             if row:
                 conn.close()
@@ -278,46 +288,44 @@ class MariadbCursorWrapper:
     def _convert_sql(self, sql):
         if not sql:
             return sql
-        
-        # Ignore SQLite-specific PRAGMA commands and raw BEGIN in MariaDB (PyMySQL handles transactions via conn.commit())
-        if sql.strip().upper().startswith('PRAGMA') or sql.strip().upper() in ('BEGIN', 'BEGIN TRANSACTION', 'BEGIN WORK'):
+        # SQLite 전용 PRAGMA 및 raw BEGIN 명령은 MariaDB(PyMySQL)에서 안전 우회 (conn.commit()으로 관리)
+        clean_sql = sql.strip().upper()
+        if clean_sql.startswith('PRAGMA') or clean_sql in ('BEGIN', 'BEGIN TRANSACTION', 'BEGIN WORK'):
             return "SELECT 1"
 
-        s = sql
-        # Replace ? with %s
-        s = s.replace('?', '%s')
-        # Replace AUTOINCREMENT with AUTO_INCREMENT for MariaDB
-        s = re.sub(r'(?i)\bAUTOINCREMENT\b', 'AUTO_INCREMENT', s)
-        # Replace INSERT OR REPLACE WITH REPLACE INTO
-        s = re.sub(r'(?i)\bINSERT\s+OR\s+REPLACE\s+INTO\b', 'REPLACE INTO', s)
-        # Replace INSERT OR IGNORE WITH INSERT IGNORE
-        s = re.sub(r'(?i)\bINSERT\s+OR\s+IGNORE\s+INTO\b', 'INSERT IGNORE INTO', s)
-        # Replace SQLite strftime with MariaDB DATE_FORMAT (escape % as %% for PyMySQL query formatting)
-        s = re.sub(r"(?i)strftime\('%Y-%m',\s*([^)]+)\)", r"DATE_FORMAT(\1, '%%Y-%%m')", s)
-        s = re.sub(r"(?i)strftime\('%Y',\s*([^)]+)\)", r"DATE_FORMAT(\1, '%%Y')", s)
-        
-        # Escape MariaDB reserved keywords `key` and `value` (exclude PRIMARY/FOREIGN/UNIQUE KEY syntax)
-        s = re.sub(r'(?i)(?<!PRIMARY\s)(?<!FOREIGN\s)(?<!UNIQUE\s)(?<!`)\bkey\b(?!`)(?!\s*\()', '`key`', s)
-        s = re.sub(r'(?i)(?<!`)\bvalue\b(?!`)', '`value`', s)
+        converted = sql
 
-        # Convert SQLite ON CONFLICT(...) DO UPDATE SET to MariaDB ON DUPLICATE KEY UPDATE
-        s = re.sub(r'(?i)\bON\s+CONFLICT\s*\([^)]*\)\s*DO\s+UPDATE\s+SET\b', 'ON DUPLICATE KEY UPDATE', s)
-        # Convert SQLite EXCLUDED.col or excluded.col to MariaDB VALUES(col)
-        s = re.sub(r'(?i)\bEXCLUDED\.(\w+)\b', r'VALUES(\1)', s)
+        # 1. ? 바인딩 파라미터를 PyMySQL용 %s로 변환
+        if '?' in converted:
+            converted = converted.replace('?', '%s')
 
-        # Convert SQLite CAST(x AS TEXT) to MariaDB CONCAT(x, '') to prevent collation mismatch (Error 1267)
-        s = re.sub(r'(?i)\bCAST\s*\((.*?)\s+AS\s+TEXT\)', r"CONCAT(\1, '')", s)
-        # Convert SQLite RANDOM() to MariaDB RAND()
-        s = re.sub(r'(?i)\bRANDOM\s*\(\s*\)', r'RAND()', s)
-        # Convert SQLite string concatenation ('str' || col || 'str') to MariaDB CONCAT(...)
-        s = re.sub(r"('(?:''|[^'])*')\s*\|\|\s*([a-zA-Z0-9_\.]+)\s*\|\|\s*('(?:''|[^'])*')", r"CONCAT(\1, \2, \3)", s)
-        # Convert SQLite datetime('now', ...) to MariaDB CURRENT_TIMESTAMP and DATE_SUB
-        s = re.sub(r"(?i)datetime\s*\(\s*'now'\s*,\s*'-(\d+)\s*days'\s*,?\s*.*?\)", r"DATE_SUB(NOW(), INTERVAL \1 DAY)", s)
-        s = re.sub(r"(?i)datetime\s*\(\s*'now'\s*,?\s*.*?\)", "CURRENT_TIMESTAMP", s)
-        # current_time 은 MariaDB 예약 키워드(내장함수)이므로 컬럼명으로 쓸 때 백틱 이스케이프 필요
-        # 단, VALUES(`current_time`) 이중 이스케이프 방지: 이미 백틱이 있는 경우 제외
-        s = re.sub(r'(?<![`\w])current_time(?![`\w])', '`current_time`', s)
-        return s
+        # 2. SQLite 전용 구문(INSERT OR IGNORE, INSERT OR REPLACE) 변환
+        if 'INSERT OR IGNORE INTO' in converted:
+            converted = converted.replace('INSERT OR IGNORE INTO', 'INSERT IGNORE INTO')
+        elif 'INSERT OR IGNORE' in converted:
+            converted = converted.replace('INSERT OR IGNORE', 'INSERT IGNORE')
+
+        if 'INSERT OR REPLACE INTO' in converted:
+            converted = converted.replace('INSERT OR REPLACE INTO', 'REPLACE INTO')
+        elif 'INSERT OR REPLACE' in converted:
+            converted = converted.replace('INSERT OR REPLACE', 'REPLACE INTO')
+
+        # 3. SQLite ON CONFLICT(file_path) DO UPDATE SET EXCLUDED... ➔ MariaDB ON DUPLICATE KEY UPDATE...
+        if 'ON CONFLICT' in converted and 'EXCLUDED' in converted:
+            import re
+            m = re.search(r'ON\s+CONFLICT\s*\([^)]*\)\s*DO\s+UPDATE\s+SET\s+(.*)', converted, re.DOTALL | re.IGNORECASE)
+            if m:
+                set_clause = m.group(1)
+                set_clause = re.sub(r'EXCLUDED\.([a-zA-Z0-9_]+)', r'VALUES(\1)', set_clause, flags=re.IGNORECASE)
+        # 4. MariaDB/MySQL 예약어 key / value 자동 백틱 이스케이프 보안책
+        if 'settings' in converted and '`key` ' not in converted:
+            import re
+            converted = re.sub(r'\bWHERE\s+key\b', 'WHERE `key`', converted, flags=re.IGNORECASE)
+            converted = re.sub(r'\bSET\s+key\b', 'SET `key`', converted, flags=re.IGNORECASE)
+            converted = re.sub(r'\bSELECT\s+value\b', 'SELECT `value`', converted, flags=re.IGNORECASE)
+            converted = re.sub(r'\bSET\s+value\b', 'SET `value`', converted, flags=re.IGNORECASE)
+
+        return converted
 
 
     def execute(self, sql, params=None):
@@ -342,11 +350,19 @@ class MariadbCursorWrapper:
 
     def fetchone(self):
         row = self._cursor.fetchone()
-        return DictRow(row) if row else None
+        if not row:
+            return None
+        if isinstance(row, dict):
+            return row
+        return DictRow(row)
 
     def fetchall(self):
         rows = self._cursor.fetchall()
-        return [DictRow(r) for r in rows] if rows else []
+        if not rows:
+            return []
+        if isinstance(rows[0], dict):
+            return list(rows)
+        return [DictRow(r) for r in rows]
 
     @property
     def rowcount(self):
@@ -1085,7 +1101,7 @@ def init_databases():
         
         # settings 테이블 초기값 주입 (ALADIN TTBKey)
         try:
-            cursor.execute("SELECT value FROM settings WHERE key = 'ALADIN'")
+            cursor.execute("SELECT `value` FROM settings WHERE `key` = 'ALADIN'")
             if not cursor.fetchone():
                 # os.getenv 등을 위해 .env 파싱도 대비
                 aladin_val = os.environ.get('ALADIN', '')
@@ -1126,12 +1142,12 @@ def init_databases():
                 ('SCAN_IGNORE_PATTERNS', "@eaDir/\n#recycle/\n*.tmp\n*.sample.cbz\n.DS_Store\nThumbs.db\ndesktop.ini"),
             ]
             for k, v in default_settings:
-                cursor.execute("SELECT value FROM settings WHERE key = ?", (k,))
+                cursor.execute("SELECT `value` FROM settings WHERE `key` = ?", (k,))
                 if not cursor.fetchone():
                     cursor.execute("INSERT INTO settings (key, value) VALUES (?, ?)", (k, v))
             
             # 기존 DB의 SCAN_IGNORE_PATTERNS 값 중 @eaDir, #recycle 끝에 /가 없는 구형 설정 자동 마이그레이션
-            cursor.execute("SELECT value FROM settings WHERE key = 'SCAN_IGNORE_PATTERNS'")
+            cursor.execute("SELECT `value` FROM settings WHERE `key` = 'SCAN_IGNORE_PATTERNS'")
             sig_row = cursor.fetchone()
             if sig_row and sig_row[0]:
                 curr_val = sig_row[0]
@@ -1145,7 +1161,7 @@ def init_databases():
                     else:
                         new_lines.append(line)
                 if changed:
-                    cursor.execute("UPDATE settings SET value = ? WHERE key = 'SCAN_IGNORE_PATTERNS'", ('\n'.join(new_lines),))
+                    cursor.execute("UPDATE settings SET `value` = ? WHERE `key` = 'SCAN_IGNORE_PATTERNS'", ('\n'.join(new_lines),))
 
             conn.commit()
 

@@ -356,6 +356,7 @@
     "delete_category": "카테고리 삭제",
     "scan_book_now": "이 책 즉시 스캔 (표지/메타)",
     "search_metadata": "메타정보 검색",
+    "add_to_collection": "컬렉션에 추가",
     "mark_as_unread": "읽지 않은 상태로 변경 (0%)"
   },
   "viewer": {
@@ -665,13 +666,6 @@
     "modal_title": "장르 / 태그 필터",
     "search_placeholder": "검색어 입력...",
     "tab_genres": "장르",
-    "tab_tags": "태그",
-    "apply_btn": "필터 적용"
-  },
-  "context_menu": {
-    "scan_book_now": "이 책 즉시 스캔 (표지/메타)",
-    "search_metadata": "메타정보 검색",
-    "add_to_collection": "➕ 컬렉션에 추가",
-    "mark_as_unread": "읽지 않은 상태로 변경 (0%)"
+    "tab_tags": "태그"
   }
 }

@@ -1,16 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-repositories/__init__.py – DB 엔진(DBMS) 환경설정에 따른 동적 리포지토리 노출 라우터
+repositories/__init__.py – DB 엔진(DBMS / DB_ENGINE) 환경설정에 따른 동적 리포지토리 노출 라우터
 """
 import os
 import sys
 
-DBMS = os.getenv("DBMS", "sqlite").lower()
+DBMS = os.getenv("DB_ENGINE", os.getenv("DBMS", "sqlite")).lower()
 
-if DBMS == "postgres" or DBMS == "postgresql":
-    # 향후 postgres 폴더 구조를 갖출 때 임포트할 예비 레이어
-    # 현재는 sqlite 버전을 폴백으로 반환
-    from repositories.sqlite import (
+if DBMS in ("mariadb", "mysql"):
+    from repositories.mariadb import (
         audiobook_repository,
         book_offset_repository,
         book_repository,
@@ -27,7 +25,7 @@ if DBMS == "postgres" or DBMS == "postgresql":
         series_repository,
         settings_repository,
         trash_repository,
-        user_repository
+        user_repository,
     )
 else:
     from repositories.sqlite import (
@@ -47,7 +45,7 @@ else:
         series_repository,
         settings_repository,
         trash_repository,
-        user_repository
+        user_repository,
     )
 
 # 하위 호환성을 위해 sys.modules에 매핑하여 기존 'from repositories.xxx_repository import ...' 임포트 완벽 지원

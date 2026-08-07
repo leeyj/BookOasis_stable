@@ -112,7 +112,8 @@ class SchedulerService:
         print("[Scheduler] Checking for interrupted scan jobs to auto-resume...")
         for db_type in ['general', 'adult', 'audiobook']:
             db_path = database.get_db_path(db_type)
-            if not os.path.exists(db_path):
+            # MariaDB 모드 식별자(mariadb:...)는 파일 경로가 아니므로 파일 존재 검사 스킵
+            if not db_path.startswith('mariadb:') and not os.path.exists(db_path):
                 continue
                 
             try:
@@ -172,7 +173,8 @@ class SchedulerService:
 
         for db_type in ['general', 'adult', 'audiobook']:
             db_path = database.get_db_path(db_type)
-            if not os.path.exists(db_path):
+            # MariaDB 모드 식별자(mariadb:...)는 파일 경로가 아니므로 파일 존재 검사 스킵
+            if not db_path.startswith('mariadb:') and not os.path.exists(db_path):
                 continue
                 
             try:
@@ -181,7 +183,7 @@ class SchedulerService:
                 
                 # general DB에서 LAZY_SCAN_CRON 설정을 가져와 등록
                 if db_type == 'general':
-                    from repositories.sqlite.reading_progress_repository import ReadingProgressRepository
+                    from repositories.reading_progress_repository import ReadingProgressRepository
                     lazy_cron = ReadingProgressRepository.get_settings_value(db_type, 'LAZY_SCAN_CRON')
                     if lazy_cron:
                         try:
@@ -407,7 +409,7 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
                 else:
                     # 전역 설정 폴백
                     try:
-                        from repositories.sqlite.reading_progress_repository import ReadingProgressRepository
+                        from repositories.reading_progress_repository import ReadingProgressRepository
                         val_g = ReadingProgressRepository.get_settings_value(db_type, 'RCLONE_RC_URL')
                         if val_g:
                             rc_urls = [u.strip().rstrip('/') for u in str(val_g).split(',') if u.strip()]

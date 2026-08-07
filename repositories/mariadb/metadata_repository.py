@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-metadata_repository.py – 도서 상세 메타데이터 및 외부 매핑 데이터 액세스 레이어
+metadata_repository.py – MariaDB 전용 도서 상세 메타데이터 및 외부 매핑 데이터 액세스 레이어
 """
 import database
 
@@ -12,7 +12,7 @@ class MetadataRepository:
         cursor.execute(
             """
             SELECT author, publisher, score, summary, tags, genre, cover_image, is_favorite, title, title_alias, series_name, series_alias
-            FROM books WHERE id = ?
+            FROM books WHERE id = %s
             """,
             (book_id,)
         )
@@ -28,9 +28,9 @@ class MetadataRepository:
             cursor.execute(
                 """
                 UPDATE books SET
-                    author = ?, publisher = ?, score = ?, summary = ?, tags = ?, genre = ?, title_alias = ?,
+                    author = %s, publisher = %s, score = %s, summary = %s, tags = %s, genre = %s, title_alias = %s,
                     metadata_locked = 1
-                WHERE id = ?
+                WHERE id = %s
                 """,
                 (author, publisher, score, summary, tags, genre, title_alias, book_id)
             )
@@ -55,7 +55,7 @@ class MetadataRepository:
     def get_setting_value(db_type, key):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
-        cursor.execute("SELECT `value` FROM settings WHERE `key` = ?", (key,))
+        cursor.execute("SELECT `value` FROM settings WHERE `key` = %s", (key,))
         row = cursor.fetchone()
         conn.close()
         return row['value'] if row else None
@@ -68,8 +68,8 @@ class MetadataRepository:
             """
             SELECT MIN(id) AS id, series_name, author, publisher, summary, MAX(cover_image) AS cover_image
             FROM books
-            WHERE series_name LIKE ? AND (summary IS NOT NULL AND summary != '' AND summary != '등록된 설명이 없습니다.')
-            GROUP BY series_name
+            WHERE series_name LIKE %s AND (summary IS NOT NULL AND summary != '' AND summary != '등록된 설명이 없습니다.')
+            GROUP BY series_name, author, publisher, summary
             LIMIT 3
             """,
             (f"%{series_name}%",)
@@ -86,7 +86,7 @@ class MetadataRepository:
             cursor.execute(
                 """
                 SELECT author, isbn, publisher, summary, link, score
-                FROM books WHERE id = ?
+                FROM books WHERE id = %s
                 """,
                 (source_book_id,)
             )
@@ -97,8 +97,8 @@ class MetadataRepository:
             cursor.execute(
                 """
                 UPDATE books
-                SET author = ?, isbn = ?, publisher = ?, summary = ?, link = ?, score = ?, metadata_locked = 1
-                WHERE series_name = ? AND library_id = ?
+                SET author = %s, isbn = %s, publisher = %s, summary = %s, link = %s, score = %s, metadata_locked = 1
+                WHERE series_name = %s AND library_id = %s
                 """,
                 (
                     source['author'],

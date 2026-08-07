@@ -4,6 +4,7 @@ import os
 import importlib
 import subprocess
 import hashlib
+import traceback
 from flask import json
 from plugins.metadata.base import BaseMetadataProvider
 
@@ -251,6 +252,7 @@ class MetadataFactory:
                     discovered.append((provider_name, target_class))
             except Exception as e:
                 print(f"[MetadataFactory] Plugin load failed ({provider_name}): {e}")
+                traceback.print_exc()
 
         return discovered
 

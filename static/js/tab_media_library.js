@@ -13,7 +13,7 @@ import { loadLibraries, triggerAddLibrary, triggerEditLibrary, triggerDeleteLibr
 import { loadLibrarySchedules, saveLibrarySchedule, runLibraryScanNow } from './scheduler.js';
 
 // 서브 모듈 임포트
-import { loadDashboardData, scrollDashboardRow, loadDashboardPlugins } from './dashboard.js';
+import { loadDashboardData, scrollDashboardRow, loadDashboardPlugins, switchPluginsViewTab } from './dashboard.js';
 import { initInfiniteScrollObserver } from './infinite_scroll.js';
 import { showBookContextMenu, triggerScanSingleBookAction, triggerSearchAladinMetadataAction, triggerMarkAsUnreadAction } from './book_context_menu.js';
 import { openMetadataSearchModal, closeMetadataSearchModal, performMetadataSearch } from './metadata_search.js';
@@ -21,7 +21,8 @@ import { openMetadataSearchModal, closeMetadataSearchModal, performMetadataSearc
 // book_list.js 임포트
 import { loadBooksList, loadReadingHistory, filterBooks, toggleLibrarySort, resumeSeries, updateSortButtonUI } from './book_list.js';
 
-// settings_tab.js 임포트
+// plugin_custom_view.js 임포트
+import { mountCategoryPluginUI } from './plugin_custom_view.js';
 import { switchSettingsTab, loadInitialSystemSettings, loadGeneralSettings, submitGeneralSettings, initReportsTab, loadReportList, loadReportDetail, loadViewerSettings, submitViewerSettings } from './settings_tab.js';
 
 // 장르/태그 및 사이드바 제어 모듈

@@ -23,7 +23,7 @@ if __name__ == '__main__':
 
     # ─── 유령 태스크 및 고착 스캔 상태 부팅 시점 자동 정화 ───
     try:
-        from repositories.sqlite.scanner_queue_repository import ScannerQueueRepository
+        from repositories.scanner_queue_repository import ScannerQueueRepository
         ScannerQueueRepository.startup_cleanup_ghost_tasks()
     except Exception as clean_err:
         print(f"[Scanner-Worker] 부팅 시점 유령 태스크 정화 실패: {clean_err}")

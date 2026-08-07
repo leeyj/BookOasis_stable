@@ -206,7 +206,7 @@ class StreamPageService:
             # [Fast Path] Zip 오프셋 기반 부분 스트리밍 가속 기동
             if book_id is not None:
                 try:
-                    from repositories.sqlite.book_offset_repository import BookOffsetRepository
+                    from repositories.book_offset_repository import BookOffsetRepository
                     row = BookOffsetRepository.get_book_offset(db_type, book_id, page_idx)
 
                     if row and os.path.exists(file_path):

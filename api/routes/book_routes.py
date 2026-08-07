@@ -278,7 +278,7 @@ def unlock_media_metadata():
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
 
     try:
-        from repositories.sqlite.book_repository import BookRepository
+        from repositories.book_repository import BookRepository
         success = BookRepository.unlock_media_metadata(
             db_type=db_type,
             series_name=series_name,

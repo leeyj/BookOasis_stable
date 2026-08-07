@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-settings_repository.py – 시스템 환경설정(settings) 테이블 조회 및 업데이트 전담 데이터 액세스 레이어
+settings_repository.py – MariaDB 전용 시스템 환경설정(settings) 데이터 액세스 레이어
 """
 import database
 
@@ -10,20 +10,20 @@ class SettingsRepository:
         """특정 설정 키에 대응하는 값 조회"""
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
-        cursor.execute("SELECT `value` FROM settings WHERE `key` = ?", (key,))
+        cursor.execute("SELECT `value` FROM settings WHERE `key` = %s", (key,))
         row = cursor.fetchone()
         conn.close()
         return row['value'] if row else None
 
     @staticmethod
     def set_value(db_type, key, value):
-        """설정 키-값 등록 및 갱신 (UPSERT)"""
+        """설정 키-값 등록 및 갱신 (UPSERT / REPLACE)"""
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
             cursor.execute("""
-                INSERT OR REPLACE INTO settings (key, value, updated_at) 
-                VALUES (?, ?, CURRENT_TIMESTAMP)
+                REPLACE INTO settings (`key`, `value`, updated_at) 
+                VALUES (%s, %s, CURRENT_TIMESTAMP)
             """, (key, value))
             conn.commit()
             return True
@@ -48,7 +48,7 @@ class SettingsRepository:
         """지정된 접두어로 시작하는 설정 키-값 딕셔너리 반환"""
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
-        cursor.execute("SELECT `key`, `value` FROM settings WHERE `key` LIKE ?", (f"{prefix}%",))
+        cursor.execute("SELECT `key`, `value` FROM settings WHERE `key` LIKE %s", (f"{prefix}%",))
         rows = cursor.fetchall()
         conn.close()
         return {row['key']: row['value'] for row in rows}

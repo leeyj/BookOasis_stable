@@ -11,11 +11,8 @@ import database
 scan_bp = Blueprint('scan', __name__)
 
 def get_db_path_for_scan(db_type):
-    if db_type == 'adult':
-        return database.DB_ADULT_PATH
-    elif db_type == 'audiobook':
-        return database.DB_AUDIOBOOK_PATH
-    return database.DB_GENERAL_PATH
+    """db_type에 대응하는 스캔 대상 데이터베이스 경로/식별자 반환 (MariaDB 모드 대응)"""
+    return database.get_db_path(db_type)
 
 @scan_bp.route('/api/media/books/<int:book_id>/scan', methods=['POST'])
 @admin_required

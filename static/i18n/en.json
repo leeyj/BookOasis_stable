@@ -356,6 +356,7 @@
     "delete_category": "Delete Category",
     "scan_book_now": "Scan This Book Now (Cover/Meta)",
     "search_metadata": "Search Metadata",
+    "add_to_collection": "Add to Collection",
     "mark_as_unread": "Mark as Unread (0%)"
   },
   "viewer": {
@@ -667,11 +668,5 @@
     "tab_genres": "Genres",
     "tab_tags": "Tags",
     "apply_btn": "Apply Filter"
-  },
-  "context_menu": {
-    "scan_book_now": "Scan Book Now (Cover/Meta)",
-    "search_metadata": "Search Metadata",
-    "add_to_collection": "➕ Add to Collection",
-    "mark_as_unread": "Mark as Unread (0%)"
   }
 }

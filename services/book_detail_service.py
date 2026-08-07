@@ -272,7 +272,7 @@ class BookDetailService:
                 return False, f'DB 업데이트 오류: {str(e)}'
         
         # 1. 해당 시리즈에 속한 도서의 library_id와 대표 book 레코드 1개 조회
-        from repositories.sqlite.book_repository import BookRepository 
+        from repositories.book_repository import BookRepository
         library_id = BookRepository.resolve_series_library_id(db_type, series_name, '', [])
         if library_id is None:
             return False, '해당 시리즈에 속한 도서를 찾을 수 없습니다.'

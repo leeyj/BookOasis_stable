@@ -193,7 +193,7 @@ def get_favorite_entries(db_type: str, download_prefix: str, urn_prefix: str, us
 
 def get_recently_read_entries(db_type: str, download_prefix: str, urn_prefix: str, user_id: int = None):
     # 표시 건수 설정 조회
-    from repositories.sqlite.reading_progress_repository import ReadingProgressRepository
+    from repositories.reading_progress_repository import ReadingProgressRepository
     row_limit = ReadingProgressRepository.get_settings_value(db_type, 'RECENT_BOOKS_LIMIT')
     limit = 30
     if row_limit and str(row_limit).isdigit():

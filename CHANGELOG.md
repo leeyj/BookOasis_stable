@@ -1,4 +1,11 @@
 # CHANGELOG
+## v1.8.4
+- 뒤로가기 오류 수정 | fix back button error
+- 쿼리 오류 수정 | fix query error
+- 로그 오류 수정 | fix log error
+- 스캔 시작/종료 로그 MariaDB 호환성 대응 | fix log for MariaDB compatibility
+- UI 버그 수정 | fix UI bug
+- 마이그레이션 툴 오류 수정 | fix migration tool error
 ## v1.8.3
 - (scanner) 대용량 라이브러리 스캔 시 중간 플러시 DB 경합(`Scanner flush failed due to persistent DB contention`) 원천 방지 및 Redis 락 대기 타임아웃/재시도 상향 (`lock_timeout`: 5초, `max_attempts`: 15회), 미획득 시 펜딩 데이터 유예(deferral) 보강 | fix scanner mid-scan flush DB write contention & add lock timeout retry with pending buffer deferral
 - (mariaDB) 스캐너 배치 플러시 `ON CONFLICT(file_path) DO UPDATE SET EXCLUDED...` 1064 SQL 구문 오류 자동 변환 (`ON DUPLICATE KEY UPDATE` & `VALUES(...)`) | fix MariaDB scanner bulk insert ON CONFLICT EXCLUDED 1064 SQL syntax error

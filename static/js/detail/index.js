@@ -263,8 +263,10 @@ export function goBackToList(triggerBack = true) {
     }
   }
 
-  // 수동 목록으로 돌아가기 버튼을 누른 경우에만 브라우저 히스토리 스택 원상복구
-  if (triggerBack && window.location.hash.startsWith('#detail')) {
-    history.back();
+  // 상세 뷰 해시(#detail)가 남아있는 경우 브라우저 외부/홈으로 튕김(history.back) 없이 해시만 안전하게 제거
+  if (window.location.hash.startsWith('#detail')) {
+    try {
+      history.replaceState({ view: 'list', libraryId: state.currentLibraryId }, '', window.location.pathname + window.location.search);
+    } catch (e) {}
   }
 }

@@ -1,0 +1,169 @@
+# -*- coding: utf-8 -*-
+"""
+collection_repository.py – MariaDB 전용 컬렉션(collections, collection_items) 데이터 액세스 레이어
+"""
+import database
+
+class CollectionRepository:
+    @staticmethod
+    def create_collection(db_type, user_id, name, description=None, color='#7c3aed', cover_image=None):
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                """
+                INSERT INTO collections (user_id, name, description, color, cover_image)
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                (user_id, name, description, color, cover_image)
+            )
+            coll_id = cursor.lastrowid
+            conn.commit()
+            return coll_id
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    @staticmethod
+    def get_user_collections(db_type, user_id):
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                """
+                SELECT c.id, c.user_id, c.name, c.description, c.color, c.cover_image, c.created_at, c.updated_at,
+                       COUNT(ci.id) AS item_count
+                FROM collections c
+                LEFT JOIN collection_items ci ON ci.collection_id = c.id
+                WHERE c.user_id = %s
+                GROUP BY c.id, c.user_id, c.name, c.description, c.color, c.cover_image, c.created_at, c.updated_at
+                ORDER BY c.created_at DESC
+                """,
+                (user_id,)
+            )
+            rows = cursor.fetchall()
+            return [dict(r) for r in rows] if rows else []
+        finally:
+            conn.close()
+
+    @staticmethod
+    def get_collection_by_id(db_type, collection_id, user_id=None):
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            if user_id:
+                cursor.execute("SELECT * FROM collections WHERE id = %s AND user_id = %s", (collection_id, user_id))
+            else:
+                cursor.execute("SELECT * FROM collections WHERE id = %s", (collection_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+        finally:
+            conn.close()
+
+    @staticmethod
+    def update_collection(db_type, collection_id, user_id, name, description=None, color='#7c3aed', cover_image=None):
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                """
+                UPDATE collections
+                SET name = %s, description = %s, color = %s, cover_image = %s
+                WHERE id = %s AND user_id = %s
+                """,
+                (name, description, color, cover_image, collection_id, user_id)
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    @staticmethod
+    def delete_collection(db_type, collection_id, user_id):
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("DELETE FROM collection_items WHERE collection_id = %s", (collection_id,))
+            cursor.execute("DELETE FROM collections WHERE id = %s AND user_id = %s", (collection_id, user_id))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    @staticmethod
+    def add_item_to_collection(db_type, collection_id, book_id=None, series_name=None, audiobook_id=None):
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            if book_id is not None:
+                cursor.execute("SELECT id FROM collection_items WHERE collection_id = %s AND book_id = %s", (collection_id, book_id))
+            elif series_name is not None:
+                cursor.execute("SELECT id FROM collection_items WHERE collection_id = %s AND series_name = %s", (collection_id, series_name))
+            elif audiobook_id is not None:
+                cursor.execute("SELECT id FROM collection_items WHERE collection_id = %s AND audiobook_id = %s", (collection_id, audiobook_id))
+            else:
+                return None
+
+            if cursor.fetchone():
+                return None
+
+            cursor.execute(
+                """
+                INSERT INTO collection_items (collection_id, book_id, series_name, audiobook_id)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (collection_id, book_id, series_name, audiobook_id)
+            )
+            item_id = cursor.lastrowid
+            conn.commit()
+            return item_id
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    @staticmethod
+    def remove_item_from_collection(db_type, collection_id, item_id):
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("DELETE FROM collection_items WHERE collection_id = %s AND id = %s", (collection_id, item_id))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    @staticmethod
+    def get_collection_items(db_type, collection_id):
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                """
+                SELECT ci.*,
+                       b.title AS book_title, b.cover_image AS book_cover, b.series_name AS book_series, b.file_format AS book_format,
+                       ab.title AS audiobook_title, ab.folder_name AS audiobook_folder
+                FROM collection_items ci
+                LEFT JOIN books b ON b.id = ci.book_id
+                LEFT JOIN audiobooks ab ON ab.id = ci.audiobook_id
+                WHERE ci.collection_id = %s
+                ORDER BY ci.sort_order ASC, ci.created_at ASC
+                """,
+                (collection_id,)
+            )
+            rows = cursor.fetchall()
+            return [dict(r) for r in rows] if rows else []
+        finally:
+            conn.close()

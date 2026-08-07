@@ -131,7 +131,7 @@ class StatsDashboardMetadataProvider(BaseMetadataProvider):
                 COUNT(*) AS total_books,
                 COUNT(DISTINCT CASE
                     WHEN TRIM(COALESCE(series_name, '')) != '' THEN TRIM(series_name)
-                    ELSE '__single__:' || CAST(id AS TEXT)
+                    ELSE CONCAT('__single__:', id)
                 END) AS total_series
             FROM books
             WHERE COALESCE(is_deleted, 0) = 0

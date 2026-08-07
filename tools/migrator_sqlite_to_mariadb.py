@@ -119,34 +119,46 @@ CREATE TABLE IF NOT EXISTS audiobooks (
     author VARCHAR(500),
     publisher VARCHAR(255),
     reader VARCHAR(500),
+    code VARCHAR(255),
+    poster TEXT,
+    premiered VARCHAR(100),
+    ratings VARCHAR(50),
+    author_intro TEXT,
     description TEXT,
+    folder_name VARCHAR(500),
     folder_path VARCHAR(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
     cover_image TEXT,
     is_favorite INT DEFAULT 0,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     is_deleted INT DEFAULT 0,
+    deleted_at DATETIME DEFAULT NULL,
     total_tracks INT DEFAULT 0,
     total_duration INT DEFAULT 0,
     release_date VARCHAR(100),
     series_name VARCHAR(500),
     series_index DOUBLE DEFAULT 0,
     metadata_locked INT DEFAULT 0,
+    file_type VARCHAR(50),
     UNIQUE KEY uq_audiobooks_folder_path (folder_path(500)),
     INDEX idx_audiobooks_lib_del (library_id, is_deleted, title(255), id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS tracks (
+CREATE TABLE IF NOT EXISTS audiobook_tracks (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     audiobook_id BIGINT NOT NULL,
     track_number INT DEFAULT 0,
+    track_code VARCHAR(100),
     title VARCHAR(500) NOT NULL,
+    filename VARCHAR(500),
     file_path VARCHAR(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    file_mtime DOUBLE DEFAULT 0.0,
     duration INT DEFAULT 0,
     file_size BIGINT DEFAULT 0,
+    format VARCHAR(50),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_tracks_file_path (file_path(500)),
-    INDEX idx_tracks_audiobook_id (audiobook_id)
+    UNIQUE KEY uq_audiobook_tracks_file_path (file_path(500)),
+    INDEX idx_audiobook_tracks_audiobook_id (audiobook_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS audiobook_progress (
@@ -326,9 +338,25 @@ def init_schema(db_type, db_name):
 
 
 def ensure_table_exists_in_mariadb(ma_conn, table_name, sq_conn):
-    """SQLite 테이블 스키마 정보를 동적으로 조회하여 MariaDB에 해당 테이블이 없으면 자동 생성"""
+    """SQLite 테이블 스키마 정보를 동적으로 조회하여 MariaDB에 해당 테이블이 없으면 자동 생성하고, 기존 테이블의 누락 컬럼은 ALTER TABLE로 자동 보강"""
     if table_name.startswith('books_search') or table_name.startswith('sqlite_') or table_name.startswith('lost_and_found'):
         return
+
+    ma_cur = ma_conn.cursor()
+
+    # 0. 구형 tracks 테이블 존재 및 audiobook_tracks 미존재 시 자동 테이블명 변경
+    if table_name == 'audiobook_tracks':
+        try:
+            ma_cur.execute("SHOW TABLES LIKE 'tracks'")
+            has_old_tracks = bool(ma_cur.fetchone())
+            ma_cur.execute("SHOW TABLES LIKE 'audiobook_tracks'")
+            has_new_tracks = bool(ma_cur.fetchone())
+            if has_old_tracks and not has_new_tracks:
+                ma_cur.execute("RENAME TABLE `tracks` TO `audiobook_tracks`")
+                ma_conn.commit()
+                print("  [+] MariaDB 구형 테이블 `tracks` ➔ `audiobook_tracks` 자동 변경 완료.")
+        except Exception as e:
+            print(f"  [!] RENAME TABLE tracks Warning: {e}")
 
     cols = []
     try:
@@ -343,6 +371,7 @@ def ensure_table_exists_in_mariadb(ma_conn, table_name, sq_conn):
         return
 
     col_defs = []
+    col_type_map = {}
     for c in cols:
         name = c['name']
         col_type = (c['type'] or 'TEXT').upper()
@@ -354,8 +383,12 @@ def ensure_table_exists_in_mariadb(ma_conn, table_name, sq_conn):
             m_type = 'DOUBLE'
         elif 'BLOB' in col_type:
             m_type = 'LONGBLOB'
+        elif 'DATETIME' in col_type or 'DATE' in col_type:
+            m_type = 'DATETIME'
         else:
             m_type = 'TEXT'
+
+        col_type_map[name] = m_type
 
         if is_pk:
             if m_type == 'TEXT':
@@ -366,12 +399,29 @@ def ensure_table_exists_in_mariadb(ma_conn, table_name, sq_conn):
 
     col_str = ",\n  ".join(col_defs)
     ddl = f"CREATE TABLE IF NOT EXISTS `{table_name}` (\n  {col_str}\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
-    ma_cur = ma_conn.cursor()
     try:
         ma_cur.execute(ddl)
         ma_conn.commit()
     except Exception as e:
         print(f"  [!] Dynamic DDL Create Warning for table `{table_name}`: {e}")
+
+    # MariaDB 기존 테이블의 누락 컬럼 자동 ALTER TABLE 추가 보강
+    try:
+        ma_cur.execute(f"SHOW COLUMNS FROM `{table_name}`")
+        ma_cols = set(r['Field'] for r in ma_cur.fetchall())
+        for c in cols:
+            col_name = c['name']
+            if col_name not in ma_cols:
+                m_type = col_type_map.get(col_name, 'TEXT')
+                alter_sql = f"ALTER TABLE `{table_name}` ADD COLUMN `{col_name}` {m_type}"
+                try:
+                    ma_cur.execute(alter_sql)
+                    ma_conn.commit()
+                    print(f"  [+] MariaDB 기존 테이블 `{table_name}` 누락 컬럼 `{col_name}`({m_type}) ALTER TABLE 자동 추가 완료.")
+                except Exception as alter_err:
+                    print(f"  [!] ALTER TABLE `{table_name}` ADD COLUMN `{col_name}` Warning: {alter_err}")
+    except Exception as show_err:
+        print(f"  [!] SHOW COLUMNS Warning for table `{table_name}`: {show_err}")
 
 def migrate_single_db(db_type):
     config = DB_MAP[db_type]

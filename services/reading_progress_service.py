@@ -5,7 +5,7 @@ import time
 import atexit
 from datetime import datetime
 
-from repositories.sqlite.reading_progress_repository import ReadingProgressRepository
+from repositories.reading_progress_repository import ReadingProgressRepository
 from services.webhook_dispatcher import (
     build_book_event_payload,
     dispatch_standard_book_event,

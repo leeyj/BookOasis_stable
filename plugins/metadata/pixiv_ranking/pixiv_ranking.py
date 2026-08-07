@@ -17,6 +17,7 @@ Pixiv 랭킹 대시보드 위젯 플러그인 (BookOasis metadata plugin)
   별칭 필드도 함께 채워서 반환합니다.
 """
 
+import sys
 import base64
 import json
 import logging

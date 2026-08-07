@@ -78,6 +78,8 @@ def _build_series_entries(db_type, rows):
             total_tracks = max((int(b.get('total_tracks') or 0) for b in books), default=0)
         series_key = hashlib.md5(f"{lib_id}|{series_name}|{comp_dir}".encode('utf-8')).hexdigest()[:16]
 
+        book_count = sum(int(b.get('series_book_count') or b.get('book_count') or 1) for b in books)
+
         entries.append({
             'series_key': f"{lib_id}:{series_key}",
             'series_name': series_name,
@@ -85,7 +87,7 @@ def _build_series_entries(db_type, rows):
             'display_name': series_alias if series_alias else series_name,
             'representative_title': representative.get('title_alias') or representative['title'] or '',
             'author': author,
-            'book_count': len(books),
+            'book_count': book_count,
             'total_tracks': total_tracks,
             'cover_image': get_cover_image_with_t(final_cover, updated_at),
             'is_favorite': any_favorite,

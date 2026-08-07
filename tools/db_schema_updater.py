@@ -76,6 +76,62 @@ def _ensure_mariadb_indexes():
         except Exception:
             pass
 
+def _ensure_mariadb_columns():
+    """기존 MariaDB 데이터베이스의 테이블에 누락된 필수 컬럼 자동 ALTER TABLE 보강"""
+    from tools.migrator_sqlite_to_mariadb import connect_mariadb
+    
+    # 0. 구형 tracks 테이블 RENAME 처리
+    try:
+        conn = connect_mariadb('media_audiobook')
+        cur = conn.cursor()
+        cur.execute("SHOW TABLES LIKE 'tracks'")
+        has_old = bool(cur.fetchone())
+        cur.execute("SHOW TABLES LIKE 'audiobook_tracks'")
+        has_new = bool(cur.fetchone())
+        if has_old and not has_new:
+            cur.execute("RENAME TABLE `tracks` TO `audiobook_tracks`")
+            conn.commit()
+            print("  [+] MariaDB 구형 테이블 `tracks` ➔ `audiobook_tracks` 자동 RENAME 완료.")
+        conn.close()
+    except Exception:
+        pass
+
+    required_columns = [
+        ('media_audiobook', 'audiobooks', 'code', 'VARCHAR(255)'),
+        ('media_audiobook', 'audiobooks', 'poster', 'TEXT'),
+        ('media_audiobook', 'audiobooks', 'premiered', 'VARCHAR(100)'),
+        ('media_audiobook', 'audiobooks', 'ratings', 'VARCHAR(50)'),
+        ('media_audiobook', 'audiobooks', 'author_intro', 'TEXT'),
+        ('media_audiobook', 'audiobooks', 'folder_name', 'VARCHAR(500)'),
+        ('media_audiobook', 'audiobooks', 'file_type', 'VARCHAR(50)'),
+        ('media_audiobook', 'audiobooks', 'deleted_at', 'DATETIME DEFAULT NULL'),
+        ('media_audiobook', 'audiobook_tracks', 'track_code', 'VARCHAR(100)'),
+        ('media_audiobook', 'audiobook_tracks', 'filename', 'VARCHAR(500)'),
+        ('media_audiobook', 'audiobook_tracks', 'file_mtime', 'DOUBLE DEFAULT 0.0'),
+        ('media_audiobook', 'audiobook_tracks', 'format', 'VARCHAR(50)'),
+        ('media_general', 'books', 'series_alias', 'VARCHAR(500)'),
+        ('media_general', 'books', 'title_alias', 'VARCHAR(500)'),
+        ('media_general', 'books', 'file_mtime', 'DOUBLE DEFAULT 0.0'),
+        ('media_general', 'books', 'file_size', 'BIGINT DEFAULT 0'),
+        ('media_adult', 'books', 'series_alias', 'VARCHAR(500)'),
+        ('media_adult', 'books', 'title_alias', 'VARCHAR(500)'),
+        ('media_adult', 'books', 'file_mtime', 'DOUBLE DEFAULT 0.0'),
+        ('media_adult', 'books', 'file_size', 'BIGINT DEFAULT 0'),
+    ]
+
+    for db_name, tbl, col_name, col_def in required_columns:
+        try:
+            conn = connect_mariadb(db_name)
+            cur = conn.cursor()
+            cur.execute(f"SHOW COLUMNS FROM `{tbl}` WHERE Field = %s", (col_name,))
+            if not cur.fetchone():
+                cur.execute(f"ALTER TABLE `{tbl}` ADD COLUMN `{col_name}` {col_def}")
+                conn.commit()
+                print(f"  [+] MariaDB 누락 컬럼 자동 보강 완료: `{db_name}`.`{tbl}`.{col_name}")
+            conn.close()
+        except Exception:
+            pass
+
 def run_schema_update():
     print("=" * 60)
     print(" 데이터베이스 최신 스키마 강제 업데이트 및 동기화 도구")
@@ -90,6 +146,7 @@ def run_schema_update():
             for db_type, config in DB_MAP.items():
                 dbname = config['mariadb_db']
                 init_schema(db_type, dbname)
+            _ensure_mariadb_columns()
             _ensure_mariadb_indexes()
             _ensure_mariadb_scan_history_schema()
             print("[+] MariaDB 데이터베이스, 스키마 및 고속 복합 인덱스 검사 완료.")
