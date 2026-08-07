@@ -336,6 +336,12 @@
     "btn_rescan": "Rescan",
     "btn_rescan_all": "Rescan all",
     "btn_rescan_series": "Rescan Series",
+    "btn_mark_series_completed": "Mark All Completed",
+    "marking_completed": "Marking as completed...",
+    "no_books_to_mark_completed": "There are no books to mark as completed.",
+    "confirm_mark_series_completed": "Mark all volumes in this series as completed?",
+    "mark_series_completed_done": "Marked {count} volumes as completed.",
+    "mark_series_completed_fail": "Failed to mark volumes as completed.",
     "no_missing_page_books": "No books with missing page info found.",
     "time_est": "~ {minutes} min",
     "btn_apply_meta": "Apply",
@@ -667,6 +673,7 @@
     "search_placeholder": "Enter search keyword...",
     "tab_genres": "Genres",
     "tab_tags": "Tags",
-    "apply_btn": "Apply Filter"
+    "apply_btn": "Apply Filter",
+    "no_results": "No search results found."
   }
 }

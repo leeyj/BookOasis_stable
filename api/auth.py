@@ -131,6 +131,15 @@ def check_adult_permission(db_type):
         if session.get('has_adult_access') == 1:
             return True
         return False
+
+    if db_type == 'audiobook':
+        # 어드민은 패스, 일반 유저는 세션의 audiobook 접근 권한으로 판별
+        if session.get('role') == 'admin':
+            return True
+        if session.get('has_audiobook_access') == 1:
+            return True
+        return False
+
     return True
 
 @auth_bp.before_app_request

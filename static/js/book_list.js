@@ -7,6 +7,8 @@ import { initInfiniteScrollObserver } from './infinite_scroll.js';
 import { stripLeadingBracketTags } from './series_display.js';
 import { mountIndexScrollbar, unmountIndexScrollbar } from './index_scrollbar.js';
 
+let filterDebounceTimer = null;
+
 function normalizeMetadataToken(token) {
   if (!token) return '';
   return String(token)
@@ -26,35 +28,6 @@ function updateLibraryTotalCount(items) {
   });
   countSpan.innerText = i18n.t('book_list.total_count', {seriesCount: seriesCount.toLocaleString(), bookCount: bookCount.toLocaleString()});
 }
-
-function sortBooksList(filtered, sortDir) {
-  filtered.sort((a, b) => {
-    if (sortDir === 'asc' || sortDir === 'desc') {
-      const nameA = stripLeadingBracketTags(a.series_name || '');
-      const nameB = stripLeadingBracketTags(b.series_name || '');
-      return sortDir === 'asc' 
-        ? nameA.localeCompare(nameB, 'ko', { numeric: true, sensitivity: 'base' })
-        : nameB.localeCompare(nameA, 'ko', { numeric: true, sensitivity: 'base' });
-    } else {
-      // date_desc (최신순), date_asc (과거순)
-      const dateA = a.latest_added ? new Date(a.latest_added).getTime() : 0;
-      const dateB = b.latest_added ? new Date(b.latest_added).getTime() : 0;
-      return sortDir === 'date_desc' ? (dateB - dateA) : (dateA - dateB);
-    }
-  });
-}
-
-function getSearchableSeriesName(item) {
-  return stripLeadingBracketTags(item && item.series_name ? item.series_name : '').toLowerCase();
-}
-
-function matchesSearchQuery(item, query) {
-  return getSearchableSeriesName(item).includes(query) ||
-    String(item && item.representative_title ? item.representative_title : '').toLowerCase().includes(query) ||
-    String(item && item.title ? item.title : '').toLowerCase().includes(query) ||
-    String(item && item.author ? item.author : '').toLowerCase().includes(query);
-}
-
 
 // 1. 도서 시리즈 목록 로드
 export async function loadBooksList(isAppend = false) {
@@ -80,87 +53,59 @@ export async function loadBooksList(isAppend = false) {
   console.log(`[Book-List] loadBooksList 시작 - type=${state.currentLibraryType}, libraryId=${state.currentLibraryId}, isAppend=${isAppend}`);
   
   try {
-    // append가 아닐 때는 최초 1회 전체 데이터를 가져옴
+    const limit = state.LIMIT || 120;
+    const targetPage = isAppend ? state.currentPage : 1;
+
     if (!isAppend) {
       state.currentPage = 1;
       state.hasMore = true;
       container.innerHTML = `<div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('book_list.loading')}</div>`;
-      
-      try {
-        console.log(`[Book-List] API fetchAllBooksList 호출: type=${state.currentLibraryType}, libraryId=${state.currentLibraryId}`);
-        const data = await api.fetchAllBooksList(state.currentLibraryType, state.currentLibraryId);
-        console.log(`[Book-List] API fetchAllBooksList 응답:`, data);
-        if (data.success) {
-          state.allBooksData = data.series || [];
-          console.log(`[Book-List] 수신된 시리즈 개수: ${state.allBooksData.length}`);
-        } else {
-          container.innerHTML = `<div class="loading-spinner">${i18n.t('book_list.load_fail', {error: data.error || ''})}</div>`;
-          return;
-        }
-      } catch (e) {
-        container.innerHTML = `<div class="loading-spinner">${i18n.t('book_list.server_error')}</div>`;
-        console.error('도서 목록 로드 오류:', e);
-        return;
-      }
     }
 
-  // 클라이언트 사이드 필터링 및 정렬 수행
-  let filtered = [...state.allBooksData];
-
-  // 1) 검색 필터링
-  if (state.searchQuery) {
-    filtered = filtered.filter(item => matchesSearchQuery(item, state.searchQuery));
-  }
-
-  // 1-1) 장르 다중 필터링 (AND 결합)
-  if (state.filterGenres && state.filterGenres.length > 0) {
-    filtered = filtered.filter(item => {
-      if (!item.genre) return false;
-      const itemGenres = item.genre.split(',').map(normalizeMetadataToken).filter(Boolean);
-      const selectedGenres = state.filterGenres.map(normalizeMetadataToken).filter(Boolean);
-      return selectedGenres.every(g => itemGenres.includes(g));
+    const data = await api.fetchBooksList({
+      type: state.currentLibraryType,
+      libraryId: state.currentLibraryId,
+      page: targetPage,
+      limit,
+      search: state.searchQuery || '',
+      sort: state.currentSortDirection || 'asc',
+      genres: (state.filterGenres || []).map(normalizeMetadataToken).filter(Boolean),
+      tags: (state.filterTags || []).map(normalizeMetadataToken).filter(Boolean),
     });
-  }
 
-  // 1-2) 태그 다중 필터링 (AND 결합)
-  if (state.filterTags && state.filterTags.length > 0) {
-    filtered = filtered.filter(item => {
-      if (!item.tags) return false;
-      const itemTags = item.tags.split(',').map(normalizeMetadataToken).filter(Boolean);
-      const selectedTags = state.filterTags.map(normalizeMetadataToken).filter(Boolean);
-      return selectedTags.every(t => itemTags.includes(t));
-    });
-  }
+    if (!data.success) {
+      container.innerHTML = `<div class="loading-spinner">${i18n.t('book_list.load_fail', {error: data.error || ''})}</div>`;
+      return;
+    }
 
-  // 2) 가나다(자연) 정렬 및 최신순 정렬 등
-  const sortDir = state.currentSortDirection || 'asc';
-  sortBooksList(filtered, sortDir);
-  
-  state.filteredBooksData = filtered;
+    const incomingSeries = Array.isArray(data.series) ? data.series : [];
 
-  updateLibraryTotalCount(filtered);
+    if (isAppend) {
+      state.currentBooksData = state.currentBooksData.concat(incomingSeries);
+      appendBooksGrid(incomingSeries);
+    } else {
+      state.currentBooksData = incomingSeries;
+      renderBooksGrid(state.currentBooksData);
+    }
 
-  // 3) 클라이언트 사이드 페이징 적용 (청크로 나누기)
-  const limit = state.LIMIT || 120;
-  const offset = (state.currentPage - 1) * limit;
-  const pageItems = filtered.slice(offset, offset + limit);
-  
-  state.hasMore = (offset + limit) < filtered.length;
+    state.filteredBooksData = state.currentBooksData;
+    updateLibraryTotalCount(state.currentBooksData);
 
-  if (isAppend) {
-    state.currentBooksData = state.currentBooksData.concat(pageItems);
-    appendBooksGrid(pageItems);
-  } else {
-    state.currentBooksData = pageItems;
-    renderBooksGrid(state.currentBooksData);
-  }
-
-  if (state.hasMore) {
-    state.currentPage++;
-  }
+    state.hasMore = !!data.has_more;
+    state.currentPage = state.hasMore ? (targetPage + 1) : targetPage;
 
   if (spinner) {
     spinner.style.display = state.hasMore ? 'block' : 'none';
+  }
+
+  const gridView = document.getElementById('books-grid-view');
+  const isGridActive = !!(gridView && gridView.style.display !== 'none');
+  if (isGridActive) {
+    if (state.hasMore) {
+      unmountIndexScrollbar();
+    } else {
+      mountIndexScrollbar();
+    }
   }
   } finally {
     state.isLoading = false;
@@ -225,56 +170,17 @@ export function filterBooks() {
   if (query && state.currentLibraryId === 'history') {
     state.currentLibraryId = 'all';
     loadLibraries();
-  }
-  
-  // 서버에 요청 없이 로컬 상태 목록 갱신
-  state.currentPage = 1;
-  state.hasMore = true;
-  
-  let filtered = [...state.allBooksData];
-  if (state.searchQuery) {
-    filtered = filtered.filter(item => matchesSearchQuery(item, state.searchQuery));
+    return;
   }
 
-  // 1-1) 장르 다중 필터링 (AND 결합)
-  if (state.filterGenres && state.filterGenres.length > 0) {
-    filtered = filtered.filter(item => {
-      if (!item.genre) return false;
-      const itemGenres = item.genre.split(',').map(normalizeMetadataToken).filter(Boolean);
-      const selectedGenres = state.filterGenres.map(normalizeMetadataToken).filter(Boolean);
-      return selectedGenres.every(g => itemGenres.includes(g));
-    });
+  if (filterDebounceTimer) {
+    clearTimeout(filterDebounceTimer);
   }
-
-  // 1-2) 태그 다중 필터링 (AND 결합)
-  if (state.filterTags && state.filterTags.length > 0) {
-    filtered = filtered.filter(item => {
-      if (!item.tags) return false;
-      const itemTags = item.tags.split(',').map(normalizeMetadataToken).filter(Boolean);
-      const selectedTags = state.filterTags.map(normalizeMetadataToken).filter(Boolean);
-      return selectedTags.every(t => itemTags.includes(t));
-    });
-  }
-
-  const sortDir = state.currentSortDirection || 'asc';
-  sortBooksList(filtered, sortDir);
-  
-  state.filteredBooksData = filtered;
-
-  updateLibraryTotalCount(filtered);
-
-  const limit = state.LIMIT || 120;
-  const pageItems = filtered.slice(0, limit);
-  state.hasMore = limit < filtered.length;
-  state.currentPage = 2;
-  
-  state.currentBooksData = pageItems;
-  renderBooksGrid(pageItems);
-
-  const spinner = document.getElementById('infinite-scroll-spinner');
-  if (spinner) {
-    spinner.style.display = state.hasMore ? 'block' : 'none';
-  }
+  filterDebounceTimer = setTimeout(() => {
+    state.currentPage = 1;
+    state.hasMore = true;
+    loadBooksList(false);
+  }, 220);
 }
 
 export function updateSortButtonUI() {
@@ -309,42 +215,9 @@ export function toggleLibrarySort() {
 
   updateSortButtonUI();
 
-  // 서버 요청 없이 로컬 상태 정렬 후 리렌더링
   state.currentPage = 1;
   state.hasMore = true;
-  
-  let filtered = [...state.allBooksData];
-  if (state.searchQuery) {
-    filtered = filtered.filter(item => matchesSearchQuery(item, state.searchQuery));
-  }
-
-  sortBooksList(filtered, newSort);
-
-  updateLibraryTotalCount(filtered);
-
-  const limit = state.LIMIT || 120;
-  const pageItems = filtered.slice(0, limit);
-  state.hasMore = limit < filtered.length;
-  state.currentPage = 2;
-  
-  state.currentBooksData = pageItems;
-  renderBooksGrid(pageItems);
-
-  const spinner = document.getElementById('infinite-scroll-spinner');
-  if (spinner) {
-    spinner.style.display = state.hasMore ? 'block' : 'none';
-  }
-
-  // 정렬 변경 즉시 우측 초성 바로가기 가시성 동기화
-  const gridView = document.getElementById('books-grid-view');
-  const isGridActive = !!(gridView && gridView.style.display !== 'none');
-  if (isGridActive && state.currentLibraryId !== 'history') {
-    if (newSort === 'date_desc' || newSort === 'date_asc') {
-      unmountIndexScrollbar();
-    } else {
-      mountIndexScrollbar();
-    }
-  }
+  loadBooksList(false);
 }
 
 // 시리즈 이어보기 로직

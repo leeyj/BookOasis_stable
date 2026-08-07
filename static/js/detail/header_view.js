@@ -284,6 +284,9 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
   const summaryToggleLabelMore = i18n.t('detail.summary_more') || '더보기';
   const summaryToggleLabelLess = i18n.t('detail.summary_less') || '접기';
   const isAudiobookContext = state.currentLibraryType === 'audiobook';
+    const markSeriesCompletedBtnHtml = `
+      <button class="ridi-link-btn" data-role="detail-mark-series-complete" data-series-name="${safeSeriesName.replace(/"/g, '&quot;')}" data-library-id="${actualLibraryId}" style="margin: 0; background: #16a34a; border-color: #22c55e; display: inline-flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-circle-check"></i> ${i18n.t('detail.btn_mark_series_completed')}</button>
+    `;
   const identifierLabel = 'ISBN(WEB_ID)';
   const identifierValue = isAudiobookContext ? (meta.web_id || '-') : (meta.isbn || '-');
   const identifierEditValue = isAudiobookContext ? (meta.web_id || '') : (meta.isbn || '');
@@ -354,6 +357,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
           <button id="btn-manual-meta-search" class="ridi-link-btn" style="display:none; margin: 0; background: #7c3aed; border-color: #a855f7;"><i class="fa-solid fa-wand-magic-sparkles"></i> ${i18n.t('detail.btn_recommend_match')}</button>
           <button id="btn-plugin-meta-search" class="ridi-link-btn" data-role="detail-plugin-meta-search" data-book-id="${firstBookId || ''}" data-series-name="${safeSeriesName.replace(/"/g, '&quot;')}" style="margin: 0; background: #2563eb; border-color: #3b82f6;"><i class="fa-solid fa-magnifying-glass"></i> ${i18n.t('detail.btn_search_meta')}</button>
           <button class="ridi-link-btn" data-role="detail-rescan-series" data-series-name="${safeSeriesName.replace(/"/g, '&quot;')}" data-library-id="${actualLibraryId}" style="margin: 0; background: #ea580c; border-color: #f97316; display: inline-flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-arrows-rotate"></i> ${i18n.t('detail.btn_rescan_series')}</button>
+          ${markSeriesCompletedBtnHtml}
         </div>
       </div>
 

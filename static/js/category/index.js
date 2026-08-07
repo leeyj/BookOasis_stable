@@ -9,6 +9,83 @@ import { triggerAddLibrary } from './crud_controller.js';
 // 고정 포함 전체 15개 이상부터 "더 보기" 버튼 노출
 const SIDEBAR_MORE_THRESHOLD = 15;
 
+function getLegacyCustomOrderStorageKey(libraryType) {
+  return `libraries_order_${libraryType}`;
+}
+
+function getMixedOrderStorageKey(libraryType) {
+  return `libraries_order_mixed_${libraryType}`;
+}
+
+function getMovableCategoryItems(sidebar) {
+  if (!sidebar) return [];
+  return Array.from(sidebar.querySelectorAll('li[data-type="custom"], li[data-type="plugin"]'));
+}
+
+function getMovableCategoryToken(el) {
+  if (!el || !el.dataset) return '';
+  const type = String(el.dataset.type || '').trim();
+  if (type === 'plugin') {
+    const pluginId = String(el.dataset.pluginId || '').trim();
+    if (!pluginId) return '';
+    return `plugin:${pluginId}`;
+  }
+
+  const customId = String(el.dataset.id || '').trim();
+  if (!customId) return '';
+  return `custom:${customId}`;
+}
+
+function applySavedMixedOrder(sidebar) {
+  if (!sidebar) return;
+
+  let savedOrder = [];
+  try {
+    savedOrder = JSON.parse(localStorage.getItem(getMixedOrderStorageKey(state.currentLibraryType)) || '[]');
+  } catch (_) {
+    savedOrder = [];
+  }
+  if (!Array.isArray(savedOrder) || savedOrder.length === 0) return;
+
+  const movableItems = getMovableCategoryItems(sidebar);
+  if (movableItems.length === 0) return;
+
+  const itemByToken = new Map();
+  movableItems.forEach((el) => {
+    const token = getMovableCategoryToken(el);
+    if (token) itemByToken.set(token, el);
+  });
+
+  const ordered = [];
+  savedOrder.forEach((token) => {
+    if (itemByToken.has(token)) {
+      ordered.push(itemByToken.get(token));
+      itemByToken.delete(token);
+    }
+  });
+
+  if (itemByToken.size > 0) {
+    // 신규 항목은 현재 렌더 순서(custom -> plugin fallback)를 유지
+    movableItems.forEach((el) => {
+      const token = getMovableCategoryToken(el);
+      if (token && itemByToken.has(token)) {
+        ordered.push(el);
+        itemByToken.delete(token);
+      }
+    });
+  }
+
+  const systemItems = Array.from(sidebar.querySelectorAll('li[data-type="system"]'));
+  if (systemItems.length === 0) return;
+
+  ordered.forEach((el) => el.remove());
+  let insertAfterEl = systemItems[systemItems.length - 1];
+  ordered.forEach((el) => {
+    insertAfterEl.after(el);
+    insertAfterEl = el;
+  });
+}
+
 function isCurrentUserAdmin() {
   const user = state.currentUser || window.currentUser || {};
   return String(user.role || '').trim().toLowerCase() === 'admin';
@@ -57,13 +134,20 @@ export function applySidebarShowMore(sidebar, currentLibraryId) {
   const visibleCount = SIDEBAR_MORE_THRESHOLD - 1; // 14개까지 노출
 
   items.forEach((item, idx) => {
-    item.style.display = (idx >= visibleCount && !expanded) ? 'none' : '';
+    if (idx >= visibleCount && !expanded) {
+      item.style.display = 'none';
+    } else {
+      // style.display를 완전히 제거하면 HTML의 인라인 style="display: flex"가 자연스럽게 복원됨
+      item.style.removeProperty('display');
+    }
   });
 
   // "더 보기" / "접기" 버튼 생성
+  // data-type="system"을 부여하여 Sortable.js filter에 걸리도록 하여 드래그 간섭 방지
   const moreBtn = document.createElement('li');
   moreBtn.className = 'menu-item sidebar-more-btn';
   moreBtn.dataset.role = 'sidebar-show-more';
+  moreBtn.dataset.type = 'system';  // Sortable filter 제외 등록
   const hiddenCount = total - visibleCount;
   if (expanded) {
     moreBtn.innerHTML = `<i class="fa-solid fa-chevron-up"></i> <span>접기</span>`;
@@ -187,7 +271,7 @@ export async function loadLibraries() {
       }
       
       if (data.libraries && data.libraries.length > 0) {
-        const savedOrderStr = localStorage.getItem(`libraries_order_${state.currentLibraryType}`);
+        const savedOrderStr = localStorage.getItem(getLegacyCustomOrderStorageKey(state.currentLibraryType));
         if (savedOrderStr) {
           try {
             const savedOrder = JSON.parse(savedOrderStr);
@@ -236,12 +320,14 @@ export async function loadLibraries() {
       }
 
       sidebar.innerHTML = html;
-      applySidebarShowMore(sidebar, state.currentLibraryId);
+      applySavedMixedOrder(sidebar);
       const activeItem = document.getElementById(`category-${state.currentLibraryId}`) || sidebar.querySelector(`[data-id="${state.currentLibraryId}"]`);
       state.currentLibraryHideCovers = !!(activeItem && activeItem.dataset && activeItem.dataset.type === 'custom' && activeItem.dataset.hideCover === '1');
       updateCurrentCategoryIndicator(state.currentLibraryId, activeItem);
       bindSidebarContextMenu();
       bindDragAndDropEvents(!isPinned);
+      // Sortable.js 초기화 이후에 "더 보기" 버튼 삽입해야 Sortable의 내부 상태와 충돌 없이 정상 동작함
+      applySidebarShowMore(sidebar, state.currentLibraryId);
 
       window.dispatchEvent(new CustomEvent('library:categories-rendered', {
         detail: {
@@ -279,7 +365,7 @@ export function bindDragAndDropEvents(isEnabled) {
   if (typeof Sortable !== 'undefined') {
     sidebar._sortable = new Sortable(sidebar, {
       animation: 150,
-      draggable: 'li[data-type="custom"]',
+      draggable: 'li[data-type="custom"], li[data-type="plugin"]',
       filter: 'li[data-type="system"]',
       preventOnFilter: false,
       onEnd: function () {
@@ -292,7 +378,14 @@ export function bindDragAndDropEvents(isEnabled) {
 export function saveNewOrder() {
   const sidebar = document.getElementById('sidebar-categories');
   if (!sidebar) return;
+
   const customItems = sidebar.querySelectorAll('li[data-type="custom"]');
-  const order = Array.from(customItems).map(el => String(el.dataset.id));
-  localStorage.setItem(`libraries_order_${state.currentLibraryType}`, JSON.stringify(order));
+  const legacyCustomOrder = Array.from(customItems).map(el => String(el.dataset.id));
+  localStorage.setItem(getLegacyCustomOrderStorageKey(state.currentLibraryType), JSON.stringify(legacyCustomOrder));
+
+  const movableItems = getMovableCategoryItems(sidebar);
+  const mixedOrder = movableItems
+    .map((el) => getMovableCategoryToken(el))
+    .filter((token) => !!token);
+  localStorage.setItem(getMixedOrderStorageKey(state.currentLibraryType), JSON.stringify(mixedOrder));
 }

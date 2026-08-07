@@ -26,6 +26,9 @@ services:
       - MARIADB_USER=bookoasis
       - MARIADB_PASSWORD=bookoasis_pass
       - MARIADB_DATABASE_PREFIX=media_
+      - MARIADB_CONNECT_TIMEOUT=10
+      - MARIADB_READ_TIMEOUT=90
+      - MARIADB_WRITE_TIMEOUT=90
     depends_on:
       redis:
         condition: service_started

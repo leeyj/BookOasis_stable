@@ -86,6 +86,16 @@ export function initLibrarySearchShortcut() {
 export function handleLibrarySearchAction() {
   const searchInput = document.getElementById('library-search');
   if (!searchInput) return;
+
+  const hasQuery = !!String(searchInput.value || '').trim();
+  if (hasQuery) {
+    searchInput.value = '';
+    if (typeof window.filterBooks === 'function') window.filterBooks();
+    else filterBooks();
+    focusLibrarySearchInput();
+    return;
+  }
+
   if (document.activeElement !== searchInput) {
     focusLibrarySearchInput();
   } else {

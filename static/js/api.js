@@ -16,10 +16,12 @@ export async function fetchLibraries(type) {
   return res.json();
 }
 
-export async function fetchBooksList({type, libraryId, page, limit, append, search, sort}) {
+export async function fetchBooksList({type, libraryId, page, limit, append, search, sort, genres = [], tags = []}) {
   const searchQuery = search ? `&search=${encodeURIComponent(search)}` : '';
   const sortQuery = sort ? `&sort=${sort}` : '';
-  const url = `/api/media/list?type=${type}&library_id=${libraryId}&page=${page}&limit=${limit}${searchQuery}${sortQuery}&_=${Date.now()}`;
+  const genresQuery = genres.length > 0 ? `&genres=${encodeURIComponent(genres.join(','))}` : '';
+  const tagsQuery = tags.length > 0 ? `&tags=${encodeURIComponent(tags.join(','))}` : '';
+  const url = `/api/media/list?type=${type}&library_id=${libraryId}&page=${page}&limit=${limit}${searchQuery}${sortQuery}${genresQuery}${tagsQuery}&_=${Date.now()}`;
   const res = await safeFetch(url, {cache: 'no-store'});
   return res.json();
 }
@@ -154,6 +156,29 @@ export async function markBookAsUnread(type, bookId) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({ db_type: type, book_id: bookId })
+  });
+  return res.json();
+}
+
+export async function markSeriesAsCompleted(type, bookIds, options = {}) {
+  const payload = {
+    db_type: type,
+    book_ids: Array.isArray(bookIds) ? bookIds : [],
+  };
+
+  if (options && options.audiobook_id != null) {
+    payload.audiobook_id = options.audiobook_id;
+  }
+  if (options && Array.isArray(options.track_ids)) {
+    payload.track_ids = options.track_ids;
+  }
+
+  const res = await fetch('/api/media/series/complete', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
   });
   return res.json();
 }

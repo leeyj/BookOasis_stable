@@ -1,4 +1,5 @@
 import time
+from repositories.book_repository import BookRepository
 
 _GENRE_CACHE = {}
 _TAG_CACHE = {}

@@ -11,14 +11,39 @@ export function canAccessAdultLibrary() {
   return raw === true || raw === 1 || String(raw) === '1';
 }
 
+export function canAccessAudiobookLibrary() {
+  const user = state.currentUser || window.currentUser || {};
+  const role = String(user.role || '').toLowerCase();
+  if (role === 'admin') return true;
+
+  const raw = user.has_audiobook_access;
+  return raw === true || raw === 1 || String(raw) === '1';
+}
+
+export function canAccessLibraryType(type) {
+  if (type === 'adult') return canAccessAdultLibrary();
+  if (type === 'audiobook') return canAccessAudiobookLibrary();
+  return true;
+}
+
 export function applyLibraryTypeToggleVisibility() {
   const toggleGroup = document.getElementById('library-type-toggle-group');
   if (!toggleGroup) return;
 
   const allowAdult = canAccessAdultLibrary();
-  toggleGroup.style.display = allowAdult ? 'inline-flex' : 'none';
+  const allowAudiobook = canAccessAudiobookLibrary();
+  const btnGeneral = document.getElementById('btn-lib-general');
+  const btnAdult = document.getElementById('btn-lib-adult');
+  const btnAudiobook = document.getElementById('btn-lib-audiobook');
 
-  if (!allowAdult && state.currentLibraryType === 'adult') {
+  if (btnGeneral) btnGeneral.style.display = 'inline-flex';
+  if (btnAdult) btnAdult.style.display = allowAdult ? 'inline-flex' : 'none';
+  if (btnAudiobook) btnAudiobook.style.display = allowAudiobook ? 'inline-flex' : 'none';
+
+  const visibleCount = [btnGeneral, btnAdult, btnAudiobook].filter(btn => btn && btn.style.display !== 'none').length;
+  toggleGroup.style.display = visibleCount > 1 ? 'inline-flex' : 'none';
+
+  if (!canAccessLibraryType(state.currentLibraryType)) {
     state.currentLibraryType = 'general';
   }
 
@@ -42,8 +67,12 @@ export function applyLibraryTypeButtonState(type) {
 }
 
 export async function switchLibraryType(type) {
-  if (type === 'adult' && !canAccessAdultLibrary()) {
-    alert('성인 도서관 접근 권한이 없습니다.');
+  if (!canAccessLibraryType(type)) {
+    if (type === 'adult') {
+      alert('성인 도서관 접근 권한이 없습니다.');
+    } else if (type === 'audiobook') {
+      alert('오디오북 도서관 접근 권한이 없습니다.');
+    }
     return;
   }
 
@@ -62,6 +91,8 @@ export async function switchLibraryType(type) {
 }
 
 window.canAccessAdultLibrary = canAccessAdultLibrary;
+window.canAccessAudiobookLibrary = canAccessAudiobookLibrary;
+window.canAccessLibraryType = canAccessLibraryType;
 window.applyLibraryTypeToggleVisibility = applyLibraryTypeToggleVisibility;
 window.applyLibraryTypeButtonState = applyLibraryTypeButtonState;
 window.switchLibraryType = switchLibraryType;

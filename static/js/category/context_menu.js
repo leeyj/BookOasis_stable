@@ -33,8 +33,13 @@ export function bindSidebarContextMenu() {
 
   if (sidebar) {
     // 우클릭 직후 발생하는 click/onClick 전파로 카테고리 전환이 일어나는 것을 차단
+    // 단, "더 보기 / 접기" 버튼은 차단 대상에서 제외
     sidebar.addEventListener('click', (e) => {
       if (Date.now() < suppressSidebarClickUntil) {
+        if (e.target && typeof e.target.closest === 'function') {
+          const moreBtn = e.target.closest('[data-role="sidebar-show-more"]');
+          if (moreBtn) return; // 더 보기 버튼은 차단하지 않음
+        }
         e.preventDefault();
         e.stopPropagation();
         if (typeof e.stopImmediatePropagation === 'function') {

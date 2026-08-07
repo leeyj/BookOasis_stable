@@ -7,9 +7,11 @@ import database
 
 class SeriesRepository:
     @staticmethod
-    def fetch_books_for_grouping(db_type, library_id, search_query='', favorite_only=False, user_id=None, role=None, limit=None, offset=None):
+    def fetch_books_for_grouping(db_type, library_id, search_query='', favorite_only=False, genre_filters=None, tag_filters=None, user_id=None, role=None, limit=None, offset=None):
         """시리즈 그룹핑 렌더링에 필요한 기본 도서 레코드 목록 조회 (WAL 락 경합 시 지수 백오프 자동 재시도)"""
         safe_user_id = int(user_id) if user_id is not None and int(user_id) > 0 else 1
+        genre_filters = [str(v).strip() for v in (genre_filters or []) if str(v).strip()]
+        tag_filters = [str(v).strip() for v in (tag_filters or []) if str(v).strip()]
 
         if db_type == 'audiobook':
             where = ["COALESCE(a.is_deleted, 0) = 0"]
@@ -55,36 +57,6 @@ class SeriesRepository:
                     sql += " OFFSET ?"
                     params.append(int(offset))
         else:
-            where = ["(b.is_deleted = 0 OR b.is_deleted IS NULL)"]
-            params = []
-
-            if favorite_only:
-                where.append("EXISTS (SELECT 1 FROM user_favorites uf WHERE uf.book_id = b.id AND uf.user_id = ?)")
-                params.append(safe_user_id)
-
-            if library_id and str(library_id) not in ('all', 'favorite', 'history', 'home'):
-                try:
-                    lib_id_val = int(library_id)
-                    where.append("b.library_id = ?")
-                    params.append(lib_id_val)
-                except (ValueError, TypeError):
-                    pass
-
-            if search_query:
-                like = f"%{search_query}%"
-                where.append("(b.series_name LIKE ? OR b.title LIKE ? OR b.author LIKE ?)")
-                params.extend([like, like, like])
-
-            # 일반 사용자는 허용된 카테고리만 필터링
-            if role != 'admin' and user_id:
-                where.append(
-                    "EXISTS ("
-                    "SELECT 1 FROM user_category_permissions p "
-                    "WHERE p.library_id = b.library_id AND p.user_id = ? AND p.has_access = 1"
-                    ")"
-                )
-                params.append(user_id)
-
             sub_where = ["(b2.is_deleted = 0 OR b2.is_deleted IS NULL)"]
             sub_params = []
             if library_id and str(library_id) not in ('all', 'favorite', 'history', 'home'):
@@ -101,6 +73,27 @@ class SeriesRepository:
                 )
                 sub_params.append(user_id)
 
+            for genre in genre_filters:
+                compact = genre.replace(' ', '')
+                sub_where.append("(',' || REPLACE(COALESCE(b2.genre, ''), ' ', '') || ',') LIKE ?")
+                sub_params.append(f"%,{compact},%")
+
+            for tag in tag_filters:
+                compact = tag.replace(' ', '')
+                sub_where.append("(',' || REPLACE(COALESCE(b2.tags, ''), ' ', '') || ',') LIKE ?")
+                sub_params.append(f"%,{compact},%")
+
+            sub_join = ""
+            if role != 'admin' and user_id:
+                sub_join = " JOIN user_category_permissions p ON p.library_id = b2.library_id AND p.user_id = ? AND p.has_access = 1 "
+                sub_params = [user_id] + sub_params
+
+            outer_where = ["(b.is_deleted = 0 OR b.is_deleted IS NULL)"]
+            params = list(sub_params)
+            if favorite_only:
+                outer_where.append("EXISTS (SELECT 1 FROM user_favorites uf WHERE uf.book_id = b.id AND uf.user_id = ?)")
+                params.append(safe_user_id)
+
             sql = f"""
                 SELECT b.id, b.series_name, b.series_alias, b.title, b.title_alias, b.author, b.file_path, b.file_format,
                        b.cover_image, b.cover_updated_at,
@@ -116,13 +109,13 @@ class SeriesRepository:
                     ) AS rep_id,
                     COUNT(*) AS series_book_count
                     FROM books b2
+                    {sub_join}
                     WHERE {' AND '.join(sub_where)}
                     GROUP BY b2.library_id, COALESCE(NULLIF(b2.series_name, ''), b2.title)
                 ) rep ON b.id = rep.rep_id
-                WHERE {' AND '.join(where)}
+                WHERE {' AND '.join(outer_where)}
                 ORDER BY b.library_id ASC, b.series_name ASC, b.id ASC
             """
-            params = sub_params + params
 
             if limit is not None:
                 sql += " LIMIT ?"

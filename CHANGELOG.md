@@ -1,4 +1,13 @@
 # CHANGELOG
+## v1.8.6
+- (sidebar/category-plugin) 카테고리 레벨 플러그인 탭을 일반 사용자 카테고리와 동일한 드래그 이동 대상으로 확장하고 혼합 순서(`custom+plugin`)를 로컬 저장하여 재접속 시 순서를 유지 | enable category-level plugin tabs to be draggable like user categories and persist mixed custom+plugin sidebar order across reloads
+- (performance/all-view) 전체보기 초기 로딩을 전량 선로드(`/api/media/all-list`)에서 서버 페이지네이션(`/api/media/list`) 기반으로 전환하여 대용량 라이브러리 응답 지연 개선 | switch all-view initial loading from full preload to server-side pagination for large library latency reduction
+- (performance/filter) 장르/태그 필터를 서버 리스트 API 파라미터(`genres`,`tags`)로 처리하도록 확장하여 페이지네이션 모드에서도 필터 기능 유지 | add server-side genre/tag filters to list API so filtering works with paginated loading
+- (dashboard/audiobook) 오디오북 라이브러리에서 연속 독서일수가 0으로 고정되던 문제 수정: streak 날짜 조회를 `user_progress`가 아닌 `audiobook_progress.last_listened_at` 기준으로 분기 처리하고 권한/삭제 조건을 동일 적용 | fix audiobook streak stuck at 0 by using `audiobook_progress.last_listened_at` for distinct read dates with permission and soft-delete filters
+- (dashboard/audiobook) 오디오북 대시보드의 연/월 완독 통계 쿼리를 `audiobook_progress` 기준으로 분기 추가 (`is_completed=1`) | add audiobook-specific annual/monthly completion aggregation branches using `audiobook_progress`
+- (migration/audiobook) 앱 기동 시 `audiobook_progress.last_listened_at` 누락 레코드 자동 백필 추가 (`current_time > 0` 또는 `is_completed = 1` 대상): `audiobooks.updated_at` 우선, 실패 시 CURRENT_TIMESTAMP로 보정 | add startup-time auto backfill for missing `audiobook_progress.last_listened_at` on active/completed rows
+- (migration/tooling) `tools/db_schema_updater.py`에 SQLite/MariaDB 오디오북 진행률 타임스탬프 백필 단계 추가로 커뮤니티 업데이트 경로 자동 적용 강화 | add SQLite/MariaDB audiobook progress timestamp backfill step in schema updater for community upgrade path
+
 ## v1.8.5
 - (favorite) 즐겨찾기 별 클릭 상세 콘솔 로그 추가 및 단권 도서/유저 ID 매칭 오류 수정 | fix favorite star toggle logging & single book user ID matching
 - (category) 카테고리 저장/수정 시 원격 VFS 탐색 os.path.exists 커널 블로킹 및 502 Bad Gateway 수정 | fix category edit VFS os.path.exists kernel hang & 502 Bad Gateway

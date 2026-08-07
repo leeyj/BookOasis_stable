@@ -13,6 +13,17 @@ from utils.i18n import _t
 
 media_library_routes_bp = Blueprint('media_library_browse_routes', __name__)
 
+
+def _parse_csv_filter_values(raw_value):
+    if not raw_value:
+        return []
+    values = []
+    for token in str(raw_value).split(','):
+        normalized = token.strip()
+        if normalized:
+            values.append(normalized)
+    return values
+
 @media_library_routes_bp.route('/api/media/libraries', methods=['GET'])
 @login_required
 def get_media_libraries():
@@ -50,6 +61,8 @@ def get_media_list():
     library_id = request.args.get('library_id')
     search_query = request.args.get('search', '').strip()
     sort = request.args.get('sort', 'asc').strip().lower()
+    genre_filters = _parse_csv_filter_values(request.args.get('genres', ''))
+    tag_filters = _parse_csv_filter_values(request.args.get('tags', ''))
     user_id = session.get('user_id')
     role = session.get('role')
     try:
@@ -66,6 +79,8 @@ def get_media_list():
             limit,
             search_query,
             sort,
+            genre_filters=genre_filters,
+            tag_filters=tag_filters,
             user_id=user_id,
             role=role
         )

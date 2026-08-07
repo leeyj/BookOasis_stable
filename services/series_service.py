@@ -120,6 +120,8 @@ def _sort_entries(entries, sort='asc'):
 
 _ALL_BOOKS_CACHE = {}
 _ALL_BOOKS_CACHE_TTL = 60.0  # 60초 인메모리 캐싱
+_LIST_QUERY_CACHE = {}
+_LIST_QUERY_CACHE_TTL = 120.0
 
 class SeriesService:
     @staticmethod
@@ -128,15 +130,65 @@ class SeriesService:
         _ALL_BOOKS_CACHE.clear()
 
     @staticmethod
-    def get_books_list(db_type, library_id, page, limit, search_query, sort='asc', user_id=None, role=None):
+    def get_books_list(db_type, library_id, page, limit, search_query, sort='asc', genre_filters=None, tag_filters=None, user_id=None, role=None):
         import time
         t0 = time.perf_counter()
         library_id = _normalize_library_id(library_id)
         favorite_only = library_id == 'favorite'
+        normalized_genres = [str(v).strip() for v in (genre_filters or []) if str(v).strip()]
+        normalized_tags = [str(v).strip() for v in (tag_filters or []) if str(v).strip()]
 
         offset = max(0, (page - 1) * limit)
-        sql_limit = (limit + 1) if (not search_query and sort in ('asc', 'desc')) else None
-        sql_offset = offset if (not search_query and sort in ('asc', 'desc')) else None
+        requires_full_scan = bool(search_query) or (sort not in ('asc', 'desc'))
+
+        if requires_full_scan:
+            now = time.time()
+            cache_key = (
+                db_type,
+                library_id,
+                str(search_query or ''),
+                str(sort or 'asc'),
+                tuple(normalized_genres),
+                tuple(normalized_tags),
+                int(user_id) if user_id else 0,
+                str(role or ''),
+            )
+            cached = _LIST_QUERY_CACHE.get(cache_key)
+            if cached and (now - cached[0] < _LIST_QUERY_CACHE_TTL):
+                entries = cached[1]
+                paged = entries[offset:offset + limit + 1]
+                t_cached = time.perf_counter()
+                print(f"[PERF-PROFILE] get_books_list(lib={library_id}, page={page}) QUERY-CACHE HIT ({len(entries)}entries): {(t_cached-t0)*1000:.1f}ms")
+                return paged
+
+            t1 = time.perf_counter()
+            rows = SeriesRepository.fetch_books_for_grouping(
+                db_type,
+                library_id,
+                search_query=search_query or '',
+                favorite_only=favorite_only,
+                genre_filters=normalized_genres,
+                tag_filters=normalized_tags,
+                user_id=user_id,
+                role=role,
+                limit=None,
+                offset=None
+            )
+            t2 = time.perf_counter()
+
+            entries = _build_series_entries(db_type, rows)
+            t3 = time.perf_counter()
+
+            _sort_entries(entries, sort=sort)
+            t4 = time.perf_counter()
+
+            _LIST_QUERY_CACHE[cache_key] = (now, entries)
+            paged = entries[offset:offset + limit + 1]
+            print(f"[PERF-PROFILE] get_books_list(lib={library_id}, page={page}) FULL-SCAN CACHE BUILD TOTAL: {(t4-t0)*1000:.1f}ms | SQL-Fetch({len(rows)}rows): {(t2-t1)*1000:.1f}ms | BuildSeries({len(entries)}entries): {(t3-t2)*1000:.1f}ms | Sort: {(t4-t3)*1000:.1f}ms")
+            return paged
+
+        sql_limit = limit + 1
+        sql_offset = offset
 
         t1 = time.perf_counter()
         rows = SeriesRepository.fetch_books_for_grouping(
@@ -144,6 +196,8 @@ class SeriesService:
             library_id,
             search_query=search_query or '',
             favorite_only=favorite_only,
+            genre_filters=normalized_genres,
+            tag_filters=normalized_tags,
             user_id=user_id,
             role=role,
             limit=sql_limit,

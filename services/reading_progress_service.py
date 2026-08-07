@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import threading
 import time
 import atexit
@@ -347,9 +348,155 @@ class ReadingProgressService:
             logger.warning(f"[Redis] mark_unread cache invalidation failed for {pending_member}: {e}")
 
     @staticmethod
+    def mark_books_completed(db_type: str, book_ids, user_id=1):
+        """여러 권을 현재 사용자 기준 완독 처리합니다."""
+        if not book_ids:
+            return 0
+
+        normalized_ids = []
+        for raw_id in book_ids:
+            try:
+                book_id = int(raw_id)
+            except Exception:
+                continue
+            if book_id > 0:
+                normalized_ids.append(book_id)
+
+        if not normalized_ids:
+            return 0
+
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        items = []
+        for book_id in sorted(set(normalized_ids)):
+            book_row = ReadingProgressRepository.get_book_for_progress(db_type, book_id)
+            if not book_row:
+                continue
+
+            file_format = str(book_row.get('file_format') or '').lower()
+            total_pages = int(book_row.get('total_pages') or 0)
+
+            if file_format == 'epub':
+                pages_read = 100
+                last_epub_percent = 100
+                last_epub_updated_at = now_str
+            else:
+                pages_read = max(1, total_pages)
+                last_epub_percent = None
+                last_epub_updated_at = None
+
+            items.append({
+                'book_id': book_id,
+                'user_id': int(user_id),
+                'pages_read': pages_read,
+                'is_completed': 1,
+                'last_read_at': now_str,
+                'last_epub_cfi': None,
+                'last_epub_href': None,
+                'last_epub_spine_index': None,
+                'last_epub_percent': last_epub_percent,
+                'last_epub_fingerprint': None,
+                'last_epub_updated_at': last_epub_updated_at,
+                'delta': 0,
+            })
+
+        if not items:
+            return 0
+
+        synced = ReadingProgressRepository.batch_flush_progress_items(db_type, items)
+
+        try:
+            from utils.redis_helper import redis_delete_pattern
+            redis_delete_pattern(f"cache:history*:{db_type}:{user_id}")
+        except Exception:
+            pass
+
+        redis_client = get_redis_client()
+        if redis_client:
+            try:
+                pending_key = make_key("sync:progress:pending")
+                for item in items:
+                    cache_key = make_key(f"user:progress:{db_type}:{user_id}:{item['book_id']}")
+                    redis_client.delete(cache_key)
+                    redis_client.srem(pending_key, f"{db_type}:{user_id}:{item['book_id']}")
+            except Exception as e:
+                logger.warning(f"[Redis] mark_books_completed cache invalidation failed: {e}")
+
+        return synced
+
+    @staticmethod
+    def mark_audiobook_completed(audiobook_id, user_id=1, track_ids=None):
+        """오디오북 1개를 현재 사용자 기준 100% 완독 처리합니다."""
+        try:
+            aid = int(audiobook_id)
+        except Exception:
+            return 0
+
+        if aid <= 0:
+            return 0
+
+        from repositories.audiobook_repository import AudiobookRepository
+
+        audiobook = AudiobookRepository.get_audiobook_by_id(aid)
+        if not audiobook:
+            return 0
+
+        tracks = AudiobookRepository.get_audiobook_tracks(aid) or []
+
+        normalized_track_ids = set()
+        for raw_tid in (track_ids or []):
+            try:
+                tid = int(raw_tid)
+            except Exception:
+                continue
+            if tid > 0:
+                normalized_track_ids.add(tid)
+
+        current_track_id = None
+        if tracks:
+            preferred = [t for t in tracks if int(t.get('id') or 0) in normalized_track_ids]
+            target_tracks = preferred if preferred else tracks
+            target_tracks = sorted(
+                target_tracks,
+                key=lambda t: (int(t.get('track_number') or 0), int(t.get('id') or 0))
+            )
+            current_track_id = int(target_tracks[-1].get('id') or 0) or None
+
+        total_duration = float(audiobook.get('total_duration') or 0.0)
+        if total_duration <= 0 and tracks:
+            total_duration = float(sum(float(t.get('duration') or 0.0) for t in tracks))
+
+        AudiobookRepository.save_audiobook_progress(
+            aid,
+            int(user_id),
+            current_track_id,
+            max(0.0, total_duration),
+            100.0,
+            1.0,
+            1,
+        )
+
+        try:
+            from utils.redis_helper import redis_delete_pattern
+            redis_delete_pattern(f"cache:history*:{'audiobook'}:{user_id}")
+        except Exception:
+            pass
+
+        redis_client = get_redis_client()
+        if redis_client:
+            try:
+                audio_progress_key = make_key(f"user:audiobook_progress:{user_id}:{aid}")
+                redis_client.delete(audio_progress_key)
+            except Exception as e:
+                logger.warning(f"[Redis] mark_audiobook_completed cache invalidation failed: {e}")
+
+        return 1
+
+    @staticmethod
     def flush_progress_cache():
         """인메모리 버퍼 및 Redis 캐시에 쌓여 있는 비동기 진행률 데이터를 SQLite DB 파일에 동기화(Flush)합니다."""
         items_dict = {}
+        redis_pending_by_db = {}
+        chunk_size = max(1, int(os.environ.get('PROGRESS_FLUSH_CHUNK_SIZE', '200') or '200'))
 
         # 1. 인메모리 버퍼 펜딩 수집
         mem_batch = InMemoryProgressBuffer.pop_all()
@@ -373,9 +520,9 @@ class ReadingProgressService:
                             try:
                                 data = json.loads(cached_data_str)
                                 items_dict[item_str] = data
+                                redis_pending_by_db.setdefault(db_type, []).append(item_str)
                             except Exception:
                                 pass
-                        redis_client.srem(pending_key, item)
 
         if not items_dict:
             return 0
@@ -407,17 +554,50 @@ class ReadingProgressService:
                         continue
 
                 try:
-                    raw_items = []
+                    prepared_items = []
                     for item_key, data in db_items:
                         parts = item_key.split(':')
                         item_copy = dict(data)
                         item_copy['user_id'] = parts[1]
                         item_copy['book_id'] = parts[2]
-                        raw_items.append(item_copy)
+                        prepared_items.append((item_key, item_copy))
 
                     from repositories.reading_progress_repository import ReadingProgressRepository
-                    synced = ReadingProgressRepository.batch_flush_progress_items(db_type, raw_items)
-                    synced_count += synced
+                    redis_pending_members = set(redis_pending_by_db.get(db_type) or [])
+                    done_members = []
+                    failed_chunks = []
+
+                    for start_idx in range(0, len(prepared_items), chunk_size):
+                        chunk = prepared_items[start_idx:start_idx + chunk_size]
+                        raw_items = [row for _, row in chunk]
+                        try:
+                            synced = ReadingProgressRepository.batch_flush_progress_items(db_type, raw_items)
+                            synced_count += synced
+
+                            if redis_client and redis_pending_members:
+                                for item_key, _ in chunk:
+                                    if item_key in redis_pending_members:
+                                        done_members.append(item_key)
+                        except Exception as chunk_err:
+                            failed_chunks.extend(chunk)
+                            logger_db.error(
+                                f"[Progress Batch Flush ERROR] Chunk failed for db_type={db_type} "
+                                f"(offset={start_idx}, size={len(chunk)}): {chunk_err}"
+                            )
+
+                    # DB 커밋 성공 청크만 pending 제거하여 실패 청크는 다음 flush에서 재시도되도록 유지
+                    if redis_client and done_members:
+                        redis_client.srem(pending_key, *done_members)
+
+                    # Redis 미사용 환경에서는 실패 청크를 메모리 버퍼로 되돌려 유실을 방지
+                    if (not redis_client) and failed_chunks:
+                        for item_key, failed_data in failed_chunks:
+                            InMemoryProgressBuffer.set(
+                                db_type,
+                                failed_data.get('user_id'),
+                                failed_data.get('book_id'),
+                                failed_data,
+                            )
                 except Exception as db_err:
                     logger_db.error(f"[Progress Batch Flush ERROR] Database transaction failed for db_type={db_type}: {db_err}")
             finally:

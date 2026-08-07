@@ -101,7 +101,15 @@ class BookRepository:
             cursor.execute("SELECT DISTINCT tags FROM books WHERE (is_deleted = 0 OR is_deleted IS NULL) AND tags IS NOT NULL AND tags != ''")
         rows = cursor.fetchall()
         conn.close()
-        return [r[0] for r in rows if r[0]]
+        values = []
+        for r in rows:
+            if isinstance(r, dict):
+                v = r.get('tags')
+            else:
+                v = r[0] if r else None
+            if v:
+                values.append(v)
+        return values
 
     @staticmethod
     def get_media_genres(db_type, library_id=None):
@@ -116,7 +124,15 @@ class BookRepository:
             cursor.execute("SELECT DISTINCT genre FROM books WHERE (is_deleted = 0 OR is_deleted IS NULL) AND genre IS NOT NULL AND genre != ''")
         rows = cursor.fetchall()
         conn.close()
-        return [r[0] for r in rows if r[0]]
+        values = []
+        for r in rows:
+            if isinstance(r, dict):
+                v = r.get('genre')
+            else:
+                v = r[0] if r else None
+            if v:
+                values.append(v)
+        return values
 
     @staticmethod
     def get_book_file_info_with_permission(db_type, book_id, perm_clause, perm_params):

@@ -396,6 +396,34 @@ class ReadingProgressRepository:
     def get_distinct_read_dates(db_type, user_id):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
+
+        if db_type == 'audiobook':
+            cursor.execute("""
+                SELECT DISTINCT DATE(p.last_listened_at) AS read_date
+                FROM audiobook_progress p
+                JOIN audiobooks a ON p.audiobook_id = a.id
+                JOIN user_category_permissions ucp ON a.library_id = ucp.library_id AND ucp.user_id = p.user_id AND ucp.has_access = 1
+                WHERE p.user_id = %s
+                  AND p.last_listened_at IS NOT NULL
+                  AND COALESCE(a.is_deleted, 0) = 0
+                  AND (COALESCE(p.current_time, 0) > 0 OR COALESCE(p.is_completed, 0) = 1)
+                ORDER BY read_date DESC
+            """, (user_id,))
+            rows = cursor.fetchall()
+            conn.close()
+            normalized = []
+            for r in rows:
+                if isinstance(r, dict):
+                    val = r.get('read_date')
+                else:
+                    try:
+                        val = r['read_date']
+                    except Exception:
+                        val = r[0] if r else None
+                if val:
+                    normalized.append(str(val))
+            return normalized
+
         cursor.execute("""
             SELECT DISTINCT DATE(p.last_read_at) as read_date
             FROM user_progress p
@@ -406,12 +434,46 @@ class ReadingProgressRepository:
         """, (user_id,))
         rows = cursor.fetchall()
         conn.close()
-        return [r[0] for r in rows if r[0]]
+        normalized = []
+        for r in rows:
+            if isinstance(r, dict):
+                val = r.get('read_date')
+            else:
+                try:
+                    val = r['read_date']
+                except Exception:
+                    val = r[0] if r else None
+            if val:
+                normalized.append(str(val))
+        return normalized
 
     @staticmethod
     def get_completed_count_by_year(db_type, user_id, year_str):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
+
+        if db_type == 'audiobook':
+            cursor.execute("""
+                SELECT COUNT(*)
+                FROM audiobook_progress p
+                JOIN audiobooks a ON p.audiobook_id = a.id
+                JOIN user_category_permissions ucp ON a.library_id = ucp.library_id AND ucp.user_id = p.user_id AND ucp.has_access = 1
+                WHERE p.user_id = %s
+                  AND COALESCE(p.is_completed, 0) = 1
+                  AND DATE_FORMAT(p.last_listened_at, '%%Y') = %s
+                  AND COALESCE(a.is_deleted, 0) = 0
+            """, (user_id, str(year_str)))
+            row = cursor.fetchone()
+            conn.close()
+            if not row:
+                return 0
+            if isinstance(row, dict):
+                return int(row.get('COUNT(*)', 0) or 0)
+            try:
+                return int(row[0] or 0)
+            except Exception:
+                return 0
+
         cursor.execute("""
             SELECT COUNT(*)
             FROM user_progress p
@@ -422,12 +484,42 @@ class ReadingProgressRepository:
         """, (user_id, str(year_str)))
         row = cursor.fetchone()
         conn.close()
-        return row[0] if row else 0
+        if not row:
+            return 0
+        if isinstance(row, dict):
+            return int(row.get('COUNT(*)', 0) or 0)
+        try:
+            return int(row[0] or 0)
+        except Exception:
+            return 0
 
     @staticmethod
     def get_completed_count_by_month(db_type, user_id, year_month_str):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
+
+        if db_type == 'audiobook':
+            cursor.execute("""
+                SELECT COUNT(*)
+                FROM audiobook_progress p
+                JOIN audiobooks a ON p.audiobook_id = a.id
+                JOIN user_category_permissions ucp ON a.library_id = ucp.library_id AND ucp.user_id = p.user_id AND ucp.has_access = 1
+                WHERE p.user_id = %s
+                  AND COALESCE(p.is_completed, 0) = 1
+                  AND DATE_FORMAT(p.last_listened_at, '%%Y-%%m') = %s
+                  AND COALESCE(a.is_deleted, 0) = 0
+            """, (user_id, year_month_str))
+            row = cursor.fetchone()
+            conn.close()
+            if not row:
+                return 0
+            if isinstance(row, dict):
+                return int(row.get('COUNT(*)', 0) or 0)
+            try:
+                return int(row[0] or 0)
+            except Exception:
+                return 0
+
         cursor.execute("""
             SELECT COUNT(*)
             FROM user_progress p
@@ -438,7 +530,14 @@ class ReadingProgressRepository:
         """, (user_id, year_month_str))
         row = cursor.fetchone()
         conn.close()
-        return row[0] if row else 0
+        if not row:
+            return 0
+        if isinstance(row, dict):
+            return int(row.get('COUNT(*)', 0) or 0)
+        try:
+            return int(row[0] or 0)
+        except Exception:
+            return 0
 
     @staticmethod
     def batch_flush_progress_items(db_type, items):

@@ -336,6 +336,12 @@
     "btn_rescan": "다시 스캔",
     "btn_rescan_all": "모두 재스캔",
     "btn_rescan_series": "이 시리즈 재스캔",
+    "btn_mark_series_completed": "모두 완독처리",
+    "marking_completed": "완독 처리 중...",
+    "no_books_to_mark_completed": "완독 처리할 도서가 없습니다.",
+    "confirm_mark_series_completed": "이 시리즈의 모든 권을 완독 처리하시겠습니까?",
+    "mark_series_completed_done": "{count}권을 완독 처리했습니다.",
+    "mark_series_completed_fail": "완독 처리 중 오류가 발생했습니다.",
     "no_missing_page_books": "페이지 정보가 부족한 도서가 없습니다.",
     "time_est": "약 {minutes}분",
     "btn_apply_meta": "이 정보로 채우기",
@@ -666,6 +672,8 @@
     "modal_title": "장르 / 태그 필터",
     "search_placeholder": "검색어 입력...",
     "tab_genres": "장르",
-    "tab_tags": "태그"
+    "tab_tags": "태그",
+    "apply_btn": "필터 적용",
+    "no_results": "검색 결과가 없습니다."
   }
 }

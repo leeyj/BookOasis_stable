@@ -311,6 +311,49 @@ def _ensure_mariadb_indexes():
         except Exception:
             pass
 
+
+def _backfill_audiobook_last_listened_at_sqlite(conn):
+    """SQLite audiobook_progress의 last_listened_at 누락분 보정"""
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE audiobook_progress
+            SET last_listened_at = COALESCE(
+                (SELECT a.updated_at FROM audiobooks a WHERE a.id = audiobook_progress.audiobook_id),
+                CURRENT_TIMESTAMP
+            )
+            WHERE (last_listened_at IS NULL OR TRIM(COALESCE(last_listened_at, '')) = '')
+              AND (COALESCE(current_time, 0) > 0 OR COALESCE(is_completed, 0) = 1)
+        """)
+        conn.commit()
+        changed = cur.rowcount or 0
+        if changed > 0:
+            print(f"  [+] SQLite audiobook_progress last_listened_at 보정 완료: {changed}건")
+    except Exception as e:
+        print(f"  [경고] SQLite audiobook_progress last_listened_at 보정 실패: {e}")
+
+
+def _backfill_audiobook_last_listened_at_mariadb():
+    """MariaDB audiobook_progress의 last_listened_at 누락분 보정"""
+    try:
+        from tools.migrator_sqlite_to_mariadb import connect_mariadb
+        conn = connect_mariadb('media_audiobook')
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE audiobook_progress p
+            LEFT JOIN audiobooks a ON a.id = p.audiobook_id
+            SET p.last_listened_at = COALESCE(a.updated_at, CURRENT_TIMESTAMP)
+            WHERE (p.last_listened_at IS NULL OR TRIM(CAST(p.last_listened_at AS CHAR)) = '' OR p.last_listened_at = '0000-00-00 00:00:00')
+              AND (COALESCE(p.current_time, 0) > 0 OR COALESCE(p.is_completed, 0) = 1)
+        """)
+        conn.commit()
+        changed = cur.rowcount or 0
+        if changed > 0:
+            print(f"  [+] MariaDB audiobook_progress last_listened_at 보정 완료: {changed}건")
+        conn.close()
+    except Exception as e:
+        print(f"  [경고] MariaDB audiobook_progress last_listened_at 보정 실패: {e}")
+
     col_collations = [
         ('media_general', 'books', 'file_path', 'VARCHAR(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL'),
         ('media_adult', 'books', 'file_path', 'VARCHAR(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL'),
@@ -428,6 +471,7 @@ def run_schema_update():
                 init_schema(db_type, dbname)
             _ensure_mariadb_columns()
             _ensure_mariadb_indexes()
+            _backfill_audiobook_last_listened_at_mariadb()
             print("[+] MariaDB 데이터베이스, 스키마 및 고속 복합 인덱스 검사 완료.")
         except Exception as ex:
             print(f"[!] MariaDB 스키마 검사 중 경고: {ex}")
@@ -494,6 +538,10 @@ def run_schema_update():
                 print(f"  - 스키마 내 누락 컬럼 자동 탐지 및 추가 중...")
                 auto_migrate_schema(conn, schema_text)
                 conn.commit()
+
+            if db_key == 'audiobook':
+                print(f"  - audiobook_progress last_listened_at 누락분 보정 중...")
+                _backfill_audiobook_last_listened_at_sqlite(conn)
 
             if indexes_text:
                 print(f"  - 스키마 내 누락 인덱스 자동 생성 중...")

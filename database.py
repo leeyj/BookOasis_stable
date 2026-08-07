@@ -441,6 +441,9 @@ class MariaDBConnectionPool:
         password = os.environ.get('MARIADB_PASSWORD', '')
         prefix = os.environ.get('MARIADB_DATABASE_PREFIX', 'media_')
         dbname = f"{prefix}{self.db_type}"
+        connect_timeout = max(1, int(os.environ.get('MARIADB_CONNECT_TIMEOUT', '10') or '10'))
+        read_timeout = max(1, int(os.environ.get('MARIADB_READ_TIMEOUT', '90') or '90'))
+        write_timeout = max(1, int(os.environ.get('MARIADB_WRITE_TIMEOUT', '90') or '90'))
         return pymysql.connect(
             host=host,
             port=port,
@@ -450,9 +453,9 @@ class MariaDBConnectionPool:
             charset='utf8mb4',
             autocommit=False,
             cursorclass=pymysql.cursors.DictCursor,
-            connect_timeout=10,
-            read_timeout=30,
-            write_timeout=30
+            connect_timeout=connect_timeout,
+            read_timeout=read_timeout,
+            write_timeout=write_timeout
         )
 
     def get_connection(self, wait_timeout=30.0):
@@ -675,6 +678,21 @@ def auto_migrate_schema(conn, schema_text):
                 # SQLite ALTER TABLE ADD COLUMN은 DEFAULT CURRENT_TIMESTAMP / CURRENT_DATE / CURRENT_TIME 등의 동적 기본값을 지원하지 않음 (상수만 가능)
                 # 따라서 동적 기본값 정의는 제거하여 추가함
                 col_def_clean = re.sub(r'(?i)DEFAULT\s+(CURRENT_TIMESTAMP|CURRENT_DATE|CURRENT_TIME)', '', col_def)
+
+                # 레거시 데이터가 있는 테이블에 NOT NULL 컬럼을 추가할 때는
+                # MariaDB/SQLite 모두 DEFAULT가 없으면 ALTER가 실패할 수 있으므로 안전 기본값을 보강합니다.
+                upper_def = col_def_clean.upper()
+                has_not_null = 'NOT NULL' in upper_def
+                has_default = 'DEFAULT' in upper_def
+                if has_not_null and not has_default:
+                    if re.search(r'\b(INT|INTEGER|BIGINT|SMALLINT|TINYINT|NUMERIC|DECIMAL|REAL|FLOAT|DOUBLE)\b', upper_def):
+                        default_literal = '1' if col_name.lower() == 'user_id' else '0'
+                    elif re.search(r'\b(CHAR|TEXT|CLOB|VARCHAR)\b', upper_def):
+                        default_literal = "''"
+                    else:
+                        default_literal = '0'
+                    col_def_clean = f"{col_def_clean} DEFAULT {default_literal}"
+
                 alter_query = f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_def_clean}"
                 try:
                     cursor.execute(alter_query)
@@ -1019,6 +1037,7 @@ def init_databases():
     CREATE INDEX IF NOT EXISTS idx_user_progress_last_read ON user_progress(user_id, last_read_at DESC);
     CREATE INDEX IF NOT EXISTS idx_user_progress_last_read_book ON user_progress(last_read_at DESC, book_id);
     CREATE INDEX IF NOT EXISTS idx_user_reading_log_user_date ON user_reading_log(user_id, read_date);
+    CREATE INDEX IF NOT EXISTS idx_user_reading_log_book_user_date ON user_reading_log(book_id, user_id, read_date);
     CREATE INDEX IF NOT EXISTS idx_user_favorites_user_book ON user_favorites(user_id, book_id);
     CREATE INDEX IF NOT EXISTS idx_user_favorites_book ON user_favorites(book_id);
     CREATE INDEX IF NOT EXISTS idx_user_category_permissions_lookup ON user_category_permissions(user_id, library_id, has_access);
@@ -1216,6 +1235,25 @@ def init_databases():
             conn.commit()
         except Exception as seed_err:
             print(f"[DB-Migration ERROR] user_category_permissions seeding failed: {seed_err}")
+
+        # 오디오북 진행률 레거시 데이터 중 last_listened_at 누락분을 1회성으로 보정
+        try:
+            if db_type == 'audiobook':
+                cursor.execute("""
+                    UPDATE audiobook_progress
+                    SET last_listened_at = COALESCE(
+                        (SELECT a.updated_at FROM audiobooks a WHERE a.id = audiobook_progress.audiobook_id),
+                        CURRENT_TIMESTAMP
+                    )
+                    WHERE (last_listened_at IS NULL OR TRIM(COALESCE(last_listened_at, '')) = '')
+                      AND (COALESCE(current_time, 0) > 0 OR COALESCE(is_completed, 0) = 1)
+                """)
+                conn.commit()
+                if (cursor.rowcount or 0) > 0:
+                    print(f"[DB-Migration] audiobook DB - backfilled last_listened_at rows: {cursor.rowcount}")
+        except Exception as audio_backfill_err:
+            print(f"[DB-Migration ERROR] audiobook_progress last_listened_at backfill failed: {audio_backfill_err}")
+
         # 주의: is_remote 는 운영자가 UI에서 관리하는 의도값이다.
         # 과거에는 서버 기동 시 physical_path 기반 자동 판별로 0 -> 1 보정을 수행했지만,
         # SMB/CIFS/NFS 같은 NAS 마운트나 사용자가 수동 해제한 라이브러리까지 다시 체크되는

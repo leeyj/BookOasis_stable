@@ -32,7 +32,7 @@ import { initSidebarInteractions, restoreDesktopSidebarState, toggleDesktopSideb
 import { decodeDetailParams } from './url_obfuscator.js';
 
 // 모듈화로 분리한 미디어 타입 토글 및 검색 단축키 제어부 임포트
-import { canAccessAdultLibrary, applyLibraryTypeToggleVisibility, applyLibraryTypeButtonState, switchLibraryType } from './library_type_toggle.js';
+import { canAccessLibraryType, applyLibraryTypeToggleVisibility, applyLibraryTypeButtonState, switchLibraryType } from './library_type_toggle.js';
 import { focusLibrarySearchInput, applySearchShortcutSetting, initLibrarySearchShortcut, handleLibrarySearchAction, handleLibrarySearchKeydown, initLibraryTypeHotkeys } from './search_shortcut_manager.js';
 
 import './viewer/viewer_padding.js';
@@ -314,7 +314,7 @@ async function initTabMediaLibrary() {
 
       if (event.state && event.state.view === 'category' && event.state.libraryId) {
         if (event.state.type) {
-          if (event.state.type === 'adult' && !canAccessAdultLibrary()) {
+          if (!canAccessLibraryType(event.state.type)) {
             applyLibraryTypeButtonState('general');
           } else {
             applyLibraryTypeButtonState(event.state.type);
@@ -327,7 +327,7 @@ async function initTabMediaLibrary() {
       } else if (!event.state && (window.location.hash === '' || window.location.hash.startsWith('#library='))) {
         const hashType = parseMediaTypeFromUrl();
         if (hashType) {
-          if (hashType === 'adult' && !canAccessAdultLibrary()) {
+          if (!canAccessLibraryType(hashType)) {
             applyLibraryTypeButtonState('general');
           } else {
             applyLibraryTypeButtonState(hashType);
@@ -348,7 +348,7 @@ async function initTabMediaLibrary() {
   const targetMediaType = parseMediaTypeFromUrl();
 
   if (targetMediaType) {
-    if (targetMediaType === 'adult' && !canAccessAdultLibrary()) {
+    if (!canAccessLibraryType(targetMediaType)) {
       applyLibraryTypeButtonState('general');
     } else {
       applyLibraryTypeButtonState(targetMediaType);

@@ -502,6 +502,47 @@ def mark_book_as_unread():
         print(f"[Unread API Error] {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@stream_bp.route('/api/media/series/complete', methods=['POST'])
+@login_required
+def mark_series_as_completed():
+    """시리즈의 도서들을 현재 사용자 기준 일괄 완독 처리"""
+    try:
+        data = request.get_json(silent=True) or {}
+        db_type = data.get('db_type', 'general')
+        if not check_adult_permission(db_type):
+            return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+
+        user_id = session.get('user_id', 1)
+
+        if db_type == 'audiobook':
+            raw_audiobook_id = data.get('audiobook_id')
+            raw_track_ids = data.get('track_ids') or []
+
+            try:
+                audiobook_id = int(raw_audiobook_id)
+            except Exception:
+                audiobook_id = 0
+
+            if audiobook_id <= 0:
+                return jsonify({'success': False, 'error': 'audiobook_id가 누락되었습니다.'}), 400
+
+            updated_count = ReadingProgressService.mark_audiobook_completed(
+                audiobook_id,
+                user_id=user_id,
+                track_ids=raw_track_ids if isinstance(raw_track_ids, list) else [],
+            )
+        else:
+            raw_book_ids = data.get('book_ids') or []
+            if not isinstance(raw_book_ids, list) or len(raw_book_ids) == 0:
+                return jsonify({'success': False, 'error': 'book_ids가 누락되었습니다.'}), 400
+
+            updated_count = ReadingProgressService.mark_books_completed(db_type, raw_book_ids, user_id=user_id)
+
+        return jsonify({'success': True, 'updated_count': int(updated_count)})
+    except Exception as e:
+        print(f"[Series Complete API Error] {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @stream_bp.route('/api/media/preload-next-book', methods=['POST'])
 @login_required
 def preload_next_book_api():

@@ -47,6 +47,10 @@ const INDEX_CHARS = [
 let scrollbarEl = null;
 
 export function mountIndexScrollbar() {
+  if (state.hasMore) {
+    return;
+  }
+
   const sortDir = state.currentSortDirection || 'asc';
   // 추가일 정렬(최신/과거)에서는 우측 초성 바로가기를 숨깁니다.
   if (sortDir === 'date_desc' || sortDir === 'date_asc') {

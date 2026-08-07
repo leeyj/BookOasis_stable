@@ -164,10 +164,8 @@ export function toggleFilterModal() {
     
     if (modal.style.display === 'none') {
         modal.style.display = 'flex';
-        // 데이터를 로드하지 않은 상태라면 로드
-        if (genresData.length === 0 || tagsData.length === 0) {
-            loadGenresAndTagsData();
-        }
+        // 카테고리/스코프 변경 시 stale 데이터가 남지 않도록 모달 오픈마다 재조회
+        loadGenresAndTagsData();
     } else {
         modal.style.display = 'none';
     }
@@ -177,18 +175,33 @@ export function toggleFilterModal() {
 export async function loadGenresAndTagsData() {
     const libraryId = getScopedLibraryIdForTagFilter();
     const dbType = state.currentLibraryType || 'general';
+    const genresUrl = `/api/media/genres?type=${dbType}&library_id=${libraryId}`;
+    const tagsUrl = `/api/media/tags?type=${dbType}&library_id=${libraryId}`;
 
     try {
-        const [genresRes, tagsRes] = await Promise.all([
-            fetch(`/api/media/genres?type=${dbType}&library_id=${libraryId}`).then(res => res.json()),
-            fetch(`/api/media/tags?type=${dbType}&library_id=${libraryId}`).then(res => res.json())
+        const [genresHttp, tagsHttp] = await Promise.all([
+            fetch(genresUrl),
+            fetch(tagsUrl),
         ]);
+
+        let genresRes = {};
+        let tagsRes = {};
+        try {
+            genresRes = await genresHttp.json();
+        } catch (e) {}
+        try {
+            tagsRes = await tagsHttp.json();
+        } catch (e) {}
 
         if (genresRes.success) {
             genresData = Array.from(new Set((genresRes.genres || []).map(normalizeMetadataToken).filter(Boolean)));
+        } else {
+            genresData = [];
         }
         if (tagsRes.success) {
             tagsData = Array.from(new Set((tagsRes.tags || []).map(normalizeMetadataToken).filter(Boolean)));
+        } else {
+            tagsData = [];
         }
 
         renderChips();
@@ -238,7 +251,10 @@ function renderChips() {
     const filteredList = list.filter(item => item.toLowerCase().includes(searchVal));
 
     if (filteredList.length === 0) {
-        wrapper.innerHTML = `<span style="font-size: 0.8rem; color: #64748b; margin: 1rem auto;">검색 결과가 없습니다.</span>`;
+        const noResultText = (window.i18n && typeof window.i18n.t === 'function')
+            ? window.i18n.t('filter.no_results', '검색 결과가 없습니다.')
+            : '검색 결과가 없습니다.';
+        wrapper.innerHTML = `<span style="font-size: 0.8rem; color: #64748b; margin: 1rem auto;">${noResultText}</span>`;
         return;
     }
 
