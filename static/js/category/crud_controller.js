@@ -10,6 +10,66 @@ const MAX_LIBRARY_PATHS = 20;
 const MAX_LIBRARY_PATH_LINE_LENGTH = 1024;
 const MAX_LIBRARY_PATH_TEXT_LENGTH = 8192;
 
+function populateLibraryGroupSelect(selectedGroupId = '') {
+  const select = document.getElementById('library-form-group-id');
+  if (!select) return;
+  const selected = selectedGroupId == null ? '' : String(selectedGroupId);
+  select.innerHTML = '<option value="">미분류</option>' + (state.libraryGroups || []).map((group) => {
+    const groupId = String(group.id);
+    const safeName = String(group.name || '')
+      .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return `<option value="${groupId}"${groupId === selected ? ' selected' : ''}>${safeName}</option>`;
+  }).join('');
+  select.value = selected;
+}
+
+export async function triggerAddLibraryGroup() {
+  const name = prompt('새 그룹 이름을 입력하세요.');
+  if (name === null) return;
+  const cleanName = name.trim();
+  if (!cleanName || cleanName.length > 25) {
+    alert('그룹 이름은 1~25자로 입력해 주세요.');
+    return;
+  }
+  const formData = new FormData();
+  formData.append('type', state.currentLibraryType);
+  formData.append('name', cleanName);
+  const result = await api.addLibraryGroup(formData);
+  if (!result.success) {
+    alert(result.error || '그룹을 추가하지 못했습니다.');
+    return;
+  }
+  await window.loadLibraries?.();
+}
+
+export async function triggerEditLibraryGroup(group) {
+  const name = prompt('그룹 이름을 입력하세요.', group?.name || '');
+  if (name === null) return;
+  const formData = new FormData();
+  formData.append('type', state.currentLibraryType);
+  formData.append('id', group.id);
+  formData.append('name', name.trim());
+  const result = await api.editLibraryGroup(formData);
+  if (!result.success) {
+    alert(result.error || '그룹 이름을 변경하지 못했습니다.');
+    return;
+  }
+  await window.loadLibraries?.();
+}
+
+export async function triggerDeleteLibraryGroup(group) {
+  if (!confirm(`'${group?.name || ''}' 그룹을 삭제할까요? 하위 카테고리는 미분류로 이동합니다.`)) return;
+  const formData = new FormData();
+  formData.append('type', state.currentLibraryType);
+  formData.append('id', group.id);
+  const result = await api.deleteLibraryGroup(formData);
+  if (!result.success) {
+    alert(result.error || '그룹을 삭제하지 못했습니다.');
+    return;
+  }
+  await window.loadLibraries?.();
+}
+
 export function triggerAddLibrary() {
   console.log('[Category-CRUD] triggerAddLibrary() 진입');
   const modal = document.getElementById('library-form-modal');
@@ -23,6 +83,7 @@ export function triggerAddLibrary() {
   }
   form.reset();
   document.getElementById('library-form-id').value = '';
+  populateLibraryGroupSelect('');
   const remoteEl = document.getElementById('library-form-remote');
   if (remoteEl) {
     remoteEl.checked = false;
@@ -79,6 +140,10 @@ export function triggerAddLibrary() {
 
 export async function triggerEditLibrary() {
   if (!currentTargetLibrary || currentTargetLibrary.type === 'system') return;
+  if (currentTargetLibrary.type === 'group') {
+    await triggerEditLibraryGroup(currentTargetLibrary);
+    return;
+  }
   
   const modal = document.getElementById('library-form-modal');
   const title = document.getElementById('library-modal-title');
@@ -99,22 +164,25 @@ export async function triggerEditLibrary() {
   
   const id = currentTargetLibrary.id;
   const name = currentTargetLibrary.name;
+  const libraryItem = document.querySelector(`[data-type="custom"][data-id="${id}"]`);
  
   document.getElementById('library-form-id').value = id;
   document.getElementById('library-form-name').value = name;
+  const groupIdVal = libraryItem?.dataset?.groupId || '';
+  populateLibraryGroupSelect(groupIdVal);
   
-  const pathVal = document.querySelector(`[data-id="${id}"]`)?.dataset?.path || '';
+  const pathVal = libraryItem?.dataset?.path || '';
   document.getElementById('library-form-path').value = pathVal;
 
-  const categoryTypeVal = document.querySelector(`[data-id="${id}"]`)?.dataset?.categoryType || 'local';
+  const categoryTypeVal = libraryItem?.dataset?.categoryType || 'local';
   selectCategoryType(categoryTypeVal);
 
-  const isRemoteVal = document.querySelector(`[data-id="${id}"]`)?.dataset?.remote || '0';
+  const isRemoteVal = libraryItem?.dataset?.remote || '0';
   const remoteEl = document.getElementById('library-form-remote');
   if (remoteEl) remoteEl.checked = (isRemoteVal === '1');
 
   // Rclone RC URL 바인딩 및 표시 토글
-  const rcloneUrlVal = document.querySelector(`[data-id="${id}"]`)?.dataset?.rcloneUrl || '';
+  const rcloneUrlVal = libraryItem?.dataset?.rcloneUrl || '';
   const rcloneUrlEl = document.getElementById('library-form-rclone-url');
   if (rcloneUrlEl) rcloneUrlEl.value = rcloneUrlVal;
 
@@ -124,8 +192,8 @@ export async function triggerEditLibrary() {
   }
 
   // 아이콘 및 컬러 칩 데이터 바인딩
-  const iconVal = document.querySelector(`[data-id="${id}"]`)?.dataset?.icon || 'fa-book';
-  const colorVal = document.querySelector(`[data-id="${id}"]`)?.dataset?.color || '#94a3b8';
+  const iconVal = libraryItem?.dataset?.icon || 'fa-book';
+  const colorVal = libraryItem?.dataset?.color || '#94a3b8';
   
   const iconInput = document.getElementById('library-form-icon');
   if (iconInput) iconInput.value = iconVal;
@@ -141,7 +209,7 @@ export async function triggerEditLibrary() {
     else el.classList.remove('active');
   });
 
-  const hideCoverVal = document.querySelector(`[data-id="${id}"]`)?.dataset?.hideCover || '0';
+  const hideCoverVal = libraryItem?.dataset?.hideCover || '0';
   const hideCoverEl = document.getElementById('library-form-hide-cover');
   if (hideCoverEl) hideCoverEl.checked = (hideCoverVal === '1');
 
@@ -165,6 +233,10 @@ export async function triggerEditLibrary() {
 
 export async function triggerDeleteLibrary() {
   if (!currentTargetLibrary || currentTargetLibrary.type === 'system') return;
+  if (currentTargetLibrary.type === 'group') {
+    await triggerDeleteLibraryGroup(currentTargetLibrary);
+    return;
+  }
   const confirmDel = confirm(i18n.t('category.delete_confirm', {name: currentTargetLibrary.name}));
   if (!confirmDel) return;
 

@@ -883,6 +883,69 @@ body {
     text-shadow: 0 0 8px rgba(240, 171, 252, 0.5);
 }
 
+.sidebar-library-group {
+    list-style: none;
+    margin: 0.2rem 0;
+}
+
+.sidebar-menu .sidebar-group-header {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.sidebar-group-header > span {
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+}
+
+.sidebar-group-header small {
+    color: var(--app-text-muted, #94a3b8);
+    font-size: 0.72rem;
+}
+
+.sidebar-group-chevron {
+    width: 0.7rem;
+    font-size: 0.65rem;
+    transition: transform 0.18s ease;
+}
+
+.sidebar-library-group.collapsed .sidebar-group-chevron {
+    transform: rotate(-90deg);
+}
+
+.sidebar-library-group-items {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 0 1.15rem;
+    min-height: 0.65rem;
+}
+
+.sidebar-library-group-items:empty {
+    min-height: 1.75rem;
+    border: 1px dashed rgba(148, 163, 184, 0.28);
+    border-radius: 4px;
+}
+
+.sidebar-library-group-items .sortable-ghost {
+    opacity: 0.45;
+}
+
+.sidebar-library-group.collapsed .sidebar-library-group-items {
+    display: none;
+}
+
+.sidebar-library-group-items .menu-item {
+    font-size: 0.9rem;
+}
+
 /* 사이드바 "더 보기 / 접기" Plex 스타일 버튼 */
 .sidebar-menu .sidebar-more-btn {
     color: #a78bfa;
@@ -1082,6 +1145,182 @@ body.has-system-ticker .library-sidebar {
     background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
     color: #fff;
     box-shadow: 0 2px 6px rgba(124, 58, 237, 0.4);
+}
+
+.scan-activity-wrap {
+    position: relative;
+    flex-shrink: 0;
+    margin-right: 0.5rem;
+}
+
+.btn-scan-activity {
+    position: relative;
+    width: 2.25rem;
+    height: 2.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.btn-scan-activity:hover,
+.btn-scan-activity[aria-expanded="true"] {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #e2e8f0;
+}
+
+.btn-scan-activity.is-active > i {
+    color: #f59e0b;
+    animation: scanActivityPulse 1.4s ease-in-out infinite;
+}
+
+.scan-activity-indicator {
+    position: absolute;
+    top: 0.35rem;
+    right: 0.35rem;
+    width: 0.42rem;
+    height: 0.42rem;
+    border-radius: 50%;
+    background: #f59e0b;
+    box-shadow: 0 0 0 2px #172033;
+    opacity: 0;
+}
+
+.btn-scan-activity.is-active .scan-activity-indicator {
+    opacity: 1;
+}
+
+.scan-activity-popover {
+    position: absolute;
+    z-index: 10020;
+    top: calc(100% + 0.65rem);
+    left: 0;
+    width: min(360px, calc(100vw - 2rem));
+    max-height: min(62vh, 520px);
+    overflow: hidden;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 6px;
+    background: #20272b;
+    color: #d5d9dc;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.48);
+}
+
+.scan-activity-header {
+    min-height: 3.25rem;
+    padding: 0.8rem 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.scan-activity-header > div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.scan-activity-header strong {
+    color: #f1f5f9;
+    font-size: 0.92rem;
+}
+
+.scan-activity-header span {
+    color: #8f9aa3;
+    font-size: 0.72rem;
+}
+
+.scan-activity-header button {
+    width: 1.9rem;
+    height: 1.9rem;
+    border: 0;
+    background: transparent;
+    color: #8f9aa3;
+    cursor: pointer;
+}
+
+.scan-activity-list {
+    max-height: calc(min(62vh, 520px) - 3.25rem);
+    overflow-y: auto;
+}
+
+.scan-activity-item {
+    display: grid;
+    grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+    gap: 0.65rem;
+    align-items: start;
+    padding: 0.85rem 0.9rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.scan-activity-item:last-child {
+    border-bottom: 0;
+}
+
+.scan-activity-item-icon {
+    color: #f59e0b;
+    padding-top: 0.1rem;
+}
+
+.scan-activity-item.is-pending .scan-activity-item-icon {
+    color: #7f8a93;
+}
+
+.scan-activity-item-copy {
+    min-width: 0;
+}
+
+.scan-activity-item-title,
+.scan-activity-item-detail {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.scan-activity-item-title {
+    color: #d5d9dc;
+    font-size: 0.84rem;
+    font-weight: 650;
+}
+
+.scan-activity-item-detail {
+    margin-top: 0.25rem;
+    color: #8f9aa3;
+    font-size: 0.75rem;
+}
+
+.scan-activity-item-time {
+    color: #7f8a93;
+    font-size: 0.7rem;
+    white-space: nowrap;
+}
+
+.scan-activity-empty {
+    min-height: 8rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
+    color: #8f9aa3;
+    font-size: 0.82rem;
+}
+
+.scan-activity-empty i {
+    color: #64727c;
+    font-size: 1.35rem;
+}
+
+@keyframes scanActivityPulse {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
 }
 
 /* 커스텀 우클릭 컨텍스트 메뉴 */

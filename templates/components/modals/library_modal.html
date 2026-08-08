@@ -12,6 +12,12 @@
                 <input type="text" id="library-form-name" name="name" required maxlength="25" data-i18n-placeholder="modal.category_name_placeholder" placeholder="예: 판타지 소설, 코믹스 등">
             </div>
             <div class="library-form-group">
+                <label for="library-form-group-id">상위 그룹</label>
+                <select id="library-form-group-id" name="group_id">
+                    <option value="">미분류</option>
+                </select>
+            </div>
+            <div class="library-form-group">
                 <label data-i18n="modal.category_type_label">카테고리 유형</label>
                 <div class="category-type-selector" style="display: flex; gap: 0.5rem; margin-top: 0.4rem;">
                     <button type="button" class="category-type-btn active" data-role="library-category-type" data-type="local">

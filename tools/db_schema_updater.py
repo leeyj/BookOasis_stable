@@ -42,6 +42,14 @@ except ImportError as e:
 # MariaDB 중앙 스키마 정의 (Single Source of Truth)
 # ==============================================================================
 MARIADB_CENTRAL_SCHEMA = """
+CREATE TABLE IF NOT EXISTS library_groups (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    icon VARCHAR(100) DEFAULT 'fa-folder',
+    color VARCHAR(50) DEFAULT '#a855f7',
+    sort_order INT DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
 CREATE TABLE IF NOT EXISTS libraries (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL UNIQUE,
@@ -54,7 +62,11 @@ CREATE TABLE IF NOT EXISTS libraries (
     rclone_rc_url TEXT DEFAULT NULL,
     icon VARCHAR(100) DEFAULT 'fa-book',
     color VARCHAR(50) DEFAULT '#94a3b8',
-    hide_cover INT DEFAULT 0
+    hide_cover INT DEFAULT 0,
+    group_id BIGINT DEFAULT NULL,
+    sort_order INT DEFAULT 0,
+    INDEX idx_libraries_group_id (group_id),
+    INDEX idx_libraries_group_order (group_id, sort_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE IF NOT EXISTS scanner_tasks (
@@ -420,6 +432,12 @@ def _ensure_mariadb_columns():
         pass
 
     required_columns = [
+        ('media_general', 'libraries', 'group_id', 'BIGINT DEFAULT NULL'),
+        ('media_adult', 'libraries', 'group_id', 'BIGINT DEFAULT NULL'),
+        ('media_audiobook', 'libraries', 'group_id', 'BIGINT DEFAULT NULL'),
+        ('media_general', 'libraries', 'sort_order', 'INT DEFAULT 0'),
+        ('media_adult', 'libraries', 'sort_order', 'INT DEFAULT 0'),
+        ('media_audiobook', 'libraries', 'sort_order', 'INT DEFAULT 0'),
         ('media_audiobook', 'audiobooks', 'code', 'VARCHAR(255)'),
         ('media_audiobook', 'audiobooks', 'poster', 'TEXT'),
         ('media_audiobook', 'audiobooks', 'premiered', 'VARCHAR(100)'),
@@ -460,6 +478,12 @@ def _ensure_mariadb_columns():
 
 def _ensure_mariadb_indexes():
     required_indexes = [
+        ('media_general', 'libraries', 'idx_libraries_group_id', 'CREATE INDEX idx_libraries_group_id ON libraries (group_id)'),
+        ('media_adult', 'libraries', 'idx_libraries_group_id', 'CREATE INDEX idx_libraries_group_id ON libraries (group_id)'),
+        ('media_audiobook', 'libraries', 'idx_libraries_group_id', 'CREATE INDEX idx_libraries_group_id ON libraries (group_id)'),
+        ('media_general', 'libraries', 'idx_libraries_group_order', 'CREATE INDEX idx_libraries_group_order ON libraries (group_id, sort_order)'),
+        ('media_adult', 'libraries', 'idx_libraries_group_order', 'CREATE INDEX idx_libraries_group_order ON libraries (group_id, sort_order)'),
+        ('media_audiobook', 'libraries', 'idx_libraries_group_order', 'CREATE INDEX idx_libraries_group_order ON libraries (group_id, sort_order)'),
         ('media_general', 'books', 'idx_books_series_name', 'CREATE INDEX idx_books_series_name ON books (series_name(255))'),
         ('media_general', 'books', 'idx_books_series_alias', 'CREATE INDEX idx_books_series_alias ON books (series_alias(255))'),
         ('media_general', 'books', 'idx_books_library_id', 'CREATE INDEX idx_books_library_id ON books (library_id)'),

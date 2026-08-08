@@ -552,6 +552,125 @@ let wasScanningPrevious = false;
 let lastActiveLibIds = new Set();
 let lastIsHeaderScanning = false;
 let scanLatchTimerMap = new Map();
+let latestSystemStatus = null;
+
+function escapeActivityText(value) {
+  const node = document.createElement('div');
+  node.textContent = String(value ?? '');
+  return node.innerHTML;
+}
+
+function escapeActivityAttribute(value) {
+  return escapeActivityText(value).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function getScanActivityTaskInfo(task, isPending = false) {
+  const taskType = task?.type || task?.task_type || 'background';
+  const kwargs = task?.kwargs || {};
+  const libraryId = kwargs.library_id;
+  const dbType = kwargs.db_type || state.currentLibraryType || 'general';
+  const stage = String(task?.stage || '').trim();
+  const names = {
+    library_scan: '카테고리 스캔',
+    cover_scan: '표지 스캔',
+    lazy_scan: '미디어 검색',
+  };
+  const title = task?.library_name
+    || (taskType === 'lazy_scan' ? '전체 시스템' : libraryId != null ? `Library ${libraryId} (${dbType})` : '백그라운드 작업');
+  const detail = isPending ? `${names[taskType] || '백그라운드 작업'} 대기 중` : stage || `${names[taskType] || '백그라운드 작업'} 진행 중`;
+  const startedAt = task?.started_at || task?.enqueued_at;
+  return { title, detail, startedAt };
+}
+
+function formatScanActivityElapsed(startedAt) {
+  if (!startedAt) return '';
+  const normalized = String(startedAt).replace(' ', 'T');
+  const startedMs = Date.parse(normalized);
+  if (!Number.isFinite(startedMs)) return '';
+  const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startedMs) / 1000));
+  if (elapsedSeconds < 60) return `${elapsedSeconds}초`;
+  const minutes = Math.floor(elapsedSeconds / 60);
+  if (minutes < 60) return `${minutes}분`;
+  return `${Math.floor(minutes / 60)}시간 ${minutes % 60}분`;
+}
+
+function renderScanActivity(data) {
+  latestSystemStatus = data;
+  const button = document.getElementById('btn-scan-activity');
+  const summary = document.getElementById('scan-activity-summary');
+  const list = document.getElementById('scan-activity-list');
+  if (!button || !summary || !list) return;
+
+  const running = data?.raw_status?.running || null;
+  const pending = Array.isArray(data?.raw_status?.pending) ? data.raw_status.pending : [];
+  const isActive = Boolean(data?.success && data?.is_active);
+  button.classList.toggle('is-active', isActive);
+
+  const tasks = [];
+  if (running) tasks.push({ task: running, pending: false });
+  pending.forEach(task => tasks.push({ task, pending: true }));
+  if (tasks.length === 0 && isActive && Array.isArray(data?.tasks)) {
+    data.tasks.forEach(detail => tasks.push({
+      task: { type: 'background', library_name: '시스템 유지보수', stage: detail },
+      pending: false,
+    }));
+  }
+  button.title = tasks.length > 0 ? `스캔 활동 ${tasks.length}건` : '스캔 활동';
+  summary.textContent = running
+    ? `실행 중 · 대기 ${pending.length}건`
+    : pending.length ? `대기 ${pending.length}건` : tasks.length ? '실행 중' : '대기 중';
+  if (tasks.length === 0) {
+    list.innerHTML = `
+      <div class="scan-activity-empty">
+        <i class="fa-regular fa-circle-check" aria-hidden="true"></i>
+        <span>진행 중인 스캔이 없습니다.</span>
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = tasks.map(({ task, pending: isPending }) => {
+    const info = getScanActivityTaskInfo(task, isPending);
+    const elapsed = isPending ? '' : formatScanActivityElapsed(info.startedAt);
+    return `
+      <div class="scan-activity-item${isPending ? ' is-pending' : ''}">
+        <span class="scan-activity-item-icon">
+          <i class="fa-solid ${isPending ? 'fa-clock' : 'fa-circle-notch fa-spin'}" aria-hidden="true"></i>
+        </span>
+        <div class="scan-activity-item-copy">
+          <div class="scan-activity-item-title" title="${escapeActivityAttribute(info.title)}">${escapeActivityText(info.title)}</div>
+          <div class="scan-activity-item-detail" title="${escapeActivityAttribute(info.detail)}">${escapeActivityText(info.detail)}</div>
+        </div>
+        <span class="scan-activity-item-time">${escapeActivityText(elapsed)}</span>
+      </div>`;
+  }).join('');
+}
+
+function setScanActivityPopoverOpen(open) {
+  const button = document.getElementById('btn-scan-activity');
+  const popover = document.getElementById('scan-activity-popover');
+  if (!button || !popover) return;
+  popover.hidden = !open;
+  button.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (open && latestSystemStatus) renderScanActivity(latestSystemStatus);
+}
+
+function initScanActivityPopover() {
+  const button = document.getElementById('btn-scan-activity');
+  const closeButton = document.getElementById('btn-close-scan-activity');
+  const popover = document.getElementById('scan-activity-popover');
+  if (!button || !closeButton || !popover || button.dataset.bound === '1') return;
+  button.dataset.bound = '1';
+  button.addEventListener('click', event => {
+    event.stopPropagation();
+    setScanActivityPopoverOpen(popover.hidden);
+  });
+  closeButton.addEventListener('click', () => setScanActivityPopoverOpen(false));
+  popover.addEventListener('click', event => event.stopPropagation());
+  document.addEventListener('click', () => setScanActivityPopoverOpen(false));
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') setScanActivityPopoverOpen(false);
+  });
+}
 
 function applyCategoryScanSpinnersState() {
   const headerSpinner = document.getElementById('header-category-scan-spinner');
@@ -652,6 +771,7 @@ export function startSystemStatusPolling() {
       const res = await fetch(`/api/system/status?type=${state.currentLibraryType}`);
       const data = await res.json();
       updateCategoryScanSpinners(data);
+      renderScanActivity(data);
     } catch (err) {
       console.error('[ScanSpinner] 상태 조회 실패:', err);
     }
@@ -671,8 +791,12 @@ window.addEventListener('resize', () => {
 
 // 스크립트 로드 시 즉시 시작
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', startSystemStatusPolling);
+  document.addEventListener('DOMContentLoaded', () => {
+    initScanActivityPopover();
+    startSystemStatusPolling();
+  });
 } else {
+  initScanActivityPopover();
   startSystemStatusPolling();
 }
 

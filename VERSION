@@ -1,5 +1,5 @@
-"dashboard": "1.8.7"
-"migrator": "1.0.9"
+"dashboard": "1.8.8"
+"migrator": "1.1.0"
 "extensions": "1.0.2"
-"DBMS": "1.8.7"
+"DBMS": "1.8.8"
 "state": "release-production"

@@ -18,6 +18,18 @@ function isCurrentUserAdmin() {
   return String(user.role || '').trim().toLowerCase() === 'admin';
 }
 
+function configureCategoryContextMenu(type) {
+  const isSystem = type === 'system';
+  const isGroup = type === 'group';
+  document.getElementById('ctx-edit-category').style.display = isSystem ? 'none' : 'block';
+  document.getElementById('ctx-delete-category').style.display = isSystem ? 'none' : 'block';
+  document.getElementById('ctx-scan-category').style.display = (isSystem || isGroup) ? 'none' : 'block';
+  ['ctx-force-scan-category', 'ctx-scan-covers-category', 'ctx-cancel-scan-category'].forEach((id) => {
+    const element = document.getElementById(id);
+    if (element) element.style.display = (isSystem || isGroup) ? 'none' : 'block';
+  });
+}
+
 export function setCurrentTargetLibrary(val) {
   currentTargetLibrary = val;
 }
@@ -69,33 +81,7 @@ export function bindSidebarContextMenu() {
         
         currentTargetLibrary = { id, name, type };
 
-        if (type === 'system') {
-          document.getElementById('ctx-edit-category').style.display = 'none';
-          document.getElementById('ctx-delete-category').style.display = 'none';
-          document.getElementById('ctx-scan-category').style.display = 'none';
-          if (document.getElementById('ctx-force-scan-category')) {
-            document.getElementById('ctx-force-scan-category').style.display = 'none';
-          }
-          if (document.getElementById('ctx-scan-covers-category')) {
-            document.getElementById('ctx-scan-covers-category').style.display = 'none';
-          }
-          if (document.getElementById('ctx-cancel-scan-category')) {
-            document.getElementById('ctx-cancel-scan-category').style.display = 'none';
-          }
-        } else {
-          document.getElementById('ctx-edit-category').style.display = 'block';
-          document.getElementById('ctx-delete-category').style.display = 'block';
-          document.getElementById('ctx-scan-category').style.display = 'block';
-          if (document.getElementById('ctx-force-scan-category')) {
-            document.getElementById('ctx-force-scan-category').style.display = 'block';
-          }
-          if (document.getElementById('ctx-scan-covers-category')) {
-            document.getElementById('ctx-scan-covers-category').style.display = 'block';
-          }
-          if (document.getElementById('ctx-cancel-scan-category')) {
-            document.getElementById('ctx-cancel-scan-category').style.display = 'block';
-          }
-        }
+        configureCategoryContextMenu(type);
       } else {
         currentTargetLibrary = null;
         document.getElementById('ctx-edit-category').style.display = 'none';
@@ -130,33 +116,7 @@ export function bindSidebarContextMenu() {
             suppressSidebarClickUntil = Date.now() + 900;
             currentTargetLibrary = { id, name, type };
 
-            if (type === 'system') {
-              document.getElementById('ctx-edit-category').style.display = 'none';
-              document.getElementById('ctx-delete-category').style.display = 'none';
-              document.getElementById('ctx-scan-category').style.display = 'none';
-              if (document.getElementById('ctx-force-scan-category')) {
-                document.getElementById('ctx-force-scan-category').style.display = 'none';
-              }
-              if (document.getElementById('ctx-scan-covers-category')) {
-                document.getElementById('ctx-scan-covers-category').style.display = 'none';
-              }
-              if (document.getElementById('ctx-cancel-scan-category')) {
-                document.getElementById('ctx-cancel-scan-category').style.display = 'none';
-              }
-            } else {
-              document.getElementById('ctx-edit-category').style.display = 'block';
-              document.getElementById('ctx-delete-category').style.display = 'block';
-              document.getElementById('ctx-scan-category').style.display = 'block';
-              if (document.getElementById('ctx-force-scan-category')) {
-                document.getElementById('ctx-force-scan-category').style.display = 'block';
-              }
-              if (document.getElementById('ctx-scan-covers-category')) {
-                document.getElementById('ctx-scan-covers-category').style.display = 'block';
-              }
-              if (document.getElementById('ctx-cancel-scan-category')) {
-                document.getElementById('ctx-cancel-scan-category').style.display = 'block';
-              }
-            }
+            configureCategoryContextMenu(type);
             showContextMenu(x, y);
           });
         }

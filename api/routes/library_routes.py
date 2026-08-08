@@ -16,6 +16,72 @@ import database
 
 library_bp = Blueprint('library', __name__)
 MAX_LIBRARY_NAME_LENGTH = 25
+MAX_LIBRARY_GROUP_NAME_LENGTH = 25
+
+
+def _parse_group_id(raw_value):
+    if raw_value in (None, '', 'null'):
+        return None
+    try:
+        return int(raw_value)
+    except (TypeError, ValueError):
+        raise ValueError('올바르지 않은 그룹입니다.')
+
+
+@library_bp.route('/api/media/library-groups/add', methods=['POST'])
+@admin_required
+def add_library_group():
+    db_type = request.form.get('type', 'general')
+    name = request.form.get('name', '').strip()
+    if not name or len(name) > MAX_LIBRARY_GROUP_NAME_LENGTH:
+        return jsonify({'success': False, 'error': '그룹 이름은 1~25자로 입력해 주세요.'}), 400
+    try:
+        group_id = CategoryService.add_library_group(db_type, name)
+        return jsonify({'success': True, 'group_id': group_id, 'message': '그룹을 추가했습니다.'})
+    except Exception as error:
+        error_text = str(error)
+        if 'UNIQUE' in error_text or 'Duplicate' in error_text or '1062' in error_text:
+            error_text = '같은 이름의 그룹이 이미 있습니다.'
+        return jsonify({'success': False, 'error': error_text}), 400
+
+
+@library_bp.route('/api/media/library-groups/edit', methods=['POST'])
+@admin_required
+def edit_library_group():
+    db_type = request.form.get('type', 'general')
+    name = request.form.get('name', '').strip()
+    try:
+        group_id = int(request.form.get('id', ''))
+        CategoryService.edit_library_group(db_type, group_id, name)
+        return jsonify({'success': True, 'message': '그룹 이름을 변경했습니다.'})
+    except Exception as error:
+        return jsonify({'success': False, 'error': str(error)}), 400
+
+
+@library_bp.route('/api/media/library-groups/delete', methods=['POST'])
+@admin_required
+def delete_library_group():
+    db_type = request.form.get('type', 'general')
+    try:
+        group_id = int(request.form.get('id', ''))
+        CategoryService.delete_library_group(db_type, group_id)
+        return jsonify({'success': True, 'message': '그룹을 삭제하고 하위 카테고리를 미분류로 이동했습니다.'})
+    except Exception as error:
+        return jsonify({'success': False, 'error': str(error)}), 400
+
+
+@library_bp.route('/api/media/libraries/move', methods=['POST'])
+@admin_required
+def move_media_libraries():
+    payload = request.get_json(silent=True) or {}
+    db_type = payload.get('type', 'general')
+    try:
+        CategoryService.move_libraries(db_type, payload.get('items'))
+        return jsonify({'success': True, 'message': '카테고리 위치를 저장했습니다.'})
+    except ValueError as error:
+        return jsonify({'success': False, 'error': str(error)}), 400
+    except Exception as error:
+        return jsonify({'success': False, 'error': str(error)}), 500
 
 def get_db_path_for_scan(db_type):
     """db_type에 대응하는 스캔 대상 데이터베이스 경로/식별자 반환 (MariaDB 모드 대응)"""
@@ -60,9 +126,13 @@ def add_media_library():
     rclone_rc_url = normalize_rclone_url(request.form.get('rclone_rc_url'))
     icon = request.form.get('icon', 'fa-book').strip() or 'fa-book'
     color = request.form.get('color', '#94a3b8').strip() or '#94a3b8'
+    try:
+        group_id = _parse_group_id(request.form.get('group_id'))
+    except ValueError as error:
+        return jsonify({'success': False, 'error': str(error)}), 400
     
     try:
-        library_id = CategoryService.add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover)
+        library_id = CategoryService.add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id)
     except sqlite3.IntegrityError:
         return jsonify({'success': False, 'error': _t('api.err_library_name_exists')}), 400
     except Exception as e:
@@ -122,6 +192,10 @@ def edit_media_library():
     rclone_rc_url = normalize_rclone_url(request.form.get('rclone_rc_url'))
     icon = request.form.get('icon', 'fa-book').strip() or 'fa-book'
     color = request.form.get('color', '#94a3b8').strip() or '#94a3b8'
+    try:
+        group_id = _parse_group_id(request.form.get('group_id'))
+    except ValueError as error:
+        return jsonify({'success': False, 'error': str(error)}), 400
     
     # 기존 라이브러리 정보 가져오기 (경로 변경 여부 판단용)
     try:
@@ -131,7 +205,7 @@ def edit_media_library():
         print(f"[API Warning] Failed to fetch old library: {e}")
         
     try:
-        CategoryService.edit_library(db_type, int(library_id), name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover)
+        CategoryService.edit_library(db_type, int(library_id), name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id)
     except sqlite3.IntegrityError:
         return jsonify({'success': False, 'error': _t('api.err_library_name_exists')}), 400
     except Exception as e:

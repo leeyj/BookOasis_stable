@@ -52,6 +52,7 @@ def index():
     return render_template('index.html', active_page='media_library', settings=settings, view_log_enabled=view_log_enabled)
 
 @system_bp.route('/api/system/status', methods=['GET'])
+@login_required
 def get_system_status():
     """현재 백그라운드 스캔 상태를 메모리 기반으로 조회합니다."""
     db_type = request.args.get('type', 'general')
@@ -100,7 +101,26 @@ def get_system_status():
         # 실행 중인 스캔 태스크, 대기열(pending) 태스크, DB 튜닝 작업 중 하나라도 존재하면 활성화
         is_active = bool(has_running or has_pending or tuning_active)
 
-        return jsonify({
+        def _add_library_name(task):
+            if not task:
+                return task
+            kwargs = task.get('kwargs', {})
+            task_db_type = kwargs.get('db_type', db_type)
+            library_id = kwargs.get('library_id')
+            if library_id is not None:
+                library_name = get_library_name(task_db_type, library_id)
+                if library_name:
+                    task['library_name'] = library_name
+            elif task.get('type') == 'lazy_scan':
+                task['library_name'] = '전체 시스템'
+            return task
+
+        if status.get('running'):
+            _add_library_name(status['running'])
+        for pending_task in status.get('pending', []):
+            _add_library_name(pending_task)
+
+        response = jsonify({
             'success': True,
             'is_active': is_active,
             'tasks': running_tasks,
@@ -109,6 +129,10 @@ def get_system_status():
             'has_pending': has_pending,
             'pending_count': len(pending)
         })
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

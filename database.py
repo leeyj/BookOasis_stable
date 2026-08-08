@@ -777,6 +777,14 @@ def startup_db_sanity_check():
 def init_databases():
     """세 데이터베이스(일반, 성인, 오디오북)의 테이블 스키마 초기화"""
     schema = """
+    CREATE TABLE IF NOT EXISTS library_groups (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        icon TEXT DEFAULT 'fa-folder',
+        color TEXT DEFAULT '#a855f7',
+        sort_order INTEGER DEFAULT 0
+    );
+
     CREATE TABLE IF NOT EXISTS libraries (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL UNIQUE,
@@ -789,7 +797,9 @@ def init_databases():
         rclone_rc_url TEXT DEFAULT NULL,
         icon TEXT DEFAULT 'fa-book',
         color TEXT DEFAULT '#94a3b8',
-        hide_cover INTEGER DEFAULT 0
+        hide_cover INTEGER DEFAULT 0,
+        group_id INTEGER DEFAULT NULL,
+        sort_order INTEGER DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS scanner_tasks (
@@ -1057,6 +1067,8 @@ def init_databases():
     CREATE INDEX IF NOT EXISTS idx_books_series_name ON books(series_name);
     CREATE INDEX IF NOT EXISTS idx_books_series_alias ON books(series_alias);
     CREATE INDEX IF NOT EXISTS idx_books_library_id ON books(library_id);
+    CREATE INDEX IF NOT EXISTS idx_libraries_group_id ON libraries(group_id);
+    CREATE INDEX IF NOT EXISTS idx_libraries_group_order ON libraries(group_id, sort_order);
     CREATE INDEX IF NOT EXISTS idx_books_is_favorite ON books(is_favorite);
     CREATE INDEX IF NOT EXISTS idx_books_created_at ON books(created_at);
     CREATE INDEX IF NOT EXISTS idx_books_series_lib_title ON books(series_name, library_id, title);

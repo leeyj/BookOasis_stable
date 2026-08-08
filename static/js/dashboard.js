@@ -2,6 +2,7 @@
 import { state } from './state.js';
 import * as api from './api.js';
 import { renderDashboardHistory, renderDashboardRecentlyAdded } from './ui.js';
+import { updateLibraryTotalCount } from './book_list.js';
 
 let dashboardLoadToken = 0;
 let pluginsLoadToken = 0;
@@ -14,6 +15,8 @@ export async function loadDashboardData() {
 
   const historyRow = document.getElementById('dashboard-history-row');
   const newRow = document.getElementById('dashboard-new-row');
+  const countSpan = document.getElementById('library-total-count');
+  if (countSpan) countSpan.innerText = '';
 
   const isTypeSwitched = dashboardRowLastType !== targetType;
   dashboardRowLastType = targetType;
@@ -32,14 +35,21 @@ export async function loadDashboardData() {
       window.loadDashboardInsights(targetType);
     }
 
-    // 1. 최근 읽은 도서 & 신규 추가 도서 동시 병렬 요청 (Promise.all)
+    // 1. 전체 보관함 합계, 최근 읽은 도서, 신규 추가 도서를 동시에 요청
+    const totalsPromise = api.fetchBooksTotals({type: targetType, libraryId: 'all'})
+      .catch(err => ({ success: false, error: String(err) }));
     const historyPromise = api.fetchReadingHistory(targetType);
     const recentlyAddedPromise = fetch(`/api/media/recently-added?type=${targetType}&_=${Date.now()}`, {cache: 'no-store'})
       .then(res => res.json())
       .catch(err => ({ success: false, error: String(err) }));
 
-    const [historyData, newData] = await Promise.all([historyPromise, recentlyAddedPromise]);
+    const [totalsData, historyData, newData] = await Promise.all([totalsPromise, historyPromise, recentlyAddedPromise]);
     if (requestToken !== dashboardLoadToken) return;
+    if (state.currentLibraryId !== 'home' || state.currentLibraryType !== targetType) return;
+
+    if (totalsData && totalsData.success) {
+      updateLibraryTotalCount([], totalsData);
+    }
 
     // 최근 읽은 도서 렌더링
     if (historyData && historyData.success) {

@@ -35,6 +35,7 @@
   | `physical_path` | string | 필수 | 파일시스템 절대경로 (멀티경로 시 줄바꿈으로 구분) |
   | `is_remote` | string | 선택 | 원격 마운트 여부 (`1` / `0`) |
   | `rclone_rc_url` | string | 선택 | Rclone Remote Control 주소 (예: `http://localhost:5572`) |
+  | `group_id` | integer | 선택 | 가상 상위 그룹 ID. 비우면 미분류로 저장 |
 
 * **응답 예시 (200 OK)**:
   ```json
@@ -59,12 +60,26 @@
   | `physical_path` | string | 필수 | 변경할 파일 시스템 절대 경로 |
   | `is_remote` | string | 선택 | 원격 연결 사용 플래그 |
   | `rclone_rc_url` | string | 선택 | Rclone 원격 API 서버 Endpoint 주소 |
+  | `group_id` | integer | 선택 | 변경할 가상 상위 그룹 ID. 비우면 미분류로 이동 |
 
 ---
 
 ### `[POST]` `/api/media/libraries/delete`
 * **설명**: 카테고리를 소거하며 하위 도서 메타데이터 및 독서 이력, 에러 보고서 파일을 연쇄 삭제(Cascade Delete)합니다.
 * **권한**: `@admin_required`
+
+---
+
+### 가상 상위 그룹 API
+* `POST /api/media/library-groups/add`: `type`, `name`으로 그룹 생성
+* `POST /api/media/library-groups/edit`: `type`, `id`, `name`으로 그룹 이름 변경
+* `POST /api/media/library-groups/delete`: `type`, `id`로 그룹 삭제
+* `POST /api/media/libraries/move`: 카테고리의 그룹 소속과 그룹 내 순서를 일괄 저장
+* **권한**: 모두 `@admin_required`
+* **삭제 정책**: 그룹을 삭제해도 카테고리와 도서는 삭제되지 않으며 해당 카테고리는 미분류로 이동합니다.
+* **조회**: `GET /api/media/libraries` 응답의 `groups`와 각 `libraries[].group_id`를 사용합니다. 일반 사용자에게는 접근 가능한 카테고리가 포함된 그룹만 반환합니다.
+* **이동 요청**: JSON 본문으로 `type`과 모든 카테고리의 `items`를 전달합니다. `items`는 화면 순서대로 `{"id": 12, "group_id": 3}` 형식을 사용하며 미분류는 `group_id: null`입니다.
+* **정렬 정책**: 서버가 전달 순서를 그룹별 `sort_order`로 재계산해 단일 트랜잭션으로 저장합니다.
 
 ---
 
@@ -748,15 +763,85 @@ BookOasis는 외부 수신 서버로 도서 이벤트를 `POST` 전송할 수 �
 
 ## ⚡ 10. 스캐너 & 비동기 작업 큐 API (`scan` / `system`)
 
+### `[GET]` `/api/system/status`
+* **설명**: 상단 스캔 활동 패널과 카테고리 스피너가 사용하는 경량 실시간 상태 API입니다. 실행 중 작업 1건, 대기 작업 목록, DB 튜닝 여부를 반환합니다.
+* **권한**: 로그인 사용자 (`@login_required`)
+* **캐시 정책**: `no-store`, `no-cache`
+* **쿼리 파라미터**:
+  * `type` (string, 선택): DB 스코프 (`general` / `adult` / `audiobook`, 기본값: `general`)
+* **갱신 주기**: 기본 웹 UI에서 2초마다 조회합니다. 기존 카테고리 스피너와 스캔 활동 패널이 같은 응답을 공유하므로 추가 폴링은 발생하지 않습니다.
+* **응답 예시 (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "is_active": true,
+    "tasks": [
+      "[판타지 소설 (general)] 카테고리 도서 자동 스캔 동기화 진행 중...",
+      "스캔 대기열: 1건"
+    ],
+    "raw_status": {
+      "running": {
+        "type": "library_scan",
+        "key": "library_scan_general_12",
+        "kwargs": {
+          "db_type": "general",
+          "library_id": 12
+        },
+        "enqueued_at": "2026-08-08 10:00:00",
+        "started_at": "2026-08-08 10:00:03",
+        "stage": null,
+        "library_name": "판타지 소설"
+      },
+      "pending": [
+        {
+          "type": "cover_scan",
+          "key": "cover_scan_general_13",
+          "kwargs": {
+            "db_type": "general",
+            "library_id": 13
+          },
+          "enqueued_at": "2026-08-08 10:00:05",
+          "stage": null,
+          "library_name": "일반 만화"
+        }
+      ]
+    },
+    "has_running": true,
+    "has_pending": true,
+    "pending_count": 1
+  }
+  ```
+* **필드 참고**:
+  * `is_active`: 실행/대기 작업 또는 DB 튜닝이 하나라도 있으면 `true`
+  * `tasks`: 사용자 표시용 상태 문구 배열
+  * `raw_status.running`: 현재 실행 작업 1건 또는 `null`
+  * `raw_status.pending`: 대기 작업 배열
+  * `stage`: 워커가 세부 단계를 기록한 경우에만 값이 있으며 일반 스캔에서는 `null`일 수 있음
+  * 파일 단위 진행률이나 현재 파일 경로는 현재 응답 계약에 포함되지 않음
+
+---
+
 ### `[POST]` `/api/media/libraries/<int:library_id>/scan`
 * **설명**: 지정한 라이브러리 카테고리의 풀 비동기 스캔 작업을 백그라운드 큐에 등록합니다.
 * **권한**: `@admin_required`
+* **요청 파라미터**:
+  * `type` (string, 선택): DB 스코프 (기본값: `general`)
+  * `force` (boolean/string, 선택): 강제 스캔 여부 (`true` / `1`)
 
 ---
 
 ### `[POST]` `/api/media/libraries/<int:library_id>/cancel-scan`
-* **설명**: 진행 중이거나 대기 중인 특정 라이브러리의 스캔 작업을 즉시 취소합니다.
+* **설명**: 지정한 라이브러리의 `scan_status`를 `cancelling`으로 변경하여 진행 중 스캔에 취소를 요청합니다.
 * **권한**: `@admin_required`
+* **주의**: 실행 프로세스를 즉시 강제 종료하는 API가 아니며, 워커가 취소 상태를 확인한 시점에 중단됩니다. 대기 작업 제거는 `/api/media/system/queue/cancel`을 사용합니다.
+
+---
+
+### `[POST]` `/api/media/libraries/<int:library_id>/scan-covers`
+* **설명**: 지정한 라이브러리의 표지 전용 스캔(`cover_scan`)을 대기열에 등록합니다.
+* **권한**: `@admin_required`
+* **요청 파라미터**:
+  * `type` (string, 선택): DB 스코프 (기본값: `general`)
 
 ---
 
@@ -767,13 +852,44 @@ BookOasis는 외부 수신 서버로 도서 이벤트를 `POST` 전송할 수 �
 ---
 
 ### `[GET]` `/api/media/system/queue`
-* **설명**: 백그라운드 스캐너 작업 큐의 대기/진행/완료 Task 상태 목록 및 진행률을 실시간 조회합니다.
+* **설명**: 관리자 큐 화면에서 실행 중 작업 1건과 대기 작업 목록을 조회합니다. 완료 작업 목록과 숫자 진행률은 반환하지 않습니다.
+* **권한**: `@admin_required`
+* **응답 구조**:
+  ```json
+  {
+    "success": true,
+    "queue": {
+      "running": {
+        "type": "library_scan",
+        "key": "library_scan_general_12",
+        "kwargs": {"db_type": "general", "library_id": 12},
+        "enqueued_at": "2026-08-08 10:00:00",
+        "started_at": "2026-08-08 10:00:03",
+        "stage": null,
+        "library_name": "판타지 소설 (general)"
+      },
+      "pending": []
+    }
+  }
+  ```
 
 ---
 
 ### `[POST]` `/api/media/system/queue/clear`
 * **설명**: 대기 중인 모든 백그라운드 작업을 취소하고 큐를 초기화합니다.
 * **권한**: `@admin_required`
+
+---
+
+### `[POST]` `/api/media/system/queue/cancel`
+* **설명**: 대기 중인 특정 작업 1건을 취소합니다. 실행 중 작업에는 적용되지 않습니다.
+* **권한**: `@admin_required`
+* **쿼리 또는 Form 파라미터**:
+  * `task_id` (string, 필수): 취소할 작업의 `key` 값. 이름은 `task_id`지만 숫자 DB ID가 아니라 `library_scan_general_12` 같은 `task_key`를 전달합니다.
+* **응답 코드**:
+  * `200`: 취소 성공
+  * `400`: `task_id` 누락
+  * `404`: 해당 대기 작업을 찾지 못함
 
 ---
 

@@ -41,6 +41,32 @@ def apply_running_scan_status(libraries, db_type, queue_status):
 
 class CategoryService:
     @staticmethod
+    def get_library_groups(db_type):
+        return CategoryRepository.get_library_groups(db_type)
+
+    @staticmethod
+    def add_library_group(db_type, name):
+        clean_name = str(name or '').strip()
+        if not clean_name:
+            raise ValueError('그룹 이름은 비워둘 수 없습니다.')
+        if len(clean_name) > 25:
+            raise ValueError('그룹 이름은 25자를 초과할 수 없습니다.')
+        return CategoryRepository.add_library_group(db_type, clean_name)
+
+    @staticmethod
+    def edit_library_group(db_type, group_id, name):
+        clean_name = str(name or '').strip()
+        if not clean_name:
+            raise ValueError('그룹 이름은 비워둘 수 없습니다.')
+        if len(clean_name) > 25:
+            raise ValueError('그룹 이름은 25자를 초과할 수 없습니다.')
+        CategoryRepository.edit_library_group(db_type, group_id, clean_name)
+
+    @staticmethod
+    def delete_library_group(db_type, group_id):
+        CategoryRepository.delete_library_group(db_type, group_id)
+
+    @staticmethod
     def get_libraries(db_type, user_id=None, role=None):
         if user_id and role != 'admin':
             rows = CategoryRepository.get_libraries_by_user_permissions(db_type, user_id)
@@ -57,7 +83,60 @@ class CategoryService:
             'icon': r['icon'] or 'fa-book',
             'color': r['color'] or '#94a3b8',
             'hide_cover': r['hide_cover'] or 0,
+            'group_id': r.get('group_id'),
+            'sort_order': r.get('sort_order') or 0,
         } for r in rows]
+
+    @staticmethod
+    def move_libraries(db_type, items):
+        if not isinstance(items, list) or not items:
+            raise ValueError('이동할 카테고리 정보가 없습니다.')
+
+        existing_ids = {int(library['id']) for library in CategoryRepository.get_all_libraries(db_type)}
+        valid_group_ids = {int(group['id']) for group in CategoryRepository.get_library_groups(db_type)}
+        normalized = []
+        seen_ids = set()
+        group_positions = {}
+        for item in items:
+            try:
+                library_id = int(item.get('id'))
+            except (AttributeError, TypeError, ValueError):
+                raise ValueError('올바르지 않은 카테고리입니다.')
+            if library_id not in existing_ids or library_id in seen_ids:
+                raise ValueError('카테고리 이동 정보가 올바르지 않습니다.')
+            group_id = item.get('group_id')
+            if group_id in (None, '', 'null'):
+                group_id = None
+            else:
+                try:
+                    group_id = int(group_id)
+                except (TypeError, ValueError):
+                    raise ValueError('올바르지 않은 그룹입니다.')
+                if group_id not in valid_group_ids:
+                    raise ValueError('선택한 그룹을 찾을 수 없습니다.')
+
+            position_key = group_id if group_id is not None else 'ungrouped'
+            sort_order = group_positions.get(position_key, 1)
+            group_positions[position_key] = sort_order + 1
+            normalized.append({'id': library_id, 'group_id': group_id, 'sort_order': sort_order})
+            seen_ids.add(library_id)
+
+        if seen_ids != existing_ids:
+            raise ValueError('모든 카테고리의 이동 정보가 필요합니다.')
+        CategoryRepository.move_libraries(db_type, normalized)
+
+    @staticmethod
+    def _normalize_group_id(db_type, group_id):
+        if group_id in (None, '', 'null'):
+            return None
+        try:
+            normalized = int(group_id)
+        except (TypeError, ValueError):
+            raise ValueError('올바르지 않은 그룹입니다.')
+        valid_ids = {int(group['id']) for group in CategoryRepository.get_library_groups(db_type)}
+        if normalized not in valid_ids:
+            raise ValueError('선택한 그룹을 찾을 수 없습니다.')
+        return normalized
 
     @staticmethod
     def _clean_physical_path(raw_path):
@@ -66,24 +145,26 @@ class CategoryService:
         return '\n'.join([line for line in lines if line])
 
     @staticmethod
-    def add_library(db_type, name, physical_path, is_remote=0, rclone_rc_url=None, icon='fa-book', color='#94a3b8', hide_cover=0):
+    def add_library(db_type, name, physical_path, is_remote=0, rclone_rc_url=None, icon='fa-book', color='#94a3b8', hide_cover=0, group_id=None):
         name = str(name or '').strip()
         if not name:
             raise ValueError('카테고리 이름은 비워둘 수 없습니다.')
         if len(name) > 25:
             raise ValueError('카테고리 이름은 25자를 초과할 수 없습니다.')
         physical_path = CategoryService._clean_physical_path(physical_path)
-        return CategoryRepository.add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover)
+        group_id = CategoryService._normalize_group_id(db_type, group_id)
+        return CategoryRepository.add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id)
 
     @staticmethod
-    def edit_library(db_type, library_id, name, physical_path, is_remote=0, rclone_rc_url=None, icon='fa-book', color='#94a3b8', hide_cover=0):
+    def edit_library(db_type, library_id, name, physical_path, is_remote=0, rclone_rc_url=None, icon='fa-book', color='#94a3b8', hide_cover=0, group_id=None):
         name = str(name or '').strip()
         if not name:
             raise ValueError('카테고리 이름은 비워둘 수 없습니다.')
         if len(name) > 25:
             raise ValueError('카테고리 이름은 25자를 초과할 수 없습니다.')
         physical_path = CategoryService._clean_physical_path(physical_path)
-        CategoryRepository.edit_library(db_type, library_id, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover)
+        group_id = CategoryService._normalize_group_id(db_type, group_id)
+        CategoryRepository.edit_library(db_type, library_id, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id)
 
     @staticmethod
     def delete_library(db_type, library_id):

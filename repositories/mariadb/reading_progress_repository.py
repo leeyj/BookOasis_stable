@@ -220,6 +220,7 @@ class ReadingProgressRepository:
             return [dict(row) for row in rows]
 
         base_select = """
+            SELECT * FROM (
             SELECT b.id, b.library_id, b.title, b.title_alias, b.series_name, b.series_alias, b.cover_image, b.cover_updated_at, b.file_format,
                    p.pages_read, b.total_pages, p.last_read_at,
                    CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
@@ -241,7 +242,18 @@ class ReadingProgressRepository:
                                    OR (COALESCE(b2.total_pages, 0) > 0 AND COALESCE(p2.pages_read, 0) < COALESCE(b2.total_pages, 0))
                                )
                    ) THEN 1 ELSE 0 END AS has_unfinished_siblings,
-                   COALESCE(b.metadata_locked, 0) AS metadata_locked
+                   COALESCE(b.metadata_locked, 0) AS metadata_locked,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY b.library_id,
+                           CASE WHEN b.series_name IS NOT NULL AND TRIM(b.series_name) != ''
+                                THEN b.series_name ELSE CONCAT('__single__:', b.id) END
+                       ORDER BY p.last_read_at DESC, b.id DESC
+                   ) AS series_rank,
+                   COUNT(*) OVER (
+                       PARTITION BY b.library_id,
+                           CASE WHEN b.series_name IS NOT NULL AND TRIM(b.series_name) != ''
+                                THEN b.series_name ELSE CONCAT('__single__:', b.id) END
+                   ) AS history_book_count
             FROM user_progress p
             JOIN books b ON p.book_id = b.id
             JOIN user_category_permissions ucp ON b.library_id = ucp.library_id AND ucp.user_id = p.user_id AND ucp.has_access = 1
@@ -272,7 +284,9 @@ class ReadingProgressRepository:
                             )
             """
         base_select += """
-            ORDER BY p.last_read_at DESC
+            ) ranked_history
+            WHERE series_rank = 1
+            ORDER BY last_read_at DESC
             LIMIT %s
         """
         cursor.execute(base_select, (user_id, int(limit)))

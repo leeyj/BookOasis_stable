@@ -93,6 +93,31 @@
                     data-i18n-title="header.filter_title" title="장르/태그 필터 열기">
                     <i class="fa-solid fa-filter"></i> <span data-i18n="header.filter">필터</span>
                 </button>
+                <div class="scan-activity-wrap">
+                    <button id="btn-scan-activity" class="btn-scan-activity" type="button"
+                        aria-label="스캔 활동" aria-expanded="false" aria-controls="scan-activity-popover"
+                        title="스캔 활동">
+                        <i class="fa-solid fa-wave-square" aria-hidden="true"></i>
+                        <span id="scan-activity-indicator" class="scan-activity-indicator" aria-hidden="true"></span>
+                    </button>
+                    <section id="scan-activity-popover" class="scan-activity-popover" hidden aria-live="polite">
+                        <header class="scan-activity-header">
+                            <div>
+                                <strong>스캔 활동</strong>
+                                <span id="scan-activity-summary">대기 중</span>
+                            </div>
+                            <button id="btn-close-scan-activity" type="button" aria-label="닫기" title="닫기">
+                                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                            </button>
+                        </header>
+                        <div id="scan-activity-list" class="scan-activity-list">
+                            <div class="scan-activity-empty">
+                                <i class="fa-regular fa-circle-check" aria-hidden="true"></i>
+                                <span>진행 중인 스캔이 없습니다.</span>
+                            </div>
+                        </div>
+                    </section>
+                </div>
                 <button id="btn-lib-sort" data-role="library-sort-toggle" class="btn-toggle"
                     style="margin-right: 0.5rem; padding: 0.4rem 0.8rem; display: none; align-items: center; gap: 0.3rem;"
                     data-i18n-title="header.sort_title" title="정렬 조건 변경">

@@ -35,7 +35,12 @@ def get_media_libraries():
         user_id = session.get('user_id')
         role = session.get('role')
         libraries = CategoryService.get_libraries(db_type, user_id=user_id, role=role)
-        return jsonify({'success': True, 'libraries': libraries})
+        visible_group_ids = {library.get('group_id') for library in libraries if library.get('group_id') is not None}
+        groups = [
+            group for group in CategoryService.get_library_groups(db_type)
+            if role == 'admin' or group.get('id') in visible_group_ids
+        ]
+        return jsonify({'success': True, 'libraries': libraries, 'groups': groups})
     except sqlite3.OperationalError as e:
         msg = str(e)
         lock_like = ('locked' in msg.lower()) or ('pool exhausted' in msg.lower()) or ('timeout waiting for connection' in msg.lower())

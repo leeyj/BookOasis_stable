@@ -6,10 +6,68 @@ import database
 
 class CategoryRepository:
     @staticmethod
+    def get_library_groups(db_type):
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name, icon, color, sort_order FROM library_groups ORDER BY sort_order ASC, name ASC")
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+
+    @staticmethod
+    def add_library_group(db_type, name, icon='fa-folder', color='#a855f7'):
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "INSERT INTO library_groups (name, icon, color, sort_order) VALUES (%s, %s, %s, COALESCE((SELECT next_order FROM (SELECT MAX(sort_order) + 1 AS next_order FROM library_groups) grouped), 0))",
+                (name, icon, color)
+            )
+            group_id = cursor.lastrowid
+            conn.commit()
+            return group_id
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    @staticmethod
+    def edit_library_group(db_type, group_id, name):
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("UPDATE library_groups SET name = %s WHERE id = %s", (name, group_id))
+            if cursor.rowcount == 0:
+                raise ValueError('그룹을 찾을 수 없습니다.')
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    @staticmethod
+    def delete_library_group(db_type, group_id):
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("UPDATE libraries SET group_id = NULL WHERE group_id = %s", (group_id,))
+            cursor.execute("DELETE FROM library_groups WHERE id = %s", (group_id,))
+            if cursor.rowcount == 0:
+                raise ValueError('그룹을 찾을 수 없습니다.')
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    @staticmethod
     def get_all_libraries(db_type):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM libraries ORDER BY name ASC")
+        cursor.execute("SELECT * FROM libraries ORDER BY sort_order ASC, name ASC")
         rows = cursor.fetchall()
         conn.close()
         return [dict(row) for row in rows]
@@ -23,7 +81,7 @@ class CategoryRepository:
             SELECT l.* FROM libraries l
             JOIN user_category_permissions p ON l.id = p.library_id
             WHERE p.user_id = %s AND p.has_access = 1
-            ORDER BY l.name ASC
+            ORDER BY l.sort_order ASC, l.name ASC
             """,
             (user_id,)
         )
@@ -32,17 +90,33 @@ class CategoryRepository:
         return [dict(row) for row in rows]
 
     @staticmethod
-    def add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover):
+    def move_libraries(db_type, items):
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.executemany(
+                "UPDATE libraries SET group_id = %s, sort_order = %s WHERE id = %s",
+                [(item['group_id'], item['sort_order'], item['id']) for item in items]
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    @staticmethod
+    def add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id=None):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
             cursor.execute(
                 """
                 INSERT INTO libraries 
-                (name, physical_path, scan_status, is_remote, rclone_rc_url, icon, color, hide_cover) 
-                VALUES (%s, %s, 'ready', %s, %s, %s, %s, %s)
+                (name, physical_path, scan_status, is_remote, rclone_rc_url, icon, color, hide_cover, group_id) 
+                VALUES (%s, %s, 'ready', %s, %s, %s, %s, %s, %s)
                 """,
-                (name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover)
+                (name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id)
             )
             lib_id = cursor.lastrowid
             conn.commit()
@@ -54,17 +128,17 @@ class CategoryRepository:
             conn.close()
 
     @staticmethod
-    def edit_library(db_type, library_id, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover):
+    def edit_library(db_type, library_id, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id=None):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
             cursor.execute(
                 """
                 UPDATE libraries 
-                SET name = %s, physical_path = %s, is_remote = %s, rclone_rc_url = %s, icon = %s, color = %s, hide_cover = %s
+                SET name = %s, physical_path = %s, is_remote = %s, rclone_rc_url = %s, icon = %s, color = %s, hide_cover = %s, group_id = %s
                 WHERE id = %s
                 """,
-                (name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, library_id)
+                (name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, library_id)
             )
             conn.commit()
         except Exception as e:

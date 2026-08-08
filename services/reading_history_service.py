@@ -59,7 +59,7 @@ def _group_history_items(items):
         if len(group_items) <= 1:
             payload = {
                 **current,
-                'book_count': 1,
+                'book_count': max(1, int(current.get('history_book_count') or 1)),
                 'representative_book_id': current.get('id'),
                 'representative_title': current.get('title_alias') or current.get('title') or '',
             }
@@ -111,8 +111,16 @@ class ReadingHistoryService:
             merged.sort(key=lambda item: str(item.get('last_read_at') or ''), reverse=True)
             return merged
 
-        # 1. Redis 캐시 확인 (구형 캐시에 series_alias 없으면 DB 재조회)
-        cache_key = f"cache:history:v6:{db_type}:{user_id}"
+        row_limit = ReadingProgressRepository.get_settings_value(db_type, 'RECENT_BOOKS_LIMIT')
+        limit = 30
+        if row_limit and str(row_limit).isdigit():
+            limit = max(1, min(int(row_limit), 100))
+
+        row_hide = ReadingProgressRepository.get_settings_value(db_type, 'HIDE_COMPLETED_IN_HISTORY')
+        hide_completed = (row_hide == '1')
+
+        # 설정별로 캐시를 분리해 노출 개수 변경을 즉시 반영한다.
+        cache_key = f"cache:history:v7:{db_type}:{user_id}:{limit}:{int(hide_completed)}"
         cached_data = redis_get(cache_key)
         if cached_data:
             try:
@@ -134,16 +142,6 @@ class ReadingHistoryService:
                         return parsed
             except Exception:
                 pass
-
-        # 표시 건수 설정 조회
-        row_limit = ReadingProgressRepository.get_settings_value(db_type, 'RECENT_BOOKS_LIMIT')
-        limit = 30
-        if row_limit and str(row_limit).isdigit():
-            limit = int(row_limit)
-
-        # 완독 도서 숨김 설정 조회
-        row_hide = ReadingProgressRepository.get_settings_value(db_type, 'HIDE_COMPLETED_IN_HISTORY')
-        hide_completed = (row_hide == '1')
 
         rows = ReadingProgressRepository.fetch_reading_history(db_type, user_id, limit, hide_completed)
         
@@ -170,7 +168,7 @@ class ReadingHistoryService:
         ]
 
         result = apply_live_progress(result)
-        result = _group_history_items(result)
+        result = _group_history_items(result)[:limit]
 
         # 2. Redis 캐시 세팅 (3600초=1시간 만료 설정)
         try:

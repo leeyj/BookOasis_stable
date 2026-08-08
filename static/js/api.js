@@ -98,6 +98,30 @@ export async function deleteLibrary(formData) {
   return res.json();
 }
 
+export async function moveLibraries(items, type) {
+  const res = await safeFetch('/api/media/libraries/move', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({type, items})
+  });
+  return res.json();
+}
+
+export async function addLibraryGroup(formData) {
+  const res = await safeFetch('/api/media/library-groups/add', {method: 'POST', body: formData});
+  return res.json();
+}
+
+export async function editLibraryGroup(formData) {
+  const res = await safeFetch('/api/media/library-groups/edit', {method: 'POST', body: formData});
+  return res.json();
+}
+
+export async function deleteLibraryGroup(formData) {
+  const res = await safeFetch('/api/media/library-groups/delete', {method: 'POST', body: formData});
+  return res.json();
+}
+
 export async function toggleFavorite(type, bookId, isFavorite) {
   console.log(`[Favorite-API] toggleFavorite 호출: type=${type}, bookId=${bookId}, isFavorite=${isFavorite}`);
   const formData = new FormData();

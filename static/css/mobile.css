@@ -256,6 +256,20 @@ body.has-system-ticker .sidebar-collapsible-content.show {
     gap: 0.5rem;
 }
 
+.scan-activity-wrap {
+    margin-right: 0;
+}
+
+.scan-activity-popover {
+    position: fixed;
+    top: auto;
+    right: 0.75rem;
+    bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+    left: 0.75rem;
+    width: auto;
+    max-height: min(70dvh, 520px);
+}
+
 .library-controls input[type="text"] {
     width: 100%;
     order: 3; /* 검색창을 맨 뒤로 보냄 */

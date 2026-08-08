@@ -19,7 +19,7 @@ function normalizeMetadataToken(token) {
 }
 
 
-function updateLibraryTotalCount(items, totals = null) {
+export function updateLibraryTotalCount(items, totals = null) {
   const countSpan = document.getElementById('library-total-count');
   if (!countSpan) return;
   const serverSeriesCount = Number(totals?.total_series_count);
@@ -105,7 +105,9 @@ export async function loadBooksList(isAppend = false) {
     if (!isAppend) {
       api.fetchBooksTotals(requestFilters)
         .then((totals) => {
-          if (totalsSerial === totalsRequestSerial && totals.success) {
+          const isSameList = state.currentLibraryType === requestFilters.type
+            && String(state.currentLibraryId || '') === String(requestFilters.libraryId || '');
+          if (totalsSerial === totalsRequestSerial && isSameList && totals.success) {
             updateLibraryTotalCount([], totals);
           }
         })

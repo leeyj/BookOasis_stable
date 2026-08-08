@@ -4,7 +4,7 @@ import * as api from '../api.js';
 import { selectCategory } from '../tab_media_library.js';
 import { updateCurrentCategoryIndicator } from '../category_indicator.js';
 import { bindSidebarContextMenu } from './context_menu.js';
-import { triggerAddLibrary } from './crud_controller.js';
+import { triggerAddLibrary, triggerAddLibraryGroup } from './crud_controller.js';
 
 // 고정 포함 전체 15개 이상부터 "더 보기" 버튼 노출
 const SIDEBAR_MORE_THRESHOLD = 15;
@@ -19,7 +19,7 @@ function getMixedOrderStorageKey(libraryType) {
 
 function getMovableCategoryItems(sidebar) {
   if (!sidebar) return [];
-  return Array.from(sidebar.querySelectorAll('li[data-type="custom"], li[data-type="plugin"]'));
+  return Array.from(sidebar.children).filter((el) => el.matches('li[data-type="custom"], li[data-type="plugin"]'));
 }
 
 function getMovableCategoryToken(el) {
@@ -79,7 +79,8 @@ function applySavedMixedOrder(sidebar) {
   if (systemItems.length === 0) return;
 
   ordered.forEach((el) => el.remove());
-  let insertAfterEl = systemItems[systemItems.length - 1];
+  const groupItems = Array.from(sidebar.children).filter((el) => el.matches('li[data-library-group-id]'));
+  let insertAfterEl = groupItems[groupItems.length - 1] || systemItems[systemItems.length - 1];
   ordered.forEach((el) => {
     insertAfterEl.after(el);
     insertAfterEl = el;
@@ -100,6 +101,23 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;');
 }
 
+function renderLibraryItem(lib, isPinned) {
+  const isActive = String(state.currentLibraryId) === String(lib.id) ? 'active' : '';
+  const draggableAttr = !isPinned ? 'draggable="true"' : '';
+  const safeName = escapeHtml(lib.name || '');
+  const safePath = escapeHtml(lib.physical_path || '');
+  const safeRclone = escapeHtml(lib.rclone_rc_url || '');
+  const safeIcon = escapeHtml(lib.icon || 'fa-book');
+  const safeColor = escapeHtml(lib.color || '#94a3b8');
+  const hideCover = Number(lib.hide_cover || 0) ? 1 : 0;
+  const groupId = lib.group_id == null ? '' : String(lib.group_id);
+  return `<li class="menu-item ${isActive}" data-type="custom" data-role="sidebar-category-dynamic" data-id="${lib.id}" data-category-id="${lib.id}" data-name="${safeName}" data-path="${safePath}" data-remote="${lib.is_remote || 0}" data-rclone-url="${safeRclone}" data-icon="${safeIcon}" data-color="${safeColor}" data-hide-cover="${hideCover}" data-group-id="${groupId}" ${draggableAttr} style="display: flex; align-items: center; justify-content: space-between;"><span style="display: inline-flex; align-items: center; gap: 0.6rem;"><i class="fa-solid ${safeIcon}" style="color: ${safeColor};"></i> ${safeName}</span><i class="fa-solid fa-circle-notch fa-spin category-scan-spinner" style="display:none; color:#c084fc; font-size:0.75rem; margin-left:auto;" title="스캔 진행 중"></i></li>`;
+}
+
+function getGroupCollapsedStorageKey(groupId) {
+  return `library_group_collapsed_${state.currentLibraryType}_${groupId}`;
+}
+
 /**
  * Plex 스타일 사이드바 "더 보기" 제어
  * - 총 카테고리 항목 수 >= SIDEBAR_MORE_THRESHOLD 일 때 (THRESHOLD-1)번째 항목 이후를 접어서 보여줌
@@ -111,6 +129,11 @@ export function applySidebarShowMore(sidebar, currentLibraryId) {
 
   // 기존 "더 보기" / "접기" 버튼 제거
   sidebar.querySelectorAll('[data-role="sidebar-show-more"]').forEach(el => el.remove());
+
+  if (sidebar.querySelector('[data-type="group"]')) {
+    sidebar.querySelectorAll('li[data-role="sidebar-category-dynamic"]').forEach(item => item.style.removeProperty('display'));
+    return;
+  }
 
   const items = Array.from(sidebar.querySelectorAll('li[data-role="sidebar-category-dynamic"]'));
   const total = items.length;
@@ -189,6 +212,26 @@ function initDynamicSidebarDelegation() {
       return;
     }
 
+    const addGroupBtn = rawTarget.closest('[data-role="sidebar-add-library-group"]');
+    if (addGroupBtn) {
+      event.preventDefault();
+      event.stopPropagation();
+      triggerAddLibraryGroup();
+      return;
+    }
+
+    const groupToggle = rawTarget.closest('[data-role="sidebar-group-toggle"]');
+    if (groupToggle) {
+      event.preventDefault();
+      event.stopPropagation();
+      const groupId = groupToggle.dataset.id;
+      const groupContainer = groupToggle.closest('[data-library-group-id]');
+      const isCollapsed = groupContainer?.classList.toggle('collapsed') || false;
+      groupToggle.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+      localStorage.setItem(getGroupCollapsedStorageKey(groupId), isCollapsed ? 'true' : 'false');
+      return;
+    }
+
     const pinBtn = rawTarget.closest('[data-role="sidebar-pin-categories"]');
     if (pinBtn) {
       console.log('[Category-Delegation] 핀 고정 버튼 감지됨:', pinBtn);
@@ -232,6 +275,7 @@ export async function loadLibraries() {
   try {
     const data = await api.fetchLibraries(state.currentLibraryType);
     if (data.success) {
+      state.libraryGroups = Array.isArray(data.groups) ? data.groups : [];
       const isPinned = localStorage.getItem('category_order_pinned') !== 'false';
       const pinBtnStyle = isPinned 
         ? "color: #a855f7; transform: none;" 
@@ -242,6 +286,11 @@ export async function loadLibraries() {
       const addBtnHtml = isAdmin 
         ? `<button data-role="sidebar-add-library" style="background: none; border: none; color: #a855f7; cursor: pointer; padding: 0.2rem 0.4rem; font-size: 0.9rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px;" title="${i18n.t('category.add_new_tooltip')}">
             <i class="fa-solid fa-plus"></i>
+          </button>`
+        : '';
+      const addGroupBtnHtml = isAdmin
+        ? `<button data-role="sidebar-add-library-group" style="background: none; border: none; color: #a855f7; cursor: pointer; padding: 0.2rem 0.4rem; font-size: 0.9rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px;" title="그룹 추가">
+            <i class="fa-solid fa-folder-plus"></i>
           </button>`
         : '';
       
@@ -258,6 +307,7 @@ export async function loadLibraries() {
           <button id="btn-pin-categories" data-role="sidebar-pin-categories" style="background: none; border: none; cursor: pointer; padding: 0.2rem 0.4rem; font-size: 0.9rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; ${pinBtnStyle}" title="${pinTitle}">
             <i class="fa-solid fa-thumbtack"></i>
           </button>
+          ${addGroupBtnHtml}
           ${addBtnHtml}
         </div>
       </li>`;
@@ -271,8 +321,9 @@ export async function loadLibraries() {
       }
       
       if (data.libraries && data.libraries.length > 0) {
+        const hasServerOrder = data.libraries.some((lib) => Number(lib.sort_order || 0) > 0);
         const savedOrderStr = localStorage.getItem(getLegacyCustomOrderStorageKey(state.currentLibraryType));
-        if (savedOrderStr) {
+        if (!hasServerOrder && savedOrderStr) {
           try {
             const savedOrder = JSON.parse(savedOrderStr);
             data.libraries.sort((a, b) => {
@@ -287,16 +338,34 @@ export async function loadLibraries() {
           }
         }
 
-        data.libraries.forEach(lib => {
-          const isActive = String(state.currentLibraryId) === String(lib.id) ? 'active' : '';
-          const draggableAttr = !isPinned ? 'draggable="true"' : '';
-          const safeName    = escapeHtml(lib.name || '');
-          const safePath    = escapeHtml(lib.physical_path || '');
-          const safeRclone  = escapeHtml(lib.rclone_rc_url || '');
-          const safeIcon    = escapeHtml(lib.icon || 'fa-book');
-          const safeColor   = escapeHtml(lib.color || '#94a3b8');
-          const hideCover = Number(lib.hide_cover || 0) ? 1 : 0;
-          html += `<li class="menu-item ${isActive}" data-type="custom" data-role="sidebar-category-dynamic" data-id="${lib.id}" data-category-id="${lib.id}" data-name="${safeName}" data-path="${safePath}" data-remote="${lib.is_remote || 0}" data-rclone-url="${safeRclone}" data-icon="${safeIcon}" data-color="${safeColor}" data-hide-cover="${hideCover}" ${draggableAttr} style="display: flex; align-items: center; justify-content: space-between;"><span style="display: inline-flex; align-items: center; gap: 0.6rem;"><i class="fa-solid ${safeIcon}" style="color: ${safeColor};"></i> ${safeName}</span><i class="fa-solid fa-circle-notch fa-spin category-scan-spinner" style="display:none; color:#c084fc; font-size:0.75rem; margin-left:auto;" title="스캔 진행 중"></i></li>`;
+        const librariesByGroup = new Map();
+        data.libraries.forEach((lib) => {
+          const groupKey = lib.group_id == null ? '' : String(lib.group_id);
+          if (!librariesByGroup.has(groupKey)) librariesByGroup.set(groupKey, []);
+          librariesByGroup.get(groupKey).push(lib);
+        });
+
+        state.libraryGroups.forEach((group) => {
+          const groupId = String(group.id);
+          const groupLibraries = librariesByGroup.get(groupId) || [];
+          if (!isAdmin && groupLibraries.length === 0) return;
+          const containsActive = groupLibraries.some((lib) => String(lib.id) === String(state.currentLibraryId));
+          const isCollapsed = !containsActive && localStorage.getItem(getGroupCollapsedStorageKey(groupId)) === 'true';
+          const safeGroupName = escapeHtml(group.name || '');
+          const safeGroupIcon = escapeHtml(group.icon || 'fa-folder');
+          const safeGroupColor = escapeHtml(group.color || '#a855f7');
+          html += `<li class="sidebar-library-group${isCollapsed ? ' collapsed' : ''}" data-library-group-id="${groupId}">
+            <button type="button" class="menu-item sidebar-group-header" data-type="group" data-role="sidebar-group-toggle" data-id="${groupId}" data-name="${safeGroupName}" aria-expanded="${isCollapsed ? 'false' : 'true'}">
+              <span><i class="fa-solid fa-chevron-down sidebar-group-chevron"></i><i class="fa-solid ${safeGroupIcon}" style="color:${safeGroupColor};"></i>${safeGroupName}</span>
+              <small>${groupLibraries.length}</small>
+            </button>
+            <ul class="sidebar-library-group-items" data-group-id="${groupId}">${groupLibraries.map((lib) => renderLibraryItem(lib, isPinned)).join('')}</ul>
+          </li>`;
+          librariesByGroup.delete(groupId);
+        });
+
+        (librariesByGroup.get('') || []).forEach((lib) => {
+          html += renderLibraryItem(lib, isPinned);
         });
       }
 
@@ -355,23 +424,67 @@ export function bindDragAndDropEvents(isEnabled) {
   const sidebar = document.getElementById('sidebar-categories');
   if (!sidebar) return;
 
-  if (sidebar._sortable) {
-    sidebar._sortable.destroy();
-    sidebar._sortable = null;
-  }
+  (sidebar._categorySortables || []).forEach((sortable) => sortable.destroy());
+  sidebar._categorySortables = [];
 
   if (!isEnabled) return;
 
   if (typeof Sortable !== 'undefined') {
-    sidebar._sortable = new Sortable(sidebar, {
+    const persistOnEnd = async (event) => {
+      saveNewOrder();
+      if (event.item?.dataset?.type !== 'custom') return;
+      await persistLibraryPositions(sidebar);
+    };
+    const allowCategoryMove = (event) => {
+      const groupContainer = event.related?.closest?.('[data-library-group-id]');
+      if (groupContainer?.classList.contains('collapsed')) {
+        groupContainer.classList.remove('collapsed');
+        const toggle = groupContainer.querySelector('[data-role="sidebar-group-toggle"]');
+        toggle?.setAttribute('aria-expanded', 'true');
+        localStorage.setItem(getGroupCollapsedStorageKey(groupContainer.dataset.libraryGroupId), 'false');
+      }
+      const targetIsGroup = event.to?.matches?.('.sidebar-library-group-items');
+      return !(targetIsGroup && event.dragged?.dataset?.type !== 'custom');
+    };
+
+    sidebar._categorySortables.push(new Sortable(sidebar, {
       animation: 150,
+      group: {name: 'library-categories', pull: true, put: true},
       draggable: 'li[data-type="custom"], li[data-type="plugin"]',
       filter: 'li[data-type="system"]',
       preventOnFilter: false,
-      onEnd: function () {
-        saveNewOrder();
-      }
+      onMove: allowCategoryMove,
+      onEnd: persistOnEnd
+    }));
+
+    sidebar.querySelectorAll('.sidebar-library-group-items').forEach((groupList) => {
+      sidebar._categorySortables.push(new Sortable(groupList, {
+        animation: 150,
+        group: {name: 'library-categories', pull: true, put: true},
+        draggable: 'li[data-type="custom"]',
+        emptyInsertThreshold: 18,
+        onMove: allowCategoryMove,
+        onEnd: persistOnEnd
+      }));
     });
+  }
+}
+
+async function persistLibraryPositions(sidebar) {
+  const items = Array.from(sidebar.querySelectorAll('li[data-type="custom"]')).map((element) => {
+    const groupContainer = element.closest('[data-library-group-id]');
+    const groupId = groupContainer?.dataset?.libraryGroupId || null;
+    element.dataset.groupId = groupId || '';
+    return {id: element.dataset.id, group_id: groupId};
+  });
+
+  try {
+    const result = await api.moveLibraries(items, state.currentLibraryType);
+    if (!result.success) throw new Error(result.error || '카테고리 위치를 저장하지 못했습니다.');
+    await loadLibraries();
+  } catch (error) {
+    alert(error.message || '카테고리 위치를 저장하지 못했습니다.');
+    await loadLibraries();
   }
 }
 
@@ -379,7 +492,7 @@ export function saveNewOrder() {
   const sidebar = document.getElementById('sidebar-categories');
   if (!sidebar) return;
 
-  const customItems = sidebar.querySelectorAll('li[data-type="custom"]');
+  const customItems = Array.from(sidebar.children).filter((el) => el.matches('li[data-type="custom"]'));
   const legacyCustomOrder = Array.from(customItems).map(el => String(el.dataset.id));
   localStorage.setItem(getLegacyCustomOrderStorageKey(state.currentLibraryType), JSON.stringify(legacyCustomOrder));
 
