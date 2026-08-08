@@ -8,6 +8,7 @@ import { stripLeadingBracketTags } from './series_display.js';
 import { mountIndexScrollbar, unmountIndexScrollbar } from './index_scrollbar.js';
 
 let filterDebounceTimer = null;
+let totalsRequestSerial = 0;
 
 function normalizeMetadataToken(token) {
   if (!token) return '';
@@ -18,14 +19,16 @@ function normalizeMetadataToken(token) {
 }
 
 
-function updateLibraryTotalCount(items) {
+function updateLibraryTotalCount(items, totals = null) {
   const countSpan = document.getElementById('library-total-count');
   if (!countSpan) return;
-  const seriesCount = items.length;
-  let bookCount = 0;
-  items.forEach(item => {
-    bookCount += (parseInt(item.book_count) || 1);
-  });
+  const serverSeriesCount = Number(totals?.total_series_count);
+  const serverBookCount = Number(totals?.total_book_count);
+  const hasServerTotals = Number.isFinite(serverSeriesCount) && Number.isFinite(serverBookCount);
+  const seriesCount = hasServerTotals ? serverSeriesCount : items.length;
+  const bookCount = hasServerTotals
+    ? serverBookCount
+    : items.reduce((sum, item) => sum + (parseInt(item.book_count) || 1), 0);
   countSpan.innerText = i18n.t('book_list.total_count', {seriesCount: seriesCount.toLocaleString(), bookCount: bookCount.toLocaleString()});
 }
 
@@ -55,22 +58,32 @@ export async function loadBooksList(isAppend = false) {
   try {
     const limit = state.LIMIT || 120;
     const targetPage = isAppend ? state.currentPage : 1;
+    const requestFilters = {
+      type: state.currentLibraryType,
+      libraryId: state.currentLibraryId,
+      search: state.searchQuery || '',
+      genres: (state.filterGenres || []).map(normalizeMetadataToken).filter(Boolean),
+      tags: (state.filterTags || []).map(normalizeMetadataToken).filter(Boolean),
+    };
+    const totalsSerial = isAppend ? totalsRequestSerial : ++totalsRequestSerial;
 
     if (!isAppend) {
       state.currentPage = 1;
       state.hasMore = true;
       container.innerHTML = `<div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('book_list.loading')}</div>`;
+      const countSpan = document.getElementById('library-total-count');
+      if (countSpan) countSpan.innerText = '';
     }
 
     const data = await api.fetchBooksList({
-      type: state.currentLibraryType,
-      libraryId: state.currentLibraryId,
+      type: requestFilters.type,
+      libraryId: requestFilters.libraryId,
       page: targetPage,
       limit,
-      search: state.searchQuery || '',
+      search: requestFilters.search,
       sort: state.currentSortDirection || 'asc',
-      genres: (state.filterGenres || []).map(normalizeMetadataToken).filter(Boolean),
-      tags: (state.filterTags || []).map(normalizeMetadataToken).filter(Boolean),
+      genres: requestFilters.genres,
+      tags: requestFilters.tags,
     });
 
     if (!data.success) {
@@ -89,7 +102,15 @@ export async function loadBooksList(isAppend = false) {
     }
 
     state.filteredBooksData = state.currentBooksData;
-    updateLibraryTotalCount(state.currentBooksData);
+    if (!isAppend) {
+      api.fetchBooksTotals(requestFilters)
+        .then((totals) => {
+          if (totalsSerial === totalsRequestSerial && totals.success) {
+            updateLibraryTotalCount([], totals);
+          }
+        })
+        .catch((error) => console.warn('[Book-List] 전체 수량 조회 실패:', error));
+    }
 
     state.hasMore = !!data.has_more;
     state.currentPage = state.hasMore ? (targetPage + 1) : targetPage;

@@ -4,6 +4,7 @@ __pycache__/
 
 # Local Environment & Secrets
 .env
+.agent.md
 .venv/
 venv/
 ENV/

@@ -78,17 +78,21 @@ async function ensureFilterDataLoaded() {
     }
 }
 
-function getScopedLibraryIdForTagFilter() {
-    if (state.tagFilterSearchInAll) {
-        return 'all';
-    }
-
+function getCurrentLibraryIdForFilterOptions() {
     const currentId = state.currentLibraryId;
     if (currentId === 'home' || currentId === 'history' || currentId === 'favorite' || currentId === 'settings') {
         return state.detailLibraryId || 'all';
     }
 
     return currentId || 'all';
+}
+
+function getScopedLibraryIdForTagFilter() {
+    if (state.tagFilterSearchInAll) {
+        return 'all';
+    }
+
+    return getCurrentLibraryIdForFilterOptions();
 }
 
 async function prepareTargetCategoryForQuickFilter() {
@@ -173,7 +177,7 @@ export function toggleFilterModal() {
 
 // 장르 및 태그 데이터 로드
 export async function loadGenresAndTagsData() {
-    const libraryId = getScopedLibraryIdForTagFilter();
+    const libraryId = getCurrentLibraryIdForFilterOptions();
     const dbType = state.currentLibraryType || 'general';
     const genresUrl = `/api/media/genres?type=${dbType}&library_id=${libraryId}`;
     const tagsUrl = `/api/media/tags?type=${dbType}&library_id=${libraryId}`;

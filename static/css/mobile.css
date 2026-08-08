@@ -363,6 +363,30 @@ body {
     white-space: nowrap;
 }
 
+.settings-tab-content {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.settings-tab-content .library-form-group-row {
+    align-items: flex-start !important;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.settings-tab-content .library-form-group-row input[type="checkbox"] {
+    margin-top: 0.15rem !important;
+}
+
+.settings-tab-content .library-form-group-row label {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.45;
+}
+
 /* 환경설정 테이블 모바일 스크롤 처리 */
 .settings-table-wrapper {
     width: 100%;

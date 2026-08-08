@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import hashlib
+import json
 from utils.cover_helper import get_cover_image_with_t, resolve_series_cover
 from repositories.series_repository import SeriesRepository
 
@@ -74,8 +75,10 @@ def _build_series_entries(db_type, rows):
         tags = next((b['tags'] for b in books if b['tags']), '')
         series_alias = next((b['series_alias'] for b in books if b.get('series_alias')), '')
         total_tracks = 0
+        is_completed = 0
         if db_type == 'audiobook':
             total_tracks = max((int(b.get('total_tracks') or 0) for b in books), default=0)
+            is_completed = 1 if any(int(b.get('is_completed') or 0) == 1 for b in books) else 0
         series_key = hashlib.md5(f"{lib_id}|{series_name}|{comp_dir}".encode('utf-8')).hexdigest()[:16]
 
         book_count = sum(int(b.get('series_book_count') or b.get('book_count') or 1) for b in books)
@@ -89,6 +92,7 @@ def _build_series_entries(db_type, rows):
             'author': author,
             'book_count': book_count,
             'total_tracks': total_tracks,
+            'is_completed': is_completed,
             'cover_image': get_cover_image_with_t(final_cover, updated_at),
             'is_favorite': any_favorite,
             'metadata_locked': any_locked,
@@ -122,12 +126,22 @@ _ALL_BOOKS_CACHE = {}
 _ALL_BOOKS_CACHE_TTL = 60.0  # 60초 인메모리 캐싱
 _LIST_QUERY_CACHE = {}
 _LIST_QUERY_CACHE_TTL = 120.0
+_TOTALS_CACHE = {}
+_TOTALS_CACHE_TTL = 30.0
+_TOTALS_REDIS_TTL = 300
 
 class SeriesService:
     @staticmethod
     def invalidate_all_books_cache():
-        global _ALL_BOOKS_CACHE
+        global _ALL_BOOKS_CACHE, _LIST_QUERY_CACHE, _TOTALS_CACHE
         _ALL_BOOKS_CACHE.clear()
+        _LIST_QUERY_CACHE.clear()
+        _TOTALS_CACHE.clear()
+        try:
+            from utils.redis_helper import redis_delete_pattern
+            redis_delete_pattern('cache:series_totals:*')
+        except Exception:
+            pass
 
     @staticmethod
     def get_books_list(db_type, library_id, page, limit, search_query, sort='asc', genre_filters=None, tag_filters=None, user_id=None, role=None):
@@ -215,6 +229,67 @@ class SeriesService:
         
         print(f"[PERF-PROFILE] get_books_list(lib={library_id}, page={page}) TOTAL: {(t4-t0)*1000:.1f}ms | SQL-Fetch({len(rows)}rows): {(t2-t1)*1000:.1f}ms | BuildSeries({len(entries)}entries): {(t3-t2)*1000:.1f}ms | Sort: {(t4-t3)*1000:.1f}ms")
         return paged
+
+    @staticmethod
+    def get_books_totals(db_type, library_id, search_query='', genre_filters=None, tag_filters=None, user_id=None, role=None):
+        import time
+        library_id = _normalize_library_id(library_id)
+        favorite_only = library_id == 'favorite'
+        normalized_genres = [str(value).strip() for value in (genre_filters or []) if str(value).strip()]
+        normalized_tags = [str(value).strip() for value in (tag_filters or []) if str(value).strip()]
+        cache_payload = json.dumps({
+            'db_type': db_type,
+            'library_id': library_id,
+            'search': str(search_query or ''),
+            'genres': normalized_genres,
+            'tags': normalized_tags,
+            'user_id': int(user_id) if user_id else 0,
+            'role': str(role or ''),
+        }, ensure_ascii=False, sort_keys=True, separators=(',', ':'))
+        cache_digest = hashlib.sha256(cache_payload.encode('utf-8')).hexdigest()
+        cache_key = f"cache:series_totals:{db_type}:{cache_digest}"
+
+        redis_available = False
+        try:
+            from utils.redis_helper import get_redis_client, redis_get
+            redis_available = get_redis_client() is not None
+            if redis_available:
+                cached_json = redis_get(cache_key)
+                if cached_json:
+                    cached_totals = json.loads(cached_json)
+                    return {
+                        'total_series_count': int(cached_totals.get('total_series_count') or 0),
+                        'total_book_count': int(cached_totals.get('total_book_count') or 0),
+                    }
+        except Exception:
+            redis_available = False
+
+        now = time.time()
+        if not redis_available:
+            cached = _TOTALS_CACHE.get(cache_key)
+            if cached and now - cached[0] < _TOTALS_CACHE_TTL:
+                return cached[1]
+
+        totals = SeriesRepository.fetch_grouping_totals(
+            db_type,
+            library_id,
+            search_query=search_query or '',
+            favorite_only=favorite_only,
+            genre_filters=normalized_genres,
+            tag_filters=normalized_tags,
+            user_id=user_id,
+            role=role,
+        )
+
+        if redis_available:
+            try:
+                from utils.redis_helper import redis_set
+                redis_set(cache_key, json.dumps(totals, ensure_ascii=False), ex=_TOTALS_REDIS_TTL)
+            except Exception:
+                pass
+        else:
+            _TOTALS_CACHE[cache_key] = (now, totals)
+        return totals
 
     @staticmethod
     def get_all_books_list(db_type, library_id, user_id=None, role=None):

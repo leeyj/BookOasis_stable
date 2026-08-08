@@ -26,6 +26,15 @@ export async function fetchBooksList({type, libraryId, page, limit, append, sear
   return res.json();
 }
 
+export async function fetchBooksTotals({type, libraryId, search, genres = [], tags = []}) {
+  const searchQuery = search ? `&search=${encodeURIComponent(search)}` : '';
+  const genresQuery = genres.length > 0 ? `&genres=${encodeURIComponent(genres.join(','))}` : '';
+  const tagsQuery = tags.length > 0 ? `&tags=${encodeURIComponent(tags.join(','))}` : '';
+  const url = `/api/media/list-totals?type=${type}&library_id=${libraryId}${searchQuery}${genresQuery}${tagsQuery}&_=${Date.now()}`;
+  const res = await safeFetch(url, {cache: 'no-store'});
+  return res.json();
+}
+
 export async function fetchAllBooksList(type, libraryId) {
   const url = `/api/media/all-list?type=${type}&library_id=${libraryId}&_=${Date.now()}`;
   const res = await fetch(url, {cache: 'no-store'});

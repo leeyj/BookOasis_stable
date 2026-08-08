@@ -44,6 +44,18 @@ class SeriesRepositorySearchTest(unittest.TestCase):
                 1, '예상과 다른 시리즈', '[연재] 도굴왕 001', '산지직송',
                 '/books/도굴왕/001.zip', 'zip', 10
             );
+            INSERT INTO books (
+                id, series_name, title, author, file_path, file_format, library_id
+            ) VALUES (
+                2, '무림 이야기', '첫 번째 권', '도굴왕 작가',
+                '/books/무림/001.zip', 'zip', 10
+            );
+            INSERT INTO books (
+                id, series_name, title, author, file_path, file_format, library_id
+            ) VALUES (
+                3, '예상과 다른 시리즈', '[연재] 도굴왕 002', '산지직송',
+                '/books/도굴왕/002.zip', 'zip', 10
+            );
             """
         )
         conn.commit()
@@ -70,6 +82,33 @@ class SeriesRepositorySearchTest(unittest.TestCase):
         )
 
         self.assertEqual([row['id'] for row in rows], [1])
+
+    def test_natural_search_does_not_match_author(self):
+        rows = SeriesRepository.fetch_books_for_grouping(
+            'general', 10, search_query='도굴왕 작가', user_id=1, role='admin'
+        )
+
+        self.assertEqual(rows, [])
+
+    def test_author_prefix_searches_author_only(self):
+        rows = SeriesRepository.fetch_books_for_grouping(
+            'general', 10, search_query='작가:도굴왕', user_id=1, role='admin'
+        )
+
+        self.assertEqual([row['id'] for row in rows], [2])
+
+    def test_category_totals_are_queried_separately_from_page_rows(self):
+        rows = SeriesRepository.fetch_books_for_grouping(
+            'general', 10, user_id=1, role='admin', limit=1, offset=0
+        )
+        totals = SeriesRepository.fetch_grouping_totals(
+            'general', 10, user_id=1, role='admin'
+        )
+
+        self.assertEqual(len(rows), 1)
+        self.assertNotIn('total_series_count', rows[0])
+        self.assertEqual(totals['total_series_count'], 2)
+        self.assertEqual(totals['total_book_count'], 3)
 
 
 if __name__ == '__main__':

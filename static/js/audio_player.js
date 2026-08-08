@@ -1,55 +1,108 @@
 // static/js/audio_player.js - 바닐라 JS 몰입형 오디오북 플레이어 코어 컨트롤러
+import { createAudioProgressSync } from './audio_player_modules/progress_sync.js';
+import { initAudioLifecycleAndShortcuts } from './audio_player_modules/lifecycle_shortcuts.js';
+import { createMiniPlayerUiController } from './audio_player_modules/mini_player_ui.js';
+import { createAudioPlaybackEngine } from './audio_player_modules/playback_engine.js';
+import { registerAudioPlayerPublicApi } from './audio_player_modules/public_api.js';
+
 let audioInstance = null;
 let currentAudiobookData = null;
 let currentTrackIndex = 0;
+
+document.addEventListener('audiobook-track-completed', (event) => {
+  const trackId = Number(event?.detail?.trackId || 0);
+  if (!trackId) return;
+  document.querySelectorAll(`[data-audiobook-track-completed="${trackId}"]`).forEach((dot) => {
+    dot.classList.add('is-visible');
+  });
+});
+let currentAudioPlayerViewMode = 'hidden'; // hidden | mini | full
 let currentAudioSpeedIndex = 0;
 let sleepTimerId = null;
 let sleepMinutes = 0;
 const audioSpeeds = [1.0, 1.25, 1.5, 1.75, 2.0, 0.75];
 const sleepOptions = [0, 15, 30, 45, 60];
 let currentSleepIndex = 0;
-let lastObservedProgressKey = '';
-let lastFlushedProgressKey = '';
-let lastAutoSaveAtMs = 0;
-const AUDIO_PROGRESS_AUTO_SAVE_MS = 10000;
+const playbackEngine = createAudioPlaybackEngine();
 
-let audioCtx = null;
-let gainNode = null;
-let audioSourceNode = null;
-let currentVolumeValue = 1.0;
+const progressSync = createAudioProgressSync({
+  getAudioInstance: () => audioInstance,
+  getAudiobookData: () => currentAudiobookData,
+  getCurrentTrackIndex: () => currentTrackIndex,
+  getPlaybackRate: () => audioSpeeds[currentAudioSpeedIndex],
+  onProgressSaved: (result) => {
+    if (!currentAudiobookData || !Array.isArray(currentAudiobookData.tracks)) return;
+    const savedTrackId = Number(result?.track_id || 0);
+    if (!savedTrackId) return;
 
-// iOS Safari 감지:
-// iOS는 createMediaElementSource()로 AudioContext에 연결하면
-// 화면 잠금 시 AudioContext가 강제 suspend되어 소리가 완전히 끊김.
-// iOS는 hardware 볼륨 버튼으로 제어하므로 GainNode 볼륨 조절의 실익도 없음.
-// → iOS에서는 AudioContext를 아예 사용하지 않아 화면 잠금 재생을 보장함.
-const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const track = currentAudiobookData.tracks.find((row) => Number(row?.id || 0) === savedTrackId);
+    if (!track) return;
 
-function setupWebAudioGainNode(audioEl) {
-  // iOS에서는 AudioContext 사용 자체를 차단 (화면 잠금 재생 보장)
-  if (IS_IOS) return;
-  if (!audioEl) return;
-  try {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) return;
-    if (!audioCtx) {
-      audioCtx = new AudioContextClass();
+    const nextPct = Number(result?.track_progress_pct || 0);
+    if (Number.isFinite(nextPct)) {
+      track.track_progress_pct = Math.max(0, Math.min(100, nextPct));
     }
-    if (audioCtx && audioCtx.state === 'suspended') {
-      audioCtx.resume().catch(() => {});
-    }
-    if (!audioSourceNode && audioCtx && audioEl) {
-      audioSourceNode = audioCtx.createMediaElementSource(audioEl);
-      gainNode = audioCtx.createGain();
-      audioSourceNode.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-      if (gainNode && gainNode.gain) {
-        gainNode.gain.value = currentVolumeValue;
+    track.is_track_completed = Number(result?.track_is_completed) === 1 ? 1 : 0;
+
+    const allTracksCompleted = currentAudiobookData.tracks.length > 0
+      && currentAudiobookData.tracks.every((row) => {
+        const pct = Number(row?.track_progress_pct || 0);
+        return Number(row?.is_track_completed) === 1 || pct >= 95;
+      });
+
+    if (allTracksCompleted) {
+      document.querySelectorAll(`[data-audiobook-completed="${currentAudiobookData.meta?.id || ''}"]`).forEach((badge) => {
+        badge.classList.add('is-visible');
+      });
+      const cardCover = document.querySelector(`.book-card[data-book-id="${currentAudiobookData.meta?.id || ''}"] .book-card-cover`);
+      if (cardCover && !cardCover.querySelector('.book-card-audiobook-completed')) {
+        const completedDot = document.createElement('span');
+        completedDot.className = 'book-card-audiobook-completed';
+        completedDot.title = window.i18n?.t('detail.audiobook_completed') || '청취 완료';
+        completedDot.setAttribute('aria-label', completedDot.title);
+        cardCover.appendChild(completedDot);
       }
     }
-  } catch (e) {
-    console.warn('[AudioPlayer] Web Audio GainNode setup warning:', e);
+
+    updateMiniPlayerUi();
   }
+});
+
+const miniPlayerUi = createMiniPlayerUiController({
+  getCurrentViewMode: () => currentAudioPlayerViewMode,
+  setCurrentViewMode: (mode) => {
+    currentAudioPlayerViewMode = mode;
+  },
+  getAudiobookData: () => currentAudiobookData,
+  getCurrentTrackIndex: () => currentTrackIndex,
+  getAudioInstance: () => audioInstance,
+  getEffectiveTrackDuration,
+  updatePlaybackToggleButtons
+});
+
+function isMiniBarFeatureEnabled() {
+  return miniPlayerUi.isMiniBarFeatureEnabled();
+}
+
+function getInitialAudioPlayerViewMode() {
+  const configuredMode = (typeof window !== 'undefined' && window.__audioMiniPlayerMode)
+    ? String(window.__audioMiniPlayerMode)
+    : 'mini';
+
+  // right_dock 설정에서는 재생 시작 시 전체 모달 대신 우측 패널로 진입한다.
+  if (configuredMode === 'right_dock' && isMiniBarFeatureEnabled()) {
+    return 'mini';
+  }
+
+  return 'full';
+}
+
+function initMiniBarDrag() {
+  miniPlayerUi.init();
+}
+
+function setupWebAudioGainNode(audioEl) {
+  playbackEngine.setupWebAudioGainNode(audioEl);
 }
 
 
@@ -74,7 +127,17 @@ function initAudioPlayerDelegation() {
 
     const action = target.getAttribute('data-action');
     const rawValue = target.getAttribute('data-value');
+    if (action === 'mini-drag-handle') return;
+    if (action === 'toggle-mini-peek') {
+      miniPlayerUi.toggleMiniPeek();
+      return;
+    }
+    if (action === 'open-full' && miniPlayerUi.shouldSuppressOpenFull()) return;
+    if (action === 'open-full' && miniPlayerUi.revealIfCollapsed()) return;
+    if (action === 'close' && miniPlayerUi.shouldBlockClose()) return;
     if (action === 'close') return closeAudioPlayerModal();
+    if (action === 'open-full') return expandAudioPlayerModal();
+    if (action === 'dismiss-mini') return stopAndHideAudioPlayer();
     if (action === 'bookmark') return toggleAudioBookmark();
     if (action === 'fullscreen') return toggleAudioFullscreen();
     if (action === 'prev-track') return playPrevTrack();
@@ -102,6 +165,7 @@ function initAudioPlayerDelegation() {
 }
 
 initAudioPlayerDelegation();
+initMiniBarDrag();
 
 export async function openAudioPlayer(audiobookId, trackIdOrTitle = null, startTime = 0) {
   try {
@@ -115,7 +179,9 @@ export async function openAudioPlayer(audiobookId, trackIdOrTitle = null, startT
       tracks: data.books || []
     };
 
-    openAudioPlayerModal(currentAudiobookData, trackIdOrTitle, startTime);
+    openAudioPlayerModal(currentAudiobookData, trackIdOrTitle, startTime, {
+      viewMode: getInitialAudioPlayerViewMode()
+    });
   } catch (err) {
     console.error('[AudioPlayer] Error opening audio player:', err);
     if (typeof window.showToast === 'function') {
@@ -126,9 +192,46 @@ export async function openAudioPlayer(audiobookId, trackIdOrTitle = null, startT
   }
 }
 
-export function openAudioPlayerModal(audioData, targetTrackId = null, startTime = 0) {
+function setAudioPlayerViewMode(mode, options = {}) {
+  miniPlayerUi.setViewMode(mode, options);
+}
+
+export function applyAudioMiniPlayerMode(mode) {
+  miniPlayerUi.applyAudioMiniPlayerMode(mode);
+  if (currentAudioPlayerViewMode === 'mini') {
+    updateMiniPlayerUi();
+  }
+}
+
+function updatePlaybackToggleButtons(isPlaying) {
+  const playHtml = '<i class="fa-solid fa-play" style="margin-left: 4px;"></i>';
+  const pauseHtml = '<i class="fa-solid fa-pause"></i>';
+  const html = isPlaying ? pauseHtml : playHtml;
+
+  const fullBtn = document.getElementById('btn-audio-play-toggle');
+  if (fullBtn) fullBtn.innerHTML = html;
+
+  const miniBtn = document.getElementById('btn-audio-mini-play-toggle');
+  if (miniBtn) miniBtn.innerHTML = html;
+}
+
+function updateMiniPlayerUi() {
+  miniPlayerUi.updateMiniPlayerUi();
+}
+
+export function expandAudioPlayerModal() {
+  if (!currentAudiobookData) return;
+  miniPlayerUi.markExpandGuard();
+  setAudioPlayerViewMode('full');
+  updateMiniPlayerUi();
+}
+
+export function openAudioPlayerModal(audioData, targetTrackId = null, startTime = 0, options = {}) {
   const modal = document.getElementById('audio-player-modal');
   if (!modal) return;
+
+  const requestedViewMode = options.viewMode || currentAudioPlayerViewMode || 'full';
+  const isMiniTrackSwitch = (currentAudioPlayerViewMode === 'mini' && requestedViewMode === 'mini');
 
   const meta = audioData.meta || {};
   const tracks = audioData.tracks || [];
@@ -178,11 +281,10 @@ export function openAudioPlayerModal(audioData, targetTrackId = null, startTime 
     if (coverImg) coverImg.style.display = 'none';
   }
 
-  modal.style.display = 'block';
-  document.body.style.overflow = 'hidden';
-  lastObservedProgressKey = '';
-  lastFlushedProgressKey = '';
-  lastAutoSaveAtMs = 0;
+  setAudioPlayerViewMode(requestedViewMode === 'hidden' ? 'mini' : requestedViewMode, {
+    skipMiniReposition: isMiniTrackSwitch
+  });
+  progressSync.resetProgressTracking();
 
   if (!audioInstance) {
     audioInstance = new Audio();
@@ -204,6 +306,7 @@ export function openAudioPlayerModal(audioData, targetTrackId = null, startTime 
   toggleAudioPlay(true);
   initMediaSession(meta, currentTrack);
   renderChapterList();
+  updateMiniPlayerUi();
 }
 
 function getEffectiveTrackDuration() {
@@ -230,16 +333,6 @@ function getEffectiveTrackDuration() {
   return 0;
 }
 
-// iOS Safari AudioContext resume 헬퍼
-// iOS는 사용자 제스처 컨텍스트 내에서만 AudioContext.resume()을 허용함.
-// 잠금화면 재생 버튼 → MediaSession play → audio.play() → 'play'/'playing' 이벤트는
-// iOS가 사용자 액션으로 인정하므로, 이 시점에 resume해야 실제로 동작함.
-function resumeAudioContextIfNeeded() {
-  if (audioCtx && audioCtx.state === 'suspended') {
-    audioCtx.resume().catch(e => console.warn('[AudioPlayer] AudioContext resume failed:', e));
-  }
-}
-
 function initAudioEvents() {
   if (!audioInstance) return;
 
@@ -250,9 +343,7 @@ function initAudioEvents() {
 
   // iOS 핵심: play/playing 이벤트 시점에 AudioContext를 resume함.
   // createMediaElementSource 연결 이후 AudioContext가 suspended이면 소리가 나지 않음.
-  // 잠금화면 → 재생 버튼 탭 → audio.play() → 'play' 이벤트 → resume 성공 (사용자 액션 컨텍스트)
-  audioInstance.addEventListener('play', resumeAudioContextIfNeeded);
-  audioInstance.addEventListener('playing', resumeAudioContextIfNeeded);
+  playbackEngine.bindResumeOnPlay(audioInstance);
 
   audioInstance.ontimeupdate = () => {
     if (!audioInstance) return;
@@ -269,20 +360,38 @@ function initAudioEvents() {
 
     scheduleProgressSnapshot();
     maybeAutoSaveProgress();
+    updateMiniPlayerUi();
   };
 
   audioInstance.onpause = () => {
+    updatePlaybackToggleButtons(false);
     if (!audioInstance || audioInstance.ended) return;
-    saveProgress(false, { useBeacon: true, force: true });
+    // 일시정지는 페이지 이탈이 아니므로 fetch keepalive 기반 강제 저장을 우선한다.
+    saveProgress(false, { useBeacon: false, force: true });
   };
 
   audioInstance.onended = () => {
     if (currentAudiobookData && currentAudiobookData.tracks && currentTrackIndex < currentAudiobookData.tracks.length - 1) {
       playNextTrack();
     } else {
-      if (btnPlay) btnPlay.innerHTML = '<i class="fa-solid fa-play" style="margin-left: 4px;"></i>';
-      saveProgress(true);
+      updatePlaybackToggleButtons(false);
+      const completedAudiobookId = currentAudiobookData?.meta?.id;
+      saveProgress(true).then((result) => {
+        if (!completedAudiobookId || (result && result.ok === false)) return;
+        document.querySelectorAll(`[data-audiobook-completed="${completedAudiobookId}"]`).forEach((badge) => {
+          badge.classList.add('is-visible');
+        });
+        const cardCover = document.querySelector(`.book-card[data-book-id="${completedAudiobookId}"] .book-card-cover`);
+        if (cardCover && !cardCover.querySelector('.book-card-audiobook-completed')) {
+          const completedDot = document.createElement('span');
+          completedDot.className = 'book-card-audiobook-completed';
+          completedDot.title = window.i18n?.t('detail.audiobook_completed') || '청취 완료';
+          completedDot.setAttribute('aria-label', completedDot.title);
+          cardCover.appendChild(completedDot);
+        }
+      });
     }
+    updateMiniPlayerUi();
   };
 
   if (seekbar) {
@@ -301,15 +410,42 @@ function initAudioEvents() {
 }
 
 export function closeAudioPlayerModal() {
-  const modal = document.getElementById('audio-player-modal');
-  if (modal) modal.style.display = 'none';
-  document.body.style.overflow = '';
+  if (!isMiniBarFeatureEnabled()) {
+    stopAndHideAudioPlayer();
+    return;
+  }
+
+  // full 모달 닫기는 재생 유지 + 미니바 축소로 동작
   if (audioInstance) {
-    audioInstance.pause();
     saveProgress(false);
   }
+  setAudioPlayerViewMode('mini');
   const drawer = document.getElementById('audio-chapter-drawer');
   if (drawer) drawer.style.transform = 'translateY(100%)';
+  updateMiniPlayerUi();
+}
+
+export function stopAndHideAudioPlayer() {
+  if (document.fullscreenElement) {
+    document.exitFullscreen().catch(() => {});
+  }
+  const hadAudio = !!audioInstance;
+  if (audioInstance) {
+    audioInstance.pause();
+    // 명시적 종료(X/중지)는 페이지 이탈 상황이 아니므로 beacon 대신 fetch 강제 저장을 우선 사용.
+    saveProgressInternal(false, { useBeacon: false, force: true }).catch(() => {});
+  }
+
+  // 일부 브라우저에서 pause 직후 currentTime 반영 지연이 있어 짧은 지연 후 1회 보강 저장.
+  if (hadAudio) {
+    setTimeout(() => {
+      saveProgressInternal(false, { useBeacon: false, force: true }).catch(() => {});
+    }, 120);
+  }
+
+  const drawer = document.getElementById('audio-chapter-drawer');
+  if (drawer) drawer.style.transform = 'translateY(100%)';
+  setAudioPlayerViewMode('hidden');
 }
 
 export function toggleAudioBookmark() {
@@ -341,20 +477,22 @@ export async function toggleAudioFullscreen() {
 export function toggleAudioPlay(forcePlay = null) {
   if (!audioInstance) return;
   setupWebAudioGainNode(audioInstance);
-  if (audioCtx && audioCtx.state === 'suspended') {
-    audioCtx.resume().catch(() => {});
-  }
+  playbackEngine.ensureAudioContextResumed();
   const btn = document.getElementById('btn-audio-play-toggle');
   const shouldPlay = forcePlay !== null ? forcePlay : audioInstance.paused;
 
   if (shouldPlay) {
     audioInstance.play().then(() => {
       if (btn) btn.innerHTML = '<i class="fa-solid fa-pause"></i>';
+      updatePlaybackToggleButtons(true);
+      updateMiniPlayerUi();
     }).catch(e => console.log('[AudioPlayer] Play blocked:', e));
   } else {
     audioInstance.pause();
     if (btn) btn.innerHTML = '<i class="fa-solid fa-play" style="margin-left: 4px;"></i>';
-    saveProgress(false);
+    updatePlaybackToggleButtons(false);
+    updateMiniPlayerUi();
+    // 저장은 onpause 핸들러에서 단일 경로로 처리한다.
   }
 }
 
@@ -363,9 +501,10 @@ export function playPrevTrack() {
   if (currentTrackIndex > 0) {
     saveProgress(false, { useBeacon: false, force: true });
     currentTrackIndex--;
-    openAudioPlayerModal(currentAudiobookData, currentAudiobookData.tracks[currentTrackIndex].id, 0);
+    openAudioPlayerModal(currentAudiobookData, currentAudiobookData.tracks[currentTrackIndex].id, 0, { viewMode: currentAudioPlayerViewMode || 'mini' });
   } else {
     audioInstance.currentTime = 0;
+    updateMiniPlayerUi();
   }
 }
 
@@ -374,7 +513,7 @@ export function playNextTrack() {
   if (currentTrackIndex < currentAudiobookData.tracks.length - 1) {
     saveProgress(false, { useBeacon: false, force: true });
     currentTrackIndex++;
-    openAudioPlayerModal(currentAudiobookData, currentAudiobookData.tracks[currentTrackIndex].id, 0);
+    openAudioPlayerModal(currentAudiobookData, currentAudiobookData.tracks[currentTrackIndex].id, 0, { viewMode: currentAudioPlayerViewMode || 'mini' });
   }
 }
 
@@ -428,7 +567,7 @@ function renderChapterList() {
 
 export function selectChapterTrack(trackId) {
   if (!currentAudiobookData) return;
-  openAudioPlayerModal(currentAudiobookData, trackId, 0);
+  openAudioPlayerModal(currentAudiobookData, trackId, 0, { viewMode: currentAudioPlayerViewMode || 'full' });
   toggleAudioChapterDrawer();
 }
 
@@ -440,22 +579,7 @@ export function toggleVolumePopover() {
 }
 
 export function setAudioVolume(val) {
-  let volume = parseFloat(val);
-  if (isNaN(volume)) volume = 1;
-  volume = Math.max(0, Math.min(1, volume));
-  currentVolumeValue = volume;
-
-  if (audioInstance) {
-    try {
-      audioInstance.volume = volume;
-    } catch (e) {}
-  }
-
-  // iOS Safari / WebKit 등 volume 속성 제한 브라우저 대비 Web Audio GainNode 제어
-  setupWebAudioGainNode(audioInstance);
-  if (gainNode && gainNode.gain) {
-    gainNode.gain.value = volume;
-  }
+  const volume = playbackEngine.setVolume(audioInstance, val);
 
   const slider = document.getElementById('audio-volume-slider');
   if (slider && String(slider.value) !== String(volume)) {
@@ -498,78 +622,20 @@ export function cycleSleepTimer() {
   }
 }
 
-function saveProgress(isCompleted = false) {
-  return saveProgressInternal(isCompleted, { useBeacon: false, force: false });
+function saveProgress(isCompleted = false, options = {}) {
+  return progressSync.saveProgress(isCompleted, options);
 }
 
 function scheduleProgressSnapshot() {
-  const payload = buildProgressPayload(false);
-  if (!payload) return;
-  const progressKey = buildProgressKey(payload);
-  lastObservedProgressKey = progressKey;
+  progressSync.scheduleProgressSnapshot();
 }
 
 function maybeAutoSaveProgress() {
-  if (!audioInstance || audioInstance.paused || audioInstance.ended) return;
-  const now = Date.now();
-  if ((now - lastAutoSaveAtMs) < AUDIO_PROGRESS_AUTO_SAVE_MS) return;
-  lastAutoSaveAtMs = now;
-  saveProgressInternal(false, { useBeacon: false, force: false });
-}
-
-function buildProgressPayload(isCompleted = false) {
-  if (!currentAudiobookData || !currentAudiobookData.meta || !audioInstance) return;
-  const meta = currentAudiobookData.meta;
-  const tracks = currentAudiobookData.tracks || [];
-  const track = tracks[currentTrackIndex];
-  if (!track) return;
-
-  return {
-    current_track_id: track.id,
-    current_time: audioInstance.currentTime || 0,
-    playback_rate: audioSpeeds[currentAudioSpeedIndex],
-    is_completed: isCompleted
-  };
-}
-
-function buildProgressKey(payload) {
-  const seconds = Math.floor(Number(payload.current_time || 0));
-  return [payload.current_track_id, seconds, payload.playback_rate, payload.is_completed ? 1 : 0].join(':');
+  progressSync.maybeAutoSaveProgress();
 }
 
 function saveProgressInternal(isCompleted = false, options = {}) {
-  const payload = buildProgressPayload(isCompleted);
-  if (!payload) return Promise.resolve(null);
-
-  const { useBeacon = false, force = false } = options;
-  const progressKey = buildProgressKey(payload);
-  if (!force && progressKey === lastFlushedProgressKey) {
-    return Promise.resolve(true);
-  }
-  lastObservedProgressKey = progressKey;
-  lastFlushedProgressKey = progressKey;
-
-  const meta = currentAudiobookData.meta;
-  const url = `/api/media/audiobooks/${meta.id}/progress`;
-
-  if (useBeacon && typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
-    try {
-      const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-      const sent = navigator.sendBeacon(url, blob);
-      if (sent) {
-        return Promise.resolve(true);
-      }
-    } catch (e) {
-      console.warn('[AudioPlayer] Progress beacon failed, falling back to fetch:', e);
-    }
-  }
-
-  return fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-    keepalive: true
-  }).catch(e => console.warn('[AudioPlayer] Progress save failed:', e));
+  return progressSync.saveProgressInternal(isCompleted, options);
 }
 
 function formatTime(sec) {
@@ -580,119 +646,65 @@ function formatTime(sec) {
 }
 
 function initMediaSession(meta, track) {
-  if ('mediaSession' in navigator) {
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: track ? track.title : meta.series_name,
-      artist: meta.author || 'BookOasis',
-      album: meta.series_name || 'Audiobook',
-      artwork: meta.cover_image ? [{ src: meta.cover_image }] : []
-    });
-
-    // play 핸들러: toggleAudioPlay → audioInstance.play() → 'play' 이벤트 → resumeAudioContextIfNeeded 자동 연쇄
-    navigator.mediaSession.setActionHandler('play', () => toggleAudioPlay(true));
-    navigator.mediaSession.setActionHandler('pause', () => toggleAudioPlay(false));
-    navigator.mediaSession.setActionHandler('seekbackward', (details) => audioPlayerSkip(-(details.seekOffset ?? 15)));
-    navigator.mediaSession.setActionHandler('seekforward', (details) => audioPlayerSkip(details.seekOffset ?? 15));
-    navigator.mediaSession.setActionHandler('previoustrack', () => playPrevTrack());
-    navigator.mediaSession.setActionHandler('nexttrack', () => playNextTrack());
-    // 잠금화면 탐색바(seekto) 지원
-    try {
-      navigator.mediaSession.setActionHandler('seekto', (details) => {
-        if (audioInstance && details.seekTime != null) {
-          audioInstance.currentTime = details.seekTime;
-        }
-      });
-    } catch (e) { /* seekto 미지원 브라우저 무시 */ }
-  }
+  playbackEngine.initMediaSession(meta, track, {
+    onPlay: () => toggleAudioPlay(true),
+    onPause: () => toggleAudioPlay(false),
+    onSeekBackward: (details) => audioPlayerSkip(-(details.seekOffset ?? 15)),
+    onSeekForward: (details) => audioPlayerSkip(details.seekOffset ?? 15),
+    onPrevTrack: () => playPrevTrack(),
+    onNextTrack: () => playNextTrack(),
+    onSeekTo: (details) => {
+      if (audioInstance && details.seekTime != null) {
+        audioInstance.currentTime = details.seekTime;
+      }
+    }
+  });
 }
 
-// 전역 키보드 단축키 매핑 (스페이스: 재생/일시정지, 좌/우 방향키: -15초/+15초 이동, 상/하 방향키: 볼륨 조절)
-window.addEventListener('keydown', (e) => {
-  const modal = document.getElementById('audio-player-modal');
-  const isModalOpen = modal && modal.style.display === 'block';
-  const isAudioActive = audioInstance && !audioInstance.paused;
-
-  if (isModalOpen && e.key === 'Escape') {
-    e.preventDefault();
-    closeAudioPlayerModal();
-    return;
-  }
-
-  if (!isModalOpen && !isAudioActive) return;
-
-  // 텍스트 입력 엘리먼트에 포커스가 있을 때는 기본 동작 방해하지 않음
-  const activeTag = (document.activeElement && document.activeElement.tagName) ? document.activeElement.tagName.toUpperCase() : '';
-  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(activeTag) || (document.activeElement && document.activeElement.isContentEditable)) {
-    return;
-  }
-
-  if (e.key === ' ' || e.code === 'Space') {
-    e.preventDefault();
-    toggleAudioPlay();
-  } else if (e.key === 'ArrowLeft') {
-    e.preventDefault();
-    audioPlayerSkip(-15);
-  } else if (e.key === 'ArrowRight') {
-    e.preventDefault();
-    audioPlayerSkip(15);
-  } else if (e.key === 'ArrowUp') {
-    e.preventDefault();
-    if (audioInstance) {
-      const newVol = Math.min(1.0, (audioInstance.volume !== undefined ? audioInstance.volume : 1.0) + 0.1);
-      setAudioVolume(newVol);
-      const slider = document.getElementById('audio-volume-slider');
-      if (slider) slider.value = newVol;
-    }
-  } else if (e.key === 'ArrowDown') {
-    e.preventDefault();
-    if (audioInstance) {
-      const newVol = Math.max(0.0, (audioInstance.volume !== undefined ? audioInstance.volume : 1.0) - 0.1);
-      setAudioVolume(newVol);
-      const slider = document.getElementById('audio-volume-slider');
-      if (slider) slider.value = newVol;
-    }
-  }
+registerAudioPlayerPublicApi({
+  openAudioPlayer,
+  openAudioPlayerModal,
+  closeAudioPlayerModal,
+  toggleAudioBookmark,
+  toggleAudioFullscreen,
+  expandAudioPlayerModal,
+  stopAndHideAudioPlayer,
+  applyAudioMiniPlayerMode,
+  toggleAudioPlay,
+  playPrevTrack,
+  playNextTrack,
+  audioPlayerSkip,
+  cycleAudioSpeed,
+  toggleAudioChapterDrawer,
+  selectChapterTrack,
+  toggleVolumePopover,
+  setAudioVolume,
+  cycleSleepTimer
 });
-
-window.openAudioPlayer = openAudioPlayer;
-window.openAudioPlayerModal = openAudioPlayerModal;
-window.closeAudioPlayerModal = closeAudioPlayerModal;
-window.toggleAudioBookmark = toggleAudioBookmark;
-window.toggleAudioFullscreen = toggleAudioFullscreen;
-window.toggleAudioPlay = toggleAudioPlay;
-window.playPrevTrack = playPrevTrack;
-window.playNextTrack = playNextTrack;
-window.audioPlayerSkip = audioPlayerSkip;
-window.cycleAudioSpeed = cycleAudioSpeed;
-window.toggleAudioChapterDrawer = toggleAudioChapterDrawer;
-window.selectChapterTrack = selectChapterTrack;
-window.toggleVolumePopover = toggleVolumePopover;
-window.setAudioVolume = setAudioVolume;
-window.cycleSleepTimer = cycleSleepTimer;
 
 function flushAudioProgressForLifecycle(useBeacon = false) {
-  const modal = document.getElementById('audio-player-modal');
-  if (!modal || modal.style.display !== 'block') return;
-  saveProgressInternal(false, { useBeacon, force: true });
+  progressSync.flushAudioProgressForLifecycle(useBeacon);
 }
 
-window.addEventListener('pagehide', () => {
-  flushAudioProgressForLifecycle(true);
-});
-
-window.addEventListener('beforeunload', () => {
-  flushAudioProgressForLifecycle(true);
-});
-
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') {
+initAudioLifecycleAndShortcuts({
+  isModalOpen: () => {
+    const modal = document.getElementById('audio-player-modal');
+    return !!(modal && modal.style.display === 'block');
+  },
+  isAudioActive: () => !!(audioInstance && !audioInstance.paused),
+  onEscape: () => closeAudioPlayerModal(),
+  onTogglePlay: () => toggleAudioPlay(),
+  onSkipBackward: () => audioPlayerSkip(-15),
+  onSkipForward: () => audioPlayerSkip(15),
+  onPageHide: () => flushAudioProgressForLifecycle(true),
+  onBeforeUnload: () => flushAudioProgressForLifecycle(true),
+  onVisibilityHidden: () => {
     // 화면 잠금/탭 전환 시 진행도 즉시 저장
     flushAudioProgressForLifecycle(true);
-  } else if (document.visibilityState === 'visible') {
+  },
+  onVisibilityVisible: () => {
     // iOS Safari는 화면 잠금 시 AudioContext를 강제 suspend 처리함.
     // 화면 복귀 시 명시적으로 resume하지 않으면 소리가 끊긴 채 유지됨.
-    if (audioCtx && audioCtx.state === 'suspended') {
-      audioCtx.resume().catch(e => console.warn('[AudioPlayer] AudioContext resume failed on visibility restore:', e));
-    }
+    playbackEngine.ensureAudioContextResumed();
   }
 });

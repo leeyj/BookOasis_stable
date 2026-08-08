@@ -333,7 +333,11 @@ export async function markSeriesCompleted(event, seriesName, libraryId) {
     });
     if (res && res.success) {
       if (typeof window.showToast === 'function') {
-        window.showToast(i18n.t('detail.mark_series_completed_done', { count: res.updated_count || 0 }), 'success');
+        const count = res.updated_count || 0;
+        const message = isAudiobook
+          ? i18n.t('detail.mark_audiobook_completed_done', { count })
+          : i18n.t('detail.mark_series_completed_done', { count });
+        window.showToast(message, 'success');
       }
       setTimeout(() => {
         if (typeof window.openBookDetail === 'function') {

@@ -10,9 +10,9 @@ import os
 import sys
 import json
 import argparse
-import sqlite3
 import zipfile
 import datetime
+import decimal
 
 # 프로젝트 루트 디렉터리를 sys.path에 추가
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -22,12 +22,11 @@ if BASE_DIR not in sys.path:
 import database
 
 def get_db_connection(db_type):
-    db_path = database.get_db_path(db_type)
-    if not os.path.exists(db_path):
-        raise FileNotFoundError(f"Database file not found at: {db_path}")
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    return conn
+    if not database.is_mariadb_mode():
+        db_path = database.get_db_path(db_type)
+        if not os.path.exists(db_path):
+            raise FileNotFoundError(f"Database file not found at: {db_path}")
+    return database.get_connection(db_type)
 
 def parse_root_paths(raw_path):
     if not raw_path:
@@ -35,6 +34,14 @@ def parse_root_paths(raw_path):
     lines = raw_path.replace('\r', '').replace(';', '\n').split('\n')
     paths = [p.strip() for p in lines if p.strip()]
     return paths
+
+
+def json_default(value):
+    if isinstance(value, (datetime.datetime, datetime.date, datetime.time)):
+        return value.isoformat(sep=' ') if isinstance(value, datetime.datetime) else value.isoformat()
+    if isinstance(value, decimal.Decimal):
+        return float(value)
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
 
 def parse_library_ids(raw_args):
     ids = []
@@ -84,6 +91,9 @@ def export_single_category(db_type, library_id, output_path=None):
     audiobooks_payload = []
     audiobook_tracks_payload = []
     audiobook_progress_payload = []
+    audiobook_track_progress_payload = []
+    user_progress_payload = []
+    user_favorites_payload = []
     cover_files_to_pack = set()
 
     if db_type == 'audiobook':
@@ -144,8 +154,10 @@ def export_single_category(db_type, library_id, output_path=None):
                 (audiobook_id,)
             )
             track_rows = cursor.fetchall()
+            track_num_map = {}
             for tr in track_rows:
                 trd = dict(tr)
+                track_num_map[int(trd['id'])] = int(trd.get('track_number') or 0)
                 track_path = trd.get('file_path', '')
                 rel_track_path = None
                 selected_root = root_paths[matched_root_idx] if root_paths and matched_root_idx < len(root_paths) else ''
@@ -168,13 +180,25 @@ def export_single_category(db_type, library_id, output_path=None):
             cursor.execute("SELECT * FROM audiobook_progress WHERE audiobook_id = ?", (audiobook_id,))
             prog_rows = cursor.fetchall()
             if prog_rows:
-                track_num_map = {int(dict(t).get('id')): int(dict(t).get('track_number') or 0) for t in track_rows}
                 for pr in prog_rows:
                     pd = dict(pr)
                     pd['audiobook_export_index'] = idx
                     curr_tid = pd.get('current_track_id')
                     pd['current_track_number'] = track_num_map.get(int(curr_tid), 0) if curr_tid else 0
                     audiobook_progress_payload.append(pd)
+
+            cursor.execute(
+                "SELECT * FROM audiobook_track_progress WHERE audiobook_id = ?",
+                (audiobook_id,),
+            )
+            for progress in cursor.fetchall():
+                progress_data = dict(progress)
+                progress_data['audiobook_export_index'] = idx
+                progress_data['track_number'] = track_num_map.get(
+                    int(progress_data.get('track_id') or 0),
+                    0,
+                )
+                audiobook_track_progress_payload.append(progress_data)
     else:
         # 일반/성인 도서 내보내기
         cursor.execute("SELECT * FROM books WHERE library_id = ? AND (is_deleted IS NULL OR is_deleted = 0)", (library_id,))
@@ -240,6 +264,18 @@ def export_single_category(db_type, library_id, output_path=None):
             if offset_rows:
                 offsets_payload[idx] = [dict(o) for o in offset_rows]
 
+            cursor.execute("SELECT * FROM user_progress WHERE book_id = ?", (book_id,))
+            for progress in cursor.fetchall():
+                progress_data = dict(progress)
+                progress_data['book_export_index'] = idx
+                user_progress_payload.append(progress_data)
+
+            cursor.execute("SELECT * FROM user_favorites WHERE book_id = ?", (book_id,))
+            for favorite in cursor.fetchall():
+                favorite_data = dict(favorite)
+                favorite_data['book_export_index'] = idx
+                user_favorites_payload.append(favorite_data)
+
     conn.close()
 
     # 4. 고유 아카이브 파일명 생성 ({카테고리명}_{db_type}_lib{id}_{YYYYMMDD_HHMMSS}.oasis.zip)
@@ -262,7 +298,7 @@ def export_single_category(db_type, library_id, output_path=None):
 
     # 5. 매니페스트 및 메타데이터 작성
     manifest = {
-        "export_version": "1.3",
+        "export_version": "2.0",
         "created_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "db_type": db_type,
         "media_kind": "audiobook" if db_type == 'audiobook' else "book",
@@ -273,6 +309,9 @@ def export_single_category(db_type, library_id, output_path=None):
         "audiobooks_count": len(audiobooks_payload),
         "audiobook_tracks_count": len(audiobook_tracks_payload),
         "audiobook_progress_count": len(audiobook_progress_payload),
+        "audiobook_track_progress_count": len(audiobook_track_progress_payload),
+        "user_progress_count": len(user_progress_payload),
+        "user_favorites_count": len(user_favorites_payload),
         "covers_count": len(cover_files_to_pack)
     }
 
@@ -282,6 +321,10 @@ def export_single_category(db_type, library_id, output_path=None):
             "name": library['name'],
             "physical_paths": root_paths,
             "cron_schedule": library.get('cron_schedule'),
+            "scan_status": library.get('scan_status', 'ready'),
+            "is_remote": library.get('is_remote', 0),
+            "vfs_refresh_before_scan": library.get('vfs_refresh_before_scan', 0),
+            "rclone_rc_url": library.get('rclone_rc_url'),
             "icon": library.get('icon', 'fa-book'),
             "color": library.get('color', '#94a3b8'),
             "hide_cover": library.get('hide_cover', 0)
@@ -290,7 +333,10 @@ def export_single_category(db_type, library_id, output_path=None):
         "offsets": offsets_payload,
         "audiobooks": audiobooks_payload,
         "audiobook_tracks": audiobook_tracks_payload,
-        "audiobook_progress": audiobook_progress_payload
+        "audiobook_progress": audiobook_progress_payload,
+        "audiobook_track_progress": audiobook_track_progress_payload,
+        "user_progress": user_progress_payload,
+        "user_favorites": user_favorites_payload
     }
 
     # 6. ZIP 패키징 (이미지 파일 재압축으로 인한 CPU 점유를 막기 위해 ZIP_STORED 단순 묶음 적용)
@@ -298,8 +344,8 @@ def export_single_category(db_type, library_id, output_path=None):
     os.makedirs(os.path.dirname(os.path.abspath(final_output_path)), exist_ok=True)
 
     with zipfile.ZipFile(final_output_path, 'w', compression=zipfile.ZIP_STORED) as zipf:
-        zipf.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
-        zipf.writestr("metadata.json", json.dumps(metadata, ensure_ascii=False, indent=2))
+        zipf.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2, default=json_default))
+        zipf.writestr("metadata.json", json.dumps(metadata, ensure_ascii=False, indent=2, default=json_default))
 
         covers_base = os.path.join(BASE_DIR, 'covers')
         for cover_path in cover_files_to_pack:

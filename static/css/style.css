@@ -2203,6 +2203,65 @@ body.has-system-ticker .library-sidebar {
     margin-bottom: 0.8rem;
 }
 
+.audiobook-completed-badge {
+    display: none;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.55rem;
+    border: 1px solid rgba(74, 222, 128, 0.55);
+    border-radius: 999px;
+    background: rgba(22, 163, 74, 0.18);
+    color: #86efac;
+    font-size: 0.72rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.audiobook-completed-badge.is-visible {
+    display: inline-flex;
+}
+
+.audiobook-completed-badge-compact {
+    margin-left: auto;
+}
+
+.book-card-audiobook-completed {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 6;
+    width: 12px;
+    height: 12px;
+    border: 2px solid #dcfce7;
+    border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55), 0 0 0 2px rgba(34, 197, 94, 0.28);
+}
+
+.ab-col-title {
+    overflow: hidden;
+}
+
+.ab-track-title-text {
+    vertical-align: middle;
+}
+
+.ab-track-completed-dot {
+    display: none;
+    width: 9px;
+    height: 9px;
+    margin-left: 0.5rem;
+    border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
+    vertical-align: middle;
+    flex: 0 0 auto;
+}
+
+.ab-track-completed-dot.is-visible {
+    display: inline-block;
+}
+
 .ab-tab-btn {
     border: 1px solid rgba(148, 163, 184, 0.3);
     background: rgba(15, 23, 42, 0.55);
@@ -2919,18 +2978,18 @@ body.has-system-ticker .library-sidebar {
   transition: width 0.3s;
 }
 
-/* 완독 배지 */
-.volumes-list-grid .vol-grid-completed-badge {
+/* 완독 도트 */
+.volumes-list-grid .vol-grid-completed-dot {
   position: absolute;
-  top: 0.45rem;
-  right: 0.45rem;
-  background: rgba(34, 197, 94, 0.85);
-  color: #fff;
-  font-size: 0.6rem;
-  padding: 0.1rem 0.3rem;
-  border-radius: 3px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+    top: 8px;
+    right: 8px;
+    z-index: 5;
+    width: 12px;
+    height: 12px;
+    border: 2px solid #dcfce7;
+    border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55), 0 0 0 2px rgba(34, 197, 94, 0.28);
 }
 
 /* 미열람 카드 살짝 어둡게 */

@@ -837,6 +837,21 @@ def init_databases():
         file_size INTEGER DEFAULT 0
     );
 
+    CREATE TABLE IF NOT EXISTS series_summary (
+        library_id INTEGER NOT NULL,
+        series_key VARCHAR(500) NOT NULL,
+        representative_book_id INTEGER NOT NULL,
+        series_book_count INTEGER NOT NULL DEFAULT 0,
+        sort_series_name VARCHAR(500) NOT NULL DEFAULT '',
+        PRIMARY KEY (library_id, series_key)
+    );
+
+    CREATE TABLE IF NOT EXISTS series_summary_state (
+        id INTEGER PRIMARY KEY,
+        is_ready INTEGER NOT NULL DEFAULT 0,
+        refreshed_at DATETIME DEFAULT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS audiobooks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         library_id INTEGER REFERENCES libraries(id),
@@ -887,6 +902,18 @@ def init_databases():
         is_completed INTEGER DEFAULT 0,
         last_listened_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(audiobook_id, user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS audiobook_track_progress (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        audiobook_id INTEGER REFERENCES audiobooks(id) ON DELETE CASCADE,
+        track_id INTEGER REFERENCES audiobook_tracks(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL DEFAULT 1,
+        current_time REAL DEFAULT 0.0,
+        progress_pct REAL DEFAULT 0.0,
+        is_completed INTEGER DEFAULT 0,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(audiobook_id, track_id, user_id)
     );
 
     CREATE TABLE IF NOT EXISTS user_progress (
@@ -1022,6 +1049,7 @@ def init_databases():
 
     indexes_schema = """
     CREATE INDEX IF NOT EXISTS idx_audiobook_tracks_audiobook_id ON audiobook_tracks(audiobook_id);
+    CREATE INDEX IF NOT EXISTS idx_audiobook_track_progress_lookup ON audiobook_track_progress(audiobook_id, user_id, track_id);
     CREATE INDEX IF NOT EXISTS idx_audiobooks_library_id ON audiobooks(library_id);
     CREATE INDEX IF NOT EXISTS idx_audiobooks_title ON audiobooks(title);
     CREATE INDEX IF NOT EXISTS idx_book_offsets_book_id ON book_offsets(book_id);
@@ -1033,6 +1061,7 @@ def init_databases():
     CREATE INDEX IF NOT EXISTS idx_books_created_at ON books(created_at);
     CREATE INDEX IF NOT EXISTS idx_books_series_lib_title ON books(series_name, library_id, title);
     CREATE INDEX IF NOT EXISTS idx_books_library_active_series ON books(library_id, COALESCE(is_deleted, 0), COALESCE(series_name, ''));
+    CREATE INDEX IF NOT EXISTS idx_series_summary_order ON series_summary(library_id, sort_series_name, representative_book_id);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_user_progress_book_user ON user_progress(book_id, user_id);
     CREATE INDEX IF NOT EXISTS idx_user_progress_last_read ON user_progress(user_id, last_read_at DESC);
     CREATE INDEX IF NOT EXISTS idx_user_progress_last_read_book ON user_progress(last_read_at DESC, book_id);
@@ -1160,6 +1189,8 @@ def init_databases():
                 ('SYSTEM_MEM_LIMIT', '1536.0'),
                 ('PROCESS_RSS_LIMIT', '2048.0'),
                 ('RECENT_BOOKS_LIMIT', '30'),
+                ('AUDIO_MINI_PLAYER_MODE', 'mini'),
+                ('AUDIO_RIGHT_DOCK_DIM_ENABLED', '0'),
                 ('TAG_FILTER_SEARCH_SCOPE_ALL', '0'),
                 ('SIDEBAR_TOP_CONTROLS', '0'),
                 ('HDD_AGGRESSIVE_WARMUP', '0'),
@@ -1258,6 +1289,15 @@ def init_databases():
         # 과거에는 서버 기동 시 physical_path 기반 자동 판별로 0 -> 1 보정을 수행했지만,
         # SMB/CIFS/NFS 같은 NAS 마운트나 사용자가 수동 해제한 라이브러리까지 다시 체크되는
         # 부작용이 있어 더 이상 startup 단계에서 덮어쓰지 않는다.
+
+        try:
+            is_mariadb = hasattr(conn, '_conn') or type(conn).__name__.startswith(('Mariadb', 'PooledMariaDB'))
+            if is_mariadb and db_type != 'audiobook':
+                from repositories.mariadb.series_repository import SeriesRepository
+                if SeriesRepository.rebuild_summary(db_type, only_if_unready=True):
+                    print(f"[DB-Migration] {db_type} DB - initial series summary created")
+        except Exception as summary_err:
+            print(f"[DB-Migration ERROR] {db_type} series summary initialization failed: {summary_err}")
 
         conn.close()
 

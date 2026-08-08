@@ -25,7 +25,13 @@ class TrashService:
         if not book_ids:
             return True
         try:
-            return TrashRepository.restore_books(db_type, book_ids)
+            restored = TrashRepository.restore_books(db_type, book_ids)
+            if restored and db_type != 'audiobook':
+                from repositories.series_repository import SeriesRepository
+                SeriesRepository.rebuild_summary(db_type)
+                from services.series_service import SeriesService
+                SeriesService.invalidate_all_books_cache()
+            return restored
         except Exception as e:
             print(f"[TrashService ERROR] Failed to restore books: {e}")
             return False

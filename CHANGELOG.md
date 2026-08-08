@@ -1,4 +1,16 @@
 # CHANGELOG
+## v1.8.7
+- (display) 도서 권수 표시 오류 수정 | fix incorrect book volume count display
+- (migration/tooling) DB 이관 도구 MariaDB 호환성 보강 | improve MariaDB compatibility for database migration tools
+- (grid/completion) 그리드 뷰에 완독 표시 추가 | add completion indicators to grid view
+- (audiobook/playback) 오디오북 백그라운드 재생 지원 | support audiobook background playback
+- (cache/config) `.env` 또는 override를 통한 디스크 캐시 설정 지원 | support disk cache configuration through `.env` or overrides
+  ```env
+  DISK_CACHE_MAX_GB=20
+  DISK_CACHE_MAX_FILES=200
+  ```
+- (filter/genre-tag) 장르/태그 선택지를 현재 카테고리 기준으로 표시 | scope genre and tag options to the current category
+- (search) 검색 오류 수정 | fix search errors
 ## v1.8.6
 - (sidebar/category-plugin) 카테고리 레벨 플러그인 탭을 일반 사용자 카테고리와 동일한 드래그 이동 대상으로 확장하고 혼합 순서(`custom+plugin`)를 로컬 저장하여 재접속 시 순서를 유지 | enable category-level plugin tabs to be draggable like user categories and persist mixed custom+plugin sidebar order across reloads
 - (performance/all-view) 전체보기 초기 로딩을 전량 선로드(`/api/media/all-list`)에서 서버 페이지네이션(`/api/media/list`) 기반으로 전환하여 대용량 라이브러리 응답 지연 개선 | switch all-view initial loading from full preload to server-side pagination for large library latency reduction

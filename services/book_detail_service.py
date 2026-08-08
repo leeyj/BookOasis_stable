@@ -38,6 +38,12 @@ class BookDetailService:
 
             # 트랙 목록
             track_rows = AudiobookRepository.get_audiobook_tracks(aid)
+            track_progress = AudiobookRepository.get_audiobook_track_progress(aid, user_id)
+            current_track_number = None
+            if current_track_id is not None:
+                current_track = next((row for row in track_rows if int(row['id']) == int(current_track_id)), None)
+                if current_track:
+                    current_track_number = int(current_track.get('track_number') or 0)
 
             meta = {
                 'id': aid,
@@ -68,6 +74,22 @@ class BookDetailService:
                 mins = int(dur_sec // 60)
                 secs = int(dur_sec % 60)
                 time_str = f"{mins:02d}:{secs:02d}"
+                saved_track_progress = track_progress.get(int(t['id']))
+                if is_completed:
+                    track_progress_pct = 100.0
+                    is_track_completed = 1
+                elif saved_track_progress:
+                    track_progress_pct = float(saved_track_progress.get('progress_pct') or 0.0)
+                    is_track_completed = 1 if track_progress_pct >= 95.0 else 0
+                elif current_track_number is not None and int(t.get('track_number') or 0) < current_track_number:
+                    track_progress_pct = 100.0
+                    is_track_completed = 1
+                elif current_track_id is not None and int(t['id']) == int(current_track_id) and float(dur_sec or 0.0) > 0:
+                    track_progress_pct = min(100.0, (float(current_time or 0.0) / float(dur_sec)) * 100.0)
+                    is_track_completed = 1 if track_progress_pct >= 95.0 else 0
+                else:
+                    track_progress_pct = 0.0
+                    is_track_completed = 0
 
                 books_list.append({
                     'id': t['id'],
@@ -78,6 +100,8 @@ class BookDetailService:
                     'file_format': t['format'] or 'mp3',
                     'duration': dur_sec,
                     'time_str': time_str,
+                    'track_progress_pct': track_progress_pct,
+                    'is_track_completed': is_track_completed,
                     'file_size': t['file_size'] or 0,
                     'file_path': t['file_path'],
                     'total_pages': mins if mins > 0 else 1,

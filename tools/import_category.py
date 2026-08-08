@@ -10,7 +10,6 @@ import os
 import sys
 import json
 import argparse
-import sqlite3
 import zipfile
 import shutil
 import datetime
@@ -23,12 +22,11 @@ if BASE_DIR not in sys.path:
 import database
 
 def get_db_connection(db_type):
-    db_path = database.get_db_path(db_type)
-    if not os.path.exists(db_path):
-        raise FileNotFoundError(f"Database file not found at: {db_path}")
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    return conn
+    if not database.is_mariadb_mode():
+        db_path = database.get_db_path(db_type)
+        if not os.path.exists(db_path):
+            raise FileNotFoundError(f"Database file not found at: {db_path}")
+    return database.get_connection(db_type)
 
 def parse_target_paths(raw_args):
     result = []
@@ -44,6 +42,49 @@ def parse_target_paths(raw_args):
             if cleaned:
                 result.append(os.path.abspath(cleaned))
     return result
+
+
+def upsert_record(cursor, table, key_columns, values):
+    """내부에서 지정한 키를 기준으로 엔진 독립적인 UPDATE/INSERT를 수행합니다."""
+    where_clause = " AND ".join(f"`{column}` = ?" for column in key_columns)
+    cursor.execute(
+        f"SELECT id FROM `{table}` WHERE {where_clause}",
+        tuple(values[column] for column in key_columns),
+    )
+    existing = cursor.fetchone()
+    if existing:
+        update_columns = [
+            column for column in values
+            if column not in key_columns and column != 'id'
+        ]
+        set_clause = ", ".join(f"`{column}` = ?" for column in update_columns)
+        cursor.execute(
+            f"UPDATE `{table}` SET {set_clause} WHERE id = ?",
+            tuple(values[column] for column in update_columns) + (existing['id'],),
+        )
+        return existing['id']
+
+    insert_columns = [column for column in values if column != 'id']
+    column_clause = ", ".join(f"`{column}`" for column in insert_columns)
+    placeholders = ", ".join("?" for _ in insert_columns)
+    cursor.execute(
+        f"INSERT INTO `{table}` ({column_clause}) VALUES ({placeholders})",
+        tuple(values[column] for column in insert_columns),
+    )
+    return cursor.lastrowid
+
+
+def invalidate_series_summary(cursor, library_id):
+    cursor.execute("DELETE FROM series_summary WHERE library_id = ?", (library_id,))
+    cursor.execute("SELECT id FROM series_summary_state WHERE id = 1")
+    if cursor.fetchone():
+        cursor.execute(
+            "UPDATE series_summary_state SET is_ready = 0, refreshed_at = NULL WHERE id = 1"
+        )
+    else:
+        cursor.execute(
+            "INSERT INTO series_summary_state (id, is_ready, refreshed_at) VALUES (1, 0, NULL)"
+        )
 
 def get_all_existing_libraries():
     """모든 DB(General 및 Adult)의 기존 카테고리 목록을 수집합니다."""
@@ -91,6 +132,8 @@ def inspect_package(input_path):
     audiobooks_info = metadata.get('audiobooks', [])
     audiobook_tracks_info = metadata.get('audiobook_tracks', [])
     audiobook_progress_info = metadata.get('audiobook_progress', [])
+    audiobook_track_progress_info = metadata.get('audiobook_track_progress', [])
+    user_progress_info = metadata.get('user_progress', [])
     root_paths = lib_info.get('physical_paths', [])
     orig_root_count = manifest.get('root_paths_count', len(root_paths))
     media_kind = manifest.get('media_kind', 'book')
@@ -104,8 +147,10 @@ def inspect_package(input_path):
         print(f"  • Total Audiobooks : {manifest.get('audiobooks_count', len(audiobooks_info))} items")
         print(f"  • Total Tracks     : {manifest.get('audiobook_tracks_count', len(audiobook_tracks_info))} items")
         print(f"  • Total Progress   : {manifest.get('audiobook_progress_count', len(audiobook_progress_info))} items")
+        print(f"  • Track Progress   : {manifest.get('audiobook_track_progress_count', len(audiobook_track_progress_info))} items")
     else:
         print(f"  • Total Books   : {manifest.get('books_count', len(books_info))} items")
+        print(f"  • Total Progress: {manifest.get('user_progress_count', len(user_progress_info))} items")
     print(f"  • Total Covers  : {cover_count} files")
     print(f"  • Original Physical Paths Count : {orig_root_count} entries")
     for idx, rp in enumerate(root_paths):
@@ -154,6 +199,17 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
         sys.exit(1)
 
     target_db_type = db_type if db_type else manifest.get('db_type', 'general')
+    package_is_audiobook = (
+        manifest.get('media_kind') == 'audiobook'
+        or manifest.get('db_type') == 'audiobook'
+    )
+    if package_is_audiobook != (target_db_type == 'audiobook'):
+        print(
+            f"[!] Error: Package media type and target DB do not match "
+            f"(package={'audiobook' if package_is_audiobook else 'book'}, target={target_db_type})."
+        )
+        sys.exit(1)
+
     lib_info = metadata.get('library', {})
     orig_root_paths = lib_info.get('physical_paths', [])
     orig_root_count = manifest.get('root_paths_count', len(orig_root_paths))
@@ -218,12 +274,18 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
 
         db_physical_path = "\n".join(target_paths)
         cursor.execute("""
-            INSERT INTO libraries (name, physical_path, cron_schedule, icon, color, hide_cover)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO libraries (
+                name, physical_path, cron_schedule, scan_status, is_remote,
+                vfs_refresh_before_scan, rclone_rc_url, icon, color, hide_cover
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             target_lib_name,
             db_physical_path,
             lib_info.get('cron_schedule'),
+            'ready',
+            lib_info.get('is_remote', 0),
+            lib_info.get('vfs_refresh_before_scan', 0),
+            lib_info.get('rclone_rc_url'),
             lib_info.get('icon', 'fa-book'),
             lib_info.get('color', '#94a3b8'),
             lib_info.get('hide_cover', 0)
@@ -277,6 +339,9 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
     audiobooks_list = metadata.get('audiobooks', [])
     audiobook_tracks_list = metadata.get('audiobook_tracks', [])
     audiobook_progress_list = metadata.get('audiobook_progress', [])
+    audiobook_track_progress_list = metadata.get('audiobook_track_progress', [])
+    user_progress_list = metadata.get('user_progress', [])
+    user_favorites_list = metadata.get('user_favorites', [])
 
     imported_books_count = 0
     skipped_duplicate_books_count = 0
@@ -284,6 +349,9 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
     imported_audiobooks_count = 0
     imported_audiobook_tracks_count = 0
     imported_audiobook_progress_count = 0
+    imported_audiobook_track_progress_count = 0
+    imported_user_progress_count = 0
+    imported_user_favorites_count = 0
     skipped_duplicate_audiobooks_count = 0
     skipped_duplicate_tracks_count = 0
 
@@ -322,15 +390,16 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
             try:
                 cursor.execute("""
                     INSERT INTO audiobooks (
-                        library_id, title, sort_title, author, publisher, code, poster,
+                        library_id, title, sort_title, web_id, author, publisher, code, poster,
                         premiered, ratings, author_intro, description,
                         folder_name, folder_path, total_duration, total_tracks, file_type,
                         is_favorite, created_at, updated_at, is_deleted, deleted_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     target_library_id,
                     ab.get('title', 'Unknown Audiobook'),
                     ab.get('sort_title'),
+                    ab.get('web_id'),
                     ab.get('author'),
                     ab.get('publisher'),
                     ab.get('code'),
@@ -345,8 +414,8 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
                     ab.get('total_tracks', 0),
                     ab.get('file_type', 'multi'),
                     ab.get('is_favorite', 0),
-                    ab.get('created_at', now_str),
-                    ab.get('updated_at', now_str),
+                    ab.get('created_at') or now_str,
+                    ab.get('updated_at') or now_str,
                     ab.get('is_deleted', 0),
                     ab.get('deleted_at')
                 ))
@@ -386,18 +455,21 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
             try:
                 cursor.execute("""
                     INSERT INTO audiobook_tracks (
-                        audiobook_id, track_number, track_code, filename, file_path, file_mtime, file_size, duration, format
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        audiobook_id, track_number, track_code, title, filename, file_path,
+                        file_mtime, file_size, duration, format, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     new_ab_id,
                     tr.get('track_number', 0),
                     tr.get('track_code'),
+                    tr.get('title'),
                     tr.get('filename', ''),
                     new_track_path,
                     tr.get('file_mtime', 0.0),
                     tr.get('file_size', 0),
                     tr.get('duration', 0.0),
-                    tr.get('format', 'mp3')
+                    tr.get('format', 'mp3'),
+                    tr.get('created_at') or datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 ))
                 new_track_id = int(cursor.lastrowid)
                 track_number = int(tr.get('track_number') or 0)
@@ -416,31 +488,55 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
             mapped_track_id = track_lookup.get((new_ab_id, track_num)) if track_num > 0 else None
 
             try:
-                cursor.execute("""
-                    INSERT OR REPLACE INTO audiobook_progress (
-                        audiobook_id, user_id, current_track_id, current_time,
-                        total_progress_pct, playback_rate, is_completed, last_listened_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    new_ab_id,
-                    pr.get('user_id', 1),
-                    mapped_track_id,
-                    pr.get('current_time', 0.0),
-                    pr.get('total_progress_pct', 0.0),
-                    pr.get('playback_rate', 1.0),
-                    pr.get('is_completed', 0),
-                    pr.get('last_listened_at') or datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                ))
+                upsert_record(cursor, 'audiobook_progress', ('audiobook_id', 'user_id'), {
+                    'audiobook_id': new_ab_id,
+                    'user_id': pr.get('user_id', 1),
+                    'current_track_id': mapped_track_id,
+                    'current_time': pr.get('current_time', 0.0),
+                    'total_progress_pct': pr.get('total_progress_pct', 0.0),
+                    'playback_rate': pr.get('playback_rate', 1.0),
+                    'is_completed': pr.get('is_completed', 0),
+                    'last_listened_at': pr.get('last_listened_at') or datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                })
                 imported_audiobook_progress_count += 1
             except Exception as pr_err:
                 print(f"[!] Error inserting audiobook progress row: {pr_err}")
+
+        for progress in audiobook_track_progress_list:
+            ab_idx = int(progress.get('audiobook_export_index', -1))
+            if ab_idx not in audiobook_index_to_new_id:
+                continue
+            new_ab_id = audiobook_index_to_new_id[ab_idx]
+            track_number = int(progress.get('track_number') or 0)
+            mapped_track_id = track_lookup.get((new_ab_id, track_number))
+            if not mapped_track_id:
+                continue
+            try:
+                upsert_record(
+                    cursor,
+                    'audiobook_track_progress',
+                    ('audiobook_id', 'track_id', 'user_id'),
+                    {
+                        'audiobook_id': new_ab_id,
+                        'track_id': mapped_track_id,
+                        'user_id': progress.get('user_id', 1),
+                        'current_time': progress.get('current_time', 0.0),
+                        'progress_pct': progress.get('progress_pct', 0.0),
+                        'is_completed': progress.get('is_completed', 0),
+                        'updated_at': progress.get('updated_at') or datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    },
+                )
+                imported_audiobook_track_progress_count += 1
+            except Exception as progress_error:
+                print(f"[!] Error inserting audiobook track progress row: {progress_error}")
     else:
+        book_index_to_new_id = {}
         for idx, b in enumerate(books_list):
             rel_path = b.get('relative_path', '')
             if not rel_path:
                 continue
 
-            root_idx = b.get('root_index', 0)
+            root_idx = int(b.get('root_index', 0) or 0)
             if root_idx < len(target_paths):
                 selected_target_root = target_paths[root_idx]
             else:
@@ -460,6 +556,7 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
             dup_book = cursor.fetchone()
             if dup_book:
                 skipped_duplicate_books_count += 1
+                book_index_to_new_id[idx] = int(dup_book['id'])
                 print(f"[!] Skipping duplicate file path: '{new_file_path}' (Existing Book ID: {dup_book['id']})")
                 continue
 
@@ -469,8 +566,9 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
                         library_id, title, series_name, author, isbn, file_path, file_format,
                         total_pages, has_offsets, cover_image, publisher, link, score,
                         release_date, summary, genre, tags, is_favorite, cover_updated_at,
-                        created_at, metadata_locked, file_mtime, file_size
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        created_at, is_deleted, deleted_at, metadata_locked, series_alias,
+                        title_alias, file_mtime, file_size
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     target_library_id,
                     b.get('title', 'Unknown Title'),
@@ -491,12 +589,17 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
                     b.get('tags'),
                     b.get('is_favorite', 0),
                     b.get('cover_updated_at', now_str),
-                    now_str,
+                    b.get('created_at') or now_str,
+                    b.get('is_deleted', 0),
+                    b.get('deleted_at'),
                     b.get('metadata_locked', 0),
+                    b.get('series_alias'),
+                    b.get('title_alias'),
                     b.get('file_mtime', 0.0),
                     b.get('file_size', 0)
                 ))
                 new_book_id = cursor.lastrowid
+                book_index_to_new_id[idx] = int(new_book_id)
                 imported_books_count += 1
 
                 idx_key = str(idx)
@@ -518,13 +621,42 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
                         ))
                         imported_offsets_count += 1
 
-            except sqlite3.IntegrityError:
-                skipped_duplicate_books_count += 1
-                print(f"[!] Warning: Skipping duplicate book file: {new_file_path}")
-                continue
             except Exception as b_err:
                 print(f"[!] Error inserting book '{b.get('title')}': {b_err}")
                 continue
+
+        for progress in user_progress_list:
+            book_idx = int(progress.get('book_export_index', -1))
+            if book_idx not in book_index_to_new_id:
+                continue
+            try:
+                values = {
+                    column: value
+                    for column, value in progress.items()
+                    if column not in ('id', 'book_export_index', 'book_id')
+                }
+                values['book_id'] = book_index_to_new_id[book_idx]
+                values.setdefault('user_id', 1)
+                upsert_record(cursor, 'user_progress', ('book_id', 'user_id'), values)
+                imported_user_progress_count += 1
+            except Exception as progress_error:
+                print(f"[!] Error inserting book progress row: {progress_error}")
+
+        for favorite in user_favorites_list:
+            book_idx = int(favorite.get('book_export_index', -1))
+            if book_idx not in book_index_to_new_id:
+                continue
+            try:
+                upsert_record(cursor, 'user_favorites', ('user_id', 'book_id'), {
+                    'user_id': favorite.get('user_id', 1),
+                    'book_id': book_index_to_new_id[book_idx],
+                    'created_at': favorite.get('created_at') or datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                })
+                imported_user_favorites_count += 1
+            except Exception as favorite_error:
+                print(f"[!] Error inserting favorite row: {favorite_error}")
+
+        invalidate_series_summary(cursor, target_library_id)
 
     conn.commit()
     conn.close()
@@ -540,9 +672,12 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
         print(f"   - Imported Audiobooks: {imported_audiobooks_count} / {len(audiobooks_list)} (Skipped Duplicates: {skipped_duplicate_audiobooks_count})")
         print(f"   - Imported Audiobook Tracks: {imported_audiobook_tracks_count} / {len(audiobook_tracks_list)} (Skipped Duplicates: {skipped_duplicate_tracks_count})")
         print(f"   - Imported Audiobook Progress: {imported_audiobook_progress_count} / {len(audiobook_progress_list)}")
+        print(f"   - Imported Track Progress: {imported_audiobook_track_progress_count} / {len(audiobook_track_progress_list)}")
     else:
         print(f"   - Imported Books: {imported_books_count} / {len(books_list)} (Skipped Duplicates: {skipped_duplicate_books_count})")
         print(f"   - Imported Book Offsets: {imported_offsets_count} items")
+        print(f"   - Imported Book Progress: {imported_user_progress_count} / {len(user_progress_list)}")
+        print(f"   - Imported Favorites: {imported_user_favorites_count} / {len(user_favorites_list)}")
     print(f"   - Restored Covers: {extracted_covers} files")
     print("==========================================================")
 

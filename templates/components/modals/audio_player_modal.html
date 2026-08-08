@@ -21,6 +21,10 @@
 
             <!-- 우측 보조 버튼 -->
             <div style="display: flex; align-items: center; gap: 1.2rem;">
+                <button data-role="audio-player-action" data-action="dismiss-mini" title="중지 후 닫기" style="background: none; border: none; color: #fca5a5; font-size: 1.05rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem;">
+                    <i class="fa-solid fa-stop"></i>
+                    <span style="font-size: 0.78rem; font-weight: 700; color: #fecaca;">중지</span>
+                </button>
                 <button data-role="audio-player-action" data-action="bookmark" title="북마크" style="background: none; border: none; color: #94a3b8; font-size: 1.1rem; cursor: pointer;">
                     <i class="fa-regular fa-bookmark"></i>
                 </button>
@@ -140,3 +144,49 @@
         </div>
     </div>
 </div>
+
+<!-- 시트 모달형 미니 플레이어 배경 오버레이 -->
+<div id="audio-mini-sheet-backdrop" style="display: none; position: fixed; inset: 0; z-index: 1103; background: rgba(2, 6, 23, 0.58); backdrop-filter: blur(1.5px);"></div>
+
+<!-- mac 스타일 상단 좌측 미니 플레이어 바 -->
+<div id="audio-player-mini-bar" data-role="audio-player-action" data-action="open-full" style="display: none; position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); left: 12px; z-index: 1105; width: min(440px, calc(100vw - 24px)); backdrop-filter: blur(14px); background: rgba(12, 18, 30, 0.86); border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; box-shadow: 0 12px 28px rgba(0,0,0,0.35); overflow: hidden; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', sans-serif; transition: transform 0.22s ease; will-change: transform;">
+    <div id="audio-mini-main-row" style="display: flex; align-items: center; gap: 0.7rem; padding: 0.58rem 0.68rem;">
+        <button data-role="audio-player-action" data-action="mini-drag-handle" title="미니바 위치 이동" aria-label="미니바 위치 이동" style="width: 22px; height: 40px; border: none; border-radius: 8px; background: rgba(255,255,255,0.05); color: #94a3b8; cursor: grab; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; touch-action: none;">
+            <i class="fa-solid fa-up-down-left-right" style="font-size: 0.72rem;"></i>
+        </button>
+
+        <button data-role="audio-player-action" data-action="toggle-mini-peek" title="미니 플레이어 숨기기/펼치기" aria-label="미니 플레이어 숨기기/펼치기" style="width: 24px; height: 40px; border: none; border-radius: 8px; background: rgba(255,255,255,0.05); color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <i id="audio-mini-peek-icon" class="fa-solid fa-eye-slash" style="font-size: 0.82rem;"></i>
+        </button>
+
+        <button id="audio-mini-cover-button" data-role="audio-player-action" data-action="open-full" title="플레이어 펼치기" style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border: none; border-radius: 10px; padding: 0; background: rgba(255,255,255,0.07); cursor: pointer; overflow: hidden; flex-shrink: 0;">
+            <img id="audio-mini-cover" src="" alt="Audio cover" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+            <i id="audio-mini-cover-placeholder" class="fa-solid fa-headphones" style="color: #7dd3fc; font-size: 1rem;"></i>
+        </button>
+
+        <div id="audio-mini-text-block" data-role="audio-player-action" data-action="open-full" style="min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 0.12rem; cursor: pointer;">
+            <div id="audio-mini-title" style="font-size: 0.84rem; font-weight: 700; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">오디오북</div>
+            <div id="audio-mini-subtitle" style="font-size: 0.72rem; color: #a9b4c7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">트랙</div>
+        </div>
+
+        <div id="audio-mini-controls" style="display: flex; align-items: center; gap: 0.2rem; flex-shrink: 0;">
+            <button data-role="audio-player-action" data-action="prev-track" title="이전 트랙" style="width: 28px; height: 28px; border: none; border-radius: 7px; background: transparent; color: #cbd5e1; cursor: pointer;"><i class="fa-solid fa-backward-step"></i></button>
+            <button id="btn-audio-mini-play-toggle" data-role="audio-player-action" data-action="toggle-play" title="재생/일시정지" style="width: 32px; height: 32px; border: none; border-radius: 999px; background: #ffffff; color: #0f172a; cursor: pointer; display: flex; align-items: center; justify-content: center;"><i class="fa-solid fa-pause"></i></button>
+            <button data-role="audio-player-action" data-action="next-track" title="다음 트랙" style="width: 28px; height: 28px; border: none; border-radius: 7px; background: transparent; color: #cbd5e1; cursor: pointer;"><i class="fa-solid fa-forward-step"></i></button>
+            <button data-role="audio-player-action" data-action="dismiss-mini" title="재생 종료" style="width: 28px; height: 28px; border: none; border-radius: 7px; background: transparent; color: #94a3b8; cursor: pointer;"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+    </div>
+
+    <div style="height: 2px; background: rgba(255,255,255,0.08);">
+        <div id="audio-mini-progress" style="height: 100%; width: 0%; background: linear-gradient(90deg, #38bdf8 0%, #22d3ee 100%); transition: width 0.16s linear;"></div>
+    </div>
+    <div id="audio-mini-track-footer" style="display: none; padding: 0.4rem 0.8rem 0.65rem 0.8rem; font-size: 0.72rem; color: #a9b4c7; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-top: 1px solid rgba(255,255,255,0.06);">
+        트랙 정보
+    </div>
+    <div id="audio-mini-track-list" style="display: none; padding: 0.42rem 0.62rem 0.72rem 0.62rem; overflow-y: auto; flex: 1 1 auto; min-height: 0; border-top: 1px solid rgba(255,255,255,0.06);"></div>
+</div>
+
+<!-- 우측 알림형 숨김 상태에서 노출되는 작은 펼치기 버튼 -->
+<button id="audio-mini-right-expand" data-role="audio-player-action" data-action="toggle-mini-peek" title="패널 펼치기" aria-label="패널 펼치기" style="display: none; position: fixed; top: 50%; transform: translateY(-50%); right: 8px; z-index: 1110; width: 34px; height: 56px; border: 1px solid rgba(255,255,255,0.16); border-radius: 12px; background: rgba(12, 18, 30, 0.9); color: #e2e8f0; box-shadow: 0 10px 22px rgba(0,0,0,0.35); cursor: pointer; align-items: center; justify-content: center; backdrop-filter: blur(12px);">
+    <i class="fa-solid fa-angle-left" style="font-size: 1rem;"></i>
+</button>

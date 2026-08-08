@@ -3,6 +3,15 @@ import database
 from repositories.category_repository import CategoryRepository
 
 
+def _refresh_series_summaries(*db_types):
+    from repositories.series_repository import SeriesRepository
+    for db_type in dict.fromkeys(db_types):
+        if db_type != 'audiobook':
+            SeriesRepository.rebuild_summary(db_type)
+    from services.series_service import SeriesService
+    SeriesService.invalidate_all_books_cache()
+
+
 def apply_running_scan_status(libraries, db_type, queue_status):
     """큐에서 실행 중인 스캔을 라이브러리 상태 목록에 우선 반영한다."""
     running = (queue_status or {}).get('running')
@@ -152,6 +161,8 @@ class CategoryService:
                 except Exception:
                     pass
 
+            _refresh_series_summaries(db_type)
+
         import threading
         t = threading.Thread(target=database.optimize_database, args=(db_type,))
         t.daemon = True
@@ -217,6 +228,7 @@ class CategoryService:
         
         # 4. 트랜잭션 수행
         CategoryRepository.move_library_transaction(from_type, to_type, library_id, lib["name"], lib, books)
+        _refresh_series_summaries(from_type, to_type)
         
         # 5. 이관 후 구 DB의 디스크 공간 회수를 위해 백그라운드로 튜닝 구동
         import threading

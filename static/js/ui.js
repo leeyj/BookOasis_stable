@@ -215,6 +215,10 @@ export function createBookCard(item, options = {}) {
     `;
   }
 
+  const audiobookCompletedDotHtml = isAudiobook && Number(item.is_completed) === 1
+    ? `<span class="book-card-audiobook-completed" title="${i18n.t('detail.audiobook_completed')}" aria-label="${i18n.t('detail.audiobook_completed')}"></span>`
+    : '';
+
   card.innerHTML = `
     <div class="book-card-cover">
       <div class="book-card-overlay"></div>
@@ -222,6 +226,7 @@ export function createBookCard(item, options = {}) {
       ${badgeHtml}
       ${favBtnHtml}
       ${lockedBadgeHtml}
+      ${audiobookCompletedDotHtml}
 
       <button class="btn-resume-series" title="${options.actionTitle || '읽기'}">
         <i class="fa-solid fa-book-open"></i>

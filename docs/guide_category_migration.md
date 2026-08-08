@@ -10,6 +10,8 @@ tags: [cli, export, import, merge, migration, backup, multi-path, batch, zip_sto
 이 도구는 외부 메타데이터 검색(알라딘/네이버 등) 및 뷰어 스트리밍 offset 재계산 없이, 카테고리의 모든 DB 메타데이터와 커버 이미지를 타 시스템/백업본으로 초고속 이관하거나 **기존 운영 중인 카테고리에 1초 만에 통합/병합(Merge)**할 수 있는 독립 CLI 전용 유틸리티입니다.  
 **네이티브 환경은 물론 도커(Docker / Docker-Compose) 환경도 완벽 대응합니다.**
 
+현재 `.env`의 `DB_ENGINE` 설정에 따라 SQLite와 MariaDB를 자동으로 사용합니다. Export v2 패키지는 도서 진행도/즐겨찾기, 오디오북 전체 및 트랙별 진행도, 최신 라이브러리 원격 설정을 함께 보존하며 기존 v1 패키지도 가져올 수 있습니다.
+
 ---
 
 ## 🔍 0. 패키지 검사 및 병합 가능 카테고리 미리보기 (`--info` / `--inspect`)

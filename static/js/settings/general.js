@@ -148,6 +148,12 @@ export function applySettingsToUI(settings) {
   if (settings.HDD_AGGRESSIVE_WARMUP !== undefined) {
     state.hddAggressiveWarmup = (settings.HDD_AGGRESSIVE_WARMUP === '1');
   }
+  if (settings.AUDIO_MINI_PLAYER_MODE !== undefined) {
+    state.audioMiniPlayerMode = (settings.AUDIO_MINI_PLAYER_MODE === 'right_dock') ? 'right_dock' : 'mini';
+  }
+  if (settings.AUDIO_RIGHT_DOCK_DIM_ENABLED !== undefined) {
+    state.audioRightDockDimEnabled = (settings.AUDIO_RIGHT_DOCK_DIM_ENABLED === '1');
+  }
   if (settings.TTS_ENABLED !== undefined) {
     state.ttsEnabled = (settings.TTS_ENABLED === '1');
   }
@@ -159,6 +165,14 @@ export function applySettingsToUI(settings) {
   }
   if (settings.COLLAPSE_DETAIL_GENRE_TAGS !== undefined) {
     state.collapseDetailGenreTags = (settings.COLLAPSE_DETAIL_GENRE_TAGS === '1');
+  }
+
+  if (typeof window !== 'undefined') {
+    window.__audioMiniPlayerMode = state.audioMiniPlayerMode || 'mini';
+    window.__audioRightDockDimEnabled = (state.audioRightDockDimEnabled === true);
+    if (typeof window.applyAudioMiniPlayerMode === 'function') {
+      window.applyAudioMiniPlayerMode(window.__audioMiniPlayerMode);
+    }
   }
 
   applySidebarTopControlsSetting(state.sidebarTopControls === true);
@@ -274,6 +288,16 @@ export async function loadGeneralSettings() {
       const hddAggressiveWarmupEl = document.getElementById('setting-hdd-aggressive-warmup');
       if (hddAggressiveWarmupEl) {
         hddAggressiveWarmupEl.checked = (s.HDD_AGGRESSIVE_WARMUP === '1');
+      }
+
+      const audioMiniPlayerModeEl = document.getElementById('setting-audio-mini-player-mode');
+      if (audioMiniPlayerModeEl) {
+        audioMiniPlayerModeEl.value = (s.AUDIO_MINI_PLAYER_MODE === 'right_dock') ? 'right_dock' : 'mini';
+      }
+
+      const audioRightDockDimEnabledEl = document.getElementById('setting-audio-right-dock-dim-enabled');
+      if (audioRightDockDimEnabledEl) {
+        audioRightDockDimEnabledEl.checked = (s.AUDIO_RIGHT_DOCK_DIM_ENABLED === '1');
       }
 
       const detailVolumeGridViewEl = document.getElementById('setting-detail-volume-grid-view');
@@ -436,6 +460,9 @@ export async function submitGeneralSettings(event) {
   const sidebarTopControls = document.getElementById('setting-sidebar-top-controls')?.checked ? '1' : '0';
   const showSidebarCategoryAll = document.getElementById('setting-show-sidebar-category-all')?.checked ? '1' : '0';
   const hddAggressiveWarmup = document.getElementById('setting-hdd-aggressive-warmup')?.checked ? '1' : '0';
+  const audioMiniPlayerModeRaw = document.getElementById('setting-audio-mini-player-mode')?.value || 'mini';
+  const audioMiniPlayerMode = (audioMiniPlayerModeRaw === 'right_dock') ? 'right_dock' : 'mini';
+  const audioRightDockDimEnabled = document.getElementById('setting-audio-right-dock-dim-enabled')?.checked ? '1' : '0';
   const proxyAuth = document.getElementById('setting-proxy-header-auth')?.value || '0';
   const rcloneRcUrl = document.getElementById('setting-rclone-rc-url')?.value || 'http://localhost:5572';
   const timezone = document.getElementById('setting-timezone')?.value || 'UTC';
@@ -478,6 +505,8 @@ export async function submitGeneralSettings(event) {
       api.updateSystemSetting('SIDEBAR_TOP_CONTROLS', sidebarTopControls),
       api.updateSystemSetting('SHOW_SIDEBAR_CATEGORY_ALL', showSidebarCategoryAll),
       api.updateSystemSetting('HDD_AGGRESSIVE_WARMUP', hddAggressiveWarmup),
+      api.updateSystemSetting('AUDIO_MINI_PLAYER_MODE', audioMiniPlayerMode),
+      api.updateSystemSetting('AUDIO_RIGHT_DOCK_DIM_ENABLED', audioRightDockDimEnabled),
       api.updateSystemSetting('PROXY_HEADER_AUTH', proxyAuth),
       api.updateSystemSetting('RCLONE_RC_URL', rcloneRcUrl),
       api.updateSystemSetting('TTS_ENABLED', ttsEnabled),
@@ -509,6 +538,8 @@ export async function submitGeneralSettings(event) {
         SIDEBAR_TOP_CONTROLS: sidebarTopControls,
         SHOW_SIDEBAR_CATEGORY_ALL: showSidebarCategoryAll,
         HDD_AGGRESSIVE_WARMUP: hddAggressiveWarmup,
+        AUDIO_MINI_PLAYER_MODE: audioMiniPlayerMode,
+        AUDIO_RIGHT_DOCK_DIM_ENABLED: audioRightDockDimEnabled,
         TTS_ENABLED: ttsEnabled,
         TTS_WAKE_LOCK: ttsWakeLock,
         DETAIL_VOLUME_GRID_VIEW: detailVolumeGridView,

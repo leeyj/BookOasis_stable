@@ -174,7 +174,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
   if (isAudiobookLib && meta) {
     const curTime = Number(meta.current_time || 0);
     const totalPct = Number(meta.total_progress_pct || 0);
-    if (curTime > 0 || totalPct > 0 || meta.current_track_id) {
+    if (curTime > 0 || totalPct > 0 || meta.current_track_id || Number(meta.is_completed) === 1) {
       hasAudioProgress = true;
       continueReason = 'in-progress';
       if (meta.current_track_id && books && books.length > 0) {
@@ -284,9 +284,18 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
   const summaryToggleLabelMore = i18n.t('detail.summary_more') || '더보기';
   const summaryToggleLabelLess = i18n.t('detail.summary_less') || '접기';
   const isAudiobookContext = state.currentLibraryType === 'audiobook';
-    const markSeriesCompletedBtnHtml = `
-      <button class="ridi-link-btn" data-role="detail-mark-series-complete" data-series-name="${safeSeriesName.replace(/"/g, '&quot;')}" data-library-id="${actualLibraryId}" style="margin: 0; background: #16a34a; border-color: #22c55e; display: inline-flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-circle-check"></i> ${i18n.t('detail.btn_mark_series_completed')}</button>
-    `;
+  const isAudiobookCompleted = isAudiobookContext && Number(meta.is_completed) === 1;
+  const audiobookCompletedBadgeHtml = isAudiobookContext ? `
+    <span class="audiobook-completed-badge${isAudiobookCompleted ? ' is-visible' : ''}" data-audiobook-completed="${meta.id || ''}">
+      <i class="fa-solid fa-headphones"></i> ${i18n.t('detail.audiobook_completed')}
+    </span>
+  ` : '';
+  const markSeriesCompletedLabel = isAudiobookContext
+    ? i18n.t('detail.btn_mark_audiobook_completed')
+    : i18n.t('detail.btn_mark_series_completed');
+  const markSeriesCompletedBtnHtml = `
+    <button class="ridi-link-btn" data-role="detail-mark-series-complete" data-series-name="${safeSeriesName.replace(/"/g, '&quot;')}" data-library-id="${actualLibraryId}" style="margin: 0; background: #16a34a; border-color: #22c55e; display: inline-flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-circle-check"></i> ${markSeriesCompletedLabel}</button>
+  `;
   const identifierLabel = 'ISBN(WEB_ID)';
   const identifierValue = isAudiobookContext ? (meta.web_id || '-') : (meta.isbn || '-');
   const identifierEditValue = isAudiobookContext ? (meta.web_id || '') : (meta.isbn || '');
@@ -320,6 +329,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
         <h3 class="book-detail-title" style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
           ${meta.series_alias || visibleTitle}
           ${meta.series_alias ? `<span style="font-size: 0.85rem; color: #94a3b8; font-weight: normal;">(${visibleTitle})</span>` : ''}
+          ${audiobookCompletedBadgeHtml}
           <button class="btn-fav-toggle" data-role="detail-series-favorite" data-series-name="${safeSeriesName.replace(/"/g, '&quot;')}" data-library-id="${actualLibraryId}" data-next-status="${isSeriesFav ? 1 : 0}" style="background:none; border:none; color:${seriesFavIconColor}; cursor:pointer; font-size:1.4rem; display:inline-flex; align-items:center;" title="${i18n.t('detail.toggle_fav_series')}">
             <i class="${seriesFavIconClass}"></i>
           </button>

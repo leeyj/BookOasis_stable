@@ -11,6 +11,9 @@ This standalone CLI utility allows you to ultra-fast migrate all database metada
 
 **Fully supports both Native environments and Docker (Docker / Docker-Compose) environments, along with multi-path (Multi-path) directory mappings and batch exports.**
 
+The tools automatically use SQLite or MariaDB according to `DB_ENGINE` in `.env`. Export v2 packages preserve book progress/favorites, audiobook and per-track progress, and current remote-library settings; existing v1 packages remain importable.
+
+
 ---
 
 ## 🔍 0. Pre-Import Package Inspection (`--info` / `--inspect`)

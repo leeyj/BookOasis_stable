@@ -7,10 +7,76 @@ import hashlib
 import re
 from datetime import datetime
 
+MEDIA_SERVER_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if MEDIA_SERVER_DIR not in sys.path:
+    sys.path.insert(0, MEDIA_SERVER_DIR)
+
+from dotenv import load_dotenv
+
+load_dotenv(os.path.join(MEDIA_SERVER_DIR, ".env"))
+
+import database
+
 def get_db_connection(db_path):
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def get_target_connection(db_type):
+    """현재 .env의 DB_ENGINE 설정에 맞는 BookOasis DB 연결을 반환합니다."""
+    return database.get_connection(db_type)
+
+
+def get_target_engine_name():
+    engine = os.environ.get("DB_ENGINE", os.environ.get("DBMS", "sqlite")).strip().lower()
+    return "mariadb" if engine in ("mariadb", "mysql") else "sqlite"
+
+
+def ensure_target_schema():
+    """현재 엔진에 맞춰 최신 BookOasis 스키마를 보장합니다."""
+    if get_target_engine_name() == "mariadb":
+        from tools.db_schema_updater import run_schema_update
+
+        run_schema_update()
+        return
+    database.init_databases()
+
+
+def row_value(row, key, default=None):
+    if row is None:
+        return default
+    try:
+        value = row[key]
+    except (KeyError, IndexError, TypeError):
+        return default
+    return default if value is None else value
+
+
+def upsert_user_progress(cursor, book_id, pages_read, is_completed, last_read_at):
+    cursor.execute(
+        "SELECT id FROM user_progress WHERE book_id = ? AND user_id = 1",
+        (book_id,),
+    )
+    existing = cursor.fetchone()
+    if existing:
+        cursor.execute(
+            """
+            UPDATE user_progress
+            SET pages_read = ?, is_completed = ?, last_read_at = ?
+            WHERE id = ?
+            """,
+            (pages_read, is_completed, last_read_at, row_value(existing, "id")),
+        )
+        return
+    cursor.execute(
+        """
+        INSERT INTO user_progress
+        (book_id, user_id, pages_read, is_completed, last_read_at)
+        VALUES (?, 1, ?, ?, ?)
+        """,
+        (book_id, pages_read, is_completed, last_read_at),
+    )
 
 def table_exists(conn, table_name):
     row = conn.execute(
@@ -199,13 +265,13 @@ def run_kavita_to_bookoasis():
     if oasis_root_input == '1':
         oasis_root = input("수정할 BookOasis 루트 경로를 입력하세요:\n> ").strip().replace('\\', '/')
 
-    db_dir = os.path.join(oasis_root, 'db')
-    db_general_path = os.path.join(db_dir, 'media_general.db')
     covers_dir = os.path.join(oasis_root, 'covers')
 
-    if not os.path.exists(db_general_path):
-        print(f"❌ 에러: BookOasis 데이터베이스 파일이 존재하지 않습니다: {db_general_path}")
-        print("서버를 먼저 가동하여 DB 스키마가 초기화된 후에 마이그레이터를 실행해 주세요.")
+    try:
+        ensure_target_schema()
+    except Exception as init_error:
+        print(f"❌ 에러: BookOasis 데이터베이스 초기화/연결에 실패했습니다: {init_error}")
+        print(".env의 DB_ENGINE 및 MariaDB 접속 설정을 확인해 주세요.")
         return
 
     print("\n==================================================")
@@ -213,7 +279,7 @@ def run_kavita_to_bookoasis():
     print("==================================================")
     
     kavita_conn = get_db_connection(kavita_db_path)
-    general_conn = get_db_connection(db_general_path)
+    general_conn = get_target_connection('general')
     
     kavita_cursor = kavita_conn.cursor()
     general_cursor = general_conn.cursor()
@@ -257,7 +323,11 @@ def run_kavita_to_bookoasis():
     JOIN Volume v ON c.VolumeId = v.Id
     JOIN Series s ON v.SeriesId = s.Id
     JOIN Library l ON s.LibraryId = l.Id
-    LEFT JOIN AppUserProgresses p ON c.Id = p.ChapterId
+    LEFT JOIN (
+        SELECT ChapterId, MAX(PagesRead) AS PagesRead, MAX(LastModified) AS LastModified
+        FROM AppUserProgresses
+        GROUP BY ChapterId
+    ) p ON c.Id = p.ChapterId
     """
     
     try:
@@ -285,12 +355,17 @@ def run_kavita_to_bookoasis():
             general_cursor.execute("SELECT id FROM libraries WHERE name = ?", (lib_name,))
             db_lib_row = general_cursor.fetchone()
             if db_lib_row:
-                lib_id = db_lib_row[0]
+                lib_id = row_value(db_lib_row, "id")
                 general_cursor.execute("UPDATE libraries SET physical_path = ? WHERE id = ?", (common_path, lib_id))
             else:
                 general_cursor.execute(
-                    "INSERT INTO libraries (name, physical_path) VALUES (?, ?)",
-                    (lib_name, common_path)
+                    """
+                    INSERT INTO libraries (
+                        name, physical_path, scan_status, is_remote,
+                        vfs_refresh_before_scan, icon, color, hide_cover
+                    ) VALUES (?, ?, 'ready', 0, 0, 'fa-book', '#94a3b8', 0)
+                    """,
+                    (lib_name, common_path),
                 )
                 lib_id = general_cursor.lastrowid
             library_cache[lib_name] = lib_id
@@ -349,8 +424,8 @@ def run_kavita_to_bookoasis():
             general_cursor.execute("SELECT id, cover_image FROM books WHERE file_path = ?", (file_path,))
             existing_book = general_cursor.fetchone()
             if existing_book:
-                book_id = existing_book["id"]
-                cover_to_save = saved_cover_name or existing_book["cover_image"]
+                book_id = row_value(existing_book, "id")
+                cover_to_save = saved_cover_name or row_value(existing_book, "cover_image")
                 general_cursor.execute(
                     """
                     UPDATE books
@@ -379,24 +454,26 @@ def run_kavita_to_bookoasis():
                 is_completed = 1 if pages_read >= total_pages else 0
                 last_modified = row['ProgressLastModified'] or datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-                general_cursor.execute(
-                    """
-                    INSERT OR REPLACE INTO user_progress
-                    (book_id, user_id, pages_read, is_completed, last_read_at)
-                    VALUES (?, 1, ?, ?, ?)
-                    """,
-                    (book_id, pages_read, is_completed, last_modified)
+                upsert_user_progress(
+                    general_cursor,
+                    book_id,
+                    pages_read,
+                    is_completed,
+                    last_modified,
                 )
                     
             migrated_books += 1
             if migrated_books % 500 == 0 or migrated_books == total_rows:
                 print(f"[*] 진행도: {migrated_books} / {total_rows} 권 처리 완료...")
                 general_conn.commit()
+
+        general_conn.commit()
                 
         print("\n==================================================")
         print(" ✨ 이관 결과 리포트")
         print("==================================================")
         print(f"- 이관 성공 도서 권수: {migrated_books} 권")
+        print(f"- 대상 데이터베이스 엔진: {get_target_engine_name()}")
         if migrate_covers:
             print(f"- WebP 변환 성공 표지: {success_covers} 개")
         else:
@@ -404,6 +481,10 @@ def run_kavita_to_bookoasis():
         print("이관 작업이 성공적으로 종료되었습니다.")
         
     except Exception as ex:
+        try:
+            general_conn.rollback()
+        except Exception:
+            pass
         print(f"❌ 이관 중 예외 발생: {ex}")
     finally:
         kavita_conn.close()
@@ -419,17 +500,12 @@ def run_bookoasis_to_bookoasis():
     oasis_root_input = input(f"BookOasis의 루트 경로를 입력하세요 ({default_oasis_root})\n맞으면 엔터, 수정하려면 경로 입력\n> ").strip()
     oasis_root = oasis_root_input if oasis_root_input else default_oasis_root
     
-    db_dir = os.path.join(oasis_root, 'db')
     covers_dir = os.path.join(oasis_root, 'covers')
-    
-    target_dbs = []
-    for db_name in ['media_general.db', 'media_adult.db']:
-        db_path = os.path.join(db_dir, db_name)
-        if os.path.exists(db_path):
-            target_dbs.append(db_path)
-            
-    if not target_dbs:
-        print("❌ 에러: 변경할 BookOasis 데이터베이스 파일이 존재하지 않습니다.")
+
+    try:
+        ensure_target_schema()
+    except Exception as init_error:
+        print(f"❌ 에러: BookOasis 데이터베이스 초기화/연결에 실패했습니다: {init_error}")
         return
 
     # 2. 경로 교체 규칙 획득
@@ -440,15 +516,22 @@ def run_bookoasis_to_bookoasis():
         print("❌ 에러: 교체할 이전/이후 경로는 비워둘 수 없습니다.")
         return
 
+    print(f"\n대상 DB 엔진: {get_target_engine_name()}")
+    print(f"기존 경로: {old_prefix}")
+    print(f"신규 경로: {new_prefix}")
+    if not prompt_yes_no("위 규칙으로 일반/성인/오디오북 경로를 변경하겠습니까?", False):
+        print("경로 변경을 취소했습니다.")
+        return
+
     print("\n==================================================")
     print(" 🚀 [Step 3] 경로 교체 및 커버 해시 리네이밍 실행")
     print("==================================================")
     
-    for db_path in target_dbs:
-        db_name = os.path.basename(db_path)
-        print(f"\n[*] 데이터베이스 처리 중: {db_name}")
-        
-        conn = get_db_connection(db_path)
+    target_db_types = ('general', 'adult', 'audiobook')
+    for db_type in target_db_types:
+        print(f"\n[*] 데이터베이스 처리 중: {db_type} ({get_target_engine_name()})")
+
+        conn = get_target_connection(db_type)
         cursor = conn.cursor()
         
         try:
@@ -460,9 +543,43 @@ def run_bookoasis_to_bookoasis():
                     updated_path = lib['physical_path'].replace(old_prefix, new_prefix)
                     cursor.execute("UPDATE libraries SET physical_path = ? WHERE id = ?", (updated_path, lib['id']))
                     print(f"  └ 라이브러리 [{lib['name']}] 경로 변경: {lib['physical_path']} -> {updated_path}")
-            conn.commit()
             
-            # 2. 도서 목록 조회 및 리네임 작업
+            if db_type == 'audiobook':
+                cursor.execute("SELECT id, folder_path FROM audiobooks")
+                audiobooks = cursor.fetchall()
+                updated_audiobooks_count = 0
+                for audiobook in audiobooks:
+                    folder_path = row_value(audiobook, 'folder_path', '')
+                    if not folder_path or old_prefix not in folder_path:
+                        continue
+                    new_folder_path = folder_path.replace(old_prefix, new_prefix)
+                    cursor.execute(
+                        "UPDATE audiobooks SET folder_path = ? WHERE id = ?",
+                        (new_folder_path, row_value(audiobook, 'id')),
+                    )
+                    updated_audiobooks_count += 1
+
+                cursor.execute("SELECT id, file_path FROM audiobook_tracks")
+                tracks = cursor.fetchall()
+                updated_tracks_count = 0
+                for track in tracks:
+                    file_path = row_value(track, 'file_path', '')
+                    if not file_path or old_prefix not in file_path:
+                        continue
+                    cursor.execute(
+                        "UPDATE audiobook_tracks SET file_path = ? WHERE id = ?",
+                        (file_path.replace(old_prefix, new_prefix), row_value(track, 'id')),
+                    )
+                    updated_tracks_count += 1
+
+                conn.commit()
+                print(
+                    f"  [+] 완료: 오디오북 {updated_audiobooks_count}개 폴더 경로 및 "
+                    f"트랙 {updated_tracks_count}개 파일 경로 수정."
+                )
+                continue
+
+            # 2. 일반/성인 도서 목록 조회 및 커버 리네임 작업
             cursor.execute("SELECT id, file_path, cover_image, library_id FROM books")
             books = cursor.fetchall()
             
@@ -470,7 +587,7 @@ def run_bookoasis_to_bookoasis():
             renamed_covers_count = 0
             
             for b in books:
-                file_path = b['file_path']
+                file_path = row_value(b, 'file_path', '')
                 if not file_path or old_prefix not in file_path:
                     continue
                     
@@ -478,7 +595,7 @@ def run_bookoasis_to_bookoasis():
                 new_file_path = file_path.replace(old_prefix, new_prefix)
                 
                 # 커버 이미지 해시 리네임 연계 처리
-                cover_image = b['cover_image']
+                cover_image = row_value(b, 'cover_image')
                 new_cover_image = cover_image
                 
                 if cover_image and not cover_image.startswith('series_'):
@@ -490,7 +607,7 @@ def run_bookoasis_to_bookoasis():
                     old_cover_filename = f"book_{old_hash}.webp"
                     new_cover_filename = f"book_{new_hash}.webp"
                     
-                    lib_id = b['library_id']
+                    lib_id = row_value(b, 'library_id')
                     if lib_id:
                         old_phys_path = os.path.join(covers_dir, str(lib_id), old_cover_filename)
                         new_phys_path = os.path.join(covers_dir, str(lib_id), new_cover_filename)
@@ -513,7 +630,7 @@ def run_bookoasis_to_bookoasis():
                 # DB 데이터 업데이트 쿼리 반영
                 cursor.execute(
                     "UPDATE books SET file_path = ?, cover_image = ? WHERE id = ?",
-                    (new_file_path, new_cover_image, b['id'])
+                    (new_file_path, new_cover_image, row_value(b, 'id'))
                 )
                 updated_books_count += 1
                 
@@ -521,7 +638,11 @@ def run_bookoasis_to_bookoasis():
             print(f"  [+] 완료: {updated_books_count}권의 도서 경로 수정 및 {renamed_covers_count}개의 표지 해시 파일 리네이밍 성공.")
             
         except Exception as e:
-            print(f"❌ {db_name} 처리 중 에러 발생: {e}")
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            print(f"❌ {db_type} 처리 중 에러 발생: {e}")
         finally:
             conn.close()
             
@@ -531,11 +652,12 @@ def run_bookoasis_to_bookoasis():
 
 def main():
     print("==================================================")
-    print(" 📊 BookOasis 데이터 이관 및 관리 시스템 (v1.0)")
+    print(" 📊 BookOasis 데이터 이관 및 관리 시스템 (v2.0)")
     print("==================================================")
     print(" [Step 1] 마이그레이션 모드를 선택하세요:")
-    print("  1. Kavita ➡️ BookOasis 이관")
-    print("  2. BookOasis ➡️ BookOasis (서버 기기 이동/경로 교체)")
+    print(f"  현재 대상 DB 엔진: {get_target_engine_name()}")
+    print("  1. Kavita ➡️ BookOasis 이관 (SQLite/MariaDB)")
+    print("  2. BookOasis ➡️ BookOasis (일반/성인/오디오북 경로 교체)")
     
     choice = input("\n>> 원하는 메뉴 번호를 입력 후 엔터 (기본값: 1)\n> ").strip()
     if not choice:

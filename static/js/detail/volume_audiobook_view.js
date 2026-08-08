@@ -41,12 +41,17 @@ export function renderAudiobookVolumes(orderedBooks, detailMeta = null) {
     totalBytes += fileSize;
     const codec = String(book.file_format || '-').toLowerCase();
     const kbps = durationSec > 0 ? Math.round((fileSize * 8 / 1000) / durationSec) : 0;
+    const isTrackCompleted = Number(book.is_track_completed) === 1 || Number(book.track_progress_pct || 0) >= 95;
+    const trackCompletedDotHtml = `<span class="ab-track-completed-dot${isTrackCompleted ? ' is-visible' : ''}"
+      data-audiobook-track-completed="${book.id}"
+      title="${i18n.t('detail.audiobook_completed')}"
+      aria-label="${i18n.t('detail.audiobook_completed')}"></span>`;
 
     chapterRowsHtml += `
       <tr data-role="detail-audio-open" data-audiobook-id="${audiobookId}" data-track-id="${book.id}">
         <td class="ab-col-play"><button class="ab-play-mini" data-role="detail-audio-play" data-audiobook-id="${audiobookId}" data-track-id="${book.id}"><i class="fa-solid fa-play"></i></button></td>
         <td class="ab-col-id">${idx}</td>
-        <td class="ab-col-title">${cleanTitle}</td>
+        <td class="ab-col-title"><span class="ab-track-title-text">${cleanTitle}</span>${trackCompletedDotHtml}</td>
         <td class="ab-col-time">${startText}</td>
         <td class="ab-col-time">${durationText}</td>
       </tr>
@@ -56,7 +61,7 @@ export function renderAudiobookVolumes(orderedBooks, detailMeta = null) {
       <tr data-role="detail-audio-open" data-audiobook-id="${audiobookId}" data-track-id="${book.id}">
         <td class="ab-col-play"><button class="ab-play-mini" data-role="detail-audio-play" data-audiobook-id="${audiobookId}" data-track-id="${book.id}"><i class="fa-solid fa-play"></i></button></td>
         <td class="ab-col-id">${idx + 1}</td>
-        <td class="ab-col-title">${rawTitle}</td>
+        <td class="ab-col-title"><span class="ab-track-title-text">${rawTitle}</span>${trackCompletedDotHtml}</td>
         <td class="ab-col-codec">${codec}</td>
         <td class="ab-col-time">${kbps > 0 ? `${kbps} KB` : '-'}</td>
         <td class="ab-col-size">${toSizeMB(fileSize)}</td>
@@ -66,6 +71,12 @@ export function renderAudiobookVolumes(orderedBooks, detailMeta = null) {
   });
 
   const totalDurationText = toClock(runningStartSec);
+  const isCompleted = Number(detailMeta?.is_completed) === 1;
+  const completedBadgeHtml = `
+    <span class="audiobook-completed-badge audiobook-completed-badge-compact${isCompleted ? ' is-visible' : ''}" data-audiobook-completed="${audiobookId || ''}">
+      <i class="fa-solid fa-headphones"></i> ${i18n.t('detail.audiobook_completed')}
+    </span>
+  `;
 
   return `
     <div class="volumes-section ab-volumes-shell" style="margin-top: 1.2rem;">
@@ -73,6 +84,7 @@ export function renderAudiobookVolumes(orderedBooks, detailMeta = null) {
         <button class="ab-tab-btn active" data-role="detail-audio-tab" data-target="chapters">챕터 <span>${books.length}</span></button>
         <button class="ab-tab-btn" data-role="detail-audio-tab" data-target="tracks">오디오 트랙 <span>${books.length}</span></button>
         <button class="ab-tab-btn" data-role="detail-audio-tab" data-target="detail">세부사항</button>
+        ${completedBadgeHtml}
       </div>
 
       <div class="ab-tab-pane active" data-pane="chapters">

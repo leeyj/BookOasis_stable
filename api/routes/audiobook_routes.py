@@ -252,6 +252,7 @@ def audiobook_progress_api(aid):
         current_time = float(data.get('current_time', 0.0))
         playback_rate = float(data.get('playback_rate', 1.0))
         is_completed = 1 if data.get('is_completed') else 0
+        track_row = None
 
         # 현재 오디오북에 속하지 않는 track_id가 저장되지 않도록 방어한다.
         if track_id is not None:
@@ -266,16 +267,42 @@ def audiobook_progress_api(aid):
             track_id = track_id_int
 
         # 총 진행율 계산
-        total_pct = 0.0
-        try:
-            ab_row = AudiobookRepository.get_audiobook_by_id(aid)
-            if ab_row and ab_row.get('total_duration') and ab_row['total_duration'] > 0:
-                total_pct = min(100.0, (current_time / ab_row['total_duration']) * 100.0)
-        except Exception:
-            pass
+        total_pct = 100.0 if is_completed else 0.0
+        if not is_completed:
+            try:
+                ab_row = AudiobookRepository.get_audiobook_by_id(aid)
+                if ab_row and ab_row.get('total_duration') and ab_row['total_duration'] > 0:
+                    total_pct = min(100.0, (current_time / ab_row['total_duration']) * 100.0)
+            except Exception:
+                pass
 
         try:
             AudiobookRepository.save_audiobook_progress(aid, user_id, track_id, current_time, total_pct, playback_rate, is_completed)
+            track_progress_pct = 0.0
+            track_is_completed = 0
+            completed_track_count = 0
+            if track_id is not None and track_row:
+                track_duration = float(track_row.get('duration') or 0.0)
+                if track_duration > 0:
+                    track_progress_pct = min(100.0, max(0.0, (current_time / track_duration) * 100.0))
+                    track_is_completed = 1 if track_progress_pct >= 95.0 else 0
+                AudiobookRepository.save_audiobook_track_progress(
+                    aid,
+                    user_id,
+                    track_id,
+                    current_time,
+                    track_progress_pct,
+                    track_is_completed,
+                )
+
+            if is_completed:
+                try:
+                    tracks = AudiobookRepository.get_audiobook_tracks(aid)
+                    completed_track_count = AudiobookRepository.mark_audiobook_tracks_completed(aid, int(user_id), tracks)
+                    track_progress_pct = 100.0
+                    track_is_completed = 1
+                except Exception:
+                    completed_track_count = 0
 
             # 최근 읽은 도서 캐시를 즉시 무효화하여 대시보드 반영 지연(최대 1시간)을 방지
             try:
@@ -283,8 +310,20 @@ def audiobook_progress_api(aid):
                 redis_delete_pattern(f"cache:history*:{'audiobook'}:{user_id}")
             except Exception:
                 pass
+            if is_completed:
+                try:
+                    from services.series_service import SeriesService
+                    SeriesService.invalidate_all_books_cache()
+                except Exception:
+                    pass
 
-            return jsonify({'success': True})
+            return jsonify({
+                'success': True,
+                'track_id': track_id,
+                'track_progress_pct': track_progress_pct,
+                'track_is_completed': track_is_completed,
+                'completed_track_count': completed_track_count,
+            })
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)}), 500
     else:

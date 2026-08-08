@@ -16,8 +16,8 @@ ZIP_CACHE_CAPACITY    = 5                          # 열어둘 ZIP 파일 최대
 import os
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DISK_CACHE_DIR = os.path.join(BASE_DIR, 'cache')
-DISK_CACHE_MAX_BYTES = 5 * 1024 * 1024 * 1024    # 5 GB (최대 캐시 용량)
-DISK_CACHE_MAX_FILES = 10                         # 열어둘 로컬 디스크 파일 최대 수
+DISK_CACHE_MAX_BYTES = int(float(os.environ.get('DISK_CACHE_MAX_GB', '5')) * 1024 * 1024 * 1024)
+DISK_CACHE_MAX_FILES = int(os.environ.get('DISK_CACHE_MAX_FILES', '10'))
 os.makedirs(DISK_CACHE_DIR, exist_ok=True)
 
 
@@ -116,8 +116,12 @@ class DiskCacheManager:
             if os.path.exists(local_path):
                 os.utime(local_path, None)
 
-    def clean_up_if_needed(self):
-        """캐시 용량 혹은 개수 초과 시 오래된(mtime 기준) 파일부터 삭제"""
+    def clean_up_if_needed(self, incoming_size_bytes=0):
+        """캐시 용량/개수 초과 시 오래된 파일부터 삭제.
+
+        incoming_size_bytes가 현재 max_bytes를 넘더라도, 최소 1개 대용량 파일은
+        캐시에 남길 수 있도록 보호한다.
+        """
         with self.lock:
             if not os.path.exists(self.cache_dir):
                 return
@@ -137,7 +141,16 @@ class DiskCacheManager:
             total_size = sum(x[2] for x in files)
             total_count = len(files)
 
-            while (total_size > self.max_bytes or total_count > self.max_files) and files:
+            # 들어올 파일이 매우 큰 경우(예: 10GB 화보 ZIP), 단일 파일 캐싱은 허용한다.
+            # 단, 파일 개수 제한은 계속 적용한다.
+            effective_max_bytes = max(self.max_bytes, int(incoming_size_bytes or 0))
+
+            while (total_size > effective_max_bytes or total_count > self.max_files) and files:
+                # 단일 초대형 파일만 남은 경우에는 더 이상 제거하지 않는다.
+                if total_count <= 1:
+                    only_size = files[0][2] if files else 0
+                    if only_size > self.max_bytes:
+                        break
                 oldest_file, _, fsize = files.pop(0)
                 try:
                     os.remove(oldest_file)

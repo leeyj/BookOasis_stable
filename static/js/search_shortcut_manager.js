@@ -26,7 +26,7 @@ export function applySearchShortcutSetting() {
   const searchInput = document.getElementById('library-search');
   if (searchInput) {
     const displayShortcut = searchShortcutConfig ? searchShortcutConfig.display : 'Alt + `';
-    const fallbackText = `제목,시리즈,작가 검색...... (단축키: ${displayShortcut})`;
+    const fallbackText = `제목·시리즈·별칭 / 작가:작가명 (단축키: ${displayShortcut})`;
     let translatedPlaceholder = (window.i18n && typeof window.i18n.t === 'function')
       ? window.i18n.t('header.search_placeholder', { shortcut: displayShortcut }, fallbackText)
       : fallbackText;

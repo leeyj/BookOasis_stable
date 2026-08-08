@@ -6,6 +6,24 @@ import database
 
 class AudiobookRepository:
     @staticmethod
+    def _ensure_track_progress_table(conn):
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS audiobook_track_progress (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                audiobook_id BIGINT NOT NULL,
+                track_id BIGINT NOT NULL,
+                user_id BIGINT NOT NULL DEFAULT 1,
+                `current_time` DOUBLE DEFAULT 0.0,
+                progress_pct DOUBLE DEFAULT 0.0,
+                is_completed INT DEFAULT 0,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_audiobook_track_user_progress (audiobook_id, track_id, user_id),
+                INDEX idx_audiobook_track_progress_lookup (audiobook_id, user_id, track_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
+        """)
+
+    @staticmethod
     def get_audiobook_by_id(audiobook_id):
         conn = database.get_connection('audiobook')
         cursor = conn.cursor()
@@ -63,6 +81,23 @@ class AudiobookRepository:
         rows = cursor.fetchall()
         conn.close()
         return [dict(row) for row in rows]
+
+    @staticmethod
+    def get_audiobook_track_progress(audiobook_id, user_id):
+        conn = database.get_connection('audiobook')
+        cursor = conn.cursor()
+        try:
+            AudiobookRepository._ensure_track_progress_table(conn)
+            cursor.execute("""
+                SELECT track_id, `current_time`, progress_pct, is_completed
+                FROM audiobook_track_progress
+                WHERE audiobook_id = %s AND user_id = %s
+            """, (audiobook_id, user_id))
+            return {int(row['track_id']): dict(row) for row in cursor.fetchall()}
+        except Exception:
+            return {}
+        finally:
+            conn.close()
 
     @staticmethod
     def update_media_detail(series_name, author, web_id, publisher, summary, cover_image_url=None):
@@ -131,6 +166,50 @@ class AudiobookRepository:
         except Exception as e:
             conn.rollback()
             raise e
+        finally:
+            conn.close()
+
+    @staticmethod
+    def save_audiobook_track_progress(audiobook_id, user_id, track_id, current_time, progress_pct, is_completed):
+        conn = database.get_connection('audiobook')
+        cursor = conn.cursor()
+        try:
+            AudiobookRepository._ensure_track_progress_table(conn)
+            cursor.execute("""
+                REPLACE INTO audiobook_track_progress (
+                    audiobook_id, track_id, user_id, `current_time`, progress_pct, is_completed, updated_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+            """, (audiobook_id, track_id, user_id, current_time, progress_pct, is_completed))
+            conn.commit()
+            return True
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    @staticmethod
+    def mark_audiobook_tracks_completed(audiobook_id, user_id, tracks):
+        if not tracks:
+            return 0
+        conn = database.get_connection('audiobook')
+        cursor = conn.cursor()
+        try:
+            AudiobookRepository._ensure_track_progress_table(conn)
+            values = [
+                (audiobook_id, int(track['id']), user_id, float(track.get('duration') or 0.0), 100.0, 1)
+                for track in tracks
+            ]
+            cursor.executemany("""
+                REPLACE INTO audiobook_track_progress (
+                    audiobook_id, track_id, user_id, `current_time`, progress_pct, is_completed, updated_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+            """, values)
+            conn.commit()
+            return len(values)
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             conn.close()
 

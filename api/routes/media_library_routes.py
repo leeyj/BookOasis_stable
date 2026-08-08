@@ -96,6 +96,31 @@ def get_media_list():
             err_msg = '스캔 작업으로 데이터베이스가 잠시 바쁩니다. 잠시 후 다시 시도해 주세요.'
         return jsonify({'success': False, 'error': err_msg}), 500
 
+@media_library_routes_bp.route('/api/media/list-totals', methods=['GET'])
+@login_required
+def get_media_list_totals():
+    """현재 목록 조건의 전체 시리즈/권 수를 목록 페이지 조회와 분리해 반환합니다."""
+    db_type = request.args.get('type', 'general')
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+    library_id = request.args.get('library_id')
+    search_query = request.args.get('search', '').strip()
+    genre_filters = _parse_csv_filter_values(request.args.get('genres', ''))
+    tag_filters = _parse_csv_filter_values(request.args.get('tags', ''))
+    try:
+        totals = SeriesService.get_books_totals(
+            db_type,
+            library_id,
+            search_query=search_query,
+            genre_filters=genre_filters,
+            tag_filters=tag_filters,
+            user_id=session.get('user_id'),
+            role=session.get('role'),
+        )
+        return jsonify({'success': True, **totals})
+    except Exception as error:
+        return jsonify({'success': False, 'error': str(error)}), 500
+
 @media_library_routes_bp.route('/api/media/all-list', methods=['GET'])
 @login_required
 def get_media_all_list():

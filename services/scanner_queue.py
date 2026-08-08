@@ -337,6 +337,23 @@ def run_scanner_worker_loop():
                     from utils.redis_helper import redis_delete_pattern
                     target_db = kwargs.get('db_type', 'general')
                     redis_delete_pattern(f"cache:recent_added*:{target_db}:*")
+                    from repositories.series_repository import SeriesRepository
+                    summary_db_types = ['general', 'adult'] if task_type == 'lazy_scan' else [target_db]
+                    for summary_db_type in summary_db_types:
+                        if summary_db_type == 'audiobook':
+                            continue
+                        try:
+                            started_at = time.perf_counter()
+                            SeriesRepository.rebuild_summary(summary_db_type)
+                            elapsed_ms = (time.perf_counter() - started_at) * 1000
+                            sq.log(
+                                f"Series summary rebuilt: db={summary_db_type}, "
+                                f"elapsed_ms={elapsed_ms:.1f}"
+                            )
+                        except Exception as summary_err:
+                            sq.log(f"Series summary rebuild failed: db={summary_db_type}, error={summary_err}")
+                    from services.series_service import SeriesService
+                    SeriesService.invalidate_all_books_cache()
                 except Exception as cache_err:
                     sq.log(f"Failed to invalidate recently_added cache: {cache_err}")
 

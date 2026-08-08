@@ -107,6 +107,24 @@
                                         <input type="number" id="setting-recent-books-limit" name="RECENT_BOOKS_LIMIT" min="10" max="100" value="30" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
                                     </div>
 
+                                    <!-- 오디오 미니 플레이어 형태 -->
+                                    <div class="library-form-group">
+                                        <label for="setting-audio-mini-player-mode" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                            <i class="fa-solid fa-wave-square" style="color: #a855f7; margin-right: 0.3rem;"></i> <span data-i18n="settings.audio_mini_player_mode_label">오디오 미니 플레이어 형태</span>
+                                        </label>
+                                        <select id="setting-audio-mini-player-mode" name="AUDIO_MINI_PLAYER_MODE" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
+                                            <option value="mini" data-i18n="settings.audio_mini_player_mode_mini">기본 미니바 (좌측 상단)</option>
+                                            <option value="right_dock" data-i18n="settings.audio_mini_player_mode_right">우측 오버레이 패널형</option>
+                                        </select>
+                                        <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;" data-i18n="settings.audio_mini_player_mode_desc">기본값은 미니바이며, 우측 오버레이 패널형은 화면 오른쪽에 고정 표시되고 배경 딤 오버레이가 함께 표시됩니다.</p>
+                                    </div>
+
+                                    <div class="library-form-group-row" style="display: flex; align-items: center; gap: 0.5rem;">
+                                        <input type="checkbox" id="setting-audio-right-dock-dim-enabled" name="AUDIO_RIGHT_DOCK_DIM_ENABLED" style="cursor: pointer; accent-color: #a855f7; width: 1.1rem; height: 1.1rem; margin: 0;">
+                                        <label for="setting-audio-right-dock-dim-enabled" style="cursor: pointer; font-weight: 700; color: #fff; font-size: 0.9rem; margin: 0;" data-i18n="settings.audio_right_dock_dim_enabled_label">오디오 우측 패널 배경 딤 표시</label>
+                                    </div>
+                                    <p style="font-size: 0.78rem; color: #94a3b8; margin: -0.35rem 0 0 1.65rem;" data-i18n="settings.audio_right_dock_dim_enabled_desc">해제하면 우측 패널만 표시되고, 메인 화면 배경 딤은 표시되지 않습니다.</p>
+
                                     <!-- 체크박스 스위치 모음 -->
                                     <div style="display: flex; flex-direction: column; gap: 0.8rem; border-top: 1px dashed rgba(255,255,255,0.08); padding-top: 0.8rem;">
                                         <div class="library-form-group-row" style="display: flex; align-items: center; gap: 0.5rem;">

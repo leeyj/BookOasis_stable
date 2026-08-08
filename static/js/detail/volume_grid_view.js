@@ -31,6 +31,8 @@ export function renderVolumeGrid(orderedBooks, safeSeriesName, dbType = 'general
     buildFallbackCoverUrl({ id: book.id, title: imageDisplayTitle, format: book.file_format, seed: book.id });
     const progressPercent = totalPages > 0 ? Math.min(100, Math.round((pagesRead / totalPages) * 100)) : 0;
     const isNotCompleted = !isCompletedValue;
+    const isDownloadable = ['epub', 'pdf', 'txt', 'text'].includes(format);
+    const completedLabel = i18n.t('detail.badge_completed') || '완독';
 
     volumesHtml += `
          <div class="vol-grid-card${!isCompletedValue && pagesRead === 0 ? ' unread-card' : ''}"
@@ -43,17 +45,17 @@ export function renderVolumeGrid(orderedBooks, safeSeriesName, dbType = 'general
            data-total-pages="${book.total_pages}"
            data-is-completed="${isCompletedValue ? 1 : 0}"
            style="${unreadOnly && !isNotCompleted ? 'display: none;' : ''}">
-        ${isCompletedValue ? '<span class="vol-grid-completed-badge">완독</span>' : ''}
         <div class="vol-grid-thumb-container" style="position: relative; width: 100%; aspect-ratio: 1 / 1.45; overflow: hidden; border-radius: 8px;">
           <img class="vol-grid-thumb" src="${coverSrc}" alt="cover" data-title="${(imageDisplayTitle || '').replace(/"/g, '&quot;')}" data-format="${book.file_format || 'text'}"
                onerror="window.handleCoverError(this)" style="width: 100%; height: 100%; object-fit: cover;">
-          <a class="vol-grid-download-btn"
+          ${isCompletedValue ? `<span class="vol-grid-completed-dot" title="${completedLabel}" aria-label="${completedLabel}"></span>` : ''}
+          ${isDownloadable ? `<a class="vol-grid-download-btn"
              href="/api/media/books/${book.id}/download?type=${dbType}"
              download
              title="${i18n.t('detail.btn_download') || '다운로드'}"
              data-role="detail-download-link">
             <i class="fa-solid fa-download"></i>
-          </a>
+          </a>` : ''}
         </div>
         ${pagesRead > 0 && !isCompletedValue ? `
         <div class="vol-grid-progress">

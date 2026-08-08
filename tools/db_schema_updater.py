@@ -109,6 +109,22 @@ CREATE TABLE IF NOT EXISTS books (
     INDEX idx_books_title (title(255))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
+CREATE TABLE IF NOT EXISTS series_summary (
+    library_id BIGINT NOT NULL,
+    series_key VARCHAR(500) NOT NULL,
+    representative_book_id BIGINT NOT NULL,
+    series_book_count BIGINT NOT NULL DEFAULT 0,
+    sort_series_name VARCHAR(500) NOT NULL DEFAULT '',
+    PRIMARY KEY (library_id, series_key),
+    INDEX idx_series_summary_order (library_id, sort_series_name, representative_book_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS series_summary_state (
+    id TINYINT NOT NULL PRIMARY KEY,
+    is_ready TINYINT NOT NULL DEFAULT 0,
+    refreshed_at DATETIME DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
 CREATE TABLE IF NOT EXISTS audiobooks (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     library_id BIGINT,
@@ -164,6 +180,19 @@ CREATE TABLE IF NOT EXISTS audiobook_progress (
     is_completed INT DEFAULT 0,
     last_listened_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uq_audiobook_user_progress (audiobook_id, user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS audiobook_track_progress (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    audiobook_id BIGINT NOT NULL,
+    track_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL DEFAULT 1,
+    `current_time` DOUBLE DEFAULT 0.0,
+    progress_pct DOUBLE DEFAULT 0.0,
+    is_completed INT DEFAULT 0,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_audiobook_track_user_progress (audiobook_id, track_id, user_id),
+    INDEX idx_audiobook_track_progress_lookup (audiobook_id, user_id, track_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE IF NOT EXISTS user_progress (

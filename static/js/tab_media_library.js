@@ -341,8 +341,6 @@ async function initTabMediaLibrary() {
     }
   });
 
-  await loadLibraries();
-
   const initialHash = window.location.hash || '';
   const isDetailDeepLink = initialHash.startsWith('#detail');
   const targetMediaType = parseMediaTypeFromUrl();
@@ -356,6 +354,10 @@ async function initTabMediaLibrary() {
   } else {
     applyLibraryTypeButtonState(state.currentLibraryType || 'general');
   }
+
+  // 중요: 초기 라이브러리 로드는 타입 적용 후에 수행해야
+  // 강력새로고침 시 좌측 메뉴 타입과 상세 타입이 어긋나지 않는다.
+  await loadLibraries();
 
   if (isDetailDeepLink) {
     const restoredDetail = decodeDetailParams(initialHash);

@@ -44,7 +44,12 @@ def start_background_copy(original_path):
 
     def _copy_thread():
         try:
-            disk_cache_manager.clean_up_if_needed()
+            incoming_size = 0
+            try:
+                incoming_size = os.path.getsize(original_path)
+            except Exception:
+                incoming_size = 0
+            disk_cache_manager.clean_up_if_needed(incoming_size_bytes=incoming_size)
             temp_path = local_path + '.tmp'
             print(f"[DiskCacheHelper] Background copy started: {os.path.basename(original_path)} -> {os.path.basename(local_path)}")
             

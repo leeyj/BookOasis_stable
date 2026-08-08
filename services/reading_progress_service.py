@@ -474,10 +474,16 @@ class ReadingProgressService:
             1.0,
             1,
         )
+        AudiobookRepository.mark_audiobook_tracks_completed(aid, int(user_id), tracks)
 
         try:
             from utils.redis_helper import redis_delete_pattern
             redis_delete_pattern(f"cache:history*:{'audiobook'}:{user_id}")
+        except Exception:
+            pass
+        try:
+            from services.series_service import SeriesService
+            SeriesService.invalidate_all_books_cache()
         except Exception:
             pass
 
