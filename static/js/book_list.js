@@ -1,6 +1,6 @@
 import { state } from './state.js';
 import * as api from './api.js';
-import { renderHistoryGrid, renderBooksGrid, appendBooksGrid } from './ui.js';
+import { renderHistoryGrid, renderBooksGrid, appendBooksGrid } from './ui.js?v=20260809-unread-series-v3';
 import { openReader } from './viewer.js';
 import { loadLibraries } from './category.js';
 import { initInfiniteScrollObserver } from './infinite_scroll.js';

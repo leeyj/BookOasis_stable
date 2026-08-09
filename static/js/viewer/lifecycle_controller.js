@@ -5,7 +5,7 @@ import { TxtViewer } from '../viewer_txt.js';
 import { PdfViewer, clearPdfViewer } from '../viewer_pdf.js';
 import { tryAutoFullscreenOnOpen, exitFullscreenIfNeeded } from './fullscreen_controller.js';
 import { shouldAutoFullscreenForFormat } from './platform_profile.js';
-import { flushProgress } from '../viewer_progress.js';
+import { flushProgress, resetPreloadState } from '../viewer_progress.js';
 
 let deps = {
   loadCustomFontsList: () => {},
@@ -173,11 +173,6 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false) {
     }
   }
 
-  // 뷰어 닫기 시점에 대기 중인 독서 진행도(pendingProgress)를 즉시 동기 반영(Flush)
-  try {
-    flushProgress();
-  } catch (e) {}
-
   exitFullscreenIfNeeded();
 
   const padPanel = document.getElementById('viewer-padding-overlay-panel');
@@ -232,41 +227,40 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false) {
     clearPdfViewer();
   }
 
-  import('../viewer_progress.js').then((m) => {
-    const flushPromise = m.flushProgress();
-    if (m.resetPreloadState) m.resetPreloadState();
+  const flushPromise = flushProgress(false, true);
+  resetPreloadState();
 
-    const reloadData = () => {
-      console.log('[Viewer-Core] DB Progress flush 완료. 화면 데이터 갱신을 실행합니다.');
-      if (state.currentLibraryId === 'home') {
-        import('../dashboard.js').then((d) => d.loadDashboardData());
-      } else if (state.currentLibraryId === 'history') {
-        import('../book_list.js').then((b) => b.loadReadingHistory());
-      }
-
-      const detailView = document.getElementById('book-detail-view');
-      if (detailView && detailView.style.display !== 'none') {
-        const seriesName = String(state.detailSeriesName || '').trim();
-        if (seriesName) {
-          import('../modal.js').then((mod) => {
-            mod.openBookDetail(
-              null,
-              seriesName,
-              state.detailLibraryId || state.currentLibraryId,
-              state.detailRepresentativeBookId || null,
-              state.detailDisplayTitle || ''
-            );
-          });
-        }
-      }
-    };
-
-    if (flushPromise && typeof flushPromise.then === 'function') {
-      flushPromise.then(() => reloadData());
-    } else {
-      reloadData();
+  const reloadData = () => {
+    console.log('[Viewer-Core] DB Progress flush 완료. 화면 데이터 갱신을 실행합니다.');
+    if (state.currentLibraryId === 'home') {
+      import('../dashboard.js').then((d) => d.loadDashboardData());
+    } else if (state.currentLibraryId === 'history') {
+      import('../book_list.js').then((b) => b.loadReadingHistory());
     }
-  });
+
+    const detailView = document.getElementById('book-detail-view');
+    if (detailView && detailView.style.display !== 'none') {
+      const seriesName = String(state.detailSeriesName || '').trim();
+      if (seriesName) {
+        import('../modal.js').then((mod) => {
+          mod.openBookDetail(
+            null,
+            seriesName,
+            state.detailLibraryId || state.currentLibraryId,
+            state.detailRepresentativeBookId || null,
+            state.detailDisplayTitle || ''
+          );
+        });
+      }
+    }
+  };
+
+  flushPromise
+    .then(() => reloadData())
+    .catch((error) => {
+      console.warn('[Viewer-Core] Immediate progress flush failed; retrying view refresh:', error);
+      window.setTimeout(reloadData, 2000);
+    });
 
   if (triggerBack && !isTransitioning && window.location.hash === '#viewer') {
     history.back();

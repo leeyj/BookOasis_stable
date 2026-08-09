@@ -219,80 +219,90 @@ class ReadingProgressRepository:
             conn.close()
             return [dict(row) for row in rows]
 
-        base_select = """
-            SELECT * FROM (
-            SELECT b.id, b.library_id, b.title, b.title_alias, b.series_name, b.series_alias, b.cover_image, b.cover_updated_at, b.file_format,
-                   p.pages_read, b.total_pages, p.last_read_at,
-                   CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
-                   p.is_completed,
-                   CASE WHEN EXISTS (
-                           SELECT 1
-                           FROM books b2
-                           LEFT JOIN user_progress p2 ON b2.id = p2.book_id AND p2.user_id = p.user_id
-                           WHERE COALESCE(b2.is_deleted, 0) = 0
-                               AND b2.library_id = b.library_id
-                                AND (
-                                    (b2.series_name IS NOT NULL AND b2.series_name != '' AND b2.series_name = b.series_name)
-                                    OR
-                                    ((b2.series_name IS NULL OR b2.series_name = '') AND b2.id = b.id)
-                                )
-                               AND (
-                                   p2.book_id IS NULL
-                                   OR COALESCE(p2.is_completed, 0) = 0
-                                   OR (COALESCE(b2.total_pages, 0) > 0 AND COALESCE(p2.pages_read, 0) < COALESCE(b2.total_pages, 0))
-                               )
-                   ) THEN 1 ELSE 0 END AS has_unfinished_siblings,
-                   COALESCE(b.metadata_locked, 0) AS metadata_locked,
-                   ROW_NUMBER() OVER (
-                       PARTITION BY b.library_id,
-                           CASE WHEN b.series_name IS NOT NULL AND TRIM(b.series_name) != ''
-                                THEN b.series_name ELSE CONCAT('__single__:', b.id) END
-                       ORDER BY p.last_read_at DESC, b.id DESC
-                   ) AS series_rank,
-                   COUNT(*) OVER (
-                       PARTITION BY b.library_id,
-                           CASE WHEN b.series_name IS NOT NULL AND TRIM(b.series_name) != ''
-                                THEN b.series_name ELSE CONCAT('__single__:', b.id) END
-                   ) AS history_book_count
-            FROM user_progress p
-            JOIN books b ON p.book_id = b.id
-            JOIN user_category_permissions ucp ON b.library_id = ucp.library_id AND ucp.user_id = p.user_id AND ucp.has_access = 1
-            LEFT JOIN user_favorites uf ON uf.book_id = b.id AND uf.user_id = p.user_id
-            WHERE COALESCE(b.is_deleted, 0) = 0 AND p.user_id = %s AND COALESCE(p.pages_read, 0) > 0
+        optimized_query = """
+                SELECT limited_history.*,
+                       CASE
+                           WHEN limited_history.series_name IS NULL OR limited_history.series_name = '' THEN
+                               CASE WHEN COALESCE(limited_history.is_completed, 0) = 0
+                                             OR (COALESCE(limited_history.total_pages, 0) > 0
+                                                 AND COALESCE(limited_history.pages_read, 0) < COALESCE(limited_history.total_pages, 0))
+                                    THEN 1 ELSE 0 END
+                           WHEN EXISTS (
+                               SELECT 1
+                               FROM books b2
+                               LEFT JOIN user_progress p2 FORCE INDEX (uq_user_book_progress)
+                                   ON b2.id = p2.book_id AND p2.user_id = limited_history.user_id
+                               WHERE COALESCE(b2.is_deleted, 0) = 0
+                                   AND b2.library_id = limited_history.library_id
+                                   AND b2.series_name = limited_history.series_name
+                                   AND (
+                                       p2.book_id IS NULL
+                                       OR COALESCE(p2.is_completed, 0) = 0
+                                       OR (COALESCE(b2.total_pages, 0) > 0
+                                           AND COALESCE(p2.pages_read, 0) < COALESCE(b2.total_pages, 0))
+                                   )
+                           ) THEN 1 ELSE 0
+                       END AS has_unfinished_siblings
+                FROM (
+                    SELECT ranked_history.*
+                    FROM (
+                        SELECT b.id, b.library_id, b.title, b.title_alias, b.series_name, b.series_alias,
+                               b.cover_image, b.cover_updated_at, b.file_format, p.pages_read, b.total_pages,
+                               p.last_read_at, p.user_id,
+                               CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
+                               p.is_completed, COALESCE(b.metadata_locked, 0) AS metadata_locked,
+                               ROW_NUMBER() OVER (
+                                   PARTITION BY b.library_id,
+                                       CASE WHEN b.series_name IS NOT NULL AND TRIM(b.series_name) != ''
+                                            THEN b.series_name ELSE CONCAT('__single__:', b.id) END
+                                   ORDER BY p.last_read_at DESC, b.id DESC
+                               ) AS series_rank,
+                               COUNT(*) OVER (
+                                   PARTITION BY b.library_id,
+                                       CASE WHEN b.series_name IS NOT NULL AND TRIM(b.series_name) != ''
+                                            THEN b.series_name ELSE CONCAT('__single__:', b.id) END
+                               ) AS history_book_count
+                        FROM user_progress p
+                        JOIN books b ON p.book_id = b.id
+                        JOIN user_category_permissions ucp
+                            ON b.library_id = ucp.library_id
+                            AND ucp.user_id = p.user_id
+                            AND ucp.has_access = 1
+                        LEFT JOIN user_favorites uf ON uf.book_id = b.id AND uf.user_id = p.user_id
+                        WHERE COALESCE(b.is_deleted, 0) = 0
+                            AND p.user_id = %s
+                            AND COALESCE(p.pages_read, 0) > 0
+                    ) ranked_history
+                    WHERE ranked_history.series_rank = 1
+                    ORDER BY ranked_history.last_read_at DESC
+                    LIMIT %s
+                    OFFSET %s
+                ) limited_history
+                ORDER BY limited_history.last_read_at DESC
         """
-        if hide_completed:
-            base_select += """
-                            AND NOT (
-                                (COALESCE(p.is_completed, 0) = 1 OR (COALESCE(b.total_pages, 0) > 0 AND COALESCE(p.pages_read, 0) >= COALESCE(b.total_pages, 0)))
-                                AND NOT EXISTS (
-                                    SELECT 1
-                                    FROM books b2
-                                    LEFT JOIN user_progress p2 ON b2.id = p2.book_id AND p2.user_id = p.user_id
-                                    WHERE COALESCE(b2.is_deleted, 0) = 0
-                                        AND b2.library_id = b.library_id
-                                        AND (
-                                    (b2.series_name IS NOT NULL AND b2.series_name != '' AND b2.series_name = b.series_name)
-                                    OR
-                                    ((b2.series_name IS NULL OR b2.series_name = '') AND b2.id = b.id)
-                                )
-                                        AND (
-                                            p2.book_id IS NULL
-                                            OR COALESCE(p2.is_completed, 0) = 0
-                                            OR (COALESCE(b2.total_pages, 0) > 0 AND COALESCE(p2.pages_read, 0) < COALESCE(b2.total_pages, 0))
-                                        )
-                                )
-                            )
-            """
-        base_select += """
-            ) ranked_history
-            WHERE series_rank = 1
-            ORDER BY last_read_at DESC
-            LIMIT %s
-        """
-        cursor.execute(base_select, (user_id, int(limit)))
-        rows = cursor.fetchall()
-        conn.close()
-        return [dict(row) for row in rows]
+
+        target_limit = int(limit)
+        page_size = target_limit if not hide_completed else max(50, target_limit * 2)
+        offset = 0
+        selected_rows = []
+
+        while True:
+            cursor.execute(optimized_query, (user_id, page_size, offset))
+            batch = [dict(row) for row in cursor.fetchall()]
+
+            if not hide_completed:
+                conn.close()
+                return batch
+
+            selected_rows.extend(
+                row for row in batch
+                if int(row.get('has_unfinished_siblings') or 0) == 1
+            )
+            if len(selected_rows) >= target_limit or len(batch) < page_size:
+                conn.close()
+                return selected_rows[:target_limit]
+
+            offset += page_size
 
     @staticmethod
     def fetch_recently_added_by_user(db_type, user_id):
@@ -403,6 +413,49 @@ class ReadingProgressRepository:
         except Exception as e:
             conn.rollback()
             raise e
+        finally:
+            conn.close()
+
+    @staticmethod
+    def delete_user_progress_by_series(db_type, series_name, library_id, user_id):
+        """특정 시리즈의 사용자 독서 진척도 및 일일 로그를 일괄 삭제"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            if db_type == 'audiobook':
+                cursor.execute(
+                    "SELECT id FROM audiobooks WHERE title = %s AND library_id = %s AND COALESCE(is_deleted, 0) = 0",
+                    (series_name, library_id)
+                )
+                book_ids = [row['id'] for row in cursor.fetchall()]
+                if book_ids:
+                    placeholders = ','.join('%s' for _ in book_ids)
+                    cursor.execute(
+                        f"DELETE FROM audiobook_progress WHERE user_id = %s AND audiobook_id IN ({placeholders})",
+                        (user_id, *book_ids)
+                    )
+            else:
+                cursor.execute(
+                    "SELECT id FROM books WHERE series_name = %s AND library_id = %s AND COALESCE(is_deleted, 0) = 0",
+                    (series_name, library_id)
+                )
+                book_ids = [row['id'] for row in cursor.fetchall()]
+                if book_ids:
+                    placeholders = ','.join('%s' for _ in book_ids)
+                    params = (user_id, *book_ids)
+                    cursor.execute(
+                        f"DELETE FROM user_progress WHERE user_id = %s AND book_id IN ({placeholders})",
+                        params
+                    )
+                    cursor.execute(
+                        f"DELETE FROM user_reading_log WHERE user_id = %s AND book_id IN ({placeholders})",
+                        params
+                    )
+            conn.commit()
+            return book_ids
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             conn.close()
 

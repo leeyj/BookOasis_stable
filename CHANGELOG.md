@@ -1,4 +1,17 @@
 # CHANGELOG
+
+## v1.8.9
+- (dashboard)읽지 않은상태 변경 수정(기준: 시리즈) | unread change fix
+- (dashboard)최근 읽은 도서 쿼리 수정 | recently read query fix
+- (dashboard)홈 바로가기(타이틀) 추가 | link home dashboard
+- (sql/query)쿼리 최적화 | tunes query
+
+
+## v1.8.8
+- (category) 가상그룹 기능 추가 | add virtual group support
+- (dashboard) 홈 대시보드에서 시리즈/권수 표시 정상화 | fix dashboard series/books count
+- (scanner) 스캔현황 표시 | display scan state
+
 ## v1.8.7
 - (display) 도서 권수 표시 오류 수정 | fix incorrect book volume count display
 - (migration/tooling) DB 이관 도구 MariaDB 호환성 보강 | improve MariaDB compatibility for database migration tools
@@ -11,6 +24,7 @@
   ```
 - (filter/genre-tag) 장르/태그 선택지를 현재 카테고리 기준으로 표시 | scope genre and tag options to the current category
 - (search) 검색 오류 수정 | fix search errors
+
 ## v1.8.6
 - (sidebar/category-plugin) 카테고리 레벨 플러그인 탭을 일반 사용자 카테고리와 동일한 드래그 이동 대상으로 확장하고 혼합 순서(`custom+plugin`)를 로컬 저장하여 재접속 시 순서를 유지 | enable category-level plugin tabs to be draggable like user categories and persist mixed custom+plugin sidebar order across reloads
 - (performance/all-view) 전체보기 초기 로딩을 전량 선로드(`/api/media/all-list`)에서 서버 페이지네이션(`/api/media/list`) 기반으로 전환하여 대용량 라이브러리 응답 지연 개선 | switch all-view initial loading from full preload to server-side pagination for large library latency reduction

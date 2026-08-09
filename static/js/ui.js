@@ -107,6 +107,7 @@ function resolveCardDisplayTitle(item, showVolumeCount) {
  * @param {Object} options - 카드별 렌더링 분기 옵션
  * @param {boolean} options.showProgress - 진행률(퍼센트) 배지 노출 여부
  * @param {boolean} options.showVolumeCount - 권수 배지 노출 여부
+ * @param {string} options.markUnreadScope - 읽지 않음 처리 범위 ('book' 또는 'series')
  * @param {boolean} options.isNew - 신규 도서 서브텍스트 노출 여부
  * @param {string} options.actionTitle - 책 모양 버튼 툴팁 타이틀
  * @param {function} options.onPrimaryClick - 카드 본체 클릭 핸들러 (e, item)
@@ -129,6 +130,10 @@ export function createBookCard(item, options = {}) {
 
   const rawSeriesName = String(item.series_name || '').trim();
   const displayTitle = resolveCardDisplayTitle(item, options.showVolumeCount);
+  card.dataset.title = displayTitle;
+  card.dataset.markUnreadScope = options.markUnreadScope || 'book';
+  card.dataset.seriesName = rawSeriesName;
+  card.dataset.libraryId = item.library_id ?? '';
   const fallbackCoverSrc = buildFallbackCoverUrl({
     title: displayTitle,
     format: coverFormat,
@@ -296,7 +301,11 @@ export function createBookCard(item, options = {}) {
     // book_id가 존재하는 경우에만 실행 (시리즈 카드인 경우 대리 book_id 설정 가능)
     const targetBookId = item.id || item.representative_book_id || null;
     if (typeof window.showBookContextMenu === 'function') {
-      window.showBookContextMenu(e.clientX, e.clientY, targetBookId, displayTitle);
+      window.showBookContextMenu(e.clientX, e.clientY, targetBookId, displayTitle, false, {
+        markUnreadScope: options.markUnreadScope || 'book',
+        seriesName: item.series_name || '',
+        libraryId: item.library_id ?? null,
+      });
     }
   });
 
@@ -306,7 +315,11 @@ export function createBookCard(item, options = {}) {
     if (typeof window.handleLongPressTouchStart === 'function') {
       window.handleLongPressTouchStart(e, (x, y) => {
         if (typeof window.showBookContextMenu === 'function') {
-          window.showBookContextMenu(x, y, targetBookId, displayTitle);
+          window.showBookContextMenu(x, y, targetBookId, displayTitle, false, {
+            markUnreadScope: options.markUnreadScope || 'book',
+            seriesName: item.series_name || '',
+            libraryId: item.library_id ?? null,
+          });
         }
       });
     }
@@ -351,6 +364,7 @@ export function renderHistoryGrid(booksList) {
     const normalizedTitle = stripLeadingBracketTags(normalizeBookTitle(item));
     const card = createBookCard(item, isSeriesHistory ? {
       showVolumeCount: true,
+      markUnreadScope: 'series',
       actionTitle: '이어읽기',
       onPrimaryClick: (e) => openBookDetail(e, item.series_name || normalizedTitle, item.library_id, item.representative_book_id, item.series_alias || item.series_name || normalizedTitle),
       onActionClick: (e) => {
@@ -360,6 +374,7 @@ export function renderHistoryGrid(booksList) {
       }
     } : {
       showProgress: true,
+      markUnreadScope: 'series',
       actionTitle: '이어읽기',
       onPrimaryClick: (e) => openBookDetail(e, item.series_name || normalizedTitle, item.library_id, item.id),
       onActionClick: () => openReader(item.id, item.file_format, normalizedTitle, item.pages_read, item.total_pages)
@@ -431,6 +446,7 @@ export function renderDashboardHistory(booksList) {
 
     const card = createBookCard(item, {
       showProgress: true,
+      markUnreadScope: 'series',
       lazyLoad: false,
       actionTitle: '이어읽기',
       onPrimaryClick: (e) => {

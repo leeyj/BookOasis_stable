@@ -86,16 +86,20 @@ class SchedulerService:
             SchedulerService.reload_all_jobs()
             
         # ── [Redis 캐시 동기화 백그라운드 Job 등록] ──
-        from services.reading_progress_service import ReadingProgressService
+        from services.reading_progress_service import (
+            ReadingProgressService,
+            get_progress_flush_interval_seconds,
+        )
         if not scheduler.get_job('redis_cache_flush_job'):
+            flush_interval = get_progress_flush_interval_seconds()
             scheduler.add_job(
                 ReadingProgressService.flush_progress_cache, 
                 'interval', 
-                minutes=1, 
+                seconds=flush_interval,
                 id='redis_cache_flush_job',
                 max_instances=1
             )
-            print("[Scheduler] Redis cache flush job registered successfully (interval: 1m)")
+            print(f"[Scheduler] Redis cache flush job registered successfully (interval: {flush_interval}s)")
 
         try:
             SchedulerService.auto_resume_interrupted_jobs()

@@ -412,6 +412,49 @@ class ReadingProgressRepository:
             conn.close()
 
     @staticmethod
+    def delete_user_progress_by_series(db_type, series_name, library_id, user_id):
+        """특정 시리즈의 사용자 독서 진척도 및 일일 로그를 일괄 삭제"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            if db_type == 'audiobook':
+                cursor.execute(
+                    "SELECT id FROM audiobooks WHERE title = ? AND library_id = ? AND COALESCE(is_deleted, 0) = 0",
+                    (series_name, library_id)
+                )
+                book_ids = [row['id'] for row in cursor.fetchall()]
+                if book_ids:
+                    placeholders = ','.join('?' for _ in book_ids)
+                    cursor.execute(
+                        f"DELETE FROM audiobook_progress WHERE user_id = ? AND audiobook_id IN ({placeholders})",
+                        (user_id, *book_ids)
+                    )
+            else:
+                cursor.execute(
+                    "SELECT id FROM books WHERE series_name = ? AND library_id = ? AND COALESCE(is_deleted, 0) = 0",
+                    (series_name, library_id)
+                )
+                book_ids = [row['id'] for row in cursor.fetchall()]
+                if book_ids:
+                    placeholders = ','.join('?' for _ in book_ids)
+                    params = (user_id, *book_ids)
+                    cursor.execute(
+                        f"DELETE FROM user_progress WHERE user_id = ? AND book_id IN ({placeholders})",
+                        params
+                    )
+                    cursor.execute(
+                        f"DELETE FROM user_reading_log WHERE user_id = ? AND book_id IN ({placeholders})",
+                        params
+                    )
+            conn.commit()
+            return book_ids
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    @staticmethod
     def get_distinct_read_dates(db_type, user_id):
         """특정 사용자가 책을 읽은 고유 날짜 목록 조회"""
         conn = database.get_connection(db_type)

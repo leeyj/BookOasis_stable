@@ -89,8 +89,9 @@ function triggerPreloadNextBook(bookId) {
 /**
  * 대기 중인 진척도 저장 예약 건이 있다면 즉시 동기 전송(Flush)하고 청소
  * @param {boolean} useBeacon - 모바일 탭 닫기/이탈 시 sendBeacon 사용 여부
+ * @param {boolean} flushImmediately - 응답 전에 해당 진행도를 DB에 즉시 반영할지 여부
  */
-export function flushProgress(useBeacon = false) {
+export function flushProgress(useBeacon = false, flushImmediately = false) {
   if (!pendingProgress) return Promise.resolve(null);
 
   const data = { ...pendingProgress };
@@ -123,10 +124,16 @@ export function flushProgress(useBeacon = false) {
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ...data, flush_immediately: flushImmediately }),
     keepalive: true
+  }).then(response => {
+    if (!response.ok) {
+      throw new Error(`Progress save failed with HTTP ${response.status}`);
+    }
+    return response;
   }).catch(err => {
     console.error('[Viewer-Progress] Failed to save progress on flush:', err);
+    if (flushImmediately) throw err;
     return null;
   });
 }

@@ -59,6 +59,9 @@
 .sidebar-title {
     margin: 0 !important;
     line-height: 1.2;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 /* 햄버거 토글 버튼 노출 및 데스크톱 버튼 숨김 */

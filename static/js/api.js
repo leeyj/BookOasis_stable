@@ -182,13 +182,19 @@ export async function unlockMetadata(type, seriesName, libraryId, bookId) {
   return res.json();
 }
 
-export async function markBookAsUnread(type, bookId) {
+export async function markBookAsUnread(type, bookId, options = {}) {
   const res = await fetch('/api/media/unread', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ db_type: type, book_id: bookId })
+    body: JSON.stringify({
+      db_type: type,
+      book_id: bookId,
+      scope: options.scope || 'book',
+      series_name: options.seriesName || '',
+      library_id: options.libraryId ?? null,
+    })
   });
   return res.json();
 }

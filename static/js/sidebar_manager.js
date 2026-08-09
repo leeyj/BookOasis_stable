@@ -9,8 +9,39 @@ function isMobileLayout() {
 function getSidebarElements() {
   const content = document.getElementById('sidebar-collapsible-content');
   const btn = document.getElementById('btn-sidebar-toggle');
+  const desktopBtn = document.getElementById('btn-sidebar-toggle-desktop');
+  const brandHome = document.querySelector('[data-role="mobile-brand-home"]');
   const btnIcon = btn ? btn.querySelector('i') : null;
-  return { content, btn, btnIcon };
+  return { content, btn, desktopBtn, brandHome, btnIcon };
+}
+
+export function syncSidebarResponsiveControls() {
+  const { btn, desktopBtn, brandHome } = getSidebarElements();
+  const mobile = isMobileLayout();
+
+  if (btn) {
+    btn.style.setProperty('display', mobile ? 'block' : 'none', 'important');
+  }
+  if (desktopBtn) {
+    desktopBtn.style.setProperty('display', mobile ? 'none' : 'flex', 'important');
+  }
+  if (brandHome) {
+    if (mobile) {
+      brandHome.setAttribute('role', 'button');
+      brandHome.setAttribute('tabindex', '0');
+      brandHome.setAttribute('aria-label', 'BookOasis 홈으로 이동');
+    } else {
+      brandHome.removeAttribute('role');
+      brandHome.removeAttribute('tabindex');
+      brandHome.removeAttribute('aria-label');
+    }
+  }
+}
+
+function scheduleSidebarResponsiveSync() {
+  syncSidebarResponsiveControls();
+  window.requestAnimationFrame(syncSidebarResponsiveControls);
+  window.setTimeout(syncSidebarResponsiveControls, 250);
 }
 
 function setSidebarMenuOpen(isOpen, options = {}) {
@@ -121,10 +152,34 @@ function initSidebarCategorySync() {
   window.__sidebarCategorySyncBound = true;
 }
 
+function initSidebarViewportRecovery() {
+  if (window.__sidebarViewportRecoveryBound) return;
+
+  const mediaQuery = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`);
+  const recover = () => scheduleSidebarResponsiveSync();
+
+  window.addEventListener('pageshow', recover);
+  window.addEventListener('focus', recover);
+  window.addEventListener('resize', recover);
+  window.addEventListener('orientationchange', recover);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') recover();
+  });
+  if (typeof mediaQuery.addEventListener === 'function') {
+    mediaQuery.addEventListener('change', recover);
+  } else if (typeof mediaQuery.addListener === 'function') {
+    mediaQuery.addListener(recover);
+  }
+
+  window.__sidebarViewportRecoveryBound = true;
+}
+
 export function initSidebarInteractions() {
   initSidebarToggleButton();
   initSidebarAutoClose();
   initSidebarCategorySync();
+  initSidebarViewportRecovery();
+  syncSidebarResponsiveControls();
   syncSidebarMenuState();
 }
 

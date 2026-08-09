@@ -1,9 +1,9 @@
 // book_context_menu.js – 도서 우클릭 단독 스캔 컨텍스트 메뉴 제어 모듈
 import { state } from './state.js';
-import * as api from './api.js';
+import * as api from './api.js?v=20260809-unread-series-v3';
 import { openBookDetail } from './modal.js';
-import { loadBooksList, loadReadingHistory } from './book_list.js';
-import { loadDashboardData } from './dashboard.js';
+import { loadBooksList, loadReadingHistory } from './book_list.js?v=20260809-unread-series-v3';
+import { loadDashboardData } from './dashboard.js?v=20260809-unread-series-v3';
 import { hideFloatingMenu, isFloatingMenuOpen, positionMenuAtPoint } from './context_menu_manager.js';
 
 let currentTargetBook = null;
@@ -198,7 +198,7 @@ function closeBookContextMenu() {
   hideBookContextMenu({ suppressMs: 0, clearTarget: true });
 }
 
-export function showBookContextMenu(x, y, bookId, bookTitle, isVolumeDetail = false) {
+export function showBookContextMenu(x, y, bookId, bookTitle, isVolumeDetail = false, context = {}) {
   const bookMenu = document.getElementById('book-context-menu');
   if (!bookMenu) return;
 
@@ -207,7 +207,14 @@ export function showBookContextMenu(x, y, bookId, bookTitle, isVolumeDetail = fa
   
   lastEventX = x;
   lastEventY = y;
-  currentTargetBook = { id: bookId, title: bookTitle, isVolumeDetail };
+  currentTargetBook = { id: bookId, title: bookTitle, isVolumeDetail, ...context };
+
+  const unreadLabel = document.querySelector('#ctx-unread-book span');
+  if (unreadLabel) {
+    unreadLabel.textContent = context.markUnreadScope === 'series'
+      ? (window.i18n?.t('context_menu.mark_series_as_unread') || '이 시리즈 전체를 읽지 않은 상태로 변경 (0%)')
+      : (window.i18n?.t('context_menu.mark_as_unread') || '읽지 않은 상태로 변경 (0%)');
+  }
   
   // 메타정보 검색 메뉴의 플러그인 활성 상태 동적 검사
   const metaSearchEl = document.getElementById('ctx-search-meta-book');
@@ -364,21 +371,46 @@ export function triggerSearchMetadataAction() {
 window.triggerSearchMetadataAction = triggerSearchMetadataAction;
 window.triggerSearchAladinMetadataAction = triggerSearchMetadataAction;
 
+function removeUnreadTargetCards({ id, isSeriesScope, seriesName, libraryId }) {
+  if (state.currentLibraryId !== 'home' && state.currentLibraryId !== 'history') return;
+
+  const historyContainer = state.currentLibraryId === 'home'
+    ? document.getElementById('dashboard-history-row')
+    : document.getElementById('books-list-container');
+  if (!historyContainer) return;
+
+  historyContainer.querySelectorAll('.book-card').forEach((card) => {
+    const sameBook = String(card.dataset.bookId || '') === String(id);
+    const sameSeries = isSeriesScope
+      && String(card.dataset.seriesName || '') === String(seriesName || '')
+      && String(card.dataset.libraryId || '') === String(libraryId ?? '');
+    if (sameBook || sameSeries) card.remove();
+  });
+}
+
 export async function triggerMarkAsUnreadAction() {
   if (!currentTargetBook || !currentTargetBook.id) return;
-  const { id, title } = currentTargetBook;
+  const { id, title, markUnreadScope, seriesName, libraryId } = currentTargetBook;
+  const isSeriesScope = markUnreadScope === 'series';
 
   import('./view_manager.js').then(async (vm) => {
     try {
-      const res = await api.markBookAsUnread(state.currentLibraryType, id);
+      const res = await api.markBookAsUnread(state.currentLibraryType, id, {
+        scope: isSeriesScope ? 'series' : 'book',
+        seriesName,
+        libraryId,
+      });
       if (res.success) {
-        vm.showToast(`"${title}" 도서가 읽지 않은 상태(0%)로 변경되었습니다.`, 'success');
+        const targetLabel = isSeriesScope ? '시리즈 전체가' : '도서가';
+        vm.showToast(`"${title}" ${targetLabel} 읽지 않은 상태(0%)로 변경되었습니다.`, 'success');
+        removeUnreadTargetCards({ id, isSeriesScope, seriesName, libraryId });
+        closeBookContextMenu();
         
         // 화면 리프레시: 현재 위치한 탭/뷰에 맞추어 라이브 리로드 실행
         if (state.currentLibraryId === 'home') {
-          loadDashboardData();
+          await loadDashboardData();
         } else if (state.currentLibraryId === 'history') {
-          loadReadingHistory();
+          await loadReadingHistory();
         } else {
           // 상세 뷰 혹은 일반 도서 목록 새로고침
           const detailModal = document.getElementById('book-detail-modal');
@@ -388,7 +420,7 @@ export async function triggerMarkAsUnreadAction() {
               openBookDetail(null, seriesName, state.currentLibraryId);
             }
           }
-          loadBooksList();
+          await loadBooksList();
         }
       } else {
         vm.showToast(`변경 실패: ${res.error}`, 'error');
@@ -419,7 +451,12 @@ function resolveBookContextTarget(event) {
 
   const title = (card.getAttribute('data-title') || card.dataset?.title || '').trim() || '도서';
   const isVolumeDetail = card.classList.contains('vol-grid-card') || card.classList.contains('volume-card');
-  return { id: parsedId, title, isVolumeDetail };
+  const markUnreadScope = card.dataset?.markUnreadScope || 'book';
+  const seriesName = card.dataset?.seriesName || '';
+  const rawLibraryId = card.dataset?.libraryId || '';
+  const parsedLibraryId = Number.parseInt(rawLibraryId, 10);
+  const libraryId = Number.isFinite(parsedLibraryId) ? parsedLibraryId : null;
+  return { id: parsedId, title, isVolumeDetail, markUnreadScope, seriesName, libraryId };
 }
 
 // 카드별 개별 바인딩 누락/재렌더 타이밍 이슈가 있어도 우클릭 메뉴를 보장한다.
@@ -435,7 +472,11 @@ document.addEventListener('contextmenu', (event) => {
     event.stopImmediatePropagation();
   }
 
-  showBookContextMenu(event.clientX, event.clientY, target.id, target.title, target.isVolumeDetail);
+  showBookContextMenu(event.clientX, event.clientY, target.id, target.title, target.isVolumeDetail, {
+    markUnreadScope: target.markUnreadScope,
+    seriesName: target.seriesName,
+    libraryId: target.libraryId,
+  });
 }, true);
 
 // 우클릭 직후 브라우저/플랫폼별 합성 click으로 상세 열기(onclick)가 발동하는 케이스 차단

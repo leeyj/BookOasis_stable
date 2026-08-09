@@ -1,7 +1,7 @@
 // dashboard.js – 대시보드 데이터 로드 및 수평 휠/버튼 스크롤 제어
 import { state } from './state.js';
 import * as api from './api.js';
-import { renderDashboardHistory, renderDashboardRecentlyAdded } from './ui.js';
+import { renderDashboardHistory, renderDashboardRecentlyAdded } from './ui.js?v=20260809-unread-series-v3';
 import { updateLibraryTotalCount } from './book_list.js';
 
 let dashboardLoadToken = 0;

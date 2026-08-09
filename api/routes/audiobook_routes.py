@@ -307,7 +307,7 @@ def audiobook_progress_api(aid):
             # 최근 읽은 도서 캐시를 즉시 무효화하여 대시보드 반영 지연(최대 1시간)을 방지
             try:
                 from utils.redis_helper import redis_delete_pattern
-                redis_delete_pattern(f"cache:history*:{'audiobook'}:{user_id}")
+                redis_delete_pattern(f"cache:history*:{'audiobook'}:{user_id}:*")
             except Exception:
                 pass
             if is_completed:

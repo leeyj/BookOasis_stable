@@ -16,6 +16,13 @@ from utils.redis_helper import get_redis_client, make_key, redis_del, redis_acqu
 
 logger = logging.getLogger("bookoasis")
 
+
+def get_progress_flush_interval_seconds():
+    try:
+        return max(1, int(os.environ.get('PROGRESS_FLUSH_INTERVAL_SEC', '2') or '2'))
+    except (TypeError, ValueError):
+        return 2
+
 class InMemoryProgressBuffer:
     """Thread-safe 파이썬 인메모리 버퍼 (Redis 미사용 / DB 동시 쓰기 락 방지용)"""
     _lock = threading.Lock()
@@ -55,7 +62,46 @@ class InMemoryProgressBuffer:
 
 class ReadingProgressService:
     @staticmethod
-    def record_progress(db_type: str, book_id, page_idx: int, total_pages: int, user_id=1, epub_session=None):
+    def _persist_progress_immediately(db_type: str, user_id, book_id, payload: dict):
+        redis_client = get_redis_client()
+        lock_token = redis_acquire_lock(f"lock:db_write:{db_type}", ttl=90, wait_timeout=5.0)
+        if not lock_token:
+            return False
+
+        try:
+            item = dict(payload)
+            item['user_id'] = user_id
+            item['book_id'] = book_id
+            synced = ReadingProgressRepository.batch_flush_progress_items(db_type, [item])
+            if synced < 1:
+                return False
+
+            InMemoryProgressBuffer.delete(db_type, user_id, book_id)
+            if redis_client:
+                cache_key = make_key(f"user:progress:{db_type}:{user_id}:{book_id}")
+                pending_key = make_key("sync:progress:pending")
+                redis_client.delete(cache_key)
+                redis_client.srem(pending_key, f"{db_type}:{user_id}:{book_id}")
+
+            try:
+                from utils.redis_helper import redis_delete_pattern
+                redis_delete_pattern(f"cache:history*:{db_type}:{user_id}:*")
+            except Exception:
+                pass
+            return True
+        except Exception as exc:
+            logger.warning(
+                f"[Progress Immediate Flush] Failed for db_type={db_type}, "
+                f"user_id={user_id}, book_id={book_id}: {exc}"
+            )
+            return False
+        finally:
+            if redis_client and lock_token:
+                redis_release_lock(f"lock:db_write:{db_type}", lock_token)
+
+    @staticmethod
+    def record_progress(db_type: str, book_id, page_idx: int, total_pages: int, user_id=1,
+                        epub_session=None, flush_immediately=False):
         """독서 진행률 및 활동 로그 기록 (0ms 메모리 버퍼링 및 비동기 배치 DB 저장을 통한 SQLite Lock 완벽 방지)"""
         book_row = ReadingProgressRepository.get_book_for_progress(db_type, book_id)
 
@@ -121,7 +167,7 @@ class ReadingProgressService:
         # 사용자의 최근 읽은 도서 캐시 무효화 (대시보드 실시간 반영)
         try:
             from utils.redis_helper import redis_delete_pattern
-            redis_delete_pattern(f"cache:history*:{db_type}:{user_id}")
+            redis_delete_pattern(f"cache:history*:{db_type}:{user_id}:*")
         except Exception:
             pass
 
@@ -168,13 +214,19 @@ class ReadingProgressService:
             'delta': delta
         }
 
-        if redis_client:
+        persisted = False
+        if flush_immediately:
+            persisted = ReadingProgressService._persist_progress_immediately(
+                db_type, user_id, book_id, progress_payload
+            )
+
+        if not persisted and redis_client:
             # 1. Redis 환경: Redis 캐시 기록 및 펜딩 큐 등록
             cache_key = make_key(f"user:progress:{db_type}:{user_id}:{book_id}")
             redis_client.set(cache_key, json.dumps(progress_payload))
             pending_sync_key = make_key("sync:progress:pending")
             redis_client.sadd(pending_sync_key, f"{db_type}:{user_id}:{book_id}")
-        else:
+        elif not persisted:
             # 2. Non-Redis 환경: 파이썬 인메모리 버퍼에 0ms 즉시 기록 (DB 락 방지)
             InMemoryProgressBuffer.set(db_type, user_id, book_id, progress_payload)
 
@@ -239,6 +291,8 @@ class ReadingProgressService:
                 dispatch_standard_book_event(payload)
         except Exception as webhook_err:
             print(f"[Progress Webhook] dispatch skipped due to error: {webhook_err}")
+
+        return persisted if flush_immediately else True
 
     @staticmethod
     def get_progress_state(db_type: str, book_id, user_id=1):
@@ -321,31 +375,42 @@ class ReadingProgressService:
         }
 
     @staticmethod
-    def mark_unread(db_type: str, book_id, user_id=1):
-        ReadingProgressRepository.delete_user_progress_by_book(db_type, book_id, user_id)
-        InMemoryProgressBuffer.delete(db_type, user_id, book_id)
+    def mark_unread(db_type: str, book_id, user_id=1, series_name=None, library_id=None):
+        if series_name and library_id is not None:
+            book_ids = ReadingProgressRepository.delete_user_progress_by_series(
+                db_type, series_name, library_id, user_id
+            )
+        else:
+            ReadingProgressRepository.delete_user_progress_by_book(db_type, book_id, user_id)
+            book_ids = [book_id]
+
+        for target_book_id in book_ids:
+            InMemoryProgressBuffer.delete(db_type, user_id, target_book_id)
 
         try:
             from utils.redis_helper import redis_delete_pattern
-            redis_delete_pattern(f"cache:history*:{db_type}:{user_id}")
+            redis_delete_pattern(f"cache:history*:{db_type}:{user_id}:*")
         except Exception:
             pass
 
         redis_client = get_redis_client()
         if not redis_client:
-            return
+            return len(book_ids)
 
-        progress_key = make_key(f"user:progress:{db_type}:{user_id}:{book_id}")
-        audio_progress_key = make_key(f"user:audiobook_progress:{user_id}:{book_id}")
         pending_key = make_key("sync:progress:pending")
-        pending_member = f"{db_type}:{user_id}:{book_id}"
 
         try:
-            redis_client.delete(progress_key)
-            redis_client.delete(audio_progress_key)
-            redis_client.srem(pending_key, pending_member)
+            for target_book_id in book_ids:
+                progress_key = make_key(f"user:progress:{db_type}:{user_id}:{target_book_id}")
+                audio_progress_key = make_key(f"user:audiobook_progress:{user_id}:{target_book_id}")
+                pending_member = f"{db_type}:{user_id}:{target_book_id}"
+                redis_client.delete(progress_key)
+                redis_client.delete(audio_progress_key)
+                redis_client.srem(pending_key, pending_member)
         except Exception as e:
-            logger.warning(f"[Redis] mark_unread cache invalidation failed for {pending_member}: {e}")
+            logger.warning(f"[Redis] mark_unread cache invalidation failed: {e}")
+
+        return len(book_ids)
 
     @staticmethod
     def mark_books_completed(db_type: str, book_ids, user_id=1):
@@ -406,7 +471,7 @@ class ReadingProgressService:
 
         try:
             from utils.redis_helper import redis_delete_pattern
-            redis_delete_pattern(f"cache:history*:{db_type}:{user_id}")
+            redis_delete_pattern(f"cache:history*:{db_type}:{user_id}:*")
         except Exception:
             pass
 
@@ -478,7 +543,7 @@ class ReadingProgressService:
 
         try:
             from utils.redis_helper import redis_delete_pattern
-            redis_delete_pattern(f"cache:history*:{'audiobook'}:{user_id}")
+            redis_delete_pattern(f"cache:history*:{'audiobook'}:{user_id}:*")
         except Exception:
             pass
         try:
@@ -626,16 +691,21 @@ def start_inmemory_flush_worker():
         _inmemory_worker_started = True
 
     def worker_loop():
+        flush_interval = get_progress_flush_interval_seconds()
         while True:
             try:
-                time.sleep(2)
-                ReadingProgressService.flush_progress_cache()
+                time.sleep(flush_interval)
+                if get_redis_client() is None:
+                    ReadingProgressService.flush_progress_cache()
             except Exception as e:
                 logger.error(f"[Progress Worker] Flush loop exception: {e}")
 
     t = threading.Thread(target=worker_loop, daemon=True, name="ProgressInmemoryFlushWorker")
     t.start()
-    logger.info("[Progress Worker] In-memory progress flush worker started (interval=2s)")
+    logger.info(
+        f"[Progress Worker] In-memory progress flush worker started "
+        f"(interval={get_progress_flush_interval_seconds()}s)"
+    )
 
 # 모듈 초기화 시 워커 가동 및 프로세스 종료 시 Safety Flush 자동 등록
 start_inmemory_flush_worker()

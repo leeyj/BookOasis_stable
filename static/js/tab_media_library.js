@@ -14,13 +14,13 @@ import { applySidebarShowMore } from './category/index.js';
 import { loadLibrarySchedules, saveLibrarySchedule, runLibraryScanNow } from './scheduler.js';
 
 // 서브 모듈 임포트
-import { loadDashboardData, scrollDashboardRow, loadDashboardPlugins, switchPluginsViewTab } from './dashboard.js';
+import { loadDashboardData, scrollDashboardRow, loadDashboardPlugins, switchPluginsViewTab } from './dashboard.js?v=20260809-unread-series-v3';
 import { initInfiniteScrollObserver } from './infinite_scroll.js';
-import { showBookContextMenu, triggerScanSingleBookAction, triggerSearchAladinMetadataAction, triggerMarkAsUnreadAction } from './book_context_menu.js';
+import { showBookContextMenu, triggerScanSingleBookAction, triggerSearchAladinMetadataAction, triggerMarkAsUnreadAction } from './book_context_menu.js?v=20260809-unread-series-v5';
 import { openMetadataSearchModal, closeMetadataSearchModal, performMetadataSearch } from './metadata_search.js';
 
 // book_list.js 임포트
-import { loadBooksList, loadReadingHistory, filterBooks, toggleLibrarySort, resumeSeries, updateSortButtonUI } from './book_list.js';
+import { loadBooksList, loadReadingHistory, filterBooks, toggleLibrarySort, resumeSeries, updateSortButtonUI } from './book_list.js?v=20260809-unread-series-v3';
 
 // plugin_custom_view.js 임포트
 import { mountCategoryPluginUI } from './plugin_custom_view.js';
@@ -43,13 +43,17 @@ function initLibraryShellDelegation() {
 
   document.addEventListener('click', (event) => {
     const target = event && event.target && typeof event.target.closest === 'function'
-      ? event.target.closest('[data-role="sidebar-category-static"], [data-role="desktop-sidebar-toggle"], [data-role="library-search-action"], [data-role="library-open-filter"], [data-role="library-sort-toggle"], [data-role="library-type-toggle"], [data-role="library-filter-reset"], [data-role="detail-back-to-list"]')
+      ? event.target.closest('[data-role="mobile-brand-home"], [data-role="sidebar-category-static"], [data-role="desktop-sidebar-toggle"], [data-role="library-search-action"], [data-role="library-open-filter"], [data-role="library-sort-toggle"], [data-role="library-type-toggle"], [data-role="library-filter-reset"], [data-role="detail-back-to-list"]')
       : null;
     if (!target) return;
 
     event.preventDefault();
 
     const role = target.getAttribute('data-role');
+    if (role === 'mobile-brand-home') {
+      if (window.matchMedia('(max-width: 1200px)').matches) return selectCategory('home');
+      return;
+    }
     if (role === 'sidebar-category-static') {
       return selectCategory(target.getAttribute('data-category-id') || 'home');
     }
@@ -75,6 +79,14 @@ function initLibraryShellDelegation() {
       return goBackToList();
     }
   }, true);
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const target = event.target?.closest?.('[data-role="mobile-brand-home"]');
+    if (!target || !window.matchMedia('(max-width: 1200px)').matches) return;
+    event.preventDefault();
+    selectCategory('home');
+  });
 
   document.addEventListener('input', (event) => {
     const target = event && event.target;

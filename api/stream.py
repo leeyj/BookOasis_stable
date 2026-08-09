@@ -436,6 +436,7 @@ def save_viewer_progress():
         page_idx = data.get('page_idx') # 0-indexed로 처리
         total_pages = data.get('total_pages')
         epub_session = data.get('epub_session') or None
+        flush_immediately = bool(data.get('flush_immediately', False))
         user_id = session.get('user_id', 1)
 
         if book_id is None or page_idx is None:
@@ -445,14 +446,17 @@ def save_viewer_progress():
         if total_pages is None:
             total_pages = 1
 
-        StreamService.record_progress(
+        persisted = StreamService.record_progress(
             db_type,
             book_id,
             page_idx,
             total_pages,
             user_id=user_id,
-            epub_session=epub_session
+            epub_session=epub_session,
+            flush_immediately=flush_immediately,
         )
+        if flush_immediately and not persisted:
+            return jsonify({'success': False, 'error': 'progress persistence is busy'}), 503
         return jsonify({'success': True})
     except Exception as e:
         print(f"[Progress API Error] {e}")
@@ -491,13 +495,26 @@ def mark_book_as_unread():
         if not check_adult_permission(db_type):
             return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
         book_id = data.get('book_id')
+        scope = data.get('scope', 'book')
+        series_name = str(data.get('series_name') or '').strip()
+        library_id = data.get('library_id')
         user_id = session.get('user_id', 1)
 
         if book_id is None:
             return jsonify({'success': False, 'error': 'book_id가 누락되었습니다.'}), 400
+        if scope not in ('book', 'series'):
+            return jsonify({'success': False, 'error': '지원하지 않는 읽지 않음 범위입니다.'}), 400
+        if scope == 'series' and (not series_name or library_id is None):
+            return jsonify({'success': False, 'error': '시리즈명 또는 라이브러리 ID가 누락되었습니다.'}), 400
 
-        ReadingProgressService.mark_unread(db_type, book_id, user_id=user_id)
-        return jsonify({'success': True})
+        affected_count = ReadingProgressService.mark_unread(
+            db_type,
+            book_id,
+            user_id=user_id,
+            series_name=series_name if scope == 'series' else None,
+            library_id=library_id if scope == 'series' else None,
+        )
+        return jsonify({'success': True, 'affected_count': affected_count, 'scope': scope})
     except Exception as e:
         print(f"[Unread API Error] {e}")
         return jsonify({'success': False, 'error': str(e)}), 500

@@ -28,7 +28,8 @@ class StreamService:
         return StreamPageService.extract_page(file_path, page_idx, db_type=db_type, book_id=book_id)
 
     @staticmethod
-    def record_progress(db_type: str, book_id, page_idx: int, total_pages: int, user_id=1, epub_session=None):
+    def record_progress(db_type: str, book_id, page_idx: int, total_pages: int, user_id=1,
+                        epub_session=None, flush_immediately=False):
         return ReadingProgressService.record_progress(
             db_type,
             book_id,
@@ -36,6 +37,7 @@ class StreamService:
             total_pages,
             user_id=user_id,
             epub_session=epub_session,
+            flush_immediately=flush_immediately,
         )
 
     @staticmethod

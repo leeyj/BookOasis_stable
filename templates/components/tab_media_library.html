@@ -14,7 +14,7 @@
     <div class="library-sidebar"
         style="display: flex; flex-direction: column; justify-content: space-between; min-height: auto;">
         <div class="sidebar-header-wrapper" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-            <h3 class="sidebar-title" style="margin: 0; display: flex; align-items: center; gap: 0.55rem;"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="BookOasis" style="width: 32px; height: 32px; object-fit: contain;"> <span>BookOasis</span></h3>
+            <h3 class="sidebar-title" data-role="mobile-brand-home" style="margin: 0; display: flex; align-items: center; gap: 0.55rem;"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="" aria-hidden="true" style="width: 32px; height: 32px; object-fit: contain;"> <span>BookOasis</span></h3>
             <button id="btn-sidebar-toggle" class="btn-sidebar-toggle" aria-expanded="false" style="display: none; background: transparent; border: none; color: var(--app-text-primary); font-size: 1.25rem; cursor: pointer; padding: 0.2rem 0.5rem; outline: none;">
                 <i class="fa-solid fa-bars"></i>
             </button>
@@ -243,4 +243,4 @@
     </div>
 </div>
 
-<script type="module" src="{{ static_asset_url('js/tab_media_library.js') }}"></script>
+<script type="module" src="{{ static_asset_url('js/tab_media_library.js', sig='unread-series-v5') }}"></script>

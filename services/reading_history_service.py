@@ -120,7 +120,7 @@ class ReadingHistoryService:
         hide_completed = (row_hide == '1')
 
         # 설정별로 캐시를 분리해 노출 개수 변경을 즉시 반영한다.
-        cache_key = f"cache:history:v7:{db_type}:{user_id}:{limit}:{int(hide_completed)}"
+        cache_key = f"cache:history:v8:{db_type}:{user_id}:{limit}:{int(hide_completed)}"
         cached_data = redis_get(cache_key)
         if cached_data:
             try:
