@@ -3,7 +3,6 @@ import os
 import sys
 import gc
 import time
-import sqlite3
 import argparse
 from PIL import Image
 
@@ -29,6 +28,33 @@ def _collect_zip_offsets_safe(file_path):
     except Exception as e:
         print(f"[Lazy-Scanner] 오프셋 수집 중 예외 무시: {e}")
         return []
+
+
+def _fetch_lazy_scan_candidates(cursor):
+    cursor.execute("""
+        SELECT id, file_path, series_name, file_format, cover_image, library_id, total_pages, has_offsets,
+               COALESCE(metadata_locked, 0) AS metadata_locked
+        FROM books
+        WHERE LOWER(file_path) NOT LIKE '%.txt'
+          AND (
+              (cover_image IS NULL OR cover_image = '')
+              OR cover_image = 'NO_COVER'
+              OR (
+                  LOWER(COALESCE(file_format, '')) IN ('zip', 'cbz')
+                  AND COALESCE(has_offsets, 0) = 0
+              )
+          )
+    """)
+    return cursor.fetchall()
+
+
+def _open_database_connection(db_type):
+    if not database.is_mariadb_mode():
+        db_path = database.get_db_path(db_type)
+        if not os.path.exists(db_path):
+            return None
+    return database.get_connection(db_type, wait_timeout=60.0)
+
 
 def setup_lazy_scanner_logging():
     write_log = True
@@ -127,13 +153,11 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
                     print("[Lazy-Scanner] 🛑 용량 한도 달성으로 DB 순회를 중단하고 차기 서브-배치로 이관합니다.")
                 break
 
-            db_path = database.get_db_path(db_type)
-            if not os.path.exists(db_path):
+            conn = _open_database_connection(db_type)
+            if conn is None:
                 continue
                 
             print(f"[Lazy-Scanner] 🔍 DB 연결 및 검사 시작: {db_type}")
-            conn = sqlite3.connect(db_path, timeout=60.0)
-            conn.row_factory = sqlite3.Row
             try:
                 conn.execute("PRAGMA busy_timeout = 60000;")
                 conn.execute("PRAGMA synchronous = NORMAL;")
@@ -150,23 +174,13 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
             else:
                 # ── DB SQL 필터링 최적화 ──
                 # 1. txt 확장자 제외
-                # 2. 커버 경로가 없는 경우(NULL 또는 빈 문자열)
+                # 2. 커버 경로가 없거나 이전 추출에 실패한 경우
                 # 3. ZIP/CBZ 포맷 중 페이지 수(total_pages)=0 이거나 오프셋(has_offsets)=0 인 경우
                 # 위 스캔 후보 도서만 DB 인덱스 레벨에서 1차 선별하여 퍼포먼스 극대화
-                cursor.execute("""
-                    SELECT id, file_path, series_name, file_format, cover_image, library_id, total_pages, has_offsets,
-                           COALESCE(metadata_locked, 0) AS metadata_locked
-                    FROM books
-                    WHERE LOWER(file_path) NOT LIKE '%.txt'
-                      AND (
-                          (cover_image IS NULL OR cover_image = '')
-                          OR (LOWER(COALESCE(file_format, '')) IN ('zip', 'cbz') AND COALESCE(has_offsets, 0) = 0)
-                      )
-                      AND COALESCE(cover_image, '') != 'NO_COVER'
-                      AND COALESCE(has_offsets, 0) != -1
-                """)
+                books = _fetch_lazy_scan_candidates(cursor)
                 
-            books = cursor.fetchall()
+            if target_book_id is not None:
+                books = cursor.fetchall()
             print(f"[Lazy-Scanner] 📋 DB({db_type}) 스캔 필요 후보 도서 레코드 조회 완료 (총 {len(books)}권). 파일 물리 점검 시작...")
             
             targets = []
@@ -501,7 +515,7 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
                         elif file_path.lower().endswith('.pdf') and ("mupdf" in err_msg.lower() or "syntax error" in err_msg.lower() or "page tree" in err_msg.lower() or "cannot open" in err_msg.lower() or "fitz" in err_msg.lower()):
                             error_type = "MuPDFFormatError"
                             
-                        # ── 실패한 도서는 cover_image = 'NO_COVER'로 갱신하여 다음 쿼리에서 무한 반복 스킵 ──
+                        # 실패 상태를 UI에 표시하되 다음 스케줄에서는 다시 추출을 시도합니다.
                         try:
                             cursor.execute("""
                                 UPDATE books SET

@@ -10,6 +10,9 @@ export async function renderCollectionsView() {
   const indicator = document.getElementById('current-category-indicator');
   const countBadge = document.getElementById('library-total-count');
 
+  const scrollSpinner = document.getElementById('infinite-scroll-spinner');
+  if (scrollSpinner) scrollSpinner.style.display = 'none';
+
   if (indicator) indicator.innerText = '컬렉션 (Collections)';
 
   if (!container) return;
@@ -119,6 +122,9 @@ export async function renderCollectionDetail(collectionId) {
   const container = document.getElementById('books-list-container') || document.getElementById('media-library-grid');
   const indicator = document.getElementById('current-category-indicator');
   const countBadge = document.getElementById('library-total-count');
+
+  const scrollSpinner = document.getElementById('infinite-scroll-spinner');
+  if (scrollSpinner) scrollSpinner.style.display = 'none';
 
   if (!container) return;
   container.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:3rem; color:#94a3b8;"><i class="fa-solid fa-circle-notch fa-spin"></i> 컬렉션 상세 정보를 불러오는 중...</div>`;

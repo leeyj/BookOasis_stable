@@ -372,6 +372,7 @@
     "scan_book_now": "이 책 즉시 스캔 (표지/메타)",
     "search_metadata": "메타정보 검색",
     "add_to_collection": "컬렉션에 추가",
+    "add_series_to_collection": "이 시리즈를 컬렉션에 추가",
     "mark_as_unread": "읽지 않은 상태로 변경 (0%)",
     "mark_series_as_unread": "이 시리즈 전체를 읽지 않은 상태로 변경 (0%)"
   },

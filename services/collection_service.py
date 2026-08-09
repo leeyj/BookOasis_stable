@@ -1,5 +1,4 @@
 from repositories.collection_repository import CollectionRepository
-from repositories.series_repository import SeriesRepository
 from repositories.book_repository import BookRepository
 
 class CollectionService:
@@ -30,7 +29,7 @@ class CollectionService:
             item_dict = dict(item)
             if item.get('series_name'):
                 s_name = item['series_name']
-                series_books = SeriesRepository.get_books_by_series(db_type, s_name)
+                series_books = BookRepository.get_books_by_series(db_type, s_name, user_id=user_id)
                 book_count = len(series_books) if series_books else 0
                 rep_cover = None
                 rep_format = 'zip'

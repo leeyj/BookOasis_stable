@@ -1,4 +1,7 @@
 # CHANGELOG
+## v1.9.0
+- (lazy/mariadb) 스캐너 오류 수정 | fix lazy scanner
+- (dashboard) 컬렉션 추가 방식 확장 | expend collection addd method
 
 ## v1.8.9
 - (dashboard)읽지 않은상태 변경 수정(기준: 시리즈) | unread change fix

@@ -372,6 +372,7 @@
     "scan_book_now": "Scan This Book Now (Cover/Meta)",
     "search_metadata": "Search Metadata",
     "add_to_collection": "Add to Collection",
+    "add_series_to_collection": "Add This Series to Collection",
     "mark_as_unread": "Mark as Unread (0%)",
     "mark_series_as_unread": "Mark Entire Series as Unread (0%)"
   },

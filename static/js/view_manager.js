@@ -74,10 +74,14 @@ export function switchActiveView(viewName) {
     case 'grid':
       if (gridView) gridView.style.display = 'block';
       if (btnSort) {
-        // 'history'(최근 읽은 도서) 카테고리에서는 정렬 버튼을 노출하지 않고 그 외 보관함에서는 노출
-        btnSort.style.display = (state.currentLibraryId === 'history') ? 'none' : 'inline-flex';
+        // 'history'(최근 읽은 도서), 'collection'(컬렉션) 카테고리에서는 정렬 버튼을 노출하지 않고 그 외 보관함에서는 노출
+        btnSort.style.display = (['history', 'collection'].includes(state.currentLibraryId)) ? 'none' : 'inline-flex';
       }
-      if (state.currentLibraryId !== 'history') {
+      if (state.currentLibraryId === 'collection') {
+        const scrollSpinner = document.getElementById('infinite-scroll-spinner');
+        if (scrollSpinner) scrollSpinner.style.display = 'none';
+      }
+      if (state.currentLibraryId !== 'history' && state.currentLibraryId !== 'collection') {
         mountIndexScrollbar();
       }
       break;

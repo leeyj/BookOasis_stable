@@ -19,16 +19,23 @@ class BookRepository:
         return dict(row) if row else None
 
     @staticmethod
-    def get_books_by_series(db_type, series_name, library_id, user_id):
+    def get_books_by_series(db_type, series_name, library_id=None, user_id=None):
         """동일 시리즈 내 전체 도서 목록 조회 (유저 읽기 진척도 포함)"""
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
-        cursor.execute("""
+        where = ["COALESCE(b.is_deleted, 0) = 0", "b.series_name = ?"]
+        params = [series_name]
+        if library_id is not None:
+            where.append("b.library_id = ?")
+            params.append(library_id)
+        
+        sql = f"""
             SELECT b.id, b.title, b.file_format, b.total_pages, b.cover_image, b.cover_updated_at, b.file_path, p.pages_read
             FROM books b
             LEFT JOIN user_progress p ON b.id = p.book_id AND p.user_id = ?
-            WHERE COALESCE(b.is_deleted, 0) = 0 AND b.series_name = ? AND b.library_id = ?
-        """, (user_id, series_name, library_id))
+            WHERE {' AND '.join(where)}
+        """
+        cursor.execute(sql, (user_id, *params))
         rows = cursor.fetchall()
         conn.close()
         return [dict(row) for row in rows]
