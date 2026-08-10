@@ -290,11 +290,14 @@ def change_password():
         
     user_id = session['user_id']
     new_hash = generate_password_hash(new_password.strip())
-    
+
     # 두 DB 모두 계정을 동기화하여 비밀번호 변경 반영 (세션 일치)
-    for db_type in ['general', 'adult', 'audiobook']:
-        UserRepository.update_password(db_type, user_id, new_hash)
-        
+    try:
+        for db_type in ['general', 'adult', 'audiobook']:
+            UserRepository.update_password(db_type, user_id, new_hash)
+    except Exception as e:
+        return jsonify({'success': False, 'error': _t('api.password_change_failed', error=str(e))}), 500
+
     session['is_default_password'] = 0
     return jsonify({'success': True, 'message': _t('api.password_changed_success')})
 
@@ -413,10 +416,13 @@ def reset_user_password(target_user_id):
         set_default = 0
         
     new_hash = generate_password_hash(new_password)
-    
-    for db_type in ['general', 'adult', 'audiobook']:
-        UserRepository.admin_reset_password(db_type, target_user_id, new_hash, set_default)
-        
+
+    try:
+        for db_type in ['general', 'adult', 'audiobook']:
+            UserRepository.admin_reset_password(db_type, target_user_id, new_hash, set_default)
+    except Exception as e:
+        return jsonify({'success': False, 'error': _t('api.password_change_failed', error=str(e))}), 500
+
     return jsonify({'success': True, 'message': _t('api.password_changed_success')})
 
 @auth_bp.route('/api/i18n/languages', methods=['GET'])

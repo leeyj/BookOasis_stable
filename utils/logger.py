@@ -7,17 +7,72 @@ import re
 
 TIMESTAMP_REGEX = re.compile(r'^(?:\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]|\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})')
 
+DEFAULT_ARCHIVE_MAX_FILES = 10
+DEFAULT_ARCHIVE_MAX_MB = 200
+
+
+def _read_nonnegative_int_env(name, default):
+    try:
+        return max(0, int(os.environ.get(name, default)))
+    except (TypeError, ValueError):
+        return default
+
 class ZipRotatingLogger:
-    def __init__(self, filepath, max_bytes):
+    def __init__(self, filepath, max_bytes, archive_max_files=None, archive_max_bytes=None):
         self.filepath = filepath
         self.max_bytes = max_bytes
         self.log_dir = os.path.dirname(filepath)
         self.filename = os.path.basename(filepath)
+        self.archive_max_files = (
+            _read_nonnegative_int_env('LOG_ARCHIVE_MAX_FILES', DEFAULT_ARCHIVE_MAX_FILES)
+            if archive_max_files is None else max(0, int(archive_max_files))
+        )
+        self.archive_max_bytes = (
+            _read_nonnegative_int_env('LOG_ARCHIVE_MAX_MB', DEFAULT_ARCHIVE_MAX_MB) * 1024 * 1024
+            if archive_max_bytes is None else max(0, int(archive_max_bytes))
+        )
+        self._archive_pattern = re.compile(
+            rf'^{re.escape(self.filename)}_\d{{8}}_\d{{6}}(?:_\d{{6}})?\.zip$'
+        )
         os.makedirs(self.log_dir, exist_ok=True)
         self._current_size = 0
         if os.path.exists(filepath):
             self._current_size = os.path.getsize(filepath)
         self._at_line_start = True
+        self._cleanup_archives()
+
+    def _list_archives(self):
+        archives = []
+        try:
+            entries = os.scandir(self.log_dir)
+        except OSError:
+            return archives
+
+        with entries:
+            for entry in entries:
+                try:
+                    if entry.is_file() and self._archive_pattern.match(entry.name):
+                        stat = entry.stat()
+                        archives.append((stat.st_mtime, entry.name, entry.path, stat.st_size))
+                except OSError:
+                    continue
+        archives.sort(key=lambda archive: (archive[0], archive[1]))
+        return archives
+
+    def _cleanup_archives(self):
+        archives = self._list_archives()
+        total_bytes = sum(archive[3] for archive in archives)
+
+        while archives and (
+            len(archives) > self.archive_max_files
+            or total_bytes > self.archive_max_bytes
+        ):
+            _, _, archive_path, archive_size = archives.pop(0)
+            try:
+                os.remove(archive_path)
+                total_bytes -= archive_size
+            except OSError:
+                continue
 
     def _rotate(self):
         if not os.path.exists(self.filepath):
@@ -33,7 +88,8 @@ class ZipRotatingLogger:
             with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zf:
                 zf.write(temp_log, self.filename)
             os.remove(temp_log)
-        except Exception as e:
+            self._cleanup_archives()
+        except Exception:
             pass
         self._current_size = 0
 

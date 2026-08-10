@@ -25,7 +25,19 @@ function escapeHtml(value) {
 function parseScanDate(value) {
   const raw = String(value || '').trim();
   if (!raw || raw === '-') return null;
-  const parsed = new Date(raw.includes('T') ? raw : raw.replace(' ', 'T'));
+
+  // 서버가 타임존 정보 없이 "YYYY-MM-DD HH:mm:ss" 형태의 로컬 시각을 보내는 경우,
+  // new Date()에 그대로 넘기면 브라우저/엔진에 따라 UTC로 해석되어 KST 기준 9시간 오차가 발생할 수 있다.
+  // 연-월-일-시-분-초 컴포넌트를 직접 읽어 항상 "로컬 시각"으로 고정 생성해 이 모호함을 없앤다.
+  const naiveMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?$/);
+  if (naiveMatch) {
+    const [, y, mo, d, h, mi, s] = naiveMatch.map(Number);
+    const local = new Date(y, mo - 1, d, h, mi, s);
+    return Number.isNaN(local.getTime()) ? null : local;
+  }
+
+  // Z 또는 +09:00 같은 타임존 오프셋이 명시된 표준 ISO 문자열은 그대로 위임
+  const parsed = new Date(raw);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 

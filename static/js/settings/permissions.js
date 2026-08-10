@@ -104,6 +104,7 @@ function renderMatrixBody(users, categories, permissions, targetDb) {
 
     users.forEach(user => {
       const key = `${targetDb}_${cat.id}`;
+      const permissionTargetDb = cat.db_type || targetDb;
       const hasPerm = permissions[user.id] && permissions[user.id][key] !== undefined
         ? permissions[user.id][key]
         : true;
@@ -113,7 +114,7 @@ function renderMatrixBody(users, categories, permissions, targetDb) {
       rowHTML += `
         <td style="padding:1rem; text-align:center;">
           <input type="checkbox" class="permission-chk-category"
-                 data-user-id="${user.id}" data-library-id="${cat.id}" data-db-type="${targetDb}"
+                 data-user-id="${user.id}" data-library-id="${cat.id}" data-db-type="${permissionTargetDb}"
                  ${hasPerm ? 'checked' : ''} ${isDisabled}
                  style="cursor:pointer; width:1.1rem; height:1.1rem; accent-color:${accentColor};">
         </td>

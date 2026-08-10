@@ -18,6 +18,8 @@ services:
     environment:
       - PORT=5930
       - REDIS_URL=redis://redis:6379/0
+      - LOG_ARCHIVE_MAX_FILES=10
+      - LOG_ARCHIVE_MAX_MB=200
     depends_on:
       - redis
 

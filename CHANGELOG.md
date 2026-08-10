@@ -1,4 +1,11 @@
 # CHANGELOG
+## v1.9.1
+- (log) 로그 로테이션 정책 적용 | log rotation rule added
+- (mariadb) 초기 설치시 admin 계정 보장 | admin id fix
+- (mariadb) 초기 설치시 DB 오류 매세지 구체화 | DBMS error message added
+- (plugin) 권한해제시 오류 수정 | fix plugin assignment
+- (flask)파이썬 버전 호환 확장(3.10~3.14) | support python version (3.10~3.14)
+
 ## v1.9.0
 - (lazy/mariadb) 스캐너 오류 수정 | fix lazy scanner
 - (dashboard) 컬렉션 추가 방식 확장 | expend collection addd method

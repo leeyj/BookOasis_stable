@@ -600,8 +600,17 @@ function getScanActivityTaskInfo(task, isPending = false) {
 
 function formatScanActivityElapsed(startedAt) {
   if (!startedAt) return '';
-  const normalized = String(startedAt).replace(' ', 'T');
-  const startedMs = Date.parse(normalized);
+  const raw = String(startedAt).trim();
+  // 서버가 타임존 없는 "YYYY-MM-DD HH:mm:ss" 로컬 시각을 보내므로, Date.parse에 그대로 넘기면
+  // 브라우저에 따라 UTC로 해석되어 KST 기준 9시간 오차가 생길 수 있다. 컴포넌트를 직접 읽어 로컬로 고정한다.
+  const naiveMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?$/);
+  let startedMs;
+  if (naiveMatch) {
+    const [, y, mo, d, h, mi, s] = naiveMatch.map(Number);
+    startedMs = new Date(y, mo - 1, d, h, mi, s).getTime();
+  } else {
+    startedMs = Date.parse(raw);
+  }
   if (!Number.isFinite(startedMs)) return '';
   const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startedMs) / 1000));
   if (elapsedSeconds < 60) return `${elapsedSeconds}초`;

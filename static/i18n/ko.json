@@ -523,6 +523,7 @@
     "invalid_credentials": "아이디 또는 비밀번호가 올바르지 않습니다.",
     "new_password_length_error": "새 비밀번호는 공백 제외 최소 4자리 이상이어야 합니다.",
     "password_changed_success": "비밀번호가 정상 변경되었습니다.",
+    "password_change_failed": "비밀번호 변경 실패: {error}",
     "username_password_initial_required": "아이디와 초기 비밀번호를 입력해 주세요.",
     "password_length_error": "비밀번호는 최소 4자리 이상이어야 합니다.",
     "username_exists": "이미 존재하는 사용자 아이디입니다.",

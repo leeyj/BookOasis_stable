@@ -523,6 +523,7 @@
     "invalid_credentials": "Invalid username or password.",
     "new_password_length_error": "The new password must be at least 4 characters long.",
     "password_changed_success": "Password changed successfully.",
+    "password_change_failed": "Failed to change password: {error}",
     "username_password_initial_required": "Please enter a username and an initial password.",
     "password_length_error": "The password must be at least 4 characters long.",
     "username_exists": "Username already exists.",

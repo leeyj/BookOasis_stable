@@ -359,7 +359,7 @@ class MariadbCursorWrapper:
         if not row:
             return None
         if isinstance(row, dict):
-            return row
+            return DictRow(row)
         return DictRow(row)
 
     def fetchall(self):
@@ -367,7 +367,7 @@ class MariadbCursorWrapper:
         if not rows:
             return []
         if isinstance(rows[0], dict):
-            return list(rows)
+            return [DictRow(row) for row in rows]
         return [DictRow(r) for r in rows]
 
     @property
