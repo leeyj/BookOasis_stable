@@ -26,6 +26,25 @@ tags: [install, guide, setup]
 
 ## 2. 설치 단계 (Quick Start)
 
+### ⚡ 대화형 설치 스크립트 (선택)
+
+수동으로 단계를 따라 하는 대신, Docker/Native 방식 선택부터 보안 키 생성까지 안내해 주는 대화형 설치 마법사를 사용할 수 있습니다. 두 가지 실행 방식이 있으며 **동작은 동일**하고, stdin 연결 방식만 다릅니다.
+
+**방법 A — 원격 부트스트랩 (`get.sh`, 저장소를 미리 클론하지 않아도 됨):**
+```bash
+curl -fsSL https://raw.githubusercontent.com/leeyj/BookOasis_stable/main/get.sh | bash
+```
+> `get.sh`는 소스를 `~/.bookoasis/src`에 내려받은 뒤, 아래 `install.sh`를 실제 터미널(TTY)에 재연결하여 실행합니다. `curl | bash`로 직접 `install.sh`를 실행하면 파이프가 표준입력을 이미 점유하고 있어 대화형 질문(read)이 즉시 실패하므로, 반드시 `get.sh`를 통해 실행하십시오.
+
+**방법 B — 소스 클론 후 직접 실행:**
+```bash
+git clone https://github.com/leeyj/BookOasis_stable.git
+cd BookOasis_stable
+bash install.sh
+```
+
+두 방법 모두 실행 도중 설치 방식(Docker/Native), 설치 경로, 라이브러리 경로, `SECRET_KEY`/`WEBHOOK_TOKEN`을 대화형으로 안내받습니다. 아래 ①~④ 단계는 스크립트를 사용하지 않고 수동으로 구성하는 경우의 안내입니다.
+
 ### ① 소스 코드 복제 및 가상환경 구성
 프로젝트 코드를 준비하고 파이썬 가상환경(venv)을 생성하여 격리합니다.
 
@@ -70,7 +89,7 @@ pip install -r requirements.txt
 
 다만 아래 항목은 여전히 `.env` 기반으로 관리하는 것을 권장합니다.
 
-- **세션 고정 키**: 서버 재기동 시 로그인 세션 유지 (`SECRET_KEY`)
+- **세션 고정 키**: 서버 재기동 시 로그인 세션 유지 (`SECRET_KEY`). 아래 예시의 `yoursupersecretfixedkey12345!`는 절대 그대로 쓰지 말고 인스턴스마다 서로 다른 무작위 값으로 교체하십시오. 같은 값을 여러 서버가 공유하면 한쪽에서 발급한 세션 쿠키가 다른 쪽에서도 유효하게 해석될 수 있어 세션 위조/충돌 위험이 있습니다.
 - **인바운드 스캔 웹훅 토큰**: 외부 폴러 연동 (`WEBHOOK_TOKEN`)
 - **아웃바운드 표준 이벤트 웹훅**: `book.new/read/finish` 전송 (`WEBHOOK_EVENT_*`)
 - **MariaDB / MySQL 엔터프라이즈 모드 (선택)**: 대용량 도서 락 병목 및 손상 위험 전면 제거 (`DB_ENGINE=mariadb`)
@@ -83,6 +102,7 @@ BookOasis는 레디스 연결 실패 시 또는 환경변수 부재 시 **자동
 **.env 파일 구성 예시:**
 ```env
 # Gunicorn 재구동 시 사용자 로그인 세션 유지를 위한 고정 키
+# 반드시 서버(인스턴스)마다 다른 값으로 설정하십시오. 예: python -c "import secrets; print(secrets.token_hex(32))"
 SECRET_KEY=yoursupersecretfixedkey12345!
 
 # (선택) MariaDB / MySQL 데이터베이스 엔터프라이즈 모드 설정

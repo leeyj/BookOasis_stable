@@ -27,6 +27,16 @@ function callDep(name, ...args) {
   return undefined;
 }
 
+// 만화 뷰어에서 RTL(우->좌) 읽기 방향이 활성화되어 있는지 여부.
+// 화면 좌/우 핫스팟 클릭처럼 물리적 화면 위치에 반응하는 조작에서만 사용한다.
+function isComicRtlActive() {
+  const isComicFormat = ['zip', 'cbz', 'imgdir'].includes((state.currentViewerFormat || '').toLowerCase());
+  if (!isComicFormat) return false;
+  return (typeof window.Settings !== 'undefined' && typeof window.Settings.getComicReadingDirection === 'function')
+    ? window.Settings.getComicReadingDirection() === 'rtl'
+    : localStorage.getItem('comic_reading_direction') === 'rtl';
+}
+
 function handleViewerKeydown(e) {
   const viewerModal = document.getElementById('media-viewer-modal');
   if (!viewerModal || viewerModal.style.display !== 'flex') return;
@@ -103,17 +113,20 @@ function handleViewerKeydown(e) {
     return;
   }
 
-  const isRtl = (typeof window.Settings !== 'undefined' && typeof window.Settings.getComicReadingDirection === 'function')
-    ? window.Settings.getComicReadingDirection() === 'rtl'
-    : localStorage.getItem('comic_reading_direction') === 'rtl';
+  const isRtl = isComicRtlActive();
+
+  // 화살표 키는 아래 3번에서 읽는 방향(RTL/LTR)에 따라 별도로 분기 처리하므로,
+  // 커스텀 Next/Prev 키 기본값에 포함된 ArrowRight/ArrowLeft는 여기서 매칭 대상에서 제외한다.
+  // (제외하지 않으면 이 매칭이 먼저 걸려 아래 RTL 분기가 항상 무시됨)
+  const isDirectionalArrowKey = (k) => k === 'arrowright' || k === 'arrowleft';
 
   // 1. 스페이스바, PageDown, 커스텀 Next 키는 읽는 방향에 상관없이 무조건 '다음 스토리 내용(nextPage)'
   const isForwardAction = isSpaceKey || isPageDown ||
-                          customNextKeys.some(k => k === rawKey || k === codeKey || (k === 'space' && isSpaceKey));
+                          customNextKeys.some(k => !isDirectionalArrowKey(k) && (k === rawKey || k === codeKey || (k === 'space' && isSpaceKey)));
 
   // 2. PageUp, 커스텀 Prev 키는 읽는 방향에 상관없이 무조건 '이전 스토리 내용(prevPage)'
   const isBackwardAction = isPageUp ||
-                           customPrevKeys.some(k => k === rawKey || k === codeKey || (k === 'space' && isSpaceKey));
+                           customPrevKeys.some(k => !isDirectionalArrowKey(k) && (k === rawKey || k === codeKey || (k === 'space' && isSpaceKey)));
 
   if (isForwardAction) {
     e.preventDefault();
@@ -196,14 +209,14 @@ export function initWheelListener() {
         if (target.closest('.left-zone')) {
           e.preventDefault();
           e.stopPropagation();
-          callDep('prevPage');
+          callDep(isComicRtlActive() ? 'nextPage' : 'prevPage');
           return;
         }
 
         if (target.closest('.right-zone')) {
           e.preventDefault();
           e.stopPropagation();
-          callDep('nextPage');
+          callDep(isComicRtlActive() ? 'prevPage' : 'nextPage');
         }
       },
       { passive: false }

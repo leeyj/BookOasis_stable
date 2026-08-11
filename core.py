@@ -8,6 +8,8 @@ from urllib.parse import urlencode
 from dotenv import load_dotenv
 load_dotenv()
 
+from utils.engine_signature import ENGINE_NAME, ENGINE_SIGNATURE, ENGINE_LICENSE
+
 # 자식 워커 프로세스 여부 감지
 IS_WORKER = os.environ.get('BOOKOASIS_IS_WORKER') == 'true'
 
@@ -339,11 +341,11 @@ if not IS_WORKER:
 
     @app.after_request
     def add_fingerprint_headers(response):
-        response.headers['X-Powered-By'] = 'BookOasis Engine'
-        response.headers['X-BookOasis-Engine'] = 'BookOasis Engine v1.0'
+        response.headers['X-Powered-By'] = ENGINE_NAME
+        response.headers['X-BookOasis-Engine'] = f'{ENGINE_NAME} v1.0'
         response.headers['X-BookOasis-Version'] = app.config.get('RELEASE_VERSION', 'dev')
-        response.headers['X-BookOasis-License'] = 'AGPLv3'
-        response.headers['X-BookOasis-Signature'] = 'boe-core-a17f3c9'
+        response.headers['X-BookOasis-License'] = ENGINE_LICENSE
+        response.headers['X-BookOasis-Signature'] = ENGINE_SIGNATURE
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['X-Frame-Options'] = 'SAMEORIGIN'
         response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
@@ -368,6 +370,9 @@ if not IS_WORKER:
             response.cache_control.public = True
             response.cache_control.immutable = True
         return response
+
+    from utils.engine_signature import engine_banner_line
+    print(f"[Scanner-Trigger] {engine_banner_line()}")
 
     # 앱 기동 시 DB 초기화 수행
     init_databases()

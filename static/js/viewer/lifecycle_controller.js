@@ -173,7 +173,7 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false) {
     }
   }
 
-  exitFullscreenIfNeeded();
+  const fullscreenExitPromise = exitFullscreenIfNeeded();
 
   const padPanel = document.getElementById('viewer-padding-overlay-panel');
   if (padPanel) {
@@ -208,9 +208,23 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false) {
     }
 
     // 모바일 브라우저 뷰포트 레이아웃 재계산 및 카테고리 헤더 리플로우 유도
-    requestAnimationFrame(() => {
+    const forceLayoutRecovery = () => {
+      // 강제 리플로우: 일부 모바일 브라우저는 Fullscreen 종료 직후 safe-area/뷰포트
+      // 단위(env(), dvh)를 즉시 재계산하지 않아 상단 사이드바(햄버거 메뉴)가
+      // 잘못된 크기로 그려진 채 남는 경우가 있어, 실제 스타일 재계산을 강제한다.
+      void document.body.offsetHeight;
       window.dispatchEvent(new Event('resize'));
-    });
+      import('../sidebar_manager.js').then((m) => {
+        if (m.syncSidebarResponsiveControls) m.syncSidebarResponsiveControls();
+      }).catch(() => {});
+    };
+
+    requestAnimationFrame(forceLayoutRecovery);
+    // exitFullscreenIfNeeded()는 비동기로 완료되므로, 전환이 실제로 끝난 뒤
+    // 한 번 더 복구를 수행해 Fullscreen 종료 타이밍과의 경쟁 상태를 방지한다.
+    Promise.resolve(fullscreenExitPromise)
+      .then(() => requestAnimationFrame(forceLayoutRecovery))
+      .catch(() => {});
   }
 
   if (activeViewerInstance && typeof activeViewerInstance.destroy === 'function') {

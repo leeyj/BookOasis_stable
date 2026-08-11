@@ -221,11 +221,11 @@ class SeriesRepository:
                 if not search_term:
                     where.append("1 = 0")
                 elif search_mode == 'author':
-                    where.append("COALESCE(a.author, '') LIKE %s")
-                    params.append(f"%{search_term}%")
+                    where.append("LOWER(COALESCE(a.author, '')) LIKE %s")
+                    params.append(f"%{search_term.lower()}%")
                 else:
-                    where.append("COALESCE(a.title, '') LIKE %s")
-                    params.append(f"%{search_term}%")
+                    where.append("LOWER(COALESCE(a.title, '')) LIKE %s")
+                    params.append(f"%{search_term.lower()}%")
             if role != 'admin' and user_id:
                 where.append(
                     "EXISTS ("
@@ -279,15 +279,15 @@ class SeriesRepository:
                 if not search_term:
                     sub_where.append("1 = 0")
                 elif search_mode == 'author':
-                    sub_where.append("COALESCE(b2.author, '') LIKE %s")
-                    sub_params.append(f"%{search_term}%")
+                    sub_where.append("LOWER(COALESCE(b2.author, '')) LIKE %s")
+                    sub_params.append(f"%{search_term.lower()}%")
                 else:
-                    like = f"%{search_term}%"
+                    like = f"%{search_term.lower()}%"
                     sub_where.append(
-                        "(COALESCE(b2.title, '') LIKE %s "
-                        "OR COALESCE(b2.title_alias, '') LIKE %s "
-                        "OR COALESCE(b2.series_name, '') LIKE %s "
-                        "OR COALESCE(b2.series_alias, '') LIKE %s)"
+                        "(LOWER(COALESCE(b2.title, '')) LIKE %s "
+                        "OR LOWER(COALESCE(b2.title_alias, '')) LIKE %s "
+                        "OR LOWER(COALESCE(b2.series_name, '')) LIKE %s "
+                        "OR LOWER(COALESCE(b2.series_alias, '')) LIKE %s)"
                     )
                     sub_params.extend([like, like, like, like])
 
@@ -390,11 +390,11 @@ class SeriesRepository:
                 if not search_term:
                     where.append("1 = 0")
                 elif search_mode == 'author':
-                    where.append("COALESCE(a.author, '') LIKE %s")
-                    params.append(f"%{search_term}%")
+                    where.append("LOWER(COALESCE(a.author, '')) LIKE %s")
+                    params.append(f"%{search_term.lower()}%")
                 else:
-                    where.append("COALESCE(a.title, '') LIKE %s")
-                    params.append(f"%{search_term}%")
+                    where.append("LOWER(COALESCE(a.title, '')) LIKE %s")
+                    params.append(f"%{search_term.lower()}%")
             if role != 'admin' and user_id:
                 where.append(
                     "EXISTS (SELECT 1 FROM user_category_permissions p "
@@ -425,13 +425,13 @@ class SeriesRepository:
                 if not search_term:
                     sub_where.append("1 = 0")
                 elif search_mode == 'author':
-                    sub_where.append("COALESCE(b2.author, '') LIKE %s")
-                    sub_params.append(f"%{search_term}%")
+                    sub_where.append("LOWER(COALESCE(b2.author, '')) LIKE %s")
+                    sub_params.append(f"%{search_term.lower()}%")
                 else:
-                    like = f"%{search_term}%"
+                    like = f"%{search_term.lower()}%"
                     sub_where.append(
-                        "(COALESCE(b2.title, '') LIKE %s OR COALESCE(b2.title_alias, '') LIKE %s "
-                        "OR COALESCE(b2.series_name, '') LIKE %s OR COALESCE(b2.series_alias, '') LIKE %s)"
+                        "(LOWER(COALESCE(b2.title, '')) LIKE %s OR LOWER(COALESCE(b2.title_alias, '')) LIKE %s "
+                        "OR LOWER(COALESCE(b2.series_name, '')) LIKE %s OR LOWER(COALESCE(b2.series_alias, '')) LIKE %s)"
                     )
                     sub_params.extend([like, like, like, like])
             for genre in genre_filters:

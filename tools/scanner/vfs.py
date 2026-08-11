@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+# BookOasis Engine (boe-core-a17f3c9) - VFS(rclone) 캐시 사전 갱신 로직
+# Copyright (c) BookOasis contributors. Licensed under the GNU AGPLv3 (see LICENSE).
+# 이 파일을 포함한 수정본을 네트워크 서비스로 운용하는 경우, AGPLv3 13조에 따라
+# 이용자에게 대응 소스코드(Corresponding Source)를 제공해야 하며, 5조에 따라
+# 위 저작권/라이선스 고지를 임의로 제거할 수 없습니다.
 import os
 import urllib.request
 import urllib.error
@@ -8,6 +13,7 @@ import base64
 import time
 import database
 from utils.drive_helper import is_remote_path, is_gdrive_url, is_rclone_vfs_path, get_rclone_refresh_dirs
+from utils.engine_signature import ENGINE_NAME, ENGINE_SIGNATURE
 
 
 def _is_connection_refused_error(err):
@@ -94,8 +100,13 @@ def trigger_vfs_refresh(db_path, library_id, physical_path):
                 for rc_url in rc_urls:
                     try:
                         parsed = urllib.parse.urlparse(rc_url)
-                        headers = {'Content-Type': 'application/json'}
-                        
+                        # User-Agent에 엔진 시그니처를 남겨, 이 VFS 사전 갱신 로직이 그대로
+                        # 복제/재사용된 경우 네트워크 트래픽에서도 출처를 식별할 수 있게 한다.
+                        headers = {
+                            'Content-Type': 'application/json',
+                            'User-Agent': f'{ENGINE_NAME}/{ENGINE_SIGNATURE}',
+                        }
+
                         if parsed.username and parsed.password:
                             auth_str = f"{parsed.username}:{parsed.password}"
                             auth_b64 = base64.b64encode(auth_str.encode('utf-8')).decode('utf-8')

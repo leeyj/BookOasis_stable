@@ -67,7 +67,10 @@ class BookScanService:
             
             # 2. 로컬 메타데이터 파일 탐색
             merged_meta = merge_local_metadata(parent_dir)
-            print(f"[BookScanService] 파싱된 로컬 메타데이터: {merged_meta}")
+            # cover_b64_map은 파일별 Base64 커버 원본을 통째로 담고 있어 그대로 출력하면
+            # 로그 파일 용량을 불필요하게 낭비하므로, 개수만 요약해서 남긴다.
+            meta_summary = {k: (f"<{len(v)} items>" if k == 'cover_b64_map' else v) for k, v in merged_meta.items()}
+            print(f"[BookScanService] 파싱된 로컬 메타데이터: {meta_summary}")
             
             # 3. 커버 이미지 결정 (Force 재추출 강제 지정)
             cover_image = None

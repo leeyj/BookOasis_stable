@@ -43,13 +43,21 @@ export function tryAutoFullscreenOnOpen(modal = null) {
 }
 
 export function exitFullscreenIfNeeded() {
-  if (!isViewerInFullscreen()) return;
+  if (!isViewerInFullscreen()) return Promise.resolve();
 
   if (document.exitFullscreen) {
-    document.exitFullscreen().catch(() => {});
+    return document.exitFullscreen().catch(() => {});
   } else if (document.webkitExitFullscreen) {
-    document.webkitExitFullscreen();
+    try {
+      document.webkitExitFullscreen();
+    } catch (e) {
+      // ignore
+    }
+    // webkitExitFullscreen는 Promise를 반환하지 않으므로,
+    // 실제 전환이 끝날 만큼 짧게 대기한 뒤 다음 단계로 넘어간다.
+    return new Promise((resolve) => setTimeout(resolve, 120));
   }
+  return Promise.resolve();
 }
 
 export function isMobileDevice() {

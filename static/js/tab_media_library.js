@@ -28,7 +28,7 @@ import { switchSettingsTab, loadInitialSystemSettings, loadGeneralSettings, subm
 
 // 장르/태그 및 사이드바 제어 모듈
 import { initFloatingFilter, toggleFilterModal } from './genre_tag_filter.js';
-import { initSidebarInteractions, restoreDesktopSidebarState, toggleDesktopSidebar } from './sidebar_manager.js';
+import { initSidebarInteractions, restoreDesktopSidebarState, toggleDesktopSidebar, syncSidebarResponsiveControls } from './sidebar_manager.js';
 import { decodeDetailParams } from './url_obfuscator.js';
 
 // 모듈화로 분리한 미디어 타입 토글 및 검색 단축키 제어부 임포트
@@ -139,6 +139,9 @@ function recoverTopCategoryUiAfterBack() {
   if (libraryControls) libraryControls.style.display = 'flex';
 
   applyLibraryTypeToggleVisibility();
+  // 뷰어 전체화면 종료 등으로 상단 사이드바(햄버거 메뉴)의 표시 상태가
+  // 어긋난 채로 남는 경우를 대비해 back 복귀 시점에 항상 강제 재동기화한다.
+  syncSidebarResponsiveControls();
 
   if (sidebarCollapsible) {
     const isOpen = sidebarCollapsible.classList.contains('show');

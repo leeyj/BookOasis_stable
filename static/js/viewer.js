@@ -503,8 +503,18 @@ function initMediaViewerDelegation() {
     if (!target) return;
 
     event.preventDefault();
-    const action = target.getAttribute('data-action');
+    let action = target.getAttribute('data-action');
     const value = target.getAttribute('data-value');
+
+    // 화면 좌/우 핫스팟 존은 물리적 화면 위치를 클릭하는 공간적(spatial) 조작이라,
+    // 만화 RTL(우->좌) 읽기 방향에서는 좌/우 클릭 시 넘어가는 스토리 방향도 반대가 되어야 한다.
+    // (메뉴의 '이전'/'다음' 버튼처럼 항상 스토리 순서를 가리키는 조작과는 구분됨)
+    const isComicFormat = ['zip', 'cbz', 'imgdir'].includes((state.currentViewerFormat || '').toLowerCase());
+    if (isComicFormat && (action === 'prev-page' || action === 'next-page') && target.closest('#common-viewer-hotspot')) {
+      if (getComicReadingDirection() === 'rtl') {
+        action = action === 'prev-page' ? 'next-page' : 'prev-page';
+      }
+    }
 
     if (action === 'close') return closeMediaViewer();
     if (action === 'font-size') return changeFontSize(Number.parseInt(value || '0', 10) || 0);

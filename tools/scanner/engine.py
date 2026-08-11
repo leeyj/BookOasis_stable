@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+# BookOasis Engine (boe-core-a17f3c9) - 라이브러리 스캐너 핵심 로직
+# Copyright (c) BookOasis contributors. Licensed under the GNU AGPLv3 (see LICENSE).
+# 이 파일을 포함한 수정본을 네트워크 서비스로 운용하는 경우, AGPLv3 13조에 따라
+# 이용자에게 대응 소스코드(Corresponding Source)를 제공해야 하며, 5조에 따라
+# 위 저작권/라이선스 고지를 임의로 제거할 수 없습니다.
 import os
 import sys
 import gc

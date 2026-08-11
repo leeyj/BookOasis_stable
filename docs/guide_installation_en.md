@@ -26,6 +26,25 @@ This document is a comprehensive guide to installing the BookOasis media server 
 
 ## 2. Installation Steps (Quick Start)
 
+### ⚡ Interactive Install Script (Optional)
+
+Instead of following the manual steps below, you can use an interactive install wizard that walks you through Docker/Native mode selection and security key generation. There are two ways to run it — they behave identically, differing only in how stdin is wired up.
+
+**Option A — Remote bootstrap (`get.sh`, no need to clone the repo first):**
+```bash
+curl -fsSL https://raw.githubusercontent.com/leeyj/BookOasis_stable/main/get.sh | bash
+```
+> `get.sh` downloads the source into `~/.bookoasis/src`, then re-attaches the `install.sh` prompts to your real terminal (TTY). If you pipe `install.sh` directly through `curl | bash`, the pipe already occupies stdin, so the interactive prompts (`read`) fail immediately — always run it via `get.sh` instead.
+
+**Option B — Clone the source and run directly:**
+```bash
+git clone https://github.com/leeyj/BookOasis_stable.git
+cd BookOasis_stable
+bash install.sh
+```
+
+Both options interactively ask for the install mode (Docker/Native), install path, library path, and `SECRET_KEY`/`WEBHOOK_TOKEN`. The manual steps ①–④ below describe how to configure everything by hand instead.
+
 ### ① Clone Source Code & Setup Virtual Environment
 Prepare the project code and isolate it by creating a Python virtual environment (venv).
 
@@ -70,7 +89,7 @@ Complex `.env` settings from older versions (plugin activation flags, API keys, 
 
 However, the following are still recommended to be managed via `.env`:
 
-- **Fixed session key**: keep login sessions across restarts (`SECRET_KEY`)
+- **Fixed session key**: keep login sessions across restarts (`SECRET_KEY`). Never keep the example value `yoursupersecretfixedkey12345!` as-is — set a different random value for each instance. If multiple servers share the same key, a session cookie issued by one may also be accepted as valid by another, risking session forgery/collision.
 - **Inbound scan webhook token**: external poller-triggered scans (`WEBHOOK_TOKEN`)
 - **Outbound standard event webhook**: delivery for `book.new/read/finish` (`WEBHOOK_EVENT_*`)
 - **Redis In-Memory Cache (Optional & Recommended)**: Safely intercepts write operations to prevent SQLite database corruption. (`REDIS_URL`)
@@ -82,6 +101,7 @@ BookOasis automatically falls back to SQLite-direct write mode if a Redis connec
 **.env Configuration Example:**
 ```env
 # Fixed secret key to preserve user login sessions upon Gunicorn restarts
+# Always use a different value per server instance, e.g.: python -c "import secrets; print(secrets.token_hex(32))"
 SECRET_KEY=yoursupersecretfixedkey12345!
 
 # (Optional) inbound webhook token for external-triggered scan
