@@ -1,4 +1,15 @@
 # CHANGELOG
+## v1.9.3
+- (install)설치 오류 수정(긴급) | fix install error
+
+## v1.9.2
+- (mobile) 뒤로가기시 햄버거 메뉴 노출 수정 | fix mobile view error
+- (dashboard) 대소문자 오류 보정 | Correct for capitalization errors 
+- (security) 시그니처 패턴 추가 | added sig sign
+- (install) get.sh 추가 (한방설치 툴) | added get.sh (one click install)
+    ** curl get.sh 로 실행 | run "curl get.sh"
+- (view)RTL 방향에 맞추어 동작 버그 수정 | bugfix RTL movement
+
 ## v1.9.1
 - (log) 로그 로테이션 정책 적용 | log rotation rule added
 - (mariadb) 초기 설치시 admin 계정 보장 | admin id fix

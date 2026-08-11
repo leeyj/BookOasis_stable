@@ -1186,7 +1186,7 @@ def init_databases():
                     except Exception as env_err:
                         print(f"[DB-Migration] .env load error: {env_err}")
                 
-                cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('ALADIN', ?)", (aladin_val,))
+                cursor.execute("INSERT OR REPLACE INTO settings (`key`, `value`) VALUES ('ALADIN', ?)", (aladin_val,))
                 conn.commit()
                 print(f"[DB-Migration] {db_type} DB - Initial ALADIN setting migrated: {aladin_val}")
             
@@ -1214,7 +1214,7 @@ def init_databases():
             for k, v in default_settings:
                 cursor.execute("SELECT `value` FROM settings WHERE `key` = ?", (k,))
                 if not cursor.fetchone():
-                    cursor.execute("INSERT INTO settings (key, value) VALUES (?, ?)", (k, v))
+                    cursor.execute("INSERT INTO settings (`key`, `value`) VALUES (?, ?)", (k, v))
             
             # 기존 DB의 SCAN_IGNORE_PATTERNS 값 중 @eaDir, #recycle 끝에 /가 없는 구형 설정 자동 마이그레이션
             cursor.execute("SELECT `value` FROM settings WHERE `key` = 'SCAN_IGNORE_PATTERNS'")
