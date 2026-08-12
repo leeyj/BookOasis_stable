@@ -34,17 +34,17 @@
 | A | 4 | `dashboard.js` 자체 인라인 스타일(플러그인 위젯 카드, 통계 미니카드 등 별도 마크업, ~31곳) 정리 | ✅ 완료 | 2026-08-12 |
 | C | 1 | 스크롤 행 섹션(헤더+화살표) 공용 헬퍼화 — `dashboard.js`/`tab_media_library.js`의 `scrollDashboardRow`/`initDashboardNavDelegation`과 `tab_smart_recommend.js`의 `initSmartRecNavDelegation` 통합 | ✅ 완료 | 2026-08-12 |
 | C | 2 | 설정 탭 체크박스 row 매크로화 | ✅ 완료 | 2026-08-12 |
-| B | 1 | `ui.js` → 스캔 활동 상태 폴링/팝오버를 `scan_activity_status.js`로 분리 | ⬜ 대기 | - |
-| B | 2 | `scheduler.js` → 크론 헬퍼 UI를 `cron_helper.js`로 분리 | ⬜ 대기 | - |
-| B | 3 | `audio_player.js` → `audio_player_modules/` 컨벤션 확장 | ⬜ 대기 | - |
-| B | 4 | `audio_player_modules/mini_player_ui.js`(827줄) 클로저 분리 검토 | ⬜ 대기 (신규 발견) | - |
-| B | 5 | `viewer/renderer.js`(825줄) 추가 분리 여지 검토 | ⬜ 대기 (신규 발견) | - |
+| B | 1 | `ui.js` → 스캔 활동 상태 폴링/팝오버를 `scan_activity_status.js`로 분리 | ✅ 완료 | 2026-08-12 |
+| B | 2 | `scheduler.js` → 크론 헬퍼 UI를 `cron_helper.js`로 분리 | ✅ 완료 | 2026-08-12 |
+| B | 3 | `audio_player.js` → `audio_player_modules/` 컨벤션 확장 (챕터 드로어를 `chapter_drawer.js`로 분리) | ✅ 완료 | 2026-08-12 |
+| B | 7 | `book_context_menu.js`(690줄) — 응집도 높아 분리 지점 없음 | ⏭️ 스킵 | 2026-08-12 |
+| B | 5 | `viewer/renderer.js`(825줄) — 성능 핫패스, 무리한 분리는 리스크만 키움 | ⏭️ 스킵 | 2026-08-12 |
+| B | 4 | `audio_player_modules/mini_player_ui.js`(827줄) 클로저 분리 | ⏭️ 스킵 | 2026-08-12 |
 | B | 6 | `viewer_txt.js`(1011줄) — TXT/EPUB이 공용 이벤트 핸들러 안에서 얽혀있어 리스크 질적으로 다름 | ⏸️ 보류 | - |
-| B | 7 | `book_context_menu.js`(690줄) — 응집도 높아 낮은 우선순위 | ⬜ 대기 | - |
 | D | 1 | `trash_repository.py` mariadb/sqlite 공용화 파일럿 | ⬜ 대기 | - |
 | D | 2 | 파일럿 성공 시 소형 리포지토리 순차 확장 | ⬜ 대기 | - |
 
-상태 값: ⬜ 대기 / 🔄 진행중 / ✅ 완료 / ⏸️ 보류
+상태 값: ⬜ 대기 / 🔄 진행중 / ✅ 완료 / ⏸️ 보류 / ⏭️ 스킵(의도적으로 하지 않기로 결정)
 
 ---
 
@@ -113,4 +113,24 @@ C-2 완료: `templates/components/settings/general_tab.html` 최상단에 `{% ma
 
 **트랙 B 추가 조사 완료 (2026-08-12, 실행 전).** `static/js` 전체를 다시 스윕하고 각 대형 파일의 함수 구조를 확인해 트랙 B 티켓을 7개로 재정의했다(위 "트랙 B" 섹션 참고). 아직 실제 분리 작업은 착수 전이다.
 
-다음 세션은 **트랙 B 티켓 1번**(`ui.js`의 스캔 활동 상태 폴링/팝오버를 `scan_activity_status.js`로 분리)부터 시작한다 — 함수 경계가 이미 명확해서(573~828줄) 가장 안전하고 빠르게 절반 가까이 줄일 수 있는 티켓. `viewer_txt.js`(B-6)는 이미 상당 부분 분리돼 있다는 게 확인됐으니, 착수 전에 반드시 다시 한번 코드를 읽고 남은 오케스트레이션 로직의 진짜 분리 지점을 찾는 것부터 시작할 것 — "아직 안 쪼갠 파일"이라는 전제로 접근하면 안 됨. 트랙 내에서도 진행도 표를 갱신하고, 다음 ⬜ 대기 티켓부터 이어서 진행한다.
+**트랙 B 1~3번 완료 (2026-08-12).**
+
+- B-1: `static/js/scan_activity_status.js` 신설. `ui.js`의 573~828줄(스캔 활동 폴링/팝오버/카테고리 스피너: `renderScanActivity`, `initScanActivityPopover`, `updateCategoryScanSpinners`, `startSystemStatusPolling` 등)을 통째로 이동. `ui.js`에는 `import './scan_activity_status.js';`만 남겨 모듈 그래프상 사이드이펙트(폴링 시작, DOMContentLoaded 초기화)가 기존과 동일한 시점에 정확히 1회 실행되도록 보존. `ui.js` 828→561줄.
+  - **[해결됨, 2026-08-12]** 이관 과정에서 발견했던 `window.addEventListener('resize', ...)`의 정의되지 않은 전역 함수 `syncSystemTickerLayout()` 참조 버그: 조사 결과 `#system-ticker-footer` 요소 자체가 현재 어떤 템플릿/JS에서도 생성되지 않는 완전히 죽은 기능(예전에 있던 "시스템 속보 푸터" 기능이 마크업만 걷어내고 CSS·이 리스너는 안 치운 채 남은 잔재)이라, `footer`가 항상 `null`이라 실제로는 절대 호출되지 않는 도달 불가능한 코드였음. 기능을 되살리는 대신 `scan_activity_status.js`의 해당 `resize` 리스너를 삭제. 사용자 확인 후 같은 기능의 고아 CSS도 전부 함께 제거: `static/css/style.css`의 `.system-ticker-footer`/`.ticker-title`/`.ticker-wrap`/`.ticker-content`/`@keyframes tickerSlideUp`/`@keyframes marquee`(~70줄)와 `body.has-system-ticker` 관련 규칙 2건(1037~1043줄), `static/css/mobile.css`의 `body.has-system-ticker` 규칙 3건 + `.system-ticker-footer` 반응형 규칙(~20줄). `grep`으로 전체 저장소에 `system-ticker`/`has-system-ticker` 잔여 참조 없음을 확인, CSS 중괄호 균형도 재검증.
+- B-2: `static/js/cron_helper.js` 신설. `scheduler.js`의 크론 헬퍼 서브시스템(`pad2`, `buildCronFromHelper`, `parseHelperStateFromCron`, `hydrateCronHelperFromCron`, `onCronHelperModeChange`, `updateCronHelperSummary`, `applyCronHelperToInput`)을 이동. `scheduler.js`의 `openScanSettingsModal` 내부 `cronInput.oninput` 핸들러가 비공개 함수 `refreshCronHelperSummary()`를 직접 호출하던 부분은 동일 동작의 공개 wrapper `updateCronHelperSummary()`(import)로 교체. `scheduler.js` 698→522줄.
+- B-3: 기존 `audio_player_modules/` 컨벤션(`createXxx(deps)` 팩토리 + getter/콜백 주입)을 그대로 따라 `audio_player_modules/chapter_drawer.js` 신설, `renderChapterList`/`toggleAudioChapterDrawer`/`selectChapterTrack`(챕터 드로어 렌더링·토글·트랙 선택)을 분리. 이 세 함수는 `currentAudiobookData`/`currentTrackIndex` 등 핵심 재생 상태를 읽기만 하고 쓰지 않아, `audio_player.js`의 다른 함수들(볼륨/배속/취침타이머 등)보다 훨씬 안전하게 분리 가능했음 — 나머지는 `audioInstance.playbackRate` 등 핵심 재생 상태를 직접 변경하므로 후순위로 미룸(아래 참고). `audio_player.js` 710→695줄.
+
+세 티켓 모두 `node --check`로 문법 검증 완료. 브라우저 실동작 확인은 아직 안 함 — 다음 세션 시작 시 `/run`으로 최근 읽음 그리드, 오디오북 재생 화면, 설정 스케줄 탭을 열어 회귀 없는지 확인할 것.
+
+**남은 트랙 B 우선순위 재분석 (2026-08-12, "리스크 낮은 것부터" 기준으로 재정렬):**
+
+| 순위 | 티켓 | 근거 |
+| :-: | :--- | :--- |
+| 1 | B-7 `book_context_menu.js` | 재확인 결과 포지셔닝/플러그인 아이템/닫기/롱프레스가 전부 "컨텍스트 메뉴"라는 하나의 응집된 책임 — 쪼갤 지점이 없음. 실질적으로 "조사 후 분리 불필요로 종결"하는 낮은 리스크·낮은 노력 티켓. 다음 세션 시작점으로 가장 적합(빠르게 닫고 다음으로 넘어갈 수 있음). |
+| 2 | B-5 `viewer/renderer.js`(825줄) | Web Worker(이미지 디코딩)/Blob URL 캐시/스크롤 옵저버가 모듈 최상위 `let`/`Map`/`Set` 상태로 얽혀 있음 — 코믹/웹툰 렌더링 핫패스라 성능 회귀 리스크가 있지만, 아직 "실제로 쪼갤 지점이 있는지" 조사 자체를 안 한 상태라 판단 보류. B-4보다는 먼저 조사할 가치가 있음(조사 결과 "쪼갤 필요 없음"으로 끝날 수도 있음 — B-7과 비슷하게 종결될 가능성 있음). |
+| 3 | B-4 `audio_player_modules/mini_player_ui.js`(827줄) | `createMiniPlayerUiController(deps)` 팩토리 **하나**가 827줄 — 이번 세션에서 했던 B-1/B-2/B-3처럼 "이미 분리된 독립 기능을 기계적으로 이동"하는 게 아니라, **드래그 상태(`miniBarDragState`)/축소 상태(`miniBarCollapsed`)/트랙 리스트 렌더 상태를 공유하는 하나의 큰 클로저를 여러 개로 새로 쪼개는" 설계 작업**이라 이 프로젝트에서 아직 시도해본 적 없는 패턴. 드래그·뷰모드 전환은 수동 상호작용 테스트 없이는 회귀를 잡기 어려워 리스크가 가장 높음 → 최후순위 유지. |
+| - | B-6 `viewer_txt.js`(1011줄) | 기존 결정 유지: 트랙 B 범위에서 완전히 제외, 보류. |
+
+**B-4~B-7 전부 스킵 결정 (2026-08-12, 사용자 판단).** 사용자가 "유지보수에 크게 어려움이 있지 않고, 무리하게 쪼갰다가는 위험도만 커진다"는 이유로 B-4/B-5/B-7을 조사조차 하지 않고 명시적으로 스킵하기로 결정 — 위 우선순위 분석은 "이 순서로 진행"이 아니라 "만약 다시 손댈 일이 생기면 이 순서로"의 참고 자료로만 남긴다. B-6(`viewer_txt.js`)은 기존 사유(TXT/EPUB이 공용 이벤트 핸들러에서 얽혀 있어 리스크 질적으로 다름)로 이미 보류 상태였으므로 동일하게 유지. **트랙 B는 이것으로 종료** — 사이즈만으로 손댈 이유가 부족한 파일을 억지로 쪼개지 않는다는 이 프로젝트의 "필요 이상으로 추상화하지 않는다" 원칙과 일치하는 결정.
+
+**트랙 B 종료 (2026-08-12).** A/B/C 모두 완료. **남은 건 트랙 D(백엔드 mariadb/sqlite 리포지토리 중복 정리)뿐** — 다음 세션은 D-1(`trash_repository.py` 파일럿)부터 시작한다. 착수 전 반드시 다시 한번 "SQL은 한 곳에, 방언 차이만 어댑터로 분리" 패턴이 정말 필요한지, 파일럿 범위를 벗어나지 않는지 확인할 것(트랙 D 섹션 참고 — 전체 재작성 금지, 파일럿 1개로 제한). 또한 B-1~3에서 브라우저 실동작 확인(`/run`)이 아직 안 됐다는 점도 함께 확인하고 넘어갈 것.

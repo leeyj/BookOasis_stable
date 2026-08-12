@@ -42,10 +42,15 @@ export function applyTxtTwoPageTrailingSpacer(scrollWrapper, contentArea) {
   const stepWidth = getTxtPageAdvanceWidth(scrollWrapper);
   if (!Number.isFinite(stepWidth) || stepWidth <= 0) return;
 
-  const maxScroll = Math.max(0, scrollWrapper.scrollWidth - scrollWrapper.clientWidth);
-  const spreadRatio = maxScroll / stepWidth;
-  const spreadFraction = spreadRatio - Math.floor(spreadRatio);
-  const hasOddTailPage = Math.abs(spreadFraction - 0.5) < 0.12;
+  // txt_settings_apply.js가 columnWidth를 이 값으로 픽셀 고정하므로,
+  // 스프레드 폭 기반의 어림 판정 대신 실제 컬럼(페이지) 개수를 역산해 홀짝을 정확히 판정한다.
+  // (기존의 fraction±0.12 휴리스틱은 기기별 서브픽셀/폰트 반올림 오차에 취약해
+  //  홀수 챕터에서 페이지 반복(PC) / 챕터 전환 안 됨(Android) 버그의 원인이었다.)
+  const gap = getTxtPageGapPx(scrollWrapper);
+  const singleColWidth = Math.max(1, (stepWidth - gap) / 2);
+  const totalWidth = scrollWrapper.scrollWidth;
+  const pageCount = Math.max(1, Math.round((totalWidth + gap) / (singleColWidth + gap)));
+  const hasOddTailPage = pageCount % 2 === 1;
 
   if (hasOddTailPage) {
     contentArea.style.paddingRight = `${Math.round(stepWidth / 2)}px`;

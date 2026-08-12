@@ -4,6 +4,7 @@ import { initAudioLifecycleAndShortcuts } from './audio_player_modules/lifecycle
 import { createMiniPlayerUiController } from './audio_player_modules/mini_player_ui.js';
 import { createAudioPlaybackEngine } from './audio_player_modules/playback_engine.js';
 import { registerAudioPlayerPublicApi } from './audio_player_modules/public_api.js';
+import { createChapterDrawer } from './audio_player_modules/chapter_drawer.js';
 
 let audioInstance = null;
 let currentAudiobookData = null;
@@ -78,6 +79,13 @@ const miniPlayerUi = createMiniPlayerUiController({
   getAudioInstance: () => audioInstance,
   getEffectiveTrackDuration,
   updatePlaybackToggleButtons
+});
+
+const chapterDrawer = createChapterDrawer({
+  getAudiobookData: () => currentAudiobookData,
+  getCurrentTrackIndex: () => currentTrackIndex,
+  getViewMode: () => currentAudioPlayerViewMode,
+  openTrack: (trackId, startTime, options) => openAudioPlayerModal(currentAudiobookData, trackId, startTime, options)
 });
 
 function isMiniBarFeatureEnabled() {
@@ -537,38 +545,15 @@ export function cycleAudioSpeed() {
 }
 
 export function toggleAudioChapterDrawer() {
-  const drawer = document.getElementById('audio-chapter-drawer');
-  if (!drawer) return;
-  const isHidden = drawer.style.transform === 'translateY(100%)' || !drawer.style.transform;
-  drawer.style.transform = isHidden ? 'translateY(0%)' : 'translateY(100%)';
+  chapterDrawer.toggleAudioChapterDrawer();
 }
 
 function renderChapterList() {
-  const container = document.getElementById('audio-chapter-list');
-  if (!container || !currentAudiobookData || !currentAudiobookData.tracks) return;
-
-  const tracks = currentAudiobookData.tracks;
-  container.innerHTML = tracks.map((t, idx) => {
-    const isPlaying = idx === currentTrackIndex;
-    const activeStyle = isPlaying ? 'background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8;' : 'background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); color: #e2e8f0;';
-    const playIcon = isPlaying ? '<i class="fa-solid fa-volume-high" style="color: #38bdf8;"></i>' : `<span style="font-size: 0.8rem; color: #64748b;">${t.track_number || (idx + 1)}</span>`;
-
-    return `
-      <div data-role="audio-chapter-track" data-track-id="${t.id}" style="display: flex; align-items: center; justify-content: space-between; padding: 0.8rem 1rem; border-radius: 12px; cursor: pointer; transition: all 0.2s; ${activeStyle}">
-        <div style="display: flex; align-items: center; gap: 0.9rem; overflow: hidden;">
-          ${playIcon}
-          <span style="font-size: 0.9rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${t.title}</span>
-        </div>
-        <span style="font-size: 0.8rem; color: #94a3b8; font-family: monospace;">${t.time_str || ''}</span>
-      </div>
-    `;
-  }).join('');
+  chapterDrawer.renderChapterList();
 }
 
 export function selectChapterTrack(trackId) {
-  if (!currentAudiobookData) return;
-  openAudioPlayerModal(currentAudiobookData, trackId, 0, { viewMode: currentAudioPlayerViewMode || 'full' });
-  toggleAudioChapterDrawer();
+  chapterDrawer.selectChapterTrack(trackId);
 }
 
 export function toggleVolumePopover() {

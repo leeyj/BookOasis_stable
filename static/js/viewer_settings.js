@@ -159,7 +159,13 @@ export function loadAndApplyCustomFont(fontName, fontUrl, element) {
     requestAnimationFrame(() => {
       const wrapper = document.getElementById('txt-scroll-wrapper');
       if (wrapper && wrapper.classList.contains('scroll-mode-page')) {
-        import('./viewer/txt_page_utils.js').then(m => m.snapTxtPageScrollLeft(wrapper));
+        const contentArea = document.getElementById('txt-content-area');
+        import('./viewer/txt_page_utils.js').then(m => {
+          // 폰트 교체로 글자폭이 바뀌면 컬럼(페이지) 수가 달라질 수 있으므로
+          // 홀수 마지막 페이지 스페이서를 최신 레이아웃 기준으로 다시 계산한다.
+          if (contentArea) m.applyTxtTwoPageTrailingSpacer(wrapper, contentArea);
+          m.snapTxtPageScrollLeft(wrapper);
+        });
       }
     });
     return fontFaceName;

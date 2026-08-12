@@ -66,7 +66,12 @@ export function bindSidebarContextMenu() {
       if (!isAdmin) {
         return;
       }
-      
+      if (menuItem && menuItem.dataset.type === 'plugin') {
+        // 플러그인 카테고리는 실제 카테고리가 아니므로 컨텍스트 메뉴를 띄우지 않음
+        e.preventDefault();
+        return;
+      }
+
       suppressSidebarClickUntil = Date.now() + 700;
       e.preventDefault();
       e.stopPropagation();
@@ -106,11 +111,11 @@ export function bindSidebarContextMenu() {
       if (!isAdmin) return;
 
       const menuItem = e.target.closest('.menu-item');
-      if (menuItem) {
+      if (menuItem && menuItem.dataset.type !== 'plugin') {
         const type = menuItem.dataset.type;
         const id = menuItem.dataset.id;
         const name = menuItem.dataset.name;
-        
+
         if (typeof window.handleLongPressTouchStart === 'function') {
           window.handleLongPressTouchStart(e, (x, y) => {
             suppressSidebarClickUntil = Date.now() + 900;

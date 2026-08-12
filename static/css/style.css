@@ -853,6 +853,13 @@ body {
     user-select: none;
 }
 
+/* 아이콘 글리프별 실제 너비가 달라 텍스트 시작 위치가 미묘하게 어긋나는 것을 방지 (Font Awesome .fa-fw와 동일한 접근) */
+.sidebar-menu .menu-item > i {
+    width: 1.25em;
+    text-align: center;
+    flex-shrink: 0;
+}
+
 .sidebar-menu .menu-item:hover {
     background: rgba(255, 255, 255, 0.04);
     color: #fff;
@@ -881,6 +888,19 @@ body {
 .sidebar-menu .menu-item.active i {
     color: #f0abfc !important;
     text-shadow: 0 0 8px rgba(240, 171, 252, 0.5);
+}
+
+/* 플러그인 카테고리는 실제 카테고리와 구분되도록 글자색을 다르게 표시 */
+.sidebar-menu .menu-item[data-type="plugin"] {
+    color: #38bdf8;
+}
+
+.sidebar-menu .menu-item[data-type="plugin"]:hover {
+    color: #7dd3fc;
+}
+
+.sidebar-menu .menu-item[data-type="plugin"].active {
+    color: #f0abfc;
 }
 
 .sidebar-library-group {
@@ -1032,14 +1052,6 @@ body {
     gap: 1.5rem;
     padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
     box-sizing: border-box;
-}
-
-body.has-system-ticker .library-main-content {
-    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
-}
-
-body.has-system-ticker .library-sidebar {
-    padding-bottom: calc(44px + env(safe-area-inset-bottom, 0px));
 }
 
 .btn-sidebar-toggle-desktop:hover {
@@ -1201,7 +1213,7 @@ body.has-system-ticker .library-sidebar {
     position: absolute;
     z-index: 10020;
     top: calc(100% + 0.65rem);
-    left: 0;
+    right: 0;
     width: min(360px, calc(100vw - 2rem));
     max-height: min(62vh, 520px);
     overflow: hidden;
@@ -3052,78 +3064,6 @@ body.has-system-ticker .library-sidebar {
 .detail-layout { display: flex; gap: 2rem; }
 .detail-left { width: 30%; min-width: 200px; }
 .detail-right { width: 70%; display: flex; flex-direction: column; gap: 0.8rem; }
-
-/* 실시간 뉴스 티커 푸터 바 */
-.system-ticker-footer {
-    position: fixed;
-    bottom: 0px;
-    left: var(--system-ticker-left, 0px);
-    width: calc(100% - var(--system-ticker-left, 0px));
-    height: 32px;
-    background: rgba(15, 23, 42, 0.96);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border-top: 1px solid rgba(168, 85, 247, 0.45);
-    border-top-left-radius: 6px;
-    border-top-right-radius: 6px;
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.6), 0 0 12px rgba(168, 85, 247, 0.25);
-    z-index: 10000;
-    display: flex;
-    align-items: center;
-    box-sizing: border-box;
-    font-family: inherit;
-    animation: tickerSlideUp 0.3s ease-out;
-    pointer-events: none;
-}
-
-@keyframes tickerSlideUp {
-    from { transform: translateY(100%); }
-    to { transform: translateY(0); }
-}
-
-.system-ticker-footer .ticker-title {
-    background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
-    color: #fff;
-    font-size: 0.64rem;
-    font-weight: 800;
-    padding: 0 0.55rem;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-    white-space: nowrap;
-    letter-spacing: 0.35px;
-    text-transform: uppercase;
-    box-shadow: 4px 0 10px rgba(0, 0, 0, 0.3);
-    z-index: 10;
-}
-
-.system-ticker-footer .ticker-wrap {
-    flex: 1;
-    overflow: hidden;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    position: relative;
-    padding-left: 0.8rem;
-}
-
-.system-ticker-footer .ticker-content {
-    display: inline-block;
-    white-space: nowrap;
-    padding-left: 100%;
-    font-size: 0.72rem;
-    color: #cbd5e1;
-    font-weight: 500;
-    animation: marquee 40s linear infinite;
-    position: absolute;
-    will-change: transform;
-}
-
-@keyframes marquee {
-    0% { transform: translate3d(0, 0, 0); }
-    100% { transform: translate3d(-100%, 0, 0); }
-}
 
 /* ──────────────────────────────────────────────────────────
    볼륨 카드 스캔 오류 경고 배너 (total_pages=0 / 커버 없음)

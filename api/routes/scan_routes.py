@@ -2,6 +2,7 @@
 """
 scan_routes.py – 스캔 관리 라우터 (도서 스캔, 표지 스캔 등)
 """
+import os
 from flask import Blueprint, request, jsonify
 from services.book_scan_service import BookScanService
 from api.auth import admin_required
@@ -64,6 +65,65 @@ def trigger_library_scan(library_id):
         return jsonify({'success': True, 'message': _t('api.msg_scan_started')})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+def _resolve_library_scoped_path(physical_path, rel_path):
+    """라이브러리 physical_path(복수 루트 가능) 기준 상대경로를 절대경로로 해석하고,
+    경로 탈출(디렉터리 트래버설) 여부를 검증해서 반환한다. 유효하지 않으면 None."""
+    from utils.drive_helper import is_gdrive_url
+
+    roots = [p.strip() for p in str(physical_path or '').replace('\r', '').split('\n') if p.strip()]
+    roots = [r for r in roots if not is_gdrive_url(r)]
+
+    for root in roots:
+        root_norm = os.path.normpath(root)
+        candidate = os.path.normpath(os.path.join(root_norm, rel_path))
+        root_cmp = os.path.normcase(root_norm)
+        cand_cmp = os.path.normcase(candidate)
+        if cand_cmp != root_cmp and not cand_cmp.startswith(root_cmp + os.sep):
+            continue
+        if os.path.exists(candidate):
+            return candidate
+    return None
+
+
+@scan_bp.route('/api/media/libraries/<int:library_id>/scan-path', methods=['POST'])
+@admin_required
+def trigger_library_path_scan(library_id):
+    """새로 추가한 특정 도서/시리즈 폴더 하나만 즉시 동기 스캔하여 등록 (주기 전체 스캔과 별개)"""
+    db_type = request.form.get('type', 'general')
+    rel_path = (request.form.get('path') or '').strip()
+    force_val = request.form.get('force', 'false').lower()
+    force = force_val in ('true', '1')
+
+    if not rel_path:
+        return jsonify({'success': False, 'error': '스캔할 경로(path)가 필요합니다.'}), 400
+
+    try:
+        from repositories.category_repository import CategoryRepository
+        lib_info = CategoryRepository.get_library_by_id(db_type, library_id)
+        if not lib_info:
+            return jsonify({'success': False, 'error': _t('api.err_library_not_found')}), 404
+
+        target_path = _resolve_library_scoped_path(lib_info['physical_path'], rel_path)
+        if not target_path:
+            return jsonify({'success': False, 'error': '해당 경로를 라이브러리 내에서 찾을 수 없습니다.'}), 404
+
+        db_path = get_db_path_for_scan(db_type)
+
+        print(
+            f"[API-ScanPath] 🎯 User requested single-path scan for library_id={library_id}, "
+            f"db_type={db_type}, path='{target_path}', force={force}"
+        )
+
+        from tools.scanner.core import scan_library_path
+        scan_library_path(db_path, library_id, target_path, force=force)
+
+        return jsonify({'success': True, 'message': '지정한 경로의 스캔 및 등록이 완료되었습니다.'})
+    except FileNotFoundError as e:
+        return jsonify({'success': False, 'error': str(e)}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @scan_bp.route('/api/media/libraries/<int:library_id>/cancel-scan', methods=['POST'])
 @admin_required

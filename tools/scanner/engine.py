@@ -92,7 +92,7 @@ def _dispatch_new_books_to_plugin_hooks(db_type, event_payload):
         except Exception as hook_err:
             print(f"[Scanner-PluginHook] provider={meta.get('id')} failed: {hook_err}")
 
-def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_type, target_paths, is_remote, threads_to_use, library_errors):
+def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_type, target_paths, is_remote, threads_to_use, library_errors, path_scope=None):
     cursor = conn.cursor()
 
     def log_pool_stats(tag):
@@ -107,11 +107,19 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
         except Exception as e:
             print(f"[DB-Pool] ({db_type}) [{tag}] stats read failed: {e}")
 
-    cursor.execute("""
+    # path_scope가 주어지면(단일 경로 부분 스캔) 이동/삭제 감지 대상을 해당 하위 트리로 한정해
+    # 스캔 범위 밖의 책들이 오탐으로 휴지통 처리되는 것을 방지한다.
+    scope_clause = ""
+    scope_params = (library_id,)
+    if path_scope:
+        scope_clause = " AND file_path LIKE ?"
+        scope_params = (library_id, canonical_path(path_scope) + '%')
+
+    cursor.execute(f"""
         SELECT id, file_path, has_offsets,
                cover_image, author, publisher, summary, file_mtime, file_size
-        FROM books WHERE library_id = ?
-    """, (library_id,))
+        FROM books WHERE library_id = ?{scope_clause}
+    """, scope_params)
     all_rows = cursor.fetchall()
     db_books = {}          
     db_meta_full = set()   

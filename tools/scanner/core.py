@@ -198,6 +198,61 @@ def scan_library(db_path, library_id, physical_path, force=False, skip_vfs_refre
             print(f"[Scanner ERROR] Scan report save failed: {report_err}")
 
 @scanner_print_control_decorator
+def scan_library_path(db_path, library_id, target_path, force=False, skip_vfs_refresh=False):
+    """Scan a single book/series subfolder within a library and register just those books
+    (used by the 'add one book/series then scan it in' API, as opposed to a full periodic scan)."""
+    print(f"🎯 [ScannerEngine] Single-path scan EXECUTING! DB Path={db_path}, Library ID={library_id}, Target='{target_path}', Force={force}")
+
+    library_errors = []
+    target_path = str(target_path).strip()
+    if not target_path:
+        raise ValueError("스캔 경로가 입력되지 않았습니다.")
+
+    db_type = 'audiobook' if 'audiobook' in os.path.basename(db_path) else ('adult' if 'adult' in os.path.basename(db_path) else 'general')
+
+    from utils.drive_helper import is_gdrive_url
+    is_gdrive = is_gdrive_url(target_path)
+    is_remote = is_remote_path(target_path)
+
+    if not is_gdrive and not os.path.exists(target_path):
+        raise FileNotFoundError(f"스캔 대상 경로를 찾을 수 없습니다: {target_path}")
+
+    if not skip_vfs_refresh:
+        trigger_vfs_refresh(db_path, library_id, target_path)
+
+    if db_type == 'audiobook':
+        print(f"[Scanner-Audiobook] 🎧 Triggering audiobook single-path scan for library_id={library_id}, path='{target_path}'...")
+        from services.audiobook_scanner import scan_audiobook_library
+        scan_audiobook_library(target_path, library_id=library_id, force=force)
+        print(f"[Scanner-Audiobook] 🎧 Audiobook single-path scan completed for library_id={library_id}")
+        return
+
+    threads_to_use = 1 if is_remote else MAX_SCANNER_THREADS
+
+    conn = database.get_connection(db_type)
+    try:
+        from tools.scanner.path_utils import canonical_path
+        _scan_library_internal(
+            conn, db_path, library_id, target_path, force, db_type,
+            [target_path], is_remote, threads_to_use, library_errors,
+            path_scope=canonical_path(target_path)
+        )
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        gc.collect()
+
+    if library_errors:
+        try:
+            from utils.report_helper import save_scan_report
+            save_scan_report(library_id, library_errors)
+        except Exception as report_err:
+            print(f"[Scanner ERROR] Scan report save failed: {report_err}")
+
+
+@scanner_print_control_decorator
 def scan_library_covers_only(db_path, library_id, physical_path):
     """Force re-extract/regenerate only covers of existing books in library path and sync (skip offset/meta)"""
     print(f"[Scanner-Covers] Cover-only Scan started: Library ID={library_id}, Path='{physical_path}'")
