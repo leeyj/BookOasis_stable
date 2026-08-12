@@ -166,6 +166,9 @@ export function applySettingsToUI(settings) {
   if (settings.COLLAPSE_DETAIL_GENRE_TAGS !== undefined) {
     state.collapseDetailGenreTags = (settings.COLLAPSE_DETAIL_GENRE_TAGS === '1');
   }
+  if (settings.SMART_RECOMMEND_ENABLED !== undefined) {
+    state.smartRecommendEnabled = (settings.SMART_RECOMMEND_ENABLED !== '0');
+  }
 
   if (typeof window !== 'undefined') {
     window.__audioMiniPlayerMode = state.audioMiniPlayerMode || 'mini';
@@ -308,6 +311,11 @@ export async function loadGeneralSettings() {
       const collapseDetailGenreTagsEl = document.getElementById('setting-collapse-detail-genre-tags');
       if (collapseDetailGenreTagsEl) {
         collapseDetailGenreTagsEl.checked = (s.COLLAPSE_DETAIL_GENRE_TAGS === '1');
+      }
+
+      const smartRecommendEnabledEl = document.getElementById('setting-smart-recommend-enabled');
+      if (smartRecommendEnabledEl) {
+        smartRecommendEnabledEl.checked = (s.SMART_RECOMMEND_ENABLED !== '0');
       }
 
       // 프록시 헤더 인증 (SSO) 설정
@@ -470,7 +478,8 @@ export async function submitGeneralSettings(event) {
   const ttsWakeLock = document.getElementById('setting-tts-wake-lock')?.checked ? '1' : '0';
   const detailVolumeGridView = document.getElementById('setting-detail-volume-grid-view')?.checked ? '1' : '0';
   const collapseDetailGenreTags = document.getElementById('setting-collapse-detail-genre-tags')?.checked ? '1' : '0';
-  
+  const smartRecommendEnabled = document.getElementById('setting-smart-recommend-enabled')?.checked ? '1' : '0';
+
   try {
     // 🌟 단축키 설정 영구 저장 및 활성화
     if (tempShortcut) {
@@ -512,7 +521,8 @@ export async function submitGeneralSettings(event) {
       api.updateSystemSetting('TTS_ENABLED', ttsEnabled),
       api.updateSystemSetting('TTS_WAKE_LOCK', ttsWakeLock),
       api.updateSystemSetting('DETAIL_VOLUME_GRID_VIEW', detailVolumeGridView),
-      api.updateSystemSetting('COLLAPSE_DETAIL_GENRE_TAGS', collapseDetailGenreTags)
+      api.updateSystemSetting('COLLAPSE_DETAIL_GENRE_TAGS', collapseDetailGenreTags),
+      api.updateSystemSetting('SMART_RECOMMEND_ENABLED', smartRecommendEnabled)
     ];
     
     const results = await Promise.all(promises);
@@ -543,11 +553,15 @@ export async function submitGeneralSettings(event) {
         TTS_ENABLED: ttsEnabled,
         TTS_WAKE_LOCK: ttsWakeLock,
         DETAIL_VOLUME_GRID_VIEW: detailVolumeGridView,
-        COLLAPSE_DETAIL_GENRE_TAGS: collapseDetailGenreTags
+        COLLAPSE_DETAIL_GENRE_TAGS: collapseDetailGenreTags,
+        SMART_RECOMMEND_ENABLED: smartRecommendEnabled
       });
       loadGeneralSettings();
       if (typeof window.loadLibraries === 'function') {
         window.loadLibraries();
+      }
+      if (smartRecommendEnabled === '0' && state.currentLibraryId === 'smart_rec' && typeof window.selectCategory === 'function') {
+        window.selectCategory('home');
       }
     } else {
       alert(i18n.t('settings.general_save_fail', {error: failed.error}));

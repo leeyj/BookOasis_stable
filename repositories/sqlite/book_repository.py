@@ -148,6 +148,60 @@ class BookRepository:
         return values
 
     @staticmethod
+    def get_series_genre_tags_index(db_type):
+        """스마트 추천용: 시리즈 단위 대표 정보(대표 book id, 커버, 포맷, 장르, 태그, 평점) 인덱스 조회"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT series_name, library_id,
+                   MIN(id) AS id,
+                   MAX(cover_image) AS cover_image,
+                   MAX(cover_updated_at) AS cover_updated_at,
+                   MAX(file_format) AS file_format,
+                   MAX(genre) AS genre,
+                   MAX(tags) AS tags,
+                   MAX(score) AS score
+            FROM books
+            WHERE (is_deleted = 0 OR is_deleted IS NULL)
+              AND series_name IS NOT NULL AND series_name != ''
+              AND ((genre IS NOT NULL AND genre != '') OR (tags IS NOT NULL AND tags != ''))
+            GROUP BY series_name, library_id
+            """
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+
+    @staticmethod
+    def get_latest_series_by_library(db_type, library_id, limit=30):
+        """스마트 추천 폴백용: 장르/태그 정보가 없는 시리즈를 대신할 동일 카테고리 최신 등록 시리즈 조회"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT series_name, library_id,
+                   MIN(id) AS id,
+                   MAX(cover_image) AS cover_image,
+                   MAX(cover_updated_at) AS cover_updated_at,
+                   MAX(file_format) AS file_format,
+                   MAX(score) AS score,
+                   MAX(created_at) AS created_at
+            FROM books
+            WHERE (is_deleted = 0 OR is_deleted IS NULL)
+              AND library_id = ?
+              AND series_name IS NOT NULL AND series_name != ''
+            GROUP BY series_name
+            ORDER BY MAX(created_at) DESC
+            LIMIT ?
+            """,
+            (library_id, limit)
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+
+    @staticmethod
     def get_book_file_info_with_permission(db_type, book_id, perm_clause, perm_params):
         """권한 체크를 수용하여 도서의 파일 경로 및 포맷 정보 조회"""
         conn = database.get_connection(db_type)

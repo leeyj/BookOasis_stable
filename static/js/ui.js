@@ -191,9 +191,9 @@ export function createBookCard(item, options = {}) {
     const chapters = (item.total_tracks !== undefined && Number(item.total_tracks) > 0)
       ? Number(item.total_tracks)
       : ((item.book_count !== undefined && Number(item.book_count) > 0) ? Number(item.book_count) : (Number(item.total_pages) || 1));
-    subTextHtml = `<p style="font-size:0.82rem; color:#38bdf8; font-weight:600; margin-top:auto; padding-top:0.2rem; margin-bottom:-0.15rem; display:flex; align-items:center; gap:0.35rem;"><i class="fa-solid fa-headphones"></i> ${chapters}</p>`;
+    subTextHtml = `<p class="book-card-sub-audio"><i class="fa-solid fa-headphones"></i> ${chapters}</p>`;
   } else if (item.pages_read > 0 && options.showProgress) {
-    subTextHtml = `<p style="font-size:0.75rem; color:#94a3b8; margin:0.25rem 0 0 0;">${i18n.t('dashboard.continue_reading', { pages: item.pages_read })}</p>`;
+    subTextHtml = `<p class="book-card-sub-progress">${i18n.t('dashboard.continue_reading', { pages: item.pages_read })}</p>`;
   }
 
   // 4. 즐겨찾기 버튼 구성
@@ -214,8 +214,8 @@ export function createBookCard(item, options = {}) {
   let lockedBadgeHtml = '';
   if (item.metadata_locked === 1 || item.metadata_locked === '1') {
     lockedBadgeHtml = `
-      <div class="book-card-locked-badge" title="메타데이터 잠김 (수동 편집됨)" style="position: absolute; bottom: 8px; left: 8px; z-index: 5; background: rgba(0, 0, 0, 0.65); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.4); width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.4); backdrop-filter: blur(2px);">
-        <i class="fa-solid fa-lock" style="font-size: 0.7rem;"></i>
+      <div class="book-card-locked-badge" title="메타데이터 잠김 (수동 편집됨)">
+        <i class="fa-solid fa-lock"></i>
       </div>
     `;
   }
@@ -429,7 +429,7 @@ export function renderDashboardHistory(booksList) {
 
   if (booksList.length === 0) {
     const tNoHistory = window.i18n ? window.i18n.t('common.no_history_books') : '최근에 읽은 도서 내역이 없습니다.';
-    container.innerHTML = `<div class="loading-spinner" style="grid-column:1/-1; padding:2rem;">${tNoHistory}</div>`;
+    container.innerHTML = `<div class="loading-spinner loading-spinner--compact">${tNoHistory}</div>`;
     return;
   }
 
@@ -477,7 +477,7 @@ export function renderDashboardRecentlyAdded(booksList) {
   if (!container) return;
 
   if (booksList.length === 0) {
-    container.innerHTML = '<div class="loading-spinner" style="grid-column:1/-1; padding:2rem;">최근에 추가된 도서가 없습니다.</div>';
+    container.innerHTML = '<div class="loading-spinner loading-spinner--compact">최근에 추가된 도서가 없습니다.</div>';
     return;
   }
 

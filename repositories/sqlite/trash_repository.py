@@ -91,22 +91,32 @@ class TrashRepository:
         cursor = conn.cursor()
         try:
             placeholders = ','.join(['?'] * len(book_ids))
-            
-            # 1. 휴지통(is_deleted=1) 상태인 도서의 종속 데이터 및 책 레코드 물리 삭제
-            cursor.execute(f"DELETE FROM user_progress WHERE book_id IN (SELECT id FROM books WHERE id IN ({placeholders}) AND COALESCE(is_deleted, 0) = 1)", book_ids)
-            cursor.execute(f"DELETE FROM user_reading_log WHERE book_id IN (SELECT id FROM books WHERE id IN ({placeholders}) AND COALESCE(is_deleted, 0) = 1)", book_ids)
-            cursor.execute(f"DELETE FROM user_favorites WHERE book_id IN (SELECT id FROM books WHERE id IN ({placeholders}) AND COALESCE(is_deleted, 0) = 1)", book_ids)
-            cursor.execute(f"DELETE FROM book_offsets WHERE book_id IN (SELECT id FROM books WHERE id IN ({placeholders}) AND COALESCE(is_deleted, 0) = 1)", book_ids)
-            cursor.execute(f"DELETE FROM books WHERE id IN ({placeholders}) AND COALESCE(is_deleted, 0) = 1", book_ids)
-            
-            # 2. 커버 이미지 참조 여부를 필터링하여 살아있는 도서(is_deleted=0)가 쓰지 않는 파일 목록만 추려 반환
+
+            # 실제로 휴지통(is_deleted=1) 상태인 id만 1회 조회로 확정 -> 이후 서브쿼리 없이 바로 삭제
+            cursor.execute(f"SELECT id FROM books WHERE id IN ({placeholders}) AND COALESCE(is_deleted, 0) = 1", book_ids)
+            confirmed_ids = [row['id'] for row in cursor.fetchall()]
+            if not confirmed_ids:
+                conn.commit()
+                return []
+            confirmed_placeholders = ','.join(['?'] * len(confirmed_ids))
+
+            cursor.execute(f"DELETE FROM user_progress WHERE book_id IN ({confirmed_placeholders})", confirmed_ids)
+            cursor.execute(f"DELETE FROM user_reading_log WHERE book_id IN ({confirmed_placeholders})", confirmed_ids)
+            cursor.execute(f"DELETE FROM user_favorites WHERE book_id IN ({confirmed_placeholders})", confirmed_ids)
+            cursor.execute(f"DELETE FROM book_offsets WHERE book_id IN ({confirmed_placeholders})", confirmed_ids)
+            cursor.execute(f"DELETE FROM books WHERE id IN ({confirmed_placeholders})", confirmed_ids)
+
+            # 커버 참조 카운트를 건별 SELECT 반복 대신 단일 GROUP BY 조회로 일괄 확인 (트랜잭션 점유 시간 단축)
             unreferenced_covers = []
-            for cover_img in target_covers:
-                cursor.execute("SELECT COUNT(1) AS cnt FROM books WHERE cover_image = ?", (cover_img,))
-                row_cnt = cursor.fetchone()
-                if not row_cnt or (row_cnt['cnt'] or 0) == 0:
-                    unreferenced_covers.append(cover_img)
-            
+            if target_covers:
+                cover_placeholders = ','.join(['?'] * len(target_covers))
+                cursor.execute(
+                    f"SELECT cover_image, COUNT(1) AS cnt FROM books WHERE cover_image IN ({cover_placeholders}) GROUP BY cover_image",
+                    target_covers
+                )
+                referenced_counts = {row['cover_image']: row['cnt'] for row in cursor.fetchall()}
+                unreferenced_covers = [c for c in target_covers if not referenced_counts.get(c)]
+
             conn.commit()
             return unreferenced_covers
         except Exception as e:

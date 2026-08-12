@@ -46,6 +46,12 @@ export async function fetchReadingHistory(type) {
   return res.json();
 }
 
+export async function fetchSmartRecommendations(type, seriesName, libraryId) {
+  const libQuery = libraryId ? `&library_id=${encodeURIComponent(libraryId)}` : '';
+  const res = await fetch(`/api/media/recommendations?type=${type}&series_name=${encodeURIComponent(seriesName)}${libQuery}&_=${Date.now()}`, {cache: 'no-store'});
+  return res.json();
+}
+
 export async function fetchMediaDetail(type, libraryId, series, representativeBookId = null) {
   let url = `/api/media/detail?type=${type}&library_id=${libraryId}&series=${encodeURIComponent(series)}`;
   if (representativeBookId) {

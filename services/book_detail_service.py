@@ -6,6 +6,7 @@ from repositories.book_repository import BookRepository
 from utils.sort_helper import natural_sort_key
 from utils.cover_helper import get_cover_image_with_t, resolve_series_cover, invalidate_series_cover_cache
 from utils.redis_helper import redis_delete_pattern
+from utils.permission_clause import build_library_permission_clause
 
 class BookDetailService:
     @staticmethod
@@ -112,27 +113,9 @@ class BookDetailService:
 
             return meta, books_list
 
-        enforce_permission = (role != 'admin' and bool(user_id))
-
         # 권한 제어 절 정보 결정
-        if enforce_permission:
-            perm_clause = (
-                " AND EXISTS ("
-                "SELECT 1 FROM user_category_permissions p "
-                "WHERE p.library_id = books.library_id AND p.user_id = ? AND p.has_access = 1"
-                ")"
-            )
-            perm_clause_b = (
-                " AND EXISTS ("
-                "SELECT 1 FROM user_category_permissions p "
-                "WHERE p.library_id = b.library_id AND p.user_id = ? AND p.has_access = 1"
-                ")"
-            )
-            perm_params = [user_id]
-        else:
-            perm_clause = ''
-            perm_clause_b = ''
-            perm_params = []
+        perm_clause, perm_params = build_library_permission_clause(user_id, role, alias='books')
+        perm_clause_b, _ = build_library_permission_clause(user_id, role, alias='b')
 
         def _comparison_dir(path, file_format):
             normalized = (path or '').replace('\\', '/')

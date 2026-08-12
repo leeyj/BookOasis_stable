@@ -87,17 +87,6 @@ export async function loadDashboardData() {
   }
 }
 
-export function scrollDashboardRow(type, dir) {
-  const rowId = type === 'history' ? 'dashboard-history-row' : 'dashboard-new-row';
-  const container = document.getElementById(rowId);
-  if (container) {
-    const scrollAmount = container.clientWidth * 0.7;
-    container.scrollBy({
-      left: dir === 'left' ? -scrollAmount : scrollAmount,
-      behavior: 'smooth'
-    });
-  }
-}
 
 export async function loadDashboardPlugins(requestToken = null) {
   const section = document.getElementById('dashboard-plugins-section');
@@ -157,17 +146,17 @@ export async function loadDashboardPlugins(requestToken = null) {
         const iconClass = widget.icon || 'fa-solid fa-puzzle-piece';
         const title = escapeHtml(widget.title || widget.name || widgetId);
         const provider = escapeHtml(widget.provider || widget.name || 'Plugin');
-        const subtitle = widget.subtitle ? `<div style="margin-top: 0.35rem; color: #94a3b8; font-size: 0.78rem;">${escapeHtml(widget.subtitle)}</div>` : '';
+        const subtitle = widget.subtitle ? `<div class="plugin-widget-subtitle">${escapeHtml(widget.subtitle)}</div>` : '';
 
         const cardHtml = `
-          <div class="plugin-card" id="plugin-${widgetId}" style="flex: 1 1 350px; min-width: 320px; background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 1rem; box-sizing: border-box; cursor: grab; user-select: none;">
-              <h4 style="margin: 0 0 0.7rem 0; color: #cbd5e1; font-size: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; pointer-events: none;">
-                  <span style="display:flex; align-items:center; min-width:0;"><i class="${iconClass}" style="color: #38bdf8; margin-right: 0.35rem;"></i><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${title}</span></span>
-                  <span style="font-size: 0.75rem; color: #64748b; font-weight: normal; flex-shrink:0;">제공: ${provider}</span>
+          <div class="plugin-card" id="plugin-${widgetId}">
+              <h4 class="plugin-card-header">
+                  <span class="plugin-card-header-title"><i class="${iconClass}"></i><span class="plugin-card-header-title-text">${title}</span></span>
+                  <span class="plugin-card-provider">제공: ${provider}</span>
               </h4>
               ${subtitle}
-              <div id="${contentId}" style="display: flex; flex-direction: column; gap: 1rem; max-height: 400px; overflow-y: auto; padding-right: 0.5rem; margin-top: 0.6rem;">
-                  <div class="loading-spinner" style="padding: 1rem 0;"><i class="fa-solid fa-circle-notch fa-spin"></i> 위젯 데이터를 불러오는 중...</div>
+              <div id="${contentId}" class="plugin-widget-body">
+                  <div class="loading-spinner loading-spinner--widget"><i class="fa-solid fa-circle-notch fa-spin"></i> 위젯 데이터를 불러오는 중...</div>
               </div>
           </div>
         `;
@@ -186,7 +175,7 @@ export async function loadDashboardPlugins(requestToken = null) {
         const iconClass = widget.icon || 'fa-solid fa-puzzle-piece';
         const title = escapeHtml(widget.title || widget.name || widgetId);
         const provider = escapeHtml(widget.provider || widget.name || 'Plugin');
-        const subtitle = widget.subtitle ? `<div style="margin-top: 0.35rem; color: #94a3b8; font-size: 0.85rem; margin-bottom: 0.5rem;">${escapeHtml(widget.subtitle)}</div>` : '';
+        const subtitle = widget.subtitle ? `<div class="plugin-widget-subtitle plugin-widget-subtitle--tab">${escapeHtml(widget.subtitle)}</div>` : '';
 
         // 탭 버튼 생성
         if (tabsContainer) {
@@ -201,17 +190,17 @@ export async function loadDashboardPlugins(requestToken = null) {
         // 탭 본문 생성
         if (dynamicWrapper) {
           const tabContentHtml = `
-            <div class="plugins-tab-content plugin-dynamic-tab-content" id="plugins-content-${widgetId}" style="display: none; width: 100%; flex-direction: column;">
-              <div class="dashboard-section" style="width: 100%;">
-                <div class="section-header" style="margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 0.6rem; display: flex; justify-content: space-between; align-items: center;">
-                  <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1.2rem; font-weight: 700;">
-                    <i class="${iconClass}" style="color: #a855f7; margin-right: 0.5rem;"></i> <span>${title}</span>
+            <div class="plugins-tab-content plugin-dynamic-tab-content" id="plugins-content-${widgetId}">
+              <div class="dashboard-section">
+                <div class="section-header">
+                  <h3 class="section-title">
+                    <i class="${iconClass}"></i> <span>${title}</span>
                   </h3>
-                  <span style="font-size: 0.8rem; color: #64748b;">제공: ${provider}</span>
+                  <span class="plugin-tab-provider">제공: ${provider}</span>
                 </div>
                 ${subtitle}
-                <div id="${contentId}" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; width: 100%; margin-top: 1rem;">
-                  <div class="loading-spinner" style="padding: 2rem 0; grid-column: 1/-1;"><i class="fa-solid fa-circle-notch fa-spin"></i> 데이터를 불러오는 중...</div>
+                <div id="${contentId}" class="plugin-tab-widget-body">
+                  <div class="loading-spinner loading-spinner--widget-grid"><i class="fa-solid fa-circle-notch fa-spin"></i> 데이터를 불러오는 중...</div>
                 </div>
               </div>
             </div>
@@ -320,10 +309,10 @@ async function loadDashboardWidgetData(pluginId, limit, contentId, requestToken)
           const value = formatDashboardMetricText(item.value || '-');
           const desc = formatDashboardMetricText(item.description || '');
           const metricHtml = `
-            <div style="padding: 0.85rem 0.9rem; border-radius: 8px; background: rgba(15, 23, 42, 0.55); border: 1px solid rgba(148, 163, 184, 0.15); display: flex; flex-direction: column; gap: 0.2rem;">
-              <span style="color: #94a3b8; font-size: 0.8rem; white-space: pre-line;">${metric}</span>
-              <strong style="color: #f8fafc; font-size: 1.15rem; line-height: 1.35; white-space: pre-line;">${value}</strong>
-              ${desc ? `<span style="color: #64748b; font-size: 0.74rem; white-space: pre-line;">${desc}</span>` : ''}
+            <div class="dashboard-metric-card">
+              <span class="dashboard-metric-label">${metric}</span>
+              <strong class="dashboard-metric-value">${value}</strong>
+              ${desc ? `<span class="dashboard-metric-desc">${desc}</span>` : ''}
             </div>
           `;
           container.insertAdjacentHTML('beforeend', metricHtml);
@@ -346,28 +335,28 @@ async function loadDashboardWidgetData(pluginId, limit, contentId, requestToken)
         const rawTotalPages = item.total_pages || item.totalPages || 0;
 
         let clickAttr = '';
-        let cursorStyle = '';
+        let isClickable = false;
         if (!isExternal) {
             if (rawBookId && rawFileFormat) {
             clickAttr = `data-role="dashboard-widget-item" data-item-action="open-reader" data-book-id="${rawBookId}" data-file-format="${escapeHtml(rawFileFormat)}" data-book-title="${escapeHtml(rawTitle)}" data-pages-read="${rawPagesRead}" data-total-pages="${rawTotalPages}"`;
-                cursorStyle = 'cursor: pointer;';
+                isClickable = true;
             } else if (rawSeriesName) {
             clickAttr = `data-role="dashboard-widget-item" data-item-action="open-detail" data-series-name="${escapeHtml(rawSeriesName)}" data-library-id="${escapeHtml(rawLibraryId)}"`;
-                cursorStyle = 'cursor: pointer;';
+                isClickable = true;
             }
         }
 
         const itemHtml = `
-          <div class="plugin-item-card" data-series-name="${escapeHtml(rawSeriesName)}" data-library-id="${escapeHtml(rawLibraryId)}" data-book-id="${rawBookId || ''}" data-file-format="${escapeHtml(rawFileFormat)}" style="display: flex; gap: 1rem; align-items: flex-start; padding-bottom: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.05); ${cursorStyle}" ${clickAttr}>
-            <div style="width: 60px; height: 85px; flex-shrink: 0; border-radius: 4px; overflow: hidden; background: #1e293b;">
-              <img src="${cover}" alt="cover" style="width: 100%; height: 100%; object-fit: cover;">
+          <div class="plugin-item-card${isClickable ? ' plugin-item-card--clickable' : ''}" data-series-name="${escapeHtml(rawSeriesName)}" data-library-id="${escapeHtml(rawLibraryId)}" data-book-id="${rawBookId || ''}" data-file-format="${escapeHtml(rawFileFormat)}" ${clickAttr}>
+            <div class="plugin-item-cover">
+              <img src="${cover}" alt="cover">
             </div>
-            <div style="display: flex; flex-direction: column; gap: 0.3rem; flex: 1; min-width: 0;">
-              <a href="${isExternal ? link : '#'}" ${isExternal ? 'target="_blank" rel="noopener noreferrer"' : ''} style="color: #f8fafc; font-size: 0.95rem; font-weight: 600; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${title}">${title}</a>
-              <span style="color: #94a3b8; font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${author}</span>
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.2rem;">
-                <span style="color: #64748b; font-size: 0.75rem;">${publisher}</span>
-                <span style="color: #a855f7; font-size: 0.75rem;">${pubDate}</span>
+            <div class="plugin-item-info">
+              <a class="plugin-item-title" href="${isExternal ? link : '#'}" ${isExternal ? 'target="_blank" rel="noopener noreferrer"' : ''} title="${title}">${title}</a>
+              <span class="plugin-item-meta">${author}</span>
+              <div class="plugin-item-footer">
+                <span class="plugin-item-publisher">${publisher}</span>
+                <span class="plugin-item-pubdate">${pubDate}</span>
               </div>
             </div>
           </div>
@@ -377,7 +366,7 @@ async function loadDashboardWidgetData(pluginId, limit, contentId, requestToken)
     }
   } catch (e) {
     console.error(`대시보드 위젯 로드 오류(${pluginId}):`, e);
-    container.innerHTML = '<div style="text-align: center; color: #ef4444; font-size: 0.9rem; padding: 1rem 0; grid-column: 1/-1;">서버 연결 오류</div>';
+    container.innerHTML = '<div class="plugin-widget-error">서버 연결 오류</div>';
   }
 }
 

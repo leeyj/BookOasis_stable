@@ -14,7 +14,8 @@ import { applySidebarShowMore } from './category/index.js';
 import { loadLibrarySchedules, saveLibrarySchedule, runLibraryScanNow } from './scheduler.js';
 
 // 서브 모듈 임포트
-import { loadDashboardData, scrollDashboardRow, loadDashboardPlugins, switchPluginsViewTab } from './dashboard.js?v=20260809-unread-series-v3';
+import { loadDashboardData, loadDashboardPlugins, switchPluginsViewTab } from './dashboard.js?v=20260809-unread-series-v3';
+import { initScrollableRowNavDelegation } from './scrollable_row_nav.js';
 import { initInfiniteScrollObserver } from './infinite_scroll.js';
 import { showBookContextMenu, triggerScanSingleBookAction, triggerSearchAladinMetadataAction, triggerMarkAsUnreadAction } from './book_context_menu.js?v=20260809-unread-series-v5';
 import { openMetadataSearchModal, closeMetadataSearchModal, performMetadataSearch } from './metadata_search.js';
@@ -105,24 +106,6 @@ function initLibraryShellDelegation() {
   }, true);
 
   window.__libraryShellDelegationBound = true;
-}
-
-function initDashboardNavDelegation() {
-  if (window.__dashboardNavDelegationBound) return;
-
-  document.addEventListener('click', (event) => {
-    const btn = event && event.target && typeof event.target.closest === 'function'
-      ? event.target.closest('[data-role="dashboard-row-nav"]')
-      : null;
-    if (!btn) return;
-
-    event.preventDefault();
-    const row = btn.getAttribute('data-row') || 'history';
-    const dir = btn.getAttribute('data-dir') || 'left';
-    scrollDashboardRow(row, dir);
-  }, true);
-
-  window.__dashboardNavDelegationBound = true;
 }
 
 function recoverTopCategoryUiAfterBack() {
@@ -241,7 +224,7 @@ function normalizeMediaType(val) {
 // 메인 초기화 함수
 async function initTabMediaLibrary() {
   initLibraryShellDelegation();
-  initDashboardNavDelegation();
+  initScrollableRowNavDelegation();
 
   if (window.currentUser) {
     state.currentUser = window.currentUser;
@@ -391,6 +374,9 @@ async function initTabMediaLibrary() {
 }
 
 export function selectCategory(id, skipHistory = false) {
+  if (id === 'smart_rec' && state.smartRecommendEnabled === false) {
+    id = 'home';
+  }
   state.currentLibraryId = id;
   try {
     localStorage.setItem('last_selected_library_id', id);
@@ -423,6 +409,11 @@ export function selectCategory(id, skipHistory = false) {
     import('./tab_collections.js').then((colls) => {
       colls.renderCollectionsView();
     });
+  } else if (id === 'smart_rec') {
+    switchActiveView('grid');
+    import('./tab_smart_recommend.js').then((mod) => {
+      mod.renderSmartRecommendView();
+    });
   } else if (id === 'settings') {
     switchActiveView('settings');
     if (state.currentUser && state.currentUser.role === 'admin') {
@@ -452,7 +443,6 @@ export function selectCategory(id, skipHistory = false) {
 }
 
 // 글로벌 전역 함수 노출
-window.scrollDashboardRow = scrollDashboardRow;
 window.selectCategory = selectCategory;
 window.switchLibraryType = switchLibraryType;
 window.filterBooks = filterBooks;

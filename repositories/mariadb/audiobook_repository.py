@@ -2,6 +2,7 @@
 """
 audiobook_repository.py – MariaDB 전용 오디오북(audiobooks, audiobook_tracks, audiobook_progress) 데이터 액세스 레이어
 """
+import os
 import database
 
 class AudiobookRepository:
@@ -224,6 +225,219 @@ class AudiobookRepository:
         rows = cursor.fetchall()
         conn.close()
         return [r['folder_path'] for r in rows if r and r['folder_path']]
+
+    @staticmethod
+    def _has_file_mtime_column(cursor):
+        try:
+            cursor.execute("SHOW COLUMNS FROM audiobook_tracks LIKE 'file_mtime'")
+            return cursor.fetchone() is not None
+        except Exception:
+            return False
+
+    @staticmethod
+    def save_audiobook_scan(folder_path, library_id, meta, tracks):
+        """오디오북 폴더 스캔 결과(메타 + 트랙 목록)를 신규/변경분만 DB에 반영.
+
+        Returns dict: {audiobook_id, is_new, meta_updated, track_inserts, track_updates, track_deletes}
+        """
+        conn = database.get_connection('audiobook')
+        cursor = conn.cursor()
+        try:
+            has_file_mtime_col = AudiobookRepository._has_file_mtime_column(cursor)
+
+            cursor.execute(
+                """
+                SELECT id, library_id, title, web_id, author, publisher, code, poster,
+                       premiered, ratings, author_intro, description,
+                       folder_name, total_duration, total_tracks, file_type
+                FROM audiobooks
+                WHERE folder_path = %s
+                """,
+                (folder_path,)
+            )
+            row = cursor.fetchone()
+
+            existing_tracks_full = {}
+            if row:
+                audiobook_id = row['id']
+                track_select_sql = (
+                    "SELECT id, track_number, track_code, filename, file_path, file_mtime, file_size, duration, format "
+                    "FROM audiobook_tracks WHERE audiobook_id = %s"
+                    if has_file_mtime_col else
+                    "SELECT id, track_number, track_code, filename, file_path, 0.0 AS file_mtime, file_size, duration, format "
+                    "FROM audiobook_tracks WHERE audiobook_id = %s"
+                )
+                cursor.execute(track_select_sql, (audiobook_id,))
+                for r in cursor.fetchall():
+                    if not r or not r['file_path']:
+                        continue
+                    key = os.path.normpath(str(r['file_path']))
+                    existing_tracks_full[key] = {
+                        'id': int(r['id']),
+                        'track_number': int(r['track_number'] or 0),
+                        'track_code': str(r['track_code'] or ''),
+                        'filename': str(r['filename'] or ''),
+                        'file_path': key,
+                        'file_mtime': float(r['file_mtime'] or 0.0),
+                        'file_size': int(r['file_size'] or 0),
+                        'duration': float(r['duration'] or 0.0),
+                        'format': str(r['format'] or '')
+                    }
+
+            meta_updated = 0
+            is_new = not row
+            if row:
+                audiobook_id = row['id']
+                existing_meta = (
+                    row['library_id'], row['title'], row['web_id'], row['author'], row['publisher'],
+                    row['code'], row['poster'], row['premiered'], float(row['ratings'] or 0.0),
+                    row['author_intro'], row['description'], row['folder_name'],
+                    float(row['total_duration'] or 0.0), int(row['total_tracks'] or 0), row['file_type']
+                )
+                incoming_meta = (
+                    library_id, meta['title'], meta['web_id'], meta['author'], meta['publisher'],
+                    meta['code'], meta['poster'], meta['premiered'], float(meta['ratings'] or 0.0),
+                    meta['author_intro'], meta['description'], meta['folder_name'],
+                    float(meta['total_duration'] or 0.0), int(meta['total_tracks'] or 0), meta['file_type']
+                )
+                if existing_meta != incoming_meta:
+                    cursor.execute("""
+                        UPDATE audiobooks SET
+                            library_id = %s,
+                            title = %s,
+                            web_id = %s,
+                            author = %s,
+                            publisher = %s,
+                            code = %s,
+                            poster = %s,
+                            premiered = %s,
+                            ratings = %s,
+                            author_intro = %s,
+                            description = %s,
+                            folder_name = %s,
+                            total_duration = %s,
+                            total_tracks = %s,
+                            file_type = %s,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = %s
+                    """, (
+                        library_id, meta['title'], meta['web_id'], meta['author'], meta['publisher'],
+                        meta['code'], meta['poster'], meta['premiered'], meta['ratings'],
+                        meta['author_intro'], meta['description'], meta['folder_name'],
+                        meta['total_duration'], meta['total_tracks'], meta['file_type'],
+                        audiobook_id
+                    ))
+                    meta_updated = 1
+            else:
+                cursor.execute("""
+                    INSERT INTO audiobooks (
+                        library_id, title, web_id, author, publisher, code, poster,
+                        premiered, ratings, author_intro, description,
+                        folder_name, folder_path, total_duration, total_tracks, file_type
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    library_id, meta['title'], meta['web_id'], meta['author'], meta['publisher'],
+                    meta['code'], meta['poster'], meta['premiered'], meta['ratings'],
+                    meta['author_intro'], meta['description'], meta['folder_name'],
+                    meta['folder_path'], meta['total_duration'], meta['total_tracks'],
+                    meta['file_type']
+                ))
+                audiobook_id = cursor.lastrowid
+                meta_updated = 1
+
+            track_inserts = 0
+            track_updates = 0
+            track_deletes = 0
+            incoming_paths = set()
+            for t in tracks:
+                norm_path = os.path.normpath(str(t['file_path']))
+                incoming_paths.add(norm_path)
+                existing = existing_tracks_full.get(norm_path)
+                if not existing:
+                    if has_file_mtime_col:
+                        cursor.execute("""
+                            INSERT INTO audiobook_tracks (
+                                audiobook_id, track_number, track_code, filename, file_path, file_mtime, file_size, duration, format
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            audiobook_id, t['track_number'], t['track_code'], t['filename'],
+                            norm_path, t['file_mtime'], t['file_size'], t['duration'], t['format']
+                        ))
+                    else:
+                        cursor.execute("""
+                            INSERT INTO audiobook_tracks (
+                                audiobook_id, track_number, track_code, filename, file_path, file_size, duration, format
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            audiobook_id, t['track_number'], t['track_code'], t['filename'],
+                            norm_path, t['file_size'], t['duration'], t['format']
+                        ))
+                    track_inserts += 1
+                    continue
+
+                changed = (
+                    existing['track_number'] != int(t['track_number']) or
+                    existing['track_code'] != str(t['track_code'] or '') or
+                    existing['filename'] != str(t['filename'] or '') or
+                    int(float(existing['file_mtime'] or 0.0)) != int(float(t['file_mtime'] or 0.0)) or
+                    existing['file_size'] != int(t['file_size'] or 0) or
+                    abs(existing['duration'] - float(t['duration'] or 0.0)) > 0.0001 or
+                    existing['format'] != str(t['format'] or '')
+                )
+                if changed:
+                    if has_file_mtime_col:
+                        cursor.execute("""
+                            UPDATE audiobook_tracks SET
+                                track_number = %s,
+                                track_code = %s,
+                                filename = %s,
+                                file_mtime = %s,
+                                file_size = %s,
+                                duration = %s,
+                                format = %s
+                            WHERE id = %s
+                        """, (
+                            t['track_number'], t['track_code'], t['filename'],
+                            t['file_mtime'],
+                            t['file_size'], t['duration'], t['format'],
+                            existing['id']
+                        ))
+                    else:
+                        cursor.execute("""
+                            UPDATE audiobook_tracks SET
+                                track_number = %s,
+                                track_code = %s,
+                                filename = %s,
+                                file_size = %s,
+                                duration = %s,
+                                format = %s
+                            WHERE id = %s
+                        """, (
+                            t['track_number'], t['track_code'], t['filename'],
+                            t['file_size'], t['duration'], t['format'],
+                            existing['id']
+                        ))
+                    track_updates += 1
+
+            removed_paths = set(existing_tracks_full.keys()) - incoming_paths
+            for p in removed_paths:
+                cursor.execute("DELETE FROM audiobook_tracks WHERE id = %s", (existing_tracks_full[p]['id'],))
+                track_deletes += 1
+
+            conn.commit()
+            return {
+                'audiobook_id': audiobook_id,
+                'is_new': is_new,
+                'meta_updated': meta_updated,
+                'track_inserts': track_inserts,
+                'track_updates': track_updates,
+                'track_deletes': track_deletes,
+            }
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     @staticmethod
     def get_by_folder_path(folder_path):

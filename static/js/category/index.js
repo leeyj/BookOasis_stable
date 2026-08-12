@@ -298,6 +298,7 @@ export async function loadLibraries() {
       const tHistory = (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('category.history', '최근 읽은 도서') : '최근 읽은 도서';
       const tFavorite = (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('category.favorite', '즐겨찾기') : '즐겨찾기';
       const tCollection = (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('category.collection', '컬렉션') : '컬렉션';
+      const tSmartRec = (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('category.smart_recommend', '스마트 추천') : '스마트 추천';
       const tPlugins = (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('category.plugins', '플러그인') : '플러그인';
       const tAll = (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('category.all', '전체보기') : '전체보기';
 
@@ -315,6 +316,9 @@ export async function loadLibraries() {
       html += `<li class="menu-item ${state.currentLibraryId === 'history' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-history" data-id="history" data-category-id="history"><i class="fa-solid fa-clock-rotate-left"></i> ${tHistory}</li>`;
       html += `<li class="menu-item ${state.currentLibraryId === 'favorite' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-favorite" data-id="favorite" data-category-id="favorite"><i class="fa-solid fa-star" style="color: #eab308;"></i> ${tFavorite}</li>`;
       html += `<li class="menu-item ${state.currentLibraryId === 'collection' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-collection" data-id="collection" data-category-id="collection"><i class="fa-solid fa-bookmark" style="color: #a855f7;"></i> ${tCollection}</li>`;
+      if (state.smartRecommendEnabled !== false) {
+        html += `<li class="menu-item ${state.currentLibraryId === 'smart_rec' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-smart-rec" data-id="smart_rec" data-category-id="smart_rec"><i class="fa-solid fa-wand-magic-sparkles" style="color: #34d399;"></i> ${tSmartRec}</li>`;
+      }
       html += `<li class="menu-item ${state.currentLibraryId === 'plugins' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-plugins" data-id="plugins" data-category-id="plugins"><i class="fa-solid fa-puzzle-piece" style="color: #38bdf8;"></i> ${tPlugins}</li>`;
       if (state.showSidebarCategoryAll !== false) {
         html += `<li class="menu-item ${state.currentLibraryId === 'all' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-all" data-id="all" data-category-id="all"><i class="fa-solid fa-layer-group"></i> ${tAll}</li>`;

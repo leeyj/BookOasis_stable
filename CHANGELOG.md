@@ -1,4 +1,13 @@
 # CHANGELOG
+## v1.9.4
+- (dashboard/category)스마트 추천 기능 추가 | add smart recommendations
+- (bug/trash) 휴지통 대량 비우기 시 DB 락 장기 점유로 인한 Lock wait timeout 수정 | fix lock wait timeout from long-held DB lock during bulk trash empty
+- (audiobook)쿼리 중앙화 | Query centralization
+- (backend) js 모듈 컴포넌트 화 | JavaScript module to component
+** 남은이슈
+ - lazy 스캐너 쿼리 완전 분리 | Complete separation of lazy scanner queries
+ - js Big Object 컴포넌트 화 | Convert the JS Big object to components
+
 ## v1.9.3
 - (install)설치 오류 수정(긴급) | fix install error
 

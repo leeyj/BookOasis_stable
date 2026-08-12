@@ -1611,6 +1611,58 @@ body.has-system-ticker .library-sidebar {
     white-space: nowrap;
 }
 
+/* 일반 설정 탭 전용 체크박스 스위치 행 (library-form-group-row와 별개 - 굵은 흰색 라벨 톤) */
+.settings-checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.settings-checkbox-row--divider {
+    border-top: 1px dashed rgba(255, 255, 255, 0.08);
+    padding-top: 0.8rem;
+}
+
+.settings-checkbox-row input[type="checkbox"] {
+    cursor: pointer;
+    accent-color: #a855f7;
+    width: 1.1rem;
+    height: 1.1rem;
+    margin: 0;
+}
+
+.settings-checkbox-row input[type="checkbox"].settings-checkbox-input--blue {
+    accent-color: #38bdf8;
+}
+
+.settings-checkbox-row label {
+    cursor: pointer;
+    font-weight: 700;
+    color: #fff;
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.settings-checkbox-hint {
+    color: #64748b;
+    font-weight: 400;
+    font-size: 0.8rem;
+}
+
+.settings-checkbox-desc {
+    font-size: 0.78rem;
+    color: #94a3b8;
+    margin: -0.35rem 0 0 1.65rem;
+}
+
+.settings-checkbox-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    border-top: 1px dashed rgba(255, 255, 255, 0.08);
+    padding-top: 0.8rem;
+}
+
 .library-modal-footer {
     display: flex;
     justify-content: flex-end;
@@ -1956,6 +2008,12 @@ body.has-system-ticker .library-sidebar {
     margin: 0;
 }
 
+/* 스크롤 행 섹션 헤더의 좌우 네비게이션 버튼 묶음 */
+.section-nav-btns {
+    display: flex;
+    gap: 0.5rem;
+}
+
 /* 가로 스크롤 네비게이션용 화살표 버튼 */
 .btn-nav-arrow {
     background: rgba(30, 41, 59, 0.6);
@@ -1977,6 +2035,133 @@ body.has-system-ticker .library-sidebar {
     border-color: #c084fc;
     color: #fff;
     box-shadow: 0 0 8px rgba(168, 85, 247, 0.5);
+}
+
+/* 스마트 추천 탭 */
+.smart-rec-page {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+}
+
+.smart-rec-tabs-bar {
+    display: flex;
+    gap: 0.7rem;
+    flex-wrap: wrap;
+}
+
+.smart-rec-loading {
+    padding: 2rem;
+    color: #94a3b8;
+}
+
+.smart-rec-loading--centered {
+    text-align: center;
+}
+
+.smart-rec-error {
+    color: #ef4444;
+    padding: 1rem;
+}
+
+.smart-rec-empty-state {
+    text-align: center;
+    padding: 4rem 1rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+}
+
+.smart-rec-empty-state-icon {
+    font-size: 3rem;
+    color: #475569;
+    margin-bottom: 1rem;
+}
+
+.smart-rec-empty-state-title {
+    margin: 0 0 0.5rem 0;
+    color: #cbd5e1;
+}
+
+.smart-rec-empty-state-desc {
+    color: #64748b;
+    font-size: 0.9rem;
+}
+
+.smart-rec-tab {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.9rem 0.5rem 0.5rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    cursor: pointer;
+    color: #cbd5e1;
+    max-width: 220px;
+    transition: all 0.15s ease;
+}
+
+.smart-rec-tab.active {
+    background: rgba(52, 211, 153, 0.15);
+    border-color: #34d399;
+    color: #f8fafc;
+}
+
+.smart-rec-tab-cover {
+    width: 28px;
+    height: 38px;
+    object-fit: cover;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.smart-rec-tab-title {
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.smart-rec-section {
+    margin-bottom: 1.5rem;
+}
+
+.smart-rec-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.8rem;
+}
+
+.smart-rec-section-title {
+    margin: 0;
+    font-size: 1rem;
+    color: #f8fafc;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.smart-rec-section-title i {
+    color: #34d399;
+}
+
+.smart-rec-fallback-note {
+    font-size: 0.78rem;
+    font-weight: 400;
+    color: #64748b;
+}
+
+.section-nav-btns--hidden {
+    display: none;
+}
+
+.smart-rec-section-empty {
+    color: #64748b;
+    font-size: 0.88rem;
+    padding: 0.5rem 0 1rem 0;
 }
 
 /* 대시보드 통계 카드 */
@@ -2475,6 +2660,53 @@ body.has-system-ticker .library-sidebar {
     border-radius: 50%;
     background: #22c55e;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55), 0 0 0 2px rgba(34, 197, 94, 0.28);
+}
+
+/* 카드/상세 헤더 공용: 메타데이터 잠금 배지 */
+.book-card-locked-badge {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    z-index: 5;
+    background: rgba(0, 0, 0, 0.65);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.4);
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(2px);
+}
+
+.book-card-locked-badge i {
+    font-size: 0.7rem;
+}
+
+/* 카드 하단 메타 텍스트: 오디오북 챕터/이어읽기 진행률 */
+.book-card-sub-audio {
+    font-size: 0.82rem;
+    color: #38bdf8;
+    font-weight: 600;
+    margin-top: auto;
+    padding-top: 0.2rem;
+    margin-bottom: -0.15rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.book-card-sub-progress {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin: 0.25rem 0 0 0;
+}
+
+/* 로딩 스피너: 대시보드 행 등 좁은 영역용 컴팩트 여백 변형 */
+.loading-spinner--compact {
+    padding: 2rem;
 }
 
 .ab-col-title {
@@ -3107,6 +3339,240 @@ body.has-system-ticker .library-sidebar {
     color: #ffffff;
     border-color: #fca5a5;
     box-shadow: 0 4px 12px rgba(239, 68, 68, 0.5);
+}
+
+/* 대시보드 플러그인 위젯 카드 (공통 데스크) */
+.plugin-widget-subtitle {
+    margin-top: 0.35rem;
+    color: #94a3b8;
+    font-size: 0.78rem;
+}
+
+.plugin-widget-subtitle--tab {
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+}
+
+.plugin-card {
+    flex: 1 1 350px;
+    min-width: 320px;
+    background: rgba(30, 41, 59, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 1rem;
+    box-sizing: border-box;
+    cursor: grab;
+    user-select: none;
+}
+
+.plugin-card-header {
+    margin: 0 0 0.7rem 0;
+    color: #cbd5e1;
+    font-size: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 0.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.6rem;
+    pointer-events: none;
+}
+
+.plugin-card-header-title {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.plugin-card-header-title i {
+    color: #38bdf8;
+    margin-right: 0.35rem;
+}
+
+.plugin-card-header-title-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.plugin-card-provider {
+    font-size: 0.75rem;
+    color: #64748b;
+    font-weight: normal;
+    flex-shrink: 0;
+}
+
+.plugin-widget-body {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+    margin-top: 0.6rem;
+}
+
+.loading-spinner--widget {
+    padding: 1rem 0;
+}
+
+.loading-spinner--widget-grid {
+    padding: 2rem 0;
+    grid-column: 1 / -1;
+}
+
+/* 대시보드 플러그인 위젯 - 독점 탭 패널 (plugins-tab-content 내부로 스코프 한정) */
+.plugins-tab-content {
+    display: none;
+    width: 100%;
+    flex-direction: column;
+}
+
+.plugins-tab-content .dashboard-section {
+    width: 100%;
+}
+
+.plugins-tab-content .section-header {
+    margin-bottom: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding-bottom: 0.6rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.plugins-tab-content .section-title {
+    margin: 0;
+    color: #fff;
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.plugins-tab-content .section-title i {
+    color: #a855f7;
+    margin-right: 0.5rem;
+}
+
+.plugin-tab-provider {
+    font-size: 0.8rem;
+    color: #64748b;
+}
+
+.plugin-tab-widget-body {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1.5rem;
+    width: 100%;
+    margin-top: 1rem;
+}
+
+/* 대시보드 통계(metric) 미니 카드 */
+.dashboard-metric-card {
+    padding: 0.85rem 0.9rem;
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.dashboard-metric-label {
+    color: #94a3b8;
+    font-size: 0.8rem;
+    white-space: pre-line;
+}
+
+.dashboard-metric-value {
+    color: #f8fafc;
+    font-size: 1.15rem;
+    line-height: 1.35;
+    white-space: pre-line;
+}
+
+.dashboard-metric-desc {
+    color: #64748b;
+    font-size: 0.74rem;
+    white-space: pre-line;
+}
+
+/* 대시보드 플러그인 위젯 - 도서/아이템 리스트 카드 */
+.plugin-item-card {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    padding-bottom: 0.8rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.plugin-item-card--clickable {
+    cursor: pointer;
+}
+
+.plugin-item-cover {
+    width: 60px;
+    height: 85px;
+    flex-shrink: 0;
+    border-radius: 4px;
+    overflow: hidden;
+    background: #1e293b;
+}
+
+.plugin-item-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.plugin-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.plugin-item-title {
+    color: #f8fafc;
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.plugin-item-meta {
+    color: #94a3b8;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.plugin-item-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.2rem;
+}
+
+.plugin-item-publisher {
+    color: #64748b;
+    font-size: 0.75rem;
+}
+
+.plugin-item-pubdate {
+    color: #a855f7;
+    font-size: 0.75rem;
+}
+
+.plugin-widget-error {
+    text-align: center;
+    color: #ef4444;
+    font-size: 0.9rem;
+    padding: 1rem 0;
+    grid-column: 1 / -1;
 }
 
 /* Drag and Drop Sortable Plugins Style */

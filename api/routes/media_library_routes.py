@@ -8,6 +8,7 @@ from services.series_service import SeriesService
 from services.book_detail_service import BookDetailService
 from services.reading_history_service import ReadingHistoryService
 from services.library_service import LibraryService
+from services.recommendation_service import RecommendationService
 from api.auth import login_required, check_adult_permission
 from utils.i18n import _t
 
@@ -217,6 +218,24 @@ def get_media_history():
     try:
         history = ReadingHistoryService.get_history(db_type, user_id=user_id)
         return jsonify({'success': True, 'books': history})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@media_library_routes_bp.route('/api/media/recommendations', methods=['GET'])
+@login_required
+def get_smart_recommendations():
+    """읽은 시리즈 기준 장르/태그 겹침 스마트 추천"""
+    db_type = request.args.get('type', 'general')
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+    series_name = request.args.get('series_name')
+    library_id = request.args.get('library_id')
+    if not series_name:
+        return jsonify({'success': False, 'error': 'series_name is required'}), 400
+    user_id = session.get('user_id', 1)
+    try:
+        data = RecommendationService.get_similar_series(db_type, series_name, library_id, user_id=user_id)
+        return jsonify({'success': True, **data})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

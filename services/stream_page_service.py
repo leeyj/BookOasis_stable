@@ -4,6 +4,7 @@ import mimetypes
 
 from api.cache import namelist_cache, image_cache
 from utils.cache_helper import get_zip_file_hybrid, get_zip_read_lock
+from utils.permission_clause import build_library_permission_clause
 import database
 
 IMG_EXT = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp')
@@ -64,16 +65,7 @@ _book_info_cache = LRUCache(capacity=2000)
 class StreamPageService:
     @staticmethod
     def _book_permission_clause(user_id=None, role=None, book_alias='b'):
-        is_admin = str(role or '').lower() == 'admin'
-        if is_admin or not user_id:
-            return '', []
-        clause = (
-            f" AND EXISTS ("
-            f"SELECT 1 FROM user_category_permissions p "
-            f"WHERE p.library_id = {book_alias}.library_id AND p.user_id = ? AND p.has_access = 1"
-            f")"
-        )
-        return clause, [user_id]
+        return build_library_permission_clause(user_id, role, alias=book_alias)
 
     @staticmethod
     def get_book_file_info(db_type, book_id, user_id=None, role=None):

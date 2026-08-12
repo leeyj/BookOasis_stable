@@ -2,11 +2,9 @@
 import os
 import json
 import re
-import sqlite3
 import struct
 import subprocess
 import time
-from database import get_connection
 from utils.drive_helper import is_remote_path
 
 AUDIO_EXTENSIONS = ('.mp3', '.m4b', '.m4a', '.flac', '.aac', '.wav', '.ogg', '.opus', '.wma')
@@ -510,23 +508,16 @@ def parse_audiobook_folder(folder_path, existing_track_cache=None, remote_fast_p
 
 def scan_and_save_audiobook_folder(folder_path, library_id=None):
     """
-    단일 오디오북 폴더를 스캔하여 media_audiobook.db 에 저장/업데이트합니다.
+    단일 오디오북 폴더를 스캔하여 오디오북 DB에 저장/업데이트합니다.
     """
-    conn = get_connection('audiobook')
-    cursor = conn.cursor()
+    from repositories.audiobook_repository import AudiobookRepository
+
     started_at = time.perf_counter()
     parse_elapsed_sec = 0.0
 
     try:
         normalized_folder_path = os.path.normpath(folder_path)
         remote_fast_path = is_remote_path(normalized_folder_path)
-        has_file_mtime_col = False
-        try:
-            cursor.execute("PRAGMA table_info(audiobook_tracks)")
-            cols = {str(c['name']).lower() for c in cursor.fetchall()}
-            has_file_mtime_col = 'file_mtime' in cols
-        except Exception:
-            has_file_mtime_col = False
 
         # library_id 유효성 확인 (libraries 테이블에 존재하는지 체크, 없으면 None)
         if library_id is not None:
@@ -534,58 +525,18 @@ def scan_and_save_audiobook_folder(folder_path, library_id=None):
             if not CategoryRepository.get_library_by_id('audiobook', library_id):
                 library_id = None
 
-        # 기존 오디오북 확인
-        cursor.execute(
-            """
-            SELECT id, library_id, title, web_id, author, publisher, code, poster,
-                   premiered, ratings, author_intro, description,
-                   folder_name, total_duration, total_tracks, file_type
-            FROM audiobooks
-            WHERE folder_path = ?
-            """,
-            (normalized_folder_path,)
-        )
-        row = cursor.fetchone()
+        # 기존 오디오북/트랙 정보로 파싱 시 duration 캐시 재사용을 위해 조회
+        existing = AudiobookRepository.get_by_folder_path(normalized_folder_path)
         existing_track_cache = {}
-        existing_tracks_full = {}
-        audiobook_id = None
-        track_inserts = 0
-        track_updates = 0
-        track_deletes = 0
-        meta_updated = 0
-
-        if row:
-            audiobook_id = row['id']
-            track_select_sql = (
-                "SELECT id, track_number, track_code, filename, file_path, file_mtime, file_size, duration, format "
-                "FROM audiobook_tracks WHERE audiobook_id = ?"
-                if has_file_mtime_col else
-                "SELECT id, track_number, track_code, filename, file_path, 0.0 AS file_mtime, file_size, duration, format "
-                "FROM audiobook_tracks WHERE audiobook_id = ?"
-            )
-            cursor.execute(
-                track_select_sql,
-                (audiobook_id,)
-            )
-            for r in cursor.fetchall():
-                if not r or not r['file_path']:
+        if existing:
+            for r in AudiobookRepository.get_audiobook_tracks(existing['id']):
+                if not r or not r.get('file_path'):
                     continue
                 key = os.path.normpath(str(r['file_path']))
                 existing_track_cache[key] = {
-                    'file_mtime': float(r['file_mtime'] or 0.0),
-                    'file_size': int(r['file_size'] or 0),
-                    'duration': float(r['duration'] or 0.0)
-                }
-                existing_tracks_full[key] = {
-                    'id': int(r['id']),
-                    'track_number': int(r['track_number'] or 0),
-                    'track_code': str(r['track_code'] or ''),
-                    'filename': str(r['filename'] or ''),
-                    'file_path': key,
-                    'file_mtime': float(r['file_mtime'] or 0.0),
-                    'file_size': int(r['file_size'] or 0),
-                    'duration': float(r['duration'] or 0.0),
-                    'format': str(r['format'] or '')
+                    'file_mtime': float(r.get('file_mtime') or 0.0),
+                    'file_size': int(r.get('file_size') or 0),
+                    'duration': float(r.get('duration') or 0.0)
                 }
 
         parse_started_at = time.perf_counter()
@@ -606,143 +557,13 @@ def scan_and_save_audiobook_folder(folder_path, library_id=None):
         metadata_track_duration_mode = bool(result.get('metadata_track_duration_mode', False))
         file_probe_hits = int(result.get('file_probe_hits', 0) or 0)
 
-        if row:
-            existing_meta = (
-                row['library_id'], row['title'], row['web_id'], row['author'], row['publisher'],
-                row['code'], row['poster'], row['premiered'], float(row['ratings'] or 0.0),
-                row['author_intro'], row['description'], row['folder_name'],
-                float(row['total_duration'] or 0.0), int(row['total_tracks'] or 0), row['file_type']
-            )
-            incoming_meta = (
-                library_id, meta['title'], meta['web_id'], meta['author'], meta['publisher'],
-                meta['code'], meta['poster'], meta['premiered'], float(meta['ratings'] or 0.0),
-                meta['author_intro'], meta['description'], meta['folder_name'],
-                float(meta['total_duration'] or 0.0), int(meta['total_tracks'] or 0), meta['file_type']
-            )
-            if existing_meta != incoming_meta:
-                cursor.execute("""
-                    UPDATE audiobooks SET
-                        library_id = ?,
-                        title = ?,
-                        web_id = ?,
-                        author = ?,
-                        publisher = ?,
-                        code = ?,
-                        poster = ?,
-                        premiered = ?,
-                        ratings = ?,
-                        author_intro = ?,
-                        description = ?,
-                        folder_name = ?,
-                        total_duration = ?,
-                        total_tracks = ?,
-                        file_type = ?,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                """, (
-                    library_id, meta['title'], meta['web_id'], meta['author'], meta['publisher'],
-                    meta['code'], meta['poster'], meta['premiered'], meta['ratings'],
-                    meta['author_intro'], meta['description'], meta['folder_name'],
-                    meta['total_duration'], meta['total_tracks'], meta['file_type'],
-                    audiobook_id
-                ))
-                meta_updated = 1
-        else:
-            cursor.execute("""
-                INSERT INTO audiobooks (
-                    library_id, title, web_id, author, publisher, code, poster,
-                    premiered, ratings, author_intro, description,
-                    folder_name, folder_path, total_duration, total_tracks, file_type
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                library_id, meta['title'], meta['web_id'], meta['author'], meta['publisher'],
-                meta['code'], meta['poster'], meta['premiered'], meta['ratings'],
-                meta['author_intro'], meta['description'], meta['folder_name'],
-                meta['folder_path'], meta['total_duration'], meta['total_tracks'],
-                meta['file_type']
-            ))
-            audiobook_id = cursor.lastrowid
-            meta_updated = 1
+        scan_result = AudiobookRepository.save_audiobook_scan(normalized_folder_path, library_id, meta, tracks)
+        audiobook_id = scan_result['audiobook_id']
+        meta_updated = scan_result['meta_updated']
+        track_inserts = scan_result['track_inserts']
+        track_updates = scan_result['track_updates']
+        track_deletes = scan_result['track_deletes']
 
-        # 트랙 변경분만 DB에 반영하여 쓰기 비용을 줄입니다.
-        incoming_paths = set()
-        for t in tracks:
-            norm_path = os.path.normpath(str(t['file_path']))
-            incoming_paths.add(norm_path)
-            existing = existing_tracks_full.get(norm_path)
-            if not existing:
-                if has_file_mtime_col:
-                    cursor.execute("""
-                        INSERT INTO audiobook_tracks (
-                            audiobook_id, track_number, track_code, filename, file_path, file_mtime, file_size, duration, format
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        audiobook_id, t['track_number'], t['track_code'], t['filename'],
-                        norm_path, t['file_mtime'], t['file_size'], t['duration'], t['format']
-                    ))
-                else:
-                    cursor.execute("""
-                        INSERT INTO audiobook_tracks (
-                            audiobook_id, track_number, track_code, filename, file_path, file_size, duration, format
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        audiobook_id, t['track_number'], t['track_code'], t['filename'],
-                        norm_path, t['file_size'], t['duration'], t['format']
-                    ))
-                track_inserts += 1
-                continue
-
-            changed = (
-                existing['track_number'] != int(t['track_number']) or
-                existing['track_code'] != str(t['track_code'] or '') or
-                existing['filename'] != str(t['filename'] or '') or
-                int(float(existing['file_mtime'] or 0.0)) != int(float(t['file_mtime'] or 0.0)) or
-                existing['file_size'] != int(t['file_size'] or 0) or
-                abs(existing['duration'] - float(t['duration'] or 0.0)) > 0.0001 or
-                existing['format'] != str(t['format'] or '')
-            )
-            if changed:
-                if has_file_mtime_col:
-                    cursor.execute("""
-                        UPDATE audiobook_tracks SET
-                            track_number = ?,
-                            track_code = ?,
-                            filename = ?,
-                            file_mtime = ?,
-                            file_size = ?,
-                            duration = ?,
-                            format = ?
-                        WHERE id = ?
-                    """, (
-                        t['track_number'], t['track_code'], t['filename'],
-                        t['file_mtime'],
-                        t['file_size'], t['duration'], t['format'],
-                        existing['id']
-                    ))
-                else:
-                    cursor.execute("""
-                        UPDATE audiobook_tracks SET
-                            track_number = ?,
-                            track_code = ?,
-                            filename = ?,
-                            file_size = ?,
-                            duration = ?,
-                            format = ?
-                        WHERE id = ?
-                    """, (
-                        t['track_number'], t['track_code'], t['filename'],
-                        t['file_size'], t['duration'], t['format'],
-                        existing['id']
-                    ))
-                track_updates += 1
-
-        removed_paths = set(existing_tracks_full.keys()) - incoming_paths
-        if removed_paths:
-            for p in removed_paths:
-                cursor.execute("DELETE FROM audiobook_tracks WHERE id = ?", (existing_tracks_full[p]['id'],))
-                track_deletes += 1
-
-        conn.commit()
         elapsed_sec = time.perf_counter() - started_at
         elapsed_ms = int(elapsed_sec * 1000)
         parse_elapsed_ms = int(parse_elapsed_sec * 1000)
@@ -797,11 +618,8 @@ def scan_and_save_audiobook_folder(folder_path, library_id=None):
         )
         return audiobook_id
     except Exception as err:
-        conn.rollback()
         print(f"[AudiobookScanner ERROR] Failed to save audiobook {folder_path}: {err}")
         return None
-    finally:
-        conn.close()
 
 
 def scan_audiobook_library(library_path, library_id=None, force=False):

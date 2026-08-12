@@ -283,7 +283,19 @@
     "plugins": "플러그인",
     "view_all": "전체보기",
     "settings": "환경설정",
-    "logout_title": "로그아웃"
+    "logout_title": "로그아웃",
+    "smart_recommend": "스마트 추천"
+  },
+  "smart_recommend": {
+    "title": "스마트 추천",
+    "loading": "불러오는 중...",
+    "error": "오류: {error}",
+    "similar_genre": "같은/유사한 장르",
+    "similar_tags": "같은/유사한 태그",
+    "empty": "추천할 시리즈가 부족합니다.",
+    "fallback_note": " (장르/태그 정보가 없어 카테고리 최신 도서를 보여드려요)",
+    "no_history_title": "최근 읽은 도서가 없습니다.",
+    "no_history_desc": "도서를 몇 편 읽으면 취향에 맞는 추천을 보여드려요."
   },
   "header": {
     "general_books": "일반 도서",
@@ -586,6 +598,7 @@
     "home": "Home",
     "history": "최근 읽은 도서",
     "favorite": "즐겨찾기",
+    "smart_recommend": "스마트 추천",
     "plugins": "플러그인",
     "all": "전체보기",
     "add_title": "새 카테고리 추가",

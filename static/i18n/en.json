@@ -283,7 +283,19 @@
     "plugins": "Plugins",
     "view_all": "All Books",
     "settings": "Settings",
-    "logout_title": "Log Out"
+    "logout_title": "Log Out",
+    "smart_recommend": "Smart Picks"
+  },
+  "smart_recommend": {
+    "title": "Smart Picks",
+    "loading": "Loading...",
+    "error": "Error: {error}",
+    "similar_genre": "Similar Genre",
+    "similar_tags": "Similar Tags",
+    "empty": "Not enough series to recommend yet.",
+    "fallback_note": " (No genre/tag data — showing latest in this category)",
+    "no_history_title": "No reading history yet.",
+    "no_history_desc": "Read a few series and we'll tailor recommendations for you."
   },
   "header": {
     "general_books": "General Books",
@@ -586,6 +598,7 @@
     "home": "Home",
     "history": "Recently Read",
     "favorite": "Favorites",
+    "smart_recommend": "Smart Picks",
     "plugins": "Plugins",
     "all": "All Media",
     "add_title": "Add New Category",

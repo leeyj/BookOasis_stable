@@ -1,3 +1,11 @@
+            {# 체크박스 스위치 행(.settings-checkbox-row) 반복 매크로 - 이 파일에서만 사용 #}
+            {% macro checkbox_row(id, name, checked=False, i18n_key=None, extra_class='', input_class='') %}
+            <div class="settings-checkbox-row{% if extra_class %} {{ extra_class }}{% endif %}">
+                <input type="checkbox" id="{{ id }}" name="{{ name }}"{% if input_class %} class="{{ input_class }}"{% endif %}{% if checked %} checked{% endif %}>
+                <label for="{{ id }}"{% if i18n_key %} data-i18n="{{ i18n_key }}"{% endif %}>{{ caller() }}</label>
+            </div>
+            {% endmacro %}
+
             <!-- 2. 일반 설정 탭 -->
             <div id="settings-tab-general" class="settings-tab-content" style="display: none; flex-direction: column; gap: 1.5rem;">
                 <div class="dashboard-section">
@@ -119,48 +127,26 @@
                                         <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;" data-i18n="settings.audio_mini_player_mode_desc">기본값은 미니바이며, 우측 오버레이 패널형은 화면 오른쪽에 고정 표시되고 배경 딤 오버레이가 함께 표시됩니다.</p>
                                     </div>
 
-                                    <div class="library-form-group-row" style="display: flex; align-items: center; gap: 0.5rem;">
-                                        <input type="checkbox" id="setting-audio-right-dock-dim-enabled" name="AUDIO_RIGHT_DOCK_DIM_ENABLED" style="cursor: pointer; accent-color: #a855f7; width: 1.1rem; height: 1.1rem; margin: 0;">
-                                        <label for="setting-audio-right-dock-dim-enabled" style="cursor: pointer; font-weight: 700; color: #fff; font-size: 0.9rem; margin: 0;" data-i18n="settings.audio_right_dock_dim_enabled_label">오디오 우측 패널 배경 딤 표시</label>
-                                    </div>
-                                    <p style="font-size: 0.78rem; color: #94a3b8; margin: -0.35rem 0 0 1.65rem;" data-i18n="settings.audio_right_dock_dim_enabled_desc">해제하면 우측 패널만 표시되고, 메인 화면 배경 딤은 표시되지 않습니다.</p>
+                                    {% call checkbox_row('setting-audio-right-dock-dim-enabled', 'AUDIO_RIGHT_DOCK_DIM_ENABLED', i18n_key='settings.audio_right_dock_dim_enabled_label') %}오디오 우측 패널 배경 딤 표시{% endcall %}
+                                    <p class="settings-checkbox-desc" data-i18n="settings.audio_right_dock_dim_enabled_desc">해제하면 우측 패널만 표시되고, 메인 화면 배경 딤은 표시되지 않습니다.</p>
 
                                     <!-- 체크박스 스위치 모음 -->
-                                    <div style="display: flex; flex-direction: column; gap: 0.8rem; border-top: 1px dashed rgba(255,255,255,0.08); padding-top: 0.8rem;">
-                                        <div class="library-form-group-row" style="display: flex; align-items: center; gap: 0.5rem;">
-                                            <input type="checkbox" id="setting-show-sidebar-category-all" name="SHOW_SIDEBAR_CATEGORY_ALL" style="cursor: pointer; accent-color: #a855f7; width: 1.1rem; height: 1.1rem; margin: 0;" checked>
-                                            <label for="setting-show-sidebar-category-all" style="cursor: pointer; font-weight: 700; color: #fff; font-size: 0.9rem; margin: 0;">사이드바에 '전체 도서 보기' 메뉴 표시</label>
-                                        </div>
+                                    <div class="settings-checkbox-group">
+                                        {% call checkbox_row('setting-show-sidebar-category-all', 'SHOW_SIDEBAR_CATEGORY_ALL', checked=True) %}사이드바에 '전체 도서 보기' 메뉴 표시{% endcall %}
 
-                                        <div class="library-form-group-row" style="display: flex; align-items: center; gap: 0.5rem;">
-                                            <input type="checkbox" id="setting-sidebar-top-controls" name="SIDEBAR_TOP_CONTROLS" style="cursor: pointer; accent-color: #a855f7; width: 1.1rem; height: 1.1rem; margin: 0;">
-                                            <label for="setting-sidebar-top-controls" style="cursor: pointer; font-weight: 700; color: #fff; font-size: 0.9rem; margin: 0;" data-i18n="settings.sidebar_top_controls_label">사이드바의 환경설정/계정 메뉴를 상단에 배치</label>
-                                        </div>
+                                        {% call checkbox_row('setting-sidebar-top-controls', 'SIDEBAR_TOP_CONTROLS', i18n_key='settings.sidebar_top_controls_label') %}사이드바의 환경설정/계정 메뉴를 상단에 배치{% endcall %}
 
-                                        <div class="library-form-group-row" style="display: flex; align-items: center; gap: 0.5rem;">
-                                            <input type="checkbox" id="setting-hide-completed-in-history" name="HIDE_COMPLETED_IN_HISTORY" style="cursor: pointer; accent-color: #a855f7; width: 1.1rem; height: 1.1rem; margin: 0;">
-                                            <label for="setting-hide-completed-in-history" style="cursor: pointer; font-weight: 700; color: #fff; font-size: 0.9rem; margin: 0;" data-i18n="settings.hide_completed_label">다 읽은 도서는 최근 읽은 도서에서 삭제</label>
-                                        </div>
+                                        {% call checkbox_row('setting-hide-completed-in-history', 'HIDE_COMPLETED_IN_HISTORY', i18n_key='settings.hide_completed_label') %}다 읽은 도서는 최근 읽은 도서에서 삭제{% endcall %}
 
-                                        <div class="library-form-group-row" style="display: flex; align-items: center; gap: 0.5rem;">
-                                            <input type="checkbox" id="setting-tag-filter-scope-all" name="TAG_FILTER_SEARCH_SCOPE_ALL" style="cursor: pointer; accent-color: #a855f7; width: 1.1rem; height: 1.1rem; margin: 0;">
-                                            <label for="setting-tag-filter-scope-all" style="cursor: pointer; font-weight: 700; color: #fff; font-size: 0.9rem; margin: 0;" data-i18n="settings.tag_filter_scope_all_label">태그 선택 시 전체 목록에서 조회</label>
-                                        </div>
+                                        {% call checkbox_row('setting-tag-filter-scope-all', 'TAG_FILTER_SEARCH_SCOPE_ALL', i18n_key='settings.tag_filter_scope_all_label') %}태그 선택 시 전체 목록에서 조회{% endcall %}
 
-                                        <div class="library-form-group-row" style="display: flex; align-items: center; gap: 0.5rem;">
-                                            <input type="checkbox" id="setting-show-txt-no-cover-info-banner" name="SHOW_TXT_NO_COVER_INFO_BANNER" style="cursor: pointer; accent-color: #a855f7; width: 1.1rem; height: 1.1rem; margin: 0;" checked>
-                                            <label for="setting-show-txt-no-cover-info-banner" style="cursor: pointer; font-weight: 700; color: #fff; font-size: 0.9rem; margin: 0;" data-i18n="settings.show_txt_no_cover_info_banner_label">TXT 무커버 안내 배너 표시</label>
-                                        </div>
+                                        {% call checkbox_row('setting-show-txt-no-cover-info-banner', 'SHOW_TXT_NO_COVER_INFO_BANNER', checked=True, i18n_key='settings.show_txt_no_cover_info_banner_label') %}TXT 무커버 안내 배너 표시{% endcall %}
 
-                                        <div class="library-form-group-row" style="display: flex; align-items: center; gap: 0.5rem;">
-                                            <input type="checkbox" id="setting-detail-volume-grid-view" name="DETAIL_VOLUME_GRID_VIEW" style="cursor: pointer; accent-color: #a855f7; width: 1.1rem; height: 1.1rem; margin: 0;">
-                                            <label for="setting-detail-volume-grid-view" style="cursor: pointer; font-weight: 700; color: #fff; font-size: 0.9rem; margin: 0;">도서 상세 목록 그리드로 보기 <span style="color: #64748b; font-weight: 400; font-size: 0.8rem;">(커버+제목 그리드 형태)</span></label>
-                                        </div>
+                                        {% call checkbox_row('setting-detail-volume-grid-view', 'DETAIL_VOLUME_GRID_VIEW') %}도서 상세 목록 그리드로 보기 <span class="settings-checkbox-hint">(커버+제목 그리드 형태)</span>{% endcall %}
 
-                                        <div class="library-form-group-row" style="display: flex; align-items: center; gap: 0.5rem;">
-                                            <input type="checkbox" id="setting-collapse-detail-genre-tags" name="COLLAPSE_DETAIL_GENRE_TAGS" style="cursor: pointer; accent-color: #a855f7; width: 1.1rem; height: 1.1rem; margin: 0;">
-                                            <label for="setting-collapse-detail-genre-tags" style="cursor: pointer; font-weight: 700; color: #fff; font-size: 0.9rem; margin: 0;">도서 상세 태그/장르 축소 <span style="color: #64748b; font-weight: 400; font-size: 0.8rem;">(기본 1개 표출 후 +N 클릭 시 전체 펼침)</span></label>
-                                        </div>
+                                        {% call checkbox_row('setting-collapse-detail-genre-tags', 'COLLAPSE_DETAIL_GENRE_TAGS') %}도서 상세 태그/장르 축소 <span class="settings-checkbox-hint">(기본 1개 표출 후 +N 클릭 시 전체 펼침)</span>{% endcall %}
+
+                                        {% call checkbox_row('setting-smart-recommend-enabled', 'SMART_RECOMMEND_ENABLED', checked=True) %}스마트 추천 기능 사용 <span class="settings-checkbox-hint">(해제 시 사이드바 메뉴에서도 숨김)</span>{% endcall %}
                                     </div>
                                 </div>
                             </div>
@@ -233,10 +219,7 @@
                                     </div>
 
                                     <!-- HDD 적극 웜업 설정 -->
-                                    <div class="library-form-group-row" style="display: flex; align-items: center; gap: 0.5rem; border-top: 1px dashed rgba(255,255,255,0.08); padding-top: 0.8rem;">
-                                        <input type="checkbox" id="setting-hdd-aggressive-warmup" name="HDD_AGGRESSIVE_WARMUP" style="cursor: pointer; accent-color: #38bdf8; width: 1.1rem; height: 1.1rem; margin: 0;">
-                                        <label for="setting-hdd-aggressive-warmup" style="cursor: pointer; font-weight: 700; color: #fff; font-size: 0.9rem; margin: 0;" data-i18n="settings.hdd_aggressive_warmup_label">HDD 환경시 체크 (적극 웜업)</label>
-                                    </div>
+                                    {% call checkbox_row('setting-hdd-aggressive-warmup', 'HDD_AGGRESSIVE_WARMUP', i18n_key='settings.hdd_aggressive_warmup_label', extra_class='settings-checkbox-row--divider', input_class='settings-checkbox-input--blue') %}HDD 환경시 체크 (적극 웜업){% endcall %}
                                 </div>
                             </div>
 
