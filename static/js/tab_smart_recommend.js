@@ -122,6 +122,7 @@ async function renderRecommendationsFor(seriesItem) {
     bodyEl.innerHTML = '';
     bodyEl.appendChild(buildSection('smart-rec-genre', i18n.t('smart_recommend.similar_genre'), 'fa-tags', data.genre || [], data.genre_is_fallback));
     bodyEl.appendChild(buildSection('smart-rec-tags', i18n.t('smart_recommend.similar_tags'), 'fa-hashtag', data.tags || [], data.tags_is_fallback));
+    bodyEl.appendChild(buildSection('smart-rec-author', i18n.t('smart_recommend.same_author'), 'fa-feather-pointed', data.author || [], false));
   } catch (err) {
     bodyEl.innerHTML = `<div class="smart-rec-error">${i18n.t('smart_recommend.error', { error: err.message })}</div>`;
   }

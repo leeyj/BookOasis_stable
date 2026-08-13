@@ -476,7 +476,7 @@ def parse_audiobook_folder(folder_path, existing_track_cache=None, remote_fast_p
         clean_title = re.sub(r'^\s*\[\s*\d+\s*\]\s*', '', os.path.splitext(fname)[0]).strip()
         display_fname = clean_title if clean_title else fname
 
-        code_match = re.search(r'(\d+[A-Za-z]|\d+)', fname)
+        code_match = re.search(r'(\d+[A-Za-z]?)', fname)
         track_code = code_match.group(1) if code_match else str(idx)
 
         ext = os.path.splitext(fname)[1].lstrip('.').lower()

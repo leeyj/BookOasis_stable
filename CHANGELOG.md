@@ -1,4 +1,11 @@
 # CHANGELOG
+## v1.9.7
+- (viewer) 홀수 페이지일때 마지막 장만 표시 | show last odd page alone instead of repeating
+- (dashboard) 스마트 추천에 동일작가 표시 추가 | added same-author section to smart recommendations
+- (redis) 2초 풀링->30초 풀링으로 수정 | changed retry cooldown from 2s to 30s
+- (all) 코드 리펙토링 최적화 | code refactoring
+- (api) 플러그인 관련 엔드포인트 신설 | added plugin-related endpoints
+
 ## v1.9.6
 - (mobile) 상/하 제스처 추가 | added up/down movement
 - (viewer) 홀수페이지 일때 다음장 넘어가지 않는 버그 수정 | bugfix next chapter logic

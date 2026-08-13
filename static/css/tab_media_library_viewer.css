@@ -189,6 +189,14 @@
     margin-left: 0.25rem;
 }
 
+/* 🌟 2장 보기 모드에서 전체 페이지가 홀수라 마지막 한 장만 남을 때: 확대 대신 나머지 반쪽을 빈 페이지로 표시 */
+.comic-page-blank-slot {
+    flex: 0 0 50%;
+    max-width: 50%;
+    height: 100%;
+    visibility: hidden;
+}
+
 /* 너비에 맞추기 모드 (웹툰 등 세로 스크롤용) */
 .comic-image-wrapper.fit-width img {
     position: relative;

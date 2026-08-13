@@ -275,6 +275,13 @@ function getComicPageIndices() {
   }
 
   if (Settings.getComicReadingDirection() === 'rtl') {
+    // basePage(comicCurrentPage) 다음 페이지가 없어서 getComicDisplayPageIndex가
+    // basePage 그대로 clamp한 경우 = 짝이 없는 마지막 홀수 페이지.
+    // 이 경우 직전 스프레드에서 이미 보여준 (basePage - 1) 페이지와 재조합하면
+    // 마지막 전 페이지가 두 번 반복 노출되므로, 짝 없이 단독 표시한다.
+    if (displayPageIndex === comicCurrentPage) {
+      return [comicCurrentPage];
+    }
     const prevPage = displayPageIndex - 1;
     const indices = prevPage >= 0 ? [displayPageIndex, prevPage] : [displayPageIndex];
     return indices;
@@ -552,6 +559,10 @@ export function loadComicPage() {
     let loadedCount = 0;
     const expectedLoads = pageIndices.length;
     const hasTwoPageSpread = expectedLoads > 1;
+    // 2쪽 보기 모드에서 전체 페이지가 홀수라 마지막 한 장만 남는 경우.
+    // (전체 1페이지짜리 도서에서 첫 장을 단독 표시하는 경우는 제외 — 그건 화면 꽉 채움이 맞다)
+    const isTwoPageTailSingle = (scrollMode !== 'scroll') && Settings.getComicPageStep() === 2
+      && expectedLoads === 1 && comicCurrentPage > 0;
     let earlyPreloadTriggered = false;
     const imageElements = [];
 
@@ -610,16 +621,24 @@ export function loadComicPage() {
           const removeCenterGap = (localStorage.getItem('remove_2page_center_gap') === '1');
           wrapper.innerHTML = `<div class="comic-page-pair ${removeCenterGap ? 'no-center-gap' : ''}" style="visibility: hidden;"></div>`;
           const pairContainer = wrapper.querySelector('.comic-page-pair');
-          if (expectedLoads === 1 && pairContainer) {
+          if (expectedLoads === 1 && pairContainer && !isTwoPageTailSingle) {
             pairContainer.classList.add('single-page');
           }
 
           imageElements.forEach((loadedImg) => {
             if (loadedImg) {
               loadedImg.style.opacity = '1';
+              if (isTwoPageTailSingle) {
+                loadedImg.classList.add('comic-page-img-left');
+              }
               pairContainer.appendChild(loadedImg);
             }
           });
+          if (isTwoPageTailSingle) {
+            const blankSlot = document.createElement('div');
+            blankSlot.className = 'comic-page-blank-slot';
+            pairContainer.appendChild(blankSlot);
+          }
           pairContainer.style.visibility = 'visible';
           loadTrace.log('page images committed to DOM', {
             pageIndices,

@@ -155,11 +155,12 @@ class BookRepository:
                    MAX(file_format) AS file_format,
                    MAX(genre) AS genre,
                    MAX(tags) AS tags,
+                   MAX(author) AS author,
                    MAX(score) AS score
             FROM books
             WHERE (is_deleted = 0 OR is_deleted IS NULL)
               AND series_name IS NOT NULL AND series_name != ''
-              AND ((genre IS NOT NULL AND genre != '') OR (tags IS NOT NULL AND tags != ''))
+              AND ((genre IS NOT NULL AND genre != '') OR (tags IS NOT NULL AND tags != '') OR (author IS NOT NULL AND author != ''))
             GROUP BY series_name, library_id
             """
         )

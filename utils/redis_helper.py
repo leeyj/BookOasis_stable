@@ -9,6 +9,12 @@ logger = logging.getLogger("bookoasis")
 
 REDIS_URL = os.getenv("REDIS_URL")
 _client = None
+_last_fail_time = 0.0
+
+# Redis 연결 실패 후 재시도까지 대기하는 시간(초). 짧은 간격으로 재시도가 몰려
+# (예: 2초 주기 flush job, 요청마다 호출되는 progress 저장 등) 매번 새 커넥션 풀을
+# 만들고 DNS 조회/연결을 반복하며 응답 지연을 유발하는 것을 방지합니다.
+REDIS_RETRY_COOLDOWN_SEC = max(0, int(os.getenv("REDIS_RETRY_COOLDOWN_SEC", "30") or "30"))
 
 # 키 접두사 (Key Prefix) 네임스페이스 격리
 KEY_PREFIX = "bookoasis:"
@@ -18,8 +24,9 @@ def get_redis_client():
     Redis 클라이언트를 안전하게 초기화 및 반환합니다.
     REDIS_URL이 설정되어 있지 않거나 연결 실패 시 None을 반환하여
     기존 SQLite 직접 쓰기 모드로 Fallback 처리할 수 있게 지원합니다.
+    연결 실패 시에는 REDIS_RETRY_COOLDOWN_SEC 동안 재시도를 건너뜁니다.
     """
-    global _client
+    global _client, _last_fail_time
     if _client is not None:
         return _client
 
@@ -27,11 +34,14 @@ def get_redis_client():
         logger.info("[Redis] REDIS_URL is not set. Running in SQLite-direct mode.")
         return None
 
+    if _last_fail_time and (time.monotonic() - _last_fail_time) < REDIS_RETRY_COOLDOWN_SEC:
+        return None
+
     try:
         # 단일 레디스 클라이언트 생성 (socket_timeout, socket_keepalive 및 connection_pool 튜닝)
         pool = redis.ConnectionPool.from_url(
-            REDIS_URL, 
-            socket_timeout=15.0, 
+            REDIS_URL,
+            socket_timeout=15.0,
             socket_connect_timeout=2.0,
             socket_keepalive=True,
             health_check_interval=30,
@@ -39,15 +49,17 @@ def get_redis_client():
             decode_responses=True  # 문자열 자동 디코딩
         )
         client = redis.Redis(connection_pool=pool)
-        
+
         # 실제 연결 테스트 (ping)
         if client.ping():
             logger.info(f"[Redis] Successfully connected to Redis ({REDIS_URL})")
             _client = client
+            _last_fail_time = 0.0
             return _client
     except Exception as e:
-        logger.warning(f"[Redis] Connection to {REDIS_URL} failed: {e}. Falling back to SQLite-direct.")
+        logger.warning(f"[Redis] Connection to {REDIS_URL} failed: {e}. Falling back to SQLite-direct for {REDIS_RETRY_COOLDOWN_SEC}s.")
         _client = None
+        _last_fail_time = time.monotonic()
 
     return _client
 
@@ -128,7 +140,7 @@ def redis_lrem(key: str, value: str) -> int:
 
 def redis_brpop(key: str, timeout: int = 3) -> str:
     """Redis List의 오른쪽에서 값을 블로킹으로 꺼내옵니다. (Timeout 단위: 초)"""
-    global _client
+    global _client, _last_fail_time
     client = get_redis_client()
     if not client:
         return None
@@ -141,6 +153,7 @@ def redis_brpop(key: str, timeout: int = 3) -> str:
     except (redis.ConnectionError, redis.TimeoutError, OSError, Exception) as e:
         logger.warning(f"[Redis] redis_brpop failed for key '{key}': {e}. Resetting Redis client for auto-reconnect.")
         _client = None
+        _last_fail_time = time.monotonic()
         return None
 
 def redis_acquire_lock(key: str, ttl: int = 60, wait_timeout: float = 0.0, sleep_interval: float = 0.1):

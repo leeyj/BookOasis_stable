@@ -48,10 +48,8 @@
     "view_all": "View All",
     "single_book_list": "Single Books",
     "book_unit": "{count} books",
-    "plugin_health_all_ok": "{count} plugin(s) loaded successfully",
     "plugin_health_error_summary": "{count} plugin(s) failed to load",
     "plugin_health_details_toggle": "Details",
-    "plugin_health_status_success": "OK",
     "plugin_health_status_error": "Failed",
     "plugin_health_dismiss": "Dismiss"
   },
@@ -298,6 +296,7 @@
     "error": "Error: {error}",
     "similar_genre": "Similar Genre",
     "similar_tags": "Similar Tags",
+    "same_author": "More by the Same Author",
     "empty": "Not enough series to recommend yet.",
     "fallback_note": " (No genre/tag data — showing latest in this category)",
     "no_history_title": "No reading history yet.",

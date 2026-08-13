@@ -32,6 +32,7 @@ def _get_series_index(db_type):
     for row in index_rows:
         row['_genre_tokens'] = _tokenize(row.get('genre'))
         row['_tags_tokens'] = _tokenize(row.get('tags'))
+        row['_author_tokens'] = _tokenize(row.get('author'))
 
     _series_index_cache[db_type] = {'rows': index_rows, 'expires_at': time.time() + INDEX_CACHE_TTL}
     return index_rows
@@ -84,7 +85,7 @@ def _fallback_latest(db_type, library_id, exclude_series_names, limit):
 class RecommendationService:
     @staticmethod
     def get_similar_series(db_type, series_name, library_id=None, user_id=1, limit=RECOMMEND_LIMIT):
-        cache_key = f"cache:smart_rec:v2:{db_type}:{library_id}:{series_name}:{limit}"
+        cache_key = f"cache:smart_rec:v3:{db_type}:{library_id}:{series_name}:{limit}"
         cached = redis_get(cache_key)
         if cached:
             try:
@@ -106,9 +107,12 @@ class RecommendationService:
         exclude_series_names.add(series_name)
 
         if target_row is None:
-            # 시리즈 자체가 인덱스에 없음 = 장르/태그 정보가 전혀 없는 시리즈 -> 카테고리 최신 도서로 폴백
+            # 시리즈 자체가 인덱스에 없음 = 장르/태그/작가 정보가 전혀 없는 시리즈 -> 카테고리 최신 도서로 폴백
             fallback = _fallback_latest(db_type, library_id, exclude_series_names, limit)
-            result = {'genre': fallback, 'tags': fallback, 'genre_is_fallback': True, 'tags_is_fallback': True}
+            result = {
+                'genre': fallback, 'tags': fallback, 'author': [],
+                'genre_is_fallback': True, 'tags_is_fallback': True,
+            }
         else:
             series_library_id = target_row['library_id']
             if target_row['_genre_tokens']:
@@ -125,8 +129,12 @@ class RecommendationService:
                 tag_matches = _fallback_latest(db_type, series_library_id, exclude_series_names, limit)
                 tags_is_fallback = True
 
+            # 작가 추천은 라이브러리(카테고리) 제한 없이 전체 기준으로 겹치는 시리즈를 찾는다.
+            # 폴백 대상이 없는 정보이므로 매칭이 없으면 그냥 빈 목록으로 둔다(섹션은 UI에서 비어있음으로 표시).
+            author_matches = _rank_candidates(target_row['_author_tokens'], index_rows, '_author_tokens', exclude_series_names, limit)
+
             result = {
-                'genre': genre_matches, 'tags': tag_matches,
+                'genre': genre_matches, 'tags': tag_matches, 'author': author_matches,
                 'genre_is_fallback': genre_is_fallback, 'tags_is_fallback': tags_is_fallback,
             }
 

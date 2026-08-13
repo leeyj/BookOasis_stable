@@ -48,10 +48,8 @@
     "view_all": "전체보기",
     "single_book_list": "단행본 목록",
     "book_unit": "{count}권",
-    "plugin_health_all_ok": "플러그인 {count}개 정상 로드됨",
     "plugin_health_error_summary": "플러그인 {count}개 로드 실패",
     "plugin_health_details_toggle": "자세히 보기",
-    "plugin_health_status_success": "정상",
     "plugin_health_status_error": "실패",
     "plugin_health_dismiss": "닫기"
   },
@@ -298,6 +296,7 @@
     "error": "오류: {error}",
     "similar_genre": "같은/유사한 장르",
     "similar_tags": "같은/유사한 태그",
+    "same_author": "작가의 다른 작품",
     "empty": "추천할 시리즈가 부족합니다.",
     "fallback_note": " (장르/태그 정보가 없어 카테고리 최신 도서를 보여드려요)",
     "no_history_title": "최근 읽은 도서가 없습니다.",
