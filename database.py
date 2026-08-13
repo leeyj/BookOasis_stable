@@ -1055,6 +1055,14 @@ def init_databases():
         UNIQUE(collection_id, series_name),
         UNIQUE(collection_id, audiobook_id)
     );
+
+    CREATE TABLE IF NOT EXISTS plugin_load_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        plugin_id TEXT NOT NULL,
+        status TEXT NOT NULL,
+        message TEXT DEFAULT NULL,
+        occurred_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
     """
 
     indexes_schema = """
@@ -1084,6 +1092,7 @@ def init_databases():
     CREATE INDEX IF NOT EXISTS idx_user_category_permissions_lookup ON user_category_permissions(user_id, library_id, has_access);
     CREATE INDEX IF NOT EXISTS idx_collections_user ON collections(user_id);
     CREATE INDEX IF NOT EXISTS idx_collection_items_coll ON collection_items(collection_id);
+    CREATE INDEX IF NOT EXISTS idx_plugin_load_events_plugin_time ON plugin_load_events(plugin_id, occurred_at DESC);
     """
     
     # 기동 전 WAL/SHM 무결성 자동 검증 및 정리

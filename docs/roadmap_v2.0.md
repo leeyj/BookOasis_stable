@@ -41,8 +41,8 @@
 | B | 5 | `viewer/renderer.js`(825줄) — 성능 핫패스, 무리한 분리는 리스크만 키움 | ⏭️ 스킵 | 2026-08-12 |
 | B | 4 | `audio_player_modules/mini_player_ui.js`(827줄) 클로저 분리 | ⏭️ 스킵 | 2026-08-12 |
 | B | 6 | `viewer_txt.js`(1011줄) — TXT/EPUB이 공용 이벤트 핸들러 안에서 얽혀있어 리스크 질적으로 다름 | ⏸️ 보류 | - |
-| D | 1 | `trash_repository.py` mariadb/sqlite 공용화 파일럿 | ⬜ 대기 | - |
-| D | 2 | 파일럿 성공 시 소형 리포지토리 순차 확장 | ⬜ 대기 | - |
+| D | 1 | `trash_repository.py` mariadb/sqlite 공용화 파일럿 | ✅ 완료 | 2026-08-13 |
+| D | 2 | 파일럿 성공 시 소형 리포지토리 순차 확장 | ⏭️ 스킵 | 2026-08-13 |
 
 상태 값: ⬜ 대기 / 🔄 진행중 / ✅ 완료 / ⏸️ 보류 / ⏭️ 스킵(의도적으로 하지 않기로 결정)
 
@@ -90,6 +90,29 @@
 1. `repositories/mariadb/trash_repository.py` + `repositories/sqlite/trash_repository.py` 파일럿 — 두 파일을 동시에 고친 경험이 있어 두 구현의 차이를 가장 잘 파악하고 있는 상태. 공용 SQL 정의 + 방언 어댑터 패턴을 여기서만 시도해보고, 실제로 코드량/버그 리스크가 줄었는지 확인 후 다른 리포지토리로 확장할지 결정
 2. (파일럿 성공 시) `book_offset_repository.py`, `settings_repository.py` 등 작고 단순한 파일부터 순차 확장
 
+**D-1 완료 (2026-08-13).** 착수 전 재검토에서 "정말 필요한가"부터 다시 물었고, 두 가지로 결론:
+
+- **필요성**: B-4~7과 달리 추측성 리스크가 아니라 실제 이력이 있음. git log(`8910e21`)에서 확인한 "휴지통 락 이슈" 수정이 중첩 서브쿼리 DELETE → 확정 후 삭제 패턴으로의 **로직 변경**이었고, 이걸 mariadb/sqlite 두 파일에 동일하게 반영해야 했던 실제 이중 유지보수 비용이 있었음.
+- **MSSQL 확장성 고려**: 쿼리 중앙화 작업의 최종 목표인 3번째 백엔드(MSSQL) 지원을 반영해 설계를 조정. pyodbc(MSSQL 표준 드라이버)의 기본 paramstyle이 `qmark`(`?`)라 sqlite와 동일 — 어댑터를 mariadb/sqlite 이분법이 아니라 `placeholder: str` 하나만 받는 순수 함수로 짰기 때문에, 나중에 MSSQL을 추가할 때 `repositories/mssql/trash_repository.py`에 `placeholder='?'`로 공용 함수를 호출하는 얇은 래퍼만 추가하면 됨(공용 SQL 로직은 무수정). row의 dict 접근(`row['id']`, `dict(row)`)은 repository 레이어가 아니라 `database.py` 커넥션 레이어 책임(mariadb는 이미 `MariadbCursorWrapper`로 처리 중) — MSSQL 추가 시 그쪽에 `MssqlCursorWrapper`를 붙이면 되고, 이 파일 설계에는 영향 없음. 이 파일의 SQL은 `LIMIT`/`TOP`/`AUTO_INCREMENT` 등 방언 전용 문법을 쓰지 않아 플레이스홀더 문자 하나만 파라미터화하는 것으로 충분했음.
+
+**구현**: `repositories/trash_repository_shared.py` 신설(126줄, SQL 로직 전체 + `placeholder` 인자로 방언 흡수). `repositories/mariadb/trash_repository.py`·`repositories/sqlite/trash_repository.py`는 각각 `_PLACEHOLDER = '%s'`/`'?'`로 공용 함수를 호출하는 얇은 래퍼로 축소(126/127줄 → 각 47줄). `TrashRepository` 클래스명·메서드 시그니처는 그대로 유지해 호출부(`services/trash_service.py`) 무수정.
+
+**부수 발견(수정함)**: 공용화 과정에서 sqlite 쪽에만 `restore_books`/`fetch_book_covers`/`hard_delete_books_transaction`의 "빈 리스트면 조기 반환" 가드가 빠져 있던 걸 발견 — mariadb에는 있었음. 특히 `fetch_book_covers`/`hard_delete_books_transaction`은 빈 리스트가 들어오면 `IN ()` 구문 오류로 죽을 수 있는 잠재 버그였음(현재 호출부가 빈 리스트로 호출한 적이 없어 아직 발현 안 됨). 공용화하면서 mariadb의 안전한 쪽으로 통일 — "한 파일만 고쳐지고 다른 파일은 안 고쳐지는" 패턴이 트랙 D를 시작하기도 전에 이미 한 번 더 실증된 사례.
+
+**검증**: `python -m py_compile` 통과. `DB_ENGINE=sqlite`/`mariadb` 양쪽 모두 `import repositories`로 실제 로드해 `TrashRepository`가 정상 해석되고 순환참조 없음을 확인(기존 `repositories/series_search_query.py` 공용 모듈 패턴과 동일한 임포트 구조). **실서버 동작도 사용자가 직접 확인(2026-08-13)** — 휴지통에서 29권 영구 삭제 실행, 로그상 `hard_delete_books_transaction` 경로(확정 id 조회 → 종속 테이블 정리 → books 삭제 → 미참조 커버 GROUP BY 판별 → 커버 파일 물리 삭제)가 정상 동작해 29개 미참조 커버가 정확히 삭제되고 "Successfully hard deleted 29 books from DB and storage" 로그로 마무리됨. 복구(`restore_books`) 경로는 아직 실동작 확인 전.
+
+**D-2 스킵 결정 (2026-08-13, 보수적 재검토 후).** 로드맵이 다음 후보로 지목했던 `book_offset_repository.py`/`plugin_repository.py`/`settings_repository.py` 등을 실제로 diff해본 결과, 트래시 파일럿과 성격이 달랐다:
+
+- 플레이스홀더(`%s`/`?`)만 정규화하고 남는 diff가 트래시(8줄)보다 훨씬 큼(예: `settings_repository.py` 110줄, `metadata_repository.py` 242줄 — 심지어 두 파일 다 줄 수는 mariadb/sqlite 동일한데도).
+- `settings_repository.py`/`plugin_repository.py`는 UPSERT 문법 자체가 `REPLACE INTO`(mariadb) vs `INSERT OR REPLACE`(sqlite)로 진짜 갈림 — `placeholder: str` 하나로 흡수 안 되고, MSSQL(`MERGE`/`IF EXISTS`)까지 고려하면 3-way 분기가 필요해 트래시가 증명한 "얇은 래퍼" 이득이 사라짐.
+- git log 확인 결과 트래시처럼 "동일 버그를 양쪽에 동일하게 고친" 이중 유지보수 이력이 다른 파일들엔 없었음 — 오히려 `book_offset`/`book_scan`/`scheduler`/`settings_repository.py`는 sqlite 쪽 커밋 수가 mariadb보다 많아(반영 누락 가능성 신호), 트랙 D가 다루는 "중복이라 위험" 문제와는 다른 별개 이슈로 확인됨(이번 세션 범위 밖).
+
+B-4~7 스킵 때 세운 원칙("실제 유지보수 불편을 겪은 적 없으면 무리해서 안 쪼갠다")을 그대로 적용해 **D-2는 스킵, 트랙 D는 D-1 파일럿 1개로 완전히 종료.**
+
+**부수 작업 (D-2 조사 중 발견, 트랙 D와 무관하게 별도 처리): `LRUCache` 3중복 정리.** `book_offset_repository.py` 조사 과정에서 애초 "sqlite에만 있는 LRU 캐시(레디스 이전 잔재?)"라는 가설이 나왔으나 확인 결과 **틀림** — `_LRUCache` 클래스는 mariadb/sqlite 양쪽에 동일하게 존재했고(제가 diff를 잘못 읽어 처음에 "sqlite에만 있다"고 잘못 보고했음), git 이력상 Redis가 있던 적도 없는 파일. 실제 원인은 `api/cache.py`에 이미 있는 거의 동일한 `LRUCache`를 못 쓰고 복붙한 것 — `repositories/*`에서 `from api.cache import LRUCache`를 하면 `api/__init__.py`가 먼저 실행되며 블루프린트 체인이 `repositories`를 다시 임포트해 순환참조가 걸리기 때문(주석에 명시돼 있었음). Redis(`utils/redis_helper.py`)는 읽기 진행률 쓰기 버퍼링용으로 이 오프셋 캐시와는 무관.
+
+해결: 의존성 없는 leaf 모듈 `utils/lru_cache.py` 신설(`LRUCache` 클래스, threading/collections만 사용). `api/cache.py`는 자체 정의를 지우고 여기서 import(`SizedLRUCache`는 로직이 달라 그대로 유지). `repositories/mariadb/book_offset_repository.py`·`repositories/sqlite/book_offset_repository.py`도 인라인 `_LRUCache` 정의를 지우고 동일하게 import. `class _LRUCache`/`class LRUCache` 정의가 3곳 → 1곳으로. 검증: `python -m py_compile` 통과, `DB_ENGINE=sqlite`/`mariadb` 양쪽 + `api.cache`를 먼저 임포트하는 순서/나중에 임포트하는 순서 모두 순환참조 없이 정상 로드 확인, `api.cache.LRUCache is utils.lru_cache.LRUCache`로 동일 클래스 공유까지 확인.
+
 ---
 
 ## 검증 방법
@@ -120,7 +143,7 @@ C-2 완료: `templates/components/settings/general_tab.html` 최상단에 `{% ma
 - B-2: `static/js/cron_helper.js` 신설. `scheduler.js`의 크론 헬퍼 서브시스템(`pad2`, `buildCronFromHelper`, `parseHelperStateFromCron`, `hydrateCronHelperFromCron`, `onCronHelperModeChange`, `updateCronHelperSummary`, `applyCronHelperToInput`)을 이동. `scheduler.js`의 `openScanSettingsModal` 내부 `cronInput.oninput` 핸들러가 비공개 함수 `refreshCronHelperSummary()`를 직접 호출하던 부분은 동일 동작의 공개 wrapper `updateCronHelperSummary()`(import)로 교체. `scheduler.js` 698→522줄.
 - B-3: 기존 `audio_player_modules/` 컨벤션(`createXxx(deps)` 팩토리 + getter/콜백 주입)을 그대로 따라 `audio_player_modules/chapter_drawer.js` 신설, `renderChapterList`/`toggleAudioChapterDrawer`/`selectChapterTrack`(챕터 드로어 렌더링·토글·트랙 선택)을 분리. 이 세 함수는 `currentAudiobookData`/`currentTrackIndex` 등 핵심 재생 상태를 읽기만 하고 쓰지 않아, `audio_player.js`의 다른 함수들(볼륨/배속/취침타이머 등)보다 훨씬 안전하게 분리 가능했음 — 나머지는 `audioInstance.playbackRate` 등 핵심 재생 상태를 직접 변경하므로 후순위로 미룸(아래 참고). `audio_player.js` 710→695줄.
 
-세 티켓 모두 `node --check`로 문법 검증 완료. 브라우저 실동작 확인은 아직 안 함 — 다음 세션 시작 시 `/run`으로 최근 읽음 그리드, 오디오북 재생 화면, 설정 스케줄 탭을 열어 회귀 없는지 확인할 것.
+세 티켓 모두 `node --check`로 문법 검증 완료. **브라우저 실동작 확인도 사용자가 직접 완료(2026-08-13)** — 최근 읽음 그리드/스캔 활동 팝오버, 오디오북 재생 화면(챕터 드로어 포함), 설정 스케줄 탭(크론 헬퍼 포함) 모두 회귀 없음 확인.
 
 **남은 트랙 B 우선순위 재분석 (2026-08-12, "리스크 낮은 것부터" 기준으로 재정렬):**
 
@@ -134,3 +157,5 @@ C-2 완료: `templates/components/settings/general_tab.html` 최상단에 `{% ma
 **B-4~B-7 전부 스킵 결정 (2026-08-12, 사용자 판단).** 사용자가 "유지보수에 크게 어려움이 있지 않고, 무리하게 쪼갰다가는 위험도만 커진다"는 이유로 B-4/B-5/B-7을 조사조차 하지 않고 명시적으로 스킵하기로 결정 — 위 우선순위 분석은 "이 순서로 진행"이 아니라 "만약 다시 손댈 일이 생기면 이 순서로"의 참고 자료로만 남긴다. B-6(`viewer_txt.js`)은 기존 사유(TXT/EPUB이 공용 이벤트 핸들러에서 얽혀 있어 리스크 질적으로 다름)로 이미 보류 상태였으므로 동일하게 유지. **트랙 B는 이것으로 종료** — 사이즈만으로 손댈 이유가 부족한 파일을 억지로 쪼개지 않는다는 이 프로젝트의 "필요 이상으로 추상화하지 않는다" 원칙과 일치하는 결정.
 
 **트랙 B 종료 (2026-08-12).** A/B/C 모두 완료. **남은 건 트랙 D(백엔드 mariadb/sqlite 리포지토리 중복 정리)뿐** — 다음 세션은 D-1(`trash_repository.py` 파일럿)부터 시작한다. 착수 전 반드시 다시 한번 "SQL은 한 곳에, 방언 차이만 어댑터로 분리" 패턴이 정말 필요한지, 파일럿 범위를 벗어나지 않는지 확인할 것(트랙 D 섹션 참고 — 전체 재작성 금지, 파일럿 1개로 제한). 또한 B-1~3에서 브라우저 실동작 확인(`/run`)이 아직 안 됐다는 점도 함께 확인하고 넘어갈 것.
+
+**D-1 완료, 트랙 D 파일럿 종료 (2026-08-13).** 상세 내역은 위 "트랙 D" 섹션 참고. 요약: 필요성 재검토(실제 이중 유지보수 이력 확인) → MSSQL 3번째 백엔드 목표를 반영한 `placeholder` 파라미터화 설계로 `repositories/trash_repository_shared.py` 신설 → mariadb/sqlite 두 파일을 얇은 래퍼로 축소 → 부수적으로 sqlite 쪽 누락 가드 3건 발견·수정 → 컴파일/임포트 검증 완료. **A/B/C/D 트랙 전부 종료 (2026-08-13).** D-2는 스킵 결정으로 로드맵상 계획된 작업은 모두 마무리됐다. 남은 것: ① D-1의 `restore_books`(도서 복구) 경로는 아직 실동작 확인 전(영구 삭제 경로만 확인됨) — 기회가 되면 확인. ② `LRUCache` 중복 정리(부수 작업)는 컴파일/임포트 검증까지 완료했으나 브라우저 실동작 확인(뷰어에서 ZIP 코믹/웹툰 열람 시 오프셋 캐시 정상 동작)은 아직 안 함. ③ 이 로드맵 자체가 사실상 완료 상태이므로, 다음에 새 작업을 시작한다면 이 문서 갱신보다 새 이슈/로드맵 문서를 여는 게 맞을 수 있음.

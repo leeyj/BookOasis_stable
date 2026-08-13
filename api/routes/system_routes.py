@@ -5,7 +5,7 @@ system_routes.py – 시스템 상태, 큐, 정보 조회 라우터
 import os
 import re
 from flask import Blueprint, request, jsonify, session
-from api.auth import admin_required, login_required
+from api.auth import admin_required, login_required, verify_webhook_token
 from flask import render_template
 from urllib.request import Request, urlopen
 from services.plugin_service import PluginService
@@ -280,12 +280,12 @@ def trigger_scan_via_webhook():
     db_type = request.args.get('type') or request.form.get('type') or 'general'
     force_param = request.args.get('force') or request.form.get('force')
     force_requeue = True if force_param in ('1', 'true', 'True', 'on') else False
-    
+    rel_path = (request.args.get('path') or request.form.get('path') or '').strip()
+
     # 1. 보안 토큰 검증
-    sys_token = SettingsService.get('WEBHOOK_TOKEN', '', db_type='general') or os.environ.get('WEBHOOK_TOKEN')
-    if not sys_token or not token or token != sys_token:
+    if not verify_webhook_token(token):
         return jsonify({'success': False, 'error': 'Invalid webhook token.'}), 401
-        
+
     if not library_id:
         return jsonify({'success': False, 'error': 'library_id is required.'}), 400
 
@@ -308,7 +308,28 @@ def trigger_scan_via_webhook():
 
     if not lib_name or not physical_path:
         return jsonify({'success': False, 'error': f'Library ID {library_id} not found in {db_type}.'}), 404
-        
+
+    # 2-1. path가 지정된 경우: 시리즈/폴더 단위 즉시 동기 스캔 (전체 스캔 큐를 타지 않음)
+    if rel_path:
+        try:
+            from api.routes.scan_routes import _resolve_library_scoped_path, get_db_path_for_scan
+            target_path = _resolve_library_scoped_path(physical_path, rel_path)
+            if not target_path:
+                return jsonify({'success': False, 'error': f'Path not found within library: {rel_path}'}), 404
+
+            db_path = get_db_path_for_scan(db_type)
+            from tools.scanner.core import scan_library_path
+            scan_library_path(db_path, lib_id_int, target_path, force=force_requeue)
+
+            return jsonify({
+                'success': True,
+                'message': f'"{lib_name} ({db_type})" 내 "{rel_path}" 경로의 스캔 및 등록이 완료되었습니다.'
+            })
+        except FileNotFoundError as e:
+            return jsonify({'success': False, 'error': str(e)}), 404
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+
     # 3. 백그라운드 스캔 대기열 주입 (스캐너 워커 필수 인자 포함)
     try:
         db_path = database.get_db_path(db_type)

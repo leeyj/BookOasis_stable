@@ -326,6 +326,15 @@ CREATE TABLE IF NOT EXISTS collection_items (
     UNIQUE KEY uq_coll_audiobook (collection_id, audiobook_id),
     INDEX idx_collection_items_coll (collection_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS plugin_load_events (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    plugin_id VARCHAR(255) NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    message TEXT DEFAULT NULL,
+    occurred_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_plugin_load_events_plugin_time (plugin_id, occurred_at DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 """
 
 

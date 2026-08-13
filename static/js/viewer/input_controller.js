@@ -486,6 +486,22 @@ export function initViewerClickToggle() {
         return;
       }
 
+      // 📱 1-1) 스와이프 제스처 처리 (페이지 모드일 때 수직 스와이프, RTL 무관 상:이전 / 하:다음)
+      if (scrollMode === 'page' && absY >= SWIPE_MIN_DISTANCE && absY > absX * 1.2 && duration <= SWIPE_MAX_TIME) {
+        lastTouchEndTime = Date.now();
+
+        if (diffY > 0) {
+          // 👆 Swipe Up (아래에서 위로 쓸어올림) → 이전 페이지
+          console.log(`[Viewer-Touch-Swipe] Swipe Up detected (diffY=${diffY})`);
+          callDep('prevPage');
+        } else {
+          // 👇 Swipe Down (위에서 아래로 쓸어내림) → 다음 페이지
+          console.log(`[Viewer-Touch-Swipe] Swipe Down detected (diffY=${diffY})`);
+          callDep('nextPage');
+        }
+        return;
+      }
+
       // 📱 2) 단순 탭(Tap) 오버레이 토글 처리
       if (absX < TAP_THRESHOLD && absY < TAP_THRESHOLD) {
         const width = window.innerWidth;

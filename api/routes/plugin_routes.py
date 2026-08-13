@@ -3,7 +3,7 @@ from flask import Blueprint, request, jsonify, session
 
 from services.metadata_service import MetadataService
 from services.plugin_service import PluginService
-from api.auth import login_required, check_adult_permission, admin_required
+from api.auth import login_required, check_adult_permission, admin_required, webhook_token_required
 from utils.i18n import _t
 
 plugin_routes_bp = Blueprint('media_plugin_routes', __name__)
@@ -15,6 +15,45 @@ def get_metadata_plugins_api():
     try:
         plugins = MetadataService.get_searchable_plugins()
         return jsonify({'success': True, 'plugins': plugins})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+def _build_plugin_load_status_payload():
+    from services.metadata_factory import MetadataFactory
+    from repositories.plugin_repository import PluginRepository
+
+    # 조회 시점 기준 최신 상태를 보장하기 위해 discovery를 1회 갱신(성공/실패 상태 변화가 있으면 DB에 즉시 반영됨)
+    MetadataFactory._discover_provider_classes()
+
+    statuses = PluginRepository.get_latest_load_status('general')
+    error_count = sum(1 for s in statuses if s.get('status') == 'error')
+    recent_events = PluginRepository.get_recent_load_events('general', limit=50)
+
+    return {
+        'success': True,
+        'statuses': statuses,
+        'error_count': error_count,
+        'recent_events': recent_events,
+    }
+
+@plugin_routes_bp.route('/api/media/plugins/load-status', methods=['GET'])
+@admin_required
+def get_plugin_load_status_api():
+    """관리자 대시보드용 플러그인 로드 성공/실패 현황 및 최근 이력 조회"""
+    try:
+        return jsonify(_build_plugin_load_status_payload())
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@plugin_routes_bp.route('/api/webhook/plugins/status', methods=['GET'])
+@webhook_token_required
+def get_plugin_load_status_webhook_api():
+    """
+    외부 연동 프로그램(모니터링 스크립트 등)용 플러그인 로드 상태 조회 API.
+    관리자 세션 없이, 기존 스캔 웹훅과 동일한 WEBHOOK_TOKEN으로 인증한다(?token=... 또는 X-Webhook-Token 헤더).
+    """
+    try:
+        return jsonify(_build_plugin_load_status_payload())
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

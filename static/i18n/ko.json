@@ -47,7 +47,13 @@
     "no_latest_books": "등록된 도서가 없습니다. 서재를 스캔해 보세요.",
     "view_all": "전체보기",
     "single_book_list": "단행본 목록",
-    "book_unit": "{count}권"
+    "book_unit": "{count}권",
+    "plugin_health_all_ok": "플러그인 {count}개 정상 로드됨",
+    "plugin_health_error_summary": "플러그인 {count}개 로드 실패",
+    "plugin_health_details_toggle": "자세히 보기",
+    "plugin_health_status_success": "정상",
+    "plugin_health_status_error": "실패",
+    "plugin_health_dismiss": "닫기"
   },
   "login": {
     "title": "북 오아시스",

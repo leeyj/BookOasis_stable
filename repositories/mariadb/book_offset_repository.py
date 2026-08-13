@@ -2,32 +2,10 @@
 """
 book_offset_repository.py – MariaDB 전용 ZIP 파일 압축 해제 고속화 오프셋 정보(book_offsets) 데이터 액세스 레이어
 """
-import threading
-from collections import OrderedDict
 import database
+from utils.lru_cache import LRUCache
 
-class _LRUCache:
-    def __init__(self, capacity: int = 10):
-        self.capacity = capacity
-        self.cache    = OrderedDict()
-        self.lock     = threading.Lock()
-
-    def get(self, key):
-        with self.lock:
-            if key not in self.cache:
-                return None
-            self.cache.move_to_end(key)
-            return self.cache[key]
-
-    def put(self, key, value):
-        with self.lock:
-            if key in self.cache:
-                self.cache.move_to_end(key)
-            self.cache[key] = value
-            if len(self.cache) > self.capacity:
-                self.cache.popitem(last=False)
-
-_offset_cache = _LRUCache(capacity=5000)
+_offset_cache = LRUCache(capacity=5000)
 
 class BookOffsetRepository:
     @staticmethod

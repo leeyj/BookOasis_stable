@@ -6,6 +6,7 @@ cache.py – 미디어 서버 공용 캐시 모듈
 """
 import threading
 from collections import OrderedDict
+from utils.lru_cache import LRUCache
 
 # ─── 캐시 설정 상수 ───────────────────────────────────────────
 IMAGE_CACHE_MAX_BYTES = 8 * 1024 * 1024 * 1024   # 8 GB
@@ -63,31 +64,7 @@ class SizedLRUCache:
             }
 
 
-class LRUCache:
-    """
-    개수 기반 LRU 캐시 (ZIP 파일 객체 / namelist 용).
-    스레드 안전합니다.
-    """
-    def __init__(self, capacity: int = 10):
-        self.capacity = capacity
-        self.cache    = OrderedDict()
-        self.lock     = threading.Lock()
-
-    def get(self, key):
-        with self.lock:
-            if key not in self.cache:
-                return None
-            self.cache.move_to_end(key)
-            return self.cache[key]
-
-    def put(self, key, value):
-        with self.lock:
-            if key in self.cache:
-                self.cache.move_to_end(key)
-            self.cache[key] = value
-            if len(self.cache) > self.capacity:
-                self.cache.popitem(last=False)
-
+# LRUCache(개수 기반, ZIP 파일 객체 / namelist 용)는 utils/lru_cache.py에서 임포트한다.
 
 # ─── 공용 캐시 인스턴스 (모듈 싱글턴) ────────────────────────
 zip_cache      = LRUCache(capacity=ZIP_CACHE_CAPACITY)       # ZipFile 객체

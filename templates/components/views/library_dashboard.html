@@ -1,5 +1,16 @@
 <!-- templates/components/views/library_dashboard.html -->
 <div id="library-dashboard-view" style="display: none; flex-direction: column; gap: 0.9rem;">
+    <!-- -1. 플러그인 로드 상태 알림 패널 (관리자 전용, 기본 숨김 – JS가 role 확인 후 데이터 채워서 노출) -->
+    <div id="plugin-health-panel" class="plugin-health-panel" style="display: none;">
+        <div class="plugin-health-panel-summary">
+            <i class="fa-solid fa-puzzle-piece plugin-health-panel-icon"></i>
+            <span id="plugin-health-panel-summary-text"></span>
+            <button type="button" id="plugin-health-panel-toggle" class="plugin-health-panel-toggle" style="display: none;" data-i18n="dashboard.plugin_health_details_toggle">자세히 보기</button>
+            <button type="button" id="plugin-health-panel-dismiss" class="plugin-health-panel-dismiss" title="닫기" data-i18n-title="dashboard.plugin_health_dismiss"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div id="plugin-health-panel-details" class="plugin-health-panel-details" style="display: none;"></div>
+    </div>
+
     <!-- 0. 독서 동기부여 위젯 라인 (Reading Insights) -->
     {% include "components/dashboard_reading_insights.html" %}
 

@@ -69,6 +69,7 @@ class MetadataFactory:
     _instance = None
     _cached_provider = None
     _loaded_provider_name = None
+    _last_known_load_status = {}  # provider_name -> 'success'|'error' (프로세스 생애주기 동안의 마지막 기록 상태, DB 중복 기록 방지용)
 
     @classmethod
     def hot_reload_plugin(cls, plugin_id=None):
@@ -92,6 +93,7 @@ class MetadataFactory:
             if cls._loaded_provider_name == target:
                 cls._cached_provider = None
                 cls._loaded_provider_name = None
+            cls._last_known_load_status.pop(target, None)
         else:
             for name in list(sys.modules.keys()):
                 if name.startswith('plugins.metadata.') and name != 'plugins.metadata.base':
@@ -100,6 +102,7 @@ class MetadataFactory:
 
             cls._cached_provider = None
             cls._loaded_provider_name = None
+            cls._last_known_load_status.clear()
 
         return {
             'plugin_id': target or None,
@@ -225,6 +228,22 @@ class MetadataFactory:
         return bundle if bundle else None
 
     @classmethod
+    def _record_load_status(cls, provider_name, status, message=None):
+        """
+        플러그인 로드 시도 결과를 DB에 이력으로 남긴다. 매 discovery 호출마다(요청당 1회) 불리므로,
+        직전에 기록한 상태와 동일하면(상태 변화 없음) DB 기록을 건너뛰어 쓰기 폭주를 막는다.
+        이 기록 자체가 실패해도 플러그인 로딩 흐름에는 영향을 주지 않는다(항상 조용히 무시).
+        """
+        try:
+            if cls._last_known_load_status.get(provider_name) == status:
+                return
+            cls._last_known_load_status[provider_name] = status
+            from repositories.plugin_repository import PluginRepository
+            PluginRepository.record_load_event('general', provider_name, status, (str(message)[:500] if message else None))
+        except Exception as e:
+            print(f"[MetadataFactory] Failed to record plugin load status ({provider_name}): {e}")
+
+    @classmethod
     def _discover_provider_classes(cls):
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         plugins_dir = os.path.join(base_dir, 'plugins', 'metadata')
@@ -250,9 +269,11 @@ class MetadataFactory:
                 _, target_class = cls._import_provider_module_and_class(provider_name)
                 if target_class:
                     discovered.append((provider_name, target_class))
+                    cls._record_load_status(provider_name, 'success')
             except Exception as e:
                 print(f"[MetadataFactory] Plugin load failed ({provider_name}): {e}")
                 traceback.print_exc()
+                cls._record_load_status(provider_name, 'error', e)
 
         return discovered
 

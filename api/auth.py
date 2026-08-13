@@ -123,6 +123,25 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def verify_webhook_token(token):
+    """
+    외부 연동 프로그램(gd-poller 등 CLI/스크립트)용 공용 웹훅 토큰(WEBHOOK_TOKEN) 검증.
+    브라우저 세션 없이 호출하는 read-only 외부 API에서 재사용한다 — 새 토큰을 발급하지 않고
+    기존 스캔 웹훅(/api/webhook/scan)과 동일한 시스템 설정값(WEBHOOK_TOKEN)을 공유한다.
+    """
+    sys_token = SettingsService.get('WEBHOOK_TOKEN', '', db_type='general') or os.environ.get('WEBHOOK_TOKEN')
+    return bool(sys_token) and bool(token) and token == sys_token
+
+def webhook_token_required(f):
+    """쿼리스트링/폼(token) 또는 X-Webhook-Token 헤더로 전달된 WEBHOOK_TOKEN을 검증하는 데코레이터"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = request.args.get('token') or request.form.get('token') or request.headers.get('X-Webhook-Token')
+        if not verify_webhook_token(token):
+            return jsonify({'success': False, 'error': 'Invalid webhook token.'}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
 def check_adult_permission(db_type):
     if db_type == 'adult':
         # 어드민은 패스, 일반 유저는 세션의 adult 접근 권한으로 판별

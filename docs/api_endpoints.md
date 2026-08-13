@@ -427,7 +427,7 @@
 ## 📡 6. 외부 연동 및 자동화용 웹훅 API (Webhook)
 
 ### `[GET]` 또는 `[POST]` `/api/webhook/scan`
-* **설명**: 외부 마운트 제어(gd-poller 등)나 자동화 갱신 트리거 시, 세션 로그인 없이 헤더나 쿼리 스트링 보안 토큰만으로 라이브러리 스캔 작업을 즉시 대기열에 비동기 등록합니다.
+* **설명**: 외부 마운트 제어(gd-poller 등)나 자동화 갱신 트리거 시, 세션 로그인 없이 헤더나 쿼리 스트링 보안 토큰만으로 라이브러리 스캔 작업을 즉시 대기열에 비동기 등록합니다. `path`를 함께 지정하면 라이브러리 전체가 아닌 해당 폴더(시리즈) 하나만 즉시 동기 스캔+등록합니다.
 * **권한**: 비세션 인증 (단, `.env`의 `WEBHOOK_TOKEN`과 매칭 검증 필수)
 * **요청 파라미터**:
   | 파라미터명 | 타입 | 필수여부 | 설명 |
@@ -435,6 +435,7 @@
   | `token` | string | 필수 | `.env`에 정의된 `WEBHOOK_TOKEN` 보안 API 토큰값 |
   | `library_id` | integer | 필수 | 동기화 스캔을 수행할 대상 라이브러리 카테고리의 고유 ID |
   | `type` | string | 선택 | 라이브러리 데이터베이스 영역 (`general` 또는 `adult`, 디폴트: `general`) |
+  | `path` | string | 선택 | 라이브러리 물리 경로 기준 상대경로. 지정 시 전체 스캔 대신 해당 폴더 하나만 즉시 동기 스캔 |
 
 * **응답 예시 (200 OK)**:
   ```json
@@ -451,28 +452,50 @@
   }
   ```
 
+### `[GET]` `/api/webhook/plugins/status`
+* **설명**: 외부 모니터링 프로그램(알림 봇, 헬스체크 스크립트 등)이 세션 로그인 없이 플러그인 로드 성공/실패 현황을 조회할 수 있는 read-only 웹훅 API. 관리자 대시보드 상단의 플러그인 상태 패널과 동일한 데이터를 반환합니다. `/api/webhook/scan`과 동일한 `WEBHOOK_TOKEN`을 공유하므로 별도 키 발급이 필요 없습니다.
+* **권한**: 비세션 인증 (`WEBHOOK_TOKEN`을 쿼리스트링 `token` 또는 `X-Webhook-Token` 헤더로 전달)
+* **요청 파라미터**:
+  | 파라미터명 | 타입 | 필수여부 | 설명 |
+  | :--- | :--- | :--- | :--- |
+  | `token` | string | 조건부 필수 | `WEBHOOK_TOKEN` 값. `X-Webhook-Token` 헤더로 대신 전달해도 됨(둘 중 하나만 있으면 됨) |
+
+* **응답 예시 (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "error_count": 1,
+    "statuses": [
+      {"plugin_id": "aladin", "status": "success", "message": null, "occurred_at": "2026-08-13 05:27:49"},
+      {"plugin_id": "stats_dashboard", "status": "error", "message": "No module named 'foo'", "occurred_at": "2026-08-13 05:27:49"}
+    ],
+    "recent_events": [ "... 최근 상태 변화 이력 최대 50건 (statuses와 동일한 필드 구조) ..." ]
+  }
+  ```
+* **응답 예시 (401 Unauthorized - 토큰 오류)**: `/api/webhook/scan`과 동일한 형식.
+* **참고**: `statuses`는 플러그인별 가장 최근 상태 1건씩(현재 상태 스냅샷), `recent_events`는 상태가 실제로 바뀐 시점들의 이력(성공→실패, 실패→성공 전환 시마다 1건 기록, 상태 불변 시에는 기록 안 함)입니다.
+
 #### 💡 외부 폴러(gd-poller 등) 연동 설정 예시 (YAML)
 
-외부 Google Drive 변경 모니터링 도구인 `gd-poller` 등과 연동할 때, 아래의 디스패처 설정을 활용해 북오아시스의 특정 라이브러리를 동적으로 재스캔할 수 있습니다.
+외부 Google Drive 변경 모니터링 도구인 [`gd-poller`](https://github.com/halfaider/gd-poller)와 연동하면, 스케줄러의 전체 디렉토리 스캔을 기다리지 않고 변경이 감지된 폴더(시리즈) 하나만 즉시 스캔+등록할 수 있습니다.
 
-**[Option A] WebhookDispatcher 설정**
-```yaml
-- class: WebhookDispatcher
-  url: "http://your-bookoasis-ip:5930/api/webhook/scan"
-  method: "GET"
-  params:
-    token: "oasis_secure_api_token_1234"  # .env의 WEBHOOK_TOKEN 설정값
-    library_id: "25"                       # 대상 라이브러리 카테고리 ID
-    type: "general"                        # general 또는 adult
-  buffer_interval: 60                      # 변경 발생 시 60초 대기 후 누적 1회 트리거
-```
+`gd-poller`에는 범용 HTTP 웹훅 디스패처가 없고, `CommandDispatcher`는 설정한 명령어 뒤에 `[action, file|directory, path, removed_path?]`를 그대로 인자로 append해서 실행하는 구조라 `curl`을 직접 command로 지정할 수 없습니다(경로가 쿼리스트링이 아닌 위치 인자로 붙습니다). 이를 위해 인자를 받아 라이브러리 상대경로로 변환한 뒤 `/api/webhook/scan`을 호출하는 브릿지 스크립트를 `tools/gdpoller_scan_bridge.py`에 포함해두었습니다.
 
-**[Option B] CommandDispatcher (curl 쉘 스크립트 실행) 설정**
+**CommandDispatcher 설정 (gd-poller config.yaml)**
 ```yaml
 - class: CommandDispatcher
-  command: "curl -s 'http://your-bookoasis-ip:5930/api/webhook/scan?token=oasis_secure_api_token_1234&library_id=25&type=general'"
-  buffer_interval: 60
+  command: >-
+    python3 /path/to/media_server/tools/gdpoller_scan_bridge.py
+    --base-url http://your-bookoasis-ip:5930
+    --token oasis_secure_api_token_1234
+    --library-id 25
+    --type general
+    --root /path/that/gd-poller/sees/as/the/library/root
+    --debounce 20
 ```
+
+* `--root`는 gd-poller가 인식하는(= mappings 적용 후) 라이브러리 물리 경로의 루트입니다. 브릿지 스크립트가 변경된 파일의 부모 폴더를 이 루트 기준 상대경로로 변환해 `path` 파라미터로 넘깁니다.
+* `--debounce`(초)는 동일 폴더에 대한 연속 이벤트를 로컬에서 걸러내는 값입니다. gd-poller의 `CommandDispatcher` 자체는 폴더 단위 버퍼링/그룹핑을 하지 않으므로(파일 단위로 즉시 dispatch), 다중 파일이 한꺼번에 올라오는 경우를 대비해 스크립트 쪽에서 최소한의 중복 호출 억제를 수행합니다.
 
 ### 아웃바운드 표준 이벤트 웹훅 (Outbound Standard Event Webhook)
 
@@ -672,6 +695,13 @@ BookOasis는 외부 수신 서버로 도서 이벤트를 `POST` 전송할 수 �
 * **쿼리 파라미터**:
   * `type` (string, 선택): DB 구분 (`general` / `adult`, 기본값: `general`)
   * `limit` (integer, 선택): 위젯 아이템 노출 개수 (기본값: `3`)
+
+---
+
+### `[GET]` `/api/media/plugins/load-status`
+* **설명**: 관리자 대시보드 상단 플러그인 상태 패널용 API. 조회 시점에 플러그인 discovery를 1회 갱신한 뒤, 플러그인별 최신 로드 성공/실패 상태와 최근 상태 변화 이력을 반환합니다. 세션 쿠키 인증이라 외부 프로그램은 대신 `/api/webhook/plugins/status`(토큰 인증)를 사용해야 합니다.
+* **권한**: `@admin_required`
+* **응답 형식**: `/api/webhook/plugins/status`와 동일(아래 6번 섹션 참고)
 
 ---
 

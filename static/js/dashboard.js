@@ -3,6 +3,7 @@ import { state } from './state.js';
 import * as api from './api.js';
 import { renderDashboardHistory, renderDashboardRecentlyAdded } from './ui.js?v=20260809-unread-series-v3';
 import { updateLibraryTotalCount } from './book_list.js';
+import { loadPluginHealthPanel } from './plugin_health_panel.js';
 
 let dashboardLoadToken = 0;
 let pluginsLoadToken = 0;
@@ -34,6 +35,9 @@ export async function loadDashboardData() {
     if (typeof window.loadDashboardInsights === 'function') {
       window.loadDashboardInsights(targetType);
     }
+
+    // 0-1. 플러그인 로드 상태 패널 (관리자 전용, 나머지 대시보드 로딩을 막지 않도록 별도 실행)
+    loadPluginHealthPanel();
 
     // 1. 전체 보관함 합계, 최근 읽은 도서, 신규 추가 도서를 동시에 요청
     const totalsPromise = api.fetchBooksTotals({type: targetType, libraryId: 'all'})

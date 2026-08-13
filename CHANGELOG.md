@@ -1,4 +1,19 @@
 # CHANGELOG
+## v1.9.6
+- (mobile) 상/하 제스처 추가 | added up/down movement
+- (viewer) 홀수페이지 일때 다음장 넘어가지 않는 버그 수정 | bugfix next chapter logic
+- (all) 보스모드 추가(alt+q or qq) | added bossmode (alt+q or qq)
+- (all) 코드 리펙토링 최적화 | code refactoring
+- (plugin) 관련 api 추가 | added plugin api
+
+## v1.9.5
+- (mobile) 확대시 햄버거 메뉴 이슈 수정 | bugfix header button 
+- (dashboard) 메뉴 정렬 | align category menu(left)
+- (api) 특정 디렉토리 스캔 엔드포인트 추가 | added api endpoint
+ * api_endpoint.md 참조.
+- (dashboard) 플러그인/카테고리 구분 강화 | diff color plugin/category
+
+
 ## v1.9.4
 - (dashboard/category)스마트 추천 기능 추가 | add smart recommendations
 - (bug/trash) 휴지통 대량 비우기 시 DB 락 장기 점유로 인한 Lock wait timeout 수정 | fix lock wait timeout from long-held DB lock during bulk trash empty
