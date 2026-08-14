@@ -10,7 +10,7 @@ import { mountIndexScrollbar, unmountIndexScrollbar } from './index_scrollbar.js
 let filterDebounceTimer = null;
 let totalsRequestSerial = 0;
 
-function normalizeMetadataToken(token) {
+export function normalizeMetadataToken(token) {
   if (!token) return '';
   return String(token)
     .replace(/^[\s'"\[\],]+|[\s'"\[\],]+$/g, '')
@@ -33,7 +33,7 @@ export function updateLibraryTotalCount(items, totals = null) {
 }
 
 // 1. 도서 시리즈 목록 로드
-export async function loadBooksList(isAppend = false) {
+export async function loadBooksList(isAppend = false, startPage = null) {
   const currentId = state.currentLibraryId || '';
   if (['home', 'collection', 'settings', 'plugins'].includes(currentId) || currentId.startsWith('plugin_')) {
     console.warn(`[Book-List] loadBooksList skipped: currentLibraryId=${currentId} is not a book list category.`);
@@ -57,7 +57,7 @@ export async function loadBooksList(isAppend = false) {
   
   try {
     const limit = state.LIMIT || 120;
-    const targetPage = isAppend ? state.currentPage : 1;
+    const targetPage = isAppend ? state.currentPage : (startPage || 1);
     const requestFilters = {
       type: state.currentLibraryType,
       libraryId: state.currentLibraryId,
@@ -68,7 +68,7 @@ export async function loadBooksList(isAppend = false) {
     const totalsSerial = isAppend ? totalsRequestSerial : ++totalsRequestSerial;
 
     if (!isAppend) {
-      state.currentPage = 1;
+      state.currentPage = targetPage;
       state.hasMore = true;
       container.innerHTML = `<div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('book_list.loading')}</div>`;
       const countSpan = document.getElementById('library-total-count');
@@ -123,12 +123,13 @@ export async function loadBooksList(isAppend = false) {
 
   const gridView = document.getElementById('books-grid-view');
   const isGridActive = !!(gridView && gridView.style.display !== 'none');
-  if (isGridActive) {
-    if (state.hasMore) {
-      unmountIndexScrollbar();
-    } else {
-      mountIndexScrollbar();
-    }
+  const sortDir = state.currentSortDirection || 'asc';
+  // 가나다 오름/내림차순일 때는 아직 전체 목록을 다 불러오지 못한 상태(hasMore=true)여도
+  // 초성 바로가기 바를 표시한다. handleIndexClick이 필요 시 추가 페이지를 더 불러온다.
+  if (isGridActive && (sortDir === 'asc' || sortDir === 'desc')) {
+    mountIndexScrollbar();
+  } else {
+    unmountIndexScrollbar();
   }
   } finally {
     state.isLoading = false;

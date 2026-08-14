@@ -48,6 +48,25 @@ def _fetch_lazy_scan_candidates(cursor):
     return cursor.fetchall()
 
 
+def _fetch_library_remote_map(cursor):
+    """library_id -> is_remote(bool) 매핑을 한 번만 조회해서 캐싱합니다.
+
+    파일 물리 점검 루프에서 매 도서마다 is_remote_path()(휴리스틱, /proc/mounts
+    재파싱 + realpath 다중 호출)로 원격 여부를 추측하는 대신, 이미 라이브러리
+    등록 시 확정된 libraries.is_remote 값을 그대로 신뢰합니다. 휴리스틱이
+    원격 경로를 로컬로 오판하면 이후 os.path.exists()가 FUSE/rclone 마운트에서
+    수십 초~무한정 커널 블로킹될 수 있어(과거 502 Bad Gateway 사고 사례 참고),
+    대량 후보(수십만 건) 순회 시 이 오판 하나가 전체 lazy 스캔을 멈춰 세울 수 있습니다.
+    """
+    try:
+        cursor.execute("SELECT id, COALESCE(is_remote, 0) AS is_remote FROM libraries")
+        rows = cursor.fetchall()
+        return {int(row['id']): bool(int(row['is_remote'] or 0)) for row in rows}
+    except Exception as e:
+        print(f"[Lazy-Scanner] 라이브러리 원격 여부 매핑 조회 실패: {e}")
+        return {}
+
+
 def _open_database_connection(db_type):
     if not database.is_mariadb_mode():
         db_path = database.get_db_path(db_type)
@@ -182,7 +201,8 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
             if target_book_id is not None:
                 books = cursor.fetchall()
             print(f"[Lazy-Scanner] 📋 DB({db_type}) 스캔 필요 후보 도서 레코드 조회 완료 (총 {len(books)}권). 파일 물리 점검 시작...")
-            
+            library_remote_map = _fetch_library_remote_map(cursor)
+
             targets = []
             for book in books:
                 if stop_requested:
@@ -229,9 +249,15 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
                 # 커버 재추출 없이 오프셋 수집만 수행하여 불필요한 I/O를 방지
                 offset_only = (not cover_missing and offset_missing)
                 
-                from utils.drive_helper import is_remote_path
-                _is_remote = is_remote_path(file_path)
-                
+                library_id = book['library_id']
+                if library_id in library_remote_map:
+                    # DB에 이미 확정돼 있는 라이브러리 원격 플래그를 신뢰 (휴리스틱 재판별 회피)
+                    _is_remote = library_remote_map[library_id]
+                else:
+                    # library_id가 매핑에 없는 예외 케이스(고아 레코드 등)에 한해서만 휴리스틱 폴백
+                    from utils.drive_helper import is_remote_path
+                    _is_remote = is_remote_path(file_path)
+
                 # [원격 경로 최적화] 커버는 정상이고 오프셋만 없는 원격지(GDRIVE 등) 도서는
                 # 백그라운드 대량 스캔 부하 차단을 위해 Lazy 스캔 수집 대상에서 원천 배제합니다.
                 # (뷰어에서 열릴 때 실시간으로 파싱되므로 성능에 문제 없음)

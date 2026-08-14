@@ -102,6 +102,46 @@ def get_media_list():
             err_msg = '스캔 작업으로 데이터베이스가 잠시 바쁩니다. 잠시 후 다시 시도해 주세요.'
         return jsonify({'success': False, 'error': err_msg}), 500
 
+@media_library_routes_bp.route('/api/media/list/jump', methods=['GET'])
+@login_required
+def get_media_list_jump_position():
+    """초성(가나다) 바로가기: 대상 글자로 시작하는 첫 항목의 페이지/오프셋을 계산해 반환"""
+    db_type = request.args.get('type', 'general')
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+    library_id = request.args.get('library_id')
+    search_query = request.args.get('search', '').strip()
+    sort = request.args.get('sort', 'asc').strip().lower()
+    target_char = request.args.get('char', '').strip()
+    genre_filters = _parse_csv_filter_values(request.args.get('genres', ''))
+    tag_filters = _parse_csv_filter_values(request.args.get('tags', ''))
+    user_id = session.get('user_id')
+    role = session.get('role')
+    try:
+        limit = int(request.args.get('limit', 30))
+    except ValueError:
+        limit = 30
+
+    if not target_char:
+        return jsonify({'success': False, 'error': 'char is required'}), 400
+
+    try:
+        result = SeriesService.find_jump_position(
+            db_type,
+            library_id,
+            search_query,
+            sort,
+            target_char,
+            limit,
+            genre_filters=genre_filters,
+            tag_filters=tag_filters,
+            user_id=user_id,
+            role=role
+        )
+        return jsonify({'success': True, **result})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @media_library_routes_bp.route('/api/media/list-totals', methods=['GET'])
 @login_required
 def get_media_list_totals():

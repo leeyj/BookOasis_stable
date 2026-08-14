@@ -14,7 +14,9 @@ This is the central technical documentation and task history archive portal for 
   - [설치 가이드 (guide_installation.md)](./guide_installation.md) / [English (guide_installation_en.md)](./guide_installation_en.md): 설치 요구사항, 빠른 구동법, 리버스 프록시 연동 / Prerequisites, startup bat files, and reverse proxy configs.
   - [CSP 단계 전환 체크리스트 (checklist_csp_rollout.md)](./checklist_csp_rollout.md) / [English (checklist_csp_rollout_en.md)](./checklist_csp_rollout_en.md): Report-Only 관측에서 Enforce 전환까지 운영 점검/롤백 절차 / Operational gates and rollback path for CSP rollout.
   - [마이그레이션 가이드 (migration_guide.md)](./migration_guide.md) / [English (migration_guide_en.md)](./migration_guide_en.md): Kavita에서 BookOasis로의 완벽 이사 / Seamless migration from Kavita to BookOasis.
-  - [관리자 가이드 (guide_admin.md)](./guide_admin.md) / [English (guide_admin_en.md)](./guide_admin_en.md): 사용자 권한 제어, 라이브러리 추가, 백그라운드 스캐너 제어 / User privileges, library additions, and background task controls.
+  - [관리자 가이드 (guide_admin.md)](./guide_admin.md) / [English (guide_admin_en.md)](./guide_admin_en.md): 사용자 권한 제어, 라이브러리 추가, 백그라운드 스캐너 제어, MariaDB 성능 튜닝 / User privileges, library additions, background task controls, and MariaDB performance tuning.
+  - [MariaDB 전환 가이드 (move_to_mariadb.md)](./move_to_mariadb.md): SQLite에서 MariaDB 엔터프라이즈 엔진으로 전환 및 데이터 이관 절차 / Detailed guide for migrating from SQLite to the MariaDB enterprise engine.
+  - [카테고리 내보내기/가져오기 CLI 가이드 (guide_category_migration.md)](./guide_category_migration.md) / [English (guide_category_migration_en.md)](./guide_category_migration_en.md): `export_category.py`/`import_category.py`를 이용한 카테고리 백업·이관·병합 / Category export/import/merge CLI tooling.
   - [OPDS 연동 가이드 (guide_opds.md)](./guide_opds.md) / [English (guide_opds_en.md)](./guide_opds_en.md): 모바일 앱 연동 및 Basic Auth 셋업 / Mobile reader sync and Basic Auth configs.
   - [아키텍처 가이드 (guide_architecture.md)](./guide_architecture.md) / [English (guide_architecture_en.md)](./guide_architecture_en.md): 4계층 아키텍처 구조 설계 및 시퀀스 / 4-tier clean architecture design.
   - [플러그인 개발 가이드 (guide_plugins.md)](./guide_plugins.md) / [English (guide_plugins_en.md)](./guide_plugins_en.md): 메타데이터 확장 플러그인 인터페이스 스펙 / Extensible metadata plugin developer guide.
@@ -22,9 +24,10 @@ This is the central technical documentation and task history archive portal for 
 
 * **기술 사양서 (Specifications)**:
   - [API 엔드포인트 명세서 (api_endpoints.md)](./api_endpoints.md): OpenAPI/Swagger 스타일 백엔드 API 명세 / OpenAPI/Swagger style backend API specifications.
-  - [DB 스키마 명세서 (spec_db_schema.md)](./spec_db_schema.md) / [English (spec_db_schema_en.md)](./spec_db_schema_en.md): SQLite 일반/성인 DB 테이블 구조 및 관계 / SQLite general/adult table structures and relationships.
+  - [DB 스키마 명세서 (spec_db_schema.md)](./spec_db_schema.md) / [English (spec_db_schema_en.md)](./spec_db_schema_en.md): SQLite(general/adult/audiobook) 및 MariaDB 3-DB 테이블 구조와 관계 / SQLite (general/adult/audiobook) and MariaDB 3-database table structures and relationships.
   - [핵심 기능 기술 명세서 (spec_feature_overview.md)](./spec_feature_overview.md) / [English (spec_feature_overview_en.md)](./spec_feature_overview_en.md): ZIP 실시간 스트리밍, Kavita 렌더링 최적화, 플러그인 등 / ZIP streaming pipeline, layout optimizations, and plugin systems.
   - [스캔 로직 기술 사양서 (spec_scanner_logic.md)](./spec_scanner_logic.md) / [English (spec_scanner_logic_en.md)](./spec_scanner_logic_en.md): 백그라운드 동기화 스캔 엔진 세부 동작 메커니즘 / Multi-threaded scanner engine internals.
+  - [스캐너 큐 상태 전이 명세서 (spec_scanner_queue_state_transitions.md)](./spec_scanner_queue_state_transitions.md): 스캐너 큐 및 라이브러리 스캔 상태 전이 규칙 / Scanner queue and library scan state transition rules.
   - [플러그인 작성 체크리스트 (plugin_checklist.md)](./plugin_checklist.md) / [English (plugin_checklist_en.md)](./plugin_checklist_en.md): 새 플러그인 작성 시 필수 확인 항목 / Quick validation list for new plugin authors.
 
   ---
@@ -46,4 +49,4 @@ This is the central technical documentation and task history archive portal for 
     - [DB 스키마 명세서 (spec_db_schema.md)](./spec_db_schema.md) / [English (spec_db_schema_en.md)](./spec_db_schema_en.md)
 
 ---
-  *최종 업데이트 (Last Updated): 2026-07-17*
+  *최종 업데이트 (Last Updated): 2026-08-14*

@@ -264,6 +264,12 @@ class MetadataFactory:
             elif os.path.isdir(full_path):
                 candidate_provider_names.append(entry)
 
+        try:
+            from repositories.plugin_repository import PluginRepository
+            PluginRepository.prune_stale_load_events('general', candidate_provider_names)
+        except Exception as e:
+            print(f"[MetadataFactory] Failed to prune stale plugin load events: {e}")
+
         for provider_name in candidate_provider_names:
             try:
                 _, target_class = cls._import_provider_module_and_class(provider_name)

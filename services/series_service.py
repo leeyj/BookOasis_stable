@@ -1,9 +1,43 @@
 # -*- coding: utf-8 -*-
 import os
+import re
 import hashlib
 import json
 from utils.cover_helper import get_cover_image_with_t, resolve_series_cover
 from repositories.series_repository import SeriesRepository
+
+_CHOSEONG = [
+    'ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ',
+    'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ',
+    'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ',
+]
+
+_LEADING_TAG_RE = re.compile(r'^\s*(?:(?:\[[^\]]+\]|\{[^}]+\})\s*)+')
+
+
+def _strip_leading_bracket_tags(value):
+    """static/js/series_display.js의 stripLeadingBracketTags와 동일 규칙."""
+    raw = str(value or '').strip()
+    if not raw:
+        return ''
+    stripped = _LEADING_TAG_RE.sub('', raw).strip()
+    return stripped or raw
+
+
+def _get_initial(text):
+    """static/js/index_scrollbar.js의 getInitial()과 동일한 초성/알파벳 분류 규칙."""
+    text = (text or '').strip()
+    if not text:
+        return '#'
+    ch = text[0]
+    code = ord(ch)
+    if 0xAC00 <= code <= 0xD7A3:
+        return _CHOSEONG[(code - 0xAC00) // 588]
+    if 0x3131 <= code <= 0x314E:
+        return ch
+    if ('a' <= ch <= 'z') or ('A' <= ch <= 'Z'):
+        return ch.upper()
+    return '#'
 
 def _comparison_dir_for_book(file_path, file_format):
     normalized = str(file_path or '').replace('\\', '/')
@@ -229,6 +263,76 @@ class SeriesService:
         
         print(f"[PERF-PROFILE] get_books_list(lib={library_id}, page={page}) TOTAL: {(t4-t0)*1000:.1f}ms | SQL-Fetch({len(rows)}rows): {(t2-t1)*1000:.1f}ms | BuildSeries({len(entries)}entries): {(t3-t2)*1000:.1f}ms | Sort: {(t4-t3)*1000:.1f}ms")
         return paged
+
+    @staticmethod
+    def find_jump_position(db_type, library_id, search_query, sort, target_char, limit,
+                            genre_filters=None, tag_filters=None, user_id=None, role=None):
+        """
+        가나다(초성) 바로가기: 전체 목록을 동일한 정렬 기준으로 구성한 뒤 target_char로
+        시작하는 첫 항목의 절대 인덱스를 찾아 페이지/오프셋으로 환산합니다.
+        get_books_list()의 전체스캔(full-scan) 경로와 동일한 fetch+build+sort 로직 및
+        캐시(_LIST_QUERY_CACHE)를 재사용하여, 반복 점프 시 재계산 비용을 없앱니다.
+        """
+        import time
+        library_id = _normalize_library_id(library_id)
+        favorite_only = library_id == 'favorite'
+        normalized_genres = [str(v).strip() for v in (genre_filters or []) if str(v).strip()]
+        normalized_tags = [str(v).strip() for v in (tag_filters or []) if str(v).strip()]
+        sort_key = (sort or 'asc').lower()
+        if sort_key not in ('asc', 'desc'):
+            sort_key = 'asc'
+
+        now = time.time()
+        cache_key = (
+            db_type,
+            library_id,
+            str(search_query or ''),
+            sort_key,
+            tuple(normalized_genres),
+            tuple(normalized_tags),
+            int(user_id) if user_id else 0,
+            str(role or ''),
+        )
+        cached = _LIST_QUERY_CACHE.get(cache_key)
+        if cached and (now - cached[0] < _LIST_QUERY_CACHE_TTL):
+            entries = cached[1]
+        else:
+            rows = SeriesRepository.fetch_books_for_grouping(
+                db_type,
+                library_id,
+                search_query=search_query or '',
+                favorite_only=favorite_only,
+                genre_filters=normalized_genres,
+                tag_filters=normalized_tags,
+                user_id=user_id,
+                role=role,
+                limit=None,
+                offset=None
+            )
+            entries = _build_series_entries(db_type, rows)
+            _sort_entries(entries, sort=sort_key)
+            _LIST_QUERY_CACHE[cache_key] = (now, entries)
+
+        target = str(target_char or '').strip()
+        total = len(entries)
+        found_index = -1
+        for idx, entry in enumerate(entries):
+            title = _strip_leading_bracket_tags(entry.get('series_name') or entry.get('representative_title') or '')
+            if _get_initial(title) == target:
+                found_index = idx
+                break
+
+        if found_index == -1:
+            return {'found': False, 'total': total}
+
+        safe_limit = max(1, int(limit or 1))
+        return {
+            'found': True,
+            'index': found_index,
+            'page': (found_index // safe_limit) + 1,
+            'offset_in_page': found_index % safe_limit,
+            'total': total,
+        }
 
     @staticmethod
     def get_books_totals(db_type, library_id, search_query='', genre_filters=None, tag_filters=None, user_id=None, role=None):

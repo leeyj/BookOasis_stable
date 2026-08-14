@@ -1,8 +1,17 @@
 # CHANGELOG
+## v1.9.9
+- (lazy-scanner) 원격 경로 오판으로 인한 os.path.exists 커널 블로킹 위험 제거(휴리스틱 대신 libraries.is_remote 캐시 사용) | avoid kernel-blocking os.path.exists on misclassified remote paths by caching libraries.is_remote instead of re-deriving it per file
+- (document)문서 최신화 | update docs
+- (dashboard) 카테고리 전환/최초 로드 시 정렬 버튼 라벨이 실제 정렬 상태와 무관하게 항상 "가나다 오름차순"으로 고정 표시되던 버그 수정 | fix sort button label always showing "A-Z ascending" regardless of the actual active sort on category switch/initial load
+- (viewer/epub) 빠른 연속 페이지 넘김 시 챕터 지연 로딩 레이스로 특정 챕터가 영구적으로 빈 내용/로딩 상태에 고착되던 버그 수정 | fix EPUB chapter lazy-load race that could permanently stick a chapter as empty/loading during rapid page-turning
+- (plugin) 폴더를 삭제해도 마지막 실패 이력이 DB에 남아 계속 "로드 실패"로 표시되던 버그 수정(디스크에 없는 플러그인의 이력 자동 정리) | fix plugin load-failure messages persisting after folder deletion by auto-pruning stale DB history for plugins no longer on disk
+- (dashboard) 대용량 카테고리에서 가나다 초성 바로가기가 표시되지 않고, 눌러도 페이지를 하나씩 순차 로드해 느리던 문제 수정(서버 전용 점프 API 추가) | fix A-Z index sidebar not showing (and jumping being slow page-by-page) in large categories by adding a dedicated server-side jump-position API
+
 ## v1.9.8
 - (db) books.isbn 인덱스 추가(중복 ISBN 조회 성능 개선) | added books.isbn index for faster duplicate-ISBN lookups
 - (mariadb) innodb_buffer_pool_size 명시적 설정(2G) | explicitly set innodb_buffer_pool_size (2G)
 - (viewer) 다음 책 전환 시 Fullscreen 종료 대기 없이 재진입하던 경쟁상태 수정(안드로이드 태블릿에서 2페이지 모드 마지막 권 진행 불가 버그) | fix race between fullscreen exit and re-entry on next-book transition (Android tablets stuck on last volume in 2-page mode)
+
 
 ## v1.9.7
 - (viewer) 홀수 페이지일때 마지막 장만 표시 | show last odd page alone instead of repeating

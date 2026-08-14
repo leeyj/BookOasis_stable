@@ -71,6 +71,11 @@ export function bindSidebarContextMenu() {
         e.preventDefault();
         return;
       }
+      if (menuItem && menuItem.dataset.role === 'sidebar-category-static') {
+        // 전체보기/환경설정 같은 고정 메뉴는 실제 카테고리가 아니므로 컨텍스트 메뉴를 띄우지 않음
+        e.preventDefault();
+        return;
+      }
 
       suppressSidebarClickUntil = Date.now() + 700;
       e.preventDefault();
@@ -111,7 +116,7 @@ export function bindSidebarContextMenu() {
       if (!isAdmin) return;
 
       const menuItem = e.target.closest('.menu-item');
-      if (menuItem && menuItem.dataset.type !== 'plugin') {
+      if (menuItem && menuItem.dataset.type !== 'plugin' && menuItem.dataset.role !== 'sidebar-category-static') {
         const type = menuItem.dataset.type;
         const id = menuItem.dataset.id;
         const name = menuItem.dataset.name;

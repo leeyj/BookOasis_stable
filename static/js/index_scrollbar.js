@@ -1,42 +1,9 @@
 import { state } from './state.js';
-import { jumpToIndex } from './book_list.js';
-import { stripLeadingBracketTags } from './series_display.js';
+import { loadBooksList, normalizeMetadataToken } from './book_list.js';
+import * as api from './api.js';
 
-// 한글 초성 배열
-const CHOSEONG = [
-  'ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ',
-  'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ',
-  'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'
-];
-
-/**
- * 텍스트의 첫 글자를 분석하여 초성, 알파벳 대문자, 또는 '#'을 반환합니다.
- */
-export function getInitial(text) {
-  if (!text || text.trim() === '') return '#';
-  
-  const firstChar = text.trim().charAt(0);
-  const code = firstChar.charCodeAt(0);
-
-  // 한글 가(AC00) ~ 힣(D7A3)
-  if (code >= 0xAC00 && code <= 0xD7A3) {
-    const choseongIndex = Math.floor((code - 0xAC00) / 588);
-    return CHOSEONG[choseongIndex];
-  }
-  
-  // 이미 초성인 경우 (ㄱ ~ ㅎ)
-  if (code >= 0x3131 && code <= 0x314E) {
-    return firstChar;
-  }
-
-  // 영문 알파벳
-  if (/[a-zA-Z]/.test(firstChar)) {
-    return firstChar.toUpperCase();
-  }
-
-  // 숫자 및 기타 기호
-  return '#';
-}
+// 초성/알파벳 분류 로직은 서버(services/series_service.py의 _get_initial)에서 동일하게 수행하여
+// 목표 페이지/오프셋을 계산해주므로, 클라이언트에서는 별도로 분류할 필요가 없습니다.
 
 const INDEX_CHARS = [
   '#', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
@@ -47,10 +14,6 @@ const INDEX_CHARS = [
 let scrollbarEl = null;
 
 export function mountIndexScrollbar() {
-  if (state.hasMore) {
-    return;
-  }
-
   const sortDir = state.currentSortDirection || 'asc';
   // 추가일 정렬(최신/과거)에서는 우측 초성 바로가기를 숨깁니다.
   if (sortDir === 'date_desc' || sortDir === 'date_asc') {
@@ -101,7 +64,27 @@ export function unmountIndexScrollbar() {
   }
 }
 
-function handleIndexClick(char) {
+let isJumping = false;
+
+// 새로 로드된(단일 페이지) 그리드에서 해당 오프셋의 카드로 스크롤 이동
+function scrollToCardOffset(offsetInPage) {
+  setTimeout(() => {
+    const cards = document.querySelectorAll('#books-list-container .book-card');
+    const card = cards[offsetInPage];
+    if (!card) return;
+    const mainContent = document.querySelector('.library-main-content');
+    if (mainContent && mainContent.scrollHeight > mainContent.clientHeight) {
+      const cardRect = card.getBoundingClientRect();
+      const mainRect = mainContent.getBoundingClientRect();
+      const offsetTop = cardRect.top - mainRect.top + mainContent.scrollTop;
+      mainContent.scrollTo({ top: Math.max(0, offsetTop - 80), behavior: 'auto' });
+    } else {
+      card.scrollIntoView({ behavior: 'auto', block: 'start' });
+    }
+  }, 60);
+}
+
+async function handleIndexClick(char) {
   // 1. 현재 데이터가 가나다 정렬(asc, desc)일 때만 동작하도록 제한
   const sortDir = state.currentSortDirection || 'asc';
   if (sortDir !== 'asc' && sortDir !== 'desc') {
@@ -113,36 +96,35 @@ function handleIndexClick(char) {
     return;
   }
 
-  if (!state.filteredBooksData || state.filteredBooksData.length === 0) return;
+  if (isJumping) return;
+  isJumping = true;
+  if (scrollbarEl) scrollbarEl.classList.add('is-loading');
 
-  // 2. target 인덱스 찾기
-  let targetIndex = -1;
+  try {
+    const limit = state.LIMIT || 120;
+    const result = await api.fetchJumpPosition({
+      type: state.currentLibraryType,
+      libraryId: state.currentLibraryId,
+      search: state.searchQuery || '',
+      sort: sortDir,
+      genres: (state.filterGenres || []).map(normalizeMetadataToken).filter(Boolean),
+      tags: (state.filterTags || []).map(normalizeMetadataToken).filter(Boolean),
+      char,
+      limit,
+    });
 
-  for (let i = 0; i < state.filteredBooksData.length; i++) {
-    const book = state.filteredBooksData[i];
-    // ui.js의 normalizeBookTitle 로직과 동일하게 제목을 가져옴
-    const title = stripLeadingBracketTags(book.series_name || book.title || '');
-    const initial = getInitial(title);
-
-    // ASC 정렬 시 첫 번째 매칭 아이템
-    if (sortDir === 'asc' && initial === char) {
-      targetIndex = i;
-      break;
+    if (!result || !result.success || !result.found) {
+      console.log(`'${char}'(으)로 시작하는 책을 찾을 수 없습니다.`);
+      return;
     }
-    
-    // DESC 정렬 시에도 일단 첫 번째 매칭을 찾음 (역순이므로 가장 Z나 ㅎ에 가까운 것부터 나옴)
-    // 좀 더 엄밀하게 하려면 이진 탐색 등을 쓸 수 있지만, 브라우저 성능이 충분하므로 선형 탐색 사용
-    if (sortDir === 'desc' && initial === char) {
-      targetIndex = i;
-      break;
-    }
-  }
 
-  // 3. 찾았으면 이동, 못 찾았으면 알림
-  if (targetIndex !== -1) {
-    jumpToIndex(targetIndex);
-  } else {
-    // 해당 초성으로 시작하는 책이 없음
-    console.log(`'${char}'(으)로 시작하는 책을 찾을 수 없습니다.`);
+    // 대상 페이지만 바로 불러와서 교체하고(중간 페이지들은 건너뜀), 그 안의 정확한 위치로 스크롤한다.
+    await loadBooksList(false, result.page);
+    scrollToCardOffset(result.offset_in_page);
+  } catch (e) {
+    console.error('[Index-Scrollbar] 초성 바로가기 실패:', e);
+  } finally {
+    isJumping = false;
+    if (scrollbarEl) scrollbarEl.classList.remove('is-loading');
   }
 }

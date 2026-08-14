@@ -3172,6 +3172,13 @@ body {
     padding-right: 40px;
 }
 
+/* 초성 점프를 위해 추가 페이지를 불러오는 동안의 대기 상태 표시 */
+.alphabet-scrollbar.is-loading {
+    opacity: 0.5;
+    pointer-events: none;
+    cursor: wait;
+}
+
 /* 모바일 숨김 처리 */
 @media (max-width: 768px) {
     .alphabet-scrollbar {

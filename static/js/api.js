@@ -26,6 +26,16 @@ export async function fetchBooksList({type, libraryId, page, limit, append, sear
   return res.json();
 }
 
+export async function fetchJumpPosition({type, libraryId, search, sort, genres = [], tags = [], char, limit}) {
+  const searchQuery = search ? `&search=${encodeURIComponent(search)}` : '';
+  const sortQuery = sort ? `&sort=${sort}` : '';
+  const genresQuery = genres.length > 0 ? `&genres=${encodeURIComponent(genres.join(','))}` : '';
+  const tagsQuery = tags.length > 0 ? `&tags=${encodeURIComponent(tags.join(','))}` : '';
+  const url = `/api/media/list/jump?type=${type}&library_id=${libraryId}&limit=${limit}${searchQuery}${sortQuery}${genresQuery}${tagsQuery}&char=${encodeURIComponent(char)}&_=${Date.now()}`;
+  const res = await safeFetch(url, {cache: 'no-store'});
+  return res.json();
+}
+
 export async function fetchBooksTotals({type, libraryId, search, genres = [], tags = []}) {
   const searchQuery = search ? `&search=${encodeURIComponent(search)}` : '';
   const genresQuery = genres.length > 0 ? `&genres=${encodeURIComponent(genres.join(','))}` : '';

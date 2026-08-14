@@ -552,17 +552,37 @@ function renderCurrentChunk(initMode = false) {
   const isEpub = (state.currentViewerFormat === 'epub');
 
   if (isEpub && (txtChunks[currentChunkIdx] === null || txtChunks[currentChunkIdx] === 'LOADING_PENDING')) {
+    // 요청 시점의 챕터 번호를 고정 캡처합니다. currentChunkIdx는 이후 빠른 연속 페이지
+    // 넘김으로 계속 바뀔 수 있는 가변 변수라, 응답을 그 변수로 다시 참조해서 쓰면
+    // 엉뚱한(현재의) 슬롯에 데이터를 덮어쓰는 레이스가 발생합니다.
+    const requestedIdx = currentChunkIdx;
     showViewerLoading(i18n.t("viewer.loading_txt_title"), i18n.t("viewer.loading_txt_sub"));
-    requestEpubChapterContent(currentChunkIdx, { force: true, updateDom: false })
-      .then(data => {
-        hideViewerLoading();
-        txtChunks[currentChunkIdx] = (data && typeof data === 'string') ? data : '<p>내용이 없습니다.</p>';
-        renderCurrentChunk(initMode);
-      })
-      .catch(err => {
-        hideViewerLoading();
-        showViewerError(i18n.t('viewer.error_txt_load'));
-      });
+
+    const awaitChapter = (retriesLeft, isFirstAttempt) => {
+      requestEpubChapterContent(requestedIdx, { force: isFirstAttempt, updateDom: false })
+        .then(data => {
+          if (data && typeof data === 'string') {
+            txtChunks[requestedIdx] = data;
+          } else if (retriesLeft > 0) {
+            // null 응답은 같은 챕터를 이미 다른 호출이 fetch 중이라는 뜻(in-flight 중복 방지).
+            // 빈 내용으로 성급하게 덮어쓰지 말고, 그 fetch가 채워줄 때까지 짧게 재확인한다.
+            setTimeout(() => awaitChapter(retriesLeft - 1, false), 200);
+            return;
+          } else {
+            txtChunks[requestedIdx] = '<p>내용이 없습니다.</p>';
+          }
+          hideViewerLoading();
+          if (currentChunkIdx === requestedIdx) {
+            renderCurrentChunk(initMode);
+          }
+        })
+        .catch(err => {
+          hideViewerLoading();
+          showViewerError(i18n.t('viewer.error_txt_load'));
+        });
+    };
+
+    awaitChapter(10, true);
     return;
   }
 

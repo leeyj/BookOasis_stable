@@ -57,6 +57,30 @@ class PluginRepository:
         return [dict(row) for row in rows]
 
     @staticmethod
+    def prune_stale_load_events(db_type, valid_plugin_ids):
+        """더 이상 plugins/metadata 디렉토리에 존재하지 않는 플러그인의 과거 로드 이력을 정리합니다.
+        (폴더를 삭제해도 마지막 실패 기록이 영구히 남아 계속 '실패'로 표시되는 문제 방지)"""
+        valid_ids = list(valid_plugin_ids or [])
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            if valid_ids:
+                placeholders = ','.join('?' for _ in valid_ids)
+                cursor.execute(
+                    f"DELETE FROM plugin_load_events WHERE plugin_id NOT IN ({placeholders})",
+                    valid_ids
+                )
+            else:
+                cursor.execute("DELETE FROM plugin_load_events")
+            conn.commit()
+            return cursor.rowcount
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    @staticmethod
     def get_recent_load_events(db_type, limit=100):
         """최근 플러그인 로드 이력(상태 변화 포함) 조회"""
         conn = database.get_connection(db_type)

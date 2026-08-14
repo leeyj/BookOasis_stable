@@ -399,6 +399,12 @@ export function selectCategory(id, skipHistory = false) {
   state.currentLibraryHideCovers = !!(activeItem && activeItem.dataset && activeItem.dataset.type === 'custom' && activeItem.dataset.hideCover === '1');
   updateCurrentCategoryIndicator(id, activeItem);
 
+  // 정렬 버튼 라벨을 실제 상태(state.currentSortDirection)와 동기화.
+  // 이전에는 toggleLibrarySort()를 눌러야만 라벨이 갱신되어, 카테고리 전환 시
+  // 실제로는 "최신 추가순" 등으로 정렬된 채로 로드되는데도 버튼엔 항상
+  // 초기 HTML의 "가나다 오름차순" 텍스트가 그대로 남아있는 문제가 있었다.
+  updateSortButtonUI();
+
   goBackToList();
 
   if (id === 'home') {
