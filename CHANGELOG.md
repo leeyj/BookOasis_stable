@@ -1,4 +1,9 @@
 # CHANGELOG
+## v1.9.8
+- (db) books.isbn 인덱스 추가(중복 ISBN 조회 성능 개선) | added books.isbn index for faster duplicate-ISBN lookups
+- (mariadb) innodb_buffer_pool_size 명시적 설정(2G) | explicitly set innodb_buffer_pool_size (2G)
+- (viewer) 다음 책 전환 시 Fullscreen 종료 대기 없이 재진입하던 경쟁상태 수정(안드로이드 태블릿에서 2페이지 모드 마지막 권 진행 불가 버그) | fix race between fullscreen exit and re-entry on next-book transition (Android tablets stuck on last volume in 2-page mode)
+
 ## v1.9.7
 - (viewer) 홀수 페이지일때 마지막 장만 표시 | show last odd page alone instead of repeating
 - (dashboard) 스마트 추천에 동일작가 표시 추가 | added same-author section to smart recommendations

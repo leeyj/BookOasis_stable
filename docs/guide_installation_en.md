@@ -226,6 +226,14 @@ docker compose -f docker-compose.mariadb.yml up -d
 * Spawns `mariadb:10.11` and `redis:7-alpine` alongside `bookoasis`.
 * Data is stored persistently in `./mariadb_data`.
 
+**② (Optional) MariaDB buffer pool tuning override**
+`docker-compose.mariadb.yml` already sets `innodb_buffer_pool_size=2G` instead of the image's 128MB default. For very large libraries (hundreds of thousands of items), even 2G may not be enough. Keep any further tuning in an override file so it survives `git pull`:
+```bash
+cp docker-compose.override.mariadb.example.yml docker-compose.override.yml
+# edit --innodb-buffer-pool-size in the file to match your available RAM
+docker compose -f docker-compose.mariadb.yml -f docker-compose.override.yml up -d
+```
+
 ---
 
 #### 💡 Docker Users with Existing External MariaDB / Redis

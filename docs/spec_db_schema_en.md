@@ -298,6 +298,7 @@ CREATE INDEX IF NOT EXISTS idx_book_offsets_book_id ON book_offsets(book_id);
 CREATE INDEX IF NOT EXISTS idx_book_offsets_book_page ON book_offsets(book_id, page_idx);
 CREATE INDEX IF NOT EXISTS idx_books_series_name ON books(series_name);
 CREATE INDEX IF NOT EXISTS idx_books_library_id ON books(library_id);
+CREATE INDEX IF NOT EXISTS idx_books_isbn ON books(isbn);
 CREATE INDEX IF NOT EXISTS idx_books_is_favorite ON books(is_favorite);
 CREATE INDEX IF NOT EXISTS idx_books_created_at ON books(created_at);
 CREATE INDEX IF NOT EXISTS idx_books_series_lib_title ON books(series_name, library_id, title);

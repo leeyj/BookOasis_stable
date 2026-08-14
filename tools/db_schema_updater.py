@@ -118,7 +118,8 @@ CREATE TABLE IF NOT EXISTS books (
     INDEX idx_books_series_name (series_name(255)),
     INDEX idx_books_series_alias (series_alias(255)),
     INDEX idx_books_library_id (library_id),
-    INDEX idx_books_title (title(255))
+    INDEX idx_books_title (title(255)),
+    INDEX idx_books_isbn (isbn)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE IF NOT EXISTS series_summary (
@@ -478,10 +479,12 @@ def _ensure_mariadb_indexes():
         ('media_general', 'books', 'idx_books_series_alias', 'CREATE INDEX idx_books_series_alias ON books (series_alias(255))'),
         ('media_general', 'books', 'idx_books_library_id', 'CREATE INDEX idx_books_library_id ON books (library_id)'),
         ('media_general', 'books', 'idx_books_title', 'CREATE INDEX idx_books_title ON books (title(255))'),
+        ('media_general', 'books', 'idx_books_isbn', 'CREATE INDEX idx_books_isbn ON books (isbn)'),
         ('media_adult', 'books', 'idx_books_series_name', 'CREATE INDEX idx_books_series_name ON books (series_name(255))'),
         ('media_adult', 'books', 'idx_books_series_alias', 'CREATE INDEX idx_books_series_alias ON books (series_alias(255))'),
         ('media_adult', 'books', 'idx_books_library_id', 'CREATE INDEX idx_books_library_id ON books (library_id)'),
         ('media_adult', 'books', 'idx_books_title', 'CREATE INDEX idx_books_title ON books (title(255))'),
+        ('media_adult', 'books', 'idx_books_isbn', 'CREATE INDEX idx_books_isbn ON books (isbn)'),
     ]
 
     for db_name, tbl, idx_name, idx_sql in required_indexes:

@@ -1075,6 +1075,7 @@ def init_databases():
     CREATE INDEX IF NOT EXISTS idx_books_series_name ON books(series_name);
     CREATE INDEX IF NOT EXISTS idx_books_series_alias ON books(series_alias);
     CREATE INDEX IF NOT EXISTS idx_books_library_id ON books(library_id);
+    CREATE INDEX IF NOT EXISTS idx_books_isbn ON books(isbn);
     CREATE INDEX IF NOT EXISTS idx_libraries_group_id ON libraries(group_id);
     CREATE INDEX IF NOT EXISTS idx_libraries_group_order ON libraries(group_id, sort_order);
     CREATE INDEX IF NOT EXISTS idx_books_is_favorite ON books(is_favorite);

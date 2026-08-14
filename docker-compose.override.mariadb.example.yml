@@ -1,0 +1,21 @@
+version: "3.8"
+
+# MariaDB 올인원 모드(docker-compose.mariadb.yml) 전용 오버라이드 샘플입니다.
+# 사용법:
+#   cp docker-compose.override.mariadb.example.yml docker-compose.override.yml
+#   docker compose -f docker-compose.mariadb.yml -f docker-compose.override.yml up -d
+#
+# ⚠️ Compose는 command: 배열을 병합하지 않고 통째로 덮어씁니다.
+#    버퍼풀 값만 바꾸고 싶어도 아래처럼 전체 옵션 목록을 그대로 복사해서
+#    --innodb-buffer-pool-size 값만 수정해 주세요.
+
+services:
+  mariadb:
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_bin
+      - --tmp-table-size=256M
+      - --max-heap-table-size=256M
+      # 대용량 라이브러리(수십만 권 이상)나 innodb_buffer_pool_size 관련 조회 지연이 있다면
+      # 보유 RAM 여유분에 맞춰 값을 올려주세요. (전체 media_* DB 용량 이상을 권장)
+      - --innodb-buffer-pool-size=2G

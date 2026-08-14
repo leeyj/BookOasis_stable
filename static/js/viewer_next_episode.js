@@ -217,10 +217,15 @@ function triggerOpenNextBook(nextBook) {
   }
 
   // 1. 현재 열려 있는 뷰어를 완전히 닫고 다음 책으로 전환하여 깜빡임 루프를 방지합니다.
-  closeMediaViewer(false, false);
+  //    Fullscreen 종료(exitFullscreen)가 실제로 끝날 때까지 기다린 뒤 다음 책을 엽니다.
+  //    (기다리지 않고 바로 openReader의 requestFullscreen을 호출하면, 이전 종료
+  //     전환이 아직 끝나지 않은 Android 등에서 새 요청이 무시되어 화면이 멈춘 것처럼
+  //     보이는 문제가 있었습니다.)
+  const closePromise = closeMediaViewer(false, false);
 
   // 2. 순환 참조 회피를 위해 viewer.js를 동적으로 임포트하여 다음 책 로드
-  return import('./viewer.js')
+  return Promise.resolve(closePromise)
+    .then(() => import('./viewer.js'))
     .then(m => {
       m.openReader(
         nextBook.id,

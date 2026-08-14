@@ -51,6 +51,7 @@ services:
       - --collation-server=utf8mb4_bin
       - --tmp-table-size=256M
       - --max-heap-table-size=256M
+      - --innodb-buffer-pool-size=2G
     environment:
       - MARIADB_ROOT_PASSWORD=root_pass
       - MARIADB_USER=bookoasis

@@ -163,7 +163,7 @@ export function openReader(bookId, format, title, pagesRead, totalPages) {
 
 export function closeMediaViewer(triggerBack = true, isTransitioning = false) {
   const viewerModal = document.getElementById('media-viewer-modal');
-  if (!viewerModal) return;
+  if (!viewerModal) return Promise.resolve();
 
   if (activeViewerInstance && typeof activeViewerInstance.prepareForClose === 'function') {
     try {
@@ -279,6 +279,13 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false) {
   if (triggerBack && !isTransitioning && window.location.hash === '#viewer') {
     history.back();
   }
+
+  // 다음 책/에피소드 전환처럼 닫자마자 곧바로 새 뷰어를 여는 호출부가
+  // Fullscreen 종료 전환이 실제로 끝날 때까지 기다릴 수 있도록 반환한다.
+  // (특히 Android는 exitFullscreen이 비동기로 늦게 끝나는데, 이걸 기다리지 않고
+  //  바로 다음 책에서 requestFullscreen을 다시 호출하면 브라우저가 두 번째
+  //  요청을 조용히 무시해 화면이 멈춘 것처럼 보이는 문제가 있었다.)
+  return Promise.resolve(fullscreenExitPromise);
 }
 
 export function handleBookDeletedFallback(reason = '해당 도서(카테고리)가 서버에서 삭제되었습니다.') {

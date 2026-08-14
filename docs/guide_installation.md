@@ -234,6 +234,14 @@ docker compose -f docker-compose.mariadb.yml up -d
 * `mariadb:10.11` 및 `redis:7-alpine` 이미지가 함께 띄워지며, 헬스체크 완료 후 BookOasis 컨테이너가 자동으로 연동 가동됩니다.
 * 데이터는 로컬 `./mariadb_data` 볼륨에 영구 저장됩니다.
 
+**② (옵션) MariaDB 버퍼풀 등 튜닝 오버라이드**
+`docker-compose.mariadb.yml`은 MariaDB 이미지 기본값(128MB)이 아닌 `innodb_buffer_pool_size=2G`로 명시되어 있습니다. 다만 도서 수가 훨씬 많은 대용량 라이브러리(수십만 권 이상)에서는 이 2G도 부족할 수 있습니다. Git 소스 업데이트 시 초기화되지 않도록, 값을 더 올려야 한다면 오버라이드 파일로 분리해 조정하세요.
+```bash
+cp docker-compose.override.mariadb.example.yml docker-compose.override.yml
+# 파일 내 --innodb-buffer-pool-size 값을 보유 RAM에 맞게 수정 후
+docker compose -f docker-compose.mariadb.yml -f docker-compose.override.yml up -d
+```
+
 ---
 
 #### 💡 기존에 외부 MariaDB / Redis를 보유 중인 도커 사용자

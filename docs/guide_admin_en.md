@@ -141,3 +141,17 @@ python tools/migrator_sqlite_to_mariadb.py
   1. Navigate to the `static/fonts/custom/` directory within your server's installation path. (Create the directory if it does not exist.)
   2. Upload (or copy) your font files into this directory.
   3. Access BookOasis in your browser, open the viewer, and check the font selection dropdown. The newly added fonts will automatically appear in the list.
+
+### ④ MariaDB Performance Tuning: innodb_buffer_pool_size
+The official MariaDB image defaults `innodb_buffer_pool_size` to just **128MB**. As your library grows (tens of thousands of books or more), a buffer pool smaller than your actual data size forces repeated disk I/O on every query, causing statistics/diagnostic queries to become abnormally slow.
+
+* **Recommended value**: Set it to at least the combined size of `media_general` + `media_adult` + `media_audiobook`, within your available RAM (`docker-compose.mariadb.yml` defaults to `2G`).
+* **Docker Compose deployments**: For large libraries needing more than the `2G` default, don't edit `docker-compose.mariadb.yml` directly — copy `docker-compose.override.mariadb.example.yml` as an override instead. (See the "MariaDB + Redis Combo Mode" section of the installation guide.)
+* **Native (non-Docker) MariaDB**: Add the following to the `[mysqld]` section of `/etc/mysql/mariadb.conf.d/50-server.cnf` (path may vary by distro), then restart with `systemctl restart mariadb`:
+  ```ini
+  innodb_buffer_pool_size = 2G
+  ```
+* **Verify**:
+  ```sql
+  SHOW VARIABLES LIKE 'innodb_buffer_pool_size';
+  ```
