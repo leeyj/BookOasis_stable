@@ -1,4 +1,9 @@
 # CHANGELOG
+## v2.0.0
+- (settings) 일반 사용자가 관리자 저장 설정값을 받아오지 못해 사이드바 표시/스마트 추천/썸네일 크기 등이 항상 JS 기본값으로만 동작하던 버그 수정(관리자 전용 API 대신 모든 로그인 사용자가 접근 가능한 공개 설정 API 신설) | fix regular users never receiving admin-saved settings (sidebar visibility, smart recommend, thumbnail size, etc. always fell back to hardcoded defaults) by adding a public settings API usable by all logged-in users instead of the admin-only one
+- (viewer/epub,txt) 2페이지 보기에서 짧은 챕터가 홀수 페이지로 끝나면 다음 챕터로 넘어가지 않던 버그 수정 | fix next-chapter navigation getting stuck in 2-page spread mode when a short chapter ends on an odd page
+- (sidebar) 계정 영역 우클릭 시 카테고리 컨텍스트 메뉴가 뜨던 버그 수정 | fix category context menu appearing on right-click over the account widget
+
 ## v1.9.9
 - (lazy-scanner) 원격 경로 오판으로 인한 os.path.exists 커널 블로킹 위험 제거(휴리스틱 대신 libraries.is_remote 캐시 사용) | avoid kernel-blocking os.path.exists on misclassified remote paths by caching libraries.is_remote instead of re-deriving it per file
 - (document)문서 최신화 | update docs

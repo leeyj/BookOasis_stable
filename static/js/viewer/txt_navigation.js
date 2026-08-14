@@ -13,14 +13,40 @@ export function prevTxtPageAction(ctx) {
         scrollWrapper.style.scrollBehavior = 'auto';
         ctx.renderCurrentChunk();
 
-        setTimeout(() => {
+        // 이미지가 많은 챕터는 20ms 안에 로딩/레이아웃이 끝나지 않을 수 있다.
+        // 그 시점의 scrollWidth로 끝 페이지를 잡으면, 나중에 이미지가 마저
+        // 로드되며 실제 콘텐츠가 더 넓어져도 스크롤 위치는 이미 고정되어
+        // 진짜 마지막 페이지보다 훨씬 앞쪽에 멈추게 된다(이미지 로드 전 폭 기준).
+        let chapterEndJumpDone = false;
+        const finishJumpToChapterEnd = () => {
+          if (chapterEndJumpDone) return;
+          chapterEndJumpDone = true;
           scrollWrapper.scrollLeft = scrollWrapper.scrollWidth;
-        }, 20);
-
-        setTimeout(() => {
           scrollWrapper.style.scrollBehavior = '';
           ctx.saveDetailPosition();
-        }, 80);
+        };
+
+        setTimeout(() => {
+          const contentArea = ctx.getContentArea ? ctx.getContentArea() : null;
+          const pendingImages = contentArea
+            ? Array.from(contentArea.querySelectorAll('img')).filter(img => !img.complete)
+            : [];
+          if (!pendingImages.length) {
+            finishJumpToChapterEnd();
+            return;
+          }
+          let remaining = pendingImages.length;
+          const onImageSettled = () => {
+            remaining -= 1;
+            if (remaining <= 0) finishJumpToChapterEnd();
+          };
+          pendingImages.forEach(img => {
+            img.addEventListener('load', onImageSettled, { once: true });
+            img.addEventListener('error', onImageSettled, { once: true });
+          });
+          // 이미지 로드가 끝내 완료 이벤트를 못 보내는 경우를 대비한 안전장치.
+          setTimeout(finishJumpToChapterEnd, 3000);
+        }, 20);
       }
     } else {
       const pageStepWidth = ctx.getTxtPageAdvanceWidth(scrollWrapper);

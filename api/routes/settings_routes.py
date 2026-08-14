@@ -5,7 +5,7 @@ settings_routes.py – 시스템 설정 관리 라우터
 from flask import Blueprint, request, jsonify
 from services.settings_service import SettingsService
 from services.scheduler_service import SchedulerService
-from api.auth import admin_required
+from api.auth import admin_required, login_required
 from utils.i18n import _t
 
 settings_bp = Blueprint('settings', __name__)
@@ -24,6 +24,27 @@ SETTING_VALUE_LIMITS = {
     'WEBHOOK_EVENT_SECRET': 1024,
 }
 
+# applySettingsToUI()가 모든 로그인 사용자의 화면 렌더링/동작에 사용하는 값들.
+# 민감한 키(RCLONE_RC_URL, WEBHOOK_TOKEN, DB 풀 크기 등)는 절대 포함하지 않는다 -
+# 그런 값은 /api/media/settings(관리자 전용)로만 제공된다.
+PUBLIC_UI_SETTING_KEYS = (
+    'BOOK_THUMBNAIL_WIDTH',
+    'PAGE_LIMIT',
+    'HIDE_COMPLETED_IN_HISTORY',
+    'TAG_FILTER_SEARCH_SCOPE_ALL',
+    'SHOW_TXT_NO_COVER_INFO_BANNER',
+    'SIDEBAR_TOP_CONTROLS',
+    'SHOW_SIDEBAR_CATEGORY_ALL',
+    'HDD_AGGRESSIVE_WARMUP',
+    'AUDIO_MINI_PLAYER_MODE',
+    'AUDIO_RIGHT_DOCK_DIM_ENABLED',
+    'TTS_ENABLED',
+    'TTS_WAKE_LOCK',
+    'DETAIL_VOLUME_GRID_VIEW',
+    'COLLAPSE_DETAIL_GENRE_TAGS',
+    'SMART_RECOMMEND_ENABLED',
+)
+
 @settings_bp.route('/api/media/settings', methods=['GET'])
 @admin_required
 def get_system_settings():
@@ -34,6 +55,24 @@ def get_system_settings():
     try:
         settings = SettingsService.get_all(db_type)
         return jsonify({'success': True, 'settings': settings})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@settings_bp.route('/api/media/settings/public', methods=['GET'])
+@login_required
+def get_public_ui_settings():
+    """
+    화면 렌더링/동작에 필요한 공개 설정값만 반환 (관리자 여부와 무관하게 모든 로그인
+    사용자가 조회 가능). 관리자가 저장한 값이 일반 사용자 세션에도 동일하게 반영되도록
+    최초 로드 시 이 엔드포인트를 사용한다.
+    """
+    db_type = request.args.get('type', 'general')
+    if db_type == 'audiobook':
+        db_type = 'general'
+    try:
+        all_settings = SettingsService.get_all(db_type)
+        public_settings = {k: v for k, v in all_settings.items() if k in PUBLIC_UI_SETTING_KEYS}
+        return jsonify({'success': True, 'settings': public_settings})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

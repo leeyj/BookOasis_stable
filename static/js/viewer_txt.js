@@ -601,6 +601,34 @@ function renderCurrentChunk(initMode = false) {
   applyDynamicParagraphStyles();
   applyTxtTwoPageTrailingSpacer(scrollWrapper, contentArea);
 
+  // 이미지가 로드되기 전에 위 계산이 끝나면(짧은 챕터에서 흔함) 홀/짝 판정이
+  // 최종 레이아웃과 어긋난 채 고정될 수 있어, 이미지 로드 완료 후 재계산한다.
+  const pendingImages = Array.from(contentArea.querySelectorAll('img')).filter(img => !img.complete);
+  if (pendingImages.length) {
+    let settled = false;
+    let remaining = pendingImages.length;
+    const recomputeWhenReady = () => {
+      if (settled) return;
+      remaining -= 1;
+      if (remaining <= 0) {
+        settled = true;
+        applyTxtTwoPageTrailingSpacer(scrollWrapper, contentArea);
+      }
+    };
+    pendingImages.forEach(img => {
+      img.addEventListener('load', recomputeWhenReady, { once: true });
+      img.addEventListener('error', recomputeWhenReady, { once: true });
+    });
+    // 네트워크 문제 등으로 일부 이미지가 load/error 이벤트를 끝내 발생시키지
+    // 않는 경우를 대비한 안전장치 — 무한 대기 방지.
+    setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        applyTxtTwoPageTrailingSpacer(scrollWrapper, contentArea);
+      }
+    }, 3000);
+  }
+
   // 모드 재전환 시 placeholder가 남아도 가시 범위 챕터를 즉시 재요청해 자동 복구한다.
   if (isEpub && scrollMode === 'scroll') {
     hydrateEpubChapterWindow(currentChunkIdx, 12);
@@ -799,6 +827,7 @@ export function applyTxtSettings(options = {}) {
 export function prevTxtPage() {
   prevTxtPageAction({
     getScrollWrapper: () => document.getElementById('txt-scroll-wrapper'),
+    getContentArea: () => document.getElementById('txt-content-area'),
     cancelPendingRestore: cancelPendingTxtRestore,
     getScrollMode: () => localStorage.getItem('viewer_scroll_mode') || 'page',
     snapTxtPageScrollLeft,

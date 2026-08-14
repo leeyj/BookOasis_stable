@@ -76,6 +76,11 @@ export function bindSidebarContextMenu() {
         e.preventDefault();
         return;
       }
+      if (e.target.closest('.user-profile-widget')) {
+        // 계정(사용자 프로필) 위젯은 카테고리가 아니므로 컨텍스트 메뉴를 띄우지 않음
+        e.preventDefault();
+        return;
+      }
 
       suppressSidebarClickUntil = Date.now() + 700;
       e.preventDefault();

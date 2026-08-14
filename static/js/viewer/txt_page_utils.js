@@ -42,14 +42,24 @@ export function applyTxtTwoPageTrailingSpacer(scrollWrapper, contentArea) {
   const stepWidth = getTxtPageAdvanceWidth(scrollWrapper);
   if (!Number.isFinite(stepWidth) || stepWidth <= 0) return;
 
-  // txt_settings_apply.js가 columnWidth를 이 값으로 픽셀 고정하므로,
-  // 스프레드 폭 기반의 어림 판정 대신 실제 컬럼(페이지) 개수를 역산해 홀짝을 정확히 판정한다.
-  // (기존의 fraction±0.12 휴리스틱은 기기별 서브픽셀/폰트 반올림 오차에 취약해
-  //  홀수 챕터에서 페이지 반복(PC) / 챕터 전환 안 됨(Android) 버그의 원인이었다.)
-  const gap = getTxtPageGapPx(scrollWrapper);
-  const singleColWidth = Math.max(1, (stepWidth - gap) / 2);
-  const totalWidth = scrollWrapper.scrollWidth;
-  const pageCount = Math.max(1, Math.round((totalWidth + gap) / (singleColWidth + gap)));
+  // scrollWrapper/contentArea는 항상 스프레드(2컬럼) 전체 폭으로 고정 렌더링되므로,
+  // 챕터 내용이 1컬럼 분량밖에 안 되는 짧은 챕터에서도 scrollWidth가 항상 2컬럼 폭
+  // 그대로 측정되어 실제 컬럼(페이지) 개수를 반영하지 못한다(=늘 짝수로 오판).
+  // 대신 컬럼을 임시로 1개로 풀어 "단일 컬럼 기준 총 높이"를 측정하고, 컬럼 1개의
+  // 가용 높이로 나눠 실제 컬럼 수를 역산한다 — 폭이 아니라 높이 기반이라 챕터
+  // 길이와 무관하게 정확하다.
+  const columnHeight = contentArea.clientHeight;
+  if (!Number.isFinite(columnHeight) || columnHeight <= 0) return;
+
+  const prevColumnWidth = contentArea.style.columnWidth;
+  const prevColumnCount = contentArea.style.columnCount;
+  contentArea.style.columnWidth = '';
+  contentArea.style.columnCount = '1';
+  const naturalHeight = contentArea.scrollHeight;
+  contentArea.style.columnWidth = prevColumnWidth;
+  contentArea.style.columnCount = prevColumnCount;
+
+  const pageCount = Math.max(1, Math.ceil(naturalHeight / columnHeight));
   const hasOddTailPage = pageCount % 2 === 1;
 
   if (hasOddTailPage) {

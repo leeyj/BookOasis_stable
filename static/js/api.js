@@ -304,6 +304,14 @@ export async function fetchSystemSettings(type) {
   return res.json();
 }
 
+// 관리자 여부와 무관하게 모든 로그인 사용자가 조회 가능한 공개 UI 설정값
+// (사이드바 표시, 스마트 추천 사용 여부 등 화면 동작에 필요한 값만 포함)
+export async function fetchPublicUiSettings(type) {
+  const normalizedType = (type === 'audiobook') ? 'general' : type;
+  const res = await fetch(`/api/media/settings/public?type=${normalizedType}`);
+  return res.json();
+}
+
 export async function fetchMetadataPlugins() {
   const res = await fetch('/api/media/metadata/plugins');
   return res.json();

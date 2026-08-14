@@ -182,9 +182,13 @@ export function applySettingsToUI(settings) {
 }
 
 // 최초 로드 시 설정 일괄 호출 적용
+// 관리자 전용 API(/api/media/settings)가 아니라, 모든 로그인 사용자가 접근 가능한
+// 공개 UI 설정 API를 사용한다. 예전에는 관리자 전용 API를 썼는데, 일반 사용자는
+// 403으로 실패해서 applySettingsToUI가 아예 호출되지 않아 관리자가 저장한 값과
+// 무관하게 항상 JS 기본값으로만 동작하는 버그가 있었다.
 export async function loadInitialSystemSettings() {
   try {
-    const res = await api.fetchSystemSettings(state.currentLibraryType || 'general');
+    const res = await api.fetchPublicUiSettings(state.currentLibraryType || 'general');
     if (res.success && res.settings) {
       applySettingsToUI(res.settings);
     }
