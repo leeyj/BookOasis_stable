@@ -72,7 +72,7 @@ export const txtRuntimeState = {
 import { showViewerLoading, hideViewerLoading, showViewerError, showToast } from './view_manager.js';
 import { saveProgress } from './viewer_progress.js';
 import { initPageStep, initReadingDirection, getComicReadingDirection } from './viewer/reader_settings.js';
-import { getTxtPageAdvanceWidth, snapTxtPageScrollLeft, applyTxtTwoPageTrailingSpacer } from './viewer/txt_page_utils.js';
+import { getTxtPageAdvanceWidth, snapTxtPageScrollLeft, isTxtScrollLeftAtMaxPage, getTxtPageMaxScroll, applyTxtTwoPageTrailingSpacer, applyTxtImageMaxHeight } from './viewer/txt_page_utils.js';
 import { chunkText, formatTxtToHtml, stripHtml } from './viewer/txt_text_utils.js';
 import { renderTxtChunkView, applyTxtParagraphStyles } from './viewer/txt_render.js';
 import { getTxtAnchorInfoByMode, restoreTxtAnchorInfoByMode } from './viewer/txt_anchor_utils.js';
@@ -122,6 +122,235 @@ function hydrateEpubChapterWindow(centerIdx, radius = 10) {
 
 function retryVisibleEpubPlaceholders(maxCount = 8) {
   retryVisibleEpubPlaceholdersExt(txtChunks, maxCount);
+}
+
+// 스크롤/터치/리사이즈 런타임 리스너를 등록한다. EPUB과 일반 TXT 두 로딩 경로
+// 모두에서 호출되어야 한다 — 예전에는 TXT 경로에만 있어서 EPUB 책은 브라우저
+// 리사이즈 시 컬럼 폭이 갱신되지 않아 2페이지 모드가 1페이지처럼 깨지는 버그가 있었다.
+function setupTxtViewerRuntimeListeners() {
+  const contentArea = document.getElementById('txt-content-area');
+  const scrollWrapper = document.getElementById('txt-scroll-wrapper');
+  if (scrollWrapper) {
+    if (scrollWrapper.__txtScrollHandler) {
+      scrollWrapper.removeEventListener('scroll', scrollWrapper.__txtScrollHandler);
+    }
+    if (scrollWrapper.__txtTouchHandler) {
+      scrollWrapper.removeEventListener('touchend', scrollWrapper.__txtTouchHandler);
+      scrollWrapper.removeEventListener('touchcancel', scrollWrapper.__txtTouchHandler);
+    }
+
+    const triggerNextEpisodeIfNeeded = () => {
+      const mode = localStorage.getItem('viewer_scroll_mode') || 'page';
+      if (mode !== 'scroll') return;
+
+      const scrollHeight = scrollWrapper.scrollHeight - scrollWrapper.clientHeight;
+      if (scrollHeight <= 0) return;
+
+      const ratio = scrollWrapper.scrollTop / scrollHeight;
+      const newIdx = Math.min(txtChunks.length - 1, Math.max(0, Math.floor(ratio * txtChunks.length)));
+      const isAtAbsoluteEnd = scrollWrapper.scrollTop + scrollWrapper.clientHeight >= scrollWrapper.scrollHeight - 15;
+      if (!isAtAbsoluteEnd || isTransitioning || txtScrollNextEpisodeTriggered || newIdx < txtChunks.length - 1) return;
+
+      isTransitioning = true;
+      txtScrollNextEpisodeTriggered = true;
+      import('./viewer_next_episode.js').then(m => {
+        m.handleNextEpisodeDirect(state.activeBookId);
+        setTimeout(() => { isTransitioning = false; }, 300);
+      });
+    };
+
+    // 스크롤 모드 시 이전 진척도 스크롤 위치 복구
+    const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
+    if (scrollMode === 'scroll' && currentChunkIdx > 0 && txtChunks.length > 0) {
+      txtPendingRestoreTimer = setTimeout(() => {
+        const ratio = currentChunkIdx / txtChunks.length;
+        scrollWrapper.scrollTop = scrollWrapper.scrollHeight * ratio;
+        txtPendingRestoreTimer = null;
+      }, 150);
+    }
+
+    let isTransitioning = false;
+    let rAfPending = false;
+    let scrollDebounceTimeout = null;
+
+    const processScroll = () => {
+      rAfPending = false;
+      const mode = localStorage.getItem('viewer_scroll_mode') || 'page';
+      if (mode === 'page') {
+        if (txtPageSnapInProgress) return;
+        clearTimeout(txtPageSnapTimeout);
+        txtPageSnapTimeout = setTimeout(() => {
+          txtPageSnapInProgress = true;
+          snapTxtPageScrollLeft(scrollWrapper);
+          txtPageSnapInProgress = false;
+          logActiveViewportText();
+          saveDetailPosition();
+        }, 90);
+        return;
+      }
+
+      if (mode !== 'scroll') return;
+
+      const scrollHeight = scrollWrapper.scrollHeight - scrollWrapper.clientHeight;
+      if (scrollHeight <= 0) return;
+
+      const currentScroll = scrollWrapper.scrollTop;
+      const chunks = contentArea.querySelectorAll('.txt-scroll-chunk');
+      let detectedIdx = 0;
+
+      for (let chunk of chunks) {
+        const idx = parseInt(chunk.getAttribute('data-idx'));
+        if (currentScroll >= chunk.offsetTop - 120) {
+          detectedIdx = idx;
+        } else {
+          break;
+        }
+      }
+
+      const newIdx = Math.min(txtChunks.length - 1, Math.max(0, detectedIdx));
+      const ratio = scrollHeight > 0 ? scrollWrapper.scrollTop / scrollHeight : 0;
+      const isEpubMode = (state.currentViewerFormat === 'epub');
+
+      // EPUB 스크롤 모드: 현재 화면 뷰포트 인근(전후 10개 챕터) null 챕터 선제 동적 로드
+      if (isEpubMode) {
+        hydrateEpubChapterWindow(newIdx, 10);
+      }
+
+      if (!txtScrollPreloadTriggered && ratio >= 0.9 && txtChunks.length > 1) {
+        txtScrollPreloadTriggered = true;
+        saveProgress(
+          state.activeBookId,
+          Math.min(txtChunks.length - 1, newIdx),
+          txtChunks.length,
+          isEpubMode ? { epub_session: { index: newIdx, percent: Math.round(ratio * 100) } } : null
+        );
+      }
+
+      if (newIdx !== currentChunkIdx) {
+        currentChunkIdx = newIdx;
+        const pageInfo = document.getElementById('comic-overlay-page-info');
+        if (pageInfo) {
+          pageInfo.textContent = i18n.t('viewer.txt_chunk_info', {current: currentChunkIdx + 1, total: txtChunks.length});
+        }
+        syncActiveEpubToc();
+
+        // EPUB 모드: 현재 감지된 챕터 및 이전/다음 챕터가 null이면 동적 로드
+        if (isEpubMode) {
+          const fetchList = [newIdx, newIdx - 1, newIdx + 1].filter(i => i >= 0 && i < txtChunks.length && (txtChunks[i] === null || txtChunks[i] === 'LOADING_PENDING'));
+          fetchList.forEach(fIdx => {
+            requestEpubChapterContent(fIdx);
+          });
+        }
+
+        const targetChunk = contentArea.querySelector(`.txt-scroll-chunk[data-idx="${newIdx}"]`);
+        let fingerprint = '';
+        if (targetChunk) {
+          fingerprint = String(targetChunk.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 180);
+        }
+        const epubSessionPayload = isEpubMode
+          ? {
+              epub_session: {
+                index: newIdx,
+                percent: Math.max(0, Math.min(100, Math.round(ratio * 100))),
+                fingerprint: fingerprint || undefined
+              }
+            }
+          : null;
+        saveProgress(state.activeBookId, currentChunkIdx, txtChunks.length, epubSessionPayload);
+      }
+
+      triggerNextEpisodeIfNeeded();
+
+      // Debounce heavy operations (logActiveViewportText, saveDetailPosition, fine-grained progress)
+      clearTimeout(scrollDebounceTimeout);
+      scrollDebounceTimeout = setTimeout(() => {
+        logActiveViewportText();
+        saveDetailPosition();
+        if (isEpubMode) {
+          const targetChunk = contentArea.querySelector(`.txt-scroll-chunk[data-idx="${currentChunkIdx}"]`);
+          let fingerprint = '';
+          if (targetChunk) {
+            fingerprint = String(targetChunk.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 180);
+          }
+          const epubSessionPayload = {
+            epub_session: {
+              index: currentChunkIdx,
+              percent: Math.max(0, Math.min(100, Math.round(ratio * 100))),
+              fingerprint: fingerprint || undefined
+            }
+          };
+          saveProgress(state.activeBookId, currentChunkIdx, txtChunks.length, epubSessionPayload);
+        }
+      }, 150);
+    };
+
+    const scrollHandler = () => {
+      if (!rAfPending) {
+        rAfPending = true;
+        requestAnimationFrame(processScroll);
+      }
+    };
+    scrollWrapper.addEventListener('scroll', scrollHandler, { passive: true });
+    scrollWrapper.__txtScrollHandler = scrollHandler;
+
+    const touchHandler = () => {
+      triggerNextEpisodeIfNeeded();
+    };
+    scrollWrapper.__txtTouchHandler = touchHandler;
+    scrollWrapper.addEventListener('touchend', touchHandler, { passive: true });
+    scrollWrapper.addEventListener('touchcancel', touchHandler, { passive: true });
+  }
+
+  let lastWindowWidth = window.innerWidth;
+  const handleResize = () => {
+    const wrapper = document.getElementById('txt-scroll-wrapper');
+    if (!wrapper) return;
+    const mode = localStorage.getItem('viewer_scroll_mode') || 'page';
+
+    const currentWidth = window.innerWidth;
+    const widthChanged = Math.abs(currentWidth - lastWindowWidth) > 5;
+    lastWindowWidth = currentWidth;
+
+    if (mode === 'page') {
+      const prevStepWidth = getTxtPageAdvanceWidth(wrapper);
+      // 챕터 마지막의 짧은 페이지(스프레드)에 있을 때는 stepWidth 배수 기반 인덱스
+      // 계산이 부정확할 수 있으므로(snapTxtPageScrollLeft와 동일한 문제), 그 경우
+      // 인덱스 재구성 대신 "마지막 페이지였다"는 사실 자체를 보존한다.
+      const wasAtLastPage = isTxtScrollLeftAtMaxPage(wrapper);
+      const currentColumnIdx = Math.round(wrapper.scrollLeft / prevStepWidth);
+      // Resize relayout should preserve current visual page, not stale saved localStorage position.
+      applyTxtSettings({ previousMode: mode, skipSavedPositionRestore: true });
+      const contentArea = document.getElementById('txt-content-area');
+      applyTxtImageMaxHeight(wrapper, contentArea);
+      applyTxtTwoPageTrailingSpacer(wrapper, contentArea);
+      const newStepWidth = getTxtPageAdvanceWidth(wrapper);
+      wrapper.scrollLeft = wasAtLastPage ? getTxtPageMaxScroll(wrapper) : currentColumnIdx * newStepWidth;
+      snapTxtPageScrollLeft(wrapper);
+      logActiveViewportText();
+    } else {
+      // In scroll mode, mobile address bar toggles change height only. Skip DOM re-render if width hasn't changed.
+      if (!widthChanged) return;
+
+      const beforeHeight = wrapper.scrollHeight - wrapper.clientHeight;
+      const ratio = beforeHeight > 0 ? wrapper.scrollTop / beforeHeight : 0;
+      // Scroll mode resize also preserves ratio instead of restoring stale saved position.
+      applyTxtSettings({ previousMode: mode, skipSavedPositionRestore: true });
+      const afterHeight = wrapper.scrollHeight - wrapper.clientHeight;
+      if (afterHeight > 0) {
+        wrapper.scrollTop = afterHeight * ratio;
+      }
+      logActiveViewportText();
+    }
+  };
+
+  if (activeResizeHandler) {
+    window.removeEventListener('resize', activeResizeHandler);
+  }
+  activeResizeHandler = () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(handleResize, 100);
+  };
+  window.addEventListener('resize', activeResizeHandler, { passive: true });
 }
 
 export function initTxtViewer(bookId, initialPageIdx = 0) {
@@ -208,7 +437,13 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
             
             initReadingDirection();
             renderCurrentChunk(true);
-            applyTxtSettings();
+            // scrollWrapper에 아직 scroll-mode-page 클래스가 안 붙어 있는 최초 오픈 시점이라,
+            // previousMode를 안 넘기면 실제 설정이 '페이지(2장)' 모드여도 내부적으로
+            // "scroll → page 모드 전환"으로 오판해 더블 rAF로 지연 적용된다. 그 사이
+            // 컬럼 미설정 상태로 첫 페인트가 되어 1페이지 폭처럼 보이는 원인이 되므로,
+            // 최초 렌더링임을 명시해 동기적으로 바로 적용되게 한다.
+            applyTxtSettings({ previousMode: getViewerSettings().scrollMode });
+            setupTxtViewerRuntimeListeners();
 
             // ─── 3단계: 이전/다음 챕터 백그라운드 프리패치 (전후 10개 챕터 확장) ───
             hydrateEpubChapterWindow(startIdx, 10);
@@ -302,223 +537,10 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
 
       initReadingDirection();
       renderCurrentChunk(true);
-      applyTxtSettings();
+      // 최초 오픈 시 previousMode 오판 방지 (위 스트리밍 경로와 동일한 이유)
+      applyTxtSettings({ previousMode: getViewerSettings().scrollMode });
 
-      const scrollWrapper = document.getElementById('txt-scroll-wrapper');
-      if (scrollWrapper) {
-        if (scrollWrapper.__txtScrollHandler) {
-          scrollWrapper.removeEventListener('scroll', scrollWrapper.__txtScrollHandler);
-        }
-        if (scrollWrapper.__txtTouchHandler) {
-          scrollWrapper.removeEventListener('touchend', scrollWrapper.__txtTouchHandler);
-          scrollWrapper.removeEventListener('touchcancel', scrollWrapper.__txtTouchHandler);
-        }
-
-        const triggerNextEpisodeIfNeeded = () => {
-          const mode = localStorage.getItem('viewer_scroll_mode') || 'page';
-          if (mode !== 'scroll') return;
-
-          const scrollHeight = scrollWrapper.scrollHeight - scrollWrapper.clientHeight;
-          if (scrollHeight <= 0) return;
-
-          const ratio = scrollWrapper.scrollTop / scrollHeight;
-          const newIdx = Math.min(txtChunks.length - 1, Math.max(0, Math.floor(ratio * txtChunks.length)));
-          const isAtAbsoluteEnd = scrollWrapper.scrollTop + scrollWrapper.clientHeight >= scrollWrapper.scrollHeight - 15;
-          if (!isAtAbsoluteEnd || isTransitioning || txtScrollNextEpisodeTriggered || newIdx < txtChunks.length - 1) return;
-
-          isTransitioning = true;
-          txtScrollNextEpisodeTriggered = true;
-          import('./viewer_next_episode.js').then(m => {
-            m.handleNextEpisodeDirect(state.activeBookId);
-            setTimeout(() => { isTransitioning = false; }, 300);
-          });
-        };
-
-        // 스크롤 모드 시 이전 진척도 스크롤 위치 복구
-        const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
-        if (scrollMode === 'scroll' && currentChunkIdx > 0 && txtChunks.length > 0) {
-          txtPendingRestoreTimer = setTimeout(() => {
-            const ratio = currentChunkIdx / txtChunks.length;
-            scrollWrapper.scrollTop = scrollWrapper.scrollHeight * ratio;
-            txtPendingRestoreTimer = null;
-          }, 150);
-        }
-
-        let isTransitioning = false;
-        let rAfPending = false;
-        let scrollDebounceTimeout = null;
-
-        const processScroll = () => {
-          rAfPending = false;
-          const mode = localStorage.getItem('viewer_scroll_mode') || 'page';
-          if (mode === 'page') {
-            if (txtPageSnapInProgress) return;
-            clearTimeout(txtPageSnapTimeout);
-            txtPageSnapTimeout = setTimeout(() => {
-              txtPageSnapInProgress = true;
-              snapTxtPageScrollLeft(scrollWrapper);
-              txtPageSnapInProgress = false;
-              logActiveViewportText();
-              saveDetailPosition();
-            }, 90);
-            return;
-          }
-
-          if (mode !== 'scroll') return;
-
-          const scrollHeight = scrollWrapper.scrollHeight - scrollWrapper.clientHeight;
-          if (scrollHeight <= 0) return;
-
-          const currentScroll = scrollWrapper.scrollTop;
-          const chunks = contentArea.querySelectorAll('.txt-scroll-chunk');
-          let detectedIdx = 0;
-          
-          for (let chunk of chunks) {
-            const idx = parseInt(chunk.getAttribute('data-idx'));
-            if (currentScroll >= chunk.offsetTop - 120) {
-              detectedIdx = idx;
-            } else {
-              break;
-            }
-          }
-
-          const newIdx = Math.min(txtChunks.length - 1, Math.max(0, detectedIdx));
-          const ratio = scrollHeight > 0 ? scrollWrapper.scrollTop / scrollHeight : 0;
-          const isEpubMode = (state.currentViewerFormat === 'epub');
-
-          // EPUB 스크롤 모드: 현재 화면 뷰포트 인근(전후 10개 챕터) null 챕터 선제 동적 로드
-          if (isEpubMode) {
-            hydrateEpubChapterWindow(newIdx, 10);
-          }
-
-          if (!txtScrollPreloadTriggered && ratio >= 0.9 && txtChunks.length > 1) {
-            txtScrollPreloadTriggered = true;
-            saveProgress(
-              state.activeBookId,
-              Math.min(txtChunks.length - 1, newIdx),
-              txtChunks.length,
-              isEpubMode ? { epub_session: { index: newIdx, percent: Math.round(ratio * 100) } } : null
-            );
-          }
-
-          if (newIdx !== currentChunkIdx) {
-            currentChunkIdx = newIdx;
-            const pageInfo = document.getElementById('comic-overlay-page-info');
-            if (pageInfo) {
-              pageInfo.textContent = i18n.t('viewer.txt_chunk_info', {current: currentChunkIdx + 1, total: txtChunks.length});
-            }
-            syncActiveEpubToc();
-
-            // EPUB 모드: 현재 감지된 챕터 및 이전/다음 챕터가 null이면 동적 로드
-            if (isEpubMode) {
-              const fetchList = [newIdx, newIdx - 1, newIdx + 1].filter(i => i >= 0 && i < txtChunks.length && (txtChunks[i] === null || txtChunks[i] === 'LOADING_PENDING'));
-              fetchList.forEach(fIdx => {
-                requestEpubChapterContent(fIdx);
-              });
-            }
-
-            const targetChunk = contentArea.querySelector(`.txt-scroll-chunk[data-idx="${newIdx}"]`);
-            let fingerprint = '';
-            if (targetChunk) {
-              fingerprint = String(targetChunk.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 180);
-            }
-            const epubSessionPayload = isEpubMode
-              ? {
-                  epub_session: {
-                    index: newIdx,
-                    percent: Math.max(0, Math.min(100, Math.round(ratio * 100))),
-                    fingerprint: fingerprint || undefined
-                  }
-                }
-              : null;
-            saveProgress(state.activeBookId, currentChunkIdx, txtChunks.length, epubSessionPayload);
-          }
-
-          triggerNextEpisodeIfNeeded();
-
-          // Debounce heavy operations (logActiveViewportText, saveDetailPosition, fine-grained progress)
-          clearTimeout(scrollDebounceTimeout);
-          scrollDebounceTimeout = setTimeout(() => {
-            logActiveViewportText();
-            saveDetailPosition();
-            if (isEpubMode) {
-              const targetChunk = contentArea.querySelector(`.txt-scroll-chunk[data-idx="${currentChunkIdx}"]`);
-              let fingerprint = '';
-              if (targetChunk) {
-                fingerprint = String(targetChunk.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 180);
-              }
-              const epubSessionPayload = {
-                epub_session: {
-                  index: currentChunkIdx,
-                  percent: Math.max(0, Math.min(100, Math.round(ratio * 100))),
-                  fingerprint: fingerprint || undefined
-                }
-              };
-              saveProgress(state.activeBookId, currentChunkIdx, txtChunks.length, epubSessionPayload);
-            }
-          }, 150);
-        };
-
-        const scrollHandler = () => {
-          if (!rAfPending) {
-            rAfPending = true;
-            requestAnimationFrame(processScroll);
-          }
-        };
-        scrollWrapper.addEventListener('scroll', scrollHandler, { passive: true });
-        scrollWrapper.__txtScrollHandler = scrollHandler;
-
-        const touchHandler = () => {
-          triggerNextEpisodeIfNeeded();
-        };
-        scrollWrapper.__txtTouchHandler = touchHandler;
-        scrollWrapper.addEventListener('touchend', touchHandler, { passive: true });
-        scrollWrapper.addEventListener('touchcancel', touchHandler, { passive: true });
-      }
-
-      let lastWindowWidth = window.innerWidth;
-      const handleResize = () => {
-        const wrapper = document.getElementById('txt-scroll-wrapper');
-        if (!wrapper) return;
-        const mode = localStorage.getItem('viewer_scroll_mode') || 'page';
-
-        const currentWidth = window.innerWidth;
-        const widthChanged = Math.abs(currentWidth - lastWindowWidth) > 5;
-        lastWindowWidth = currentWidth;
-
-        if (mode === 'page') {
-          const prevStepWidth = getTxtPageAdvanceWidth(wrapper);
-          const currentColumnIdx = Math.round(wrapper.scrollLeft / prevStepWidth);
-          // Resize relayout should preserve current visual page, not stale saved localStorage position.
-          applyTxtSettings({ previousMode: mode, skipSavedPositionRestore: true });
-          const newStepWidth = getTxtPageAdvanceWidth(wrapper);
-          wrapper.scrollLeft = currentColumnIdx * newStepWidth;
-          snapTxtPageScrollLeft(wrapper);
-          logActiveViewportText();
-        } else {
-          // In scroll mode, mobile address bar toggles change height only. Skip DOM re-render if width hasn't changed.
-          if (!widthChanged) return;
-
-          const beforeHeight = wrapper.scrollHeight - wrapper.clientHeight;
-          const ratio = beforeHeight > 0 ? wrapper.scrollTop / beforeHeight : 0;
-          // Scroll mode resize also preserves ratio instead of restoring stale saved position.
-          applyTxtSettings({ previousMode: mode, skipSavedPositionRestore: true });
-          const afterHeight = wrapper.scrollHeight - wrapper.clientHeight;
-          if (afterHeight > 0) {
-            wrapper.scrollTop = afterHeight * ratio;
-          }
-          logActiveViewportText();
-        }
-      };
-
-      if (activeResizeHandler) {
-        window.removeEventListener('resize', activeResizeHandler);
-      }
-      activeResizeHandler = () => {
-        clearTimeout(resizeTimeout);
-        resizeTimeout = setTimeout(handleResize, 100);
-      };
-      window.addEventListener('resize', activeResizeHandler, { passive: true });
+      setupTxtViewerRuntimeListeners();
     })
     .catch((err) => {
       console.error('[Viewer-Txt] 로딩 에러 발생:', err);
@@ -599,6 +621,7 @@ function renderCurrentChunk(initMode = false) {
   if (!rendered) return;
 
   applyDynamicParagraphStyles();
+  applyTxtImageMaxHeight(scrollWrapper, contentArea);
   applyTxtTwoPageTrailingSpacer(scrollWrapper, contentArea);
 
   // 이미지가 로드되기 전에 위 계산이 끝나면(짧은 챕터에서 흔함) 홀/짝 판정이

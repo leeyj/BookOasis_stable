@@ -2,6 +2,10 @@
 import os
 import re
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+EPUB_IMAGE_CACHE_DIR = os.path.join(BASE_DIR, 'cache', 'epub_images')
+EPUB_IMAGE_MAX_SIDE = 1600  # 뷰어 실제 표시 폭(2페이지 모드 최대 1600px)을 넘는 원본은 리사이즈
+
 
 class TextEpubContentService:
     @staticmethod
@@ -423,23 +427,82 @@ class TextEpubContentService:
 
     @staticmethod
     def extract_epub_resource(file_path, resource_path):
-        """EPUB 내 특정 상대경로 리소스(이미지 등)를 바이너리로 반환"""
-        import zipfile
+        """EPUB 내 특정 상대경로 리소스(이미지 등)를 (data, mime, error)로 반환.
 
-        if not os.path.exists(file_path):
-            return None, 'File not found'
+        기존에는 요청마다 zip 파일을 새로 열고 원본 해상도를 그대로 서빙해,
+        원격(GDrive 등) 경로거나 이미지가 큰 EPUB에서 체감 로딩이 느렸다.
+        - zip 파일 오픈은 utils.cache_helper.get_zip_file_hybrid로 재사용(원격 경로는
+          로컬 디스크 캐시/시크 최적화까지 자동 적용됨, 코믹 뷰어와 동일 인프라).
+        - 추출한 이미지는 뷰어 실제 표시 폭 기준으로 리사이즈해 디스크에 WebP로
+          캐시해두고, 다음 요청부터는 zip을 열 필요 없이 캐시 파일만 서빙한다.
+        """
+        import hashlib
+        from utils.cache_helper import get_zip_file_hybrid, get_zip_read_lock
 
-        try:
-            with zipfile.ZipFile(file_path, 'r') as zf:
-                normalized_path = resource_path.replace('\\', '/')
+        normalized_path = resource_path.replace('\\', '/')
+        cache_key = hashlib.md5(f"{file_path}::{normalized_path}".encode('utf-8')).hexdigest()
+        os.makedirs(EPUB_IMAGE_CACHE_DIR, exist_ok=True)
+        cache_path_webp = os.path.join(EPUB_IMAGE_CACHE_DIR, f"{cache_key}.webp")
+        cache_path_orig = os.path.join(EPUB_IMAGE_CACHE_DIR, f"{cache_key}.orig")
+
+        def _read_cached():
+            if os.path.exists(cache_path_webp) and os.path.getsize(cache_path_webp) > 0:
+                with open(cache_path_webp, 'rb') as f:
+                    return f.read(), 'image/webp'
+            if os.path.exists(cache_path_orig) and os.path.getsize(cache_path_orig) > 0:
+                import mimetypes
+                mime, _ = mimetypes.guess_type(normalized_path)
+                with open(cache_path_orig, 'rb') as f:
+                    return f.read(), (mime or 'image/jpeg')
+            return None, None
+
+        cached_data, cached_mime = _read_cached()
+        if cached_data is not None:
+            return cached_data, cached_mime, None
+
+        with get_zip_read_lock(file_path):
+            # 락 대기 중 다른 요청이 이미 캐시를 만들어뒀을 수 있으므로 재확인
+            cached_data, cached_mime = _read_cached()
+            if cached_data is not None:
+                return cached_data, cached_mime, None
+
+            zf = get_zip_file_hybrid(file_path)
+            if zf is None:
+                return None, None, 'File not found'
+
+            try:
+                raw_data = zf.read(normalized_path)
+            except KeyError:
+                raw_data = None
+                for name in zf.namelist():
+                    if name.lower() == normalized_path.lower():
+                        raw_data = zf.read(name)
+                        break
+                if raw_data is None:
+                    return None, None, 'Resource not found'
+            except Exception as e:
+                return None, None, str(e)
+
+            try:
+                import io
+                from PIL import Image
+                with Image.open(io.BytesIO(raw_data)) as img:
+                    img = img.convert('RGBA' if img.mode in ('RGBA', 'LA', 'P') else 'RGB')
+                    if max(img.size) > EPUB_IMAGE_MAX_SIDE:
+                        ratio = EPUB_IMAGE_MAX_SIDE / max(img.size)
+                        new_size = (max(1, int(img.width * ratio)), max(1, int(img.height * ratio)))
+                        img = img.resize(new_size, Image.LANCZOS)
+                    img.save(cache_path_webp, 'WEBP', quality=85, method=4)
+                with open(cache_path_webp, 'rb') as f:
+                    return f.read(), 'image/webp', None
+            except Exception as e:
+                # PIL이 못 여는 포맷(svg 등)은 원본 그대로 캐시/서빙
+                print(f"[EPUB-Image] Resize failed, caching original instead ({normalized_path}): {e}")
                 try:
-                    data = zf.read(normalized_path)
-                    return data, None
-                except KeyError:
-                    # 대소문자 매핑 실패 대비 전체 검색
-                    for name in zf.namelist():
-                        if name.lower() == normalized_path.lower():
-                            return zf.read(name), None
-                    return None, 'Resource not found'
-        except Exception as e:
-            return None, str(e)
+                    with open(cache_path_orig, 'wb') as f:
+                        f.write(raw_data)
+                except Exception as cache_err:
+                    print(f"[EPUB-Image] Original cache write failed: {cache_err}")
+                import mimetypes
+                mime, _ = mimetypes.guess_type(normalized_path)
+                return raw_data, (mime or 'image/jpeg'), None

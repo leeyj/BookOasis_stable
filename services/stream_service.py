@@ -66,4 +66,5 @@ class StreamService:
 
     @staticmethod
     def extract_epub_resource(file_path, resource_path):
+        """Returns (data, mime, error)."""
         return TextEpubContentService.extract_epub_resource(file_path, resource_path)

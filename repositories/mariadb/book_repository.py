@@ -10,7 +10,7 @@ class BookRepository:
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, series_name, library_id, file_path FROM books WHERE id = %s AND COALESCE(is_deleted, 0) = 0",
+            "SELECT id, series_name, library_id, file_path, file_format FROM books WHERE id = %s AND COALESCE(is_deleted, 0) = 0",
             (book_id,)
         )
         row = cursor.fetchone()

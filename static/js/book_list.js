@@ -1,6 +1,6 @@
 import { state } from './state.js';
 import * as api from './api.js';
-import { renderHistoryGrid, renderBooksGrid, appendBooksGrid } from './ui.js?v=20260809-unread-series-v3';
+import { renderHistoryGrid, renderBooksGrid, appendBooksGrid, prependBooksGrid } from './ui.js?v=20260809-unread-series-v3';
 import { openReader } from './viewer.js';
 import { loadLibraries } from './category.js';
 import { initInfiniteScrollObserver } from './infinite_scroll.js';
@@ -70,6 +70,8 @@ export async function loadBooksList(isAppend = false, startPage = null) {
     if (!isAppend) {
       state.currentPage = targetPage;
       state.hasMore = true;
+      state.firstLoadedPage = targetPage;
+      state.hasPrevious = targetPage > 1;
       container.innerHTML = `<div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('book_list.loading')}</div>`;
       const countSpan = document.getElementById('library-total-count');
       if (countSpan) countSpan.innerText = '';
@@ -120,6 +122,10 @@ export async function loadBooksList(isAppend = false, startPage = null) {
   if (spinner) {
     spinner.style.display = state.hasMore ? 'block' : 'none';
   }
+  if (!isAppend) {
+    const spinnerTop = document.getElementById('infinite-scroll-spinner-top');
+    if (spinnerTop) spinnerTop.style.display = state.hasPrevious ? 'block' : 'none';
+  }
 
   const gridView = document.getElementById('books-grid-view');
   const isGridActive = !!(gridView && gridView.style.display !== 'none');
@@ -139,12 +145,75 @@ export async function loadBooksList(isAppend = false, startPage = null) {
   initInfiniteScrollObserver();
 }
 
+// 초성 바로가기 등으로 중간 페이지부터 로드된 경우, 위로 스크롤 시 이전 페이지를 앞에 이어붙인다.
+export async function loadPreviousBooksPage() {
+  if (state.isLoading || state.isLoadingPrevious || !state.hasPrevious) return;
+
+  const container = document.getElementById('books-list-container');
+  const mainContent = document.querySelector('.library-main-content');
+  if (!container || !mainContent) return;
+
+  const targetPage = state.firstLoadedPage - 1;
+  if (targetPage < 1) {
+    state.hasPrevious = false;
+    return;
+  }
+
+  state.isLoadingPrevious = true;
+  const spinnerTop = document.getElementById('infinite-scroll-spinner-top');
+  if (spinnerTop) spinnerTop.classList.add('is-loading');
+
+  try {
+    const limit = state.LIMIT || 120;
+    const data = await api.fetchBooksList({
+      type: state.currentLibraryType,
+      libraryId: state.currentLibraryId,
+      page: targetPage,
+      limit,
+      search: state.searchQuery || '',
+      sort: state.currentSortDirection || 'asc',
+      genres: (state.filterGenres || []).map(normalizeMetadataToken).filter(Boolean),
+      tags: (state.filterTags || []).map(normalizeMetadataToken).filter(Boolean),
+    });
+
+    if (!data.success) return;
+
+    const incomingSeries = Array.isArray(data.series) ? data.series : [];
+    if (incomingSeries.length === 0) {
+      state.hasPrevious = false;
+      return;
+    }
+
+    // 콘텐츠를 그리드 위쪽에 끼워넣으면 스크롤 위치가 밀려 보이므로,
+    // 삽입 전후 높이 차이만큼 scrollTop을 보정해 사용자 시점을 그대로 유지한다.
+    const heightBefore = container.scrollHeight;
+    state.currentBooksData = incomingSeries.concat(state.currentBooksData);
+    prependBooksGrid(incomingSeries);
+    const heightAfter = container.scrollHeight;
+    mainContent.scrollTop += (heightAfter - heightBefore);
+
+    state.filteredBooksData = state.currentBooksData;
+    state.firstLoadedPage = targetPage;
+    state.hasPrevious = targetPage > 1;
+
+    if (spinnerTop) spinnerTop.style.display = state.hasPrevious ? 'block' : 'none';
+  } catch (e) {
+    console.error('[Book-List] 이전 페이지 로드 실패:', e);
+  } finally {
+    state.isLoadingPrevious = false;
+    if (spinnerTop) spinnerTop.classList.remove('is-loading');
+  }
+}
+
 // 최근 읽은 도서 히스토리 목록 로드
 export async function loadReadingHistory() {
   state.isLoading = true;
   state.hasMore = false;
+  state.hasPrevious = false;
   const spinner = document.getElementById('infinite-scroll-spinner');
   if (spinner) spinner.style.display = 'none';
+  const spinnerTop = document.getElementById('infinite-scroll-spinner-top');
+  if (spinnerTop) spinnerTop.style.display = 'none';
   const container = document.getElementById('books-list-container');
   if (!container) { state.isLoading = false; return; }
   container.innerHTML = `<div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('book_list.history_loading')}</div>`;

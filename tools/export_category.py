@@ -327,7 +327,9 @@ def export_single_category(db_type, library_id, output_path=None):
             "rclone_rc_url": library.get('rclone_rc_url'),
             "icon": library.get('icon', 'fa-book'),
             "color": library.get('color', '#94a3b8'),
-            "hide_cover": library.get('hide_cover', 0)
+            "hide_cover": library.get('hide_cover', 0),
+            "group_id": library.get('group_id'),
+            "sort_order": library.get('sort_order', 0)
         },
         "books": books_payload,
         "offsets": offsets_payload,

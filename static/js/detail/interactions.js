@@ -9,8 +9,17 @@ export function bindDetailInteractions() {
       : null;
     if (!target) return;
 
-    event.preventDefault();
     const role = target.getAttribute('data-role');
+
+    // 다운로드 링크는 <a download> 네이티브 동작(파일 저장)을 그대로 써야 하므로
+    // preventDefault를 걸면 안 된다. 걸면 클릭이 씹히거나(그리드 뷰) 부모 카드의
+    // data-role(detail-volume-open-reader)로 새어나가 책이 열려버린다(리스트 뷰).
+    if (role === 'detail-download-link') {
+      event.stopPropagation();
+      return;
+    }
+
+    event.preventDefault();
 
     if (role === 'detail-genre-filter') {
       return window.quickFilterByGenre?.(target.getAttribute('data-genre') || '');
@@ -135,10 +144,6 @@ export function bindDetailInteractions() {
       if (Number.isFinite(bookId) && bookId > 0) {
         return window.openReader?.(bookId, target.getAttribute('data-file-format') || '', target.getAttribute('data-book-title') || '', pagesRead, totalPages);
       }
-      return;
-    }
-    if (role === 'detail-download-link') {
-      event.stopPropagation();
       return;
     }
   }, true);

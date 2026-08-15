@@ -423,6 +423,29 @@ export function appendBooksGrid(seriesList) {
   container.appendChild(fragment);
 }
 
+// 도서 시리즈 목록 앞쪽에 삽입 (초성 점프 이후 위쪽 무한 스크롤 연동)
+export function prependBooksGrid(seriesList) {
+  const container = document.getElementById('books-list-container');
+  if (!container) return;
+
+  const fragment = document.createDocumentFragment();
+  seriesList.forEach(item => {
+    const detailDisplayTitle = resolveCardDisplayTitle(item, true);
+    const card = createBookCard(item, {
+      showVolumeCount: true,
+      actionTitle: '이어읽기',
+      onPrimaryClick: (e) => openBookDetail(e, item.series_name, item.library_id, item.representative_book_id, detailDisplayTitle),
+      onActionClick: (e) => {
+        if (typeof window.resumeSeries === 'function') {
+          window.resumeSeries(e, item.series_name, item.library_id, item.representative_book_id);
+        }
+      }
+    });
+    fragment.appendChild(card);
+  });
+  container.insertBefore(fragment, container.firstChild);
+}
+
 // 대시보드 최근 읽은 도서 렌더링
 export function renderDashboardHistory(booksList) {
   const container = document.getElementById('dashboard-history-row');

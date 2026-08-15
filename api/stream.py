@@ -239,14 +239,11 @@ def get_epub_image():
     if not file_path:
         return jsonify({'error': _t('api.err_book_not_found')}), 404
 
-    data, error = StreamService.extract_epub_resource(file_path, resource_path)
+    data, mime, error = StreamService.extract_epub_resource(file_path, resource_path)
     if error:
         return jsonify({'error': error}), 404 if error == 'Resource not found' else 500
 
-    mime, _ = mimetypes.guess_type(resource_path)
-    mime = mime or 'image/jpeg'
-
-    res = Response(data, mimetype=mime)
+    res = Response(data, mimetype=mime or 'image/jpeg')
     res.headers['Cache-Control'] = 'public, max-age=31536000'
     return res
 

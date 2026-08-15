@@ -92,7 +92,7 @@ export function renderVolumeList(orderedBooks, safeSeriesName, actualLibraryId, 
     const readBtnHtml = isDownloadable
       ? `<div class="btn-read-row">
            <button class="btn-read" data-role="detail-continue" data-continue-action="reader" data-book-id="${book.id}" data-file-format="${(book.file_format || '').replace(/"/g, '&quot;')}" data-book-title="${(rawDisplayTitle || '').replace(/"/g, '&quot;')}" data-pages-read="${book.pages_read}" data-total-pages="${book.total_pages}">${readBtnText}</button>
-           <a class="btn-download" href="/api/media/books/${book.id}/download?type=${dbType}" download title="${i18n.t('detail.btn_download')}">
+           <a class="btn-download" href="/api/media/books/${book.id}/download?type=${dbType}" download title="${i18n.t('detail.btn_download')}" data-role="detail-download-link">
              <i class="fa-solid fa-download"></i> ${i18n.t('detail.btn_download')}
            </a>
          </div>`

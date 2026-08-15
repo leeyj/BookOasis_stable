@@ -272,6 +272,20 @@ def get_about_info():
         'github_url': 'https://github.com/leeyj/BookOasis_stable'
     })
 
+@system_bp.route('/api/client-log', methods=['POST'])
+@login_required
+def client_log():
+    """모바일 등 원격 디버깅용 - USB 연결 없이 클라이언트 콘솔 로그를 서버 로그 파일에 기록합니다."""
+    try:
+        data = request.get_json(silent=True) or {}
+        tag = str(data.get('tag', 'client'))[:100]
+        message = str(data.get('message', ''))[:4000]
+        user_id = session.get('user_id', 'unknown')
+        print(f"[CLIENT-LOG:{tag}] (user={user_id}) {message}")
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @system_bp.route('/api/webhook/scan', methods=['GET', 'POST'])
 def trigger_scan_via_webhook():
     """외부 CLI 및 마운트 갱신 툴(gd-poller 등) 연동용 토큰 인증 방식 실시간 스캔 트리거 API"""

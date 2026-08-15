@@ -19,7 +19,8 @@ CREATE TABLE libraries (
     id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, physical_path TEXT,
     cron_schedule TEXT, last_scanned_at TEXT, scan_status TEXT DEFAULT 'ready',
     is_remote INTEGER DEFAULT 0, vfs_refresh_before_scan INTEGER DEFAULT 0,
-    rclone_rc_url TEXT, icon TEXT, color TEXT, hide_cover INTEGER DEFAULT 0
+    rclone_rc_url TEXT, icon TEXT, color TEXT, hide_cover INTEGER DEFAULT 0,
+    group_id INTEGER DEFAULT NULL, sort_order INTEGER DEFAULT 0
 );
 CREATE TABLE books (
     id INTEGER PRIMARY KEY AUTOINCREMENT, library_id INTEGER, title TEXT,
@@ -66,9 +67,9 @@ CREATE TABLE audiobooks (
 );
 CREATE TABLE audiobook_tracks (
     id INTEGER PRIMARY KEY AUTOINCREMENT, audiobook_id INTEGER,
-    track_number INTEGER, track_code TEXT, title TEXT, filename TEXT,
+    track_number INTEGER, track_code TEXT, filename TEXT,
     file_path TEXT UNIQUE, file_mtime REAL, file_size INTEGER,
-    duration REAL, format TEXT, created_at TEXT
+    duration REAL, format TEXT
 );
 CREATE TABLE audiobook_progress (
     id INTEGER PRIMARY KEY AUTOINCREMENT, audiobook_id INTEGER, user_id INTEGER,
@@ -105,8 +106,9 @@ class CategoryMigrationToolsTest(unittest.TestCase):
             """
             INSERT INTO libraries (
                 name, physical_path, scan_status, is_remote,
-                vfs_refresh_before_scan, rclone_rc_url, icon, color, hide_cover
-            ) VALUES ('Source', ?, 'ready', 1, 1, 'http://localhost:5572', 'fa-book', '#123456', 1)
+                vfs_refresh_before_scan, rclone_rc_url, icon, color, hide_cover,
+                group_id, sort_order
+            ) VALUES ('Source', ?, 'ready', 1, 1, 'http://localhost:5572', 'fa-book', '#123456', 1, 7, 3)
             """,
             (str(tmp_path / "source_media"),),
         )
@@ -174,12 +176,16 @@ class CategoryMigrationToolsTest(unittest.TestCase):
         summary_state = result.execute(
             "SELECT is_ready FROM series_summary_state WHERE id = 1"
         ).fetchone()[0]
+        imported_library = result.execute(
+            "SELECT group_id, sort_order FROM libraries WHERE name = 'Imported'"
+        ).fetchone()
         result.close()
 
         self.assertEqual(tuple(book), ("Series Alias", "Title Alias"))
         self.assertEqual(tuple(progress), (95, 1))
         self.assertEqual(favorite_count, 1)
         self.assertEqual(summary_state, 0)
+        self.assertEqual(tuple(imported_library), (7, 3))
 
     def test_audiobook_category_v2_round_trip(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -204,9 +210,9 @@ class CategoryMigrationToolsTest(unittest.TestCase):
             source.execute(
                 """
                 INSERT INTO audiobook_tracks (
-                    audiobook_id, track_number, title, filename, file_path,
-                    duration, format, created_at
-                ) VALUES (1, 1, 'Chapter One', '01.mp3', ?, 100, 'mp3', '2026-08-08 10:00:00')
+                    audiobook_id, track_number, filename, file_path,
+                    duration, format
+                ) VALUES (1, 1, '01.mp3', ?, 100, 'mp3')
                 """,
                 (str(tmp_path / "source_audio" / "Audiobook" / "01.mp3"),),
             )
@@ -261,7 +267,7 @@ class CategoryMigrationToolsTest(unittest.TestCase):
                 "SELECT web_id FROM audiobooks WHERE title = 'Audiobook'"
             ).fetchone()
             track = result.execute(
-                "SELECT title FROM audiobook_tracks WHERE track_number = 1"
+                "SELECT filename FROM audiobook_tracks WHERE track_number = 1"
             ).fetchone()
             progress = result.execute(
                 "SELECT progress_pct, is_completed FROM audiobook_track_progress"
@@ -269,7 +275,7 @@ class CategoryMigrationToolsTest(unittest.TestCase):
             result.close()
 
             self.assertEqual(audiobook['web_id'], 'WEB-1')
-            self.assertEqual(track['title'], 'Chapter One')
+            self.assertEqual(track['filename'], '01.mp3')
             self.assertEqual(tuple(progress), (95.0, 1))
 
 

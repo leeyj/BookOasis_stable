@@ -44,6 +44,23 @@ def parse_target_paths(raw_args):
     return result
 
 
+def get_table_columns(cursor, table_name):
+    """SQLite/MariaDB 양쪽에서 동작하는, 실제 DB에 존재하는 테이블 컬럼 목록 조회.
+    스키마가 버전마다 조금씩 달라지므로(예: audiobook_tracks.title/created_at은
+    MariaDB 스키마에만 존재하고 SQLite 스키마에는 없음), INSERT 문을 하드코딩하지 않고
+    이 목록으로 컬럼 존재 여부를 확인해 걸러낸다."""
+    if database.is_mariadb_mode():
+        cursor.execute(
+            "SELECT COLUMN_NAME FROM information_schema.columns "
+            "WHERE table_schema = DATABASE() AND table_name = ?",
+            (table_name,),
+        )
+        rows = cursor.fetchall()
+        return {row[0] if not isinstance(row, dict) else row['COLUMN_NAME'] for row in rows}
+    cursor.execute(f"PRAGMA table_info({table_name})")
+    return {row['name'] if isinstance(row, dict) or hasattr(row, 'keys') else row[1] for row in cursor.fetchall()}
+
+
 def upsert_record(cursor, table, key_columns, values):
     """내부에서 지정한 키를 기준으로 엔진 독립적인 UPDATE/INSERT를 수행합니다."""
     where_clause = " AND ".join(f"`{column}` = ?" for column in key_columns)
@@ -276,8 +293,9 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
         cursor.execute("""
             INSERT INTO libraries (
                 name, physical_path, cron_schedule, scan_status, is_remote,
-                vfs_refresh_before_scan, rclone_rc_url, icon, color, hide_cover
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                vfs_refresh_before_scan, rclone_rc_url, icon, color, hide_cover,
+                group_id, sort_order
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             target_lib_name,
             db_physical_path,
@@ -288,7 +306,9 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
             lib_info.get('rclone_rc_url'),
             lib_info.get('icon', 'fa-book'),
             lib_info.get('color', '#94a3b8'),
-            lib_info.get('hide_cover', 0)
+            lib_info.get('hide_cover', 0),
+            lib_info.get('group_id'),
+            lib_info.get('sort_order', 0)
         ))
         target_library_id = cursor.lastrowid
         conn.commit()
@@ -426,6 +446,12 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
                 print(f"[!] Error inserting audiobook '{ab.get('title')}': {ab_err}")
                 continue
 
+        # audiobook_tracks 스키마는 백엔드마다 다르다(예: title/created_at 컬럼은
+        # MariaDB에만 있고 SQLite에는 없음). 하드코딩된 컬럼 목록으로 INSERT하면
+        # 컬럼이 없는 백엔드에서 전체 가져오기가 실패하므로, 실제 대상 테이블에 있는
+        # 컬럼만 골라 동적으로 INSERT 문을 구성한다.
+        available_track_columns = get_table_columns(cursor, 'audiobook_tracks')
+
         for tr in audiobook_tracks_list:
             ab_idx = int(tr.get('audiobook_export_index', -1))
             if ab_idx not in audiobook_index_to_new_id:
@@ -453,24 +479,26 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
                     continue
 
             try:
-                cursor.execute("""
-                    INSERT INTO audiobook_tracks (
-                        audiobook_id, track_number, track_code, title, filename, file_path,
-                        file_mtime, file_size, duration, format, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    new_ab_id,
-                    tr.get('track_number', 0),
-                    tr.get('track_code'),
-                    tr.get('title'),
-                    tr.get('filename', ''),
-                    new_track_path,
-                    tr.get('file_mtime', 0.0),
-                    tr.get('file_size', 0),
-                    tr.get('duration', 0.0),
-                    tr.get('format', 'mp3'),
-                    tr.get('created_at') or datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                ))
+                track_values = {
+                    'audiobook_id': new_ab_id,
+                    'track_number': tr.get('track_number', 0),
+                    'track_code': tr.get('track_code'),
+                    'title': tr.get('title'),
+                    'filename': tr.get('filename', ''),
+                    'file_path': new_track_path,
+                    'file_mtime': tr.get('file_mtime', 0.0),
+                    'file_size': tr.get('file_size', 0),
+                    'duration': tr.get('duration', 0.0),
+                    'format': tr.get('format', 'mp3'),
+                    'created_at': tr.get('created_at') or datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                }
+                track_values = {k: v for k, v in track_values.items() if k in available_track_columns}
+                columns_clause = ", ".join(f"`{c}`" for c in track_values)
+                placeholders = ", ".join("?" for _ in track_values)
+                cursor.execute(
+                    f"INSERT INTO audiobook_tracks ({columns_clause}) VALUES ({placeholders})",
+                    tuple(track_values.values()),
+                )
                 new_track_id = int(cursor.lastrowid)
                 track_number = int(tr.get('track_number') or 0)
                 if track_number > 0:

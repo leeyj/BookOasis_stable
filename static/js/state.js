@@ -18,6 +18,9 @@ export const state = {
   // 페이지네이션
   currentPage: 1,
   hasMore: true,
+  firstLoadedPage: 1, // 현재 그리드에 로드된 첫 페이지 번호 (초성 점프로 중간 페이지부터 로드된 경우 1보다 큼)
+  hasPrevious: false, // firstLoadedPage 이전에 아직 안 불러온 페이지가 있는지
+  isLoadingPrevious: false,
   isLoading: false,
   LIMIT: 120,
   searchQuery: '',

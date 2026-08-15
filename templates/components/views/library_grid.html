@@ -1,4 +1,8 @@
         <div id="books-grid-view">
+            <!-- 위쪽 무한 스크롤 로딩 스피너 (초성 점프 등으로 중간 페이지부터 로드된 경우) -->
+            <div id="infinite-scroll-spinner-top" class="scroll-spinner" style="display: none; text-align: center; padding: 1.5rem; color: #a855f7;">
+                <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>
+            </div>
             <div class="books-grid" id="books-list-container">
                 <!-- JS에 의해 동적으로 도서 카드들이 주입됨 -->
                 <div class="loading-spinner" data-i18n="common.loading_books">도서 목록을 불러오는 중...</div>
