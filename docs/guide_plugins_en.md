@@ -303,6 +303,33 @@ The recommended modern flow is configuring webhook targets from the **Plugin Set
 In addition, the scanner emits `scan.new_books_detected` automatically when new books are found.
 
 - payload: `db_type`, `library_id`, `library_name`, `new_books_count`, `sample_titles`
+- `db_type` includes `audiobook` in addition to `general`/`adult`. The audiobook scanner (`services/audiobook_scanner.py`) is a separate pipeline, but it's wired to reuse the same `on_scan_new_books_detected` hook path, so new audiobooks are detected through the same plugin hook with no extra handling needed. See [spec_scanner_logic_en.md](./spec_scanner_logic_en.md#3-audiobook-scanner-a-fully-separate-pipeline) for the internal mechanics.
+
+### Opt-in Activation for Private Plugins (ADD_PLUGIN, beta stage)
+
+This convention was agreed with community developers. Anyone who can see the `plugins/metadata/` directory can see any plugin's code, so a private plugin (e.g. an in-house or paid plugin) distributed only to specific operators must **stay self-inactive unless the operator explicitly opts in**.
+
+> ⚠️ This is currently in beta and supports exactly one fixed plugin_id: **`security-bookoasis-plugin`**. Any other plugin_id is ignored, and a multi-id allowlist is not supported yet (may be extended later if needed).
+
+- The operator sets `ADD_PLUGIN=security-bookoasis-plugin` (exactly this value) either in `.env` or under `environment:` in `docker-compose.override.yml`.
+- (Optional) Without touching the settings UI, storing the `ADD_PLUGIN` key directly in the DB `settings` table also works and takes precedence over the `.env` value.
+- The plugin's own code must call the API below, at the point where it decides whether to activate (e.g. inside `on_scan_new_books_detected`, `get_dashboard_data`, `search`, or similar hook entry points), to check whether the configured `ADD_PLUGIN` value exactly matches its own fixed plugin_id. If it doesn't match, the plugin must do nothing and quietly return an empty result / `success: False`.
+
+```
+GET /api/media/plugins/add-plugin-check?plugin_id=security-bookoasis-plugin
+```
+
+Example response:
+
+```json
+{"success": true, "plugin_id": "security-bookoasis-plugin", "enabled": true}
+```
+
+- This API can be called without a login session (same public read-only nature as other plugin-bootstrap APIs).
+- It only returns whether the queried `plugin_id` matches the fixed value — it never exposes the server's configured `ADD_PLUGIN` value itself.
+- This gate is independent of the existing `PLUGIN_ENABLED_{id}` DB toggle (the admin UI's on/off switch). `ADD_PLUGIN` decides whether a plugin's existence is exposed at all, while `PLUGIN_ENABLED_{id}` handles the routine on/off state of a plugin that's already allowed to be exposed.
+
+**Sample code**: start by copying [plugins/metadata/__template_add_plugin_gate.py](../plugins/metadata/__template_add_plugin_gate.py) as-is. Its filename starts with `__`, so it's excluded from plugin auto-discovery (same convention as the other template, `__template_dashboard_plugin.py`) and will never load as a real plugin while left in place. It shows `_is_add_plugin_enabled()` calling the API above, caching the result for 60 seconds, and always failing closed (treating errors/timeouts as disabled) — and demonstrates applying the same pattern to `search`/`apply` as well as hooks like `on_scan_new_books_detected`.
 
 ### New Books Webhook Notification Example Plugin
 

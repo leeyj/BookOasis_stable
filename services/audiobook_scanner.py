@@ -622,6 +622,52 @@ def scan_and_save_audiobook_folder(folder_path, library_id=None):
         return None
 
 
+def _dispatch_audiobook_new_items_events(library_id, new_items):
+    """새로 감지된 오디오북에 대해 표준 웹훅 이벤트(scan.new_books_detected) +
+    플러그인 on_scan_new_books_detected 훅을 (일반 도서 스캔의
+    tools/scanner/engine.py 패턴과 동일하게) 비동기로 디스패치한다.
+
+    일반/성인 도서 스캔은 스캔 완료 시 이 두 가지를 이미 호출하지만, 오디오북 스캔
+    경로(이 파일)는 별도 파이프라인이라 지금까지 아무 디스패치도 없었다 — 그래서
+    webhook_new_books_notify 같은 플러그인이 오디오북 신간에는 반응하지 않았다.
+    """
+    if not new_items:
+        return
+
+    import threading
+
+    def _worker():
+        try:
+            from repositories.category_repository import CategoryRepository
+            lib_info = CategoryRepository.get_library_by_id('audiobook', library_id) if library_id else None
+            library_name = (lib_info or {}).get('name') or f"Lib_{library_id}"
+
+            sample = [it['title'] for it in new_items[:10]]
+            event_payload = {
+                'db_type': 'audiobook',
+                'library_id': library_id,
+                'library_name': library_name,
+                'new_books_count': len(new_items),
+                'sample_titles': sample,
+            }
+
+            try:
+                from services.webhook_dispatcher import dispatch_webhook_event
+                dispatch_webhook_event('scan.new_books_detected', event_payload)
+            except Exception as e:
+                print(f"[AudiobookScanner-Webhook] dispatch failed: {e}")
+
+            try:
+                from tools.scanner.engine import _dispatch_new_books_to_plugin_hooks
+                _dispatch_new_books_to_plugin_hooks('audiobook', event_payload)
+            except Exception as e:
+                print(f"[AudiobookScanner-PluginHook] dispatch failed: {e}")
+        except Exception as e:
+            print(f"[AudiobookScanner-AsyncEvent ERROR] Failed to dispatch scan events: {e}")
+
+    threading.Thread(target=_worker, daemon=True).start()
+
+
 def scan_audiobook_library(library_path, library_id=None, force=False):
     """
     상위 오디오북 라이브러리 디렉토리를 순회하며 모든 오디오북 폴더를 스캔합니다.
@@ -636,6 +682,7 @@ def scan_audiobook_library(library_path, library_id=None, force=False):
     existing_folder_paths = set()
     skip_existing = not force
     library_started_at = time.perf_counter()
+    new_items = []
 
     from repositories.audiobook_repository import AudiobookRepository
     raw_paths = AudiobookRepository.get_folder_paths(library_id)
@@ -667,13 +714,24 @@ def scan_audiobook_library(library_path, library_id=None, force=False):
                 )
                 dirs.clear()
                 continue
+            was_new_folder = os.path.normpath(root) not in existing_folder_paths
             aid = scan_and_save_audiobook_folder(root, library_id=library_id)
             if aid:
                 count += 1
+                if was_new_folder:
+                    try:
+                        from repositories.audiobook_repository import AudiobookRepository as _AR
+                        row = _AR.get_audiobook_by_id(aid)
+                        title = (row or {}).get('title') or os.path.basename(root)
+                    except Exception:
+                        title = os.path.basename(root)
+                    new_items.append({'id': aid, 'title': title})
                 # 오디오북 단위를 감지했으므로 그 하위 디렉터리 깊이 탐색은 방지
                 dirs.clear()
             else:
                 errors += 1
+
+    _dispatch_audiobook_new_items_events(library_id, new_items)
 
     library_elapsed_sec = time.perf_counter() - library_started_at
     library_elapsed_ms = int(library_elapsed_sec * 1000)

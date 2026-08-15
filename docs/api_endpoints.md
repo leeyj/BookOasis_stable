@@ -690,6 +690,23 @@ BookOasis는 외부 수신 서버로 도서 이벤트를 `POST` 전송할 수 �
 
 ---
 
+### `[GET]` `/api/media/plugins/add-plugin-check`
+* **설명**: 비공개(private) 플러그인이 자기 자신의 선택적 활성화 여부를 스스로 판단할 수 있도록 하는 조회 API. 운영자가 `.env`/docker-compose override 또는 DB `settings` 테이블의 `ADD_PLUGIN` 값을 조회 대상 `plugin_id`와 정확히 일치하도록 설정해두지 않는 한 항상 `enabled: false`를 반환합니다. 베타 테스트 단계이므로 현재는 고정된 단일 plugin_id `-----`만 지원하며, 그 외 값은 항상 `enabled: false`입니다. 자세한 사용법은 [guide_plugins.md](./guide_plugins.md#비공개private-플러그인-선택적-활성화-add_plugin-베타-테스트-단계)를 참고하세요.
+* **권한**: 없음 (로그인 세션 불필요, 다른 플러그인 부트스트랩용 API와 동일한 공개 조회 성격)
+* **쿼리 파라미터**:
+  * `plugin_id` (string, 필수): 활성화 여부를 확인할 플러그인 ID
+* **응답 예시 (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "plugin_id": "-----",
+    "enabled": true
+  }
+  ```
+* **참고**: 조회한 `plugin_id` 하나의 일치 여부만 반환하며, 서버에 설정된 `ADD_PLUGIN` 값 자체는 절대 노출하지 않습니다. 기존 `PLUGIN_ENABLED_{id}` DB 토글(관리자 UI on/off)과는 별개의 게이트입니다.
+
+---
+
 ### `[GET]` `/api/media/dashboard/widgets/<plugin_id>/data`
 * **설명**: 플러그인의 대시보드 미니 위젯 및 카테고리 풀페이지 전용 동적 쿼리 데이터(`stats`, `items`)를 조회합니다.
 * **쿼리 파라미터**:

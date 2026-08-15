@@ -1,6 +1,14 @@
 # CHANGELOG
+## v2.0.3
+- (plugin) 오디오북 라이브러리 스캔에서 신규 도서 감지 시 웹훅/플러그인 훅(`on_scan_new_books_detected`)이 전혀 호출되지 않던 문제 수정 — 일반/성인 도서 스캔과 동일하게 `services/audiobook_scanner.py`에서 표준 이벤트 및 플러그인 훅을 디스패치하도록 추가 | fix audiobook library scans never dispatching the new-book webhook/plugin hook (`on_scan_new_books_detected`) — `services/audiobook_scanner.py` now dispatches the same standard event and plugin hook as regular/adult book scans
+- (plugin) `webhook_new_books_notify` 플러그인이 User-Agent 헤더 없이 요청을 보내 Discord/Cloudflare에서 403(에러 1010)으로 차단되던 문제 수정, 알림 메시지도 원본 JSON을 그대로 보내던 것에서 사람이 읽기 좋은 형태(예: "📚 새 도서 74권 추가됨 - 만화(완결A)" + 샘플 제목 + "...외 N권")로 변경 | fix `webhook_new_books_notify` plugin requests being blocked by Discord/Cloudflare (403 / error 1010) due to a missing User-Agent header, and switch notification messages from raw JSON dumps to human-readable text (e.g. "📚 74 new books added - Comics(CompleteA)" plus sample titles and a "...N more" summary)
+- 문서 최신화 | update document
+
 ## v2.0.2
 - (plugin) 플러그인이 사용자가 직접 등록한 화이트리스트 도메인에 한해 외부 사이트를 앱 내 웹뷰로 열거나, 파일을 다운로드해 라이브러리로 바로 임포트할 수 있는 API(`window.BookOasisPlugin.openWebview`/`downloadToLibrary`) 및 [설정 > 외부 도메인] 관리 탭 추가. 앱은 어떤 도메인도 기본 제공/추천하지 않으며 SSRF 방어(사설 IP 차단, 리다이렉트 재검증, 응답 크기 제한)를 거침 | add plugin API (`window.BookOasisPlugin.openWebview`/`downloadToLibrary`) and a new [Settings > External Domains] tab, letting plugins show an external site in an in-app webview or download a file straight into a library — restricted to domains the user explicitly whitelists (the app ships no default/recommended domains), with server-side SSRF protection (private IP blocking, redirect re-validation, response size caps)
+  - 샘플 플러그인 참고: `plugins/metadata/gutenberg_browser` | see sample plugin: `plugins/metadata/gutenberg_browser`
+
+
 
 ## v2.0.1
 - (viewer/epub,txt) 2페이지 보기에서 짧은 챕터/안드로이드 태블릿의 서브픽셀 반올림 오차로 챕터 끝 판정이 틀어져 다음 챕터로 못 넘어가거나 페이지 넘길 때마다 화면이 밀리던 버그 수정 | fix chapter-end miscalculation on short chapters and Android tablets (sub-pixel rounding) that blocked next-chapter advance or caused the page to drift left on every page turn

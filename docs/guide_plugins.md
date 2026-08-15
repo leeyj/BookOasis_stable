@@ -425,6 +425,33 @@ def get_context_menu_items(self, db_type, context):
 추가로 스캐너는 신규 도서를 감지하면 자동으로 `scan.new_books_detected` 이벤트를 발송합니다.
 
 - payload: `db_type`, `library_id`, `library_name`, `new_books_count`, `sample_titles`
+- `db_type`은 `general`/`adult`뿐 아니라 `audiobook`도 포함됩니다. 오디오북 스캐너(`services/audiobook_scanner.py`)는 별도 파이프라인이지만 동일한 `on_scan_new_books_detected` 훅 경로를 재사용하도록 연결되어 있어, 별도 처리 없이 같은 플러그인 훅으로 오디오북 신간도 감지됩니다. 자세한 내부 동작은 [spec_scanner_logic.md](./spec_scanner_logic.md#3-오디오북-스캐너-완전히-분리된-파이프라인)를 참고하세요.
+
+### 비공개(private) 플러그인 선택적 활성화 (ADD_PLUGIN, 베타 테스트 단계)
+
+커뮤니티 개발자와 합의된 규약입니다. `plugins/metadata/` 디렉토리에 코드가 존재하면 누구나 그 플러그인을 볼 수 있기 때문에, 특정 운영자에게만 배포되는 비공개 플러그인(예: 사내/유료 플러그인)은 **운영자가 명시적으로 opt-in하지 않는 한 자기 자신을 비활성 상태로 유지**해야 합니다.
+
+> ⚠️ 베타 테스트 단계이므로 현재는 고정된 단일 plugin_id **`--------`** 하나만 지원합니다. 다른 plugin_id를 등록해도 무시되며, 다중 plugin_id 허용목록 방식은 아직 지원하지 않습니다(추후 필요 시 확장 예정).
+
+- 운영자는 `.env` 또는 `docker-compose.override.yml`의 `environment:` 항목에 `ADD_PLUGIN=security-bookoasis-plugin`을 정확히 설정합니다.
+- (선택) 환경설정 화면 없이도 DB `settings` 테이블에 `ADD_PLUGIN` 키를 직접 저장하면 이 값이 `.env` 값보다 우선 적용됩니다.
+- 플러그인 코드는 자신의 활성화 여부를 결정하는 시점(예: `on_scan_new_books_detected`, `get_dashboard_data`, `search` 등 훅 진입부)에 아래 API를 호출해 `ADD_PLUGIN` 값이 자신의 고정 plugin_id와 정확히 일치하는지 확인합니다. 일치하지 않으면 아무 동작도 하지 않고 조용히 빈 결과/`success: False`를 반환해야 합니다.
+
+```
+GET /api/media/plugins/add-plugin-check?plugin_id=123412341234123412341234
+```
+
+응답 예시:
+
+```json
+{"success": true, "plugin_id": "security-bookoasis-plugin", "enabled": true}
+```
+
+- 이 API는 로그인 세션 없이도 호출 가능합니다(다른 플러그인 부트스트랩용 API와 동일한 공개 조회 성격).
+- 조회한 `plugin_id`가 고정값과 일치하는지 여부만 반환하며, 서버에 설정된 `ADD_PLUGIN` 값 자체는 절대 노출하지 않습니다.
+- 이 게이트는 기존 `PLUGIN_ENABLED_{id}` DB 토글(관리자 UI에서 켜고 끄는 값)과는 별개입니다. `ADD_PLUGIN`은 "존재 자체를 드러낼지"를 결정하고, `PLUGIN_ENABLED_{id}`는 이미 노출이 허용된 플러그인의 통상적인 on/off를 담당합니다.
+
+**샘플 코드**: [plugins/metadata/__template_add_plugin_gate.py](../plugins/metadata/__template_add_plugin_gate.py)를 그대로 복사해 시작하세요. 파일명이 `__`로 시작하므로 플러그인 자동 탐색 대상에서 제외되어(다른 템플릿인 `__template_dashboard_plugin.py`와 동일한 관례) 그대로 두어도 실제 플러그인으로 로드되지 않습니다. `_is_add_plugin_enabled()`가 위 API를 호출해 결과를 60초간 캐시하고, 네트워크 오류 시에도 항상 "비활성화"로 안전하게 처리(fail-closed)하는 예시이며, `search`/`apply`뿐 아니라 `on_scan_new_books_detected` 같은 훅에도 동일한 패턴을 적용하는 법을 보여줍니다.
 
 ### 신규도서 웹훅 알림 예제 플러그인
 

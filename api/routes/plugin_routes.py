@@ -57,6 +57,26 @@ def get_plugin_load_status_webhook_api():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@plugin_routes_bp.route('/api/media/plugins/add-plugin-check', methods=['GET'])
+def check_add_plugin_api():
+    """
+    비공개(private) 플러그인이 자기 자신의 선택적 활성화 여부를 스스로 판단할 수 있도록 하는 조회 API.
+    베타 테스트 단계라 고정된 단일 plugin_id("security-bookoasis-plugin")만 지원하며,
+    운영자가 .env/docker-compose override 또는 DB 설정값의 ADD_PLUGIN을 정확히 이 값으로
+    설정해두지 않는 한, 비공개 플러그인은 이 값을 확인해 스스로 비활성 상태로 남아야 한다.
+    조회한 plugin_id 하나의 일치 여부만 반환하며, ADD_PLUGIN 설정값 자체는 노출하지 않는다.
+    """
+    plugin_id = request.args.get('plugin_id', '').strip()
+    if not plugin_id:
+        return jsonify({'success': False, 'error': _t('api.err_plugin_id_missing')}), 400
+
+    try:
+        from utils.plugin_env import is_plugin_in_add_plugin_list
+        enabled = is_plugin_in_add_plugin_list(plugin_id)
+        return jsonify({'success': True, 'plugin_id': plugin_id, 'enabled': enabled})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @plugin_routes_bp.route('/api/media/metadata/plugins/manage', methods=['GET'])
 @admin_required
 def get_metadata_plugins_manage_api():

@@ -190,25 +190,47 @@ class WebhookNewBooksNotifyMetadataProvider(BaseMetadataProvider):
             "sample_titles_csv": csv,
         }
 
+    def _format_readable_message(self, event_payload):
+        """Discord/Slack/Telegram 등에 사람이 읽기 좋은 텍스트 메시지를 만든다.
+        (기존에는 이벤트 원본 JSON을 그대로 메시지 본문에 넣어 알림이 실질적으로
+        읽기 어려웠음 — 예: "📚 새 도서 74권 추가됨 - 만화(완결A)")"""
+        payload = event_payload or {}
+        count = int(payload.get("new_books_count") or 0)
+        library_name = str(payload.get("library_name") or "").strip()
+        library_label = library_name or f"라이브러리 #{payload.get('library_id', '?')}"
+
+        sample_titles = payload.get("sample_titles") or []
+        if not isinstance(sample_titles, list):
+            sample_titles = []
+        sample_titles = [str(t).strip() for t in sample_titles if str(t).strip()]
+
+        lines = [f"📚 새 도서 {count}권 추가됨 - {library_label}"]
+        lines.extend(f"• {title}" for title in sample_titles)
+
+        remaining = count - len(sample_titles)
+        if remaining > 0:
+            lines.append(f"...외 {remaining}권")
+
+        return "\n".join(lines)
+
     def _build_body_for_target(self, db_type, target, event_payload):
         channel_format = str(target.get("format") or "generic").strip().lower()
-        title = "[BookOasis] scan.new_books_detected"
-        compact = json.dumps(event_payload or {}, ensure_ascii=False)
+        message = self._format_readable_message(event_payload)
 
         if channel_format == "discord":
             return {
                 "username": "BookOasis",
-                "content": f"{title}\n{compact[:1700]}",
+                "content": message[:1900],
             }
 
         if channel_format == "slack":
             return {
-                "text": f"{title}\n{compact[:3000]}",
+                "text": message[:3900],
             }
 
         if channel_format == "telegram":
             body = {
-                "text": f"{title}\n{compact[:3500]}",
+                "text": message[:4000],
                 "disable_web_page_preview": True,
             }
             chat_id = str(target.get("chat_id") or "").strip()
@@ -223,9 +245,11 @@ class WebhookNewBooksNotifyMetadataProvider(BaseMetadataProvider):
             if template is not None:
                 return self._render_template(template, self._build_context(event_payload))
 
+        # generic: 프로그램적으로 파싱하는 소비자를 위해 원본 payload도 함께 실어 보낸다.
         return {
             "source": "bookoasis",
             "event": "scan.new_books_detected",
+            "message": message,
             "payload": event_payload or {},
         }
 
@@ -234,6 +258,10 @@ class WebhookNewBooksNotifyMetadataProvider(BaseMetadataProvider):
         method = str(target.get("method") or "POST").strip().upper()
         headers = target.get("headers") if isinstance(target.get("headers"), dict) else {}
         headers = dict(headers)
+        # Discord/Cloudflare 등은 urllib 기본 User-Agent("Python-urllib/x.x")를
+        # 403(에러 1010)으로 차단하는 경우가 있어 명시적으로 지정한다.
+        # (대상별 headers에서 직접 지정했다면 그 값을 그대로 존중)
+        headers.setdefault("User-Agent", "BookOasis-Webhook/1.0")
         body = self._build_body_for_target(db_type, target, event_payload)
 
         req_url = url
