@@ -739,11 +739,55 @@ def _count_books(self, db_type):
 
 ---
 
+## 10. 🌐 외부 도메인 웹뷰 & 다운로드 API
+
+플러그인이 외부 사이트를 앱 내에서 보여주거나, 외부 URL의 파일을 라이브러리로 다운로드해야 할 때 쓰는 코어 제공 API입니다.
+
+**책임 소재**: BookOasis는 어떤 외부 도메인도 기본 제공/추천하지 않습니다. 이 API는 **각 사용자가 [설정 > 외부 도메인] 탭에서 직접 등록한 화이트리스트**에 있는 도메인에 대해서만 동작합니다. 플러그인이 임의로 화이트리스트를 추가/우회할 수 없으며, 어떤 도메인을 등록하고 무엇을 하는지는 전적으로 사용자 본인의 책임입니다.
+
+### `window.BookOasisPlugin.openWebview(url)`
+
+서버 프록시를 통해 URL을 가져와 앱 내 모달(iframe)로 표시합니다.
+
+```js
+window.BookOasisPlugin.openWebview('https://example.com/some-page');
+```
+
+- 호스트가 사용자의 화이트리스트에 없으면 안내 토스트만 뜨고 아무 것도 열리지 않습니다. **정확 매칭**이라 `example.com`만 등록해도 `www.example.com`은 별개 호스트로 취급되어 거부됩니다 — 서브도메인까지 포함하려면 `*.example.com` 형태(와일드카드)로 등록해야 합니다.
+- 서버가 SSRF 방어(사설/루프백 IP 차단, 리다이렉트 재검증, 응답 크기 제한 15MB)를 수행하므로 화이트리스트에 있어도 일부 요청은 거부될 수 있습니다.
+- 응답이 HTML이면 `<base href="원본사이트">`를 자동 주입해 상대경로 이미지/CSS/JS/링크가 프록시가 아닌 원본 사이트 기준으로 풀리도록 합니다. 완전한 자산 재작성기는 아니라서(예: 인라인 `style="background:url(...)"`) 무거운 SPA는 여전히 깨질 수 있습니다.
+
+### `window.BookOasisPlugin.downloadToLibrary(url, { libraryId, dbType })`
+
+URL의 파일을 다운로드해 선택한 라이브러리 물리 경로에 저장하고, 스캐너로 즉시 임포트합니다.
+
+```js
+window.BookOasisPlugin.downloadToLibrary('https://example.com/book.epub', {
+  libraryId: 12,
+  dbType: 'general' // 생략 시 'general'
+});
+```
+
+- 화이트리스트 검증 + SSRF 방어(응답 크기 제한 500MB)를 거칩니다.
+- 호출한 사용자가 대상 라이브러리에 접근 권한이 없으면 실패합니다.
+- 지원 확장자(`.zip .cbz .epub .pdf .txt`)가 아니면 파일은 저장되지만 도서로 임포트되지는 않습니다(`imported_as_book: false`).
+- 반환값(Promise)은 `{ success, filename, imported_as_book, warning?, scan_error? }` 형태입니다.
+
+플러그인 Python 백엔드에서 직접 다운로드/프록시 로직을 새로 구현할 필요 없이 위 두 API를 재사용하십시오. 실제 사용 예시는 아래 참조 구현을 확인하십시오.
+
+### 참조 구현: `gutenberg_browser` 샘플 플러그인
+
+- 경로: `plugins/metadata/gutenberg_browser/`
+- `category_tab`으로 사이드바 1등 시민 메뉴 등록 + `index.html`/`script.js`에서 `openWebview()`(Project Gutenberg 웹사이트 열기)와 `downloadToLibrary()`(입력한 URL을 선택한 라이브러리로 다운로드) 두 API를 모두 시연합니다.
+- 라이브러리 목록은 `GET /api/media/libraries?type=general`로 조회해 `<select>`를 채우는 방식을 참고하십시오.
+
+---
+
 ## 💡 Tip: iframe 외부 연동 시 보안 제약 사항 안내
 독립된 플러그인 화면에서 `<iframe>`을 사용해 외부 웹 서비스를 끌어오고자 할 때는 브라우저 보안 제약에 유의해야 합니다.
 
 1. **X-Frame-Options / CSP 차단**:
    - `X-Frame-Options: SAMEORIGIN` 또는 `Content-Security-Policy` 헤더를 통해 자신들의 사이트가 타사 사이트에 프레임 형태로 삽입되는 것을 차단하는 사이트(예: Google, Naver 등)는 iframe으로 직접 로딩이 불가능합니다.
-   - **해결 방안**: 플러그인 파이썬 백엔드(Python)에서 웹 콘텐츠를 직접 `requests`로 긁어온 뒤 보안 헤더를 필터링하여 응답하는 Proxy API를 구축해 프론트엔드로 전달하거나, `target="_blank"` 속성을 지정해 새 창/새 탭으로 바로 열어 주십시오.
+   - **해결 방안**: 직접 Proxy API를 구축할 필요 없이 위 §10의 `window.BookOasisPlugin.openWebview()`를 사용하십시오 — 프록시와 헤더 제거가 이미 구현되어 있습니다.
 2. **Mixed Content 차단**:
    - BookOasis 웹 서비스가 SSL(HTTPS) 환경에서 제공되는 경우, iframe 내에 호출되는 주소 역시 반드시 `https://` 보안 통신 주소여야 합니다. `http://`로 시작하는 일반 주소는 브라우저 보안 규격(Mixed Content)에 의해 자동으로 로드가 완전 차단됩니다.

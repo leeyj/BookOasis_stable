@@ -1,0 +1,48 @@
+<div class="gb-plugin-container">
+  <div class="gb-header-banner">
+    <div class="gb-title-group">
+      <h2><i class="fa-solid fa-book-atlas"></i> Project Gutenberg</h2>
+      <p class="gb-subtitle">
+        저작권이 만료된 고전 도서를 무료로 제공하는 <code>gutenberg.org</code>를 앱 안에서 열람하고,
+        원하는 책을 라이브러리로 바로 다운로드해볼 수 있는 데모 플러그인입니다.
+      </p>
+    </div>
+  </div>
+
+  <div class="gb-notice">
+    <i class="fa-solid fa-circle-info"></i>
+    <span>
+      이 플러그인은 <strong>gutenberg.org</strong>를 기본 제공/추천하지 않습니다. 아래 기능을 쓰려면
+      먼저 <strong>설정 &gt; 외부 도메인</strong> 탭에서 <code>gutenberg.org</code>(또는 <code>*.gutenberg.org</code>)를
+      직접 등록해야 합니다. 등록/이용에 대한 책임은 사용자 본인에게 있습니다.
+    </span>
+  </div>
+
+  <div class="gb-section">
+    <h3><i class="fa-solid fa-globe"></i> 웹사이트 둘러보기</h3>
+    <p class="gb-section-desc">Project Gutenberg 메인 페이지를 앱 내 모달로 엽니다.</p>
+    <button type="button" class="gb-btn gb-btn-primary" id="gb-open-webview-btn">
+      <i class="fa-solid fa-up-right-from-square"></i> gutenberg.org 열기
+    </button>
+  </div>
+
+  <div class="gb-section">
+    <h3><i class="fa-solid fa-download"></i> 라이브러리로 다운로드</h3>
+    <p class="gb-section-desc">
+      Gutenberg 책 상세 페이지에서 "EPUB" 다운로드 링크 주소를 복사해 붙여넣으세요.
+      (예: <code>https://www.gutenberg.org/ebooks/&lt;id&gt;.epub.noimages</code>)
+    </p>
+    <div class="gb-form-row">
+      <input type="url" id="gb-download-url" class="gb-input" placeholder="https://www.gutenberg.org/ebooks/1342.epub.noimages">
+    </div>
+    <div class="gb-form-row">
+      <select id="gb-library-select" class="gb-select">
+        <option value="">라이브러리를 선택하세요...</option>
+      </select>
+      <button type="button" class="gb-btn gb-btn-primary" id="gb-download-btn">
+        <i class="fa-solid fa-download"></i> 다운로드
+      </button>
+    </div>
+    <div id="gb-download-status" class="gb-status"></div>
+  </div>
+</div>

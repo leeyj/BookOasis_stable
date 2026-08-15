@@ -76,6 +76,7 @@
     "tab_plugins": "플러그인 설정",
     "tab_reports": "스캔 리포트",
     "tab_trash": "삭제 관리",
+    "tab_external_domains": "외부 도메인",
     "show_dashboard_insights": "대시보드 독서 통계 위젯 표시",
     "show_dashboard_insights_desc": "대시보드 상단에 연속 독서 일수, 진행 중 도서, 독서 목표 및 장르 통계 카드를 노출합니다.",
     "key_tab_title": "단축키 및 물리 버튼 매핑 설정",

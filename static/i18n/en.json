@@ -76,6 +76,7 @@
     "tab_plugins": "Plugin Settings",
     "tab_reports": "Scan Reports",
     "tab_trash": "Delete Management",
+    "tab_external_domains": "External Domains",
     "show_dashboard_insights": "Show Dashboard Reading Insights Widget",
     "show_dashboard_insights_desc": "Displays reading streak, currently reading, reading goals, and genre breakdown widgets at the top of the dashboard.",
     "key_tab_title": "Shortcut & Hardware Key Mapping",

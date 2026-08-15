@@ -38,6 +38,7 @@ import { focusLibrarySearchInput, applySearchShortcutSetting, initLibrarySearchS
 
 import './viewer/viewer_padding.js';
 import './audio_player.js';
+import './plugin_webview_api.js';
 
 function initLibraryShellDelegation() {
   if (window.__libraryShellDelegationBound) return;

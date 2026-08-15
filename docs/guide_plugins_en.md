@@ -617,11 +617,55 @@ Note:
 
 ---
 
+## 10. 🌐 External Domain Webview & Download API
+
+Core-provided API for plugins that need to show an external site inside the app, or download a file from an external URL into a library.
+
+**Responsibility**: BookOasis does not provide or recommend any external domain by default. This API only works for domains **the user has explicitly registered** in their own [Settings > External Domains] tab whitelist. Plugins cannot add or bypass this whitelist — registering and using a domain is entirely the user's own responsibility.
+
+### `window.BookOasisPlugin.openWebview(url)`
+
+Fetches the URL through a server-side proxy and displays it in an in-app modal (iframe).
+
+```js
+window.BookOasisPlugin.openWebview('https://example.com/some-page');
+```
+
+- If the host isn't in the current user's whitelist, only an error toast is shown and nothing opens. Matching is **exact** — registering `example.com` does NOT cover `www.example.com` (treated as a different host); use a wildcard entry like `*.example.com` to cover subdomains.
+- The server performs SSRF defense (blocks private/loopback IPs, re-validates every redirect hop, caps response size at 15MB), so some requests may still be rejected even for whitelisted domains.
+- If the response is HTML, a `<base href="original-site">` tag is auto-injected so relative image/CSS/JS/link URLs resolve against the original site instead of the proxy. This isn't a full asset rewriter (e.g. inline `style="background:url(...)"` isn't handled), so heavy SPA-style sites may still render incorrectly.
+
+### `window.BookOasisPlugin.downloadToLibrary(url, { libraryId, dbType })`
+
+Downloads the file at the URL, saves it into the selected library's physical path, and immediately triggers a scan to import it.
+
+```js
+window.BookOasisPlugin.downloadToLibrary('https://example.com/book.epub', {
+  libraryId: 12,
+  dbType: 'general' // defaults to 'general' if omitted
+});
+```
+
+- Goes through the same whitelist check + SSRF defense (500MB response cap).
+- Fails if the calling user doesn't have access to the target library.
+- If the extension isn't one of the supported formats (`.zip .cbz .epub .pdf .txt`), the file is still saved but not imported as a book (`imported_as_book: false`).
+- Returns a Promise resolving to `{ success, filename, imported_as_book, warning?, scan_error? }`.
+
+You don't need to implement your own download/proxy logic in the plugin's Python backend — reuse these two APIs instead. See the reference implementation below for a working example.
+
+### Reference implementation: the `gutenberg_browser` sample plugin
+
+- Path: `plugins/metadata/gutenberg_browser/`
+- Registers a first-class sidebar menu via `category_tab`, and its `index.html`/`script.js` demonstrate both `openWebview()` (opens the Project Gutenberg website) and `downloadToLibrary()` (downloads a user-entered URL into a chosen library).
+- See how it populates its library `<select>` via `GET /api/media/libraries?type=general`.
+
+---
+
 ## 💡 Tip: Handling iframe Security Constraints
 When embedding external web services inside a custom plugin tab or card using `<iframe>`, you should be aware of security constraints enforced by browsers.
 
 1. **X-Frame-Options & CSP Blockage**:
    - Websites that configure `X-Frame-Options: SAMEORIGIN` or restrictive `Content-Security-Policy` headers (e.g., Google, Naver, GitHub) **cannot** be rendered inside an iframe on third-party sites.
-   - **Solution**: Implement a reverse proxy route in your plugin's python backend (using `requests` to fetch the external page and stripping off the restrictive headers before returning it to the browser), or simply open the link in a new tab via `target="_blank"`.
+   - **Solution**: You no longer need to build your own proxy route — use `window.BookOasisPlugin.openWebview()` from §10 above, which already implements the proxy and header stripping.
 2. **Mixed Content Blockage**:
    - If BookOasis is served over SSL (HTTPS), all iframe source URLs must also use `https://`. Unencrypted `http://` resources will be automatically blocked by modern web browsers.

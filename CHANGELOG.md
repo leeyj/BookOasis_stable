@@ -1,4 +1,7 @@
 # CHANGELOG
+## v2.0.2
+- (plugin) 플러그인이 사용자가 직접 등록한 화이트리스트 도메인에 한해 외부 사이트를 앱 내 웹뷰로 열거나, 파일을 다운로드해 라이브러리로 바로 임포트할 수 있는 API(`window.BookOasisPlugin.openWebview`/`downloadToLibrary`) 및 [설정 > 외부 도메인] 관리 탭 추가. 앱은 어떤 도메인도 기본 제공/추천하지 않으며 SSRF 방어(사설 IP 차단, 리다이렉트 재검증, 응답 크기 제한)를 거침 | add plugin API (`window.BookOasisPlugin.openWebview`/`downloadToLibrary`) and a new [Settings > External Domains] tab, letting plugins show an external site in an in-app webview or download a file straight into a library — restricted to domains the user explicitly whitelists (the app ships no default/recommended domains), with server-side SSRF protection (private IP blocking, redirect re-validation, response size caps)
+
 ## v2.0.1
 - (viewer/epub,txt) 2페이지 보기에서 짧은 챕터/안드로이드 태블릿의 서브픽셀 반올림 오차로 챕터 끝 판정이 틀어져 다음 챕터로 못 넘어가거나 페이지 넘길 때마다 화면이 밀리던 버그 수정 | fix chapter-end miscalculation on short chapters and Android tablets (sub-pixel rounding) that blocked next-chapter advance or caused the page to drift left on every page turn
 - (viewer/epub) EPUB 뷰어에 브라우저 리사이즈 리스너가 아예 등록되지 않아 창 크기를 줄이면 2페이지 모드가 1페이지처럼 깨지던 버그 수정 | fix EPUB viewer having no resize listener at all, which broke 2-page mode into a 1-page-like layout when the browser window was resized

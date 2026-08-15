@@ -5,6 +5,7 @@ import { initReportsTab, loadReportList, loadReportDetail } from './settings/rep
 import { loadUsersList } from './settings/users.js';
 import { loadPermissionsMatrix } from './settings/permissions.js';
 import { loadQueueStatus } from './settings/queue.js';
+import { loadExternalDomainsSettings } from './settings/external_domains.js';
 
 export {
   applySettingsToUI,
@@ -18,7 +19,8 @@ export {
   loadUsersList,
   loadPermissionsMatrix,
   loadViewerSettings,
-  submitViewerSettings
+  submitViewerSettings,
+  loadExternalDomainsSettings
 };
 
 function initSettingsTabDelegation() {
@@ -68,6 +70,7 @@ export function switchSettingsTab(tabId) {
   // 일반 사용자는 어드민 전용 탭에 접근하지 못하도록 차단 및 'about'으로 우회
   const isAdmin = window.currentUser && window.currentUser.role === 'admin';
   const adminOnlyTabs = ['schedule', 'plugins', 'reports', 'users', 'permissions', 'trash'];
+  // 'external-domains'는 의도적으로 이 목록에 없음 — 일반 사용자도 자신의 화이트리스트를 관리해야 함
   
   if (!isAdmin && adminOnlyTabs.includes(tabId)) {
     console.warn(`[Settings-Tab] Access denied for tab '${tabId}'. Redirecting to 'about'...`);
@@ -120,6 +123,8 @@ export function switchSettingsTab(tabId) {
     if (window.loadTrashList) {
       window.loadTrashList();
     }
+  } else if (tabId === 'external-domains') {
+    loadExternalDomainsSettings();
   } else if (tabId === 'about') {
     loadAboutInfo();
   } else if (tabId === 'changelog') {

@@ -22,6 +22,9 @@
                 <button class="settings-tab-btn" data-settings-tab="trash">
                     <i class="fa-solid fa-trash-can"></i> <span data-i18n="settings.tab_trash">삭제 관리</span>
                 </button>
+                <button class="settings-tab-btn" data-settings-tab="external-domains">
+                    <i class="fa-solid fa-globe"></i> <span data-i18n="settings.tab_external_domains">외부 도메인</span>
+                </button>
                 <button class="settings-tab-btn" id="settings-tab-btn-users" data-settings-tab="users" style="display: none;">
                     <i class="fa-solid fa-users"></i> <span data-i18n="settings.tab_users">사용자 관리</span>
                 </button>
@@ -61,6 +64,9 @@
 
             <!-- 4.5 삭제 관리 (휴지통) 탭 -->
             {% include "components/settings/trash_tab.html" %}
+
+            <!-- 4.8 외부 도메인 허용 목록 탭 -->
+            {% include "components/settings/external_domains_tab.html" %}
 
             <!-- 5. 사용자 관리 탭 -->
             {% include "components/settings/users_tab.html" %}
