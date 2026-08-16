@@ -2,6 +2,7 @@
 import { state } from './state.js';
 import { stripLeadingBracketTags } from './series_display.js';
 import { renderAudiobookVolumes } from './detail/volume_audiobook_view.js';
+import { renderVideoVolumes } from './detail/volume_video_view.js';
 import { renderVolumeGrid } from './detail/volume_grid_view.js';
 import { renderVolumeList } from './detail/volume_list_view.js';
 export { renderDetailHeader } from './detail/header_view.js';
@@ -22,6 +23,12 @@ export function renderVolumesList(books, safeSeriesName, actualLibraryId, dbType
 
   if (isAudiobook) {
     return renderAudiobookVolumes(orderedBooks, state.detailMeta);
+  }
+
+  const isVideo = (state.currentLibraryType === 'video') || (books && books.length > 0 && books[0].video_id != null);
+
+  if (isVideo) {
+    return renderVideoVolumes(orderedBooks, state.detailMeta);
   }
 
   if (gridMode) {

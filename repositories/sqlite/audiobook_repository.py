@@ -64,6 +64,24 @@ class AudiobookRepository:
         return dict(row) if row else None
 
     @staticmethod
+    def update_favorite(audiobook_id, is_favorite):
+        """오디오북 즐겨찾기 상태 갱신"""
+        conn = database.get_connection('audiobook')
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "UPDATE audiobooks SET is_favorite = ? WHERE id = ?",
+                (1 if is_favorite else 0, audiobook_id)
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    @staticmethod
     def get_audiobook_progress(audiobook_id, user_id):
         conn = database.get_connection('audiobook')
         cursor = conn.cursor()

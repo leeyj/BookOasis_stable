@@ -20,7 +20,7 @@
     <!-- 1. 최근 읽은 도서 섹션 -->
     <div class="dashboard-section">
         <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
-            <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1rem; font-weight: 700;"><i class="fa-solid fa-clock-rotate-left" style="color: #a855f7; margin-right: 0.5rem;"></i> <span data-i18n="dashboard.recent_title">최근 읽은 도서</span><span style="margin-left: 0.35rem; font-size: 0.82em; font-weight: 500; color: #94a3b8;">(시리즈기준)</span></h3>
+            <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1rem; font-weight: 700;"><i class="fa-solid fa-clock-rotate-left" style="color: #a855f7; margin-right: 0.5rem;"></i> <span id="dashboard-recent-title" data-i18n="dashboard.recent_title">최근 읽은 도서</span><span id="dashboard-recent-title-suffix" style="margin-left: 0.35rem; font-size: 0.82em; font-weight: 500; color: #94a3b8;">(시리즈기준)</span></h3>
             <div class="section-nav-btns" style="display: flex; gap: 0.5rem;">
                 <button data-scroll-row-nav="dashboard-history-row" data-dir="left" class="btn-nav-arrow" data-i18n-title="common.prev" title="이전"><i class="fa-solid fa-chevron-left"></i></button>
                 <button data-scroll-row-nav="dashboard-history-row" data-dir="right" class="btn-nav-arrow" data-i18n-title="common.next" title="다음"><i class="fa-solid fa-chevron-right"></i></button>
@@ -37,7 +37,7 @@
     <!-- 2. 신규 추가 도서 섹션 -->
     <div class="dashboard-section">
         <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
-            <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1rem; font-weight: 700;"><i class="fa-solid fa-square-plus" style="color: #a855f7; margin-right: 0.5rem;"></i> <span data-i18n="dashboard.new_books_title">신규 추가 도서</span></h3>
+            <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1rem; font-weight: 700;"><i class="fa-solid fa-square-plus" style="color: #a855f7; margin-right: 0.5rem;"></i> <span id="dashboard-new-title" data-i18n="dashboard.new_books_title">신규 추가 도서</span></h3>
             <div class="section-nav-btns" style="display: flex; gap: 0.5rem;">
                 <button data-scroll-row-nav="dashboard-new-row" data-dir="left" class="btn-nav-arrow" data-i18n-title="common.prev" title="이전"><i class="fa-solid fa-chevron-left"></i></button>
                 <button data-scroll-row-nav="dashboard-new-row" data-dir="right" class="btn-nav-arrow" data-i18n-title="common.next" title="다음"><i class="fa-solid fa-chevron-right"></i></button>

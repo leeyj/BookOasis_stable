@@ -4,6 +4,15 @@ import * as api from '../api.js';
 import { selectCategory } from '../tab_media_library.js';
 import { currentTargetLibrary } from './context_menu.js';
 import { updateRemoteWarning, enableVFSCheckForRemote } from './path_browser.js';
+import { loadVideoLibraryView } from '../video_library.js';
+
+async function reloadLibrarySidebar() {
+  if (state.currentLibraryType === 'video') {
+    await loadVideoLibraryView();
+  } else if (typeof window.loadLibraries === 'function') {
+    await window.loadLibraries();
+  }
+}
 
 const MAX_LIBRARY_NAME_LENGTH = 25;
 const MAX_LIBRARY_PATHS = 20;
@@ -255,10 +264,8 @@ export async function triggerDeleteLibrary() {
         window.hideGlobalLoadingSpinner();
       }
       alert(data.message);
-      if (typeof window.loadLibraries === 'function') {
-        await window.loadLibraries();
-      }
-      
+      await reloadLibrarySidebar();
+
       if (String(state.currentLibraryId) === String(currentTargetLibrary.id)) {
         selectCategory('history');
       }
@@ -428,9 +435,7 @@ export async function submitLibraryForm(event) {
       } else {
         alert(result.message);
       }
-      if (typeof window.loadLibraries === 'function') {
-        await window.loadLibraries();
-      }
+      await reloadLibrarySidebar();
       if (isEdit && String(state.currentLibraryId) === String(id)) {
         selectCategory(String(id), true);
       }

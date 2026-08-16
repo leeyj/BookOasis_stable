@@ -5,7 +5,7 @@ export function bindDetailInteractions() {
 
   document.addEventListener('click', (event) => {
     const target = event && event.target && typeof event.target.closest === 'function'
-      ? event.target.closest('[data-role="detail-genre-filter"], [data-role="detail-tag-filter"], [data-role="detail-collapse-toggle"], [data-role="detail-rescan-missing"], [data-role="detail-unlock-metadata"], [data-role="detail-cover-upload"], [data-role="detail-series-favorite"], [data-role="detail-edit-toggle"], [data-role="detail-plugin-meta-search"], [data-role="detail-rescan-series"], [data-role="detail-mark-series-complete"], [data-role="detail-save-meta"], [data-role="detail-cancel-meta"], [data-role="detail-volume-filter"], [data-role="detail-volume-sort"], [data-role="detail-summary-toggle"], [data-role="detail-continue"], [data-role="detail-book-favorite"], [data-role="detail-rescan-book"], [data-role="detail-audio-open"], [data-role="detail-audio-play"], [data-role="detail-audio-tab"], [data-role="detail-volume-open-reader"], [data-role="detail-download-link"]')
+      ? event.target.closest('[data-role="detail-genre-filter"], [data-role="detail-tag-filter"], [data-role="detail-collapse-toggle"], [data-role="detail-rescan-missing"], [data-role="detail-unlock-metadata"], [data-role="detail-cover-upload"], [data-role="detail-series-favorite"], [data-role="detail-edit-toggle"], [data-role="detail-plugin-meta-search"], [data-role="detail-rescan-series"], [data-role="detail-mark-series-complete"], [data-role="detail-save-meta"], [data-role="detail-cancel-meta"], [data-role="detail-volume-filter"], [data-role="detail-volume-sort"], [data-role="detail-summary-toggle"], [data-role="detail-continue"], [data-role="detail-book-favorite"], [data-role="detail-rescan-book"], [data-role="detail-audio-open"], [data-role="detail-audio-play"], [data-role="detail-audio-tab"], [data-role="detail-video-open"], [data-role="detail-video-play"], [data-role="detail-volume-open-reader"], [data-role="detail-download-link"]')
       : null;
     if (!target) return;
 
@@ -96,6 +96,15 @@ export function bindDetailInteractions() {
         }
         return;
       }
+      if (action === 'video') {
+        const vid = Number.parseInt(target.getAttribute('data-video-id') || '', 10);
+        const episodeId = Number.parseInt(target.getAttribute('data-episode-id') || '', 10);
+        const startTime = Number(target.getAttribute('data-start-time') || '0') || 0;
+        if (Number.isFinite(vid) && vid > 0) {
+          return window.openVideoPlayer?.(vid, Number.isFinite(episodeId) ? episodeId : null, startTime);
+        }
+        return;
+      }
       const bookId = Number.parseInt(target.getAttribute('data-book-id') || '', 10);
       const pagesRead = Number(target.getAttribute('data-pages-read') || '0') || 0;
       const totalPages = Number(target.getAttribute('data-total-pages') || '0') || 0;
@@ -124,6 +133,14 @@ export function bindDetailInteractions() {
       const trackId = Number.parseInt(target.getAttribute('data-track-id') || '', 10);
       if (Number.isFinite(aid) && aid > 0 && Number.isFinite(trackId) && trackId > 0) {
         return window.openAudioPlayer?.(aid, trackId, 0);
+      }
+      return;
+    }
+    if (role === 'detail-video-open' || role === 'detail-video-play') {
+      const vid = Number.parseInt(target.getAttribute('data-video-id') || '', 10);
+      const episodeId = Number.parseInt(target.getAttribute('data-episode-id') || '', 10);
+      if (Number.isFinite(vid) && vid > 0 && Number.isFinite(episodeId) && episodeId > 0) {
+        return window.openVideoPlayer?.(vid, episodeId, 0);
       }
       return;
     }

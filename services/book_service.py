@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
-from repositories import BookRepository
+from repositories import BookRepository, AudiobookRepository, VideoRepository
 from utils.sort_helper import natural_sort_key
 from utils.cover_helper import get_cover_image_with_t
 
@@ -58,10 +58,23 @@ class BookService:
 
     @staticmethod
     def update_favorite(db_type, book_id, is_favorite, user_id):
-        """특정 도서의 즐겨찾기 상태 변경 (사용자별)"""
+        """특정 도서의 즐겨찾기 상태 변경 (사용자별)
+        오디오북/영상은 book_id 자리에 audiobook_id/video_id가 그대로 전달되며(단일 진행 개체),
+        해당 엔티티 테이블의 is_favorite 컬럼을 직접 갱신한다."""
+        if db_type == 'audiobook':
+            return AudiobookRepository.update_favorite(book_id, is_favorite)
+        if db_type == 'video':
+            return VideoRepository.update_favorite(book_id, is_favorite)
         return BookRepository.update_favorite(db_type, book_id, is_favorite, user_id)
 
     @staticmethod
     def update_series_favorite(db_type, series_name, is_favorite, user_id):
-        """특정 시리즈 전체 도서의 즐겨찾기 상태 변경 (사용자별)"""
+        """특정 시리즈 전체 도서의 즐겨찾기 상태 변경 (사용자별)
+        오디오북/영상은 "시리즈"가 곧 단일 엔티티이므로 제목으로 해당 행을 찾아 한 번에 갱신한다."""
+        if db_type == 'audiobook':
+            row = AudiobookRepository.get_audiobook_by_series_or_folder_name(series_name)
+            return AudiobookRepository.update_favorite(row['id'], is_favorite) if row else False
+        if db_type == 'video':
+            row = VideoRepository.get_video_by_title_or_folder_name(series_name)
+            return VideoRepository.update_favorite(row['id'], is_favorite) if row else False
         return BookRepository.update_series_favorite(db_type, series_name, is_favorite, user_id)

@@ -54,6 +54,11 @@ class CollectionService:
                 item_dict['type'] = 'audiobook'
                 item_dict['cover_image'] = item.get('audiobook_poster')
                 item_dict['file_format'] = 'audiobook'
+            elif item.get('video_id'):
+                item_dict['title'] = item.get('video_title')
+                item_dict['type'] = 'video'
+                item_dict['cover_image'] = f"/api/media/videos/{item['video_id']}/cover"
+                item_dict['file_format'] = 'video'
 
             enriched_items.append(item_dict)
 
@@ -72,11 +77,11 @@ class CollectionService:
         return CollectionRepository.delete_collection(db_type, collection_id, user_id)
 
     @staticmethod
-    def add_item(db_type, collection_id, user_id, book_id=None, series_name=None, audiobook_id=None):
+    def add_item(db_type, collection_id, user_id, book_id=None, series_name=None, audiobook_id=None, video_id=None):
         coll = CollectionRepository.get_collection_by_id(db_type, collection_id, user_id=user_id)
         if not coll:
             raise ValueError("컬렉션을 찾을 수 없거나 접근 권한이 없습니다.")
-        return CollectionRepository.add_item_to_collection(db_type, collection_id, book_id, series_name, audiobook_id)
+        return CollectionRepository.add_item_to_collection(db_type, collection_id, book_id, series_name, audiobook_id, video_id)
 
     @staticmethod
     def remove_item(db_type, collection_id, user_id, item_id):

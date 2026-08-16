@@ -70,14 +70,14 @@ class UserRepository:
         return int(row['cnt']) if row else 0
 
     @staticmethod
-    def add_user(db_type, username, password_hash, role, has_adult_access, has_audiobook_access=1):
+    def add_user(db_type, username, password_hash, role, has_adult_access, has_audiobook_access=1, has_video_access=1):
         """신규 사용자 등록 및 카테고리 권한 기본 매핑 시딩"""
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
             cursor.execute(
-                "INSERT INTO users (username, password_hash, role, is_default_password, has_adult_access, has_audiobook_access) VALUES (?, ?, ?, 1, ?, ?)", 
-                (username, password_hash, role, has_adult_access, has_audiobook_access)
+                "INSERT INTO users (username, password_hash, role, is_default_password, has_adult_access, has_audiobook_access, has_video_access) VALUES (?, ?, ?, 1, ?, ?, ?)",
+                (username, password_hash, role, has_adult_access, has_audiobook_access, has_video_access)
             )
             user_id = cursor.lastrowid
             

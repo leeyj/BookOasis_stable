@@ -26,6 +26,7 @@ if DBMS in ("mariadb", "mysql"):
         settings_repository,
         trash_repository,
         user_repository,
+        video_repository,
     )
 else:
     from repositories.sqlite import (
@@ -46,6 +47,7 @@ else:
         settings_repository,
         trash_repository,
         user_repository,
+        video_repository,
     )
 
 # 하위 호환성을 위해 sys.modules에 매핑하여 기존 'from repositories.xxx_repository import ...' 임포트 완벽 지원
@@ -66,6 +68,7 @@ sys.modules['repositories.series_repository'] = series_repository
 sys.modules['repositories.settings_repository'] = settings_repository
 sys.modules['repositories.trash_repository'] = trash_repository
 sys.modules['repositories.user_repository'] = user_repository
+sys.modules['repositories.video_repository'] = video_repository
 
 # 직속 임포트 노출 지원 (from repositories import BookRepository)
 AudiobookRepository = audiobook_repository.AudiobookRepository
@@ -85,3 +88,4 @@ SeriesRepository = series_repository.SeriesRepository
 SettingsRepository = settings_repository.SettingsRepository
 TrashRepository = trash_repository.TrashRepository
 UserRepository = user_repository.UserRepository
+VideoRepository = video_repository.VideoRepository

@@ -186,7 +186,30 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
     }
   }
 
-  if (!continueTarget && books && books.length > 0) {
+  const isVideoLib = state.currentLibraryType === 'video' || (books && books.length > 0 && books[0].video_id != null);
+
+  let hasVideoProgress = false;
+  if (isVideoLib && meta) {
+    const curTime = Number(meta.current_time || 0);
+    const totalPct = Number(meta.total_progress_pct || 0);
+    if (curTime > 0 || totalPct > 0 || meta.current_episode_id || Number(meta.is_completed) === 1) {
+      hasVideoProgress = true;
+      continueReason = 'in-progress';
+      if (meta.current_episode_id && books && books.length > 0) {
+        continueTarget = books.find((b) => Number(b.id) === Number(meta.current_episode_id));
+      }
+      if (!continueTarget && books && books.length > 0) {
+        continueTarget = books[0];
+      }
+    }
+  }
+
+  if (!continueTarget && isVideoLib && books && books.length > 0) {
+    continueTarget = books[0];
+    continueReason = 'first';
+  }
+
+  if (!continueTarget && !isVideoLib && books && books.length > 0) {
     const inProgressBooks = books.filter((book) => book.pages_read > 0 && book.is_completed === 0);
     if (inProgressBooks.length > 0) {
       inProgressBooks.sort((left, right) => new Date(right.last_read_at || 0) - new Date(left.last_read_at || 0));
@@ -217,9 +240,10 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
     let iconClass = 'fa-solid fa-play';
     const continueFmt = String(continueTarget.file_format || '').toLowerCase();
     const isAudioContext = state.currentLibraryType === 'audiobook' || ['audiobook', 'mp3', 'm4a', 'm4b', 'flac', 'aac', 'wav', 'ogg', 'opus', 'wma'].includes(continueFmt);
+    const isVideoBtnContext = isVideoLib || continueTarget.video_id != null;
 
     let progressPercent = 0;
-    if (hasAudioProgress && meta && Number(meta.total_progress_pct) > 0) {
+    if ((hasAudioProgress || hasVideoProgress) && meta && Number(meta.total_progress_pct) > 0) {
       progressPercent = Math.round(Number(meta.total_progress_pct));
     } else if (continueTarget.pages_read > 0) {
       const format = (continueTarget.file_format || '').toLowerCase();
@@ -232,39 +256,48 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
 
     let tooltipTitle = '';
     if (continueReason === 'in-progress') {
-      btnLabel = isAudioContext
-        ? (i18n.t('detail.continue_listening') || '이어서 듣기')
-        : (i18n.t('detail.continue_reading') || '이어서 읽기');
+      btnLabel = isVideoBtnContext
+        ? '이어보기'
+        : isAudioContext
+          ? (i18n.t('detail.continue_listening') || '이어서 듣기')
+          : (i18n.t('detail.continue_reading') || '이어서 읽기');
       tooltipTitle = `${continueTarget.title}${progressPercent > 0 ? ` (${progressPercent}%)` : ''}`;
       btnColor = '#8b5cf6';
       btnBorder = '#a78bfa';
-      iconClass = isAudioContext ? 'fa-solid fa-headphones' : 'fa-solid fa-play';
+      iconClass = isVideoBtnContext ? 'fa-solid fa-clapperboard' : isAudioContext ? 'fa-solid fa-headphones' : 'fa-solid fa-play';
     } else if (continueReason === 'recent') {
-      btnLabel = isAudioContext
-        ? (i18n.t('detail.continue_listening') || '이어서 듣기')
-        : (i18n.t('detail.continue_reading') || '이어서 읽기');
+      btnLabel = isVideoBtnContext
+        ? '이어보기'
+        : isAudioContext
+          ? (i18n.t('detail.continue_listening') || '이어서 듣기')
+          : (i18n.t('detail.continue_reading') || '이어서 읽기');
       tooltipTitle = continueTarget.title;
       btnColor = '#6d28d9';
       btnBorder = '#8b5cf6';
-      iconClass = isAudioContext ? 'fa-solid fa-headphones' : 'fa-solid fa-play';
+      iconClass = isVideoBtnContext ? 'fa-solid fa-clapperboard' : isAudioContext ? 'fa-solid fa-headphones' : 'fa-solid fa-play';
     } else {
-      btnLabel = isAudioContext
-        ? (i18n.t('detail.start_listening') || '처음부터 듣기')
-        : (i18n.t('detail.start_reading') || '첫 권부터 읽기');
+      btnLabel = isVideoBtnContext
+        ? '처음부터 보기'
+        : isAudioContext
+          ? (i18n.t('detail.start_listening') || '처음부터 듣기')
+          : (i18n.t('detail.start_reading') || '첫 권부터 읽기');
       tooltipTitle = continueTarget.title;
       btnColor = '#10b981';
       btnBorder = '#34d399';
-      iconClass = isAudioContext ? 'fa-solid fa-headphones' : 'fa-solid fa-book-open-reader';
+      iconClass = isVideoBtnContext ? 'fa-solid fa-clapperboard' : isAudioContext ? 'fa-solid fa-headphones' : 'fa-solid fa-book-open-reader';
     }
 
     const resumeTrackId = (meta && meta.current_track_id) ? meta.current_track_id : continueTarget.id;
     const resumeStartTime = (meta && Number(meta.current_time) > 0) ? Number(meta.current_time) : (continueTarget.pages_read || 0);
+    const continueAction = isVideoBtnContext ? 'video' : (isAudioContext ? 'audio' : 'reader');
     continueBtnHtml = `
-      <button class="ridi-link-btn" style="margin: 0; background: ${btnColor}; border-color: ${btnBorder}; font-weight: bold; color: #fff; display: inline-flex; align-items: center; gap: 0.3rem;" 
+      <button class="ridi-link-btn" style="margin: 0; background: ${btnColor}; border-color: ${btnBorder}; font-weight: bold; color: #fff; display: inline-flex; align-items: center; gap: 0.3rem;"
               data-role="detail-continue"
-              data-continue-action="${isAudioContext ? 'audio' : 'reader'}"
+              data-continue-action="${continueAction}"
               data-audiobook-id="${(meta && meta.id) ? meta.id : (continueTarget.audiobook_id || continueTarget.id || '')}"
               data-track-id="${resumeTrackId || ''}"
+              data-video-id="${(meta && meta.id) ? meta.id : (continueTarget.video_id || '')}"
+              data-episode-id="${(meta && meta.current_episode_id) ? meta.current_episode_id : (continueTarget.video_id ? continueTarget.id : '')}"
               data-start-time="${resumeStartTime || 0}"
               data-book-id="${continueTarget.id || ''}"
               data-file-format="${(continueTarget.file_format || '').replace(/"/g, '&quot;')}"
@@ -290,15 +323,18 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
       <i class="fa-solid fa-headphones"></i> ${i18n.t('detail.audiobook_completed')}
     </span>
   ` : '';
+  // 영상 강좌는 show.yaml 스캔 메타 전용이라 즐겨찾기/편집/플러그인 메타검색/커버 업로드/
+  // 개별 재스캔/전체완료 표시 등 "도서 카탈로그 편집" 계열 버튼에 대응하는 백엔드가 없다 - 헤더에서 숨김.
+  const isVideoContext = state.currentLibraryType === 'video';
   const markSeriesCompletedLabel = isAudiobookContext
     ? i18n.t('detail.btn_mark_audiobook_completed')
     : i18n.t('detail.btn_mark_series_completed');
-  const markSeriesCompletedBtnHtml = `
+  const markSeriesCompletedBtnHtml = isVideoContext ? '' : `
     <button class="ridi-link-btn" data-role="detail-mark-series-complete" data-series-name="${safeSeriesName.replace(/"/g, '&quot;')}" data-library-id="${actualLibraryId}" style="margin: 0; background: #16a34a; border-color: #22c55e; display: inline-flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-circle-check"></i> ${markSeriesCompletedLabel}</button>
   `;
   const identifierLabel = 'ISBN(WEB_ID)';
-  const identifierValue = isAudiobookContext ? (meta.web_id || '-') : (meta.isbn || '-');
-  const identifierEditValue = isAudiobookContext ? (meta.web_id || '') : (meta.isbn || '');
+  const identifierValue = (isAudiobookContext || isVideoContext) ? (meta.web_id || '-') : (meta.isbn || '-');
+  const identifierEditValue = (isAudiobookContext || isVideoContext) ? (meta.web_id || '') : (meta.isbn || '');
   const detailLockedBadgeHtml = isLocked ? `
     <div class="book-card-locked-badge" title="메타데이터 잠김 (수동 편집됨)">
       <i class="fa-solid fa-lock"></i>
@@ -310,6 +346,31 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
     </button>
   ` : '';
 
+  const seriesFavBtnHtml = `
+          <button class="btn-fav-toggle" data-role="detail-series-favorite" data-series-name="${safeSeriesName.replace(/"/g, '&quot;')}" data-library-id="${actualLibraryId}" data-next-status="${isSeriesFav ? 1 : 0}" style="background:none; border:none; color:${seriesFavIconColor}; cursor:pointer; font-size:1.4rem; display:inline-flex; align-items:center;" title="${i18n.t('detail.toggle_fav_series')}">
+            <i class="${seriesFavIconClass}"></i>
+          </button>
+  `;
+  const editToggleBtnHtml = isVideoContext ? '' : `
+          <button class="ridi-link-btn btn-edit-toggle" data-role="detail-edit-toggle" style="background: #0284c7; border-color: #0ea5e9; font-size: 0.75rem; padding: 0.2rem 0.6rem; display: inline-flex; align-items: center; gap: 0.2rem; margin-left: 0.4rem;">
+            <i class="fa-solid fa-pen-to-square"></i> ${i18n.t('detail.edit_info')}
+          </button>
+  `;
+  const coverUploadOverlayHtml = isVideoContext ? '' : `
+        <div class="cover-upload-overlay" id="cover-upload-overlay-btn" data-role="detail-cover-upload">
+          <i class="fa-solid fa-camera"></i>
+          <span>${i18n.t('detail.change_cover')}</span>
+        </div>
+        <input type="file" id="cover-upload-file-input" data-role="detail-cover-file-input" accept="image/*" style="display: none;">
+  `;
+  const pluginMetaSearchBtnHtml = isVideoContext ? '' : `
+          <button id="btn-plugin-meta-search" class="ridi-link-btn" data-role="detail-plugin-meta-search" data-book-id="${firstBookId || ''}" data-series-name="${safeSeriesName.replace(/"/g, '&quot;')}" style="margin: 0; background: #2563eb; border-color: #3b82f6;"><i class="fa-solid fa-magnifying-glass"></i> ${i18n.t('detail.btn_search_meta')}</button>
+  `;
+  const rescanSeriesBtnHtml = isVideoContext ? '' : `
+          <button class="ridi-link-btn" data-role="detail-rescan-series" data-series-name="${safeSeriesName.replace(/"/g, '&quot;')}" data-library-id="${actualLibraryId}" style="margin: 0; background: #ea580c; border-color: #f97316; display: inline-flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-arrows-rotate"></i> ${i18n.t('detail.btn_rescan_series')}</button>
+  `;
+  const volumeCountLabel = isVideoContext ? `${books.length}편` : `${books.length}권`;
+
   return `
     <!-- 상단 헤더: 커버(작게) + 메타정보 -->
     <div class="detail-header-panel">
@@ -317,25 +378,17 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
            <img class="detail-cover-sm" id="detail-cover-img-preview" src="${coverSrc}" alt="Cover" data-title="${(visibleTitle || '').replace(/"/g, '&quot;')}" data-format="${headerFormat}"
               onerror="window.handleCoverError(this)">
         ${detailLockedBadgeHtml}
-        <div class="cover-upload-overlay" id="cover-upload-overlay-btn" data-role="detail-cover-upload">
-          <i class="fa-solid fa-camera"></i>
-          <span>${i18n.t('detail.change_cover')}</span>
-        </div>
-        <input type="file" id="cover-upload-file-input" data-role="detail-cover-file-input" accept="image/*" style="display: none;">
+        ${coverUploadOverlayHtml}
       </div>
-      
+
       <!-- 뷰어 모드 (일반 노출) -->
       <div id="detail-header-meta-view" class="detail-header-meta">
         <h3 class="book-detail-title" style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
           ${meta.series_alias || visibleTitle}
           ${meta.series_alias ? `<span style="font-size: 0.85rem; color: #94a3b8; font-weight: normal;">(${visibleTitle})</span>` : ''}
           ${audiobookCompletedBadgeHtml}
-          <button class="btn-fav-toggle" data-role="detail-series-favorite" data-series-name="${safeSeriesName.replace(/"/g, '&quot;')}" data-library-id="${actualLibraryId}" data-next-status="${isSeriesFav ? 1 : 0}" style="background:none; border:none; color:${seriesFavIconColor}; cursor:pointer; font-size:1.4rem; display:inline-flex; align-items:center;" title="${i18n.t('detail.toggle_fav_series')}">
-            <i class="${seriesFavIconClass}"></i>
-          </button>
-          <button class="ridi-link-btn btn-edit-toggle" data-role="detail-edit-toggle" style="background: #0284c7; border-color: #0ea5e9; font-size: 0.75rem; padding: 0.2rem 0.6rem; display: inline-flex; align-items: center; gap: 0.2rem; margin-left: 0.4rem;">
-            <i class="fa-solid fa-pen-to-square"></i> ${i18n.t('detail.edit_info')}
-          </button>
+          ${seriesFavBtnHtml}
+          ${editToggleBtnHtml}
           ${unlockBtnHtml}
         </h3>
         <div class="detail-meta">
@@ -343,7 +396,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
           <span class="meta-item"><i class="fa-solid fa-pen-nib"></i> ${meta.author || '-'}</span>
           <span class="meta-item"><i class="fa-solid fa-barcode"></i> ${identifierLabel}: ${identifierValue}</span>
           <span class="meta-item"><i class="fa-solid fa-building"></i> ${meta.publisher || '-'}</span>
-          <span class="meta-item"><i class="fa-solid fa-book-open"></i> ${books.length}권</span>
+          <span class="meta-item"><i class="fa-solid fa-book-open"></i> ${volumeCountLabel}</span>
         </div>
         <div class="detail-meta-tags" style="display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.5rem; margin-bottom: 0.8rem;">
           ${genreRowHtml}
@@ -364,9 +417,9 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
         <!-- 버튼: 이어서 읽기 및 메타정보 찾기 -->
         <div style="display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; align-items: center;">
           ${continueBtnHtml}
-          <button id="btn-manual-meta-search" class="ridi-link-btn" style="display:none; margin: 0; background: #7c3aed; border-color: #a855f7;"><i class="fa-solid fa-wand-magic-sparkles"></i> ${i18n.t('detail.btn_recommend_match')}</button>
-          <button id="btn-plugin-meta-search" class="ridi-link-btn" data-role="detail-plugin-meta-search" data-book-id="${firstBookId || ''}" data-series-name="${safeSeriesName.replace(/"/g, '&quot;')}" style="margin: 0; background: #2563eb; border-color: #3b82f6;"><i class="fa-solid fa-magnifying-glass"></i> ${i18n.t('detail.btn_search_meta')}</button>
-          <button class="ridi-link-btn" data-role="detail-rescan-series" data-series-name="${safeSeriesName.replace(/"/g, '&quot;')}" data-library-id="${actualLibraryId}" style="margin: 0; background: #ea580c; border-color: #f97316; display: inline-flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-arrows-rotate"></i> ${i18n.t('detail.btn_rescan_series')}</button>
+          ${isVideoContext ? '' : `<button id="btn-manual-meta-search" class="ridi-link-btn" style="display:none; margin: 0; background: #7c3aed; border-color: #a855f7;"><i class="fa-solid fa-wand-magic-sparkles"></i> ${i18n.t('detail.btn_recommend_match')}</button>`}
+          ${pluginMetaSearchBtnHtml}
+          ${rescanSeriesBtnHtml}
           ${markSeriesCompletedBtnHtml}
         </div>
       </div>

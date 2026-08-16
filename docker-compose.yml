@@ -14,6 +14,22 @@ services:
       - ./covers:/app/covers
       - ./cache:/app/cache
       - ./plugins:/app/plugins
+    # ── GPU 하드웨어 트랜스코딩을 쓰고 싶다면 아래 중 서버 환경에 맞는 항목의 주석을 해제하세요 ──
+    # (기본은 둘 다 비활성화 상태입니다. devices/gpu 설정이 가리키는 장치가 호스트에
+    #  실제로 없으면 docker-compose up 자체가 시작 실패하니, 있는 것만 해제하세요.)
+    #
+    # [Intel iGPU (Iris 등) - VAAPI]
+    # devices:
+    #   - /dev/dri:/dev/dri
+    #
+    # [NVIDIA GPU (P600 등) - NVENC. 호스트에 NVIDIA 드라이버 + nvidia-container-toolkit 설치 필요]
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
     env_file:
       - .env
     environment:

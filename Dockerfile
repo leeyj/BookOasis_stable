@@ -10,10 +10,17 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # 4. Install System Dependencies
+# intel-media-va-driver/libva2/vainfo: Intel iGPU(QuickSync, 예: Iris) VAAPI 하드웨어
+# 트랜스코딩 런타임 드라이버. ffmpeg 패키지 자체는 VAAPI hwaccel을 컴파일 지원하지만,
+# 실제 동작에는 이 드라이버 스택이 별도로 필요하다 (설정 > 일반 > 영상 트랜스코딩의
+# "VAAPI 점검" 버튼이 이 패키지 유무 + /dev/dri 패스스루 여부를 확인함).
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     ffmpeg \
     gosu \
+    intel-media-va-driver \
+    libva2 \
+    vainfo \
     && rm -rf /var/lib/apt/lists/*
 
 # 5. Install Python Dependencies

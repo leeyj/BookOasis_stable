@@ -463,6 +463,12 @@ export async function triggerLazyScan() {
   return res.json();
 }
 
+export async function checkVaapiSupport(devicePath) {
+  const query = devicePath ? `?device=${encodeURIComponent(devicePath)}` : '';
+  const res = await fetch(`/api/media/videos/check-vaapi${query}`, { cache: 'no-store' });
+  return res.json();
+}
+
 export async function fetchTags(type, libraryId) {
   const libQuery = libraryId ? `&library_id=${libraryId}` : '';
   const res = await fetch(`/api/media/tags?type=${type}${libQuery}`);

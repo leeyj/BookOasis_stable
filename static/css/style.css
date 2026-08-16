@@ -141,6 +141,20 @@
     --library-session-header-sheen: rgba(56, 189, 248, 0.08);
 }
 
+:root:not([data-app-theme="epaper"])[data-library-type="video"] {
+    --library-session-main-tint: rgba(168, 85, 247, 0.04);
+    --library-session-sidebar-tint: rgba(168, 85, 247, 0.03);
+    --library-session-divider: rgba(168, 85, 247, 0.24);
+    --library-session-header-sheen: rgba(168, 85, 247, 0.08);
+}
+
+/* 영상 강좌 세션은 도서 장르 기반 AI 추천(스마트추천)과 메타데이터 플러그인 탭은
+   개념이 맞지 않아 계속 숨긴다. 전체보기/이어보기/즐겨찾기/컬렉션은 5단계에서 활성화됨. */
+html[data-library-type="video"] #sidebar-categories [data-id="smart_rec"],
+html[data-library-type="video"] #sidebar-categories [data-id="plugins"] {
+    display: none !important;
+}
+
 /* e-paper 테마에서는 타입별 변동을 완전히 비활성화 */
 :root[data-app-theme="epaper"] {
     --library-session-main-tint: transparent;
@@ -1905,6 +1919,12 @@ body {
     cursor: pointer;
     display: flex;
     flex-direction: column;
+    /* 그리드 트랙 크기(--book-card-width)가 자식 콘텐츠(긴 제목 등)의 최소 크기에
+       밀려 카드마다 제각각 커지는 걸 막는다 - 그리드 아이템 기본 min-width:auto가
+       콘텐츠 기반이라 발생하는 흔한 함정. width:100%로 트랙 폭에 명시적으로 고정. */
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
     transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
     position: relative;
     -webkit-touch-callout: none;

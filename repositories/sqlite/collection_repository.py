@@ -95,7 +95,7 @@ class CollectionRepository:
             conn.close()
 
     @staticmethod
-    def add_item_to_collection(db_type, collection_id, book_id=None, series_name=None, audiobook_id=None):
+    def add_item_to_collection(db_type, collection_id, book_id=None, series_name=None, audiobook_id=None, video_id=None):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
@@ -106,6 +106,8 @@ class CollectionRepository:
                 cursor.execute("SELECT id FROM collection_items WHERE collection_id = ? AND series_name = ?", (collection_id, series_name))
             elif audiobook_id is not None:
                 cursor.execute("SELECT id FROM collection_items WHERE collection_id = ? AND audiobook_id = ?", (collection_id, audiobook_id))
+            elif video_id is not None:
+                cursor.execute("SELECT id FROM collection_items WHERE collection_id = ? AND video_id = ?", (collection_id, video_id))
             else:
                 return None
 
@@ -114,10 +116,10 @@ class CollectionRepository:
 
             cursor.execute(
                 """
-                INSERT INTO collection_items (collection_id, book_id, series_name, audiobook_id)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO collection_items (collection_id, book_id, series_name, audiobook_id, video_id)
+                VALUES (?, ?, ?, ?, ?)
                 """,
-                (collection_id, book_id, series_name, audiobook_id)
+                (collection_id, book_id, series_name, audiobook_id, video_id)
             )
             item_id = cursor.lastrowid
             conn.commit()
@@ -151,10 +153,12 @@ class CollectionRepository:
                 """
                 SELECT ci.*,
                        b.title AS book_title, b.cover_image AS book_cover, b.series_name AS book_series, b.file_format AS book_format,
-                       ab.title AS audiobook_title, ab.folder_name AS audiobook_folder
+                       ab.title AS audiobook_title, ab.folder_name AS audiobook_folder,
+                       v.title AS video_title, v.folder_name AS video_folder
                 FROM collection_items ci
                 LEFT JOIN books b ON b.id = ci.book_id
                 LEFT JOIN audiobooks ab ON ab.id = ci.audiobook_id
+                LEFT JOIN videos v ON v.id = ci.video_id
                 WHERE ci.collection_id = ?
                 ORDER BY ci.sort_order ASC, ci.created_at ASC
                 """,

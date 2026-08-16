@@ -14,6 +14,7 @@
             <button type="button" class="permission-session-tab active" data-permission-session="general" style="padding:0.55rem 0.9rem; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(168,85,247,0.18); color:#fff; font-weight:700; cursor:pointer;">일반 도서</button>
             <button type="button" class="permission-session-tab" data-permission-session="adult" style="padding:0.55rem 0.9rem; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.03); color:#cbd5e1; font-weight:700; cursor:pointer;">성인 서재</button>
             <button type="button" class="permission-session-tab" data-permission-session="audiobook" style="padding:0.55rem 0.9rem; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.03); color:#cbd5e1; font-weight:700; cursor:pointer;">오디오북 카테고리</button>
+            <button type="button" class="permission-session-tab" data-permission-session="video" style="padding:0.55rem 0.9rem; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.03); color:#cbd5e1; font-weight:700; cursor:pointer;">영상 강좌 카테고리</button>
         </div>
 
         <div id="permission-session-general" class="permission-session-panel" style="display:block;">
@@ -53,6 +54,17 @@
                         <tr style="background: rgba(15, 23, 42, 0.4); border-bottom: 1px solid rgba(255,255,255,0.08); color: #94a3b8;" id="permissions-audiobook-table-header"></tr>
                     </thead>
                     <tbody id="permissions-audiobook-table-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="permission-session-video" class="permission-session-panel" style="display:none;">
+            <div class="settings-table-wrapper" style="background: rgba(30, 41, 59, 0.25); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; overflow-x: auto; backdrop-filter: blur(10px);">
+                <table class="settings-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; min-width: 600px;">
+                    <thead>
+                        <tr style="background: rgba(15, 23, 42, 0.4); border-bottom: 1px solid rgba(255,255,255,0.08); color: #94a3b8;" id="permissions-video-table-header"></tr>
+                    </thead>
+                    <tbody id="permissions-video-table-body"></tbody>
                 </table>
             </div>
         </div>

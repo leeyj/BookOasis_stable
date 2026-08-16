@@ -27,6 +27,20 @@
     </ul>
 </div>
 
+<!-- 영상 강좌 카드 우클릭 커스텀 컨텍스트 메뉴 (전용 축소 메뉴) -->
+<div id="video-context-menu" class="context-menu" style="display: none;">
+    <div class="context-menu-header">
+        <span class="context-menu-title" id="video-ctx-title">강좌 메뉴</span>
+        <button type="button" class="context-menu-close-btn" data-role="video-context-close" aria-label="닫기"><span class="context-menu-close-icon">&times;</span><span class="context-menu-close-text">닫기</span></button>
+    </div>
+    <ul class="context-menu-list">
+        <li class="context-menu-item" data-role="video-context-action" data-action="open-detail"><i class="fa-solid fa-circle-info" style="color: #38bdf8;"></i> <span>상세보기</span></li>
+        <li class="context-menu-item" data-role="video-context-action" data-action="toggle-favorite"><i class="fa-solid fa-star" style="color: #eab308;"></i> <span id="video-ctx-favorite-label">즐겨찾기 추가</span></li>
+        <li class="context-menu-item" data-role="video-context-action" data-action="add-to-collection"><i class="fa-solid fa-folder-plus" style="color: #c084fc;"></i> <span>컬렉션에 추가</span></li>
+        <li class="context-menu-item context-menu-close-item" data-role="video-context-close"><i class="fa-solid fa-xmark" style="color: #f87171;"></i> <span>닫기</span></li>
+    </ul>
+</div>
+
 <!-- 스케줄 작업용 컨텍스트 메뉴 -->
 <div id="schedule-action-context-menu" class="context-menu" style="display: none; min-width: 200px;">
     <div class="context-menu-header" style="padding: 0.35rem 0.85rem 0.55rem 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;">

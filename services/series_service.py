@@ -110,7 +110,7 @@ def _build_series_entries(db_type, rows):
         series_alias = next((b['series_alias'] for b in books if b.get('series_alias')), '')
         total_tracks = 0
         is_completed = 0
-        if db_type == 'audiobook':
+        if db_type in ('audiobook', 'video'):
             total_tracks = max((int(b.get('total_tracks') or 0) for b in books), default=0)
             is_completed = 1 if any(int(b.get('is_completed') or 0) == 1 for b in books) else 0
         series_key = hashlib.md5(f"{lib_id}|{series_name}|{comp_dir}".encode('utf-8')).hexdigest()[:16]

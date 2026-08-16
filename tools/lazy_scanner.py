@@ -729,6 +729,91 @@ def get_series_cover_fallback_single(series_name, parent_dir, filename, file_pat
     return (None, None, [])
 
 
+def run_lazy_video_duration_backfill():
+    """
+    영상 강좌 스캔 시 duration=0(미분석)으로 남겨둔 에피소드를 백그라운드에서 ffprobe로 채웁니다.
+    services/video_scanner.py::parse_video_folder()가 스캔 속도를 위해 duration/width/height를
+    동기로 추출하지 않고 0으로 남겨두는데(Plex/Jellyfin처럼 발견과 분석을 분리), 그 뒷단을 이 함수가 담당합니다.
+    """
+    global stop_requested
+
+    if not database.is_mariadb_mode():
+        db_path = database.get_db_path('video')
+        if not os.path.exists(db_path):
+            return
+
+    MAX_EPISODES_PER_RUN = 300
+
+    conn = _open_database_connection('video')
+    if conn is None:
+        return
+
+    print("[Lazy-Scanner] 🎬 영상 에피소드 미분석(duration=0) 항목 백필 시작")
+    try:
+        from services.video_scanner import _probe_video_info, is_browser_compatible
+
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, video_id, file_path
+            FROM video_episodes
+            WHERE COALESCE(duration, 0) <= 0
+            ORDER BY id ASC
+            LIMIT ?
+        """, (MAX_EPISODES_PER_RUN,))
+        candidates = cursor.fetchall()
+
+        if not candidates:
+            print("[Lazy-Scanner] 🎬 미분석 영상 에피소드 없음. 스킵.")
+            return
+
+        print(f"[Lazy-Scanner] 🎬 미분석 영상 에피소드 {len(candidates)}건 발견. ffprobe 분석 시작...")
+
+        updated_count = 0
+        touched_video_ids = set()
+        for row in candidates:
+            if stop_requested:
+                print("[Lazy-Scanner] ⚠️ 중단 요청(SIGTERM/SIGINT) 감지. 영상 백필을 중단합니다.")
+                break
+
+            episode_id = row['id']
+            video_id = row['video_id']
+            file_path = row['file_path']
+
+            if not file_path or not os.path.exists(file_path):
+                continue
+
+            duration, width, height, vcodec, acodec = _probe_video_info(file_path)
+            if duration <= 0:
+                # 여전히 실패(파일 손상/네트워크 일시 오류 등) - 다음 lazy 실행에서 재시도
+                continue
+
+            needs_transcode = 0 if is_browser_compatible(file_path, vcodec, acodec) else 1
+
+            cursor.execute(
+                "UPDATE video_episodes SET duration = ?, width = ?, height = ?, needs_transcode = ? WHERE id = ?",
+                (duration, width, height, needs_transcode, episode_id)
+            )
+            conn.commit()
+            updated_count += 1
+            touched_video_ids.add(video_id)
+
+        for video_id in touched_video_ids:
+            cursor.execute("SELECT COALESCE(SUM(duration), 0) AS total FROM video_episodes WHERE video_id = ?", (video_id,))
+            total_row = cursor.fetchone()
+            total = total_row['total'] if total_row else 0
+            cursor.execute("UPDATE videos SET total_duration = ? WHERE id = ?", (total, video_id))
+        conn.commit()
+
+        print(f"[Lazy-Scanner] 🎬 영상 에피소드 백필 완료: {updated_count}건 업데이트, 강좌 {len(touched_video_ids)}건 total_duration 재계산")
+    except Exception as e:
+        print(f"[Lazy-Scanner] 영상 백필 중 오류: {e}")
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
 if __name__ == '__main__':
     # ─── 종료 시그널 핸들러 등록 ───
     try:
@@ -744,6 +829,8 @@ if __name__ == '__main__':
 
     try:
         run_lazy_cover_extraction(target_book_id=args.book_id, target_db_type=args.db_type)
+        if args.book_id is None:
+            run_lazy_video_duration_backfill()
     except SystemExit as se:
         sys.exit(se.code)
     except Exception as main_err:

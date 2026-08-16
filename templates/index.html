@@ -32,7 +32,8 @@
             username: {{ session.get('username', '') | tojson }},
             role: {{ session.get('role', '') | tojson }},
             has_adult_access: Number({{ session.get('has_adult_access', 0) | tojson }}),
-            has_audiobook_access: Number({{ session.get('has_audiobook_access', 0) | tojson }})
+            has_audiobook_access: Number({{ session.get('has_audiobook_access', 0) | tojson }}),
+            has_video_access: Number({{ session.get('has_video_access', 0) | tojson }})
         };
         window.bookOasisConsoleLog = typeof console.log === 'function' ? console.log.bind(console) : function() {};
         

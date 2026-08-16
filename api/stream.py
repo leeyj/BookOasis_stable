@@ -61,6 +61,8 @@ def _format_cover_label(file_format):
         return 'PDF'
     if key in ('audiobook', 'audio'):
         return 'AUDIO'
+    if key == 'video':
+        return 'VIDEO'
     return 'TEXT'
 
 

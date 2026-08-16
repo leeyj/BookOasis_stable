@@ -1,4 +1,16 @@
 # CHANGELOG
+## v2.1.0
+- (video) 오디오북과 나란한 새 미디어 세션 "영상 강좌" 추가 — 폴더당 강좌 1개, `S01E01` 명명 + `show.yaml` 사이드카(Plex TV쇼 스타일)로 에피소드를 인식하며, 전용 DB/스캐너/스트리밍(Range 206) 라우트와 사이드바 세션 토글, 관리자 권한 매트릭스를 갖춤 | add a new "Video Courses" media session alongside audiobooks — one course per folder, episodes recognized via `S01E01` naming + a `show.yaml` sidecar (Plex TV-show style), with its own DB/scanner/streaming (Range 206) routes, a sidebar session toggle, and an admin permission matrix
+- (video) 상세페이지·이어보기·즐겨찾기·컬렉션·최근시청·전체보기·홈 대시보드(최근 시청/신규 추가)까지 오디오북과 동일한 공용 파이프라인에 통합 | integrate the detail page, resume-playback, favorites, collections, recently-watched, browse-all, and home dashboard (recent/newly-added rows) into the same shared pipeline used by audiobooks
+- (video) 원격(rclone) 드라이브에서도 스캔이 느려지지 않도록 재생시간/해상도 추출을 백그라운드 지연(Lazy) 분석으로 분리 | keep scans fast on remote (rclone) drives by moving duration/resolution extraction into a background lazy-analysis pass instead of doing it synchronously during scan
+- (video) 브라우저가 직접 재생 가능한 파일은 원본을 그대로 스트리밍하고, MKV 등 비호환 파일만 ffmpeg로 자동 폴백(CPU 기본, Intel VAAPI 하드웨어 가속 감지 시 자동 전환) — 설정 화면에 VAAPI 지원 여부 점검 버튼 및 커스텀 인코딩 파라미터 입력란 추가 | stream browser-compatible files as-is, and automatically fall back to ffmpeg only for incompatible files like MKV (CPU by default, auto-switching to Intel VAAPI hardware acceleration when detected) — added a VAAPI availability check button and custom encoding-parameter fields to Settings
+- (video) SMI/SRT 자막 사이드카(언어 태그 포함 파일명, 예: `.ko.srt`)를 자동 인식해 WebVTT로 변환 후 재생 시 자막으로 표시 | auto-detect SMI/SRT subtitle sidecars (including language-tagged filenames like `.ko.srt`), convert them to WebVTT, and show them as subtitles during playback
+- (fix) 그리드 뷰에서 제목이 긴 카드가 그리드 트랙을 밀어 넓히면서 카드 크기가 환경설정의 썸네일 크기를 따라가지 않던 문제 수정(일반 도서/오디오북/영상 강좌 공통) | fix grid cards not respecting the configured thumbnail-size setting when a long title pushed its grid track wider than the rest (affected general books, audiobooks, and video courses alike)
+- (db) MariaDB에서 `collection_items.video_id` 컬럼 자동 마이그레이션이 인라인 FK 절 때문에 조용히 실패하던 문제 수정, 스키마 자동 보강 실패 시 로그를 남기도록 개선 | fix `collection_items.video_id` auto-migration silently failing on MariaDB due to an inline foreign-key clause, and make schema auto-repair failures log instead of failing silently
+
+## v2.0.6
+- (api) DB 게이트웨이를 거치지 않고 직접 DB에 접속해야 하는 외부 연동 프로그램/플러그인용, 현재 DB 엔진(SQLite/MariaDB)을 확인할 수 있는 웹훅 API(`/api/webhook/system/db-engine`) 추가 | add a webhook API (`/api/webhook/system/db-engine`) so external programs/plugins that must connect to the DB directly (bypassing the API gateway) can check whether the current DB engine is SQLite or MariaDB
+
 ## v2.0.5
 - (dashboard) TV용 UI 추가(베타) - 사이드바 그룹 드로어, 이어보기/최근추가 홈, 카테고리 그리드(정렬 지원), 킷오스크 리더/플러그인 모드(`/?kiosk=1`), 팝업 로그인/로그아웃, 리모컨(방향키/Enter/ESC) 내비게이션 | added TV app UI (beta) - overlay category drawer, continue-reading/recently-added home rows, sortable category grid, kiosk reader/plugin mode (`/?kiosk=1`), popup login/logout, and remote-control (arrow/Enter/Esc) navigation
 - (category) 라이브러리/플러그인 카테고리를 가상 그룹(폴더)에 넣고 드래그로 정렬할 수 있는 기능 추가 | add virtual groups (folders) for library/plugin categories in the sidebar, with drag-to-reorder for both group members and the groups themselves

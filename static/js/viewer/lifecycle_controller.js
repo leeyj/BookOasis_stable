@@ -38,6 +38,14 @@ export function openReader(bookId, format, title, pagesRead, totalPages) {
     }
   }
 
+  if (fmt === 'video' || state.currentLibraryType === 'video') {
+    if (typeof window.openVideoPlayer === 'function') {
+      // 강좌(작품) ID를 전달받아 이어보기 위치(episode/time)는 플레이어 내부에서 진도 조회로 복원한다.
+      window.openVideoPlayer(bookId);
+      return;
+    }
+  }
+
   import('../viewer_next_episode.js').then((m) => {
     if (m.clearNextEpisodeArm) {
       console.log('[Viewer-Core] Resetting next episode arming state for new reader session');

@@ -26,16 +26,20 @@ export async function loadPermissionsMatrix() {
   const adultBody = document.getElementById('permissions-adult-table-body');
   const audiobookHeaderRow = document.getElementById('permissions-audiobook-table-header');
   const audiobookBody = document.getElementById('permissions-audiobook-table-body');
-  if (!generalHeaderRow || !generalBody || !adultBody || !audiobookHeaderRow || !audiobookBody) return;
+  const videoHeaderRow = document.getElementById('permissions-video-table-header');
+  const videoBody = document.getElementById('permissions-video-table-body');
+  if (!generalHeaderRow || !generalBody || !adultBody || !audiobookHeaderRow || !audiobookBody || !videoHeaderRow || !videoBody) return;
 
   const tLoading = window.i18n ? window.i18n.t('common.loading') : '불러오는 중...';
   const tError = window.i18n ? window.i18n.t('common.error') : '오류';
 
   generalHeaderRow.innerHTML = `<th style="padding:1rem; text-align:center;">${tLoading}</th>`;
   audiobookHeaderRow.innerHTML = `<th style="padding:1rem; text-align:center;">${tLoading}</th>`;
+  videoHeaderRow.innerHTML = `<th style="padding:1rem; text-align:center;">${tLoading}</th>`;
   generalBody.innerHTML = '';
   adultBody.innerHTML = '';
   audiobookBody.innerHTML = '';
+  videoBody.innerHTML = '';
 
   try {
     const res = await fetch('/api/admin/permissions');
@@ -44,6 +48,7 @@ export async function loadPermissionsMatrix() {
     if (!data.success) {
       generalHeaderRow.innerHTML = `<th style="padding:1rem; color:#ef4444;">${tError}: ${data.error}</th>`;
       audiobookHeaderRow.innerHTML = `<th style="padding:1rem; color:#ef4444;">${tError}: ${data.error}</th>`;
+      videoHeaderRow.innerHTML = `<th style="padding:1rem; color:#ef4444;">${tError}: ${data.error}</th>`;
       return;
     }
 
@@ -53,11 +58,14 @@ export async function loadPermissionsMatrix() {
     const users = data.users || [];
     const generalMatrix = data.matrices?.general || { categories: [], permissions: {} };
     const audiobookMatrix = data.matrices?.audiobook || { categories: [], permissions: {} };
+    const videoMatrix = data.matrices?.video || { categories: [], permissions: {} };
 
     renderMatrixHeader(generalHeaderRow, users);
     renderMatrixHeader(audiobookHeaderRow, users);
+    renderMatrixHeader(videoHeaderRow, users);
     generalBody.innerHTML = renderMatrixBody(users, generalMatrix.categories, generalMatrix.permissions, 'general');
     audiobookBody.innerHTML = renderMatrixBody(users, audiobookMatrix.categories, audiobookMatrix.permissions, 'audiobook');
+    videoBody.innerHTML = renderMatrixBody(users, videoMatrix.categories, videoMatrix.permissions, 'video');
     adultBody.innerHTML = renderAdultBody(users);
 
     bindPermissionEvents();
@@ -66,6 +74,7 @@ export async function loadPermissionsMatrix() {
     const tServerErr = window.i18n ? window.i18n.t('settings.users_server_error') : '서버 요청 중 오류가 발생했습니다.';
     generalHeaderRow.innerHTML = `<th style="padding:1rem; color:#ef4444;">${tServerErr}</th>`;
     audiobookHeaderRow.innerHTML = `<th style="padding:1rem; color:#ef4444;">${tServerErr}</th>`;
+    videoHeaderRow.innerHTML = `<th style="padding:1rem; color:#ef4444;">${tServerErr}</th>`;
     console.error(err);
   }
 }

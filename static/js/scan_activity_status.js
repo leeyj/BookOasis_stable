@@ -145,7 +145,9 @@ function applyCategoryScanSpinnersState() {
     const libId = li.getAttribute('data-category-id') || li.getAttribute('data-id');
     const sp = li.querySelector('.category-scan-spinner');
     if (sp) {
-      const isScanning = libId && lastActiveLibIds.has(String(libId));
+      // 사이드바에는 항상 현재 세션 타입(state.currentLibraryType)의 카테고리만 렌더링되므로,
+      // 그 타입 기준으로 복합키를 만들어야 다른 타입의 동일 id 스캔과 섞이지 않는다.
+      const isScanning = libId && lastActiveLibIds.has(`${state.currentLibraryType}:${libId}`);
       sp.style.display = isScanning ? 'inline-block' : 'none';
     }
   });
@@ -164,12 +166,16 @@ function updateCategoryScanSpinners(data) {
       const taskType = t.type || t.task_type;
       const kwargs = t.kwargs || {};
       const libId = kwargs.library_id;
+      // library_id는 물리 DB(db_type)마다 별도 시퀀스라, 타입 없이 숫자만 비교하면
+      // 서로 다른 세션의 라이브러리가 우연히 같은 id를 가질 때 스캔 스피너가 엉뚱한
+      // 카테고리 옆에도 뜨는 버그가 생긴다 - 반드시 "dbType:libId" 복합키로 구분한다.
+      const taskDbType = kwargs.db_type || 'general';
 
       if (taskType === 'lazy_scan') {
         isGlobalOrCurrentLibScanning = true;
       } else if (libId !== undefined && libId !== null) {
-        currentActiveLibIds.add(String(libId));
-        if (String(state.currentLibraryId) === String(libId)) {
+        currentActiveLibIds.add(`${taskDbType}:${libId}`);
+        if (taskDbType === state.currentLibraryType && String(state.currentLibraryId) === String(libId)) {
           isGlobalOrCurrentLibScanning = true;
         }
       } else {
@@ -217,7 +223,7 @@ function updateCategoryScanSpinners(data) {
   });
 
   lastActiveLibIds = effectiveActiveLibIds;
-  lastIsHeaderScanning = isGlobalOrCurrentLibScanning || effectiveActiveLibIds.has(String(state.currentLibraryId));
+  lastIsHeaderScanning = isGlobalOrCurrentLibScanning || effectiveActiveLibIds.has(`${state.currentLibraryType}:${state.currentLibraryId}`);
 
   applyCategoryScanSpinnersState();
 }

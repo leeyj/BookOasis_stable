@@ -21,7 +21,13 @@
 
   "dashboard": {
     "recent_title": "Recent Readings",
+    "recent_title_audiobook": "Recently Listened",
+    "recent_title_video": "Recently Watched",
     "new_books_title": "New Arrivals",
+    "new_books_title_audiobook": "New Audiobooks",
+    "new_books_title_video": "New Courses",
+    "recent_title_suffix": "(by series)",
+    "recent_title_suffix_video": "(by course)",
     "plugin_desk_title": "Plugin Desk",
     "insights_streak": "Reading Streak",
     "insights_days_suffix": "days streak",
@@ -307,6 +313,7 @@
     "general_books": "General Books",
     "adult_books": "Adult Books",
     "audiobooks": "Audiobooks",
+    "videos": "Video Courses",
     "title": "Library",
     "filter": "Filter",
     "filter_title": "Open Genre/Tag Filter",
@@ -625,6 +632,8 @@
   },
   "book_list": {
     "total_count": "(Total: {seriesCount} series / {bookCount} books)",
+    "total_count_audiobook": "(Total: {seriesCount} series / {bookCount} tracks)",
+    "total_count_video": "(Total: {seriesCount} courses / {bookCount} episodes)",
     "loading": "Loading book list...",
     "load_fail": "Failed to load list: {error}",
     "server_error": "A server connection error occurred.",

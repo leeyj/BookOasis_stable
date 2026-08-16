@@ -133,8 +133,8 @@ class ReadingHistoryService:
                     has_base_fields = ('series_alias' in first and 'book_count' in first)
                     if not has_base_fields:
                         pass
-                    elif db_type == 'audiobook':
-                        # v5 오디오북 캐시는 total_tracks 필드가 필수이다.
+                    elif db_type in ('audiobook', 'video'):
+                        # v5 오디오북/영상 캐시는 total_tracks 필드가 필수이다.
                         # 구버전 캐시(v4 등)는 해당 필드가 없어 카드 수치가 1로 폴백될 수 있다.
                         if 'total_tracks' in first:
                             return parsed
@@ -162,7 +162,7 @@ class ReadingHistoryService:
                 'is_favorite' : r['is_favorite'] or 0,
                 'last_read_at': r['last_read_at'],
                 'metadata_locked': r.get('metadata_locked', 0),
-                **({'total_tracks': (r.get('total_tracks', 0) or 0)} if db_type == 'audiobook' else {}),
+                **({'total_tracks': (r.get('total_tracks', 0) or 0)} if db_type in ('audiobook', 'video') else {}),
             }
             for r in rows
         ]

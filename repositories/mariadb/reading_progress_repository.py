@@ -219,6 +219,24 @@ class ReadingProgressRepository:
             conn.close()
             return [dict(row) for row in rows]
 
+        if db_type == 'video':
+            cursor.execute("""
+                SELECT v.id, v.library_id, v.title, '' AS title_alias, v.title AS series_name, '' AS series_alias,
+                       CONCAT('/api/media/videos/', v.id, '/cover') AS cover_image,
+                       v.updated_at AS cover_updated_at, 'video' AS file_format,
+                       COALESCE(p.current_time, 0) AS pages_read, v.total_episodes AS total_pages, v.total_episodes AS total_tracks,
+                       COALESCE(v.is_favorite, 0) AS is_favorite, COALESCE(p.is_completed, 0) AS is_completed,
+                       0 AS has_unfinished_siblings, p.last_watched_at AS last_read_at, 0 AS metadata_locked
+                FROM videos v
+                JOIN video_progress p ON v.id = p.video_id
+                WHERE p.user_id = %s AND COALESCE(v.is_deleted, 0) = 0 AND (COALESCE(p.current_time, 0) > 0 OR COALESCE(p.is_completed, 0) = 1)
+                ORDER BY p.last_watched_at DESC
+                LIMIT %s
+            """, (user_id, int(limit)))
+            rows = cursor.fetchall()
+            conn.close()
+            return [dict(row) for row in rows]
+
         optimized_query = """
                 SELECT limited_history.*,
                        CASE
@@ -325,6 +343,25 @@ class ReadingProgressRepository:
             conn.close()
             return [dict(row) for row in rows]
 
+        if db_type == 'video':
+            safe_user_id = int(user_id) if user_id is not None else -1
+            conn = database.get_connection(db_type)
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT v.id, v.library_id, v.title, '' AS title_alias, v.title AS series_name, '' AS series_alias,
+                       CONCAT('/api/media/videos/', v.id, '/cover') AS cover_image,
+                       v.updated_at AS cover_updated_at, 'video' AS file_format, v.total_episodes AS total_pages, v.created_at,
+                       COALESCE(v.is_favorite, 0) AS is_favorite, 0 AS metadata_locked
+                FROM videos v
+                JOIN user_category_permissions p ON v.library_id = p.library_id
+                WHERE COALESCE(v.is_deleted, 0) = 0 AND p.user_id = %s AND p.has_access = 1
+                ORDER BY v.created_at DESC, v.id DESC
+                LIMIT 20
+            """, (safe_user_id,))
+            rows = cursor.fetchall()
+            conn.close()
+            return [dict(row) for row in rows]
+
         safe_user_id = int(user_id) if user_id is not None else -1
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
@@ -366,6 +403,23 @@ class ReadingProgressRepository:
                 FROM audiobooks a
                 WHERE COALESCE(a.is_deleted, 0) = 0
                 ORDER BY a.created_at DESC, a.id DESC
+                LIMIT 20
+            """)
+            rows = cursor.fetchall()
+            conn.close()
+            return [dict(row) for row in rows]
+
+        if db_type == 'video':
+            conn = database.get_connection(db_type)
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT v.id, v.library_id, v.title, '' AS title_alias, v.title AS series_name, '' AS series_alias,
+                       CONCAT('/api/media/videos/', v.id, '/cover') AS cover_image,
+                       v.updated_at AS cover_updated_at, 'video' AS file_format, v.total_episodes AS total_pages, v.created_at,
+                       COALESCE(v.is_favorite, 0) AS is_favorite, 0 AS metadata_locked
+                FROM videos v
+                WHERE COALESCE(v.is_deleted, 0) = 0
+                ORDER BY v.created_at DESC, v.id DESC
                 LIMIT 20
             """)
             rows = cursor.fetchall()

@@ -20,9 +20,19 @@ export function canAccessAudiobookLibrary() {
   return raw === true || raw === 1 || String(raw) === '1';
 }
 
+export function canAccessVideoLibrary() {
+  const user = state.currentUser || window.currentUser || {};
+  const role = String(user.role || '').toLowerCase();
+  if (role === 'admin') return true;
+
+  const raw = user.has_video_access;
+  return raw === true || raw === 1 || String(raw) === '1';
+}
+
 export function canAccessLibraryType(type) {
   if (type === 'adult') return canAccessAdultLibrary();
   if (type === 'audiobook') return canAccessAudiobookLibrary();
+  if (type === 'video') return canAccessVideoLibrary();
   return true;
 }
 
@@ -32,15 +42,18 @@ export function applyLibraryTypeToggleVisibility() {
 
   const allowAdult = canAccessAdultLibrary();
   const allowAudiobook = canAccessAudiobookLibrary();
+  const allowVideo = canAccessVideoLibrary();
   const btnGeneral = document.getElementById('btn-lib-general');
   const btnAdult = document.getElementById('btn-lib-adult');
   const btnAudiobook = document.getElementById('btn-lib-audiobook');
+  const btnVideo = document.getElementById('btn-lib-video');
 
   if (btnGeneral) btnGeneral.style.display = 'inline-flex';
   if (btnAdult) btnAdult.style.display = allowAdult ? 'inline-flex' : 'none';
   if (btnAudiobook) btnAudiobook.style.display = allowAudiobook ? 'inline-flex' : 'none';
+  if (btnVideo) btnVideo.style.display = allowVideo ? 'inline-flex' : 'none';
 
-  const visibleCount = [btnGeneral, btnAdult, btnAudiobook].filter(btn => btn && btn.style.display !== 'none').length;
+  const visibleCount = [btnGeneral, btnAdult, btnAudiobook, btnVideo].filter(btn => btn && btn.style.display !== 'none').length;
   toggleGroup.style.display = visibleCount > 1 ? 'inline-flex' : 'none';
 
   if (!canAccessLibraryType(state.currentLibraryType)) {
@@ -51,7 +64,7 @@ export function applyLibraryTypeToggleVisibility() {
 }
 
 export function applyLibraryTypeButtonState(type) {
-  const safeType = (type === 'adult' || type === 'audiobook') ? type : 'general';
+  const safeType = (type === 'adult' || type === 'audiobook' || type === 'video') ? type : 'general';
   state.currentLibraryType = safeType;
   window.currentLibraryType = safeType;
   document.documentElement.setAttribute('data-library-type', safeType);
@@ -63,6 +76,8 @@ export function applyLibraryTypeButtonState(type) {
     document.getElementById('btn-lib-adult')?.classList.add('active');
   } else if (safeType === 'audiobook') {
     document.getElementById('btn-lib-audiobook')?.classList.add('active');
+  } else if (safeType === 'video') {
+    document.getElementById('btn-lib-video')?.classList.add('active');
   }
 }
 
@@ -72,12 +87,22 @@ export async function switchLibraryType(type) {
       alert('성인 도서관 접근 권한이 없습니다.');
     } else if (type === 'audiobook') {
       alert('오디오북 도서관 접근 권한이 없습니다.');
+    } else if (type === 'video') {
+      alert('영상 강좌 접근 권한이 없습니다.');
     }
     return;
   }
 
   applyLibraryTypeButtonState(type);
   localStorage.setItem('last_selected_library_type', type);
+
+  // 영상 강좌는 일반 도서 그리드/대시보드 파이프라인을 타지 않고 전용 화면을 로드한다
+  if (type === 'video') {
+    if (typeof window.loadVideoLibraryView === 'function') {
+      await window.loadVideoLibraryView();
+    }
+    return;
+  }
 
   // 전역 뷰 상태 초기화 및 라이브러리 목록 재로드
   if (typeof window.selectCategory === 'function') {
@@ -92,6 +117,7 @@ export async function switchLibraryType(type) {
 
 window.canAccessAdultLibrary = canAccessAdultLibrary;
 window.canAccessAudiobookLibrary = canAccessAudiobookLibrary;
+window.canAccessVideoLibrary = canAccessVideoLibrary;
 window.canAccessLibraryType = canAccessLibraryType;
 window.applyLibraryTypeToggleVisibility = applyLibraryTypeToggleVisibility;
 window.applyLibraryTypeButtonState = applyLibraryTypeButtonState;

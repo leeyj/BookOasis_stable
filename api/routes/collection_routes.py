@@ -16,7 +16,7 @@ def _get_current_user_info():
 
 def _get_target_db():
     raw_type = request.args.get('db_type', 'general')
-    if raw_type not in ('general', 'adult', 'audiobook'):
+    if raw_type not in ('general', 'adult', 'audiobook', 'video'):
         return 'general'
     return raw_type
 
@@ -106,9 +106,10 @@ def add_collection_item(collection_id):
     book_id = data.get('book_id')
     series_name = data.get('series_name')
     audiobook_id = data.get('audiobook_id')
+    video_id = data.get('video_id')
 
     try:
-        item_id = CollectionService.add_item(db_type, collection_id, user_id, book_id, series_name, audiobook_id)
+        item_id = CollectionService.add_item(db_type, collection_id, user_id, book_id, series_name, audiobook_id, video_id)
         return jsonify({'success': True, 'item_id': item_id})
     except Exception as e:
         return jsonify({'error': str(e)}), 400

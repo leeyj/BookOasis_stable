@@ -159,6 +159,14 @@ def check_adult_permission(db_type):
             return True
         return False
 
+    if db_type == 'video':
+        # 어드민은 패스, 일반 유저는 세션의 video 접근 권한으로 판별
+        if session.get('role') == 'admin':
+            return True
+        if session.get('has_video_access') == 1:
+            return True
+        return False
+
     return True
 
 @auth_bp.before_app_request
@@ -217,6 +225,7 @@ def check_authentication():
                         session['is_default_password'] = user['is_default_password']
                         session['has_adult_access'] = user['has_adult_access']
                         session['has_audiobook_access'] = user.get('has_audiobook_access', 1)
+                        session['has_video_access'] = user.get('has_video_access', 1)
         
     # 1. 미로그인 시 차단
     if 'user_id' not in session:
@@ -273,13 +282,15 @@ def login():
             session['is_default_password'] = user['is_default_password']
             session['has_adult_access'] = user['has_adult_access']
             session['has_audiobook_access'] = user.get('has_audiobook_access', 1)
-            
+            session['has_video_access'] = user.get('has_video_access', 1)
+
             return jsonify({
                 'success': True,
                 'role': user['role'],
                 'is_default_password': user['is_default_password'],
                 'has_adult_access': user.get('has_adult_access', 0),
-                'has_audiobook_access': user.get('has_audiobook_access', 1)
+                'has_audiobook_access': user.get('has_audiobook_access', 1),
+                'has_video_access': user.get('has_video_access', 1)
             })
         else:
             return jsonify({'success': False, 'error': _t('api.invalid_credentials')}), 401
@@ -316,7 +327,7 @@ def change_password():
 
     # 두 DB 모두 계정을 동기화하여 비밀번호 변경 반영 (세션 일치)
     try:
-        for db_type in ['general', 'adult', 'audiobook']:
+        for db_type in ['general', 'adult', 'audiobook', 'video']:
             UserRepository.update_password(db_type, user_id, new_hash)
     except Exception as e:
         return jsonify({'success': False, 'error': _t('api.password_change_failed', error=str(e))}), 500
@@ -351,6 +362,7 @@ def add_user():
     role = data.get('role', 'user').strip()
     has_adult_access = 1 if data.get('has_adult_access', True) else 0
     has_audiobook_access = 1 if data.get('has_audiobook_access', True) else 0
+    has_video_access = 1 if data.get('has_video_access', True) else 0
 
     length_error = _validate_username_password_lengths(username, password)
     if length_error:
@@ -366,8 +378,8 @@ def add_user():
     
     try:
         # 동기화를 위해 두 데이터베이스에 모두 사용자 추가
-        for db_type in ['general', 'adult', 'audiobook']:
-            UserRepository.add_user(db_type, username, password_hash, role, has_adult_access, has_audiobook_access)
+        for db_type in ['general', 'adult', 'audiobook', 'video']:
+            UserRepository.add_user(db_type, username, password_hash, role, has_adult_access, has_audiobook_access, has_video_access)
     except Exception as e:
         if 'UNIQUE' in str(e):
             return jsonify({'success': False, 'error': _t('api.username_exists')}), 409
@@ -397,7 +409,7 @@ def delete_user(target_user_id):
             }), 400
         
     # 두 데이터베이스 모두에서 삭제
-    for db_type in ['general', 'adult', 'audiobook']:
+    for db_type in ['general', 'adult', 'audiobook', 'video']:
         UserRepository.delete_user(db_type, target_user_id)
         
     return jsonify({'success': True, 'message': _t('api.user_deleted_success')})
@@ -441,7 +453,7 @@ def reset_user_password(target_user_id):
     new_hash = generate_password_hash(new_password)
 
     try:
-        for db_type in ['general', 'adult', 'audiobook']:
+        for db_type in ['general', 'adult', 'audiobook', 'video']:
             UserRepository.admin_reset_password(db_type, target_user_id, new_hash, set_default)
     except Exception as e:
         return jsonify({'success': False, 'error': _t('api.password_change_failed', error=str(e))}), 500

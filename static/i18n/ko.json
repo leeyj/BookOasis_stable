@@ -21,7 +21,13 @@
 
   "dashboard": {
     "recent_title": "최근 읽은 도서",
+    "recent_title_audiobook": "최근 들은 오디오북",
+    "recent_title_video": "최근 시청한 강좌",
     "new_books_title": "신규 추가 도서",
+    "new_books_title_audiobook": "신규 추가 오디오북",
+    "new_books_title_video": "신규 추가 강좌",
+    "recent_title_suffix": "(시리즈기준)",
+    "recent_title_suffix_video": "(강좌기준)",
     "plugin_desk_title": "플러그인 데스크",
     "insights_streak": "연속 독서 일수",
     "insights_days_suffix": "일 연속",
@@ -307,6 +313,7 @@
     "general_books": "일반 도서",
     "adult_books": "성인 도서",
     "audiobooks": "오디오북",
+    "videos": "영상 강좌",
     "title": "도서 보관함",
     "filter": "필터",
     "filter_title": "장르/태그 필터 열기",
@@ -625,6 +632,8 @@
   },
   "book_list": {
     "total_count": "(전체: {seriesCount} 시리즈 / {bookCount} 권)",
+    "total_count_audiobook": "(전체: {seriesCount} 시리즈 / {bookCount} 트랙)",
+    "total_count_video": "(전체: {seriesCount} 강좌 / {bookCount} 편)",
     "loading": "도서 목록을 불러오는 중...",
     "load_fail": "목록 로드 실패: {error}",
     "server_error": "서버 연결 오류가 발생했습니다.",

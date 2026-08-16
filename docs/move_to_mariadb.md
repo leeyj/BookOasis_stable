@@ -27,7 +27,7 @@
 
 ### 1단계: 제공되는 `docker-compose.mariadb.yml` 활용
 
-프로젝트에 포함된 `docker-compose.mariadb.yml` 파일은 BookOasis 서버와 MariaDB 컨테이너, 그리고 3개 미디어 DB(`media_general`, `media_adult`, `media_audiobook`) 및 계정 권한 초기화 스크립트(`init.sql`)를 자동으로 함께 구성해 드립니다.
+프로젝트에 포함된 `docker-compose.mariadb.yml` 파일은 BookOasis 서버와 MariaDB 컨테이너, 그리고 4개 미디어 DB(`media_general`, `media_adult`, `media_audiobook`, `media_video`) 및 계정 권한 초기화 스크립트(`init.sql`)를 자동으로 함께 구성해 드립니다.
 
 ```bash
 # 기존 컨테이너 중지
@@ -47,18 +47,20 @@ docker-compose -f docker-compose.mariadb.yml up -d
 
 ### 1단계: MariaDB에 데이터베이스 및 권한 생성 (1회 필요)
 
-외부 MariaDB의 phpMyAdmin, DBeaver, 또는 CLI에 접속하여 3개 미디어 DB와 권한을 생성합니다:
+외부 MariaDB의 phpMyAdmin, DBeaver, 또는 CLI에 접속하여 4개 미디어 DB와 권한을 생성합니다:
 
 ```sql
 CREATE DATABASE IF NOT EXISTS media_general CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
 CREATE DATABASE IF NOT EXISTS media_adult CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
 CREATE DATABASE IF NOT EXISTS media_audiobook CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+CREATE DATABASE IF NOT EXISTS media_video CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
 
 -- 사용자 생성 및 권한 부여 ('your_password'를 원하는 비밀번호로 변경하세요)
 CREATE USER IF NOT EXISTS 'bookoasis'@'%' IDENTIFIED BY 'your_password';
 GRANT ALL PRIVILEGES ON media_general.* TO 'bookoasis'@'%';
 GRANT ALL PRIVILEGES ON media_adult.* TO 'bookoasis'@'%';
 GRANT ALL PRIVILEGES ON media_audiobook.* TO 'bookoasis'@'%';
+GRANT ALL PRIVILEGES ON media_video.* TO 'bookoasis'@'%';
 FLUSH PRIVILEGES;
 ```
 

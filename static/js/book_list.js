@@ -29,7 +29,15 @@ export function updateLibraryTotalCount(items, totals = null) {
   const bookCount = hasServerTotals
     ? serverBookCount
     : items.reduce((sum, item) => sum + (parseInt(item.book_count) || 1), 0);
-  countSpan.innerText = i18n.t('book_list.total_count', {seriesCount: seriesCount.toLocaleString(), bookCount: bookCount.toLocaleString()});
+
+  // 미디어 타입별로 "권" 단위가 어울리지 않는 경우(오디오북=트랙, 영상=편)를 위한 라벨 분기.
+  const i18nKey = state.currentLibraryType === 'audiobook'
+    ? 'book_list.total_count_audiobook'
+    : state.currentLibraryType === 'video'
+      ? 'book_list.total_count_video'
+      : 'book_list.total_count';
+
+  countSpan.innerText = i18n.t(i18nKey, {seriesCount: seriesCount.toLocaleString(), bookCount: bookCount.toLocaleString()});
 }
 
 // 1. 도서 시리즈 목록 로드
@@ -248,6 +256,12 @@ export async function loadReadingHistory() {
 export function filterBooks() {
   const query = document.getElementById('library-search').value.toLowerCase().trim();
   state.searchQuery = query;
+
+  // 영상 강좌 세션은 일반 도서 파이프라인(loadBooksList)을 타지 않으므로 별도 필터러로 위임
+  if (state.currentLibraryType === 'video') {
+    if (typeof window.filterVideoCourses === 'function') window.filterVideoCourses();
+    return;
+  }
 
   // 홈 대시보드에서는 검색 시 전체보기로 전환해 동일한 검색어로 목록 필터링한다.
   if (query && state.currentLibraryId === 'home' && typeof window.selectCategory === 'function') {

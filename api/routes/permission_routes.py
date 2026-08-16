@@ -64,6 +64,7 @@ def get_permissions():
 
         general_categories, general_permissions = _fetch_library_permissions('general', include_plugins=True)
         audiobook_categories, audiobook_permissions = _fetch_library_permissions('audiobook', include_plugins=False)
+        video_categories, video_permissions = _fetch_library_permissions('video', include_plugins=False)
 
         return jsonify({
             'success': True,
@@ -87,6 +88,12 @@ def get_permissions():
                     'title': '오디오북 서재',
                     'subtitle': '오디오북 카테고리 권한',
                     'kind': 'matrix'
+                },
+                {
+                    'id': 'video',
+                    'title': '영상 강좌',
+                    'subtitle': '영상 강좌 카테고리 권한',
+                    'kind': 'matrix'
                 }
             ],
             'matrices': {
@@ -97,6 +104,10 @@ def get_permissions():
                 'audiobook': {
                     'categories': audiobook_categories,
                     'permissions': audiobook_permissions,
+                },
+                'video': {
+                    'categories': video_categories,
+                    'permissions': video_permissions,
                 }
             }
         })

@@ -157,7 +157,8 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
       };
 
       // 메타데이터가 공란이거나 기본 설명일 때 자동 트리거 분기
-      const isMetaEmpty = !meta.summary || meta.summary === '등록된 설명이 없습니다.';
+      // (영상 강좌는 show.yaml 스캔 메타 전용이라 도서용 메타 추천 검색 대상이 아님)
+      const isMetaEmpty = (state.currentLibraryType !== 'video') && (!meta.summary || meta.summary === '등록된 설명이 없습니다.');
       if (isMetaEmpty) {
         triggerRecommendSearch();
       } else {

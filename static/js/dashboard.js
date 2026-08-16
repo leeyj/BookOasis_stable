@@ -9,10 +9,39 @@ let dashboardLoadToken = 0;
 let pluginsLoadToken = 0;
 let dashboardRowLastType = null;
 
+// 대시보드 섹션 제목("최근 읽은 도서"/"신규 추가 도서")은 오디오북/영상 강좌 세션에서도
+// "도서" 문구를 그대로 쓰고 있었다 - 상단 총계 배지(book_list.js::updateLibraryTotalCount)와
+// 동일한 이유로 세션 타입별 라벨을 따로 둔다.
+function updateDashboardSectionLabels(targetType) {
+  const recentTitleEl = document.getElementById('dashboard-recent-title');
+  const recentSuffixEl = document.getElementById('dashboard-recent-title-suffix');
+  const newTitleEl = document.getElementById('dashboard-new-title');
+
+  const recentKey = targetType === 'audiobook'
+    ? 'dashboard.recent_title_audiobook'
+    : targetType === 'video'
+      ? 'dashboard.recent_title_video'
+      : 'dashboard.recent_title';
+  const newKey = targetType === 'audiobook'
+    ? 'dashboard.new_books_title_audiobook'
+    : targetType === 'video'
+      ? 'dashboard.new_books_title_video'
+      : 'dashboard.new_books_title';
+  const suffixKey = targetType === 'video'
+    ? 'dashboard.recent_title_suffix_video'
+    : 'dashboard.recent_title_suffix';
+
+  if (recentTitleEl) recentTitleEl.textContent = i18n.t(recentKey);
+  if (newTitleEl) newTitleEl.textContent = i18n.t(newKey);
+  if (recentSuffixEl) recentSuffixEl.textContent = i18n.t(suffixKey);
+}
+
 export async function loadDashboardData() {
   const requestToken = ++dashboardLoadToken;
   const targetType = state.currentLibraryType || 'general';
   state.isLoading = true;
+
+  updateDashboardSectionLabels(targetType);
 
   const historyRow = document.getElementById('dashboard-history-row');
   const newRow = document.getElementById('dashboard-new-row');

@@ -2,7 +2,7 @@
 """
 migrator_sqlite_to_mariadb.py - SQLite to MariaDB 1-Click 자동 데이터 이전 도구
 
-BookOasis 미디어 서버의 3개 SQLite 데이터베이스(media_general.db, media_adult.db, media_audiobook.db)의
+BookOasis 미디어 서버의 4개 SQLite 데이터베이스(media_general.db, media_adult.db, media_audiobook.db, media_video.db)의
 모든 테이블 및 레코드를 MariaDB 엔터프라이즈 데이터베이스로 고속 대량 이전합니다.
 """
 
@@ -43,6 +43,10 @@ DB_MAP = {
     'audiobook': {
         'sqlite_path': os.path.join(MEDIA_SERVER_DIR, 'db', 'media_audiobook.db'),
         'mariadb_db': f"{MARIADB_DATABASE_PREFIX}audiobook"
+    },
+    'video': {
+        'sqlite_path': os.path.join(MEDIA_SERVER_DIR, 'db', 'media_video.db'),
+        'mariadb_db': f"{MARIADB_DATABASE_PREFIX}video"
     }
 }
 

@@ -312,6 +312,64 @@
                                 </div>
                             </div>
 
+                            <!-- ============================================================ -->
+                            <!-- 🎬 5. 영상 강좌 트랜스코딩 설정 (Video Transcoding, 실험적)  -->
+                            <!-- ============================================================ -->
+                            <div style="background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(192, 132, 252, 0.2); border-radius: 8px; padding: 1.25rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.2rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.6rem;">
+                                    <i class="fa-solid fa-film" style="color: #c084fc; font-size: 1.1rem;"></i>
+                                    <h4 style="margin: 0; color: #fff; font-size: 1rem; font-weight: 700;">영상 강좌 트랜스코딩 설정 (실험적)</h4>
+                                </div>
+                                <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+
+                                    <div style="background: rgba(192, 132, 252, 0.08); border: 1px dashed rgba(192, 132, 252, 0.3); border-radius: 6px; padding: 0.8rem 1rem; font-size: 0.8rem; color: #cbd5e1; line-height: 1.7;">
+                                        <strong style="color: #c084fc;">자동 재생 정책 (수동 스위치 없음)</strong><br>
+                                        1) 브라우저가 원본을 직접 재생할 수 있으면(mp4/webm + H.264/VP8/VP9 + AAC/Opus 등) 항상 원본을 그대로 스트리밍합니다.<br>
+                                        2) 직접 재생이 안 되는 파일(MKV 컨테이너 등)만 아래 ffmpeg 폴백을 자동으로 거칩니다.<br>
+                                        3) 폴백 시 기본은 CPU(libx264) 인코딩이며, 아래 점검에서 VAAPI가 감지되면 자동으로 VAAPI 인코딩을 사용합니다.<br>
+                                        각 항목별 실제 재생 가능 여부는 스캔 후 백그라운드(Lazy) 분석이 끝나야 확정됩니다.
+                                    </div>
+
+                                    <!-- VAAPI 지원 여부 체크 -->
+                                    <div class="library-form-group">
+                                        <label style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                            <i class="fa-solid fa-microchip" style="color: #c084fc; margin-right: 0.3rem;"></i> 하드웨어 가속(VAAPI) 사용 가능 여부 점검
+                                        </label>
+                                        <div style="display: flex; gap: 0.5rem; align-items: center; max-width: 480px; width: 100%; flex-wrap: wrap;">
+                                            <input type="text" id="setting-vaapi-device-path" name="FFMPEG_VAAPI_DEVICE" value="/dev/dri/renderD128" style="flex: 1; min-width: 200px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; font-family: monospace; font-size: 0.85rem;">
+                                            <button type="button" id="btn-check-vaapi" style="background: linear-gradient(135deg, #c084fc 0%, #7c3aed 100%); color: #fff; border: none; padding: 0.6rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.3rem; height: 38px;">
+                                                <i class="fa-solid fa-magnifying-glass"></i> 지금 점검
+                                            </button>
+                                        </div>
+                                        <div id="vaapi-check-result" style="display: none; margin-top: 0.6rem; padding: 0.8rem 1rem; border-radius: 6px; font-size: 0.82rem; line-height: 1.6; white-space: pre-wrap; font-family: monospace; max-width: 700px; max-height: 260px; overflow-y: auto;"></div>
+                                        <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;">서버(컨테이너)에서 ffmpeg가 VAAPI 하드웨어 가속을 실제로 사용할 수 있는지(빌드 지원 + 인코더 + <code>/dev/dri</code> 디바이스 패스스루 + vainfo 드라이버 응답)를 단계별로 점검합니다. 도커라면 <code>docker-compose.yml</code>에 <code>devices: - /dev/dri:/dev/dri</code>가 있어야 디바이스가 잡힙니다. <strong style="color: #c084fc;">점검 버튼을 누르면 이 서버 경로 값도 함께 저장되고, 결과가 즉시 실제 스트리밍 판단에도 반영됩니다.</strong></p>
+                                    </div>
+
+                                    <!-- CPU/기타 GPU 폴백 인코딩 파라미터 -->
+                                    <div class="library-form-group">
+                                        <label for="setting-ffmpeg-transcode-args" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                            <i class="fa-solid fa-terminal" style="color: #c084fc; margin-right: 0.3rem;"></i> 기본 폴백 인코딩 파라미터 (VAAPI 미감지 시 사용)
+                                        </label>
+                                        <textarea id="setting-ffmpeg-transcode-args" name="FFMPEG_TRANSCODE_ARGS" rows="2" style="width: 100%; max-width: 700px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; font-family: monospace; font-size: 0.85rem; line-height: 1.4; resize: vertical;" placeholder="-c:v libx264 -preset veryfast -crf 23 -c:a aac -b:a 128k"></textarea>
+                                        <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0; line-height: 1.6;">
+                                            비워두면 기본값(<code>-c:v libx264 -preset veryfast -crf 23 -c:a aac -b:a 128k</code>, CPU 소프트웨어 인코딩)을 사용합니다. 입력/출력 파일 인자는 서버가 자동으로 붙이므로 중간 인코딩 옵션만 적으세요.<br>
+                                            <strong style="color: #c084fc;">NVIDIA GPU(NVENC, 예: P600 등)가 있다면</strong> VAAPI 전용 자동 판별은 별도로 만들지 않았으니, 이 필드에 직접 NVENC 옵션을 넣으면 됩니다(호스트에 NVIDIA 드라이버 + <code>nvidia-container-toolkit</code> 설치 및 <code>docker-compose.yml</code>의 NVIDIA GPU 예약 설정 활성화가 선행되어야 함):<br>
+                                            <code>-c:v h264_nvenc -preset p4 -tune ll -c:a aac -b:a 128k</code><br>
+                                            ffmpeg가 이 서버에서 NVENC를 실제로 쓸 수 있는지는 <code>ffmpeg -h encoder=h264_nvenc</code> 및 <code>nvidia-smi</code> 명령을 컨테이너 안에서 직접 실행해 확인하세요(VAAPI처럼 자동 점검 버튼은 제공하지 않습니다).
+                                        </p>
+                                    </div>
+
+                                    <!-- VAAPI 폴백 인코딩 파라미터 -->
+                                    <div class="library-form-group">
+                                        <label for="setting-ffmpeg-vaapi-args" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                            <i class="fa-solid fa-microchip" style="color: #c084fc; margin-right: 0.3rem;"></i> VAAPI 폴백 인코딩 파라미터 (VAAPI 감지 시)
+                                        </label>
+                                        <textarea id="setting-ffmpeg-vaapi-args" name="FFMPEG_VAAPI_ARGS" rows="2" style="width: 100%; max-width: 700px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; font-family: monospace; font-size: 0.85rem; line-height: 1.4; resize: vertical;" placeholder="-vf format=nv12,hwupload -c:v h264_vaapi -qp 24 -c:a aac -b:a 128k"></textarea>
+                                        <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;">비워두면 기본값(<code>-vf format=nv12,hwupload -c:v h264_vaapi -qp 24 -c:a aac -b:a 128k</code>)을 사용합니다. <code>-vaapi_device</code> 옵션은 위 디바이스 경로 값을 서버가 자동으로 붙이므로 여기엔 적지 않아도 됩니다.</p>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div style="margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 1rem; display: flex; justify-content: flex-end;">
                                 <button type="submit" class="btn-submit" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.7rem 1.8rem; font-size: 0.95rem; font-weight: 700; border-radius: 6px; background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%); color: #fff; border: none; cursor: pointer;">
                                     <i class="fa-regular fa-floppy-disk"></i> <span data-i18n="settings.btn_save_config">설정 저장</span>

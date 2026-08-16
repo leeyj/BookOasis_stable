@@ -5,7 +5,7 @@ system_routes.py – 시스템 상태, 큐, 정보 조회 라우터
 import os
 import re
 from flask import Blueprint, request, jsonify, session
-from api.auth import admin_required, login_required, verify_webhook_token
+from api.auth import admin_required, login_required, verify_webhook_token, webhook_token_required
 from flask import render_template
 from urllib.request import Request, urlopen
 from services.plugin_service import PluginService
@@ -369,6 +369,24 @@ def trigger_scan_via_webhook():
             'success': True,
             'already_queued': False,
             'message': f'"{lib_name} ({db_type})" 스캔 작업이 대기열에 성공적으로 등록되었습니다.'
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@system_bp.route('/api/webhook/system/db-engine', methods=['GET'])
+@webhook_token_required
+def get_db_engine_webhook_api():
+    """
+    DB 게이트웨이(API)를 거치지 않고 DB에 직접 접속해야 하는 외부 연동 프로그램/플러그인이
+    현재 운영 중인 DB 엔진(SQLite/MariaDB)을 사전에 확인할 수 있도록 제공하는 조회 API.
+    관리자 세션 없이 기존 스캔 웹훅과 동일한 WEBHOOK_TOKEN으로 인증한다(?token=... 또는 X-Webhook-Token 헤더).
+    """
+    try:
+        is_mariadb = database.is_mariadb_mode()
+        return jsonify({
+            'success': True,
+            'engine': 'mariadb' if is_mariadb else 'sqlite',
+            'is_mariadb': is_mariadb
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

@@ -2,7 +2,8 @@
 import os
 # pyrefly: ignore [missing-import]
 from repositories.audiobook_repository import AudiobookRepository
-from repositories.book_repository import BookRepository 
+from repositories.video_repository import VideoRepository
+from repositories.book_repository import BookRepository
 from utils.sort_helper import natural_sort_key
 from utils.cover_helper import get_cover_image_with_t, resolve_series_cover, invalidate_series_cover_cache
 from utils.redis_helper import redis_delete_pattern
@@ -109,6 +110,99 @@ class BookDetailService:
                     'cover_image': meta['cover_image'],
                     'is_completed': 1 if prog_row and prog_row['is_completed'] else 0,
                     'is_favorite': meta['is_favorite'],
+                })
+
+            return meta, books_list
+
+        if db_type == 'video':
+            video_row = None
+            if representative_book_id:
+                try:
+                    video_row = VideoRepository.get_video_by_id(int(representative_book_id))
+                except Exception:
+                    pass
+
+            if not video_row and series_name:
+                video_row = VideoRepository.get_video_by_title_or_folder_name(series_name)
+
+            if not video_row:
+                return {'series_name': series_name, 'author': '-', 'publisher': '-', 'summary': '등록된 영상 강좌가 없습니다.', 'cover_image': ''}, []
+
+            vid = video_row['id']
+
+            # 사용자 진행도
+            prog_row = VideoRepository.get_video_progress(vid, user_id)
+            current_episode_id = prog_row['current_episode_id'] if prog_row else None
+            current_time = prog_row['current_time'] if prog_row else 0.0
+            total_progress_pct = prog_row['total_progress_pct'] if (prog_row and 'total_progress_pct' in prog_row) else 0.0
+            is_completed = prog_row['is_completed'] if (prog_row and 'is_completed' in prog_row) else 0
+
+            # 에피소드 목록
+            episode_rows = VideoRepository.get_video_episodes(vid)
+            episode_progress = VideoRepository.get_video_episode_progress_map(vid, user_id)
+
+            meta = {
+                'id': vid,
+                'series_name': video_row['title'],
+                'series_alias': '',
+                'author': '-',
+                'isbn': '',
+                'web_id': video_row['web_id'] or '',
+                'publisher': '-',
+                'code': video_row['web_id'] or '',
+                'ratings': 0.0,
+                'summary': video_row['description'] or '등록된 설명이 없습니다.',
+                'genre': video_row['genres'] or '',
+                'tags': '',
+                'cover_image': f"/api/media/videos/{vid}/cover",
+                'total_duration': video_row['total_duration'] or 0.0,
+                'total_episodes': video_row['total_episodes'] or len(episode_rows),
+                'is_favorite': video_row['is_favorite'] or 0,
+                'current_episode_id': current_episode_id,
+                'current_time': current_time,
+                'total_progress_pct': total_progress_pct,
+                'is_completed': is_completed,
+                'metadata_locked': 0
+            }
+
+            books_list = []
+            for ep in episode_rows:
+                dur_sec = ep['duration'] or 0.0
+                mins = int(dur_sec // 60)
+                secs = int(dur_sec % 60)
+                time_str = f"{mins:02d}:{secs:02d}"
+                saved_ep_progress = episode_progress.get(int(ep['id']))
+                if is_completed:
+                    ep_progress_pct = 100.0
+                    is_ep_completed = 1
+                elif saved_ep_progress:
+                    ep_progress_pct = float(saved_ep_progress.get('progress_pct') or 0.0)
+                    is_ep_completed = 1 if ep_progress_pct >= 95.0 else 0
+                elif current_episode_id is not None and int(ep['id']) == int(current_episode_id) and float(dur_sec or 0.0) > 0:
+                    ep_progress_pct = min(100.0, (float(current_time or 0.0) / float(dur_sec)) * 100.0)
+                    is_ep_completed = 1 if ep_progress_pct >= 95.0 else 0
+                else:
+                    ep_progress_pct = 0.0
+                    is_ep_completed = 0
+
+                books_list.append({
+                    'id': ep['id'],
+                    'video_id': vid,
+                    'episode_number': ep['episode_number'],
+                    'episode_code': ep['episode_code'] or '',
+                    'title': ep['title'] or ep['filename'],
+                    'file_format': ep['format'] or 'mp4',
+                    'duration': dur_sec,
+                    'time_str': time_str,
+                    'premiered': ep['premiered'] or '',
+                    'episode_progress_pct': ep_progress_pct,
+                    'is_episode_completed': is_ep_completed,
+                    'file_size': ep['file_size'] or 0,
+                    'file_path': ep['file_path'],
+                    'cover_image': meta['cover_image'],
+                    'is_completed': 1 if prog_row and prog_row['is_completed'] else 0,
+                    'is_favorite': meta['is_favorite'],
+                    'has_subtitle': 1 if ep['subtitle_path'] else 0,
                 })
 
             return meta, books_list

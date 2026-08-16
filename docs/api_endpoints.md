@@ -475,6 +475,25 @@
 * **응답 예시 (401 Unauthorized - 토큰 오류)**: `/api/webhook/scan`과 동일한 형식.
 * **참고**: `statuses`는 플러그인별 가장 최근 상태 1건씩(현재 상태 스냅샷), `recent_events`는 상태가 실제로 바뀐 시점들의 이력(성공→실패, 실패→성공 전환 시마다 1건 기록, 상태 불변 시에는 기록 안 함)입니다.
 
+### `[GET]` `/api/webhook/system/db-engine`
+* **설명**: DB 게이트웨이(API)를 거치지 않고 DB에 직접 접속해야 하는 외부 연동 프로그램/플러그인이, 현재 운영 중인 DB 엔진이 SQLite인지 MariaDB인지 사전에 확인할 수 있는 read-only 웹훅 API. `DB_ENGINE`(또는 `DBMS`) 환경변수 판별 로직을 그대로 반영합니다.
+* **권한**: 비세션 인증 (`WEBHOOK_TOKEN`을 쿼리스트링 `token` 또는 `X-Webhook-Token` 헤더로 전달)
+* **요청 파라미터**:
+  | 파라미터명 | 타입 | 필수여부 | 설명 |
+  | :--- | :--- | :--- | :--- |
+  | `token` | string | 조건부 필수 | `WEBHOOK_TOKEN` 값. `X-Webhook-Token` 헤더로 대신 전달해도 됨(둘 중 하나만 있으면 됨) |
+
+* **응답 예시 (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "engine": "sqlite",
+    "is_mariadb": false
+  }
+  ```
+* **응답 예시 (401 Unauthorized - 토큰 오류)**: `/api/webhook/scan`과 동일한 형식.
+* **참고**: `engine`은 `"sqlite"` 또는 `"mariadb"` 둘 중 하나이며(환경변수가 `mysql`이어도 `mariadb`로 정규화), `is_mariadb`는 동일 정보를 boolean으로 제공합니다.
+
 #### 💡 외부 폴러(gd-poller 등) 연동 설정 예시 (YAML)
 
 외부 Google Drive 변경 모니터링 도구인 [`gd-poller`](https://github.com/halfaider/gd-poller)와 연동하면, 스케줄러의 전체 디렉토리 스캔을 기다리지 않고 변경이 감지된 폴더(시리즈) 하나만 즉시 스캔+등록할 수 있습니다.

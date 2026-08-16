@@ -38,6 +38,8 @@ import { focusLibrarySearchInput, applySearchShortcutSetting, initLibrarySearchS
 
 import './viewer/viewer_padding.js';
 import './audio_player.js';
+import './video_library.js';
+import './video_player.js';
 import './plugin_webview_api.js';
 
 function initLibraryShellDelegation() {
@@ -277,6 +279,7 @@ function normalizeMediaType(val) {
   if (!val) return null;
   val = String(val).toLowerCase().trim();
   if (['audiobook', 'audio', 'sound'].includes(val)) return 'audiobook';
+  if (['video', 'course', 'lecture'].includes(val)) return 'video';
   if (['adult', 'r18'].includes(val)) return 'adult';
   if (['general', 'book', 'books', 'normal'].includes(val)) return 'general';
   return null;
@@ -393,12 +396,13 @@ async function initTabMediaLibrary() {
       } else if (!event.state && (window.location.hash === '' || window.location.hash.startsWith('#library='))) {
         const hashType = parseMediaTypeFromUrl();
         if (hashType) {
-          if (!canAccessLibraryType(hashType)) {
-            applyLibraryTypeButtonState('general');
+          const resolvedType = canAccessLibraryType(hashType) ? hashType : 'general';
+          applyLibraryTypeButtonState(resolvedType);
+          if (resolvedType === 'video') {
+            if (typeof window.loadVideoLibraryView === 'function') window.loadVideoLibraryView();
           } else {
-            applyLibraryTypeButtonState(hashType);
+            loadLibraries();
           }
-          loadLibraries();
         }
         if (state.currentLibraryId !== 'home') {
           selectCategory('home', true);
@@ -423,7 +427,11 @@ async function initTabMediaLibrary() {
 
   // 중요: 초기 라이브러리 로드는 타입 적용 후에 수행해야
   // 강력새로고침 시 좌측 메뉴 타입과 상세 타입이 어긋나지 않는다.
-  await loadLibraries();
+  if (state.currentLibraryType === 'video') {
+    if (typeof window.loadVideoLibraryView === 'function') await window.loadVideoLibraryView();
+  } else {
+    await loadLibraries();
+  }
 
   if (isDetailDeepLink) {
     const restoredDetail = decodeDetailParams(initialHash);
@@ -476,6 +484,9 @@ export function selectCategory(id, skipHistory = false) {
   goBackToList();
 
   if (id === 'home') {
+    // 영상 세션도 오디오북과 동일하게 공용 대시보드(최근 시청/신규 추가)를 그대로 재사용한다.
+    // series_repository/reading_progress_repository가 이미 db_type='video' 분기를 갖고 있어
+    // 별도 전용 홈 화면 없이도 targetType='video'로 정상 동작한다.
     switchActiveView('dashboard');
     loadDashboardData();
   } else if (id === 'collection') {
@@ -504,7 +515,15 @@ export function selectCategory(id, skipHistory = false) {
     mountCategoryPluginUI(pluginId);
   } else {
     switchActiveView('grid');
-    if (id === 'history') {
+    if (state.currentLibraryType === 'video' && !['history', 'all', 'favorite'].includes(id)) {
+      const numericId = parseInt(id, 10);
+      if (Number.isFinite(numericId) && typeof window.loadVideoCourseGrid === 'function') {
+        window.loadVideoCourseGrid(numericId);
+      } else {
+        const container = document.getElementById('books-list-container');
+        if (container) container.innerHTML = '<div class="loading-spinner">좌측에서 영상 강좌 라이브러리를 선택하거나, 없다면 + 버튼으로 추가해 주세요.</div>';
+      }
+    } else if (id === 'history') {
       loadReadingHistory();
     } else {
       loadBooksList(false);

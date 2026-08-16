@@ -29,6 +29,7 @@ try:
         DB_GENERAL_PATH,
         DB_ADULT_PATH,
         DB_AUDIOBOOK_PATH,
+        DB_VIDEO_PATH,
         init_databases,
         get_connection,
         auto_migrate_schema,
@@ -215,6 +216,76 @@ CREATE TABLE IF NOT EXISTS audiobook_track_progress (
     INDEX idx_audiobook_track_progress_lookup (audiobook_id, user_id, track_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
+CREATE TABLE IF NOT EXISTS videos (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    library_id BIGINT,
+    title VARCHAR(500) NOT NULL,
+    sort_title VARCHAR(500),
+    web_id VARCHAR(100),
+    genres VARCHAR(500),
+    poster TEXT,
+    backdrop TEXT,
+    premiered VARCHAR(100),
+    description TEXT,
+    folder_name VARCHAR(500) NOT NULL,
+    folder_path TEXT NOT NULL,
+    total_duration DOUBLE DEFAULT 0.0,
+    total_episodes INT DEFAULT 0,
+    is_favorite INT DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    is_deleted INT DEFAULT 0,
+    deleted_at DATETIME DEFAULT NULL,
+    UNIQUE KEY uq_videos_folder_path (folder_path(500))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS video_episodes (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    video_id BIGINT NOT NULL,
+    episode_number INT NOT NULL,
+    episode_code VARCHAR(50),
+    title VARCHAR(500),
+    filename VARCHAR(500) NOT NULL,
+    file_path TEXT NOT NULL,
+    file_mtime DOUBLE DEFAULT 0.0,
+    file_size BIGINT DEFAULT 0,
+    duration DOUBLE DEFAULT 0.0,
+    width INT DEFAULT 0,
+    height INT DEFAULT 0,
+    premiered VARCHAR(100),
+    format VARCHAR(50) DEFAULT 'mp4',
+    needs_transcode INT DEFAULT 0,
+    subtitle_path TEXT,
+    UNIQUE KEY uq_video_episodes_file_path (file_path(500)),
+    INDEX idx_video_episodes_video_id (video_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS video_progress (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    video_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL DEFAULT 1,
+    current_episode_id BIGINT,
+    `current_time` DOUBLE DEFAULT 0.0,
+    total_progress_pct DOUBLE DEFAULT 0.0,
+    playback_rate DOUBLE DEFAULT 1.0,
+    is_completed INT DEFAULT 0,
+    last_watched_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_video_user_progress (video_id, user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS video_episode_progress (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    video_id BIGINT NOT NULL,
+    episode_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL DEFAULT 1,
+    `current_time` DOUBLE DEFAULT 0.0,
+    progress_pct DOUBLE DEFAULT 0.0,
+    is_completed INT DEFAULT 0,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_video_episode_user_progress (video_id, episode_id, user_id),
+    INDEX idx_video_episode_progress_lookup (video_id, user_id, episode_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
 CREATE TABLE IF NOT EXISTS user_progress (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     book_id BIGINT NOT NULL,
@@ -298,6 +369,7 @@ CREATE TABLE IF NOT EXISTS users (
     is_default_password INT DEFAULT 1,
     has_adult_access INT DEFAULT 1,
     has_audiobook_access INT DEFAULT 1,
+    has_video_access INT DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
@@ -327,11 +399,13 @@ CREATE TABLE IF NOT EXISTS collection_items (
     book_id BIGINT DEFAULT NULL,
     series_name VARCHAR(500) DEFAULT NULL,
     audiobook_id BIGINT DEFAULT NULL,
+    video_id BIGINT DEFAULT NULL,
     sort_order INT DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uq_coll_book (collection_id, book_id),
     UNIQUE KEY uq_coll_series (collection_id, series_name(255)),
     UNIQUE KEY uq_coll_audiobook (collection_id, audiobook_id),
+    UNIQUE KEY uq_coll_video (collection_id, video_id),
     INDEX idx_collection_items_coll (collection_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
@@ -421,8 +495,8 @@ def _ensure_mariadb_columns():
             conn.commit()
             print("  [+] MariaDB 구형 테이블 `tracks` ➔ `audiobook_tracks` 자동 RENAME 완료.")
         conn.close()
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"  [!] MariaDB 구형 테이블 RENAME 검사 중 오류: {e}")
 
     required_columns = [
         ('media_general', 'libraries', 'group_id', 'BIGINT DEFAULT NULL'),
@@ -453,6 +527,14 @@ def _ensure_mariadb_columns():
         ('media_adult', 'books', 'file_size', 'BIGINT DEFAULT 0'),
         ('media_general', 'collections', 'updated_at', 'DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
         ('media_adult', 'collections', 'updated_at', 'DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
+        ('media_general', 'users', 'has_video_access', 'INT DEFAULT 1'),
+        ('media_adult', 'users', 'has_video_access', 'INT DEFAULT 1'),
+        ('media_audiobook', 'users', 'has_video_access', 'INT DEFAULT 1'),
+        ('media_general', 'collection_items', 'video_id', 'BIGINT DEFAULT NULL'),
+        ('media_adult', 'collection_items', 'video_id', 'BIGINT DEFAULT NULL'),
+        ('media_audiobook', 'collection_items', 'video_id', 'BIGINT DEFAULT NULL'),
+        ('media_video', 'video_episodes', 'needs_transcode', 'INT DEFAULT 0'),
+        ('media_video', 'video_episodes', 'subtitle_path', 'TEXT'),
     ]
 
     for db_name, tbl, col_name, col_def in required_columns:
@@ -465,8 +547,8 @@ def _ensure_mariadb_columns():
                 conn.commit()
                 print(f"  [+] MariaDB 누락 컬럼 자동 보강 완료: `{db_name}`.`{tbl}`.{col_name}")
             conn.close()
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"  [!] MariaDB 컬럼 보강 실패: `{db_name}`.`{tbl}`.{col_name} ({col_def}) -> {e}")
 
 
 def _ensure_mariadb_indexes():
@@ -476,6 +558,7 @@ def _ensure_mariadb_indexes():
         ('media_adult', 'books', 'idx_books_lib_del_series', 'CREATE INDEX idx_books_lib_del_series ON books (library_id, is_deleted, series_name(255), id)'),
         ('media_adult', 'books', 'idx_books_lib_del_title', 'CREATE INDEX idx_books_lib_del_title ON books (library_id, is_deleted, title(255), id)'),
         ('media_audiobook', 'audiobooks', 'idx_audiobooks_lib_del', 'CREATE INDEX idx_audiobooks_lib_del ON audiobooks (library_id, is_deleted, title(255), id)'),
+        ('media_video', 'videos', 'idx_videos_lib_del', 'CREATE INDEX idx_videos_lib_del ON videos (library_id, is_deleted, title(255), id)'),
         ('media_general', 'libraries', 'idx_libraries_group_id', 'CREATE INDEX idx_libraries_group_id ON libraries (group_id)'),
         ('media_adult', 'libraries', 'idx_libraries_group_id', 'CREATE INDEX idx_libraries_group_id ON libraries (group_id)'),
         ('media_audiobook', 'libraries', 'idx_libraries_group_id', 'CREATE INDEX idx_libraries_group_id ON libraries (group_id)'),
@@ -504,8 +587,8 @@ def _ensure_mariadb_indexes():
                 conn.commit()
                 print(f"  [+] MariaDB 고속 성능 인덱스 생성 완료: `{db_name}`.`{tbl}`.{idx_name}")
             conn.close()
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"  [!] MariaDB 인덱스 생성 실패: `{db_name}`.`{tbl}`.{idx_name} -> {e}")
 
 
 def run_schema_update():
@@ -534,7 +617,8 @@ def run_schema_update():
     db_paths = {
         '일반 DB (media_general)': DB_GENERAL_PATH,
         '성인 DB (media_adult)': DB_ADULT_PATH,
-        '오디오북 DB (media_audiobook)': DB_AUDIOBOOK_PATH
+        '오디오북 DB (media_audiobook)': DB_AUDIOBOOK_PATH,
+        '영상 강좌 DB (media_video)': DB_VIDEO_PATH
     }
 
     for db_name, db_path in db_paths.items():
@@ -568,7 +652,7 @@ def run_schema_update():
         schema_text = None
         indexes_text = None
 
-    for db_key, db_path in [('general', DB_GENERAL_PATH), ('adult', DB_ADULT_PATH), ('audiobook', DB_AUDIOBOOK_PATH)]:
+    for db_key, db_path in [('general', DB_GENERAL_PATH), ('adult', DB_ADULT_PATH), ('audiobook', DB_AUDIOBOOK_PATH), ('video', DB_VIDEO_PATH)]:
         if not os.path.exists(db_path):
             continue
 

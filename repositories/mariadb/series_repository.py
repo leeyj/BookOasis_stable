@@ -11,7 +11,7 @@ class SeriesRepository:
     @staticmethod
     def rebuild_summary(db_type, only_if_unready=False):
         """현재 books 데이터를 기준으로 시리즈 요약을 트랜잭션 안에서 재생성한다."""
-        if db_type == 'audiobook':
+        if db_type in ('audiobook', 'video'):
             return False
 
         conn = database.get_connection(db_type)
@@ -195,7 +195,7 @@ class SeriesRepository:
         tag_filters = [str(v).strip() for v in (tag_filters or []) if str(v).strip()]
         search_mode, search_term = parse_series_search_query(search_query)
 
-        if db_type != 'audiobook' and not search_query and not favorite_only and not genre_filters and not tag_filters:
+        if db_type not in ('audiobook', 'video') and not search_query and not favorite_only and not genre_filters and not tag_filters:
             try:
                 summary_rows = SeriesRepository._fetch_summary_rows(
                     db_type, library_id, user_id, role, limit, offset, safe_user_id
@@ -251,6 +251,58 @@ class SeriesRepository:
                 FROM audiobooks a
                 WHERE {' AND '.join(where)}
                 ORDER BY a.library_id ASC, a.title ASC, a.id ASC
+            """
+            if limit is not None:
+                sql += " LIMIT %s"
+                params.append(int(limit))
+                if offset is not None:
+                    sql += " OFFSET %s"
+                    params.append(int(offset))
+        elif db_type == 'video':
+            where = ["COALESCE(v.is_deleted, 0) = 0"]
+            params = [safe_user_id]
+            if favorite_only:
+                where.append("v.is_favorite = 1")
+            if library_id and str(library_id) not in ('all', 'favorite', 'history', 'home'):
+                try:
+                    lib_id_val = int(library_id)
+                    where.append("v.library_id = %s")
+                    params.append(lib_id_val)
+                except (ValueError, TypeError):
+                    pass
+            if search_query:
+                if not search_term:
+                    where.append("1 = 0")
+                elif search_mode == 'author':
+                    where.append("1 = 0")
+                else:
+                    where.append("LOWER(COALESCE(v.title, '')) LIKE %s")
+                    params.append(f"%{search_term.lower()}%")
+            if role != 'admin' and user_id:
+                where.append(
+                    "EXISTS ("
+                    "SELECT 1 FROM user_category_permissions p "
+                    "WHERE p.library_id = v.library_id AND p.user_id = %s AND p.has_access = 1"
+                    ")"
+                )
+                params.append(user_id)
+
+            sql = f"""
+                SELECT v.id, v.title AS series_name, '' AS series_alias, v.title, '' AS title_alias,
+                       '' AS author, v.folder_path AS file_path, 'video' AS file_format,
+                       CONCAT('/api/media/videos/', v.id, '/cover') AS cover_image,
+                       v.updated_at AS cover_updated_at,
+                       COALESCE(v.is_favorite, 0) AS is_favorite,
+                       v.created_at, v.genres AS genre, '' AS tags, v.library_id, 0 AS metadata_locked,
+                       COALESCE(v.total_episodes, 0) AS total_tracks,
+                       COALESCE((
+                           SELECT MAX(vp.is_completed) FROM video_progress vp
+                           WHERE vp.video_id = v.id AND vp.user_id = %s
+                       ), 0) AS is_completed,
+                       1 AS series_book_count
+                FROM videos v
+                WHERE {' AND '.join(where)}
+                ORDER BY v.library_id ASC, v.title ASC, v.id ASC
             """
             if limit is not None:
                 sql += " LIMIT %s"
@@ -353,7 +405,7 @@ class SeriesRepository:
             result = []
             for row in rows:
                 item = dict(row)
-                if db_type != 'audiobook':
+                if db_type not in ('audiobook', 'video'):
                     item['is_favorite'] = 1 if item['id'] in fav_set else 0
                 result.append(item)
             return result
@@ -367,7 +419,7 @@ class SeriesRepository:
         tag_filters = [str(value).strip() for value in (tag_filters or []) if str(value).strip()]
         search_mode, search_term = parse_series_search_query(search_query)
 
-        if db_type != 'audiobook' and not search_query and not favorite_only and not genre_filters and not tag_filters:
+        if db_type not in ('audiobook', 'video') and not search_query and not favorite_only and not genre_filters and not tag_filters:
             try:
                 summary_totals = SeriesRepository._fetch_summary_totals(db_type, library_id, user_id, role)
                 if summary_totals is not None:
@@ -404,6 +456,36 @@ class SeriesRepository:
             sql = f"""
                 SELECT COUNT(*) AS total_series_count, COUNT(*) AS total_book_count
                 FROM audiobooks a
+                WHERE {' AND '.join(where)}
+            """
+        elif db_type == 'video':
+            where = ["COALESCE(v.is_deleted, 0) = 0"]
+            params = []
+            if favorite_only:
+                where.append("v.is_favorite = 1")
+            if library_id and str(library_id) not in ('all', 'favorite', 'history', 'home'):
+                try:
+                    where.append("v.library_id = %s")
+                    params.append(int(library_id))
+                except (ValueError, TypeError):
+                    pass
+            if search_query:
+                if not search_term:
+                    where.append("1 = 0")
+                elif search_mode == 'author':
+                    where.append("1 = 0")
+                else:
+                    where.append("LOWER(COALESCE(v.title, '')) LIKE %s")
+                    params.append(f"%{search_term.lower()}%")
+            if role != 'admin' and user_id:
+                where.append(
+                    "EXISTS (SELECT 1 FROM user_category_permissions p "
+                    "WHERE p.library_id = v.library_id AND p.user_id = %s AND p.has_access = 1)"
+                )
+                params.append(user_id)
+            sql = f"""
+                SELECT COUNT(*) AS total_series_count, COUNT(*) AS total_book_count
+                FROM videos v
                 WHERE {' AND '.join(where)}
             """
         else:

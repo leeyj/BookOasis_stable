@@ -20,5 +20,8 @@ db/
 covers/
 cache/
 logs/
+docs/archive
+docs/bug
+docs/history
 
 

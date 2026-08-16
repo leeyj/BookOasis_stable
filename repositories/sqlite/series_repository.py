@@ -71,6 +71,57 @@ class SeriesRepository:
                 if offset is not None:
                     sql += " OFFSET ?"
                     params.append(int(offset))
+        elif db_type == 'video':
+            where = ["COALESCE(v.is_deleted, 0) = 0"]
+            params = [safe_user_id]
+            if favorite_only:
+                where.append("v.is_favorite = 1")
+            if library_id and str(library_id) not in ('all', 'favorite', 'history', 'home'):
+                try:
+                    lib_id_val = int(library_id)
+                    where.append("v.library_id = ?")
+                    params.append(lib_id_val)
+                except (ValueError, TypeError):
+                    pass
+            if search_query:
+                if not search_term:
+                    where.append("1 = 0")
+                elif search_mode == 'author':
+                    where.append("1 = 0")
+                else:
+                    where.append("COALESCE(v.title, '') LIKE ?")
+                    params.append(f"%{search_term}%")
+            if role != 'admin' and user_id:
+                where.append(
+                    "EXISTS ("
+                    "SELECT 1 FROM user_category_permissions p "
+                    "WHERE p.library_id = v.library_id AND p.user_id = ? AND p.has_access = 1"
+                    ")"
+                )
+                params.append(user_id)
+
+            sql = f"""
+                SELECT v.id, v.title AS series_name, '' AS series_alias, v.title, '' AS title_alias,
+                       '' AS author, v.folder_path AS file_path, 'video' AS file_format,
+                       CONCAT('/api/media/videos/', v.id, '/cover') AS cover_image,
+                       v.updated_at AS cover_updated_at,
+                       COALESCE(v.is_favorite, 0) AS is_favorite,
+                       v.created_at, v.genres AS genre, '' AS tags, v.library_id, 0 AS metadata_locked,
+                       COALESCE(v.total_episodes, 0) AS total_tracks,
+                       COALESCE((
+                           SELECT MAX(vp.is_completed) FROM video_progress vp
+                           WHERE vp.video_id = v.id AND vp.user_id = ?
+                       ), 0) AS is_completed
+                FROM videos v
+                WHERE {' AND '.join(where)}
+                ORDER BY v.library_id ASC, v.title ASC, v.id ASC
+            """
+            if limit is not None:
+                sql += " LIMIT ?"
+                params.append(int(limit))
+                if offset is not None:
+                    sql += " OFFSET ?"
+                    params.append(int(offset))
         else:
             sub_where = ["(b2.is_deleted = 0 OR b2.is_deleted IS NULL)"]
             sub_params = []
@@ -169,7 +220,7 @@ class SeriesRepository:
                 result = []
                 for row in rows:
                     item = dict(row)
-                    if db_type != 'audiobook':
+                    if db_type not in ('audiobook', 'video'):
                         item['is_favorite'] = 1 if item['id'] in fav_set else 0
                     result.append(item)
                 conn.close()
@@ -225,6 +276,36 @@ class SeriesRepository:
             sql = f"""
                 SELECT COUNT(*) AS total_series_count, COUNT(*) AS total_book_count
                 FROM audiobooks a
+                WHERE {' AND '.join(where)}
+            """
+        elif db_type == 'video':
+            where = ["COALESCE(v.is_deleted, 0) = 0"]
+            params = []
+            if favorite_only:
+                where.append("v.is_favorite = 1")
+            if library_id and str(library_id) not in ('all', 'favorite', 'history', 'home'):
+                try:
+                    where.append("v.library_id = ?")
+                    params.append(int(library_id))
+                except (ValueError, TypeError):
+                    pass
+            if search_query:
+                if not search_term:
+                    where.append("1 = 0")
+                elif search_mode == 'author':
+                    where.append("1 = 0")
+                else:
+                    where.append("COALESCE(v.title, '') LIKE ?")
+                    params.append(f"%{search_term}%")
+            if role != 'admin' and user_id:
+                where.append(
+                    "EXISTS (SELECT 1 FROM user_category_permissions p "
+                    "WHERE p.library_id = v.library_id AND p.user_id = ? AND p.has_access = 1)"
+                )
+                params.append(user_id)
+            sql = f"""
+                SELECT COUNT(*) AS total_series_count, COUNT(*) AS total_book_count
+                FROM videos v
                 WHERE {' AND '.join(where)}
             """
         else:

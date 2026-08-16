@@ -96,22 +96,24 @@ export async function toggleBookFavorite(event, bookId, nextStatus, seriesName, 
 export async function toggleSeriesFavorite(event, seriesName, currentStatus, libraryId) {
   if (event) event.stopPropagation();
   try {
-    const data = await api.fetchMediaDetail(
-      state.currentLibraryType,
-      libraryId || state.currentLibraryId,
-      seriesName,
-      state.detailRepresentativeBookId
-    );
-    if (data.success && data.books && data.books.length > 0) {
-      const nextStatus = currentStatus === 1 ? 0 : 1;
-      const promises = data.books.map(b => window.toggleFavoriteAction(b.id, nextStatus));
-      await Promise.all(promises);
+    // 시리즈명 기준 단건 토글 API를 직접 호출한다(오디오북/영상은 시리즈=단일 엔티티라
+    // 개별 항목을 순회하며 잘못된 id로 토글하던 예전 로직을 제거 - 일반 도서도 서버가
+    // 시리즈에 속한 도서 전체를 한 번에 처리하므로 N번 호출이 필요 없다).
+    const nextStatus = currentStatus === 1 ? 0 : 1;
+    const data = await api.toggleSeriesFavorite(state.currentLibraryType, seriesName, nextStatus === 1);
+    if (data.success) {
       const statusText = nextStatus === 1 ? i18n.t('modal.fav_added') : i18n.t('modal.fav_removed');
       if (typeof window.showToast === 'function') {
         window.showToast(i18n.t('modal.series_fav_status', {seriesName: seriesName, statusText: statusText}), 'success');
       }
       if (typeof window.openBookDetail === 'function') {
         window.openBookDetail(null, seriesName, libraryId, state.detailRepresentativeBookId, state.detailDisplayTitle);
+      }
+    } else {
+      if (typeof window.showToast === 'function') {
+        window.showToast(i18n.t('modal.series_fav_fail'), 'error');
+      } else {
+        alert(i18n.t('modal.series_fav_fail'));
       }
     }
   } catch (err) {

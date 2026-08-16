@@ -175,6 +175,7 @@ export async function renderCollectionDetail(collectionId) {
       items.forEach(item => {
         const isSeries = item.type === 'series';
         const isAudiobook = item.type === 'audiobook';
+        const isVideo = item.type === 'video';
         const itemTitle = item.title || item.series_name || '제목 없음';
 
         const cardOptions = isSeries ? {
@@ -186,6 +187,10 @@ export async function renderCollectionDetail(collectionId) {
           actionTitle: '재생',
           onPrimaryClick: () => window.playAudiobook?.(item.audiobook_id),
           onActionClick: () => window.playAudiobook?.(item.audiobook_id)
+        } : (isVideo ? {
+          actionTitle: '상세보기',
+          onPrimaryClick: (e) => openBookDetail(e, itemTitle, 'all', item.video_id, itemTitle),
+          onActionClick: (e) => openBookDetail(e, itemTitle, 'all', item.video_id, itemTitle)
         } : {
           showProgress: true,
           actionTitle: '바로 읽기',
@@ -193,10 +198,10 @@ export async function renderCollectionDetail(collectionId) {
           onActionClick: (e) => {
             if (window.openReader) window.openReader(item.book_id, item.file_format, itemTitle);
           }
-        });
+        }));
 
         const card = createBookCard({
-          id: item.book_id || item.id,
+          id: item.video_id || item.audiobook_id || item.book_id || item.id,
           representative_book_id: item.book_id,
           title: itemTitle,
           series_name: isSeries ? itemTitle : (item.book_series || item.series_name || ''),
@@ -385,6 +390,7 @@ async function addItemToCollection(collectionId, itemInfo) {
     if (itemInfo.book_id) payload.book_id = itemInfo.book_id;
     if (itemInfo.series_name) payload.series_name = itemInfo.series_name;
     if (itemInfo.audiobook_id) payload.audiobook_id = itemInfo.audiobook_id;
+    if (itemInfo.video_id) payload.video_id = itemInfo.video_id;
 
     const res = await fetch(`/api/v1/collections/${collectionId}/items?db_type=${state.currentLibraryType || 'general'}`, {
       method: 'POST',

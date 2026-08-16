@@ -14,6 +14,7 @@ os.makedirs(DB_DIR, exist_ok=True)
 DB_GENERAL_PATH = os.path.join(DB_DIR, 'media_general.db')
 DB_ADULT_PATH = os.path.join(DB_DIR, 'media_adult.db')
 DB_AUDIOBOOK_PATH = os.path.join(DB_DIR, 'media_audiobook.db')
+DB_VIDEO_PATH = os.path.join(DB_DIR, 'media_video.db')
 SQLITE_BUSY_TIMEOUT_MS = int(os.environ.get('SQLITE_BUSY_TIMEOUT_MS', '60000') or '60000')
 
 class PooledConnection(sqlite3.Connection):
@@ -188,7 +189,7 @@ class SQLiteConnectionPool:
             self.allocated = max(0, self.allocated - closed_count)
         print(f"[DB-Shutdown] 커넥션 {closed_count}개 정리 완료: {self.db_path}")
 
-_pools = {'general': None, 'adult': None, 'audiobook': None}
+_pools = {'general': None, 'adult': None, 'audiobook': None, 'video': None}
 _pools_lock = threading.Lock()
 _shutdown_in_progress = False
 
@@ -208,6 +209,8 @@ def get_db_path(db_type='general'):
         return DB_ADULT_PATH
     elif db_type == 'audiobook':
         return DB_AUDIOBOOK_PATH
+    elif db_type == 'video':
+        return DB_VIDEO_PATH
     return DB_GENERAL_PATH
 
 _cached_pool_size = None
@@ -552,7 +555,7 @@ class MariaDBConnectionPool:
                     break
             self.allocated = 0
 
-_mariadb_pools = {'general': None, 'adult': None, 'audiobook': None}
+_mariadb_pools = {'general': None, 'adult': None, 'audiobook': None, 'video': None}
 
 def get_mariadb_connection(db_type='general'):
     pool_size = _get_pool_size_raw()
@@ -737,6 +740,7 @@ def startup_db_sanity_check():
         'general'  : DB_GENERAL_PATH,
         'adult'    : DB_ADULT_PATH,
         'audiobook': DB_AUDIOBOOK_PATH,
+        'video'    : DB_VIDEO_PATH,
     }
     for db_type, db_path in db_map.items():
         if not os.path.exists(db_path):
@@ -932,6 +936,72 @@ def init_databases():
         UNIQUE(audiobook_id, track_id, user_id)
     );
 
+    CREATE TABLE IF NOT EXISTS videos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        library_id INTEGER REFERENCES libraries(id),
+        title TEXT NOT NULL,
+        sort_title TEXT,
+        web_id TEXT,
+        genres TEXT,
+        poster TEXT,
+        backdrop TEXT,
+        premiered TEXT,
+        description TEXT,
+        folder_name TEXT NOT NULL,
+        folder_path TEXT NOT NULL UNIQUE,
+        total_duration REAL DEFAULT 0.0,
+        total_episodes INTEGER DEFAULT 0,
+        is_favorite INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0,
+        deleted_at DATETIME DEFAULT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS video_episodes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        video_id INTEGER REFERENCES videos(id) ON DELETE CASCADE,
+        episode_number INTEGER NOT NULL,
+        episode_code TEXT,
+        title TEXT,
+        filename TEXT NOT NULL,
+        file_path TEXT NOT NULL UNIQUE,
+        file_mtime REAL DEFAULT 0.0,
+        file_size INTEGER DEFAULT 0,
+        duration REAL DEFAULT 0.0,
+        width INTEGER DEFAULT 0,
+        height INTEGER DEFAULT 0,
+        premiered TEXT,
+        format TEXT DEFAULT 'mp4',
+        needs_transcode INTEGER DEFAULT 0,
+        subtitle_path TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS video_progress (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        video_id INTEGER REFERENCES videos(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL DEFAULT 1,
+        current_episode_id INTEGER REFERENCES video_episodes(id),
+        current_time REAL DEFAULT 0.0,
+        total_progress_pct REAL DEFAULT 0.0,
+        playback_rate REAL DEFAULT 1.0,
+        is_completed INTEGER DEFAULT 0,
+        last_watched_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(video_id, user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS video_episode_progress (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        video_id INTEGER REFERENCES videos(id) ON DELETE CASCADE,
+        episode_id INTEGER REFERENCES video_episodes(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL DEFAULT 1,
+        current_time REAL DEFAULT 0.0,
+        progress_pct REAL DEFAULT 0.0,
+        is_completed INTEGER DEFAULT 0,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(video_id, episode_id, user_id)
+    );
+
     CREATE TABLE IF NOT EXISTS user_progress (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         book_id INTEGER REFERENCES books(id),
@@ -1027,6 +1097,7 @@ def init_databases():
         is_default_password INTEGER DEFAULT 1,
         has_adult_access INTEGER DEFAULT 1,
         has_audiobook_access INTEGER DEFAULT 1,
+        has_video_access INTEGER DEFAULT 1,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -1055,11 +1126,13 @@ def init_databases():
         book_id INTEGER DEFAULT NULL REFERENCES books(id) ON DELETE CASCADE,
         series_name TEXT DEFAULT NULL,
         audiobook_id INTEGER DEFAULT NULL REFERENCES audiobooks(id) ON DELETE CASCADE,
+        video_id INTEGER DEFAULT NULL,
         sort_order INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(collection_id, book_id),
         UNIQUE(collection_id, series_name),
-        UNIQUE(collection_id, audiobook_id)
+        UNIQUE(collection_id, audiobook_id),
+        UNIQUE(collection_id, video_id)
     );
 
     CREATE TABLE IF NOT EXISTS plugin_load_events (
@@ -1076,6 +1149,10 @@ def init_databases():
     CREATE INDEX IF NOT EXISTS idx_audiobook_track_progress_lookup ON audiobook_track_progress(audiobook_id, user_id, track_id);
     CREATE INDEX IF NOT EXISTS idx_audiobooks_library_id ON audiobooks(library_id);
     CREATE INDEX IF NOT EXISTS idx_audiobooks_title ON audiobooks(title);
+    CREATE INDEX IF NOT EXISTS idx_video_episodes_video_id ON video_episodes(video_id);
+    CREATE INDEX IF NOT EXISTS idx_video_episode_progress_lookup ON video_episode_progress(video_id, user_id, episode_id);
+    CREATE INDEX IF NOT EXISTS idx_videos_library_id ON videos(library_id);
+    CREATE INDEX IF NOT EXISTS idx_videos_title ON videos(title);
     CREATE INDEX IF NOT EXISTS idx_book_offsets_book_id ON book_offsets(book_id);
     CREATE INDEX IF NOT EXISTS idx_book_offsets_book_page ON book_offsets(book_id, page_idx);
     CREATE INDEX IF NOT EXISTS idx_books_series_name ON books(series_name);
@@ -1106,7 +1183,7 @@ def init_databases():
     # 기동 전 WAL/SHM 무결성 자동 검증 및 정리
     startup_db_sanity_check()
 
-    for db_type in ['general', 'adult', 'audiobook']:
+    for db_type in ['general', 'adult', 'audiobook', 'video']:
         conn = get_connection(db_type)
         cursor = conn.cursor()
         cursor.executescript(schema)
