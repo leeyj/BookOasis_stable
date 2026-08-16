@@ -1,4 +1,13 @@
 # CHANGELOG
+## v2.0.5
+- (dashboard) TV용 UI 추가(베타) - 사이드바 그룹 드로어, 이어보기/최근추가 홈, 카테고리 그리드(정렬 지원), 킷오스크 리더/플러그인 모드(`/?kiosk=1`), 팝업 로그인/로그아웃, 리모컨(방향키/Enter/ESC) 내비게이션 | added TV app UI (beta) - overlay category drawer, continue-reading/recently-added home rows, sortable category grid, kiosk reader/plugin mode (`/?kiosk=1`), popup login/logout, and remote-control (arrow/Enter/Esc) navigation
+- (category) 라이브러리/플러그인 카테고리를 가상 그룹(폴더)에 넣고 드래그로 정렬할 수 있는 기능 추가 | add virtual groups (folders) for library/plugin categories in the sidebar, with drag-to-reorder for both group members and the groups themselves
+- (plugin) 저장소가 기본 제공하던 샘플 플러그인 7종을 바인드 마운트 대상인 `plugins/metadata/`에서 마운트되지 않는 `sample_plugins/metadata/`로 이동 — 업데이트(`git pull`/`git clean` 등) 시 사용자가 직접 설치한 플러그인이 유실되던 문제 해결. [설정 > 플러그인] 탭에 "샘플에서 설치" 버튼 추가, 빈 마운트에서도 부팅되도록 프레임워크 필수 파일 자동 시드 로직 추가 | move the 7 bundled sample plugins out of the bind-mounted `plugins/metadata/` into a non-mounted `sample_plugins/metadata/`, fixing user-installed plugins being wiped out on update (`git pull`/`git clean`, etc.) — added an "Install from sample" button in [Settings > Plugins], plus boot-time auto-seeding of required framework files so the app still starts on a completely empty mount
+- (docker) 기본 `docker-compose.yml`을 로컬 빌드 대신 GHCR 공식 이미지(`ghcr.io/leeyj/bookoasis:stable`) 사용으로 전환, 소스 직접 빌드용 `docker-compose.build.yml` 및 MariaDB 콤보용 `docker-compose.mariadb.ghcr.yml` 추가 | switch the default `docker-compose.yml` to pull the official GHCR image instead of building locally, and add `docker-compose.build.yml` (source build) and `docker-compose.mariadb.ghcr.yml` (MariaDB combo + GHCR) variants
+
+## v2.0.4
+- (lib) requests 라이브러리 추가 | added requests
+
 ## v2.0.3
 - (plugin) 오디오북 라이브러리 스캔에서 신규 도서 감지 시 웹훅/플러그인 훅(`on_scan_new_books_detected`)이 전혀 호출되지 않던 문제 수정 — 일반/성인 도서 스캔과 동일하게 `services/audiobook_scanner.py`에서 표준 이벤트 및 플러그인 훅을 디스패치하도록 추가 | fix audiobook library scans never dispatching the new-book webhook/plugin hook (`on_scan_new_books_detected`) — `services/audiobook_scanner.py` now dispatches the same standard event and plugin hook as regular/adult book scans
 - (plugin) `webhook_new_books_notify` 플러그인이 User-Agent 헤더 없이 요청을 보내 Discord/Cloudflare에서 403(에러 1010)으로 차단되던 문제 수정, 알림 메시지도 원본 JSON을 그대로 보내던 것에서 사람이 읽기 좋은 형태(예: "📚 새 도서 74권 추가됨 - 만화(완결A)" + 샘플 제목 + "...외 N권")로 변경 | fix `webhook_new_books_notify` plugin requests being blocked by Discord/Cloudflare (403 / error 1010) due to a missing User-Agent header, and switch notification messages from raw JSON dumps to human-readable text (e.g. "📚 74 new books added - Comics(CompleteA)" plus sample titles and a "...N more" summary)

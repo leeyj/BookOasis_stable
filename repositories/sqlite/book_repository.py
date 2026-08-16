@@ -19,6 +19,24 @@ class BookRepository:
         return dict(row) if row else None
 
     @staticmethod
+    def get_book_reader_info(db_type, book_id, user_id=None):
+        """킷오스크/외부 딥링크에서 openReader()에 바로 넘길 도서 메타(제목/포맷/진척도) 조회"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT b.id, b.title, b.file_format, b.total_pages, b.file_path, p.pages_read
+            FROM books b
+            LEFT JOIN user_progress p ON b.id = p.book_id AND p.user_id = ?
+            WHERE b.id = ? AND COALESCE(b.is_deleted, 0) = 0
+            """,
+            (user_id, book_id)
+        )
+        row = cursor.fetchone()
+        conn.close()
+        return dict(row) if row else None
+
+    @staticmethod
     def get_books_by_series(db_type, series_name, library_id=None, user_id=None):
         """동일 시리즈 내 전체 도서 목록 조회 (유저 읽기 진척도 포함)"""
         conn = database.get_connection(db_type)

@@ -1058,6 +1058,44 @@ body {
     color: #a855f7 !important;
 }
 
+/* 킷오스크 모드: /tv 등 외부 브라우징 화면에서 딥링크로 접속 시 사이드바/헤더를 완전히 숨기고 리더/플러그인 화면만 노출 */
+.kiosk-mode .library-sidebar {
+    width: 0 !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    border-right: none !important;
+    overflow: hidden !important;
+    opacity: 0;
+    pointer-events: none;
+}
+.kiosk-mode .library-header {
+    display: none !important;
+}
+
+.kiosk-back-btn {
+    position: fixed;
+    top: 1.2rem;
+    left: 1.2rem;
+    z-index: 5000;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(15, 15, 20, 0.7);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #f8fafc;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.kiosk-back-btn:hover {
+    color: #a855f7;
+    border-color: #a855f7;
+}
+
 /* 상단 헤더 및 컨트롤 */
 .library-header {
     display: grid;

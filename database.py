@@ -802,6 +802,12 @@ def init_databases():
         sort_order INTEGER DEFAULT 0
     );
 
+    CREATE TABLE IF NOT EXISTS plugin_group_assignments (
+        plugin_id TEXT PRIMARY KEY,
+        group_id INTEGER NOT NULL,
+        sort_order INTEGER DEFAULT 0
+    );
+
     CREATE TABLE IF NOT EXISTS scanner_tasks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         task_type TEXT NOT NULL,
@@ -1078,6 +1084,7 @@ def init_databases():
     CREATE INDEX IF NOT EXISTS idx_books_isbn ON books(isbn);
     CREATE INDEX IF NOT EXISTS idx_libraries_group_id ON libraries(group_id);
     CREATE INDEX IF NOT EXISTS idx_libraries_group_order ON libraries(group_id, sort_order);
+    CREATE INDEX IF NOT EXISTS idx_plugin_group_assignments_group_id ON plugin_group_assignments(group_id);
     CREATE INDEX IF NOT EXISTS idx_books_is_favorite ON books(is_favorite);
     CREATE INDEX IF NOT EXISTS idx_books_created_at ON books(created_at);
     CREATE INDEX IF NOT EXISTS idx_books_series_lib_title ON books(series_name, library_id, title);

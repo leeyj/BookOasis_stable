@@ -114,6 +114,14 @@ function renderLibraryItem(lib, isPinned) {
   return `<li class="menu-item ${isActive}" data-type="custom" data-role="sidebar-category-dynamic" data-id="${lib.id}" data-category-id="${lib.id}" data-name="${safeName}" data-path="${safePath}" data-remote="${lib.is_remote || 0}" data-rclone-url="${safeRclone}" data-icon="${safeIcon}" data-color="${safeColor}" data-hide-cover="${hideCover}" data-group-id="${groupId}" ${draggableAttr} style="display: flex; align-items: center; justify-content: space-between;"><span style="display: inline-flex; align-items: center; gap: 0.6rem;"><i class="fa-solid ${safeIcon}" style="color: ${safeColor};"></i> ${safeName}</span><i class="fa-solid fa-circle-notch fa-spin category-scan-spinner" style="display:none; color:#c084fc; font-size:0.75rem; margin-left:auto;" title="스캔 진행 중"></i></li>`;
 }
 
+function renderPluginItem(cp) {
+  const catId = cp.category_id;
+  const isActive = String(state.currentLibraryId) === String(catId) ? 'active' : '';
+  const safeTitle = escapeHtml(cp.title || cp.name);
+  const safeIcon = escapeHtml(cp.icon || 'fa-puzzle-piece');
+  return `<li class="menu-item ${isActive}" data-type="plugin" data-role="sidebar-category-dynamic" id="category-${catId}" data-id="${catId}" data-category-id="${catId}" data-plugin-id="${cp.id}"><i class="${safeIcon}" style="color: #38bdf8;"></i> ${safeTitle}</li>`;
+}
+
 function getGroupCollapsedStorageKey(groupId) {
   return `library_group_collapsed_${state.currentLibraryType}_${groupId}`;
 }
@@ -341,56 +349,71 @@ export async function loadLibraries() {
             console.error('Error parsing library order:', e);
           }
         }
-
-        const librariesByGroup = new Map();
-        data.libraries.forEach((lib) => {
-          const groupKey = lib.group_id == null ? '' : String(lib.group_id);
-          if (!librariesByGroup.has(groupKey)) librariesByGroup.set(groupKey, []);
-          librariesByGroup.get(groupKey).push(lib);
-        });
-
-        state.libraryGroups.forEach((group) => {
-          const groupId = String(group.id);
-          const groupLibraries = librariesByGroup.get(groupId) || [];
-          if (!isAdmin && groupLibraries.length === 0) return;
-          const containsActive = groupLibraries.some((lib) => String(lib.id) === String(state.currentLibraryId));
-          const isCollapsed = !containsActive && localStorage.getItem(getGroupCollapsedStorageKey(groupId)) === 'true';
-          const safeGroupName = escapeHtml(group.name || '');
-          const safeGroupIcon = escapeHtml(group.icon || 'fa-folder');
-          const safeGroupColor = escapeHtml(group.color || '#a855f7');
-          html += `<li class="sidebar-library-group${isCollapsed ? ' collapsed' : ''}" data-library-group-id="${groupId}">
-            <button type="button" class="menu-item sidebar-group-header" data-type="group" data-role="sidebar-group-toggle" data-id="${groupId}" data-name="${safeGroupName}" aria-expanded="${isCollapsed ? 'false' : 'true'}">
-              <span><i class="fa-solid fa-chevron-down sidebar-group-chevron"></i><i class="fa-solid ${safeGroupIcon}" style="color:${safeGroupColor};"></i>${safeGroupName}</span>
-              <small>${groupLibraries.length}</small>
-            </button>
-            <ul class="sidebar-library-group-items" data-group-id="${groupId}">${groupLibraries.map((lib) => renderLibraryItem(lib, isPinned)).join('')}</ul>
-          </li>`;
-          librariesByGroup.delete(groupId);
-        });
-
-        (librariesByGroup.get('') || []).forEach((lib) => {
-          html += renderLibraryItem(lib, isPinned);
-        });
       }
 
-      // 동적 카테고리 레벨 플러그인 탭 주입
+      const librariesByGroup = new Map();
+      (data.libraries || []).forEach((lib) => {
+        const groupKey = lib.group_id == null ? '' : String(lib.group_id);
+        if (!librariesByGroup.has(groupKey)) librariesByGroup.set(groupKey, []);
+        librariesByGroup.get(groupKey).push(lib);
+      });
+
+      // 동적 카테고리 레벨 플러그인 탭 조회 (그룹 렌더링보다 먼저 수행해야 그룹 내부에 배치 가능)
+      let categoryPlugins = [];
       try {
         const catPluginRes = await fetch(`/api/media/category-plugins?type=${state.currentLibraryType}`);
         if (catPluginRes.ok) {
           const catPluginData = await catPluginRes.json();
-          if (catPluginData.success && catPluginData.category_plugins && catPluginData.category_plugins.length > 0) {
-            catPluginData.category_plugins.forEach(cp => {
-              const catId = cp.category_id;
-              const isActive = String(state.currentLibraryId) === String(catId) ? 'active' : '';
-              const safeTitle = escapeHtml(cp.title || cp.name);
-              const safeIcon = escapeHtml(cp.icon || 'fa-puzzle-piece');
-              html += `<li class="menu-item ${isActive}" data-type="plugin" data-role="sidebar-category-dynamic" id="category-${catId}" data-id="${catId}" data-category-id="${catId}" data-plugin-id="${cp.id}"><i class="${safeIcon}" style="color: #38bdf8;"></i> ${safeTitle}</li>`;
-            });
+          if (catPluginData.success && Array.isArray(catPluginData.category_plugins)) {
+            categoryPlugins = catPluginData.category_plugins;
           }
         }
       } catch (e) {
         console.warn('[Category] Failed to fetch category plugins:', e);
       }
+
+      const validGroupIds = new Set(state.libraryGroups.map((g) => String(g.id)));
+      const pluginsByGroup = new Map();
+      const ungroupedPlugins = [];
+      categoryPlugins.forEach((cp) => {
+        const groupKey = cp.group_id == null ? '' : String(cp.group_id);
+        if (groupKey && validGroupIds.has(groupKey)) {
+          if (!pluginsByGroup.has(groupKey)) pluginsByGroup.set(groupKey, []);
+          pluginsByGroup.get(groupKey).push(cp);
+        } else {
+          ungroupedPlugins.push(cp);
+        }
+      });
+
+      state.libraryGroups.forEach((group) => {
+        const groupId = String(group.id);
+        const groupLibraries = librariesByGroup.get(groupId) || [];
+        const groupPlugins = pluginsByGroup.get(groupId) || [];
+        if (!isAdmin && groupLibraries.length === 0 && groupPlugins.length === 0) return;
+        const containsActive = groupLibraries.some((lib) => String(lib.id) === String(state.currentLibraryId))
+          || groupPlugins.some((cp) => String(cp.category_id) === String(state.currentLibraryId));
+        const isCollapsed = !containsActive && localStorage.getItem(getGroupCollapsedStorageKey(groupId)) === 'true';
+        const safeGroupName = escapeHtml(group.name || '');
+        const safeGroupIcon = escapeHtml(group.icon || 'fa-folder');
+        const safeGroupColor = escapeHtml(group.color || '#a855f7');
+        html += `<li class="sidebar-library-group${isCollapsed ? ' collapsed' : ''}" data-type="group-container" data-library-group-id="${groupId}">
+          <button type="button" class="menu-item sidebar-group-header" data-type="group" data-role="sidebar-group-toggle" data-id="${groupId}" data-name="${safeGroupName}" aria-expanded="${isCollapsed ? 'false' : 'true'}">
+            <span><i class="fa-solid fa-chevron-down sidebar-group-chevron"></i><i class="fa-solid ${safeGroupIcon}" style="color:${safeGroupColor};"></i>${safeGroupName}</span>
+            <small>${groupLibraries.length + groupPlugins.length}</small>
+          </button>
+          <ul class="sidebar-library-group-items" data-group-id="${groupId}">${groupLibraries.map((lib) => renderLibraryItem(lib, isPinned)).join('')}${groupPlugins.map((cp) => renderPluginItem(cp)).join('')}</ul>
+        </li>`;
+        librariesByGroup.delete(groupId);
+        pluginsByGroup.delete(groupId);
+      });
+
+      (librariesByGroup.get('') || []).forEach((lib) => {
+        html += renderLibraryItem(lib, isPinned);
+      });
+
+      ungroupedPlugins.forEach((cp) => {
+        html += renderPluginItem(cp);
+      });
 
       sidebar.innerHTML = html;
       applySavedMixedOrder(sidebar);
@@ -436,8 +459,14 @@ export function bindDragAndDropEvents(isEnabled) {
   if (typeof Sortable !== 'undefined') {
     const persistOnEnd = async (event) => {
       saveNewOrder();
-      if (event.item?.dataset?.type !== 'custom') return;
-      await persistLibraryPositions(sidebar);
+      const draggedType = event.item?.dataset?.type;
+      if (draggedType === 'custom') {
+        await persistLibraryPositions(sidebar);
+      } else if (draggedType === 'plugin') {
+        await persistPluginGroupPositions(sidebar);
+      } else if (draggedType === 'group-container') {
+        await persistGroupPositions(sidebar);
+      }
     };
     const allowCategoryMove = (event) => {
       const groupContainer = event.related?.closest?.('[data-library-group-id]');
@@ -448,13 +477,18 @@ export function bindDragAndDropEvents(isEnabled) {
         localStorage.setItem(getGroupCollapsedStorageKey(groupContainer.dataset.libraryGroupId), 'false');
       }
       const targetIsGroup = event.to?.matches?.('.sidebar-library-group-items');
-      return !(targetIsGroup && event.dragged?.dataset?.type !== 'custom');
+      const draggedType = event.dragged?.dataset?.type;
+      if (draggedType === 'group-container') {
+        // 그룹 자체는 다른 그룹 내부(하위 목록)로 들어갈 수 없음
+        return !targetIsGroup;
+      }
+      return !(targetIsGroup && draggedType !== 'custom' && draggedType !== 'plugin');
     };
 
     sidebar._categorySortables.push(new Sortable(sidebar, {
       animation: 150,
       group: {name: 'library-categories', pull: true, put: true},
-      draggable: 'li[data-type="custom"], li[data-type="plugin"]',
+      draggable: 'li[data-type="custom"], li[data-type="plugin"], li[data-type="group-container"]',
       filter: 'li[data-type="system"]',
       preventOnFilter: false,
       onMove: allowCategoryMove,
@@ -465,7 +499,7 @@ export function bindDragAndDropEvents(isEnabled) {
       sidebar._categorySortables.push(new Sortable(groupList, {
         animation: 150,
         group: {name: 'library-categories', pull: true, put: true},
-        draggable: 'li[data-type="custom"]',
+        draggable: 'li[data-type="custom"], li[data-type="plugin"]',
         emptyInsertThreshold: 18,
         onMove: allowCategoryMove,
         onEnd: persistOnEnd
@@ -488,6 +522,38 @@ async function persistLibraryPositions(sidebar) {
     await loadLibraries();
   } catch (error) {
     alert(error.message || '카테고리 위치를 저장하지 못했습니다.');
+    await loadLibraries();
+  }
+}
+
+async function persistGroupPositions(sidebar) {
+  const items = Array.from(sidebar.querySelectorAll(':scope > li[data-type="group-container"]')).map((element) => ({
+    id: element.dataset.libraryGroupId
+  }));
+
+  try {
+    const result = await api.moveLibraryGroups(items, state.currentLibraryType);
+    if (!result.success) throw new Error(result.error || '그룹 순서를 저장하지 못했습니다.');
+    await loadLibraries();
+  } catch (error) {
+    alert(error.message || '그룹 순서를 저장하지 못했습니다.');
+    await loadLibraries();
+  }
+}
+
+async function persistPluginGroupPositions(sidebar) {
+  const items = Array.from(sidebar.querySelectorAll('li[data-type="plugin"]')).map((element) => {
+    const groupContainer = element.closest('[data-library-group-id]');
+    const groupId = groupContainer?.dataset?.libraryGroupId || null;
+    return {plugin_id: element.dataset.pluginId, group_id: groupId};
+  });
+
+  try {
+    const result = await api.assignPluginGroups(items, state.currentLibraryType);
+    if (!result.success) throw new Error(result.error || '플러그인 그룹 위치를 저장하지 못했습니다.');
+    await loadLibraries();
+  } catch (error) {
+    alert(error.message || '플러그인 그룹 위치를 저장하지 못했습니다.');
     await loadLibraries();
   }
 }

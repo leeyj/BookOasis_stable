@@ -1,13 +1,32 @@
             <!-- 3. 플러그인 설정 탭 -->
             <div id="settings-tab-plugins" class="settings-tab-content" style="display: none; flex-direction: column; gap: 1.5rem;">
                 <div class="dashboard-section">
-                    <div class="section-header" style="margin-bottom: 1.2rem;">
-                        <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1.2rem; font-weight: 700;">
-                            <i class="fa-solid fa-plug" style="color: #a855f7; margin-right: 0.5rem;"></i> 확장 기능 및 플러그인 관리
-                        </h3>
-                        <p style="font-size: 0.82rem; color: #94a3b8; margin: 0.4rem 0 0 0;">서버에 로드된 동적 플러그인의 활성화 여부(ON/OFF) 및 상세 환경설정 값을 일괄 관리합니다.</p>
+                    <div class="section-header" style="margin-bottom: 1.2rem; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+                        <div>
+                            <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1.2rem; font-weight: 700;">
+                                <i class="fa-solid fa-plug" style="color: #a855f7; margin-right: 0.5rem;"></i> 확장 기능 및 플러그인 관리
+                            </h3>
+                            <p style="font-size: 0.82rem; color: #94a3b8; margin: 0.4rem 0 0 0;">서버에 로드된 동적 플러그인의 활성화 여부(ON/OFF) 및 상세 환경설정 값을 일괄 관리합니다.</p>
+                        </div>
+                        <button type="button" data-role="open-sample-plugins-modal" style="background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%); color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; height: 36px; font-size: 0.85rem; box-shadow: 0 4px 12px rgba(168,85,247,0.25); white-space: nowrap;">
+                            <i class="fa-solid fa-download"></i> 샘플에서 설치
+                        </button>
                     </div>
                     <div id="settings-plugins-container" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                        <!-- JS를 통해 동적 생성 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 샘플 플러그인 설치 모달 -->
+            <div id="sample-plugins-modal" class="library-modal" style="display: none; z-index: 10005;">
+                <div class="library-modal-content" style="max-width: 520px;">
+                    <div class="library-modal-header">
+                        <h3 style="margin: 0; color: #fff; font-size: 1.2rem;"><i class="fa-solid fa-download" style="color: #a855f7; margin-right: 0.5rem;"></i> 샘플에서 설치</h3>
+                        <span class="library-modal-close" data-role="close-sample-plugins-modal">&times;</span>
+                    </div>
+                    <p style="font-size: 0.8rem; color: #94a3b8; margin: 0 0 1rem 0;">저장소에 미리 준비된 샘플 플러그인을 선택하면 <code>plugins/metadata/</code>에 바로 설치됩니다. 업데이트 시 개인 설치 플러그인이 유실되지 않도록 샘플은 별도 위치에 보관되어 있습니다.</p>
+                    <div id="sample-plugins-list" style="display: flex; flex-direction: column; gap: 0.7rem; max-height: 60vh; overflow-y: auto;">
                         <!-- JS를 통해 동적 생성 -->
                     </div>
                 </div>

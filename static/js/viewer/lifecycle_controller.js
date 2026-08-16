@@ -245,6 +245,14 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false) {
   resetPreloadState();
 
   const reloadData = () => {
+    if (document.body.classList.contains('kiosk-mode')) {
+      // 킷오스크 모드는 사이드바/대시보드가 아예 로드되지 않으므로, 진행도 저장 후
+      // 외부(예: my_supporter /tv)에서 넘겨준 복귀 URL로 곧장 이동시킨다.
+      if (window.__kioskReturnUrl) {
+        window.location.href = window.__kioskReturnUrl;
+      }
+      return;
+    }
     console.log('[Viewer-Core] DB Progress flush 완료. 화면 데이터 갱신을 실행합니다.');
     if (state.currentLibraryId === 'home') {
       import('../dashboard.js').then((d) => d.loadDashboardData());

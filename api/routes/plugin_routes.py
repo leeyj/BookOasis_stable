@@ -222,6 +222,33 @@ def sample_update_metadata_plugin_api():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@plugin_routes_bp.route('/api/media/metadata/plugins/samples', methods=['GET'])
+@admin_required
+def list_sample_plugins_api():
+    """sample_plugins/metadata/ 에 있는, 아직 설치되지 않은 것 포함 전체 샘플 플러그인 카탈로그 조회"""
+    try:
+        samples = PluginService.list_sample_plugins()
+        return jsonify({'success': True, 'samples': samples})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@plugin_routes_bp.route('/api/media/metadata/plugins/install-from-sample', methods=['POST'])
+@admin_required
+def install_sample_plugin_api():
+    """샘플 카탈로그의 플러그인 하나를 실제 plugins/metadata/ 로 복사 설치"""
+    data = request.get_json(silent=True) or {}
+    plugin_id = str(data.get('plugin_id', '')).strip()
+    if not plugin_id:
+        return jsonify({'success': False, 'error': _t('api.err_plugin_id_missing')}), 400
+
+    try:
+        success, payload = PluginService.install_from_sample(plugin_id)
+        if not success:
+            return jsonify({'success': False, **payload}), 400
+        return jsonify({'success': True, **payload})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @plugin_routes_bp.route('/api/media/dashboard/widgets', methods=['GET'])
 def get_dashboard_widgets_api():
     """대시보드에 표시할 활성화된 위젯(플러그인) 목록을 반환합니다."""
@@ -285,12 +312,15 @@ def get_category_plugins_api():
 
     try:
         from services.metadata_factory import MetadataFactory
+        from services.category_service import CategoryService
         providers = MetadataFactory.get_available_providers()
 
         perm_map = {}
         if user_id and user_role != 'admin':
             from repositories.settings_repository import SettingsRepository
             perm_map = SettingsRepository.get_settings_by_prefix('general', f"PERM_CATEGORY_{user_id}_plugin_")
+
+        plugin_group_map = CategoryService.get_plugin_group_assignments(db_type)
 
         active_category_plugins = []
         for p in providers:
@@ -313,7 +343,8 @@ def get_category_plugins_api():
                 'title': cat_tab.get('title') or p.get('name'),
                 'icon': cat_tab.get('icon') or 'fa-solid fa-puzzle-piece',
                 'order': int(cat_tab.get('order') or 50),
-                'ui': p.get('ui')
+                'ui': p.get('ui'),
+                'group_id': plugin_group_map.get(p.get('id'))
             })
 
         active_category_plugins.sort(key=lambda x: x['order'])

@@ -125,3 +125,119 @@ def test_move_libraries_normalizes_order_per_group():
         {'id': 3, 'group_id': None, 'sort_order': 1},
         {'id': 1, 'group_id': 7, 'sort_order': 2},
     ])
+
+
+def test_mariadb_schema_contains_plugin_group_storage():
+    assert 'CREATE TABLE IF NOT EXISTS plugin_group_assignments' in MARIADB_CENTRAL_SCHEMA
+    assert 'plugin_id VARCHAR(255) PRIMARY KEY' in MARIADB_CENTRAL_SCHEMA
+    assert 'idx_plugin_group_assignments_group_id' in MARIADB_CENTRAL_SCHEMA
+
+
+def test_assign_plugin_groups_requires_admin():
+    client = _create_app().test_client()
+    _login(client)
+
+    response = client.post('/api/media/plugin-groups/assign', json={
+        'type': 'general',
+        'items': [{'plugin_id': 'stats_dashboard', 'group_id': None}],
+    })
+
+    assert response.status_code == 403
+
+
+def test_admin_can_assign_plugin_groups():
+    client = _create_app().test_client()
+    _login(client, role='admin')
+    items = [{'plugin_id': 'stats_dashboard', 'group_id': 3}]
+
+    with patch('api.routes.library_routes.CategoryService.assign_plugin_groups') as assign_plugin_groups:
+        response = client.post('/api/media/plugin-groups/assign', json={
+            'type': 'general',
+            'items': items,
+        })
+
+    assert response.status_code == 200
+    assign_plugin_groups.assert_called_once_with('general', items)
+
+
+def test_assign_plugin_groups_normalizes_order_per_group():
+    items = [
+        {'plugin_id': 'pixiv_ranking', 'group_id': 7},
+        {'plugin_id': 'stats_dashboard', 'group_id': None},
+        {'plugin_id': 'gutenberg_browser', 'group_id': 7},
+    ]
+
+    with patch(
+        'services.category_service.CategoryRepository.get_library_groups',
+        return_value=[{'id': 7}],
+    ), patch('services.category_service.CategoryRepository.assign_plugin_groups') as assign_plugin_groups:
+        CategoryService.assign_plugin_groups('general', items)
+
+    assign_plugin_groups.assert_called_once_with('general', [
+        {'plugin_id': 'pixiv_ranking', 'group_id': 7, 'sort_order': 1},
+        {'plugin_id': 'stats_dashboard', 'group_id': None, 'sort_order': 1},
+        {'plugin_id': 'gutenberg_browser', 'group_id': 7, 'sort_order': 2},
+    ])
+
+
+def test_assign_plugin_groups_rejects_unknown_group():
+    with patch('services.category_service.CategoryRepository.get_library_groups', return_value=[]):
+        try:
+            CategoryService.assign_plugin_groups('general', [{'plugin_id': 'stats_dashboard', 'group_id': 99}])
+            assert False, 'expected ValueError'
+        except ValueError:
+            pass
+
+
+def test_move_library_groups_requires_admin():
+    client = _create_app().test_client()
+    _login(client)
+
+    response = client.post('/api/media/library-groups/move', json={
+        'type': 'general',
+        'items': [{'id': 1}, {'id': 2}],
+    })
+
+    assert response.status_code == 403
+
+
+def test_admin_can_move_library_groups():
+    client = _create_app().test_client()
+    _login(client, role='admin')
+    items = [{'id': 2}, {'id': 1}]
+
+    with patch('api.routes.library_routes.CategoryService.move_library_groups') as move_library_groups:
+        response = client.post('/api/media/library-groups/move', json={
+            'type': 'general',
+            'items': items,
+        })
+
+    assert response.status_code == 200
+    move_library_groups.assert_called_once_with('general', items)
+
+
+def test_move_library_groups_normalizes_sequential_order():
+    items = [{'id': 2}, {'id': 1}]
+
+    with patch(
+        'services.category_service.CategoryRepository.get_library_groups',
+        return_value=[{'id': 1}, {'id': 2}],
+    ), patch('services.category_service.CategoryRepository.move_library_groups') as move_library_groups:
+        CategoryService.move_library_groups('general', items)
+
+    move_library_groups.assert_called_once_with('general', [
+        {'id': 2, 'sort_order': 1},
+        {'id': 1, 'sort_order': 2},
+    ])
+
+
+def test_move_library_groups_requires_full_set():
+    with patch(
+        'services.category_service.CategoryRepository.get_library_groups',
+        return_value=[{'id': 1}, {'id': 2}],
+    ):
+        try:
+            CategoryService.move_library_groups('general', [{'id': 1}])
+            assert False, 'expected ValueError'
+        except ValueError:
+            pass

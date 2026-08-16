@@ -213,6 +213,10 @@ docker compose -f docker-compose.ghcr.yml -f docker-compose.override.yml up -d
 docker compose -f docker-compose.ghcr.yml -f docker-compose.override.yml pull
 docker compose -f docker-compose.ghcr.yml -f docker-compose.override.yml up -d
 ```
+> **Building from source instead?** Use `docker-compose.build.yml`, which builds the local `Dockerfile` instead of pulling the GHCR image:
+> ```bash
+> docker compose -f docker-compose.build.yml -f docker-compose.override.yml up -d --build
+> ```
 
 ---
 
@@ -221,6 +225,10 @@ Recommended mode running MariaDB and Redis containers together to eliminate data
 
 **① Run MariaDB Combo Compose**
 ```bash
+# GHCR official image, no local build required (recommended)
+docker compose -f docker-compose.mariadb.ghcr.yml up -d
+
+# To build from source instead
 docker compose -f docker-compose.mariadb.yml up -d
 ```
 * Spawns `mariadb:10.11` and `redis:7-alpine` alongside `bookoasis`.

@@ -213,6 +213,66 @@ function parseLibraryIdFromUrl() {
   return null;
 }
 
+function parseKioskParamsFromUrl() {
+  try {
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.get('kiosk') !== '1') return null;
+    const bookId = (searchParams.get('book') || '').trim();
+    const pluginId = (searchParams.get('plugin') || '').trim();
+    if (!bookId && !pluginId) return null;
+    return {
+      bookId,
+      pluginId,
+      type: normalizeMediaType(searchParams.get('type')) || 'general',
+      returnUrl: (searchParams.get('return') || '').trim()
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+function injectKioskBackButton(returnUrl) {
+  if (!returnUrl || document.getElementById('kiosk-back-btn')) return;
+  const btn = document.createElement('button');
+  btn.id = 'kiosk-back-btn';
+  btn.type = 'button';
+  btn.className = 'kiosk-back-btn';
+  btn.title = '돌아가기';
+  btn.innerHTML = '<i class="fa-solid fa-arrow-left"></i>';
+  btn.addEventListener('click', () => {
+    window.location.href = returnUrl;
+  });
+  document.body.appendChild(btn);
+}
+
+async function bootKioskMode({ bookId, pluginId, type, returnUrl }) {
+  document.body.classList.add('kiosk-mode');
+  if (returnUrl) {
+    window.__kioskReturnUrl = returnUrl;
+    injectKioskBackButton(returnUrl);
+  }
+  state.currentLibraryType = type;
+  await loadInitialSystemSettings();
+
+  if (pluginId) {
+    mountCategoryPluginUI(pluginId);
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/media/books/${encodeURIComponent(bookId)}/reader-info?type=${encodeURIComponent(type)}`);
+    const data = await res.json();
+    if (!data.success) {
+      console.error('[Kiosk] 도서 정보를 불러오지 못했습니다:', data.error);
+      return;
+    }
+    const book = data.book;
+    openReader(book.id, book.file_format, book.title, book.pages_read, book.total_pages);
+  } catch (e) {
+    console.error('[Kiosk] 리더 부팅 실패:', e);
+  }
+}
+
 function normalizeMediaType(val) {
   if (!val) return null;
   val = String(val).toLowerCase().trim();
@@ -224,6 +284,13 @@ function normalizeMediaType(val) {
 
 // 메인 초기화 함수
 async function initTabMediaLibrary() {
+  const kioskParams = parseKioskParamsFromUrl();
+  if (kioskParams) {
+    // 킷오스크 모드: 사이드바/설정 등 라이브러리 UI를 전혀 부팅하지 않고 지정된 책의 리더 또는 플러그인 화면만 즉시 연다.
+    await bootKioskMode(kioskParams);
+    return;
+  }
+
   initLibraryShellDelegation();
   initScrollableRowNavDelegation();
 

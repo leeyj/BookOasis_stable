@@ -21,6 +21,25 @@ class BookInfoService:
         }
 
     @staticmethod
+    def get_reader_info(db_type, book_id, user_id=None):
+        """킷오스크 모드 등에서 openReader()를 book_id만으로 즉시 호출하기 위한 메타 조회"""
+        row = BookRepository.get_book_reader_info(db_type, book_id, user_id=user_id)
+        if not row:
+            return None
+
+        total_pages = row['total_pages'] or 0
+        if total_pages == 0:
+            total_pages = BookInfoService.get_total_pages(db_type, book_id) or 0
+
+        return {
+            'id': row['id'],
+            'title': row['title'],
+            'file_format': row['file_format'],
+            'total_pages': total_pages,
+            'pages_read': row['pages_read'] or 0
+        }
+
+    @staticmethod
     def get_total_pages(db_type, book_id):
         row = BookRepository.get_book_pages_and_path(db_type, book_id)
         if not row:

@@ -180,6 +180,23 @@ def get_book_info(book_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@book_routes_bp.route('/api/media/books/<int:book_id>/reader-info', methods=['GET'])
+@login_required
+def get_book_reader_info(book_id):
+    """book_id만으로 openReader()를 즉시 호출할 수 있도록 제목/포맷/읽기 진척도를 반환 (킷오스크 모드 등 외부 딥링크용)"""
+    db_type = request.args.get('type', 'general')
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+
+    user_id = session.get('user_id')
+    try:
+        info = BookInfoService.get_reader_info(db_type, book_id, user_id=user_id)
+        if info is None:
+            return jsonify({'success': False, 'error': 'Book not found'}), 404
+        return jsonify({'success': True, 'book': info})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @book_routes_bp.route('/api/media/books/<int:book_id>/favorite', methods=['POST', 'PATCH'])
 @login_required
 def toggle_book_favorite(book_id):

@@ -123,6 +123,24 @@ export async function moveLibraries(items, type) {
   return res.json();
 }
 
+export async function moveLibraryGroups(items, type) {
+  const res = await safeFetch('/api/media/library-groups/move', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({type, items})
+  });
+  return res.json();
+}
+
+export async function assignPluginGroups(items, type) {
+  const res = await safeFetch('/api/media/plugin-groups/assign', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({type, items})
+  });
+  return res.json();
+}
+
 export async function addLibraryGroup(formData) {
   const res = await safeFetch('/api/media/library-groups/add', {method: 'POST', body: formData});
   return res.json();
@@ -391,6 +409,24 @@ export async function saveMetadataPluginConfig(type, pluginId, configData) {
 
 export async function sampleUpdateMetadataPlugin(pluginId) {
   const res = await fetch('/api/media/metadata/plugins/sample-update', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      plugin_id: pluginId
+    })
+  });
+  return res.json();
+}
+
+export async function fetchSamplePlugins() {
+  const res = await fetch('/api/media/metadata/plugins/samples');
+  return res.json();
+}
+
+export async function installSamplePlugin(pluginId) {
+  const res = await fetch('/api/media/metadata/plugins/install-from-sample', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'

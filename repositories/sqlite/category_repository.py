@@ -53,9 +53,57 @@ class CategoryRepository:
         cursor = conn.cursor()
         try:
             cursor.execute("UPDATE libraries SET group_id = NULL WHERE group_id = ?", (group_id,))
+            cursor.execute("DELETE FROM plugin_group_assignments WHERE group_id = ?", (group_id,))
             cursor.execute("DELETE FROM library_groups WHERE id = ?", (group_id,))
             if cursor.rowcount == 0:
                 raise ValueError('그룹을 찾을 수 없습니다.')
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    @staticmethod
+    def move_library_groups(db_type, items):
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.executemany(
+                "UPDATE library_groups SET sort_order = ? WHERE id = ?",
+                [(item['sort_order'], item['id']) for item in items]
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    @staticmethod
+    def get_plugin_group_assignments(db_type):
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute("SELECT plugin_id, group_id, sort_order FROM plugin_group_assignments")
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+
+    @staticmethod
+    def assign_plugin_groups(db_type, items):
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            plugin_ids = [item['plugin_id'] for item in items]
+            if plugin_ids:
+                placeholders = ','.join('?' for _ in plugin_ids)
+                cursor.execute(f"DELETE FROM plugin_group_assignments WHERE plugin_id IN ({placeholders})", plugin_ids)
+            grouped_items = [(item['plugin_id'], item['group_id'], item['sort_order']) for item in items if item['group_id'] is not None]
+            if grouped_items:
+                cursor.executemany(
+                    "INSERT INTO plugin_group_assignments (plugin_id, group_id, sort_order) VALUES (?, ?, ?)",
+                    grouped_items
+                )
             conn.commit()
         except Exception:
             conn.rollback()

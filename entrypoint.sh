@@ -211,6 +211,26 @@ for dir in $DATA_DIRS; do
     chmod 755 "$dir" 2>/dev/null || true
 done
 
+# ─────────────────────────────────────────────────────────
+# [플러그인 프레임워크 파일 시드] /app/plugins 는 사용자 데이터용 바인드 마운트라,
+# 완전히 빈 호스트 폴더로 마운트되면 base.py 등 필수 프레임워크 파일이 컨테이너
+# 안에서도 안 보여서 부팅 자체가 실패한다. 이미지 빌드 시 마운트에 가려지지 않는
+# /app/_plugin_framework_defaults 에 보관해 둔 원본에서, "없는 파일만" 채워 넣는다
+# (기존 파일은 절대 덮어쓰지 않음 — 사용자가 수정한 base.py 등을 보존).
+# ─────────────────────────────────────────────────────────
+if [ -d "/app/_plugin_framework_defaults" ]; then
+    mkdir -p /app/plugins/metadata 2>/dev/null || true
+    for src in /app/_plugin_framework_defaults/*; do
+        name=$(basename "$src")
+        dest="/app/plugins/metadata/$name"
+        if [ ! -e "$dest" ]; then
+            cp -r "$src" "$dest" 2>/dev/null && \
+                echo "[Entrypoint] 플러그인 프레임워크 파일 시드: $name" || \
+                echo "[Entrypoint] ⚠️  플러그인 프레임워크 파일 시드 실패: $name"
+        fi
+    done
+fi
+
 DB_ENGINE_LOWER=$(echo "${DB_ENGINE:-sqlite}" | tr '[:upper:]' '[:lower:]')
 
 if [ "$DB_ENGINE_LOWER" = "mariadb" ] || [ "$DB_ENGINE_LOWER" = "mysql" ]; then

@@ -2,7 +2,9 @@ version: "3.8"
 
 services:
   bookoasis:
-    image: ghcr.io/leeyj/bookoasis:stable
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: bookoasis
     restart: unless-stopped
     stop_grace_period: 1m  # 종료 시 DB WAL 체크포인트 및 캐시 Flush 완료를 위한 유예 시간

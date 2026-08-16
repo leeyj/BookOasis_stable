@@ -91,9 +91,16 @@ BookOasis가 대용량(10만 권 이상) 환경에서도 버벅임 없이 초광
 
 3. **컨테이너 실행**
    ```bash
-   docker compose up -d --build
+   docker compose up -d
    ```
+   기본 `docker-compose.yml`은 로컬 빌드 없이 GHCR(`ghcr.io/leeyj/bookoasis:stable`)에 미리 빌드되어 배포된 공식 이미지를 그대로 받아옵니다. Synology/Unraid 등 저사양 NAS에서도 빠르게 기동됩니다.
+
 > **Tip:** `docker-compose.override.yml`은 `.gitignore`에 등록되어 있으므로 향후 프로젝트 소스가 업데이트되어 `git pull`을 받아도 사용자의 개인 경로 설정 파일이 충돌을 일으키거나 유실되지 않습니다.
+
+> **소스를 직접 수정하는 개발자라면**: 로컬 `Dockerfile`을 빌드해서 쓰는 `docker-compose.build.yml`을 대신 사용하세요.
+> ```bash
+> docker compose -f docker-compose.build.yml -f docker-compose.override.yml up -d --build
+> ```
 
 > 보안 정책에 따라 운영자용 배포/업데이트 절차는 비공개 내부 문서로 관리합니다.
 
@@ -164,6 +171,11 @@ BookOasis는 기본 파일 기반 **SQLite** 엔진 외에도, 10만 권 이상�
 ### 🚀 MariaDB 모드로 전환하기
 1. **Docker 사용자 (자동/원클릭)**
    - `docker-compose.override.yml`에 `DB_ENGINE=mariadb` 및 접속 정보를 추가한 뒤 컨테이너를 실행하면 필요한 데이터베이스(`media_general`, `media_adult`, `media_audiobook`) 및 스키마가 자동 구축됩니다.
+   - GHCR 공식 이미지로 로컬 빌드 없이 바로 기동하려면 `docker-compose.mariadb.ghcr.yml`을 사용하세요.
+     ```bash
+     docker compose -f docker-compose.mariadb.ghcr.yml -f docker-compose.override.yml up -d
+     ```
+     소스를 직접 빌드하려면 기존 `docker-compose.mariadb.yml`(로컬 `Dockerfile` 빌드)을 그대로 사용하시면 됩니다.
    - 상세 이관 안내: [Docker 사용자용 MariaDB 마이그레이션 가이드 (docs/move_to_mariadb.md)](./docs/move_to_mariadb.md)
 
 2. **1-Click 데이터 마이그레이션 (SQLite ➔ MariaDB)**

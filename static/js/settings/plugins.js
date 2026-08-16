@@ -89,10 +89,10 @@ export async function loadPluginsSettings() {
       injectPluginSettingsStyles(data.plugins);
       applyConfigValues(container, data.plugins);
       initPluginSettingsScripts(container, data.plugins);
-      
+
       // 토글 스위치 스타일링을 위한 CSS 헤드 인젝트 (최초 1회)
       injectToggleSwitchCSS();
-      
+
       // 이벤트 바인딩
       bindPluginEvents();
     } else {
@@ -102,6 +102,8 @@ export async function loadPluginsSettings() {
     console.error('플러그인 목록 조회 에러:', err);
     container.innerHTML = '<div style="text-align: center; padding: 2rem; color: #f43f5e;">서버와 통신 중 오류가 발생했습니다.</div>';
   }
+
+  initSamplePluginsModal();
 }
 
 function escapeHtmlAttr(value) {
@@ -420,5 +422,101 @@ function bindPluginEvents() {
         btn.innerHTML = prevText;
       }
     });
+  });
+}
+
+// ── 샘플 플러그인 설치 모달 ──────────────────────────────
+
+function openSamplePluginsModal() {
+  const modal = document.getElementById('sample-plugins-modal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  loadSamplePluginsList();
+}
+
+function closeSamplePluginsModal() {
+  const modal = document.getElementById('sample-plugins-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function loadSamplePluginsList() {
+  const list = document.getElementById('sample-plugins-list');
+  if (!list) return;
+  list.innerHTML = '<div style="text-align: center; padding: 1.5rem; color: #a855f7;"><i class="fa-solid fa-circle-notch fa-spin"></i></div>';
+
+  try {
+    const data = await api.fetchSamplePlugins();
+    if (!data.success || !data.samples || data.samples.length === 0) {
+      list.innerHTML = '<div style="text-align: center; padding: 1.5rem; color: #94a3b8;">설치 가능한 샘플 플러그인이 없습니다.</div>';
+      return;
+    }
+
+    list.innerHTML = data.samples.map((s) => `
+      <div class="sample-plugin-item" style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.9rem 1rem; background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px;">
+        <div style="min-width: 0;">
+          <div style="color: #fff; font-weight: 600; font-size: 0.92rem;">${escapeHtmlText(s.name)}</div>
+          <div style="color: #94a3b8; font-size: 0.75rem;">${escapeHtmlText(s.id)}</div>
+        </div>
+        ${s.installed
+          ? `<span style="flex-shrink: 0; font-size: 0.8rem; color: #4ade80; font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem;"><i class="fa-solid fa-check"></i> 설치됨</span>`
+          : `<button type="button" class="sample-plugin-install-btn" data-plugin-id="${escapeHtmlAttr(s.id)}" style="flex-shrink: 0; padding: 0.45rem 0.9rem; font-size: 0.8rem; border-radius: 6px; border: 1px solid rgba(168,85,247,0.5); background: rgba(168,85,247,0.18); color: #e9d5ff; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;">
+              <i class="fa-solid fa-download"></i> 설치
+            </button>`
+        }
+      </div>
+    `).join('');
+
+    list.querySelectorAll('.sample-plugin-install-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const pluginId = btn.dataset.pluginId;
+        const prevText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> 설치 중...';
+        try {
+          const res = await api.installSamplePlugin(pluginId);
+          if (res.success) {
+            if (typeof window.showToast === 'function') {
+              window.showToast(res.message, 'success');
+            }
+            await loadSamplePluginsList();
+            await loadPluginsSettings();
+          } else {
+            if (typeof window.showToast === 'function') {
+              window.showToast(res.error || '설치 실패', 'error');
+            } else {
+              alert(res.error || '설치 실패');
+            }
+            btn.disabled = false;
+            btn.innerHTML = prevText;
+          }
+        } catch (err) {
+          console.error('샘플 플러그인 설치 에러:', err);
+          btn.disabled = false;
+          btn.innerHTML = prevText;
+        }
+      });
+    });
+  } catch (err) {
+    console.error('샘플 플러그인 목록 조회 에러:', err);
+    list.innerHTML = '<div style="text-align: center; padding: 1.5rem; color: #f43f5e;">서버와 통신 중 오류가 발생했습니다.</div>';
+  }
+}
+
+function initSamplePluginsModal() {
+  if (window.__samplePluginsModalBound) return;
+  window.__samplePluginsModalBound = true;
+
+  document.addEventListener('click', (event) => {
+    const openBtn = event.target.closest('[data-role="open-sample-plugins-modal"]');
+    if (openBtn) {
+      event.preventDefault();
+      openSamplePluginsModal();
+      return;
+    }
+    const closeBtn = event.target.closest('[data-role="close-sample-plugins-modal"]');
+    if (closeBtn) {
+      event.preventDefault();
+      closeSamplePluginsModal();
+    }
   });
 }

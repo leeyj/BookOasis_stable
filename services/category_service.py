@@ -67,6 +67,65 @@ class CategoryService:
         CategoryRepository.delete_library_group(db_type, group_id)
 
     @staticmethod
+    def move_library_groups(db_type, items):
+        if not isinstance(items, list) or not items:
+            raise ValueError('이동할 그룹 정보가 없습니다.')
+
+        existing_ids = {int(group['id']) for group in CategoryRepository.get_library_groups(db_type)}
+        normalized = []
+        seen_ids = set()
+        for sort_order, item in enumerate(items, start=1):
+            try:
+                group_id = int(item.get('id'))
+            except (AttributeError, TypeError, ValueError):
+                raise ValueError('올바르지 않은 그룹입니다.')
+            if group_id not in existing_ids or group_id in seen_ids:
+                raise ValueError('그룹 이동 정보가 올바르지 않습니다.')
+            normalized.append({'id': group_id, 'sort_order': sort_order})
+            seen_ids.add(group_id)
+
+        if seen_ids != existing_ids:
+            raise ValueError('모든 그룹의 이동 정보가 필요합니다.')
+        CategoryRepository.move_library_groups(db_type, normalized)
+
+    @staticmethod
+    def get_plugin_group_assignments(db_type):
+        rows = CategoryRepository.get_plugin_group_assignments(db_type)
+        return {row['plugin_id']: row['group_id'] for row in rows}
+
+    @staticmethod
+    def assign_plugin_groups(db_type, items):
+        if not isinstance(items, list) or not items:
+            raise ValueError('이동할 플러그인 정보가 없습니다.')
+
+        valid_group_ids = {int(group['id']) for group in CategoryRepository.get_library_groups(db_type)}
+        normalized = []
+        seen_ids = set()
+        group_positions = {}
+        for item in items:
+            plugin_id = str(item.get('plugin_id') or '').strip()
+            if not plugin_id or plugin_id in seen_ids:
+                raise ValueError('올바르지 않은 플러그인입니다.')
+            group_id = item.get('group_id')
+            if group_id in (None, '', 'null'):
+                group_id = None
+            else:
+                try:
+                    group_id = int(group_id)
+                except (TypeError, ValueError):
+                    raise ValueError('올바르지 않은 그룹입니다.')
+                if group_id not in valid_group_ids:
+                    raise ValueError('선택한 그룹을 찾을 수 없습니다.')
+
+            position_key = group_id if group_id is not None else 'ungrouped'
+            sort_order = group_positions.get(position_key, 1)
+            group_positions[position_key] = sort_order + 1
+            normalized.append({'plugin_id': plugin_id, 'group_id': group_id, 'sort_order': sort_order})
+            seen_ids.add(plugin_id)
+
+        CategoryRepository.assign_plugin_groups(db_type, normalized)
+
+    @staticmethod
     def get_libraries(db_type, user_id=None, role=None):
         if user_id and role != 'admin':
             rows = CategoryRepository.get_libraries_by_user_permissions(db_type, user_id)

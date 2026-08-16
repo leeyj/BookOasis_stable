@@ -1,0 +1,67 @@
+version: "3.8"
+
+services:
+  bookoasis:
+    image: ghcr.io/leeyj/bookoasis:stable
+    container_name: bookoasis
+    restart: unless-stopped
+    stop_grace_period: 1m
+    ports:
+      - "5930:5930"
+    volumes:
+      - ./db:/app/db
+      - ./covers:/app/covers
+      - ./cache:/app/cache
+      - ./plugins:/app/plugins
+    env_file:
+      - .env
+    environment:
+      - PORT=5930
+      - REDIS_URL=redis://redis:6379/0
+      - LOG_ARCHIVE_MAX_FILES=10
+      - LOG_ARCHIVE_MAX_MB=200
+      - DB_ENGINE=mariadb
+      - MARIADB_HOST=mariadb
+      - MARIADB_PORT=3306
+      - MARIADB_USER=bookoasis
+      - MARIADB_PASSWORD=bookoasis_pass
+      - MARIADB_DATABASE_PREFIX=media_
+      - MARIADB_CONNECT_TIMEOUT=10
+      - MARIADB_READ_TIMEOUT=90
+      - MARIADB_WRITE_TIMEOUT=90
+    depends_on:
+      redis:
+        condition: service_started
+      mariadb:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    container_name: bookoasis_redis
+    restart: unless-stopped
+
+  mariadb:
+    image: mariadb:10.11
+    container_name: bookoasis_mariadb
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_bin
+      - --tmp-table-size=256M
+      - --max-heap-table-size=256M
+      - --innodb-buffer-pool-size=2G
+    environment:
+      - MARIADB_ROOT_PASSWORD=root_pass
+      - MARIADB_USER=bookoasis
+      - MARIADB_PASSWORD=bookoasis_pass
+      - MARIADB_DATABASE=media_general
+    volumes:
+      - ./mariadb_data:/var/lib/mysql
+      - ./docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 5

@@ -278,7 +278,7 @@ A simple and useful starter plugin is one that opens an external search page fro
 
 Sample file:
 
-- [plugins/metadata/naver_book/naver_book.py](../plugins/metadata/naver_book/naver_book.py)
+- [sample_plugins/metadata/naver_book/naver_book.py](../sample_plugins/metadata/naver_book/naver_book.py)
 
 Core behavior:
 
@@ -333,7 +333,7 @@ Example response:
 
 ### New Books Webhook Notification Example Plugin
 
-- Path: `plugins/metadata/webhook_new_books_notify/webhook_new_books_notify.py`
+- Path: `sample_plugins/metadata/webhook_new_books_notify/webhook_new_books_notify.py`
 - Behavior: after scan completes with new books, it sends notifications to configured multi webhook targets via `on_scan_new_books_detected`
 - Supported formats: `discord`, `slack`, `telegram`, `generic`, `custom`
 - Note: works from plugin settings only (no `.env` required).
@@ -623,7 +623,7 @@ def _count_books(self, db_type):
 
 ## 9. Statistics Plugin Example (Same Requirements)
 
-Example plugin: `plugins/metadata/stats_dashboard/stats_dashboard.py`
+Example plugin: `sample_plugins/metadata/stats_dashboard/stats_dashboard.py`
 
 Dashboard items:
 
@@ -682,7 +682,7 @@ You don't need to implement your own download/proxy logic in the plugin's Python
 
 ### Reference implementation: the `gutenberg_browser` sample plugin
 
-- Path: `plugins/metadata/gutenberg_browser/`
+- Path: `sample_plugins/metadata/gutenberg_browser/`
 - Registers a first-class sidebar menu via `category_tab`, and its `index.html`/`script.js` demonstrate both `openWebview()` (opens the Project Gutenberg website) and `downloadToLibrary()` (downloads a user-entered URL into a chosen library).
 - See how it populates its library `<select>` via `GET /api/media/libraries?type=general`.
 

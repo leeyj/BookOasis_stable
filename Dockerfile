@@ -25,6 +25,13 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY . .
 RUN chmod +x /app/entrypoint.sh /app/manage.sh
 
+# 6-1. plugins/ 는 docker-compose에서 바인드 마운트되는 사용자 데이터 폴더라, 완전히 빈
+# 호스트 폴더로 마운트되면 컨테이너 안의 원본(base.py 등 필수 프레임워크 파일)이 가려져
+# 버린다. 마운트에 가려지지 않는 별도 경로에 원본을 보관해 두었다가, entrypoint.sh가
+# 부팅 시 "없으면 채워넣기"(있으면 절대 덮어쓰지 않음) 방식으로 시드한다.
+RUN mkdir -p /app/_plugin_framework_defaults && \
+    cp -r /app/plugins/metadata/. /app/_plugin_framework_defaults/
+
 # 7. Create volumes and directories
 RUN mkdir -p db covers cache plugins
 

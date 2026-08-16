@@ -400,7 +400,7 @@ def get_context_menu_items(self, db_type, context):
 
 샘플 파일:
 
-- [plugins/metadata/naver_book/naver_book.py](../plugins/metadata/naver_book/naver_book.py)
+- [sample_plugins/metadata/naver_book/naver_book.py](../sample_plugins/metadata/naver_book/naver_book.py)
 
 핵심 동작:
 
@@ -455,7 +455,7 @@ GET /api/media/plugins/add-plugin-check?plugin_id=123412341234123412341234
 
 ### 신규도서 웹훅 알림 예제 플러그인
 
-- 경로: `plugins/metadata/webhook_new_books_notify/webhook_new_books_notify.py`
+- 경로: `sample_plugins/metadata/webhook_new_books_notify/webhook_new_books_notify.py`
 - 동작: 스캔 완료 후 신규 도서가 있으면 `on_scan_new_books_detected` 훅에서 설정된 다중 웹훅 대상으로 전송
 - 지원 포맷: `discord`, `slack`, `telegram`, `generic`, `custom`
 - 참고: `.env` 없이 플러그인 설정만으로 동작합니다.
@@ -745,7 +745,7 @@ def _count_books(self, db_type):
 
 ## 9. 통계 플러그인 예시 (동일 요구사항)
 
-예시 플러그인: `plugins/metadata/stats_dashboard/stats_dashboard.py`
+예시 플러그인: `sample_plugins/metadata/stats_dashboard/stats_dashboard.py`
 
 대시보드 노출 항목:
 
@@ -804,7 +804,7 @@ window.BookOasisPlugin.downloadToLibrary('https://example.com/book.epub', {
 
 ### 참조 구현: `gutenberg_browser` 샘플 플러그인
 
-- 경로: `plugins/metadata/gutenberg_browser/`
+- 경로: `sample_plugins/metadata/gutenberg_browser/`
 - `category_tab`으로 사이드바 1등 시민 메뉴 등록 + `index.html`/`script.js`에서 `openWebview()`(Project Gutenberg 웹사이트 열기)와 `downloadToLibrary()`(입력한 URL을 선택한 라이브러리로 다운로드) 두 API를 모두 시연합니다.
 - 라이브러리 목록은 `GET /api/media/libraries?type=general`로 조회해 `<select>`를 채우는 방식을 참고하십시오.
 

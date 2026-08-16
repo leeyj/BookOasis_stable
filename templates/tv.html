@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <script>
+        (function() {
+            try {
+                var theme = localStorage.getItem('app_dashboard_theme') || 'purple';
+                document.documentElement.setAttribute('data-app-theme', theme);
+            } catch (e) {}
+        })();
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#090d16">
+    <title>BookOasis TV</title>
+    <link rel="icon" type="image/png" href="{{ static_asset_url('images/logo.png', sig='boe-favicon-a17f3c9') }}">
+    <link rel="stylesheet" href="{{ static_asset_url('lib/font-awesome/css/all.min.css') }}">
+    <link rel="stylesheet" href="{{ static_asset_url('css/tv.css') }}">
+    <script>
+        window.__tvUser = {{ ({'username': tv_username, 'role': tv_role} if tv_username else None) | tojson }};
+    </script>
+</head>
+<body>
+
+<button type="button" id="tv-drawer-toggle" class="tv-drawer-toggle" title="카테고리">
+    <i class="fa-solid fa-bars"></i>
+</button>
+
+<button type="button" id="tv-account-badge" class="tv-account-badge" title="계정">
+    <i class="fa-solid fa-user"></i>
+    <span id="tv-account-name">로그인</span>
+</button>
+
+<div id="tv-account-popup" class="tv-account-popup" style="display:none;">
+    <div id="tv-account-popup-user" style="display:none;">
+        <div class="tv-account-popup-row"><span id="tv-account-popup-username"></span></div>
+        <button type="button" id="tv-account-logout-btn" class="tv-popup-btn"><i class="fa-solid fa-right-from-bracket"></i> 로그아웃</button>
+    </div>
+    <form id="tv-login-form" class="tv-login-form" style="display:none;">
+        <input type="text" id="tv-login-username" class="tv-login-input" placeholder="아이디" autocomplete="username" required>
+        <input type="password" id="tv-login-password" class="tv-login-input" placeholder="비밀번호" autocomplete="current-password" required>
+        <div id="tv-login-error" class="tv-login-error" style="display:none;"></div>
+        <button type="submit" class="tv-popup-btn tv-popup-btn-primary"><i class="fa-solid fa-right-to-bracket"></i> 로그인</button>
+    </form>
+</div>
+
+<div id="tv-drawer-scrim" class="tv-drawer-scrim"></div>
+
+<div id="tv-drawer" class="tv-drawer">
+    <div class="tv-drawer-header">
+        <span class="tv-drawer-header-title"><i class="fa-solid fa-book"></i> 카테고리</span>
+        <button type="button" id="tv-drawer-close" class="tv-drawer-close" title="닫기">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+    <div class="tv-drawer-body">
+        <button type="button" id="tv-drawer-home" class="tv-drawer-item active">
+            <i class="fa-solid fa-house"></i><span>홈</span>
+        </button>
+        <div id="tv-drawer-list" class="tv-drawer-list"></div>
+    </div>
+</div>
+
+<main id="tv-main" class="tv-main">
+    <div id="tv-home-view" class="tv-view">
+        <section class="tv-row">
+            <h2 class="tv-row-title"><i class="fa-solid fa-bookmark"></i> 이어보기</h2>
+            <div id="tv-row-history" class="tv-row-track"><div class="tv-row-loading">불러오는 중...</div></div>
+        </section>
+        <section class="tv-row">
+            <h2 class="tv-row-title"><i class="fa-solid fa-star"></i> 최근 추가</h2>
+            <div id="tv-row-recent" class="tv-row-track"><div class="tv-row-loading">불러오는 중...</div></div>
+        </section>
+    </div>
+
+    <div id="tv-category-view" class="tv-view" style="display:none;">
+        <div class="tv-category-header">
+            <h2 id="tv-category-title" class="tv-row-title"></h2>
+            <button type="button" id="tv-sort-toggle" class="tv-sort-toggle">
+                <i class="fa-solid fa-sort-alpha-down"></i>
+                <span id="tv-sort-label">가나다 오름차순</span>
+            </button>
+        </div>
+        <div id="tv-category-grid" class="tv-grid"></div>
+        <button type="button" id="tv-category-more" class="tv-load-more" style="display:none;">더 보기</button>
+    </div>
+</main>
+
+<script src="{{ static_asset_url('js/tv.js') }}"></script>
+</body>
+</html>

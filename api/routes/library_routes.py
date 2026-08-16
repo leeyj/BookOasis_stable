@@ -70,6 +70,34 @@ def delete_library_group():
         return jsonify({'success': False, 'error': str(error)}), 400
 
 
+@library_bp.route('/api/media/library-groups/move', methods=['POST'])
+@admin_required
+def move_library_groups():
+    payload = request.get_json(silent=True) or {}
+    db_type = payload.get('type', 'general')
+    try:
+        CategoryService.move_library_groups(db_type, payload.get('items'))
+        return jsonify({'success': True, 'message': '그룹 순서를 저장했습니다.'})
+    except ValueError as error:
+        return jsonify({'success': False, 'error': str(error)}), 400
+    except Exception as error:
+        return jsonify({'success': False, 'error': str(error)}), 500
+
+
+@library_bp.route('/api/media/plugin-groups/assign', methods=['POST'])
+@admin_required
+def assign_plugin_groups():
+    payload = request.get_json(silent=True) or {}
+    db_type = payload.get('type', 'general')
+    try:
+        CategoryService.assign_plugin_groups(db_type, payload.get('items'))
+        return jsonify({'success': True, 'message': '플러그인 그룹을 저장했습니다.'})
+    except ValueError as error:
+        return jsonify({'success': False, 'error': str(error)}), 400
+    except Exception as error:
+        return jsonify({'success': False, 'error': str(error)}), 500
+
+
 @library_bp.route('/api/media/libraries/move', methods=['POST'])
 @admin_required
 def move_media_libraries():

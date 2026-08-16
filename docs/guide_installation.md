@@ -221,6 +221,10 @@ docker compose -f docker-compose.ghcr.yml -f docker-compose.override.yml up -d
 docker compose -f docker-compose.ghcr.yml -f docker-compose.override.yml pull
 docker compose -f docker-compose.ghcr.yml -f docker-compose.override.yml up -d
 ```
+> **소스를 직접 빌드하고 싶다면**: GHCR 이미지 대신 로컬 `Dockerfile`을 빌드하는 `docker-compose.build.yml`을 사용하세요.
+> ```bash
+> docker compose -f docker-compose.build.yml -f docker-compose.override.yml up -d --build
+> ```
 
 ---
 
@@ -229,6 +233,10 @@ MariaDB 및 Redis 컨테이너를 함께 띄워, 수만~수십만 권 대용량 
 
 **① MariaDB 올인원 Compose 실행**
 ```bash
+# 로컬 빌드 없이 GHCR 공식 이미지로 바로 기동 (권장)
+docker compose -f docker-compose.mariadb.ghcr.yml up -d
+
+# 소스를 직접 빌드해서 쓰려면
 docker compose -f docker-compose.mariadb.yml up -d
 ```
 * `mariadb:10.11` 및 `redis:7-alpine` 이미지가 함께 띄워지며, 헬스체크 완료 후 BookOasis 컨테이너가 자동으로 연동 가동됩니다.

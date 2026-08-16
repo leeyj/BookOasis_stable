@@ -69,6 +69,13 @@ CREATE TABLE IF NOT EXISTS libraries (
     INDEX idx_libraries_group_order (group_id, sort_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
+CREATE TABLE IF NOT EXISTS plugin_group_assignments (
+    plugin_id VARCHAR(255) PRIMARY KEY,
+    group_id BIGINT NOT NULL,
+    sort_order INT DEFAULT 0,
+    INDEX idx_plugin_group_assignments_group_id (group_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
 CREATE TABLE IF NOT EXISTS scanner_tasks (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     task_type VARCHAR(100) NOT NULL,

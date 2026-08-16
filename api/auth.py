@@ -172,7 +172,11 @@ def check_authentication():
         url_for('media_api.auth.login'),
         '/login',
         '/logout',
-        '/change-password'
+        '/change-password',
+        # /tv 페이지 셸은 민감 데이터가 없어 비로그인 상태에서도 렌더링을 허용하고,
+        # 화면 안에서 킷오스크용 팝업 로그인 폼을 띄운다(전체 페이지 /login 이동 대신).
+        # 실제 데이터는 /api/media/* 가 각자 인증을 요구하므로 안전하다.
+        '/tv'
     ]
     
     # static 폴더, health 체크, OPDS/cover, 웹훅 경로 예외

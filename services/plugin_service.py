@@ -2,9 +2,13 @@
 import json
 import re
 import os
+import shutil
+import importlib.util
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 import database
+
+_SAFE_PLUGIN_ID_RE = re.compile(r'^[A-Za-z0-9_]+$')
 
 class PluginService:
     @staticmethod
@@ -69,6 +73,96 @@ class PluginService:
     def _get_plugin_dir(cls, plugin_id):
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         return os.path.join(base_dir, 'plugins', 'metadata', str(plugin_id or '').strip())
+
+    @classmethod
+    def _get_sample_plugin_dir(cls, plugin_id):
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        return os.path.join(base_dir, 'sample_plugins', 'metadata', str(plugin_id or '').strip())
+
+    @classmethod
+    def _introspect_sample_plugin(cls, plugin_id, plugin_dir):
+        """샘플 플러그인을 실제 로더 경로(plugins.metadata.*)에 올리지 않고, 파일 경로로만
+        격리 임포트해서 표시용 id/name만 조회한다. 실패해도 카탈로그 노출에는 지장 없도록
+        폴더명을 기본값으로 폴백한다."""
+        display = {'id': plugin_id, 'name': plugin_id}
+        candidate_files = [
+            os.path.join(plugin_dir, f'{plugin_id}.py'),
+            os.path.join(plugin_dir, 'provider.py'),
+        ]
+        module_file = next((f for f in candidate_files if os.path.isfile(f)), None)
+        if not module_file:
+            return display
+
+        try:
+            from services.metadata_factory import MetadataFactory
+            spec = importlib.util.spec_from_file_location(f'sample_plugins.{plugin_id}', module_file)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            target_class = MetadataFactory._find_provider_class(module, plugin_id)
+            if target_class:
+                display['id'] = getattr(target_class, 'id', plugin_id) or plugin_id
+                display['name'] = getattr(target_class, 'name', plugin_id) or plugin_id
+        except Exception as e:
+            print(f"[PluginService] 샘플 플러그인 소개 정보 조회 실패 ({plugin_id}): {e}")
+        return display
+
+    @classmethod
+    def list_sample_plugins(cls):
+        """sample_plugins/metadata/ 하위 폴더를 스캔해 설치 가능한 샘플 플러그인 목록을 반환합니다."""
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        samples_root = os.path.join(base_dir, 'sample_plugins', 'metadata')
+        if not os.path.isdir(samples_root):
+            return []
+
+        results = []
+        for name in sorted(os.listdir(samples_root)):
+            if name.startswith('__') or not _SAFE_PLUGIN_ID_RE.match(name):
+                continue
+            plugin_dir = os.path.join(samples_root, name)
+            if not os.path.isdir(plugin_dir):
+                continue
+
+            info = cls._introspect_sample_plugin(name, plugin_dir)
+            results.append({
+                'id': name,
+                'name': info.get('name') or name,
+                'installed': os.path.isdir(cls._get_plugin_dir(name)),
+            })
+        return results
+
+    @classmethod
+    def install_from_sample(cls, plugin_id):
+        """sample_plugins/metadata/<id> 를 실제 로더 경로 plugins/metadata/<id> 로 복사 설치합니다."""
+        plugin_id = str(plugin_id or '').strip()
+        if not plugin_id or not _SAFE_PLUGIN_ID_RE.match(plugin_id):
+            return False, {'error': '올바르지 않은 플러그인 ID입니다.'}
+
+        source_dir = cls._get_sample_plugin_dir(plugin_id)
+        if not os.path.isdir(source_dir):
+            return False, {'error': f'샘플 플러그인을 찾을 수 없습니다: {plugin_id}'}
+
+        dest_dir = cls._get_plugin_dir(plugin_id)
+        if os.path.exists(dest_dir):
+            return False, {'error': f'이미 설치되어 있습니다: {plugin_id}'}
+
+        try:
+            shutil.copytree(source_dir, dest_dir)
+        except Exception as e:
+            return False, {'error': f'플러그인 파일 복사 실패: {e}'}
+
+        reload_info = {'plugin_id': plugin_id, 'reload_ok': True}
+        try:
+            from services.metadata_factory import MetadataFactory
+            reload_info = MetadataFactory.hot_reload_plugin(plugin_id)
+            reload_info['reload_ok'] = True
+        except Exception as e:
+            reload_info = {'plugin_id': plugin_id, 'reload_ok': False, 'reload_error': str(e)}
+
+        return True, {
+            'message': f'{plugin_id} 플러그인을 설치했습니다.',
+            'plugin_id': plugin_id,
+            'reload': reload_info,
+        }
 
     @classmethod
     def _read_local_plugin_version(cls, plugin_id, version_file='VERSION', version_key='plugin version'):
