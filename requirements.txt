@@ -8,6 +8,7 @@ psutil>=6.0.0,<8
 PyYAML>=6.0.2,<7
 beautifulsoup4==4.12.3
 lxml>=5.3.0,<7
+requests>=2.31,<3
 redis==5.0.1
 mutagen==1.47.0
 tinytag==2.0.0
