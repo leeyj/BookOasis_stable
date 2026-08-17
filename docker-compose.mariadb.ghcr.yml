@@ -34,11 +34,48 @@ services:
         condition: service_started
       mariadb:
         condition: service_healthy
+      mariadb-grant-repair:
+        condition: service_completed_successfully
 
   redis:
     image: redis:7-alpine
     container_name: bookoasis_redis
     restart: unless-stopped
+
+  # bookoasis 계정의 GRANT를 매번 up 할 때마다 root 권한으로 재확인/재부여하는 1회성 작업.
+  # docker-entrypoint-initdb.d/init.sql은 MariaDB 데이터 볼륨이 완전히 비어있는 최초 1회에만
+  # 실행되므로, 기존에 이미 이 스택을 쓰고 있던 사용자가 업데이트로 새 DB(예: media_video)가
+  # 추가돼도 자동으로 GRANT를 못 받는 문제가 있었다 (커뮤니티에서 반복 리포트, "Access denied
+  # ... to database 'media_X'"). 이 컨테이너는 매번 실행되지만 전부 IF NOT EXISTS/멱등 GRANT라
+  # 여러 번 실행해도 안전하며, 작업 완료 즉시 종료한다(상시 구동 아님).
+  # 주의: "GRANT ... ON media_%.*" 같은 와일드카드 패턴은 GRANT 문 자체에서는 지원되지 않고
+  # (실제 실행 시 SQL 구문 오류) mysql.db 시스템 테이블을 직접 조작해야만 동작하는, 버전에
+  # 취약한 저수준 트릭이다 - 그래서 여기서는 검증된 개별 DB 나열 방식을 쓴다. 이 컨테이너가
+  # 매 up마다 자동 재실행되므로, 앞으로 새 DB가 추가되면 이 목록에 줄 하나만 더 추가하면 되고
+  # 기존 사용자도 다음 업데이트 시 자동으로 커버된다.
+  mariadb-grant-repair:
+    image: mariadb:10.11
+    container_name: bookoasis_mariadb_grant_repair
+    restart: "no"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    environment:
+      - MARIADB_ROOT_PASSWORD=root_pass
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        mariadb -h mariadb -uroot -p"$$MARIADB_ROOT_PASSWORD" -e "
+          CREATE DATABASE IF NOT EXISTS media_general CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+          CREATE DATABASE IF NOT EXISTS media_adult CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+          CREATE DATABASE IF NOT EXISTS media_audiobook CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+          CREATE DATABASE IF NOT EXISTS media_video CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+          GRANT ALL PRIVILEGES ON media_general.* TO 'bookoasis'@'%';
+          GRANT ALL PRIVILEGES ON media_adult.* TO 'bookoasis'@'%';
+          GRANT ALL PRIVILEGES ON media_audiobook.* TO 'bookoasis'@'%';
+          GRANT ALL PRIVILEGES ON media_video.* TO 'bookoasis'@'%';
+          FLUSH PRIVILEGES;
+        " && echo "[Grant-Repair] bookoasis 계정에 4개 media_* DB 권한을 재확인/부여했습니다."
 
   mariadb:
     image: mariadb:10.11

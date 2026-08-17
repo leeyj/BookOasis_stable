@@ -85,7 +85,7 @@ Recommended class attributes:
 - `is_searchable` (bool): show in manual metadata search modal
 - `config_schema` (list): settings form schema (used for auto-generated form)
 - `dashboard_widget` (dict or None): dashboard widget metadata
-- `category_tab` (dict or None): category-level plugin manifest (`title`, `icon`, `order`)
+- `category_tab` (dict or None): category-level plugin manifest (`title`, `icon`, `order`, `sessions`)
 - `update_manifest` (dict or None): plugin-owned update declaration contract
 
 ### Category-Level Plugins Specification
@@ -100,9 +100,18 @@ class MyCategoryPlugin(BaseMetadataProvider):
     category_tab = {
         "title": "My Custom Library",
         "icon": "fa-solid fa-chart-line",
-        "order": 80
+        "order": 80,
+        "sessions": "all"  # optional, see "Scoping to sessions" below
     }
 ```
+
+#### Scoping to sessions (`sessions`)
+`category_tab.sessions` declares which session(s) — general/adult/audiobook/video — this plugin's sidebar tab appears under.
+
+- Omitted: defaults to `general` only (backward-compatible with plugins written before this field existed).
+- `"all"`: appears in all 4 sessions.
+- A list like `["adult"]` restricts it to specific sessions — e.g. an adult-content plugin declaring `sessions: ["adult"]` will never appear under the general-books sidebar, only under the adult session.
+- Per-account visibility (on/off per user) is still managed separately, from the 'General' tab of the admin permission matrix. `sessions` controls *which session it can appear in*; the permission matrix controls *which users see it*.
 
 #### UI Template Tag Specification (Full HTML5 Support)
 Category-level plugin UI templates (`index.html`, `style.css`, `script.js`) enjoy **100% unrestricted HTML5 tags (`<canvas>`, `<svg>`, `<table>`, `<form>`, `<input>`, `<button>`) and custom CSS/JS execution**.

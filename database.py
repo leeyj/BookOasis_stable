@@ -1184,10 +1184,41 @@ def init_databases():
     startup_db_sanity_check()
 
     for db_type in ['general', 'adult', 'audiobook', 'video']:
-        conn = get_connection(db_type)
-        cursor = conn.cursor()
-        cursor.executescript(schema)
-        conn.commit()
+        # DB 연결 자체가 실패하면(예: MariaDB 계정에 새로 추가된 DB에 대한 GRANT가 아직
+        # 없는 경우 "Access denied ... to database 'media_X'") 여기서 예외가 그대로
+        # 전파되어 gunicorn 워커 부팅 자체가 실패하고 서버 전체가 죽는다. 한 DB의 권한
+        # 설정이 아직 안 됐다고 나머지 DB(및 앱 전체)까지 마비시킬 이유는 없으므로,
+        # 이 DB만 건너뛰고 다음 DB로 계속 진행한다 (docs/move_to_mariadb.md FAQ Q1 참고).
+        conn = None
+        try:
+            conn = get_connection(db_type)
+            cursor = conn.cursor()
+            cursor.executescript(schema)
+            conn.commit()
+        except Exception as conn_err:
+            print(f"[DB-Migration ERROR] '{db_type}' DB 연결/초기화 실패로 이 DB를 건너뜁니다: {conn_err}")
+            db_engine = os.environ.get('DB_ENGINE', os.environ.get('DBMS', ''))
+            if 'access denied' in str(conn_err).lower() or 'mariadb' in db_engine.lower():
+                mariadb_user = os.environ.get('MARIADB_USER', 'bookoasis')
+                db_prefix = os.environ.get('MARIADB_DATABASE_PREFIX', 'media_')
+                print(
+                    "[DB-Migration ERROR] MariaDB 권한 문제로 보입니다. "
+                    f"'{mariadb_user}' 계정에 '{db_prefix}{db_type}' 권한이 없을 수 있습니다. "
+                    "MariaDB에 root로 접속해 아래 SQL을 실행하세요 (docker-compose.mariadb.yml 사용 중이면 "
+                    "'mariadb-grant-repair' 서비스가 다음 `docker-compose up` 시 자동으로 재실행합니다):"
+                )
+                print(
+                    f"  CREATE DATABASE IF NOT EXISTS {db_prefix}{db_type} CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;\n"
+                    f"  GRANT ALL PRIVILEGES ON {db_prefix}{db_type}.* TO '{mariadb_user}'@'%';\n"
+                    "  FLUSH PRIVILEGES;"
+                )
+                print("[DB-Migration ERROR] 자세한 내용은 docs/move_to_mariadb.md FAQ Q1을 참고하세요.")
+            if conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+            continue
 
         # 신규 표현식 인덱스 생성 전에 누락 컬럼을 먼저 보강해야 구버전 DB에서도 안전합니다.
         try:

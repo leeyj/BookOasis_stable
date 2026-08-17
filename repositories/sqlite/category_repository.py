@@ -318,29 +318,37 @@ class CategoryRepository:
         
         try:
             # 1. 목적지 DB에 카테고리 삽입
+            # group_id/sort_order를 안 옮기면 사이드바 가상 그룹(폴더) 소속과 정렬 위치가
+            # 이동할 때마다 조용히 초기화된다.
             cursor_dst.execute(
-                """INSERT INTO libraries 
-                   (name, physical_path, cron_schedule, last_scanned_at, scan_status, is_remote, vfs_refresh_before_scan, rclone_rc_url, icon, color, hide_cover) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (new_lib_name, new_lib_data["physical_path"], new_lib_data["cron_schedule"], new_lib_data["last_scanned_at"], 
-                 new_lib_data["scan_status"], new_lib_data["is_remote"], new_lib_data["vfs_refresh_before_scan"], 
-                 new_lib_data["rclone_rc_url"], new_lib_data["icon"], new_lib_data["color"], new_lib_data["hide_cover"])
+                """INSERT INTO libraries
+                   (name, physical_path, cron_schedule, last_scanned_at, scan_status, is_remote, vfs_refresh_before_scan, rclone_rc_url, icon, color, hide_cover, group_id, sort_order)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (new_lib_name, new_lib_data["physical_path"], new_lib_data["cron_schedule"], new_lib_data["last_scanned_at"],
+                 new_lib_data["scan_status"], new_lib_data["is_remote"], new_lib_data["vfs_refresh_before_scan"],
+                 new_lib_data["rclone_rc_url"], new_lib_data["icon"], new_lib_data["color"], new_lib_data["hide_cover"],
+                 new_lib_data.get("group_id"), new_lib_data.get("sort_order", 0))
             )
             new_lib_id = cursor_dst.lastrowid
-            
+
             book_id_map = {}
             for book in books_data:
                 old_book_id = book["id"]
                 # 2. 목적지 DB에 도서 삽입
+                # metadata_locked/series_alias/title_alias/file_mtime/file_size/is_deleted/deleted_at을
+                # 안 옮기면 잠금 상태·별칭·증분 스캔용 mtime이 이동할 때마다 조용히 초기화된다.
                 cursor_dst.execute(
-                    """INSERT INTO books 
-                       (library_id, title, series_name, author, file_path, file_format, total_pages, has_offsets, cover_image, 
-                        publisher, link, score, release_date, summary, genre, tags, is_favorite, cover_updated_at, created_at) 
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    """INSERT INTO books
+                       (library_id, title, series_name, author, file_path, file_format, total_pages, has_offsets, cover_image,
+                        publisher, link, score, release_date, summary, genre, tags, is_favorite, cover_updated_at, created_at,
+                        is_deleted, deleted_at, metadata_locked, series_alias, title_alias, file_mtime, file_size)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (new_lib_id, book["title"], book["series_name"], book["author"], book["file_path"], book["file_format"],
                      book["total_pages"], book["has_offsets"], book["cover_image"], book["publisher"], book["link"],
                      book["score"], book["release_date"], book["summary"], book["genre"], book["tags"], book["is_favorite"],
-                     book["cover_updated_at"], book["created_at"])
+                     book["cover_updated_at"], book["created_at"],
+                     book.get("is_deleted", 0), book.get("deleted_at"), book.get("metadata_locked", 0),
+                     book.get("series_alias"), book.get("title_alias"), book.get("file_mtime", 0.0), book.get("file_size", 0))
                 )
                 new_book_id = cursor_dst.lastrowid
                 book_id_map[old_book_id] = new_book_id

@@ -208,7 +208,7 @@ window.addEventListener('message', (event) => {
 - `is_searchable` (bool): 수동 메타데이터 검색 모달 노출 여부
 - `config_schema` (list): 설정 폼 스키마 (기본 자동 생성 폼용)
 - `dashboard_widget` (dict 또는 None): 대시보드 위젯 메타 (공통 데스크 카드 또는 단독 탭 뷰 구성 정보)
-- `category_tab` (dict 또는 None): 카테고리 레벨 플러그인 매니페스트 (사이드바 카테고리 1등 시민 메뉴 등록 정보: `title`, `icon`, `order`)
+- `category_tab` (dict 또는 None): 카테고리 레벨 플러그인 매니페스트 (사이드바 카테고리 1등 시민 메뉴 등록 정보: `title`, `icon`, `order`, `sessions`)
 - `update_manifest` (dict 또는 None): 플러그인 내부 업데이트 선언 계약
 
 ### 카테고리 레벨 플러그인 (Category-Level Plugins) 규격
@@ -223,9 +223,18 @@ class MyCategoryPlugin(BaseMetadataProvider):
     category_tab = {
         "title": "나만의 커스텀 서재",
         "icon": "fa-solid fa-chart-line",
-        "order": 80
+        "order": 80,
+        "sessions": "all"  # 선택 사항. 아래 "노출 세션 지정" 참고
     }
 ```
+
+#### 노출 세션 지정 (`sessions`)
+`category_tab.sessions`로 이 플러그인이 어느 세션(일반 도서/성인 서재/오디오북/영상 강좌)의 사이드바에 노출될지 선언할 수 있습니다.
+
+- 생략 시 기본값은 `일반 도서(general)` 단일 세션입니다(하위 호환).
+- `"all"`: 4개 세션(general/adult/audiobook/video) 전체에 노출.
+- `["adult"]`처럼 리스트로 특정 세션만 지정 가능. 예를 들어 성인용 콘텐츠를 다루는 플러그인은 `sessions: ["adult"]`로 선언하면 일반 도서 사이드바에는 나타나지 않고 성인 서재 세션에만 노출됩니다.
+- 계정별 노출 여부(권한 on/off)는 여전히 설정 → 권한 관리의 '일반 도서' 탭 매트릭스에서 관리합니다. `sessions`는 "어느 세션에 뜰지"를, 권한 매트릭스는 "어느 사용자에게 뜰지"를 결정하는 별개의 축입니다.
 
 #### UI 템플릿 태그 규격 (HTML5 풀 지원)
 카테고리 레벨 플러그인의 `index.html`, `style.css`, `script.js` 템플릿 화면에서는 **`<canvas>`, `<svg>`, `<table>`, `<form>`, `<input>`, `<button>` 등 모든 HTML5 태그와 CSS, JS가 100% 제약 없이 자유롭게 허용**됩니다.

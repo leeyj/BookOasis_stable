@@ -10,21 +10,22 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # 4. Install System Dependencies
-# intel-media-va-driver/libva2/vainfo: Intel iGPU(QuickSync, 예: Iris) VAAPI 하드웨어
+# intel-media-va-driver(Intel iGPU)/mesa-va-drivers(AMD Radeon)/libva2/vainfo: VAAPI 하드웨어
 # 트랜스코딩 런타임 드라이버. ffmpeg 패키지 자체는 VAAPI hwaccel을 컴파일 지원하지만,
 # 실제 동작에는 이 드라이버 스택이 별도로 필요하다 (설정 > 일반 > 영상 트랜스코딩의
-# "VAAPI 점검" 버튼이 이 패키지 유무 + /dev/dri 패스스루 여부를 확인함).
-# intel-media-va-driver는 Debian에서 amd64 전용 패키지(Intel iGPU 자체가 x86 하드웨어라
-# arm64에는 존재하지 않음). GHCR 멀티아키텍처 빌드(linux/amd64,linux/arm64)가 arm64에서
-# apt-get install 시 "Unable to locate package"로 실패하는 것을 막기 위해 TARGETARCH가
-# amd64일 때만 설치한다.
+# "VAAPI 점검" 버튼이 이 패키지 유무 + /dev/dri 패스스루 여부를 확인함). mesa-va-drivers가
+# 없으면 libva가 AMD GPU를 자동 감지해도 radeonsi_drv_video.so를 못 찾아
+# "vaInitialize failed with error code -1"로 실패한다 (커뮤니티 문의로 확인, 2026-08-17).
+# 둘 다 Debian에서 amd64 전용 패키지(iGPU/dGPU 자체가 x86 하드웨어라 arm64에는 없음).
+# GHCR 멀티아키텍처 빌드(linux/amd64,linux/arm64)가 arm64에서 apt-get install 시
+# "Unable to locate package"로 실패하는 것을 막기 위해 TARGETARCH가 amd64일 때만 설치한다.
 ARG TARGETARCH
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     ffmpeg \
     gosu \
     && if [ "$TARGETARCH" = "amd64" ]; then \
-         apt-get install -y --no-install-recommends intel-media-va-driver libva2 vainfo; \
+         apt-get install -y --no-install-recommends intel-media-va-driver mesa-va-drivers libva2 vainfo; \
        fi \
     && rm -rf /var/lib/apt/lists/*
 

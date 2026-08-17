@@ -152,6 +152,49 @@ function initSidebarCategorySync() {
   window.__sidebarCategorySyncBound = true;
 }
 
+// 모바일 햄버거 버튼은 CSS에서 position:fixed(layout viewport 기준)로 고정돼 있다.
+// 핀치 확대(pinch-zoom) 시 실제로 보이는 visual viewport는 좁아지고 이동하지만, fixed
+// 요소의 좌표는 layout viewport 기준 그대로 남아 화면 밖으로 밀려날 수 있다. html/body가
+// overflow:hidden이라 사용자가 스크롤로 되찾을 수도 없다 (커뮤니티 리포트, Pixel 7 2배
+// 확대 시 412px 뷰포트가 206px로 좁아지며 버튼이 완전히 이탈하는 것으로 재현됨).
+// visualViewport의 resize/scroll 이벤트로 실제 보이는 영역 기준으로 위치를 보정한다.
+let mobileToggleOriginalTopPx = null;
+let mobileToggleOriginalRightPx = null;
+
+function syncMobileToggleViewportPosition() {
+  const viewport = window.visualViewport;
+  const { btn } = getSidebarElements();
+  if (!viewport || !btn || !isMobileLayout()) return;
+  if (getComputedStyle(btn).display === 'none') return;
+
+  // CSS가 정의한 원래 top/right 여백(safe-area 포함)을 최초 1회만 읽어서 기준값으로 삼는다 -
+  // 이후 인라인 스타일로 덮어써도 CSS 원본 디자인의 여백 자체는 그대로 유지된다.
+  if (mobileToggleOriginalTopPx === null) {
+    btn.style.top = '';
+    btn.style.right = '';
+    const rect = btn.getBoundingClientRect();
+    mobileToggleOriginalTopPx = rect.top;
+    mobileToggleOriginalRightPx = window.innerWidth - rect.right;
+  }
+
+  const btnWidth = btn.offsetWidth || 0;
+  btn.style.right = 'auto';
+  btn.style.left = `${viewport.offsetLeft + viewport.width - btnWidth - mobileToggleOriginalRightPx}px`;
+  btn.style.top = `${viewport.offsetTop + mobileToggleOriginalTopPx}px`;
+}
+
+function initMobileToggleViewportSync() {
+  if (window.__mobileToggleViewportSyncBound) return;
+  const viewport = window.visualViewport;
+  if (!viewport) return;
+
+  viewport.addEventListener('resize', syncMobileToggleViewportPosition);
+  viewport.addEventListener('scroll', syncMobileToggleViewportPosition);
+  window.addEventListener('orientationchange', syncMobileToggleViewportPosition);
+
+  window.__mobileToggleViewportSyncBound = true;
+}
+
 function initSidebarViewportRecovery() {
   if (window.__sidebarViewportRecoveryBound) return;
 
@@ -179,6 +222,7 @@ export function initSidebarInteractions() {
   initSidebarAutoClose();
   initSidebarCategorySync();
   initSidebarViewportRecovery();
+  initMobileToggleViewportSync();
   syncSidebarResponsiveControls();
   syncSidebarMenuState();
 }

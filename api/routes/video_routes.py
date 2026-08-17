@@ -189,20 +189,58 @@ def _stream_transcoded_video(file_path, video_id=None, episode_id=None):
     print(f"[Video-Transcode][vid={video_id} ep={episode_id}] mode={'vaapi' if use_vaapi else 'cpu'} cmd={' '.join(cmd)}")
     threading.Thread(target=_log_ffmpeg_stderr, args=(proc, video_id, episode_id), daemon=True).start()
 
+    import selectors
+
+    # 원본이 rclone 등 원격 마운트(VFS)에 있는 경우, ffmpeg가 파일을 처음 열고
+    # 첫 데이터를 내보내기까지(콜드 캐시 -> 원격에서 최초 청크 fetch) 수십 초가 걸릴 수
+    # 있다. 반면 스트리밍이 일단 시작된 뒤에 데이터가 끊기는 것은 실제 stall일 가능성이
+    # 높으므로, "첫 청크"와 "그 이후"의 허용 무응답 시간을 분리한다.
+    FIRST_CHUNK_TIMEOUT_SEC = 60   # 원격 마운트 콜드 캐시 최초 오픈/버퍼링 허용 시간
+    STALL_TIMEOUT_SEC = 15         # 스트리밍 시작 후 청크 간 최대 허용 무응답 시간
+
     def generate():
+        sel = selectors.DefaultSelector()
+        sel.register(proc.stdout, selectors.EVENT_READ)
+        got_first_chunk = False
         try:
             while True:
-                chunk = proc.stdout.read(1024 * 256)
+                timeout = STALL_TIMEOUT_SEC if got_first_chunk else FIRST_CHUNK_TIMEOUT_SEC
+                events = sel.select(timeout=timeout)
+                if not events:
+                    stage = 'STREAM-STALL' if got_first_chunk else 'FIRST-CHUNK-TIMEOUT'
+                    print(f"[Video-Transcode][vid={video_id} ep={episode_id}] {stage} 감지 ({timeout}s 무응답) - 프로세스 강제 종료")
+                    break
+                # read1()을 사용해야 한다: 일반 read(n)은 BufferedReader가 n바이트를
+                # 채울 때까지 내부적으로 raw read를 반복 호출하므로, select()가 이미
+                # "읽을 수 있음"을 알려준 뒤에도 프로세스가 소량만 쓰고 멈추면 여기서
+                # 다시 무기한 블로킹된다 (select 기반 타임아웃이 무력화됨, 실측 확인됨).
+                # read1()은 내부 raw read를 최대 1회만 호출해 즉시 반환한다.
+                chunk = proc.stdout.read1(1024 * 256)
                 if not chunk:
                     break
+                got_first_chunk = True
                 yield chunk
         finally:
+            sel.close()
             try:
                 proc.stdout.close()
             except Exception:
                 pass
             if proc.poll() is None:
                 proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except Exception:
+                    try:
+                        proc.kill()
+                        proc.wait(timeout=3)
+                    except Exception:
+                        pass
+            else:
+                try:
+                    proc.wait(timeout=1)
+                except Exception:
+                    pass
 
     rv = Response(generate(), 200, mimetype='video/mp4', content_type='video/mp4', direct_passthrough=True)
     rv.headers.add('Cache-Control', 'no-store')

@@ -57,10 +57,14 @@ CREATE DATABASE IF NOT EXISTS media_video CHARACTER SET utf8mb4 COLLATE utf8mb4_
 
 -- 사용자 생성 및 권한 부여 ('your_password'를 원하는 비밀번호로 변경하세요)
 CREATE USER IF NOT EXISTS 'bookoasis'@'%' IDENTIFIED BY 'your_password';
--- media_ 로 시작하는 이름의 DB(지금 4개는 물론 향후 새 미디어 세션이 추가되며 생기는 DB까지)에
--- 한 번에 권한을 부여하는 와일드카드 GRANT입니다. 이렇게 해두면 나중에 BookOasis가 새 DB를
--- 추가해도(예: media_video가 추가됐던 것처럼) 이 SQL을 다시 실행할 필요가 없습니다.
-GRANT ALL PRIVILEGES ON media_%.* TO 'bookoasis'@'%';
+-- 주의: "GRANT ... ON media_%.*" 같은 와일드카드 패턴은 GRANT 문에서 지원되지 않습니다
+-- (실제 실행 시 SQL 구문 오류). 아래처럼 현재 4개 DB에 개별로 권한을 부여하세요. 이후
+-- BookOasis가 새 미디어 세션을 추가하면(예: 앞으로 media_X가 새로 생기면) 이 GRANT 블록에
+-- 한 줄만 추가해서 다시 실행하면 됩니다.
+GRANT ALL PRIVILEGES ON media_general.* TO 'bookoasis'@'%';
+GRANT ALL PRIVILEGES ON media_adult.* TO 'bookoasis'@'%';
+GRANT ALL PRIVILEGES ON media_audiobook.* TO 'bookoasis'@'%';
+GRANT ALL PRIVILEGES ON media_video.* TO 'bookoasis'@'%';
 FLUSH PRIVILEGES;
 ```
 
@@ -129,13 +133,16 @@ docker exec -it bookoasis python tools/migrator_sqlite_to_mariadb.py
 
 ### Q1. `Access denied for user 'bookoasis'@'%' to database 'media_adult'` 또는 `SELECT command denied ... for table 'media_video'.'videos'` 에러가 발생해요!
 - **원인**: MariaDB 공식 도커 이미지는 기본적으로 1개의 DB만 생성하므로 나머지 DB 권한이 빠져있을 수 있습니다. 특히 BookOasis가 버전업하며 새 미디어 세션(예: v2.1.0의 영상 강좌 → `media_video`)을 추가하면, **이미 예전에 MariaDB로 전환해서 쓰고 계시던 분**은 새로 생긴 DB(또는 그 안의 특정 테이블)에 대한 권한이 없어서 이 에러를 만날 수 있습니다. `Access denied ... to database`(에러 1044)와 `SELECT command denied ... for table`(에러 1142)은 같은 근본 원인(권한 부족)의 두 가지 다른 증상일 뿐이며 해결책은 동일합니다. Docker Compose 번들형(유형 A)이라도, `docker-entrypoint-initdb.d/init.sql`은 MariaDB 데이터 볼륨이 **완전히 비어있는 최초 1회**에만 실행되므로 기존 컨테이너를 업데이트만 한 경우엔 자동으로 반영되지 않습니다.
-- **해결책 (1회 실행으로 영구 해결)**: MariaDB에 접속해서 아래 와일드카드 GRANT를 1회만 실행하세요. `media_`로 시작하는 이름의 DB라면 지금 것이든 앞으로 BookOasis가 추가할 것이든 전부 커버되므로, 이후로는 새 미디어 세션이 추가돼도 이 작업을 다시 할 필요가 없습니다.
+- **해결책**: Docker Compose 번들형(유형 A)이라면 최신 버전의 `docker-compose.mariadb.yml`을 그대로 사용하세요 — `mariadb-grant-repair` 서비스가 `docker-compose up`을 실행할 때마다 자동으로 4개 DB에 대한 GRANT를 재확인/재부여하므로, 앞으로는 새 미디어 세션이 추가돼도 이 작업을 손으로 다시 할 필요가 없습니다. 외부 MariaDB(유형 B)를 쓰신다면 아래 SQL을 1회 실행하세요.
   ```sql
   CREATE DATABASE IF NOT EXISTS media_video CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
-  GRANT ALL PRIVILEGES ON media_%.* TO 'bookoasis'@'%';
+  GRANT ALL PRIVILEGES ON media_general.* TO 'bookoasis'@'%';
+  GRANT ALL PRIVILEGES ON media_adult.* TO 'bookoasis'@'%';
+  GRANT ALL PRIVILEGES ON media_audiobook.* TO 'bookoasis'@'%';
+  GRANT ALL PRIVILEGES ON media_video.* TO 'bookoasis'@'%';
   FLUSH PRIVILEGES;
   ```
-  (신규 설치라면 최신 소스에 동봉된 `docker-entrypoint-initdb.d/init.sql`이 마운트된 `docker-compose.mariadb.yml`을 그대로 사용하시면 자동으로 적용됩니다.)
+  (`GRANT ... ON media_%.*` 같은 와일드카드 패턴은 GRANT 문에서 지원되지 않아 SQL 구문 오류가 발생하니 사용하지 마세요.)
 
 ### Q2. 기존 SQLite로 되돌리고 싶으면 어떻게 하나요?
 - `docker-compose.override.yml`에서 `DB_ENGINE=sqlite`로 변경하거나 해당 파일을 삭제 후 `docker-compose restart` 하시면 즉시 기존 SQLite 데이터베이스로 원복됩니다. 기존 데이터는 전혀 훼손되지 않습니다.

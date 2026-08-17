@@ -8,6 +8,28 @@ from utils.i18n import _t
 
 plugin_routes_bp = Blueprint('media_plugin_routes', __name__)
 
+PLUGIN_SESSION_TYPES = {'general', 'adult', 'audiobook', 'video'}
+
+
+def _resolve_plugin_sessions(category_tab):
+    """플러그인 매니페스트(category_tab)의 'sessions' 필드로 노출 세션을 결정한다.
+    - 'all': 4개 세션(general/adult/audiobook/video) 전체에 노출
+    - 리스트(예: ['adult']): 명시된 세션에만 노출
+    - 미지정: 하위 호환을 위해 기존 동작과 동일하게 'general'에만 노출
+    """
+    raw = category_tab.get('sessions')
+    if raw is None:
+        return {'general'}
+    if isinstance(raw, str):
+        if raw.strip().lower() == 'all':
+            return set(PLUGIN_SESSION_TYPES)
+        raw = [raw]
+    if isinstance(raw, (list, tuple, set)):
+        resolved = {str(s).strip().lower() for s in raw if str(s).strip().lower() in PLUGIN_SESSION_TYPES}
+        if resolved:
+            return resolved
+    return {'general'}
+
 @plugin_routes_bp.route('/api/media/metadata/plugins', methods=['GET'])
 @admin_required
 def get_metadata_plugins_api():
@@ -310,6 +332,9 @@ def get_category_plugins_api():
     user_id = session.get('user_id')
     user_role = session.get('role', 'user')
 
+    if db_type not in PLUGIN_SESSION_TYPES:
+        return jsonify({'success': True, 'category_plugins': []}), 200
+
     try:
         from services.metadata_factory import MetadataFactory
         from services.category_service import CategoryService
@@ -328,6 +353,12 @@ def get_category_plugins_api():
                 continue
             cat_tab = p.get('category_tab')
             if not isinstance(cat_tab, dict):
+                continue
+
+            # 플러그인이 매니페스트의 'sessions'로 자신이 노출될 세션을 선언한다
+            # (예: sessions=['adult']면 일반 도서 사이드바에는 뜨지 않음, 'all'이면
+            # 4개 세션 전체). 선언이 없으면 하위 호환을 위해 general에만 노출된다.
+            if db_type not in _resolve_plugin_sessions(cat_tab):
                 continue
 
             plugin_cat_id = f"plugin_{p.get('id')}"
