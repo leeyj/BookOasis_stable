@@ -2,6 +2,7 @@
 ## v2.1.1
 - (video) 잠금화면/백그라운드에서도 강좌 재생을 오디오로 계속 들을 수 있도록 영상 플레이어에 Media Session API(재생/일시정지/탐색/이전-다음 회차) 연동 | wire the Media Session API (play/pause/seek/prev-next episode) into the video player so course playback can continue as audio when the screen locks or the app backgrounds
 - (tools) 카테고리 내보내기/가져오기 CLI(`export_category.py`/`import_category.py`)가 영상 강좌(video) 카테고리도 지원하도록 확장 — 강좌/에피소드/시청 진행률까지 오디오북과 동일한 방식으로 백업 및 이관 가능 | extend the category export/import CLI tools to support video-course categories — courses, episodes, and watch progress can now be backed up and migrated the same way audiobooks already are
+- (fix) GHCR 멀티아키텍처(amd64/arm64) 도커 이미지 빌드가 arm64에서 실패하던 문제 수정 — amd64 전용 패키지인 `intel-media-va-driver`(Intel VAAPI 드라이버)를 `TARGETARCH`가 amd64일 때만 설치하도록 변경 | fix the GHCR multi-arch (amd64/arm64) Docker image build failing on arm64 — only install the amd64-only `intel-media-va-driver` (Intel VAAPI driver) package when `TARGETARCH` is amd64
 
 ## v2.1.0
 - (video) 오디오북과 나란한 새 미디어 세션 "영상 강좌" 추가 — 폴더당 강좌 1개, `S01E01` 명명 + `show.yaml` 사이드카(Plex TV쇼 스타일)로 에피소드를 인식하며, 전용 DB/스캐너/스트리밍(Range 206) 라우트와 사이드바 세션 토글, 관리자 권한 매트릭스를 갖춤 | add a new "Video Courses" media session alongside audiobooks — one course per folder, episodes recognized via `S01E01` naming + a `show.yaml` sidecar (Plex TV-show style), with its own DB/scanner/streaming (Range 206) routes, a sidebar session toggle, and an admin permission matrix
