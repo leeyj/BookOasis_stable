@@ -106,7 +106,7 @@ def invalidate_series_summary(cursor, library_id):
 def get_all_existing_libraries():
     """모든 DB(General 및 Adult)의 기존 카테고리 목록을 수집합니다."""
     libraries = []
-    for db_type in ['general', 'adult', 'audiobook']:
+    for db_type in ['general', 'adult', 'audiobook', 'video']:
         try:
             conn = get_db_connection(db_type)
             cur = conn.cursor()
@@ -150,6 +150,9 @@ def inspect_package(input_path):
     audiobook_tracks_info = metadata.get('audiobook_tracks', [])
     audiobook_progress_info = metadata.get('audiobook_progress', [])
     audiobook_track_progress_info = metadata.get('audiobook_track_progress', [])
+    videos_info = metadata.get('videos', [])
+    video_episodes_info = metadata.get('video_episodes', [])
+    video_progress_info = metadata.get('video_progress', [])
     user_progress_info = metadata.get('user_progress', [])
     root_paths = lib_info.get('physical_paths', [])
     orig_root_count = manifest.get('root_paths_count', len(root_paths))
@@ -160,7 +163,11 @@ def inspect_package(input_path):
     print("==========================================================")
     print(f"  • Category Name : {manifest.get('library_name') or lib_info.get('name')}")
     print(f"  • DB Type       : {manifest.get('db_type', 'general')}")
-    if media_kind == 'audiobook' or manifest.get('db_type') == 'audiobook':
+    if media_kind == 'video' or manifest.get('db_type') == 'video':
+        print(f"  • Total Video Courses : {manifest.get('videos_count', len(videos_info))} items")
+        print(f"  • Total Episodes      : {manifest.get('video_episodes_count', len(video_episodes_info))} items")
+        print(f"  • Total Progress      : {manifest.get('video_progress_count', len(video_progress_info))} items")
+    elif media_kind == 'audiobook' or manifest.get('db_type') == 'audiobook':
         print(f"  • Total Audiobooks : {manifest.get('audiobooks_count', len(audiobooks_info))} items")
         print(f"  • Total Tracks     : {manifest.get('audiobook_tracks_count', len(audiobook_tracks_info))} items")
         print(f"  • Total Progress   : {manifest.get('audiobook_progress_count', len(audiobook_progress_info))} items")
@@ -216,14 +223,18 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
         sys.exit(1)
 
     target_db_type = db_type if db_type else manifest.get('db_type', 'general')
-    package_is_audiobook = (
-        manifest.get('media_kind') == 'audiobook'
-        or manifest.get('db_type') == 'audiobook'
+    package_media_kind = manifest.get('media_kind')
+    if not package_media_kind:
+        package_media_kind = 'audiobook' if manifest.get('db_type') == 'audiobook' else (
+            'video' if manifest.get('db_type') == 'video' else 'book'
+        )
+    expected_media_kind = 'audiobook' if target_db_type == 'audiobook' else (
+        'video' if target_db_type == 'video' else 'book'
     )
-    if package_is_audiobook != (target_db_type == 'audiobook'):
+    if package_media_kind != expected_media_kind:
         print(
             f"[!] Error: Package media type and target DB do not match "
-            f"(package={'audiobook' if package_is_audiobook else 'book'}, target={target_db_type})."
+            f"(package={package_media_kind}, target={target_db_type})."
         )
         sys.exit(1)
 
@@ -360,6 +371,10 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
     audiobook_tracks_list = metadata.get('audiobook_tracks', [])
     audiobook_progress_list = metadata.get('audiobook_progress', [])
     audiobook_track_progress_list = metadata.get('audiobook_track_progress', [])
+    videos_list = metadata.get('videos', [])
+    video_episodes_list = metadata.get('video_episodes', [])
+    video_progress_list = metadata.get('video_progress', [])
+    video_episode_progress_list = metadata.get('video_episode_progress', [])
     user_progress_list = metadata.get('user_progress', [])
     user_favorites_list = metadata.get('user_favorites', [])
 
@@ -370,12 +385,198 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
     imported_audiobook_tracks_count = 0
     imported_audiobook_progress_count = 0
     imported_audiobook_track_progress_count = 0
+    imported_videos_count = 0
+    imported_video_episodes_count = 0
+    imported_video_progress_count = 0
+    imported_video_episode_progress_count = 0
+    skipped_duplicate_videos_count = 0
+    skipped_duplicate_episodes_count = 0
     imported_user_progress_count = 0
     imported_user_favorites_count = 0
     skipped_duplicate_audiobooks_count = 0
     skipped_duplicate_tracks_count = 0
 
-    if target_db_type == 'audiobook':
+    if target_db_type == 'video':
+        video_index_to_new_id = {}
+        video_index_to_target_root = {}
+        episode_lookup = {}
+
+        for idx, v in enumerate(videos_list):
+            rel_folder = v.get('relative_folder_path', '')
+            root_idx = int(v.get('root_index', 0) or 0)
+            if root_idx < len(target_paths):
+                selected_target_root = target_paths[root_idx]
+            else:
+                selected_target_root = target_paths[0]
+            video_index_to_target_root[idx] = selected_target_root
+
+            clean_rel = rel_folder.replace('/', os.sep).replace('\\', os.sep)
+            new_folder_path = os.path.normpath(os.path.join(selected_target_root, clean_rel)) if clean_rel else selected_target_root
+
+            poster = v.get('poster', '')
+            if poster and not str(poster).startswith(('http://', 'https://')):
+                filename = os.path.basename(poster)
+                mapped = os.path.join(lib_covers_dir, filename)
+                poster = mapped if os.path.exists(mapped) else poster
+
+            now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            cursor.execute("SELECT id FROM videos WHERE folder_path = ?", (new_folder_path,))
+            dup_v = cursor.fetchone()
+            if dup_v:
+                skipped_duplicate_videos_count += 1
+                video_index_to_new_id[idx] = int(dup_v['id'])
+                continue
+
+            try:
+                cursor.execute("""
+                    INSERT INTO videos (
+                        library_id, title, sort_title, web_id, genres, poster, backdrop,
+                        premiered, description, folder_name, folder_path, total_duration, total_episodes,
+                        is_favorite, created_at, updated_at, is_deleted, deleted_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    target_library_id,
+                    v.get('title', 'Unknown Video Course'),
+                    v.get('sort_title'),
+                    v.get('web_id'),
+                    v.get('genres'),
+                    poster,
+                    v.get('backdrop'),
+                    v.get('premiered'),
+                    v.get('description'),
+                    v.get('folder_name') or os.path.basename(new_folder_path),
+                    new_folder_path,
+                    v.get('total_duration', 0.0),
+                    v.get('total_episodes', 0),
+                    v.get('is_favorite', 0),
+                    v.get('created_at') or now_str,
+                    v.get('updated_at') or now_str,
+                    v.get('is_deleted', 0),
+                    v.get('deleted_at')
+                ))
+                new_video_id = cursor.lastrowid
+                video_index_to_new_id[idx] = int(new_video_id)
+                imported_videos_count += 1
+            except Exception as v_err:
+                print(f"[!] Error inserting video course '{v.get('title')}': {v_err}")
+                continue
+
+        # video_episodes 스키마도 audiobook_tracks와 마찬가지로 백엔드마다 컬럼 구성이
+        # 조금씩 다를 수 있으므로(예: needs_transcode/subtitle_path 자동보강 시점 차이),
+        # 실제 대상 테이블에 있는 컬럼만 골라 동적으로 INSERT 문을 구성한다.
+        available_episode_columns = get_table_columns(cursor, 'video_episodes')
+
+        for ep in video_episodes_list:
+            v_idx = int(ep.get('video_export_index', -1))
+            if v_idx not in video_index_to_new_id:
+                continue
+            new_video_id = video_index_to_new_id[v_idx]
+
+            root_idx = int(ep.get('root_index', 0) or 0)
+            if root_idx < len(target_paths):
+                selected_target_root = target_paths[root_idx]
+            else:
+                selected_target_root = video_index_to_target_root.get(v_idx, target_paths[0])
+
+            rel_path = str(ep.get('relative_path', '') or '')
+            clean_rel = rel_path.replace('/', os.sep).replace('\\', os.sep)
+            new_episode_path = os.path.normpath(os.path.join(selected_target_root, clean_rel)) if clean_rel else ''
+
+            if new_episode_path:
+                cursor.execute("SELECT id FROM video_episodes WHERE file_path = ?", (new_episode_path,))
+                dup_ep = cursor.fetchone()
+                if dup_ep:
+                    skipped_duplicate_episodes_count += 1
+                    episode_number = int(ep.get('episode_number') or 0)
+                    if episode_number > 0:
+                        episode_lookup[(new_video_id, episode_number)] = int(dup_ep['id'])
+                    continue
+
+            try:
+                episode_values = {
+                    'video_id': new_video_id,
+                    'episode_number': ep.get('episode_number', 0),
+                    'episode_code': ep.get('episode_code'),
+                    'title': ep.get('title'),
+                    'filename': ep.get('filename', ''),
+                    'file_path': new_episode_path,
+                    'file_mtime': ep.get('file_mtime', 0.0),
+                    'file_size': ep.get('file_size', 0),
+                    'duration': ep.get('duration', 0.0),
+                    'width': ep.get('width', 0),
+                    'height': ep.get('height', 0),
+                    'premiered': ep.get('premiered'),
+                    'format': ep.get('format', 'mp4'),
+                    'needs_transcode': ep.get('needs_transcode', 0),
+                    'subtitle_path': ep.get('subtitle_path'),
+                }
+                episode_values = {k: v for k, v in episode_values.items() if k in available_episode_columns}
+                columns_clause = ", ".join(f"`{c}`" for c in episode_values)
+                placeholders = ", ".join("?" for _ in episode_values)
+                cursor.execute(
+                    f"INSERT INTO video_episodes ({columns_clause}) VALUES ({placeholders})",
+                    tuple(episode_values.values()),
+                )
+                new_episode_id = int(cursor.lastrowid)
+                episode_number = int(ep.get('episode_number') or 0)
+                if episode_number > 0:
+                    episode_lookup[(new_video_id, episode_number)] = new_episode_id
+                imported_video_episodes_count += 1
+            except Exception as ep_err:
+                print(f"[!] Error inserting video episode '{ep.get('filename', '')}': {ep_err}")
+
+        for vp in video_progress_list:
+            v_idx = int(vp.get('video_export_index', -1))
+            if v_idx not in video_index_to_new_id:
+                continue
+            new_video_id = video_index_to_new_id[v_idx]
+            episode_num = int(vp.get('current_episode_number') or 0)
+            mapped_episode_id = episode_lookup.get((new_video_id, episode_num)) if episode_num > 0 else None
+
+            try:
+                upsert_record(cursor, 'video_progress', ('video_id', 'user_id'), {
+                    'video_id': new_video_id,
+                    'user_id': vp.get('user_id', 1),
+                    'current_episode_id': mapped_episode_id,
+                    'current_time': vp.get('current_time', 0.0),
+                    'total_progress_pct': vp.get('total_progress_pct', 0.0),
+                    'playback_rate': vp.get('playback_rate', 1.0),
+                    'is_completed': vp.get('is_completed', 0),
+                    'last_watched_at': vp.get('last_watched_at') or datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                })
+                imported_video_progress_count += 1
+            except Exception as vp_err:
+                print(f"[!] Error inserting video progress row: {vp_err}")
+
+        for progress in video_episode_progress_list:
+            v_idx = int(progress.get('video_export_index', -1))
+            if v_idx not in video_index_to_new_id:
+                continue
+            new_video_id = video_index_to_new_id[v_idx]
+            episode_number = int(progress.get('episode_number') or 0)
+            mapped_episode_id = episode_lookup.get((new_video_id, episode_number))
+            if not mapped_episode_id:
+                continue
+            try:
+                upsert_record(
+                    cursor,
+                    'video_episode_progress',
+                    ('video_id', 'episode_id', 'user_id'),
+                    {
+                        'video_id': new_video_id,
+                        'episode_id': mapped_episode_id,
+                        'user_id': progress.get('user_id', 1),
+                        'current_time': progress.get('current_time', 0.0),
+                        'progress_pct': progress.get('progress_pct', 0.0),
+                        'is_completed': progress.get('is_completed', 0),
+                        'updated_at': progress.get('updated_at') or datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    },
+                )
+                imported_video_episode_progress_count += 1
+            except Exception as progress_error:
+                print(f"[!] Error inserting video episode progress row: {progress_error}")
+    elif target_db_type == 'audiobook':
         audiobook_index_to_new_id = {}
         audiobook_index_to_target_root = {}
         track_lookup = {}
@@ -696,7 +897,12 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
     print(f"   - Target Physical Paths ({len(target_paths)} entries):")
     for tp in target_paths:
         print(f"     * {tp}")
-    if target_db_type == 'audiobook':
+    if target_db_type == 'video':
+        print(f"   - Imported Video Courses: {imported_videos_count} / {len(videos_list)} (Skipped Duplicates: {skipped_duplicate_videos_count})")
+        print(f"   - Imported Episodes: {imported_video_episodes_count} / {len(video_episodes_list)} (Skipped Duplicates: {skipped_duplicate_episodes_count})")
+        print(f"   - Imported Video Progress: {imported_video_progress_count} / {len(video_progress_list)}")
+        print(f"   - Imported Episode Progress: {imported_video_episode_progress_count} / {len(video_episode_progress_list)}")
+    elif target_db_type == 'audiobook':
         print(f"   - Imported Audiobooks: {imported_audiobooks_count} / {len(audiobooks_list)} (Skipped Duplicates: {skipped_duplicate_audiobooks_count})")
         print(f"   - Imported Audiobook Tracks: {imported_audiobook_tracks_count} / {len(audiobook_tracks_list)} (Skipped Duplicates: {skipped_duplicate_tracks_count})")
         print(f"   - Imported Audiobook Progress: {imported_audiobook_progress_count} / {len(audiobook_progress_list)}")
@@ -736,7 +942,7 @@ def main():
     )
     parser.add_argument("-i", "--input", type=str, required=True, help="Path to input .oasis.zip package")
     parser.add_argument("-p", "--target-path", action="append", default=None, help="New target physical path(s). Can be specified multiple times (-p path1 -p path2) or comma-separated")
-    parser.add_argument("-d", "--db", choices=['general', 'adult', 'audiobook'], default=None, help="Target DB type (default: from package manifest)")
+    parser.add_argument("-d", "--db", choices=['general', 'adult', 'audiobook', 'video'], default=None, help="Target DB type (default: from package manifest)")
     parser.add_argument("-n", "--name", type=str, default=None, help="New category name when creating new category")
     parser.add_argument("-m", "--merge-to", type=str, default=None, help="Merge package into existing category (by Category ID or Category Name) instead of creating a new category")
     parser.add_argument("--info", "--inspect", action="store_true", help="Inspect package metadata, root path info, and list existing DB categories for merging")

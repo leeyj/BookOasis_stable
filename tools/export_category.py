@@ -92,11 +92,118 @@ def export_single_category(db_type, library_id, output_path=None):
     audiobook_tracks_payload = []
     audiobook_progress_payload = []
     audiobook_track_progress_payload = []
+    videos_payload = []
+    video_episodes_payload = []
+    video_progress_payload = []
+    video_episode_progress_payload = []
     user_progress_payload = []
     user_favorites_payload = []
     cover_files_to_pack = set()
 
-    if db_type == 'audiobook':
+    if db_type == 'video':
+        cursor.execute("SELECT * FROM videos WHERE library_id = ? AND (is_deleted IS NULL OR is_deleted = 0)", (library_id,))
+        video_rows = cursor.fetchall()
+        videos = [dict(r) for r in video_rows]
+        print(f"[+] Found {len(videos)} video courses in library.")
+
+        for idx, v in enumerate(videos):
+            video_id = v['id']
+            abs_folder_path = v.get('folder_path', '')
+
+            matched_root_idx = 0
+            rel_folder_path = None
+            norm_folder_path = os.path.normpath(abs_folder_path).lower() if abs_folder_path else ''
+
+            for r_idx, r_path in enumerate(root_paths):
+                norm_r_path = os.path.normpath(r_path).lower()
+                if norm_folder_path.startswith(norm_r_path):
+                    matched_root_idx = r_idx
+                    try:
+                        rel_folder_path = os.path.relpath(abs_folder_path, r_path).replace('\\', '/')
+                    except ValueError:
+                        rel_folder_path = os.path.basename(abs_folder_path)
+                    break
+
+            if rel_folder_path is None:
+                base_ref = root_paths[0] if root_paths else ""
+                try:
+                    rel_folder_path = os.path.relpath(abs_folder_path, base_ref).replace('\\', '/')
+                except ValueError:
+                    rel_folder_path = os.path.basename(abs_folder_path)
+
+            v_copy = dict(v)
+            v_copy['root_index'] = matched_root_idx
+            v_copy['relative_folder_path'] = rel_folder_path
+            videos_payload.append(v_copy)
+
+            poster = v.get('poster')
+            if poster and not str(poster).startswith(('http://', 'https://')):
+                clean_cover = str(poster).replace('\\', '/').lstrip('/')
+                cover_candidates = []
+                if os.path.isabs(poster):
+                    cover_candidates.append(poster)
+                cover_candidates.append(os.path.join(BASE_DIR, clean_cover))
+                cover_candidates.append(os.path.join(BASE_DIR, 'covers', clean_cover))
+                cover_candidates.append(os.path.join(BASE_DIR, 'covers', str(library_id), os.path.basename(clean_cover)))
+                cover_candidates.append(os.path.join(BASE_DIR, 'covers', os.path.basename(clean_cover)))
+
+                for cand in cover_candidates:
+                    norm_cand = os.path.normpath(cand)
+                    if os.path.exists(norm_cand) and os.path.isfile(norm_cand):
+                        cover_files_to_pack.add(norm_cand)
+                        break
+
+            cursor.execute(
+                "SELECT * FROM video_episodes WHERE video_id = ? ORDER BY episode_number ASC, id ASC",
+                (video_id,)
+            )
+            episode_rows = cursor.fetchall()
+            episode_num_map = {}
+            for ep in episode_rows:
+                epd = dict(ep)
+                episode_num_map[int(epd['id'])] = int(epd.get('episode_number') or 0)
+                episode_path = epd.get('file_path', '')
+                rel_episode_path = None
+                selected_root = root_paths[matched_root_idx] if root_paths and matched_root_idx < len(root_paths) else ''
+                if episode_path:
+                    if selected_root:
+                        try:
+                            rel_episode_path = os.path.relpath(episode_path, selected_root).replace('\\', '/')
+                        except Exception:
+                            rel_episode_path = os.path.basename(episode_path)
+                    else:
+                        rel_episode_path = os.path.basename(episode_path)
+                else:
+                    rel_episode_path = ''
+
+                epd['video_export_index'] = idx
+                epd['root_index'] = matched_root_idx
+                epd['relative_path'] = rel_episode_path
+                video_episodes_payload.append(epd)
+
+            cursor.execute("SELECT * FROM video_progress WHERE video_id = ?", (video_id,))
+            vprog_rows = cursor.fetchall()
+            if vprog_rows:
+                for vp in vprog_rows:
+                    vpd = dict(vp)
+                    vpd['video_export_index'] = idx
+                    curr_eid = vpd.get('current_episode_id')
+                    vpd['current_episode_number'] = episode_num_map.get(int(curr_eid), 0) if curr_eid else 0
+                    video_progress_payload.append(vpd)
+
+            cursor.execute(
+                "SELECT * FROM video_episode_progress WHERE video_id = ?",
+                (video_id,),
+            )
+            for progress in cursor.fetchall():
+                progress_data = dict(progress)
+                progress_data['video_export_index'] = idx
+                progress_data['episode_number'] = episode_num_map.get(
+                    int(progress_data.get('episode_id') or 0),
+                    0,
+                )
+                video_episode_progress_payload.append(progress_data)
+    elif db_type == 'audiobook':
         cursor.execute("SELECT * FROM audiobooks WHERE library_id = ? AND (is_deleted IS NULL OR is_deleted = 0)", (library_id,))
         audiobook_rows = cursor.fetchall()
         audiobooks = [dict(r) for r in audiobook_rows]
@@ -301,7 +408,7 @@ def export_single_category(db_type, library_id, output_path=None):
         "export_version": "2.0",
         "created_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "db_type": db_type,
-        "media_kind": "audiobook" if db_type == 'audiobook' else "book",
+        "media_kind": "video" if db_type == 'video' else ("audiobook" if db_type == 'audiobook' else "book"),
         "library_id": library_id,
         "library_name": lib_name,
         "root_paths_count": len(root_paths),
@@ -310,6 +417,10 @@ def export_single_category(db_type, library_id, output_path=None):
         "audiobook_tracks_count": len(audiobook_tracks_payload),
         "audiobook_progress_count": len(audiobook_progress_payload),
         "audiobook_track_progress_count": len(audiobook_track_progress_payload),
+        "videos_count": len(videos_payload),
+        "video_episodes_count": len(video_episodes_payload),
+        "video_progress_count": len(video_progress_payload),
+        "video_episode_progress_count": len(video_episode_progress_payload),
         "user_progress_count": len(user_progress_payload),
         "user_favorites_count": len(user_favorites_payload),
         "covers_count": len(cover_files_to_pack)
@@ -337,6 +448,10 @@ def export_single_category(db_type, library_id, output_path=None):
         "audiobook_tracks": audiobook_tracks_payload,
         "audiobook_progress": audiobook_progress_payload,
         "audiobook_track_progress": audiobook_track_progress_payload,
+        "videos": videos_payload,
+        "video_episodes": video_episodes_payload,
+        "video_progress": video_progress_payload,
+        "video_episode_progress": video_episode_progress_payload,
         "user_progress": user_progress_payload,
         "user_favorites": user_favorites_payload
     }
@@ -363,7 +478,11 @@ def export_single_category(db_type, library_id, output_path=None):
     print(f"✨ Category Export Successfully Completed!")
     print(f"   - Export File: {final_output_path} ({file_size_mb:.2f} MB)")
     print(f"   - Category Name: {lib_name} (ID: {library_id})")
-    if db_type == 'audiobook':
+    if db_type == 'video':
+        print(f"   - Total Video Courses: {len(videos_payload)} items")
+        print(f"   - Total Episodes: {len(video_episodes_payload)} items")
+        print(f"   - Total Progress Rows: {len(video_progress_payload)} items")
+    elif db_type == 'audiobook':
         print(f"   - Total Audiobooks: {len(audiobooks_payload)} items")
         print(f"   - Total Tracks: {len(audiobook_tracks_payload)} items")
         print(f"   - Total Progress Rows: {len(audiobook_progress_payload)} items")
@@ -396,7 +515,7 @@ def export_categories(db_type, raw_library_ids, output_path=None):
 
 def main():
     parser = argparse.ArgumentParser(description="BookOasis Category Export CLI Tool (Multi-path & Batch Export Supported)")
-    parser.add_argument("-d", "--db", choices=['general', 'adult', 'audiobook'], default='general', help="Target Database (general, adult, audiobook)")
+    parser.add_argument("-d", "--db", choices=['general', 'adult', 'audiobook', 'video'], default='general', help="Target Database (general, adult, audiobook, video)")
     parser.add_argument("-l", "--library-id", nargs='+', required=True, help="Library ID(s) to export. Multiple IDs or comma-separated supported (e.g. -l 15 18 21)")
     parser.add_argument("-o", "--output", type=str, default=None, help="Output .oasis.zip file or destination directory path")
 

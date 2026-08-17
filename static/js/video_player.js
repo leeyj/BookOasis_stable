@@ -130,6 +130,42 @@ function renderPlayerModal(startTime = 0) {
     saveProgress(true, false);
     if (hasNext) playEpisodeAtIndex(currentEpisodeIndex + 1);
   });
+
+  initMediaSession(currentMeta, episode, videoEl, hasPrev, hasNext);
+}
+
+function initMediaSession(meta, episode, videoEl, hasPrev, hasNext) {
+  if (!('mediaSession' in navigator)) return;
+
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: `#${episode.episode_number} ${episode.title}`,
+    artist: meta.series_name || meta.title || 'BookOasis',
+    album: meta.series_name || meta.title || 'Video Course',
+    artwork: meta.cover_image ? [{ src: meta.cover_image }] : []
+  });
+
+  navigator.mediaSession.setActionHandler('play', () => videoEl.play());
+  navigator.mediaSession.setActionHandler('pause', () => videoEl.pause());
+  navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+    videoEl.currentTime = Math.max(0, videoEl.currentTime - (details.seekOffset ?? 15));
+  });
+  navigator.mediaSession.setActionHandler('seekforward', (details) => {
+    videoEl.currentTime = videoEl.currentTime + (details.seekOffset ?? 15);
+  });
+  navigator.mediaSession.setActionHandler('previoustrack', hasPrev ? () => playEpisodeAtIndex(currentEpisodeIndex - 1) : null);
+  navigator.mediaSession.setActionHandler('nexttrack', hasNext ? () => playEpisodeAtIndex(currentEpisodeIndex + 1) : null);
+
+  try {
+    navigator.mediaSession.setActionHandler('seekto', (details) => {
+      if (details.seekTime != null) videoEl.currentTime = details.seekTime;
+    });
+  } catch (e) {}
+
+  const syncPlaybackState = () => {
+    navigator.mediaSession.playbackState = videoEl.paused ? 'paused' : 'playing';
+  };
+  videoEl.addEventListener('play', syncPlaybackState);
+  videoEl.addEventListener('pause', syncPlaybackState);
 }
 
 function playEpisodeAtIndex(index) {

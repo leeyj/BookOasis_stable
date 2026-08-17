@@ -83,6 +83,32 @@ CREATE TABLE audiobook_track_progress (
     progress_pct REAL, is_completed INTEGER, updated_at TEXT,
     UNIQUE(audiobook_id, track_id, user_id)
 );
+CREATE TABLE videos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, library_id INTEGER, title TEXT,
+    sort_title TEXT, web_id TEXT, genres TEXT, poster TEXT, backdrop TEXT,
+    premiered TEXT, description TEXT, folder_name TEXT, folder_path TEXT UNIQUE,
+    total_duration REAL, total_episodes INTEGER, is_favorite INTEGER DEFAULT 0,
+    created_at TEXT, updated_at TEXT, is_deleted INTEGER DEFAULT 0, deleted_at TEXT
+);
+CREATE TABLE video_episodes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, video_id INTEGER,
+    episode_number INTEGER, episode_code TEXT, title TEXT, filename TEXT,
+    file_path TEXT UNIQUE, file_mtime REAL, file_size INTEGER, duration REAL,
+    width INTEGER, height INTEGER, premiered TEXT, format TEXT,
+    needs_transcode INTEGER DEFAULT 0, subtitle_path TEXT
+);
+CREATE TABLE video_progress (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, video_id INTEGER, user_id INTEGER,
+    current_episode_id INTEGER, current_time REAL, total_progress_pct REAL,
+    playback_rate REAL, is_completed INTEGER, last_watched_at TEXT,
+    UNIQUE(video_id, user_id)
+);
+CREATE TABLE video_episode_progress (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, video_id INTEGER,
+    episode_id INTEGER, user_id INTEGER, current_time REAL,
+    progress_pct REAL, is_completed INTEGER, updated_at TEXT,
+    UNIQUE(video_id, episode_id, user_id)
+);
 """
 
 
@@ -277,6 +303,107 @@ class CategoryMigrationToolsTest(unittest.TestCase):
             self.assertEqual(audiobook['web_id'], 'WEB-1')
             self.assertEqual(track['filename'], '01.mp3')
             self.assertEqual(tuple(progress), (95.0, 1))
+
+    def test_video_category_v2_round_trip(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            tmp_path = Path(temp_dir)
+            source_db = tmp_path / "source_video.db"
+            target_db = tmp_path / "target_video.db"
+            source = connect(source_db)
+            source.executescript(SCHEMA)
+            source.execute(
+                "INSERT INTO libraries (name, physical_path) VALUES ('Video', ?)",
+                (str(tmp_path / "source_video"),),
+            )
+            source.execute(
+                """
+                INSERT INTO videos (
+                    library_id, title, web_id, folder_name, folder_path,
+                    total_duration, total_episodes, is_deleted
+                ) VALUES (1, 'Course', 'WEB-V1', 'Course', ?, 200, 1, 0)
+                """,
+                (str(tmp_path / "source_video" / "Course"),),
+            )
+            source.execute(
+                """
+                INSERT INTO video_episodes (
+                    video_id, episode_number, filename, file_path,
+                    duration, format
+                ) VALUES (1, 1, 'S01E01.mp4', ?, 200, 'mp4')
+                """,
+                (str(tmp_path / "source_video" / "Course" / "S01E01.mp4"),),
+            )
+            source.execute(
+                """
+                INSERT INTO video_progress (
+                    video_id, user_id, current_episode_id, current_time,
+                    total_progress_pct, playback_rate, is_completed
+                ) VALUES (1, 1, 1, 95, 95, 1, 0)
+                """
+            )
+            source.execute(
+                """
+                INSERT INTO video_episode_progress (
+                    video_id, episode_id, user_id, current_time,
+                    progress_pct, is_completed
+                ) VALUES (1, 1, 1, 95, 95, 1)
+                """
+            )
+            source.commit()
+            source.close()
+
+            target = connect(target_db)
+            target.executescript(SCHEMA)
+            target.commit()
+            target.close()
+
+            package_path = tmp_path / "video.oasis.zip"
+            with mock.patch.object(export_category, "BASE_DIR", str(tmp_path / "source_root")), mock.patch.object(
+                export_category,
+                "get_db_connection",
+                side_effect=lambda _db_type: connect(source_db),
+            ):
+                self.assertTrue(
+                    export_category.export_single_category("video", 1, str(package_path))
+                )
+
+            with zipfile.ZipFile(package_path) as package:
+                manifest = json.loads(package.read("manifest.json"))
+            self.assertEqual(manifest["media_kind"], "video")
+            self.assertEqual(manifest["videos_count"], 1)
+            self.assertEqual(manifest["video_episodes_count"], 1)
+
+            with mock.patch.object(import_category, "BASE_DIR", str(tmp_path / "target_root")), mock.patch.object(
+                import_category,
+                "get_db_connection",
+                side_effect=lambda _db_type: connect(target_db),
+            ):
+                import_category.import_category(
+                    str(package_path),
+                    [str(tmp_path / "target_video")],
+                    db_type="video",
+                    name="Imported Video",
+                )
+
+            result = connect(target_db)
+            video = result.execute(
+                "SELECT web_id FROM videos WHERE title = 'Course'"
+            ).fetchone()
+            episode = result.execute(
+                "SELECT id, filename FROM video_episodes WHERE episode_number = 1"
+            ).fetchone()
+            progress = result.execute(
+                "SELECT progress_pct, is_completed FROM video_episode_progress"
+            ).fetchone()
+            video_progress = result.execute(
+                "SELECT current_episode_id FROM video_progress"
+            ).fetchone()
+            result.close()
+
+            self.assertEqual(video['web_id'], 'WEB-V1')
+            self.assertEqual(episode['filename'], 'S01E01.mp4')
+            self.assertEqual(tuple(progress), (95.0, 1))
+            self.assertEqual(video_progress['current_episode_id'], episode['id'])
 
 
 if __name__ == "__main__":
