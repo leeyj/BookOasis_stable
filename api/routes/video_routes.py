@@ -18,6 +18,18 @@ except Exception:
 
 video_bp = Blueprint('video_api', __name__)
 
+
+def _is_safari_or_ios(user_agent):
+    """Safari(코덱과 무관하게 mkv 컨테이너 자체를 열 수 없음) 또는 iOS(App Store 정책상
+    Chrome/Firefox 등도 전부 WebKit 기반이라 동일 제약)인지 판별한다.
+    UA에 'Safari'가 포함된 브라우저가 많으므로(Chrome/Edge 등) 배타 토큰으로 반드시 걸러야 한다."""
+    ua = (user_agent or '').lower()
+    is_ios = any(token in ua for token in ('iphone', 'ipad', 'ipod'))
+    is_desktop_safari = 'safari' in ua and not any(
+        token in ua for token in ('chrome', 'chromium', 'crios', 'edg', 'opr', 'firefox', 'fxios')
+    )
+    return is_ios or is_desktop_safari
+
 VIDEO_MIMETYPE_MAP = {
     'mkv': 'video/x-matroska',
     'mp4': 'video/mp4',
@@ -82,7 +94,7 @@ def _send_video_range_response(file_path):
             rv = Response(status=416)
             rv.headers.add('Content-Range', f'bytes */{file_size}')
             rv.headers.add('Accept-Ranges', 'bytes')
-            rv.headers.add('Cache-Control', 'no-transform')
+            rv.headers.add('Cache-Control', 'no-store, no-transform')
             return rv
 
         length = byte2 - byte1 + 1
@@ -97,7 +109,7 @@ def _send_video_range_response(file_path):
         rv.headers.add('Content-Range', f'bytes {byte1}-{byte2}/{file_size}')
         rv.headers.add('Accept-Ranges', 'bytes')
         rv.headers.add('Content-Length', str(length))
-        rv.headers.add('Cache-Control', 'no-transform')
+        rv.headers.add('Cache-Control', 'no-store, no-transform')
         return rv
 
     else:
@@ -110,7 +122,7 @@ def _send_video_range_response(file_path):
         )
         rv.headers.add('Accept-Ranges', 'bytes')
         rv.headers.add('Content-Length', str(file_size))
-        rv.headers.add('Cache-Control', 'no-transform')
+        rv.headers.add('Cache-Control', 'no-store, no-transform')
         return rv
 
 
@@ -357,19 +369,87 @@ def stream_video_episode(vid, eid):
     # needs_transcode를 확정하고 DB에도 반영한다(이후 요청/Lazy 백필은 이 값을 그대로 재사용).
     if not row.get('needs_transcode') and float(row.get('duration') or 0) <= 0:
         from services.video_scanner import _probe_video_info, is_browser_compatible
-        duration, width, height, vcodec, acodec = _probe_video_info(row['file_path'])
+        duration, width, height, vcodec, acodec, format_name = _probe_video_info(row['file_path'])
         if duration > 0:
-            computed_needs_transcode = 0 if is_browser_compatible(row['file_path'], vcodec, acodec) else 1
+            computed_needs_transcode = 0 if is_browser_compatible(row['file_path'], vcodec, acodec, format_name) else 1
             try:
                 VideoRepository.update_episode_probe_result(eid, vid, duration, width, height, computed_needs_transcode)
             except Exception as e:
                 print(f"[Video-Stream] JIT 코덱 분석 결과 저장 실패 (vid={vid} ep={eid}): {e}")
             row['needs_transcode'] = computed_needs_transcode
 
-    if not row.get('needs_transcode'):
+    # needs_transcode는 DB에 전역 1개 값으로 저장되어(요청자 브라우저와 무관), mkv 컨테이너가
+    # Chrome/Edge 기준으로 "호환"이라 needs_transcode=0으로 확정된 뒤에도 Safari/iOS는 코덱과
+    # 무관하게 mkv 컨테이너 자체를 열지 못해 재생이 아예 실패한다(화면 잠금과 무관, 첫 재생부터
+    # 실패). 저장된 값과 무관하게 Safari/iOS + mkv 조합에서만 요청 단위로 강제 트랜스코딩한다.
+    file_ext = os.path.splitext(row['file_path'])[1].lstrip('.').lower()
+    ua = request.headers.get('User-Agent')
+    force_transcode_for_safari_mkv = file_ext == 'mkv' and _is_safari_or_ios(ua)
+    needs_any_transcode = bool(row.get('needs_transcode')) or force_transcode_for_safari_mkv
+    is_safari_ios = _is_safari_or_ios(ua)
+    print(f"[Video-Stream] vid={vid} ep={eid} ext={file_ext} needs_transcode={row.get('needs_transcode')} "
+          f"force_safari_mkv={force_transcode_for_safari_mkv} is_safari_ios={is_safari_ios} ua={ua}")
+
+    if not needs_any_transcode:
         return _send_video_range_response(row['file_path'])
 
+    # iOS Safari의 기본 <video> 재생 엔진은 우리 기존 트랜스코딩 방식(Content-Length 없는
+    # 청크 스트림 + fragmented MP4를 pipe:1로 직결)을 사실상 지원하지 않는다(MediaError
+    # code 4, MEDIA_ERR_SRC_NOT_SUPPORTED - 실사용자 리포트로 확인). mkv 컨테이너 문제와
+    # 별개로, "트랜스코딩이 필요한 모든 경우"에 Safari/iOS는 HLS(m3u8) 경로로 보낸다 -
+    # Safari는 HLS를 <video src="....m3u8">만으로 네이티브 지원한다. Chrome/Edge/Android는
+    # 기존 pipe 트랜스코딩 경로를 그대로 사용(이미 커뮤니티에서 정상 동작 확인됨).
+    if is_safari_ios:
+        return _stream_hls_for_safari(row['file_path'], vid, eid)
+
     return _stream_transcoded_video(row['file_path'], vid, eid)
+
+
+def _stream_hls_for_safari(file_path, vid, eid):
+    """Safari/iOS 전용: 온디맨드 HLS(m3u8) 생성을 보장하고 플레이리스트를 반환한다."""
+    from services import video_hls_service as hls
+    from services.settings_service import SettingsService
+
+    device_path = SettingsService.get('FFMPEG_VAAPI_DEVICE', '/dev/dri/renderD128') or '/dev/dri/renderD128'
+    use_vaapi = _detect_vaapi_available(device_path)
+    default_args = DEFAULT_VAAPI_TRANSCODE_ARGS if use_vaapi else DEFAULT_CPU_TRANSCODE_ARGS
+    setting_key = 'FFMPEG_VAAPI_ARGS' if use_vaapi else 'FFMPEG_TRANSCODE_ARGS'
+    args_str = SettingsService.get(setting_key, '') or default_args
+
+    try:
+        extra_args = shlex.split(args_str)
+    except ValueError as e:
+        return jsonify({'success': False, 'error': f'{setting_key} 파싱 실패: {e}'}), 500
+
+    hls.ensure_hls_generation(eid, file_path, use_vaapi, device_path, extra_args)
+    manifest = hls.wait_for_playlist(eid)
+    if manifest is None:
+        return jsonify({'success': False, 'error': 'HLS 스트림 준비 중입니다. 잠시 후 다시 시도해주세요.'}), 503
+
+    segment_base_url = f"/api/media/videos/{vid}/episodes/{eid}/hls-segment/"
+    rewritten = hls.rewrite_playlist_segment_urls(manifest, segment_base_url)
+
+    rv = Response(rewritten, 200, mimetype='application/vnd.apple.mpegurl', content_type='application/vnd.apple.mpegurl')
+    rv.headers.add('Cache-Control', 'no-store')
+    return rv
+
+
+@video_bp.route('/api/media/videos/<int:vid>/episodes/<int:eid>/hls-segment/<segment_name>', methods=['GET'])
+@login_required
+def stream_video_hls_segment(vid, eid, segment_name):
+    """Safari/iOS HLS 재생용 개별 .ts 세그먼트 서빙."""
+    if not _has_video_library_access(vid):
+        return jsonify({'success': False, 'error': '영상 강좌 접근 권한이 없습니다.'}), 403
+
+    from services import video_hls_service as hls
+    path = hls.get_segment_path(eid, segment_name)
+    if not path:
+        return jsonify({'success': False, 'error': 'Segment not found'}), 404
+
+    from flask import send_file
+    rv = send_file(path, mimetype='video/mp2t', conditional=True)
+    rv.headers['Cache-Control'] = 'no-store'
+    return rv
 
 
 @video_bp.route('/api/media/videos/<int:vid>/episodes/<int:eid>/subtitle', methods=['GET'])

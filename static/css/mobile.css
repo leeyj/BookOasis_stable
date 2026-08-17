@@ -54,6 +54,14 @@
     min-height: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
+    /* iOS Safari가 백그라운드(화면 잠금, 탭 전환 등) 복귀 시 정적인 헤더 영역의
+       리페인트를 누락하는 버그가 있다(JS로 토글하는 강제 리페인트 넛지를 여러 번
+       시도했으나 실기기에서 재현이 계속됨, 2026-08-17). 토글 방식 대신 헤더를 처음
+       부터 계속 자체 컴포지팅 레이어로 승격시켜두면, 복귀 시 전체 래스터화 대신
+       레이어 재합성만 하면 되어 이 버그를 원천적으로 피할 가능성이 높다. */
+    transform: translate3d(0, 0, 0);
+    -webkit-transform: translate3d(0, 0, 0);
+    will-change: transform;
 }
 
 .sidebar-title {
@@ -65,16 +73,15 @@
 }
 
 /* 햄버거 토글 버튼 노출 및 데스크톱 버튼 숨김 */
-/* html/body가 overflow:hidden인 앱쉘 구조라 안드로이드 네이티브 핀치줌 확대 후에는
-   문서를 팬(pan)할 스크롤 여유가 없어, 사이드바 안쪽에 있던 버튼이 화면 이동으로는
-   닿지 않는 위치가 될 수 있었다. 레이아웃 흐름에서 완전히 분리해 항상 같은 화면
-   좌표에 고정시켜 확대 상태와 무관하게 탭 가능하도록 한다.
+/* 예전엔 position:fixed로 화면에 고정해서 확대 상태와 무관하게 탭 가능하게 했었으나
+   (html/body가 overflow:hidden인 앱쉘 구조라 핀치줌 후 팬해도 스크롤로 못 찾아가는
+   문제 때문), 그 방식이 오히려 visualViewport 추적 JS와 얽히며 흔들림/사라짐 등 새
+   버그를 반복 유발했다(2026-08-17). BookOasis 로고 옆 일반 문서 흐름으로 되돌려
+   JS 위치 추적을 완전히 제거 — 확대 후 헤더 밖으로 팬하면 버튼도 같이 화면 밖으로
+   나갈 수 있지만, 이건 사진을 확대했을 때 가장자리가 잘리는 것과 같은 정상적이고
+   되돌리기 쉬운 동작이라 "항상 떠있어야 하는데 사라지는" 이전 버그보다 낫다.
    (뷰어 모달은 z-index:1200 + 불투명에 가까운 배경이라 뷰어가 열리면 자연히 가려짐) */
 .btn-sidebar-toggle {
-    position: fixed !important;
-    top: calc(env(safe-area-inset-top, 0px) + 30px);
-    right: 22px;
-    z-index: 500;
     display: flex !important; /* HTML 인라인 display: none 오버라이드 */
     align-items: center;
     justify-content: center;
@@ -84,6 +91,7 @@
     border: 1px solid var(--app-border) !important;
     border-radius: 8px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+    flex-shrink: 0;
 }
 .btn-sidebar-toggle-desktop {
     display: none !important; /* HTML 인라인 display: flex 오버라이드 */

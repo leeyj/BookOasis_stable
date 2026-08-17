@@ -1,5 +1,7 @@
 // static/js/video_player.js - 영상 강좌 재생 모달 (네이티브 <video controls> 기반, 최소 통합 스코프)
 // audio_player.js::openAudioPlayer()와 동일하게 공용 상세 API(/api/media/detail)를 직접 fetch해서 연다.
+import { remoteLog } from './remote_log.js';
+
 let currentMeta = null;
 let currentEpisodes = [];
 let currentEpisodeIndex = -1;
@@ -76,7 +78,7 @@ function renderPlayerModal(startTime = 0) {
         </div>
         <button data-role="video-player-close" style="background:none; border:none; color:#94a3b8; font-size:1.6rem; cursor:pointer;">&times;</button>
       </div>
-      <video id="video-player-el" controls autoplay style="width:100%; max-height:70vh; background:#000; border-radius:8px;"
+      <video id="video-player-el" controls autoplay playsinline webkit-playsinline style="width:100%; max-height:70vh; background:#000; border-radius:8px;"
              src="/api/media/videos/${currentMeta.id}/episodes/${episode.id}/stream">${episode.has_subtitle ? `<track kind="subtitles" src="/api/media/videos/${currentMeta.id}/episodes/${episode.id}/subtitle" srclang="ko" label="자막" default>` : ''}</video>
       <div style="display:flex; justify-content:center; align-items:center; gap:0.8rem;">
         <button data-role="video-player-prev" ${hasPrev ? '' : 'disabled'} title="이전 회차" style="${transportBtnStyle(hasPrev)} width:3rem; height:3rem;">
@@ -118,6 +120,26 @@ function renderPlayerModal(startTime = 0) {
   videoEl.addEventListener('pause', syncToggleIcon);
   videoEl.addEventListener('canplay', syncToggleIcon, { once: true });
 
+  // iOS에서 재생이 아예 시작 안 되는 문제를 실기기에서 진단하기 위한 원격 로깅.
+  // MediaError.code로 원인을 구분할 수 있다: 1=중단, 2=네트워크, 3=디코딩 실패,
+  // 4=MEDIA_ERR_SRC_NOT_SUPPORTED(포맷/컨테이너 자체를 브라우저가 지원 안 함 - mkv
+  // 컨테이너 미지원이 원인이라면 이 코드가 찍힐 가능성이 높다).
+  videoEl.addEventListener('error', () => {
+    const err = videoEl.error;
+    remoteLog('video-error', {
+      code: err ? err.code : null,
+      message: err ? err.message : null,
+      src: videoEl.currentSrc,
+      networkState: videoEl.networkState,
+      readyState: videoEl.readyState
+    });
+  });
+  videoEl.addEventListener('loadstart', () => remoteLog('video-loadstart', { src: videoEl.currentSrc }));
+  videoEl.addEventListener('loadedmetadata', () => remoteLog('video-loadedmetadata', { duration: videoEl.duration }));
+  videoEl.addEventListener('canplay', () => remoteLog('video-canplay', {}), { once: true });
+  videoEl.addEventListener('stalled', () => remoteLog('video-stalled', { currentTime: videoEl.currentTime }));
+  videoEl.addEventListener('suspend', () => remoteLog('video-suspend', { currentTime: videoEl.currentTime }));
+
   if (startTime > 0) {
     videoEl.addEventListener('loadedmetadata', () => {
       videoEl.currentTime = startTime;
@@ -129,6 +151,17 @@ function renderPlayerModal(startTime = 0) {
   videoEl.addEventListener('ended', () => {
     saveProgress(true, false);
     if (hasNext) playEpisodeAtIndex(currentEpisodeIndex + 1);
+  });
+
+  // episode 메타데이터를 await fetch()로 가져온 뒤 이 모달을 렌더링하므로, 원래 클릭했던
+  // 사용자 제스처 컨텍스트가 이미 끊겨 있다. 그 상태에서 HTML의 autoplay 속성에만
+  // 의존하면 iOS Safari 등 엄격한 브라우저에서 소리 있는 자동재생이 조용히 차단되어
+  // 아예 재생이 시작되지 않는 경우가 있다. play()를 명시적으로 한 번 더 호출해서 결과를
+  // 확인하고, 차단됐다면(Promise reject) 콘솔에 남겨 진단 가능하게 한다 — 이 경우
+  // canplay 시점에 실행되는 syncToggleIcon이 '재생' 아이콘으로 정확히 되돌려주므로
+  // 사용자가 직접 탭해서 시작할 수 있다.
+  videoEl.play().catch((err) => {
+    console.warn('[VideoPlayer] Autoplay blocked, waiting for manual tap:', err);
   });
 
   initMediaSession(currentMeta, episode, videoEl, hasPrev, hasNext);

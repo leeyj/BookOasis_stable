@@ -6,6 +6,7 @@ import os
 import sys
 import sqlite3
 import re
+import html
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -33,7 +34,9 @@ try:
         init_databases,
         get_connection,
         auto_migrate_schema,
-        cleanup_legacy_fts_index
+        cleanup_legacy_fts_index,
+        _SCHEMA_SQL,
+        _INDEXES_SQL
     )
 except ImportError as e:
     print(f"[오류] database.py 모듈을 임포트할 수 없습니다: {e}")
@@ -256,6 +259,7 @@ CREATE TABLE IF NOT EXISTS video_episodes (
     format VARCHAR(50) DEFAULT 'mp4',
     needs_transcode INT DEFAULT 0,
     subtitle_path TEXT,
+    container_verified INT DEFAULT 0,
     UNIQUE KEY uq_video_episodes_file_path (file_path(500)),
     INDEX idx_video_episodes_video_id (video_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
@@ -441,6 +445,75 @@ def _backfill_audiobook_last_listened_at_sqlite(conn):
         print(f"  [경고] SQLite audiobook_progress last_listened_at 보정 실패: {e}")
 
 
+def _backfill_html_entities_video_titles_sqlite(conn):
+    """videos.title/description, video_episodes.title에 남아있는 미해제 HTML 엔티티
+    (예: '&lt;강좌명&gt;')를 1회성으로 정리한다.
+
+    show.yaml을 생성하는 외부(커뮤니티) 스크래핑 도구 상당수가 강좌 플랫폼 웹페이지에서
+    긁어온 제목/설명의 HTML 엔티티를 디코딩하지 않고 그대로 저장해, 이미 스캔된 기존
+    데이터에 '&lt;', '&amp;', '&#x27;' 같은 원문이 섞여 있는 경우가 있었다. video_scanner.py의
+    show.yaml 파싱 단계는 이제 html.unescape()를 적용하지만, 그건 앞으로의 신규 스캔에만
+    적용되므로 이미 저장된 기존 행은 별도로 여기서 보정해야 한다."""
+    try:
+        cur = conn.cursor()
+        changed = 0
+        cur.execute("SELECT id, title, description FROM videos WHERE title LIKE '%&%;%' OR description LIKE '%&%;%'")
+        for row in cur.fetchall():
+            new_title = html.unescape(row['title'] or '')
+            new_desc = html.unescape(row['description'] or '')
+            if new_title != row['title'] or new_desc != row['description']:
+                cur.execute("UPDATE videos SET title = ?, description = ? WHERE id = ?", (new_title, new_desc, row['id']))
+                changed += 1
+        conn.commit()
+
+        ep_changed = 0
+        cur.execute("SELECT id, title FROM video_episodes WHERE title LIKE '%&%;%'")
+        for row in cur.fetchall():
+            new_title = html.unescape(row['title'] or '')
+            if new_title != row['title']:
+                cur.execute("UPDATE video_episodes SET title = ? WHERE id = ?", (new_title, row['id']))
+                ep_changed += 1
+        conn.commit()
+
+        if changed > 0 or ep_changed > 0:
+            print(f"  [+] SQLite video HTML 엔티티 제목 보정 완료: videos {changed}건, video_episodes {ep_changed}건")
+    except Exception as e:
+        print(f"  [경고] SQLite video HTML 엔티티 제목 보정 실패: {e}")
+
+
+def _backfill_html_entities_video_titles_mariadb():
+    """videos.title/description, video_episodes.title의 미해제 HTML 엔티티를 1회성으로 정리한다
+    (SQLite 버전과 동일한 이유 — 위 _backfill_html_entities_video_titles_sqlite 참고)."""
+    try:
+        from tools.migrator_sqlite_to_mariadb import connect_mariadb
+        conn = connect_mariadb('media_video')
+        cur = conn.cursor()
+        changed = 0
+        cur.execute("SELECT id, title, description FROM videos WHERE title LIKE '%&%;%' OR description LIKE '%&%;%'")
+        for row in cur.fetchall():
+            new_title = html.unescape(row['title'] or '')
+            new_desc = html.unescape(row['description'] or '')
+            if new_title != row['title'] or new_desc != row['description']:
+                cur.execute("UPDATE videos SET title = %s, description = %s WHERE id = %s", (new_title, new_desc, row['id']))
+                changed += 1
+        conn.commit()
+
+        ep_changed = 0
+        cur.execute("SELECT id, title FROM video_episodes WHERE title LIKE '%&%;%'")
+        for row in cur.fetchall():
+            new_title = html.unescape(row['title'] or '')
+            if new_title != row['title']:
+                cur.execute("UPDATE video_episodes SET title = %s WHERE id = %s", (new_title, row['id']))
+                ep_changed += 1
+        conn.commit()
+
+        if changed > 0 or ep_changed > 0:
+            print(f"  [+] MariaDB video HTML 엔티티 제목 보정 완료: videos {changed}건, video_episodes {ep_changed}건")
+        conn.close()
+    except Exception as e:
+        print(f"  [경고] MariaDB video HTML 엔티티 제목 보정 실패: {e}")
+
+
 def _backfill_audiobook_last_listened_at_mariadb():
     """MariaDB audiobook_progress의 last_listened_at 누락분 보정"""
     try:
@@ -535,6 +608,7 @@ def _ensure_mariadb_columns():
         ('media_audiobook', 'collection_items', 'video_id', 'BIGINT DEFAULT NULL'),
         ('media_video', 'video_episodes', 'needs_transcode', 'INT DEFAULT 0'),
         ('media_video', 'video_episodes', 'subtitle_path', 'TEXT'),
+        ('media_video', 'video_episodes', 'container_verified', 'INT DEFAULT 0'),
     ]
 
     for db_name, tbl, col_name, col_def in required_columns:
@@ -610,6 +684,7 @@ def run_schema_update():
             _ensure_mariadb_columns()
             _ensure_mariadb_indexes()
             _backfill_audiobook_last_listened_at_mariadb()
+            _backfill_html_entities_video_titles_mariadb()
             print("[+] MariaDB 데이터베이스, 스키마 및 고속 복합 인덱스 검사 완료.")
         except Exception as ex:
             print(f"[!] MariaDB 스키마 검사 중 경고: {ex}")
@@ -640,19 +715,14 @@ def run_schema_update():
 
     print("\n[*] 2단계: 개별 데이터베이스 강제 스키마 갱신 및 WAL 정리 시작...")
 
-    try:
-        with open(os.path.join(PROJECT_ROOT, 'database.py'), 'r', encoding='utf-8') as f:
-            content = f.read()
-
-        schema_match = re.search(r'schema\s*=\s*"""(.*?)"""', content, re.DOTALL)
-        indexes_match = re.search(r'indexes_schema\s*=\s*"""(.*?)"""', content, re.DOTALL)
-
-        schema_text = schema_match.group(1) if schema_match else ""
-        indexes_text = indexes_match.group(1) if indexes_match else ""
-    except Exception as parse_err:
-        print(f"[경고] database.py 파일 분석 실패: {parse_err}")
-        schema_text = None
-        indexes_text = None
+    # 예전엔 database.py 소스 텍스트를 정규식(re.search)으로 긁어 schema/indexes_schema
+    # 변수를 찾았으나, 이는 database.py의 정확한 변수명에 암묵적으로 의존하는 취약한 결합이었다
+    # (실제로 database.py의 init_databases() 리팩터링 중 지역 변수 schema/indexes_schema가
+    # 모듈 상수 _SCHEMA_SQL/_INDEXES_SQL로 이름이 바뀌면서 이 정규식이 아무 것도 매칭하지
+    # 못해 SQLite 모드의 자동 컬럼 보강/인덱스 생성이 조용히 스킵되는 회귀가 발생했었다).
+    # database.py에서 직접 import해서 항상 실제 값과 동기화되도록 수정.
+    schema_text = _SCHEMA_SQL
+    indexes_text = _INDEXES_SQL
 
     for db_key, db_path in [('general', DB_GENERAL_PATH), ('adult', DB_ADULT_PATH), ('audiobook', DB_AUDIOBOOK_PATH), ('video', DB_VIDEO_PATH)]:
         if not os.path.exists(db_path):
@@ -681,6 +751,10 @@ def run_schema_update():
             if db_key == 'audiobook':
                 print(f"  - audiobook_progress last_listened_at 누락분 보정 중...")
                 _backfill_audiobook_last_listened_at_sqlite(conn)
+
+            if db_key == 'video':
+                print(f"  - video/video_episodes HTML 엔티티 제목 보정 중...")
+                _backfill_html_entities_video_titles_sqlite(conn)
 
             if indexes_text:
                 print(f"  - 스키마 내 누락 인덱스 자동 생성 중...")

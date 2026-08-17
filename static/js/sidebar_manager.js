@@ -1,4 +1,6 @@
 // sidebar_manager.js – 모바일/데스크톱 사이드바 토글 및 상태 유지 관리
+import { remoteLog } from './remote_log.js';
+
 let lastToggleTime = 0;
 const MOBILE_BREAKPOINT = 1200;
 
@@ -36,6 +38,31 @@ export function syncSidebarResponsiveControls() {
       brandHome.removeAttribute('aria-label');
     }
   }
+
+  // 상단 헤더(로고+햄버거)가 간헐적으로 영영 안 보인다는 리포트를 진단하기 위한 임시
+  // 원격 로깅. display 값만으로는 "논리적으로는 정상인데 실제 화면엔 안 그려짐"과
+  // "부모 요소가 찌그러져서 실제 크기가 0"을 구분할 수 없어, getBoundingClientRect로
+  // 실제 렌더링된 위치/크기까지 함께 남긴다.
+  const header = document.querySelector('.sidebar-header-wrapper');
+  const sidebar = document.querySelector('.library-sidebar');
+  const container = document.querySelector('.media-library-container');
+  const rectOf = (el) => {
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top), left: Math.round(r.left) };
+  };
+  remoteLog('sidebar-responsive-sync', {
+    mobile,
+    btnFound: !!btn,
+    brandHomeFound: !!brandHome,
+    btnDisplay: btn ? getComputedStyle(btn).display : null,
+    headerWrapperDisplay: header ? getComputedStyle(header).display : 'not-found',
+    sidebarDisplay: sidebar ? getComputedStyle(sidebar).display : 'not-found',
+    headerRect: rectOf(header),
+    sidebarRect: rectOf(sidebar),
+    containerRect: rectOf(container),
+    innerWidth: window.innerWidth
+  });
 }
 
 function scheduleSidebarResponsiveSync() {
@@ -152,54 +179,66 @@ function initSidebarCategorySync() {
   window.__sidebarCategorySyncBound = true;
 }
 
-// 모바일 햄버거 버튼은 CSS에서 position:fixed(layout viewport 기준)로 고정돼 있다.
-// 핀치 확대(pinch-zoom) 시 실제로 보이는 visual viewport는 좁아지고 이동하지만, fixed
-// 요소의 좌표는 layout viewport 기준 그대로 남아 화면 밖으로 밀려날 수 있다. html/body가
-// overflow:hidden이라 사용자가 스크롤로 되찾을 수도 없다 (커뮤니티 리포트, Pixel 7 2배
-// 확대 시 412px 뷰포트가 206px로 좁아지며 버튼이 완전히 이탈하는 것으로 재현됨).
-// visualViewport의 resize/scroll 이벤트로 실제 보이는 영역 기준으로 위치를 보정한다.
-let mobileToggleOriginalTopPx = null;
-let mobileToggleOriginalRightPx = null;
+// 예전엔 모바일 햄버거 버튼이 CSS position:fixed로 화면에 고정돼 있었고, 핀치줌 시
+// visualViewport를 추적해 위치를 맞추는 JS가 있었다. 그 방식이 오히려 흔들림/사라짐
+// 등 새 버그를 반복 유발해(2026-08-17) BookOasis 로고 옆 일반 문서 흐름으로 되돌렸다
+// (static/css/mobile.css의 .btn-sidebar-toggle 주석 참고). 더 이상 JS로 위치를 추적할
+// 필요가 없어져 관련 코드(syncMobileToggleViewportPosition 등)를 전부 제거했다.
 
-function syncMobileToggleViewportPosition() {
-  const viewport = window.visualViewport;
-  const { btn } = getSidebarElements();
-  if (!viewport || !btn || !isMobileLayout()) return;
-  if (getComputedStyle(btn).display === 'none') return;
-
-  // CSS가 정의한 원래 top/right 여백(safe-area 포함)을 최초 1회만 읽어서 기준값으로 삼는다 -
-  // 이후 인라인 스타일로 덮어써도 CSS 원본 디자인의 여백 자체는 그대로 유지된다.
-  if (mobileToggleOriginalTopPx === null) {
-    btn.style.top = '';
-    btn.style.right = '';
-    const rect = btn.getBoundingClientRect();
-    mobileToggleOriginalTopPx = rect.top;
-    mobileToggleOriginalRightPx = window.innerWidth - rect.right;
-  }
-
-  const btnWidth = btn.offsetWidth || 0;
-  btn.style.right = 'auto';
-  btn.style.left = `${viewport.offsetLeft + viewport.width - btnWidth - mobileToggleOriginalRightPx}px`;
-  btn.style.top = `${viewport.offsetTop + mobileToggleOriginalTopPx}px`;
+// iOS Safari는 화면 잠금 해제 후 백그라운드 상태에서 이미 그려져 있던 콘텐츠를 즉시
+// 다시 페인트하지 않는 경우가 있다(알려진 WebKit 리페인트 버그, 커뮤니티 리포트:
+// 잠금 해제 시 상단 헤더(로고+햄버거)가 안 나타남). transform을 살짝 건드렸다 되돌리는
+// 것만으로 강제 리페인트를 유도할 수 있다. (버튼이 더 이상 fixed가 아니어도 이 리페인트
+// 버그 자체는 fixed 여부와 무관하게 발생할 수 있어 유지한다.)
+function forceIosHeaderRepaint() {
+  const header = document.querySelector('.sidebar-header-wrapper');
+  const sidebar = document.querySelector('.library-sidebar');
+  [header, sidebar].forEach((el) => {
+    if (!el) return;
+    // 어떤 종류의 WebKit 리페인트 누락인지 확신할 수 없어(컴포지팅 레이어 문제인지,
+    // 순수 페인트 누락인지) transform과 opacity 두 가지 강제 리페인트 트릭을 함께
+    // 건다 - 실제 로그로 확인된 증상은 "계산된 display는 정상인데 화면엔 안 그려짐"
+    // 이라, 레이아웃(reflow)이 아니라 페인트 단계의 문제로 보고 opacity를 추가했다.
+    const prevOpacity = el.style.opacity;
+    el.style.webkitTransform = 'translateZ(0)';
+    el.style.opacity = '0.999';
+    window.requestAnimationFrame(() => {
+      el.style.webkitTransform = '';
+      el.style.opacity = prevOpacity;
+    });
+  });
 }
 
-function initMobileToggleViewportSync() {
-  if (window.__mobileToggleViewportSyncBound) return;
-  const viewport = window.visualViewport;
-  if (!viewport) return;
-
-  viewport.addEventListener('resize', syncMobileToggleViewportPosition);
-  viewport.addEventListener('scroll', syncMobileToggleViewportPosition);
-  window.addEventListener('orientationchange', syncMobileToggleViewportPosition);
-
-  window.__mobileToggleViewportSyncBound = true;
+// 실제 원인 확정(2026-08-17, 원격 로그로 확인): 헤더가 "안 그려진" 게 아니라 화면 위로
+// 스크롤되어 가려진 것이었다(headerRect.top이 -30~-59까지 나감). html/body가
+// overflow:hidden이라도 iOS Safari는 키보드 표시/숨김, 주소창 접힘 등으로 여전히 창을
+// 스크롤시킬 수 있다. tab_media_library.js::recoverTopCategoryUiAfterBack()에 뒤로가기
+// 전용으로 이미 있던 스크롤 복구 로직과 동일한 원리를 탭 전환/포그라운드 복귀 등
+// 다른 트리거 경로에도 적용한다.
+function resetScrollIfHeaderHidden() {
+  const header = document.querySelector('.sidebar-header-wrapper');
+  if (!header || !isMobileLayout()) return;
+  const rect = header.getBoundingClientRect();
+  if (rect.bottom <= 0 || rect.top < -4) {
+    // y=0 대신 y=1로 스크롤: iOS Safari는 스크롤 위치가 정확히 0일 때 주소창을
+    // 완전히 펼치며 페이지 콘텐츠 위에 겹쳐 그리는 버그가 있다. 1px만 남겨두면
+    // 주소창이 겹치지 않으면서도 사실상 맨 위와 동일하게 보인다.
+    window.scrollTo(0, 1);
+    const mainContent = document.querySelector('.library-main-content');
+    if (mainContent) mainContent.scrollTop = 0;
+  }
 }
 
 function initSidebarViewportRecovery() {
   if (window.__sidebarViewportRecoveryBound) return;
 
   const mediaQuery = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`);
-  const recover = () => scheduleSidebarResponsiveSync();
+  const recover = () => {
+    remoteLog('sidebar-recover-triggered', { visibilityState: document.visibilityState });
+    scheduleSidebarResponsiveSync();
+    forceIosHeaderRepaint();
+    resetScrollIfHeaderHidden();
+  };
 
   window.addEventListener('pageshow', recover);
   window.addEventListener('focus', recover);
@@ -218,12 +257,25 @@ function initSidebarViewportRecovery() {
 }
 
 export function initSidebarInteractions() {
+  if (window.__sidebarInteractionsInitCount === undefined) window.__sidebarInteractionsInitCount = 0;
+  window.__sidebarInteractionsInitCount += 1;
+  remoteLog('sidebar-init-start', { readyState: document.readyState, callCount: window.__sidebarInteractionsInitCount });
   initSidebarToggleButton();
   initSidebarAutoClose();
   initSidebarCategorySync();
   initSidebarViewportRecovery();
-  initMobileToggleViewportSync();
+  // 최초 로드 시에도(백그라운드 복귀 경로와 무관하게) 계산된 display 값과 실제 화면에
+  // 그려지는 것이 어긋나는 iOS WebKit 리페인트 버그가 재현됐다(로그상 display는 전부
+  // 정상인데 화면엔 안 보임). 1회 보정으로 안 될 수 있어(실측: 300ms 1회 시도로도
+  // 재현됨) 여러 시점에 반복 시도한다.
   syncSidebarResponsiveControls();
+  resetScrollIfHeaderHidden();
+  [100, 300, 800, 1500].forEach((delay) => {
+    window.setTimeout(() => {
+      forceIosHeaderRepaint();
+      resetScrollIfHeaderHidden();
+    }, delay);
+  });
   syncSidebarMenuState();
 }
 

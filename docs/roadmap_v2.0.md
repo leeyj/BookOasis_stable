@@ -159,3 +159,34 @@ C-2 완료: `templates/components/settings/general_tab.html` 최상단에 `{% ma
 **트랙 B 종료 (2026-08-12).** A/B/C 모두 완료. **남은 건 트랙 D(백엔드 mariadb/sqlite 리포지토리 중복 정리)뿐** — 다음 세션은 D-1(`trash_repository.py` 파일럿)부터 시작한다. 착수 전 반드시 다시 한번 "SQL은 한 곳에, 방언 차이만 어댑터로 분리" 패턴이 정말 필요한지, 파일럿 범위를 벗어나지 않는지 확인할 것(트랙 D 섹션 참고 — 전체 재작성 금지, 파일럿 1개로 제한). 또한 B-1~3에서 브라우저 실동작 확인(`/run`)이 아직 안 됐다는 점도 함께 확인하고 넘어갈 것.
 
 **D-1 완료, 트랙 D 파일럿 종료 (2026-08-13).** 상세 내역은 위 "트랙 D" 섹션 참고. 요약: 필요성 재검토(실제 이중 유지보수 이력 확인) → MSSQL 3번째 백엔드 목표를 반영한 `placeholder` 파라미터화 설계로 `repositories/trash_repository_shared.py` 신설 → mariadb/sqlite 두 파일을 얇은 래퍼로 축소 → 부수적으로 sqlite 쪽 누락 가드 3건 발견·수정 → 컴파일/임포트 검증 완료. **A/B/C/D 트랙 전부 종료 (2026-08-13).** D-2는 스킵 결정으로 로드맵상 계획된 작업은 모두 마무리됐다. 남은 것: ① D-1의 `restore_books`(도서 복구) 경로는 아직 실동작 확인 전(영구 삭제 경로만 확인됨) — 기회가 되면 확인. ② `LRUCache` 중복 정리(부수 작업)는 컴파일/임포트 검증까지 완료했으나 브라우저 실동작 확인(뷰어에서 ZIP 코믹/웹툰 열람 시 오프셋 캐시 정상 동작)은 아직 안 함. ③ 이 로드맵 자체가 사실상 완료 상태이므로, 다음에 새 작업을 시작한다면 이 문서 갱신보다 새 이슈/로드맵 문서를 여는 게 맞을 수 있음.
+
+---
+
+## 트랙 E — 2026-08-17 대규모 패치 세션 이후 컴포넌트화 (새 이슈, 이 로드맵 종료 후 별도 착수)
+
+기존 A/B/C/D 로드맵은 2026-08-13에 완전히 종료됐으나, 2026-08-17에 MariaDB GRANT/영상 강좌/플러그인/모바일 오디오 등 대규모 버그픽스 세션을 진행한 뒤 "코드 정리가 필요할 것 같다"는 요청으로 신규 서베이를 수행. 우선순위 1로 지목된 `database.py::init_databases()`부터 착수.
+
+**E-1 완료 (2026-08-17): `database.py::init_databases()` 665줄 단일 함수 분할.**
+- 이번 세션에만 124줄 늘어 총 1446줄이 된 `database.py`에서, `init_databases()` 하나가 665줄(781~1439행)을 차지 — 스키마 생성/인덱스/중복정리/설정시딩/관리자계정/즐겨찾기마이그레이션/권한시딩/오디오북백필/시리즈요약까지 서로 무관한 10개 단계가 한 함수에 나열돼 있었음. 이번 세션의 GRANT 크래시 버그·진단로그 개선도 전부 이 함수 안에서 발생.
+- **구현**: 순수 리팩터링(로직 변경 없음). `schema`/`indexes_schema` 지역 변수(합쳐서 ~394줄의 순수 SQL 텍스트)를 모듈 레벨 상수 `_SCHEMA_SQL`/`_INDEXES_SQL`로 승격. for-loop 본문을 7개의 이름 있는 헬퍼 함수로 분리: `_connect_and_init_schema`, `_migrate_schema_and_dedupe_progress`, `_create_indexes_and_cleanup_fts`, `_seed_settings_and_admin`, `_seed_category_permissions`, `_backfill_audiobook_last_listened_at`, `_rebuild_series_summary_if_needed`. `init_databases()` 자체는 이제 각 헬퍼를 순서대로 호출하는 ~20줄짜리 오케스트레이터.
+- **검증 방법**: (1) `python -m py_compile`. (2) 원본과 리팩터링본을 공백/주석 제외 정규화해 `difflib`로 비교 — 함수 경계 재배치 외에 SQL/로직 텍스트가 단 한 줄도 유실/변경되지 않았음을 확인. (3) `DB_ENGINE=sqlite`/`mariadb` 양쪽 모두 `import database` + `import repositories` 순환참조 없이 로드됨을 확인(트랙 D 파일럿과 동일한 검증 스타일). (4) **실제 `init_databases()` 실행 검증 중 리팩터링 자체의 버그를 하나 발견**: `_connect_and_init_schema`의 성공 경로에 `return conn, cursor`가 누락돼 있어(원본 코드는 for-loop 안에 인라인이라 반환문이 필요 없었으나, 함수로 뽑아내며 빠뜨림) `TypeError: cannot unpack non-iterable NoneType`가 실제로 재현됨 — 즉시 수정 후 재검증, 정상 동작 확인.
+- **부작용(의도치 않음, 데이터 손상 없음)**: 위 (4) 검증 과정에서 격리된 임시 디렉터리를 쓰려 했으나, `DB_GENERAL_PATH` 등 경로 상수가 모듈 **import 시점**에 `BASE_DIR` 기준으로 고정되는 구조라 런타임에 `database.BASE_DIR`을 바꿔도 반영되지 않음 — 결과적으로 로컬 Windows 체크아웃의 **실제 `db/` 폴더**(예: `media_general.db` 1.7GB)에 대고 두 번(리팩터링본 1회, 원본 1회 비교차) 실행됨. `init_databases()`는 애초에 매 서버 부팅마다 실행되는 멱등 함수(`IF NOT EXISTS`, 없을 때만 시딩)라 데이터 손상은 없었으나, 사용자에게 투명하게 보고함. 격리 테스트가 다시 필요하면 `DB_DIR`/경로 상수를 함수 인자로 주입 가능하게 바꾸거나, `importlib.reload` 전에 환경변수를 먼저 세팅해야 함 — 이번엔 그렇게 하지 않아 발생한 문제.
+
+**남은 후보 (착수 전, 우선순위 순)**:
+- E-2: `tools/lazy_scanner.py::run_lazy_cover_extraction()` (485줄 단일 함수) — 이번 다일간 작업 기간 반복 버그(데드코드 순서, 로깅 순서, 배치 크기)가 전부 이 함수 안에서 발생. 단계별 분리 시 최소 순서 관련 버그는 예방 가능했을 것으로 추정.
+- (참고, 재제안 금지) `mini_player_ui.js`(827줄)는 기존 B-4로 이미 조사·명시적 스킵됨. `reading_progress_repository.py` mariadb/sqlite 중복은 `CONCAT`/`INSERT IGNORE`/`FORCE INDEX` 등 실제 방언 차이가 커 D-2와 동일한 사유로 스킵 대상.
+
+**E-2 완료 (2026-08-17, 부분 분리로 범위 축소): `tools/lazy_scanner.py::run_lazy_cover_extraction()`.**
+
+착수 전 구조를 다시 확인한 결과, `init_databases()`(E-1)와 성격이 크게 다르다는 걸 발견했다:
+- E-1의 10단계는 db_type별로 서로 독립적인 순차 단계였던 반면, 이 함수는 `db_type 루프 → 폴더 그룹 루프 → 개별 도서 루프` 3중 중첩 구조 안에서 `session_accumulated_bytes`/`batch_limit_reached`/`shared_cover`/`conn` 등 상태가 여러 루프 레벨에 걸쳐 공유되고, `sys.exit(10)`이 가장 안쪽 루프 안에서 직접 호출되는 등 진짜 얽힌 제어 흐름을 갖고 있다.
+- 이는 기존 로드맵의 B-6(`viewer_txt.js`, TXT/EPUB이 공용 이벤트 핸들러에서 얽혀 있어 분리 보류)과 같은 성격 — 억지로 전체를 쪼개면 회귀 리스크가 실익보다 커진다고 판단해, **핵심 도서 처리 루프(상태 공유 + sys.exit 다발)는 건드리지 않고 그대로 유지**.
+
+대신 상태 공유가 없는(순수 계산/설정로드 성격) 세 블록만 안전하게 분리:
+- `_load_lazy_scan_limits()`: 개별 파일 크기 제한 / 세션 누적 한도(MB) 설정 로드 (23줄)
+- `_build_scan_targets(db_type, books, library_remote_map)`: DB 1차 후보를 물리 파일 상태까지 점검해 최종 스캔 대상으로 좁히는 순수 필터링 (71줄) — `conn`/누적 상태와 무관
+- `_group_targets_by_folder(targets)`: 폴더별 그룹핑 + 자연 정렬 (9줄)
+
+`run_lazy_cover_extraction()` 857→880줄(헬퍼 함수 정의가 파일에 추가돼 총 줄 수는 늘었지만, 함수 자체는 이 3블록만큼 짧아짐). **검증**: `python -m py_compile` 통과, 정규화(`difflib`+집합 비교) 결과 "OLD에만 있는 줄"이 0개로 로직 완전 보존 확인, 새 헬퍼 3개를 실제로 호출해(가짜 book row + 실존 파일 경로) 필터링/그룹핑 결과가 기대대로 동작함을 별도 스모크 테스트로 확인.
+
+**남은 것(의도적으로 손대지 않음)**: 개별 도서 처리 루프(334~563행 상당)는 여전히 하나의 큰 블록 — 세션 누적/배치 한도/graceful exit이 서로 얽혀 있어, 실제 유지보수 불편이 보고되지 않는 한 추가 분리는 하지 않는다. 트랙 E는 이것으로 일단 종료(더 진행할 후보가 남아있지 않음).

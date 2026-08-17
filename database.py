@@ -778,9 +778,11 @@ def startup_db_sanity_check():
             print(f"[DB-Sanity] {db_type} DB — 예기치 못한 오류 (무시하고 계속): {e}")
 
 
-def init_databases():
-    """세 데이터베이스(일반, 성인, 오디오북)의 테이블 스키마 초기화"""
-    schema = """
+# 4개 미디어 세션(general/adult/audiobook/video) 공용 스키마.
+# init_databases()에서만 쓰이는 값이라 예전엔 그 함수 안의 지역 변수였지만, 순수 SQL
+# 텍스트 361줄이 로직 코드 사이에 섞여 있어 함수 전체를 읽기 어렵게 만들고 있었다.
+# 모듈 레벨 상수로 분리해 init_databases()를 실제 로직만 남도록 정리한다 (동작 변화 없음).
+_SCHEMA_SQL = """
     CREATE TABLE IF NOT EXISTS library_groups (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL UNIQUE,
@@ -974,7 +976,8 @@ def init_databases():
         premiered TEXT,
         format TEXT DEFAULT 'mp4',
         needs_transcode INTEGER DEFAULT 0,
-        subtitle_path TEXT
+        subtitle_path TEXT,
+        container_verified INTEGER DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS video_progress (
@@ -1144,7 +1147,7 @@ def init_databases():
     );
     """
 
-    indexes_schema = """
+_INDEXES_SQL = """
     CREATE INDEX IF NOT EXISTS idx_audiobook_tracks_audiobook_id ON audiobook_tracks(audiobook_id);
     CREATE INDEX IF NOT EXISTS idx_audiobook_track_progress_lookup ON audiobook_track_progress(audiobook_id, user_id, track_id);
     CREATE INDEX IF NOT EXISTS idx_audiobooks_library_id ON audiobooks(library_id);
@@ -1179,262 +1182,316 @@ def init_databases():
     CREATE INDEX IF NOT EXISTS idx_collection_items_coll ON collection_items(collection_id);
     CREATE INDEX IF NOT EXISTS idx_plugin_load_events_plugin_time ON plugin_load_events(plugin_id, occurred_at DESC);
     """
+
+
+def _connect_and_init_schema(db_type, schema):
+    """DB 연결 후 기본 스키마를 적용한다.
+
+    연결 자체가 실패하면(예: MariaDB 계정에 새로 추가된 DB에 대한 GRANT가 아직 없는
+    경우 "Access denied ... to database 'media_X'") 여기서 예외가 그대로 전파되어
+    gunicorn 워커 부팅 자체가 실패하고 서버 전체가 죽는다. 한 DB의 권한 설정이 아직
+    안 됐다고 나머지 DB(및 앱 전체)까지 마비시킬 이유는 없으므로, 실패 시 (None, None)을
+    반환해 호출부가 이 DB만 건너뛰고 다음 DB로 계속 진행하게 한다
+    (docs/move_to_mariadb.md FAQ Q1 참고).
+    """
+    # DB 연결 자체가 실패하면(예: MariaDB 계정에 새로 추가된 DB에 대한 GRANT가 아직
+    # 없는 경우 "Access denied ... to database 'media_X'") 여기서 예외가 그대로
+    # 전파되어 gunicorn 워커 부팅 자체가 실패하고 서버 전체가 죽는다. 한 DB의 권한
+    # 설정이 아직 안 됐다고 나머지 DB(및 앱 전체)까지 마비시킬 이유는 없으므로,
+    # 이 DB만 건너뛰고 다음 DB로 계속 진행한다 (docs/move_to_mariadb.md FAQ Q1 참고).
+    conn = None
+    try:
+        conn = get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.executescript(schema)
+        conn.commit()
+    except Exception as conn_err:
+        print(f"[DB-Migration ERROR] '{db_type}' DB 연결/초기화 실패로 이 DB를 건너뜁니다: {conn_err}")
+        db_engine = os.environ.get('DB_ENGINE', os.environ.get('DBMS', ''))
+        if 'access denied' in str(conn_err).lower() or 'mariadb' in db_engine.lower():
+            mariadb_user = os.environ.get('MARIADB_USER', 'bookoasis')
+            db_prefix = os.environ.get('MARIADB_DATABASE_PREFIX', 'media_')
+            print(
+                "[DB-Migration ERROR] MariaDB 권한 문제로 보입니다. "
+                f"'{mariadb_user}' 계정에 '{db_prefix}{db_type}' 권한이 없을 수 있습니다. "
+                "MariaDB에 root로 접속해 아래 SQL을 실행하세요 (docker-compose.mariadb.yml 사용 중이면 "
+                "'mariadb-grant-repair' 서비스가 다음 `docker-compose up` 시 자동으로 재실행합니다):"
+            )
+            print(
+                f"  CREATE DATABASE IF NOT EXISTS {db_prefix}{db_type} CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;\n"
+                f"  GRANT ALL PRIVILEGES ON {db_prefix}{db_type}.* TO '{mariadb_user}'@'%';\n"
+                "  FLUSH PRIVILEGES;"
+            )
+            print("[DB-Migration ERROR] 자세한 내용은 docs/move_to_mariadb.md FAQ Q1을 참고하세요.")
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
+        return None, None
+
+    return conn, cursor
+
+
+def _migrate_schema_and_dedupe_progress(conn, cursor, db_type, schema):
+    """누락 컬럼 자동 보강 + user_progress 중복 레코드 정리(고유 인덱스 적용 준비)."""
+    # 신규 표현식 인덱스 생성 전에 누락 컬럼을 먼저 보강해야 구버전 DB에서도 안전합니다.
+    try:
+        auto_migrate_schema(conn, schema)
+    except Exception as migrate_err:
+        print(f"[DB-Migration ERROR] Exception during pre-index schema auto-migration: {migrate_err}")
     
+    # [마이그레이션] user_progress 중복 레코드 정리 및 고유 인덱스 설정 준비
+    try:
+        is_mariadb = hasattr(conn, '_conn') or type(conn).__name__.startswith('Mariadb') or type(conn).__name__.startswith('PooledMariaDB')
+        if is_mariadb:
+            cursor.execute("SHOW TABLES LIKE 'user_progress'")
+            has_user_progress = bool(cursor.fetchone())
+        else:
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user_progress'")
+            has_user_progress = bool(cursor.fetchone())
+
+        if has_user_progress:
+            # 1. 중복 레코드 삭제 (가장 최근 것 1개만 남김)
+            if is_mariadb:
+                cursor.execute("""
+                    DELETE up1 FROM user_progress up1
+                    INNER JOIN user_progress up2 
+                    ON up1.book_id = up2.book_id AND up1.user_id = up2.user_id
+                    WHERE up1.id < up2.id
+                """)
+            else:
+                cursor.execute("""
+                    DELETE FROM user_progress
+                    WHERE id NOT IN (
+                        SELECT MAX(id)
+                        FROM user_progress
+                        GROUP BY book_id, user_id
+                    )
+                """)
+            conn.commit()
+
+            # 2. 기존 일반 인덱스가 있다면 삭제하여 UNIQUE로 변경 가능하도록 준비
+            if is_mariadb:
+                cursor.execute("SHOW INDEX FROM user_progress WHERE Key_name = 'idx_user_progress_book_user'")
+                idx_rows = cursor.fetchall()
+                if idx_rows:
+                    first_row = idx_rows[0]
+                    non_unique = first_row.get('Non_unique', 1) if isinstance(first_row, dict) else 1
+                    if non_unique == 1:
+                        cursor.execute("DROP INDEX idx_user_progress_book_user ON user_progress")
+                        conn.commit()
+                        print(f"[DB-Migration] {db_type} MariaDB - Dropped non-unique index idx_user_progress_book_user")
+            else:
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_user_progress_book_user'")
+                if cursor.fetchone():
+                    cursor.execute("PRAGMA index_list('user_progress')")
+                    is_unique = False
+                    for idx in cursor.fetchall():
+                        if idx['name'] == 'idx_user_progress_book_user' and idx['unique'] == 1:
+                            is_unique = True
+                            break
+                    if not is_unique:
+                        cursor.execute("DROP INDEX idx_user_progress_book_user")
+                        conn.commit()
+                        print(f"[DB-Migration] {db_type} DB - Dropped non-unique index idx_user_progress_book_user")
+    except Exception as dup_err:
+        print(f"[DB-Migration ERROR] user_progress duplicates cleanup failed: {dup_err}")
+    
+
+
+def _create_indexes_and_cleanup_fts(conn, cursor, indexes_schema):
+    """인덱스 일괄 생성 + 레거시 FTS5 가상 테이블 정리."""
+    # 테이블 생성 완료 후 별도 트랜잭션으로 인덱스 일괄 생성하여 SQLite OperationalError 예방
+    cursor.executescript(indexes_schema)
+    conn.commit()
+
+    try:
+        cleanup_legacy_fts_index(conn)
+    except Exception as search_idx_err:
+        print(f"[DB-Cleanup] Legacy FTS5 cleanup notice: {search_idx_err}")
+    
+
+
+def _seed_settings_and_admin(conn, cursor, db_type):
+    """설정 초기값(ALADIN 등) 주입, 최초 admin 계정 생성, 레거시 즐겨찾기 마이그레이션."""
+    # settings 테이블 초기값 주입 (ALADIN TTBKey)
+    try:
+        cursor.execute("SELECT `value` FROM settings WHERE `key` = 'ALADIN'")
+        if not cursor.fetchone():
+            # os.getenv 등을 위해 .env 파싱도 대비
+            aladin_val = os.environ.get('ALADIN', '')
+            if not aladin_val:
+                # 간단하게 env 파일 읽기 헬퍼
+                try:
+                    env_path = os.path.join(BASE_DIR, '.env')
+                    if os.path.exists(env_path):
+                        with open(env_path, 'r', encoding='utf-8') as f:
+                            for line in f:
+                                if line.strip().startswith('ALADIN='):
+                                    aladin_val = line.split('=', 1)[1].strip()
+                                    break
+                except Exception as env_err:
+                    print(f"[DB-Migration] .env load error: {env_err}")
+            
+            cursor.execute("INSERT OR REPLACE INTO settings (`key`, `value`) VALUES ('ALADIN', ?)", (aladin_val,))
+            conn.commit()
+            print(f"[DB-Migration] {db_type} DB - Initial ALADIN setting migrated: {aladin_val}")
+        
+        default_settings = [
+            ('BOOK_THUMBNAIL_WIDTH', '160'),
+            ('PAGE_LIMIT', '60'),
+            ('VIEWER_FONT_SIZE', '18'),
+            ('VIEWER_FONT_FAMILY', 'sans-serif'),
+            ('DB_POOL_SIZE', '49'),
+            ('SCANNER_WRITE_LOG', '1'),
+            ('LAZY_SCAN_CRON', '0 3 * * *'),
+            ('SYSTEM_MEM_LIMIT', '1536.0'),
+            ('PROCESS_RSS_LIMIT', '2048.0'),
+            ('RECENT_BOOKS_LIMIT', '30'),
+            ('AUDIO_MINI_PLAYER_MODE', 'mini'),
+            ('AUDIO_RIGHT_DOCK_DIM_ENABLED', '0'),
+            ('TAG_FILTER_SEARCH_SCOPE_ALL', '0'),
+            ('SIDEBAR_TOP_CONTROLS', '0'),
+            ('HDD_AGGRESSIVE_WARMUP', '0'),
+            ('RCLONE_RC_URL', 'http://localhost:5572'),
+            ('LAZY_SCAN_MAX_FILE_SIZE_MB', '300'),
+            ('LAZY_SCAN_MAX_BATCH_SIZE_MB', '1024'),
+            ('SCAN_IGNORE_PATTERNS', "@eaDir/\n#recycle/\n*.tmp\n*.sample.cbz\n.DS_Store\nThumbs.db\ndesktop.ini"),
+        ]
+        for k, v in default_settings:
+            cursor.execute("SELECT `value` FROM settings WHERE `key` = ?", (k,))
+            if not cursor.fetchone():
+                cursor.execute("INSERT INTO settings (`key`, `value`) VALUES (?, ?)", (k, v))
+        
+        # 기존 DB의 SCAN_IGNORE_PATTERNS 값 중 @eaDir, #recycle 끝에 /가 없는 구형 설정 자동 마이그레이션
+        cursor.execute("SELECT `value` FROM settings WHERE `key` = 'SCAN_IGNORE_PATTERNS'")
+        sig_row = cursor.fetchone()
+        if sig_row and sig_row[0]:
+            curr_val = sig_row[0]
+            new_lines = []
+            changed = False
+            for line in curr_val.splitlines():
+                stripped = line.strip()
+                if stripped in ('@eaDir', '#recycle', '.git', '.svn'):
+                    new_lines.append(stripped + '/')
+                    changed = True
+                else:
+                    new_lines.append(line)
+            if changed:
+                cursor.execute("UPDATE settings SET `value` = ? WHERE `key` = 'SCAN_IGNORE_PATTERNS'", ('\n'.join(new_lines),))
+
+        conn.commit()
+
+        # 초기 admin 계정 시딩
+        cursor.execute("SELECT COUNT(*) FROM users")
+        if cursor.fetchone()[0] == 0:
+            from werkzeug.security import generate_password_hash
+            admin_hash = generate_password_hash('admin')
+            cursor.execute("INSERT INTO users (username, password_hash, role, is_default_password, has_adult_access, has_audiobook_access) VALUES ('admin', ?, 'admin', 1, 1, 1)", (admin_hash,))
+            conn.commit()
+            print(f"[DB-Migration] {db_type} DB - admin/admin initial account created")
+
+        # Legacy books.is_favorite -> user_favorites 1회 시드
+        # 기존 전역 즐겨찾기 데이터를 모든 사용자 초기값으로 복제한 뒤, 이후부터는 계정별로 독립 운용
+        cursor.execute("SELECT COUNT(*) FROM user_favorites")
+        favorite_rows = cursor.fetchone()[0]
+        if favorite_rows == 0:
+            cursor.execute("SELECT COUNT(*) FROM books WHERE COALESCE(is_favorite, 0) = 1")
+            legacy_fav_count = cursor.fetchone()[0]
+            if legacy_fav_count > 0:
+                cursor.execute("""
+                    INSERT OR IGNORE INTO user_favorites (user_id, book_id, created_at)
+                    SELECT u.id, b.id, CURRENT_TIMESTAMP
+                    FROM users u
+                    JOIN books b ON COALESCE(b.is_favorite, 0) = 1
+                """)
+                conn.commit()
+                print(f"[DB-Migration] {db_type} DB - migrated legacy favorites into user_favorites for all users")
+    except Exception as e:
+        print(f"[DB-Migration ERROR] Initial settings/users migration failed: {e}")
+
+
+def _seed_category_permissions(conn, cursor):
+    """기존 사용자 x 라이브러리 조합에 대해 카테고리 접근 권한을 일괄 1로 시딩한다."""
+    # 권한 테이블 초기 데이터 시딩 (기존 사용자 및 라이브러리가 있을 때 권한 일괄 1로 주입)
+    try:
+        cursor.execute("SELECT id FROM users")
+        u_ids = [r['id'] for r in cursor.fetchall()]
+        cursor.execute("SELECT id FROM libraries")
+        l_ids = [r['id'] for r in cursor.fetchall()]
+        
+        for uid in u_ids:
+            for lid in l_ids:
+                cursor.execute("""
+                    INSERT OR IGNORE INTO user_category_permissions (user_id, library_id, has_access)
+                    VALUES (?, ?, 1)
+                """, (uid, lid))
+        conn.commit()
+    except Exception as seed_err:
+        print(f"[DB-Migration ERROR] user_category_permissions seeding failed: {seed_err}")
+
+
+def _backfill_audiobook_last_listened_at(conn, cursor, db_type):
+    """오디오북 진행률 레거시 데이터 중 last_listened_at 누락분을 1회성으로 보정한다."""
+    # 오디오북 진행률 레거시 데이터 중 last_listened_at 누락분을 1회성으로 보정
+    try:
+        if db_type == 'audiobook':
+            cursor.execute("""
+                UPDATE audiobook_progress
+                SET last_listened_at = COALESCE(
+                    (SELECT a.updated_at FROM audiobooks a WHERE a.id = audiobook_progress.audiobook_id),
+                    CURRENT_TIMESTAMP
+                )
+                WHERE (last_listened_at IS NULL OR TRIM(COALESCE(last_listened_at, '')) = '')
+                  AND (COALESCE(current_time, 0) > 0 OR COALESCE(is_completed, 0) = 1)
+            """)
+            conn.commit()
+            if (cursor.rowcount or 0) > 0:
+                print(f"[DB-Migration] audiobook DB - backfilled last_listened_at rows: {cursor.rowcount}")
+    except Exception as audio_backfill_err:
+        print(f"[DB-Migration ERROR] audiobook_progress last_listened_at backfill failed: {audio_backfill_err}")
+
+
+def _rebuild_series_summary_if_needed(conn, db_type):
+    """MariaDB 환경에서 시리즈 요약 테이블이 아직 준비 안 됐으면 최초 1회 생성한다.
+
+    주의: is_remote 는 운영자가 UI에서 관리하는 의도값이다. 과거에는 서버 기동 시
+    physical_path 기반 자동 판별로 0 -> 1 보정을 수행했지만, SMB/CIFS/NFS 같은 NAS
+    마운트나 사용자가 수동 해제한 라이브러리까지 다시 체크되는 부작용이 있어 더 이상
+    startup 단계에서 덮어쓰지 않는다.
+    """
+    # 주의: is_remote 는 운영자가 UI에서 관리하는 의도값이다.
+    # 과거에는 서버 기동 시 physical_path 기반 자동 판별로 0 -> 1 보정을 수행했지만,
+    # SMB/CIFS/NFS 같은 NAS 마운트나 사용자가 수동 해제한 라이브러리까지 다시 체크되는
+    # 부작용이 있어 더 이상 startup 단계에서 덮어쓰지 않는다.
+
+    try:
+        is_mariadb = hasattr(conn, '_conn') or type(conn).__name__.startswith(('Mariadb', 'PooledMariaDB'))
+        if is_mariadb and db_type != 'audiobook':
+            from repositories.mariadb.series_repository import SeriesRepository
+            if SeriesRepository.rebuild_summary(db_type, only_if_unready=True):
+                print(f"[DB-Migration] {db_type} DB - initial series summary created")
+    except Exception as summary_err:
+        print(f"[DB-Migration ERROR] {db_type} series summary initialization failed: {summary_err}")
+
+
+def init_databases():
+    """4개 미디어 세션(general/adult/audiobook/video)의 테이블 스키마 초기화."""
     # 기동 전 WAL/SHM 무결성 자동 검증 및 정리
     startup_db_sanity_check()
 
     for db_type in ['general', 'adult', 'audiobook', 'video']:
-        # DB 연결 자체가 실패하면(예: MariaDB 계정에 새로 추가된 DB에 대한 GRANT가 아직
-        # 없는 경우 "Access denied ... to database 'media_X'") 여기서 예외가 그대로
-        # 전파되어 gunicorn 워커 부팅 자체가 실패하고 서버 전체가 죽는다. 한 DB의 권한
-        # 설정이 아직 안 됐다고 나머지 DB(및 앱 전체)까지 마비시킬 이유는 없으므로,
-        # 이 DB만 건너뛰고 다음 DB로 계속 진행한다 (docs/move_to_mariadb.md FAQ Q1 참고).
-        conn = None
-        try:
-            conn = get_connection(db_type)
-            cursor = conn.cursor()
-            cursor.executescript(schema)
-            conn.commit()
-        except Exception as conn_err:
-            print(f"[DB-Migration ERROR] '{db_type}' DB 연결/초기화 실패로 이 DB를 건너뜁니다: {conn_err}")
-            db_engine = os.environ.get('DB_ENGINE', os.environ.get('DBMS', ''))
-            if 'access denied' in str(conn_err).lower() or 'mariadb' in db_engine.lower():
-                mariadb_user = os.environ.get('MARIADB_USER', 'bookoasis')
-                db_prefix = os.environ.get('MARIADB_DATABASE_PREFIX', 'media_')
-                print(
-                    "[DB-Migration ERROR] MariaDB 권한 문제로 보입니다. "
-                    f"'{mariadb_user}' 계정에 '{db_prefix}{db_type}' 권한이 없을 수 있습니다. "
-                    "MariaDB에 root로 접속해 아래 SQL을 실행하세요 (docker-compose.mariadb.yml 사용 중이면 "
-                    "'mariadb-grant-repair' 서비스가 다음 `docker-compose up` 시 자동으로 재실행합니다):"
-                )
-                print(
-                    f"  CREATE DATABASE IF NOT EXISTS {db_prefix}{db_type} CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;\n"
-                    f"  GRANT ALL PRIVILEGES ON {db_prefix}{db_type}.* TO '{mariadb_user}'@'%';\n"
-                    "  FLUSH PRIVILEGES;"
-                )
-                print("[DB-Migration ERROR] 자세한 내용은 docs/move_to_mariadb.md FAQ Q1을 참고하세요.")
-            if conn:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
+        conn, cursor = _connect_and_init_schema(db_type, _SCHEMA_SQL)
+        if conn is None:
             continue
 
-        # 신규 표현식 인덱스 생성 전에 누락 컬럼을 먼저 보강해야 구버전 DB에서도 안전합니다.
-        try:
-            auto_migrate_schema(conn, schema)
-        except Exception as migrate_err:
-            print(f"[DB-Migration ERROR] Exception during pre-index schema auto-migration: {migrate_err}")
-        
-        # [마이그레이션] user_progress 중복 레코드 정리 및 고유 인덱스 설정 준비
-        try:
-            is_mariadb = hasattr(conn, '_conn') or type(conn).__name__.startswith('Mariadb') or type(conn).__name__.startswith('PooledMariaDB')
-            if is_mariadb:
-                cursor.execute("SHOW TABLES LIKE 'user_progress'")
-                has_user_progress = bool(cursor.fetchone())
-            else:
-                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user_progress'")
-                has_user_progress = bool(cursor.fetchone())
-
-            if has_user_progress:
-                # 1. 중복 레코드 삭제 (가장 최근 것 1개만 남김)
-                if is_mariadb:
-                    cursor.execute("""
-                        DELETE up1 FROM user_progress up1
-                        INNER JOIN user_progress up2 
-                        ON up1.book_id = up2.book_id AND up1.user_id = up2.user_id
-                        WHERE up1.id < up2.id
-                    """)
-                else:
-                    cursor.execute("""
-                        DELETE FROM user_progress
-                        WHERE id NOT IN (
-                            SELECT MAX(id)
-                            FROM user_progress
-                            GROUP BY book_id, user_id
-                        )
-                    """)
-                conn.commit()
-
-                # 2. 기존 일반 인덱스가 있다면 삭제하여 UNIQUE로 변경 가능하도록 준비
-                if is_mariadb:
-                    cursor.execute("SHOW INDEX FROM user_progress WHERE Key_name = 'idx_user_progress_book_user'")
-                    idx_rows = cursor.fetchall()
-                    if idx_rows:
-                        first_row = idx_rows[0]
-                        non_unique = first_row.get('Non_unique', 1) if isinstance(first_row, dict) else 1
-                        if non_unique == 1:
-                            cursor.execute("DROP INDEX idx_user_progress_book_user ON user_progress")
-                            conn.commit()
-                            print(f"[DB-Migration] {db_type} MariaDB - Dropped non-unique index idx_user_progress_book_user")
-                else:
-                    cursor.execute("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_user_progress_book_user'")
-                    if cursor.fetchone():
-                        cursor.execute("PRAGMA index_list('user_progress')")
-                        is_unique = False
-                        for idx in cursor.fetchall():
-                            if idx['name'] == 'idx_user_progress_book_user' and idx['unique'] == 1:
-                                is_unique = True
-                                break
-                        if not is_unique:
-                            cursor.execute("DROP INDEX idx_user_progress_book_user")
-                            conn.commit()
-                            print(f"[DB-Migration] {db_type} DB - Dropped non-unique index idx_user_progress_book_user")
-        except Exception as dup_err:
-            print(f"[DB-Migration ERROR] user_progress duplicates cleanup failed: {dup_err}")
-        
-        # 테이블 생성 완료 후 별도 트랜잭션으로 인덱스 일괄 생성하여 SQLite OperationalError 예방
-        cursor.executescript(indexes_schema)
-        conn.commit()
-
-        try:
-            cleanup_legacy_fts_index(conn)
-        except Exception as search_idx_err:
-            print(f"[DB-Cleanup] Legacy FTS5 cleanup notice: {search_idx_err}")
-        
-        # settings 테이블 초기값 주입 (ALADIN TTBKey)
-        try:
-            cursor.execute("SELECT `value` FROM settings WHERE `key` = 'ALADIN'")
-            if not cursor.fetchone():
-                # os.getenv 등을 위해 .env 파싱도 대비
-                aladin_val = os.environ.get('ALADIN', '')
-                if not aladin_val:
-                    # 간단하게 env 파일 읽기 헬퍼
-                    try:
-                        env_path = os.path.join(BASE_DIR, '.env')
-                        if os.path.exists(env_path):
-                            with open(env_path, 'r', encoding='utf-8') as f:
-                                for line in f:
-                                    if line.strip().startswith('ALADIN='):
-                                        aladin_val = line.split('=', 1)[1].strip()
-                                        break
-                    except Exception as env_err:
-                        print(f"[DB-Migration] .env load error: {env_err}")
-                
-                cursor.execute("INSERT OR REPLACE INTO settings (`key`, `value`) VALUES ('ALADIN', ?)", (aladin_val,))
-                conn.commit()
-                print(f"[DB-Migration] {db_type} DB - Initial ALADIN setting migrated: {aladin_val}")
-            
-            default_settings = [
-                ('BOOK_THUMBNAIL_WIDTH', '160'),
-                ('PAGE_LIMIT', '60'),
-                ('VIEWER_FONT_SIZE', '18'),
-                ('VIEWER_FONT_FAMILY', 'sans-serif'),
-                ('DB_POOL_SIZE', '49'),
-                ('SCANNER_WRITE_LOG', '1'),
-                ('LAZY_SCAN_CRON', '0 3 * * *'),
-                ('SYSTEM_MEM_LIMIT', '1536.0'),
-                ('PROCESS_RSS_LIMIT', '2048.0'),
-                ('RECENT_BOOKS_LIMIT', '30'),
-                ('AUDIO_MINI_PLAYER_MODE', 'mini'),
-                ('AUDIO_RIGHT_DOCK_DIM_ENABLED', '0'),
-                ('TAG_FILTER_SEARCH_SCOPE_ALL', '0'),
-                ('SIDEBAR_TOP_CONTROLS', '0'),
-                ('HDD_AGGRESSIVE_WARMUP', '0'),
-                ('RCLONE_RC_URL', 'http://localhost:5572'),
-                ('LAZY_SCAN_MAX_FILE_SIZE_MB', '300'),
-                ('LAZY_SCAN_MAX_BATCH_SIZE_MB', '1024'),
-                ('SCAN_IGNORE_PATTERNS', "@eaDir/\n#recycle/\n*.tmp\n*.sample.cbz\n.DS_Store\nThumbs.db\ndesktop.ini"),
-            ]
-            for k, v in default_settings:
-                cursor.execute("SELECT `value` FROM settings WHERE `key` = ?", (k,))
-                if not cursor.fetchone():
-                    cursor.execute("INSERT INTO settings (`key`, `value`) VALUES (?, ?)", (k, v))
-            
-            # 기존 DB의 SCAN_IGNORE_PATTERNS 값 중 @eaDir, #recycle 끝에 /가 없는 구형 설정 자동 마이그레이션
-            cursor.execute("SELECT `value` FROM settings WHERE `key` = 'SCAN_IGNORE_PATTERNS'")
-            sig_row = cursor.fetchone()
-            if sig_row and sig_row[0]:
-                curr_val = sig_row[0]
-                new_lines = []
-                changed = False
-                for line in curr_val.splitlines():
-                    stripped = line.strip()
-                    if stripped in ('@eaDir', '#recycle', '.git', '.svn'):
-                        new_lines.append(stripped + '/')
-                        changed = True
-                    else:
-                        new_lines.append(line)
-                if changed:
-                    cursor.execute("UPDATE settings SET `value` = ? WHERE `key` = 'SCAN_IGNORE_PATTERNS'", ('\n'.join(new_lines),))
-
-            conn.commit()
-
-            # 초기 admin 계정 시딩
-            cursor.execute("SELECT COUNT(*) FROM users")
-            if cursor.fetchone()[0] == 0:
-                from werkzeug.security import generate_password_hash
-                admin_hash = generate_password_hash('admin')
-                cursor.execute("INSERT INTO users (username, password_hash, role, is_default_password, has_adult_access, has_audiobook_access) VALUES ('admin', ?, 'admin', 1, 1, 1)", (admin_hash,))
-                conn.commit()
-                print(f"[DB-Migration] {db_type} DB - admin/admin initial account created")
-
-            # Legacy books.is_favorite -> user_favorites 1회 시드
-            # 기존 전역 즐겨찾기 데이터를 모든 사용자 초기값으로 복제한 뒤, 이후부터는 계정별로 독립 운용
-            cursor.execute("SELECT COUNT(*) FROM user_favorites")
-            favorite_rows = cursor.fetchone()[0]
-            if favorite_rows == 0:
-                cursor.execute("SELECT COUNT(*) FROM books WHERE COALESCE(is_favorite, 0) = 1")
-                legacy_fav_count = cursor.fetchone()[0]
-                if legacy_fav_count > 0:
-                    cursor.execute("""
-                        INSERT OR IGNORE INTO user_favorites (user_id, book_id, created_at)
-                        SELECT u.id, b.id, CURRENT_TIMESTAMP
-                        FROM users u
-                        JOIN books b ON COALESCE(b.is_favorite, 0) = 1
-                    """)
-                    conn.commit()
-                    print(f"[DB-Migration] {db_type} DB - migrated legacy favorites into user_favorites for all users")
-        except Exception as e:
-            print(f"[DB-Migration ERROR] Initial settings/users migration failed: {e}")
-        # 권한 테이블 초기 데이터 시딩 (기존 사용자 및 라이브러리가 있을 때 권한 일괄 1로 주입)
-        try:
-            cursor.execute("SELECT id FROM users")
-            u_ids = [r['id'] for r in cursor.fetchall()]
-            cursor.execute("SELECT id FROM libraries")
-            l_ids = [r['id'] for r in cursor.fetchall()]
-            
-            for uid in u_ids:
-                for lid in l_ids:
-                    cursor.execute("""
-                        INSERT OR IGNORE INTO user_category_permissions (user_id, library_id, has_access)
-                        VALUES (?, ?, 1)
-                    """, (uid, lid))
-            conn.commit()
-        except Exception as seed_err:
-            print(f"[DB-Migration ERROR] user_category_permissions seeding failed: {seed_err}")
-
-        # 오디오북 진행률 레거시 데이터 중 last_listened_at 누락분을 1회성으로 보정
-        try:
-            if db_type == 'audiobook':
-                cursor.execute("""
-                    UPDATE audiobook_progress
-                    SET last_listened_at = COALESCE(
-                        (SELECT a.updated_at FROM audiobooks a WHERE a.id = audiobook_progress.audiobook_id),
-                        CURRENT_TIMESTAMP
-                    )
-                    WHERE (last_listened_at IS NULL OR TRIM(COALESCE(last_listened_at, '')) = '')
-                      AND (COALESCE(current_time, 0) > 0 OR COALESCE(is_completed, 0) = 1)
-                """)
-                conn.commit()
-                if (cursor.rowcount or 0) > 0:
-                    print(f"[DB-Migration] audiobook DB - backfilled last_listened_at rows: {cursor.rowcount}")
-        except Exception as audio_backfill_err:
-            print(f"[DB-Migration ERROR] audiobook_progress last_listened_at backfill failed: {audio_backfill_err}")
-
-        # 주의: is_remote 는 운영자가 UI에서 관리하는 의도값이다.
-        # 과거에는 서버 기동 시 physical_path 기반 자동 판별로 0 -> 1 보정을 수행했지만,
-        # SMB/CIFS/NFS 같은 NAS 마운트나 사용자가 수동 해제한 라이브러리까지 다시 체크되는
-        # 부작용이 있어 더 이상 startup 단계에서 덮어쓰지 않는다.
-
-        try:
-            is_mariadb = hasattr(conn, '_conn') or type(conn).__name__.startswith(('Mariadb', 'PooledMariaDB'))
-            if is_mariadb and db_type != 'audiobook':
-                from repositories.mariadb.series_repository import SeriesRepository
-                if SeriesRepository.rebuild_summary(db_type, only_if_unready=True):
-                    print(f"[DB-Migration] {db_type} DB - initial series summary created")
-        except Exception as summary_err:
-            print(f"[DB-Migration ERROR] {db_type} series summary initialization failed: {summary_err}")
+        _migrate_schema_and_dedupe_progress(conn, cursor, db_type, _SCHEMA_SQL)
+        _create_indexes_and_cleanup_fts(conn, cursor, _INDEXES_SQL)
+        _seed_settings_and_admin(conn, cursor, db_type)
+        _seed_category_permissions(conn, cursor)
+        _backfill_audiobook_last_listened_at(conn, cursor, db_type)
+        _rebuild_series_summary_if_needed(conn, db_type)
 
         conn.close()
 

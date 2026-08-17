@@ -31,6 +31,7 @@ import { switchSettingsTab, loadInitialSystemSettings, loadGeneralSettings, subm
 import { initFloatingFilter, toggleFilterModal } from './genre_tag_filter.js';
 import { initSidebarInteractions, restoreDesktopSidebarState, toggleDesktopSidebar, syncSidebarResponsiveControls } from './sidebar_manager.js';
 import { decodeDetailParams } from './url_obfuscator.js';
+import { remoteLog } from './remote_log.js';
 
 // 모듈화로 분리한 미디어 타입 토글 및 검색 단축키 제어부 임포트
 import { canAccessLibraryType, applyLibraryTypeToggleVisibility, applyLibraryTypeButtonState, switchLibraryType } from './library_type_toggle.js';
@@ -134,13 +135,25 @@ function recoverTopCategoryUiAfterBack() {
     sidebarCollapsible.hidden = !isOpen;
   }
 
+  // 스크롤 복구 판정을 .library-header(검색/필터 카드) 하나만으로 하면, 그보다 더 위에
+  // 있는 .sidebar-header-wrapper(BookOasis 로고+햄버거)가 화면 밖으로 스크롤됐어도
+  // .library-header 자체는 아직 화면 안에 남아있어 복구 조건을 못 만족하는 경우가
+  // 있었다(실사용자 리포트로 확인: headerRect.top이 -30~-59까지 나가는데도 복구가
+  // 트리거 안 됨). html/body가 overflow:hidden이라도 iOS Safari는 키보드 표시/숨김,
+  // 주소창 접힘 등으로 여전히 창을 스크롤시킬 수 있다 - 두 헤더 중 더 위에 있는
+  // sidebarHeader 기준으로 판정하고, 임계값도 완화한다.
   const mainContent = document.querySelector('.library-main-content');
-  if (libraryHeader && mainContent) {
-    const headerRect = libraryHeader.getBoundingClientRect();
-    if (headerRect.bottom <= 0 || headerRect.top < -12) {
-      mainContent.scrollTop = 0;
-      window.scrollTo(0, 0);
-    }
+  const sidebarHeader = document.querySelector('.sidebar-header-wrapper');
+  const rectsOutOfView = [libraryHeader, sidebarHeader].some((el) => {
+    if (!el) return false;
+    const rect = el.getBoundingClientRect();
+    return rect.bottom <= 0 || rect.top < -4;
+  });
+  if (rectsOutOfView) {
+    if (mainContent) mainContent.scrollTop = 0;
+    // y=0 대신 y=1: iOS Safari는 스크롤 위치가 정확히 0일 때 주소창을 펼치며
+    // 페이지 콘텐츠 위에 겹쳐 그리는 버그가 있다.
+    window.scrollTo(0, 1);
   }
 
   requestAnimationFrame(() => {
@@ -409,6 +422,26 @@ async function initTabMediaLibrary() {
         }
       }
     }
+
+    // 브라우저 뒤로가기 클릭 시 상단 헤더(로고+햄버거)가 사라진다는 확실한 재현 리포트를
+    // 진단하기 위한 임시 로깅. recoverTopCategoryUiAfterBack()이 맨 앞에서 헤더를 정상
+    // 상태로 되돌리는데, 이 popstate 핸들러 뒷부분(loadLibraries/selectCategory 등 비동기
+    // 재렌더링 포함)에서 뭔가 그 상태를 다시 망가뜨리는지 확인하기 위해 즉시/지연 두
+    // 시점에 헤더 상태를 다시 찍는다.
+    const logHeaderStateAfterBack = (tag) => {
+      const header = document.querySelector('.sidebar-header-wrapper');
+      const sidebar = document.querySelector('.library-sidebar');
+      const btn = document.getElementById('btn-sidebar-toggle');
+      remoteLog(tag, {
+        headerDisplay: header ? getComputedStyle(header).display : 'not-found',
+        sidebarDisplay: sidebar ? getComputedStyle(sidebar).display : 'not-found',
+        btnDisplay: btn ? getComputedStyle(btn).display : 'not-found',
+        headerRect: header ? (() => { const r = header.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top) }; })() : null,
+        eventState: event.state
+      });
+    };
+    logHeaderStateAfterBack('popstate-header-check-immediate');
+    window.setTimeout(() => logHeaderStateAfterBack('popstate-header-check-delayed'), 300);
   });
 
   const initialHash = window.location.hash || '';

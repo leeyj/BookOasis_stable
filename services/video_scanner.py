@@ -4,6 +4,7 @@ import json
 import re
 import subprocess
 import time
+import html
 
 import yaml
 
@@ -64,15 +65,37 @@ EPISODE_PREFIX_RE = re.compile(r'^\s*S\d+E\d+\.\s*', re.IGNORECASE)
 # 브라우저가 별도 트랜스코딩 없이 <video> 태그로 직접 재생 가능한 컨테이너/코덱 조합.
 # mkv는 Chrome/Edge 계열에서 h264+aac 조합이면 대체로 잘 재생되지만, Safari는 MKV
 # 컨테이너 자체를 지원하지 않는다 - 사용자가 이 트레이드오프를 인지하고 mkv를 호환
-# 목록에 포함하기로 결정함(2026-08-17). Safari에서 mkv 재생이 안 되는 리포트가 오면
-# 이 결정을 재검토할 것.
+# 목록에 포함하기로 결정함(2026-08-17).
+#
+# [2026-08-17 후속] 예상대로 Safari/iOS에서 mkv 재생이 아예 안 된다는 리포트가 실제로
+# 들어왔다. 이 needs_transcode 플래그는 요청자 브라우저와 무관하게 DB에 전역 1개 값으로
+# 저장되므로, 여기서 policy를 다시 좁히는 대신 api/routes/video_routes.py::
+# stream_video_episode()에서 요청 시점에 User-Agent로 Safari/iOS를 감지해 mkv 파일만
+# 강제로 트랜스코딩 폴백으로 돌리도록 처리했다(_is_safari_or_ios()). 즉 이 상수 자체는
+# 그대로 두고(Chrome/Edge는 여전히 트랜스코딩 없이 직접 재생), 브라우저별 예외를
+# 라우트 레이어에서 흡수하는 방식으로 재검토를 마쳤다.
 BROWSER_COMPATIBLE_CONTAINERS = {'mp4', 'm4v', 'webm', 'mkv'}
 BROWSER_COMPATIBLE_VIDEO_CODECS = {'h264', 'vp8', 'vp9'}
 BROWSER_COMPATIBLE_AUDIO_CODECS = {'aac', 'opus', 'vorbis', 'mp3'}
 
+# 확장자가 주장하는 컨테이너와 ffprobe가 실측한 실제 컨테이너(format_name)가 일치하는지
+# 검증하기 위한 힌트. 2026-08-17 실사용자 리포트로 발견: 인프런 등 강좌 플랫폼 다운로드
+# 도구가 실제로는 MPEG-TS 스트림인 파일을 확장자만 `.mp4`로 잘못 저장하는 경우가 다수
+# 있었다(ffprobe format_name이 'mpegts'로 나옴). 코덱(h264/aac)은 정상이라 확장자+코덱만
+# 보던 기존 판정으로는 "호환"으로 오판했고, Chrome/Edge는 이 컨테이너 불일치에 관대해
+# 우연히 재생됐지만 Safari/iOS는 엄격하게 거부(MediaError code 4)했다.
+CONTAINER_FORMAT_NAME_HINTS = {
+    'mp4': ('mp4',),
+    'm4v': ('mp4',),
+    'webm': ('webm', 'matroska'),
+    'mkv': ('matroska',),
+}
 
-def is_browser_compatible(file_path, vcodec, acodec):
-    """컨테이너 확장자 + 비디오/오디오 코덱이 브라우저 네이티브 재생 가능 조합인지 판단."""
+
+def is_browser_compatible(file_path, vcodec, acodec, container_format_name=None):
+    """컨테이너 확장자 + 비디오/오디오 코덱 + (제공 시) 실제 컨테이너 포맷이 브라우저
+    네이티브 재생 가능 조합인지 판단. container_format_name은 ffprobe format.format_name
+    실측값 — 확장자와 실제 포맷이 어긋나는(예: mpegts를 .mp4로 잘못 저장) 파일을 걸러낸다."""
     ext = os.path.splitext(file_path)[1].lstrip('.').lower()
     if ext not in BROWSER_COMPATIBLE_CONTAINERS:
         return False
@@ -80,20 +103,25 @@ def is_browser_compatible(file_path, vcodec, acodec):
         return False
     if acodec and acodec not in BROWSER_COMPATIBLE_AUDIO_CODECS:
         return False
+    if container_format_name:
+        hints = CONTAINER_FORMAT_NAME_HINTS.get(ext)
+        if hints and not any(hint in container_format_name for hint in hints):
+            return False
     return True
 
 
 def _probe_video_info(file_path):
     """
-    ffprobe로 duration(초) + 비디오 스트림 width/height + 비디오/오디오 코덱명을 한 번에 조회합니다.
-    실패 시 (0.0, 0, 0, '', '')을 반환합니다.
+    ffprobe로 duration(초) + 비디오 스트림 width/height + 비디오/오디오 코덱명 +
+    실제 컨테이너 포맷명(format_name)을 한 번에 조회합니다.
+    실패 시 (0.0, 0, 0, '', '', '')을 반환합니다.
     """
     try:
         cmd = [
             'ffprobe',
             '-v', 'error',
             '-show_entries', 'stream=codec_type,codec_name,width,height',
-            '-show_entries', 'format=duration',
+            '-show_entries', 'format=duration,format_name',
             '-of', 'json',
             file_path,
         ]
@@ -106,10 +134,12 @@ def _probe_video_info(file_path):
             check=False,
         )
         if completed.returncode != 0 or not completed.stdout:
-            return 0.0, 0, 0, '', ''
+            return 0.0, 0, 0, '', '', ''
 
         data = json.loads(completed.stdout)
-        duration = float((data.get('format') or {}).get('duration') or 0.0)
+        fmt = data.get('format') or {}
+        duration = float(fmt.get('duration') or 0.0)
+        format_name = str(fmt.get('format_name') or '')
         streams = data.get('streams') or []
         vstream = next((s for s in streams if s.get('codec_type') == 'video'), {}) or {}
         astream = next((s for s in streams if s.get('codec_type') == 'audio'), {}) or {}
@@ -117,9 +147,9 @@ def _probe_video_info(file_path):
         height = int(vstream.get('height') or 0)
         vcodec = str(vstream.get('codec_name') or '').lower()
         acodec = str(astream.get('codec_name') or '').lower()
-        return duration, width, height, vcodec, acodec
+        return duration, width, height, vcodec, acodec, format_name
     except Exception:
-        return 0.0, 0, 0, '', ''
+        return 0.0, 0, 0, '', '', ''
 
 
 def _load_show_yaml(folder_path):
@@ -144,11 +174,15 @@ def _load_show_yaml(folder_path):
     if not isinstance(data, dict):
         return None, {}
 
+    # show.yaml은 강좌 플랫폼 웹페이지에서 제목/설명을 긁어오는 외부(커뮤니티) 도구가 생성하는
+    # 경우가 많은데, 그런 도구 상당수가 HTML 엔티티(&lt; &amp; &#x27; 등)를 디코딩하지 않고
+    # 원문 그대로 저장한다. html.unescape()는 엔티티가 없는 일반 텍스트에는 영향이 없으므로,
+    # 안전하게 방어적으로 적용해 "&lt;강좌명&gt;" 같은 원문 노출을 막는다.
     genres = data.get('genres', [])
     course_meta = {
-        'title': str(data.get('title', '')).strip(),
+        'title': html.unescape(str(data.get('title', '')).strip()),
         'genres': ", ".join(genres) if isinstance(genres, list) else str(genres or ''),
-        'summary': str(data.get('summary', '')).strip(),
+        'summary': html.unescape(str(data.get('summary', '')).strip()),
         'art': str(data.get('art', '')).strip(),
         'posters': str(data.get('posters', '')).strip(),
         'code': str(data.get('code', '')).strip(),
@@ -168,7 +202,7 @@ def _load_show_yaml(folder_path):
                 except (TypeError, ValueError):
                     continue
                 episode_by_index[idx] = {
-                    'title': str(ep.get('title', '')).strip(),
+                    'title': html.unescape(str(ep.get('title', '')).strip()),
                     'originally_available_at': str(ep.get('originally_available_at', '')).strip(),
                 }
         # 시즌 자체의 art가 있으면 최상위 art보다 우선

@@ -5,6 +5,7 @@ import { createMiniPlayerUiController } from './audio_player_modules/mini_player
 import { createAudioPlaybackEngine } from './audio_player_modules/playback_engine.js';
 import { registerAudioPlayerPublicApi } from './audio_player_modules/public_api.js';
 import { createChapterDrawer } from './audio_player_modules/chapter_drawer.js';
+import { remoteLog } from './remote_log.js';
 
 let audioInstance = null;
 let currentAudiobookData = null;
@@ -296,6 +297,17 @@ export function openAudioPlayerModal(audioData, targetTrackId = null, startTime 
 
   if (!audioInstance) {
     audioInstance = new Audio();
+    // 대부분의 모바일 브라우저(iOS Safari, Android Chrome 공통)는 DOM에 붙어있지 않은
+    // <audio> 엘리먼트를 화면 잠금/백그라운드 재생 세션으로 인정하지 않아, 화면이 다시
+    // 보일 때까지 재생을 끊어버린다. new Audio()로 만든 엘리먼트는 기본적으로 DOM 트리에
+    // 붙지 않으므로, 화면에는 보이지 않되(visually hidden) 문서에는 실제로 존재하도록
+    // body에 추가해야 한다.
+    audioInstance.style.position = 'fixed';
+    audioInstance.style.width = '0';
+    audioInstance.style.height = '0';
+    audioInstance.style.opacity = '0';
+    audioInstance.style.pointerEvents = 'none';
+    document.body.appendChild(audioInstance);
     initAudioEvents();
   }
 
@@ -373,10 +385,31 @@ function initAudioEvents() {
 
   audioInstance.onpause = () => {
     updatePlaybackToggleButtons(false);
+    remoteLog('audio-pause', {
+      hidden: document.visibilityState,
+      currentTime: audioInstance.currentTime,
+      ended: audioInstance.ended,
+      readyState: audioInstance.readyState,
+      networkState: audioInstance.networkState
+    });
     if (!audioInstance || audioInstance.ended) return;
     // 일시정지는 페이지 이탈이 아니므로 fetch keepalive 기반 강제 저장을 우선한다.
     saveProgress(false, { useBeacon: false, force: true });
   };
+
+  // 화면 잠금 시 재생이 끊기는 문제를 실기기에서 진단하기 위한 원격 로깅.
+  // stalled/suspend/waiting은 각각 다른 원인을 가리킨다: stalled=네트워크에서 데이터를
+  // 못 받아옴, suspend=브라우저가 자체적으로 더 이상 데이터를 받아오지 않기로 결정함
+  // (백그라운드 스로틀링의 전형적 신호), waiting=디코딩된 데이터가 부족해 재생이 멈춤.
+  audioInstance.onstalled = () => remoteLog('audio-stalled', { currentTime: audioInstance.currentTime, hidden: document.visibilityState });
+  audioInstance.onsuspend = () => remoteLog('audio-suspend', { currentTime: audioInstance.currentTime, hidden: document.visibilityState });
+  audioInstance.onwaiting = () => remoteLog('audio-waiting', { currentTime: audioInstance.currentTime, hidden: document.visibilityState });
+  audioInstance.onerror = () => remoteLog('audio-error', {
+    code: audioInstance.error ? audioInstance.error.code : null,
+    message: audioInstance.error ? audioInstance.error.message : null,
+    hidden: document.visibilityState
+  });
+  audioInstance.onplaying = () => remoteLog('audio-playing', { currentTime: audioInstance.currentTime, hidden: document.visibilityState });
 
   audioInstance.onended = () => {
     if (currentAudiobookData && currentAudiobookData.tracks && currentTrackIndex < currentAudiobookData.tracks.length - 1) {
@@ -686,10 +719,40 @@ initAudioLifecycleAndShortcuts({
   onVisibilityHidden: () => {
     // 화면 잠금/탭 전환 시 진행도 즉시 저장
     flushAudioProgressForLifecycle(true);
+    if (audioInstance) {
+      remoteLog('visibility-hidden', {
+        paused: audioInstance.paused,
+        currentTime: audioInstance.currentTime,
+        readyState: audioInstance.readyState,
+        networkState: audioInstance.networkState
+      });
+    }
   },
   onVisibilityVisible: () => {
     // iOS Safari는 화면 잠금 시 AudioContext를 강제 suspend 처리함.
     // 화면 복귀 시 명시적으로 resume하지 않으면 소리가 끊긴 채 유지됨.
     playbackEngine.ensureAudioContextResumed();
+    if (audioInstance) {
+      remoteLog('visibility-visible', {
+        paused: audioInstance.paused,
+        currentTime: audioInstance.currentTime,
+        readyState: audioInstance.readyState,
+        networkState: audioInstance.networkState
+      });
+    }
   }
 });
+
+// 화면 잠금 중에는 콘솔을 볼 수 없으므로, 재생 중일 때 주기적으로 상태를 서버 로그로
+// 흘려보내 currentTime이 실제로 멈추는 시점/paused로 바뀌는 시점을 추적한다.
+// 잠금 중이 아닐 때는 굳이 로그를 남기지 않는다(디버깅 목적 외 트래픽 방지).
+setInterval(() => {
+  if (document.visibilityState !== 'hidden') return;
+  if (!audioInstance) return;
+  remoteLog('lockscreen-heartbeat', {
+    paused: audioInstance.paused,
+    currentTime: audioInstance.currentTime,
+    readyState: audioInstance.readyState,
+    networkState: audioInstance.networkState
+  });
+}, 5000);

@@ -117,6 +117,130 @@ def setup_lazy_scanner_logging():
         builtins.print = lambda *args, **kwargs: None
 
 
+def _load_lazy_scan_limits():
+    """개별 파일 크기 제한(MB)과 세션 누적 처리 용량 한도(MB)를 설정에서 로드한다."""
+    # ── 최대 스캔 허용 파일 크기(MB) 및 세션 누적 제한(MB) 설정 로드 ──
+    max_size_mb = 300.0   # 개별 파일 안전 기본값 (300MB)
+    max_batch_mb = 1024.0 # 세션 누적 안전 기본값 (1024MB = 1GB)
+    try:
+        from repositories.settings_repository import SettingsRepository
+        size_val = SettingsRepository.get_value('general', 'LAZY_SCAN_MAX_FILE_SIZE_MB')
+        batch_val = SettingsRepository.get_value('general', 'LAZY_SCAN_MAX_BATCH_SIZE_MB')
+        if size_val is not None:
+            max_size_mb = float(str(size_val).strip() or '300')
+        if batch_val is not None:
+            max_batch_mb = float(str(batch_val).strip() or '1024')
+    except Exception as _se:
+        print(f"[Lazy-Scanner] 크기 설정 로드 실패 (기본 300MB/1024MB 적용): {_se}")
+    
+    if max_size_mb > 0:
+        print(f"[Lazy-Scanner] 📏 개별 파일 크기 제한: {max_size_mb:.0f} MB (초과 시 스킵)")
+    else:
+        print("[Lazy-Scanner] 📏 개별 파일 크기 제한 없음 (LAZY_SCAN_MAX_FILE_SIZE_MB=0)")
+
+    if max_batch_mb > 0:
+        print(f"[Lazy-Scanner] 📊 1회 세션 누적 처리 용량 한도: {max_batch_mb:.0f} MB (도달 시 다음 스케줄로 안전 이관)")
+    else:
+        print("[Lazy-Scanner] 📊 세션 누적 처리 용량 제한 없음 (LAZY_SCAN_MAX_BATCH_SIZE_MB=0)")
+    return max_size_mb, max_batch_mb
+
+
+def _build_scan_targets(db_type, books, library_remote_map):
+    """DB에서 1차 선별된 후보 도서들을 실제 물리 파일 상태까지 점검해 최종 스캔
+    대상 목록((book, offset_only) 튜플 리스트)으로 좁힌다. conn/세션 누적 상태와
+    무관한 순수 필터링 단계라 별도 함수로 분리해도 안전하다."""
+    targets = []
+    for book in books:
+        if stop_requested:
+            print(f"[Lazy-Scanner] ⚠️ DB({db_type}) 파일 물리 점검 도중 중단 요청(SIGTERM/SIGINT) 감지. 점검을 중단합니다.")
+            break
+
+        file_path = book['file_path']
+        cover_image = book['cover_image']
+        
+        # 텍스트 파일(.txt)은 표지가 없는 것이 정상이므로 복원 대상에서 사전에 제외
+        if file_path.lower().endswith('.txt'):
+            continue
+        
+        # ── 커버 유효성 판단 ──
+        cover_missing = False
+        if not cover_image:
+            # 커버 경로 자체가 없음
+            cover_missing = True
+        else:
+            cover_filepath = os.path.join(MEDIA_SERVER_DIR, 'covers', cover_image)
+            if not os.path.exists(cover_filepath) or os.path.getsize(cover_filepath) == 0:
+                # 커버 경로는 있지만 실제 파일이 없거나 0바이트
+                cover_missing = True
+
+        # ── 오프셋 유효성 판단 (ZIP/CBZ 전용) ──
+        offset_missing = False
+        file_format = (book['file_format'] or '').lower()
+        if file_format in ('zip', 'cbz'):
+            if book['total_pages'] == 0 or book['has_offsets'] == 0:
+                offset_missing = True
+
+        metadata_locked = int(book['metadata_locked'] or 0) == 1
+        if metadata_locked and cover_missing:
+            if not offset_missing:
+                print(f"[Lazy-Scanner] 메타데이터 잠금으로 커버 자동 갱신 스킵: {os.path.basename(file_path)}")
+                continue
+            cover_missing = False
+
+        if not cover_missing and not offset_missing:
+            # 커버도 있고 오프셋도 있음 → 완전히 처리된 도서, 스킵
+            continue
+
+        # ── offset_only 플래그: 커버는 정상이고 오프셋만 없는 경우 ──
+        # 커버 재추출 없이 오프셋 수집만 수행하여 불필요한 I/O를 방지
+        offset_only = (not cover_missing and offset_missing)
+        
+        library_id = book['library_id']
+        if library_id in library_remote_map:
+            # DB에 이미 확정돼 있는 라이브러리 원격 플래그를 신뢰 (휴리스틱 재판별 회피)
+            _is_remote = library_remote_map[library_id]
+        else:
+            # library_id가 매핑에 없는 예외 케이스(고아 레코드 등)에 한해서만 휴리스틱 폴백
+            from utils.drive_helper import is_remote_path
+            _is_remote = is_remote_path(file_path)
+
+        # [원격 경로 최적화] 커버는 정상이고 오프셋만 없는 원격지(GDRIVE 등) 도서는
+        # 백그라운드 대량 스캔 부하 차단을 위해 Lazy 스캔 수집 대상에서 원천 배제합니다.
+        # (뷰어에서 열릴 때 실시간으로 파싱되므로 성능에 문제 없음)
+        if offset_only and _is_remote:
+            continue
+            
+        if offset_only:
+            print(f"[Lazy-Scanner] 오프셋 전용 재수집 대상: {os.path.basename(file_path)}")
+
+        # 원격 경로(GDRIVE 등)는 os.path.exists가 느리거나 실패할 수 있으므로 무조건 포함
+        if _is_remote or os.path.exists(file_path):
+            targets.append((book, offset_only))
+
+            
+    cover_missing_count = sum(1 for _, offset_only in targets if not offset_only)
+    offset_only_count   = sum(1 for _, offset_only in targets if offset_only)
+    print(f"[Lazy-Scanner] DB={db_type} -> 처리 대상 도서 수: {len(targets)}권 (커버 재추출: {cover_missing_count}권 / 오프셋 전용: {offset_only_count} books)")
+    return targets
+
+
+def _group_targets_by_folder(targets):
+    """같은 폴더의 kavita.yaml/series.json을 폴더당 1회만 파싱할 수 있도록,
+    스캔 대상을 상위 폴더 기준으로 그룹핑하고 폴더 내부는 자연 정렬한다."""
+    # 폴더별 그룹핑: 같은 폴더의 kavita.yaml/series.json을 한 번만 파싱
+    from collections import defaultdict
+    from utils.sort_helper import natural_sort_key
+    folder_groups = defaultdict(list)
+    for book, offset_only in targets:
+        parent_dir = os.path.dirname(book['file_path'])
+        folder_groups[parent_dir].append((book, offset_only))
+    
+    # 폴더 내 파일을 정렬
+    for parent_dir in folder_groups:
+        folder_groups[parent_dir].sort(key=lambda t: natural_sort_key(t[0]['file_path']))
+    return folder_groups
+
+
 def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
     global stop_requested
 
@@ -131,29 +255,9 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
         if target_db_type in ('general', 'adult', 'audiobook'):
             db_types = [target_db_type]
 
-        # ── 최대 스캔 허용 파일 크기(MB) 및 세션 누적 제한(MB) 설정 로드 ──
-        max_size_mb = 300.0   # 개별 파일 안전 기본값 (300MB)
-        max_batch_mb = 1024.0 # 세션 누적 안전 기본값 (1024MB = 1GB)
-        try:
-            from repositories.settings_repository import SettingsRepository
-            size_val = SettingsRepository.get_value('general', 'LAZY_SCAN_MAX_FILE_SIZE_MB')
-            batch_val = SettingsRepository.get_value('general', 'LAZY_SCAN_MAX_BATCH_SIZE_MB')
-            if size_val is not None:
-                max_size_mb = float(str(size_val).strip() or '300')
-            if batch_val is not None:
-                max_batch_mb = float(str(batch_val).strip() or '1024')
-        except Exception as _se:
-            print(f"[Lazy-Scanner] 크기 설정 로드 실패 (기본 300MB/1024MB 적용): {_se}")
-        
-        if max_size_mb > 0:
-            print(f"[Lazy-Scanner] 📏 개별 파일 크기 제한: {max_size_mb:.0f} MB (초과 시 스킵)")
-        else:
-            print("[Lazy-Scanner] 📏 개별 파일 크기 제한 없음 (LAZY_SCAN_MAX_FILE_SIZE_MB=0)")
 
-        if max_batch_mb > 0:
-            print(f"[Lazy-Scanner] 📊 1회 세션 누적 처리 용량 한도: {max_batch_mb:.0f} MB (도달 시 다음 스케줄로 안전 이관)")
-        else:
-            print("[Lazy-Scanner] 📊 세션 누적 처리 용량 제한 없음 (LAZY_SCAN_MAX_BATCH_SIZE_MB=0)")
+        # ── 최대 스캔 허용 파일 크기(MB) 및 세션 누적 제한(MB) 설정 로드 ──
+        max_size_mb, max_batch_mb = _load_lazy_scan_limits()
 
         session_accumulated_bytes = 0.0
         batch_limit_reached = False
@@ -197,90 +301,9 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
             print(f"[Lazy-Scanner] 📋 DB({db_type}) 스캔 필요 후보 도서 레코드 조회 완료 (총 {len(books)}권). 파일 물리 점검 시작...")
             library_remote_map = _fetch_library_remote_map(cursor)
 
-            targets = []
-            for book in books:
-                if stop_requested:
-                    print(f"[Lazy-Scanner] ⚠️ DB({db_type}) 파일 물리 점검 도중 중단 요청(SIGTERM/SIGINT) 감지. 점검을 중단합니다.")
-                    break
-
-                file_path = book['file_path']
-                cover_image = book['cover_image']
-                
-                # 텍스트 파일(.txt)은 표지가 없는 것이 정상이므로 복원 대상에서 사전에 제외
-                if file_path.lower().endswith('.txt'):
-                    continue
-                
-                # ── 커버 유효성 판단 ──
-                cover_missing = False
-                if not cover_image:
-                    # 커버 경로 자체가 없음
-                    cover_missing = True
-                else:
-                    cover_filepath = os.path.join(MEDIA_SERVER_DIR, 'covers', cover_image)
-                    if not os.path.exists(cover_filepath) or os.path.getsize(cover_filepath) == 0:
-                        # 커버 경로는 있지만 실제 파일이 없거나 0바이트
-                        cover_missing = True
-
-                # ── 오프셋 유효성 판단 (ZIP/CBZ 전용) ──
-                offset_missing = False
-                file_format = (book['file_format'] or '').lower()
-                if file_format in ('zip', 'cbz'):
-                    if book['total_pages'] == 0 or book['has_offsets'] == 0:
-                        offset_missing = True
-
-                metadata_locked = int(book['metadata_locked'] or 0) == 1
-                if metadata_locked and cover_missing:
-                    if not offset_missing:
-                        print(f"[Lazy-Scanner] 메타데이터 잠금으로 커버 자동 갱신 스킵: {os.path.basename(file_path)}")
-                        continue
-                    cover_missing = False
-
-                if not cover_missing and not offset_missing:
-                    # 커버도 있고 오프셋도 있음 → 완전히 처리된 도서, 스킵
-                    continue
-
-                # ── offset_only 플래그: 커버는 정상이고 오프셋만 없는 경우 ──
-                # 커버 재추출 없이 오프셋 수집만 수행하여 불필요한 I/O를 방지
-                offset_only = (not cover_missing and offset_missing)
-                
-                library_id = book['library_id']
-                if library_id in library_remote_map:
-                    # DB에 이미 확정돼 있는 라이브러리 원격 플래그를 신뢰 (휴리스틱 재판별 회피)
-                    _is_remote = library_remote_map[library_id]
-                else:
-                    # library_id가 매핑에 없는 예외 케이스(고아 레코드 등)에 한해서만 휴리스틱 폴백
-                    from utils.drive_helper import is_remote_path
-                    _is_remote = is_remote_path(file_path)
-
-                # [원격 경로 최적화] 커버는 정상이고 오프셋만 없는 원격지(GDRIVE 등) 도서는
-                # 백그라운드 대량 스캔 부하 차단을 위해 Lazy 스캔 수집 대상에서 원천 배제합니다.
-                # (뷰어에서 열릴 때 실시간으로 파싱되므로 성능에 문제 없음)
-                if offset_only and _is_remote:
-                    continue
-                    
-                if offset_only:
-                    print(f"[Lazy-Scanner] 오프셋 전용 재수집 대상: {os.path.basename(file_path)}")
-
-                # 원격 경로(GDRIVE 등)는 os.path.exists가 느리거나 실패할 수 있으므로 무조건 포함
-                if _is_remote or os.path.exists(file_path):
-                    targets.append((book, offset_only))
-
-                    
-            cover_missing_count = sum(1 for _, offset_only in targets if not offset_only)
-            offset_only_count   = sum(1 for _, offset_only in targets if offset_only)
-            print(f"[Lazy-Scanner] DB={db_type} -> 처리 대상 도서 수: {len(targets)}권 (커버 재추출: {cover_missing_count}권 / 오프셋 전용: {offset_only_count} books)")
+            targets = _build_scan_targets(db_type, books, library_remote_map)
             
-            # 폴더별 그룹핑: 같은 폴더의 kavita.yaml/series.json을 한 번만 파싱
-            from collections import defaultdict
-            from utils.sort_helper import natural_sort_key
-            folder_groups = defaultdict(list)
-            for book, offset_only in targets:
-                parent_dir = os.path.dirname(book['file_path'])
-                folder_groups[parent_dir].append((book, offset_only))
-            
-            # 폴더 내 파일을 정렬
-            for parent_dir in folder_groups:
-                folder_groups[parent_dir].sort(key=lambda t: natural_sort_key(t[0]['file_path']))
+            folder_groups = _group_targets_by_folder(targets)
             
             # 카테고리별 에러 리스트 수집용 딕셔너리
             lib_errors = {}
@@ -789,12 +812,12 @@ def run_lazy_video_duration_backfill():
             if not file_path or not os.path.exists(file_path):
                 continue
 
-            duration, width, height, vcodec, acodec = _probe_video_info(file_path)
+            duration, width, height, vcodec, acodec, format_name = _probe_video_info(file_path)
             if duration <= 0:
                 # 여전히 실패(파일 손상/네트워크 일시 오류 등) - 다음 lazy 실행에서 재시도
                 continue
 
-            needs_transcode = 0 if is_browser_compatible(file_path, vcodec, acodec) else 1
+            needs_transcode = 0 if is_browser_compatible(file_path, vcodec, acodec, format_name) else 1
 
             cursor.execute(
                 "UPDATE video_episodes SET duration = ?, width = ?, height = ?, needs_transcode = ? WHERE id = ?",
@@ -814,6 +837,113 @@ def run_lazy_video_duration_backfill():
         print(f"[Lazy-Scanner] 🎬 영상 에피소드 백필 완료: {updated_count}건 업데이트, 강좌 {len(touched_video_ids)}건 total_duration 재계산")
     except Exception as e:
         print(f"[Lazy-Scanner] 영상 백필 중 오류: {e}")
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def run_lazy_video_container_revalidation():
+    """
+    이미 duration이 채워져 '분석 완료 + 브라우저 호환(needs_transcode=0)'으로 확정된 mp4/webm
+    에피소드 중, 실제 컨테이너 포맷이 확장자와 다른 파일(예: 인프런 등 강좌 플랫폼 다운로드
+    도구가 MPEG-TS 스트림을 확장자만 .mp4로 잘못 저장한 경우)을 재검증한다.
+
+    2026-08-17 실사용자 리포트로 발견: is_browser_compatible()이 확장자+코덱만 보고
+    "호환"으로 판정했던 기존 로직 때문에, 실제로는 mpegts인 파일이 Chrome/Edge에서는
+    관대하게 재생되지만 Safari/iOS에서는 MediaError code 4(포맷 미지원)로 거부당했다.
+    이 함수는 그렇게 확정 완료된 상태로 남아있던 기존 데이터를 재검사해 바로잡는다
+    (앞으로의 신규 스캔/JIT 체크는 is_browser_compatible()에 format_name 파라미터가
+    추가되어 이미 올바르게 걸러진다 - 이 함수는 그 수정 이전에 이미 확정된 데이터 전용).
+
+    container_verified 컬럼으로 이미 검사한 행을 표시해 매 실행마다 동일한 대량 데이터를
+    반복 재검사하지 않도록 한다(1회성 백필, duration 백필과 동일한 배치/설정 재사용).
+    """
+    global stop_requested
+
+    if not database.is_mariadb_mode():
+        db_path = database.get_db_path('video')
+        if not os.path.exists(db_path):
+            return
+
+    MAX_EPISODES_PER_RUN = 300
+    try:
+        from repositories.settings_repository import SettingsRepository
+        max_ep_val = SettingsRepository.get_value('general', 'LAZY_SCAN_VIDEO_MAX_EPISODES_PER_RUN')
+        if max_ep_val is not None:
+            MAX_EPISODES_PER_RUN = int(str(max_ep_val).strip() or '300')
+    except Exception as _ve:
+        print(f"[Lazy-Scanner] 영상 컨테이너 재검증 배치 크기 설정 로드 실패 (기본 300건 적용): {_ve}")
+
+    conn = _open_database_connection('video')
+    if conn is None:
+        return
+
+    print("[Lazy-Scanner] 🎬 영상 에피소드 컨테이너 포맷 재검증(mislabeled mp4/webm) 시작")
+    try:
+        from services.video_scanner import _probe_video_info, is_browser_compatible
+
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, video_id, file_path
+            FROM video_episodes
+            WHERE format IN ('mp4', 'webm')
+              AND COALESCE(needs_transcode, 0) = 0
+              AND COALESCE(container_verified, 0) = 0
+            ORDER BY id ASC
+            LIMIT ?
+        """, (MAX_EPISODES_PER_RUN,))
+        candidates = cursor.fetchall()
+
+        if not candidates:
+            print("[Lazy-Scanner] 🎬 재검증 대상 영상 에피소드 없음. 스킵.")
+            return
+
+        print(f"[Lazy-Scanner] 🎬 재검증 대상 영상 에피소드 {len(candidates)}건 발견. ffprobe 컨테이너 검사 시작...")
+
+        flipped_count = 0
+        verified_count = 0
+        touched_video_ids = set()
+        total = len(candidates)
+        for done, row in enumerate(candidates, start=1):
+            if stop_requested:
+                print("[Lazy-Scanner] ⚠️ 중단 요청(SIGTERM/SIGINT) 감지. 영상 컨테이너 재검증을 중단합니다.")
+                break
+
+            episode_id = row['id']
+            video_id = row['video_id']
+            file_path = row['file_path']
+            print(f"[Lazy-Scanner] 🎬 ({done}/{total}) 컨테이너 재검증 -> {os.path.basename(file_path or '')}")
+
+            if not file_path or not os.path.exists(file_path):
+                # 파일이 없어졌으면 판정할 수 없으니 재검증 대상에서만 제외(다음 스캔이 처리)
+                cursor.execute("UPDATE video_episodes SET container_verified = 1 WHERE id = ?", (episode_id,))
+                conn.commit()
+                continue
+
+            duration, width, height, vcodec, acodec, format_name = _probe_video_info(file_path)
+            if duration <= 0:
+                # ffprobe 실패(원격 마운트 일시 오류 등) - 다음 lazy 실행에서 재시도, 검증 완료로 표시하지 않음
+                continue
+
+            still_compatible = is_browser_compatible(file_path, vcodec, acodec, format_name)
+            if not still_compatible:
+                cursor.execute(
+                    "UPDATE video_episodes SET needs_transcode = 1, container_verified = 1 WHERE id = ?",
+                    (episode_id,)
+                )
+                flipped_count += 1
+                touched_video_ids.add(video_id)
+                print(f"[Lazy-Scanner] ⚠️ 컨테이너 불일치 발견(실제 포맷: {format_name}) -> 트랜스코딩 대상으로 전환: {os.path.basename(file_path)}")
+            else:
+                cursor.execute("UPDATE video_episodes SET container_verified = 1 WHERE id = ?", (episode_id,))
+            verified_count += 1
+            conn.commit()
+
+        print(f"[Lazy-Scanner] 🎬 영상 컨테이너 재검증 완료: {verified_count}건 검사, {flipped_count}건 트랜스코딩 대상으로 전환 (강좌 {len(touched_video_ids)}건 영향)")
+    except Exception as e:
+        print(f"[Lazy-Scanner] 영상 컨테이너 재검증 중 오류: {e}")
     finally:
         try:
             conn.close()
@@ -846,6 +976,7 @@ if __name__ == '__main__':
         # 그 뒤에 이어 붙이면 아래 코드는 영원히 실행되지 않는다. 영상 백필은 반드시 먼저 실행한다.
         if args.book_id is None:
             run_lazy_video_duration_backfill()
+            run_lazy_video_container_revalidation()
         run_lazy_cover_extraction(target_book_id=args.book_id, target_db_type=args.db_type)
     except SystemExit as se:
         sys.exit(se.code)
