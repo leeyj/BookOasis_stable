@@ -25,6 +25,9 @@ export function getComicPageStep(...args) { return Settings.getComicPageStep.app
 export function toggleComicPageStep(...args) { return Settings.toggleComicPageStep.apply(null, args); }
 export function setComicPageStep(...args) { return Settings.setComicPageStep.apply(null, args); }
 export function setComicScrollWidth(px) { return Settings.setScrollWidth(px); }
+export function getTapZoneDirection(...args) { return Settings.getTapZoneDirection.apply(null, args); }
+export function toggleTapZoneDirection(...args) { return Settings.toggleTapZoneDirection.apply(null, args); }
+export function initTapZoneDirection(...args) { return Settings.initTapZoneDirection.apply(null, args); }
 export function clearComicViewer(...args) { return Renderer.clearComicViewer.apply(null, args); }
 
 // Expose legacy globals on window as live bindings

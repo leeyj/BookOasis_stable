@@ -1,4 +1,8 @@
 # CHANGELOG
+## v2.1.6
+- (viewer) 모바일 뷰어의 상/하 스와이프 방향이 다른 앱(틱톡/릴스/웹툰 세로보기)과 반대로 되어 있던 문제 수정 — 위로 스와이프=다음 페이지, 아래로 스와이프=이전 페이지로 통일(기존 마우스 휠 방향과도 일치) | fix mobile viewer's vertical swipe direction being reversed compared to other apps (TikTok/Reels/vertical webtoon readers) — unified to swipe-up=next page, swipe-down=previous page (now consistent with the existing mouse-wheel direction)
+- (viewer) 한손으로 스마트폰을 쥐었을 때 좌/우 탭존이 손에 닿기 어렵다는 요청에 따라, 뷰어 탭존을 좌/우 ↔ 상/하로 전환할 수 있는 설정 추가(오버레이 메뉴 > 보기 탭) | add a viewer setting (Overlay menu > Layout tab) to switch the tap-to-turn-page zones between left/right and top/bottom, for easier one-handed reach on phones
+
 ## v2.1.5
 - (fix) 모바일 사이드바 햄버거 버튼이 핀치 확대/축소 시 흔들리거나 사라지던 문제 수정 — `position: fixed` 대신 로고 옆 일반 문서 흐름으로 변경 | fix mobile sidebar hamburger button jittering/disappearing on pinch-zoom — moved off `position: fixed` into normal document flow
 - (fix) iOS에서 상단 헤더가 뒤로가기/탭 전환 후 간헐적으로 안 보이던 문제 수정 — 실제로는 화면 위로 스크롤되어 가려진 것이었음(스크롤 복구 로직 보강), 스크롤 복구가 주소창을 덮어버리는 부작용도 함께 수정 | fix the top header intermittently disappearing on iOS after back-navigation/tab-switch — root cause was the header scrolling out of view, not a render bug; also fixed a side effect where the scroll-reset itself caused Safari's address bar to overlap content

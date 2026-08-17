@@ -442,6 +442,25 @@
     width: 30%;
 }
 
+/* 📌 상/하 탭존 모드 (한손 파지 대응: 좌/우 대신 위/아래로 넘기기) */
+.comic-hotspot-layer.vertical {
+    flex-direction: column;
+}
+
+.comic-hotspot-layer.vertical .hotspot-zone {
+    width: 100%;
+    height: auto;
+}
+
+.comic-hotspot-layer.vertical .left-zone,
+.comic-hotspot-layer.vertical .right-zone {
+    height: 30%;
+}
+
+.comic-hotspot-layer.vertical .center-zone {
+    height: 40%;
+}
+
 /* ────────────────────────────────────────────────────────
    📌 Kavita 스타일 플로팅 조작 오버레이 메뉴
    ──────────────────────────────────────────────────────── */

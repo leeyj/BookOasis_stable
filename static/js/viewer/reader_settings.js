@@ -2,6 +2,7 @@
 import { showViewerLoading, hideViewerLoading } from '../view_manager.js';
 
 export let comicReadingDirection = 'ltr';
+export let tapZoneDirection = 'horizontal';
 export let comicPageStep = 1;
 export let comicFitMode = 'height';
 export let comicScrollWidth = 800; // 스크롤 모드 이미지 너비 (px, 600~900, 50단위)
@@ -75,6 +76,51 @@ function syncComicReadingDirectionUI() {
   if (label) {
     label.textContent = comicReadingDirection === 'rtl' ? '오른쪽→왼쪽' : '왼쪽→오른쪽';
   }
+}
+
+// ──────────────────────────────────────────────────
+// 화면 탭존 방향 (좌/우 넘기기 ↔ 상/하 넘기기, 한손 파지 대응)
+// ──────────────────────────────────────────────────
+
+function getStoredTapZoneDirection() {
+  const saved = localStorage.getItem('viewer_tap_zone_direction');
+  return saved === 'vertical' ? 'vertical' : 'horizontal';
+}
+
+export function setTapZoneDirection(direction) {
+  tapZoneDirection = direction === 'vertical' ? 'vertical' : 'horizontal';
+  localStorage.setItem('viewer_tap_zone_direction', tapZoneDirection);
+  syncTapZoneDirectionUI();
+  return tapZoneDirection;
+}
+
+export function getTapZoneDirection() {
+  return tapZoneDirection;
+}
+
+export function toggleTapZoneDirection() {
+  return setTapZoneDirection(tapZoneDirection === 'vertical' ? 'horizontal' : 'vertical');
+}
+
+function syncTapZoneDirectionUI() {
+  const hotspot = document.getElementById('common-viewer-hotspot');
+  if (hotspot) {
+    hotspot.classList.toggle('vertical', tapZoneDirection === 'vertical');
+  }
+
+  const btn = document.getElementById('btn-tap-zone-direction');
+  const label = document.getElementById('tap-zone-direction-label');
+  if (btn) {
+    btn.classList.toggle('active', tapZoneDirection === 'vertical');
+    btn.title = tapZoneDirection === 'vertical' ? '상/하 탭으로 넘기기' : '좌/우 탭으로 넘기기';
+  }
+  if (label) {
+    label.textContent = tapZoneDirection === 'vertical' ? '상/하' : '좌/우';
+  }
+}
+
+export function initTapZoneDirection() {
+  setTapZoneDirection(getStoredTapZoneDirection());
 }
 
 function syncComicPageStepUI() {

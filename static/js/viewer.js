@@ -1,6 +1,6 @@
 // viewer.js – 미디어 뷰어 라이프사이클 및 단축키 코어 조율기
 import { state } from './state.js';
-import { nextComicPage, prevComicPage, setComicFitMode, toggleComicOverlay, markAsCompleted as markComicAsCompleted, getComicReadingDirection, toggleComicReadingDirection, toggleComicPageStep, comicJumpToFirstPage, comicJumpToLastPage } from './viewer_comic.js';
+import { nextComicPage, prevComicPage, setComicFitMode, toggleComicOverlay, markAsCompleted as markComicAsCompleted, getComicReadingDirection, toggleComicReadingDirection, toggleComicPageStep, comicJumpToFirstPage, comicJumpToLastPage, toggleTapZoneDirection, initTapZoneDirection } from './viewer_comic.js';
 import { prevTxtPage, nextTxtPage, applyTxtSettings, txtJumpToFirstPage, txtJumpToLastPage } from './viewer_txt.js';
 import { nextPdfPage, prevPdfPage, pdfJumpToFirstPage, pdfJumpToLastPage } from './viewer_pdf.js';
 import { initFullscreenStateSync, isViewerInFullscreen, toggleFullscreenViewer } from './viewer/fullscreen_controller.js';
@@ -493,6 +493,9 @@ window.toggleComicCenterGap = function () {
 // 최초 로드 시 사용자 폰트 사전 로딩
 loadCustomFontsList();
 
+// 최초 로드 시 저장된 탭존 방향(좌/우 ↔ 상/하) 복원 (핫스팟 레이어는 모달과 별개로 항상 DOM에 존재)
+initTapZoneDirection();
+
 function initMediaViewerDelegation() {
   if (window.__mediaViewerDelegationBound) return;
 
@@ -532,6 +535,7 @@ function initMediaViewerDelegation() {
     if (action === 'toggle-page-step') return window.toggleComicPageStep?.();
     if (action === 'toggle-center-gap') return window.toggleComicCenterGap?.();
     if (action === 'toggle-reading-direction') return window.toggleComicReadingDirection?.();
+    if (action === 'toggle-tap-zone-direction') return toggleTapZoneDirection();
     if (action === 'toggle-theme-cycle') return window.toggleTheme?.();
     if (action === 'toggle-padding-panel') return window.toggleViewerPaddingPanel?.();
   }, true);

@@ -486,18 +486,19 @@ export function initViewerClickToggle() {
         return;
       }
 
-      // 📱 1-1) 스와이프 제스처 처리 (페이지 모드일 때 수직 스와이프, RTL 무관 상:이전 / 하:다음)
+      // 📱 1-1) 스와이프 제스처 처리 (페이지 모드일 때 수직 스와이프, RTL 무관 상:다음 / 하:이전)
+      // 다른 앱(틱톡/릴스/웹툰 세로보기)과 동일하게 "콘텐츠를 끌어올리는" 자연스러운 스크롤 방향을 따름.
       if (scrollMode === 'page' && absY >= SWIPE_MIN_DISTANCE && absY > absX * 1.2 && duration <= SWIPE_MAX_TIME) {
         lastTouchEndTime = Date.now();
 
         if (diffY > 0) {
-          // 👆 Swipe Up (아래에서 위로 쓸어올림) → 이전 페이지
+          // 👆 Swipe Up (아래에서 위로 쓸어올림) → 다음 페이지
           console.log(`[Viewer-Touch-Swipe] Swipe Up detected (diffY=${diffY})`);
-          callDep('prevPage');
-        } else {
-          // 👇 Swipe Down (위에서 아래로 쓸어내림) → 다음 페이지
-          console.log(`[Viewer-Touch-Swipe] Swipe Down detected (diffY=${diffY})`);
           callDep('nextPage');
+        } else {
+          // 👇 Swipe Down (위에서 아래로 쓸어내림) → 이전 페이지
+          console.log(`[Viewer-Touch-Swipe] Swipe Down detected (diffY=${diffY})`);
+          callDep('prevPage');
         }
         return;
       }
