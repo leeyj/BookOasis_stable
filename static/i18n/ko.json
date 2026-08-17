@@ -28,6 +28,8 @@
     "new_books_title_video": "신규 추가 강좌",
     "recent_title_suffix": "(시리즈기준)",
     "recent_title_suffix_video": "(강좌기준)",
+    "history_load_fail": "히스토리를 불러오지 못했습니다.",
+    "new_books_load_fail": "신규 도서를 불러오지 못했습니다.",
     "plugin_desk_title": "플러그인 데스크",
     "insights_streak": "연속 독서 일수",
     "insights_days_suffix": "일 연속",

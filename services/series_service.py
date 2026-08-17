@@ -16,7 +16,11 @@ _LEADING_TAG_RE = re.compile(r'^\s*(?:(?:\[[^\]]+\]|\{[^}]+\})\s*)+')
 
 
 def _strip_leading_bracket_tags(value):
-    """static/js/series_display.js의 stripLeadingBracketTags와 동일 규칙."""
+    """static/js/series_display.js의 stripLeadingBracketTags와 동일 규칙.
+
+    정렬/초성판정 모두 이 결과를 기준으로 삼아야 한다 - 둘 중 하나만 태그를 떼면
+    정렬 순서와 판정 기준이 어긋나 초성 바로가기가 엉뚱한 위치로 튄다(대괄호 `[`가
+    영문 Z와 한글 사이 코드포인트라 태그 있는 제목들이 그 사이에 무더기로 끼어듦)."""
     raw = str(value or '').strip()
     if not raw:
         return ''
@@ -145,7 +149,13 @@ def _sort_entries(entries, sort='asc'):
     sort_key = (sort or 'asc').lower()
     if sort_key in ('asc', 'desc'):
         reverse = (sort_key == 'desc')
-        entries.sort(key=lambda x: (str(x.get('series_name') or ''), str(x.get('representative_title') or '')), reverse=reverse)
+        entries.sort(
+            key=lambda x: (
+                _strip_leading_bracket_tags(x.get('series_name') or ''),
+                _strip_leading_bracket_tags(x.get('representative_title') or ''),
+            ),
+            reverse=reverse,
+        )
         return
 
     if sort_key == 'date_asc':
@@ -189,18 +199,28 @@ class SeriesService:
         offset = max(0, (page - 1) * limit)
         requires_full_scan = bool(search_query) or (sort not in ('asc', 'desc'))
 
-        if requires_full_scan:
-            now = time.time()
-            cache_key = (
-                db_type,
-                library_id,
-                str(search_query or ''),
-                str(sort or 'asc'),
-                tuple(normalized_genres),
-                tuple(normalized_tags),
-                int(user_id) if user_id else 0,
-                str(role or ''),
-            )
+        now = time.time()
+        cache_key = (
+            db_type,
+            library_id,
+            str(search_query or ''),
+            str(sort or 'asc'),
+            tuple(normalized_genres),
+            tuple(normalized_tags),
+            int(user_id) if user_id else 0,
+            str(role or ''),
+        )
+
+        if not requires_full_scan:
+            # find_jump_position()이 남긴 신선한 전체스캔 캐시가 있으면 그걸 그대로 슬라이스해서
+            # 쓴다 - _sort_entries()가 대괄호 태그를 뗀 제목 기준으로 정렬하는데, 아래 SQL
+            # ORDER BY는 원본 제목 기준이라 서로 순서가 다르다. 점프 직후 이 캐시를 안 쓰면
+            # 초성 바로가기가 계산해준 page/offset과 실제로 렌더링되는 카드가 어긋난다.
+            cached = _LIST_QUERY_CACHE.get(cache_key)
+            if cached and (now - cached[0] < _LIST_QUERY_CACHE_TTL):
+                entries = cached[1]
+                return entries[offset:offset + limit + 1]
+        else:
             cached = _LIST_QUERY_CACHE.get(cache_key)
             if cached and (now - cached[0] < _LIST_QUERY_CACHE_TTL):
                 entries = cached[1]
@@ -317,6 +337,11 @@ class SeriesService:
         total = len(entries)
         found_index = -1
         for idx, entry in enumerate(entries):
+            # _sort_entries()가 대괄호 태그를 뗀 제목 기준으로 정렬하므로, 여기서도 반드시
+            # 같은 기준(뗀 제목)으로 초성을 판정해야 한다. 판정 기준이 정렬 기준과 어긋나면
+            # 계산된 page/offset이 실제 그리드가 보여주는 위치와 어긋나서 "엉뚱한 곳으로
+            # 점프"하게 된다 ([태그] 접두사가 흔한 영상 강좌 제목에서 특히 두드러짐 - '['는
+            # 유니코드에서 영문 Z와 한글 사이에 끼어들어 정렬 순서를 깨뜨린다).
             title = _strip_leading_bracket_tags(entry.get('series_name') or entry.get('representative_title') or '')
             if _get_initial(title) == target:
                 found_index = idx

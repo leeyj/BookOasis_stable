@@ -454,6 +454,9 @@ class ReadingProgressRepository:
         try:
             if db_type == 'audiobook':
                 cursor.execute("DELETE FROM audiobook_progress WHERE audiobook_id = ? AND user_id = ?", (book_id, user_id))
+            elif db_type == 'video':
+                cursor.execute("DELETE FROM video_progress WHERE video_id = ? AND user_id = ?", (book_id, user_id))
+                cursor.execute("DELETE FROM video_episode_progress WHERE video_id = ? AND user_id = ?", (book_id, user_id))
             else:
                 cursor.execute("DELETE FROM user_progress WHERE book_id = ? AND user_id = ?", (book_id, user_id))
                 cursor.execute("DELETE FROM user_reading_log WHERE book_id = ? AND user_id = ?", (book_id, user_id))
@@ -482,6 +485,23 @@ class ReadingProgressRepository:
                     cursor.execute(
                         f"DELETE FROM audiobook_progress WHERE user_id = ? AND audiobook_id IN ({placeholders})",
                         (user_id, *book_ids)
+                    )
+            elif db_type == 'video':
+                cursor.execute(
+                    "SELECT id FROM videos WHERE title = ? AND library_id = ? AND COALESCE(is_deleted, 0) = 0",
+                    (series_name, library_id)
+                )
+                book_ids = [row['id'] for row in cursor.fetchall()]
+                if book_ids:
+                    placeholders = ','.join('?' for _ in book_ids)
+                    params = (user_id, *book_ids)
+                    cursor.execute(
+                        f"DELETE FROM video_progress WHERE user_id = ? AND video_id IN ({placeholders})",
+                        params
+                    )
+                    cursor.execute(
+                        f"DELETE FROM video_episode_progress WHERE user_id = ? AND video_id IN ({placeholders})",
+                        params
                     )
             else:
                 cursor.execute(

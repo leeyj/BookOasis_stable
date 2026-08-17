@@ -394,12 +394,12 @@ def _process_lazy_scan(sq):
         stdout_data = ""
         stderr_data = ""
         try:
+            # stdout은 lazy_scanner.py 자체가 setup_lazy_scanner_logging()으로 이미
+            # logs/lazy_scanner.log에 전부 기록하므로, 여기서 media_server.log에 그대로
+            # 다시 찍으면 같은 내용이 두 로그 파일에 중복된다. stderr(핸들링되지 않은
+            # 예외/트레이스백처럼 lazy_scanner.log에 안 남을 수 있는 크래시)만 중계한다.
             stdout_data, stderr_data = active_subprocess.communicate(timeout=7200)
             returncode = active_subprocess.returncode
-            if stdout_data:
-                for line in stdout_data.splitlines():
-                    if line.strip():
-                        sq.log(f"[Lazy-Scanner-Out] {line}")
             if stderr_data:
                 for line in stderr_data.splitlines():
                     if line.strip():
@@ -411,9 +411,6 @@ def _process_lazy_scan(sq):
                 outs, errs = active_subprocess.communicate()
                 if outs:
                     stdout_data = (stdout_data or "") + outs
-                    for line in outs.splitlines():
-                        if line.strip():
-                            sq.log(f"[Lazy-Scanner-Out] {line}")
                 if errs:
                     stderr_data = (stderr_data or "") + errs
                     for line in errs.splitlines():

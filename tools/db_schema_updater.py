@@ -552,6 +552,8 @@ def _ensure_mariadb_columns():
 
 
 def _ensure_mariadb_indexes():
+    from tools.migrator_sqlite_to_mariadb import connect_mariadb
+
     required_indexes = [
         ('media_general', 'books', 'idx_books_lib_del_series', 'CREATE INDEX idx_books_lib_del_series ON books (library_id, is_deleted, series_name(255), id)'),
         ('media_general', 'books', 'idx_books_lib_del_title', 'CREATE INDEX idx_books_lib_del_title ON books (library_id, is_deleted, title(255), id)'),

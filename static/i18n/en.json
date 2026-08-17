@@ -28,6 +28,8 @@
     "new_books_title_video": "New Courses",
     "recent_title_suffix": "(by series)",
     "recent_title_suffix_video": "(by course)",
+    "history_load_fail": "Failed to load history.",
+    "new_books_load_fail": "Failed to load new items.",
     "plugin_desk_title": "Plugin Desk",
     "insights_streak": "Reading Streak",
     "insights_days_suffix": "days streak",

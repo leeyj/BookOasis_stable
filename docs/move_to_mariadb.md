@@ -127,8 +127,8 @@ docker exec -it bookoasis python tools/migrator_sqlite_to_mariadb.py
 
 ## ❓ 자주 묻는 질문 및 트러블슈팅 (FAQ)
 
-### Q1. `Access denied for user 'bookoasis'@'%' to database 'media_adult'` (또는 `media_video` 등) 에러가 발생해요!
-- **원인**: MariaDB 공식 도커 이미지는 기본적으로 1개의 DB만 생성하므로 나머지 DB 권한이 빠져있을 수 있습니다. 특히 BookOasis가 버전업하며 새 미디어 세션(예: v2.1.0의 영상 강좌 → `media_video`)을 추가하면, **이미 예전에 MariaDB로 전환해서 쓰고 계시던 분**은 새로 생긴 DB에 대한 권한이 없어서 이 에러를 만날 수 있습니다. Docker Compose 번들형(유형 A)이라도, `docker-entrypoint-initdb.d/init.sql`은 MariaDB 데이터 볼륨이 **완전히 비어있는 최초 1회**에만 실행되므로 기존 컨테이너를 업데이트만 한 경우엔 자동으로 반영되지 않습니다.
+### Q1. `Access denied for user 'bookoasis'@'%' to database 'media_adult'` 또는 `SELECT command denied ... for table 'media_video'.'videos'` 에러가 발생해요!
+- **원인**: MariaDB 공식 도커 이미지는 기본적으로 1개의 DB만 생성하므로 나머지 DB 권한이 빠져있을 수 있습니다. 특히 BookOasis가 버전업하며 새 미디어 세션(예: v2.1.0의 영상 강좌 → `media_video`)을 추가하면, **이미 예전에 MariaDB로 전환해서 쓰고 계시던 분**은 새로 생긴 DB(또는 그 안의 특정 테이블)에 대한 권한이 없어서 이 에러를 만날 수 있습니다. `Access denied ... to database`(에러 1044)와 `SELECT command denied ... for table`(에러 1142)은 같은 근본 원인(권한 부족)의 두 가지 다른 증상일 뿐이며 해결책은 동일합니다. Docker Compose 번들형(유형 A)이라도, `docker-entrypoint-initdb.d/init.sql`은 MariaDB 데이터 볼륨이 **완전히 비어있는 최초 1회**에만 실행되므로 기존 컨테이너를 업데이트만 한 경우엔 자동으로 반영되지 않습니다.
 - **해결책 (1회 실행으로 영구 해결)**: MariaDB에 접속해서 아래 와일드카드 GRANT를 1회만 실행하세요. `media_`로 시작하는 이름의 DB라면 지금 것이든 앞으로 BookOasis가 추가할 것이든 전부 커버되므로, 이후로는 새 미디어 세션이 추가돼도 이 작업을 다시 할 필요가 없습니다.
   ```sql
   CREATE DATABASE IF NOT EXISTS media_video CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;

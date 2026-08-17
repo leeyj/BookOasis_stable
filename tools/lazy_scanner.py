@@ -119,12 +119,6 @@ def setup_lazy_scanner_logging():
 
 def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
     global stop_requested
-    setup_lazy_scanner_logging()
-    try:
-        from utils.signal_helper import register_shutdown_handlers
-        register_shutdown_handlers()
-    except Exception:
-        pass
 
     if target_book_id is not None:
         print(f"[Lazy-Scanner] 🚀 단일 도서 즉시 스캔 기동 시작 (Book ID: {target_book_id})")
@@ -742,7 +736,18 @@ def run_lazy_video_duration_backfill():
         if not os.path.exists(db_path):
             return
 
+    # 대량(수만 건) 서재에서는 배치가 작을수록 완료까지 필요한 서브프로세스 재기동 횟수가
+    # 늘어나므로 기본값은 300건. 에피소드마다 진행 로그를 남기므로(아래 루프) 더 이상
+    # "멈춘 것처럼" 보이지 않고, book 스캔의 LAZY_SCAN_MAX_FILE_SIZE_MB 등과 동일하게
+    # 설정에서 재정의 가능하다 - 재시작이 잦은 환경에서는 값을 줄이는 걸 권장.
     MAX_EPISODES_PER_RUN = 300
+    try:
+        from repositories.settings_repository import SettingsRepository
+        max_ep_val = SettingsRepository.get_value('general', 'LAZY_SCAN_VIDEO_MAX_EPISODES_PER_RUN')
+        if max_ep_val is not None:
+            MAX_EPISODES_PER_RUN = int(str(max_ep_val).strip() or '300')
+    except Exception as _ve:
+        print(f"[Lazy-Scanner] 영상 백필 배치 크기 설정 로드 실패 (기본 300건 적용): {_ve}")
 
     conn = _open_database_connection('video')
     if conn is None:
@@ -770,7 +775,8 @@ def run_lazy_video_duration_backfill():
 
         updated_count = 0
         touched_video_ids = set()
-        for row in candidates:
+        total = len(candidates)
+        for done, row in enumerate(candidates, start=1):
             if stop_requested:
                 print("[Lazy-Scanner] ⚠️ 중단 요청(SIGTERM/SIGINT) 감지. 영상 백필을 중단합니다.")
                 break
@@ -778,6 +784,7 @@ def run_lazy_video_duration_backfill():
             episode_id = row['id']
             video_id = row['video_id']
             file_path = row['file_path']
+            print(f"[Lazy-Scanner] 🎬 ({done}/{total}) ffprobe 분석 시작 -> {os.path.basename(file_path or '')}")
 
             if not file_path or not os.path.exists(file_path):
                 continue
@@ -815,6 +822,13 @@ def run_lazy_video_duration_backfill():
 
 
 if __name__ == '__main__':
+    # 로그 설정은 영상 백필/표지 스캔 중 어느 쪽이 먼저 실행되든 둘 다 lazy_scanner.log에
+    # 남도록 가장 먼저(다른 어떤 print()보다도 앞서) 활성화한다. 예전에는
+    # run_lazy_cover_extraction() 내부에서만 호출했는데, 영상 백필을 먼저 실행하도록
+    # 순서를 바꾼 뒤로는 백필 단계의 모든 출력이 로그 활성화 전에 발생해 통째로
+    # 유실되고 있었다(부모 프로세스의 stdout 재중계도 로그 중복 문제로 이미 제거됨).
+    setup_lazy_scanner_logging()
+
     # ─── 종료 시그널 핸들러 등록 ───
     try:
         from utils.signal_helper import register_shutdown_handlers
@@ -828,9 +842,11 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     try:
-        run_lazy_cover_extraction(target_book_id=args.book_id, target_db_type=args.db_type)
+        # run_lazy_cover_extraction()은 끝에서 항상 sys.exit(0/10)을 호출해 SystemExit을 던지므로,
+        # 그 뒤에 이어 붙이면 아래 코드는 영원히 실행되지 않는다. 영상 백필은 반드시 먼저 실행한다.
         if args.book_id is None:
             run_lazy_video_duration_backfill()
+        run_lazy_cover_extraction(target_book_id=args.book_id, target_db_type=args.db_type)
     except SystemExit as se:
         sys.exit(se.code)
     except Exception as main_err:

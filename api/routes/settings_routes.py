@@ -49,8 +49,13 @@ PUBLIC_UI_SETTING_KEYS = (
 @admin_required
 def get_system_settings():
     """모든 시스템 설정값 조회"""
+    # UI 설정(썸네일 크기 등)은 general/adult에만 저장되는데(SettingsService.set() 참고),
+    # settings 테이블 자체는 스키마 초기화 시 모든 DB(audiobook/video 포함)에 동일하게
+    # 생성되면서 기본값이 함께 시드된다. audiobook/video를 그대로 넘기면
+    # SettingsService.get_all()이 그 DB 고유 설정으로 general 값을 "덮어쓰는" 로직 때문에,
+    # 관리자가 저장한 값 대신 시드된 기본값이 나온다 - 그래서 general로 정규화한다.
     db_type = request.args.get('type', 'general')
-    if db_type == 'audiobook':
+    if db_type in ('audiobook', 'video'):
         db_type = 'general'
     try:
         settings = SettingsService.get_all(db_type)
@@ -67,7 +72,7 @@ def get_public_ui_settings():
     최초 로드 시 이 엔드포인트를 사용한다.
     """
     db_type = request.args.get('type', 'general')
-    if db_type == 'audiobook':
+    if db_type in ('audiobook', 'video'):
         db_type = 'general'
     try:
         all_settings = SettingsService.get_all(db_type)

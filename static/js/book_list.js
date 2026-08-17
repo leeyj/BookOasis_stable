@@ -257,8 +257,12 @@ export function filterBooks() {
   const query = document.getElementById('library-search').value.toLowerCase().trim();
   state.searchQuery = query;
 
-  // 영상 강좌 세션은 일반 도서 파이프라인(loadBooksList)을 타지 않으므로 별도 필터러로 위임
-  if (state.currentLibraryType === 'video') {
+  // 영상 강좌 세션은 개별 라이브러리 보기에서만 별도의 클라이언트 필터러(video_library.js)를 쓴다.
+  // "전체보기"(all)/즐겨찾기/히스토리는 tab_media_library.js::selectCategory()가 video여도
+  // loadVideoCourseGrid가 아니라 이 공용 파이프라인(loadBooksList)으로 그리드를 채우므로,
+  // 여기서도 똑같이 일반 파이프라인을 타야 한다 - 안 그러면 filterVideoCourses가 채워진 적
+  // 없는 lastLoadedVideos(빈 배열)를 대상으로 필터링해서 검색 결과가 항상 0건으로 나온다.
+  if (state.currentLibraryType === 'video' && !['all', 'history', 'favorite'].includes(state.currentLibraryId)) {
     if (typeof window.filterVideoCourses === 'function') window.filterVideoCourses();
     return;
   }

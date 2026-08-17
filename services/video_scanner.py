@@ -61,10 +61,12 @@ EPISODE_CODE_RE = re.compile(r'S(\d+)E(\d+)', re.IGNORECASE)
 # 파일명 앞의 "S01E02." 접두어를 제거하기 위한 정규식 (show.yaml 매칭 실패 시 title fallback용)
 EPISODE_PREFIX_RE = re.compile(r'^\s*S\d+E\d+\.\s*', re.IGNORECASE)
 
-# 브라우저(Chrome/Firefox/Safari 공통 기준)가 별도 트랜스코딩 없이 <video> 태그로 직접
-# 재생 가능한 컨테이너/코덱 조합. Safari는 MKV 컨테이너 자체를 지원하지 않으므로
-# 컨테이너 확장자를 코덱과 별도로 검사한다.
-BROWSER_COMPATIBLE_CONTAINERS = {'mp4', 'm4v', 'webm'}
+# 브라우저가 별도 트랜스코딩 없이 <video> 태그로 직접 재생 가능한 컨테이너/코덱 조합.
+# mkv는 Chrome/Edge 계열에서 h264+aac 조합이면 대체로 잘 재생되지만, Safari는 MKV
+# 컨테이너 자체를 지원하지 않는다 - 사용자가 이 트레이드오프를 인지하고 mkv를 호환
+# 목록에 포함하기로 결정함(2026-08-17). Safari에서 mkv 재생이 안 되는 리포트가 오면
+# 이 결정을 재검토할 것.
+BROWSER_COMPATIBLE_CONTAINERS = {'mp4', 'm4v', 'webm', 'mkv'}
 BROWSER_COMPATIBLE_VIDEO_CODECS = {'h264', 'vp8', 'vp9'}
 BROWSER_COMPATIBLE_AUDIO_CODECS = {'aac', 'opus', 'vorbis', 'mp3'}
 

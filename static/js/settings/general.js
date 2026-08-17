@@ -257,6 +257,9 @@ export async function loadGeneralSettings() {
       const lazyMaxBatchSizeEl = document.getElementById('setting-lazy-scan-max-batch-size');
       if (lazyMaxBatchSizeEl) lazyMaxBatchSizeEl.value = s.LAZY_SCAN_MAX_BATCH_SIZE_MB !== undefined ? s.LAZY_SCAN_MAX_BATCH_SIZE_MB : '1024';
 
+      const lazyVideoMaxEpisodesEl = document.getElementById('setting-lazy-scan-video-max-episodes');
+      if (lazyVideoMaxEpisodesEl) lazyVideoMaxEpisodesEl.value = s.LAZY_SCAN_VIDEO_MAX_EPISODES_PER_RUN !== undefined ? s.LAZY_SCAN_VIDEO_MAX_EPISODES_PER_RUN : '300';
+
       const scanIgnorePatternsEl = document.getElementById('setting-scan-ignore-patterns');
       if (scanIgnorePatternsEl) scanIgnorePatternsEl.value = s.SCAN_IGNORE_PATTERNS !== undefined ? s.SCAN_IGNORE_PATTERNS : "@eaDir/\n#recycle/\n*.tmp\n*.sample.cbz\n.DS_Store\nThumbs.db\ndesktop.ini";
 
@@ -485,6 +488,7 @@ export async function submitGeneralSettings(event) {
   const lazyCron = document.getElementById('setting-lazy-scan-cron')?.value || '0 3 * * *';
   const lazyMaxFileSize = document.getElementById('setting-lazy-scan-max-file-size')?.value || '300';
   const lazyMaxBatchSize = document.getElementById('setting-lazy-scan-max-batch-size')?.value || '1024';
+  const lazyVideoMaxEpisodes = document.getElementById('setting-lazy-scan-video-max-episodes')?.value || '300';
   const scanIgnorePatterns = document.getElementById('setting-scan-ignore-patterns')?.value || "@eaDir/\n#recycle/\n*.tmp\n*.sample.cbz\n.DS_Store\nThumbs.db\ndesktop.ini";
   const recentBooks = document.getElementById('setting-recent-books-limit')?.value || '30';
   const sysMem = document.getElementById('setting-system-mem-limit')?.value || '1536';
@@ -534,6 +538,7 @@ export async function submitGeneralSettings(event) {
       api.updateSystemSetting('LAZY_SCAN_CRON', lazyCron),
       api.updateSystemSetting('LAZY_SCAN_MAX_FILE_SIZE_MB', lazyMaxFileSize),
       api.updateSystemSetting('LAZY_SCAN_MAX_BATCH_SIZE_MB', lazyMaxBatchSize),
+      api.updateSystemSetting('LAZY_SCAN_VIDEO_MAX_EPISODES_PER_RUN', lazyVideoMaxEpisodes),
       api.updateSystemSetting('SCAN_IGNORE_PATTERNS', scanIgnorePatterns),
       api.updateSystemSetting('TIMEZONE', timezone),
       api.updateSystemSetting('RECENT_BOOKS_LIMIT', recentBooks),

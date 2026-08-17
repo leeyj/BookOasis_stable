@@ -98,14 +98,18 @@ export async function loadDashboardData() {
       }
       renderDashboardHistory(books);
     } else {
-      if (historyRow) historyRow.innerHTML = `<div class="loading-spinner">히스토리 로드 실패: ${(historyData && historyData.error) || '오류'}</div>`;
+      // 서버 예외 원문(DB 엔진/테이블명 등 내부 정보 포함 가능)을 화면에 그대로 노출하지 않고
+      // 콘솔에만 남긴다 - 사용자에게는 일반적인 실패 메시지만 보여준다.
+      if (historyData && historyData.error) console.error('[Dashboard] 히스토리 로드 실패:', historyData.error);
+      if (historyRow) historyRow.innerHTML = `<div class="loading-spinner">${i18n.t('dashboard.history_load_fail') || '히스토리를 불러오지 못했습니다.'}</div>`;
     }
 
     // 신규 추가 도서 렌더링
     if (newData && newData.success) {
       renderDashboardRecentlyAdded(newData.books);
     } else {
-      if (newRow) newRow.innerHTML = `<div class="loading-spinner">신규 도서 로드 실패: ${(newData && newData.error) || '오류'}</div>`;
+      if (newData && newData.error) console.error('[Dashboard] 신규 도서 로드 실패:', newData.error);
+      if (newRow) newRow.innerHTML = `<div class="loading-spinner">${i18n.t('dashboard.new_books_load_fail') || '신규 도서를 불러오지 못했습니다.'}</div>`;
     }
     
   } catch (e) {
