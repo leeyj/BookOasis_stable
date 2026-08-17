@@ -1,4 +1,7 @@
 # CHANGELOG
+## v2.1.2
+- (db) MariaDB `bookoasis` 계정 GRANT를 DB별 개별 나열 대신 `media_%` 와일드카드 패턴으로 변경 — 이미 MariaDB로 전환한 기존 사용자가 새 미디어 세션(예: 영상 강좌의 `media_video`) 추가 시 `Access denied ... to database 'media_X'`를 겪던 문제를 1회성 재부여 SQL로 해결하고, 앞으로 추가될 DB까지 영구적으로 커버 | switch the MariaDB `bookoasis` account's GRANTs from per-database enumeration to a `media_%` wildcard pattern — fixes existing MariaDB users hitting `Access denied ... to database 'media_X'` when a new media session (e.g. video courses' `media_video`) is added, with a one-time re-grant that also covers all future databases
+
 ## v2.1.1
 - (video) 잠금화면/백그라운드에서도 강좌 재생을 오디오로 계속 들을 수 있도록 영상 플레이어에 Media Session API(재생/일시정지/탐색/이전-다음 회차) 연동 | wire the Media Session API (play/pause/seek/prev-next episode) into the video player so course playback can continue as audio when the screen locks or the app backgrounds
 - (tools) 카테고리 내보내기/가져오기 CLI(`export_category.py`/`import_category.py`)가 영상 강좌(video) 카테고리도 지원하도록 확장 — 강좌/에피소드/시청 진행률까지 오디오북과 동일한 방식으로 백업 및 이관 가능 | extend the category export/import CLI tools to support video-course categories — courses, episodes, and watch progress can now be backed up and migrated the same way audiobooks already are

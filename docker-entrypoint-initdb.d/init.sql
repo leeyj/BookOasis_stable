@@ -4,9 +4,11 @@ CREATE DATABASE IF NOT EXISTS media_adult CHARACTER SET utf8mb4 COLLATE utf8mb4_
 CREATE DATABASE IF NOT EXISTS media_audiobook CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
 CREATE DATABASE IF NOT EXISTS media_video CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
 
-GRANT ALL PRIVILEGES ON `media_general`.* TO 'bookoasis'@'%';
-GRANT ALL PRIVILEGES ON `media_adult`.* TO 'bookoasis'@'%';
-GRANT ALL PRIVILEGES ON `media_audiobook`.* TO 'bookoasis'@'%';
-GRANT ALL PRIVILEGES ON `media_video`.* TO 'bookoasis'@'%';
+-- 와일드카드(패턴) GRANT: db 이름을 백틱 없이 지정하면 '_'와 '%'가 SQL 와일드카드로 해석되어,
+-- 'media_'로 시작하는 모든 DB(지금 4개는 물론 앞으로 새 미디어 세션이 추가되며 생기는 DB까지)에
+-- bookoasis 계정이 자동으로 권한을 갖는다. 새 DB가 추가될 때마다 이 파일을 갱신하고 기존
+-- 설치본에 GRANT를 다시 실행해야 했던 문제(예: media_video 추가 시 기존 사용자
+-- "Access denied for user 'bookoasis'@'%' to database 'media_video'")를 근본적으로 막기 위함.
+GRANT ALL PRIVILEGES ON media_%.* TO 'bookoasis'@'%';
 
 FLUSH PRIVILEGES;

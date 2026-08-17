@@ -57,10 +57,10 @@ CREATE DATABASE IF NOT EXISTS media_video CHARACTER SET utf8mb4 COLLATE utf8mb4_
 
 -- 사용자 생성 및 권한 부여 ('your_password'를 원하는 비밀번호로 변경하세요)
 CREATE USER IF NOT EXISTS 'bookoasis'@'%' IDENTIFIED BY 'your_password';
-GRANT ALL PRIVILEGES ON media_general.* TO 'bookoasis'@'%';
-GRANT ALL PRIVILEGES ON media_adult.* TO 'bookoasis'@'%';
-GRANT ALL PRIVILEGES ON media_audiobook.* TO 'bookoasis'@'%';
-GRANT ALL PRIVILEGES ON media_video.* TO 'bookoasis'@'%';
+-- media_ 로 시작하는 이름의 DB(지금 4개는 물론 향후 새 미디어 세션이 추가되며 생기는 DB까지)에
+-- 한 번에 권한을 부여하는 와일드카드 GRANT입니다. 이렇게 해두면 나중에 BookOasis가 새 DB를
+-- 추가해도(예: media_video가 추가됐던 것처럼) 이 SQL을 다시 실행할 필요가 없습니다.
+GRANT ALL PRIVILEGES ON media_%.* TO 'bookoasis'@'%';
 FLUSH PRIVILEGES;
 ```
 
@@ -127,9 +127,15 @@ docker exec -it bookoasis python tools/migrator_sqlite_to_mariadb.py
 
 ## ❓ 자주 묻는 질문 및 트러블슈팅 (FAQ)
 
-### Q1. `Access denied for user 'bookoasis'@'%' to database 'media_adult'` 에러가 발생해요!
-- **원인**: MariaDB 공식 도커 이미지는 기본적으로 1개의 DB만 생성하므로, 성인/오디오북용 DB 권한이 빠져있을 수 있습니다.
-- **해결책**: 최신 소스에 동봉된 `docker-entrypoint-initdb.d/init.sql`이 마운트된 `docker-compose.mariadb.yml`을 사용하시거나, 위의 **[유형 B 1단계]** SQL 구문을 MariaDB에 1회 실행하여 권한을 부여해 주시면 즉시 해결됩니다.
+### Q1. `Access denied for user 'bookoasis'@'%' to database 'media_adult'` (또는 `media_video` 등) 에러가 발생해요!
+- **원인**: MariaDB 공식 도커 이미지는 기본적으로 1개의 DB만 생성하므로 나머지 DB 권한이 빠져있을 수 있습니다. 특히 BookOasis가 버전업하며 새 미디어 세션(예: v2.1.0의 영상 강좌 → `media_video`)을 추가하면, **이미 예전에 MariaDB로 전환해서 쓰고 계시던 분**은 새로 생긴 DB에 대한 권한이 없어서 이 에러를 만날 수 있습니다. Docker Compose 번들형(유형 A)이라도, `docker-entrypoint-initdb.d/init.sql`은 MariaDB 데이터 볼륨이 **완전히 비어있는 최초 1회**에만 실행되므로 기존 컨테이너를 업데이트만 한 경우엔 자동으로 반영되지 않습니다.
+- **해결책 (1회 실행으로 영구 해결)**: MariaDB에 접속해서 아래 와일드카드 GRANT를 1회만 실행하세요. `media_`로 시작하는 이름의 DB라면 지금 것이든 앞으로 BookOasis가 추가할 것이든 전부 커버되므로, 이후로는 새 미디어 세션이 추가돼도 이 작업을 다시 할 필요가 없습니다.
+  ```sql
+  CREATE DATABASE IF NOT EXISTS media_video CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+  GRANT ALL PRIVILEGES ON media_%.* TO 'bookoasis'@'%';
+  FLUSH PRIVILEGES;
+  ```
+  (신규 설치라면 최신 소스에 동봉된 `docker-entrypoint-initdb.d/init.sql`이 마운트된 `docker-compose.mariadb.yml`을 그대로 사용하시면 자동으로 적용됩니다.)
 
 ### Q2. 기존 SQLite로 되돌리고 싶으면 어떻게 하나요?
 - `docker-compose.override.yml`에서 `DB_ENGINE=sqlite`로 변경하거나 해당 파일을 삭제 후 `docker-compose restart` 하시면 즉시 기존 SQLite 데이터베이스로 원복됩니다. 기존 데이터는 전혀 훼손되지 않습니다.
