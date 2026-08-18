@@ -129,7 +129,10 @@ export async function toggleSeriesFavorite(event, seriesName, currentStatus, lib
 export async function rescanBook(event, bookId, seriesName, libraryId) {
   if (event) event.stopPropagation();
 
-  const btn = event.currentTarget;
+  // interactions.js가 document에 위임된 클릭 리스너를 쓰기 때문에 event.currentTarget은
+  // 항상 document이지 실제로 클릭한 버튼이 아니다(위임 구조로 바뀌기 전 코드가 그대로 남아있던
+  // 버그) — 클릭된 실제 지점에서 가장 가까운 버튼을 직접 찾는다.
+  const btn = (event.target && typeof event.target.closest === 'function' && event.target.closest('button')) || event.currentTarget;
   const originalHtml = btn.innerHTML;
   btn.disabled = true;
   btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('modal.scanning')}`;
@@ -175,7 +178,10 @@ export async function rescanBook(event, bookId, seriesName, libraryId) {
 export async function rescanMissingBooks(event, seriesName, libraryId) {
   if (event) event.stopPropagation();
 
-  const btn = event.currentTarget;
+  // interactions.js가 document에 위임된 클릭 리스너를 쓰기 때문에 event.currentTarget은
+  // 항상 document이지 실제로 클릭한 버튼이 아니다(위임 구조로 바뀌기 전 코드가 그대로 남아있던
+  // 버그) — 클릭된 실제 지점에서 가장 가까운 버튼을 직접 찾는다.
+  const btn = (event.target && typeof event.target.closest === 'function' && event.target.closest('button')) || event.currentTarget;
   const originalHtml = btn.innerHTML;
   btn.disabled = true;
   btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('modal.scanning')}`;
@@ -239,7 +245,10 @@ export async function rescanMissingBooks(event, seriesName, libraryId) {
 export async function rescanSeries(event, seriesName, libraryId) {
   if (event) event.stopPropagation();
 
-  const btn = event.currentTarget;
+  // interactions.js가 document에 위임된 클릭 리스너를 쓰기 때문에 event.currentTarget은
+  // 항상 document이지 실제로 클릭한 버튼이 아니다(위임 구조로 바뀌기 전 코드가 그대로 남아있던
+  // 버그) — 클릭된 실제 지점에서 가장 가까운 버튼을 직접 찾는다.
+  const btn = (event.target && typeof event.target.closest === 'function' && event.target.closest('button')) || event.currentTarget;
   const originalHtml = btn.innerHTML;
   btn.disabled = true;
   btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('modal.scanning')}`;
@@ -300,7 +309,10 @@ export async function rescanSeries(event, seriesName, libraryId) {
 export async function markSeriesCompleted(event, seriesName, libraryId) {
   if (event) event.stopPropagation();
 
-  const btn = event.currentTarget;
+  // interactions.js가 document에 위임된 클릭 리스너를 쓰기 때문에 event.currentTarget은
+  // 항상 document이지 실제로 클릭한 버튼이 아니다(위임 구조로 바뀌기 전 코드가 그대로 남아있던
+  // 버그) — 클릭된 실제 지점에서 가장 가까운 버튼을 직접 찾는다.
+  const btn = (event.target && typeof event.target.closest === 'function' && event.target.closest('button')) || event.currentTarget;
   const originalHtml = btn.innerHTML;
   btn.disabled = true;
   btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('detail.marking_completed')}`;

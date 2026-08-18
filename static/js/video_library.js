@@ -6,6 +6,7 @@
 import { openBookDetail } from './detail/index.js';
 import { updateLibraryTotalCount } from './book_list.js';
 import { positionMenuAtPoint, hideFloatingMenu, bindFloatingMenuOutsideClose } from './context_menu_manager.js';
+import { state } from './state.js';
 
 function escapeHtml(str) {
   return String(str || '').replace(/[&<>"']/g, (ch) => ({
@@ -238,6 +239,42 @@ export async function loadVideoCourseGrid(libraryId) {
     console.error('[VideoLibrary] course list load failed:', e);
   }
 }
+
+// book_list.js::toggleLibrarySort()가 video 세션일 때 위임하는 진입점 - 서버 재조회 없이
+// 이미 불러온 강좌 목록을 클라이언트 사이드에서 재정렬해 전용 카드 렌더러(renderVideoCourseCards)로
+// 다시 그린다. 여기를 거치지 않고 loadBooksList()로 빠지면 공용 카드 렌더러가 영상을 오디오북으로
+// 오인해(total_tracks 유무 기준) 재생시간/분석전 배지 대신 헤드폰 아이콘 배지를 보여주게 된다.
+// videos 테이블에는 생성일시 컬럼이 없어(list_videos_by_library 참고), 날짜순 정렬은 auto-increment id를
+// 대리 지표로 사용한다 (id가 클수록 최근 스캔된 항목).
+export function sortVideoCourses() {
+  const sortDir = state.currentSortDirection || 'asc';
+  const sorted = [...lastLoadedVideos];
+
+  if (sortDir === 'desc') {
+    sorted.sort((a, b) => String(b.title || '').localeCompare(String(a.title || ''), 'ko'));
+  } else if (sortDir === 'date_desc') {
+    sorted.sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0));
+  } else if (sortDir === 'date_asc') {
+    sorted.sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0));
+  } else {
+    sorted.sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'ko'));
+  }
+
+  lastLoadedVideos = sorted;
+
+  const query = (document.getElementById('library-search')?.value || '').toLowerCase().trim();
+  const visibleVideos = query
+    ? lastLoadedVideos.filter(v => (v.title || '').toLowerCase().includes(query))
+    : lastLoadedVideos;
+
+  updateVideoTotalCount(visibleVideos);
+  renderVideoCourseCards(
+    visibleVideos,
+    lastLoadedLibraryId,
+    query ? '검색 결과가 없습니다.' : '이 라이브러리에는 아직 스캔된 강좌가 없습니다.'
+  );
+}
+window.sortVideoCourses = sortVideoCourses;
 
 // book_list.js::filterBooks()가 video 세션일 때 위임하는 진입점 - 이미 불러온 강좌 목록을
 // 서버 재조회 없이 제목 기준으로 클라이언트 사이드 필터링한다.

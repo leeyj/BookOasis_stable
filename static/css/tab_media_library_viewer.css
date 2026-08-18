@@ -634,6 +634,20 @@
     justify-content: center;
 }
 
+/* 컨트롤이 많은 행에서 특정 지점부터 강제로 다음 줄로 넘기기 위한 스페이서 */
+.overlay-row-break {
+    flex-basis: 100%;
+    width: 0;
+    height: 0;
+}
+
+/* flex-wrap 컨테이너는 강제 줄바꿈이 있어도 auto 너비 계산 시 모든 자식의 너비 합을 기준으로
+   삼기 때문에(줄바꿈 전 1줄 기준 너비), .overlay-row-break로 2줄을 강제해도 패널 좌우에
+   불필요한 여백이 남는다. 실제 두 줄의 콘텐츠 너비에 맞춰 상한을 지정해 패널이 딱 맞게 줄어들도록 함. */
+#overlay-tab-layout .overlay-controls-row {
+    max-width: 480px;
+}
+
 /* 너비 조절 행 — 스크롤 모드에서만 표시 */
 .overlay-width-row {
     display: none;

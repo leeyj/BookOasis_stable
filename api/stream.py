@@ -223,6 +223,44 @@ def get_epub_chapter_api():
 
     return jsonify(data)
 
+@stream_bp.route('/api/media/epub/chapters', methods=['GET'])
+@login_required
+def get_epub_chapters_batch_api():
+    """EPUB 여러 챕터를 한 번의 zip open으로 묶어서 반환 (뷰어 프리페치 전용).
+    개별 챕터 엔드포인트를 프리페치 반경만큼 동시 호출하면 서버에서 같은 zip 파일을
+    그만큼 반복해서 여는 문제가 있어, 반경 전체를 한 요청으로 묶기 위해 추가."""
+    db_type = request.args.get('db_type', 'general')
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+    user_id = session.get('user_id', 1)
+    role = session.get('role')
+    book_id = request.args.get('book_id')
+    if not book_id:
+        return jsonify({'error': _t('api.err_book_id_required')}), 400
+
+    raw_indices = request.args.get('chapter_idx', '')
+    try:
+        indices = [int(x) for x in raw_indices.split(',') if x.strip() != '']
+    except ValueError:
+        return jsonify({'error': 'Invalid chapter_idx list'}), 400
+    if not indices:
+        return jsonify({'error': 'chapter_idx is required'}), 400
+
+    # 프리페치 반경 기준으로 넉넉한 상한을 두어 과도한 배치 요청 남용을 방지
+    MAX_BATCH_SIZE = 40
+    if len(indices) > MAX_BATCH_SIZE:
+        indices = indices[:MAX_BATCH_SIZE]
+
+    file_path = StreamService.get_file_path(db_type, book_id, user_id=user_id, role=role)
+    if not file_path:
+        return jsonify({'error': _t('api.err_book_not_found')}), 404
+
+    chapters, error = StreamService.get_epub_chapters_batch(file_path, book_id, db_type, indices)
+    if error:
+        return jsonify({'error': error}), 404 if error == 'File not found' else 500
+
+    return jsonify({'success': True, 'chapters': chapters})
+
 @stream_bp.route('/api/media/epub-image', methods=['GET'])
 @login_required
 def get_epub_image():

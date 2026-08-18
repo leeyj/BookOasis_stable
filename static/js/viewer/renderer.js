@@ -22,8 +22,10 @@ const _workerPending = new Map();
 let _workerCleanupAdded = false;
 const activePreloadSet = new Set();
 const blobCacheMap = new Map();
+const splitCropCacheMap = new Map();
 let currentPreloadQueue = [];
 let isPreloading = false;
+let splitModeActive = false;
 
 function createComicLoadTrace(details = {}) {
   const traceId = ++comicLoadTraceSeq;
@@ -53,7 +55,118 @@ function clearBlobCache() {
     } catch (e) {}
   });
   blobCacheMap.clear();
+  splitCropCacheMap.forEach((objectUrl) => {
+    try {
+      URL.revokeObjectURL(objectUrl);
+    } catch (e) {}
+  });
+  splitCropCacheMap.clear();
   currentPreloadQueue = [];
+}
+
+// ──────────────────────────────────────────────────
+// 페이지 좌/우 분할 보기 지원 헬퍼
+// ──────────────────────────────────────────────────
+
+// virtualIdx(가상 절반-페이지 인덱스) -> { physical(실제 이미지 인덱스), side('left'|'right') }
+function splitVirtualIndex(virtualIdx) {
+  const physical = Math.floor(virtualIdx / 2);
+  const sub = virtualIdx % 2; // 0 = 읽기 순서상 첫번째 절반, 1 = 두번째 절반
+  const firstSide = Settings.getComicReadingDirection() === 'rtl' ? 'right' : 'left';
+  const side = sub === 0 ? firstSide : (firstSide === 'left' ? 'right' : 'left');
+  return { physical, side };
+}
+
+// 분할 모드에서 comicTotalPages는 가상(절반) 페이지 수이므로, 실제 이미지 개수로 환산
+function getPhysicalTotalPages() {
+  return splitModeActive ? Math.max(1, Math.ceil(comicTotalPages / 2)) : comicTotalPages;
+}
+
+// 분할 설정 토글 시(또는 책 최초 로드 시) comicCurrentPage/comicTotalPages를
+// 물리 페이지 공간 <-> 가상 절반-페이지 공간 사이에서 왕복 변환한다.
+export function syncSplitSpreadMode() {
+  const nowOn = Settings.getComicSplitSpread();
+  if (nowOn === splitModeActive) return;
+  if (nowOn) {
+    comicTotalPages = comicTotalPages * 2;
+    comicCurrentPage = comicCurrentPage * 2;
+  } else {
+    comicTotalPages = getPhysicalTotalPages();
+    comicCurrentPage = Math.floor(comicCurrentPage / 2);
+  }
+  splitModeActive = nowOn;
+}
+
+// 스크롤 모드는 분할 보기를 지원하지 않는다(1차 범위 밖). 페이지 모드에서 분할 보기를 켠
+// 채로 스크롤 모드로 전환하면 comicTotalPages/comicCurrentPage가 가상(절반-페이지) 값으로
+// 남아있어, 스크롤 모드의 페이지 순회 루프와 진행률 저장이 모두 실제 페이지 수의 2배를
+// 물리 인덱스인 것처럼 취급해버린다 — 저장된 분할 설정(Settings)은 건드리지 않고, 스크롤
+// 모드에 있는 동안만 강제로 물리 공간으로 되돌린다. 페이지 모드로 복귀하면 다시 동기화한다.
+export function syncSplitSpreadModeForScrollMode(isScrollMode) {
+  if (isScrollMode) {
+    if (splitModeActive) {
+      comicTotalPages = getPhysicalTotalPages();
+      comicCurrentPage = splitVirtualIndex(comicCurrentPage).physical;
+      splitModeActive = false;
+    }
+  } else {
+    syncSplitSpreadMode();
+  }
+}
+
+// 서버로 보낼 진행률(항상 물리 페이지 기준 — books.total_pages 오염 방지)
+export function getPhysicalProgress() {
+  const page = splitModeActive ? splitVirtualIndex(comicCurrentPage).physical : comicCurrentPage;
+  return { page, total: getPhysicalTotalPages() };
+}
+
+// 물리 페이지 전체 이미지를 fetch/blob 캐시하고 object URL을 반환 (기존 인라인 로직을 함수로 추출)
+function getWholePageObjectUrl(bookId, physicalIndex) {
+  const cacheKey = `${bookId}_${physicalIndex}`;
+  if (blobCacheMap.has(cacheKey)) {
+    return Promise.resolve(blobCacheMap.get(cacheKey));
+  }
+  const url = FileLoader.getPageStreamUrl(physicalIndex);
+  return fetch(url)
+    .then((res) => {
+      if (!res.ok) throw new Error('Fetch fail');
+      return res.blob();
+    })
+    .then((blob) => {
+      const activeBookId = state.currentBookId || (window.state ? window.state.currentBookId : null);
+      if (activeBookId !== bookId) throw new Error('book switched');
+      const objUrl = URL.createObjectURL(blob);
+      blobCacheMap.set(cacheKey, objUrl);
+      return objUrl;
+    })
+    .catch(() => url); // 폴백: 원본 스트림 URL 그대로 반환
+}
+
+// 분할 모드용: 물리 페이지를 잘라 절반 이미지의 object URL을 반환 (가상 인덱스 기준 캐시)
+function getSplitCroppedImageUrl(bookId, virtualIndex, physicalIndex, side) {
+  const cropKey = `${bookId}_${virtualIndex}`;
+  if (splitCropCacheMap.has(cropKey)) {
+    return Promise.resolve(splitCropCacheMap.get(cropKey));
+  }
+  return getWholePageObjectUrl(bookId, physicalIndex).then((wholeUrl) => new Promise((resolve, reject) => {
+    const tempImg = new Image();
+    tempImg.onload = () => {
+      const halfW = Math.round(tempImg.naturalWidth / 2) || 1;
+      const sx = side === 'left' ? 0 : (tempImg.naturalWidth - halfW);
+      const canvas = document.createElement('canvas');
+      canvas.width = halfW;
+      canvas.height = tempImg.naturalHeight;
+      canvas.getContext('2d').drawImage(tempImg, sx, 0, halfW, tempImg.naturalHeight, 0, 0, halfW, tempImg.naturalHeight);
+      canvas.toBlob((blob) => {
+        if (!blob) { reject(new Error('split crop failed')); return; }
+        const croppedUrl = URL.createObjectURL(blob);
+        splitCropCacheMap.set(cropKey, croppedUrl);
+        resolve(croppedUrl);
+      }, 'image/jpeg', 0.92);
+    };
+    tempImg.onerror = () => reject(new Error('split crop source load failed'));
+    tempImg.src = wholeUrl;
+  }));
 }
 
 function ensureImageWorker() {
@@ -172,9 +285,16 @@ export async function initRenderer(bookId, pagesRead, totalPages) {
 
   comicCurrentPage = initialPage;
   comicTotalPages = await FileLoader.fetchTotalPagesIfNeeded(bookId, totalPages);
+  splitModeActive = false; // 책마다 항상 물리 페이지 공간에서 시작
 
   Settings.initReadingDirection();
   Settings.initPageStep();
+  Settings.initSplitSpread();
+  // 저장된 분할 설정이 켜져 있어도, 스크롤 모드가 기본값으로 저장돼 있으면 분할 보기는
+  // 적용하지 않는다(스크롤 모드는 분할 보기 미지원) — 그렇지 않으면 스크롤 모드의 페이지
+  // 순회 루프가 가상(절반-페이지) 총 페이지 수를 물리 인덱스로 오인해 범위를 벗어난다.
+  const initialScrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
+  syncSplitSpreadModeForScrollMode(initialScrollMode === 'scroll');
   Settings.initScrollWidth(); // 저장된 스크롤 너비 복원
   applyComicFitMode();
   loadComicPage();
@@ -215,7 +335,6 @@ export function applyComicFitMode() {
 }
 
 export function updatePageInfo() {
-  const infoEl = document.getElementById('comic-page-info');
   const overlayInfoEl = document.getElementById('comic-overlay-page-info');
 
   if (state.currentViewerFormat === 'epub' || state.currentViewerFormat === 'txt') {
@@ -248,7 +367,6 @@ export function updatePageInfo() {
     ? `${startPage}-${endPage} / ${totalPages}`
     : `${startPage} / ${totalPages}`;
 
-  if (infoEl) infoEl.textContent = textInfo;
   if (overlayInfoEl) overlayInfoEl.textContent = textInfo;
 
   const overlayTitleEl = document.getElementById('overlay-title-text');
@@ -677,38 +795,41 @@ export function loadComicPage() {
 
       // 🌟 Blob 캐시 맵에서 Object URL을 즉시 히트하여 브라우저 대기 및 지연 제거 (BookId 바인딩)
       const currentBookId = state.currentBookId || (window.state ? window.state.currentBookId : null);
-      const cacheKey = `${currentBookId}_${pageIndex}`;
-      if (blobCacheMap.has(cacheKey)) {
-        loadTrace.log('page image cache hit', { pageIndex, cacheKey });
-        imgEl.src = blobCacheMap.get(cacheKey);
-      } else {
-        const url = FileLoader.getPageStreamUrl(pageIndex);
-        loadTrace.log('page image fetch start', { pageIndex, cacheKey, url });
-        fetch(url)
-          .then((res) => {
-            if (!res.ok) throw new Error('Fetch fail');
-            loadTrace.log('page image fetch response', { pageIndex, status: res.status });
-            return res.blob();
-          })
-          .then((blob) => {
+      if (splitModeActive) {
+        const { physical, side } = splitVirtualIndex(pageIndex);
+        loadTrace.log('page image (split) fetch start', { pageIndex, physical, side });
+        getSplitCroppedImageUrl(currentBookId, pageIndex, physical, side)
+          .then((url) => {
             const activeBookId = state.currentBookId || (window.state ? window.state.currentBookId : null);
             if (activeBookId !== currentBookId) return;
-            const objUrl = URL.createObjectURL(blob);
-            blobCacheMap.set(cacheKey, objUrl);
-            loadTrace.log('page image blob ready', { pageIndex, blobSize: blob.size });
-            imgEl.src = objUrl;
+            loadTrace.log('page image (split) crop ready', { pageIndex, physical, side });
+            imgEl.src = url;
           })
           .catch((err) => {
-            // fetch 에러 시 원본 뷰어 스트림 경로로 폴백 복구
-            loadTrace.log('page image fetch failed, fallback to stream url', { pageIndex, error: String(err) });
+            loadTrace.log('page image (split) crop failed', { pageIndex, error: String(err) });
+            imgEl.onerror();
+          });
+      } else {
+        const cacheKey = `${currentBookId}_${pageIndex}`;
+        if (blobCacheMap.has(cacheKey)) {
+          loadTrace.log('page image cache hit', { pageIndex, cacheKey });
+          imgEl.src = blobCacheMap.get(cacheKey);
+        } else {
+          loadTrace.log('page image fetch start', { pageIndex, cacheKey });
+          getWholePageObjectUrl(currentBookId, pageIndex).then((url) => {
+            const activeBookId = state.currentBookId || (window.state ? window.state.currentBookId : null);
+            if (activeBookId !== currentBookId) return;
+            loadTrace.log('page image blob ready', { pageIndex });
             imgEl.src = url;
           });
+        }
       }
     });
 
     updatePageInfo();
     if (!isInitializingProgress) {
-      saveProgress(state.activeBookId, comicCurrentPage, comicTotalPages);
+      const { page: physicalPage, total: physicalTotal } = getPhysicalProgress();
+      saveProgress(state.activeBookId, physicalPage, physicalTotal);
     }
     loadTrace.log('page-mode render setup complete');
   }
@@ -759,9 +880,9 @@ async function startSequentialPreload(pageList) {
       break;
     }
 
-    // 범위 검사 및 이미 캐싱된 것은 패스
+    // 범위 검사 및 이미 캐싱된 것은 패스 (분할 모드에서도 프리로드 대상은 항상 물리 페이지 인덱스)
     const cacheKey = `${currentBookId}_${nextIdx}`;
-    if (nextIdx >= comicTotalPages || nextIdx < 0 || blobCacheMap.has(cacheKey)) {
+    if (nextIdx >= getPhysicalTotalPages() || nextIdx < 0 || blobCacheMap.has(cacheKey)) {
       continue;
     }
 
@@ -798,11 +919,14 @@ function preloadNextPages() {
 
   const preloadCount = 10;
   const basePage = getComicDisplayPageIndex(comicCurrentPage);
-  
+  // 분할 모드에서는 양쪽 절반이 같은 물리 이미지를 공유하므로 물리 페이지 기준으로만 프리로드한다.
+  const basePhysical = splitModeActive ? splitVirtualIndex(basePage).physical : basePage;
+  const physicalTotal = getPhysicalTotalPages();
+
   const pagesToLoad = [];
   for (let i = 1; i <= preloadCount; i++) {
-    const nextIdx = basePage + i;
-    if (nextIdx < comicTotalPages) {
+    const nextIdx = basePhysical + i;
+    if (nextIdx < physicalTotal) {
       pagesToLoad.push(nextIdx);
     }
   }

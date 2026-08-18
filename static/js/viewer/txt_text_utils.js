@@ -33,12 +33,22 @@ export function stripHtml(html) {
 }
 
 export function formatTxtToHtml(rawText) {
-  return rawText
-    .split('\n')
-    .map(line => {
-      const trimmed = line.trim();
-      if (!trimmed) return '<p class="txt-paragraph txt-empty-line" style="margin: 0; min-height: 1rem;">&nbsp;</p>';
-      return `<p class="txt-paragraph" style="margin: 0;">${escapeHtml(line)}</p>`;
-    })
-    .join('');
+  const lines = rawText.split('\n');
+  const htmlParts = [];
+  let prevWasEmpty = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      // 연속된 빈 줄(여러 개의 엔터)은 1개만 출력 — 행간을 넓혀도 문단 사이가 과도하게 벌어지는 문제 방지
+      if (prevWasEmpty) continue;
+      prevWasEmpty = true;
+      htmlParts.push('<p class="txt-paragraph txt-empty-line" style="margin: 0; min-height: 1rem;">&nbsp;</p>');
+    } else {
+      prevWasEmpty = false;
+      htmlParts.push(`<p class="txt-paragraph" style="margin: 0;">${escapeHtml(line)}</p>`);
+    }
+  }
+
+  return htmlParts.join('');
 }

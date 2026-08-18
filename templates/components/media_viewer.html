@@ -98,6 +98,14 @@
                             <i class="fa-solid fa-file-lines"></i> <span id="comic-page-step-label">1장</span>
                         </button>
 
+                        <!-- 다음 버튼부터 줄바꿈 (컨트롤이 많아 한 줄에 다 안 들어감) -->
+                        <div class="overlay-row-break"></div>
+
+                        <!-- 스프레드 이미지 좌/우 분할 보기 -->
+                        <button id="btn-comic-split-spread" class="btn-overlay-fit" data-role="viewer-action" data-action="toggle-split-spread" data-i18n-title="viewer.split_spread_title" title="페이지 분할 보기 전환">
+                            <i class="fa-solid fa-columns"></i> <span id="comic-split-spread-label" data-i18n="viewer.split_spread_off">분할 끔</span>
+                        </button>
+
                         <!-- 2장 보기 중앙 여백 토글 -->
                         <button id="btn-comic-center-gap" class="btn-overlay-fit" data-role="viewer-action" data-action="toggle-center-gap" title="2장 보기 중앙 여백 토글">
                             <i class="fa-solid fa-grip-lines-vertical"></i> <span id="comic-center-gap-label" data-i18n="viewer.center_gap_show">중앙 여백</span>
@@ -154,6 +162,7 @@
                                 <option value="black">블랙 (OLED)</option>
                             </select>
                             <select id="viewer-line-height-select" data-role="viewer-action-change" data-action="line-height" class="overlay-select" title="행간 조절">
+                                <option value="1.2">행간 1.2</option>
                                 <option value="1.4">행간 1.4</option>
                                 <option value="1.6">행간 1.6</option>
                                 <option value="1.8">행간 1.8 (기본)</option>

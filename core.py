@@ -363,6 +363,17 @@ if not IS_WORKER:
             response.headers['Pragma'] = 'no-cache'
             response.headers['Expires'] = '0'
             return response
+        # 우리 앱 자체 JS(static/js/**)는 ES 모듈 중첩 import 경로 대부분(229개 중 224개)에
+        # 배포 버전 쿼리스트링(?v=...)이 안 붙어 있어(진입점 <script src>만 static_asset_url()로
+        # 자동 버저닝됨), 브라우저/중간 캐시가 예전 파일을 계속 재사용하면 배포해도 반영이
+        # 안 되는 문제가 있었다(2026-08-18, 사이드바 디버그 로그가 배포 후에도 안 없어지던 사례).
+        # 파일 하나하나 버전을 붙이는 대신, 이 경로 전체를 "매번 서버에 재검증"으로 바꿔서
+        # (Last-Modified/ETag 기반 조건부 GET → 변경 없으면 304, 변경됐으면 즉시 새 내용) 근본
+        # 해결한다. /static/lib/**(서드파티 라이브러리)은 별도로 영구 캐시 대상이라 여기서 제외.
+        if request.path.startswith('/static/js/'):
+            response.headers['Cache-Control'] = 'no-cache, must-revalidate'
+            return response
+
         is_cacheable_path = request.path.startswith('/static/lib/') or request.path.startswith('/static/fonts/')
         is_cacheable_ext = any(request.path.endswith(ext) for ext in ['.woff', '.woff2', '.ttf', '.eot', '.png', '.jpg', '.jpeg', '.svg', '.ico'])
         if request.path.startswith('/static/') and (is_cacheable_path or is_cacheable_ext):

@@ -257,9 +257,11 @@ export async function triggerBookContextPluginAction(pluginId, actionId) {
 
   let pendingPopup = null;
   try {
+    // 팝업 차단을 피하려면 비동기 응답을 기다리기 전, 사용자 클릭 시점에 미리 창을 열어둬야
+    // 한다(open_url이 있는 플러그인 액션 전용 placeholder — 없는 액션이면 아래에서 바로 닫음).
     pendingPopup = window.open('', '_blank');
     if (pendingPopup) {
-      pendingPopup.document.write('<!doctype html><title>네이버 도서 검색 중...</title><p>검색 페이지를 여는 중입니다.</p>');
+      pendingPopup.document.write('<!doctype html><title>작업 처리 중...</title><p>플러그인 작업을 처리하는 중입니다.</p>');
       pendingPopup.document.close();
     }
 
@@ -293,6 +295,10 @@ export async function triggerBookContextPluginAction(pluginId, actionId) {
       } else {
         window.open(res.open_url, '_blank');
       }
+    } else if (pendingPopup) {
+      // 액션이 성공했지만 이동할 URL이 없는 경우(YAML 저장 등) 미리 열어둔
+      // 플레이스홀더 팝업을 그대로 두면 about:blank(정확히는 "검색 중..." 문구)로 남는다.
+      pendingPopup.close();
     }
 
     if (res.message) {
@@ -419,14 +425,20 @@ export async function triggerMarkAsUnreadAction() {
           await loadReadingHistory();
         } else {
           // 상세 뷰 혹은 일반 도서 목록 새로고침
-          const detailModal = document.getElementById('book-detail-modal');
-          if (detailModal && detailModal.style.display === 'flex') {
-            const seriesName = document.querySelector('.detail-title-text')?.textContent || '';
-            if (seriesName) {
-              openBookDetail(null, seriesName, state.currentLibraryId);
+          // (구 모달 구조 시절의 #book-detail-modal / .detail-title-text 참조는 지금의
+          // #book-detail-view / state.detailSeriesName 구조로 바뀐 뒤 갱신되지 않아 죽은
+          // 참조로 남아있었음 — 상세 화면에서 읽지 않음 처리해도 진행률 표시가 새로고침
+          // 안 되던 원인)
+          const detailView = document.getElementById('book-detail-view');
+          const isDetailViewOpen = !!detailView && detailView.style.display !== 'none';
+          if (isDetailViewOpen) {
+            const currentSeriesName = String(state.detailSeriesName || '').trim();
+            if (currentSeriesName) {
+              openBookDetail(null, currentSeriesName, libraryId || state.currentLibraryId);
             }
+          } else {
+            await loadBooksList();
           }
-          await loadBooksList();
         }
       } else {
         vm.showToast(`변경 실패: ${res.error}`, 'error');

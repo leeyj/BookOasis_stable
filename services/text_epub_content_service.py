@@ -1,10 +1,80 @@
 # -*- coding: utf-8 -*-
 import os
 import re
+import html
+import posixpath
+import urllib.parse
+from html.parser import HTMLParser
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EPUB_IMAGE_CACHE_DIR = os.path.join(BASE_DIR, 'cache', 'epub_images')
 EPUB_IMAGE_MAX_SIDE = 1600  # 뷰어 실제 표시 폭(2페이지 모드 최대 1600px)을 넘는 원본은 리사이즈
+
+
+class _EPUBBodyHTMLParser(HTMLParser):
+    """EPUB 챕터 XHTML의 <body> 내용을 허용된 태그만 남겨 정제된 HTML 문자열로 변환.
+    단일/배치 챕터 추출 경로 둘 다 재사용하도록 모듈 최상위로 분리(예전엔 get_epub_chapter
+    내부에 매 호출마다 새로 정의되는 중첩 클래스였음)."""
+
+    ALLOWED_TAGS = {
+        'p', 'br', 'hr', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+        'div', 'blockquote', 'ul', 'ol', 'li',
+        'strong', 'em', 'b', 'i', 'u', 's', 'sup', 'sub',
+        'ruby', 'rt', 'rp', 'img',
+    }
+
+    def __init__(self, xhtml_path, book_id, db_type):
+        super().__init__()
+        self.recording = False
+        self.output = []
+        self.xhtml_path = xhtml_path
+        self.book_id = book_id
+        self.db_type = db_type
+
+    def handle_starttag(self, tag, attrs):
+        tag_lower = tag.lower()
+        if tag_lower == 'body':
+            self.recording = True
+        elif self.recording and tag_lower in self.ALLOWED_TAGS:
+            if tag_lower == 'br':
+                self.output.append('<br/>')
+            elif tag_lower == 'hr':
+                self.output.append('<hr/>')
+            elif tag_lower == 'img':
+                attrs_dict = dict(attrs)
+                src_val = attrs_dict.get('src')
+                if src_val:
+                    xhtml_dir = posixpath.dirname(self.xhtml_path)
+                    clean_src = urllib.parse.unquote(src_val.split('#')[0])
+                    resolved_path = posixpath.normpath(posixpath.join(xhtml_dir, clean_src)).replace('\\', '/')
+                    encoded_path = urllib.parse.quote(resolved_path)
+                    api_src = f"/api/media/epub-image?book_id={self.book_id}&db_type={self.db_type}&path={encoded_path}"
+                    self.output.append(
+                        f'<img src="{api_src}" style="max-width: 100%; max-height: 75vh; object-fit: contain; height: auto; display: block; margin: 1.5rem auto; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"/>'
+                    )
+            else:
+                attrs_dict = dict(attrs)
+                elem_id = attrs_dict.get('id')
+                if elem_id:
+                    safe_id = html.escape(str(elem_id), quote=True)
+                    self.output.append(f'<{tag_lower} id="{safe_id}">')
+                else:
+                    self.output.append(f'<{tag_lower}>')
+
+    def handle_endtag(self, tag):
+        tag_lower = tag.lower()
+        if tag_lower == 'body':
+            self.recording = False
+        elif self.recording and tag_lower in self.ALLOWED_TAGS:
+            if tag_lower not in ('br', 'hr', 'img'):
+                self.output.append(f'</{tag_lower}>')
+
+    def handle_data(self, data):
+        if self.recording:
+            self.output.append(html.escape(data))
+
+    def get_content(self):
+        return ''.join(self.output)
 
 
 class TextEpubContentService:
@@ -241,6 +311,10 @@ class TextEpubContentService:
                         from utils.redis_helper import redis_set
                         import json
                         redis_set(redis_cache_key, json.dumps(result, ensure_ascii=False), ex=86400)
+                        # 챕터 조회(get_epub_chapter)는 spine_itemrefs 목록 하나만 필요한데,
+                        # 매 챕터 요청마다 TOC까지 포함된 전체 메타(잠재적으로 수백 챕터의 목차 텍스트)를
+                        # Redis에서 통째로 가져와 역직렬화하는 건 낭비이므로 가벼운 spine 전용 캐시를 별도로 둔다.
+                        TextEpubContentService._set_cached_spine(db_type, book_id, spine_itemrefs)
                     except Exception as r_err:
                         print(f"[Redis Cache Put ERROR] {r_err}")
 
@@ -249,160 +323,208 @@ class TextEpubContentService:
             return None, f"EPUB meta parsing failed: {e}"
 
     @staticmethod
+    def _spine_cache_key(db_type, book_id):
+        return f"cache:epub:spine:book:{db_type}:{book_id}" if book_id else None
+
+    @staticmethod
+    def _set_cached_spine(db_type, book_id, spine_itemrefs):
+        cache_key = TextEpubContentService._spine_cache_key(db_type, book_id)
+        if not cache_key:
+            return
+        import json
+        from utils.redis_helper import redis_set
+        redis_set(cache_key, json.dumps(spine_itemrefs, ensure_ascii=False), ex=86400)
+
+    @staticmethod
+    def _get_spine_itemrefs(file_path, book_id, db_type):
+        """챕터 콘텐츠 추출에 필요한 spine_itemrefs만 최소 비용으로 조회.
+        (전체 메타는 TOC까지 포함해 무거우므로, 챕터 요청마다 반복 조회하는 용도로는
+        가벼운 spine 전용 캐시를 우선 사용하고, 없을 때만 전체 메타 파싱으로 폴백한다.)"""
+        cache_key = TextEpubContentService._spine_cache_key(db_type, book_id)
+        if cache_key:
+            try:
+                import json
+                from utils.redis_helper import redis_get
+                cached = redis_get(cache_key)
+                if cached:
+                    return json.loads(cached), None
+            except Exception as r_err:
+                print(f"[Redis Cache Get ERROR] {r_err}")
+
+        meta, err = TextEpubContentService.get_epub_meta(file_path, book_id, db_type)
+        if err or not meta or 'spine_itemrefs' not in meta:
+            return None, err or 'EPUB metadata load failed'
+        return meta['spine_itemrefs'], None
+
+    @staticmethod
+    def _chapter_cache_key(db_type, book_id, chapter_idx):
+        return f"cache:epub:ch:book:{db_type}:{book_id}:{chapter_idx}" if book_id else None
+
+    @staticmethod
+    def _get_cached_chapter(db_type, book_id, chapter_idx):
+        cache_key = TextEpubContentService._chapter_cache_key(db_type, book_id, chapter_idx)
+        if not cache_key:
+            return None
+        try:
+            import json
+            from utils.redis_helper import redis_get
+            cached = redis_get(cache_key)
+            if cached:
+                return json.loads(cached)
+        except Exception as r_err:
+            print(f"[Redis Cache Get ERROR] {r_err}")
+        return None
+
+    @staticmethod
+    def _resolve_opf_dir(zf):
+        """열려 있는 zip에서 META-INF/container.xml을 읽어 OPF 파일이 위치한 디렉터리를 반환.
+        배치 추출 시 챕터 개수만큼 반복하지 않고 한 번만 호출하기 위해 분리."""
+        import xml.etree.ElementTree as ET
+
+        container_data = zf.read('META-INF/container.xml')
+        root = ET.fromstring(container_data)
+        ns = {'ns': 'urn:oasis:names:tc:opendocument:xmlns:container'}
+        rootfile = root.find('.//ns:rootfile', ns)
+        if rootfile is None:
+            rootfile = root.find('.//{urn:oasis:names:tc:opendocument:xmlns:container}rootfile')
+        opf_path = rootfile.attrib.get('full-path')
+        return os.path.dirname(opf_path)
+
+    @staticmethod
+    def _extract_and_cache_chapter(zf, opf_dir, spine_itemrefs, chapter_idx, book_id, db_type):
+        """이미 열려 있는 zip(zf)에서 챕터 하나를 추출/정제하고 개별 Redis 캐시에 저장.
+        단일 조회(get_epub_chapter)와 배치 조회(get_epub_chapters_batch)가 공유하는 핵심 로직."""
+        rel_href = spine_itemrefs[chapter_idx]
+        clean_rel_href = urllib.parse.unquote(rel_href.split('#')[0])
+        full_href = posixpath.join(opf_dir, clean_rel_href).replace('\\', '/') if opf_dir else clean_rel_href
+
+        try:
+            html_bytes = zf.read(full_href)
+        except KeyError:
+            found_name = None
+            for name in zf.namelist():
+                if name.lower() == full_href.lower():
+                    found_name = name
+                    break
+            if not found_name:
+                return None, f"Chapter file not found: {full_href}"
+            html_bytes = zf.read(found_name)
+
+        html_str = html_bytes.decode('utf-8', errors='ignore')
+        parser = _EPUBBodyHTMLParser(full_href, book_id, db_type)
+        parser.feed(html_str)
+        chapter_content = parser.get_content()
+        # 연속된 빈 줄(여러 개의 <br/> 또는 빈 <p></p>)이 원본에 많으면
+        # 행간 설정과 무관하게 문단 사이 공백이 과도하게 넓어 보이므로 1개로 축소
+        chapter_content = re.sub(r'(?:\s*<br/>\s*){2,}', '<br/>', chapter_content)
+        chapter_content = re.sub(r'(?:<p(?: id="[^"]*")?>\s*</p>\s*){2,}', lambda m: m.group(0).split('</p>')[0] + '</p>', chapter_content)
+
+        h_match = re.search(r'<h[1-6]>(.*?)</h[1-6]>', chapter_content, re.IGNORECASE)
+        if h_match:
+            ch_title = html.unescape(re.sub('<[^<]+?>', '', h_match.group(1))).strip()
+        else:
+            ch_title = f"Chapter {chapter_idx + 1}"
+
+        result = {
+            'chapter_idx': chapter_idx,
+            'title': ch_title,
+            'content': chapter_content,
+            'total_chapters': len(spine_itemrefs)
+        }
+
+        cache_key = TextEpubContentService._chapter_cache_key(db_type, book_id, chapter_idx)
+        if cache_key:
+            try:
+                import json
+                from utils.redis_helper import redis_set
+                redis_set(cache_key, json.dumps(result, ensure_ascii=False), ex=86400)
+            except Exception as r_err:
+                print(f"[Redis Cache Put ERROR] {r_err}")
+
+        return result, None
+
+    @staticmethod
     def get_epub_chapter(file_path, book_id, db_type, chapter_idx):
         """요청된 특정 챕터(chapter_idx)만 0.01초 내 단독 추출 및 변환"""
         import zipfile
-        from html.parser import HTMLParser
-        import xml.etree.ElementTree as ET
-        import urllib.parse
-        import posixpath
 
         chapter_idx = int(chapter_idx)
         if not os.path.exists(file_path):
             return None, 'File not found'
 
-        redis_cache_key = f"cache:epub:ch:book:{db_type}:{book_id}:{chapter_idx}" if book_id else None
-        if redis_cache_key:
-            try:
-                from utils.redis_helper import redis_get
-                redis_data = redis_get(redis_cache_key)
-                if redis_data:
-                    import json
-                    return json.loads(redis_data), None
-            except Exception as r_err:
-                print(f"[Redis Cache Get ERROR] {r_err}")
-
-        class EPUBHTMLParser(HTMLParser):
-            def __init__(self, xhtml_path, book_id, db_type):
-                super().__init__()
-                self.recording = False
-                self.output = []
-                self.allowed_tags = {
-                    'p', 'br', 'hr', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-                    'div', 'blockquote', 'ul', 'ol', 'li',
-                    'strong', 'em', 'b', 'i', 'u', 's', 'sup', 'sub',
-                    'ruby', 'rt', 'rp', 'img',
-                }
-                self.xhtml_path = xhtml_path
-                self.book_id = book_id
-                self.db_type = db_type
-
-            def handle_starttag(self, tag, attrs):
-                tag_lower = tag.lower()
-                if tag_lower == 'body':
-                    self.recording = True
-                elif self.recording and tag_lower in self.allowed_tags:
-                    if tag_lower == 'br':
-                        self.output.append('<br/>')
-                    elif tag_lower == 'hr':
-                        self.output.append('<hr/>')
-                    elif tag_lower == 'img':
-                        attrs_dict = dict(attrs)
-                        src_val = attrs_dict.get('src')
-                        if src_val:
-                            xhtml_dir = posixpath.dirname(self.xhtml_path)
-                            clean_src = urllib.parse.unquote(src_val.split('#')[0])
-                            resolved_path = posixpath.normpath(posixpath.join(xhtml_dir, clean_src)).replace('\\', '/')
-                            encoded_path = urllib.parse.quote(resolved_path)
-                            api_src = f"/api/media/epub-image?book_id={self.book_id}&db_type={self.db_type}&path={encoded_path}"
-                            self.output.append(
-                                f'<img src="{api_src}" style="max-width: 100%; max-height: 75vh; object-fit: contain; height: auto; display: block; margin: 1.5rem auto; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"/>'
-                            )
-                    else:
-                        attrs_dict = dict(attrs)
-                        elem_id = attrs_dict.get('id')
-                        if elem_id:
-                            import html
-                            safe_id = html.escape(str(elem_id), quote=True)
-                            self.output.append(f'<{tag_lower} id="{safe_id}">')
-                        else:
-                            self.output.append(f'<{tag_lower}>')
-
-            def handle_endtag(self, tag):
-                tag_lower = tag.lower()
-                if tag_lower == 'body':
-                    self.recording = False
-                elif self.recording and tag_lower in self.allowed_tags:
-                    if tag_lower not in ('br', 'hr', 'img'):
-                        self.output.append(f'</{tag_lower}>')
-
-            def handle_data(self, data):
-                if self.recording:
-                    import html
-                    self.output.append(html.escape(data))
-
-            def get_content(self):
-                return ''.join(self.output)
+        cached = TextEpubContentService._get_cached_chapter(db_type, book_id, chapter_idx)
+        if cached:
+            return cached, None
 
         try:
-            meta, err = TextEpubContentService.get_epub_meta(file_path, book_id, db_type)
-            if err or not meta or 'spine_itemrefs' not in meta:
+            spine_itemrefs, err = TextEpubContentService._get_spine_itemrefs(file_path, book_id, db_type)
+            if err or spine_itemrefs is None:
                 return None, f"EPUB metadata load failed: {err}"
 
-            spine_itemrefs = meta['spine_itemrefs']
             if chapter_idx < 0 or chapter_idx >= len(spine_itemrefs):
                 return None, 'Chapter index out of range'
 
-            rel_href = spine_itemrefs[chapter_idx]
-            clean_rel_href = urllib.parse.unquote(rel_href.split('#')[0])
-
             with zipfile.ZipFile(file_path, 'r') as zf:
-                container_data = zf.read('META-INF/container.xml')
-                root = ET.fromstring(container_data)
-                ns = {'ns': 'urn:oasis:names:tc:opendocument:xmlns:container'}
-                rootfile = root.find('.//ns:rootfile', ns)
-                if rootfile is None:
-                    rootfile = root.find('.//{urn:oasis:names:tc:opendocument:xmlns:container}rootfile')
-                opf_path = rootfile.attrib.get('full-path')
-                opf_dir = os.path.dirname(opf_path)
-
-                if opf_dir:
-                    full_href = posixpath.join(opf_dir, clean_rel_href).replace('\\', '/')
-                else:
-                    full_href = clean_rel_href
-
-                try:
-                    html_bytes = zf.read(full_href)
-                except KeyError:
-                    found_name = None
-                    for name in zf.namelist():
-                        if name.lower() == full_href.lower():
-                            found_name = name
-                            break
-                    if not found_name:
-                        return None, f"Chapter file not found: {full_href}"
-                    html_bytes = zf.read(found_name)
-
-                html_str = html_bytes.decode('utf-8', errors='ignore')
-                parser = EPUBHTMLParser(full_href, book_id, db_type)
-                parser.feed(html_str)
-                chapter_content = parser.get_content()
-
-                h_match = re.search(r'<h[1-6]>(.*?)</h[1-6]>', chapter_content, re.IGNORECASE)
-                if h_match:
-                    import html
-                    ch_title = html.unescape(re.sub('<[^<]+?>', '', h_match.group(1))).strip()
-                else:
-                    ch_title = f"Chapter {chapter_idx + 1}"
-
-                result = {
-                    'chapter_idx': chapter_idx,
-                    'title': ch_title,
-                    'content': chapter_content,
-                    'total_chapters': len(spine_itemrefs)
-                }
-
-                if redis_cache_key:
-                    try:
-                        from utils.redis_helper import redis_set
-                        import json
-                        redis_set(redis_cache_key, json.dumps(result, ensure_ascii=False), ex=86400)
-                    except Exception as r_err:
-                        print(f"[Redis Cache Put ERROR] {r_err}")
-
+                opf_dir = TextEpubContentService._resolve_opf_dir(zf)
+                result, err = TextEpubContentService._extract_and_cache_chapter(
+                    zf, opf_dir, spine_itemrefs, chapter_idx, book_id, db_type
+                )
+                if err:
+                    return None, err
                 return result, None
         except Exception as e:
             return None, f"EPUB chapter parsing failed: {e}"
+
+    @staticmethod
+    def get_epub_chapters_batch(file_path, book_id, db_type, chapter_indices):
+        """여러 챕터를 한 번의 zip open으로 묶어서 추출 (프리페치 시 챕터 수만큼 zip을
+        반복해서 여는 것을 방지하기 위한 배치 진입점). 개별 챕터 실패는 건너뛰고 나머지는
+        정상 반환하며, 실패한 챕터는 프론트의 기존 개별 재시도 로직에 맡긴다."""
+        import zipfile
+
+        if not os.path.exists(file_path):
+            return None, 'File not found'
+
+        try:
+            requested = sorted({int(i) for i in chapter_indices})
+        except (TypeError, ValueError):
+            return None, 'Invalid chapter_idx list'
+        if not requested:
+            return [], None
+
+        spine_itemrefs, err = TextEpubContentService._get_spine_itemrefs(file_path, book_id, db_type)
+        if err or spine_itemrefs is None:
+            return None, f"EPUB metadata load failed: {err}"
+
+        valid_indices = [i for i in requested if 0 <= i < len(spine_itemrefs)]
+        if not valid_indices:
+            return [], None
+
+        results = {}
+        missing = []
+        for idx in valid_indices:
+            cached = TextEpubContentService._get_cached_chapter(db_type, book_id, idx)
+            if cached:
+                results[idx] = cached
+            else:
+                missing.append(idx)
+
+        if missing:
+            try:
+                with zipfile.ZipFile(file_path, 'r') as zf:
+                    opf_dir = TextEpubContentService._resolve_opf_dir(zf)
+                    for idx in missing:
+                        chapter_result, chapter_err = TextEpubContentService._extract_and_cache_chapter(
+                            zf, opf_dir, spine_itemrefs, idx, book_id, db_type
+                        )
+                        if chapter_result:
+                            results[idx] = chapter_result
+                        # 챕터 하나가 실패해도(chapter_err) 배치 전체를 실패시키지 않고 건너뜀
+            except Exception as e:
+                # zip 자체를 못 열었으면 이미 캐시로 채운 결과라도 반환 (완전 실패는 아님)
+                print(f"[EPUB Batch] zip open failed for {file_path}: {e}")
+
+        return [results[idx] for idx in valid_indices if idx in results], None
 
     @staticmethod
     def get_epub_content(file_path, book_id, db_type):

@@ -163,12 +163,6 @@ export function applySettingsToUI(settings) {
   if (settings.AUDIO_RIGHT_DOCK_DIM_ENABLED !== undefined) {
     state.audioRightDockDimEnabled = (settings.AUDIO_RIGHT_DOCK_DIM_ENABLED === '1');
   }
-  if (settings.TTS_ENABLED !== undefined) {
-    state.ttsEnabled = (settings.TTS_ENABLED === '1');
-  }
-  if (settings.TTS_WAKE_LOCK !== undefined) {
-    state.ttsWakeLock = (settings.TTS_WAKE_LOCK === '1');
-  }
   if (settings.DETAIL_VOLUME_GRID_VIEW !== undefined) {
     state.detailVolumeGridView = (settings.DETAIL_VOLUME_GRID_VIEW === '1');
   }
@@ -259,6 +253,9 @@ export async function loadGeneralSettings() {
 
       const lazyVideoMaxEpisodesEl = document.getElementById('setting-lazy-scan-video-max-episodes');
       if (lazyVideoMaxEpisodesEl) lazyVideoMaxEpisodesEl.value = s.LAZY_SCAN_VIDEO_MAX_EPISODES_PER_RUN !== undefined ? s.LAZY_SCAN_VIDEO_MAX_EPISODES_PER_RUN : '300';
+
+      const lazyVideoProbeWorkersEl = document.getElementById('setting-lazy-scan-video-probe-workers');
+      if (lazyVideoProbeWorkersEl) lazyVideoProbeWorkersEl.value = s.LAZY_SCAN_VIDEO_PROBE_WORKERS !== undefined ? s.LAZY_SCAN_VIDEO_PROBE_WORKERS : '4';
 
       const scanIgnorePatternsEl = document.getElementById('setting-scan-ignore-patterns');
       if (scanIgnorePatternsEl) scanIgnorePatternsEl.value = s.SCAN_IGNORE_PATTERNS !== undefined ? s.SCAN_IGNORE_PATTERNS : "@eaDir/\n#recycle/\n*.tmp\n*.sample.cbz\n.DS_Store\nThumbs.db\ndesktop.ini";
@@ -358,16 +355,6 @@ export async function loadGeneralSettings() {
       if (comicDelayEl) {
         const delayStr = localStorage.getItem('comic_loading_delay');
         comicDelayEl.value = (delayStr !== null) ? parseInt(delayStr, 10) : '700';
-      }
-      
-      const ttsEnabledEl = document.getElementById('setting-tts-enabled');
-      if (ttsEnabledEl) {
-        ttsEnabledEl.checked = (s.TTS_ENABLED === '1');
-      }
-      
-      const ttsWakeLockEl = document.getElementById('setting-tts-wake-lock');
-      if (ttsWakeLockEl) {
-        ttsWakeLockEl.checked = (s.TTS_WAKE_LOCK === '1');
       }
       
       // 🌟 도서관 검색 단축키 설정 로드
@@ -489,6 +476,7 @@ export async function submitGeneralSettings(event) {
   const lazyMaxFileSize = document.getElementById('setting-lazy-scan-max-file-size')?.value || '300';
   const lazyMaxBatchSize = document.getElementById('setting-lazy-scan-max-batch-size')?.value || '1024';
   const lazyVideoMaxEpisodes = document.getElementById('setting-lazy-scan-video-max-episodes')?.value || '300';
+  const lazyVideoProbeWorkers = document.getElementById('setting-lazy-scan-video-probe-workers')?.value || '4';
   const scanIgnorePatterns = document.getElementById('setting-scan-ignore-patterns')?.value || "@eaDir/\n#recycle/\n*.tmp\n*.sample.cbz\n.DS_Store\nThumbs.db\ndesktop.ini";
   const recentBooks = document.getElementById('setting-recent-books-limit')?.value || '30';
   const sysMem = document.getElementById('setting-system-mem-limit')?.value || '1536';
@@ -506,8 +494,6 @@ export async function submitGeneralSettings(event) {
   const proxyAuth = document.getElementById('setting-proxy-header-auth')?.value || '0';
   const rcloneRcUrl = document.getElementById('setting-rclone-rc-url')?.value || 'http://localhost:5572';
   const timezone = document.getElementById('setting-timezone')?.value || 'UTC';
-  const ttsEnabled = document.getElementById('setting-tts-enabled')?.checked ? '1' : '0';
-  const ttsWakeLock = document.getElementById('setting-tts-wake-lock')?.checked ? '1' : '0';
   const detailVolumeGridView = document.getElementById('setting-detail-volume-grid-view')?.checked ? '1' : '0';
   const collapseDetailGenreTags = document.getElementById('setting-collapse-detail-genre-tags')?.checked ? '1' : '0';
   const smartRecommendEnabled = document.getElementById('setting-smart-recommend-enabled')?.checked ? '1' : '0';
@@ -539,6 +525,7 @@ export async function submitGeneralSettings(event) {
       api.updateSystemSetting('LAZY_SCAN_MAX_FILE_SIZE_MB', lazyMaxFileSize),
       api.updateSystemSetting('LAZY_SCAN_MAX_BATCH_SIZE_MB', lazyMaxBatchSize),
       api.updateSystemSetting('LAZY_SCAN_VIDEO_MAX_EPISODES_PER_RUN', lazyVideoMaxEpisodes),
+      api.updateSystemSetting('LAZY_SCAN_VIDEO_PROBE_WORKERS', lazyVideoProbeWorkers),
       api.updateSystemSetting('SCAN_IGNORE_PATTERNS', scanIgnorePatterns),
       api.updateSystemSetting('TIMEZONE', timezone),
       api.updateSystemSetting('RECENT_BOOKS_LIMIT', recentBooks),
@@ -554,8 +541,6 @@ export async function submitGeneralSettings(event) {
       api.updateSystemSetting('AUDIO_RIGHT_DOCK_DIM_ENABLED', audioRightDockDimEnabled),
       api.updateSystemSetting('PROXY_HEADER_AUTH', proxyAuth),
       api.updateSystemSetting('RCLONE_RC_URL', rcloneRcUrl),
-      api.updateSystemSetting('TTS_ENABLED', ttsEnabled),
-      api.updateSystemSetting('TTS_WAKE_LOCK', ttsWakeLock),
       api.updateSystemSetting('DETAIL_VOLUME_GRID_VIEW', detailVolumeGridView),
       api.updateSystemSetting('COLLAPSE_DETAIL_GENRE_TAGS', collapseDetailGenreTags),
       api.updateSystemSetting('SMART_RECOMMEND_ENABLED', smartRecommendEnabled),
@@ -589,8 +574,6 @@ export async function submitGeneralSettings(event) {
         HDD_AGGRESSIVE_WARMUP: hddAggressiveWarmup,
         AUDIO_MINI_PLAYER_MODE: audioMiniPlayerMode,
         AUDIO_RIGHT_DOCK_DIM_ENABLED: audioRightDockDimEnabled,
-        TTS_ENABLED: ttsEnabled,
-        TTS_WAKE_LOCK: ttsWakeLock,
         DETAIL_VOLUME_GRID_VIEW: detailVolumeGridView,
         COLLAPSE_DETAIL_GENRE_TAGS: collapseDetailGenreTags,
         SMART_RECOMMEND_ENABLED: smartRecommendEnabled

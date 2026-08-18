@@ -28,6 +28,12 @@ export function setComicScrollWidth(px) { return Settings.setScrollWidth(px); }
 export function getTapZoneDirection(...args) { return Settings.getTapZoneDirection.apply(null, args); }
 export function toggleTapZoneDirection(...args) { return Settings.toggleTapZoneDirection.apply(null, args); }
 export function initTapZoneDirection(...args) { return Settings.initTapZoneDirection.apply(null, args); }
+export function getComicSplitSpread(...args) { return Settings.getComicSplitSpread.apply(null, args); }
+export function toggleComicSplitSpread(...args) { return Settings.toggleComicSplitSpread.apply(null, args); }
+export function initSplitSpread(...args) { return Settings.initSplitSpread.apply(null, args); }
+export function syncSplitSpreadMode(...args) { return Renderer.syncSplitSpreadMode.apply(null, args); }
+export function syncSplitSpreadModeForScrollMode(...args) { return Renderer.syncSplitSpreadModeForScrollMode.apply(null, args); }
+export function getPhysicalProgress(...args) { return Renderer.getPhysicalProgress.apply(null, args); }
 export function clearComicViewer(...args) { return Renderer.clearComicViewer.apply(null, args); }
 
 // Expose legacy globals on window as live bindings
@@ -69,9 +75,14 @@ export const ComicViewer = {
     return initComicViewer(bookId, pagesRead, totalPages);
   },
   prepareForClose() {
-    const totalPages = Renderer.getComicTotalPages();
-    if (!state.activeBookId || !totalPages || totalPages <= 0) return;
-    saveProgress(state.activeBookId, Renderer.getComicCurrentPage(), totalPages);
+    if (!state.activeBookId) return;
+    // 분할 보기(가상 절반-페이지) 상태에서 그대로 getComicCurrentPage()/getComicTotalPages()를
+    // 보내면 실제 페이지 수의 2배가 서버 books.total_pages에 그대로 저장되어 버려서,
+    // 다음에 책을 열 때 존재하지 않는 페이지를 요청하며 400 에러가 나는 원인이 된다.
+    // 반드시 물리 페이지 기준으로 환산해서 저장해야 한다.
+    const { page, total } = Renderer.getPhysicalProgress();
+    if (!total || total <= 0) return;
+    saveProgress(state.activeBookId, page, total);
   },
   destroy() {
     clearComicViewer();

@@ -209,6 +209,17 @@
                                         <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;">1회 Lazy 스캔 실행마다 ffprobe로 재생시간/해상도를 분석할 영상 강좌 에피소드 최대 건수입니다. 원격 드라이브에서 느린 파일이 섞여 있으면 값이 클수록 책 커버 스캔이 그만큼 늦게 시작됩니다. (기본값: 300건, 서버가 자주 재시작되는 환경이라면 값을 줄이세요)</p>
                                     </div>
 
+                                    <div class="library-form-group">
+                                        <label for="setting-lazy-scan-video-probe-workers" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                            <i class="fa-solid fa-gauge-high" style="color: #38bdf8; margin-right: 0.3rem;"></i> Lazy 스캐너 영상 재생시간 분석 동시 처리 개수
+                                        </label>
+                                        <div style="display: flex; gap: 0.5rem; align-items: center; max-width: 480px; width: 100%;">
+                                            <input type="number" id="setting-lazy-scan-video-probe-workers" name="LAZY_SCAN_VIDEO_PROBE_WORKERS" min="1" max="16" value="4" style="flex: 1; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
+                                            <span style="color: #94a3b8; font-size: 0.85rem; white-space: nowrap;">개</span>
+                                        </div>
+                                        <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;">ffprobe 분석을 몇 개씩 동시에 돌릴지입니다. ffprobe는 파일을 읽어들이는 대기 시간이 대부분이라, 원격(rclone) 드라이브에서 값을 올리면 처리 속도가 크게 빨라집니다. 너무 높이면 원격 저장소 쪽 동시 요청 제한에 걸릴 수 있습니다. (기본값: 4)</p>
+                                    </div>
+
                                     <!-- 스캐너 실행 로그 저장 옵션 -->
                                     <div class="library-form-group">
                                         <label for="setting-scanner-write-log" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">

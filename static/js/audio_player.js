@@ -589,13 +589,6 @@ export function selectChapterTrack(trackId) {
   chapterDrawer.selectChapterTrack(trackId);
 }
 
-export function toggleVolumePopover() {
-  const popover = document.getElementById('audio-volume-popover');
-  if (popover) {
-    popover.style.display = popover.style.display === 'none' ? 'block' : 'none';
-  }
-}
-
 export function setAudioVolume(val) {
   const volume = playbackEngine.setVolume(audioInstance, val);
 
@@ -695,7 +688,6 @@ registerAudioPlayerPublicApi({
   cycleAudioSpeed,
   toggleAudioChapterDrawer,
   selectChapterTrack,
-  toggleVolumePopover,
   setAudioVolume,
   cycleSleepTimer
 });

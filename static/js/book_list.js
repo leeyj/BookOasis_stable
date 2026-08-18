@@ -328,6 +328,16 @@ export function toggleLibrarySort() {
 
   state.currentPage = 1;
   state.hasMore = true;
+
+  // 영상 강좌는 전용 그리드(loadVideoCourseGrid/renderVideoCourseCards)로 렌더링되는데,
+  // 여기서 무조건 loadBooksList()를 타면 일반 도서용 공용 카드 렌더러(createBookCard)로
+  // 전환되어 재생시간/분석전 배지가 오디오북 스타일(헤드폰 아이콘) 배지로 바뀌어 버린다.
+  // filterBooks()와 동일하게, 특정 영상 라이브러리를 보는 중이면 영상 전용 정렬 경로로 위임한다.
+  if (state.currentLibraryType === 'video' && !['all', 'history', 'favorite'].includes(state.currentLibraryId)) {
+    if (typeof window.sortVideoCourses === 'function') window.sortVideoCourses();
+    return;
+  }
+
   loadBooksList(false);
 }
 

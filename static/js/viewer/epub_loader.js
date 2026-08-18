@@ -146,6 +146,77 @@ export function requestEpubChapterContent(txtChunks, chapterIdx, options = {}) {
     });
 }
 
+// 여러 챕터를 한 번의 HTTP 요청(＝서버에서 zip을 1번만 오픈)으로 묶어서 프리페치.
+// requestEpubChapterContent와 동일한 in-flight/캐시 규약(epubChapterFetchInFlight, txtChunks
+// 슬롯 상태)을 공유해 단일 요청과 배치 요청이 같은 챕터를 동시에 중복 요청하지 않게 한다.
+export function requestEpubChaptersBatch(txtChunks, chapterIndices) {
+  if ((state.currentViewerFormat || '').toLowerCase() !== 'epub') {
+    return Promise.resolve();
+  }
+
+  const targets = Array.from(new Set((chapterIndices || []).map(i => parseInt(i, 10))))
+    .filter(idx => Number.isFinite(idx) && idx >= 0 && idx < txtChunks.length)
+    .filter(idx => !epubChapterFetchInFlight.has(idx))
+    .filter(idx => txtChunks[idx] === null || txtChunks[idx] === 'LOADING_PENDING');
+
+  if (targets.length === 0) {
+    return Promise.resolve();
+  }
+
+  targets.forEach(idx => {
+    epubChapterFetchInFlight.add(idx);
+    txtChunks[idx] = 'LOADING_PENDING';
+    const retryState = epubChapterRetryState.get(idx) || { attempts: 0, lastAttemptAt: 0 };
+    retryState.attempts += 1;
+    retryState.lastAttemptAt = Date.now();
+    epubChapterRetryState.set(idx, retryState);
+  });
+
+  const url = `/api/media/epub/chapters?db_type=${state.currentLibraryType}&book_id=${state.activeBookId}&chapter_idx=${targets.join(',')}`;
+
+  return fetch(url)
+    .then(r => r.json())
+    .then(async d => {
+      const chapters = (d && Array.isArray(d.chapters)) ? d.chapters : [];
+      const receivedIdxSet = new Set();
+
+      for (const ch of chapters) {
+        const idx = parseInt(ch.chapter_idx, 10);
+        if (!Number.isFinite(idx)) continue;
+        receivedIdxSet.add(idx);
+
+        const content = ch.content || '<p>내용이 없습니다.</p>';
+        txtChunks[idx] = content;
+        epubChapterRetryState.delete(idx);
+
+        await preloadEpubChapterImages(content);
+
+        const contentArea = document.getElementById('txt-content-area');
+        if (contentArea) {
+          const chunkEl = contentArea.querySelector(`.txt-scroll-chunk[data-idx="${idx}"]`);
+          if (chunkEl) chunkEl.innerHTML = content;
+        }
+      }
+
+      // 배치 응답에 빠진(개별 파싱 실패한) 챕터는 null로 되돌려 기존 재시도 경로가 나중에 채우도록 둔다
+      targets.forEach(idx => {
+        if (!receivedIdxSet.has(idx) && txtChunks[idx] === 'LOADING_PENDING') {
+          txtChunks[idx] = null;
+        }
+      });
+    })
+    .catch(() => {
+      targets.forEach(idx => {
+        if (txtChunks[idx] === 'LOADING_PENDING') {
+          txtChunks[idx] = null;
+        }
+      });
+    })
+    .finally(() => {
+      targets.forEach(idx => epubChapterFetchInFlight.delete(idx));
+    });
+}
+
 export function getVisibleEpubPlaceholderIndexes(txtChunks, maxCount = 10) {
   const contentArea = document.getElementById('txt-content-area');
   const scrollWrapper = document.getElementById('txt-scroll-wrapper');
@@ -190,11 +261,15 @@ export function hydrateEpubChapterWindow(txtChunks, centerIdx, radius = 10) {
   if (!Number.isFinite(center) || txtChunks.length === 0) return;
   const start = Math.max(0, center - Math.max(0, radius));
   const end = Math.min(txtChunks.length - 1, center + Math.max(0, radius));
+  const missing = [];
   for (let i = start; i <= end; i++) {
     if (txtChunks[i] === null || txtChunks[i] === 'LOADING_PENDING') {
-      requestEpubChapterContent(txtChunks, i);
+      missing.push(i);
     }
   }
+  // 반경 내 미로드 챕터를 개별 요청 N개가 아니라 배치 요청 1개로 묶어서 프리페치한다
+  // (서버가 요청당 zip을 새로 여는 구조라, 이게 반경을 키워도 안전한 이유).
+  requestEpubChaptersBatch(txtChunks, missing);
 }
 
 export function retryVisibleEpubPlaceholders(txtChunks, maxCount = 8) {

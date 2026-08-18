@@ -37,12 +37,10 @@ export function initViewerPaddingPanel() {
   const isTxtOrEpub = (state.currentViewerFormat === 'epub' || state.currentViewerFormat === 'txt');
   
   const novelGroup = document.getElementById('quick-padding-novel-group');
-  const comicGroup = document.getElementById('quick-padding-comic-group');
-  
+
   if (isTxtOrEpub) {
     console.log('[Viewer-Padding] Detected TXT/EPUB novel mode.');
     if (novelGroup) novelGroup.style.display = 'flex';
-    if (comicGroup) comicGroup.style.display = 'none';
     
     // 4방향 개별 소설 값 복원
     const padTop = localStorage.getItem('viewer_padding_top') || '40';
@@ -79,7 +77,6 @@ export function initViewerPaddingPanel() {
   } else {
     console.log('[Viewer-Padding] Detected Non-novel mode (Comic/PDF). Hiding groups.');
     if (novelGroup) novelGroup.style.display = 'none';
-    if (comicGroup) comicGroup.style.display = 'none';
   }
 
   // 동적 슬라이더 이벤트 프로그램 바인딩

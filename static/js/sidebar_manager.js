@@ -1,6 +1,4 @@
 // sidebar_manager.js – 모바일/데스크톱 사이드바 토글 및 상태 유지 관리
-import { remoteLog } from './remote_log.js';
-
 let lastToggleTime = 0;
 const MOBILE_BREAKPOINT = 1200;
 
@@ -38,31 +36,6 @@ export function syncSidebarResponsiveControls() {
       brandHome.removeAttribute('aria-label');
     }
   }
-
-  // 상단 헤더(로고+햄버거)가 간헐적으로 영영 안 보인다는 리포트를 진단하기 위한 임시
-  // 원격 로깅. display 값만으로는 "논리적으로는 정상인데 실제 화면엔 안 그려짐"과
-  // "부모 요소가 찌그러져서 실제 크기가 0"을 구분할 수 없어, getBoundingClientRect로
-  // 실제 렌더링된 위치/크기까지 함께 남긴다.
-  const header = document.querySelector('.sidebar-header-wrapper');
-  const sidebar = document.querySelector('.library-sidebar');
-  const container = document.querySelector('.media-library-container');
-  const rectOf = (el) => {
-    if (!el) return null;
-    const r = el.getBoundingClientRect();
-    return { w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top), left: Math.round(r.left) };
-  };
-  remoteLog('sidebar-responsive-sync', {
-    mobile,
-    btnFound: !!btn,
-    brandHomeFound: !!brandHome,
-    btnDisplay: btn ? getComputedStyle(btn).display : null,
-    headerWrapperDisplay: header ? getComputedStyle(header).display : 'not-found',
-    sidebarDisplay: sidebar ? getComputedStyle(sidebar).display : 'not-found',
-    headerRect: rectOf(header),
-    sidebarRect: rectOf(sidebar),
-    containerRect: rectOf(container),
-    innerWidth: window.innerWidth
-  });
 }
 
 function scheduleSidebarResponsiveSync() {
@@ -234,7 +207,6 @@ function initSidebarViewportRecovery() {
 
   const mediaQuery = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`);
   const recover = () => {
-    remoteLog('sidebar-recover-triggered', { visibilityState: document.visibilityState });
     scheduleSidebarResponsiveSync();
     forceIosHeaderRepaint();
     resetScrollIfHeaderHidden();
@@ -257,9 +229,6 @@ function initSidebarViewportRecovery() {
 }
 
 export function initSidebarInteractions() {
-  if (window.__sidebarInteractionsInitCount === undefined) window.__sidebarInteractionsInitCount = 0;
-  window.__sidebarInteractionsInitCount += 1;
-  remoteLog('sidebar-init-start', { readyState: document.readyState, callCount: window.__sidebarInteractionsInitCount });
   initSidebarToggleButton();
   initSidebarAutoClose();
   initSidebarCategorySync();

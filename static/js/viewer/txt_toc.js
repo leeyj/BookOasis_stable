@@ -492,31 +492,17 @@ export function jumpToTxtTocChapter({
         scrollWrapper.scrollTop = scrollWrapper.scrollHeight * ratio;
       }
       
-      // TOC 점프 완료 후 점프한 챕터 주변(전후 10개 챕터) null 챕터 즉시 백그라운드 프리패치
-      const neighbors = [];
-      for (let offset = -10; offset <= 10; offset++) {
-        if (offset !== 0) neighbors.push(chapterIdx + offset);
-      }
-      const validNeighbors = neighbors.filter(i => i >= 0 && i < chunkCount);
-      validNeighbors.forEach(fIdx => {
-        if (Array.isArray(txtChunks) && txtChunks[fIdx] === null) {
-          txtChunks[fIdx] = 'LOADING_PENDING';
-          fetch(`/api/media/epub/chapter?db_type=${state.currentLibraryType}&book_id=${activeBookId}&chapter_idx=${fIdx}`)
-            .then(r => r.json())
-            .then(d => {
-              const content = (d && d.content) ? d.content : '<p>내용이 없습니다.</p>';
-              txtChunks[fIdx] = content;
-              const contentArea = document.getElementById('txt-content-area');
-              if (contentArea) {
-                const chunkEl = contentArea.querySelector(`.txt-scroll-chunk[data-idx="${fIdx}"]`);
-                if (chunkEl) chunkEl.innerHTML = content;
-              }
-            })
-            .catch(() => {
-              txtChunks[fIdx] = null;
-            });
+      // TOC 점프 완료 후 점프한 챕터 주변(전후 10개 챕터) null 챕터 즉시 백그라운드 프리패치.
+      // epub_loader.js의 requestEpubChaptersBatch를 재사용해 개별 요청 대신 배치 1회로 묶는다
+      // (동적 import: epub_loader.js가 이 모듈을 정적으로 import하고 있어 순환 import를 피함).
+      if (Array.isArray(txtChunks)) {
+        const neighbors = [];
+        for (let offset = -10; offset <= 10; offset++) {
+          if (offset !== 0) neighbors.push(chapterIdx + offset);
         }
-      });
+        const validNeighbors = neighbors.filter(i => i >= 0 && i < chunkCount);
+        import('./epub_loader.js').then(m => m.requestEpubChaptersBatch(txtChunks, validNeighbors));
+      }
 
       // 스크롤 이벤트 수동 트리거
       if (window.dispatchEvent) {

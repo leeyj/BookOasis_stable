@@ -1,6 +1,6 @@
 // viewer.js – 미디어 뷰어 라이프사이클 및 단축키 코어 조율기
 import { state } from './state.js';
-import { nextComicPage, prevComicPage, setComicFitMode, toggleComicOverlay, markAsCompleted as markComicAsCompleted, getComicReadingDirection, toggleComicReadingDirection, toggleComicPageStep, comicJumpToFirstPage, comicJumpToLastPage, toggleTapZoneDirection, initTapZoneDirection } from './viewer_comic.js';
+import { nextComicPage, prevComicPage, setComicFitMode, toggleComicOverlay, markAsCompleted as markComicAsCompleted, getComicReadingDirection, toggleComicReadingDirection, toggleComicPageStep, comicJumpToFirstPage, comicJumpToLastPage, toggleTapZoneDirection, initTapZoneDirection, toggleComicSplitSpread } from './viewer_comic.js';
 import { prevTxtPage, nextTxtPage, applyTxtSettings, txtJumpToFirstPage, txtJumpToLastPage } from './viewer_txt.js';
 import { nextPdfPage, prevPdfPage, pdfJumpToFirstPage, pdfJumpToLastPage } from './viewer_pdf.js';
 import { initFullscreenStateSync, isViewerInFullscreen, toggleFullscreenViewer } from './viewer/fullscreen_controller.js';
@@ -106,6 +106,10 @@ export function prevPage() {
     }
   } else if (document.getElementById('pdf-viewer-container').style.display !== 'none') {
     prevPdfPage();
+  // TODO(삭제 대상, 향후 재검토): #epub-viewer-container는 EPUB이 지금은 #txt-viewer-container를
+  // 공유해서 쓰므로 실제로 존재하지 않는 ID다. 위 activeViewerInstance.prevPage 분기가 EPUB/TXT를
+  // 항상 먼저 가로채기 때문에 지금은 이 분기에 절대 도달하지 않지만(도달하면 null.style에서 즉시
+  // 크래시), 그 가로채기 로직이 바뀌면 조용한 시한폭탄이 될 수 있어 지우기 전에 한 번 더 확인 필요.
   } else if (document.getElementById('epub-viewer-container').style.display !== 'none') {
     if (isRtl) {
       epubNextPage();
@@ -134,6 +138,8 @@ export function nextPage() {
     }
   } else if (document.getElementById('pdf-viewer-container').style.display !== 'none') {
     nextPdfPage();
+  // TODO(삭제 대상, 향후 재검토): prevPage()와 동일한 사유로 도달 불가능한 #epub-viewer-container
+  // 분기(null 참조 크래시 위험 포함) — activeViewerInstance.nextPage 가로채기가 바뀌면 재검토.
   } else if (document.getElementById('epub-viewer-container').style.display !== 'none') {
     if (isRtl) {
       epubPrevPage();
@@ -325,6 +331,9 @@ window.setScrollMode = function (mode) {
       if (mode === 'scroll' && typeof setStep === 'function') {
         setStep(1);
       }
+      if (typeof m.syncSplitSpreadModeForScrollMode === 'function') {
+        m.syncSplitSpreadModeForScrollMode(mode === 'scroll');
+      }
       const apply = m.applyComicFitMode || m.setComicFitMode || (window && window.setComicFitMode);
       if (typeof apply === 'function') apply();
       const load = m.loadComicPage || m.loadComicPage;
@@ -405,8 +414,6 @@ export function viewerJumpToLast() {
 
 window.viewerJumpToFirst = viewerJumpToFirst;
 window.viewerJumpToLast = viewerJumpToLast;
-window.jumpToFirstPage = viewerJumpToFirst;
-window.jumpToLastPage = viewerJumpToLast;
 window.prevPage = prevPage;
 window.nextPage = nextPage;
 window.toggleTheme = toggleReaderTheme;
@@ -437,8 +444,21 @@ window.toggleComicPageStep = function () {
     });
   } else if (document.getElementById('txt-viewer-container').style.display !== 'none') {
     applyTxtSettings();
+  // TODO(삭제 대상, 향후 재검토): EPUB은 #txt-viewer-container를 공유해서 위 txt 분기가 항상
+  // 먼저 걸리므로 이 분기는 도달 불가능하고, applyEpubSettings()도 빈 함수(no-op)라 설령
+  // 도달해도 아무 일 안 한다. EPUB/TXT 컨테이너 통합 구조가 바뀌면 재검토.
   } else if (document.getElementById('epub-viewer-container').style.display !== 'none') {
     applyEpubSettings({ preservePagePosition: true });
+  }
+};
+
+window.toggleComicSplitSpread = function () {
+  toggleComicSplitSpread();
+  if (document.getElementById('comic-viewer-container').style.display !== 'none') {
+    import('./viewer_comic.js').then(m => {
+      if (typeof m.syncSplitSpreadMode === 'function') m.syncSplitSpreadMode();
+      if (typeof m.loadComicPage === 'function') m.loadComicPage();
+    });
   }
 };
 
@@ -485,6 +505,9 @@ window.toggleComicCenterGap = function () {
     });
   } else if (document.getElementById('txt-viewer-container').style.display !== 'none') {
     applyTxtSettings();
+  // TODO(삭제 대상, 향후 재검토): EPUB은 #txt-viewer-container를 공유해서 위 txt 분기가 항상
+  // 먼저 걸리므로 이 분기는 도달 불가능하고, applyEpubSettings()도 빈 함수(no-op)라 설령
+  // 도달해도 아무 일 안 한다. EPUB/TXT 컨테이너 통합 구조가 바뀌면 재검토.
   } else if (document.getElementById('epub-viewer-container').style.display !== 'none') {
     applyEpubSettings({ preservePagePosition: true });
   }
@@ -536,6 +559,7 @@ function initMediaViewerDelegation() {
     if (action === 'toggle-center-gap') return window.toggleComicCenterGap?.();
     if (action === 'toggle-reading-direction') return window.toggleComicReadingDirection?.();
     if (action === 'toggle-tap-zone-direction') return toggleTapZoneDirection();
+    if (action === 'toggle-split-spread') return window.toggleComicSplitSpread?.();
     if (action === 'toggle-theme-cycle') return window.toggleTheme?.();
     if (action === 'toggle-padding-panel') return window.toggleViewerPaddingPanel?.();
   }, true);

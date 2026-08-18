@@ -252,8 +252,6 @@ export function initWheelListener() {
       const isComicWidth = isComic && comicImageWrapper && comicImageWrapper.classList.contains('fit-width');
       const isTxt = document.getElementById('txt-viewer-container').style.display !== 'none';
       const isPdf = document.getElementById('pdf-viewer-container').style.display !== 'none';
-      const epubEl = document.getElementById('epub-viewer-container');
-      const isEpub = epubEl ? epubEl.style.display !== 'none' : false;
 
       // 1. Scroll-capable mode delegates wheel to native container scrolling.
       if (isComicScroll || isComicWidth || (isTxt && scrollMode === 'scroll')) {
@@ -269,16 +267,6 @@ export function initWheelListener() {
             top: e.deltaY,
             behavior: 'auto',
           });
-          e.preventDefault();
-          return;
-        }
-      }
-
-      // 2. EPUB scroll mode forwards wheel into iframe document.
-      if (isEpub && scrollMode === 'scroll') {
-        const iframe = document.querySelector('#epub-render-area iframe');
-        if (iframe && iframe.contentWindow) {
-          iframe.contentWindow.scrollBy(0, e.deltaY);
           e.preventDefault();
           return;
         }

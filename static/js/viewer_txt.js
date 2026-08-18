@@ -446,6 +446,8 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
             setupTxtViewerRuntimeListeners();
 
             // ─── 3단계: 이전/다음 챕터 백그라운드 프리패치 (전후 10개 챕터 확장) ───
+            // hydrateEpubChapterWindow는 이제 반경 내 미로드 챕터를 배치 API 1회 호출로
+            // 묶어서 요청하므로(서버에서 zip을 1번만 오픈), 반경을 키워도 zip 재오픈 부담이 없다.
             hydrateEpubChapterWindow(startIdx, 10);
           })
           .catch(err => {

@@ -145,6 +145,20 @@ def _load_lazy_scan_limits():
     return max_size_mb, max_batch_mb
 
 
+def _load_lazy_scan_probe_workers():
+    """영상 ffprobe 분석을 몇 개씩 동시에 돌릴지 설정에서 로드한다.
+    ffprobe는 I/O 대기가 대부분이라 원격 마운트에서는 값을 올릴수록 체감 속도가 크게 빨라진다."""
+    workers = 4
+    try:
+        from repositories.settings_repository import SettingsRepository
+        val = SettingsRepository.get_value('general', 'LAZY_SCAN_VIDEO_PROBE_WORKERS')
+        if val is not None:
+            workers = int(str(val).strip() or '4')
+    except Exception as _pe:
+        print(f"[Lazy-Scanner] 영상 ffprobe 동시 처리 개수 설정 로드 실패 (기본 4개 적용): {_pe}")
+    return max(1, workers)
+
+
 def _build_scan_targets(db_type, books, library_remote_map):
     """DB에서 1차 선별된 후보 도서들을 실제 물리 파일 상태까지 점검해 최종 스캔
     대상 목록((book, offset_only) 튜플 리스트)으로 좁힌다. conn/세션 누적 상태와
@@ -776,9 +790,12 @@ def run_lazy_video_duration_backfill():
     if conn is None:
         return
 
+    probe_workers = _load_lazy_scan_probe_workers()
+
     print("[Lazy-Scanner] 🎬 영상 에피소드 미분석(duration=0) 항목 백필 시작")
     try:
         from services.video_scanner import _probe_video_info, is_browser_compatible
+        from concurrent.futures import ThreadPoolExecutor, as_completed
 
         cursor = conn.cursor()
         cursor.execute("""
@@ -794,38 +811,64 @@ def run_lazy_video_duration_backfill():
             print("[Lazy-Scanner] 🎬 미분석 영상 에피소드 없음. 스킵.")
             return
 
-        print(f"[Lazy-Scanner] 🎬 미분석 영상 에피소드 {len(candidates)}건 발견. ffprobe 분석 시작...")
+        valid_rows = [row for row in candidates if row['file_path'] and os.path.exists(row['file_path'])]
+        skipped = len(candidates) - len(valid_rows)
+        if skipped:
+            print(f"[Lazy-Scanner] 🎬 파일 없음/경로 누락으로 {skipped}건 스킵")
+
+        total = len(valid_rows)
+        print(f"[Lazy-Scanner] 🎬 미분석 영상 에피소드 {total}건 발견. ffprobe 분석 시작 (동시 {probe_workers}개)...")
 
         updated_count = 0
         touched_video_ids = set()
-        total = len(candidates)
-        for done, row in enumerate(candidates, start=1):
+
+        # ffprobe는 서브프로세스 종료를 기다리는 순수 I/O 대기라 GIL을 점유하지 않으므로,
+        # 스레드풀로 여러 개를 동시에 돌려도 안전하다(원격 rclone 마운트에서 특히 체감 속도가
+        # 크게 향상됨). 다만 sqlite3 커서/커넥션은 스레드 안전하지 않으므로 DB 쓰기(UPDATE/commit)는
+        # 반드시 이 메인 스레드에서만, future 결과를 받은 뒤 순차로 수행한다.
+        done = 0
+        with ThreadPoolExecutor(max_workers=probe_workers) as executor:
+            future_to_row = {}
+            for row in valid_rows:
+                if stop_requested:
+                    break
+                future_to_row[executor.submit(_probe_video_info, row['file_path'])] = row
+
+            for future in as_completed(future_to_row):
+                row = future_to_row[future]
+                episode_id = row['id']
+                video_id = row['video_id']
+                file_path = row['file_path']
+                done += 1
+
+                if stop_requested:
+                    continue
+
+                try:
+                    duration, width, height, vcodec, acodec, format_name = future.result()
+                except Exception as probe_err:
+                    print(f"[Lazy-Scanner] ({done}/{total}) ffprobe 분석 예외 무시 -> {os.path.basename(file_path)}: {probe_err}")
+                    continue
+
+                if duration <= 0:
+                    # 여전히 실패(파일 손상/네트워크 일시 오류 등) - 다음 lazy 실행에서 재시도
+                    print(f"[Lazy-Scanner] ({done}/{total}) ffprobe 분석 실패(재시도 예정) -> {os.path.basename(file_path)}")
+                    continue
+
+                print(f"[Lazy-Scanner] ({done}/{total}) ffprobe 분석 완료 -> {os.path.basename(file_path)}")
+
+                needs_transcode = 0 if is_browser_compatible(file_path, vcodec, acodec, format_name) else 1
+
+                cursor.execute(
+                    "UPDATE video_episodes SET duration = ?, width = ?, height = ?, needs_transcode = ? WHERE id = ?",
+                    (duration, width, height, needs_transcode, episode_id)
+                )
+                conn.commit()
+                updated_count += 1
+                touched_video_ids.add(video_id)
+
             if stop_requested:
-                print("[Lazy-Scanner] ⚠️ 중단 요청(SIGTERM/SIGINT) 감지. 영상 백필을 중단합니다.")
-                break
-
-            episode_id = row['id']
-            video_id = row['video_id']
-            file_path = row['file_path']
-            print(f"[Lazy-Scanner] 🎬 ({done}/{total}) ffprobe 분석 시작 -> {os.path.basename(file_path or '')}")
-
-            if not file_path or not os.path.exists(file_path):
-                continue
-
-            duration, width, height, vcodec, acodec, format_name = _probe_video_info(file_path)
-            if duration <= 0:
-                # 여전히 실패(파일 손상/네트워크 일시 오류 등) - 다음 lazy 실행에서 재시도
-                continue
-
-            needs_transcode = 0 if is_browser_compatible(file_path, vcodec, acodec, format_name) else 1
-
-            cursor.execute(
-                "UPDATE video_episodes SET duration = ?, width = ?, height = ?, needs_transcode = ? WHERE id = ?",
-                (duration, width, height, needs_transcode, episode_id)
-            )
-            conn.commit()
-            updated_count += 1
-            touched_video_ids.add(video_id)
+                print("[Lazy-Scanner] ⚠️ 중단 요청(SIGTERM/SIGINT) 감지. 진행 중이던 ffprobe 작업 완료 후 영상 백필을 마감합니다.")
 
         for video_id in touched_video_ids:
             cursor.execute("SELECT COALESCE(SUM(duration), 0) AS total FROM video_episodes WHERE video_id = ?", (video_id,))
@@ -880,9 +923,12 @@ def run_lazy_video_container_revalidation():
     if conn is None:
         return
 
+    probe_workers = _load_lazy_scan_probe_workers()
+
     print("[Lazy-Scanner] 🎬 영상 에피소드 컨테이너 포맷 재검증(mislabeled mp4/webm) 시작")
     try:
         from services.video_scanner import _probe_video_info, is_browser_compatible
+        from concurrent.futures import ThreadPoolExecutor, as_completed
 
         cursor = conn.cursor()
         cursor.execute("""
@@ -900,46 +946,70 @@ def run_lazy_video_container_revalidation():
             print("[Lazy-Scanner] 🎬 재검증 대상 영상 에피소드 없음. 스킵.")
             return
 
-        print(f"[Lazy-Scanner] 🎬 재검증 대상 영상 에피소드 {len(candidates)}건 발견. ffprobe 컨테이너 검사 시작...")
-
         flipped_count = 0
         verified_count = 0
         touched_video_ids = set()
-        total = len(candidates)
-        for done, row in enumerate(candidates, start=1):
-            if stop_requested:
-                print("[Lazy-Scanner] ⚠️ 중단 요청(SIGTERM/SIGINT) 감지. 영상 컨테이너 재검증을 중단합니다.")
-                break
 
-            episode_id = row['id']
-            video_id = row['video_id']
-            file_path = row['file_path']
-            print(f"[Lazy-Scanner] 🎬 ({done}/{total}) 컨테이너 재검증 -> {os.path.basename(file_path or '')}")
-
-            if not file_path or not os.path.exists(file_path):
-                # 파일이 없어졌으면 판정할 수 없으니 재검증 대상에서만 제외(다음 스캔이 처리)
-                cursor.execute("UPDATE video_episodes SET container_verified = 1 WHERE id = ?", (episode_id,))
-                conn.commit()
-                continue
-
-            duration, width, height, vcodec, acodec, format_name = _probe_video_info(file_path)
-            if duration <= 0:
-                # ffprobe 실패(원격 마운트 일시 오류 등) - 다음 lazy 실행에서 재시도, 검증 완료로 표시하지 않음
-                continue
-
-            still_compatible = is_browser_compatible(file_path, vcodec, acodec, format_name)
-            if not still_compatible:
-                cursor.execute(
-                    "UPDATE video_episodes SET needs_transcode = 1, container_verified = 1 WHERE id = ?",
-                    (episode_id,)
-                )
-                flipped_count += 1
-                touched_video_ids.add(video_id)
-                print(f"[Lazy-Scanner] ⚠️ 컨테이너 불일치 발견(실제 포맷: {format_name}) -> 트랜스코딩 대상으로 전환: {os.path.basename(file_path)}")
+        # 파일이 이미 없어진 항목은 ffprobe를 돌릴 필요가 없으니 먼저 걸러내 즉시 검증완료 처리
+        valid_rows = []
+        for row in candidates:
+            if row['file_path'] and os.path.exists(row['file_path']):
+                valid_rows.append(row)
             else:
-                cursor.execute("UPDATE video_episodes SET container_verified = 1 WHERE id = ?", (episode_id,))
-            verified_count += 1
-            conn.commit()
+                cursor.execute("UPDATE video_episodes SET container_verified = 1 WHERE id = ?", (row['id'],))
+                conn.commit()
+                verified_count += 1
+
+        total = len(valid_rows)
+        print(f"[Lazy-Scanner] 🎬 재검증 대상 영상 에피소드 {total}건 발견. ffprobe 컨테이너 검사 시작 (동시 {probe_workers}개)...")
+
+        # duration 백필과 동일한 이유(ffprobe는 순수 I/O 대기)로 스레드풀 병렬화, DB 쓰기는 메인 스레드 전용
+        done = 0
+        with ThreadPoolExecutor(max_workers=probe_workers) as executor:
+            future_to_row = {}
+            for row in valid_rows:
+                if stop_requested:
+                    break
+                future_to_row[executor.submit(_probe_video_info, row['file_path'])] = row
+
+            for future in as_completed(future_to_row):
+                row = future_to_row[future]
+                episode_id = row['id']
+                video_id = row['video_id']
+                file_path = row['file_path']
+                done += 1
+
+                if stop_requested:
+                    continue
+
+                try:
+                    duration, width, height, vcodec, acodec, format_name = future.result()
+                except Exception as probe_err:
+                    print(f"[Lazy-Scanner] ({done}/{total}) 컨테이너 재검증 ffprobe 예외 무시 -> {os.path.basename(file_path)}: {probe_err}")
+                    continue
+
+                if duration <= 0:
+                    # ffprobe 실패(원격 마운트 일시 오류 등) - 다음 lazy 실행에서 재시도, 검증 완료로 표시하지 않음
+                    continue
+
+                print(f"[Lazy-Scanner] ({done}/{total}) 컨테이너 재검증 완료 -> {os.path.basename(file_path)}")
+
+                still_compatible = is_browser_compatible(file_path, vcodec, acodec, format_name)
+                if not still_compatible:
+                    cursor.execute(
+                        "UPDATE video_episodes SET needs_transcode = 1, container_verified = 1 WHERE id = ?",
+                        (episode_id,)
+                    )
+                    flipped_count += 1
+                    touched_video_ids.add(video_id)
+                    print(f"[Lazy-Scanner] ⚠️ 컨테이너 불일치 발견(실제 포맷: {format_name}) -> 트랜스코딩 대상으로 전환: {os.path.basename(file_path)}")
+                else:
+                    cursor.execute("UPDATE video_episodes SET container_verified = 1 WHERE id = ?", (episode_id,))
+                verified_count += 1
+                conn.commit()
+
+            if stop_requested:
+                print("[Lazy-Scanner] ⚠️ 중단 요청(SIGTERM/SIGINT) 감지. 진행 중이던 ffprobe 작업 완료 후 영상 컨테이너 재검증을 마감합니다.")
 
         print(f"[Lazy-Scanner] 🎬 영상 컨테이너 재검증 완료: {verified_count}건 검사, {flipped_count}건 트랜스코딩 대상으로 전환 (강좌 {len(touched_video_ids)}건 영향)")
     except Exception as e:

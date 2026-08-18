@@ -237,11 +237,6 @@ function loadViewerSettings() {
   const padLeft = localStorage.getItem('viewer_padding_left') || '20';
   const padRight = localStorage.getItem('viewer_padding_right') || '20';
 
-  const cPadTop = localStorage.getItem('comic_padding_top') || '0';
-  const cPadBottom = localStorage.getItem('comic_padding_bottom') || '40';
-  const cPadLeft = localStorage.getItem('comic_padding_left') || '0';
-  const cPadRight = localStorage.getItem('comic_padding_right') || '0';
-
   const removeGapInput = document.getElementById('setting-remove-2page-center-gap');
   if (removeGapInput) {
     removeGapInput.checked = (localStorage.getItem('remove_2page_center_gap') === '1');
@@ -251,11 +246,6 @@ function loadViewerSettings() {
   const bottomInput = document.getElementById('setting-viewer-padding-bottom');
   const leftInput = document.getElementById('setting-viewer-padding-left');
   const rightInput = document.getElementById('setting-viewer-padding-right');
-
-  const cTopInput = document.getElementById('setting-comic-padding-top');
-  const cBottomInput = document.getElementById('setting-comic-padding-bottom');
-  const cLeftInput = document.getElementById('setting-comic-padding-left');
-  const cRightInput = document.getElementById('setting-comic-padding-right');
 
   if (topInput) {
     topInput.value = padTop;
@@ -272,23 +262,6 @@ function loadViewerSettings() {
   if (rightInput) {
     rightInput.value = padRight;
     document.getElementById('setting-viewer-padding-right-val').innerText = padRight;
-  }
-
-  if (cTopInput) {
-    cTopInput.value = cPadTop;
-    document.getElementById('setting-comic-padding-top-val').innerText = cPadTop;
-  }
-  if (cBottomInput) {
-    cBottomInput.value = cPadBottom;
-    document.getElementById('setting-comic-padding-bottom-val').innerText = cPadBottom;
-  }
-  if (cLeftInput) {
-    cLeftInput.value = cPadLeft;
-    document.getElementById('setting-comic-padding-left-val').innerText = cPadLeft;
-  }
-  if (cRightInput) {
-    cRightInput.value = cPadRight;
-    document.getElementById('setting-comic-padding-right-val').innerText = cPadRight;
   }
 }
 
@@ -314,17 +287,6 @@ function submitViewerSettings(event) {
     localStorage.setItem('viewer_padding_left', padLeft);
     localStorage.setItem('viewer_padding_right', padRight);
     console.log('[Settings-Viewer] Saved Novel padding values to localStorage');
-
-    const cTopInput = document.getElementById('setting-comic-padding-top');
-    const cBottomInput = document.getElementById('setting-comic-padding-bottom');
-    const cLeftInput = document.getElementById('setting-comic-padding-left');
-    const cRightInput = document.getElementById('setting-comic-padding-right');
-
-    if (cTopInput) localStorage.setItem('comic_padding_top', cTopInput.value);
-    if (cBottomInput) localStorage.setItem('comic_padding_bottom', cBottomInput.value);
-    if (cLeftInput) localStorage.setItem('comic_padding_left', cLeftInput.value);
-    if (cRightInput) localStorage.setItem('comic_padding_right', cRightInput.value);
-    console.log('[Settings-Viewer] Saved Comic padding values to localStorage if present');
 
     // 실시간 뷰어 여백 즉시 반영을 위해 통합 함수 대리 호출
     if (typeof window.applyViewerPaddingRealtime === 'function') {

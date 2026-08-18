@@ -4,6 +4,7 @@ import { showViewerLoading, hideViewerLoading } from '../view_manager.js';
 export let comicReadingDirection = 'ltr';
 export let tapZoneDirection = 'horizontal';
 export let comicPageStep = 1;
+export let comicSplitSpread = false;
 export let comicFitMode = 'height';
 export let comicScrollWidth = 800; // 스크롤 모드 이미지 너비 (px, 600~900, 50단위)
 
@@ -36,7 +37,7 @@ function getStoredComicPageStep() {
 export function setComicPageStep(step) {
   const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
   const safeStep = step === 2 ? 2 : 1;
-  if (scrollMode === 'scroll') {
+  if (scrollMode === 'scroll' || comicSplitSpread) {
     comicPageStep = 1;
     localStorage.setItem('comic_page_step', '1');
     syncComicPageStepUI();
@@ -55,7 +56,7 @@ export function getComicPageStep() {
 
 export function toggleComicPageStep() {
   const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
-  if (scrollMode === 'scroll') {
+  if (scrollMode === 'scroll' || comicSplitSpread) {
     return setComicPageStep(1);
   }
 
@@ -135,6 +136,50 @@ function syncComicPageStepUI() {
   if (label) {
     label.textContent = scrollMode === 'scroll' ? '1장' : `${comicPageStep}장`;
   }
+}
+
+// ──────────────────────────────────────────────────
+// 페이지 좌/우 분할 보기 (스프레드 이미지 1장을 절반씩 2페이지로)
+// ──────────────────────────────────────────────────
+
+function getStoredComicSplitSpread() {
+  return localStorage.getItem('comic_split_spread') === '1';
+}
+
+export function setComicSplitSpread(on) {
+  comicSplitSpread = !!on;
+  localStorage.setItem('comic_split_spread', comicSplitSpread ? '1' : '0');
+  if (comicSplitSpread) {
+    // 분할 보기와 2쪽보기를 동시에 켜면 잘린 절반 두 장이 다시 나란히 붙어
+    // 원본을 재현해버리는 모순이 생기므로 강제로 1장 보기로 되돌린다.
+    setComicPageStep(1);
+  }
+  syncComicSplitSpreadUI();
+  return comicSplitSpread;
+}
+
+export function getComicSplitSpread() {
+  return comicSplitSpread;
+}
+
+export function toggleComicSplitSpread() {
+  return setComicSplitSpread(!getStoredComicSplitSpread());
+}
+
+function syncComicSplitSpreadUI() {
+  const btn = document.getElementById('btn-comic-split-spread');
+  const label = document.getElementById('comic-split-spread-label');
+  if (btn) {
+    btn.classList.toggle('active', comicSplitSpread);
+    btn.title = comicSplitSpread ? '분할 보기 끄기 (원본 이미지로 보기)' : '페이지를 좌/우로 분할해서 보기';
+  }
+  if (label) {
+    label.textContent = comicSplitSpread ? '분할 켬' : '분할 끔';
+  }
+}
+
+export function initSplitSpread() {
+  setComicSplitSpread(getStoredComicSplitSpread());
 }
 
 export function initReadingDirection() {

@@ -264,7 +264,8 @@ export function markAsCompleted() {
     Renderer.setComicCurrentPage(Renderer.getComicTotalPages() - 1);
     Renderer.loadComicPage();
 
-    saveProgress(state.activeBookId, Renderer.getComicCurrentPage(), Renderer.getComicTotalPages());
+    const { page: physicalPage, total: physicalTotal } = Renderer.getPhysicalProgress();
+    saveProgress(state.activeBookId, physicalPage, physicalTotal);
     import('../viewer_progress.js').then(m => m.flushProgress());
 
     alert(window.i18n.t('viewer.read_completed'));

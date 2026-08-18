@@ -130,7 +130,7 @@ export function initLibraryTypeHotkeys() {
     if (e.ctrlKey || e.altKey || e.metaKey) return;
 
     const key = e.key;
-    if (!['1', '2', '3'].includes(key)) return;
+    if (!['1', '2', '3', '4'].includes(key)) return;
 
     e.preventDefault();
     const switchFn = window.switchLibraryType || switchLibraryType;
@@ -140,6 +140,8 @@ export function initLibraryTypeHotkeys() {
       await switchFn('adult');
     } else if (key === '3') {
       await switchFn('audiobook');
+    } else if (key === '4') {
+      await switchFn('video');
     }
   });
 

@@ -1,81 +1,97 @@
 # CHANGELOG
+## v2.1.7
+- (viewer) 만화 뷰어에 스프레드 이미지 좌우 분할 보기 옵션 추가 | add a split-view option for spread images in the comic viewer
+- (fix) 분할 보기 상태로 책을 닫으면 페이지 수가 잘못 저장돼 다시 열 때 오류 나던 문제 수정 | fix closing the comic viewer while split-view was on saving a wrong page count, causing errors on reopen
+- (fix) 시리즈 상세 화면에서 "읽지 않음으로 변경"이 실제로는 반영됐지만 화면(진행률)이 갱신되지 않던 문제 수정(죽은 DOM 참조) | fix "mark as unread" actually working but not refreshing the on-screen progress bar in the series detail view (stale DOM reference)
+- (fix) 시리즈 재스캔/도서 재스캔/완독 처리 버튼이 클릭한 버튼이 아닌 document를 참조해 스피너·완료 토스트가 제대로 안 뜨던 문제 수정 | fix series/book rescan and mark-completed buttons referencing document instead of the clicked button, breaking the spinner and completion toast
+- (fix) TXT/EPUB 연속된 빈 줄이 1개로 정리되도록 수정 | fix consecutive blank lines not collapsing in TXT/EPUB
+- (viewer) TXT/EPUB 행간 설정에 1.2 옵션 추가 | add a 1.2 line-height option to TXT/EPUB
+- (fix) 만화 뷰어 오버레이 "보기" 탭 2줄 레이아웃 여백 수정 | fix layout spacing in the comic viewer's "Layout" tab
+- (fix) 영상 강좌 정렬 시 카드가 오디오북 스타일로 잘못 바뀌던 문제 수정 | fix video course cards switching to the wrong style on sort
+- (perf) EPUB 챕터 캐시 조회 최적화 | optimize EPUB chapter cache lookups
+- (chore) 구조 변경 후 남아있던 죽은 코드 2차 정리(오디오 볼륨 팝오버, 뷰어 페이지 정보/여백 패널, 설정의 만화 여백/TTS 항목, 미사용 뷰어 유틸 파일, 예전 페이지 점프 별칭) | second pass removing leftover dead code (audio volume popover, viewer page-info/padding panel remnants, comic-padding/TTS settings fields, an unused viewer utils file, an old page-jump alias)
+- (perf) EPUB 챕터 프리페치를 배치 API로 전환해 로딩 속도 개선 | switch EPUB chapter prefetching to a batch API for faster loading
+- (feature) 세션 전환 단축키(1/2/3)에 영상 강좌(4) 추가 | add video courses (4) to the session-switch keyboard shortcut (1/2/3)
+- (settings) 플러그인 관리 목록을 아코디언 형태로 개편 — 기본은 이름/ID/토글만 보이는 한 줄, 클릭하면 설명·설정 폼이 펼쳐짐(플러그인 많을 때 스크롤 과다 문제 개선) | redesign the plugin management list as an accordion — collapsed by default to a single row (name/ID/toggle), expanding to show description and settings on click (reduces excessive scrolling with many plugins)
+- (fix) 컨텍스트 메뉴 플러그인 액션이 이동할 URL 없이 끝나면 미리 열어둔 빈 팝업창이 그대로 남던 문제 수정 (커뮤니티 리포트) | fix a blank placeholder popup window being left open when a context-menu plugin action finishes without an `open_url` to navigate to (community-reported)
+- (perf) Lazy 스캐너의 영상 재생시간(ffprobe) 백필/컨테이너 재검증을 스레드풀로 병렬 처리 — 동시 처리 개수를 설정에서 조절 가능(기본 4개), 원격 마운트에서 대량 백로그 처리 속도 대폭 개선 | parallelize the lazy scanner's video duration (ffprobe) backfill and container re-validation with a thread pool — concurrency is now configurable (default 4), greatly speeding up large backlogs on remote mounts
+- (chore) 모바일 헤더 표시 문제(해결 완료) 진단용으로 남아있던 사이드바 원격 로깅 3건 제거 — 모니터링 로그 소음 정리 | remove 3 leftover sidebar remote-logging calls added to diagnose the (now-resolved) mobile header visibility bug — cleans up monitoring log noise
+- (fix) 배포해도 static/js 파일이 브라우저/중간 캐시에 예전 버전으로 남아있던 문제 근본 수정 — /static/js/**를 매 요청 서버 재검증(Cache-Control: no-cache, must-revalidate)으로 전환 (진입점 스크립트만 버전 쿼리스트링이 붙고 내부 import 229개 중 224개는 안 붙어있던 게 원인) | fix deployed changes under static/js not reliably reaching browsers/intermediate caches — switched /static/js/** to always revalidate with the server (Cache-Control: no-cache, must-revalidate); root cause was that only entry-point scripts got a version query string, while 224 of 229 internal ES module imports had none
+
 ## v2.1.6
-- (viewer) 모바일 뷰어의 상/하 스와이프 방향이 다른 앱(틱톡/릴스/웹툰 세로보기)과 반대로 되어 있던 문제 수정 — 위로 스와이프=다음 페이지, 아래로 스와이프=이전 페이지로 통일(기존 마우스 휠 방향과도 일치) | fix mobile viewer's vertical swipe direction being reversed compared to other apps (TikTok/Reels/vertical webtoon readers) — unified to swipe-up=next page, swipe-down=previous page (now consistent with the existing mouse-wheel direction)
-- (viewer) 한손으로 스마트폰을 쥐었을 때 좌/우 탭존이 손에 닿기 어렵다는 요청에 따라, 뷰어 탭존을 좌/우 ↔ 상/하로 전환할 수 있는 설정 추가(오버레이 메뉴 > 보기 탭) | add a viewer setting (Overlay menu > Layout tab) to switch the tap-to-turn-page zones between left/right and top/bottom, for easier one-handed reach on phones
+- (viewer) 모바일 세로 스와이프 방향 수정(위=다음, 아래=이전) | fix mobile vertical swipe direction (up=next, down=previous)
+- (viewer) 탭존 방향 좌우/상하 전환 옵션 추가 | add an option to switch tap-zones between horizontal/vertical
 
 ## v2.1.5
-- (fix) 모바일 사이드바 햄버거 버튼이 핀치 확대/축소 시 흔들리거나 사라지던 문제 수정 — `position: fixed` 대신 로고 옆 일반 문서 흐름으로 변경 | fix mobile sidebar hamburger button jittering/disappearing on pinch-zoom — moved off `position: fixed` into normal document flow
-- (fix) iOS에서 상단 헤더가 뒤로가기/탭 전환 후 간헐적으로 안 보이던 문제 수정 — 실제로는 화면 위로 스크롤되어 가려진 것이었음(스크롤 복구 로직 보강), 스크롤 복구가 주소창을 덮어버리는 부작용도 함께 수정 | fix the top header intermittently disappearing on iOS after back-navigation/tab-switch — root cause was the header scrolling out of view, not a render bug; also fixed a side effect where the scroll-reset itself caused Safari's address bar to overlap content
-- (video) iOS Safari/Chrome에서 영상 강좌 재생이 안 되던 문제 수정 — 컨테이너 오판, mkv 미지원, 트랜스코딩 스트림 미지원 3가지 원인 모두 해결(Safari/iOS 전용 HLS 스트리밍 도입). 실기기 확인 완료 | fix video-course playback failing on iOS Safari/Chrome — fixed container misdetection, mkv incompatibility, and unsupported transcode streams (added Safari/iOS-specific HLS). Confirmed on a real device
-- (fix) 영상 스트리밍 응답 캐시 방지 헤더 누락으로 Cloudflare 등이 오래된 응답을 캐시하던 문제 수정 | fix video streaming responses missing a cache-prevention header, causing shared caches to serve stale responses
-- (video) 강좌 제목에 HTML 엔티티가 그대로 노출되던 문제 수정 | fix HTML entities showing up raw in video course titles
-- (fix) SQLite 모드에서 컬럼/인덱스 자동 보강이 조용히 스킵되던 회귀 수정 | fix a regression silently skipping SQLite's auto column/index migration
-- (video) 영상 강좌는 화면 잠금/백그라운드 오디오 재생 미지원으로 공식 결정(Media Session API 연동은 유지) | video courses officially do not support locked/background audio playback (Media Session API integration kept)
-- (fix) 모바일 화면 잠금 시 오디오북 재생이 끊기던 문제 수정, 실기기 확인 완료 | fix audiobook playback cutting out on mobile screen lock, confirmed on real devices
+- (fix) 모바일 사이드바 햄버거 버튼 핀치줌 시 흔들림 수정 | fix sidebar hamburger button jittering on pinch-zoom
+- (fix) iOS 헤더가 간헐적으로 사라지던 문제 수정 | fix header intermittently disappearing on iOS
+- (video) iOS 영상 강좌 재생 실패 수정(HLS 도입) | fix video course playback failing on iOS (added HLS)
+- (fix) 영상 스트리밍 캐시 방지 헤더 누락 수정 | fix missing cache-prevention header on video streaming
+- (video) 강좌 제목 HTML 엔티티 노출 수정 | fix raw HTML entities in video course titles
+- (fix) SQLite 컬럼/인덱스 자동 보강 회귀 수정 | fix SQLite auto column/index migration regression
+- (video) 영상 강좌 잠금화면 백그라운드 재생 미지원 공식화 | video courses officially don't support background playback
+- (fix) 오디오북 화면 잠금 시 재생 끊김 수정 | fix audiobook playback cutting out on screen lock
 
 ## v2.1.4
-- (fix) iOS Safari/Chrome에서 영상 강좌 재생이 아예 시작되지 않던 문제 수정 — `<video>`에 iOS 필수 속성인 `playsinline`이 빠져있었고, 에피소드 메타데이터를 비동기로 가져온 뒤 모달을 렌더링하는 과정에서 원래 클릭의 사용자 제스처 컨텍스트가 끊겨 소리 있는 자동재생이 조용히 차단되는 경우가 있었음 — `playsinline` 추가 및 명시적 `play()` 재시도로 개선 | fix video-course playback sometimes failing to start at all on iOS Safari/Chrome — the `<video>` element was missing the iOS-required `playsinline` attribute, and rendering the player modal after an async episode-metadata fetch could lose the original click's user-gesture context, silently blocking autoplay-with-sound — added `playsinline` and an explicit `play()` retry
-- (plugin) 카테고리 레벨 플러그인이 계정별 권한 설정과 무관하게 성인/오디오북/영상 강좌 세션 사이드바에도 무조건 노출되던 문제 수정 — 플러그인 매니페스트(`category_tab.sessions`)로 노출될 세션(`general`/`adult`/`audiobook`/`video` 또는 `all`)을 명시적으로 선언하도록 변경, 미선언 시 하위 호환을 위해 기존처럼 general에만 노출 | fix category-level plugins always appearing in the adult/audiobook/video-course session sidebars regardless of per-account permission settings — plugins now declare which session(s) they belong to via `category_tab.sessions` (`general`/`adult`/`audiobook`/`video`, or `all`); unset defaults to general-only for backward compatibility
-- (video) 원격 마운트(rclone 등) 위 영상 강좌를 ffmpeg 트랜스코딩으로 재생할 때 인코더가 멈추면 무한 로딩에 빠지고 좀비 프로세스가 남아 이후 재생까지 연쇄로 막히던 문제 수정 — 첫 청크/스트리밍 중 무응답을 별도 타임아웃으로 감지해 프로세스를 확실히 회수하도록 변경 (커뮤니티 리포트) | fix video-course playback over remote mounts (e.g. rclone) hanging forever on an ffmpeg stall during transcoding, leaving orphaned processes that blocked subsequent playback too — added separate timeouts for first-chunk vs. mid-stream stalls with guaranteed process reaping (community-reported)
-- (db) 반복되던 MariaDB GRANT 문제(`Access denied ... to database 'media_X'`) 근본 수정 — 매 `docker-compose up`마다 자동 재실행되는 GRANT 재확인 컨테이너(`mariadb-grant-repair`) 추가. v2.1.2의 `media_%` 와일드카드 GRANT는 무효한 SQL이었음을 확인, 검증된 개별 GRANT 방식으로 전환 | fix the recurring MariaDB GRANT problem at the root — added a `mariadb-grant-repair` container that auto-reruns on every `docker-compose up`; the v2.1.2 wildcard GRANT was invalid SQL, now uses verified explicit per-database grants
-- (fix) 위 GRANT 문제로 부팅 실패 시, 로그에 바로 실행 가능한 SQL을 출력하도록 개선 | boot-failure logs now print copy-pasteable GRANT SQL directly
-- (fix) MariaDB 4개 DB 중 하나만 GRANT 누락돼도 서버 전체가 부팅 실패하던 문제 수정 — 해당 DB만 건너뛰고 나머지는 정상 기동 (커뮤니티 리포트) | fix the whole server failing to boot over a single missing MariaDB grant — now skips just that database (community-reported)
-- (video) AMD Radeon VAAPI 트랜스코딩 실패(`vaInitialize error -1`) 수정 — `mesa-va-drivers` 누락 (커뮤니티 문의) | fix AMD Radeon VAAPI transcoding failure — missing `mesa-va-drivers` (community inquiry)
-- (fix) 모바일 핀치 확대 시 사이드바 햄버거 버튼이 화면 밖으로 이탈하던 문제 수정 (커뮤니티 리포트) | fix mobile sidebar button becoming unreachable after pinch-zoom (community-reported)
-- (fix) 일반/성인 카테고리 이동 시 일부 컬럼이 조용히 기본값으로 초기화되던 문제 수정 (커뮤니티 리포트) | fix category move silently resetting some columns to defaults (community-reported)
+- (fix) iOS 영상 강좌 재생 시작 안 되던 문제 수정 | fix video course playback not starting on iOS
+- (plugin) 카테고리 플러그인 세션별 노출 제어 추가 | add per-session visibility control for category plugins
+- (video) 원격 마운트 트랜스코딩 정체 시 좀비 프로세스 문제 수정 | fix zombie processes on transcoding stalls over remote mounts
+- (db) MariaDB GRANT 문제 근본 수정(자동 재부여 컨테이너 추가) | fix MariaDB GRANT issues at the root (auto re-grant container)
+- (fix) GRANT 실패 시 로그에 실행 가능한 SQL 출력 | print copy-pasteable SQL in logs on GRANT failure
+- (fix) MariaDB 일부 DB GRANT 누락 시 전체 부팅 실패하던 문제 수정 | fix full boot failure from one missing MariaDB grant
+- (video) AMD VAAPI 트랜스코딩 실패 수정 | fix AMD VAAPI transcoding failure
+- (fix) 핀치줌 시 사이드바 버튼 화면 이탈 수정 | fix sidebar button leaving screen on pinch-zoom
+- (fix) 카테고리 이동 시 컬럼 초기화되던 문제 수정 | fix columns resetting on category move
 
 ## v2.1.3
-- (fix) MariaDB 모드에서 `db_schema_updater.py`의 고속 인덱스 자동 생성 로직이 누락된 import로 인한 `NameError` 때문에 인덱스마다 조용히 실패하고 있던 문제 수정 — `_ensure_mariadb_indexes()`에 `connect_mariadb` import 추가 (커뮤니티 리포트) | fix MariaDB mode's auto index-creation routine silently failing on every single index due to a missing import causing a `NameError` — added the missing `connect_mariadb` import to `_ensure_mariadb_indexes()` (community-reported)
-- (video) 브라우저 직접재생 호환 컨테이너에 mkv 추가(h264/aac 등 호환 코덱일 때만) — Safari는 mkv 자체를 지원하지 않는 트레이드오프를 감수하고 Chrome/Edge 계열 위주로 불필요한 트랜스코딩을 줄임. 기존에 이미 트랜스코딩 대상으로 확정된 mkv 에피소드는 소급 재평가하지 않음(재스캔 시 자연 반영) | add mkv to the browser-direct-play compatible containers (only when the inner codecs are compatible, e.g. h264/aac) — trades off Safari (which doesn't support the mkv container at all) to avoid unnecessary transcoding on Chrome/Edge; already-finalized mkv episodes are not retroactively re-evaluated (will pick up the new policy on next rescan)
-- (fix) 영상 강좌 "전체보기"에서 검색이 항상 0건으로 나오던 문제 수정 (검색이 전체보기를 채운 목록이 아니라, 채워진 적 없는 개별 라이브러리용 목록을 대상으로 필터링하고 있었음) | fix search always returning 0 results on the video-course "browse all" screen (search was filtering an empty per-library list instead of the list actually populating the browse-all grid)
-- (fix) 영상 강좌 화면에서 썸네일 크기 등 공용 UI 설정이 적용 안 되고 기본값으로만 보이던 문제 수정 (`audiobook`처럼 `video`도 설정 조회 시 `general`로 정규화) | fix video-course screens ignoring configured UI settings (e.g. thumbnail size) and always showing defaults — `video` now normalizes to `general` when fetching settings, same as `audiobook` already did
-- (fix) 홈 대시보드 히스토리/신규 도서 로드 실패 시 서버 예외 원문(DB·테이블명 포함)이 화면에 그대로 노출되던 문제 수정 | fix the home dashboard leaking raw backend exception text to users on load failure
-- (fix) Lazy 스캐너 영상 재생시간/해상도 백필이 아예 실행되지 않던 문제, 그리고 뒤이어 발견된 진행 로그 유실·중복·"멈춘 것처럼 보임" 문제들을 모두 수정 — 이제 정상 실행되고 에피소드별 진행 로그가 `lazy_scanner.log`에만 정확히 남으며, 1회 처리량도 설정(LAZY_SCAN_VIDEO_MAX_EPISODES_PER_RUN)에서 조정 가능 | fix the lazy scanner's video duration/resolution backfill never running at all, plus follow-on issues with lost/duplicated/invisible progress logging — now runs correctly, logs per-episode progress only to `lazy_scanner.log`, and batch size is configurable via LAZY_SCAN_VIDEO_MAX_EPISODES_PER_RUN
-- (fix) 초성/알파벳 바로가기가 대괄호 태그(`[강의]` 등)로 시작하는 제목에서 엉뚱한 위치로 점프하던 문제 수정 (정렬·점프 판정 기준을 태그를 뗀 제목으로 통일) | fix the alphabet/consonant jump shortcut landing in the wrong spot for bracket-tag-prefixed titles (unified sort and jump-target logic to use the tag-stripped title)
-- (fix) 영상 강좌 "이 시리즈 전체를 읽지 않은 상태로 변경"이 동작하지 않던 문제 수정 | fix "mark this whole series as unread" being a no-op for video courses
+- (fix) MariaDB 인덱스 자동 생성 실패 수정 | fix MariaDB auto index creation failing
+- (video) mkv 브라우저 직접재생 호환 목록에 추가 | add mkv to browser-direct-play compatible list
+- (fix) 영상 강좌 전체보기 검색 0건 버그 수정 | fix video course "browse all" search returning 0 results
+- (fix) 영상 강좌 UI 설정(썸네일 크기 등) 미적용 수정 | fix video course screens ignoring UI settings
+- (fix) 대시보드 에러 원문 노출 수정 | fix raw error messages leaking on dashboard
+- (fix) 영상 재생시간/해상도 백필 미실행 및 로그 문제 수정 | fix video duration/resolution backfill not running plus logging issues
+- (fix) 대괄호 태그 제목 초성 점프 오류 수정 | fix alphabet-jump landing wrong on bracket-tag titles
+- (fix) 영상 강좌 "전체 읽지 않음 처리" 미동작 수정 | fix "mark unread" not working for video courses
 
 ## v2.1.2
-- (db) MariaDB `bookoasis` 계정 GRANT를 DB별 개별 나열 대신 `media_%` 와일드카드 패턴으로 변경 — 이미 MariaDB로 전환한 기존 사용자가 새 미디어 세션(예: 영상 강좌의 `media_video`) 추가 시 `Access denied ... to database 'media_X'`를 겪던 문제를 1회성 재부여 SQL로 해결하고, 앞으로 추가될 DB까지 영구적으로 커버 | switch the MariaDB `bookoasis` account's GRANTs from per-database enumeration to a `media_%` wildcard pattern — fixes existing MariaDB users hitting `Access denied ... to database 'media_X'` when a new media session (e.g. video courses' `media_video`) is added, with a one-time re-grant that also covers all future databases
+- (db) MariaDB GRANT를 와일드카드 패턴으로 변경 | switch MariaDB grants to a wildcard pattern
 
 ## v2.1.1
-- (video) 잠금화면/백그라운드에서도 강좌 재생을 오디오로 계속 들을 수 있도록 영상 플레이어에 Media Session API(재생/일시정지/탐색/이전-다음 회차) 연동 | wire the Media Session API (play/pause/seek/prev-next episode) into the video player so course playback can continue as audio when the screen locks or the app backgrounds
-- (tools) 카테고리 내보내기/가져오기 CLI(`export_category.py`/`import_category.py`)가 영상 강좌(video) 카테고리도 지원하도록 확장 — 강좌/에피소드/시청 진행률까지 오디오북과 동일한 방식으로 백업 및 이관 가능 | extend the category export/import CLI tools to support video-course categories — courses, episodes, and watch progress can now be backed up and migrated the same way audiobooks already are
-- (fix) GHCR 멀티아키텍처(amd64/arm64) 도커 이미지 빌드가 arm64에서 실패하던 문제 수정 — amd64 전용 패키지인 `intel-media-va-driver`(Intel VAAPI 드라이버)를 `TARGETARCH`가 amd64일 때만 설치하도록 변경 | fix the GHCR multi-arch (amd64/arm64) Docker image build failing on arm64 — only install the amd64-only `intel-media-va-driver` (Intel VAAPI driver) package when `TARGETARCH` is amd64
+- (video) 영상 강좌 Media Session API(잠금화면 컨트롤) 연동 | add Media Session API integration for video courses
+- (tools) 카테고리 내보내기/가져오기에 영상 강좌 지원 추가 | add video course support to category export/import
+- (fix) arm64 도커 이미지 빌드 실패 수정 | fix arm64 Docker build failure
 
 ## v2.1.0
-- (video) 오디오북과 나란한 새 미디어 세션 "영상 강좌" 추가 — 폴더당 강좌 1개, `S01E01` 명명 + `show.yaml` 사이드카(Plex TV쇼 스타일)로 에피소드를 인식하며, 전용 DB/스캐너/스트리밍(Range 206) 라우트와 사이드바 세션 토글, 관리자 권한 매트릭스를 갖춤 | add a new "Video Courses" media session alongside audiobooks — one course per folder, episodes recognized via `S01E01` naming + a `show.yaml` sidecar (Plex TV-show style), with its own DB/scanner/streaming (Range 206) routes, a sidebar session toggle, and an admin permission matrix
-- (video) 상세페이지·이어보기·즐겨찾기·컬렉션·최근시청·전체보기·홈 대시보드(최근 시청/신규 추가)까지 오디오북과 동일한 공용 파이프라인에 통합 | integrate the detail page, resume-playback, favorites, collections, recently-watched, browse-all, and home dashboard (recent/newly-added rows) into the same shared pipeline used by audiobooks
-- (video) 원격(rclone) 드라이브에서도 스캔이 느려지지 않도록 재생시간/해상도 추출을 백그라운드 지연(Lazy) 분석으로 분리 | keep scans fast on remote (rclone) drives by moving duration/resolution extraction into a background lazy-analysis pass instead of doing it synchronously during scan
-- (video) 브라우저가 직접 재생 가능한 파일은 원본을 그대로 스트리밍하고, MKV 등 비호환 파일만 ffmpeg로 자동 폴백(CPU 기본, Intel VAAPI 하드웨어 가속 감지 시 자동 전환) — 설정 화면에 VAAPI 지원 여부 점검 버튼 및 커스텀 인코딩 파라미터 입력란 추가 | stream browser-compatible files as-is, and automatically fall back to ffmpeg only for incompatible files like MKV (CPU by default, auto-switching to Intel VAAPI hardware acceleration when detected) — added a VAAPI availability check button and custom encoding-parameter fields to Settings
-- (video) SMI/SRT 자막 사이드카(언어 태그 포함 파일명, 예: `.ko.srt`)를 자동 인식해 WebVTT로 변환 후 재생 시 자막으로 표시 | auto-detect SMI/SRT subtitle sidecars (including language-tagged filenames like `.ko.srt`), convert them to WebVTT, and show them as subtitles during playback
-- (fix) 그리드 뷰에서 제목이 긴 카드가 그리드 트랙을 밀어 넓히면서 카드 크기가 환경설정의 썸네일 크기를 따라가지 않던 문제 수정(일반 도서/오디오북/영상 강좌 공통) | fix grid cards not respecting the configured thumbnail-size setting when a long title pushed its grid track wider than the rest (affected general books, audiobooks, and video courses alike)
-- (db) MariaDB에서 `collection_items.video_id` 컬럼 자동 마이그레이션이 인라인 FK 절 때문에 조용히 실패하던 문제 수정, 스키마 자동 보강 실패 시 로그를 남기도록 개선 | fix `collection_items.video_id` auto-migration silently failing on MariaDB due to an inline foreign-key clause, and make schema auto-repair failures log instead of failing silently
+- (video) 새 미디어 세션 "영상 강좌" 추가 | add new "Video Courses" media session
+- (video) 상세/이어보기/즐겨찾기 등 공용 파이프라인 통합 | integrate video courses into the shared detail/resume/favorites pipeline
+- (video) 재생시간/해상도 추출을 백그라운드 지연 분석으로 분리 | move duration/resolution extraction to a background lazy-analysis pass
+- (video) 브라우저 비호환 파일만 자동 트랜스코딩(VAAPI 지원) | auto-transcode only browser-incompatible files (VAAPI support)
+- (video) SMI/SRT 자막 자동 인식 지원 | auto-detect SMI/SRT subtitles
+- (fix) 긴 제목이 그리드 카드 크기를 깨던 문제 수정 | fix long titles breaking grid card sizing
+- (db) MariaDB video_id 컬럼 마이그레이션 실패 수정 | fix MariaDB video_id column migration failure
 
 ## v2.0.6
-- (api) DB 게이트웨이를 거치지 않고 직접 DB에 접속해야 하는 외부 연동 프로그램/플러그인용, 현재 DB 엔진(SQLite/MariaDB)을 확인할 수 있는 웹훅 API(`/api/webhook/system/db-engine`) 추가 | add a webhook API (`/api/webhook/system/db-engine`) so external programs/plugins that must connect to the DB directly (bypassing the API gateway) can check whether the current DB engine is SQLite or MariaDB
+- (api) DB 엔진 확인용 웹훅 API 추가 | add a webhook API to check the current DB engine
 
 ## v2.0.5
-- (dashboard) TV용 UI 추가(베타) - 사이드바 그룹 드로어, 이어보기/최근추가 홈, 카테고리 그리드(정렬 지원), 킷오스크 리더/플러그인 모드(`/?kiosk=1`), 팝업 로그인/로그아웃, 리모컨(방향키/Enter/ESC) 내비게이션 | added TV app UI (beta) - overlay category drawer, continue-reading/recently-added home rows, sortable category grid, kiosk reader/plugin mode (`/?kiosk=1`), popup login/logout, and remote-control (arrow/Enter/Esc) navigation
-- (category) 라이브러리/플러그인 카테고리를 가상 그룹(폴더)에 넣고 드래그로 정렬할 수 있는 기능 추가 | add virtual groups (folders) for library/plugin categories in the sidebar, with drag-to-reorder for both group members and the groups themselves
-- (plugin) 저장소가 기본 제공하던 샘플 플러그인 7종을 바인드 마운트 대상인 `plugins/metadata/`에서 마운트되지 않는 `sample_plugins/metadata/`로 이동 — 업데이트(`git pull`/`git clean` 등) 시 사용자가 직접 설치한 플러그인이 유실되던 문제 해결. [설정 > 플러그인] 탭에 "샘플에서 설치" 버튼 추가, 빈 마운트에서도 부팅되도록 프레임워크 필수 파일 자동 시드 로직 추가 | move the 7 bundled sample plugins out of the bind-mounted `plugins/metadata/` into a non-mounted `sample_plugins/metadata/`, fixing user-installed plugins being wiped out on update (`git pull`/`git clean`, etc.) — added an "Install from sample" button in [Settings > Plugins], plus boot-time auto-seeding of required framework files so the app still starts on a completely empty mount
-- (docker) 기본 `docker-compose.yml`을 로컬 빌드 대신 GHCR 공식 이미지(`ghcr.io/leeyj/bookoasis:stable`) 사용으로 전환, 소스 직접 빌드용 `docker-compose.build.yml` 및 MariaDB 콤보용 `docker-compose.mariadb.ghcr.yml` 추가 | switch the default `docker-compose.yml` to pull the official GHCR image instead of building locally, and add `docker-compose.build.yml` (source build) and `docker-compose.mariadb.ghcr.yml` (MariaDB combo + GHCR) variants
+- (dashboard) TV용 UI 추가(베타) | add TV UI (beta)
+- (category) 카테고리 가상 그룹/드래그 정렬 추가 | add virtual groups and drag-to-reorder for categories
+- (plugin) 샘플 플러그인 위치 이동(업데이트 시 유실 방지) | move sample plugins to prevent loss on update
+- (docker) 기본 이미지를 GHCR 공식 이미지로 전환 | switch default Docker image to the official GHCR image
 
 ## v2.0.4
-- (lib) requests 라이브러리 추가 | added requests
+- (lib) requests 라이브러리 추가 | add requests library
 
 ## v2.0.3
-- (plugin) 오디오북 라이브러리 스캔에서 신규 도서 감지 시 웹훅/플러그인 훅(`on_scan_new_books_detected`)이 전혀 호출되지 않던 문제 수정 — 일반/성인 도서 스캔과 동일하게 `services/audiobook_scanner.py`에서 표준 이벤트 및 플러그인 훅을 디스패치하도록 추가 | fix audiobook library scans never dispatching the new-book webhook/plugin hook (`on_scan_new_books_detected`) — `services/audiobook_scanner.py` now dispatches the same standard event and plugin hook as regular/adult book scans
-- (plugin) `webhook_new_books_notify` 플러그인이 User-Agent 헤더 없이 요청을 보내 Discord/Cloudflare에서 403(에러 1010)으로 차단되던 문제 수정, 알림 메시지도 원본 JSON을 그대로 보내던 것에서 사람이 읽기 좋은 형태(예: "📚 새 도서 74권 추가됨 - 만화(완결A)" + 샘플 제목 + "...외 N권")로 변경 | fix `webhook_new_books_notify` plugin requests being blocked by Discord/Cloudflare (403 / error 1010) due to a missing User-Agent header, and switch notification messages from raw JSON dumps to human-readable text (e.g. "📚 74 new books added - Comics(CompleteA)" plus sample titles and a "...N more" summary)
-- 문서 최신화 | update document
+- (plugin) 오디오북 스캔 시 웹훅 훅 미호출 수정 | fix webhook hook not firing on audiobook scans
+- (plugin) 알림 웹훅 403 차단 및 메시지 가독성 수정 | fix notification webhook being blocked (403) and improve message readability
+- 문서 최신화 | update docs
 
 ## v2.0.2
-- (plugin) 플러그인이 사용자가 직접 등록한 화이트리스트 도메인에 한해 외부 사이트를 앱 내 웹뷰로 열거나, 파일을 다운로드해 라이브러리로 바로 임포트할 수 있는 API(`window.BookOasisPlugin.openWebview`/`downloadToLibrary`) 및 [설정 > 외부 도메인] 관리 탭 추가. 앱은 어떤 도메인도 기본 제공/추천하지 않으며 SSRF 방어(사설 IP 차단, 리다이렉트 재검증, 응답 크기 제한)를 거침 | add plugin API (`window.BookOasisPlugin.openWebview`/`downloadToLibrary`) and a new [Settings > External Domains] tab, letting plugins show an external site in an in-app webview or download a file straight into a library — restricted to domains the user explicitly whitelists (the app ships no default/recommended domains), with server-side SSRF protection (private IP blocking, redirect re-validation, response size caps)
-  - 샘플 플러그인 참고: `plugins/metadata/gutenberg_browser` | see sample plugin: `plugins/metadata/gutenberg_browser`
-
-
+- (plugin) 화이트리스트 도메인 웹뷰/다운로드 API 추가 | add whitelisted-domain webview/download API for plugins
 
 ## v2.0.1
-- (viewer/epub,txt) 2페이지 보기에서 짧은 챕터/안드로이드 태블릿의 서브픽셀 반올림 오차로 챕터 끝 판정이 틀어져 다음 챕터로 못 넘어가거나 페이지 넘길 때마다 화면이 밀리던 버그 수정 | fix chapter-end miscalculation on short chapters and Android tablets (sub-pixel rounding) that blocked next-chapter advance or caused the page to drift left on every page turn
-- (viewer/epub) EPUB 뷰어에 브라우저 리사이즈 리스너가 아예 등록되지 않아 창 크기를 줄이면 2페이지 모드가 1페이지처럼 깨지던 버그 수정 | fix EPUB viewer having no resize listener at all, which broke 2-page mode into a 1-page-like layout when the browser window was resized
-- (dashboard) 가나다 정렬에서 초성 바로가기로 중간 페이지에 진입한 뒤 위로 스크롤하면 이전 페이지를 불러오지 못해 더 이상 스크롤되지 않던 문제 수정(위쪽 무한 스크롤 추가) | fix scrolling up getting stuck after jumping to a mid-list page via the A-Z index shortcut by adding upward infinite scroll to load earlier pages
-- (dashboard) 다운로드 클릭시 책이 열리는 현상 수정 | fix download button error
+- (viewer) EPUB/TXT 2페이지 모드 챕터 끝 판정 오류 수정 | fix EPUB/TXT 2-page mode chapter-end miscalculation
+- (viewer) EPUB 리사이즈 리스너 누락 수정 | fix missing resize listener in EPUB viewer
+- (dashboard) 초성 점프 후 위로 스크롤 안 되던 문제 수정 | fix upward scroll breaking after alphabet-jump
+- (dashboard) 다운로드 클릭 시 책이 열리던 문제 수정 | fix download click accidentally opening the book

@@ -31,19 +31,31 @@ export async function loadPluginsSettings() {
           updateManifest.show_sample_update_button
         );
 
+        const hasConfigurableBody = hasCustomSettingsUi || schema.length > 0 || showSampleUpdateButton;
+
         const card = document.createElement('div');
-        card.className = 'plugin-card';
+        card.className = 'plugin-settings-card';
         card.style.cssText = 'background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.2rem;';
-        
+
         // 플러그인별 카드 및 폼 템플릿 구성
+        // 접힌 상태(기본값)에서는 이름/ID/토글만 보이는 한 줄 헤더만 남고, 설명·설정 폼·저장 버튼은
+        // 헤더 클릭 시에만 펼쳐지는 본문(.plugin-settings-card-body)으로 숨긴다 — 플러그인 수가 많아지면
+        // (커뮤니티 피드백: 20개만 돼도 스크롤이 너무 길어짐) 카드 하나당 세로 공간이 설명 유무와
+        // 무관하게 항상 커서 생기던 문제를 렌더링 쪽에서만 해결(플러그인 작성자 쪽 변경 불필요).
         card.innerHTML = `
-              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 0.8rem; flex-wrap: wrap; gap: 0.8rem;">
-                  <div>
-                      <h4 style="margin: 0; color: #fff; font-size: 1.05rem; font-weight: 700;">${escapeHtmlText(p.name)}</h4>
-                      <span style="font-size: 0.75rem; color: #94a3b8;">플러그인 고유 ID: ${escapeHtmlText(p.id)}</span>
+              <div class="plugin-settings-card-header" data-role="plugin-card-toggle" data-plugin-id="${p.id}" style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0; flex-wrap: wrap; gap: 0.8rem; cursor: pointer;">
+                  <div style="display: flex; align-items: center; gap: 0.6rem; min-width: 0;">
+                      <i class="fa-solid fa-chevron-right plugin-settings-card-chevron" data-plugin-chevron="${p.id}" style="color: #64748b; font-size: 0.8rem; transition: transform 0.2s; flex-shrink: 0;"></i>
+                      <div style="min-width: 0;">
+                          <h4 style="margin: 0; color: #fff; font-size: 1.05rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                              ${escapeHtmlText(p.name)}
+                              ${hasConfigurableBody ? '<span style="font-size: 0.68rem; font-weight: 600; color: #c4b5fd; background: rgba(168,85,247,0.15); border: 1px solid rgba(168,85,247,0.4); border-radius: 4px; padding: 0.1rem 0.4rem;">설정 있음</span>' : ''}
+                          </h4>
+                          <span style="font-size: 0.75rem; color: #94a3b8;">플러그인 고유 ID: ${escapeHtmlText(p.id)}</span>
+                      </div>
                   </div>
                   <!-- ON/OFF 활성화 토글 -->
-                  <div style="display: flex; align-items: center; gap: 0.6rem;">
+                  <div style="display: flex; align-items: center; gap: 0.6rem;" data-role="plugin-toggle-zone">
                       <span id="plugin-status-text-${p.id}" style="font-size: 0.82rem; color: ${p.enabled ? '#4ade80' : '#94a3b8'}; font-weight: 600;">
                           ${p.enabled ? '활성화됨' : '비활성화됨'}
                       </span>
@@ -53,35 +65,37 @@ export async function loadPluginsSettings() {
                       </label>
                   </div>
               </div>
-              
-              <!-- 설정값 동적 폼 -->
-              <form class="plugin-config-form" data-plugin-id="${p.id}" style="display: flex; flex-direction: column; gap: 1.2rem;">
-                  ${hasCustomSettingsUi ? `
-                  <div class="plugin-settings-ui-root" data-plugin-settings-root="${p.id}" data-plugin-config='${escapeHtmlAttr(JSON.stringify(config))}'>
-                    ${p.settings_ui.html}
-                  </div>
-                  ` : (schema.length > 0 ? schema.map(f => {
-                    const curVal = config[f.key];
-                    return renderSchemaField(f, curVal);
-                  }).join('') : '<p style="font-size: 0.82rem; color: #94a3b8; margin: 0;">이 플러그인은 별도의 추가 설정값이 필요하지 않습니다.</p>')}
 
-                  ${(hasCustomSettingsUi || schema.length > 0) ? `
-                  <div style="margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1rem;">
-                      <button type="submit" class="btn-submit" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1.2rem; font-size: 0.82rem;">
-                          <i class="fa-regular fa-floppy-disk"></i> 설정 저장
-                      </button>
-                  </div>
-                  ` : ''}
+              <div class="plugin-settings-card-body" data-plugin-body="${p.id}" style="display: none; flex-direction: column; gap: 1.2rem; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 1.2rem;">
+                  <!-- 설정값 동적 폼 -->
+                  <form class="plugin-config-form" data-plugin-id="${p.id}" style="display: flex; flex-direction: column; gap: 1.2rem;">
+                      ${hasCustomSettingsUi ? `
+                      <div class="plugin-settings-ui-root" data-plugin-settings-root="${p.id}" data-plugin-config='${escapeHtmlAttr(JSON.stringify(config))}'>
+                        ${p.settings_ui.html}
+                      </div>
+                      ` : (schema.length > 0 ? schema.map(f => {
+                        const curVal = config[f.key];
+                        return renderSchemaField(f, curVal);
+                      }).join('') : '<p style="font-size: 0.82rem; color: #94a3b8; margin: 0;">이 플러그인은 별도의 추가 설정값이 필요하지 않습니다.</p>')}
 
-                  ${showSampleUpdateButton ? `
-                  <div style="margin-top: 0.4rem; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 0.9rem; display: flex; flex-direction: column; gap: 0.5rem;">
-                    <button type="button" class="plugin-sample-update-btn" data-plugin-id="${p.id}" style="display: inline-flex; align-items: center; gap: 0.45rem; width: fit-content; padding: 0.5rem 1.0rem; font-size: 0.8rem; border-radius: 6px; border: 1px solid rgba(56,189,248,0.5); background: rgba(2,132,199,0.22); color: #dbeafe; cursor: pointer;">
-                      <i class="fa-solid fa-cloud-arrow-down"></i> 샘플 업데이트 (${p.id})
-                    </button>
-                    <span id="plugin-sample-update-status-${p.id}" style="font-size: 0.78rem; color: #94a3b8;">업데이트 가능 조건: 현재 버전 &lt; GitHub 버전</span>
-                  </div>
-                  ` : ''}
-              </form>
+                      ${(hasCustomSettingsUi || schema.length > 0) ? `
+                      <div style="margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1rem;">
+                          <button type="submit" class="btn-submit" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1.2rem; font-size: 0.82rem;">
+                              <i class="fa-regular fa-floppy-disk"></i> 설정 저장
+                          </button>
+                      </div>
+                      ` : ''}
+
+                      ${showSampleUpdateButton ? `
+                      <div style="margin-top: 0.4rem; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 0.9rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                        <button type="button" class="plugin-sample-update-btn" data-plugin-id="${p.id}" style="display: inline-flex; align-items: center; gap: 0.45rem; width: fit-content; padding: 0.5rem 1.0rem; font-size: 0.8rem; border-radius: 6px; border: 1px solid rgba(56,189,248,0.5); background: rgba(2,132,199,0.22); color: #dbeafe; cursor: pointer;">
+                          <i class="fa-solid fa-cloud-arrow-down"></i> 샘플 업데이트 (${p.id})
+                        </button>
+                        <span id="plugin-sample-update-status-${p.id}" style="font-size: 0.78rem; color: #94a3b8;">업데이트 가능 조건: 현재 버전 &lt; GitHub 버전</span>
+                      </div>
+                      ` : ''}
+                  </form>
+              </div>
         `;
         container.appendChild(card);
       });
@@ -250,6 +264,12 @@ function injectToggleSwitchCSS() {
       transition: .3s;
       border-radius: 50%;
     }
+    .plugin-settings-card-header:hover {
+      opacity: 0.85;
+    }
+    .plugin-settings-card-chevron-open {
+      transform: rotate(90deg);
+    }
   `;
   document.head.appendChild(style);
 }
@@ -282,6 +302,20 @@ function bindPluginEvents() {
     }, true);
     window.__pluginsStaticDelegationBound = true;
   }
+
+  // 0. 카드 헤더 클릭 시 설정 본문 펼치기/접기 (토글 스위치 영역 클릭은 제외)
+  container.querySelectorAll('.plugin-settings-card-header').forEach(header => {
+    header.addEventListener('click', (e) => {
+      if (e.target.closest('[data-role="plugin-toggle-zone"]')) return;
+      const pluginId = header.dataset.pluginId;
+      const body = container.querySelector(`[data-plugin-body="${CSS.escape(pluginId)}"]`);
+      const chevron = container.querySelector(`[data-plugin-chevron="${CSS.escape(pluginId)}"]`);
+      if (!body) return;
+      const isOpen = body.style.display !== 'none';
+      body.style.display = isOpen ? 'none' : 'flex';
+      if (chevron) chevron.classList.toggle('plugin-settings-card-chevron-open', !isOpen);
+    });
+  });
 
   // 1. 활성/비활성 스위치 토글 이벤트
   container.querySelectorAll('.plugin-toggle-checkbox').forEach(chk => {

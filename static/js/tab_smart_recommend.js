@@ -15,7 +15,7 @@ function seriesKey(item) {
 }
 
 export async function renderSmartRecommendView() {
-  const container = document.getElementById('books-list-container') || document.getElementById('media-library-grid');
+  const container = document.getElementById('books-list-container');
   const indicator = document.getElementById('current-category-indicator');
   const countBadge = document.getElementById('library-total-count');
   const scrollSpinner = document.getElementById('infinite-scroll-spinner');

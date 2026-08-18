@@ -1047,6 +1047,97 @@ BookOasis는 외부 수신 서버로 도서 이벤트를 `POST` 전송할 수 �
 * **설명**: 해당 도서의 독서 진척도(`user_progress`) 및 읽기 기록을 '안읽음' 상태로 초기화합니다.
 * **요청 파라미터**: `book_id` (integer), `db_type` (string)
 
+---
+
+## 🗂️ 12. 컬렉션(사용자 정의 모음) API (`collections`)
+
+* **인증**: 세션 로그인 필요 (`session['user_id']`). 컬렉션은 계정별로 완전히 분리되며, 다른 사용자의 컬렉션에는 접근할 수 없습니다.
+* **경로 프리픽스**: 다른 모듈과 달리 `/api/media/`가 아닌 `/api/v1/collections`를 사용합니다.
+
+### `[GET]` `/api/v1/collections`
+* **설명**: 현재 로그인한 사용자가 소유한 컬렉션 목록을 조회합니다. 각 컬렉션에 담긴 아이템 개수(`item_count`)가 함께 집계되어 반환됩니다.
+* **쿼리 스트링**:
+  * `db_type` (string, 선택): 조회 스코프 (`general` / `adult` / `audiobook` / `video`, 기본값 `general`)
+* **응답 예시 (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "collections": [
+      {
+        "id": 3,
+        "user_id": 1,
+        "name": "다시 볼 만화",
+        "description": "재독 예정작 모음",
+        "color": "#7c3aed",
+        "cover_image": null,
+        "created_at": "2026-08-10 09:12:00",
+        "item_count": 12
+      }
+    ]
+  }
+  ```
+* **오류 응답**: 미로그인 시 `401` (`{"error": "로그인이 필요합니다."}`)
+
+---
+
+### `[GET]` `/api/v1/collections/<int:collection_id>`
+* **설명**: 특정 컬렉션의 상세 정보와 담겨 있는 아이템(도서/시리즈/오디오북/비디오) 목록을 조회합니다. 본인 소유 컬렉션이 아니면 조회할 수 없습니다.
+* **쿼리 스트링**:
+  * `db_type` (string, 선택): 조회 스코프 (`general` / `adult` / `audiobook` / `video`, 기본값 `general`)
+* **비고**: `items[]`의 각 항목은 담긴 대상 종류에 따라 `type`이 `series` / `book` / `audiobook` / `video` 중 하나로 채워지며, 시리즈 항목은 대표 표지(`cover_image`)와 권수(`book_count`)가 함께 계산되어 내려갑니다.
+* **응답 예시 (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "collection": {
+      "id": 3,
+      "user_id": 1,
+      "name": "다시 볼 만화",
+      "description": "재독 예정작 모음",
+      "color": "#7c3aed",
+      "cover_image": null,
+      "created_at": "2026-08-10 09:12:00",
+      "items": [
+        {
+          "id": 15,
+          "collection_id": 3,
+          "series_name": "나 혼자만 레벨업",
+          "book_id": null,
+          "audiobook_id": null,
+          "video_id": null,
+          "title": "나 혼자만 레벨업",
+          "type": "series",
+          "book_count": 8,
+          "cover_image": "/covers/1/cover_l1.jpg",
+          "file_format": "zip"
+        },
+        {
+          "id": 16,
+          "collection_id": 3,
+          "series_name": null,
+          "book_id": 42,
+          "audiobook_id": null,
+          "video_id": null,
+          "title": "단행본 제목",
+          "type": "book",
+          "cover_image": "/covers/1/cover_42.jpg",
+          "file_format": "zip"
+        }
+      ]
+    }
+  }
+  ```
+* **오류 응답**: 미로그인 시 `401`, 존재하지 않거나 접근 권한이 없는 컬렉션은 `400` (`{"error": "컬렉션을 찾을 수 없거나 접근 권한이 없습니다."}`)
+
+---
+
+### 그 외 컬렉션 관리 엔드포인트
+목록/상세 조회 외에 컬렉션 자체를 관리하는 엔드포인트도 같은 블루프린트에 이미 구현되어 있습니다 (동일하게 세션 로그인 필요):
+* `POST /api/v1/collections`: 컬렉션 생성 (`name`, `description`, `color`)
+* `PUT /api/v1/collections/<int:collection_id>`: 컬렉션 이름/설명/색상 수정
+* `DELETE /api/v1/collections/<int:collection_id>`: 컬렉션 삭제 (담긴 아이템도 함께 삭제)
+* `POST /api/v1/collections/<int:collection_id>/items`: 아이템 추가 (`book_id` / `series_name` / `audiobook_id` / `video_id` 중 하나)
+* `DELETE /api/v1/collections/<int:collection_id>/items/<int:item_id>`: 아이템 제거
 
 
 

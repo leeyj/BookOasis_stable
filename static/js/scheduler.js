@@ -390,17 +390,6 @@ window.runAllLibrariesScanNow = runAllLibrariesScanNow;
 let activeLibraryId = null;
 let activeLibraryName = '';
 
-export function showScheduleActionMenu(event, libraryId, name) {
-  const evt = event || window.event;
-  if (evt && typeof evt.stopPropagation === 'function') {
-    evt.stopPropagation();
-  }
-
-  const anchor = evt && evt.currentTarget ? evt.currentTarget : null;
-  if (!anchor) return;
-  showScheduleActionMenuFromButton(anchor, libraryId, name);
-}
-
 export function showScheduleActionMenuFromButton(anchorEl, libraryId, name) {
   if (!anchorEl) return;
 
@@ -422,12 +411,6 @@ export function showScheduleActionMenuFromButton(anchorEl, libraryId, name) {
     lastScanEl.textContent = lastScannedAt || '-';
   }
 
-  // 저장 버튼 이벤트 해제 (모달 세팅이 있으므로 미사용 처리하거나 닫기)
-  const saveBtn = document.getElementById('schedule-action-save');
-  if (saveBtn) {
-    saveBtn.style.display = 'none'; // 액션 메뉴의 저장 옵션은 보이지 않게 처리
-  }
-
   document.getElementById('schedule-action-scan').onclick = () => {
     runLibraryScanNow(activeLibraryId, activeLibraryName, false);
     hideFloatingMenu(menu);
@@ -443,7 +426,6 @@ export function showScheduleActionMenuFromButton(anchorEl, libraryId, name) {
   positionMenuAtElement(menu, anchorEl, { zIndex: 20070 });
 }
 window.showScheduleActionMenuFromButton = showScheduleActionMenuFromButton;
-window.showScheduleActionMenu = showScheduleActionMenu;
 
 // 모달 다이얼로그 제어 함수 추가
 export function openScanSettingsModal(libraryId, name, isRemote, rcloneRcUrl, cronSchedule, vfsRefresh) {

@@ -65,6 +65,10 @@ class StreamService:
         return TextEpubContentService.get_epub_chapter(file_path, book_id, db_type, chapter_idx)
 
     @staticmethod
+    def get_epub_chapters_batch(file_path, book_id, db_type, chapter_indices):
+        return TextEpubContentService.get_epub_chapters_batch(file_path, book_id, db_type, chapter_indices)
+
+    @staticmethod
     def extract_epub_resource(file_path, resource_path):
         """Returns (data, mime, error)."""
         return TextEpubContentService.extract_epub_resource(file_path, resource_path)

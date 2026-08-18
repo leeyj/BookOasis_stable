@@ -6,7 +6,7 @@ import { resumeSeries } from './book_list.js';
 import { openReader } from './viewer.js';
 
 export async function renderCollectionsView() {
-  const container = document.getElementById('books-list-container') || document.getElementById('media-library-grid');
+  const container = document.getElementById('books-list-container');
   const indicator = document.getElementById('current-category-indicator');
   const countBadge = document.getElementById('library-total-count');
 
@@ -119,7 +119,7 @@ export async function renderCollectionsView() {
 }
 
 export async function renderCollectionDetail(collectionId) {
-  const container = document.getElementById('books-list-container') || document.getElementById('media-library-grid');
+  const container = document.getElementById('books-list-container');
   const indicator = document.getElementById('current-category-indicator');
   const countBadge = document.getElementById('library-total-count');
 
