@@ -87,34 +87,30 @@ export function applyTxtTwoPageTrailingSpacer(scrollWrapper, contentArea) {
   if (scrollMode !== 'page' || pageStep !== '2') return;
 
   // Recalculate from a clean baseline to avoid oscillation across repeated renders.
+  // (marginRight/spacer-div 방식은 둘 다 실기기 로그로 무효 확인됨 — 아래 참고)
   contentArea.style.marginRight = '0px';
+  // .txt-content CSS 규칙이 width:100%로 고정돼 있어(CSS class, tab_media_library_viewer.css),
+  // 아래 실측 전에 반드시 인라인 width를 걷어내야 "이전 홀수 보정으로 넓혀둔 폭"이
+  // 이번 측정에 섞여 들어가지 않는다.
+  contentArea.style.width = '';
 
-  const stepWidth = getTxtPageAdvanceWidth(scrollWrapper);
-  if (!Number.isFinite(stepWidth) || stepWidth <= 0) return;
+  if (!Number.isFinite(scrollWrapper.clientWidth) || scrollWrapper.clientWidth <= 0) return;
 
-  // scrollWrapper/contentArea는 항상 스프레드(2컬럼) 전체 폭으로 고정 렌더링되므로,
-  // 챕터 내용이 1컬럼 분량밖에 안 되는 짧은 챕터에서도 scrollWidth가 항상 2컬럼 폭
-  // 그대로 측정되어 실제 컬럼(페이지) 개수를 반영하지 못한다(=늘 짝수로 오판).
-  // 대신 컬럼을 임시로 1개로 풀어 "단일 컬럼 기준 총 높이"를 측정하고, 컬럼 1개의
-  // 가용 높이로 나눠 실제 컬럼 수를 역산한다 — 폭이 아니라 높이 기반이라 챕터
-  // 길이와 무관하게 정확하다.
-  const columnHeight = contentArea.clientHeight;
-  if (!Number.isFinite(columnHeight) || columnHeight <= 0) return;
+  // column-count:auto + 고정 column-width 조합에서는 컨텐츠가 필요로 하는 만큼
+  // 컬럼이 옆으로 늘어나며 contentArea.scrollWidth가 실제 컬럼 개수를 그대로
+  // 반영한다(이전엔 이 값이 항상 2컬럼 폭에 고정된다고 잘못 가정해, column-count를
+  // 임시로 1로 풀어 높이 기반으로 페이지 수를 역산했다 — 하지만 그 측정은 컬럼
+  // 폭이 아닌 컨테이너 전체 폭으로 줄바꿈되어 실제보다 짧은 높이를 재는 바람에
+  // 홀수 컬럼 챕터를 짝수로 오판해, 마지막 스프레드가 이미 본 컬럼을 다시
+  // 보여주는(중복 표시) 버그의 원인이었다). 실측 scrollWidth로 직접 역산한다.
+  const styles = window.getComputedStyle(contentArea);
+  const columnWidthPx = parseFloat(styles.columnWidth);
+  const columnGapPx = parseFloat(styles.columnGap) || 0;
+  if (!Number.isFinite(columnWidthPx) || columnWidthPx <= 0) return;
+  const columnUnitWidth = columnWidthPx + columnGapPx;
+  if (columnUnitWidth <= 0) return;
 
-  const prevColumnWidth = contentArea.style.columnWidth;
-  const prevColumnCount = contentArea.style.columnCount;
-  contentArea.style.columnWidth = '';
-  contentArea.style.columnCount = '1';
-  const naturalHeight = contentArea.scrollHeight;
-  contentArea.style.columnWidth = prevColumnWidth;
-  contentArea.style.columnCount = prevColumnCount;
-
-  // Math.ceil은 오차 허용이 없어, 정수 배수에 근접한 값이 서브픽셀 반올림으로
-  // 살짝 넘치기만 해도(안드로이드 태블릿처럼 devicePixelRatio가 정수가 아닌
-  // 기기에서 흔함) 페이지 수를 한 장 더 있는 것으로 오판한다. ceil 전에
-  // 작은 epsilon을 빼서 그 오버슈트를 흡수한다.
-  const rawPageCount = naturalHeight / columnHeight;
-  const pageCount = Math.max(1, Math.ceil(rawPageCount - 0.02));
+  const pageCount = Math.max(1, Math.round((contentArea.scrollWidth + columnGapPx) / columnUnitWidth));
   // pageCount === 1(표지처럼 챕터 전체가 컬럼 1개 분량뿐인 경우)은 예외다.
   // 이 경우 이미지(1컬럼) + 빈 2번째 컬럼이 처음부터 한 스프레드로 같이 보이므로
   // 별도의 스냅 지점(여백)이 필요 없다. 그런데도 여백을 붙이면, 이미 다 본 콘텐츠인데
@@ -123,11 +119,19 @@ export function applyTxtTwoPageTrailingSpacer(scrollWrapper, contentArea) {
   const hasOddTailPage = pageCount > 1 && pageCount % 2 === 1;
 
   if (hasOddTailPage) {
-    // padding-right는 (box-sizing: border-box인 이 요소의) 컬럼이 쓸 수 있는
-    // 폭 자체를 줄여 멀티컬럼 레이아웃을 다시 틀어지게 만든다(컬럼 폭/개수가
-    // 재계산되며 스텝 폭 계산과 어긋나 페이지 넘길 때마다 화면이 밀림).
-    // margin-right는 자신의 콘텐츠 박스(컬럼 폭)에는 영향 없이 스크롤 컨테이너의
-    // scrollWidth만 늘려주므로 안전하다.
-    contentArea.style.marginRight = `${Math.round(stepWidth / 2)}px`;
+    // 시도했던 방식과 실패 원인(둘 다 실기기 로그로 확인):
+    // 1) margin-right → 스크롤 컨테이너가 자식의 trailing margin을 scrollWidth
+    //    계산에 넣지 않는 브라우저 동작 때문에 무효.
+    // 2) 빈 <div> 스페이서(강제 컬럼 나눔/높이 오버플로우) → .txt-content가
+    //    CSS에서 width:100%로 고정돼 있어, "실제 필요한 컬럼 수"를 넘는 여분
+    //    컬럼은 콘텐츠가 흘러넘칠 때만 브라우저가 예외적으로 추가해주는 오버플로우
+    //    컬럼이라 빈 스페이서만으로는 새 컬럼이 보장되지 않았다.
+    // 최종: width를 아예 "짝수 컬럼 개수 분량"으로 명시적으로 늘려 버린다.
+    // column-count:auto는 이 명시된 width를 기준으로 정확히 그만큼의 컬럼을
+    // 배정하므로(콘텐츠 양과 무관한 순수 기하 계산), 남는 마지막 컬럼은 항상
+    // 확실히 비워진 채로 존재한다.
+    const evenColumnCount = pageCount + 1;
+    const targetWidth = Math.round(evenColumnCount * columnWidthPx + (evenColumnCount - 1) * columnGapPx);
+    contentArea.style.width = `${targetWidth}px`;
   }
 }

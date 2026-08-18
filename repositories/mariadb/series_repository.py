@@ -95,7 +95,7 @@ class SeriesRepository:
             conn.close()
 
     @staticmethod
-    def _fetch_summary_rows(db_type, library_id, user_id, role, limit, offset, favorite_user_id):
+    def _fetch_summary_rows(db_type, library_id, user_id, role, limit, offset, favorite_user_id, sort='asc'):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
@@ -134,7 +134,11 @@ class SeriesRepository:
             """
             if where:
                 sql += " WHERE " + " AND ".join(where)
-            sql += " ORDER BY s.library_id ASC, s.sort_series_name ASC, s.representative_book_id ASC"
+            # sort='desc'일 때 SQL 자체를 내림차순으로 뒤집는다 - 예전에는 항상 오름차순으로
+            # LIMIT/OFFSET을 적용한 뒤 호출부에서 그 결과만 파이썬으로 재정렬해서, 페이지 1을
+            # 넘어가면 SQL이 애초에 오름차순 기준 행 구간을 가져와버려 결과가 뒤죽박죽이었다.
+            title_dir = 'DESC' if str(sort or 'asc').lower() == 'desc' else 'ASC'
+            sql += f" ORDER BY s.library_id ASC, s.sort_series_name {title_dir}, s.representative_book_id ASC"
             if limit is not None:
                 sql += " LIMIT %s"
                 params.append(int(limit))
@@ -188,17 +192,18 @@ class SeriesRepository:
             conn.close()
 
     @staticmethod
-    def fetch_books_for_grouping(db_type, library_id, search_query='', favorite_only=False, genre_filters=None, tag_filters=None, user_id=None, role=None, limit=None, offset=None):
+    def fetch_books_for_grouping(db_type, library_id, search_query='', favorite_only=False, genre_filters=None, tag_filters=None, user_id=None, role=None, limit=None, offset=None, sort='asc'):
         """시리즈 그룹핑 렌더링에 필요한 기본 도서 레코드 목록 조회 (MariaDB Native)"""
         safe_user_id = int(user_id) if user_id is not None and int(user_id) > 0 else 1
         genre_filters = [str(v).strip() for v in (genre_filters or []) if str(v).strip()]
         tag_filters = [str(v).strip() for v in (tag_filters or []) if str(v).strip()]
         search_mode, search_term = parse_series_search_query(search_query)
+        title_dir = 'DESC' if str(sort or 'asc').lower() == 'desc' else 'ASC'
 
         if db_type not in ('audiobook', 'video') and not search_query and not favorite_only and not genre_filters and not tag_filters:
             try:
                 summary_rows = SeriesRepository._fetch_summary_rows(
-                    db_type, library_id, user_id, role, limit, offset, safe_user_id
+                    db_type, library_id, user_id, role, limit, offset, safe_user_id, sort=sort
                 )
                 if summary_rows is not None:
                     return summary_rows
@@ -250,7 +255,7 @@ class SeriesRepository:
                        1 AS series_book_count
                 FROM audiobooks a
                 WHERE {' AND '.join(where)}
-                ORDER BY a.library_id ASC, a.title ASC, a.id ASC
+                ORDER BY a.library_id ASC, a.title {title_dir}, a.id ASC
             """
             if limit is not None:
                 sql += " LIMIT %s"
@@ -302,7 +307,7 @@ class SeriesRepository:
                        1 AS series_book_count
                 FROM videos v
                 WHERE {' AND '.join(where)}
-                ORDER BY v.library_id ASC, v.title ASC, v.id ASC
+                ORDER BY v.library_id ASC, v.title {title_dir}, v.id ASC
             """
             if limit is not None:
                 sql += " LIMIT %s"
@@ -384,7 +389,7 @@ class SeriesRepository:
                     GROUP BY b2.library_id, COALESCE(NULLIF(b2.series_name, ''), b2.title)
                 ) rep ON b.id = rep.rep_id
                 WHERE {' AND '.join(outer_where)}
-                ORDER BY b.library_id ASC, b.series_name ASC, b.id ASC
+                ORDER BY b.library_id ASC, b.series_name {title_dir}, b.id ASC
             """
 
             if limit is not None:

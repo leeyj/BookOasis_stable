@@ -11,11 +11,6 @@ from flask import Blueprint, request, Response, jsonify, session
 from api.auth import login_required, check_adult_permission
 import database
 
-try:
-    import requests
-except Exception:
-    requests = None
-
 audiobook_bp = Blueprint('audiobook_api', __name__)
 
 UNSUPPORTED_BROWSER_AUDIO_EXTS = {'wma', 'ape', 'dts', 'ac3', 'ra', 'ram', 'au', 'voc', 'wv'}
@@ -193,21 +188,11 @@ def get_audiobook_cover(aid):
     row = AudiobookRepository.get_audiobook_by_id(aid)
 
     if row and row.get('poster'):
-        poster_path = row['poster']
-        if poster_path.startswith(('http://', 'https://')):
-            if requests is not None:
-                try:
-                    remote_res = requests.get(poster_path, timeout=5)
-                    if remote_res.ok and remote_res.content:
-                        remote_type = remote_res.headers.get('Content-Type', '').split(';')[0].strip() or 'image/jpeg'
-                        return Response(remote_res.content, mimetype=remote_type)
-                except Exception:
-                    pass
-        if os.path.exists(poster_path):
-            ext = os.path.splitext(poster_path)[1].lstrip('.').lower()
-            mimetype = 'image/jpeg' if ext in ('jpg', 'jpeg') else f'image/{ext}'
-            from flask import send_file
-            return send_file(poster_path, mimetype=mimetype)
+        from utils.cover_helper import get_or_cache_remote_poster_webp
+        cache_path = get_or_cache_remote_poster_webp(row['poster'], 'audio', library_id=row.get('library_id'))
+        if cache_path:
+            from api.stream import send_cached_cover_file
+            return send_cached_cover_file(cache_path)
 
     # Fallback SVG 생성
     title = row.get('title') if row else 'Audiobook'

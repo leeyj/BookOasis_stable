@@ -1,7 +1,12 @@
 # CHANGELOG
+## v2.1.8
+- (fix) TXT/EPUB 2페이지 모드에서 짧은 챕터로 넘어간 직후 빠르게 다시 넘기면 챕터가 건너뛰거나 같은 내용이 반복 표시되던 문제 수정 (챕터 전환 중 재진입을 막는 가드 누락) | fix TXT/EPUB 2-page mode skipping or re-showing already-seen content when tapping next/prev right after landing on a short chapter (missing re-entrancy guard during chapter transitions)
+- (fix) TXT/EPUB 2페이지 모드에서 컬럼(페이지) 수가 홀수인 챕터의 마지막 페이지가 직전 페이지 내용을 다시 보여주던 문제 근본 수정 | fix TXT/EPUB 2-page mode re-showing the previous page's content on the last page of chapters with an odd column count
+- (fix) 서버 재시작 후 Lazy 스캐너가 간헐적으로 재개되지 않던 문제 수정 — 워커 생존 여부를 PID 존재만으로 판단해, 재사용된 PID를 오인해 작업이 영구히 고착될 수 있었음 | fix the lazy scanner occasionally not resuming after a server restart — worker liveness was checked by PID existence alone, which could misidentify a reused PID and leave a task permanently stuck
+- (perf) 오디오북/영상 강좌 포스터를 요청마다 원격 재조회하던 것을 로컬 WebP 캐시로 전환 — 도서 표지와 동일한 방식(캐시 헤더 포함)으로 서빙 | switch audiobook/video course posters from re-fetching remotely on every request to a local WebP cache — now served the same way as book covers, with proper cache headers
+
 ## v2.1.7
 - (viewer) 만화 뷰어에 스프레드 이미지 좌우 분할 보기 옵션 추가 | add a split-view option for spread images in the comic viewer
-- (fix) 분할 보기 상태로 책을 닫으면 페이지 수가 잘못 저장돼 다시 열 때 오류 나던 문제 수정 | fix closing the comic viewer while split-view was on saving a wrong page count, causing errors on reopen
 - (fix) 시리즈 상세 화면에서 "읽지 않음으로 변경"이 실제로는 반영됐지만 화면(진행률)이 갱신되지 않던 문제 수정(죽은 DOM 참조) | fix "mark as unread" actually working but not refreshing the on-screen progress bar in the series detail view (stale DOM reference)
 - (fix) 시리즈 재스캔/도서 재스캔/완독 처리 버튼이 클릭한 버튼이 아닌 document를 참조해 스피너·완료 토스트가 제대로 안 뜨던 문제 수정 | fix series/book rescan and mark-completed buttons referencing document instead of the clicked button, breaking the spinner and completion toast
 - (fix) TXT/EPUB 연속된 빈 줄이 1개로 정리되도록 수정 | fix consecutive blank lines not collapsing in TXT/EPUB
@@ -17,6 +22,8 @@
 - (perf) Lazy 스캐너의 영상 재생시간(ffprobe) 백필/컨테이너 재검증을 스레드풀로 병렬 처리 — 동시 처리 개수를 설정에서 조절 가능(기본 4개), 원격 마운트에서 대량 백로그 처리 속도 대폭 개선 | parallelize the lazy scanner's video duration (ffprobe) backfill and container re-validation with a thread pool — concurrency is now configurable (default 4), greatly speeding up large backlogs on remote mounts
 - (chore) 모바일 헤더 표시 문제(해결 완료) 진단용으로 남아있던 사이드바 원격 로깅 3건 제거 — 모니터링 로그 소음 정리 | remove 3 leftover sidebar remote-logging calls added to diagnose the (now-resolved) mobile header visibility bug — cleans up monitoring log noise
 - (fix) 배포해도 static/js 파일이 브라우저/중간 캐시에 예전 버전으로 남아있던 문제 근본 수정 — /static/js/**를 매 요청 서버 재검증(Cache-Control: no-cache, must-revalidate)으로 전환 (진입점 스크립트만 버전 쿼리스트링이 붙고 내부 import 229개 중 224개는 안 붙어있던 게 원인) | fix deployed changes under static/js not reliably reaching browsers/intermediate caches — switched /static/js/** to always revalidate with the server (Cache-Control: no-cache, must-revalidate); root cause was that only entry-point scripts got a version query string, while 224 of 229 internal ES module imports had none
+- (fix) 라이브러리 목록에서 제목 내림차순 정렬이 페이지 2부터 뒤죽박죽 나오던 문제 수정 — SQL이 항상 오름차순으로 페이지를 가져온 뒤 그 결과만 파이썬에서 뒤집던 구조적 버그(특수문자 때문이 아니었음) | fix title-descending sort in the library list producing scrambled results from page 2 onward — SQL always paginated in ascending order and only reversed that already-wrong page in Python (not a special-character issue)
+- (fix) 뷰어를 닫지 않고 사이드바 "홈"/"최근 읽은 도서"로 바로 이동하면 방금 본 책이 대시보드에 한 권 밀려 보이던 문제 수정 — 대기 중인 진행률을 먼저 반영한 뒤 조회하도록 변경(안 그러면 서버의 1시간 캐시가 그 책 빠진 스냅샷으로 굳어버림) | fix the home dashboard/history view showing the last-read book one entry behind when navigating away via the sidebar without closing the viewer first — now flushes any pending progress before fetching (otherwise the server's 1-hour cache could lock in a snapshot missing that book)
 
 ## v2.1.6
 - (viewer) 모바일 세로 스와이프 방향 수정(위=다음, 아래=이전) | fix mobile vertical swipe direction (up=next, down=previous)

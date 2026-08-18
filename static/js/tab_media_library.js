@@ -5,6 +5,7 @@ import { openBookDetail, goBackToList } from './modal.js';
 import { updateCurrentCategoryIndicator } from './category_indicator.js';
 import { openReader, closeMediaViewer, toggleFullscreenViewer, setComicFitMode, changeFontSize, toggleReaderTheme, initKeyboardListener, nextComicPage, prevComicPage, nextPdfPage, prevPdfPage, epubPrevPage, epubNextPage, prevTxtPage, nextTxtPage } from './viewer.js';
 import { switchActiveView } from './view_manager.js';
+import { flushProgress } from './viewer_progress.js';
 
 // category.js CRUD 임포트
 import { loadLibraries, triggerAddLibrary, triggerEditLibrary, triggerDeleteLibrary, closeLibraryModal, submitLibraryForm, triggerScanLibrary, triggerScanLibraryCovers, triggerCancelScanLibrary } from './category.js';
@@ -482,9 +483,21 @@ async function initTabMediaLibrary() {
   }
 }
 
-export function selectCategory(id, skipHistory = false) {
+export async function selectCategory(id, skipHistory = false) {
   if (id === 'smart_rec' && state.smartRecommendEnabled === false) {
     id = 'home';
+  }
+
+  // 뷰어를 명시적으로 닫지 않고(예: X버튼) 사이드바 "홈"/"최근 읽은 도서" 메뉴를 바로 눌러
+  // 나가는 경우, 마지막 페이지 진행률이 아직 디바운스 대기 중(최대 3초)이거나 방금 닫히면서
+  // 예약된 저장이 서버에 완전히 반영되기 전에 이 함수의 히스토리 조회가 먼저 나갈 수 있다.
+  // 그러면 "최근 읽은 도서" 응답이 1시간 캐시되는 서버 쪽 구조상, 방금 읽은 책이 빠진 스냅샷이
+  // 그대로 굳어버려서 대시보드에 마지막으로 보던 책이 한 권 밀려 보이는 문제가 있었다.
+  // 대기 중인 진행률이 있으면(없으면 즉시 반환되는 안전한 호출) 조회 전에 먼저 반영한다.
+  if (id === 'home' || id === 'history') {
+    try {
+      await flushProgress(false, true);
+    } catch (e) {}
   }
   state.currentLibraryId = id;
   try {

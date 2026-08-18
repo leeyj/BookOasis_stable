@@ -12,12 +12,20 @@ class SeriesRepository:
         return False
 
     @staticmethod
-    def fetch_books_for_grouping(db_type, library_id, search_query='', favorite_only=False, genre_filters=None, tag_filters=None, user_id=None, role=None, limit=None, offset=None):
-        """시리즈 그룹핑 렌더링에 필요한 기본 도서 레코드 목록 조회 (WAL 락 경합 시 지수 백오프 자동 재시도)"""
+    def fetch_books_for_grouping(db_type, library_id, search_query='', favorite_only=False, genre_filters=None, tag_filters=None, user_id=None, role=None, limit=None, offset=None, sort='asc'):
+        """시리즈 그룹핑 렌더링에 필요한 기본 도서 레코드 목록 조회 (WAL 락 경합 시 지수 백오프 자동 재시도)
+
+        sort='desc'일 때 SQL 자체를 제목 내림차순으로 뒤집는다. 예전에는 항상 오름차순으로
+        SQL LIMIT/OFFSET을 적용한 뒤 호출부(series_service.py)에서 그 결과만 파이썬으로
+        재정렬했는데, 페이지 1을 넘어가면 애초에 SQL이 오름차순 기준으로 잘못된(=오름차순
+        페이지의) 행 구간을 가져와버려서 내림차순 결과가 뒤죽박죽 나오는 버그가 있었다.
+        (제목의 특수문자 때문이 아니라 페이지네이션 방향 자체가 항상 오름차순으로 고정돼 있던
+        구조적 버그 — library_id/id는 보조 정렬 기준이라 그대로 오름차순 유지)"""
         safe_user_id = int(user_id) if user_id is not None and int(user_id) > 0 else 1
         genre_filters = [str(v).strip() for v in (genre_filters or []) if str(v).strip()]
         tag_filters = [str(v).strip() for v in (tag_filters or []) if str(v).strip()]
         search_mode, search_term = parse_series_search_query(search_query)
+        title_dir = 'DESC' if str(sort or 'asc').lower() == 'desc' else 'ASC'
 
         if db_type == 'audiobook':
             where = ["COALESCE(a.is_deleted, 0) = 0"]
@@ -63,7 +71,7 @@ class SeriesRepository:
                        ), 0) AS is_completed
                 FROM audiobooks a
                 WHERE {' AND '.join(where)}
-                ORDER BY a.library_id ASC, a.title ASC, a.id ASC
+                ORDER BY a.library_id ASC, a.title {title_dir}, a.id ASC
             """
             if limit is not None:
                 sql += " LIMIT ?"
@@ -114,7 +122,7 @@ class SeriesRepository:
                        ), 0) AS is_completed
                 FROM videos v
                 WHERE {' AND '.join(where)}
-                ORDER BY v.library_id ASC, v.title ASC, v.id ASC
+                ORDER BY v.library_id ASC, v.title {title_dir}, v.id ASC
             """
             if limit is not None:
                 sql += " LIMIT ?"
@@ -196,7 +204,7 @@ class SeriesRepository:
                     GROUP BY b2.library_id, COALESCE(NULLIF(b2.series_name, ''), b2.title)
                 ) rep ON b.id = rep.rep_id
                 WHERE {' AND '.join(outer_where)}
-                ORDER BY b.library_id ASC, b.series_name ASC, b.id ASC
+                ORDER BY b.library_id ASC, b.series_name {title_dir}, b.id ASC
             """
 
             if limit is not None:

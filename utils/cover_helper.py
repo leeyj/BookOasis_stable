@@ -2,6 +2,68 @@
 import os
 import hashlib
 
+
+def get_or_cache_remote_poster_webp(poster_source, category, library_id=None, timeout=5):
+    """오디오북/영상 강좌 포스터(로컬 경로 또는 원격 URL)를 covers/{category}/{library_id}/ 아래
+    WebP로 변환해 로컬 캐시하고, 캐시 파일의 절대 경로를 반환한다. 도서 표지가
+    covers/{library_id}/... 로 라이브러리별로 나뉘는 것과 동일한 구조를 맞춘다
+    (라이브러리 삭제 시 정리하기 쉽고, 한 폴더에 파일이 무한정 쌓이는 것도 방지).
+
+    도서 표지(tools/scanner/cover.py)와 달리 이쪽은 스캔 시점이 아니라 최초 요청
+    시점에 지연 생성(lazy)된다 — 대량 스캔 중 네트워크 호출이 끼어들어 스캔 자체가
+    느려지는 것을 피하고, 실제로 화면에 노출된 것만 캐싱하기 위함. 캐시 키(파일명)는
+    도서 표지와 동일하게 숫자 id가 아니라 포스터 소스 문자열(경로/URL)의 MD5 해시라서,
+    재스캔으로 포스터 소스가 바뀌면 새 해시로 자연스럽게 재캐싱된다(별도 무효화 로직 불필요).
+    실패 시 None을 반환하며, 호출부는 기존 폴백(SVG 플레이스홀더)을 그대로 사용하면 된다.
+    """
+    if not poster_source:
+        return None
+
+    from tools.scanner.cover import COVERS_DIR
+    cache_dir = os.path.join(COVERS_DIR, category, str(library_id)) if library_id is not None else os.path.join(COVERS_DIR, category)
+    os.makedirs(cache_dir, exist_ok=True)
+
+    source_hash = hashlib.md5(str(poster_source).encode('utf-8')).hexdigest()
+    cache_path = os.path.join(cache_dir, f"{source_hash}.webp")
+
+    if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
+        return cache_path
+
+    img_data = None
+    is_remote = str(poster_source).startswith(('http://', 'https://'))
+    if is_remote:
+        try:
+            import requests
+        except Exception:
+            return None
+        try:
+            resp = requests.get(poster_source, timeout=timeout)
+            if resp.ok and resp.content:
+                img_data = resp.content
+        except Exception:
+            return None
+    else:
+        if not os.path.exists(poster_source):
+            return None
+        try:
+            with open(poster_source, 'rb') as f:
+                img_data = f.read()
+        except Exception:
+            return None
+
+    if not img_data:
+        return None
+
+    try:
+        import io
+        from PIL import Image
+        with Image.open(io.BytesIO(img_data)) as img:
+            img.save(cache_path, "WEBP", quality=80)
+        return cache_path
+    except Exception as e:
+        print(f"[Cover-Cache] Poster WebP conversion failed ({poster_source}): {e}")
+        return None
+
 def get_cover_image_with_t(cover_image, updated_at):
     """표지 이미지명에 캐시 갱신용 타임스탬프를 덧붙여 반환"""
     if not cover_image:

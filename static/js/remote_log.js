@@ -2,7 +2,9 @@
 export function remoteLog(tag, data) {
   try {
     const message = typeof data === 'string' ? data : JSON.stringify(data);
-    console.log(`[remoteLog:${tag}]`, data);
+    // 객체 그대로 찍으면 콘솔에서 접혀 나와 캡처가 번거로우니, 펼쳐볼 필요 없이
+    // 한 줄 문자열로도 같이 남긴다.
+    console.log(`[remoteLog:${tag}] ${message}`);
     const body = JSON.stringify({ tag, message });
     if (navigator.sendBeacon) {
       const blob = new Blob([body], { type: 'application/json' });

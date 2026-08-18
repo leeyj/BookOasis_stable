@@ -368,34 +368,38 @@ def get_cover_image(filename):
             return None
         return candidate
 
-    def _send_cover(path):
-        # 304 빠른 반환 (디스크 I/O 지연 5초 방지)
-        stat = path.stat()
-        etag_source = f"{path}:{stat.st_mtime_ns}:{stat.st_size}"
-        etag_val = hashlib.md5(etag_source.encode('utf-8')).hexdigest()[:16]
-        if_none_match = request.headers.get('If-None-Match')
-        if if_none_match and (if_none_match == etag_val or if_none_match == f'"{etag_val}"'):
-            res = Response(status=304)
-            res.headers['Cache-Control'] = 'public, max-age=86400'
-            res.headers['ETag'] = f'"{etag_val}"'
-            return res
-
-        mime, _ = mimetypes.guess_type(path)
-        mime = mime or 'image/png'
-        res = send_file(path, mimetype=mime, conditional=False)
-        res.headers['Cache-Control'] = 'public, max-age=86400'
-        res.headers['ETag'] = f'"{etag_val}"'
-        return res
-
     decoded_filename = urllib.parse.unquote(filename)
     path = _resolve_cover_path(decoded_filename)
     if not path or not path.exists() or not path.is_file():
         # 만약 unquote 전 경로로 존재하는지 2차 체크 (Fallback)
         path_fallback = _resolve_cover_path(filename)
         if path_fallback and path_fallback.exists() and path_fallback.is_file():
-            return _send_cover(path_fallback)
+            return send_cached_cover_file(path_fallback)
         return jsonify({'error': _t('api.err_cover_not_found')}), 404
-    return _send_cover(path)
+    return send_cached_cover_file(path)
+
+
+def send_cached_cover_file(path):
+    """로컬 커버 파일을 ETag/Cache-Control(1일)과 함께 서빙 (304 빠른 반환 지원).
+    /covers/<filename> 라우트뿐 아니라 오디오북/영상 강좌 포스터 캐시 서빙에도 공용으로 쓰인다."""
+    import mimetypes
+    path = Path(path)
+    stat = path.stat()
+    etag_source = f"{path}:{stat.st_mtime_ns}:{stat.st_size}"
+    etag_val = hashlib.md5(etag_source.encode('utf-8')).hexdigest()[:16]
+    if_none_match = request.headers.get('If-None-Match')
+    if if_none_match and (if_none_match == etag_val or if_none_match == f'"{etag_val}"'):
+        res = Response(status=304)
+        res.headers['Cache-Control'] = 'public, max-age=86400'
+        res.headers['ETag'] = f'"{etag_val}"'
+        return res
+
+    mime, _ = mimetypes.guess_type(str(path))
+    mime = mime or 'image/png'
+    res = send_file(path, mimetype=mime, conditional=False)
+    res.headers['Cache-Control'] = 'public, max-age=86400'
+    res.headers['ETag'] = f'"{etag_val}"'
+    return res
 
 
 

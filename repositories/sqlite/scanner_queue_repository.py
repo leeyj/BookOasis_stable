@@ -13,7 +13,6 @@ class ScannerQueueRepository:
         프로세스가 종료된 running/exit_pending 태스크만 pending으로 복원합니다.
         웹 프로세스만 재시작된 경우 살아 있는 스캐너 작업은 그대로 보존합니다.
         """
-        import os
         conn = database.get_connection('general')
         cursor = conn.cursor()
         try:
@@ -22,19 +21,10 @@ class ScannerQueueRepository:
             )
             restored_count = 0
             interrupted_libraries = []
+            from utils.process_helper import is_scanner_worker_pid_alive
             for row in cursor.fetchall():
                 pid = row['worker_pid']
-                is_alive = False
-                if pid:
-                    try:
-                        import psutil
-                        is_alive = psutil.pid_exists(pid)
-                    except ImportError:
-                        try:
-                            os.kill(pid, 0)
-                            is_alive = True
-                        except (OSError, ProcessLookupError, ValueError):
-                            pass
+                is_alive = is_scanner_worker_pid_alive(pid)
 
                 if is_alive:
                     continue
@@ -92,7 +82,6 @@ class ScannerQueueRepository:
         직접 검사하여 프로세스가 이미 소멸한 유령(Orphan/Stale) 태스크만 안전하게 정화합니다.
         PID 정보가 누락되었거나 소멸된 running/exit_pending 태스크를 즉시 pending으로 정화합니다.
         """
-        import os
         conn = database.get_connection('general')
         cursor = conn.cursor()
         try:
@@ -100,20 +89,11 @@ class ScannerQueueRepository:
             cursor.execute("SELECT id, worker_pid FROM scanner_tasks WHERE status IN ('running', 'exit_pending')")
             rows = cursor.fetchall()
             cleaned_count = 0
-            
+
+            from utils.process_helper import is_scanner_worker_pid_alive
             for row in rows:
                 pid = row['worker_pid']
-                is_alive = False
-                if pid:
-                    try:
-                        import psutil
-                        is_alive = psutil.pid_exists(pid)
-                    except ImportError:
-                        try:
-                            os.kill(pid, 0)
-                            is_alive = True
-                        except (OSError, ProcessLookupError, ValueError):
-                            is_alive = False
+                is_alive = is_scanner_worker_pid_alive(pid)
 
                 # PID 정보가 없거나 프로세스가 OS에서 완전히 소멸된 경우 pending 상태로 복구하여 자동 재개(Auto-Resume) 보장
                 if not is_alive:
@@ -403,17 +383,8 @@ class ScannerQueueRepository:
             already_running = cursor.fetchone()
             if already_running:
                 pid = already_running['worker_pid']
-                is_alive = False
-                if pid:
-                    try:
-                        import psutil
-                        is_alive = psutil.pid_exists(pid)
-                    except ImportError:
-                        try:
-                            os.kill(pid, 0)
-                            is_alive = True
-                        except (OSError, ProcessLookupError, ValueError):
-                            is_alive = False
+                from utils.process_helper import is_scanner_worker_pid_alive
+                is_alive = is_scanner_worker_pid_alive(pid)
                 if is_alive:
                     return False
                 else:

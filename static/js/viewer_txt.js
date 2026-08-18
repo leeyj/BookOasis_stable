@@ -865,6 +865,7 @@ export function prevTxtPage() {
     renderCurrentChunk,
     saveDetailPosition,
     logActiveViewportText,
+    getTxtPageSnapInProgress: () => txtPageSnapInProgress,
     setTxtPageSnapInProgress: value => {
       txtPageSnapInProgress = value;
     },
@@ -897,6 +898,7 @@ export function nextTxtPage() {
     renderCurrentChunk,
     saveDetailPosition,
     logActiveViewportText,
+    getTxtPageSnapInProgress: () => txtPageSnapInProgress,
     setTxtPageSnapInProgress: value => {
       txtPageSnapInProgress = value;
     },

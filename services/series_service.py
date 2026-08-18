@@ -269,7 +269,8 @@ class SeriesService:
             user_id=user_id,
             role=role,
             limit=sql_limit,
-            offset=sql_offset
+            offset=sql_offset,
+            sort=sort
         )
         t2 = time.perf_counter()
 
