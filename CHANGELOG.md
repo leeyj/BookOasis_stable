@@ -1,4 +1,8 @@
 # CHANGELOG
+## v2.1.9
+- (fix) 오래된 버전부터 업데이트해온 MariaDB 사용자에서 신규 오디오북 저장이 `(1364, "Field 'title' doesn't have a default value")`로 실패하던 문제 수정 — 구형 스키마의 `audiobook_tracks.title` NOT NULL 제약이 남아있던 것이 원인, 재시작 시 자동 보정 | fix new audiobooks failing to save with `(1364, "Field 'title' doesn't have a default value")` on MariaDB installs upgraded from older versions — caused by a leftover NOT NULL constraint on `audiobook_tracks.title` from a legacy schema, now auto-corrected on restart
+- (fix) Ultra-fast skip된 폴더에서 스캐너가 `UnboundLocalError`로 조용히 실패하고, 부분 경로 스캔(scan-path)의 폴더 처리 오류가 삼켜져 API가 성공을 반환하던 문제 수정 | fix the scanner silently failing with `UnboundLocalError` on ultra-fast-skipped folders, and folder-processing errors during partial path scans being swallowed so the API returned success anyway
+
 ## v2.1.8
 - (fix) TXT/EPUB 2페이지 모드에서 짧은 챕터로 넘어간 직후 빠르게 다시 넘기면 챕터가 건너뛰거나 같은 내용이 반복 표시되던 문제 수정 (챕터 전환 중 재진입을 막는 가드 누락) | fix TXT/EPUB 2-page mode skipping or re-showing already-seen content when tapping next/prev right after landing on a short chapter (missing re-entrancy guard during chapter transitions)
 - (fix) TXT/EPUB 2페이지 모드에서 컬럼(페이지) 수가 홀수인 챕터의 마지막 페이지가 직전 페이지 내용을 다시 보여주던 문제 근본 수정 | fix TXT/EPUB 2-page mode re-showing the previous page's content on the last page of chapters with an odd column count

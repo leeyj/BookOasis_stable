@@ -624,6 +624,27 @@ def _ensure_mariadb_columns():
         except Exception as e:
             print(f"  [!] MariaDB 컬럼 보강 실패: `{db_name}`.`{tbl}`.{col_name} ({col_def}) -> {e}")
 
+    # 구버전(테이블명이 `tracks`였던 시절)부터 계속 업그레이드해온 DB는 audiobook_tracks.title이
+    # 그 시절 정의(NOT NULL, 기본값 없음) 그대로 남아있을 수 있다. 현재 앱은 트랙을 filename으로
+    # 표시하며 INSERT 시 title을 채우지 않으므로, 이런 구형 컬럼이 남아있는 DB에서는 신규 오디오북을
+    # 추가할 때마다 (1364, "Field 'title' doesn't have a default value")로 저장이 실패한다.
+    legacy_column_relaxations = [
+        ('media_audiobook', 'audiobook_tracks', 'title', 'VARCHAR(500) NULL'),
+    ]
+    for db_name, tbl, col_name, new_col_def in legacy_column_relaxations:
+        try:
+            conn = connect_mariadb(db_name)
+            cur = conn.cursor()
+            cur.execute(f"SHOW COLUMNS FROM `{tbl}` WHERE Field = %s", (col_name,))
+            row = cur.fetchone()
+            if row and str(row.get('Null')).upper() == 'NO' and row.get('Default') is None:
+                cur.execute(f"ALTER TABLE `{tbl}` MODIFY COLUMN `{col_name}` {new_col_def}")
+                conn.commit()
+                print(f"  [+] MariaDB 구형 스키마 보정 완료: `{db_name}`.`{tbl}`.{col_name} (NOT NULL 제약 해제)")
+            conn.close()
+        except Exception as e:
+            print(f"  [!] MariaDB 구형 컬럼 제약 보정 실패: `{db_name}`.`{tbl}`.{col_name} -> {e}")
+
 
 def _ensure_mariadb_indexes():
     from tools.migrator_sqlite_to_mariadb import connect_mariadb

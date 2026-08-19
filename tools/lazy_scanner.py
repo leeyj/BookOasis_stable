@@ -372,7 +372,10 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
                     file_path = book['file_path']
                     series_name = book['series_name'] or ""
                     library_id = book['library_id']
-                    filename = os.path.basename(file_path)
+                    # gdrive:// 가상 경로는 끝에 ?gid=<file_id>가 붙어있으므로, 로그/표시용
+                    # filename에서는 제거한다 (실제 다운로드 시점의 file_path는 그대로 사용).
+                    from utils.drive_helper import split_gdrive_file_id
+                    filename = os.path.basename(split_gdrive_file_id(file_path)[0])
                     
                     if library_id not in lib_errors:
                         lib_errors[library_id] = []
@@ -650,13 +653,27 @@ def get_series_cover_fallback_single(series_name, parent_dir, filename, file_pat
     import io
     import hashlib
     from tools.scanner.cover import COVERS_DIR, extract_cover_from_b64, download_cover_from_url
-    
+
+    # 커버 캐시 파일명은 DB에 저장된 원본(가상) 경로 기준으로 안정적으로 키잉해야 하므로,
+    # 로컬 경로로 치환하기 전에 먼저 해시를 계산한다.
     book_hash = hashlib.md5(file_path.encode('utf-8')).hexdigest()
     cover_filename = f"book_{book_hash}.webp"
     local_cover_path = os.path.join(COVERS_DIR, str(library_id), cover_filename)
     db_cover_path = f"{library_id}/{cover_filename}"
-    
+
     os.makedirs(os.path.dirname(local_cover_path), exist_ok=True)
+
+    # gdrive:// 가상 경로(마운트 아닌 순수 등록 링크)면, 이 시점부터 실제 바이트가 필요한
+    # 모든 처리(오프셋 수집, ComicInfo 파싱, zip/pdf 오픈)를 위해 로컬 캐시로 치환한다.
+    # (rclone으로 실제 마운트된 "원격" 경로는 open()이 바로 되므로 건드리지 않는다.)
+    from utils.drive_helper import is_gdrive_url
+    if is_gdrive_url(file_path):
+        from utils.drive_helper import resolve_gdrive_local_path
+        resolved = resolve_gdrive_local_path(file_path)
+        if resolved == file_path:
+            print(f"[Lazy-Scanner] ⚠️ gdrive 원격 파일 다운로드 실패, 커버 추출 스킵: {filename}")
+            return (None, None, [])
+        file_path = resolved
     
     # 미리 파싱된 메타데이터가 없으면 여기서 직접 파싱 (단독 호출 시 하위 호환)
     if b64_keys_lower is None:

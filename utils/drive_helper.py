@@ -87,8 +87,13 @@ import re
 import json
 import urllib.request
 import urllib.parse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 SUPPORTED_EXTENSIONS = ('.zip', '.cbz', '.rar', '.cbr', '.epub', '.pdf', '.txt', '.yaml', '.xml', '.json')
+
+# 서브폴더 하나당 API/HTTP 요청 1번인 waterfall 구조라, 깊고 넓은 트리는 순차 재귀 시 매우
+# 느려진다. 같은 depth의 형제 서브폴더들은 서로 의존관계가 없으므로 스레드풀로 동시 처리한다.
+GDRIVE_SCAN_WORKERS = max(1, int(os.getenv('GDRIVE_SCAN_WORKERS', '4') or '4'))
 
 def extract_gdrive_folder_id(path_or_url):
     """
@@ -104,7 +109,43 @@ def extract_gdrive_folder_id(path_or_url):
         return raw
     return None
 
-def fetch_gdrive_folder_files(folder_id_or_url, parent_subpath="", depth=0, max_depth=4, visited_folders=None):
+
+# 공개 웹 폴더 뷰가 SSR로 내려주는 항목 수의 관측된 상한. 실제 폴더 항목 수가 이 값 근처거나
+# 넘으면, 나머지는 브라우저가 스크롤 시 비공식 batchexecute API로 추가 로드하는 부분이라
+# 이 스크래핑 폴백에는 아예 안 잡힐 가능성이 높다 (완전한 페이지네이션은 리버스엔지니어링이
+# 필요해 안정성 문제로 보류 — 대신 잘림을 감지해 경고만 남긴다).
+HTML_SCRAPE_SUSPECTED_PAGE_SIZE = 50
+
+
+def _fetch_subfolders_parallel(sub_specs, depth, max_depth, visited_folders, truncation_warnings):
+    """같은 depth의 형제 서브폴더들을 스레드풀로 동시에 재귀 탐색한다.
+
+    visited_folders(set)/truncation_warnings(list)에 대한 동시 append/add는 각각의 개별
+    연산이 원자적이라 손상 위험은 없고, 최악의 경우도 극히 드문 폴더 ID 경합으로 인한
+    약간의 중복 요청 정도라 별도 락 없이도 충분하다.
+    """
+    if not sub_specs:
+        return []
+
+    results = []
+    with ThreadPoolExecutor(max_workers=min(GDRIVE_SCAN_WORKERS, len(sub_specs))) as executor:
+        futures = {
+            executor.submit(
+                fetch_gdrive_folder_files, sub_id, sub_rel, depth + 1, max_depth,
+                visited_folders, truncation_warnings
+            ): sub_rel
+            for sub_id, sub_rel in sub_specs
+        }
+        for future in as_completed(futures):
+            sub_rel = futures[future]
+            try:
+                results.extend(future.result())
+            except Exception as e:
+                print(f"[gdrive_helper ⚠️] 서브폴더 병렬 탐색 실패 ('{sub_rel}'): {e}")
+    return results
+
+
+def fetch_gdrive_folder_files(folder_id_or_url, parent_subpath="", depth=0, max_depth=4, visited_folders=None, truncation_warnings=None):
     """
     Google Drive REST API (또는 웹 파싱 폴백)를 호출하여 하위 폴더(Subfolders)까지 재귀 수집합니다.
     """
@@ -119,6 +160,9 @@ def fetch_gdrive_folder_files(folder_id_or_url, parent_subpath="", depth=0, max_
 
     if visited_folders is None:
         visited_folders = set()
+
+    if truncation_warnings is None:
+        truncation_warnings = []
 
     if folder_id in visited_folders:
         return []
@@ -135,31 +179,51 @@ def fetch_gdrive_folder_files(folder_id_or_url, parent_subpath="", depth=0, max_
         try:
             print(f"[gdrive_helper] 🔑 API Key로 탐색: folder_id={folder_id} (depth={depth})")
             query = urllib.parse.quote(f"'{folder_id}' in parents and trashed = false")
-            fields = urllib.parse.quote("files(id,name,mimeType,size,modifiedTime,webContentLink,thumbnailLink)")
-            url = f"https://www.googleapis.com/drive/v3/files?q={query}&fields={fields}&key={api_key}&pageSize=1000"
-            
-            req = urllib.request.Request(url)
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                data = json.loads(resp.read().decode('utf-8'))
-                items = data.get('files', [])
-                for item in items:
-                    print(item)
-                    name = item.get('name', '')
-                    mime = item.get('mimeType', '')
-                    item_id = item.get('id', '')
+            fields = urllib.parse.quote("nextPageToken,files(id,name,mimeType,size,modifiedTime,webContentLink,thumbnailLink)")
 
-                    if mime == 'application/vnd.google-apps.folder':
-                        if item_id not in visited_folders:
-                            sub_rel = os.path.join(parent_subpath, name) if parent_subpath else name
-                            sub_files = fetch_gdrive_folder_files(item_id, parent_subpath=sub_rel, depth=depth+1, max_depth=max_depth, visited_folders=visited_folders)
-                            files_result.extend(sub_files)
-                    elif any(name.lower().endswith(ext) for ext in SUPPORTED_EXTENSIONS):
-                        item['rel_folder'] = parent_subpath
-                        files_result.append(item)
+            # 한 번의 files.list 호출은 pageSize(최대 1000)만큼만 돌려주므로, 항목이 그보다
+            # 많은 폴더는 nextPageToken이 없어질 때까지 계속 이어서 호출해야 전체 목록이 잡힌다.
+            # (예전엔 첫 페이지만 읽고 끝내서 큰 폴더의 하위 항목이 조용히 누락됐었음)
+            page_token = None
+            items = []
+            page_count = 0
+            while True:
+                page_count += 1
+                url = f"https://www.googleapis.com/drive/v3/files?q={query}&fields={fields}&key={api_key}&pageSize=1000"
+                if page_token:
+                    url += f"&pageToken={urllib.parse.quote(page_token)}"
 
-                if files_result and depth == 0:
-                    print(f"[gdrive_helper] ✅ Google API 총 {len(files_result)}개 도서 수집 성공!")
-                return files_result
+                req = urllib.request.Request(url)
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    data = json.loads(resp.read().decode('utf-8'))
+
+                page_items = data.get('files', [])
+                items.extend(page_items)
+                print(f"[gdrive_helper] 🔑 API 페이지 {page_count}: {len(page_items)}개 항목 (누적 {len(items)}개, folder_id={folder_id})")
+
+                page_token = data.get('nextPageToken')
+                if not page_token:
+                    break
+
+            sub_specs = []
+            for item in items:
+                name = item.get('name', '')
+                mime = item.get('mimeType', '')
+                item_id = item.get('id', '')
+
+                if mime == 'application/vnd.google-apps.folder':
+                    if item_id not in visited_folders:
+                        sub_rel = os.path.join(parent_subpath, name) if parent_subpath else name
+                        sub_specs.append((item_id, sub_rel))
+                elif any(name.lower().endswith(ext) for ext in SUPPORTED_EXTENSIONS):
+                    item['rel_folder'] = parent_subpath
+                    files_result.append(item)
+
+            files_result.extend(_fetch_subfolders_parallel(sub_specs, depth, max_depth, visited_folders, truncation_warnings))
+
+            if files_result and depth == 0:
+                print(f"[gdrive_helper] ✅ Google API 총 {len(files_result)}개 도서 수집 성공! ({page_count}페이지 조회)")
+            return files_result
         except Exception as e:
             print(f"[gdrive_helper ⚠️] API Key fetch warning: {e}")
 
@@ -241,24 +305,189 @@ def fetch_gdrive_folder_files(folder_id_or_url, parent_subpath="", depth=0, max_
 
         print(f"[gdrive_helper DEBUG] depth={depth} 파일={len(files_result)}개, 하위폴더={len(folders_to_recurse)}개 감지")
 
-        # 감지된 서브폴더 재귀 진입
-        for sub_id, sub_name in folders_to_recurse:
-            sub_rel = os.path.join(parent_subpath, sub_name) if parent_subpath else sub_name
-            print(f"[gdrive_helper] 📂 재귀 진입: '{sub_name}' (ID: {sub_id})")
-            sub_files = fetch_gdrive_folder_files(
-                sub_id, parent_subpath=sub_rel,
-                depth=depth + 1, max_depth=max_depth,
-                visited_folders=visited_folders
+        # 잘림 감지: 이 depth에서 스크래핑으로 잡은 항목(파일+서브폴더) 수가 관측 상한 근처면,
+        # 나머지는 브라우저 스크롤 시에만 로드되는 부분이라 이 요청 한 번으로는 못 잡았을 가능성이 높다.
+        total_items_this_level = len(seen_ids)
+        if total_items_this_level >= HTML_SCRAPE_SUSPECTED_PAGE_SIZE:
+            warn_path = parent_subpath or '(루트)'
+            print(
+                f"[gdrive_helper] ⚠️ 잘림 의심: '{warn_path}' 폴더에서 {total_items_this_level}개 항목 감지 — "
+                f"HTML 스크래핑은 페이지네이션을 지원하지 않아 이 이상은 누락됐을 수 있습니다. "
+                f"정확한 결과가 필요하면 GDRIVE_API_KEY/GOOGLE_API_KEY 설정을 권장합니다."
             )
-            files_result.extend(sub_files)
+            truncation_warnings.append((warn_path, total_items_this_level))
+
+        # 감지된 서브폴더들을 병렬로 재귀 진입
+        sub_specs = [
+            (sub_id, os.path.join(parent_subpath, sub_name) if parent_subpath else sub_name)
+            for sub_id, sub_name in folders_to_recurse
+        ]
+        files_result.extend(_fetch_subfolders_parallel(sub_specs, depth, max_depth, visited_folders, truncation_warnings))
 
         if depth == 0:
             print(f"[gdrive_helper] 🎯 최종 수집 완료된 전체 도서 수: {len(files_result)}개")
+            if truncation_warnings:
+                affected = ', '.join(f"'{p}'({n}개)" for p, n in truncation_warnings)
+                print(
+                    f"[gdrive_helper] ⚠️⚠️ 결과 잘림 가능성 요약: {len(truncation_warnings)}개 폴더에서 "
+                    f"항목이 누락됐을 수 있습니다 — {affected}. GDRIVE_API_KEY 설정을 강력히 권장합니다."
+                )
 
     except Exception as e:
         print(f"[gdrive_helper ❌] Web scraping fallback error: {e}")
 
     return files_result
+
+
+# 가상 경로(gdrive://folder_id/rel/path/filename)에는 실제 Drive 파일 바이트를 받아올 때
+# 필요한 file_id가 들어있지 않다 (파일명만으로는 재검색이 필요해 비쌈). 등록 시점에 이미
+# 알고 있는 file_id를 경로 끝에 얹어 저장해두면, 나중에 다시 목록을 조회하지 않고도
+# 바로 다운로드할 수 있다. 파일명(및 그로부터 파생되는 제목/확장자 판별)은 별도의 원본
+# filename 변수를 그대로 쓰는 다른 코드 경로들과 완전히 분리되어 있어, 이 마커가 화면
+# 제목이나 확장자 판별에는 영향을 주지 않는다 (books.title은 file_path가 아니라 그
+# 원본 filename에서만 파생됨 — tools/scanner/db_writer_sqlite.py의 insert_new_book_v2 참조).
+GDRIVE_FILE_ID_MARKER = '?gid='
+
+
+def encode_gdrive_file_id(path, file_id):
+    """가상 경로 끝에 실제 Drive file_id를 얹어 인코딩한다. file_id가 없으면 원본 그대로 반환."""
+    if not file_id or not path:
+        return path
+    return f"{path}{GDRIVE_FILE_ID_MARKER}{file_id}"
+
+
+def split_gdrive_file_id(path):
+    """encode_gdrive_file_id()로 인코딩된 경로를 (원래 경로, file_id)로 분리한다.
+    마커가 없으면 (path, None)을 반환한다."""
+    if not path or GDRIVE_FILE_ID_MARKER not in path:
+        return path, None
+    base, _, file_id = str(path).rpartition(GDRIVE_FILE_ID_MARKER)
+    return base, (file_id or None)
+
+
+def download_gdrive_file(file_id, dest_path, timeout=60):
+    """Google Drive 파일 하나를 file_id로 내려받아 dest_path에 저장한다 (성공 시 True).
+
+    API 키가 있으면 files.get?alt=media로 바로 받고, 없으면 공개 다운로드 엔드포인트를
+    쓰되 대용량 파일에서 뜨는 "바이러스 검사 확인" 경고 페이지(confirm 토큰 필요)를 처리한다.
+    임시 파일에 받은 뒤 원자적으로 rename하여, 다운로드 도중 실패해도 손상된 파일이
+    캐시에 남지 않게 한다.
+    """
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(MEDIA_SERVER_DIR, '.env'))
+    api_key = os.getenv('GDRIVE_API_KEY') or os.getenv('GOOGLE_API_KEY')
+
+    tmp_path = dest_path + '.tmp'
+    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+
+    try:
+        if api_key:
+            url = f"https://www.googleapis.com/drive/v3/files/{urllib.parse.quote(file_id)}?alt=media&key={api_key}"
+            req = urllib.request.Request(url)
+            with urllib.request.urlopen(req, timeout=timeout) as resp, open(tmp_path, 'wb') as out:
+                while True:
+                    chunk = resp.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    out.write(chunk)
+        else:
+            session_cookie = None
+            confirm_token = None
+            url = f"https://drive.google.com/uc?export=download&id={urllib.parse.quote(file_id)}"
+
+            for _attempt in range(2):
+                req = urllib.request.Request(url, headers={
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                })
+                if session_cookie:
+                    req.add_header('Cookie', session_cookie)
+
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    content_type = resp.headers.get('Content-Type', '')
+                    if 'text/html' in content_type and confirm_token is None:
+                        # 대용량 파일: urllib이 uc?export=download의 303 리다이렉트를 자동으로
+                        # 따라가 drive.usercontent.google.com/download의 "바이러스 검사 불가"
+                        # 확인 페이지에 도착한다. 이 페이지는 예전처럼 URL에 confirm=xxx가
+                        # 붙어있는 게 아니라, <form>의 숨겨진 input(confirm/uuid)에 값이 있고
+                        # 그 값들을 그대로 GET 쿼리로 재요청해야 실제 바이트가 내려온다.
+                        html = resp.read().decode('utf-8', errors='ignore')
+                        confirm_m = re.search(r'name="confirm"\s+value="([^"]*)"', html)
+                        uuid_m = re.search(r'name="uuid"\s+value="([^"]*)"', html)
+                        if not confirm_m or not uuid_m:
+                            print(f"[gdrive_helper ❌] 다운로드 확인 페이지에서 confirm/uuid 토큰을 찾지 못함: file_id={file_id}")
+                            return False
+                        confirm_token = confirm_m.group(1)
+                        uuid_token = uuid_m.group(1)
+                        session_cookie = resp.headers.get('Set-Cookie')
+                        url = (
+                            "https://drive.usercontent.google.com/download"
+                            f"?id={urllib.parse.quote(file_id)}&export=download"
+                            f"&confirm={urllib.parse.quote(confirm_token)}&uuid={urllib.parse.quote(uuid_token)}"
+                        )
+                        continue
+
+                    with open(tmp_path, 'wb') as out:
+                        while True:
+                            chunk = resp.read(1024 * 1024)
+                            if not chunk:
+                                break
+                            out.write(chunk)
+                    break
+            else:
+                return False
+
+        if os.path.exists(dest_path):
+            os.remove(dest_path)
+        os.rename(tmp_path, dest_path)
+        return True
+    except Exception as e:
+        print(f"[gdrive_helper ❌] 파일 다운로드 실패 (file_id={file_id}): {e}")
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+        return False
+
+
+def resolve_gdrive_local_path(virtual_path):
+    """gdrive:// 가상 경로를 실제 로컬 캐시 파일 경로로 해석한다.
+
+    이미 로컬에 캐시돼 있으면 즉시 그 경로를 반환하고, 없으면 Drive에서 동기적으로
+    받아온 뒤 캐시 경로를 반환한다 (첫 접근만 다운로드 비용을 치르고, 이후는 로컬
+    캐시를 그대로 재사용). gdrive 가상 경로가 아니면 원본을 그대로 반환한다.
+    """
+    if not is_gdrive_url(virtual_path):
+        return virtual_path
+
+    base_path, file_id = split_gdrive_file_id(virtual_path)
+    if not file_id:
+        print(f"[gdrive_helper ⚠️] 가상 경로에 file_id가 없어 해석할 수 없습니다: {virtual_path}")
+        return virtual_path
+
+    from api.cache import disk_cache_manager
+    # base_path(마커 제거된 경로)로 해시/확장자를 계산한다 — 전체 virtual_path를 쓰면
+    # get_local_path()의 os.path.splitext()가 "?gid=..." 뒷부분까지 확장자로 잘못
+    # 잡아 Windows에서 유효하지 않은 파일명(?  포함)이 만들어진다.
+    local_path = disk_cache_manager.get_local_path(base_path)
+    done_file = local_path + '.done'
+
+    if os.path.exists(local_path) and os.path.exists(done_file):
+        disk_cache_manager.update_access(local_path)
+        return local_path
+
+    print(f"[gdrive_helper] ⬇️ 원격 파일 캐시 없음, 동기 다운로드 시작: {os.path.basename(base_path)} (id={file_id})")
+    disk_cache_manager.clean_up_if_needed()
+    ok = download_gdrive_file(file_id, local_path)
+    if not ok:
+        return virtual_path
+
+    with open(done_file, 'w') as f:
+        f.write('done')
+    disk_cache_manager.update_access(local_path)
+    print(f"[gdrive_helper] ✅ 원격 파일 캐시 완료: {os.path.basename(base_path)}")
+    return local_path
+
 
 def is_gdrive_url(path):
     """
@@ -267,7 +496,11 @@ def is_gdrive_url(path):
     if not path:
         return False
     path_str = str(path).strip()
-    return path_str.startswith(('http://', 'https://', 'gdrive://')) or 'drive.google.com' in path_str
+    # canonical_path()/join_canonical()가 "gdrive://id/..."를 os.path.normpath로 정규화하면서
+    # 이중 슬래시가 "gdrive:/id/..."(단일 슬래시)로 접히므로, DB에 실제 저장되는 book.file_path는
+    # 항상 이 형태다. 'gdrive://'만 검사하면 저장된 경로를 원격으로 인식하지 못해
+    # is_remote_path()가 False를 반환하고 로컬 파일처럼 취급되어 열기가 조용히 실패한다.
+    return path_str.startswith(('http://', 'https://', 'gdrive://', 'gdrive:')) or 'drive.google.com' in path_str
 
 def is_remote_path(path):
     """

@@ -165,11 +165,12 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
     for t_path in target_paths:
         if is_gdrive_url(t_path):
             print(f"[Scanner] 구글 드라이브 원격 링크 카테고리 스캔 시작: {t_path}")
-            from utils.drive_helper import fetch_gdrive_folder_files, extract_gdrive_folder_id
+            from utils.drive_helper import fetch_gdrive_folder_files, extract_gdrive_folder_id, encode_gdrive_file_id
             g_files = fetch_gdrive_folder_files(t_path)
             folder_id = extract_gdrive_folder_id(t_path) or 'gdrive_root'
-            
+
             grouped_files = {}
+            grouped_file_ids = {}  # v_root -> {filename: drive file_id} — 나중에 실제 바이트를 받아올 때 필요
             for item in g_files:
                 fname = item.get('name')
                 if not fname:
@@ -182,16 +183,19 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     v_root = canonical_path(f"gdrive://{folder_id}/{rel_f}")
                 else:
                     v_root = canonical_path(f"gdrive://{folder_id}")
-                
+
                 if v_root not in grouped_files:
                     grouped_files[v_root] = []
+                    grouped_file_ids[v_root] = {}
                 grouped_files[v_root].append(fname)
-                
+                grouped_file_ids[v_root][fname] = item.get('id')
+
             for v_root, fnames in grouped_files.items():
+                file_ids = grouped_file_ids[v_root]
                 for fn in fnames:
-                    found_file_paths.add(join_canonical(v_root, fn))
-                tasks.append((v_root, fnames, t_path))
-                
+                    found_file_paths.add(encode_gdrive_file_id(join_canonical(v_root, fn), file_ids.get(fn)))
+                tasks.append((v_root, fnames, t_path, file_ids))
+
             print(f"[Scanner] 구글 드라이브 원격 도서 총 {len(g_files)}개 ({len(grouped_files)}개 폴더) 감지 완료!")
             continue
 
@@ -232,7 +236,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
             if root in scanned_folders:
                 continue
                 
-            tasks.append((root, files, t_path))
+            tasks.append((root, files, t_path, None))
 
     # 순회가 부분 실패한 경우 삭제/이동 동기화를 건너뛰어 오탐 soft-delete를 방지한다.
     if traversal_errors:
@@ -346,6 +350,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
     pending_updates = []
     pending_folders = []
     detected_new_books = []
+    folder_processing_errors = []
 
     def flush_pending_data(is_final=False):
         if not pending_inserts and not pending_updates and not pending_folders:
@@ -471,8 +476,8 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
 
     with ThreadPoolExecutor(max_workers=threads_to_use) as executor:
         futures = {
-            executor.submit(process_folder_task, root, files, force, db_meta_full, db_offsets_cached, db_folder_mtimes, is_remote, library_id, db_files_cache, t_path): root
-            for root, files, t_path in tasks
+            executor.submit(process_folder_task, root, files, force, db_meta_full, db_offsets_cached, db_folder_mtimes, is_remote, library_id, db_files_cache, t_path, file_ids): root
+            for root, files, t_path, file_ids in tasks
         }
         
         for fut in as_completed(futures):
@@ -482,60 +487,64 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
             root_folder = futures[fut]
             try:
                 res = fut.result()
-                dir_mtime = None
-                meta_mtime = None
-                if res:
-                    dir_mtime = res.get('dir_mtime')
-                    meta_mtime = res.get('meta_mtime')
-                    merged_meta = res['merged_meta']
-                    if 'errors' in res and res['errors']:
-                        library_errors.extend(res['errors'])
-                    
-                    batch_item_count = 0
-                    for item in res['results']:
-                        full_path = item['full_path']
-                        if item['skip']:
-                            continue
 
-                        filename = item['filename']
-                        file_format = item['file_format']
-                        series_name = item['series_name']
-                        title = item.get('title')
-                        cover_image = item['cover_image']
-                        offsets_data = item['offsets_data']
-                        is_offset_only = item.get('offset_only', False)
+                if not res:
+                    # process_folder_task()가 None을 반환하는 것은 예외가 아니라
+                    # "Ultra-fast skip" 등으로 처리할 변경점이 없다는 정상 조기 종료다.
+                    processed_folders_count += 1
+                    continue
 
-                        if full_path in db_books:
-                            pending_updates.append({
-                                "action": "update", "library_id": library_id, "is_offset_only": is_offset_only, "full_path": full_path, 
-                                "cover_image": cover_image, "merged_meta": merged_meta, "offsets_data": offsets_data, 
-                                "filename": filename, "series_name": series_name, "file_mtime": item.get('file_mtime', 0.0), "file_size": item.get('file_size', 0)
-                            })
-                        else:
-                            pending_inserts.append({
-                                "action": "insert", "library_id": library_id, "full_path": full_path, 
-                                "filename": filename, "file_format": file_format, "series_name": series_name, 
-                                "title": title,
-                                "cover_image": cover_image, "merged_meta": merged_meta, "offsets_data": offsets_data,
-                                "file_mtime": item.get('file_mtime', 0.0), "file_size": item.get('file_size', 0)
-                            })
-                            detected_new_books.append({
-                                'title': title or os.path.splitext(filename)[0],
-                                'file_path': full_path,
-                                'series_name': series_name,
-                                'author': (merged_meta.get('author') if isinstance(merged_meta, dict) else '') or '',
-                                'publisher': (merged_meta.get('publisher') if isinstance(merged_meta, dict) else '') or '',
-                                'format': file_format,
-                            })
-                            print(f"[Scanner-Process] Found new book: {filename} (Series: {series_name})")
-                        batch_item_count += 1
-                    
-                    if batch_item_count > 0:
-                        # ── [GIL Throttling] ──
-                        time.sleep(0.01 * min(batch_item_count, 5))
-                        
-                    del res
-                
+                dir_mtime = res.get('dir_mtime')
+                meta_mtime = res.get('meta_mtime')
+                merged_meta = res['merged_meta']
+                if 'errors' in res and res['errors']:
+                    library_errors.extend(res['errors'])
+
+                batch_item_count = 0
+                for item in res['results']:
+                    full_path = item['full_path']
+                    if item['skip']:
+                        continue
+
+                    filename = item['filename']
+                    file_format = item['file_format']
+                    series_name = item['series_name']
+                    title = item.get('title')
+                    cover_image = item['cover_image']
+                    offsets_data = item['offsets_data']
+                    is_offset_only = item.get('offset_only', False)
+
+                    if full_path in db_books:
+                        pending_updates.append({
+                            "action": "update", "library_id": library_id, "is_offset_only": is_offset_only, "full_path": full_path,
+                            "cover_image": cover_image, "merged_meta": merged_meta, "offsets_data": offsets_data,
+                            "filename": filename, "series_name": series_name, "file_mtime": item.get('file_mtime', 0.0), "file_size": item.get('file_size', 0)
+                        })
+                    else:
+                        pending_inserts.append({
+                            "action": "insert", "library_id": library_id, "full_path": full_path,
+                            "filename": filename, "file_format": file_format, "series_name": series_name,
+                            "title": title,
+                            "cover_image": cover_image, "merged_meta": merged_meta, "offsets_data": offsets_data,
+                            "file_mtime": item.get('file_mtime', 0.0), "file_size": item.get('file_size', 0)
+                        })
+                        detected_new_books.append({
+                            'title': title or os.path.splitext(filename)[0],
+                            'file_path': full_path,
+                            'series_name': series_name,
+                            'author': (merged_meta.get('author') if isinstance(merged_meta, dict) else '') or '',
+                            'publisher': (merged_meta.get('publisher') if isinstance(merged_meta, dict) else '') or '',
+                            'format': file_format,
+                        })
+                        print(f"[Scanner-Process] Found new book: {filename} (Series: {series_name})")
+                    batch_item_count += 1
+
+                if batch_item_count > 0:
+                    # ── [GIL Throttling] ──
+                    time.sleep(0.01 * min(batch_item_count, 5))
+
+                del res
+
                 # 락 경쟁 최소화 최적화: 폴더의 수정 시간(mtime)이 DB 캐시와 완전히 일치하고,
                 # 해당 폴더 내에서 새로 추가되거나 변경된 도서(ins/upd)가 전혀 없다면
                 # 불필요한 folder_mtimes 갱신 및 scanner_progress DB 쓰기를 건너뜁니다.
@@ -558,6 +567,15 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
 
             except Exception as e:
                 print(f"[Scanner-DEBUG-Pool] ❌ Folder '{root_folder}' processing exception: {e}")
+                folder_processing_errors.append({
+                    'file_path': root_folder,
+                    'error_type': 'FolderProcessingError',
+                    'message': str(e)
+                })
+                if path_scope:
+                    # 부분 경로 스캔(scan-path)은 대상 폴더 처리 실패를 삼키지 않고
+                    # 상위로 전달해 API가 성공 응답을 반환하지 않도록 한다.
+                    raise RuntimeError(f"부분 경로 스캔 실패: {folder_processing_errors}") from e
                 continue
 
             if processed_folders_count % 20 == 0:
@@ -658,34 +676,42 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
     print(f"[Scanner-DB] Deletion sync done db={db_type} library_id={library_id}")
 
     # Initialize checkpoint of library upon successful completion
-    print(f"[Scanner-DB] scan-end-cleanup commit begin db={db_type} library_id={library_id}")
-    end_gate_token = None
-    try:
-        from utils.redis_helper import redis_acquire_lock, redis_release_lock
+    # path_scope가 있는 부분 스캔(scan-path)은 전체 라이브러리의 scanner_progress/scan_status를
+    # 건드리지 않는다. 동시에 전체 스캔이 진행 중일 때 부분 스캔이 먼저 끝나면서
+    # 전체 스캔의 진행 상태(scanning)와 진행 목록을 지워버리는 것을 방지하기 위함이다.
+    if path_scope:
+        print(f"[Scanner-DB] scan-end-cleanup skipped (partial path_scope scan) db={db_type} library_id={library_id}")
+    else:
+        print(f"[Scanner-DB] scan-end-cleanup commit begin db={db_type} library_id={library_id}")
+        end_gate_token = None
+        try:
+            from utils.redis_helper import redis_acquire_lock, redis_release_lock
 
-        end_gate_token = redis_acquire_lock(f"lock:db_write:{db_type}", ttl=90, wait_timeout=5.0)
-        if not end_gate_token:
-            raise RuntimeError(f"scan-end-cleanup db write gate busy for db_type={db_type}")
-        cursor.execute("DELETE FROM scanner_progress WHERE library_id = ?", (str(library_id),))
-        cursor.execute("""
-            UPDATE libraries 
-            SET scan_status = 'ready', 
-                last_scanned_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        """, (library_id,))
-        _commit_with_retry(conn, 'scan-end-cleanup')
-    finally:
-        if end_gate_token:
-            try:
-                redis_release_lock(f"lock:db_write:{db_type}", end_gate_token)
-            except Exception:
-                pass
-    print(f"[Scanner-DB] scan-end-cleanup commit done db={db_type} library_id={library_id}")
+            end_gate_token = redis_acquire_lock(f"lock:db_write:{db_type}", ttl=90, wait_timeout=5.0)
+            if not end_gate_token:
+                raise RuntimeError(f"scan-end-cleanup db write gate busy for db_type={db_type}")
+            cursor.execute("DELETE FROM scanner_progress WHERE library_id = ?", (str(library_id),))
+            cursor.execute("""
+                UPDATE libraries
+                SET scan_status = 'ready',
+                    last_scanned_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (library_id,))
+            _commit_with_retry(conn, 'scan-end-cleanup')
+        finally:
+            if end_gate_token:
+                try:
+                    redis_release_lock(f"lock:db_write:{db_type}", end_gate_token)
+                except Exception:
+                    pass
+        print(f"[Scanner-DB] scan-end-cleanup commit done db={db_type} library_id={library_id}")
     conn.close()
     log_pool_stats('scan-end')
     gc.collect()
 
     # Save scan result error reports
+    if folder_processing_errors:
+        library_errors.extend(folder_processing_errors)
     if library_errors:
         try:
             from utils.report_helper import save_scan_report

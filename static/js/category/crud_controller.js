@@ -522,8 +522,6 @@ export async function triggerMoveLibrary() {
 }
 
 export function selectCategoryType(type) {
-  if (type === 'gdrive') type = 'local';
-
   document.querySelectorAll('.category-type-selector .category-type-btn').forEach(el => el.classList.remove('active'));
   const btn = document.querySelector(`.category-type-selector .category-type-btn[data-type="${type}"]`);
   if (btn) btn.classList.add('active');

@@ -49,7 +49,8 @@ def health():
 def index():
     settings = {}
     view_log_enabled = os.environ.get('VIEW_LOG', 'false').lower() == 'true'
-    return render_template('index.html', active_page='media_library', settings=settings, view_log_enabled=view_log_enabled)
+    develop_mode = os.environ.get('DEVELOP', 'false').lower() == 'true'
+    return render_template('index.html', active_page='media_library', settings=settings, view_log_enabled=view_log_enabled, develop_mode=develop_mode)
 
 @system_bp.route('/api/system/status', methods=['GET'])
 @login_required

@@ -17,6 +17,76 @@ SUPPORTED_IMAGE_FORMATS = ('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif')
 IMGDIR_VIRTUAL_FILENAME = '__folder__.imgdir'
 
 
+def _full_path_for(root, filename, gdrive_file_ids):
+    """root+filename을 합친 경로에, gdrive 등록분이면 실제 Drive file_id를 얹어 반환한다.
+
+    filename 자체는 절대 건드리지 않는다 — 제목/확장자 판별은 이 함수가 만드는
+    full_path가 아니라 별도로 전달되는 원본 filename에서만 이뤄지므로, 여기서
+    file_id를 붙여도 화면에 보이는 제목 등은 오염되지 않는다.
+    """
+    base = join_canonical(root, filename)
+    if not gdrive_file_ids:
+        return base
+    file_id = gdrive_file_ids.get(filename)
+    if not file_id:
+        return base
+    from utils.drive_helper import encode_gdrive_file_id
+    return encode_gdrive_file_id(base, file_id)
+
+
+_META_EXTENSIONS = ('.yaml', '.yml', '.json', '.xml')
+
+
+def _stage_gdrive_metadata_folder(root, files, gdrive_file_ids):
+    """gdrive 폴더에 kavita.yaml/series.json/info.xml 등 메타데이터 파일이 있으면
+    실제 내용을 로컬 스테이징 폴더로 받아와, merge_local_metadata()가 평소처럼
+    os.path.join(folder_path, filename) + open()으로 읽을 수 있게 해준다.
+
+    이렇게 해두면 kavita.yaml에 임베드된 Base64 커버(cover_b64_map)를 커버 스캔 때
+    바로 쓸 수 있어, 표지 하나 뽑자고 수십~수백MB 압축 파일 전체를 받을 필요가 없다.
+
+    실패해도 예외를 전파하지 않고 원본 root를 그대로 반환한다(항상 안전한 폴백).
+    """
+    if not gdrive_file_ids:
+        return root, False
+
+    meta_filenames = [
+        f for f in files
+        if f.lower().endswith(_META_EXTENSIONS) and gdrive_file_ids.get(f)
+    ]
+    if not meta_filenames:
+        return root, False
+
+    try:
+        import hashlib
+        from utils.drive_helper import download_gdrive_file
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        staging_dir = os.path.join(base_dir, 'cache', 'gdrive_meta', hashlib.md5(root.encode('utf-8')).hexdigest())
+        os.makedirs(staging_dir, exist_ok=True)
+
+        any_ready = False
+        for fname in meta_filenames:
+            dest = os.path.join(staging_dir, fname)
+            done_marker = dest + '.done'
+            if os.path.exists(dest) and os.path.exists(done_marker):
+                any_ready = True
+                continue
+            file_id = gdrive_file_ids.get(fname)
+            if download_gdrive_file(file_id, dest):
+                with open(done_marker, 'w') as f:
+                    f.write('done')
+                any_ready = True
+            else:
+                print(f"[Scanner-DEBUG-Task] ⚠️ gdrive 메타데이터 파일 다운로드 실패, 건너뜀: '{fname}'")
+
+        if any_ready:
+            return staging_dir, True
+    except Exception as e:
+        print(f"[Scanner-DEBUG-Task] ⚠️ gdrive 메타데이터 스테이징 실패, 원본 경로로 폴백: {e}")
+
+    return root, False
+
+
 def _normalize_series_text(name):
     """Normalize folder-derived series text."""
     if not name:
@@ -25,7 +95,7 @@ def _normalize_series_text(name):
     return re.sub(r'^\[(?:단행|연재|소설|만화|웹툰|일반)\]\s*', '', str(name)).strip()
 
 
-def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_folder_mtimes, is_remote=False, library_id=None, db_files_cache=None, library_root=None):
+def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_folder_mtimes, is_remote=False, library_id=None, db_files_cache=None, library_root=None, gdrive_file_ids=None):
     """Independent I/O scan task per folder (DB independent, pure FS/I/O scaling)"""
     root = canonical_path(root)
     print(f"[Scanner-DEBUG-Task] 📂 entering process_folder_task - folder: '{root}'")
@@ -73,7 +143,7 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
     imgdir_virtual_path = join_canonical(root, IMGDIR_VIRTUAL_FILENAME)
     if not force and db_files_cache:
         for filename in media_files:
-            full_path = join_canonical(root, filename)
+            full_path = _full_path_for(root, filename, gdrive_file_ids)
             if full_path in db_files_cache:
                 try:
                     p_mtime = os.path.getmtime(full_path)
@@ -136,7 +206,10 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
     series_name = _normalize_series_text(os.path.basename(root.rstrip('/')))
 
     print(f"[Scanner-DEBUG-Task]   - Metadata YAML/XML/JSON load started")
-    merged_meta = merge_local_metadata(root, files=files, is_remote=is_remote)
+    meta_folder_path, meta_staged_locally = (root, False)
+    if is_remote and root.startswith(('gdrive:', 'gdrive://')):
+        meta_folder_path, meta_staged_locally = _stage_gdrive_metadata_folder(root, files, gdrive_file_ids)
+    merged_meta = merge_local_metadata(meta_folder_path, files=files, is_remote=is_remote and not meta_staged_locally)
     print(f"[Scanner-DEBUG-Task]   - Metadata load completed")
 
     parser_warnings = merged_meta.pop('parser_warnings', [])
@@ -156,7 +229,7 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
     results = []
     errors = list(parser_warnings)
     for filename in media_files:
-        full_path = join_canonical(root, filename)
+        full_path = _full_path_for(root, filename, gdrive_file_ids)
         _, ext = os.path.splitext(filename)
         file_format = ext.replace('.', '').lower()
 

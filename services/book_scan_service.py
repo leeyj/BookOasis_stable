@@ -26,13 +26,28 @@ class BookScanService:
             file_format = book['file_format']
             print(f"[BookScanService] 대상 도서 매칭 성공: Title='{book['title']}', Path='{file_path}'")
             
-            # 가상 책(imgdir)인 경우 __folder__.imgdir 파일은 존재하지 않으므로 부모 폴더가 존재하는지 검증합니다.
+            # gdrive:// 가상 경로(마운트가 아닌 순수 등록 링크)는 os.path.exists로 확인할 수 없으므로,
+            # 실제 바이트를 로컬 디스크 캐시로 받아온 뒤 그 로컬 경로를 이후 처리에 그대로 사용한다.
+            # parent_dir(시리즈명 유도용)은 원본 가상 경로를 그대로 쓴다 — merge_local_metadata는
+            # 존재하지 않는 폴더에도 안전하게(빈 메타데이터로) 동작한다.
+            original_file_path = file_path  # 시리즈명 등 "폴더 구조" 유도용 — gdrive면 아래에서 file_path만 로컬 캐시로 치환됨
             is_imgdir = (file_format == 'imgdir') or file_path.lower().endswith('.imgdir')
-            check_path = os.path.dirname(file_path) if is_imgdir else file_path
 
-            if not os.path.exists(check_path):
-                print(f"[BookScanService ERROR] 물리 파일/디렉토리가 경로에 존재하지 않음: {check_path}")
-                return False, f"서버에 물리 파일/디렉토리가 존재하지 않습니다: {check_path}", None
+            from utils.drive_helper import is_gdrive_url
+            if is_gdrive_url(file_path):
+                from utils.drive_helper import resolve_gdrive_local_path
+                resolved = resolve_gdrive_local_path(file_path)
+                if resolved == file_path:
+                    print(f"[BookScanService ERROR] gdrive 원격 파일 다운로드 실패: {file_path}")
+                    return False, "원격(Google Drive) 파일을 받아오지 못했습니다.", None
+                file_path = resolved
+            else:
+                # 가상 책(imgdir)인 경우 __folder__.imgdir 파일은 존재하지 않으므로 부모 폴더가 존재하는지 검증합니다.
+                check_path = os.path.dirname(file_path) if is_imgdir else file_path
+
+                if not os.path.exists(check_path):
+                    print(f"[BookScanService ERROR] 물리 파일/디렉토리가 경로에 존재하지 않음: {check_path}")
+                    return False, f"서버에 물리 파일/디렉토리가 존재하지 않습니다: {check_path}", None
 
             # PDF 단일 스캔인 경우: 안전하게 격리된 서브프로세스(lazy_scanner) 실행 방식으로 우회 (Segfault/OOM 방지)
             filename = os.path.basename(file_path)
@@ -93,10 +108,12 @@ class BookScanService:
             # 5. DB 업데이트 실행
             print(f"[BookScanService] DB 업데이트 트랜잭션 쿼리 빌드")
             
+            # 시리즈명은 (gdrive 로컬 캐시 경로가 아니라) 원본 가상/실제 경로의 폴더 구조에서 유도한다.
+            series_parent_dir = os.path.dirname(original_file_path)
             if is_imgdir:
-                series_folder = os.path.basename(os.path.dirname(parent_dir.rstrip('/\\')))
+                series_folder = os.path.basename(os.path.dirname(series_parent_dir.rstrip('/\\')))
             else:
-                series_folder = os.path.basename(parent_dir.rstrip('/\\'))
+                series_folder = os.path.basename(series_parent_dir.rstrip('/\\'))
             real_series_name = series_folder or ""
 
             if real_series_name:

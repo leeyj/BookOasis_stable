@@ -166,4 +166,4 @@ def trigger_vfs_refresh(db_path, library_id, physical_path):
     except Exception as e:
         print(f"[Scanner-VFS Warning] VFS cache refresh process failed: {e}")
 
-    print("=== Scanner Task Complete ===")
+    print("=== VFS Refresh Complete ===")

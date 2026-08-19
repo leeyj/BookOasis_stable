@@ -23,9 +23,11 @@
                     <button type="button" class="category-type-btn active" data-role="library-category-type" data-type="local">
                         <i class="fa-solid fa-folder"></i> <span data-i18n="modal.type_local">로컬 / 마운트 경로</span>
                     </button>
-                    <button type="button" class="category-type-btn" data-role="library-category-type" data-type="gdrive" hidden aria-hidden="true" style="display: none !important;">
+                    {% if develop_mode %}
+                    <button type="button" class="category-type-btn" data-role="library-category-type" data-type="gdrive">
                         <i class="fa-brands fa-google-drive" style="color: #4285F4;"></i> <span data-i18n="modal.type_gdrive">구글 드라이브 공유 링크</span>
                     </button>
+                    {% endif %}
                 </div>
                 <input type="hidden" id="library-form-category-type" name="category_type" value="local">
             </div>

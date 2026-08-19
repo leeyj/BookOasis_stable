@@ -24,4 +24,8 @@ docs/archive
 docs/bug
 docs/history
 
+# Ad-hoc local test data directories (not part of the repo, may have
+# container-internal ownership that breaks the build context transfer)
+*_test_data/
+
 

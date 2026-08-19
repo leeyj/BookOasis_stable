@@ -86,8 +86,18 @@ def get_zip_file_hybrid(file_path):
     하이브리드 ZIP 캐시 획득 헬퍼
     (로컬 경로는 복사 없이 직결 서빙하여 디스크 I/O 병목을 차단하고, 원격 경로만 로컬 디스크 캐시 복사 기동)
     """
-    from utils.drive_helper import is_remote_path
-    
+    from utils.drive_helper import is_remote_path, is_gdrive_url
+
+    # 0. gdrive:// 가상 경로(마운트가 아닌 순수 등록 링크)인 경우: rclone 마운트처럼
+    # open()이 바로 되는 경로가 아니므로, 먼저 실제 바이트를 로컬 디스크 캐시로 받아온
+    # 뒤 그 로컬 경로를 그대로 아래 "로컬 경로" 분기에 태운다 (첫 접근만 다운로드 대기).
+    if is_gdrive_url(file_path):
+        from utils.drive_helper import resolve_gdrive_local_path
+        resolved = resolve_gdrive_local_path(file_path)
+        if resolved == file_path:
+            return None
+        file_path = resolved
+
     # 1. 로컬 물리 경로인 경우: 디스크 캐시 복사 단계 자체를 바이패스 (I/O 병목 방지)
     if not is_remote_path(file_path):
         zf = zip_cache.get(file_path)
