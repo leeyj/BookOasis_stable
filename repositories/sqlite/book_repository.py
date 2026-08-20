@@ -37,6 +37,21 @@ class BookRepository:
         return dict(row) if row else None
 
     @staticmethod
+    def get_book_annotation_context_info(db_type, book_id):
+        """하이라이트(주석) 플러그인 컨텍스트 메뉴에 전달할 도서 요약 정보(제목/시리즈명/커버) 조회.
+        title에는 이 프로젝트 파일명 관례상 보통 권/화 번호가 이미 포함돼 있어(예: '05권')
+        별도의 편수 컬럼 없이도 플러그인이 title만으로 식별 가능하다."""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT title, series_name, cover_image FROM books WHERE id = ? AND COALESCE(is_deleted, 0) = 0",
+            (book_id,)
+        )
+        row = cursor.fetchone()
+        conn.close()
+        return dict(row) if row else None
+
+    @staticmethod
     def get_books_by_series(db_type, series_name, library_id=None, user_id=None):
         """동일 시리즈 내 전체 도서 목록 조회 (유저 읽기 진척도 포함)"""
         conn = database.get_connection(db_type)

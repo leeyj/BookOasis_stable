@@ -10,6 +10,11 @@ import database
 # SIGTERM/SIGINT 수신 시 워커 루프를 안전 종료하기 위한 전역 플래그
 stop_requested = False
 
+
+class ScanCancelledError(Exception):
+    """사용자가 실행 중인 태스크에 취소를 요청하여 안전 중단되었음을 나타내는 신호용 예외"""
+    pass
+
 class ScannerQueue:
     _instance = None
 
@@ -200,6 +205,22 @@ class ScannerQueue:
             self.log(f"Failed to cancel pending task: {e}")
             return False
 
+    def cancel_running_task(self, task_key):
+        """실행 중인 특정 작업(현재는 lazy_scan만 지원)에 취소 요청 플래그를 설정합니다.
+        워커 프로세스가 폴링 중 이를 감지하여 subprocess를 강제 종료하고 안전 중단합니다."""
+        if not task_key:
+            return False
+        try:
+            from repositories.scanner_queue_repository import ScannerQueueRepository
+            success = ScannerQueueRepository.request_cancel_running_task(task_key)
+            if success:
+                self._invalidate_status_cache()
+                self.log(f"Cancel flag set for running task '{task_key}'. Worker will stop it shortly.")
+            return success
+        except Exception as e:
+            self.log(f"Failed to request cancel for running task: {e}")
+            return False
+
 
 def run_scanner_worker_loop():
     """
@@ -292,10 +313,11 @@ def run_scanner_worker_loop():
             
             # 3. 작업 유형별 실행 분기
             error_message = None
+            cancelled = False
             try:
                 try:
                     if task_type == 'lazy_scan':
-                        _process_lazy_scan(sq)
+                        _process_lazy_scan(sq, task_id)
                     elif task_type == 'library_scan':
                         _process_library_scan(sq, **kwargs)
                     elif task_type == 'cover_scan':
@@ -303,6 +325,9 @@ def run_scanner_worker_loop():
                     else:
                         error_message = f"Unknown task type: {task_type}"
                         sq.log(error_message)
+                except ScanCancelledError as cancel_err:
+                    cancelled = True
+                    sq.log(f"🛑 Task cancelled by user request: key={task_key}, type={task_type}, id={task_id} ({cancel_err})")
                 except Exception as work_err:
                     import traceback
                     tb_str = traceback.format_exc()
@@ -311,7 +336,8 @@ def run_scanner_worker_loop():
             finally:
                 # 4. 작업 결과 반영 (예외 발생 시에도 반드시 실행 보장)
                 finished_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                sq.log(f"Task finishing: key={task_key}, type={task_type}, id={task_id}, status={'failed' if error_message else 'completed'}")
+                result_status = 'cancelled' if cancelled else ('failed' if error_message else 'completed')
+                sq.log(f"Task finishing: key={task_key}, type={task_type}, id={task_id}, status={result_status}")
                 sq.log(f"Task result update begin: key={task_key}, type={task_type}, id={task_id}")
                 from utils.redis_helper import redis_acquire_lock, redis_release_lock
                 queue_gate_token = None
@@ -320,9 +346,12 @@ def run_scanner_worker_loop():
                     if not queue_gate_token:
                         sq.log(f"Task result update gate busy: key={task_key}, type={task_type}, id={task_id}")
                         queue_gate_token = None
-                    ScannerQueueRepository.update_task_result(task_id, finished_str, error_message)
+                    if cancelled:
+                        ScannerQueueRepository.mark_task_cancelled(task_id, finished_str)
+                    else:
+                        ScannerQueueRepository.update_task_result(task_id, finished_str, error_message)
                 except Exception as update_err:
-                    sq.log(f"❌ ScannerQueueRepository.update_task_result failed: {update_err}")
+                    sq.log(f"❌ ScannerQueueRepository result update failed: {update_err}")
                 finally:
                     if queue_gate_token:
                         try:
@@ -331,7 +360,7 @@ def run_scanner_worker_loop():
                             pass
                 sq.log(f"Task result update done: key={task_key}, type={task_type}, id={task_id}")
 
-            if not error_message:
+            if not error_message and not cancelled:
                 # 스캔 완료 시 신규 추가 도서 대시보드 캐시 무효화
                 try:
                     from utils.redis_helper import redis_delete_pattern
@@ -357,7 +386,7 @@ def run_scanner_worker_loop():
                 except Exception as cache_err:
                     sq.log(f"Failed to invalidate recently_added cache: {cache_err}")
 
-            sq.log(f"Task finished: key={task_key}, type={task_type}, id={task_id}, status={'failed' if error_message else 'completed'}")
+            sq.log(f"Task finished: key={task_key}, type={task_type}, id={task_id}, status={result_status}")
             
         except Exception as loop_err:
             sq.log(f"Error in worker loop: {loop_err}")
@@ -368,11 +397,16 @@ def run_scanner_worker_loop():
 
 active_subprocess = None
 
-def _process_lazy_scan(sq):
+# 실행 중인 subprocess를 취소 요청 감지 후 얼마나 자주 폴링할지 (초)
+_CANCEL_POLL_INTERVAL = 2.0
+
+def _process_lazy_scan(sq, task_id):
     global active_subprocess, stop_requested
+    from repositories.scanner_queue_repository import ScannerQueueRepository
+
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     script_path = os.path.join(BASE_DIR, 'tools', 'lazy_scanner.py')
-    
+
     sub_batch_count = 0
     env = os.environ.copy()
     env['PYTHONPATH'] = BASE_DIR + (os.pathsep + env.get('PYTHONPATH', ''))
@@ -393,13 +427,37 @@ def _process_lazy_scan(sq):
         )
         stdout_data = ""
         stderr_data = ""
+        cancelled_now = False
+        elapsed = 0.0
         try:
             # stdout은 lazy_scanner.py 자체가 setup_lazy_scanner_logging()으로 이미
             # logs/lazy_scanner.log에 전부 기록하므로, 여기서 media_server.log에 그대로
             # 다시 찍으면 같은 내용이 두 로그 파일에 중복된다. stderr(핸들링되지 않은
             # 예외/트레이스백처럼 lazy_scanner.log에 안 남을 수 있는 크래시)만 중계한다.
-            stdout_data, stderr_data = active_subprocess.communicate(timeout=7200)
-            returncode = active_subprocess.returncode
+            # communicate(timeout=...)를 짧은 간격으로 반복 호출(폴링)하여, 최대 2시간까지
+            # 블로킹 대기하는 대신 그 사이에도 취소 요청/서버 종료 플래그를 주기적으로 확인한다.
+            # (TimeoutExpired 이후 communicate()를 다시 호출하는 것은 CPython에서 공식적으로
+            # 지원하는 패턴이며, 이전까지 읽은 stdout/stderr 버퍼가 유실 없이 이어서 누적된다.)
+            while True:
+                try:
+                    stdout_data, stderr_data = active_subprocess.communicate(timeout=_CANCEL_POLL_INTERVAL)
+                    returncode = active_subprocess.returncode
+                    break
+                except subprocess.TimeoutExpired:
+                    elapsed += _CANCEL_POLL_INTERVAL
+                    if stop_requested or ScannerQueueRepository.is_cancel_requested(task_id):
+                        cancelled_now = True
+                        sq.log(f"🛑 취소 요청 감지. Lazy-Scanner subprocess(PID: {active_subprocess.pid}) 강제 종료 중...")
+                        active_subprocess.terminate()
+                        try:
+                            stdout_data, stderr_data = active_subprocess.communicate(timeout=5)
+                        except subprocess.TimeoutExpired:
+                            active_subprocess.kill()
+                            stdout_data, stderr_data = active_subprocess.communicate(timeout=5)
+                        returncode = active_subprocess.returncode
+                        break
+                    if elapsed >= 7200:
+                        raise subprocess.TimeoutExpired(script_path, 7200)
             if stderr_data:
                 for line in stderr_data.splitlines():
                     if line.strip():
@@ -428,7 +486,10 @@ def _process_lazy_scan(sq):
             returncode = -1
         finally:
             active_subprocess = None
-            
+
+        if cancelled_now:
+            raise ScanCancelledError(f"사용자 요청으로 lazy scan이 중지되었습니다 (서브-배치 #{sub_batch_count}).")
+
         if returncode == 'TIMEOUT':
             # 2시간 타임아웃은 스캔이 실패한 게 아니라 대상 도서 수가 많거나(원격 마운트 등으로)
             # 처리 속도가 느려 세션 예산을 다 못 채운 것뿐이므로, RAM 환수(코드 10)와 동일하게

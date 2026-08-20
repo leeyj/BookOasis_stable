@@ -92,6 +92,16 @@ function handleViewerKeydown(e) {
     return;
   }
 
+  // 형광펜 모드 토글 (EPUB/TXT 전용). 브라우저가 예약해 쓰는 조합(Ctrl/Alt+H 등)과 겹치지
+  // 않도록 아무 보조키 없는 단순 'H'만 쓰고, Ctrl/Alt/Meta가 눌려있으면 무시한다.
+  const fmt = (state.currentViewerFormat || '').toLowerCase();
+  if ((fmt === 'epub' || fmt === 'txt') && (e.key === 'h' || e.key === 'H' || codeKey === 'keyh')
+      && !e.ctrlKey && !e.altKey && !e.metaKey) {
+    e.preventDefault();
+    window.toggleHighlightMode?.();
+    return;
+  }
+
   if (isEscapeKey || customCloseKeys.includes(rawKey) || customCloseKeys.includes(codeKey)) {
     const inFullscreen = !!(
       viewerModal.classList.contains('fullscreen-mode') ||
@@ -308,6 +318,11 @@ export function syncHotspotPointerEvents() {
     console.log('[syncHotspotPointerEvents] 뷰어 모달이 flex 상태가 아님. 생략.');
     return;
   }
+
+  // 형광펜 모드(annotation_ui.js)가 이전 세션(TXT/EPUB)에서 페이지 넘김 핫스팟을
+  // 일시적으로 pointer-events:none으로 풀어둔 채 남아있을 수 있으므로, 어떤 포맷이든
+  // 뷰어가 새로 열릴 때마다 항상 기본값(auto)으로 되돌린다.
+  hotspot.style.pointerEvents = 'auto';
 
   const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
   const fmt = (state.currentViewerFormat || '').toLowerCase();

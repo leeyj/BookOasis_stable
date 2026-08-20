@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS scanner_tasks (
     started_at VARCHAR(50),
     finished_at VARCHAR(50),
     error_message TEXT,
+    cancel_requested INT DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
@@ -313,6 +314,25 @@ CREATE TABLE IF NOT EXISTS user_reading_log (
     pages_read_delta INT NOT NULL,
     duration_seconds INT DEFAULT 0,
     read_date DATE DEFAULT (CURRENT_DATE)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS book_annotations (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    book_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    format VARCHAR(20) NOT NULL,
+    chapter_idx INT,
+    start_offset INT NOT NULL,
+    end_offset INT NOT NULL,
+    quote TEXT NOT NULL,
+    prefix TEXT,
+    suffix TEXT,
+    color VARCHAR(20) DEFAULT '#fbbf24',
+    note TEXT,
+    plugin_marker VARCHAR(20),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_book_annotations_book_user (book_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE IF NOT EXISTS user_favorites (

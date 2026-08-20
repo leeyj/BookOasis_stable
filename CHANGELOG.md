@@ -1,4 +1,14 @@
 # CHANGELOG
+## v2.3.0
+- (feature) EPUB/TXT 뷰어에 하이라이트(형광펜) 기능 추가 — 형광펜 모드 토글로 페이지/스크롤 모드 모두 지원 | add highlight support to the EPUB/TXT viewer — a dedicated toggle mode works in both page and scroll reading modes
+- (feature) 하이라이트 우클릭/롱프레스 메뉴에 플러그인 확장 지점 추가 — 커뮤니티 플러그인이 옵시디언/노션 등으로 내보내기 가능, 입력이 필요한 액션(prompt 응답)도 지원. 자세한 내용은 [플러그인 개발 가이드](docs/guide_plugins.md#7-하이라이트주석-컨텍스트-메뉴-확장-계약) 참조 | add a plugin extension point to the highlight context menu (right-click/long-press) so community plugins can export highlights to Obsidian, Notion, etc., including actions that need user text input. See the [plugin developer guide](docs/guide_plugins_en.md#7-annotation-highlight-context-menu-extension-contract) for details
+- (settings) 하이라이트 모드 전환용 `H` 단축키 추가, 설정 > 단축키 탭에 재지정 불가한 고정 단축키(뷰어/오디오플레이어/TV모드/이스터에그) 안내 섹션 신설 | add the `H` shortcut to toggle highlight mode, and a new read-only reference section in Settings > Shortcuts listing all fixed (non-remappable) shortcuts across the viewer, audio player, TV mode, and easter egg
+
+## v2.2.1
+- (fix) 영상 강좌 커버 누락 시 세로형 책 폴백 이미지가 16:9로 잘려 텅 비어 보이던 문제 수정 — 영상 전용 가로형 폴백 이미지 추가 | fix the missing-cover fallback looking empty/cropped on video courses (portrait book template squeezed into 16:9) — added a dedicated landscape fallback for video
+- (fix) 특정 kavita.yaml 생성 도구가 출력하는 깨진 search 블록 때문에 커버(Base64) 정보를 통째로 못 읽던 문제 수정 | fix a malformed search block from a specific kavita.yaml generator breaking cover (Base64) parsing entirely
+
+
 ## v2.2.0
 - (fix) 대용량/원격 라이브러리에서 Lazy 스캐너가 시간 초과로 조용히 멈추던 문제 수정 | fix lazy scanner silently stopping on timeout for large/remote libraries
 - (fix) 영상 강좌 탭 대시보드에 일반 도서 위젯이 표시되던 문제 수정 | fix general-book widgets showing on the video course dashboard

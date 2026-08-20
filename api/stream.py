@@ -87,6 +87,26 @@ def _format_cover_label(file_format):
     return 'TEXT'
 
 
+def _build_landscape_video_fallback_svg(title, bg_start, bg_end, border, line, accent):
+    lines = _split_title_lines(title, max_chars=13, max_lines=2)
+    y_start = 214 if len(lines) == 1 else 196
+    line_gap = 40
+    lines_svg = ''.join(
+        f'<text x="320" y="{y_start + i * line_gap}" text-anchor="middle" fill="#f8fafc" font-family="Noto Sans KR, Pretendard, sans-serif" font-size="32" font-weight="700">{_escape_xml(line)}</text>'
+        for i, line in enumerate(lines)
+    )
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" role="img" aria-label="{_escape_xml(title)}">
+  <defs><linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="{bg_start}" /><stop offset="100%" stop-color="{bg_end}" /></linearGradient></defs>
+  <rect width="640" height="360" rx="18" fill="url(#bg)" />
+  <polygon points="572,0 640,0 640,40" fill="{accent}" opacity="0.9" />
+  <rect x="22" y="20" width="596" height="320" rx="12" fill="none" stroke="{border}" stroke-width="3" opacity="0.95" />
+  <circle cx="320" cy="128" r="38" fill="none" stroke="{line}" stroke-width="3" opacity="0.92" />
+  <polygon points="308,110 308,146 340,128" fill="{line}" opacity="0.95" />
+  {lines_svg}
+  <text x="320" y="308" text-anchor="middle" fill="#dbe3ea" font-family="monospace" font-size="22" letter-spacing="4" opacity="0.88">VIDEO</text>
+</svg>'''
+
+
 def _build_fallback_svg(title, file_format='text', seed=''):
     themes = [
         ('#13253a', '#0b1828', '#79c2ff', '#a7dcff', '#82d9b1'),
@@ -99,6 +119,13 @@ def _build_fallback_svg(title, file_format='text', seed=''):
     ref = seed or title or 'Untitled'
     h = _hash_string(ref)
     bg_start, bg_end, border, line, accent = themes[h % len(themes)]
+    label = _format_cover_label(file_format)
+
+    # 영상 강좌 그리드는 CSS에서 16:9(object-fit: cover)로 표시되므로, 세로 420x600
+    # 책 템플릿을 그대로 쓰면 위아래가 잘려나가 텅 빈 조각만 보인다 - 가로 전용 템플릿 사용
+    if label == 'VIDEO':
+        return _build_landscape_video_fallback_svg(title, bg_start, bg_end, border, line, accent)
+
     lines = _split_title_lines(title)
     y_start = 250 if len(lines) == 1 else 222 if len(lines) == 2 else 202
     line_gap = 48
@@ -106,7 +133,6 @@ def _build_fallback_svg(title, file_format='text', seed=''):
         f'<text x="210" y="{y_start + i * line_gap}" text-anchor="middle" fill="#f8fafc" font-family="Noto Sans KR, Pretendard, sans-serif" font-size="42" font-weight="700">{_escape_xml(line)}</text>'
         for i, line in enumerate(lines)
     )
-    label = _format_cover_label(file_format)
     return f'''<svg xmlns="http://www.w3.org/2000/svg" width="420" height="600" viewBox="0 0 420 600" role="img" aria-label="{_escape_xml(title)}">
   <defs><linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="{bg_start}" /><stop offset="100%" stop-color="{bg_end}" /></linearGradient></defs>
   <rect width="420" height="600" rx="20" fill="url(#bg)" />

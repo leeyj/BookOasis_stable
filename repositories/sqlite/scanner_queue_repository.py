@@ -335,6 +335,67 @@ class ScannerQueueRepository:
             conn.close()
 
     @staticmethod
+    def request_cancel_running_task(task_key):
+        """실행(running/exit_pending) 중인 태스크에 취소 플래그를 설정합니다. 워커가 자체적으로 확인 후 안전 중단합니다."""
+        conn = database.get_connection('general')
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "UPDATE scanner_tasks SET cancel_requested = 1 WHERE task_key = ? AND status IN ('running', 'exit_pending')",
+                (task_key,)
+            )
+            success = cursor.rowcount > 0
+            conn.commit()
+            return success
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    @staticmethod
+    def is_cancel_requested(task_id):
+        """워커 루프가 주기적으로 폴링하여 사용자 취소 요청 여부를 확인합니다."""
+        conn = database.get_connection('general')
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT cancel_requested FROM scanner_tasks WHERE id = ?", (task_id,))
+            row = cursor.fetchone()
+            return bool(row and row['cancel_requested'])
+        finally:
+            conn.close()
+
+    @staticmethod
+    def mark_task_cancelled(task_id, finished_str, message="사용자 요청으로 중지되었습니다."):
+        """실행 도중 취소 요청을 받아 중단된 태스크를 이력(cancelled)으로 이동합니다."""
+        conn = database.get_connection('general')
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT task_type, task_key, kwargs, enqueue_at, started_at FROM scanner_tasks WHERE id = ?", (task_id,))
+            row = cursor.fetchone()
+
+            cursor.execute(
+                "UPDATE scanner_tasks SET status = 'cancelled', finished_at = ? WHERE id = ?",
+                (finished_str, task_id)
+            )
+            conn.commit()
+
+            if row:
+                ScannerQueueRepository.record_scan_history(
+                    row['task_type'], row['task_key'], 'cancelled', row['kwargs'],
+                    row['enqueue_at'], row['started_at'], finished_str, message
+                )
+
+            cursor.execute("DELETE FROM scanner_tasks WHERE id = ?", (task_id,))
+            conn.commit()
+            return True
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    @staticmethod
     def get_pending_task_by_key(task_key):
         """특정 작업 키의 pending/exit_pending 태스크 상세 조회"""
         conn = database.get_connection('general')

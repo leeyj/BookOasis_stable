@@ -1,6 +1,7 @@
 /* epub_loader.js – EPUB 챕터 비동기 로더, 이미지 사전디코딩 및 플레이스홀더 복구 엔진 */
 import { state } from '../state.js';
 import { highlightEpubTocChapter } from './txt_toc.js';
+import { applyAnnotationsToChunkElement } from './annotation_render.js';
 
 const epubChapterFetchInFlight = new Set();
 const epubChapterRetryState = new Map();
@@ -132,7 +133,10 @@ export function requestEpubChapterContent(txtChunks, chapterIdx, options = {}) {
         const contentArea = document.getElementById('txt-content-area');
         if (contentArea) {
           const chunkEl = contentArea.querySelector(`.txt-scroll-chunk[data-idx="${idx}"]`);
-          if (chunkEl) chunkEl.innerHTML = content;
+          if (chunkEl) {
+            chunkEl.innerHTML = content;
+            applyAnnotationsToChunkElement(chunkEl, idx, { format: 'epub' });
+          }
         }
       }
       return content;
@@ -194,7 +198,10 @@ export function requestEpubChaptersBatch(txtChunks, chapterIndices) {
         const contentArea = document.getElementById('txt-content-area');
         if (contentArea) {
           const chunkEl = contentArea.querySelector(`.txt-scroll-chunk[data-idx="${idx}"]`);
-          if (chunkEl) chunkEl.innerHTML = content;
+          if (chunkEl) {
+            chunkEl.innerHTML = content;
+            applyAnnotationsToChunkElement(chunkEl, idx, { format: 'epub' });
+          }
         }
       }
 

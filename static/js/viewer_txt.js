@@ -66,6 +66,7 @@ export const txtRuntimeState = {
     txtScrollPreloadTriggered = false;
     txtScrollNextEpisodeTriggered = false;
     epubChapterRetryState.clear();
+    clearAnnotationState();
   }
 };
 
@@ -86,6 +87,9 @@ import {
   txtSliderChangeAction,
 } from './viewer/txt_navigation.js';
 import { renderEpubTocPanel, jumpToTxtTocChapter, highlightEpubTocChapter } from './viewer/txt_toc.js';
+import { loadAnnotationsForBook, clearAnnotationState } from './viewer/annotation_state.js';
+import { applyAnnotationsToAllRenderedChunks } from './viewer/annotation_render.js';
+import { initAnnotationSelectionUI } from './viewer/annotation_ui.js';
 
 import {
   clearEpubChapterRetryState,
@@ -360,7 +364,17 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
   if (!pane || !contentArea) return;
   pane.style.display = 'block';
   epubChapterRetryState.clear();
-  
+
+  loadAnnotationsForBook(bookId, state.currentLibraryType).then(() => {
+    const contentArea = document.getElementById('txt-content-area');
+    applyAnnotationsToAllRenderedChunks({
+      contentArea,
+      format: state.currentViewerFormat === 'epub' ? 'epub' : 'txt',
+      txtChunks,
+    });
+  });
+  initAnnotationSelectionUI(() => txtChunks);
+
   // 뷰어 여백(Padding) 설정 동적 적용
   import('./viewer/viewer_padding.js').then(m => {
     const padTop = localStorage.getItem('viewer_padding_top') || '40';
@@ -622,6 +636,7 @@ function renderCurrentChunk(initMode = false) {
   });
   if (!rendered) return;
 
+  applyAnnotationsToAllRenderedChunks({ contentArea, format: isEpub ? 'epub' : 'txt', txtChunks });
   applyDynamicParagraphStyles();
   applyTxtImageMaxHeight(scrollWrapper, contentArea);
   applyTxtTwoPageTrailingSpacer(scrollWrapper, contentArea);

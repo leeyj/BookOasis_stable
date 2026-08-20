@@ -103,6 +103,56 @@ KNOWN_KAVITA_KEYS = {
 }
 
 
+def _normalize_misaligned_sequence_siblings(content):
+    """`search:` 같은 시퀀스의 첫 항목만 `- Key: Value`로 대시가 붙고, 같은 항목에
+    속해야 할 나머지 형제 키들(Month/Person Translator/...)이 대시 없이 대시와 같은
+    들여쓰기로 나열되는, 특정 카테고리 kavita.yaml 생성 도구의 고질적인 오출력 패턴을
+    보정한다.
+
+        search:
+            - Day: '22'      <- 정상 (시퀀스 항목 시작)
+            Month: '03'      <- 잘못됨: Day와 같은 들여쓰기라 형제 키로 안 붙고
+            Person Translator: ...   블록 파싱 자체가 깨짐(YAML 문법 오류)
+
+    대시 다음 콘텐츠가 시작되는 컬럼까지 형제 키들을 재들여쓰기해서, 같은 매핑
+    항목의 계속되는 줄로 인식되게 만든다. 대시 항목 직후 블록(들여쓰기가 대시와
+    동일한 구간)에서만 좁게 동작하므로 정상 YAML을 건드릴 위험은 낮다.
+    """
+    lines = content.splitlines()
+    out = list(lines)
+    changed = False
+    i = 0
+    n = len(lines)
+    while i < n:
+        m = re.match(r'^([ \t]*)-([ \t]+)(\S.*:.*)$', lines[i])
+        if not m:
+            i += 1
+            continue
+
+        seq_indent = len(m.group(1))
+        content_col = len(m.group(1)) + 1 + len(m.group(2))  # '-' + 뒤따르는 공백들 이후 컬럼
+
+        j = i + 1
+        while j < n:
+            line = lines[j]
+            if not line.strip():
+                break
+            sibling_indent = len(line) - len(line.lstrip(' \t'))
+            if sibling_indent != seq_indent:
+                break
+            if line.lstrip(' \t').startswith('-'):
+                break
+            if not re.match(r'^\s*[^:]+:.*$', line):
+                break
+            out[j] = (' ' * content_col) + line.lstrip(' \t')
+            changed = True
+            j += 1
+
+        i = j if j > i + 1 else i + 1
+
+    return ('\n'.join(out), changed)
+
+
 def _normalize_dash_prefixed_mapping_lines(content):
     """Convert top-level dash-prefixed mapping lines into plain mapping lines for loose YAML fallbacks."""
     normalized_lines = []
@@ -209,6 +259,20 @@ def parse_kavita_yaml(folder_path, files=None, is_remote=False):
                     dedented = '\n'.join(stripped_lines)
                     data = yaml.load(dedented, Loader=SafeLoader) or {}
                     parsed_ok = True
+        except Exception:
+            pass
+
+    # 1-c. 파싱 실패 시, 시퀀스 항목의 형제 키 들여쓰기 오류(특정 카테고리 생성 도구의
+    #      고질적 패턴 - search: 블록 등)를 보정 후 재시도. 이게 성공하면 files:(커버
+    #      Base64) 등 문서 나머지가 온전히 보존된 채로 파싱되므로 dash-normalize/정규식
+    #      폴백보다 먼저 시도한다.
+    if not parsed_ok:
+        try:
+            realigned_content, realigned = _normalize_misaligned_sequence_siblings(raw_content)
+            if realigned:
+                data = yaml.load(realigned_content, Loader=SafeLoader) or {}
+                parsed_ok = True
+                print(f"[Scanner] YAML 시퀀스 형제 키 들여쓰기 보정으로 파싱 복구 성공: {folder_path}")
         except Exception:
             pass
 

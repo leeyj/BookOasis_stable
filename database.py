@@ -825,7 +825,8 @@ _SCHEMA_SQL = """
         enqueue_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         started_at DATETIME DEFAULT NULL,
         finished_at DATETIME DEFAULT NULL,
-        error_message TEXT
+        error_message TEXT,
+        cancel_requested INTEGER DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS books (
@@ -1020,6 +1021,24 @@ _SCHEMA_SQL = """
         last_epub_updated_at DATETIME
     );
 
+    CREATE TABLE IF NOT EXISTS book_annotations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id INTEGER REFERENCES books(id),
+        user_id INTEGER NOT NULL,
+        format TEXT NOT NULL,
+        chapter_idx INTEGER,
+        start_offset INTEGER NOT NULL,
+        end_offset INTEGER NOT NULL,
+        quote TEXT NOT NULL,
+        prefix TEXT,
+        suffix TEXT,
+        color TEXT DEFAULT '#fbbf24',
+        note TEXT,
+        plugin_marker TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS user_reading_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         book_id INTEGER REFERENCES books(id),
@@ -1089,7 +1108,8 @@ _SCHEMA_SQL = """
         finished_at TEXT,
         stage TEXT,
         worker_pid INTEGER,
-        error_message TEXT
+        error_message TEXT,
+        cancel_requested INTEGER DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS users (
@@ -1181,6 +1201,7 @@ _INDEXES_SQL = """
     CREATE INDEX IF NOT EXISTS idx_collections_user ON collections(user_id);
     CREATE INDEX IF NOT EXISTS idx_collection_items_coll ON collection_items(collection_id);
     CREATE INDEX IF NOT EXISTS idx_plugin_load_events_plugin_time ON plugin_load_events(plugin_id, occurred_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_book_annotations_book_user ON book_annotations(book_id, user_id);
     """
 
 

@@ -113,6 +113,47 @@ KNOWN_KAVITA_KEYS = {
 }
 
 
+def _normalize_misaligned_sequence_siblings(content):
+    """`search:` 같은 시퀀스의 첫 항목만 `- Key: Value`로 대시가 붙고, 같은 항목에
+    속해야 할 나머지 형제 키들(Month/Person Translator/...)이 대시 없이 대시와 같은
+    들여쓰기로 나열되는, 특정 카테고리 kavita.yaml 생성 도구의 고질적인 오출력 패턴을
+    보정한다. (tools/scanner/metadata/kavita_yaml.py와 동일 로직 - 레거시 호환 모듈 동기화)
+    """
+    lines = content.splitlines()
+    out = list(lines)
+    changed = False
+    i = 0
+    n = len(lines)
+    while i < n:
+        m = re.match(r'^([ \t]*)-([ \t]+)(\S.*:.*)$', lines[i])
+        if not m:
+            i += 1
+            continue
+
+        seq_indent = len(m.group(1))
+        content_col = len(m.group(1)) + 1 + len(m.group(2))
+
+        j = i + 1
+        while j < n:
+            line = lines[j]
+            if not line.strip():
+                break
+            sibling_indent = len(line) - len(line.lstrip(' \t'))
+            if sibling_indent != seq_indent:
+                break
+            if line.lstrip(' \t').startswith('-'):
+                break
+            if not re.match(r'^\s*[^:]+:.*$', line):
+                break
+            out[j] = (' ' * content_col) + line.lstrip(' \t')
+            changed = True
+            j += 1
+
+        i = j if j > i + 1 else i + 1
+
+    return ('\n'.join(out), changed)
+
+
 def _normalize_dash_prefixed_mapping_lines(content):
     """Convert top-level dash-prefixed mapping lines into plain mapping lines for loose YAML fallbacks."""
     normalized_lines = []
@@ -265,6 +306,16 @@ def parse_kavita_yaml(folder_path, files=None, is_remote=False):
         parsed_ok = True
     except Exception:
         pass
+
+    # 1-b. 파싱 실패 시, 시퀀스 항목의 형제 키 들여쓰기 오류(search: 블록 등) 보정 후 재시도
+    if not parsed_ok:
+        try:
+            realigned_content, realigned = _normalize_misaligned_sequence_siblings(raw_content)
+            if realigned:
+                data = yaml.load(realigned_content, Loader=SafeLoader) or {}
+                parsed_ok = True
+        except Exception:
+            pass
 
     # 2. 파싱 실패 시, 대시 오탈자(- Key: Value) 보정 후 2차 시도
     if not parsed_ok:

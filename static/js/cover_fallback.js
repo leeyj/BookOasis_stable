@@ -78,6 +78,32 @@ function splitTitleLines(title, maxCharsPerLine = 10, maxLines = 3) {
   return lines;
 }
 
+function buildLandscapeVideoCoverSvg(normalizedTitle, theme) {
+  const lines = splitTitleLines(normalizedTitle, 13, 2);
+  const lineYStart = lines.length === 1 ? 214 : 196;
+  const lineGap = 40;
+  const titleLinesSvg = lines
+    .map((line, idx) => `<text x="320" y="${lineYStart + idx * lineGap}" text-anchor="middle" fill="#f8fafc" font-family="sans-serif" font-size="32" font-weight="700">${escapeXml(line)}</text>`)
+    .join('');
+
+  return `
+<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"360\" viewBox=\"0 0 640 360\" role=\"img\" aria-label=\"${escapeXml(normalizedTitle)}\">
+  <defs>
+    <linearGradient id=\"bg\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\">
+      <stop offset=\"0%\" stop-color=\"${theme.bgStart}\" />
+      <stop offset=\"100%\" stop-color=\"${theme.bgEnd}\" />
+    </linearGradient>
+  </defs>
+  <rect width=\"640\" height=\"360\" rx=\"18\" fill=\"url(#bg)\" />
+  <polygon points=\"572,0 640,0 640,40\" fill=\"${theme.accent}\" opacity=\"0.9\" />
+  <rect x=\"22\" y=\"20\" width=\"596\" height=\"320\" rx=\"12\" fill=\"none\" stroke=\"${theme.border}\" stroke-width=\"3\" opacity=\"0.95\" />
+  <circle cx=\"320\" cy=\"128\" r=\"38\" fill=\"none\" stroke=\"${theme.line}\" stroke-width=\"3\" opacity=\"0.92\" />
+  <polygon points=\"308,110 308,146 340,128\" fill=\"${theme.line}\" opacity=\"0.95\" />
+  ${titleLinesSvg}
+  <text x="320" y="308" text-anchor="middle" fill="#dbe3ea" font-family="monospace" font-size="22" letter-spacing="4" opacity="0.88">VIDEO</text>
+</svg>`;
+}
+
 export function buildTextCoverDataUri({ title, format, seed } = {}) {
   const normalizedTitle = normalizeTitle(title);
   const label = formatLabel(format);
@@ -88,15 +114,21 @@ export function buildTextCoverDataUri({ title, format, seed } = {}) {
 
   const hash = hashString(seed || normalizedTitle);
   const theme = (label === 'AUDIO') ? AUDIOBOOK_THEME : COVER_THEMES[hash % COVER_THEMES.length];
-  const lines = splitTitleLines(normalizedTitle, 9, 3);
 
-  const lineYStart = lines.length === 1 ? 250 : lines.length === 2 ? 222 : 202;
-  const lineGap = 48;
-  const titleLinesSvg = lines
-    .map((line, idx) => `<text x="210" y="${lineYStart + idx * lineGap}" text-anchor="middle" fill="#f8fafc" font-family="sans-serif" font-size="42" font-weight="700">${escapeXml(line)}</text>`)
-    .join('');
+  let svg;
+  if (label === 'VIDEO') {
+    // 영상 강좌 그리드는 CSS에서 16:9(object-fit: cover)로 표시되므로, 세로 420x600
+    // 책 템플릿을 그대로 쓰면 위아래가 잘려나가 텅 빈 조각만 보인다 - 가로 전용 템플릿 사용
+    svg = buildLandscapeVideoCoverSvg(normalizedTitle, theme);
+  } else {
+    const lines = splitTitleLines(normalizedTitle, 9, 3);
+    const lineYStart = lines.length === 1 ? 250 : lines.length === 2 ? 222 : 202;
+    const lineGap = 48;
+    const titleLinesSvg = lines
+      .map((line, idx) => `<text x="210" y="${lineYStart + idx * lineGap}" text-anchor="middle" fill="#f8fafc" font-family="sans-serif" font-size="42" font-weight="700">${escapeXml(line)}</text>`)
+      .join('');
 
-  const svg = `
+    svg = `
 <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"420\" height=\"600\" viewBox=\"0 0 420 600\" role=\"img\" aria-label=\"${escapeXml(normalizedTitle)}\">
   <defs>
     <linearGradient id=\"bg\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\">
@@ -111,6 +143,7 @@ export function buildTextCoverDataUri({ title, format, seed } = {}) {
   ${titleLinesSvg}
   <text x="210" y="500" text-anchor="middle" fill="#dbe3ea" font-family="monospace" font-size="28" letter-spacing="4" opacity="0.88">${label}</text>
 </svg>`;
+  }
 
   const dataUri = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
   SVG_CACHE.set(cacheKey, dataUri);

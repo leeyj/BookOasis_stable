@@ -175,6 +175,34 @@ def run_context_menu_action(self, db_type, action_id, context):
     }
 ```
 
+### 📌 하이라이트 컨텍스트 메뉴 확장 (`get_annotation_context_menu_items`)
+
+EPUB/TXT 뷰어에서 만든 하이라이트를 우클릭/롱프레스했을 때 뜨는 메뉴에도 동일한 방식으로 항목을 추가할 수 있습니다. `context`에는 `annotation_id`, `book_id`, `book_title`, `series_name`, `cover_image`, `format`, `chapter_idx`, `quote`, `note`, `color`가 담깁니다. `book_title`/`series_name`/`cover_image`는 코어가 `book_id`로 매번 직접 조회해서 채워주므로 플러그인에서 따로 재조회할 필요가 없습니다.
+
+```python
+def get_annotation_context_menu_items(self, db_type, context):
+    return [
+        {
+            'id': 'export_to_notes_app',
+            'label': '메모 앱으로 내보내기',
+            'icon': 'fa-solid fa-file-export'
+        }
+    ]
+
+def run_annotation_context_menu_action(self, db_type, action_id, context):
+    quote = context.get('quote', '')
+    return {
+        'success': True,
+        'message': '전송했습니다.',
+        'open_url': f'obsidian://new?vault=MyVault&content={quote}',
+        'marker': '*'  # 하이라이트 뒤에 위첨자로 표시 - 코어 DB 밖에 저장해도 "저장됨"이 보이게
+    }
+```
+
+메모를 코어 `note` 컬럼이 아니라 플러그인 자체 저장소(JSONL 등)에 두면 코어는 무엇이 저장됐는지 전혀 모르므로, `marker` 응답 필드로 "이 하이라이트에 뭔가 달려있다"는 표시만 위임할 수 있습니다. 사용자 입력이 필요한 액션(예: 메모 직접 작성)은 `prompt` 응답 필드로 입력 모달을 띄우고 같은 action_id로 재호출받는 왕복 패턴을 지원합니다 — 전체 예제는 [sample_plugins/metadata/highlight_notes_sample/highlight_notes_sample.py](../../sample_plugins/metadata/highlight_notes_sample/highlight_notes_sample.py) 참고.
+
+자세한 계약/필드 설명은 [docs/guide_plugins.md의 7장](../../docs/guide_plugins.md)을 참고하세요. 하이라이트 CRUD REST API(`/api/v1/books/<book_id>/annotations`)는 세션 인증만 있으면 플러그인 웹뷰에서 `fetch()`로 직접 호출할 수 있습니다.
+
 ### 🔔 신규 도서 감지 웹훅 이벤트 (`on_scan_new_books_detected`)
 
 스캐너가 라이브러리 스캔을 완료하고 신규 도서를 감지했을 때 코어로부터 직접 이벤트를 전달받아 Discord, Slack, Telegram 등으로 웹훅을 전송할 수 있습니다.

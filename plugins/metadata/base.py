@@ -62,6 +62,15 @@ class BaseMetadataProvider(ABC):
         """컨텍스트 메뉴 액션 실행 계약 (선택 구현)."""
         return {'success': False, 'error': 'context menu action not implemented'}
 
+    def get_annotation_context_menu_items(self, db_type, context):
+        """EPUB/TXT 뷰어 하이라이트(주석) 우클릭/롱프레스 컨텍스트 메뉴 확장 항목 계약 (선택 구현).
+        context에는 annotation_id, book_id, book_title, format, chapter_idx, quote, note, color가 담긴다."""
+        return []
+
+    def run_annotation_context_menu_action(self, db_type, action_id, context):
+        """하이라이트 컨텍스트 메뉴 액션 실행 계약 (선택 구현)."""
+        return {'success': False, 'error': 'annotation context menu action not implemented'}
+
     def get_dashboard_data(self, db_type, limit=10):
         """대시보드 위젯 데이터 공통 계약 (위젯을 쓰는 플러그인에서 override)."""
         return {'success': False, 'error': 'dashboard widget not implemented'}

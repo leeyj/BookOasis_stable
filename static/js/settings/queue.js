@@ -7,7 +7,7 @@ function initQueueDelegation() {
 
     document.addEventListener('click', (event) => {
         const target = event && event.target && typeof event.target.closest === 'function'
-            ? event.target.closest('[data-role="queue-clear"], [data-role="queue-refresh"], [data-role="queue-cancel-running"], [data-role="queue-cancel-waiting"]')
+            ? event.target.closest('[data-role="queue-clear"], [data-role="queue-refresh"], [data-role="queue-cancel-running"], [data-role="queue-cancel-waiting"], [data-role="queue-cancel-running-task"]')
             : null;
         if (!target) return;
 
@@ -32,6 +32,12 @@ function initQueueDelegation() {
             const taskId = String(target.getAttribute('data-task-id') || '').trim();
             if (!taskId) return;
             cancelWaitingScan(taskId);
+            return;
+        }
+        if (role === 'queue-cancel-running-task') {
+            const taskId = String(target.getAttribute('data-task-id') || '').trim();
+            if (!taskId) return;
+            cancelRunningTask(taskId);
         }
     }, true);
 
@@ -108,6 +114,14 @@ function getQueueCancelButton(task, t) {
         return `
             <button class="action-btn" data-role="queue-cancel-running" data-library-id="${libId}" data-db-type="${dbType}" style="margin-left: 8px; padding: 2px 6px; background-color: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 4px; color: #fca5a5; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;">
                 <i class="fa-solid fa-circle-stop"></i> ${t('queue.btn_cancel') || '취소'}
+            </button>
+        `;
+    }
+
+    if (task.role === 'running' && task.type === 'lazy_scan' && task.key) {
+        return `
+            <button class="action-btn" data-role="queue-cancel-running-task" data-task-id="${String(task.key).replace(/"/g, '&quot;')}" style="margin-left: 8px; padding: 2px 6px; background-color: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 4px; color: #fca5a5; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;">
+                <i class="fa-solid fa-circle-stop"></i> ${t('queue.btn_cancel') || '중지'}
             </button>
         `;
     }
@@ -267,6 +281,26 @@ export async function cancelWaitingScan(taskId) {
     }
 }
 window.cancelWaitingScan = cancelWaitingScan;
+
+export async function cancelRunningTask(taskId) {
+    const confirmMsg = window.i18n ? window.i18n.t('queue.cancel_running_task_confirm') : "실행 중인 작업을 중지하시겠습니까?\n(현재 진행 중인 배치가 끝나는 즉시 안전하게 중단됩니다.)";
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const response = await fetch(`/api/media/system/queue/cancel?task_id=${encodeURIComponent(taskId)}`, { method: 'POST' });
+        const data = await response.json();
+        if (data.success) {
+            alert(data.message);
+            loadQueueStatus();
+        } else {
+            alert((window.i18n ? window.i18n.t('queue.cancel_fail') : "취소 실패: ") + data.error);
+        }
+    } catch (error) {
+        console.error("Cancel running task error", error);
+        alert(window.i18n ? window.i18n.t('queue.cancel_error') : "작업 중지 요청 중 오류가 발생했습니다.");
+    }
+}
+window.cancelRunningTask = cancelRunningTask;
 
 export async function clearQueue() {
     const msg = window.i18n ? window.i18n.t('queue.clear_confirm') : "대기 중인 모든 스캔 작업을 삭제하시겠습니까?\n(현재 실행 중인 작업은 중단되지 않습니다.)";

@@ -511,5 +511,35 @@ export async function runBookContextMenuPluginAction(type, pluginId, actionId, c
   return res.json();
 }
 
+export async function fetchAnnotationContextMenuPluginItems(type, context) {
+  const res = await fetch('/api/media/context-menu/annotation/plugins', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      type,
+      context: context || {}
+    })
+  });
+  return res.json();
+}
+
+export async function runAnnotationContextMenuPluginAction(type, pluginId, actionId, context) {
+  const res = await fetch('/api/media/context-menu/annotation/plugins/action', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      type,
+      plugin_id: pluginId,
+      action_id: actionId,
+      context: context || {}
+    })
+  });
+  return res.json();
+}
+
 
 

@@ -196,10 +196,16 @@ def cancel_system_queue_task():
     try:
         from services.scanner_queue import scanner_queue
         removed = scanner_queue.cancel_pending_task(task_id)
-        if not removed:
-            return jsonify({'success': False, 'error': '대기열에서 작업을 찾지 못했습니다.'}), 404
+        if removed:
+            return jsonify({'success': True, 'message': '대기열 작업이 취소되었습니다.'})
 
-        return jsonify({'success': True, 'message': '대기열 작업이 취소되었습니다.'})
+        # 대기열(pending/exit_pending)에 없다면 현재 실행 중인 작업일 수 있으므로
+        # 취소 요청 플래그를 설정한다. 워커가 폴링 중 이를 감지해 안전 중단한다.
+        cancelling = scanner_queue.cancel_running_task(task_id)
+        if cancelling:
+            return jsonify({'success': True, 'message': '실행 중인 작업에 중지를 요청했습니다. 잠시 후 안전하게 종료됩니다.'})
+
+        return jsonify({'success': False, 'error': '대기열에서 작업을 찾지 못했습니다.'}), 404
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

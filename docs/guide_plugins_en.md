@@ -305,6 +305,162 @@ Example return payload:
 }
 ```
 
+## 7. Annotation (Highlight) Context Menu Extension Contract
+
+Text selected in the EPUB/TXT reader can be saved as a highlight, and right-clicking (PC) or
+long-pressing (mobile) a highlight opens a context menu that follows the exact same extension
+pattern as the book context menu. The core only handles storing/anchoring/rendering highlights —
+what to *do* with a highlight (export to Obsidian/Notion, sync to an external notes app, etc.) is
+entirely up to plugins.
+
+Optional provider methods:
+
+- `get_annotation_context_menu_items(self, db_type, context)`
+- `run_annotation_context_menu_action(self, db_type, action_id, context)`
+
+Return shape is identical to the book context menu (see `get_context_menu_items`/`run_context_menu_action` above).
+
+`context` fields:
+
+- `annotation_id`
+- `book_id`
+- `book_title` — **always overwritten server-side with the current DB value**; the client-sent
+  value is only a fallback used if the lookup fails, so don't rely on it being authoritative
+- `series_name` — `null` for standalone (non-series) books
+- `cover_image` — cover image URL normalized to an app-relative path (`/covers/...`), or `null` if none
+- `format` (`epub` or `txt`)
+- `chapter_idx` (`null` for TXT)
+- `quote` — the highlighted source text
+- `note` — user-entered note (`null` if none)
+- `color`
+
+> Core resolves `book_title`/`series_name`/`cover_image` itself by looking up `book_id` in the
+> `books` table on every request — plugins don't need to re-query via
+> `self.get_db_gateway(db_type)`. Because this project's file-naming convention usually already
+> embeds the volume/episode number in the title (e.g. `05권`, `Chapter 1 ...`), `book_title` +
+> `series_name` together are enough to identify which volume/episode a highlight came from without
+> a separate numeric field.
+
+Example:
+
+```python
+def get_annotation_context_menu_items(self, db_type, context):
+    return [
+        {
+            'id': 'export_to_obsidian',
+            'label': 'Export to Obsidian',
+            'icon': 'fa-solid fa-file-export',
+        }
+    ]
+
+def run_annotation_context_menu_action(self, db_type, action_id, context):
+    if action_id != 'export_to_obsidian':
+        return {'success': False, 'error': 'unknown action'}
+
+    quote = context.get('quote', '')
+    book_title = context.get('book_title', '')
+    series_name = context.get('series_name') or book_title
+    cover_image = context.get('cover_image')  # attach to note frontmatter if desired
+    note_body = f"> {quote}\n\nSource: {series_name} — {book_title}"
+    # e.g. use Obsidian's Advanced URI plugin obsidian:// scheme to create a new note
+    obsidian_url = f"obsidian://new?vault=MyVault&content={note_body}"
+    return {'success': True, 'message': 'Sent to Obsidian.', 'open_url': obsidian_url}
+```
+
+### Actions That Need User Input (`prompt` Response)
+
+Some actions — like "let the user type their own note/annotation" — need text input before they can
+run. `run_annotation_context_menu_action()` executes headlessly on the server so it cannot show an
+input UI directly. Instead, return **a request asking the frontend to show one**; the frontend
+displays a modal, collects the value, and **calls the same `action_id` again** — this time with
+`context['prompt_value']` set to what the user typed. Check for the presence of `prompt_value` to
+tell the "first call" apart from the "re-call with user input".
+
+`prompt` request shape:
+
+```python
+{
+    'success': True,
+    'prompt': {
+        'title': 'Add Note',
+        'message': 'Write a note for this highlight.',  # optional
+        'placeholder': 'Note content...',                # optional
+        'default_value': '',                              # optional, pre-fill with an existing value
+        'multiline': True,                                # optional, defaults to True (textarea)
+        'submit_label': 'Save',                            # optional
+    }
+}
+```
+
+Full example — storing the note in **the plugin's own storage** (a JSONL file, a separate SQLite
+database, whatever you like — not core's database):
+
+```python
+def get_annotation_context_menu_items(self, db_type, context):
+    return [{'id': 'add_note', 'label': 'Add Note', 'icon': 'fa-solid fa-pen'}]
+
+def run_annotation_context_menu_action(self, db_type, action_id, context):
+    if action_id != 'add_note':
+        return {'success': False, 'error': 'unknown action'}
+
+    if 'prompt_value' not in context:
+        # Step 1: no input yet, ask the frontend to show an input dialog
+        return {
+            'success': True,
+            'prompt': {
+                'title': 'Add Note',
+                'placeholder': 'What do you think about this passage?',
+                'default_value': self._load_note(context['annotation_id']) or '',
+                'submit_label': 'Save',
+            }
+        }
+
+    # Step 2: called again with the user's input — do the actual save here
+    note_text = context['prompt_value']
+    self._save_note(context['annotation_id'], note_text)  # e.g. append to JSONL, sqlite3 UPSERT, etc.
+    return {'success': True, 'message': 'Note saved.', 'marker': '*'}
+```
+
+If the user clicks "Cancel" in the modal, no re-call happens — core handles that for you, so plugins
+don't need to special-case cancellation.
+
+### A Visual Indicator When Core Doesn't Know Where the Data Lives (`marker` Response Field)
+
+If a note/annotation is stored in the plugin's own storage (JSONL, its own SQLite, etc.) instead of
+the `note` column, core has no idea whether a given highlight has anything attached to it — it saves
+fine but there's no way to tell from the reader UI, and no way to get back to it. To solve this,
+include a `marker` key in `run_annotation_context_menu_action()`'s return value; core stores that
+value in the `book_annotations.plugin_marker` column and renders it **as a superscript right after
+the highlight**.
+
+- A string value (e.g. `'*'`, `'📝'`) sets/updates the marker; an empty string or `None` clears it.
+- Core does **not interpret the value's meaning** at all — it only handles "show something or not,
+  and what to show." The actual note content still lives only in the plugin's own storage.
+- If multiple plugins set a `marker` on the same highlight, the last write wins (there's no support
+  yet for showing multiple plugins' markers side by side).
+- Since `get_annotation_context_menu_items()` is called fresh every time the menu opens, checking your
+  own storage there to swap the menu label based on state (e.g. "Add Note" ↔ "View/Edit Note") pairs
+  naturally with this.
+
+### Sample: Highlight Notes (prompt round-trip + JSONL storage)
+
+A runnable sample plugin implementing the contract above end to end — `get_annotation_context_menu_items`/
+`run_annotation_context_menu_action`, the two-step `prompt` round-trip, and a storage pattern that
+appends notes to the plugin's own JSONL file instead of touching core's database.
+
+Sample file:
+
+- [sample_plugins/metadata/highlight_notes_sample/highlight_notes_sample.py](../sample_plugins/metadata/highlight_notes_sample/highlight_notes_sample.py)
+
+Notes:
+
+- The highlight CRUD REST API (`/api/v1/books/<book_id>/annotations`,
+  `/api/v1/annotations/<annotation_id>`) only requires the logged-in session, so a plugin's
+  `category_tab` webview UI can call it directly via `fetch()`. Use this for bulk features like
+  "export all highlights in this book" without needing the context menu at all.
+- Core does not proxy actual delivery to external services (API keys, OAuth, etc.) — opening that
+  service's URI scheme/webhook via `open_url` is the simplest integration path.
+
 ### Webhook Integration (Recommended Modern Flow)
 
 The recommended modern flow is configuring webhook targets from the **Plugin Settings UI**, not from `.env`.

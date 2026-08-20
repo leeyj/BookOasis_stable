@@ -11,6 +11,19 @@ plugin_routes_bp = Blueprint('media_plugin_routes', __name__)
 PLUGIN_SESSION_TYPES = {'general', 'adult', 'audiobook', 'video'}
 
 
+def _get_current_user_id_for_annotation():
+    """annotation_routes.py의 _get_current_user_info()와 동일한 세션 조회 규약.
+    plugin_marker는 book_annotations.user_id로 소유권을 확인해야 하므로 필요하다."""
+    user_id = session.get('user_id')
+    role = session.get('role')
+    if not user_id:
+        user_dict = session.get('user')
+        if isinstance(user_dict, dict):
+            user_id = user_dict.get('id')
+            role = user_dict.get('role')
+    return user_id, role
+
+
 def _resolve_plugin_sessions(category_tab):
     """플러그인 매니페스트(category_tab)의 'sessions' 필드로 노출 세션을 결정한다.
     - 'all': 4개 세션(general/adult/audiobook/video) 전체에 노출
@@ -477,6 +490,154 @@ def run_book_context_menu_plugin_action_api():
         result = provider.run_context_menu_action(db_type, action_id, context)
         if not isinstance(result, dict):
             result = {'success': False, 'error': '플러그인 액션 반환값 형식이 올바르지 않습니다.'}
+
+        status_code = 200 if result.get('success') else 400
+        return jsonify(result), status_code
+    except ValueError as ve:
+        return jsonify({'success': False, 'error': str(ve)}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+def _resolve_cover_url(cover_image):
+    """book_context_menu용과 동일하게, DB의 cover_image 원본값을 실제 접근 가능한 경로로
+    정규화한다 (static/js/cover_fallback.js의 getBookCoverSrc()와 동일 규칙)."""
+    if not cover_image:
+        return None
+    clean = str(cover_image).strip()
+    if not clean:
+        return None
+    if clean.startswith('http://') or clean.startswith('https://') or clean.startswith('/api/'):
+        return clean
+    clean = clean.lstrip('/\\')
+    if clean.lower().startswith('covers/'):
+        clean = clean[len('covers/'):].lstrip('/\\')
+    return f"/covers/{clean}" if clean else None
+
+
+def _enrich_annotation_context(db_type, context):
+    """클라이언트가 보낸 얕은 context(annotation_id, quote, note 등)에 도서 요약 정보
+    (title/series_name/cover_image)를 서버에서 직접 조회해 채워 넣는다. 매번 각 플러그인이
+    self.get_db_gateway(db_type)로 재조회하지 않아도 내보내기(옵시디언/노션 등)에 필요한
+    최소한의 서지정보를 바로 쓸 수 있게 하기 위함."""
+    enriched = dict(context)
+    book_id = enriched.get('book_id')
+    if not book_id:
+        return enriched
+
+    try:
+        from repositories.book_repository import BookRepository
+
+        info = BookRepository.get_book_annotation_context_info(db_type, book_id)
+        if info:
+            if info.get('title'):
+                enriched['book_title'] = info['title']
+            enriched['series_name'] = info.get('series_name') or None
+            enriched['cover_image'] = _resolve_cover_url(info.get('cover_image'))
+    except Exception:
+        # 조회 실패 시에도 클라이언트가 보낸 얕은 context는 그대로 살려서 플러그인 호출은 계속 진행
+        pass
+    return enriched
+
+
+@plugin_routes_bp.route('/api/media/context-menu/annotation/plugins', methods=['POST'])
+@login_required
+def get_annotation_context_menu_plugin_items_api():
+    """활성화된 플러그인의 EPUB/TXT 하이라이트(주석) 컨텍스트 메뉴 항목을 동적으로 조회합니다."""
+    payload = request.get_json(silent=True) or {}
+    db_type = payload.get('type', 'general')
+
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+
+    context = _enrich_annotation_context(db_type, payload.get('context') or {})
+
+    try:
+        from services.metadata_factory import MetadataFactory
+
+        providers = MetadataFactory.get_available_providers()
+        merged_items = []
+
+        for provider_meta in providers:
+            if not provider_meta.get('enabled'):
+                continue
+
+            provider_id = provider_meta.get('id')
+            if not provider_id:
+                continue
+
+            try:
+                provider = MetadataFactory.get_provider_by_id(provider_id)
+                items = provider.get_annotation_context_menu_items(db_type, context) or []
+            except Exception:
+                items = []
+
+            if not isinstance(items, list):
+                continue
+
+            for raw_item in items:
+                if not isinstance(raw_item, dict):
+                    continue
+
+                action_id = str(raw_item.get('id') or '').strip()
+                label = str(raw_item.get('label') or '').strip()
+                if not action_id or not label:
+                    continue
+
+                merged_items.append({
+                    'plugin_id': provider_id,
+                    'plugin_name': provider_meta.get('name') or provider_id,
+                    'id': action_id,
+                    'label': label,
+                    'icon': raw_item.get('icon') or 'fa-solid fa-puzzle-piece',
+                })
+
+        return jsonify({'success': True, 'items': merged_items}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@plugin_routes_bp.route('/api/media/context-menu/annotation/plugins/action', methods=['POST'])
+@login_required
+def run_annotation_context_menu_plugin_action_api():
+    """하이라이트 컨텍스트 메뉴에서 선택된 플러그인 액션을 실행합니다."""
+    payload = request.get_json(silent=True) or {}
+    db_type = payload.get('type', 'general')
+
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+
+    plugin_id = (payload.get('plugin_id') or '').strip()
+    action_id = (payload.get('action_id') or '').strip()
+    context = _enrich_annotation_context(db_type, payload.get('context') or {})
+
+    if not plugin_id:
+        return jsonify({'success': False, 'error': 'plugin_id가 누락되었습니다.'}), 400
+    if not action_id:
+        return jsonify({'success': False, 'error': 'action_id가 누락되었습니다.'}), 400
+
+    try:
+        from services.metadata_factory import MetadataFactory
+
+        provider = MetadataFactory.get_provider_by_id(plugin_id)
+        result = provider.run_annotation_context_menu_action(db_type, action_id, context)
+        if not isinstance(result, dict):
+            result = {'success': False, 'error': '플러그인 액션 반환값 형식이 올바르지 않습니다.'}
+
+        # 플러그인이 응답에 'marker' 키를 포함시키면(빈 문자열/None도 포함 - 마커 해제 용도),
+        # 하이라이트 옆에 표시할 작은 시각적 신호를 코어가 대신 영속화해준다. 플러그인은
+        # get_annotation_context_menu_items()에서 메뉴 라벨을("메모 작성" ↔ "메모 보기/수정")
+        # 스스로 판단하기 위해 이미 자기 저장소를 조회하고 있으므로, 이 필드는 순전히
+        # "본문 위에 뭘 그릴지"만을 위한 UI 힌트다 - 코어는 값의 의미를 해석하지 않는다.
+        if 'marker' in result and result.get('success') and context.get('annotation_id'):
+            try:
+                from repositories.annotation_repository import AnnotationRepository
+
+                user_id, _role = _get_current_user_id_for_annotation()
+                if user_id:
+                    AnnotationRepository.update_plugin_marker(
+                        db_type, context['annotation_id'], user_id, result.get('marker')
+                    )
+            except Exception as marker_err:
+                print(f"[Plugin-ContextMenu] plugin_marker persist failed: {marker_err}")
 
         status_code = 200 if result.get('success') else 400
         return jsonify(result), status_code

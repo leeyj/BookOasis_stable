@@ -100,7 +100,92 @@
             </div>
         </div>
     </div>
+
+    <!-- 고정 단축키 안내 (재지정 불가, 참고용) -->
+    <div class="settings-card" style="background: var(--app-bg-card); border: 1px solid var(--app-border); border-radius: 12px; padding: 1.5rem; box-shadow: var(--app-shadow, 0 4px 12px rgba(0,0,0,0.08));">
+        <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 1.2rem; border-bottom: 1px solid var(--app-border-light); padding-bottom: 1rem;">
+            <i class="fa-solid fa-list-check" style="color: var(--app-accent); font-size: 1.4rem;"></i>
+            <div>
+                <h3 style="margin: 0; color: var(--app-text-primary); font-size: 1.15rem; font-weight: 700;" data-i18n="settings.fixed_keys_title">고정 단축키 안내</h3>
+                <p style="margin: 0.2rem 0 0 0; color: var(--app-text-muted); font-size: 0.85rem;" data-i18n="settings.fixed_keys_desc">아래 키들은 위 설정과 달리 재지정할 수 없는 고정 단축키입니다. 각 화면에서만 동작합니다.</p>
+            </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 1.4rem;">
+            <div>
+                <div style="font-weight: 700; color: var(--app-text-primary); font-size: 0.85rem; margin-bottom: 0.6rem;" data-i18n="settings.fixed_keys_group_viewer">뷰어</div>
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <div class="fixed-key-row" style="display: flex; align-items: center; gap: 0.7rem; font-size: 0.85rem; color: var(--app-text-secondary);">
+                        <kbd class="fixed-key-badge">F</kbd>
+                        <span data-i18n="settings.fixed_key_fullscreen">전체화면 전환</span>
+                    </div>
+                    <div class="fixed-key-row" style="display: flex; align-items: center; gap: 0.7rem; font-size: 0.85rem; color: var(--app-text-secondary);">
+                        <kbd class="fixed-key-badge">Alt</kbd><span style="color: var(--app-text-muted);">+</span><kbd class="fixed-key-badge">Home</kbd>
+                        <span data-i18n="settings.fixed_key_dashboard_alt">뷰어를 닫고 대시보드로 이동</span>
+                    </div>
+                    <div class="fixed-key-row" style="display: flex; align-items: center; gap: 0.7rem; font-size: 0.85rem; color: var(--app-text-secondary);">
+                        <kbd class="fixed-key-badge">H</kbd>
+                        <span data-i18n="settings.fixed_key_highlight">형광펜 모드 켜기/끄기 (EPUB · TXT)</span>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div style="font-weight: 700; color: var(--app-text-primary); font-size: 0.85rem; margin-bottom: 0.6rem;" data-i18n="settings.fixed_keys_group_audio">오디오플레이어</div>
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <div class="fixed-key-row" style="display: flex; align-items: center; gap: 0.7rem; font-size: 0.85rem; color: var(--app-text-secondary);">
+                        <kbd class="fixed-key-badge">S</kbd>
+                        <span data-i18n="settings.fixed_key_audio_play">재생/일시정지</span>
+                    </div>
+                    <div class="fixed-key-row" style="display: flex; align-items: center; gap: 0.7rem; font-size: 0.85rem; color: var(--app-text-secondary);">
+                        <kbd class="fixed-key-badge">,</kbd><span style="color: var(--app-text-muted);" data-i18n="settings.fixed_key_or">또는</span><kbd class="fixed-key-badge">&lt;</kbd>
+                        <span data-i18n="settings.fixed_key_audio_back">뒤로 감기</span>
+                    </div>
+                    <div class="fixed-key-row" style="display: flex; align-items: center; gap: 0.7rem; font-size: 0.85rem; color: var(--app-text-secondary);">
+                        <kbd class="fixed-key-badge">.</kbd><span style="color: var(--app-text-muted);" data-i18n="settings.fixed_key_or">또는</span><kbd class="fixed-key-badge">&gt;</kbd>
+                        <span data-i18n="settings.fixed_key_audio_forward">앞으로 감기</span>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div style="font-weight: 700; color: var(--app-text-primary); font-size: 0.85rem; margin-bottom: 0.6rem;" data-i18n="settings.fixed_keys_group_tv">TV 모드</div>
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <div class="fixed-key-row" style="display: flex; align-items: center; gap: 0.7rem; font-size: 0.85rem; color: var(--app-text-secondary);">
+                        <kbd class="fixed-key-badge">←</kbd><kbd class="fixed-key-badge">→</kbd><kbd class="fixed-key-badge">↑</kbd><kbd class="fixed-key-badge">↓</kbd>
+                        <span data-i18n="settings.fixed_key_tv_nav">카드 · 서랍 · 정렬 · 계정 배지 간 포커스 이동</span>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div style="font-weight: 700; color: var(--app-text-primary); font-size: 0.85rem; margin-bottom: 0.6rem;" data-i18n="settings.fixed_keys_group_easter_egg">이스터에그</div>
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <div class="fixed-key-row" style="display: flex; align-items: center; gap: 0.7rem; font-size: 0.85rem; color: var(--app-text-secondary);">
+                        <kbd class="fixed-key-badge">Q</kbd><span style="color: var(--app-text-muted);" data-i18n="settings.fixed_key_or">또는</span><kbd class="fixed-key-badge">Alt</kbd><span style="color: var(--app-text-muted);">+</span><kbd class="fixed-key-badge">Q</kbd>
+                        <span data-i18n="settings.fixed_key_boss">보스키 (위장 화면으로 전환)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<style>
+.fixed-key-badge {
+    display: inline-block;
+    min-width: 1.6em;
+    padding: 0.2rem 0.5rem;
+    background: var(--app-bg-sidebar);
+    border: 1px solid var(--app-border);
+    border-radius: 5px;
+    font-family: monospace;
+    font-weight: bold;
+    font-size: 0.8rem;
+    color: var(--app-accent);
+    text-align: center;
+}
+</style>
 
 <script>
 (function() {

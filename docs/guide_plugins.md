@@ -427,6 +427,157 @@ def get_context_menu_items(self, db_type, context):
 }
 ```
 
+## 7. 하이라이트(주석) 컨텍스트 메뉴 확장 계약
+
+EPUB/TXT 뷰어에서 텍스트를 선택해 만든 하이라이트(형광펜)를 우클릭(PC)/롱프레스(모바일)하면 뜨는
+컨텍스트 메뉴에도 도서 컨텍스트 메뉴와 동일한 방식으로 플러그인 항목을 노출할 수 있습니다.
+코어는 하이라이트 저장/앵커링/렌더링만 담당하고, "이 하이라이트로 무엇을 할지"(예: 옵시디언/노션으로
+내보내기, 외부 메모 앱 연동 등)는 전적으로 플러그인 몫입니다.
+
+플러그인 선택 구현 메서드:
+
+- `get_annotation_context_menu_items(self, db_type, context)`
+- `run_annotation_context_menu_action(self, db_type, action_id, context)`
+
+반환 규격은 도서 컨텍스트 메뉴와 동일합니다 (`get_context_menu_items`/`run_context_menu_action` 참고).
+
+`context` 필드:
+
+- `annotation_id`
+- `book_id`
+- `book_title` — **서버가 항상 DB의 최신 값으로 덮어써서 전달**합니다 (클라이언트가 보낸 값은 조회
+  실패 시의 폴백일 뿐이라 신뢰하지 마세요)
+- `series_name` — 시리즈가 아닌 단권이면 `null`
+- `cover_image` — 앱 기준 상대 경로(`/covers/...`)로 정규화된 커버 이미지 URL. 커버가 없으면 `null`
+- `format` (`epub` 또는 `txt`)
+- `chapter_idx` (TXT는 `null`)
+- `quote` — 하이라이트한 원문 텍스트
+- `note` — 사용자가 남긴 메모 (없으면 `null`)
+- `color`
+
+> `book_title`/`series_name`/`cover_image`는 코어가 `book_id`로 매번 `books` 테이블을 직접
+> 재조회해서 채워 넣습니다 — 플러그인이 `self.get_db_gateway(db_type)`로 따로 재조회할 필요가
+> 없습니다. 이 프로젝트의 파일명 관례상 `book_title`에는 보통 권/화 번호가 이미 포함돼 있어서
+> (예: `05권`, `제1화 ...`) 별도의 "편수" 필드 없이도 `book_title` + `series_name` 조합으로
+> 어떤 책의 몇 번째 권/화인지 충분히 식별할 수 있습니다.
+
+예시:
+
+```python
+def get_annotation_context_menu_items(self, db_type, context):
+    return [
+        {
+            'id': 'export_to_obsidian',
+            'label': '옵시디언으로 내보내기',
+            'icon': 'fa-solid fa-file-export',
+        }
+    ]
+
+def run_annotation_context_menu_action(self, db_type, action_id, context):
+    if action_id != 'export_to_obsidian':
+        return {'success': False, 'error': 'unknown action'}
+
+    quote = context.get('quote', '')
+    book_title = context.get('book_title', '')
+    series_name = context.get('series_name') or book_title
+    cover_image = context.get('cover_image')  # 필요하면 노트 프론트매터에 첨부
+    note_body = f"> {quote}\n\n출처: {series_name} — {book_title}"
+    # 예: 옵시디언 Advanced URI 플러그인의 obsidian:// 스킴으로 새 노트 생성
+    obsidian_url = f"obsidian://new?vault=MyVault&content={note_body}"
+    return {'success': True, 'message': '옵시디언으로 전송했습니다.', 'open_url': obsidian_url}
+```
+
+### 사용자 입력이 필요한 액션 (`prompt` 응답)
+
+"메모/주석을 직접 입력해서 남기기"처럼 실행 전에 텍스트 입력을 받아야 하는 액션도 지원합니다.
+`run_annotation_context_menu_action()`은 서버에서 실행되는 헤드리스 응답이라 직접 입력창을 띄울 수
+없으므로, 대신 **"이런 입력을 보여줘 달라"는 요청을 반환**하면 프런트가 모달을 띄워 값을 받은 뒤
+**같은 `action_id`로 액션을 다시 호출**합니다. 이번엔 `context['prompt_value']`에 사용자가 입력한
+값이 담겨 오므로, 그 값의 유무로 "최초 호출"과 "입력 받은 뒤 재호출"을 구분하면 됩니다.
+
+`prompt` 요청 반환 규격:
+
+```python
+{
+    'success': True,
+    'prompt': {
+        'title': '메모 추가',
+        'message': '이 하이라이트에 대한 메모를 입력하세요.',  # 선택
+        'placeholder': '메모 내용...',                          # 선택
+        'default_value': '',                                    # 선택, 기존 값 채워주기용
+        'multiline': True,                                      # 선택, 기본값 True(textarea)
+        'submit_label': '저장',                                 # 선택
+    }
+}
+```
+
+전체 예시 — 메모를 코어 DB가 아니라 **플러그인이 직접 관리하는 저장소(JSONL 파일이든, 별도
+SQLite든 자유)에 저장**하는 패턴:
+
+```python
+def get_annotation_context_menu_items(self, db_type, context):
+    return [{'id': 'add_note', 'label': '메모/주석 추가', 'icon': 'fa-solid fa-pen'}]
+
+def run_annotation_context_menu_action(self, db_type, action_id, context):
+    if action_id != 'add_note':
+        return {'success': False, 'error': 'unknown action'}
+
+    if 'prompt_value' not in context:
+        # 1단계: 아직 입력을 안 받았으니 입력창을 띄워 달라고 요청
+        return {
+            'success': True,
+            'prompt': {
+                'title': '메모/주석 추가',
+                'placeholder': '이 구절에 대한 생각을 적어보세요',
+                'default_value': self._load_note(context['annotation_id']) or '',
+                'submit_label': '저장',
+            }
+        }
+
+    # 2단계: 사용자가 입력한 값과 함께 재호출됨 - 여기서 실제 저장 수행
+    note_text = context['prompt_value']
+    self._save_note(context['annotation_id'], note_text)  # 예: JSONL append, sqlite3 UPSERT 등 자유
+    return {'success': True, 'message': '메모가 저장되었습니다.', 'marker': '*'}
+```
+
+사용자가 모달에서 "취소"를 누르면 재호출 없이 그대로 종료됩니다(코어가 알아서 처리하므로 플러그인
+쪽에서 취소 케이스를 따로 신경 쓸 필요 없음).
+
+### 저장 위치를 코어가 모를 때의 시각적 표시 (`marker` 응답 필드)
+
+메모/주석을 `note` 컬럼이 아니라 플러그인 자체 저장소(JSONL, 자체 SQLite 등)에 두면, 코어는
+"이 하이라이트에 뭔가 달려 있는지" 전혀 모르기 때문에 화면에서 구분이 안 됩니다 — 저장은 되는데
+다시 확인할 방법이 없는 문제가 생깁니다. 이를 위해 `run_annotation_context_menu_action()`의
+반환값에 `marker` 키를 넣으면, 코어가 그 값을 `book_annotations.plugin_marker` 컬럼에 저장하고
+**하이라이트 바로 뒤에 위첨자로** 그려줍니다.
+
+- `marker`에 문자열(예: `'*'`, `'📝'`)을 넣으면 설정/갱신, 빈 문자열이나 `None`을 넣으면 표시를 지웁니다.
+- 코어는 이 값의 **의미를 전혀 해석하지 않습니다** — 그냥 "표시할지 말지, 뭘로 표시할지"만 위임받은
+  겁니다. 실제 메모 내용은 여전히 플러그인 저장소에만 있습니다.
+- 여러 플러그인이 같은 하이라이트에 각자 `marker`를 설정하면 마지막으로 저장한 값으로 덮어써집니다
+  (동시에 여러 플러그인의 표시를 함께 보여주는 기능은 아직 없습니다).
+- `get_annotation_context_menu_items()`는 메뉴가 열릴 때마다 새로 호출되므로, 그 안에서 자체
+  저장소를 조회해 메뉴 라벨을 상태에 따라 바꿔주면(예: "메모 작성" ↔ "메모 보기·수정") 더 자연스럽습니다.
+
+### 샘플: 하이라이트 메모 (prompt 왕복 + JSONL 저장)
+
+위 계약을 그대로 구현한 실행 가능한 샘플 플러그인입니다. `get_annotation_context_menu_items`/
+`run_annotation_context_menu_action`, 2단계 `prompt` 왕복, 코어 DB를 쓰지 않고 플러그인 자신의
+JSONL 파일에 메모를 append하는 저장 패턴을 한 파일 안에서 전부 보여줍니다.
+
+샘플 파일:
+
+- [sample_plugins/metadata/highlight_notes_sample/highlight_notes_sample.py](../sample_plugins/metadata/highlight_notes_sample/highlight_notes_sample.py)
+
+참고:
+
+- 하이라이트 저장/조회/삭제 REST API(`/api/v1/books/<book_id>/annotations`,
+  `/api/v1/annotations/<annotation_id>`)는 세션 인증만 있으면 플러그인 웹뷰(`category_tab` UI)의
+  `fetch()`로도 직접 호출 가능합니다. 컨텍스트 메뉴 없이 "책 전체 하이라이트 일괄 내보내기" 같은
+  기능을 만들 때는 이 API를 그대로 쓰면 됩니다.
+- Notion/Obsidian 같은 외부 서비스로의 실제 전송(API 키, OAuth 등)은 코어가 대행하지 않습니다 —
+  `open_url`로 그 서비스의 URI 스킴/웹훅을 여는 방식이 가장 간단합니다.
+
 ### 웹훅 연동 (최신 권장 방식)
 
 최신 권장 방식은 `.env`가 아니라 **플러그인 설정 화면**에서 웹훅 대상을 구성하는 것입니다.
