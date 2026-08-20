@@ -224,7 +224,23 @@ class CategoryRepository:
                 (library_id,)
             )
             cursor.execute("DELETE FROM audiobooks WHERE library_id = %s", (library_id,))
-            
+
+            # 영상 강좌 종속 데이터 정리 (오디오북과 동일하게 books 테이블을 쓰지 않으므로
+            # 아래 books 일괄 삭제로는 정리되지 않아, 삭제해도 전체보기에 계속 남는 문제가 있었다)
+            cursor.execute(
+                "DELETE FROM video_episode_progress WHERE video_id IN (SELECT id FROM videos WHERE library_id = %s)",
+                (library_id,)
+            )
+            cursor.execute(
+                "DELETE FROM video_progress WHERE video_id IN (SELECT id FROM videos WHERE library_id = %s)",
+                (library_id,)
+            )
+            cursor.execute(
+                "DELETE FROM video_episodes WHERE video_id IN (SELECT id FROM videos WHERE library_id = %s)",
+                (library_id,)
+            )
+            cursor.execute("DELETE FROM videos WHERE library_id = %s", (library_id,))
+
             cursor.execute("DELETE FROM book_offsets WHERE book_id IN (SELECT id FROM books WHERE library_id = %s)", (library_id,))
             cursor.execute("DELETE FROM user_progress WHERE book_id IN (SELECT id FROM books WHERE library_id = %s)", (library_id,))
             cursor.execute("DELETE FROM user_reading_log WHERE book_id IN (SELECT id FROM books WHERE library_id = %s)", (library_id,))

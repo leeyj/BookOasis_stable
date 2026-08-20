@@ -23,6 +23,27 @@ BASE_DIR  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 COVERS_DIR = os.path.join(BASE_DIR, 'covers')
 
 
+def _seed_default_boss_key_image():
+    """보스키(Alt+Q) 위장 화면 이미지를 covers/ 아래로 최초 1회 복사한다.
+    covers/ 는 사용자 볼륨(git 비추적)이라, 이후 사용자가 같은 파일명으로
+    직접 덮어쓰면 UI 없이도 위장 화면 이미지를 임의로 교체할 수 있다."""
+    dest = os.path.join(COVERS_DIR, 'fake_screen.png')
+    if os.path.exists(dest):
+        return
+    src = os.path.join(BASE_DIR, 'static', 'images', 'fake_screen.png')
+    if not os.path.exists(src):
+        return
+    try:
+        os.makedirs(COVERS_DIR, exist_ok=True)
+        import shutil
+        shutil.copyfile(src, dest)
+    except Exception as e:
+        print(f"[Boss-Key] Failed to seed default fake_screen.png: {e}")
+
+
+_seed_default_boss_key_image()
+
+
 def _hash_string(value):
     text = str(value or '')
     h = 2166136261

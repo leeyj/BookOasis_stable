@@ -379,7 +379,14 @@ export async function resumeSeries(e, seriesName, libraryId, representativeBookI
         window.openAudioPlayer(resolvedAudiobookId, resumeTrackId, startTime);
         return;
       }
-      
+
+      // 영상강좌는 도서용 openReader로 열 수 없으므로(txt/epub/pdf 리더는 강좌 id를 해석 못함),
+      // 상세 화면에서 에피소드를 고르도록 유도한다.
+      if (state.currentLibraryType === 'video' && typeof window.openBookDetail === 'function') {
+        window.openBookDetail(e, seriesName, activeLibId, representativeBookId, seriesName);
+        return;
+      }
+
       console.log(`[Resume-Series] 이어보기 도서 선정 성공: ${targetBook.title} (ID: ${targetBook.id}, p.${targetBook.pages_read})`);
       openReader(targetBook.id, targetBook.file_format, targetBook.title, targetBook.pages_read, targetBook.total_pages);
     } else {

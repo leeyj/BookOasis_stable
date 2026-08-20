@@ -176,7 +176,10 @@ start() {
     fi
 
     echo "[*] 스캐너 워커 구동을 시작합니다..."
-    nohup env PYTHONUNBUFFERED=1 python3 tools/scanner_worker.py > "$WORKER_LOG_FILE" 2>&1 &
+    # setsid로 새 세션/프로세스 그룹을 만들어 gunicorn과 분리한다.
+    # (같은 그룹에 있으면 gunicorn의 --max-requests 워커 재활용 시 신호가
+    #  이 그룹의 자식인 lazy_scanner.py까지 새어 들어가 중간에 죽는 문제가 있었다)
+    nohup setsid env PYTHONUNBUFFERED=1 python3 tools/scanner_worker.py > "$WORKER_LOG_FILE" 2>&1 &
     W_NEW_PID=$!
     echo "$W_NEW_PID" > "$WORKER_PID_FILE"
     

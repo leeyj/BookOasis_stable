@@ -1,6 +1,6 @@
 // 보스키(Boss Key) 이스터에그: Alt+Q 또는 qq(빠르게 두 번) 입력 시 위장 화면 표시
 (function () {
-    var IMAGE_URL = '/static/images/fake_screen.png';
+    var IMAGE_URL = '/covers/fake_screen.png';
     var DOUBLE_Q_WINDOW_MS = 400;
 
     var overlay = null;

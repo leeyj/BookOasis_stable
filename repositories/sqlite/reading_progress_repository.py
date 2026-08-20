@@ -558,6 +558,29 @@ class ReadingProgressRepository:
                     normalized.append(str(val))
             return normalized
 
+        if db_type == 'video':
+            cursor.execute("""
+                SELECT DISTINCT DATE(p.last_watched_at) AS read_date
+                FROM video_progress p
+                JOIN videos v ON p.video_id = v.id
+                WHERE p.user_id = ?
+                  AND p.last_watched_at IS NOT NULL
+                  AND COALESCE(v.is_deleted, 0) = 0
+                  AND (COALESCE(p.current_time, 0) > 0 OR COALESCE(p.is_completed, 0) = 1)
+                ORDER BY read_date DESC
+            """, (user_id,))
+            rows = cursor.fetchall()
+            conn.close()
+            normalized = []
+            for r in rows:
+                try:
+                    val = r['read_date']
+                except Exception:
+                    val = r[0] if r else None
+                if val:
+                    normalized.append(str(val))
+            return normalized
+
         cursor.execute("""
             SELECT DISTINCT DATE(p.last_read_at) as read_date
             FROM user_progress p
@@ -607,12 +630,34 @@ class ReadingProgressRepository:
                 except Exception:
                     return 0
 
+        if db_type == 'video':
+            cursor.execute("""
+                SELECT COUNT(*)
+                FROM video_progress p
+                JOIN videos v ON p.video_id = v.id
+                WHERE p.user_id = ?
+                  AND COALESCE(p.is_completed, 0) = 1
+                  AND strftime('%Y', p.last_watched_at) = ?
+                  AND COALESCE(v.is_deleted, 0) = 0
+            """, (user_id, str(year_str)))
+            row = cursor.fetchone()
+            conn.close()
+            if not row:
+                return 0
+            try:
+                return int(row[0] or 0)
+            except Exception:
+                try:
+                    return int(row['COUNT(*)'] or 0)
+                except Exception:
+                    return 0
+
         cursor.execute("""
             SELECT COUNT(*)
             FROM user_progress p
             JOIN books b ON p.book_id = b.id
             JOIN user_category_permissions ucp ON b.library_id = ucp.library_id AND ucp.user_id = p.user_id AND ucp.has_access = 1
-            WHERE p.user_id = ? AND (p.is_completed = 1 OR p.last_epub_percent >= 99) 
+            WHERE p.user_id = ? AND (p.is_completed = 1 OR p.last_epub_percent >= 99)
               AND strftime('%Y', p.last_read_at) = ? AND COALESCE(b.is_deleted, 0) = 0
         """, (user_id, str(year_str)))
         row = cursor.fetchone()
@@ -656,12 +701,34 @@ class ReadingProgressRepository:
                 except Exception:
                     return 0
 
+        if db_type == 'video':
+            cursor.execute("""
+                SELECT COUNT(*)
+                FROM video_progress p
+                JOIN videos v ON p.video_id = v.id
+                WHERE p.user_id = ?
+                  AND COALESCE(p.is_completed, 0) = 1
+                  AND strftime('%Y-%m', p.last_watched_at) = ?
+                  AND COALESCE(v.is_deleted, 0) = 0
+            """, (user_id, year_month_str))
+            row = cursor.fetchone()
+            conn.close()
+            if not row:
+                return 0
+            try:
+                return int(row[0] or 0)
+            except Exception:
+                try:
+                    return int(row['COUNT(*)'] or 0)
+                except Exception:
+                    return 0
+
         cursor.execute("""
             SELECT COUNT(*)
             FROM user_progress p
             JOIN books b ON p.book_id = b.id
             JOIN user_category_permissions ucp ON b.library_id = ucp.library_id AND ucp.user_id = p.user_id AND ucp.has_access = 1
-            WHERE p.user_id = ? AND (p.is_completed = 1 OR p.last_epub_percent >= 99) 
+            WHERE p.user_id = ? AND (p.is_completed = 1 OR p.last_epub_percent >= 99)
               AND strftime('%Y-%m', p.last_read_at) = ? AND COALESCE(b.is_deleted, 0) = 0
         """, (user_id, year_month_str))
         row = cursor.fetchone()

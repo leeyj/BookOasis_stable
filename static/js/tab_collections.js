@@ -188,6 +188,7 @@ export async function renderCollectionDetail(collectionId) {
           onPrimaryClick: () => window.playAudiobook?.(item.audiobook_id),
           onActionClick: () => window.playAudiobook?.(item.audiobook_id)
         } : (isVideo ? {
+          isVideo: true,
           actionTitle: '상세보기',
           onPrimaryClick: (e) => openBookDetail(e, itemTitle, 'all', item.video_id, itemTitle),
           onActionClick: (e) => openBookDetail(e, itemTitle, 'all', item.video_id, itemTitle)

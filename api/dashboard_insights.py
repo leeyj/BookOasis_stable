@@ -16,7 +16,7 @@ def get_dashboard_insights():
             user_id = session.get('user_id', 1)
 
         db_type = request.args.get('library_type', 'general')
-        if db_type not in ('general', 'adult', 'audiobook'):
+        if db_type not in ('general', 'adult', 'audiobook', 'video'):
             db_type = 'general'
 
         if db_type == 'adult':
@@ -125,6 +125,8 @@ def get_dashboard_insights():
                         g_name = '문서 (PDF)'
                     elif fmt_str in ('MP3', 'M4B'):
                         g_name = '오디오북 (' + fmt_str + ')'
+                    elif fmt_str == 'VIDEO':
+                        g_name = '영상 강좌'
                     else:
                         g_name = fmt_str + ' 도서'
                 else:
@@ -183,7 +185,7 @@ def save_reading_goal():
 
         target_val = max(1, int(target_books))
         db_type = data.get('library_type', 'general')
-        if db_type not in ('general', 'adult', 'audiobook'):
+        if db_type not in ('general', 'adult', 'audiobook', 'video'):
             db_type = 'general'
 
         for dt in ('general', db_type):

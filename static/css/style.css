@@ -1955,6 +1955,12 @@ body {
     transition: transform 0.5s ease;
 }
 
+/* 영상강좌 전용 그리드는 강좌 썸네일이 대체로 가로형이라 16:9로 표시 (책/오디오북 그리드는 기존 비율 유지) */
+.book-card[data-role="video-course-card"] .book-card-cover {
+    height: auto;
+    aspect-ratio: 16 / 9;
+}
+
 .book-card:hover .book-card-cover img {
     transform: scale3d(1.08, 1.08, 1);
 }
@@ -2759,6 +2765,19 @@ body {
 .book-card-sub-audio {
     font-size: 0.82rem;
     color: #38bdf8;
+    font-weight: 600;
+    margin-top: auto;
+    padding-top: 0.2rem;
+    margin-bottom: -0.15rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+/* 카드 하단 메타 텍스트: 영상강좌 에피소드 수 */
+.book-card-sub-video {
+    font-size: 0.82rem;
+    color: #c084fc;
     font-weight: 600;
     margin-top: auto;
     padding-top: 0.2rem;

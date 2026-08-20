@@ -30,15 +30,43 @@ def _collect_zip_offsets_safe(file_path):
         return []
 
 
-def _fetch_lazy_scan_candidates(cursor):
-    cursor.execute("""
+def _load_lazy_scan_no_cover_retry_days():
+    """커버 추출에 이미 실패한(NO_COVER) 도서를 며칠 지나야 다시 재시도할지 설정에서 로드한다.
+    기본값 7일 - 깨진 파일/추출 불가 PDF 등을 매 스캔(사실상 매일)마다 헛되이 재검사하던
+    기존 동작 대신, 실패 마킹 후 일정 기간은 건너뛴다. 0으로 설정하면 기존처럼 매번 재시도한다."""
+    days = 7
+    try:
+        from repositories.settings_repository import SettingsRepository
+        val = SettingsRepository.get_value('general', 'LAZY_SCAN_NO_COVER_RETRY_DAYS')
+        if val is not None:
+            days = int(str(val).strip() or '7')
+    except Exception as _re:
+        print(f"[Lazy-Scanner] NO_COVER 재시도 대기일 설정 로드 실패 (기본 7일 적용): {_re}")
+    return max(0, days)
+
+
+def _fetch_lazy_scan_candidates(cursor, no_cover_retry_days=0):
+    no_cover_clause = "cover_image = 'NO_COVER'"
+    if no_cover_retry_days > 0:
+        # 실패 마킹 시각(cover_updated_at)으로부터 N일이 지난 것만 재후보로 삼는다.
+        # 마킹 이후 오프셋 전용 성공 등으로 cover_updated_at이 갱신되지 않는 케이스를 대비해
+        # NULL(과거 데이터)은 항상 재시도 대상에 포함시킨다.
+        # (interval은 신뢰 가능한 내부 정수라 f-string 삽입 - database.py의 MariaDB 변환기가
+        #  'now', '-N days' 리터럴 패턴을 정규식으로 매칭해 DATE_SUB(NOW(), INTERVAL N DAY)로
+        #  바꿔주므로 바인드 파라미터로 넘기면 그 변환이 동작하지 않는다)
+        no_cover_clause = (
+            "(cover_image = 'NO_COVER' AND "
+            f"(cover_updated_at IS NULL OR cover_updated_at <= datetime('now', '-{no_cover_retry_days} days')))"
+        )
+
+    cursor.execute(f"""
         SELECT id, file_path, series_name, file_format, cover_image, library_id, total_pages, has_offsets,
                COALESCE(metadata_locked, 0) AS metadata_locked
         FROM books
         WHERE LOWER(file_path) NOT LIKE '%.txt'
           AND (
               (cover_image IS NULL OR cover_image = '')
-              OR cover_image = 'NO_COVER'
+              OR {no_cover_clause}
               OR (
                   LOWER(COALESCE(file_format, '')) IN ('zip', 'cbz')
                   AND COALESCE(has_offsets, 0) = 0
@@ -273,6 +301,10 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
         # ── 최대 스캔 허용 파일 크기(MB) 및 세션 누적 제한(MB) 설정 로드 ──
         max_size_mb, max_batch_mb = _load_lazy_scan_limits()
 
+        no_cover_retry_days = _load_lazy_scan_no_cover_retry_days()
+        if no_cover_retry_days > 0:
+            print(f"[Lazy-Scanner] 🔁 커버 추출 실패(NO_COVER) 도서 재시도 대기: {no_cover_retry_days}일")
+
         session_accumulated_bytes = 0.0
         batch_limit_reached = False
 
@@ -308,7 +340,7 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
                 # 2. 커버 경로가 없거나 이전 추출에 실패한 경우
                 # 3. ZIP/CBZ 포맷 중 페이지 수(total_pages)=0 이거나 오프셋(has_offsets)=0 인 경우
                 # 위 스캔 후보 도서만 DB 인덱스 레벨에서 1차 선별하여 퍼포먼스 극대화
-                books = _fetch_lazy_scan_candidates(cursor)
+                books = _fetch_lazy_scan_candidates(cursor, no_cover_retry_days=no_cover_retry_days)
                 
             if target_book_id is not None:
                 books = cursor.fetchall()

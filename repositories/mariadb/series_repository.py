@@ -459,7 +459,7 @@ class SeriesRepository:
                 )
                 params.append(user_id)
             sql = f"""
-                SELECT COUNT(*) AS total_series_count, COUNT(*) AS total_book_count
+                SELECT COUNT(*) AS total_series_count, COALESCE(SUM(a.total_tracks), 0) AS total_book_count
                 FROM audiobooks a
                 WHERE {' AND '.join(where)}
             """
@@ -489,7 +489,7 @@ class SeriesRepository:
                 )
                 params.append(user_id)
             sql = f"""
-                SELECT COUNT(*) AS total_series_count, COUNT(*) AS total_book_count
+                SELECT COUNT(*) AS total_series_count, COALESCE(SUM(v.total_episodes), 0) AS total_book_count
                 FROM videos v
                 WHERE {' AND '.join(where)}
             """

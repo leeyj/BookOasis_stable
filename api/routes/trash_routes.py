@@ -9,10 +9,14 @@ def get_trash_books():
     try:
         general_books = TrashService.get_deleted_books('general')
         adult_books = TrashService.get_deleted_books('adult')
+        audiobook_books = TrashService.get_deleted_books('audiobook')
+        video_books = TrashService.get_deleted_books('video')
         return jsonify({
             'success': True,
             'general': general_books,
-            'adult': adult_books
+            'adult': adult_books,
+            'audiobook': audiobook_books,
+            'video': video_books
         })
     except Exception as e:
         print(f"[API ERROR] Failed to fetch trash books: {e}")

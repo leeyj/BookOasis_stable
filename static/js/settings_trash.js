@@ -197,9 +197,16 @@ function deleteTrashBooks(bookIds) {
     });
 }
 
+const TRASH_DB_LABELS = {
+    general: '일반',
+    adult: '성인',
+    audiobook: '오디오북',
+    video: '영상강좌'
+};
+
 function emptyTrashAll() {
     const dbType = document.getElementById('trash-db-type').value;
-    const dbLabel = dbType === 'general' ? '일반' : '성인';
+    const dbLabel = TRASH_DB_LABELS[dbType] || dbType;
     
     if (!confirm(`주의! 현재 ${dbLabel} 데이터베이스 휴지통 내의 모든 도서 데이터를 영구 삭제하시겠습니까?\n이 작업은 모든 읽기 상태와 기록을 완전히 삭제하며 되돌릴 수 없습니다.`)) {
         return;

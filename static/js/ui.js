@@ -116,18 +116,25 @@ function resolveCardDisplayTitle(item, showVolumeCount) {
  * @returns {HTMLElement} 생성된 카드 DOM 객체
  */
 export function createBookCard(item, options = {}) {
+  // 전체보기/즐겨찾기/최근/대시보드는 현재 선택된 라이브러리 타입(state.currentLibraryType) 문맥
+  // 안에서만 렌더링되어 그리드 내 항목 타입이 항상 동일하므로(도서/오디오북/영상강좌가 한 그리드에
+  // 섞이지 않음), item 필드 추정 대신 전역 상태로 영상강좌 여부를 판별하는 것이 안전하다.
+  // total_tracks(트랙 수)만으로는 오디오북과 구분이 안 돼 예전엔 영상이 오디오북으로 오인되었다.
+  const isVideo = options.isVideo === true || state.currentLibraryType === 'video';
+
   const card = document.createElement('div');
   card.className = 'book-card';
+  if (isVideo) card.dataset.role = 'video-course-card';
   card.dataset.bookId = item.id || item.representative_book_id || '';
 
   const fmt = String(item.file_format || '').toLowerCase();
   const hasTrackCount = Number(item.total_tracks || 0) > 0;
-  const isAudiobook = (
+  const isAudiobook = !isVideo && (
     ['audiobook', 'audio', 'mp3', 'm4a', 'm4b', 'flac', 'aac', 'wav', 'ogg', 'opus'].includes(fmt) ||
     hasTrackCount ||
     item.audiobook_id !== undefined
   );
-  const coverFormat = isAudiobook ? 'audiobook' : item.file_format;
+  const coverFormat = isVideo ? 'video' : (isAudiobook ? 'audiobook' : item.file_format);
 
   const rawSeriesName = String(item.series_name || '').trim();
   const displayTitle = resolveCardDisplayTitle(item, options.showVolumeCount);
@@ -186,9 +193,16 @@ export function createBookCard(item, options = {}) {
   // 썸네일 상단 오버레이 메타(진행률/권수 배지)는 중복 노출 방지를 위해 숨김 처리
   const badgeHtml = '';
 
-  // 제목 하단 메타 텍스트는 유지 (이어읽기/신규/오디오 정보)
+  // 제목 하단 메타 텍스트는 유지 (이어읽기/신규/오디오/영상 정보)
   let subTextHtml = '';
-  if (isAudiobook) {
+  if (isVideo) {
+    const episodes = (item.total_tracks !== undefined && Number(item.total_tracks) > 0)
+      ? Number(item.total_tracks)
+      : ((item.book_count !== undefined && Number(item.book_count) > 0) ? Number(item.book_count) : 0);
+    subTextHtml = episodes > 0
+      ? `<p class="book-card-sub-video"><i class="fa-solid fa-clapperboard"></i> ${episodes}편</p>`
+      : '';
+  } else if (isAudiobook) {
     const chapters = (item.total_tracks !== undefined && Number(item.total_tracks) > 0)
       ? Number(item.total_tracks)
       : ((item.book_count !== undefined && Number(item.book_count) > 0) ? Number(item.book_count) : (Number(item.total_pages) || 1));
@@ -221,7 +235,7 @@ export function createBookCard(item, options = {}) {
     `;
   }
 
-  const audiobookCompletedDotHtml = isAudiobook && Number(item.is_completed) === 1
+  const audiobookCompletedDotHtml = (isAudiobook || isVideo) && Number(item.is_completed) === 1
     ? `<span class="book-card-audiobook-completed" title="${i18n.t('detail.audiobook_completed')}" aria-label="${i18n.t('detail.audiobook_completed')}"></span>`
     : '';
 
@@ -378,7 +392,13 @@ export function renderHistoryGrid(booksList) {
       markUnreadScope: 'series',
       actionTitle: '이어읽기',
       onPrimaryClick: (e) => openBookDetail(e, item.series_name || normalizedTitle, item.library_id, item.id),
-      onActionClick: () => openReader(item.id, item.file_format, normalizedTitle, item.pages_read, item.total_pages)
+      onActionClick: (e) => {
+        if (state.currentLibraryType === 'video') {
+          openBookDetail(e, item.series_name || normalizedTitle, item.library_id, item.id);
+          return;
+        }
+        openReader(item.id, item.file_format, normalizedTitle, item.pages_read, item.total_pages);
+      }
     });
     fragment.appendChild(card);
   });
@@ -481,7 +501,9 @@ export function renderDashboardHistory(booksList) {
       },
       onActionClick: (e) => {
         console.log('[Dashboard-ReadingHistory] Card Action Clicked (Opening Reader):', { targetBookId, targetSeriesName, fileFormat });
-        if (isAudio && typeof window.openAudioPlayer === 'function') {
+        if (state.currentLibraryType === 'video' && typeof window.openBookDetail === 'function') {
+          window.openBookDetail(e, targetSeriesName, targetLibraryId, targetBookId, item.series_alias || targetSeriesName);
+        } else if (isAudio && typeof window.openAudioPlayer === 'function') {
           window.openAudioPlayer(targetBookId);
         } else if (targetBookId && fileFormat && typeof window.openReader === 'function') {
           window.openReader(targetBookId, fileFormat, normalizedTitle, item.pages_read || 0, item.total_pages || 0);
@@ -514,7 +536,13 @@ export function renderDashboardRecentlyAdded(booksList) {
       lazyLoad: false,
       actionTitle: '바로읽기',
       onPrimaryClick: (e) => openBookDetail(e, item.series_name || normalizedTitle, item.library_id, item.id),
-      onActionClick: () => openReader(item.id, item.file_format, normalizedTitle, 0, item.total_pages)
+      onActionClick: (e) => {
+        if (state.currentLibraryType === 'video') {
+          openBookDetail(e, item.series_name || normalizedTitle, item.library_id, item.id);
+          return;
+        }
+        openReader(item.id, item.file_format, normalizedTitle, 0, item.total_pages);
+      }
     });
     fragment.appendChild(card);
   });

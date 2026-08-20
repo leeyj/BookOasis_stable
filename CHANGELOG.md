@@ -1,4 +1,14 @@
 # CHANGELOG
+## v2.2.0
+- (fix) 대용량/원격 라이브러리에서 Lazy 스캐너가 시간 초과로 조용히 멈추던 문제 수정 | fix lazy scanner silently stopping on timeout for large/remote libraries
+- (fix) 영상 강좌 탭 대시보드에 일반 도서 위젯이 표시되던 문제 수정 | fix general-book widgets showing on the video course dashboard
+- (fix) 영상 강좌/오디오북 보관함 총계에서 편·트랙 수가 강좌 수와 항상 같게 나오던 문제 수정 | fix library total count always showing the same number for courses and episodes/tracks
+- (perf) Lazy 스캐너가 커버 실패 도서를 매번 재검사하지 않도록 개선 | lazy scanner no longer re-checks cover-extraction failures on every run
+- (feature) 보스키(Alt+Q/qq) 위장 화면 이미지를 `/covers/fake_screen.png`로 이전 — 같은 파일명으로 덮어써서 임의 교체 가능 | move the boss-key (Alt+Q/qq) decoy screen image to `/covers/fake_screen.png` — overwrite the same filename to customize it
+- (feature) 영상 강좌 썸네일을 16:9 비율로 표시 — 전체보기/즐겨찾기/최근/대시보드/컬렉션 전 구간에 일관 적용, 해당 구간에서 영상이 오디오북으로 오인되어 재생 버튼이 깨지던 문제도 함께 수정 | display video course thumbnails at 16:9 across browse-all/favorites/history/dashboard/collections, also fixing videos being misidentified as audiobooks (broken play button) in those views
+- (fix) 영상 강좌 카테고리 삭제 시 관련 데이터(videos/video_episodes/video_progress/video_episode_progress)가 정리되지 않아 전체보기에 계속 남아있던 문제 수정 | fix deleting a video course category leaving its rows behind in browse-all — related tables were never cleaned up on category delete
+- (fix) 트래픽이 많은 서버에서 gunicorn 워커 재활용(`--max-requests`) 시 신호가 같은 프로세스 그룹의 Lazy 스캐너까지 새어 들어가 스캔이 반복적으로 중단되던 문제 수정 — 스캐너 워커를 `setsid`로 분리된 세션에서 구동 | fix the lazy scanner repeatedly getting killed mid-run on high-traffic servers when gunicorn recycled a worker (`--max-requests`) — signals were leaking into the scanner worker's shared process group; it now runs in its own session via `setsid`
+
 ## v2.1.9
 - (fix) 오래된 버전부터 업데이트해온 MariaDB 사용자에서 신규 오디오북 저장이 `(1364, "Field 'title' doesn't have a default value")`로 실패하던 문제 수정 — 구형 스키마의 `audiobook_tracks.title` NOT NULL 제약이 남아있던 것이 원인, 재시작 시 자동 보정 | fix new audiobooks failing to save with `(1364, "Field 'title' doesn't have a default value")` on MariaDB installs upgraded from older versions — caused by a leftover NOT NULL constraint on `audiobook_tracks.title` from a legacy schema, now auto-corrected on restart
 - (fix) Ultra-fast skip된 폴더에서 스캐너가 `UnboundLocalError`로 조용히 실패하고, 부분 경로 스캔(scan-path)의 폴더 처리 오류가 삼켜져 API가 성공을 반환하던 문제 수정 | fix the scanner silently failing with `UnboundLocalError` on ultra-fast-skipped folders, and folder-processing errors during partial path scans being swallowed so the API returned success anyway

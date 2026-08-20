@@ -418,7 +418,7 @@ def _process_lazy_scan(sq):
                             sq.log(f"[Lazy-Scanner-Err] {line}")
             except Exception as kill_err:
                 sq.log(f"[Lazy-Scanner] Error while terminating timed out process: {kill_err}")
-            returncode = -1
+            returncode = 'TIMEOUT'
         except Exception as pe:
             sq.log(f"Subprocess wait error: {pe}")
             try:
@@ -429,7 +429,21 @@ def _process_lazy_scan(sq):
         finally:
             active_subprocess = None
             
-        if returncode == 10:
+        if returncode == 'TIMEOUT':
+            # 2시간 타임아웃은 스캔이 실패한 게 아니라 대상 도서 수가 많거나(원격 마운트 등으로)
+            # 처리 속도가 느려 세션 예산을 다 못 채운 것뿐이므로, RAM 환수(코드 10)와 동일하게
+            # 다음 서브-배치를 이어서 기동한다. 예전에는 여기서 RuntimeError를 던져 태스크 전체를
+            # failed로 마킹하고 멈춰버렸다(자동 재개 없음) - 대량/원격 라이브러리에서 실제로 발생 확인됨.
+            sq.log(f"⏱️ 세션 시간 한도(7200초) 도달로 서브-배치 세션 #{sub_batch_count} 강제 종료. 다음 분량을 계속 처리합니다.")
+            try:
+                from repositories.scanner_queue_repository import ScannerQueueRepository
+                task = ScannerQueueRepository.get_task_by_key('lazy_scan')
+                if task and task.get('id'):
+                    ScannerQueueRepository.update_task_status(task['id'], 'exit_pending', stage=f'시간 한도 재기동 (배치 #{sub_batch_count})')
+            except Exception as st_err:
+                sq.log(f"[Lazy-Scanner] Intermediate status update warning: {st_err}")
+            continue
+        elif returncode == 10:
             sq.log(f"⚡ 서브-배치 세션 #{sub_batch_count} 마감 (RAM 환수 완료). 다음 분량을 계속 처리합니다.")
             try:
                 from repositories.scanner_queue_repository import ScannerQueueRepository

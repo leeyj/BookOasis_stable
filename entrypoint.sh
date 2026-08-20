@@ -178,14 +178,17 @@ start_worker_after_health() {
 
         while true; do
             echo "[Entrypoint] Starting scanner worker process..."
+            # setsid로 새 세션/프로세스 그룹을 만들어 웹 서버(gunicorn)와 분리한다.
+            # (같은 그룹에 있으면 gunicorn 워커 재기동 시 신호가 이 그룹의 자식인
+            #  lazy_scanner.py까지 새어 들어가 스캔이 중간에 죽는 문제가 있었다)
             if [ -n "$run_as_user" ]; then
-                if gosu "$run_as_user" python3 tools/scanner_worker.py >> /app/logs/media_server_worker.log 2>&1; then
+                if setsid gosu "$run_as_user" python3 tools/scanner_worker.py >> /app/logs/media_server_worker.log 2>&1; then
                     worker_exit_code=0
                 else
                     worker_exit_code=$?
                 fi
             else
-                if python3 tools/scanner_worker.py >> /app/logs/media_server_worker.log 2>&1; then
+                if setsid python3 tools/scanner_worker.py >> /app/logs/media_server_worker.log 2>&1; then
                     worker_exit_code=0
                 else
                     worker_exit_code=$?

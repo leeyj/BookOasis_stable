@@ -56,6 +56,7 @@ function formatLabel(format) {
   if (key === 'pdf') return 'PDF';
   if (key === 'imgdir') return 'IMG';
   if (['audiobook', 'audio', 'm4a', 'm4b', 'mp3', 'aac', 'flac', 'ogg', 'wma'].includes(key)) return 'AUDIO';
+  if (key === 'video') return 'VIDEO';
   return 'TEXT';
 }
 
