@@ -39,6 +39,7 @@
         
         // 🌟 VIEW_LOG 환경변수에 따른 전역 콘솔 로그 제어 (Monkey Patch)
         window.VIEW_LOG = "{{ 'true' if view_log_enabled else 'false' }}" === "true";
+        window.DEVELOP_MODE = "{{ 'true' if develop_mode else 'false' }}" === "true";
         if (window.VIEW_LOG !== true) {
             console.log = function() {};
             console.warn = function() {};

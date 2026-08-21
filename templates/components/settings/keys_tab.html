@@ -113,6 +113,16 @@
 
         <div style="display: flex; flex-direction: column; gap: 1.4rem;">
             <div>
+                <div style="font-weight: 700; color: var(--app-text-primary); font-size: 0.85rem; margin-bottom: 0.6rem;" data-i18n="settings.fixed_keys_group_library">미디어 라이브러리</div>
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <div class="fixed-key-row" style="display: flex; align-items: center; gap: 0.7rem; font-size: 0.85rem; color: var(--app-text-secondary);">
+                        <kbd class="fixed-key-badge">1</kbd><kbd class="fixed-key-badge">2</kbd><kbd class="fixed-key-badge">3</kbd><kbd class="fixed-key-badge">4</kbd>
+                        <span data-i18n="settings.fixed_key_library_switch">일반 · 성인 · 오디오북 · 영상 세션 전환</span>
+                    </div>
+                </div>
+            </div>
+
+            <div>
                 <div style="font-weight: 700; color: var(--app-text-primary); font-size: 0.85rem; margin-bottom: 0.6rem;" data-i18n="settings.fixed_keys_group_viewer">뷰어</div>
                 <div style="display: flex; flex-direction: column; gap: 0.5rem;">
                     <div class="fixed-key-row" style="display: flex; align-items: center; gap: 0.7rem; font-size: 0.85rem; color: var(--app-text-secondary);">
@@ -145,6 +155,10 @@
                         <kbd class="fixed-key-badge">.</kbd><span style="color: var(--app-text-muted);" data-i18n="settings.fixed_key_or">또는</span><kbd class="fixed-key-badge">&gt;</kbd>
                         <span data-i18n="settings.fixed_key_audio_forward">앞으로 감기</span>
                     </div>
+                    <div class="fixed-key-row" style="display: flex; align-items: center; gap: 0.7rem; font-size: 0.85rem; color: var(--app-text-secondary);">
+                        <kbd class="fixed-key-badge">Esc</kbd>
+                        <span data-i18n="settings.fixed_key_audio_close">플레이어/모달 닫기</span>
+                    </div>
                 </div>
             </div>
 
@@ -155,6 +169,14 @@
                         <kbd class="fixed-key-badge">←</kbd><kbd class="fixed-key-badge">→</kbd><kbd class="fixed-key-badge">↑</kbd><kbd class="fixed-key-badge">↓</kbd>
                         <span data-i18n="settings.fixed_key_tv_nav">카드 · 서랍 · 정렬 · 계정 배지 간 포커스 이동</span>
                     </div>
+                    <div class="fixed-key-row" style="display: flex; align-items: center; gap: 0.7rem; font-size: 0.85rem; color: var(--app-text-secondary);">
+                        <kbd class="fixed-key-badge">Enter</kbd><span style="color: var(--app-text-muted);" data-i18n="settings.fixed_key_or">또는</span><kbd class="fixed-key-badge">Space</kbd>
+                        <span data-i18n="settings.fixed_key_tv_select">포커스된 카드 열기</span>
+                    </div>
+                    <div class="fixed-key-row" style="display: flex; align-items: center; gap: 0.7rem; font-size: 0.85rem; color: var(--app-text-secondary);">
+                        <kbd class="fixed-key-badge">Esc</kbd>
+                        <span data-i18n="settings.fixed_key_tv_back">뒤로가기 / 이전 화면 전환</span>
+                    </div>
                 </div>
             </div>
 
@@ -162,8 +184,8 @@
                 <div style="font-weight: 700; color: var(--app-text-primary); font-size: 0.85rem; margin-bottom: 0.6rem;" data-i18n="settings.fixed_keys_group_easter_egg">이스터에그</div>
                 <div style="display: flex; flex-direction: column; gap: 0.5rem;">
                     <div class="fixed-key-row" style="display: flex; align-items: center; gap: 0.7rem; font-size: 0.85rem; color: var(--app-text-secondary);">
-                        <kbd class="fixed-key-badge">Q</kbd><span style="color: var(--app-text-muted);" data-i18n="settings.fixed_key_or">또는</span><kbd class="fixed-key-badge">Alt</kbd><span style="color: var(--app-text-muted);">+</span><kbd class="fixed-key-badge">Q</kbd>
-                        <span data-i18n="settings.fixed_key_boss">보스키 (위장 화면으로 전환)</span>
+                        <kbd class="fixed-key-badge">Q</kbd><kbd class="fixed-key-badge">Q</kbd><span style="color: var(--app-text-muted);" data-i18n="settings.fixed_key_or">또는</span><kbd class="fixed-key-badge">Alt</kbd><span style="color: var(--app-text-muted);">+</span><kbd class="fixed-key-badge">Q</kbd>
+                        <span data-i18n="settings.fixed_key_boss">보스키 (위장 화면으로 전환, Q는 빠르게 두 번)</span>
                     </div>
                 </div>
             </div>

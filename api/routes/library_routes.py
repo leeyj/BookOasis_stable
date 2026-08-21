@@ -154,13 +154,15 @@ def add_media_library():
     rclone_rc_url = normalize_rclone_url(request.form.get('rclone_rc_url'))
     icon = request.form.get('icon', 'fa-book').strip() or 'fa-book'
     color = request.form.get('color', '#94a3b8').strip() or '#94a3b8'
+    gdrive_copy_remote = request.form.get('gdrive_copy_remote', '').strip() or None
+    gdrive_copy_dest_path = request.form.get('gdrive_copy_dest_path', '').strip() or None
     try:
         group_id = _parse_group_id(request.form.get('group_id'))
     except ValueError as error:
         return jsonify({'success': False, 'error': str(error)}), 400
-    
+
     try:
-        library_id = CategoryService.add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id)
+        library_id = CategoryService.add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_copy_dest_path)
     except sqlite3.IntegrityError:
         return jsonify({'success': False, 'error': _t('api.err_library_name_exists')}), 400
     except Exception as e:
@@ -220,20 +222,22 @@ def edit_media_library():
     rclone_rc_url = normalize_rclone_url(request.form.get('rclone_rc_url'))
     icon = request.form.get('icon', 'fa-book').strip() or 'fa-book'
     color = request.form.get('color', '#94a3b8').strip() or '#94a3b8'
+    gdrive_copy_remote = request.form.get('gdrive_copy_remote', '').strip() or None
+    gdrive_copy_dest_path = request.form.get('gdrive_copy_dest_path', '').strip() or None
     try:
         group_id = _parse_group_id(request.form.get('group_id'))
     except ValueError as error:
         return jsonify({'success': False, 'error': str(error)}), 400
-    
+
     # 기존 라이브러리 정보 가져오기 (경로 변경 여부 판단용)
     try:
         old_library = CategoryRepository.get_library_by_id(db_type, int(library_id))
     except Exception as e:
         old_library = None
         print(f"[API Warning] Failed to fetch old library: {e}")
-        
+
     try:
-        CategoryService.edit_library(db_type, int(library_id), name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id)
+        CategoryService.edit_library(db_type, int(library_id), name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_copy_dest_path)
     except sqlite3.IntegrityError:
         return jsonify({'success': False, 'error': _t('api.err_library_name_exists')}), 400
     except Exception as e:

@@ -111,7 +111,9 @@ function renderLibraryItem(lib, isPinned) {
   const safeColor = escapeHtml(lib.color || '#94a3b8');
   const hideCover = Number(lib.hide_cover || 0) ? 1 : 0;
   const groupId = lib.group_id == null ? '' : String(lib.group_id);
-  return `<li class="menu-item ${isActive}" data-type="custom" data-role="sidebar-category-dynamic" data-id="${lib.id}" data-category-id="${lib.id}" data-name="${safeName}" data-path="${safePath}" data-remote="${lib.is_remote || 0}" data-rclone-url="${safeRclone}" data-icon="${safeIcon}" data-color="${safeColor}" data-hide-cover="${hideCover}" data-group-id="${groupId}" ${draggableAttr} style="display: flex; align-items: center; justify-content: space-between;"><span style="display: inline-flex; align-items: center; gap: 0.6rem;"><i class="fa-solid ${safeIcon}" style="color: ${safeColor};"></i> ${safeName}</span><i class="fa-solid fa-circle-notch fa-spin category-scan-spinner" style="display:none; color:#c084fc; font-size:0.75rem; margin-left:auto;" title="스캔 진행 중"></i></li>`;
+  const safeGdriveCopyRemote = escapeHtml(lib.gdrive_copy_remote || '');
+  const safeGdriveCopyDestPath = escapeHtml(lib.gdrive_copy_dest_path || '');
+  return `<li class="menu-item ${isActive}" data-type="custom" data-role="sidebar-category-dynamic" data-id="${lib.id}" data-category-id="${lib.id}" data-name="${safeName}" data-path="${safePath}" data-remote="${lib.is_remote || 0}" data-rclone-url="${safeRclone}" data-icon="${safeIcon}" data-color="${safeColor}" data-hide-cover="${hideCover}" data-group-id="${groupId}" data-gdrive-copy-remote="${safeGdriveCopyRemote}" data-gdrive-copy-dest-path="${safeGdriveCopyDestPath}" ${draggableAttr} style="display: flex; align-items: center; justify-content: space-between;"><span style="display: inline-flex; align-items: center; gap: 0.6rem;"><i class="fa-solid ${safeIcon}" style="color: ${safeColor};"></i> ${safeName}</span><i class="fa-solid fa-circle-notch fa-spin category-scan-spinner" style="display:none; color:#c084fc; font-size:0.75rem; margin-left:auto;" title="스캔 진행 중"></i></li>`;
 }
 
 function renderPluginItem(cp) {
@@ -220,6 +222,16 @@ function initDynamicSidebarDelegation() {
       return;
     }
 
+    const addGdriveCopyBtn = rawTarget.closest('[data-role="sidebar-add-gdrive-copy"]');
+    if (addGdriveCopyBtn) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (typeof window.triggerAddGdriveCopy === 'function') {
+        window.triggerAddGdriveCopy();
+      }
+      return;
+    }
+
     const addGroupBtn = rawTarget.closest('[data-role="sidebar-add-library-group"]');
     if (addGroupBtn) {
       event.preventDefault();
@@ -301,6 +313,11 @@ export async function loadLibraries() {
             <i class="fa-solid fa-folder-plus"></i>
           </button>`
         : '';
+      const addGdriveCopyBtnHtml = (isAdmin && window.DEVELOP_MODE)
+        ? `<button data-role="sidebar-add-gdrive-copy" style="background: none; border: none; color: #60a5fa; cursor: pointer; padding: 0.2rem 0.4rem; font-size: 0.9rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px;" title="Drive에서 복사해오기 (실험적)">
+            <i class="fa-brands fa-google-drive"></i>
+          </button>`
+        : '';
       
       const tHome = (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('category.home', 'Home') : 'Home';
       const tHistory = (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('category.history', '최근 읽은 도서') : '최근 읽은 도서';
@@ -318,6 +335,7 @@ export async function loadLibraries() {
           </button>
           ${addGroupBtnHtml}
           ${addBtnHtml}
+          ${addGdriveCopyBtnHtml}
         </div>
       </li>`;
 

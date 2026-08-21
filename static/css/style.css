@@ -1587,6 +1587,23 @@ body {
     animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* 카테고리 추가/수정 모달은 항목이 많아 세로 스크롤이 잦으므로 더 넓게 잡아
+   가로 여유를 확보하고(2열 배치와 함께) 세로 길이를 줄인다 */
+#library-form-modal .library-modal-content {
+    max-width: 720px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.library-form-row-2col {
+    display: flex;
+    gap: 1rem;
+}
+.library-form-row-2col > .library-form-group {
+    flex: 1;
+    min-width: 0;
+}
+
 @keyframes modalSlideUp {
     from { transform: translateY(20px); }
     to { transform: translateY(0); }
@@ -1632,7 +1649,9 @@ body {
     color: #94a3b8;
 }
 
-.library-form-group input {
+.library-form-group input,
+.library-form-group select,
+.library-form-group textarea {
     background: rgba(15, 23, 42, 0.6);
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: #fff;
@@ -1641,9 +1660,12 @@ body {
     font-size: 0.9rem;
     outline: none;
     transition: all 0.3s ease;
+    color-scheme: dark;
 }
 
-.library-form-group input:focus {
+.library-form-group input:focus,
+.library-form-group select:focus,
+.library-form-group textarea:focus {
     border-color: #a855f7;
     box-shadow: 0 0 8px rgba(168, 85, 247, 0.4);
 }

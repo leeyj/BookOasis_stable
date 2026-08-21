@@ -7,15 +7,17 @@
         </div>
         <form id="library-crud-form">
             <input type="hidden" id="library-form-id" name="id">
-            <div class="library-form-group">
-                <label for="library-form-name" data-i18n="modal.category_name_label">카테고리 이름</label>
-                <input type="text" id="library-form-name" name="name" required maxlength="25" data-i18n-placeholder="modal.category_name_placeholder" placeholder="예: 판타지 소설, 코믹스 등">
-            </div>
-            <div class="library-form-group">
-                <label for="library-form-group-id">상위 그룹</label>
-                <select id="library-form-group-id" name="group_id">
-                    <option value="">미분류</option>
-                </select>
+            <div class="library-form-row-2col">
+                <div class="library-form-group">
+                    <label for="library-form-name" data-i18n="modal.category_name_label">카테고리 이름</label>
+                    <input type="text" id="library-form-name" name="name" required maxlength="25" data-i18n-placeholder="modal.category_name_placeholder" placeholder="예: 판타지 소설, 코믹스 등">
+                </div>
+                <div class="library-form-group">
+                    <label for="library-form-group-id">상위 그룹</label>
+                    <select id="library-form-group-id" name="group_id">
+                        <option value="">미분류</option>
+                    </select>
+                </div>
             </div>
             <div class="library-form-group">
                 <label data-i18n="modal.category_type_label">카테고리 유형</label>
@@ -42,14 +44,6 @@
                         <i class="fa-solid fa-bolt"></i> <span data-i18n="modal.btn_test_gdrive_link">연결 테스트</span>
                     </button>
                 </div>
-            </div>
-            <div class="library-form-group-row" id="library-form-remote-row">
-                <input type="checkbox" id="library-form-remote" name="is_remote">
-                <label for="library-form-remote" data-i18n="modal.remote_drive_label">원격 드라이브 (VFS 마운트 / rclone 등)</label>
-            </div>
-            <div class="library-form-group-row">
-                <input type="checkbox" id="library-form-hide-cover" name="hide_cover">
-                <label for="library-form-hide-cover">이 카테고리 커버 감추기</label>
             </div>
 <style>
 .category-type-btn {
@@ -120,48 +114,147 @@
     box-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
     transform: scale(1.1);
 }
+.library-form-collapsible {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 0.6rem 0.8rem;
+    background: rgba(15, 23, 42, 0.25);
+}
+.library-form-collapsible-summary {
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.3rem 0;
+    color: #e2e8f0;
+    font-weight: 600;
+    font-size: 0.92rem;
+}
+.library-form-collapsible-summary::-webkit-details-marker {
+    display: none;
+}
+.library-form-appearance-preview-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: rgba(15, 23, 42, 0.5);
+    color: #cbd5e1;
+    font-size: 0.85rem;
+}
+.library-form-appearance-preview-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.library-form-status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #64748b;
+    flex-shrink: 0;
+}
+.library-form-status-dot.active {
+    background: #22c55e;
+    box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+}
+.library-form-collapsible-chevron {
+    margin-left: auto;
+    color: #94a3b8;
+    font-size: 0.8rem;
+    transition: transform 0.2s;
+}
+.library-form-collapsible[open] .library-form-collapsible-chevron {
+    transform: rotate(180deg);
+}
 </style>
-            <div class="library-form-group" id="library-form-rclone-url-group" style="display: none; margin-top: 0.5rem;">
-                <label for="library-form-rclone-url" data-i18n="modal.rclone_url_label">Rclone RC API 주소 (VFS 캐시 갱신용)</label>
-                <input type="text" id="library-form-rclone-url" name="rclone_rc_url" data-i18n-placeholder="modal.rclone_url_placeholder" placeholder="예: http://localhost:5572">
-                <div id="library-form-remote-warning" style="margin-top: 0.5rem; padding: 0.7rem; background: rgba(239, 68, 68, 0.1); border-left: 3px solid #ef4444; color: #ef4444; font-weight: 600; font-size: 10pt; display: none;" data-i18n="modal.remote_path_warning">원격 디렉토리(rclone등)가 하나라도 있다면 VFS 및 RC 주소를 꼭 입력하세요</div>
-            </div>
-            
-            <!-- 아이콘 및 색상 선택 -->
-            <div class="library-form-group" style="margin-top: 1rem;">
-                <label data-i18n="modal.category_icon_label">카테고리 아이콘</label>
-                <div class="category-icon-selector" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem; margin-top: 0.4rem;">
-                    <div class="icon-option active" data-role="library-icon-option" data-icon="fa-book"><i class="fa-solid fa-book"></i></div>
-                    <div class="icon-option" data-role="library-icon-option" data-icon="fa-book-open"><i class="fa-solid fa-book-open"></i></div>
-                    <div class="icon-option" data-role="library-icon-option" data-icon="fa-bookmark"><i class="fa-solid fa-bookmark"></i></div>
-                    <div class="icon-option" data-role="library-icon-option" data-icon="fa-images"><i class="fa-solid fa-images"></i></div>
-                    <div class="icon-option" data-role="library-icon-option" data-icon="fa-masks-theater"><i class="fa-solid fa-masks-theater"></i></div>
-                    <div class="icon-option" data-role="library-icon-option" data-icon="fa-newspaper"><i class="fa-solid fa-newspaper"></i></div>
-                    <div class="icon-option" data-role="library-icon-option" data-icon="fa-file-lines"><i class="fa-solid fa-file-lines"></i></div>
-                    <div class="icon-option" data-role="library-icon-option" data-icon="fa-pen-nib"><i class="fa-solid fa-pen-nib"></i></div>
-                    <div class="icon-option" data-role="library-icon-option" data-icon="fa-compass"><i class="fa-solid fa-compass"></i></div>
-                    <div class="icon-option" data-role="library-icon-option" data-icon="fa-music"><i class="fa-solid fa-music"></i></div>
-                    <div class="icon-option" data-role="library-icon-option" data-icon="fa-film"><i class="fa-solid fa-film"></i></div>
-                    <div class="icon-option" data-role="library-icon-option" data-icon="fa-star"><i class="fa-solid fa-star"></i></div>
-                </div>
-                <input type="hidden" id="library-form-icon" name="icon" value="fa-book">
-            </div>
+            <!-- 원격/고급 설정 (접이식) — 원격 드라이브 체크박스, rclone RC 주소, 구글드라이브 복사 리모트/경로 -->
+            <details class="library-form-group library-form-collapsible" id="library-form-advanced-details" style="margin-top: 1rem;">
+                <summary class="library-form-collapsible-summary">
+                    <span>원격 / 고급 설정</span>
+                    <span id="library-form-advanced-status-dot" class="library-form-status-dot"></span>
+                    <i class="fa-solid fa-chevron-down library-form-collapsible-chevron"></i>
+                </summary>
+                <div style="margin-top: 0.8rem;">
+                    <div class="library-form-group-row" id="library-form-remote-row">
+                        <input type="checkbox" id="library-form-remote" name="is_remote">
+                        <label for="library-form-remote" data-i18n="modal.remote_drive_label">원격 드라이브 (VFS 마운트 / rclone 등)</label>
+                    </div>
 
-            <div class="library-form-group" style="margin-top: 1rem;">
-                <label data-i18n="modal.category_color_label">카테고리 색상</label>
-                <div class="category-color-selector" style="display: flex; gap: 0.6rem; margin-top: 0.4rem; flex-wrap: wrap;">
-                    <div class="color-option active" data-role="library-color-option" data-color="#94a3b8" style="background-color: #94a3b8;"></div>
-                    <div class="color-option" data-role="library-color-option" data-color="#a855f7" style="background-color: #a855f7;"></div>
-                    <div class="color-option" data-role="library-color-option" data-color="#3b82f6" style="background-color: #3b82f6;"></div>
-                    <div class="color-option" data-role="library-color-option" data-color="#10b981" style="background-color: #10b981;"></div>
-                    <div class="color-option" data-role="library-color-option" data-color="#f59e0b" style="background-color: #f59e0b;"></div>
-                    <div class="color-option" data-role="library-color-option" data-color="#ef4444" style="background-color: #ef4444;"></div>
-                    <div class="color-option" data-role="library-color-option" data-color="#ec4899" style="background-color: #ec4899;"></div>
-                    <div class="color-option" data-role="library-color-option" data-color="#06b6d4" style="background-color: #06b6d4;"></div>
+                    <div class="library-form-group" id="library-form-rclone-url-group" style="display: none; margin-top: 0.8rem;">
+                        <label for="library-form-rclone-url" data-i18n="modal.rclone_url_label">Rclone RC API 주소 (VFS 캐시 갱신용)</label>
+                        <input type="text" id="library-form-rclone-url" name="rclone_rc_url" data-i18n-placeholder="modal.rclone_url_placeholder" placeholder="예: http://localhost:5572">
+                        <div id="library-form-remote-warning" style="margin-top: 0.5rem; padding: 0.7rem; background: rgba(239, 68, 68, 0.1); border-left: 3px solid #ef4444; color: #ef4444; font-weight: 600; font-size: 10pt; display: none;" data-i18n="modal.remote_path_warning">원격 디렉토리(rclone등)가 하나라도 있다면 VFS 및 RC 주소를 꼭 입력하세요</div>
+                    </div>
+
+                    <div class="library-form-group" id="library-form-gdrive-copy-group" style="margin-top: 0.8rem;">
+                        <label for="library-form-gdrive-copy-remote">서버사이드 복사 대상 리모트 (선택, 실험적)</label>
+                        <select id="library-form-gdrive-copy-remote" name="gdrive_copy_remote">
+                            <option value="">사용 안 함</option>
+                        </select>
+                        <div id="library-form-gdrive-copy-remote-empty" style="display: none; margin-top: 0.4rem; color: #94a3b8; font-size: 0.85rem;">쓰기 가능한 rclone Drive 리모트를 찾지 못했습니다.</div>
+                        <label for="library-form-gdrive-copy-dest-path" style="margin-top: 0.6rem; display: block;">복사 목적지 경로 (리모트 내부 상대경로)</label>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="text" id="library-form-gdrive-copy-dest-path" name="gdrive_copy_dest_path" maxlength="1024" placeholder="예: BookOasis/시리즈명" style="flex: 1;">
+                            <button type="button" data-role="library-validate-gdrive-copy" style="padding: 0.5rem 1rem; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.5); color: #60a5fa; border-radius: 4px; cursor: pointer; font-weight: 600; white-space: nowrap;" title="대상 리모트/경로 쓰기 권한 검증">
+                                <i class="fa-solid fa-check-double"></i> 대상 검증
+                            </button>
+                        </div>
+                        <div style="margin-top: 0.4rem; color: #94a3b8; font-size: 0.82rem;">이 카테고리의 물리 경로가 위 리모트/경로의 로컬 마운트 지점일 때만 설정하세요. 여기 설정해두면 "Drive에서 복사해오기"에서 이 카테고리를 대상으로 선택할 수 있습니다.</div>
+                    </div>
                 </div>
-                <input type="hidden" id="library-form-color" name="color" value="#94a3b8">
-            </div>
-            
+            </details>
+
+            <!-- 표시 설정 (접이식) — 아이콘, 색상, 커버 감추기. 평소엔 미리보기만 노출해 세로 길이를 줄임 -->
+            <details class="library-form-group library-form-collapsible" style="margin-top: 1rem;">
+                <summary class="library-form-collapsible-summary">
+                    <span>표시 설정</span>
+                    <span id="library-form-appearance-preview-icon" class="library-form-appearance-preview-icon"><i class="fa-solid fa-book"></i></span>
+                    <span id="library-form-appearance-preview-color" class="library-form-appearance-preview-color" style="background-color: #94a3b8;"></span>
+                    <i class="fa-solid fa-chevron-down library-form-collapsible-chevron"></i>
+                </summary>
+                <div style="margin-top: 0.8rem;">
+                    <div class="library-form-group-row">
+                        <input type="checkbox" id="library-form-hide-cover" name="hide_cover">
+                        <label for="library-form-hide-cover">이 카테고리 커버 감추기</label>
+                    </div>
+
+                    <label data-i18n="modal.category_icon_label" style="margin-top: 1rem; display: block;">카테고리 아이콘</label>
+                    <div class="category-icon-selector" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem; margin-top: 0.4rem;">
+                        <div class="icon-option active" data-role="library-icon-option" data-icon="fa-book"><i class="fa-solid fa-book"></i></div>
+                        <div class="icon-option" data-role="library-icon-option" data-icon="fa-book-open"><i class="fa-solid fa-book-open"></i></div>
+                        <div class="icon-option" data-role="library-icon-option" data-icon="fa-bookmark"><i class="fa-solid fa-bookmark"></i></div>
+                        <div class="icon-option" data-role="library-icon-option" data-icon="fa-images"><i class="fa-solid fa-images"></i></div>
+                        <div class="icon-option" data-role="library-icon-option" data-icon="fa-masks-theater"><i class="fa-solid fa-masks-theater"></i></div>
+                        <div class="icon-option" data-role="library-icon-option" data-icon="fa-newspaper"><i class="fa-solid fa-newspaper"></i></div>
+                        <div class="icon-option" data-role="library-icon-option" data-icon="fa-file-lines"><i class="fa-solid fa-file-lines"></i></div>
+                        <div class="icon-option" data-role="library-icon-option" data-icon="fa-pen-nib"><i class="fa-solid fa-pen-nib"></i></div>
+                        <div class="icon-option" data-role="library-icon-option" data-icon="fa-compass"><i class="fa-solid fa-compass"></i></div>
+                        <div class="icon-option" data-role="library-icon-option" data-icon="fa-music"><i class="fa-solid fa-music"></i></div>
+                        <div class="icon-option" data-role="library-icon-option" data-icon="fa-film"><i class="fa-solid fa-film"></i></div>
+                        <div class="icon-option" data-role="library-icon-option" data-icon="fa-star"><i class="fa-solid fa-star"></i></div>
+                    </div>
+                    <input type="hidden" id="library-form-icon" name="icon" value="fa-book">
+
+                    <label data-i18n="modal.category_color_label" style="margin-top: 1rem; display: block;">카테고리 색상</label>
+                    <div class="category-color-selector" style="display: flex; gap: 0.6rem; margin-top: 0.4rem; flex-wrap: wrap;">
+                        <div class="color-option active" data-role="library-color-option" data-color="#94a3b8" style="background-color: #94a3b8;"></div>
+                        <div class="color-option" data-role="library-color-option" data-color="#a855f7" style="background-color: #a855f7;"></div>
+                        <div class="color-option" data-role="library-color-option" data-color="#3b82f6" style="background-color: #3b82f6;"></div>
+                        <div class="color-option" data-role="library-color-option" data-color="#10b981" style="background-color: #10b981;"></div>
+                        <div class="color-option" data-role="library-color-option" data-color="#f59e0b" style="background-color: #f59e0b;"></div>
+                        <div class="color-option" data-role="library-color-option" data-color="#ef4444" style="background-color: #ef4444;"></div>
+                        <div class="color-option" data-role="library-color-option" data-color="#ec4899" style="background-color: #ec4899;"></div>
+                        <div class="color-option" data-role="library-color-option" data-color="#06b6d4" style="background-color: #06b6d4;"></div>
+                    </div>
+                    <input type="hidden" id="library-form-color" name="color" value="#94a3b8">
+                </div>
+            </details>
+
             <div class="library-modal-footer">
                 <button type="button" class="btn-cancel" data-role="library-modal-close" data-i18n="common.cancel">취소</button>
                 <button type="button" class="btn-move ui-hover-library-move" id="library-form-move-btn" data-role="library-move" style="display: none; background: rgba(245, 158, 11, 0.2); border: 1px solid rgba(245, 158, 11, 0.5); color: #f59e0b; padding: 0.5rem 1rem; border-radius: 4px; font-weight: 600; cursor: pointer; transition: all 0.2s;">이동</button>

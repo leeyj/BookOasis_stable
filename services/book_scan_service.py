@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 from repositories.book_scan_repository import BookScanRepository
+from utils.redis_helper import redis_delete_pattern
 from tools.scanner import (
     merge_local_metadata,
     extract_cover_from_b64,
@@ -131,7 +132,15 @@ class BookScanService:
             if offsets_data:
                 count = BookScanRepository.sync_book_offsets_transaction(db_type, book_id, offsets_data)
                 print(f"[BookScanService] 오프셋 DB 데이터 {count}건 동기화 처리")
-                
+
+            # 대시보드 "신규 추가 도서"/최근기록 레디스 캐시가 갱신 전(빈 커버) 상태로
+            # 굳어버리지 않도록, DB 반영 직후 관련 캐시를 함께 소거한다.
+            try:
+                redis_delete_pattern(f"cache:recent_added*:{db_type}:*")
+                redis_delete_pattern(f"cache:history*:{db_type}:*")
+            except Exception as cache_err:
+                print(f"[BookScanService WARNING] 레디스 캐시 소거 실패: {cache_err}")
+
             print(f"[BookScanService SUCCESS] '{filename}' 단독 재스캔 처리 최종 완료.")
             return True, f"'{filename}' 도서 스캔 및 메타데이터 동기화 완료!", cover_image
             

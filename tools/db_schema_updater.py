@@ -69,6 +69,8 @@ CREATE TABLE IF NOT EXISTS libraries (
     hide_cover INT DEFAULT 0,
     group_id BIGINT DEFAULT NULL,
     sort_order INT DEFAULT 0,
+    gdrive_copy_remote VARCHAR(255) DEFAULT NULL,
+    gdrive_copy_dest_path TEXT DEFAULT NULL,
     INDEX idx_libraries_group_id (group_id),
     INDEX idx_libraries_group_order (group_id, sort_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
@@ -598,6 +600,12 @@ def _ensure_mariadb_columns():
         ('media_general', 'libraries', 'sort_order', 'INT DEFAULT 0'),
         ('media_adult', 'libraries', 'sort_order', 'INT DEFAULT 0'),
         ('media_audiobook', 'libraries', 'sort_order', 'INT DEFAULT 0'),
+        ('media_general', 'libraries', 'gdrive_copy_remote', 'VARCHAR(255) DEFAULT NULL'),
+        ('media_adult', 'libraries', 'gdrive_copy_remote', 'VARCHAR(255) DEFAULT NULL'),
+        ('media_audiobook', 'libraries', 'gdrive_copy_remote', 'VARCHAR(255) DEFAULT NULL'),
+        ('media_general', 'libraries', 'gdrive_copy_dest_path', 'TEXT'),
+        ('media_adult', 'libraries', 'gdrive_copy_dest_path', 'TEXT'),
+        ('media_audiobook', 'libraries', 'gdrive_copy_dest_path', 'TEXT'),
         ('media_audiobook', 'audiobooks', 'code', 'VARCHAR(255)'),
         ('media_audiobook', 'audiobooks', 'poster', 'TEXT'),
         ('media_audiobook', 'audiobooks', 'premiered', 'VARCHAR(100)'),

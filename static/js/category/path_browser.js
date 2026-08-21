@@ -60,6 +60,81 @@ export function testGDriveLinks() {
     });
 }
 
+export async function loadGdriveCopyRemotes(selectedRemote = '') {
+  const selectEl = document.getElementById('library-form-gdrive-copy-remote');
+  const emptyEl = document.getElementById('library-form-gdrive-copy-remote-empty');
+  if (!selectEl) return;
+
+  try {
+    const res = await fetch('/api/gdrive-copy/remotes');
+    const data = await res.json();
+    const remotes = (data && data.success && Array.isArray(data.remotes)) ? data.remotes.filter(r => r.usable) : [];
+
+    selectEl.innerHTML = '<option value="">사용 안 함</option>' + remotes.map(r => {
+      const safeName = escapeHtml(r.name);
+      return `<option value="${safeName}"${r.name === selectedRemote ? ' selected' : ''}>${safeName}</option>`;
+    }).join('');
+
+    if (emptyEl) emptyEl.style.display = remotes.length === 0 ? 'block' : 'none';
+  } catch (error) {
+    console.error('[GdriveCopy] 리모트 목록 조회 오류:', error);
+    if (emptyEl) {
+      emptyEl.textContent = `리모트 목록을 불러오지 못했습니다: ${error.message || error}`;
+      emptyEl.style.display = 'block';
+    }
+  }
+}
+
+export function validateGdriveCopyTarget() {
+  const remoteEl = document.getElementById('library-form-gdrive-copy-remote');
+  const destPathEl = document.getElementById('library-form-gdrive-copy-dest-path');
+  const remote = remoteEl ? remoteEl.value : '';
+  const destPath = destPathEl ? destPathEl.value.trim() : '';
+
+  if (!remote) {
+    if (typeof window.showToast === 'function') {
+      window.showToast('검증할 리모트를 선택해 주세요.', 'warning');
+    } else {
+      alert('검증할 리모트를 선택해 주세요.');
+    }
+    return;
+  }
+
+  if (typeof window.showToast === 'function') {
+    window.showToast('대상 리모트/경로 검증 중...', 'info');
+  }
+
+  fetch('/api/gdrive-copy/validate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ remote, dest_path: destPath }),
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        const msg = `✅ 검증 성공 (계정: ${data.account_email || '알 수 없음'})`;
+        if (typeof window.showToast === 'function') {
+          window.showToast(msg, 'success');
+        } else {
+          alert(msg);
+        }
+      } else {
+        if (typeof window.showToast === 'function') {
+          window.showToast(`❌ ${data.error || '검증 실패'}`, 'error');
+        } else {
+          alert(`❌ ${data.error || '검증 실패'}`);
+        }
+      }
+    })
+    .catch(err => {
+      if (typeof window.showToast === 'function') {
+        window.showToast(`❌ 네트워크 오류: ${err.message}`, 'error');
+      } else {
+        alert(`❌ 네트워크 오류: ${err.message}`);
+      }
+    });
+}
+
 export function openPathBrowser() {
   const modal = document.getElementById('path-browser-modal');
   if (!modal) return;

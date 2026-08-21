@@ -144,6 +144,8 @@ class CategoryService:
             'hide_cover': r['hide_cover'] or 0,
             'group_id': r.get('group_id'),
             'sort_order': r.get('sort_order') or 0,
+            'gdrive_copy_remote': r.get('gdrive_copy_remote') or '',
+            'gdrive_copy_dest_path': r.get('gdrive_copy_dest_path') or '',
         } for r in rows]
 
     @staticmethod
@@ -204,7 +206,7 @@ class CategoryService:
         return '\n'.join([line for line in lines if line])
 
     @staticmethod
-    def add_library(db_type, name, physical_path, is_remote=0, rclone_rc_url=None, icon='fa-book', color='#94a3b8', hide_cover=0, group_id=None):
+    def add_library(db_type, name, physical_path, is_remote=0, rclone_rc_url=None, icon='fa-book', color='#94a3b8', hide_cover=0, group_id=None, gdrive_copy_remote=None, gdrive_copy_dest_path=None):
         name = str(name or '').strip()
         if not name:
             raise ValueError('카테고리 이름은 비워둘 수 없습니다.')
@@ -212,10 +214,10 @@ class CategoryService:
             raise ValueError('카테고리 이름은 25자를 초과할 수 없습니다.')
         physical_path = CategoryService._clean_physical_path(physical_path)
         group_id = CategoryService._normalize_group_id(db_type, group_id)
-        return CategoryRepository.add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id)
+        return CategoryRepository.add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_copy_dest_path)
 
     @staticmethod
-    def edit_library(db_type, library_id, name, physical_path, is_remote=0, rclone_rc_url=None, icon='fa-book', color='#94a3b8', hide_cover=0, group_id=None):
+    def edit_library(db_type, library_id, name, physical_path, is_remote=0, rclone_rc_url=None, icon='fa-book', color='#94a3b8', hide_cover=0, group_id=None, gdrive_copy_remote=None, gdrive_copy_dest_path=None):
         name = str(name or '').strip()
         if not name:
             raise ValueError('카테고리 이름은 비워둘 수 없습니다.')
@@ -223,7 +225,7 @@ class CategoryService:
             raise ValueError('카테고리 이름은 25자를 초과할 수 없습니다.')
         physical_path = CategoryService._clean_physical_path(physical_path)
         group_id = CategoryService._normalize_group_id(db_type, group_id)
-        CategoryRepository.edit_library(db_type, library_id, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id)
+        CategoryRepository.edit_library(db_type, library_id, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_copy_dest_path)
 
     @staticmethod
     def delete_library(db_type, library_id):

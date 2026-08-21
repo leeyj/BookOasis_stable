@@ -41,6 +41,10 @@ class ScannerQueue:
             db_type = kwargs.get('db_type', 'general')
             library_id = kwargs.get('library_id')
             return f"{task_type}_{db_type}_{library_id}"
+        elif task_type == 'gdrive_copy':
+            db_type = kwargs.get('db_type', 'general')
+            library_id = kwargs.get('library_id')
+            return f"gdrive_copy_{db_type}_{library_id}"
         return str(task_type)
 
     def enqueue(self, task_type, **kwargs):
@@ -322,6 +326,8 @@ def run_scanner_worker_loop():
                         _process_library_scan(sq, **kwargs)
                     elif task_type == 'cover_scan':
                         _process_cover_scan(sq, **kwargs)
+                    elif task_type == 'gdrive_copy':
+                        _process_gdrive_copy(sq, task_id, **kwargs)
                     else:
                         error_message = f"Unknown task type: {task_type}"
                         sq.log(error_message)
@@ -530,6 +536,10 @@ def _process_library_scan(sq, **kwargs):
 def _process_cover_scan(sq, **kwargs):
     from services.cover_scan_service import CoverScanService
     CoverScanService.run_cover_scan_job(**kwargs)
+
+def _process_gdrive_copy(sq, task_id, **kwargs):
+    from services.gdrive_copy_service import GdriveCopyService
+    GdriveCopyService.run_gdrive_copy_job(sq, task_id, **kwargs)
 
 
 # 하위 호환성 유지를 위한 전역 싱글톤 인스턴스

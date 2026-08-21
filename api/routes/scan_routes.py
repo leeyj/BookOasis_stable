@@ -118,6 +118,15 @@ def trigger_library_path_scan(library_id):
         from tools.scanner.core import scan_library_path
         scan_library_path(db_path, library_id, target_path, force=force)
 
+        # 이 경로는 scanner_queue를 거치지 않는 동기 단건 스캔이라 큐 완료 시 캐시 소거가
+        # 실행되지 않으므로, 신규 등록 도서가 반영되지 않은 대시보드 캐시가 남지 않도록 직접 소거한다.
+        try:
+            from utils.redis_helper import redis_delete_pattern
+            redis_delete_pattern(f"cache:recent_added*:{db_type}:*")
+            redis_delete_pattern(f"cache:history*:{db_type}:*")
+        except Exception as cache_err:
+            print(f"[API-ScanPath WARNING] 레디스 캐시 소거 실패: {cache_err}")
+
         return jsonify({'success': True, 'message': '지정한 경로의 스캔 및 등록이 완료되었습니다.'})
     except FileNotFoundError as e:
         return jsonify({'success': False, 'error': str(e)}), 404

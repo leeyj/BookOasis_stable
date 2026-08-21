@@ -1,4 +1,11 @@
 # CHANGELOG
+## v2.3.1
+- (fix) 단건/경로 단위 도서 스캔 후 대시보드 "신규 추가 도서" 캐시가 갱신되지 않아 표지가 기본 폴백으로 보이던 문제 수정 | fix the dashboard "newly added" widget showing a fallback cover after a single-book/path scan — the recent-added Redis cache wasn't being invalidated on that path
+- (feature) 구글 드라이브 공유 폴더를 카테고리로 등록해 바로 스트리밍하는 기능 추가 (실험적, DEVELOP=true 전용) | add registering a Google Drive share folder as a category for direct streaming (experimental, DEVELOP=true only)
+- (feature) 구글 드라이브 공유 폴더를 사용자 자신의 드라이브로 서버사이드 복사한 뒤 로컬처럼 스캔하는 기능 추가 (실험적, DEVELOP=true 전용) | add server-side copying a Google Drive share folder into your own Drive, then scanning it like a local mount (experimental, DEVELOP=true only)
+
+
+
 ## v2.3.0
 - (feature) EPUB/TXT 뷰어에 하이라이트(형광펜) 기능 추가 — 형광펜 모드 토글로 페이지/스크롤 모드 모두 지원 | add highlight support to the EPUB/TXT viewer — a dedicated toggle mode works in both page and scroll reading modes
 - (feature) 하이라이트 우클릭/롱프레스 메뉴에 플러그인 확장 지점 추가 — 커뮤니티 플러그인이 옵시디언/노션 등으로 내보내기 가능, 입력이 필요한 액션(prompt 응답)도 지원. 자세한 내용은 [플러그인 개발 가이드](docs/guide_plugins.md#7-하이라이트주석-컨텍스트-메뉴-확장-계약) 참조 | add a plugin extension point to the highlight context menu (right-click/long-press) so community plugins can export highlights to Obsidian, Notion, etc., including actions that need user text input. See the [plugin developer guide](docs/guide_plugins_en.md#7-annotation-highlight-context-menu-extension-contract) for details

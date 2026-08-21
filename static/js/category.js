@@ -25,8 +25,15 @@ import {
   selectPathFromBrowser,
   detectAndUpdateRemoteFlag,
   updateRemoteWarning,
-  enableVFSCheckForRemote
+  enableVFSCheckForRemote,
+  validateGdriveCopyTarget
 } from './category/path_browser.js';
+import {
+  openGdriveCopyModal,
+  closeGdriveCopyModal,
+  submitGdriveCopyForm,
+  triggerAddGdriveCopy
+} from './category/gdrive_copy_modal.js';
 
 // ── Re-export Modules ──
 export {
@@ -58,7 +65,12 @@ export {
   selectPathFromBrowser,
   detectAndUpdateRemoteFlag,
   updateRemoteWarning,
-  enableVFSCheckForRemote
+  enableVFSCheckForRemote,
+  validateGdriveCopyTarget,
+  openGdriveCopyModal,
+  closeGdriveCopyModal,
+  submitGdriveCopyForm,
+  triggerAddGdriveCopy
 };
 
 // ── Global Window Bindings (HTML 및 인라인 이벤트 100% 하위 호환성 보장) ──
@@ -86,6 +98,8 @@ if (typeof window !== 'undefined') {
   window.closePathBrowser = closePathBrowser;
   window.refreshPathBrowser = refreshPathBrowser;
   window.selectPathFromBrowser = selectPathFromBrowser;
+
+  window.triggerAddGdriveCopy = triggerAddGdriveCopy;
 }
 
 function initCategoryModalDelegation() {
@@ -93,7 +107,7 @@ function initCategoryModalDelegation() {
 
   document.addEventListener('click', (event) => {
     const target = event && event.target && typeof event.target.closest === 'function'
-      ? event.target.closest('[data-role="library-modal-close"], [data-role="library-category-type"], [data-role="library-open-path-browser"], [data-role="library-test-gdrive"], [data-role="library-icon-option"], [data-role="library-color-option"], [data-role="library-move"], [data-role="library-form-submit"], [data-role="path-browser-close"], [data-role="path-browser-refresh"], [data-role="path-browser-select"]')
+      ? event.target.closest('[data-role="library-modal-close"], [data-role="library-category-type"], [data-role="library-open-path-browser"], [data-role="library-test-gdrive"], [data-role="library-validate-gdrive-copy"], [data-role="library-icon-option"], [data-role="library-color-option"], [data-role="library-move"], [data-role="library-form-submit"], [data-role="path-browser-close"], [data-role="path-browser-refresh"], [data-role="path-browser-select"], [data-role="gdrive-copy-modal-close"], [data-role="gdrive-copy-submit"]')
       : null;
     if (!target) return;
 
@@ -104,6 +118,7 @@ function initCategoryModalDelegation() {
     if (role === 'library-category-type') return selectCategoryType(target.getAttribute('data-type') || 'local');
     if (role === 'library-open-path-browser') return openPathBrowser();
     if (role === 'library-test-gdrive') return testGDriveLinks();
+    if (role === 'library-validate-gdrive-copy') return validateGdriveCopyTarget();
     if (role === 'library-icon-option') return selectIconOption(target);
     if (role === 'library-color-option') return selectColorOption(target);
     if (role === 'library-move') return triggerMoveLibrary();
@@ -114,15 +129,25 @@ function initCategoryModalDelegation() {
     if (role === 'path-browser-close') return closePathBrowser();
     if (role === 'path-browser-refresh') return refreshPathBrowser();
     if (role === 'path-browser-select') return selectPathFromBrowser();
+    if (role === 'gdrive-copy-modal-close') return closeGdriveCopyModal();
+    if (role === 'gdrive-copy-submit') return submitGdriveCopyForm(event);
   }, true);
 
   document.addEventListener('submit', (event) => {
     const form = event && event.target;
-    if (!form || form.id !== 'library-crud-form') return;
-    event.preventDefault();
-    event.stopPropagation();
-    console.log('[Category-Modal] library-crud-form submit 이벤트 가로챔 완료');
-    submitLibraryForm(event);
+    if (!form) return;
+    if (form.id === 'library-crud-form') {
+      event.preventDefault();
+      event.stopPropagation();
+      console.log('[Category-Modal] library-crud-form submit 이벤트 가로챔 완료');
+      submitLibraryForm(event);
+      return;
+    }
+    if (form.id === 'gdrive-copy-form') {
+      event.preventDefault();
+      event.stopPropagation();
+      submitGdriveCopyForm(event);
+    }
   }, true);
 
   window.__categoryModalDelegationBound = true;

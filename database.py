@@ -805,7 +805,9 @@ _SCHEMA_SQL = """
         color TEXT DEFAULT '#94a3b8',
         hide_cover INTEGER DEFAULT 0,
         group_id INTEGER DEFAULT NULL,
-        sort_order INTEGER DEFAULT 0
+        sort_order INTEGER DEFAULT 0,
+        gdrive_copy_remote TEXT DEFAULT NULL,
+        gdrive_copy_dest_path TEXT DEFAULT NULL
     );
 
     CREATE TABLE IF NOT EXISTS plugin_group_assignments (

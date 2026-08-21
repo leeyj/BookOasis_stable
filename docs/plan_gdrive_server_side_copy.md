@@ -97,4 +97,32 @@ POST https://www.googleapis.com/drive/v3/files/{source_file_id}/copy
 
 ## 7. 상태
 
-**아이디어 및 실현 가능성 검증 완료 (2026-08-19). 구현 시작 전.** 다음 세션에서 1단계(자격증명 접근 계층)부터 순서대로 진행 예정. §6의 주기 동기화/끊김 감지는 §4의 6단계 기본 구현이 끝난 뒤 이어서 검토.
+**아이디어 및 실현 가능성 검증 완료 (2026-08-19).**
+
+**2026-08-21 진행 상황**: §4의 1단계는 별도 모듈로 만들지 않고 2단계 구현에 바로 녹였다. 2단계(rclone.conf 기반 "내 드라이브(쓰기 가능)" 리모트 감지 + 관리자가 리모트/목적지 경로 선택 + 실제 쓰기 권한 검증)까지 구현 완료:
+- `utils/rclone_gdrive_copy.py` — `list_writable_drive_remotes()`, `_get_access_token()`, `validate_remote_access()`
+- `api/routes/gdrive_copy_routes.py` (`GET /api/gdrive-copy/remotes`, `POST /api/gdrive-copy/validate`, `DEVELOP=true`에서만 노출)
+- `libraries` 테이블에 `gdrive_copy_remote`/`gdrive_copy_dest_path` 컬럼 추가 (SQLite/MariaDB 양쪽, 컬럼 자동 백필 포함)
+- 기존 gdrive 라이브러리 모달(`library_modal.html`)에 리모트 선택/목적지 경로/"대상 검증" UI 추가
+
+**2단계는 실서버에서 검증 완료** (2026-08-21): 리모트 드롭다운에 실제 rclone 리모트가 떴고, "대상 검증" 클릭 시 실제 Drive에 폴더가 생성되고 계정 이메일이 정상 표시됨.
+
+**2026-08-21 추가 진행**: 사용자 판단으로 "공유 링크 직접 스트리밍"(기존 gdrive 카테고리 타입)과 "복사해오기"를 완전히 분리하기로 결정. 2단계에서 기존 카테고리 추가 모달에 끼워 넣었던 리모트 선택/검증 UI는 제거하고, 별도의 "Drive에서 복사해오기" 모달(사이드바 새 버튼, `DEVELOP=true`+관리자 전용)로 이전. 3단계(실제 폴더 전체 순회 복사 + `scanner_queue`의 `gdrive_copy` task_type + 완료 후 라이브러리 자동 생성/스캔 트리거)까지 구현 완료:
+- `utils/rclone_gdrive_copy.py`에 `copy_file()`(files.copy), `resolve_dest_folder()` 추가
+- `services/gdrive_copy_service.py` (신규) — `start_gdrive_copy_job()`(큐 등록), `run_gdrive_copy_job()`(소스 폴더 목록 수집 → 목적지 폴더 트리 생성 → 파일별 복사+진행률(stage)+취소 확인 → 완료 시 `CategoryService.add_library()` + `library_scan` 큐 등록)
+- `services/scanner_queue.py`에 `gdrive_copy` task_type 배선(`_get_task_key`, 워커 디스패치, `_process_gdrive_copy`)
+- `api/routes/gdrive_copy_routes.py`에 `POST /api/gdrive-copy/start` 추가
+- `templates/components/modals/gdrive_copy_modal.html` + `static/js/category/gdrive_copy_modal.js` (신규 전용 모달), 사이드바 버튼(`static/js/category/index.js`, `window.DEVELOP_MODE` 게이팅)
+- `static/js/scan_activity_status.js`에 `gdrive_copy` 라벨 추가(기존 진행률 위젯 그대로 재사용)
+
+**2026-08-21 재설계**: 실제 모달을 써보니 매번 카테고리 이름/그룹/목적지 경로/로컬 스캔 경로를 입력하는 게 번거롭고, "복사 목적지"라는 개념 자체가 헷갈린다는 게 확인됨. 최종 확정한 전제: **"복사 받을" 로컬 경로는 미리 카테고리로 등록해둔다.**
+
+- "카테고리 추가/수정"(로컬 타입) 모달에 "서버사이드 복사 대상 리모트" + "복사 목적지 경로" + "대상 검증" 필드를 다시 넣음(2단계 UI와 동일한 API, 위치만 gdrive 타입 대신 로컬 타입 쪽으로 이동) — 관리자가 카테고리를 만들 때 "이 로컬 마운트 경로는 이 리모트/목적지에 대응한다"를 한 번 등록해두는 용도.
+- "Drive에서 복사해오기" 모달은 이제 **대상 카테고리 선택(드롭다운, `gdrive_copy_remote`가 설정된 카테고리만 노출) + 공유 링크 입력**, 단 두 필드로 단순화. 이름/그룹/리모트/목적지/로컬경로 입력 전부 제거 — 전부 선택한 카테고리에서 자동으로 가져옴.
+- `services/gdrive_copy_service.py`: `library_id` 기반으로 재작성 — 새 라이브러리를 생성하지 않고, 선택된 기존 카테고리의 `physical_path`/`gdrive_copy_remote`/`gdrive_copy_dest_path`를 그대로 사용해 복사 후 그 카테고리를 재스캔. task_key도 `gdrive_copy_{db_type}_{library_id}`로 변경(카테고리당 중복 실행 방지, 반복 동기화에 자연스럽게 대응).
+
+**실서버 end-to-end 검증 완료 (2026-08-21)**: 카테고리에 리모트/목적지 경로를 설정 → "Drive에서 복사해오기"에서 그 카테고리 선택 + 공유 링크 입력 → 실제로 지정한 목적지 폴더 안에 정확히 복사되고 로컬 스캔도 정상 확인. (중간에 "한 단계 위로 복사되는" 현상이 있었으나, 코드 버그가 아니라 카테고리의 목적지 경로 필드를 비워둔 사용자 설정 문제였음 — 채워 넣자 바로 정상 동작.)
+
+**알려진 UX 약점**: `physical_path`(로컬)와 `gdrive_copy_dest_path`(Drive 쪽)가 서로 독립된 입력 필드라 관리자가 수동으로 일치시켜야 함 — 둘이 안 맞아도 저장 시점엔 검증되지 않음. 필요시 나중에 "대상 검증" 시 physical_path와의 정합성도 함께 확인하는 개선 여지 있음(요청 전까지 먼저 만들지 않기로 함).
+
+§6(주기 동기화/끊김 감지)은 이 설계와 방향이 잘 맞음 — 같은 카테고리를 다시 선택해 새 링크로 재실행하면 사실상 수동 재동기화가 됨. 자동화는 아직 미착수.

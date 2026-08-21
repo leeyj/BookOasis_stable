@@ -28,6 +28,7 @@ function getScanActivityTaskInfo(task, isPending = false) {
     library_scan: '카테고리 스캔',
     cover_scan: '표지 스캔',
     lazy_scan: '미디어 검색',
+    gdrive_copy: 'Drive 복사',
   };
   const title = task?.library_name
     || (taskType === 'lazy_scan' ? '전체 시스템' : libraryId != null ? `Library ${libraryId} (${dbType})` : '백그라운드 작업');

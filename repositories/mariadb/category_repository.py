@@ -4,6 +4,29 @@ category_repository.py – MariaDB 전용 카테고리(도서관) 관리 및 커
 """
 import database
 
+
+def _dynamic_insert(cursor, table, row, overrides=None, exclude=('id',)):
+    """row(dict형 행)의 실제 컬럼을 그대로 사용해 INSERT 문을 동적으로 조립하고 새 id를 반환한다.
+    카테고리 이관(move_library_transaction)에서 컬럼을 하드코딩하면 스키마에 새 컬럼이
+    추가될 때마다 이관 로직을 잊지 않고 같이 고쳐야 하는 문제가 반복적으로 발생했다
+    ([[project_category_move_stale_columns_fix]] 등) — 이 헬퍼로 그 클래스의 버그를 근본적으로 차단한다.
+    exclude는 항상 대상 DB가 새로 채번하도록 제외한다(PK를 그대로 복사하면 두 DB의
+    AUTO_INCREMENT 시퀀스가 서로 독립적이라 목적지에 이미 존재하는 id와 충돌할 수 있다)."""
+    data = dict(row)
+    for key in exclude:
+        data.pop(key, None)
+    if overrides:
+        data.update(overrides)
+    columns = list(data.keys())
+    placeholders = ', '.join(['%s'] * len(columns))
+    col_list = ', '.join(f'`{c}`' for c in columns)
+    cursor.execute(
+        f"INSERT INTO `{table}` ({col_list}) VALUES ({placeholders})",
+        tuple(data[c] for c in columns)
+    )
+    return cursor.lastrowid
+
+
 class CategoryRepository:
     @staticmethod
     def get_library_groups(db_type):
@@ -154,17 +177,17 @@ class CategoryRepository:
             conn.close()
 
     @staticmethod
-    def add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id=None):
+    def add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id=None, gdrive_copy_remote=None, gdrive_copy_dest_path=None):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
             cursor.execute(
                 """
-                INSERT INTO libraries 
-                (name, physical_path, scan_status, is_remote, rclone_rc_url, icon, color, hide_cover, group_id) 
-                VALUES (%s, %s, 'ready', %s, %s, %s, %s, %s, %s)
+                INSERT INTO libraries
+                (name, physical_path, scan_status, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_copy_dest_path)
+                VALUES (%s, %s, 'ready', %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
-                (name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id)
+                (name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_copy_dest_path)
             )
             lib_id = cursor.lastrowid
             conn.commit()
@@ -176,17 +199,17 @@ class CategoryRepository:
             conn.close()
 
     @staticmethod
-    def edit_library(db_type, library_id, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id=None):
+    def edit_library(db_type, library_id, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id=None, gdrive_copy_remote=None, gdrive_copy_dest_path=None):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
             cursor.execute(
                 """
-                UPDATE libraries 
-                SET name = %s, physical_path = %s, is_remote = %s, rclone_rc_url = %s, icon = %s, color = %s, hide_cover = %s, group_id = %s
+                UPDATE libraries
+                SET name = %s, physical_path = %s, is_remote = %s, rclone_rc_url = %s, icon = %s, color = %s, hide_cover = %s, group_id = %s, gdrive_copy_remote = %s, gdrive_copy_dest_path = %s
                 WHERE id = %s
                 """,
-                (name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, library_id)
+                (name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_copy_dest_path, library_id)
             )
             conn.commit()
         except Exception as e:
@@ -285,17 +308,17 @@ class CategoryRepository:
         return row['id'] if row else None
 
     @staticmethod
-    def insert_library_raw(db_type, name, physical_path, cron_schedule, last_scanned_at, scan_status, is_remote, vfs_refresh_before_scan, rclone_rc_url, icon, color, hide_cover):
+    def insert_library_raw(db_type, name, physical_path, cron_schedule, last_scanned_at, scan_status, is_remote, vfs_refresh_before_scan, rclone_rc_url, icon, color, hide_cover, gdrive_copy_remote=None, gdrive_copy_dest_path=None):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
             cursor.execute(
                 """
-                INSERT INTO libraries 
-                (name, physical_path, cron_schedule, last_scanned_at, scan_status, is_remote, vfs_refresh_before_scan, rclone_rc_url, icon, color, hide_cover) 
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO libraries
+                (name, physical_path, cron_schedule, last_scanned_at, scan_status, is_remote, vfs_refresh_before_scan, rclone_rc_url, icon, color, hide_cover, gdrive_copy_remote, gdrive_copy_dest_path)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
-                (name, physical_path, cron_schedule, last_scanned_at, scan_status, is_remote, vfs_refresh_before_scan, rclone_rc_url, icon, color, hide_cover)
+                (name, physical_path, cron_schedule, last_scanned_at, scan_status, is_remote, vfs_refresh_before_scan, rclone_rc_url, icon, color, hide_cover, gdrive_copy_remote, gdrive_copy_dest_path)
             )
             lib_id = cursor.lastrowid
             conn.commit()
@@ -325,72 +348,39 @@ class CategoryRepository:
         cursor_dst = conn_dst.cursor()
         
         try:
-            # group_id/sort_order를 안 옮기면 사이드바 가상 그룹(폴더) 소속과 정렬 위치가
-            # 이동할 때마다 조용히 초기화된다.
-            cursor_dst.execute(
-                """INSERT INTO libraries
-                   (name, physical_path, cron_schedule, last_scanned_at, scan_status, is_remote, vfs_refresh_before_scan, rclone_rc_url, icon, color, hide_cover, group_id, sort_order)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-                (new_lib_name, new_lib_data["physical_path"], new_lib_data["cron_schedule"], new_lib_data["last_scanned_at"],
-                 new_lib_data["scan_status"], new_lib_data["is_remote"], new_lib_data["vfs_refresh_before_scan"],
-                 new_lib_data["rclone_rc_url"], new_lib_data["icon"], new_lib_data["color"], new_lib_data["hide_cover"],
-                 new_lib_data.get("group_id"), new_lib_data.get("sort_order", 0))
-            )
-            new_lib_id = cursor_dst.lastrowid
+            # 목적지 DB에 카테고리 삽입 — new_lib_data(SELECT * 결과)의 컬럼을 그대로 옮기므로
+            # group_id/sort_order를 포함해 스키마의 모든 컬럼이 자동으로 함께 이관된다.
+            new_lib_id = _dynamic_insert(cursor_dst, 'libraries', new_lib_data, overrides={'name': new_lib_name})
 
             book_id_map = {}
             for book in books_data:
                 old_book_id = book["id"]
-                # metadata_locked/series_alias/title_alias/file_mtime/file_size/is_deleted/deleted_at을
-                # 안 옮기면 잠금 상태·별칭·증분 스캔용 mtime이 이동할 때마다 조용히 초기화된다.
-                cursor_dst.execute(
-                    """INSERT INTO books
-                       (library_id, title, series_name, author, file_path, file_format, total_pages, has_offsets, cover_image,
-                        publisher, link, score, release_date, summary, genre, tags, is_favorite, cover_updated_at, created_at,
-                        is_deleted, deleted_at, metadata_locked, series_alias, title_alias, file_mtime, file_size)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-                    (new_lib_id, book["title"], book["series_name"], book["author"], book["file_path"], book["file_format"],
-                     book["total_pages"], book["has_offsets"], book["cover_image"], book["publisher"], book["link"],
-                     book["score"], book["release_date"], book["summary"], book["genre"], book["tags"], book["is_favorite"],
-                     book["cover_updated_at"], book["created_at"],
-                     book.get("is_deleted", 0), book.get("deleted_at"), book.get("metadata_locked", 0),
-                     book.get("series_alias"), book.get("title_alias"), book.get("file_mtime", 0.0), book.get("file_size", 0))
-                )
-                new_book_id = cursor_dst.lastrowid
+                # 목적지 DB에 도서 삽입 (books의 모든 컬럼 자동 이관)
+                new_book_id = _dynamic_insert(cursor_dst, 'books', book, overrides={'library_id': new_lib_id})
                 book_id_map[old_book_id] = new_book_id
-                
+
                 cursor_src.execute("SELECT * FROM user_progress WHERE book_id = %s", (old_book_id,))
-                progs = cursor_src.fetchall()
-                for p in progs:
-                    cursor_dst.execute(
-                        "INSERT INTO user_progress (book_id, user_id, pages_read, is_completed, last_read_at) VALUES (%s, %s, %s, %s, %s)",
-                        (new_book_id, p["user_id"], p["pages_read"], p["is_completed"], p["last_read_at"])
-                    )
-                    
+                for row in cursor_src.fetchall():
+                    _dynamic_insert(cursor_dst, 'user_progress', dict(row), overrides={'book_id': new_book_id})
+
                 cursor_src.execute("SELECT * FROM user_reading_log WHERE book_id = %s", (old_book_id,))
-                logs = cursor_src.fetchall()
-                for l in logs:
-                    cursor_dst.execute(
-                        "INSERT INTO user_reading_log (book_id, user_id, pages_read_delta, duration_seconds, read_date) VALUES (%s, %s, %s, %s, %s)",
-                        (new_book_id, l["user_id"], l["pages_read_delta"], l["duration_seconds"], l["read_date"])
-                    )
-                    
+                for row in cursor_src.fetchall():
+                    _dynamic_insert(cursor_dst, 'user_reading_log', dict(row), overrides={'book_id': new_book_id})
+
                 cursor_src.execute("SELECT * FROM book_offsets WHERE book_id = %s", (old_book_id,))
-                offsets = cursor_src.fetchall()
-                for o in offsets:
-                    cursor_dst.execute(
-                        "INSERT INTO book_offsets (book_id, page_idx, filename, local_header_offset, compress_size, file_size, compress_type) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                        (new_book_id, o["page_idx"], o["filename"], o["local_header_offset"], o["compress_size"], o["file_size"], o["compress_type"])
-                    )
-            
+                for row in cursor_src.fetchall():
+                    _dynamic_insert(cursor_dst, 'book_offsets', dict(row), overrides={'book_id': new_book_id})
+
+                # 즐겨찾기(user_favorites) 복제 — 예전엔 소스에서 삭제만 되고 목적지로 옮기는
+                # 코드가 없어 이관할 때마다 즐겨찾기가 조용히 유실되고 있었다.
+                cursor_src.execute("SELECT * FROM user_favorites WHERE book_id = %s", (old_book_id,))
+                for row in cursor_src.fetchall():
+                    _dynamic_insert(cursor_dst, 'user_favorites', dict(row), overrides={'book_id': new_book_id})
+
             cursor_src.execute("SELECT * FROM user_category_permissions WHERE library_id = %s", (library_id,))
-            perms = cursor_src.fetchall()
-            for perm in perms:
-                cursor_dst.execute(
-                    "INSERT INTO user_category_permissions (user_id, library_id, has_access) VALUES (%s, %s, %s)",
-                    (perm["user_id"], new_lib_id, perm["has_access"])
-                )
-                
+            for row in cursor_src.fetchall():
+                _dynamic_insert(cursor_dst, 'user_category_permissions', dict(row), overrides={'library_id': new_lib_id})
+
             for old_book_id in book_id_map.keys():
                 cursor_src.execute("DELETE FROM book_offsets WHERE book_id = %s", (old_book_id,))
                 cursor_src.execute("DELETE FROM user_progress WHERE book_id = %s", (old_book_id,))

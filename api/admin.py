@@ -20,6 +20,7 @@ from api.routes.system_routes import system_bp
 from api.routes.permission_routes import permission_bp
 from api.routes.trash_routes import trash_bp
 from api.routes.tv_routes import tv_bp
+from api.routes.gdrive_copy_routes import gdrive_copy_bp
 
 # 통합 Blueprint (api/__init__.py에서 register_blueprint하기 위한 컨테이너)
 admin_bp = Blueprint('media_admin', __name__)
@@ -34,3 +35,4 @@ admin_bp.register_blueprint(system_bp)
 admin_bp.register_blueprint(permission_bp)
 admin_bp.register_blueprint(trash_bp)
 admin_bp.register_blueprint(tv_bp)
+admin_bp.register_blueprint(gdrive_copy_bp)

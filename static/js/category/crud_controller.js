@@ -3,7 +3,7 @@ import { state } from '../state.js';
 import * as api from '../api.js';
 import { selectCategory } from '../tab_media_library.js';
 import { currentTargetLibrary } from './context_menu.js';
-import { updateRemoteWarning, enableVFSCheckForRemote } from './path_browser.js';
+import { updateRemoteWarning, enableVFSCheckForRemote, loadGdriveCopyRemotes } from './path_browser.js';
 import { loadVideoLibraryView } from '../video_library.js';
 
 async function reloadLibrarySidebar() {
@@ -98,6 +98,9 @@ export function triggerAddLibrary() {
     remoteEl.checked = false;
     remoteEl.dispatchEvent(new Event('change'));
   }
+  updateAdvancedStatusDot(false);
+  const advancedDetailsEl = document.getElementById('library-form-advanced-details');
+  if (advancedDetailsEl) advancedDetailsEl.open = false;
 
   // 이동 버튼 숨김
   const moveBtn = document.getElementById('library-form-move-btn');
@@ -122,9 +125,14 @@ export function triggerAddLibrary() {
     if (el.dataset.color === '#94a3b8') el.classList.add('active');
     else el.classList.remove('active');
   });
+  updateAppearancePreview('fa-book', '#94a3b8');
 
   const hideCoverEl = document.getElementById('library-form-hide-cover');
   if (hideCoverEl) hideCoverEl.checked = false;
+
+  const gdriveCopyDestPathEl = document.getElementById('library-form-gdrive-copy-dest-path');
+  if (gdriveCopyDestPathEl) gdriveCopyDestPathEl.value = '';
+  loadGdriveCopyRemotes('');
 
   selectCategoryType('local');
 
@@ -134,6 +142,7 @@ export function triggerAddLibrary() {
     remoteEl.addEventListener('change', (e) => {
       if (rcloneGroup) rcloneGroup.style.display = e.target.checked ? 'block' : 'none';
       updateRemoteWarning();
+      updateAdvancedStatusDot(e.target.checked);
       if (e.target.checked) {
         enableVFSCheckForRemote();
       }
@@ -189,6 +198,9 @@ export async function triggerEditLibrary() {
   const isRemoteVal = libraryItem?.dataset?.remote || '0';
   const remoteEl = document.getElementById('library-form-remote');
   if (remoteEl) remoteEl.checked = (isRemoteVal === '1');
+  updateAdvancedStatusDot(isRemoteVal === '1');
+  const advancedDetailsEl = document.getElementById('library-form-advanced-details');
+  if (advancedDetailsEl) advancedDetailsEl.open = (isRemoteVal === '1');
 
   // Rclone RC URL 바인딩 및 표시 토글
   const rcloneUrlVal = libraryItem?.dataset?.rcloneUrl || '';
@@ -199,6 +211,13 @@ export async function triggerEditLibrary() {
   if (rcloneGroup) {
     rcloneGroup.style.display = (isRemoteVal === '1') ? 'block' : 'none';
   }
+
+  // 서버사이드 복사 대상 리모트/목적지 경로 바인딩
+  const gdriveCopyRemoteVal = libraryItem?.dataset?.gdriveCopyRemote || '';
+  const gdriveCopyDestPathVal = libraryItem?.dataset?.gdriveCopyDestPath || '';
+  const gdriveCopyDestPathEl = document.getElementById('library-form-gdrive-copy-dest-path');
+  if (gdriveCopyDestPathEl) gdriveCopyDestPathEl.value = gdriveCopyDestPathVal;
+  loadGdriveCopyRemotes(gdriveCopyRemoteVal);
 
   // 아이콘 및 컬러 칩 데이터 바인딩
   const iconVal = libraryItem?.dataset?.icon || 'fa-book';
@@ -217,6 +236,7 @@ export async function triggerEditLibrary() {
     if (el.dataset.color === colorVal) el.classList.add('active');
     else el.classList.remove('active');
   });
+  updateAppearancePreview(iconVal, colorVal);
 
   const hideCoverVal = libraryItem?.dataset?.hideCover || '0';
   const hideCoverEl = document.getElementById('library-form-hide-cover');
@@ -535,6 +555,7 @@ export function selectCategoryType(type) {
   const btnTest = document.getElementById('btn-test-gdrive-links');
   const remoteRow = document.getElementById('library-form-remote-row');
   const rcloneGroup = document.getElementById('library-form-rclone-url-group');
+  const gdriveCopyGroup = document.getElementById('library-form-gdrive-copy-group');
 
   if (type === 'gdrive') {
       if (pathLabel) pathLabel.textContent = (window.i18n && i18n.t('modal.gdrive_path_label')) || '구글 드라이브 공유 폴더 링크 (엔터로 여러 개 입력 가능)';
@@ -543,13 +564,27 @@ export function selectCategoryType(type) {
       if (btnTest) btnTest.style.display = 'inline-flex';
       if (remoteRow) remoteRow.style.display = 'none';
       if (rcloneGroup) rcloneGroup.style.display = 'none';
+      if (gdriveCopyGroup) gdriveCopyGroup.style.display = 'none';
   } else {
       if (pathLabel) pathLabel.textContent = (window.i18n && i18n.t('modal.category_path_label')) || '서버 물리 경로 (엔터로 여러 개 입력 가능)';
       if (pathTextarea) pathTextarea.placeholder = '예: C:\\library\\fantasy\n/home/user/manga';
       if (btnBrowse) btnBrowse.style.display = 'inline-flex';
       if (btnTest) btnTest.style.display = 'none';
       if (remoteRow) remoteRow.style.display = 'flex';
+      if (gdriveCopyGroup) gdriveCopyGroup.style.display = 'block';
   }
+}
+
+function updateAdvancedStatusDot(isRemoteChecked) {
+  const dotEl = document.getElementById('library-form-advanced-status-dot');
+  if (dotEl) dotEl.classList.toggle('active', !!isRemoteChecked);
+}
+
+function updateAppearancePreview(iconVal, colorVal) {
+  const previewIconEl = document.getElementById('library-form-appearance-preview-icon');
+  if (previewIconEl) previewIconEl.innerHTML = `<i class="fa-solid ${iconVal}"></i>`;
+  const previewColorEl = document.getElementById('library-form-appearance-preview-color');
+  if (previewColorEl) previewColorEl.style.backgroundColor = colorVal;
 }
 
 export function selectIconOption(element) {
@@ -557,6 +592,7 @@ export function selectIconOption(element) {
   element.classList.add('active');
   const iconInput = document.getElementById('library-form-icon');
   if (iconInput) iconInput.value = element.dataset.icon;
+  updateAppearancePreview(element.dataset.icon, document.getElementById('library-form-color')?.value || '#94a3b8');
 }
 
 export function selectColorOption(element) {
@@ -564,4 +600,5 @@ export function selectColorOption(element) {
   element.classList.add('active');
   const colorInput = document.getElementById('library-form-color');
   if (colorInput) colorInput.value = element.dataset.color;
+  updateAppearancePreview(document.getElementById('library-form-icon')?.value || 'fa-book', element.dataset.color);
 }
