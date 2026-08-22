@@ -18,6 +18,11 @@
     <title>BookOasis - 도서 보관함</title>
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="{{ static_asset_url('images/logo.png', sig='boe-favicon-a17f3c9') }}">
+    <!-- PWA 매니페스트 + 홈 화면 아이콘 (여백 없이 꽉 채운 전용 아이콘 — logo.png는 여백이
+         커서 그대로 쓰면 안드로이드/iOS가 홈 화면에 추가할 때 이중으로 여백이 생겨 유독
+         작아 보인다는 실사용자 리포트로 확인, 2026-08-22) -->
+    <link rel="manifest" href="{{ static_asset_url('manifest.json', sig='boe-manifest-a17f3c9') }}">
+    <link rel="apple-touch-icon" href="{{ static_asset_url('images/apple-touch-icon.png', sig='boe-apple-icon-a17f3c9') }}">
     <!-- FontAwesome 아이콘 패키지 추가 (Local) -->
     <link rel="stylesheet" href="{{ static_asset_url('lib/font-awesome/css/all.min.css') }}">
     <!-- i18n 다국어 지원 엔진 -->

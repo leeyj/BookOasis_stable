@@ -1,4 +1,8 @@
 # CHANGELOG
+## v2.3.3
+- (fix) 홈 화면 아이콘이 다른 앱들보다 유독 작아 보이던 문제 수정 — 여백 없이 꽉 채운 전용 아이콘 + PWA 매니페스트 추가 | fix the home-screen icon looking noticeably smaller than other apps — added a properly full-bleed icon set + PWA manifest
+- (fix) 모바일에서 형광펜(하이라이트) 모드 진입 시 본문을 가리거나 페이지 넘김이 안 되는 등 여러 터치 충돌이 발생하던 문제 — 모바일에서는 형광펜 기능을 비활성화 (데스크톱은 그대로 유지) | fix multiple touch conflicts (button covering text, broken page-turn touch) when entering highlight mode on mobile — the highlight/annotation feature is now disabled on mobile (desktop unaffected)
+
 ## v2.3.2
 - (fix) 확장자는 mp3지만 실제 컨테이너/코덱이 다른(MPEG-TS 등) 오디오북 파일이 재생되지 않던 문제 수정 — 실시간 트랜스코딩 및 seek 지원 추가, 트랜스코딩 중에는 플레이어에 경고 배너 표시 | fix audiobook files with a `.mp3` extension but a mismatched actual container/codec (e.g. MPEG-TS) failing to play — added on-the-fly transcoding with seek support and an in-player warning banner while transcoding
 - (feature) 구글 드라이브 사본 뷰어 로컬 캐시에 24시간 고정 TTL 자동 정리 작업 추가 | add a fixed 24-hour TTL auto-cleanup job for the Google Drive view-copy local cache

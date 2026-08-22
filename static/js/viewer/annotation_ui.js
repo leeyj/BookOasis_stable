@@ -9,6 +9,7 @@
 // 넘김 동작으로 복귀한다. 스크롤 모드는 원래 hotspot이 없어 문제 없었지만, 우발적
 // 선택으로 팝업이 뜨는 걸 막기 위해 동일하게 모드 게이팅을 적용한다.
 import { state } from '../state.js';
+import { getViewerPlatformProfile } from './platform_profile.js';
 import { positionMenuAtPoint, hideFloatingMenu } from '../context_menu_manager.js';
 import { encodeRange, wrapRangeWithMark } from './annotation_anchor.js';
 import { addAnnotationLocal, removeAnnotationLocal, getAnnotationById } from './annotation_state.js';
@@ -46,11 +47,16 @@ function ensureToggleButton() {
   btn.title = '형광펜 모드 켜기/끄기';
   btn.textContent = '🖍️';
   btn.style.cssText = [
-    // 우측 중앙에 크게 떠 있으면 태블릿 해상도에서 본문을 가려 읽기 방해가 크므로,
-    // 전체화면 닫기 버튼(.floating-close-btn: top 56px+safe-area, right 20px+safe-area,
-    // 44px)과 같은 줄 왼쪽에 붙는 작은 아이콘으로 배치한다.
-    'position:fixed', 'right:calc(74px + env(safe-area-inset-right, 0px))',
-    'top:calc(68px + env(safe-area-inset-top, 0px))',
+    // 우측 중앙에 크게 떠 있으면 태블릿 해상도에서 본문을 가려 읽기 방해가 크므로 작은
+    // 아이콘으로 배치한다. 전체화면 닫기 버튼(.floating-close-btn: top 56px+safe-area,
+    // right 20px+safe-area, 44px)과 "같은 줄 왼쪽"에 두면 74px만큼 안쪽으로 들어와
+    // 실제 줄바꿈된 본문 텍스트 칼럼 한가운데를 덮어버린다(2026-08-22 실사용자 리포트로
+    // 확인 — 모바일에서 글자를 가림). 텍스트가 거의 화면 끝까지 채워지더라도 줄바꿈
+    // 특성상 가장 바깥쪽 우측 여백(닫기 버튼이 이미 쓰고 있는 그 자리)만큼은 거의 항상
+    // 비어 있으므로, 닫기 버튼과 같은 right 값으로 "그 아래"에 세로로 쌓아 같은 안전
+    // 여백을 재사용한다.
+    'position:fixed', 'right:calc(20px + env(safe-area-inset-right, 0px))',
+    'top:calc(108px + env(safe-area-inset-top, 0px))',
     'width:20px', 'height:20px', 'border-radius:50%', 'z-index:10004',
     'background:rgba(15,23,42,0.7)', 'border:1px solid rgba(255,255,255,0.15)',
     'color:#fff', 'font-size:0.7rem', 'cursor:pointer', 'backdrop-filter:blur(8px)',
@@ -79,6 +85,10 @@ function syncToggleButtonVisual() {
 }
 
 export function setHighlightMode(active) {
+  // 모바일은 기능 자체가 비활성화 상태(initAnnotationSelectionUI에서 이벤트 바인딩을
+  // 아예 건너뜀) — 실제로 켜져도 선택/추가/삭제가 하나도 안 먹는 반쪽짜리 상태가 되는
+  // 걸 막기 위해, 켜는 시도 자체를 여기서 한 번 더 막는다(방어적 게이트).
+  if (active && getViewerPlatformProfile().isMobileDevice) return;
   highlightModeActive = !!active;
   const hotspot = document.getElementById('common-viewer-hotspot');
   if (hotspot) hotspot.style.pointerEvents = highlightModeActive ? 'none' : 'auto';
@@ -323,8 +333,17 @@ function onMarkTouchEnd() {
 
 export function initAnnotationSelectionUI(getTxtChunks) {
   if (typeof getTxtChunks === 'function') getTxtChunksFn = getTxtChunks;
-  configureAnnotationContextMenu({ onDelete: deleteAnnotationById });
   resetHighlightMode();
+
+  // 모바일에서는 형광펜 기능 자체를 비활성화한다. 항상 떠 있는 버튼(본문 가림) → 두
+  // 손가락 탭(Android Chrome이 contextmenu로 가로채 신뢰성 없음) → 롱프레스(네이티브
+  // 단어 선택 드래그와 충돌) 순으로 시도했지만 매번 새로운 사이드이펙트가 나와, 근본
+  // 원인(모바일 터치 제스처 공간이 이미 OS 몸짓들로 꽉 차 있어 새 제스처를 안전하게
+  // 얹을 자리가 없음)을 받아들이고 기능 자체를 끄기로 결정함(2026-08-22, 사용자 지시).
+  // 데스크톱(마우스 우클릭 기반)은 이런 충돌이 없어 그대로 유지한다.
+  if (getViewerPlatformProfile().isMobileDevice) return;
+
+  configureAnnotationContextMenu({ onDelete: deleteAnnotationById });
   ensureToggleButton();
   if (bound) return;
   bound = true;
@@ -342,7 +361,6 @@ export function initAnnotationSelectionUI(getTxtChunks) {
   // PC 우클릭: 형광펜 모드 중 하이라이트 위에서만 커스텀 메뉴(플러그인 항목 + 삭제)를 띄우고
   // 그 외에는(페이지 넘김 등) 브라우저 기본 컨텍스트 메뉴를 그대로 둔다.
   document.addEventListener('contextmenu', onMarkContextMenu, true);
-  // 모바일: 롱프레스로 동일한 메뉴를 띄운다 (짧은 탭은 기존처럼 삭제 확인으로 처리).
   document.addEventListener('touchstart', onMarkTouchStart, { passive: true });
   document.addEventListener('touchmove', onMarkTouchMove, { passive: true });
   document.addEventListener('touchend', onMarkTouchEnd);
