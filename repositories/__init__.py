@@ -17,6 +17,7 @@ if DBMS in ("mariadb", "mysql"):
         category_repository,
         collection_repository,
         db_tuning_repository,
+        gdrive_book_copy_repository,
         metadata_repository,
         opds_repository,
         plugin_repository,
@@ -39,6 +40,7 @@ else:
         category_repository,
         collection_repository,
         db_tuning_repository,
+        gdrive_book_copy_repository,
         metadata_repository,
         opds_repository,
         plugin_repository,
@@ -61,6 +63,7 @@ sys.modules['repositories.book_scan_repository'] = book_scan_repository
 sys.modules['repositories.category_repository'] = category_repository
 sys.modules['repositories.collection_repository'] = collection_repository
 sys.modules['repositories.db_tuning_repository'] = db_tuning_repository
+sys.modules['repositories.gdrive_book_copy_repository'] = gdrive_book_copy_repository
 sys.modules['repositories.metadata_repository'] = metadata_repository
 sys.modules['repositories.opds_repository'] = opds_repository
 sys.modules['repositories.plugin_repository'] = plugin_repository
@@ -82,6 +85,7 @@ BookScanRepository = book_scan_repository.BookScanRepository
 CategoryRepository = category_repository.CategoryRepository
 CollectionRepository = collection_repository.CollectionRepository
 DbTuningRepository = db_tuning_repository.DbTuningRepository
+GdriveBookCopyRepository = gdrive_book_copy_repository.GdriveBookCopyRepository
 MetadataRepository = metadata_repository.MetadataRepository
 OpdsRepository = opds_repository.OpdsRepository
 PluginRepository = plugin_repository.PluginRepository

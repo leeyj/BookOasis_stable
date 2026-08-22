@@ -695,18 +695,19 @@ def get_series_cover_fallback_single(series_name, parent_dir, filename, file_pat
 
     os.makedirs(os.path.dirname(local_cover_path), exist_ok=True)
 
-    # gdrive:// 가상 경로(마운트 아닌 순수 등록 링크)면, 이 시점부터 실제 바이트가 필요한
-    # 모든 처리(오프셋 수집, ComicInfo 파싱, zip/pdf 오픈)를 위해 로컬 캐시로 치환한다.
-    # (rclone으로 실제 마운트된 "원격" 경로는 open()이 바로 되므로 건드리지 않는다.)
+    # gdrive:// 가상 경로(마운트 아닌 순수 등록 링크)는 공유자가 폴더를 정리해뒀다는 보장이
+    # 없고, 서버가 그 사람 몫의 Drive 트래픽/쿼터를 직접적으로 통제할 수도 없다 — 그래서
+    # 레이지 스캐너는 이 경로들을 위해 전체 파일을 내려받지 않는다(이전엔 여기서 무조건
+    # resolve_gdrive_local_path()로 전체 다운로드했는데, 이게 뷰어에서 없앤 것과 똑같은
+    # 동시-요청 API 차단 위험을 배경 스캔에서 다시 불러들이는 셈이었다). kavita.yaml
+    # base64/series.json URL처럼 다운로드가 필요 없는 지름길(2~3단계)은 아래에서 계속
+    # 시도하되, 그마저 안 되면(=사실상 항상, gdrive 가상 경로는 로컬 메타데이터 파싱
+    # 대상이 아니라 b64_keys_lower/series_cover_url이 비어있기 때문) ComicInfo.xml
+    # 파싱이나 zip/pdf 직접 열기 같은 "실제 바이트가 필요한" 단계 직전에 조용히 포기한다.
+    # 커버/메타데이터가 꼭 필요하면 정석은 "Drive에서 복사해오기"로 내 드라이브에 옮긴
+    # 뒤 그 로컬 사본을 다시 스캔하는 것이다.
     from utils.drive_helper import is_gdrive_url
-    if is_gdrive_url(file_path):
-        from utils.drive_helper import resolve_gdrive_local_path
-        resolved = resolve_gdrive_local_path(file_path)
-        if resolved == file_path:
-            print(f"[Lazy-Scanner] ⚠️ gdrive 원격 파일 다운로드 실패, 커버 추출 스킵: {filename}")
-            return (None, None, [])
-        file_path = resolved
-    
+
     # 미리 파싱된 메타데이터가 없으면 여기서 직접 파싱 (단독 호출 시 하위 호환)
     if b64_keys_lower is None:
         from tools.scanner.metadata import merge_local_metadata
@@ -747,7 +748,14 @@ def get_series_cover_fallback_single(series_name, parent_dir, filename, file_pat
                 return (extracted_path, None, offsets)
         except Exception as e:
             print(f"[Lazy-Scanner] series.json URL 표지 다운로드 중 예외 무시: {e}")
-            
+
+    # 여기까지 왔다는 건 위 다운로드-불필요 지름길(공유 커버 재사용/b64/URL)이 전부 안 통했다는
+    # 뜻이다 — gdrive 가상 경로는 이 아래부터 전부 실제 파일 바이트가 필요한데, 그러려면
+    # 전체 다운로드가 강제되므로 여기서 포기한다 (사유는 함수 상단 주석 참조).
+    if is_gdrive_url(file_path):
+        print(f"[Lazy-Scanner] 공유 링크 원본은 전체 다운로드 없이 커버를 만들 수 없어 스킵: {filename}")
+        return (None, None, [])
+
     # 3.5) CBZ 내부 ComicInfo.xml 메타데이터 추출 — 반환값에 함께 포함 (Lazy 핵심 강화)
     comicinfo_meta = None
     if file_path.lower().endswith(('.zip', '.cbz')):

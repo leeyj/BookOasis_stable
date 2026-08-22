@@ -12,9 +12,10 @@ MAX_LIBRARY_PATH_TEXT_LENGTH = 8192
 _AUDIO_EXTENSIONS = ('.mp3', '.m4b', '.m4a', '.flac', '.aac', '.wav', '.ogg', '.opus', '.wma')
 _BOOKISH_EXTENSIONS = ('.zip', '.cbz', '.rar', '.cbr', '.epub', '.pdf', '.txt')
 
-def validate_library_paths(physical_path, category_type='local', is_remote=0):
+def validate_library_paths(physical_path, is_remote=0):
     """
-    물리 경로 또는 원격 링크 검증 (여러 개 지원)
+    물리 경로 또는 원격 링크 검증 (여러 개 지원, 로컬 경로와 구글 드라이브 공유 링크가
+    섞여 있어도 줄 단위로 정상 처리됨)
     반환: (target_paths 리스트, 오류메시지 또는 None)
     """
     raw_text = str(physical_path or '').replace('\r', '')
@@ -31,16 +32,19 @@ def validate_library_paths(physical_path, category_type='local', is_remote=0):
     too_long_paths = [p for p in target_paths if len(p) > MAX_LIBRARY_PATH_LINE_LENGTH]
     if too_long_paths:
         return None, f'각 경로는 최대 {MAX_LIBRARY_PATH_LINE_LENGTH}자까지 허용됩니다.'
-    
-    if category_type == 'gdrive' or is_remote:
+
+    if is_remote:
         return target_paths, None
 
+    # is_remote_path()가 구글 드라이브 공유 링크(is_gdrive_url)도 True로 판별하므로,
+    # 별도의 카테고리 유형 분기 없이 줄 단위 검사만으로 로컬 경로/공유 링크 혼합 입력을
+    # 정확히 처리한다 — 실제 존재하는 로컬 경로가 아닌 줄만 공유 링크인지 확인.
     from utils.drive_helper import is_remote_path
     invalid_paths = [p for p in target_paths if not is_remote_path(p) and not os.path.exists(p)]
     if invalid_paths:
         error_msg = _t('api.err_invalid_paths', paths='\n'.join(invalid_paths))
         return None, error_msg
-    
+
     return target_paths, None
 
 def parse_remote_flag(is_remote_val, target_paths):

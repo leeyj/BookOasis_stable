@@ -12,7 +12,7 @@ gdrive_copy_service.py – 구글 드라이브 공유 폴더를 사용자 자신
 import database
 from repositories.category_repository import CategoryRepository
 from repositories.scanner_queue_repository import ScannerQueueRepository
-from utils.drive_helper import fetch_gdrive_folder_files
+from utils.drive_helper import fetch_gdrive_folder_files, has_gdrive_share_line
 from utils.rclone_gdrive_copy import get_access_token, resolve_dest_folder, find_or_create_folder, copy_file
 
 
@@ -41,6 +41,8 @@ class GdriveCopyService:
             raise ValueError('대상 카테고리를 찾을 수 없습니다.')
         if not library.get('gdrive_copy_remote'):
             raise ValueError('선택한 카테고리에 서버사이드 복사 대상 리모트가 설정되어 있지 않습니다. 카테고리 수정에서 먼저 설정해 주세요.')
+        if has_gdrive_share_line(library.get('physical_path')):
+            raise ValueError('구글 드라이브 공유 링크가 포함된 카테고리는 책을 열람할 때 자동으로 복사되므로, 이 일괄 복사 기능의 대상으로 선택할 수 없습니다.')
 
         links = GdriveCopyService.parse_source_links(source_links)
         if not links:

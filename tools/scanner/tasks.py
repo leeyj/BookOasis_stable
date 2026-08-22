@@ -17,6 +17,30 @@ SUPPORTED_IMAGE_FORMATS = ('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif')
 IMGDIR_VIRTUAL_FILENAME = '__folder__.imgdir'
 
 
+def _compute_offsets(full_path, filename, is_remote, root, gdrive_file_ids):
+    """zip/cbz의 페이지 오프셋을 계산한다. 로컬이면 파일을 직접 열어서, 진짜 gdrive://
+    가상 경로면 Range 요청으로 파일 끝(central directory)만 받아서 계산한다(전체 다운로드 없음).
+    is_remote가 True인 다른 원격(rclone 마운트 등)은 기존처럼 건너뛴다 — 그런 라이브러리는
+    이 함수가 손대지 않고 계속 빈 리스트를 반환한다(원래도 로컬 마운트라 직접 열어도
+    되지만, 그 개선은 이 변경의 범위 밖이다)."""
+    if root.startswith(('gdrive:', 'gdrive://')):
+        file_id = gdrive_file_ids.get(filename) if gdrive_file_ids else None
+        if not file_id:
+            return []
+        from utils.drive_helper import fetch_gdrive_zip_offsets
+        try:
+            offsets_data, _total_size = fetch_gdrive_zip_offsets(file_id)
+            if offsets_data:
+                print(f"[Scanner-DEBUG-Task] ⚡ [gdrive Range] '{filename}' 오프셋 계산 완료 ({len(offsets_data)}p, 전체 다운로드 없음)")
+            return offsets_data
+        except Exception as e:
+            print(f"[Scanner-DEBUG-Task] ❌ gdrive Range 오프셋 계산 실패: '{filename}' - {e}")
+            return []
+    if is_remote:
+        return []
+    return collect_zip_offsets_data(full_path)
+
+
 def _full_path_for(root, filename, gdrive_file_ids):
     """root+filename을 합친 경로에, gdrive 등록분이면 실제 Drive file_id를 얹어 반환한다.
 
@@ -252,15 +276,16 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
             full_path in db_meta_full and
             full_path not in db_offsets_cached and
             file_format in ('zip', 'cbz') and
-            not is_remote
+            (not is_remote or root.startswith(('gdrive:', 'gdrive://')))
         ):
             # ── [Offset-only Fast Path] ──
             # If existing book has cover/meta but no offset:
             # Completely skip ComicInfo parsing and cover extraction pipeline
             # Only read ZIP central directory (collect offsets) - Minimize I/O
+            # (gdrive:// 가상 경로면 전체 다운로드 없이 Range 요청만으로 처리 — _compute_offsets 참조)
             offset_only = True
             try:
-                offsets_data = collect_zip_offsets_data(full_path)
+                offsets_data = _compute_offsets(full_path, filename, is_remote, root, gdrive_file_ids)
                 if offsets_data:
                     print(f"[Scanner-DEBUG-Task] ⚡ [Offset-only] '{filename}' ({len(offsets_data)}p)")
                 else:
@@ -381,11 +406,8 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
 
             try:
                 if file_format in ('zip', 'cbz') and (force or full_path not in db_offsets_cached):
-                    if is_remote:
-                        offsets_data = []
-                    else:
-                        print(f"[Scanner-DEBUG-Task]     - Offset analysis started: '{filename}'")
-                        offsets_data = collect_zip_offsets_data(full_path)
+                    print(f"[Scanner-DEBUG-Task]     - Offset analysis started: '{filename}'")
+                    offsets_data = _compute_offsets(full_path, filename, is_remote, root, gdrive_file_ids)
             except Exception as e:
                 print(f"[Scanner-DEBUG-Task] ❌ Offset analysis failed: '{filename}' - {e}")
                 if not any(err['file_path'] == full_path for err in errors):

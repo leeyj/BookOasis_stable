@@ -224,6 +224,38 @@ function updatePlaybackToggleButtons(isPlaying) {
   if (miniBtn) miniBtn.innerHTML = html;
 }
 
+let transcodeWarningRequestToken = 0;
+
+function updateTranscodeWarning(audiobookId, trackId) {
+  // 트랙 전환마다 이전 요청 결과가 늦게 도착해 엉뚱한 트랙 기준으로 배너를 갱신하지
+  // 않도록, 매 호출마다 토큰을 새로 발급해 최신 호출만 반영한다.
+  const requestToken = ++transcodeWarningRequestToken;
+  const warningEl = document.getElementById('audio-player-transcode-warning');
+  if (warningEl) warningEl.style.display = 'none';
+
+  fetch(`/api/media/audiobooks/${audiobookId}/tracks/${trackId}/transcode-status`)
+    .then(res => res.json())
+    .then(data => {
+      if (requestToken !== transcodeWarningRequestToken) return;
+      if (warningEl) warningEl.style.display = (data && data.success && data.needs_transcode) ? 'block' : 'none';
+    })
+    .catch(() => {});
+}
+
+function setPlayButtonLoading(isLoading) {
+  // 트랜스코딩 재시작(시킹) 등으로 재생이 잠깐 멈추는 구간(waiting)에는 재생 버튼 자리에
+  // 스피너를 대신 보여준다 — 사용자가 "멈춘 건지 로딩 중인지" 구분할 수 없는 문제 대응.
+  const fullBtn = document.getElementById('btn-audio-play-toggle');
+  const miniBtn = document.getElementById('btn-audio-mini-play-toggle');
+  if (isLoading) {
+    const spinnerHtml = '<i class="fa-solid fa-spinner fa-spin"></i>';
+    if (fullBtn) fullBtn.innerHTML = spinnerHtml;
+    if (miniBtn) miniBtn.innerHTML = spinnerHtml;
+  } else if (audioInstance) {
+    updatePlaybackToggleButtons(!audioInstance.paused);
+  }
+}
+
 function updateMiniPlayerUi() {
   miniPlayerUi.updateMiniPlayerUi();
 }
@@ -316,6 +348,7 @@ export function openAudioPlayerModal(audioData, targetTrackId = null, startTime 
   const streamUrl = `/api/media/audiobooks/${meta.id}/tracks/${currentTrack.id}/stream`;
   audioInstance.src = streamUrl;
   audioInstance.playbackRate = audioSpeeds[currentAudioSpeedIndex];
+  updateTranscodeWarning(meta.id, currentTrack.id);
 
   if (startTime > 0) {
     audioInstance.currentTime = startTime;
@@ -403,13 +436,22 @@ function initAudioEvents() {
   // (백그라운드 스로틀링의 전형적 신호), waiting=디코딩된 데이터가 부족해 재생이 멈춤.
   audioInstance.onstalled = () => remoteLog('audio-stalled', { currentTime: audioInstance.currentTime, hidden: document.visibilityState });
   audioInstance.onsuspend = () => remoteLog('audio-suspend', { currentTime: audioInstance.currentTime, hidden: document.visibilityState });
-  audioInstance.onwaiting = () => remoteLog('audio-waiting', { currentTime: audioInstance.currentTime, hidden: document.visibilityState });
-  audioInstance.onerror = () => remoteLog('audio-error', {
-    code: audioInstance.error ? audioInstance.error.code : null,
-    message: audioInstance.error ? audioInstance.error.message : null,
-    hidden: document.visibilityState
-  });
-  audioInstance.onplaying = () => remoteLog('audio-playing', { currentTime: audioInstance.currentTime, hidden: document.visibilityState });
+  audioInstance.onwaiting = () => {
+    setPlayButtonLoading(true);
+    remoteLog('audio-waiting', { currentTime: audioInstance.currentTime, hidden: document.visibilityState });
+  };
+  audioInstance.onerror = () => {
+    setPlayButtonLoading(false);
+    remoteLog('audio-error', {
+      code: audioInstance.error ? audioInstance.error.code : null,
+      message: audioInstance.error ? audioInstance.error.message : null,
+      hidden: document.visibilityState
+    });
+  };
+  audioInstance.onplaying = () => {
+    setPlayButtonLoading(false);
+    remoteLog('audio-playing', { currentTime: audioInstance.currentTime, hidden: document.visibilityState });
+  };
 
   audioInstance.onended = () => {
     if (currentAudiobookData && currentAudiobookData.tracks && currentTrackIndex < currentAudiobookData.tracks.length - 1) {

@@ -101,6 +101,8 @@ export function triggerAddLibrary() {
   updateAdvancedStatusDot(false);
   const advancedDetailsEl = document.getElementById('library-form-advanced-details');
   if (advancedDetailsEl) advancedDetailsEl.open = false;
+  const gdriveCopyDetailsEl = document.getElementById('library-form-gdrive-copy-details');
+  if (gdriveCopyDetailsEl) gdriveCopyDetailsEl.open = false;
 
   // 이동 버튼 숨김
   const moveBtn = document.getElementById('library-form-move-btn');
@@ -132,21 +134,30 @@ export function triggerAddLibrary() {
 
   const gdriveCopyDestPathEl = document.getElementById('library-form-gdrive-copy-dest-path');
   if (gdriveCopyDestPathEl) gdriveCopyDestPathEl.value = '';
+  const gdriveViewMirrorEl = document.getElementById('library-form-gdrive-view-mirror-path');
+  if (gdriveViewMirrorEl) gdriveViewMirrorEl.value = '';
   loadGdriveCopyRemotes('');
 
-  selectCategoryType('local');
+  updateGdriveSectionVisibility();
 
   // 체크박스 변경 감지 바인딩 (최초 1회)
   if (remoteEl && !remoteEl.dataset.listenerBound) {
     remoteEl.dataset.listenerBound = 'true';
     remoteEl.addEventListener('change', (e) => {
-      if (rcloneGroup) rcloneGroup.style.display = e.target.checked ? 'block' : 'none';
       updateRemoteWarning();
       updateAdvancedStatusDot(e.target.checked);
+      updateGdriveSectionVisibility();
       if (e.target.checked) {
         enableVFSCheckForRemote();
       }
     });
+  }
+
+  // 물리 경로 입력 변경 감지 바인딩 (최초 1회) — 공유 링크 유무에 따라 복사 설정 섹션 갱신
+  const pathTextarea = document.getElementById('library-form-path');
+  if (pathTextarea && !pathTextarea.dataset.gdriveListenerBound) {
+    pathTextarea.dataset.gdriveListenerBound = 'true';
+    pathTextarea.addEventListener('input', updateGdriveSectionVisibility);
   }
 
   if (title) {
@@ -192,9 +203,6 @@ export async function triggerEditLibrary() {
   const pathVal = libraryItem?.dataset?.path || '';
   document.getElementById('library-form-path').value = pathVal;
 
-  const categoryTypeVal = libraryItem?.dataset?.categoryType || 'local';
-  selectCategoryType(categoryTypeVal);
-
   const isRemoteVal = libraryItem?.dataset?.remote || '0';
   const remoteEl = document.getElementById('library-form-remote');
   if (remoteEl) remoteEl.checked = (isRemoteVal === '1');
@@ -202,22 +210,33 @@ export async function triggerEditLibrary() {
   const advancedDetailsEl = document.getElementById('library-form-advanced-details');
   if (advancedDetailsEl) advancedDetailsEl.open = (isRemoteVal === '1');
 
-  // Rclone RC URL 바인딩 및 표시 토글
+  // Rclone RC URL 값 바인딩 (노출 여부는 updateGdriveSectionVisibility()가 일괄 처리)
   const rcloneUrlVal = libraryItem?.dataset?.rcloneUrl || '';
   const rcloneUrlEl = document.getElementById('library-form-rclone-url');
   if (rcloneUrlEl) rcloneUrlEl.value = rcloneUrlVal;
 
-  const rcloneGroup = document.getElementById('library-form-rclone-url-group');
-  if (rcloneGroup) {
-    rcloneGroup.style.display = (isRemoteVal === '1') ? 'block' : 'none';
-  }
-
-  // 서버사이드 복사 대상 리모트/목적지 경로 바인딩
+  // 구글 드라이브 자동 복사 리모트/목적지 경로 바인딩
   const gdriveCopyRemoteVal = libraryItem?.dataset?.gdriveCopyRemote || '';
   const gdriveCopyDestPathVal = libraryItem?.dataset?.gdriveCopyDestPath || '';
   const gdriveCopyDestPathEl = document.getElementById('library-form-gdrive-copy-dest-path');
   if (gdriveCopyDestPathEl) gdriveCopyDestPathEl.value = gdriveCopyDestPathVal;
+  const gdriveViewMirrorVal = libraryItem?.dataset?.gdriveViewLocalMirrorPath || '';
+  const gdriveViewMirrorEl = document.getElementById('library-form-gdrive-view-mirror-path');
+  if (gdriveViewMirrorEl) gdriveViewMirrorEl.value = gdriveViewMirrorVal;
+  // 이미 리모트가 연결된 카테고리는 열자마자 섹션을 펼쳐서 설정을 바로 보여준다.
+  const gdriveCopyDetailsEl = document.getElementById('library-form-gdrive-copy-details');
+  if (gdriveCopyDetailsEl) gdriveCopyDetailsEl.open = !!gdriveCopyRemoteVal;
+  const gdriveCopyStatusDotEl = document.getElementById('library-form-gdrive-copy-status-dot');
+  if (gdriveCopyStatusDotEl) gdriveCopyStatusDotEl.classList.toggle('active', !!gdriveCopyRemoteVal);
   loadGdriveCopyRemotes(gdriveCopyRemoteVal);
+
+  // 물리 경로/원격 체크박스 값이 모두 채워진 뒤 복사 설정 섹션 노출 여부 갱신
+  updateGdriveSectionVisibility();
+  const pathTextarea = document.getElementById('library-form-path');
+  if (pathTextarea && !pathTextarea.dataset.gdriveListenerBound) {
+    pathTextarea.dataset.gdriveListenerBound = 'true';
+    pathTextarea.addEventListener('input', updateGdriveSectionVisibility);
+  }
 
   // 아이콘 및 컬러 칩 데이터 바인딩
   const iconVal = libraryItem?.dataset?.icon || 'fa-book';
@@ -246,8 +265,8 @@ export async function triggerEditLibrary() {
   if (remoteEl && !remoteEl.dataset.listenerBound) {
     remoteEl.dataset.listenerBound = 'true';
     remoteEl.addEventListener('change', (e) => {
-      if (rcloneGroup) rcloneGroup.style.display = e.target.checked ? 'block' : 'none';
       updateRemoteWarning();
+      updateGdriveSectionVisibility();
       if (e.target.checked) {
         enableVFSCheckForRemote();
       }
@@ -541,37 +560,65 @@ export async function triggerMoveLibrary() {
   }
 }
 
-export function selectCategoryType(type) {
-  document.querySelectorAll('.category-type-selector .category-type-btn').forEach(el => el.classList.remove('active'));
-  const btn = document.querySelector(`.category-type-selector .category-type-btn[data-type="${type}"]`);
-  if (btn) btn.classList.add('active');
+function pathTextHasGdriveShareLine(text) {
+  return String(text || '').split('\n').some(line => /drive\.google\.com|^gdrive:/i.test(line.trim()));
+}
 
-  const typeInput = document.getElementById('library-form-category-type');
-  if (typeInput) typeInput.value = type;
-
-  const pathLabel = document.getElementById('library-form-path-label');
+/**
+ * 카테고리 유형 버튼 대신, 물리 경로 텍스트에 구글 드라이브 공유 링크가 한 줄이라도
+ * 있는지를 매번 다시 읽어 복사 설정 섹션(리모트/목적지/로컬 접근 경로/RC 주소)의
+ * 노출·필수 여부를 갱신한다. 로컬 경로와 공유 링크가 섞여 있어도 정확히 동작한다.
+ */
+export function updateGdriveSectionVisibility() {
   const pathTextarea = document.getElementById('library-form-path');
-  const btnBrowse = document.getElementById('btn-browse-paths');
-  const btnTest = document.getElementById('btn-test-gdrive-links');
-  const remoteRow = document.getElementById('library-form-remote-row');
+  const hasGdriveLine = pathTextHasGdriveShareLine(pathTextarea ? pathTextarea.value : '');
+
   const rcloneGroup = document.getElementById('library-form-rclone-url-group');
   const gdriveCopyGroup = document.getElementById('library-form-gdrive-copy-group');
+  const gdriveCopyRemoteLabel = document.getElementById('library-form-gdrive-copy-remote-label');
+  const gdriveCopyRemoteSelect = document.getElementById('library-form-gdrive-copy-remote');
+  const gdriveCopyDestPathRow = document.getElementById('library-form-gdrive-copy-dest-path-row');
+  const gdriveCopyDestPathInput = document.getElementById('library-form-gdrive-copy-dest-path');
+  const gdriveViewMirrorGroup = document.getElementById('library-form-gdrive-view-mirror-group');
+  const gdriveViewMirrorInput = document.getElementById('library-form-gdrive-view-mirror-path');
+  const remoteEl = document.getElementById('library-form-remote');
+  const isRemoteChecked = !!(remoteEl && remoteEl.checked);
 
-  if (type === 'gdrive') {
-      if (pathLabel) pathLabel.textContent = (window.i18n && i18n.t('modal.gdrive_path_label')) || '구글 드라이브 공유 폴더 링크 (엔터로 여러 개 입력 가능)';
-      if (pathTextarea) pathTextarea.placeholder = (window.i18n && i18n.t('modal.gdrive_path_placeholder')) || '예: https://drive.google.com/drive/folders/1A2B3C4D5E6F7G8H9I';
-      if (btnBrowse) btnBrowse.style.display = 'none';
-      if (btnTest) btnTest.style.display = 'inline-flex';
-      if (remoteRow) remoteRow.style.display = 'none';
-      if (rcloneGroup) rcloneGroup.style.display = 'none';
-      if (gdriveCopyGroup) gdriveCopyGroup.style.display = 'none';
+  // gdrive-copy-group 자체는 develop_mode가 꺼져 있으면 템플릿에서 아예 렌더링 안 되므로
+  // (요소 없음) 매번 null 체크로 안전하게 넘어간다.
+  if (!gdriveCopyGroup) return;
+
+  // 이 섹션은 원격(rclone) 설정과 별개 개념이라 기본은 접혀 있다 — 공유 링크가 있어
+  // 필수가 된 경우에만 여기서 자동으로 펼친다. (이미 리모트가 연결된 카테고리를 열 때
+  // 펼치는 처리는 loadGdriveCopyRemotes()가 비동기라 이 함수 호출 시점엔 select 값이
+  // 아직 반영 전일 수 있어, 그 경우는 openLibraryEditModal()이 별도로 직접 처리한다.)
+  const gdriveCopyDetailsEl = document.getElementById('library-form-gdrive-copy-details');
+  const gdriveCopyStatusDotEl = document.getElementById('library-form-gdrive-copy-status-dot');
+  const hasConfiguredRemote = !!(gdriveCopyRemoteSelect && gdriveCopyRemoteSelect.value);
+  if (gdriveCopyDetailsEl && (hasGdriveLine || hasConfiguredRemote)) gdriveCopyDetailsEl.open = true;
+  if (gdriveCopyStatusDotEl) gdriveCopyStatusDotEl.classList.toggle('active', hasGdriveLine || hasConfiguredRemote);
+
+  // Rclone RC 주소는 "원격 드라이브" 체크 또는 공유 링크 존재, 둘 중 하나만 있어도 필요.
+  if (rcloneGroup) rcloneGroup.style.display = (isRemoteChecked || hasGdriveLine) ? 'block' : 'none';
+
+  if (hasGdriveLine) {
+      // 개인 rclone Drive 리모트 없이는 공유 링크가 포함된 카테고리를 저장할 수 없다
+      // (하드 게이트) — 더 이상 "선택/실험적" 부가 기능이 아니라 필수 설정이라 항상 노출/필수화.
+      if (gdriveCopyRemoteLabel) gdriveCopyRemoteLabel.textContent = '연결할 내 구글 드라이브 리모트 (필수)';
+      if (gdriveCopyRemoteSelect) gdriveCopyRemoteSelect.required = true;
+      // 뷰어 사전복사는 목적지 경로를 자동 생성해 쓰므로(카테고리별 자동 격리), 이 입력은
+      // "Drive에서 복사해오기"(일괄 복사) 전용 카테고리에서만 의미가 있다 — 공유 링크가
+      // 있는 카테고리는 그 기능 대상에서 제외되므로 여기선 숨기고 값도 비워둔다.
+      if (gdriveCopyDestPathRow) gdriveCopyDestPathRow.style.display = 'none';
+      if (gdriveCopyDestPathInput) gdriveCopyDestPathInput.value = '';
+      if (gdriveViewMirrorGroup) gdriveViewMirrorGroup.style.display = 'block';
+      if (gdriveViewMirrorInput) gdriveViewMirrorInput.required = true;
   } else {
-      if (pathLabel) pathLabel.textContent = (window.i18n && i18n.t('modal.category_path_label')) || '서버 물리 경로 (엔터로 여러 개 입력 가능)';
-      if (pathTextarea) pathTextarea.placeholder = '예: C:\\library\\fantasy\n/home/user/manga';
-      if (btnBrowse) btnBrowse.style.display = 'inline-flex';
-      if (btnTest) btnTest.style.display = 'none';
-      if (remoteRow) remoteRow.style.display = 'flex';
-      if (gdriveCopyGroup) gdriveCopyGroup.style.display = 'block';
+      if (gdriveCopyRemoteLabel) gdriveCopyRemoteLabel.textContent = '연결할 내 구글 드라이브 리모트 (선택, 실험적)';
+      if (gdriveCopyRemoteSelect) gdriveCopyRemoteSelect.required = false;
+      if (gdriveCopyDestPathRow) gdriveCopyDestPathRow.style.display = 'block';
+      if (gdriveViewMirrorGroup) gdriveViewMirrorGroup.style.display = 'none';
+      if (gdriveViewMirrorInput) gdriveViewMirrorInput.required = false;
   }
 }
 

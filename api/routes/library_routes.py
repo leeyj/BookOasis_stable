@@ -122,16 +122,15 @@ def add_media_library():
     db_type = request.form.get('type', 'general')
     name = request.form.get('name', '').strip()
     physical_path = request.form.get('physical_path', '').strip()
-    category_type = request.form.get('category_type', 'local').strip() or 'local'
-    
+
     raw_paths = [p.strip() for p in str(physical_path or '').replace('\r', '').split('\n') if p.strip()]
     is_remote_val = request.form.get('is_remote')
     is_remote = parse_remote_flag(is_remote_val, raw_paths)
-    
-    target_paths, error = validate_library_paths(physical_path, category_type, is_remote=is_remote)
+
+    target_paths, error = validate_library_paths(physical_path, is_remote=is_remote)
     if error:
         return jsonify({'success': False, 'error': error}), 400
-    
+
     mismatch = detect_library_media_mismatch(db_type, target_paths, is_remote=is_remote)
     confirm_override = request.form.get('confirm_media_mismatch', '0') in ('1', 'true', 'True', 'on')
     if mismatch and not confirm_override:
@@ -142,12 +141,12 @@ def add_media_library():
             'confirm_message': mismatch['confirm_message'],
             'mismatch_kind': mismatch['kind']
         }), 409
-    
+
     if not name:
         return jsonify({'success': False, 'error': _t('api.err_name_required')}), 400
     if len(name) > MAX_LIBRARY_NAME_LENGTH:
         return jsonify({'success': False, 'error': f'카테고리 이름은 최대 {MAX_LIBRARY_NAME_LENGTH}자까지 허용됩니다.'}), 400
-    
+
     is_remote_val = request.form.get('is_remote')
     is_remote = parse_remote_flag(is_remote_val, target_paths)
     hide_cover = 1 if request.form.get('hide_cover', '0') in ('1', 'true', 'True', 'on') else 0
@@ -156,13 +155,16 @@ def add_media_library():
     color = request.form.get('color', '#94a3b8').strip() or '#94a3b8'
     gdrive_copy_remote = request.form.get('gdrive_copy_remote', '').strip() or None
     gdrive_copy_dest_path = request.form.get('gdrive_copy_dest_path', '').strip() or None
+    gdrive_view_local_mirror_path = request.form.get('gdrive_view_local_mirror_path', '').strip() or None
     try:
         group_id = _parse_group_id(request.form.get('group_id'))
     except ValueError as error:
         return jsonify({'success': False, 'error': str(error)}), 400
 
     try:
-        library_id = CategoryService.add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_copy_dest_path)
+        library_id = CategoryService.add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_copy_dest_path, gdrive_view_local_mirror_path)
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
     except sqlite3.IntegrityError:
         return jsonify({'success': False, 'error': _t('api.err_library_name_exists')}), 400
     except Exception as e:
@@ -192,13 +194,12 @@ def edit_media_library():
     library_id = request.form.get('id')
     name = request.form.get('name', '').strip()
     physical_path = request.form.get('physical_path', '').strip()
-    category_type = request.form.get('category_type', 'local').strip() or 'local'
-    
+
     raw_paths = [p.strip() for p in str(physical_path or '').replace('\r', '').split('\n') if p.strip()]
     is_remote_val = request.form.get('is_remote')
     is_remote = parse_remote_flag(is_remote_val, raw_paths)
-    
-    target_paths, error = validate_library_paths(physical_path, category_type, is_remote=is_remote)
+
+    target_paths, error = validate_library_paths(physical_path, is_remote=is_remote)
     if error:
         return jsonify({'success': False, 'error': error}), 400
     
@@ -224,6 +225,7 @@ def edit_media_library():
     color = request.form.get('color', '#94a3b8').strip() or '#94a3b8'
     gdrive_copy_remote = request.form.get('gdrive_copy_remote', '').strip() or None
     gdrive_copy_dest_path = request.form.get('gdrive_copy_dest_path', '').strip() or None
+    gdrive_view_local_mirror_path = request.form.get('gdrive_view_local_mirror_path', '').strip() or None
     try:
         group_id = _parse_group_id(request.form.get('group_id'))
     except ValueError as error:
@@ -237,7 +239,9 @@ def edit_media_library():
         print(f"[API Warning] Failed to fetch old library: {e}")
 
     try:
-        CategoryService.edit_library(db_type, int(library_id), name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_copy_dest_path)
+        CategoryService.edit_library(db_type, int(library_id), name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_copy_dest_path, gdrive_view_local_mirror_path)
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
     except sqlite3.IntegrityError:
         return jsonify({'success': False, 'error': _t('api.err_library_name_exists')}), 400
     except Exception as e:

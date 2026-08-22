@@ -240,7 +240,7 @@ class BookRepository:
         """권한 체크를 수용하여 도서의 파일 경로 및 포맷 정보 조회"""
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
-        query = f"SELECT b.file_path, b.file_format FROM books b WHERE b.id = ? AND COALESCE(b.is_deleted, 0) = 0{perm_clause}"
+        query = f"SELECT b.file_path, b.file_format, b.library_id FROM books b WHERE b.id = ? AND COALESCE(b.is_deleted, 0) = 0{perm_clause}"
         cursor.execute(query, (book_id, *perm_params))
         row = cursor.fetchone()
         conn.close()
@@ -248,14 +248,14 @@ class BookRepository:
 
     @staticmethod
     def get_book_file_path_with_permission(db_type, book_id, perm_clause, perm_params):
-        """권한 체크를 수용하여 도서의 파일 경로만 단순 조회"""
+        """권한 체크를 수용하여 도서의 파일 경로 및 library_id 조회"""
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
-        query = f"SELECT b.file_path FROM books b WHERE b.id = ? AND COALESCE(b.is_deleted, 0) = 0{perm_clause}"
+        query = f"SELECT b.file_path, b.library_id FROM books b WHERE b.id = ? AND COALESCE(b.is_deleted, 0) = 0{perm_clause}"
         cursor.execute(query, (book_id, *perm_params))
         row = cursor.fetchone()
         conn.close()
-        return row['file_path'] if row else None
+        return dict(row) if row else None
 
     @staticmethod
     def get_book_cover_image(db_type, book_id):

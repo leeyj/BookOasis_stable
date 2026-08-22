@@ -32,7 +32,11 @@ async function loadEligibleLibraries() {
   try {
     const data = await api.fetchLibraries(state.currentLibraryType);
     const libraries = (data && data.success && Array.isArray(data.libraries)) ? data.libraries : [];
-    const eligible = libraries.filter(lib => lib.gdrive_copy_remote);
+    // physical_path에 구글 드라이브 공유 링크가 한 줄이라도 있는 카테고리는 그 줄들이
+    // 책 단위 사전복사(뷰어 전용, 열람 시 자동)로 이미 처리되므로 이 카테고리 단위 일괄
+    // 복사 대상에서 제외한다 — 줄 단위로 검사해야 로컬 경로와 섞여 있어도 정확히 걸러진다.
+    const hasGdriveShareLine = (text) => String(text || '').split('\n').some(line => /drive\.google\.com|^gdrive:/i.test(line.trim()));
+    const eligible = libraries.filter(lib => lib.gdrive_copy_remote && !hasGdriveShareLine(lib.physical_path));
 
     selectEl.innerHTML = '<option value="">카테고리를 선택하세요</option>' + eligible.map(lib => {
       const safeName = escapeHtml(lib.name);

@@ -233,7 +233,7 @@ class BookRepository:
     def get_book_file_info_with_permission(db_type, book_id, perm_clause, perm_params):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
-        query = f"SELECT b.file_path, b.file_format FROM books b WHERE b.id = %s AND COALESCE(b.is_deleted, 0) = 0{perm_clause}"
+        query = f"SELECT b.file_path, b.file_format, b.library_id FROM books b WHERE b.id = %s AND COALESCE(b.is_deleted, 0) = 0{perm_clause}"
         cursor.execute(query, (book_id, *perm_params))
         row = cursor.fetchone()
         conn.close()
@@ -243,11 +243,11 @@ class BookRepository:
     def get_book_file_path_with_permission(db_type, book_id, perm_clause, perm_params):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
-        query = f"SELECT b.file_path FROM books b WHERE b.id = %s AND COALESCE(b.is_deleted, 0) = 0{perm_clause}"
+        query = f"SELECT b.file_path, b.library_id FROM books b WHERE b.id = %s AND COALESCE(b.is_deleted, 0) = 0{perm_clause}"
         cursor.execute(query, (book_id, *perm_params))
         row = cursor.fetchone()
         conn.close()
-        return row['file_path'] if row else None
+        return dict(row) if row else None
 
     @staticmethod
     def get_book_cover_image(db_type, book_id):

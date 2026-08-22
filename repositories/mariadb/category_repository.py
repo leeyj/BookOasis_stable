@@ -177,17 +177,17 @@ class CategoryRepository:
             conn.close()
 
     @staticmethod
-    def add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id=None, gdrive_copy_remote=None, gdrive_copy_dest_path=None):
+    def add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id=None, gdrive_copy_remote=None, gdrive_copy_dest_path=None, gdrive_view_local_mirror_path=None):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
             cursor.execute(
                 """
                 INSERT INTO libraries
-                (name, physical_path, scan_status, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_copy_dest_path)
-                VALUES (%s, %s, 'ready', %s, %s, %s, %s, %s, %s, %s, %s)
+                (name, physical_path, scan_status, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_copy_dest_path, gdrive_view_local_mirror_path)
+                VALUES (%s, %s, 'ready', %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
-                (name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_copy_dest_path)
+                (name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_copy_dest_path, gdrive_view_local_mirror_path)
             )
             lib_id = cursor.lastrowid
             conn.commit()
@@ -199,17 +199,17 @@ class CategoryRepository:
             conn.close()
 
     @staticmethod
-    def edit_library(db_type, library_id, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id=None, gdrive_copy_remote=None, gdrive_copy_dest_path=None):
+    def edit_library(db_type, library_id, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id=None, gdrive_copy_remote=None, gdrive_copy_dest_path=None, gdrive_view_local_mirror_path=None):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
             cursor.execute(
                 """
                 UPDATE libraries
-                SET name = %s, physical_path = %s, is_remote = %s, rclone_rc_url = %s, icon = %s, color = %s, hide_cover = %s, group_id = %s, gdrive_copy_remote = %s, gdrive_copy_dest_path = %s
+                SET name = %s, physical_path = %s, is_remote = %s, rclone_rc_url = %s, icon = %s, color = %s, hide_cover = %s, group_id = %s, gdrive_copy_remote = %s, gdrive_copy_dest_path = %s, gdrive_view_local_mirror_path = %s
                 WHERE id = %s
                 """,
-                (name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_copy_dest_path, library_id)
+                (name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_copy_dest_path, gdrive_view_local_mirror_path, library_id)
             )
             conn.commit()
         except Exception as e:
@@ -308,17 +308,17 @@ class CategoryRepository:
         return row['id'] if row else None
 
     @staticmethod
-    def insert_library_raw(db_type, name, physical_path, cron_schedule, last_scanned_at, scan_status, is_remote, vfs_refresh_before_scan, rclone_rc_url, icon, color, hide_cover, gdrive_copy_remote=None, gdrive_copy_dest_path=None):
+    def insert_library_raw(db_type, name, physical_path, cron_schedule, last_scanned_at, scan_status, is_remote, vfs_refresh_before_scan, rclone_rc_url, icon, color, hide_cover, gdrive_copy_remote=None, gdrive_copy_dest_path=None, gdrive_view_local_mirror_path=None):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
             cursor.execute(
                 """
                 INSERT INTO libraries
-                (name, physical_path, cron_schedule, last_scanned_at, scan_status, is_remote, vfs_refresh_before_scan, rclone_rc_url, icon, color, hide_cover, gdrive_copy_remote, gdrive_copy_dest_path)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                (name, physical_path, cron_schedule, last_scanned_at, scan_status, is_remote, vfs_refresh_before_scan, rclone_rc_url, icon, color, hide_cover, gdrive_copy_remote, gdrive_copy_dest_path, gdrive_view_local_mirror_path)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
-                (name, physical_path, cron_schedule, last_scanned_at, scan_status, is_remote, vfs_refresh_before_scan, rclone_rc_url, icon, color, hide_cover, gdrive_copy_remote, gdrive_copy_dest_path)
+                (name, physical_path, cron_schedule, last_scanned_at, scan_status, is_remote, vfs_refresh_before_scan, rclone_rc_url, icon, color, hide_cover, gdrive_copy_remote, gdrive_copy_dest_path, gdrive_view_local_mirror_path)
             )
             lib_id = cursor.lastrowid
             conn.commit()

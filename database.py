@@ -807,7 +807,8 @@ _SCHEMA_SQL = """
         group_id INTEGER DEFAULT NULL,
         sort_order INTEGER DEFAULT 0,
         gdrive_copy_remote TEXT DEFAULT NULL,
-        gdrive_copy_dest_path TEXT DEFAULT NULL
+        gdrive_copy_dest_path TEXT DEFAULT NULL,
+        gdrive_view_local_mirror_path TEXT DEFAULT NULL
     );
 
     CREATE TABLE IF NOT EXISTS plugin_group_assignments (
@@ -1069,6 +1070,17 @@ _SCHEMA_SQL = """
         compress_type INTEGER
     );
 
+    CREATE TABLE IF NOT EXISTS gdrive_book_copies (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id INTEGER NOT NULL UNIQUE REFERENCES books(id),
+        library_id INTEGER NOT NULL,
+        source_file_id TEXT NOT NULL,
+        status TEXT NOT NULL,
+        local_path TEXT,
+        error_message TEXT,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
         value TEXT,
@@ -1180,6 +1192,7 @@ _INDEXES_SQL = """
     CREATE INDEX IF NOT EXISTS idx_videos_title ON videos(title);
     CREATE INDEX IF NOT EXISTS idx_book_offsets_book_id ON book_offsets(book_id);
     CREATE INDEX IF NOT EXISTS idx_book_offsets_book_page ON book_offsets(book_id, page_idx);
+    CREATE INDEX IF NOT EXISTS idx_gdrive_book_copies_library_id ON gdrive_book_copies(library_id);
     CREATE INDEX IF NOT EXISTS idx_books_series_name ON books(series_name);
     CREATE INDEX IF NOT EXISTS idx_books_series_alias ON books(series_alias);
     CREATE INDEX IF NOT EXISTS idx_books_library_id ON books(library_id);

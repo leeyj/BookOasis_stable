@@ -87,6 +87,7 @@ import re
 import json
 import urllib.request
 import urllib.parse
+import urllib.error
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 SUPPORTED_EXTENSIONS = ('.zip', '.cbz', '.rar', '.cbr', '.epub', '.pdf', '.txt', '.yaml', '.xml', '.json')
@@ -450,6 +451,106 @@ def download_gdrive_file(file_id, dest_path, timeout=60):
         return False
 
 
+def _gdrive_range_get(file_id, start=None, end=None, suffix=None, timeout=10, max_attempts=3):
+    """Drive의 alt=media 다운로드 엔드포인트에 HTTP Range 요청을 보내 파일 일부만 받아온다.
+    (start,end) 또는 suffix(끝에서 N바이트) 중 하나를 지정한다. (bytes, total_size)를 반환하며,
+    total_size는 응답의 Content-Range 헤더에서 파싱한다(별도 메타데이터 조회 불필요 — 실측 검증됨).
+    GDRIVE_API_KEY/GOOGLE_API_KEY가 없으면 지원하지 않는다(공개 uc?export=download 경로는
+    Range를 신뢰할 수 있게 지원하지 않아 이 기능에서는 API 키 방식만 사용한다).
+
+    네트워크 순단/지연 시 무한정 매달리지 않도록 요청당 타임아웃을 짧게(기본 10초) 잡고,
+    타임아웃/연결 오류/일시적 차단(403/429/5xx) 모두 최대 max_attempts번까지 폐기 후 재시도한다.
+    전부 실패하면 예외를 그대로 던져 호출자가 폴백(전체 다운로드 등)으로 넘어가게 한다."""
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(MEDIA_SERVER_DIR, '.env'))
+    api_key = os.getenv('GDRIVE_API_KEY') or os.getenv('GOOGLE_API_KEY')
+    if not api_key:
+        raise ValueError('GDRIVE_API_KEY가 설정되어 있지 않아 Range 부분 다운로드를 사용할 수 없습니다.')
+
+    range_header = f"bytes=-{suffix}" if suffix is not None else f"bytes={start}-{end}"
+    url = f"https://www.googleapis.com/drive/v3/files/{urllib.parse.quote(file_id)}?alt=media&key={api_key}"
+
+    last_error = None
+    for attempt in range(max_attempts):
+        req = urllib.request.Request(url, headers={
+            'Range': range_header,
+            # 짧은 시간에 Range 요청이 몰리면(대량 스캔, 빠른 페이지 넘김 등) Google이
+            # "automated queries" 403으로 일시 차단하는 것이 실측 확인됨 — 표준 브라우저 UA로
+            # 봇처럼 보일 가능성을 낮춘다.
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        })
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = resp.read()
+                content_range = resp.headers.get('Content-Range', '')
+                if '/' not in content_range:
+                    raise ValueError(f'Drive 응답에 Content-Range가 없습니다 (Range 미지원 가능성): {content_range!r}')
+                total_size = int(content_range.rsplit('/', 1)[-1])
+                return data, total_size
+        except urllib.error.HTTPError as e:
+            last_error = e
+            if e.code in (403, 429) or e.code >= 500:
+                if attempt < max_attempts - 1:
+                    import time
+                    time.sleep(min(2 ** attempt, 5))
+                    continue
+            raise
+        except (TimeoutError, urllib.error.URLError, ConnectionError, OSError) as e:
+            # 소켓 타임아웃(순단/지연)·연결 리셋 등 — 요청을 폐기하고 짧게 대기 후 재시도.
+            last_error = e
+            print(f"[gdrive_helper] ⚠️ Range 요청 실패(시도 {attempt + 1}/{max_attempts}), 폐기 후 재시도: {e}")
+            if attempt < max_attempts - 1:
+                import time
+                time.sleep(1)
+                continue
+            raise
+    raise last_error
+
+
+def fetch_gdrive_zip_offsets(file_id, initial_tail=65536, max_tail=8 * 1024 * 1024):
+    """gdrive 파일 전체를 받지 않고, 끝부분(ZIP central directory)만 Range로 받아서
+    페이지 오프셋 메타데이터를 계산한다. central directory가 initial_tail보다 크면
+    (매우 많은 페이지 수 등) BadZipFile이 나므로 4배씩 늘려가며 재시도한다.
+    반환값은 (offsets_data, total_size) — offsets_data는 tools/scanner/offset.py의
+    collect_zip_offsets_data()와 동일한 튜플 형식이라 그대로 book_offsets에 저장 가능하다."""
+    import io
+    import zipfile
+    from tools.scanner.offset import _offsets_from_zipfile
+
+    tail_size = initial_tail
+    while tail_size <= max_tail:
+        tail_bytes, total_size = _gdrive_range_get(file_id, suffix=tail_size)
+        buf = io.BytesIO()
+        buf.write(b'\x00' * max(0, total_size - len(tail_bytes)))
+        buf.write(tail_bytes)
+        buf.seek(0)
+        try:
+            with zipfile.ZipFile(buf) as zf:
+                return _offsets_from_zipfile(zf), total_size
+        except zipfile.BadZipFile:
+            tail_size *= 4
+            continue
+    print(f"[gdrive_helper ⚠️] central directory가 최대 tail 크기({max_tail}바이트)를 초과해 오프셋 계산 실패: file_id={file_id}")
+    return [], 0
+
+
+def fetch_gdrive_page_bytes(file_id, header_offset, compress_size):
+    """book_offsets에 저장된 오프셋으로, 파일 전체를 받지 않고 페이지 하나의 압축된
+    원본 바이트만 Range로 받아온다. 압축 해제는 호출자(stream_page_service.py)가
+    기존 로컬 경로와 동일한 로직(compress_type 기준)으로 처리한다."""
+    import struct
+
+    # 로컬 파일 헤더(고정 30바이트) + 파일명/추가필드 길이를 안전하게 커버하도록 256바이트 프로브
+    probe, _ = _gdrive_range_get(file_id, start=header_offset, end=header_offset + 255)
+    sig, ver, flags, method, mtime, mdate, crc, csize, usize, fname_len, extra_len = struct.unpack('<4sHHHHHLLLHH', probe[:30])
+    if sig != b'PK\x03\x04':
+        raise ValueError(f'로컬 파일 헤더 시그니처가 올바르지 않습니다 (offset={header_offset})')
+
+    data_offset = header_offset + 30 + fname_len + extra_len
+    page_bytes, _ = _gdrive_range_get(file_id, start=data_offset, end=data_offset + compress_size - 1)
+    return page_bytes
+
+
 def resolve_gdrive_local_path(virtual_path):
     """gdrive:// 가상 경로를 실제 로컬 캐시 파일 경로로 해석한다.
 
@@ -501,6 +602,18 @@ def is_gdrive_url(path):
     # 항상 이 형태다. 'gdrive://'만 검사하면 저장된 경로를 원격으로 인식하지 못해
     # is_remote_path()가 False를 반환하고 로컬 파일처럼 취급되어 열기가 조용히 실패한다.
     return path_str.startswith(('http://', 'https://', 'gdrive://', 'gdrive:')) or 'drive.google.com' in path_str
+
+
+def has_gdrive_share_line(physical_path_text):
+    """카테고리 physical_path(여러 줄 텍스트)에 구글 드라이브 공유 링크가 한 줄이라도
+    있는지 판별한다. 로컬 경로와 공유 링크가 섞인 카테고리도 정확히 감지하기 위해
+    is_gdrive_url()을 줄 단위로 적용한다 (전체 문자열에 startswith만 적용하면 첫 줄이
+    아닌 다른 줄의 링크를 놓친다)."""
+    if not physical_path_text:
+        return False
+    lines = str(physical_path_text).replace('\r', '').split('\n')
+    return any(is_gdrive_url(line.strip()) for line in lines if line.strip())
+
 
 def is_remote_path(path):
     """

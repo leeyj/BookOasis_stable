@@ -12,7 +12,6 @@ import {
   closeLibraryModal,
   submitLibraryForm,
   triggerMoveLibrary,
-  selectCategoryType,
   selectIconOption,
   selectColorOption
 } from './category/crud_controller.js';
@@ -54,7 +53,6 @@ export {
   closeLibraryModal,
   submitLibraryForm,
   triggerMoveLibrary,
-  selectCategoryType,
   selectIconOption,
   selectColorOption,
   testGDriveLinks,
@@ -89,7 +87,6 @@ if (typeof window !== 'undefined') {
   window.submitLibraryForm = submitLibraryForm;
   window.triggerMoveLibrary = triggerMoveLibrary;
 
-  window.selectCategoryType = selectCategoryType;
   window.selectIconOption = selectIconOption;
   window.selectColorOption = selectColorOption;
 
@@ -107,7 +104,7 @@ function initCategoryModalDelegation() {
 
   document.addEventListener('click', (event) => {
     const target = event && event.target && typeof event.target.closest === 'function'
-      ? event.target.closest('[data-role="library-modal-close"], [data-role="library-category-type"], [data-role="library-open-path-browser"], [data-role="library-test-gdrive"], [data-role="library-validate-gdrive-copy"], [data-role="library-icon-option"], [data-role="library-color-option"], [data-role="library-move"], [data-role="library-form-submit"], [data-role="path-browser-close"], [data-role="path-browser-refresh"], [data-role="path-browser-select"], [data-role="gdrive-copy-modal-close"], [data-role="gdrive-copy-submit"]')
+      ? event.target.closest('[data-role="library-modal-close"], [data-role="library-open-path-browser"], [data-role="library-test-gdrive"], [data-role="library-validate-gdrive-copy"], [data-role="library-icon-option"], [data-role="library-color-option"], [data-role="library-move"], [data-role="library-form-submit"], [data-role="path-browser-close"], [data-role="path-browser-refresh"], [data-role="path-browser-select"], [data-role="gdrive-copy-modal-close"], [data-role="gdrive-copy-submit"]')
       : null;
     if (!target) return;
 
@@ -115,7 +112,6 @@ function initCategoryModalDelegation() {
 
     const role = target.getAttribute('data-role');
     if (role === 'library-modal-close') return closeLibraryModal();
-    if (role === 'library-category-type') return selectCategoryType(target.getAttribute('data-type') || 'local');
     if (role === 'library-open-path-browser') return openPathBrowser();
     if (role === 'library-test-gdrive') return testGDriveLinks();
     if (role === 'library-validate-gdrive-copy') return validateGdriveCopyTarget();

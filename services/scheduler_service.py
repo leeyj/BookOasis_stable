@@ -101,6 +101,25 @@ class SchedulerService:
             )
             print(f"[Scheduler] Redis cache flush job registered successfully (interval: {flush_interval}s)")
 
+        # ── [gdrive 뷰캐시 TTL 정리 백그라운드 Job 등록] ──
+        if not scheduler.get_job('gdrive_view_copy_cleanup_job'):
+            def _run_gdrive_view_copy_cleanup():
+                from services.gdrive_view_copy_service import cleanup_stale_view_copies
+                for target_db_type in ['general', 'adult', 'audiobook', 'video']:
+                    try:
+                        cleanup_stale_view_copies(target_db_type)
+                    except Exception as cleanup_err:
+                        print(f"[Scheduler ERROR] gdrive view-copy cleanup failed ({target_db_type}): {cleanup_err}")
+
+            scheduler.add_job(
+                _run_gdrive_view_copy_cleanup,
+                'interval',
+                hours=1,
+                id='gdrive_view_copy_cleanup_job',
+                max_instances=1
+            )
+            print("[Scheduler] Gdrive view-copy TTL cleanup job registered successfully (interval: 1h)")
+
         try:
             SchedulerService.auto_resume_interrupted_jobs()
         except Exception as e:

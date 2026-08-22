@@ -57,13 +57,13 @@ def trigger_vfs_refresh(db_path, library_id, physical_path):
     target_paths_raw = [p.strip() for p in str(physical_path).replace('\r', '').split('\n') if p.strip()]
     target_paths = list(dict.fromkeys(target_paths_raw))
     remote_paths = list(dict.fromkeys([p for p in target_paths if is_rclone_vfs_path(p) and not is_gdrive_url(p)]))
-    
+
     if not remote_paths:
         return
-        
+
     db_type = 'adult' if 'adult' in os.path.basename(db_path) else 'general'
     print(f"[Scanner-VFS] Remote mount path detected: {remote_paths} - Checking cache status...")
-    
+
     try:
         from repositories.category_repository import CategoryRepository
         row = CategoryRepository.get_library_by_id(db_type, library_id)
@@ -71,25 +71,42 @@ def trigger_vfs_refresh(db_path, library_id, physical_path):
         if not row or row['is_remote'] != 1:
             print(f"[Scanner-VFS] VFS refresh skipped: remote drive flag is disabled for library {library_id}.")
             return
-            
-        if not row or row['vfs_refresh_before_scan'] != 1:
-            return
-            
-        rc_urls = ["http://localhost:5572"]
-        if row['rclone_rc_url'] and row['rclone_rc_url'].strip():
-            rc_urls = [u.strip().rstrip('/') for u in str(row['rclone_rc_url']).split(',') if u.strip()]
-        else:
-            try:
-                from repositories.settings_repository import SettingsRepository
-                val = SettingsRepository.get_value(db_type, 'RCLONE_RC_URL')
-                if val:
-                    rc_urls = [u.strip().rstrip('/') for u in str(val).split(',') if u.strip()]
-            except Exception:
-                pass
 
-        # Deduplicate RC URLs while preserving order
-        rc_urls = list(dict.fromkeys(rc_urls))
-                
+        if row['vfs_refresh_before_scan'] != 1:
+            return
+
+        rc_urls = resolve_rc_urls(db_type, row)
+    except Exception as e:
+        print(f"[Scanner-VFS Warning] VFS cache refresh process failed: {e}")
+        return
+
+    refresh_vfs_paths(remote_paths, rc_urls)
+
+
+def resolve_rc_urls(db_type, row):
+    """라이브러리 row의 rclone_rc_url 컬럼(콤마 구분)을 우선 쓰고, 비어있으면 전역
+    설정(RCLONE_RC_URL) -> localhost 기본값 순으로 폴백해 RC 주소 목록을 만든다.
+    trigger_vfs_refresh()와 책 단위 사전복사(gdrive_view_copy_service.py) 양쪽에서 공용."""
+    rc_urls = ["http://localhost:5572"]
+    if row and row.get('rclone_rc_url') and str(row['rclone_rc_url']).strip():
+        rc_urls = [u.strip().rstrip('/') for u in str(row['rclone_rc_url']).split(',') if u.strip()]
+    else:
+        try:
+            from repositories.settings_repository import SettingsRepository
+            val = SettingsRepository.get_value(db_type, 'RCLONE_RC_URL')
+            if val:
+                rc_urls = [u.strip().rstrip('/') for u in str(val).split(',') if u.strip()]
+        except Exception:
+            pass
+    return list(dict.fromkeys(rc_urls))
+
+
+def refresh_vfs_paths(remote_paths, rc_urls):
+    """remote_paths(로컬 마운트 경로들) 각각에 대해 rc_urls 중 응답하는 rclone RC 서버로
+    vfs/refresh를 시도한다 (재시도/후보 경로 폴백 포함). 실패해도 예외를 던지지 않는다 —
+    호출부는 이 갱신을 최선의 노력으로만 취급해야 한다(성공 안 해도 다음 접근 때 자연
+    캐시 만료로 결국 보이긴 하므로, 뷰어 흐름을 막을 만큼 치명적이지 않음)."""
+    try:
         for r_path in remote_paths:
             print(f"[Scanner-VFS] Starting VFS cache pre-refresh. Target: {r_path}")
             rel_paths = get_rclone_refresh_dirs(r_path)

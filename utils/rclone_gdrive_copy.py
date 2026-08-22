@@ -169,6 +169,43 @@ def find_or_create_folder(access_token, name, parent_id):
     return resp.json()['id']
 
 
+def ensure_ignore_marker(access_token, folder_id):
+    """folder_id 아래에 .bookoasisignore 파일(내용 '*' — 이 폴더 전체를 무시)이 없으면 만든다.
+    책 단위 사전복사 전용 캐시 폴더(_bookoasis_view_cache)를 일반/레이지 스캐너가 별개의
+    로컬 소스로 잘못 다시 스캔해 중복 등록하는 것을 막기 위한 마커. 매번 호출해도 안전
+    (존재하면 즉시 반환, 없을 때만 1회 생성)."""
+    headers = {'Authorization': f'Bearer {access_token}'}
+    query = f"name = '.bookoasisignore' and '{folder_id}' in parents and trashed = false"
+    resp = requests.get(
+        f'{DRIVE_API_BASE}/files',
+        headers=headers,
+        params={'q': query, 'fields': 'files(id)'},
+        timeout=DRIVE_API_TIMEOUT,
+    )
+    if resp.status_code == 200 and (resp.json().get('files') or []):
+        return
+
+    boundary = 'bookoasis-ignore-marker'
+    metadata = json.dumps({'name': '.bookoasisignore', 'parents': [folder_id], 'mimeType': 'text/plain'})
+    body = (
+        f'--{boundary}\r\n'
+        f'Content-Type: application/json; charset=UTF-8\r\n\r\n{metadata}\r\n'
+        f'--{boundary}\r\n'
+        f'Content-Type: text/plain\r\n\r\n*\r\n'
+        f'--{boundary}--'
+    )
+    upload_resp = requests.post(
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+        headers={**headers, 'Content-Type': f'multipart/related; boundary={boundary}'},
+        data=body.encode('utf-8'),
+        timeout=DRIVE_API_TIMEOUT,
+    )
+    if upload_resp.status_code not in (200, 201):
+        # 마커 생성 실패는 치명적이지 않다 — 최악의 경우 다음 스캔에서 이 캐시 폴더가
+        # 잘못 재스캔될 수 있을 뿐, 복사/열람 자체는 계속 진행해도 된다.
+        print(f'[RcloneGdriveCopy] .bookoasisignore 마커 생성 실패 (HTTP {upload_resp.status_code}) — 무시하고 계속')
+
+
 def copy_file(access_token, file_id, dest_folder_id, dest_name=None):
     """file_id로 지정된 파일을 dest_folder_id 아래로 서버사이드 복사한다 (files.copy). 1회 재시도."""
     headers = {'Authorization': f'Bearer {access_token}'}

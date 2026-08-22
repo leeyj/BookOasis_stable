@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS libraries (
     sort_order INT DEFAULT 0,
     gdrive_copy_remote VARCHAR(255) DEFAULT NULL,
     gdrive_copy_dest_path TEXT DEFAULT NULL,
+    gdrive_view_local_mirror_path TEXT DEFAULT NULL,
     INDEX idx_libraries_group_id (group_id),
     INDEX idx_libraries_group_order (group_id, sort_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
@@ -357,6 +358,18 @@ CREATE TABLE IF NOT EXISTS book_offsets (
     INDEX idx_offsets_book (book_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
+CREATE TABLE IF NOT EXISTS gdrive_book_copies (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    book_id BIGINT NOT NULL UNIQUE,
+    library_id BIGINT NOT NULL,
+    source_file_id VARCHAR(255) NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    local_path TEXT,
+    error_message TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_gdrive_book_copies_library (library_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
 CREATE TABLE IF NOT EXISTS settings (
     `key` VARCHAR(255) PRIMARY KEY,
     `value` TEXT,
@@ -606,6 +619,9 @@ def _ensure_mariadb_columns():
         ('media_general', 'libraries', 'gdrive_copy_dest_path', 'TEXT'),
         ('media_adult', 'libraries', 'gdrive_copy_dest_path', 'TEXT'),
         ('media_audiobook', 'libraries', 'gdrive_copy_dest_path', 'TEXT'),
+        ('media_general', 'libraries', 'gdrive_view_local_mirror_path', 'TEXT'),
+        ('media_adult', 'libraries', 'gdrive_view_local_mirror_path', 'TEXT'),
+        ('media_audiobook', 'libraries', 'gdrive_view_local_mirror_path', 'TEXT'),
         ('media_audiobook', 'audiobooks', 'code', 'VARCHAR(255)'),
         ('media_audiobook', 'audiobooks', 'poster', 'TEXT'),
         ('media_audiobook', 'audiobooks', 'premiered', 'VARCHAR(100)'),

@@ -1,4 +1,11 @@
 # CHANGELOG
+## v2.3.2
+- (fix) 확장자는 mp3지만 실제 컨테이너/코덱이 다른(MPEG-TS 등) 오디오북 파일이 재생되지 않던 문제 수정 — 실시간 트랜스코딩 및 seek 지원 추가, 트랜스코딩 중에는 플레이어에 경고 배너 표시 | fix audiobook files with a `.mp3` extension but a mismatched actual container/codec (e.g. MPEG-TS) failing to play — added on-the-fly transcoding with seek support and an in-player warning banner while transcoding
+- (feature) 구글 드라이브 사본 뷰어 로컬 캐시에 24시간 고정 TTL 자동 정리 작업 추가 | add a fixed 24-hour TTL auto-cleanup job for the Google Drive view-copy local cache
+- 카테고리 메뉴 전면 개편
+    -구글 링크 등록 기능등
+    -카테고리 추가/수정 모달에 "구글 드라이브 사본 뷰어 연결" 설정을 별도 접이식 섹션으로 분리
+    
 ## v2.3.1
 - (fix) 단건/경로 단위 도서 스캔 후 대시보드 "신규 추가 도서" 캐시가 갱신되지 않아 표지가 기본 폴백으로 보이던 문제 수정 | fix the dashboard "newly added" widget showing a fallback cover after a single-book/path scan — the recent-added Redis cache wasn't being invalidated on that path
 - (feature) 구글 드라이브 공유 폴더를 카테고리로 등록해 바로 스트리밍하는 기능 추가 (실험적, DEVELOP=true 전용) | add registering a Google Drive share folder as a category for direct streaming (experimental, DEVELOP=true only)
