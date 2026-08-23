@@ -145,7 +145,6 @@ class CategoryService:
             'group_id': r.get('group_id'),
             'sort_order': r.get('sort_order') or 0,
             'gdrive_copy_remote': r.get('gdrive_copy_remote') or '',
-            'gdrive_copy_dest_path': r.get('gdrive_copy_dest_path') or '',
             'gdrive_view_local_mirror_path': r.get('gdrive_view_local_mirror_path') or '',
         } for r in rows]
 
@@ -207,32 +206,45 @@ class CategoryService:
         return '\n'.join([line for line in lines if line])
 
     @staticmethod
-    def add_library(db_type, name, physical_path, is_remote=0, rclone_rc_url=None, icon='fa-book', color='#94a3b8', hide_cover=0, group_id=None, gdrive_copy_remote=None, gdrive_copy_dest_path=None, gdrive_view_local_mirror_path=None):
-        name = str(name or '').strip()
-        if not name:
-            raise ValueError('카테고리 이름은 비워둘 수 없습니다.')
-        if len(name) > 25:
-            raise ValueError('카테고리 이름은 25자를 초과할 수 없습니다.')
+    def _validate_gdrive_requirements(physical_path, gdrive_copy_remote, gdrive_view_local_mirror_path):
+        """공유 링크가 포함된 카테고리는 책을 열 때마다 그 1권만 개인 드라이브로
+        복사해 보여주는 뷰어 전용 용도로만 쓰인다 — 폴더 전체를 미리 복사해두는
+        일괄 복사는 카테고리와 무관한 별개 동작으로 분리됐다(gdrive_copy_service.py,
+        환경설정 쪽 "Drive에서 복사해오기"). 그래서 카테고리 저장 시점엔 리모트와,
+        책을 서빙할 때 필요한 로컬 마운트 루트만 확보돼 있으면 된다 — 마운트 루트를
+        열람 때마다 실시간으로 알아낼 방법이 없어(로컬 디스크 경로를 읽어 서빙해야 함)
+        여기서 반드시 막아야 한다."""
         from utils.drive_helper import has_gdrive_share_line
-        if has_gdrive_share_line(physical_path) and (not gdrive_copy_remote or not gdrive_view_local_mirror_path):
-            raise ValueError('구글 드라이브 공유 링크가 포함된 카테고리는 서버사이드 복사 대상 리모트와 리모트 로컬 마운트 루트를 반드시 설정해야 합니다. 개인 rclone Drive 리모트 없이는 사용할 수 없습니다.')
-        physical_path = CategoryService._clean_physical_path(physical_path)
-        group_id = CategoryService._normalize_group_id(db_type, group_id)
-        return CategoryRepository.add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_copy_dest_path, gdrive_view_local_mirror_path)
+        if not has_gdrive_share_line(physical_path):
+            return
+        if not gdrive_copy_remote:
+            raise ValueError('구글 드라이브 공유 링크가 포함된 카테고리는 연결할 리모트를 반드시 선택해야 합니다. 개인 rclone Drive 리모트 없이는 사용할 수 없습니다.')
+        if not gdrive_view_local_mirror_path:
+            raise ValueError('리모트의 로컬 마운트 루트를 확보하지 못했습니다. 리모트가 실제로 마운트돼 있는지 확인하거나 직접 입력해 주세요.')
 
     @staticmethod
-    def edit_library(db_type, library_id, name, physical_path, is_remote=0, rclone_rc_url=None, icon='fa-book', color='#94a3b8', hide_cover=0, group_id=None, gdrive_copy_remote=None, gdrive_copy_dest_path=None, gdrive_view_local_mirror_path=None):
+    def add_library(db_type, name, physical_path, is_remote=0, rclone_rc_url=None, icon='fa-book', color='#94a3b8', hide_cover=0, group_id=None, gdrive_copy_remote=None, gdrive_view_local_mirror_path=None):
         name = str(name or '').strip()
         if not name:
             raise ValueError('카테고리 이름은 비워둘 수 없습니다.')
         if len(name) > 25:
             raise ValueError('카테고리 이름은 25자를 초과할 수 없습니다.')
-        from utils.drive_helper import has_gdrive_share_line
-        if has_gdrive_share_line(physical_path) and (not gdrive_copy_remote or not gdrive_view_local_mirror_path):
-            raise ValueError('구글 드라이브 공유 링크가 포함된 카테고리는 서버사이드 복사 대상 리모트와 리모트 로컬 마운트 루트를 반드시 설정해야 합니다. 개인 rclone Drive 리모트 없이는 사용할 수 없습니다.')
+        CategoryService._validate_gdrive_requirements(physical_path, gdrive_copy_remote, gdrive_view_local_mirror_path)
         physical_path = CategoryService._clean_physical_path(physical_path)
         group_id = CategoryService._normalize_group_id(db_type, group_id)
-        CategoryRepository.edit_library(db_type, library_id, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_copy_dest_path, gdrive_view_local_mirror_path)
+        return CategoryRepository.add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_view_local_mirror_path)
+
+    @staticmethod
+    def edit_library(db_type, library_id, name, physical_path, is_remote=0, rclone_rc_url=None, icon='fa-book', color='#94a3b8', hide_cover=0, group_id=None, gdrive_copy_remote=None, gdrive_view_local_mirror_path=None):
+        name = str(name or '').strip()
+        if not name:
+            raise ValueError('카테고리 이름은 비워둘 수 없습니다.')
+        if len(name) > 25:
+            raise ValueError('카테고리 이름은 25자를 초과할 수 없습니다.')
+        CategoryService._validate_gdrive_requirements(physical_path, gdrive_copy_remote, gdrive_view_local_mirror_path)
+        physical_path = CategoryService._clean_physical_path(physical_path)
+        group_id = CategoryService._normalize_group_id(db_type, group_id)
+        CategoryRepository.edit_library(db_type, library_id, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_view_local_mirror_path)
 
     @staticmethod
     def delete_library(db_type, library_id):

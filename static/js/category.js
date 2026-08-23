@@ -25,7 +25,8 @@ import {
   detectAndUpdateRemoteFlag,
   updateRemoteWarning,
   enableVFSCheckForRemote,
-  validateGdriveCopyTarget
+  validateGdriveCopyTarget,
+  detectGdriveMountRoot
 } from './category/path_browser.js';
 import {
   openGdriveCopyModal,
@@ -104,7 +105,7 @@ function initCategoryModalDelegation() {
 
   document.addEventListener('click', (event) => {
     const target = event && event.target && typeof event.target.closest === 'function'
-      ? event.target.closest('[data-role="library-modal-close"], [data-role="library-open-path-browser"], [data-role="library-test-gdrive"], [data-role="library-validate-gdrive-copy"], [data-role="library-icon-option"], [data-role="library-color-option"], [data-role="library-move"], [data-role="library-form-submit"], [data-role="path-browser-close"], [data-role="path-browser-refresh"], [data-role="path-browser-select"], [data-role="gdrive-copy-modal-close"], [data-role="gdrive-copy-submit"]')
+      ? event.target.closest('[data-role="library-modal-close"], [data-role="library-open-path-browser"], [data-role="library-test-gdrive"], [data-role="library-validate-gdrive-copy"], [data-role="library-detect-gdrive-mount-root"], [data-role="library-icon-option"], [data-role="library-color-option"], [data-role="library-move"], [data-role="library-form-submit"], [data-role="path-browser-close"], [data-role="path-browser-refresh"], [data-role="path-browser-select"], [data-role="gdrive-copy-modal-close"], [data-role="gdrive-copy-submit"]')
       : null;
     if (!target) return;
 
@@ -115,6 +116,7 @@ function initCategoryModalDelegation() {
     if (role === 'library-open-path-browser') return openPathBrowser();
     if (role === 'library-test-gdrive') return testGDriveLinks();
     if (role === 'library-validate-gdrive-copy') return validateGdriveCopyTarget();
+    if (role === 'library-detect-gdrive-mount-root') return detectGdriveMountRoot(false);
     if (role === 'library-icon-option') return selectIconOption(target);
     if (role === 'library-color-option') return selectColorOption(target);
     if (role === 'library-move') return triggerMoveLibrary();

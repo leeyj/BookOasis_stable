@@ -807,7 +807,6 @@ _SCHEMA_SQL = """
         group_id INTEGER DEFAULT NULL,
         sort_order INTEGER DEFAULT 0,
         gdrive_copy_remote TEXT DEFAULT NULL,
-        gdrive_copy_dest_path TEXT DEFAULT NULL,
         gdrive_view_local_mirror_path TEXT DEFAULT NULL
     );
 

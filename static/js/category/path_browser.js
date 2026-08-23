@@ -1,4 +1,5 @@
 // path_browser.js – 서버 물리 경로 탐색 모달 및 원격 경로/GDrive 연결 테스트
+import { state } from '../state.js';
 
 const MAX_LIBRARY_PATHS = 20;
 const MAX_LIBRARY_PATH_LINE_LENGTH = 1024;
@@ -83,6 +84,64 @@ export async function loadGdriveCopyRemotes(selectedRemote = '') {
       emptyEl.style.display = 'block';
     }
   }
+}
+
+/**
+ * 서버의 OS 마운트 테이블(/proc/mounts, 우선) 또는 rclone RC의 mount/listmounts(폴백)로
+ * 이 리모트가 실제로 마운트된 로컬 루트를 자동 감지해 "이 리모트의 로컬 마운트 루트"
+ * 입력칸을 채운다. 관리자가 이미 아는 정보(서버가 스스로 알아낼 수 있는 정보)를 다시
+ * 타이핑하지 않게 하려는 목적 — 실패하면 조용히 넘어가거나(silent=true, 자동 트리거 시)
+ * 토스트로 알려준다(silent=false, 버튼 클릭 시).
+ */
+export function detectGdriveMountRoot(silent = false) {
+  const mirrorInput = document.getElementById('library-form-gdrive-view-mirror-path');
+  const rcloneUrlInput = document.getElementById('library-form-rclone-url');
+  const remoteInput = document.getElementById('library-form-gdrive-copy-remote');
+  if (!mirrorInput) return Promise.resolve(false);
+
+  if (!remoteInput || !remoteInput.value) {
+    if (!silent && typeof window.showToast === 'function') {
+      window.showToast('먼저 연결할 리모트를 선택해 주세요.', 'warning');
+    }
+    return Promise.resolve(false);
+  }
+
+  // 카테고리 모달의 물리 경로는 공유 소스 링크라 매칭 기준으로 쓸 수 없다 — remote_name만
+  // 으로 /proc/mounts를 조회하므로 물리 경로 없이도 감지가 가능하다.
+  if (!silent && typeof window.showToast === 'function') {
+    window.showToast('마운트 루트 감지 중...', 'info');
+  }
+
+  return fetch('/api/gdrive-copy/detect-mount-root', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      type: state.currentLibraryType,
+      rclone_rc_url: rcloneUrlInput ? rcloneUrlInput.value : '',
+      remote: remoteInput ? remoteInput.value : '',
+    }),
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success && data.mount_root) {
+        mirrorInput.value = data.mount_root;
+        mirrorInput.dispatchEvent(new Event('input', { bubbles: true }));
+        if (!silent && typeof window.showToast === 'function') {
+          window.showToast(`✅ 마운트 루트 감지됨: ${data.mount_root}`, 'success');
+        }
+        return true;
+      }
+      if (!silent && typeof window.showToast === 'function') {
+        window.showToast(`❌ ${data.error || '자동 감지 실패 — 직접 입력해 주세요.'}`, 'error');
+      }
+      return false;
+    })
+    .catch(err => {
+      if (!silent && typeof window.showToast === 'function') {
+        window.showToast(`❌ 네트워크 오류: ${err.message}`, 'error');
+      }
+      return false;
+    });
 }
 
 export function validateGdriveCopyTarget() {

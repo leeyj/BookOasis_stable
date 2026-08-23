@@ -970,6 +970,58 @@ window.BookOasisPlugin.downloadToLibrary('https://example.com/book.epub', {
 
 ---
 
+## 11. 🔗 구글 드라이브 복사/뷰-복사 연동 API (실험적)
+
+`DEVELOP=true` 환경에서만 노출되는 실험적 API입니다. 관리자 세션(`admin_required`)이 필요하므로, 카테고리 레벨 플러그인의 `index.html`/`script.js`에서 `fetch()`로 직접 호출하면 됩니다(같은 오리진이라 별도 인증 코드 없이 세션 쿠키가 자동으로 실립니다) — §7의 하이라이트 REST API와 동일한 사용 패턴입니다.
+
+이 영역은 서로 다른 두 기능으로 나뉘어 있습니다.
+
+1. **일괄 복사(`/api/gdrive-copy/*`)** — 카테고리와 무관하게 리모트+저장 폴더+공유 링크만으로 폴더 전체를 미리 복사하는 독립 동작 (기존 "Drive에서 복사해오기" 모달이 쓰는 것과 동일한 API).
+2. **책 단위 사전복사/뷰-복사(`/api/gdrive-view-copy/*`)** — gdrive 공유 카테고리의 책을 열 때마다 그 1권만 자동 복사하는 기존 뷰어 흐름을, 뷰어를 열지 않고도 조회/트리거할 수 있게 여는 API.
+
+**포맷 범위(제약사항)**: 책 단위 사전복사는 **일반/성인 서재의 `zip`/`cbz`, `epub`, `txt`, `pdf` 도서에만** 적용됩니다. 오디오북과 영상 강좌는 해당하지 않습니다 — 각자 별도 스캐너/스트리밍 파이프라인을 쓰고 있어 gdrive 공유 링크를 아예 인식하지 못합니다(카테고리 생성 자체는 막혀있지 않지만, 그런 카테고리는 스캔 결과가 0권으로 조용히 끝납니다). `/api/gdrive-view-copy/*`를 오디오북/영상 `db_type`으로 호출해도 항상 `not_applicable`/빈 목록만 돌아옵니다.
+
+### 11.1 일괄 복사 API
+
+| 엔드포인트 | 메서드 | 설명 |
+| :--- | :--- | :--- |
+| `/api/gdrive-copy/remotes` | GET | 쓰기 가능한 rclone Drive 리모트 목록 (`{success, remotes: [{name, usable}, ...]}`) |
+| `/api/gdrive-copy/validate` | POST | `{remote, dest_path}` — 목적지 접근 가능 여부 검증 |
+| `/api/gdrive-copy/detect-mount-root` | POST | `{type, remote, physical_path?, rclone_rc_url?}` — 이 리모트의 로컬 마운트 루트 자동 감지 |
+| `/api/gdrive-copy/start` | POST | `{type, remote, dest_local_path, rclone_rc_url?, source_links}` — 복사 작업을 큐에 등록하고 즉시 반환 (진행 상태는 스캐너 큐 상태 API로 별도 확인) |
+
+### 11.2 책 단위 사전복사/뷰-복사 API
+
+| 엔드포인트 | 메서드 | 설명 |
+| :--- | :--- | :--- |
+| `/api/gdrive-view-copy/libraries?type=<db_type>` | GET | gdrive 공유 링크가 포함된 카테고리 목록. 각 항목: `{id, name, gdrive_copy_remote, gdrive_view_local_mirror_path, configured}` (`configured`는 리모트+마운트 루트가 둘 다 채워졌는지) |
+| `/api/gdrive-view-copy/status?type=<db_type>&book_id=<id>` | GET | 실제 복사를 트리거하지 않는 순수 조회. `status`는 `not_applicable`(gdrive 책 아님) / `not_copied`(아직 복사 안 됨) / `copied` / `unsupported` 중 하나, `copied`면 `local_path`/`updated_at`도 함께 반환 |
+| `/api/gdrive-view-copy/prefetch` | POST | `{type, book_id}` — 뷰어를 열지 않고 그 책 1권을 미리 복사(코어의 `resolve_viewable_path()`를 그대로 재사용하므로 락/TTL/미지원 판정 등 뷰어 경로와 완전히 동일한 규칙 적용). 동기 호출이며 내부에 최대 수 초의 VFS 가시성 폴링이 포함되므로, 여러 권을 미리 당겨두려는 플러그인은 book_id별로 순차 호출해야 합니다 |
+
+예시 — "이 카테고리의 안 읽은 책을 미리 복사해두기" 같은 플러그인의 핵심 로직:
+
+```javascript
+// plugins/metadata/my_gdrive_plugin/script.js
+async function prefetchLibrary(dbType, libraryId, bookIds) {
+  for (const bookId of bookIds) {
+    const res = await fetch('/api/gdrive-view-copy/prefetch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: dbType, book_id: bookId }),
+    });
+    const data = await res.json();
+    console.log(`[MyPlugin] book ${bookId}:`, data.resolved_locally ? '복사 완료' : '아직 대기/실패');
+  }
+}
+```
+
+주의:
+
+- 두 기능 모두 `.env`의 `DEVELOP=true` 게이트를 그대로 따릅니다 — 운영자가 이 플래그를 켜지 않은 서버에서는 위 엔드포인트가 전부 404를 반환합니다.
+- `/api/gdrive-view-copy/prefetch`는 실제 Drive API 호출(서버사이드 `files.copy`)을 유발하므로, 무분별하게 대량의 책을 한꺼번에 prefetch하는 플러그인은 서버의 `GDRIVE_API_KEY`(설정된 경우) 또는 원본 공유 파일의 다운로드 어뷰즈 쿼터를 소진시킬 위험이 있습니다 — 사용자가 명시적으로 트리거한 소규모 배치(예: "이 시리즈만" 수십 권 단위)로 제한하는 것을 권장합니다.
+
+---
+
 ## 💡 Tip: iframe 외부 연동 시 보안 제약 사항 안내
 독립된 플러그인 화면에서 `<iframe>`을 사용해 외부 웹 서비스를 끌어오고자 할 때는 브라우저 보안 제약에 유의해야 합니다.
 

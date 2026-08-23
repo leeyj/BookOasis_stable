@@ -19,7 +19,11 @@ import time
 
 from repositories.gdrive_book_copy_repository import GdriveBookCopyRepository
 from utils.drive_helper import is_gdrive_url, split_gdrive_file_id
-from utils.rclone_gdrive_copy import get_access_token, find_or_create_folder, ensure_ignore_marker, copy_file
+from utils.rclone_gdrive_copy import (
+    rclone_copy_file_by_id,
+    rclone_ensure_ignore_marker,
+    compute_relative_dest_path,
+)
 
 # 뷰캐시 사본 보관 기간(시간). 만료되면 로컬 파일을 지우고 다음 열람 시 재복사한다.
 # LRU 등 정교한 정책은 쓰지 않는다 — 소수 사용자 규모에서는 하루 지나서 다시 복사되는
@@ -73,6 +77,38 @@ def _split_gdrive_source_path(base_path):
     filename = parts[-1]
     rel_folder = '/'.join(parts[1:-1])
     return rel_folder, filename
+
+
+def _resolve_drive_cache_root_subpath(remote, mount_root, db_type, library):
+    """"_bookoasis_view_cache"를 rclone 'remote:path' 문법 기준으로 리모트 루트 아래
+    어느 상대경로에 둘지 계산한다 (예: '' 또는 'tempview').
+
+    관리자가 "로컬 마운트 루트" 필드에 순수 마운트 지점이 아니라 그 하위 폴더까지
+    포함한 전체 경로(예: '/mount/root/tempview')를 넣어둔 경우 — Drive 루트가
+    지저분해지지 않게 원하는 폴더 안에 정리해서 담고 싶어서인 경우가 많다 — 그
+    의도를 실제로 반영한다. 순수 마운트 지점을 라이브로 재감지해 저장된 값과
+    비교하고, 차이가 나는 만큼(예: 'tempview')을 그대로 반환한다. rclone의
+    'remote:path' 주소 체계는 로컬 마운트가 실제로 보여주는 경로와 항상 일치하므로
+    (root_folder_id/마운트 서브경로 스코핑도 rclone 스스로 반영), REST API로 Drive
+    폴더 id를 직접 추론하던 예전 방식과 달리 로컬/Drive가 서로 어긋날 수 없다
+    (2026-08-23, 로컬/Drive 경로가 서로 다른 곳을 가리키던 버그의 근본 수정)."""
+    try:
+        from tools.scanner.vfs import detect_mount_root, resolve_rc_urls
+        rc_urls = resolve_rc_urls(db_type, library)
+        pure_mount_root = detect_mount_root(remote, None, rc_urls)
+    except Exception as e:
+        print(f"[GdriveViewCopy] 순수 마운트 루트 재감지 실패(무시, 리모트 루트 바로 아래에 캐시를 둠): {e}")
+        return ''
+
+    if not pure_mount_root:
+        return ''
+
+    extra_subpath = compute_relative_dest_path(mount_root, pure_mount_root)
+    if not extra_subpath:
+        return ''
+
+    print(f"[GdriveViewCopy] 마운트 루트에 지정된 하위 폴더 감지됨: '{extra_subpath}' — 그 안에 캐시를 정리합니다")
+    return extra_subpath
 
 
 def resolve_viewable_path(db_type, book_id, file_path, library):
@@ -146,18 +182,25 @@ def resolve_viewable_path(db_type, book_id, file_path, library):
         rel_folder, filename = _split_gdrive_source_path(base_path)
 
         try:
-            access_token = get_access_token(remote)
+            # rclone CLI가 소스(공유 폴더 file_id)와 목적지(내 드라이브) 사이의 실제
+            # 서버사이드 복사를 대신 수행한다(utils/rclone_gdrive_copy.py의
+            # rclone_copy_file_by_id 참조) — REST API로 Drive 폴더 id를 직접 관리하던
+            # 예전 방식은 root_folder_id/마운트 서브경로 스코핑을 우리가 다시 구현해야
+            # 했고 실제로 여러 번 어긋났다(2026-08-23). rclone의 'remote:path' 문법은
+            # 로컬 마운트가 실제로 보여주는 경로와 항상 같은 걸 가리키므로 이 문제가
+            # 원천적으로 사라진다.
+            drive_cache_root_subpath = _resolve_drive_cache_root_subpath(remote, mount_root, db_type, library)
+            drive_view_cache_root = f"{drive_cache_root_subpath}/_bookoasis_view_cache" if drive_cache_root_subpath else "_bookoasis_view_cache"
+            drive_lib_subpath = f"{drive_view_cache_root}/lib_{library_id}"
+            drive_dest_dir = f"{drive_lib_subpath}/{rel_folder}" if rel_folder else drive_lib_subpath
+
             # _bookoasis_view_cache 루트 폴더 자체에 .bookoasisignore 마커를 심어둬서,
             # 일반/레이지 스캐너가 이 캐시 폴더를 별개의 로컬 소스로 잘못 재스캔해
             # 책을 중복 등록하지 않게 한다 (로컬 마운트로 자연스레 반영될 때까지는
             # 스캐너가 아직 못 볼 수 있지만, 매 복사 시도마다 확인하므로 결국 반영된다).
-            view_cache_root_id = find_or_create_folder(access_token, '_bookoasis_view_cache', 'root')
-            ensure_ignore_marker(access_token, view_cache_root_id)
-            dest_folder_id = find_or_create_folder(access_token, f'lib_{library_id}', view_cache_root_id)
-            for part in [p for p in rel_folder.split('/') if p]:
-                dest_folder_id = find_or_create_folder(access_token, part, dest_folder_id)
+            rclone_ensure_ignore_marker(f"{remote}:{drive_view_cache_root}/.bookoasisignore")
 
-            copy_file(access_token, source_file_id, dest_folder_id, dest_name=filename)
+            rclone_copy_file_by_id(remote, source_file_id, f"{remote}:{drive_dest_dir}/{filename}")
 
             local_path = os.path.join(mirror_root, rel_folder, filename) if rel_folder else os.path.join(mirror_root, filename)
 

@@ -176,7 +176,7 @@
                 <div style="margin-top: 0.8rem;">
                     <div class="library-form-group" id="library-form-gdrive-copy-group">
                         <div style="margin-bottom: 0.7rem; padding: 0.6rem 0.8rem; background: rgba(59, 130, 246, 0.08); border-left: 3px solid #60a5fa; border-radius: 4px; color: #cbd5e1; font-size: 0.82rem;">
-                            다른 사람이 공유한 구글 드라이브 파일을 내 계정으로 복사해서 보여주는 기능들이 공통으로 쓰는 연결 설정입니다. 여기서는 등록/저장만 하고, 실제 복사는 나중에(열람 시 자동 또는 별도 트리거로) 이뤄집니다. 아래에서 사용할 내 드라이브 계정을 선택하세요.
+                            물리 경로에 구글 드라이브 공유 링크가 있는 카테고리 전용 설정입니다. 책을 열 때마다 그 1권만 아래 리모트(내 드라이브 계정)로 복사해 보여줍니다 — 별도 입력 없이 <strong>지정된 경로 하위에 임시 디렉토리가 자동 생성</strong>됩니다. 폴더 전체를 미리 복사해두고 싶다면 카테고리와 무관한 "Drive에서 복사해오기"를 따로 사용하세요.
                         </div>
                         <label for="library-form-gdrive-copy-remote" id="library-form-gdrive-copy-remote-label">연결할 내 구글 드라이브 리모트 (선택, 실험적)</label>
                         <select id="library-form-gdrive-copy-remote" name="gdrive_copy_remote">
@@ -184,23 +184,16 @@
                         </select>
                         <div id="library-form-gdrive-copy-remote-empty" style="display: none; margin-top: 0.4rem; color: #94a3b8; font-size: 0.85rem;">쓰기 가능한 rclone Drive 리모트를 찾지 못했습니다.</div>
 
-                        <div id="library-form-gdrive-copy-dest-path-row">
-                            <label for="library-form-gdrive-copy-dest-path" style="margin-top: 0.6rem; display: block;">복사본이 저장될 내 드라이브 내 폴더
-                                <i class="fa-solid fa-circle-info library-form-info-icon" title='이 카테고리의 물리 경로가 위 폴더의 로컬 마운트 지점일 때만 설정하세요. 여기 설정해두면 "Drive에서 복사해오기"에서 이 카테고리를 대상으로 선택할 수 있습니다.'></i>
+                        <div id="library-form-gdrive-view-mirror-group" style="display: none; margin-top: 0.6rem;">
+                            <label for="library-form-gdrive-view-mirror-path">이 리모트의 로컬 마운트 루트 (자동 감지)
+                                <i class="fa-solid fa-circle-info library-form-info-icon" title="이 rclone 리모트 전체가 마운트된 서버 내 경로입니다. 리모트를 선택하면 자동으로 감지를 시도하고(리모트 이름만으로 조회하므로 물리 경로 입력이 불필요), 실패했을 때만 직접 입력하면 됩니다. Drive 루트가 지저분해지는 게 싫다면 자동 감지된 값 뒤에 원하는 하위 폴더 이름을 이어붙이세요 — 예: '/mnt/sjva' → '/mnt/sjva/tempview'. 그 폴더가 Drive 쪽에도 그대로 만들어져 안에 정리됩니다."></i>
                             </label>
                             <div style="display: flex; gap: 0.5rem;">
-                                <input type="text" id="library-form-gdrive-copy-dest-path" name="gdrive_copy_dest_path" maxlength="1024" placeholder="예: BookOasis/시리즈명" style="flex: 1;">
-                                <button type="button" data-role="library-validate-gdrive-copy" style="padding: 0.5rem 1rem; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.5); color: #60a5fa; border-radius: 4px; cursor: pointer; font-weight: 600; white-space: nowrap;" title="대상 리모트/경로 쓰기 권한 검증">
-                                    <i class="fa-solid fa-check-double"></i> 대상 검증
+                                <input type="text" id="library-form-gdrive-view-mirror-path" name="gdrive_view_local_mirror_path" maxlength="1024" placeholder="리모트 선택 시 자동 감지, 실패하면 직접 입력" style="flex: 1;">
+                                <button type="button" data-role="library-detect-gdrive-mount-root" style="padding: 0.5rem 1rem; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.5); color: #60a5fa; border-radius: 4px; cursor: pointer; font-weight: 600; white-space: nowrap;" title="rclone RC로 마운트 루트 자동 감지">
+                                    <i class="fa-solid fa-magnifying-glass"></i> 자동 감지
                                 </button>
                             </div>
-                        </div>
-
-                        <div id="library-form-gdrive-view-mirror-group" style="display: none; margin-top: 0.6rem;">
-                            <label for="library-form-gdrive-view-mirror-path">이 리모트의 로컬 마운트 루트 (리모트 전체가 마운트된 서버 내 경로)
-                                <i class="fa-solid fa-circle-info library-form-info-icon" title="책을 열람할 때마다 원본 공유 링크 스트리밍 대신, 이 마운트 루트 아래 서버가 자동으로 만드는 전용 캐시 폴더(_bookoasis_view_cache/lib_<카테고리ID>)의 복사본을 사용합니다. 목적지 경로를 직접 정할 필요가 없습니다 — 카테고리별로 자동 격리되어 충돌하지 않습니다. 물리 경로에 구글 드라이브 공유 링크가 하나라도 있으면, 개인 rclone Drive 리모트와 이 마운트 루트를 반드시 설정해야 카테고리를 저장할 수 있습니다."></i>
-                            </label>
-                            <input type="text" id="library-form-gdrive-view-mirror-path" name="gdrive_view_local_mirror_path" maxlength="1024" placeholder="예: /home/user/gdrive_mount">
                         </div>
                     </div>
                 </div>

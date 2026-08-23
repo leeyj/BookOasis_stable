@@ -70,7 +70,6 @@ CREATE TABLE IF NOT EXISTS libraries (
     group_id BIGINT DEFAULT NULL,
     sort_order INT DEFAULT 0,
     gdrive_copy_remote VARCHAR(255) DEFAULT NULL,
-    gdrive_copy_dest_path TEXT DEFAULT NULL,
     gdrive_view_local_mirror_path TEXT DEFAULT NULL,
     INDEX idx_libraries_group_id (group_id),
     INDEX idx_libraries_group_order (group_id, sort_order)
@@ -616,9 +615,6 @@ def _ensure_mariadb_columns():
         ('media_general', 'libraries', 'gdrive_copy_remote', 'VARCHAR(255) DEFAULT NULL'),
         ('media_adult', 'libraries', 'gdrive_copy_remote', 'VARCHAR(255) DEFAULT NULL'),
         ('media_audiobook', 'libraries', 'gdrive_copy_remote', 'VARCHAR(255) DEFAULT NULL'),
-        ('media_general', 'libraries', 'gdrive_copy_dest_path', 'TEXT'),
-        ('media_adult', 'libraries', 'gdrive_copy_dest_path', 'TEXT'),
-        ('media_audiobook', 'libraries', 'gdrive_copy_dest_path', 'TEXT'),
         ('media_general', 'libraries', 'gdrive_view_local_mirror_path', 'TEXT'),
         ('media_adult', 'libraries', 'gdrive_view_local_mirror_path', 'TEXT'),
         ('media_audiobook', 'libraries', 'gdrive_view_local_mirror_path', 'TEXT'),

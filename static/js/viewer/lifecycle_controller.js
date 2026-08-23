@@ -6,6 +6,7 @@ import { PdfViewer, clearPdfViewer } from '../viewer_pdf.js';
 import { tryAutoFullscreenOnOpen, exitFullscreenIfNeeded } from './fullscreen_controller.js';
 import { shouldAutoFullscreenForFormat } from './platform_profile.js';
 import { flushProgress, resetPreloadState } from '../viewer_progress.js';
+import { setAnnotationUiEnabled } from './annotation_ui.js';
 
 let deps = {
   loadCustomFontsList: () => {},
@@ -128,6 +129,7 @@ export function openReader(bookId, format, title, pagesRead, totalPages) {
   if (widthLabel) widthLabel.textContent = `${savedScrollWidth}px`;
 
   state.currentViewerFormat = fmt;
+  setAnnotationUiEnabled(fmt === 'txt' || fmt === 'epub');
 
   if (activeViewerInstance && typeof activeViewerInstance.destroy === 'function') {
     try {

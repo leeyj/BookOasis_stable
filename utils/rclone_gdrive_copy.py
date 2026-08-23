@@ -20,6 +20,8 @@ OAUTH_TOKEN_TIMEOUT = 10
 DRIVE_API_TIMEOUT = 15
 OAUTH_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3'
+RCLONE_COPY_TIMEOUT = 300
+RCLONE_FOLDER_COPY_TIMEOUT = 1800
 
 # remote_name -> {'access_token': str, 'expires_at': epoch_seconds}
 _token_cache = {}
@@ -141,6 +143,44 @@ def get_access_token(remote_name):
     return access_token
 
 
+def get_remote_root_folder_id(remote_name):
+    """이 리모트가 rclone.conf에서 root_folder_id로 특정 서브폴더에 고정돼 있으면 그
+    폴더 id를, 아니면 Drive API의 실제 최상위를 가리키는 'root' 별칭을 반환한다.
+
+    'root' 별칭은 항상 내 드라이브의 진짜 최상위를 가리킨다 — rclone 리모트가
+    root_folder_id로 특정 서브폴더(예: 공유 조직화용 'tempview' 폴더)에 고정된
+    경우에도 마찬가지다. 이 함수 없이 무조건 'root'를 부모로 써서 폴더를 만들면,
+    Drive API 상으로는 성공해도 그 폴더는 rclone이 마운트한 서브트리 바깥(진짜
+    최상위)에 생기므로 로컬 마운트 경로에서는 영원히 보이지 않는다 — 복사 성공
+    로그와 실제 파일 부재가 같이 나타나는 버그의 원인이었다(2026-08-23 실사용자 리포트)."""
+    dump = _rclone_config_dump()
+    cfg = (dump or {}).get(remote_name) or {}
+    return cfg.get('root_folder_id') or 'root'
+
+
+def resolve_effective_root_folder_id(access_token, remote_name):
+    """이 리모트를 통해 파일/폴더를 만들 때 실제로 써야 하는 시작 폴더 id를 계산한다.
+    두 가지 스코핑 방식을 모두 반영해야 한다:
+    1) rclone.conf의 root_folder_id 설정(get_remote_root_folder_id) — 리모트 자체가
+       특정 서브폴더에 고정된 경우.
+    2) 'rclone mount remote:subpath ...'처럼 마운트 명령행 인자로만 준 서브경로
+       (detect_mount_remote_subpath) — rclone.conf엔 흔적이 없어 1)만으로는 못 잡음.
+    2)는 /proc/mounts에서만 읽을 수 있어(도커 등 마운트 네임스페이스가 다르면 못 읽고
+    빈 문자열) 최선의 노력이다 — 이 경우 이전처럼 root_folder_id/실제 루트로만 계산되어
+    같은 증상(로컬에서 안 보임)이 재발할 수 있으니, 감지 실패 시 로그를 남긴다."""
+    from tools.scanner.vfs import detect_mount_remote_subpath
+
+    folder_id = get_remote_root_folder_id(remote_name)
+    subpath = detect_mount_remote_subpath(remote_name)
+    if not subpath:
+        print(f"[RcloneGdriveCopy] 리모트 '{remote_name}'의 마운트 서브경로를 감지하지 못함 (도커 등으로 /proc/mounts를 못 읽는 경우 정상) — root_folder_id 기준으로만 계산")
+        return folder_id
+
+    for part in [p for p in subpath.split('/') if p]:
+        folder_id = find_or_create_folder(access_token, part, folder_id)
+    return folder_id
+
+
 def find_or_create_folder(access_token, name, parent_id):
     """parent_id 아래에서 name과 일치하는 폴더를 찾고, 없으면 생성해 폴더 id를 반환."""
     headers = {'Authorization': f'Bearer {access_token}'}
@@ -169,43 +209,6 @@ def find_or_create_folder(access_token, name, parent_id):
     return resp.json()['id']
 
 
-def ensure_ignore_marker(access_token, folder_id):
-    """folder_id 아래에 .bookoasisignore 파일(내용 '*' — 이 폴더 전체를 무시)이 없으면 만든다.
-    책 단위 사전복사 전용 캐시 폴더(_bookoasis_view_cache)를 일반/레이지 스캐너가 별개의
-    로컬 소스로 잘못 다시 스캔해 중복 등록하는 것을 막기 위한 마커. 매번 호출해도 안전
-    (존재하면 즉시 반환, 없을 때만 1회 생성)."""
-    headers = {'Authorization': f'Bearer {access_token}'}
-    query = f"name = '.bookoasisignore' and '{folder_id}' in parents and trashed = false"
-    resp = requests.get(
-        f'{DRIVE_API_BASE}/files',
-        headers=headers,
-        params={'q': query, 'fields': 'files(id)'},
-        timeout=DRIVE_API_TIMEOUT,
-    )
-    if resp.status_code == 200 and (resp.json().get('files') or []):
-        return
-
-    boundary = 'bookoasis-ignore-marker'
-    metadata = json.dumps({'name': '.bookoasisignore', 'parents': [folder_id], 'mimeType': 'text/plain'})
-    body = (
-        f'--{boundary}\r\n'
-        f'Content-Type: application/json; charset=UTF-8\r\n\r\n{metadata}\r\n'
-        f'--{boundary}\r\n'
-        f'Content-Type: text/plain\r\n\r\n*\r\n'
-        f'--{boundary}--'
-    )
-    upload_resp = requests.post(
-        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
-        headers={**headers, 'Content-Type': f'multipart/related; boundary={boundary}'},
-        data=body.encode('utf-8'),
-        timeout=DRIVE_API_TIMEOUT,
-    )
-    if upload_resp.status_code not in (200, 201):
-        # 마커 생성 실패는 치명적이지 않다 — 최악의 경우 다음 스캔에서 이 캐시 폴더가
-        # 잘못 재스캔될 수 있을 뿐, 복사/열람 자체는 계속 진행해도 된다.
-        print(f'[RcloneGdriveCopy] .bookoasisignore 마커 생성 실패 (HTTP {upload_resp.status_code}) — 무시하고 계속')
-
-
 def copy_file(access_token, file_id, dest_folder_id, dest_name=None):
     """file_id로 지정된 파일을 dest_folder_id 아래로 서버사이드 복사한다 (files.copy). 1회 재시도."""
     headers = {'Authorization': f'Bearer {access_token}'}
@@ -232,9 +235,33 @@ def copy_file(access_token, file_id, dest_folder_id, dest_name=None):
     raise ValueError(f'파일 복사 실패 (file_id={file_id}): {last_error}')
 
 
-def resolve_dest_folder(access_token, dest_path):
-    """dest_path(리모트 내부 상대경로)의 폴더 체인을 없으면 생성하며 최종 폴더 id를 반환."""
-    folder_id = 'root'
+def compute_relative_dest_path(physical_path, mount_root):
+    """physical_path가 mount_root(이 리모트가 통째로 마운트된 로컬 경로) 아래에 있으면
+    그 상대경로(Drive 쪽 dest_path로 그대로 쓸 수 있는 값)를 반환하고, 아니면 None.
+
+    "카테고리 복사" 배치 플로우에서 admin이 물리 경로(로컬)와 dest_path(Drive쪽)를 각각
+    손으로 입력하다 보니 둘이 겹치는 부분("share" 같은)을 착각해 어긋나는 게 실사용자
+    혼란 포인트였다(2026-08-22). mount_root 하나만 알면 물리 경로에서 자동으로 뽑아낼 수
+    있으므로, dest_path를 직접 입력받지 않고 이걸로 계산한다."""
+    physical_path = (physical_path or '').strip()
+    mount_root = (mount_root or '').strip()
+    if not physical_path or not mount_root:
+        return None
+    norm_physical = physical_path.replace('\\', '/').rstrip('/')
+    norm_mount = mount_root.replace('\\', '/').rstrip('/')
+    if norm_physical == norm_mount:
+        return ''
+    prefix = norm_mount + '/'
+    if norm_physical.startswith(prefix):
+        return norm_physical[len(prefix):]
+    return None
+
+
+def resolve_dest_folder(access_token, dest_path, remote_name=None):
+    """dest_path(리모트 내부 상대경로)의 폴더 체인을 없으면 생성하며 최종 폴더 id를 반환.
+    remote_name을 주면 그 리모트의 실제 스코핑(root_folder_id + 마운트 서브경로)을
+    시작점으로 쓴다 — resolve_effective_root_folder_id() 참조."""
+    folder_id = resolve_effective_root_folder_id(access_token, remote_name) if remote_name else 'root'
     dest_path = (dest_path or '').strip().strip('/')
     if dest_path:
         for part in [p for p in dest_path.split('/') if p]:
@@ -258,7 +285,7 @@ def validate_remote_access(remote_name, dest_path):
             return {'success': False, 'error': f'Drive 계정 정보 조회 실패 (HTTP {about_resp.status_code})'}
         account_email = (about_resp.json().get('user') or {}).get('emailAddress')
 
-        folder_id = resolve_dest_folder(access_token, dest_path)
+        folder_id = resolve_dest_folder(access_token, dest_path, remote_name)
 
         return {'success': True, 'account_email': account_email, 'folder_id': folder_id}
     except ValueError as e:
@@ -267,3 +294,80 @@ def validate_remote_access(remote_name, dest_path):
         return {'success': False, 'error': f'네트워크 오류: {e}'}
     except Exception as e:
         return {'success': False, 'error': f'알 수 없는 오류: {e}'}
+
+
+# ==============================================================================
+# rclone CLI 기반 서버사이드 복사 (2026-08-23 도입)
+# ==============================================================================
+# 위쪽 REST 기반 copy_file()/find_or_create_folder()는 파일 하나씩 Drive API를 직접
+# 호출하는 방식이라, 이미지 낱장 폴더(zip으로 안 묶인 책)처럼 파일이 여러 개인 소스는
+# 우리가 직접 순회하며 재귀 로직을 다시 구현해야 했다. rclone은 이미 이 문제(재귀 탐색,
+# 동시성, 재시도, 이미 복사된 파일 스킵)를 내장하고 있고, 소스와 목적지가 둘 다 Drive
+# 백엔드면 자동으로 서버사이드 복사를 쓴다 — 로컬 다운로드가 아니라 구글 데이터센터
+# 내부에서 끝난다(2026-08-23 실 계정으로 검증: "Copied (server-side copy)" 로그 확인).
+#
+# 더 중요한 이점: 'remote:path' 문법이 로컬 마운트가 실제로 보여주는 경로 체계와
+# 100% 동일하다 — root_folder_id 스코핑이나 'rclone mount remote:subpath ...'처럼
+# 명령행으로만 스코핑된 마운트도 rclone 스스로 정확히 해석한다. 우리가 REST API로
+# "이 리모트의 실제 루트 폴더 id가 뭔지" 직접 추론하려다 겪은 버그들
+# (get_remote_root_folder_id/resolve_effective_root_folder_id로 땜질해야 했던 것)이
+# 원천적으로 발생하지 않는다.
+
+
+def _run_rclone(args, timeout=RCLONE_COPY_TIMEOUT, input_bytes=None):
+    """rclone CLI를 서브프로세스로 실행하고 (returncode, stdout, stderr) bytes를 반환한다."""
+    try:
+        result = subprocess.run(
+            ['rclone'] + list(args),
+            capture_output=True, timeout=timeout, input=input_bytes,
+        )
+        return result.returncode, result.stdout, result.stderr
+    except FileNotFoundError:
+        raise ValueError('rclone 바이너리를 찾을 수 없습니다 (PATH 확인 필요)')
+    except subprocess.TimeoutExpired:
+        raise ValueError('rclone 명령이 시간 초과됐습니다')
+
+
+def rclone_copy_file_by_id(remote_name, file_id, dest_rclone_path):
+    """단일 파일(file_id)을 remote_name 리모트의 dest_rclone_path로 서버사이드 복사한다
+    (`rclone backend copyid`). dest_rclone_path에는 반드시 'remote:' 접두사를 포함해야
+    한다 — 빠뜨리면 이 서버 로컬 디스크로 실제 다운로드돼버린다(2026-08-23 로컬 테스트로
+    직접 확인한 실수 포인트). 목적지 상위 폴더가 없으면 rclone이 자동 생성한다."""
+    if ':' not in dest_rclone_path:
+        raise ValueError(f"dest_rclone_path에 'remote:' 접두사가 없습니다: {dest_rclone_path}")
+    code, _, stderr = _run_rclone(['backend', 'copyid', f'{remote_name}:', file_id, dest_rclone_path])
+    if code != 0:
+        raise ValueError(f'rclone copyid 실패: {stderr.decode("utf-8", "replace")[:300]}')
+    return True
+
+
+def rclone_copy_folder_by_id(remote_name, folder_id, dest_rclone_path):
+    """폴더(folder_id) 전체를 재귀적으로 remote_name 리모트의 dest_rclone_path 아래로
+    서버사이드 복사한다(`rclone copy`, 인라인 root_folder_id 오버라이드로 임의의 공유
+    폴더를 소스 리모트의 루트인 것처럼 취급). 이미지 낱장 폴더(imgdir) 책 복사에 쓴다.
+    dest_rclone_path에는 반드시 'remote:' 접두사가 있어야 한다(위 copy_file_by_id 참고)."""
+    if ':' not in dest_rclone_path:
+        raise ValueError(f"dest_rclone_path에 'remote:' 접두사가 없습니다: {dest_rclone_path}")
+    source = f'{remote_name},root_folder_id={folder_id}:'
+    code, _, stderr = _run_rclone(
+        ['copy', source, dest_rclone_path, '--drive-server-side-across-configs'],
+        timeout=RCLONE_FOLDER_COPY_TIMEOUT,
+    )
+    if code != 0:
+        raise ValueError(f'rclone copy(폴더) 실패: {stderr.decode("utf-8", "replace")[:300]}')
+    return True
+
+
+def rclone_ensure_ignore_marker(marker_rclone_path):
+    """marker_rclone_path(예: 'sjva:_bookoasis_view_cache/.bookoasisignore')에
+    '.bookoasisignore' 마커(내용 '*')가 없으면 만든다 — 로컬/레이지 스캐너가 뷰캐시
+    폴더를 별개 소스로 잘못 재스캔해 중복 등록하지 않게 막는다. 존재 확인 후에만
+    실제로 쓴다(멱등, 매 복사 시도마다 불러도 안전)."""
+    check_code, check_out, _ = _run_rclone(['lsf', marker_rclone_path])
+    if check_code == 0 and check_out.strip():
+        return
+    code, _, stderr = _run_rclone(['rcat', marker_rclone_path], input_bytes=b'*')
+    if code != 0:
+        # 마커 생성 실패는 치명적이지 않다 — 최악의 경우 다음 스캔에서 이 캐시 폴더가
+        # 잘못 재스캔될 수 있을 뿐, 복사/열람 자체는 계속 진행해도 된다.
+        print(f'[RcloneGdriveCopy] .bookoasisignore 마커 생성 실패 (무시하고 계속): {stderr.decode("utf-8", "replace")[:200]}')

@@ -1,8 +1,8 @@
 // gdrive_copy_modal.js – 구글 드라이브 "복사해오기" 전용 모달 (실험적)
-// 대상 카테고리는 미리 "카테고리 추가/수정" 모달에서 서버사이드 복사 리모트/목적지 경로를
-// 설정해둔 것 중에서 선택한다 — 이 모달에서는 소스 공유 링크만 추가로 입력한다.
+// 카테고리와 무관한 독립 동작이다 — 리모트 + 저장할 로컬 폴더만 있으면 실행된다.
+// 복사해온 파일을 카테고리로 등록할지는 완료 후 사용자가 별도로 정한다
+// (2026-08-23, "복사 전용 카테고리를 미리 만들어두게 강제할 이유가 없다"는 판단).
 import { state } from '../state.js';
-import * as api from '../api.js';
 
 function escapeHtml(str) {
   return String(str)
@@ -21,55 +21,67 @@ function toast(msg, type = 'info') {
   }
 }
 
-async function loadEligibleLibraries() {
-  const selectEl = document.getElementById('gdrive-copy-form-library');
-  const emptyEl = document.getElementById('gdrive-copy-form-library-empty');
-  const infoEl = document.getElementById('gdrive-copy-form-library-info');
+async function loadRemotes() {
+  const selectEl = document.getElementById('gdrive-copy-form-remote');
+  const emptyEl = document.getElementById('gdrive-copy-form-remote-empty');
   if (!selectEl) return;
 
-  if (infoEl) infoEl.style.display = 'none';
-
   try {
-    const data = await api.fetchLibraries(state.currentLibraryType);
-    const libraries = (data && data.success && Array.isArray(data.libraries)) ? data.libraries : [];
-    // physical_path에 구글 드라이브 공유 링크가 한 줄이라도 있는 카테고리는 그 줄들이
-    // 책 단위 사전복사(뷰어 전용, 열람 시 자동)로 이미 처리되므로 이 카테고리 단위 일괄
-    // 복사 대상에서 제외한다 — 줄 단위로 검사해야 로컬 경로와 섞여 있어도 정확히 걸러진다.
-    const hasGdriveShareLine = (text) => String(text || '').split('\n').some(line => /drive\.google\.com|^gdrive:/i.test(line.trim()));
-    const eligible = libraries.filter(lib => lib.gdrive_copy_remote && !hasGdriveShareLine(lib.physical_path));
+    const res = await fetch('/api/gdrive-copy/remotes');
+    const data = await res.json();
+    const remotes = (data && data.success && Array.isArray(data.remotes)) ? data.remotes.filter(r => r.usable) : [];
 
-    selectEl.innerHTML = '<option value="">카테고리를 선택하세요</option>' + eligible.map(lib => {
-      const safeName = escapeHtml(lib.name);
-      const safeRemote = escapeHtml(lib.gdrive_copy_remote);
-      return `<option value="${lib.id}" data-remote="${safeRemote}" data-dest-path="${escapeHtml(lib.gdrive_copy_dest_path || '')}" data-path="${escapeHtml(lib.physical_path || '')}">${safeName} (${safeRemote})</option>`;
+    selectEl.innerHTML = '<option value="">사용 안 함</option>' + remotes.map(r => {
+      const safeName = escapeHtml(r.name);
+      return `<option value="${safeName}">${safeName}</option>`;
     }).join('');
 
-    if (emptyEl) emptyEl.style.display = eligible.length === 0 ? 'block' : 'none';
+    if (emptyEl) emptyEl.style.display = remotes.length === 0 ? 'block' : 'none';
   } catch (error) {
-    console.error('[GdriveCopyModal] 카테고리 목록 조회 오류:', error);
+    console.error('[GdriveCopyModal] 리모트 목록 조회 오류:', error);
     if (emptyEl) {
-      emptyEl.textContent = `카테고리 목록을 불러오지 못했습니다: ${error.message || error}`;
+      emptyEl.textContent = `리모트 목록을 불러오지 못했습니다: ${error.message || error}`;
       emptyEl.style.display = 'block';
     }
   }
 }
 
-function updateLibraryInfo() {
-  const selectEl = document.getElementById('gdrive-copy-form-library');
-  const infoEl = document.getElementById('gdrive-copy-form-library-info');
-  if (!selectEl || !infoEl) return;
-
-  const option = selectEl.selectedOptions && selectEl.selectedOptions[0];
-  if (!option || !option.value) {
-    infoEl.style.display = 'none';
+async function detectMountRootForCopyModal() {
+  const remoteEl = document.getElementById('gdrive-copy-form-remote');
+  const destPathEl = document.getElementById('gdrive-copy-form-dest-path');
+  const rcloneUrlEl = document.getElementById('gdrive-copy-form-rclone-url');
+  const hintEl = document.getElementById('gdrive-copy-form-dest-path-hint');
+  if (!remoteEl || !remoteEl.value) {
+    toast('먼저 연결할 리모트를 선택해 주세요.', 'warning');
+    return;
+  }
+  if (!destPathEl || !destPathEl.value.trim()) {
+    toast('먼저 저장할 로컬 폴더 경로를 입력해 주세요.', 'warning');
     return;
   }
 
-  const remote = option.dataset.remote || '';
-  const destPath = option.dataset.destPath || '';
-  const localPath = option.dataset.path || '';
-  infoEl.textContent = `리모트: ${remote}${destPath ? ` / ${destPath}` : ''} → 로컬: ${localPath}`;
-  infoEl.style.display = 'block';
+  toast('마운트 루트 확인 중...', 'info');
+  try {
+    const res = await fetch('/api/gdrive-copy/detect-mount-root', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: state.currentLibraryType,
+        physical_path: destPathEl.value.trim(),
+        rclone_rc_url: rcloneUrlEl ? rcloneUrlEl.value : '',
+        remote: remoteEl.value,
+      }),
+    });
+    const data = await res.json();
+    if (data.success && data.mount_root) {
+      toast(`✅ 마운트 루트 확인됨: ${data.mount_root}`, 'success');
+      if (hintEl) hintEl.textContent = `마운트 루트: ${data.mount_root} — Drive 쪽 목적지는 이 아래 상대경로로 자동 생성됩니다.`;
+    } else {
+      toast(`❌ ${data.error || '마운트 루트를 찾지 못했습니다 — 입력한 경로가 실제로 이 리모트가 마운트된 위치인지 확인해 주세요.'}`, 'error');
+    }
+  } catch (err) {
+    toast(`❌ 네트워크 오류: ${err.message}`, 'error');
+  }
 }
 
 export function openGdriveCopyModal() {
@@ -78,15 +90,13 @@ export function openGdriveCopyModal() {
   if (!modal || !form) return;
 
   form.reset();
-  loadEligibleLibraries();
+  loadRemotes();
 
-  const selectEl = document.getElementById('gdrive-copy-form-library');
-  if (selectEl && !selectEl.dataset.listenerBound) {
-    selectEl.dataset.listenerBound = 'true';
-    selectEl.addEventListener('change', updateLibraryInfo);
+  const detectBtn = document.querySelector('[data-role="gdrive-copy-detect-mount-root"]');
+  if (detectBtn && !detectBtn.dataset.listenerBound) {
+    detectBtn.dataset.listenerBound = 'true';
+    detectBtn.addEventListener('click', detectMountRootForCopyModal);
   }
-  const infoEl = document.getElementById('gdrive-copy-form-library-info');
-  if (infoEl) infoEl.style.display = 'none';
 
   modal.style.display = 'flex';
 }
@@ -102,15 +112,21 @@ export async function submitGdriveCopyForm(event) {
     if (typeof event.stopPropagation === 'function') event.stopPropagation();
   }
 
-  const libraryId = document.getElementById('gdrive-copy-form-library')?.value || '';
+  const remote = document.getElementById('gdrive-copy-form-remote')?.value || '';
+  const destLocalPath = document.getElementById('gdrive-copy-form-dest-path')?.value.trim() || '';
+  const rcloneRcUrl = document.getElementById('gdrive-copy-form-rclone-url')?.value.trim() || '';
   const sourceLinks = document.getElementById('gdrive-copy-form-links')?.value.trim() || '';
 
-  if (!libraryId) {
-    alert('대상 카테고리를 선택해 주세요.');
+  if (!remote) {
+    toast('연결할 리모트를 선택해 주세요.', 'warning');
+    return;
+  }
+  if (!destLocalPath) {
+    toast('저장할 로컬 폴더 경로를 입력해 주세요.', 'warning');
     return;
   }
   if (!sourceLinks) {
-    alert('구글 드라이브 공유 폴더 링크를 입력해 주세요.');
+    toast('구글 드라이브 공유 폴더 링크를 입력해 주세요.', 'warning');
     return;
   }
 
@@ -126,7 +142,9 @@ export async function submitGdriveCopyForm(event) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         type: state.currentLibraryType,
-        library_id: libraryId,
+        remote,
+        dest_local_path: destLocalPath,
+        rclone_rc_url: rcloneRcUrl,
         source_links: sourceLinks,
       }),
     });
@@ -136,10 +154,10 @@ export async function submitGdriveCopyForm(event) {
       closeGdriveCopyModal();
       toast('복사 작업을 시작했습니다. 진행 상태는 화면 하단 스캔 상태에서 확인할 수 있습니다.', 'success');
     } else {
-      alert(`[복사 시작 오류]\n${data.error || '알 수 없는 오류'}`);
+      toast(`복사 시작 오류: ${data.error || '알 수 없는 오류'}`, 'error');
     }
   } catch (e) {
-    alert(`[서버 통신 예외]\n${e && e.message ? e.message : String(e)}`);
+    toast(`서버 통신 예외: ${e && e.message ? e.message : String(e)}`, 'error');
   } finally {
     if (submitBtn) {
       submitBtn.disabled = false;

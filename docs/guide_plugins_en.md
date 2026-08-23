@@ -853,6 +853,58 @@ You don't need to implement your own download/proxy logic in the plugin's Python
 
 ---
 
+## 11. 🔗 Google Drive Copy / View-Copy Integration API (Experimental)
+
+Exposed only in `DEVELOP=true` environments. These endpoints require an admin session (`admin_required`), so a category-level plugin's `index.html`/`script.js` can just call them with `fetch()` — same origin means the session cookie rides along automatically, same pattern as the §7 annotation REST API.
+
+This area covers two distinct features:
+
+1. **Batch copy (`/api/gdrive-copy/*`)** — copies an entire folder up front, decoupled from categories, using only a remote + destination folder + share link (the same API the existing "Copy from Drive" modal uses).
+2. **Per-book pre-copy / view-copy (`/api/gdrive-view-copy/*`)** — the existing viewer flow that copies exactly one book the moment it's opened in a gdrive-share category, now queryable/triggerable without opening the viewer.
+
+**Format scope (limitation)**: per-book pre-copy only applies to `zip`/`cbz`, `epub`, `txt`, and `pdf` books in general/adult libraries. Audiobooks and video courses are not covered — they run entirely separate scanner/streaming pipelines that never recognize gdrive share links at all (nothing blocks creating such a category, but it will scan 0 books). Calling `/api/gdrive-view-copy/*` with an audiobook/video `db_type` always returns `not_applicable` or an empty list.
+
+### 11.1 Batch copy API
+
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/api/gdrive-copy/remotes` | GET | List writable rclone Drive remotes (`{success, remotes: [{name, usable}, ...]}`) |
+| `/api/gdrive-copy/validate` | POST | `{remote, dest_path}` — validate destination reachability |
+| `/api/gdrive-copy/detect-mount-root` | POST | `{type, remote, physical_path?, rclone_rc_url?}` — auto-detect this remote's local mount root |
+| `/api/gdrive-copy/start` | POST | `{type, remote, dest_local_path, rclone_rc_url?, source_links}` — enqueues the copy job and returns immediately (check progress via the scanner queue status API separately) |
+
+### 11.2 Per-book pre-copy / view-copy API
+
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/api/gdrive-view-copy/libraries?type=<db_type>` | GET | Lists categories that contain a gdrive share link. Each item: `{id, name, gdrive_copy_remote, gdrive_view_local_mirror_path, configured}` (`configured` means both the remote and mount root are set) |
+| `/api/gdrive-view-copy/status?type=<db_type>&book_id=<id>` | GET | Read-only status check, no copy triggered. `status` is one of `not_applicable` (not a gdrive book) / `not_copied` / `copied` / `unsupported`; `copied` also returns `local_path`/`updated_at` |
+| `/api/gdrive-view-copy/prefetch` | POST | `{type, book_id}` — pre-copies that one book without opening the viewer (reuses the core `resolve_viewable_path()` directly, so locking/TTL/unsupported handling exactly matches the viewer path). Synchronous, including up to a few seconds of internal VFS-visibility polling — a plugin prefetching multiple books should call this once per `book_id` sequentially |
+
+Example — the core of a "pre-copy unread books in this category" plugin:
+
+```javascript
+// plugins/metadata/my_gdrive_plugin/script.js
+async function prefetchLibrary(dbType, libraryId, bookIds) {
+  for (const bookId of bookIds) {
+    const res = await fetch('/api/gdrive-view-copy/prefetch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: dbType, book_id: bookId }),
+    });
+    const data = await res.json();
+    console.log(`[MyPlugin] book ${bookId}:`, data.resolved_locally ? 'copied' : 'still pending/failed');
+  }
+}
+```
+
+Notes:
+
+- Both features follow the same `.env` `DEVELOP=true` gate — on servers without that flag, every endpoint above returns 404.
+- `/api/gdrive-view-copy/prefetch` triggers a real Drive API call (server-side `files.copy`), so a plugin that prefetches large numbers of books indiscriminately risks exhausting the server's `GDRIVE_API_KEY` quota (if configured) or the source share's download-abuse quota — scope prefetching to small, user-triggered batches (e.g. "just this series", tens of books at a time), not entire libraries.
+
+---
+
 ## 💡 Tip: Handling iframe Security Constraints
 When embedding external web services inside a custom plugin tab or card using `<iframe>`, you should be aware of security constraints enforced by browsers.
 

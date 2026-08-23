@@ -13,7 +13,7 @@ class GdriveBookCopyRepository:
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT book_id, library_id, source_file_id, status, local_path, error_message
+            SELECT book_id, library_id, source_file_id, status, local_path, error_message, updated_at
             FROM gdrive_book_copies
             WHERE book_id = %s
             """,

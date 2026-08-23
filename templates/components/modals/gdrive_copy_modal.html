@@ -1,4 +1,6 @@
-<!-- 구글 드라이브 "복사해오기" 전용 모달 (실험적, DEVELOP=true 전용) -->
+<!-- 구글 드라이브 "복사해오기" 전용 모달 (실험적, DEVELOP=true 전용)
+     카테고리와 무관한 독립 동작이다 — 리모트와 저장할 로컬 폴더만 있으면 실행되고,
+     복사해온 파일을 카테고리로 등록할지는 완료 후 사용자가 별도로 정한다. -->
 <div id="gdrive-copy-modal" class="library-modal" style="display: none;">
     <div class="library-modal-content">
         <div class="library-modal-header">
@@ -6,13 +8,29 @@
             <span class="library-modal-close" data-role="gdrive-copy-modal-close">&times;</span>
         </div>
         <form id="gdrive-copy-form">
+            <div style="margin-bottom: 0.8rem; padding: 0.6rem 0.8rem; background: rgba(59, 130, 246, 0.08); border-left: 3px solid #60a5fa; border-radius: 4px; color: #cbd5e1; font-size: 0.82rem;">
+                복사는 카테고리와 무관하게 바로 실행됩니다. 복사가 끝난 뒤, 저장한 폴더를 가리키는 일반 카테고리를 만들면(또는 이미 있다면 재스캔하면) 평소처럼 목록에 나타납니다.
+            </div>
             <div class="library-form-group">
-                <label for="gdrive-copy-form-library">대상 카테고리</label>
-                <select id="gdrive-copy-form-library" name="library_id" required>
-                    <option value="">카테고리를 선택하세요</option>
+                <label for="gdrive-copy-form-remote">연결할 내 구글 드라이브 리모트</label>
+                <select id="gdrive-copy-form-remote" name="remote" required>
+                    <option value="">사용 안 함</option>
                 </select>
-                <div id="gdrive-copy-form-library-empty" style="display: none; margin-top: 0.4rem; color: #94a3b8; font-size: 0.85rem;">서버사이드 복사 대상 리모트/경로가 설정된 카테고리가 없습니다. 먼저 카테고리 추가/수정 모달에서 설정해 주세요.</div>
-                <div id="gdrive-copy-form-library-info" style="display: none; margin-top: 0.4rem; color: #60a5fa; font-size: 0.85rem;"></div>
+                <div id="gdrive-copy-form-remote-empty" style="display: none; margin-top: 0.4rem; color: #94a3b8; font-size: 0.85rem;">쓰기 가능한 rclone Drive 리모트를 찾지 못했습니다.</div>
+            </div>
+            <div class="library-form-group">
+                <label for="gdrive-copy-form-rclone-url">Rclone RC API 주소 (마운트 루트 자동 감지용)</label>
+                <input type="text" id="gdrive-copy-form-rclone-url" name="rclone_rc_url" placeholder="예: http://localhost:5572">
+            </div>
+            <div class="library-form-group">
+                <label for="gdrive-copy-form-dest-path">저장할 로컬 폴더 경로 (이 리모트가 마운트된 서버 내 경로)</label>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="text" id="gdrive-copy-form-dest-path" name="dest_local_path" required maxlength="1024" placeholder="예: /mnt/gdrive/my_backup/library" style="flex: 1;">
+                    <button type="button" data-role="gdrive-copy-detect-mount-root" style="padding: 0.5rem 1rem; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.5); color: #60a5fa; border-radius: 4px; cursor: pointer; font-weight: 600; white-space: nowrap;" title="rclone RC/OS 마운트 테이블로 이 리모트의 마운트 루트 확인">
+                        <i class="fa-solid fa-magnifying-glass"></i> 마운트 루트 확인
+                    </button>
+                </div>
+                <div id="gdrive-copy-form-dest-path-hint" style="margin-top: 0.3rem; color: #94a3b8; font-size: 0.8rem;">폴더가 아직 없어도 괜찮습니다 — Drive 쪽 목적지 폴더는 이 경로에서 마운트 루트를 뺀 나머지로 자동 생성됩니다.</div>
             </div>
             <div class="library-form-group">
                 <label for="gdrive-copy-form-links">구글 드라이브 공유 폴더 링크 (엔터로 여러 개 입력 가능)</label>

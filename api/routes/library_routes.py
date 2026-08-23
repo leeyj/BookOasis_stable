@@ -154,7 +154,6 @@ def add_media_library():
     icon = request.form.get('icon', 'fa-book').strip() or 'fa-book'
     color = request.form.get('color', '#94a3b8').strip() or '#94a3b8'
     gdrive_copy_remote = request.form.get('gdrive_copy_remote', '').strip() or None
-    gdrive_copy_dest_path = request.form.get('gdrive_copy_dest_path', '').strip() or None
     gdrive_view_local_mirror_path = request.form.get('gdrive_view_local_mirror_path', '').strip() or None
     try:
         group_id = _parse_group_id(request.form.get('group_id'))
@@ -162,7 +161,7 @@ def add_media_library():
         return jsonify({'success': False, 'error': str(error)}), 400
 
     try:
-        library_id = CategoryService.add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_copy_dest_path, gdrive_view_local_mirror_path)
+        library_id = CategoryService.add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_view_local_mirror_path)
     except ValueError as e:
         return jsonify({'success': False, 'error': str(e)}), 400
     except sqlite3.IntegrityError:
@@ -224,7 +223,6 @@ def edit_media_library():
     icon = request.form.get('icon', 'fa-book').strip() or 'fa-book'
     color = request.form.get('color', '#94a3b8').strip() or '#94a3b8'
     gdrive_copy_remote = request.form.get('gdrive_copy_remote', '').strip() or None
-    gdrive_copy_dest_path = request.form.get('gdrive_copy_dest_path', '').strip() or None
     gdrive_view_local_mirror_path = request.form.get('gdrive_view_local_mirror_path', '').strip() or None
     try:
         group_id = _parse_group_id(request.form.get('group_id'))
@@ -239,7 +237,7 @@ def edit_media_library():
         print(f"[API Warning] Failed to fetch old library: {e}")
 
     try:
-        CategoryService.edit_library(db_type, int(library_id), name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_copy_dest_path, gdrive_view_local_mirror_path)
+        CategoryService.edit_library(db_type, int(library_id), name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_view_local_mirror_path)
     except ValueError as e:
         return jsonify({'success': False, 'error': str(e)}), 400
     except sqlite3.IntegrityError:

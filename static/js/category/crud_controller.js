@@ -3,7 +3,7 @@ import { state } from '../state.js';
 import * as api from '../api.js';
 import { selectCategory } from '../tab_media_library.js';
 import { currentTargetLibrary } from './context_menu.js';
-import { updateRemoteWarning, enableVFSCheckForRemote, loadGdriveCopyRemotes } from './path_browser.js';
+import { updateRemoteWarning, enableVFSCheckForRemote, loadGdriveCopyRemotes, detectGdriveMountRoot } from './path_browser.js';
 import { loadVideoLibraryView } from '../video_library.js';
 
 async function reloadLibrarySidebar() {
@@ -132,10 +132,13 @@ export function triggerAddLibrary() {
   const hideCoverEl = document.getElementById('library-form-hide-cover');
   if (hideCoverEl) hideCoverEl.checked = false;
 
-  const gdriveCopyDestPathEl = document.getElementById('library-form-gdrive-copy-dest-path');
-  if (gdriveCopyDestPathEl) gdriveCopyDestPathEl.value = '';
   const gdriveViewMirrorEl = document.getElementById('library-form-gdrive-view-mirror-path');
   if (gdriveViewMirrorEl) gdriveViewMirrorEl.value = '';
+  // loadGdriveCopyRemotes()는 비동기라 <select>가 직전에 연 카테고리의 값을 그대로
+  // 들고 있을 수 있다 — updateGdriveSectionVisibility()가 그 값을 읽기 전에 먼저
+  // 동기적으로 비워서, 새 카테고리 모달이 항상 접힌 상태로 열리게 한다.
+  const gdriveCopyRemoteSelectEl = document.getElementById('library-form-gdrive-copy-remote');
+  if (gdriveCopyRemoteSelectEl) gdriveCopyRemoteSelectEl.value = '';
   loadGdriveCopyRemotes('');
 
   updateGdriveSectionVisibility();
@@ -158,6 +161,13 @@ export function triggerAddLibrary() {
   if (pathTextarea && !pathTextarea.dataset.gdriveListenerBound) {
     pathTextarea.dataset.gdriveListenerBound = 'true';
     pathTextarea.addEventListener('input', updateGdriveSectionVisibility);
+  }
+  // 리모트 선택 변경 감지 바인딩 (최초 1회) — loadGdriveCopyRemotes()가 매번 innerHTML만
+  // 바꾸므로 <select> 엘리먼트 자체는 재사용됨, 리스너는 한 번만 걸면 계속 유효하다.
+  const gdriveCopyRemoteEl = document.getElementById('library-form-gdrive-copy-remote');
+  if (gdriveCopyRemoteEl && !gdriveCopyRemoteEl.dataset.gdriveListenerBound) {
+    gdriveCopyRemoteEl.dataset.gdriveListenerBound = 'true';
+    gdriveCopyRemoteEl.addEventListener('change', updateGdriveSectionVisibility);
   }
 
   if (title) {
@@ -215,11 +225,8 @@ export async function triggerEditLibrary() {
   const rcloneUrlEl = document.getElementById('library-form-rclone-url');
   if (rcloneUrlEl) rcloneUrlEl.value = rcloneUrlVal;
 
-  // 구글 드라이브 자동 복사 리모트/목적지 경로 바인딩
+  // 구글 드라이브 자동 복사 리모트/마운트 루트 바인딩
   const gdriveCopyRemoteVal = libraryItem?.dataset?.gdriveCopyRemote || '';
-  const gdriveCopyDestPathVal = libraryItem?.dataset?.gdriveCopyDestPath || '';
-  const gdriveCopyDestPathEl = document.getElementById('library-form-gdrive-copy-dest-path');
-  if (gdriveCopyDestPathEl) gdriveCopyDestPathEl.value = gdriveCopyDestPathVal;
   const gdriveViewMirrorVal = libraryItem?.dataset?.gdriveViewLocalMirrorPath || '';
   const gdriveViewMirrorEl = document.getElementById('library-form-gdrive-view-mirror-path');
   if (gdriveViewMirrorEl) gdriveViewMirrorEl.value = gdriveViewMirrorVal;
@@ -236,6 +243,11 @@ export async function triggerEditLibrary() {
   if (pathTextarea && !pathTextarea.dataset.gdriveListenerBound) {
     pathTextarea.dataset.gdriveListenerBound = 'true';
     pathTextarea.addEventListener('input', updateGdriveSectionVisibility);
+  }
+  const gdriveCopyRemoteEl2 = document.getElementById('library-form-gdrive-copy-remote');
+  if (gdriveCopyRemoteEl2 && !gdriveCopyRemoteEl2.dataset.gdriveListenerBound) {
+    gdriveCopyRemoteEl2.dataset.gdriveListenerBound = 'true';
+    gdriveCopyRemoteEl2.addEventListener('change', updateGdriveSectionVisibility);
   }
 
   // 아이콘 및 컬러 칩 데이터 바인딩
@@ -565,9 +577,11 @@ function pathTextHasGdriveShareLine(text) {
 }
 
 /**
- * 카테고리 유형 버튼 대신, 물리 경로 텍스트에 구글 드라이브 공유 링크가 한 줄이라도
- * 있는지를 매번 다시 읽어 복사 설정 섹션(리모트/목적지/로컬 접근 경로/RC 주소)의
- * 노출·필수 여부를 갱신한다. 로컬 경로와 공유 링크가 섞여 있어도 정확히 동작한다.
+ * 물리 경로 텍스트에 구글 드라이브 공유 링크가 한 줄이라도 있는지를 매번 다시 읽어
+ * 복사 설정 섹션(리모트/로컬 마운트 루트)의 노출·필수 여부를 갱신한다. 공유 링크가
+ * 있는 카테고리는 항상 "책을 열 때 그 1권만 복사"하는 뷰어 용도이므로(폴더 전체를
+ * 미리 복사해두는 일괄 복사는 카테고리와 무관한 별개 기능으로 분리됨, 2026-08-23)
+ * 역할을 고를 필요 없이 리모트 선택 즉시 마운트 루트 자동 감지를 시도한다.
  */
 export function updateGdriveSectionVisibility() {
   const pathTextarea = document.getElementById('library-form-path');
@@ -577,8 +591,6 @@ export function updateGdriveSectionVisibility() {
   const gdriveCopyGroup = document.getElementById('library-form-gdrive-copy-group');
   const gdriveCopyRemoteLabel = document.getElementById('library-form-gdrive-copy-remote-label');
   const gdriveCopyRemoteSelect = document.getElementById('library-form-gdrive-copy-remote');
-  const gdriveCopyDestPathRow = document.getElementById('library-form-gdrive-copy-dest-path-row');
-  const gdriveCopyDestPathInput = document.getElementById('library-form-gdrive-copy-dest-path');
   const gdriveViewMirrorGroup = document.getElementById('library-form-gdrive-view-mirror-group');
   const gdriveViewMirrorInput = document.getElementById('library-form-gdrive-view-mirror-path');
   const remoteEl = document.getElementById('library-form-remote');
@@ -606,20 +618,34 @@ export function updateGdriveSectionVisibility() {
       // (하드 게이트) — 더 이상 "선택/실험적" 부가 기능이 아니라 필수 설정이라 항상 노출/필수화.
       if (gdriveCopyRemoteLabel) gdriveCopyRemoteLabel.textContent = '연결할 내 구글 드라이브 리모트 (필수)';
       if (gdriveCopyRemoteSelect) gdriveCopyRemoteSelect.required = true;
-      // 뷰어 사전복사는 목적지 경로를 자동 생성해 쓰므로(카테고리별 자동 격리), 이 입력은
-      // "Drive에서 복사해오기"(일괄 복사) 전용 카테고리에서만 의미가 있다 — 공유 링크가
-      // 있는 카테고리는 그 기능 대상에서 제외되므로 여기선 숨기고 값도 비워둔다.
-      if (gdriveCopyDestPathRow) gdriveCopyDestPathRow.style.display = 'none';
-      if (gdriveCopyDestPathInput) gdriveCopyDestPathInput.value = '';
       if (gdriveViewMirrorGroup) gdriveViewMirrorGroup.style.display = 'block';
       if (gdriveViewMirrorInput) gdriveViewMirrorInput.required = true;
+      maybeAutoDetectGdriveMountRoot();
   } else {
       if (gdriveCopyRemoteLabel) gdriveCopyRemoteLabel.textContent = '연결할 내 구글 드라이브 리모트 (선택, 실험적)';
       if (gdriveCopyRemoteSelect) gdriveCopyRemoteSelect.required = false;
-      if (gdriveCopyDestPathRow) gdriveCopyDestPathRow.style.display = 'block';
       if (gdriveViewMirrorGroup) gdriveViewMirrorGroup.style.display = 'none';
       if (gdriveViewMirrorInput) gdriveViewMirrorInput.required = false;
   }
+}
+
+let gdriveMountRootAutoDetectTimer = null;
+
+// 마운트 루트는 리모트 이름만으로 /proc/mounts를 조회해 감지되므로(물리 경로는 공유
+// 소스 링크라 계산 기준으로 쓸 수 없음) 리모트가 선택되는 즉시(300ms 디바운스)
+// 시도한다. 이미 값이 있으면(이전 감지 결과나 관리자가 직접 입력) 건드리지 않는다.
+function maybeAutoDetectGdriveMountRoot() {
+  const mirrorInput = document.getElementById('library-form-gdrive-view-mirror-path');
+  const remoteEl = document.getElementById('library-form-gdrive-copy-remote');
+  if (!mirrorInput || mirrorInput.value.trim()) return;
+  if (!remoteEl || !remoteEl.value) return;
+
+  if (gdriveMountRootAutoDetectTimer) clearTimeout(gdriveMountRootAutoDetectTimer);
+  gdriveMountRootAutoDetectTimer = setTimeout(() => {
+    gdriveMountRootAutoDetectTimer = null;
+    if (mirrorInput.value.trim()) return;
+    detectGdriveMountRoot(true);
+  }, 300);
 }
 
 function updateAdvancedStatusDot(isRemoteChecked) {

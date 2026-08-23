@@ -122,6 +122,16 @@ export function toggleHighlightMode() {
 // 다른 뷰어 토글(window.toggleComicPageStep 등)과 동일한 관례로 호출할 수 있도록 노출.
 window.toggleHighlightMode = toggleHighlightMode;
 
+// 형광펜 모드는 TXT/EPUB 전용 기능(zip/cbz/pdf 등에는 hotspot을 풀어줄 텍스트 선택
+// 대상 자체가 없음). 토글 버튼이 media-viewer-modal에 한 번 붙으면 이후 다른 포맷의
+// 뷰어를 열어도 DOM에 그대로 남아있어(모달이 재사용됨) zip 뷰에서도 버튼이 뜬다는
+// 커뮤니티 리포트로 확인됨 — 뷰어를 열 때마다 포맷에 맞춰 버튼 표시 여부를 동기화한다.
+export function setAnnotationUiEnabled(enabled) {
+  if (!enabled) resetHighlightMode();
+  const btn = document.getElementById(TOGGLE_ID);
+  if (btn) btn.style.display = enabled ? 'flex' : 'none';
+}
+
 function ensureButton() {
   let btn = document.getElementById(BUTTON_ID);
   if (btn) return btn;

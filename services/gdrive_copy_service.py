@@ -1,19 +1,25 @@
 # -*- coding: utf-8 -*-
 """
 gdrive_copy_service.py – 구글 드라이브 공유 폴더를 사용자 자신의 드라이브로
-서버사이드 복사(files.copy)한 뒤, 대상 카테고리(이미 등록된, 서버사이드 복사
-리모트/목적지 경로가 설정된 로컬/마운트 카테고리)를 재스캔하는 백그라운드 작업
+서버사이드 복사(files.copy)해 지정한 로컬 폴더에 내려받는 백그라운드 작업
 (scanner_queue task_type: gdrive_copy).
 
-대상 카테고리는 매번 새로 만들지 않는다 — 관리자가 "카테고리 추가/수정" 모달에서
-미리 리모트/목적지 경로를 설정해둔 카테고리(physical_path가 그 리모트/경로의 실제
-로컬 마운트 지점) 중에서 선택해 반복적으로 새 파일만 추가 복사하는 방식이다.
+복사는 카테고리와 무관한 독립 동작이다 — "복사해온 파일을 카테고리로 등록해서
+보여줄지"는 순전히 사용자 선택이라, 복사 대상 카테고리를 미리 만들어두게 강제할
+이유가 없다(2026-08-23, 사용자 판단). 예전엔 사전에 리모트/목적지 경로를 설정해둔
+카테고리를 골라야만 실행할 수 있었지만, 지금은 리모트 + 저장할 로컬 폴더만 있으면
+바로 실행되고 완료 후 재스캔도 트리거하지 않는다 — 나중에 그 폴더를 가리키는 일반
+카테고리를 만들면 평소처럼 스캔된다.
 """
-import database
-from repositories.category_repository import CategoryRepository
 from repositories.scanner_queue_repository import ScannerQueueRepository
-from utils.drive_helper import fetch_gdrive_folder_files, has_gdrive_share_line
-from utils.rclone_gdrive_copy import get_access_token, resolve_dest_folder, find_or_create_folder, copy_file
+from utils.drive_helper import fetch_gdrive_folder_files
+from utils.rclone_gdrive_copy import (
+    get_access_token,
+    resolve_dest_folder,
+    find_or_create_folder,
+    copy_file,
+    compute_relative_dest_path,
+)
 
 
 class GdriveCopyService:
@@ -28,21 +34,15 @@ class GdriveCopyService:
         return links
 
     @staticmethod
-    def start_gdrive_copy_job(db_type, library_id, source_links):
+    def start_gdrive_copy_job(db_type, remote, dest_local_path, source_links, rclone_rc_url=None):
         from services.scanner_queue import scanner_queue
 
-        try:
-            library_id = int(library_id)
-        except (TypeError, ValueError):
-            raise ValueError('대상 카테고리를 선택해 주세요.')
-
-        library = CategoryRepository.get_library_by_id(db_type, library_id)
-        if not library:
-            raise ValueError('대상 카테고리를 찾을 수 없습니다.')
-        if not library.get('gdrive_copy_remote'):
-            raise ValueError('선택한 카테고리에 서버사이드 복사 대상 리모트가 설정되어 있지 않습니다. 카테고리 수정에서 먼저 설정해 주세요.')
-        if has_gdrive_share_line(library.get('physical_path')):
-            raise ValueError('구글 드라이브 공유 링크가 포함된 카테고리는 책을 열람할 때 자동으로 복사되므로, 이 일괄 복사 기능의 대상으로 선택할 수 없습니다.')
+        remote = str(remote or '').strip()
+        dest_local_path = str(dest_local_path or '').strip()
+        if not remote:
+            raise ValueError('연결할 리모트를 선택해 주세요.')
+        if not dest_local_path:
+            raise ValueError('저장할 로컬 폴더 경로를 입력해 주세요.')
 
         links = GdriveCopyService.parse_source_links(source_links)
         if not links:
@@ -51,33 +51,40 @@ class GdriveCopyService:
         enqueued = scanner_queue.enqueue(
             'gdrive_copy',
             db_type=db_type,
-            library_id=library_id,
+            remote=remote,
+            dest_local_path=dest_local_path,
+            rclone_rc_url=rclone_rc_url,
             source_links=links,
         )
         if not enqueued:
-            raise ValueError('이 카테고리에 대한 복사 작업이 이미 진행 중이거나 대기 중입니다.')
+            raise ValueError('이 폴더에 대한 복사 작업이 이미 진행 중이거나 대기 중입니다.')
         return True
 
     @staticmethod
-    def run_gdrive_copy_job(sq, task_id, db_type='general', library_id=None, source_links=None):
-        from services.scanner_queue import ScanCancelledError, scanner_queue
+    def run_gdrive_copy_job(sq, task_id, db_type='general', remote=None, dest_local_path=None, rclone_rc_url=None, source_links=None):
+        from services.scanner_queue import ScanCancelledError
 
         source_links = source_links or []
 
-        library = CategoryRepository.get_library_by_id(db_type, library_id)
-        if not library:
-            raise RuntimeError(f'카테고리(id={library_id})를 찾을 수 없습니다 (삭제되었을 수 있음).')
-
-        remote = library.get('gdrive_copy_remote')
-        dest_path = library.get('gdrive_copy_dest_path') or ''
-        local_scan_path = library.get('physical_path')
         if not remote:
-            raise RuntimeError('카테고리에 서버사이드 복사 대상 리모트가 설정되어 있지 않습니다.')
+            raise RuntimeError('연결할 리모트가 지정되지 않았습니다.')
+        if not dest_local_path:
+            raise RuntimeError('저장할 로컬 폴더 경로가 지정되지 않았습니다.')
 
-        sq.log(f"[GdriveCopy] 시작: library='{library.get('name')}', remote='{remote}', dest_path='{dest_path}', links={len(source_links)}개")
+        # dest_path(Drive 쪽 목적지 폴더)는 관리자가 손으로 입력하지 않고, 저장할 로컬
+        # 폴더에서 "마운트 루트"를 뺀 나머지로 매번 새로 계산한다 — 손으로 입력한 두 값이
+        # 겹치는 부분을 착각해 어긋나는 게 실사용자 혼란 포인트였음(2026-08-22). 마운트
+        # 루트 자체도 관리자가 입력하지 않는다 — /proc/mounts(OS 마운트 테이블, 우선)나
+        # rclone RC의 mount/listmounts(등록된 경우만, 폴백)로 실시간 감지한다.
+        from tools.scanner.vfs import detect_mount_root, resolve_rc_urls
+        rc_urls = resolve_rc_urls(db_type, {'rclone_rc_url': rclone_rc_url or ''})
+        mount_root = detect_mount_root(remote, dest_local_path, rc_urls)
+        dest_path = compute_relative_dest_path(dest_local_path, mount_root) or ''
+
+        sq.log(f"[GdriveCopy] 시작: remote='{remote}', dest_local_path='{dest_local_path}', dest_path='{dest_path}', links={len(source_links)}개")
 
         access_token = get_access_token(remote)
-        dest_root_folder_id = resolve_dest_folder(access_token, dest_path)
+        dest_root_folder_id = resolve_dest_folder(access_token, dest_path, remote)
 
         # 1. 소스 폴더(들)의 파일 목록 수집
         ScannerQueueRepository.update_task_status(task_id, 'running', stage='소스 폴더 목록 조회 중...')
@@ -129,15 +136,7 @@ class GdriveCopyService:
 
         summary = f'{copied}/{total} 파일 복사 완료' + (f' ({len(failed)}개 실패)' if failed else '')
         ScannerQueueRepository.update_task_status(task_id, 'running', stage=summary)
-        sq.log(f"[GdriveCopy] {summary}")
+        sq.log(f"[GdriveCopy] {summary} — dest_local_path='{dest_local_path}'. 이 폴더를 가리키는 카테고리를 만들면(또는 이미 있다면 재스캔하면) 목록에 반영됩니다.")
 
         if copied == 0:
             raise RuntimeError(f'모든 파일 복사에 실패했습니다: {", ".join(failed[:5])}')
-
-        # 4. 기존 카테고리 재스캔 트리거
-        db_path = database.get_db_path(db_type)
-        scanner_queue.enqueue(
-            'library_scan', db_type=db_type, db_path=db_path, library_id=library_id,
-            physical_path=local_scan_path, force=False, trigger_type='manual', is_cron=False,
-        )
-        sq.log(f"[GdriveCopy] 카테고리 #{library_id} 스캔 큐 등록 완료")

@@ -43,8 +43,8 @@ class ScannerQueue:
             return f"{task_type}_{db_type}_{library_id}"
         elif task_type == 'gdrive_copy':
             db_type = kwargs.get('db_type', 'general')
-            library_id = kwargs.get('library_id')
-            return f"gdrive_copy_{db_type}_{library_id}"
+            dest_local_path = str(kwargs.get('dest_local_path') or '').strip().rstrip('/\\')
+            return f"gdrive_copy_{db_type}_{dest_local_path}"
         return str(task_type)
 
     def enqueue(self, task_type, **kwargs):
@@ -371,7 +371,9 @@ def run_scanner_worker_loop():
                 try:
                     from utils.redis_helper import redis_delete_pattern
                     target_db = kwargs.get('db_type', 'general')
-                    redis_delete_pattern(f"cache:recent_added*:{target_db}:*")
+                    recent_added_db_types = ['general', 'adult', 'audiobook', 'video'] if task_type == 'lazy_scan' else [target_db]
+                    for recent_added_db_type in recent_added_db_types:
+                        redis_delete_pattern(f"cache:recent_added*:{recent_added_db_type}:*")
                     from repositories.series_repository import SeriesRepository
                     summary_db_types = ['general', 'adult'] if task_type == 'lazy_scan' else [target_db]
                     for summary_db_type in summary_db_types:

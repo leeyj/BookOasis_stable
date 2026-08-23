@@ -101,6 +101,169 @@ def resolve_rc_urls(db_type, row):
     return list(dict.fromkeys(rc_urls))
 
 
+def _rc_request_headers(rc_url):
+    """rc_url의 userinfo(basic auth)를 헤더로 옮기고, 인증정보가 빠진 깨끗한 URL을 함께 반환."""
+    headers = {
+        'Content-Type': 'application/json',
+        'User-Agent': f'{ENGINE_NAME}/{ENGINE_SIGNATURE}',
+    }
+    parsed = urllib.parse.urlparse(rc_url)
+    if parsed.username and parsed.password:
+        auth_str = f"{parsed.username}:{parsed.password}"
+        auth_b64 = base64.b64encode(auth_str.encode('utf-8')).decode('utf-8')
+        headers['Authorization'] = f"Basic {auth_b64}"
+        clean_rc_url = f"{parsed.scheme}://{parsed.netloc.split('@')[-1]}"
+    else:
+        clean_rc_url = rc_url
+    return headers, clean_rc_url
+
+
+def _unescape_proc_mounts_field(value):
+    """/proc/mounts는 공백/탭/개행/백슬래시를 8진 이스케이프(\\040 등)로 인코딩한다."""
+    return (
+        value.replace('\\040', ' ')
+             .replace('\\011', '\t')
+             .replace('\\012', '\n')
+             .replace('\\134', '\\')
+    )
+
+
+def detect_mount_root_from_proc_mounts(remote_name, physical_path=None):
+    """리눅스 /proc/mounts에서 이 rclone 리모트(remote_name, 콜론 없이)가 마운트된 로컬
+    경로를 찾는다. rclone RC의 mount/listmounts는 CLI(`rclone mount ...`)로 시작한
+    마운트를 추적하지 못하는 경우가 실제로 확인됐다(2026-08-22, `--rc`가 걸려 있어도
+    listmounts가 빈 배열을 반환) — OS 마운트 테이블을 직접 읽는 이 방법이 rclone 버전/RC
+    등록 방식과 무관하게 항상 정확하다. BookOasis 프로세스가 rclone과 같은 마운트
+    네임스페이스에 있을 때만 동작(도커라면 호스트 /proc 마운트가 없는 한 안 보일 수 있음)
+    — 그 경우 detect_mount_root_via_rc()로 폴백."""
+    remote_name = (remote_name or '').strip().rstrip(':')
+    if not remote_name:
+        print("[Vfs-MountDetect] remote_name이 비어 있어 /proc/mounts 조회를 건너뜀")
+        return None
+
+    try:
+        with open('/proc/mounts', 'r', encoding='utf-8', errors='replace') as f:
+            lines = f.readlines()
+    except OSError as e:
+        print(f"[Vfs-MountDetect] /proc/mounts 읽기 실패(도커 등 마운트 네임스페이스가 다르면 정상): {e}")
+        return None
+
+    physical_path_norm = (physical_path or '').strip().replace('\\', '/').rstrip('/') or None
+    for line in lines:
+        parts = line.split()
+        if len(parts) < 3:
+            continue
+        source, mountpoint_raw, fstype = parts[0], parts[1], parts[2]
+        if 'fuse.rclone' not in fstype and fstype != 'rclone':
+            continue
+        source_remote = source.split(':', 1)[0]
+        if source_remote != remote_name:
+            continue
+        mountpoint = _unescape_proc_mounts_field(mountpoint_raw).rstrip('/')
+        print(f"[Vfs-MountDetect] /proc/mounts에서 발견: remote='{remote_name}' -> mountpoint='{mountpoint}'")
+        if physical_path_norm and not (physical_path_norm == mountpoint or physical_path_norm.startswith(mountpoint + '/')):
+            print(f"[Vfs-MountDetect] 경고: physical_path='{physical_path_norm}'가 이 마운트 하위 경로가 아님 — 물리 경로를 다시 확인하세요")
+            continue
+        return mountpoint
+
+    print(f"[Vfs-MountDetect] /proc/mounts에 remote='{remote_name}' 마운트 없음")
+    return None
+
+
+def detect_mount_remote_subpath(remote_name):
+    """/proc/mounts의 source 필드(예: 'sjva:tempview')에서 리모트 이름 뒤의 서브경로
+    ('tempview')를 반환한다. 관리자가 'rclone mount sjva:tempview /path'처럼 특정
+    서브폴더를 대상으로 마운트한 경우, 로컬 마운트 루트는 그 서브폴더에 대응하지만
+    rclone.conf의 root_folder_id는 비어있을 수 있다(명령행 인자로만 스코핑된 경우
+    설정 파일엔 아무 흔적이 없음) — Drive API 호출 시 이 서브경로를 시작점에 반영하지
+    않으면 파일이 실제 Drive 루트(마운트 범위 밖)에 생겨 로컬에서 영원히 안 보이는
+    문제로 이어진다(2026-08-23 실사용자 리포트, get_remote_root_folder_id()의
+    root_folder_id 처리만으로는 이 케이스를 못 잡아냄). 못 찾으면 빈 문자열."""
+    remote_name = (remote_name or '').strip().rstrip(':')
+    if not remote_name:
+        return ''
+    try:
+        with open('/proc/mounts', 'r', encoding='utf-8', errors='replace') as f:
+            lines = f.readlines()
+    except OSError:
+        return ''
+    for line in lines:
+        parts = line.split()
+        if len(parts) < 3:
+            continue
+        source, _mountpoint, fstype = parts[0], parts[1], parts[2]
+        if 'fuse.rclone' not in fstype and fstype != 'rclone':
+            continue
+        if ':' not in source:
+            continue
+        prefix, _, subpath = source.partition(':')
+        if prefix != remote_name:
+            continue
+        return subpath.strip('/')
+    return ''
+
+
+def detect_mount_root_via_rc(rc_urls, physical_path):
+    """rclone RC의 mount/listmounts로 현재 활성 마운트 목록을 조회해, physical_path를
+    포함하는(그 경로가 하위에 있는) 마운트의 MountPoint를 반환한다 — 관리자가 "이 리모트가
+    로컬 어디에 마운트돼 있는지"를 직접 타이핑하지 않아도, rclone 자신이 이미 아는 정보를
+    그대로 읽어오는 것이다. 여러 rc_urls 후보를 순서대로 시도, 실패/불일치 시 None.
+    가장 길게(구체적으로) 일치하는 MountPoint를 우선한다."""
+    physical_path = (physical_path or '').strip().replace('\\', '/').rstrip('/')
+    if not physical_path:
+        print("[Vfs-MountDetect] physical_path가 비어 있어 감지를 건너뜀")
+        return None
+
+    print(f"[Vfs-MountDetect] 감지 시작: physical_path='{physical_path}', rc_urls={rc_urls}")
+
+    for rc_url in rc_urls:
+        try:
+            headers, clean_rc_url = _rc_request_headers(rc_url)
+            full_url = f"{clean_rc_url.rstrip('/')}/mount/listmounts"
+            req = urllib.request.Request(full_url, data=b'{}', headers=headers)
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                raw_body = resp.read().decode('utf-8')
+                payload = json.loads(raw_body)
+        except Exception as e:
+            print(f"[Vfs-MountDetect] RC 서버 '{rc_url}' 조회 실패(다음 후보로 계속): {e}")
+            continue
+
+        print(f"[Vfs-MountDetect] RC 서버 '{rc_url}' 응답: {raw_body}")
+
+        mount_points = payload.get('mountPoints') if isinstance(payload, dict) else None
+        if not isinstance(mount_points, list):
+            print(f"[Vfs-MountDetect] RC 서버 '{rc_url}' 응답에 mountPoints 배열이 없음 (payload keys: {list(payload.keys()) if isinstance(payload, dict) else type(payload)})")
+            continue
+        if not mount_points:
+            print(f"[Vfs-MountDetect] RC 서버 '{rc_url}': 현재 활성 마운트가 0개 (rclone mount로 마운트된 게 아니라 rclone.conf 상의 원격 자체를 다른 방식(fstab 등)으로 마운트했을 가능성)")
+
+        best_match = None
+        for entry in mount_points:
+            mp = str(entry.get('MountPoint') or '').replace('\\', '/').rstrip('/')
+            print(f"[Vfs-MountDetect]   후보 마운트: Fs='{entry.get('Fs')}', MountPoint='{mp}' -> {'일치' if (physical_path == mp or physical_path.startswith(mp + '/')) else '불일치'}")
+            if not mp:
+                continue
+            if physical_path == mp or physical_path.startswith(mp + '/'):
+                if best_match is None or len(mp) > len(best_match):
+                    best_match = mp
+        if best_match:
+            print(f"[Vfs-MountDetect] 감지 성공: '{best_match}'")
+            return best_match
+
+    print(f"[Vfs-MountDetect] 감지 실패: physical_path='{physical_path}'를 포함하는 마운트를 못 찾음")
+    return None
+
+
+def detect_mount_root(remote_name, physical_path, rc_urls):
+    """마운트 루트 자동 감지 진입점. /proc/mounts(OS 마운트 테이블, 항상 정확하지만
+    BookOasis와 rclone이 같은 마운트 네임스페이스에 있어야 함)를 먼저 시도하고, 실패하면
+    RC의 mount/listmounts(그 마운트가 RC로 등록됐을 때만 보임)로 폴백한다."""
+    mount_root = detect_mount_root_from_proc_mounts(remote_name, physical_path)
+    if mount_root:
+        return mount_root
+    return detect_mount_root_via_rc(rc_urls, physical_path)
+
+
 def refresh_vfs_paths(remote_paths, rc_urls):
     """remote_paths(로컬 마운트 경로들) 각각에 대해 rc_urls 중 응답하는 rclone RC 서버로
     vfs/refresh를 시도한다 (재시도/후보 경로 폴백 포함). 실패해도 예외를 던지지 않는다 —
