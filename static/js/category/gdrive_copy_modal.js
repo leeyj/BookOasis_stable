@@ -77,7 +77,9 @@ async function detectMountRootForCopyModal() {
       toast(`✅ 마운트 루트 확인됨: ${data.mount_root}`, 'success');
       if (hintEl) hintEl.textContent = `마운트 루트: ${data.mount_root} — Drive 쪽 목적지는 이 아래 상대경로로 자동 생성됩니다.`;
     } else {
-      toast(`❌ ${data.error || '마운트 루트를 찾지 못했습니다 — 입력한 경로가 실제로 이 리모트가 마운트된 위치인지 확인해 주세요.'}`, 'error');
+      toast(`❌ ${data.error || '마운트 루트를 찾지 못했습니다'} — 도커 컨테이너로 실행 중이라면 BookOasis와 rclone RC 서버가 경로를 다르게 볼 수 있어 자동 감지가 원천적으로 안 될 수 있습니다. 아래 "마운트 루트 직접 입력"에 실제 마운트 경로를 입력해 주세요.`, 'error');
+      const overrideGroup = document.getElementById('gdrive-copy-form-mount-root-override-group');
+      if (overrideGroup) overrideGroup.style.display = 'block';
     }
   } catch (err) {
     toast(`❌ 네트워크 오류: ${err.message}`, 'error');
@@ -91,6 +93,9 @@ export function openGdriveCopyModal() {
 
   form.reset();
   loadRemotes();
+
+  const overrideGroup = document.getElementById('gdrive-copy-form-mount-root-override-group');
+  if (overrideGroup) overrideGroup.style.display = 'none';
 
   const detectBtn = document.querySelector('[data-role="gdrive-copy-detect-mount-root"]');
   if (detectBtn && !detectBtn.dataset.listenerBound) {
@@ -116,6 +121,7 @@ export async function submitGdriveCopyForm(event) {
   const destLocalPath = document.getElementById('gdrive-copy-form-dest-path')?.value.trim() || '';
   const rcloneRcUrl = document.getElementById('gdrive-copy-form-rclone-url')?.value.trim() || '';
   const sourceLinks = document.getElementById('gdrive-copy-form-links')?.value.trim() || '';
+  const mountRootOverride = document.getElementById('gdrive-copy-form-mount-root-override')?.value.trim() || '';
 
   if (!remote) {
     toast('연결할 리모트를 선택해 주세요.', 'warning');
@@ -146,6 +152,7 @@ export async function submitGdriveCopyForm(event) {
         dest_local_path: destLocalPath,
         rclone_rc_url: rcloneRcUrl,
         source_links: sourceLinks,
+        mount_root_override: mountRootOverride,
       }),
     });
     const data = await res.json();

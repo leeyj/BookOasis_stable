@@ -1,4 +1,7 @@
 # CHANGELOG
+## v2.4.1
+- (fix) 도커 환경에서 "Drive에서 복사해오기"의 마운트 루트 자동 감지가 실패하던 문제 — 마운트 루트 직접 입력 필드 추가 (실험적, DEVELOP=true 전용) | fix mount-root auto-detect failing for "Copy from Drive" in Docker setups — added a manual mount-root input field (experimental, DEVELOP=true only)
+
 ## v2.4.0
 - (refactor) 구글 드라이브 책 단위 사전복사를 REST API 직접 호출 대신 rclone CLI(`backend copyid`/`copy`) 기반으로 교체 (실험적, DEVELOP=true 전용) — 로컬 마운트가 실제로 보여주는 경로 체계와 항상 일치해 이전 세션들에서 반복된 root_folder_id/마운트 서브경로 스코핑 버그가 원천적으로 사라짐 | switch Google Drive per-book pre-copy from direct REST API calls to the rclone CLI (`backend copyid`/`copy`) (experimental, DEVELOP=true only) — always matches the path scheme the local mount actually shows, eliminating the class of root_folder_id/mount-subpath scoping bugs hit in prior sessions
 - (제약사항/known limitation) 구글 드라이브 공유 카테고리에서 zip/cbz로 묶이지 않은 낱장 이미지 폴더(이미지 폴더 책)는 지원하지 않습니다 — 이미지 폴더를 공유받았다면 "Drive에서 복사해오기"로 폴더째 내 드라이브에 복사한 뒤, 그 폴더를 가리키는 일반 카테고리를 새로 만들어 보세요(로컬 이미지 폴더는 정상 지원). | (limitation) Google Drive share categories don't support loose image-folder books (comics not packaged as zip/cbz) — if you've been shared one, use "Copy from Drive" to copy the whole folder into your own Drive first, then create a regular category pointing at it (local image-folder books are fully supported)

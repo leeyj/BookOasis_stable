@@ -84,7 +84,12 @@ def detect_gdrive_copy_mount_root():
         mount_root = detect_mount_root(remote_name, physical_path, rc_urls)
         if mount_root:
             return jsonify({'success': True, 'mount_root': mount_root})
-        return jsonify({'success': False, 'error': 'RC 서버에서 이 경로를 포함하는 마운트를 찾지 못했습니다.'})
+        return jsonify({'success': False, 'error': (
+            'RC 서버에서 이 경로를 포함하는 마운트를 찾지 못했습니다. '
+            '도커 컨테이너로 실행 중이라면 이 서버가 보는 경로와 rclone RC 서버가 보는 마운트 경로가 '
+            '서로 다른 파일시스템 관점(볼륨 매핑)이라 자동 감지가 원천적으로 안 될 수 있습니다 — '
+            '이 경우 "마운트 루트 직접 입력"에 실제 마운트 경로를 입력해 주세요.'
+        )})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -105,6 +110,7 @@ def start_gdrive_copy():
             dest_local_path=data.get('dest_local_path'),
             rclone_rc_url=data.get('rclone_rc_url'),
             source_links=data.get('source_links'),
+            mount_root_override=data.get('mount_root_override'),
         )
         return jsonify({'success': True, 'message': 'Drive 복사 작업을 시작했습니다.'})
     except ValueError as e:

@@ -34,11 +34,12 @@ class GdriveCopyService:
         return links
 
     @staticmethod
-    def start_gdrive_copy_job(db_type, remote, dest_local_path, source_links, rclone_rc_url=None):
+    def start_gdrive_copy_job(db_type, remote, dest_local_path, source_links, rclone_rc_url=None, mount_root_override=None):
         from services.scanner_queue import scanner_queue
 
         remote = str(remote or '').strip()
         dest_local_path = str(dest_local_path or '').strip()
+        mount_root_override = str(mount_root_override or '').strip()
         if not remote:
             raise ValueError('연결할 리모트를 선택해 주세요.')
         if not dest_local_path:
@@ -54,6 +55,7 @@ class GdriveCopyService:
             remote=remote,
             dest_local_path=dest_local_path,
             rclone_rc_url=rclone_rc_url,
+            mount_root_override=mount_root_override,
             source_links=links,
         )
         if not enqueued:
@@ -61,7 +63,7 @@ class GdriveCopyService:
         return True
 
     @staticmethod
-    def run_gdrive_copy_job(sq, task_id, db_type='general', remote=None, dest_local_path=None, rclone_rc_url=None, source_links=None):
+    def run_gdrive_copy_job(sq, task_id, db_type='general', remote=None, dest_local_path=None, rclone_rc_url=None, mount_root_override=None, source_links=None):
         from services.scanner_queue import ScanCancelledError
 
         source_links = source_links or []
@@ -74,11 +76,21 @@ class GdriveCopyService:
         # dest_path(Drive 쪽 목적지 폴더)는 관리자가 손으로 입력하지 않고, 저장할 로컬
         # 폴더에서 "마운트 루트"를 뺀 나머지로 매번 새로 계산한다 — 손으로 입력한 두 값이
         # 겹치는 부분을 착각해 어긋나는 게 실사용자 혼란 포인트였음(2026-08-22). 마운트
-        # 루트 자체도 관리자가 입력하지 않는다 — /proc/mounts(OS 마운트 테이블, 우선)나
-        # rclone RC의 mount/listmounts(등록된 경우만, 폴백)로 실시간 감지한다.
-        from tools.scanner.vfs import detect_mount_root, resolve_rc_urls
-        rc_urls = resolve_rc_urls(db_type, {'rclone_rc_url': rclone_rc_url or ''})
-        mount_root = detect_mount_root(remote, dest_local_path, rc_urls)
+        # 루트 자체도 기본적으로는 관리자가 입력하지 않는다 — /proc/mounts(OS 마운트
+        # 테이블, 우선)나 rclone RC의 mount/listmounts(등록된 경우만, 폴백)로 실시간
+        # 감지한다. 단, 도커 환경에서는 이 서버와 rclone RC 서버가 서로 다른 파일시스템
+        # 관점(볼륨 매핑)을 가져 두 방법 모두 원천적으로 실패할 수 있어(2026-08-24 실사용자
+        # 리포트), mount_root_override가 주어지면 감지를 건너뛰고 그대로 신뢰한다.
+        mount_root_override = str(mount_root_override or '').strip()
+        if mount_root_override:
+            mount_root = mount_root_override
+            sq.log(f"[GdriveCopy] 마운트 루트 수동 입력값 사용: '{mount_root}' (자동 감지 건너뜀)")
+        else:
+            from tools.scanner.vfs import detect_mount_root, resolve_rc_urls
+            rc_urls = resolve_rc_urls(db_type, {'rclone_rc_url': rclone_rc_url or ''})
+            mount_root = detect_mount_root(remote, dest_local_path, rc_urls)
+            if not mount_root:
+                sq.log(f"[GdriveCopy] 경고: 마운트 루트 자동 감지 실패 — dest_path를 Drive 루트 기준으로 계산합니다. 도커 환경이라면 마운트 루트를 직접 입력해 주세요.")
         dest_path = compute_relative_dest_path(dest_local_path, mount_root) or ''
 
         sq.log(f"[GdriveCopy] 시작: remote='{remote}', dest_local_path='{dest_local_path}', dest_path='{dest_path}', links={len(source_links)}개")
