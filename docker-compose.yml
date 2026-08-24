@@ -14,6 +14,10 @@ services:
       - ./covers:/app/covers
       - ./cache:/app/cache
       - ./plugins:/app/plugins
+      # ── "Drive에서 복사해오기" 기능을 쓰려면 자신의 rclone.conf를 아래 경로로 마운트하세요 ──
+      # (rclone 바이너리는 이미지에 내장되어 있어 별도 설치가 필요 없습니다. 파일만 준비하세요.
+      #  rclone이 OAuth 토큰을 갱신하며 파일에 다시 쓸 수 있으므로 :ro로 마운트하지 마세요)
+      # - ./rclone.conf:/app/rclone/rclone.conf
     # ── GPU 하드웨어 트랜스코딩을 쓰고 싶다면 아래 중 서버 환경에 맞는 항목의 주석을 해제하세요 ──
     # (기본은 둘 다 비활성화 상태입니다. devices/gpu 설정이 가리키는 장치가 호스트에
     #  실제로 없으면 docker-compose up 자체가 시작 실패하니, 있는 것만 해제하세요.)

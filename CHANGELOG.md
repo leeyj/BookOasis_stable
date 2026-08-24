@@ -1,4 +1,7 @@
 # CHANGELOG
+## v2.4.4
+- (feature) rclone(mod 빌드)을 이미지에 내장 — 별도 설치 없이 `/app/rclone/rclone.conf`로 자신의 rclone.conf만 마운트하면 "Drive에서 복사해오기"가 동작 (실험적, DEVELOP=true 전용) | bundle rclone (mod build) into the image — mount your rclone.conf to `/app/rclone/rclone.conf` and "Copy from Drive" works with no install step (experimental, DEVELOP=true only)
+
 ## v2.4.3
 - (fix) 도커 PUID 사용 시 앱 계정(media_user)과 rclone.conf를 설정한 계정(root)의 홈 디렉토리가 달라 리모트를 못 찾던 문제 수정 (실험적, DEVELOP=true 전용) | fix the app (media_user) failing to find rclone.conf configured under root's home when running with a Docker PUID (experimental, DEVELOP=true only)
 

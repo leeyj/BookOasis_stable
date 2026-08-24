@@ -27,10 +27,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     gosu \
     tzdata \
+    curl \
+    unzip \
     && if [ "$TARGETARCH" = "amd64" ]; then \
          apt-get install -y --no-install-recommends intel-media-va-driver mesa-va-drivers libva2 vainfo; \
        fi \
     && rm -rf /var/lib/apt/lists/*
+
+# 4-1. rclone(wiserain mod 빌드) 설치 — "Drive에서 복사해오기" 기능 전용. 사용자가 컨테이너
+# 안에 직접 설치하던 방식(docker exec)은 root 계정으로 이뤄지는 경우가 많아 앱 실행 계정
+# (media_user, PUID 사용 시)과 rclone.conf 위치가 어긋나는 문제가 반복 보고됐다
+# (v2.4.3 CHANGELOG 참조). 이미지에 미리 심어두면 이 설치 단계 자체가 사라진다.
+# 일반 rclone이 아닌 mod 빌드를 쓰는 이유는 국내 커뮤니티에서 흔히 쓰는 구글 드라이브
+# 관련 확장 기능 때문 — 표준 rclone 릴리스와 CLI 호환.
+RUN curl -fsSL https://raw.githubusercontent.com/wiserain/rclone/mod/install.sh | bash
 
 # 5. Install Python Dependencies
 COPY requirements.txt .
@@ -49,7 +59,9 @@ RUN mkdir -p /app/_plugin_framework_defaults && \
     cp -r /app/plugins/metadata/. /app/_plugin_framework_defaults/
 
 # 7. Create volumes and directories
-RUN mkdir -p db covers cache plugins
+# rclone: 사용자가 자신의 rclone.conf를 그대로 바인드 마운트할 수 있는 고정 경로.
+# utils/rclone_gdrive_copy.py의 설정 경로 우선순위 1순위.
+RUN mkdir -p db covers cache plugins rclone
 
 # 8. Expose Application Port
 EXPOSE 5930

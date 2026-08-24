@@ -35,6 +35,10 @@ DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3'
 RCLONE_COPY_TIMEOUT = 300
 RCLONE_FOLDER_COPY_TIMEOUT = 1800
 
+# 이미지에 내장된 rclone(Dockerfile, 2026-08-24)이 최우선으로 보는 고정 경로. 사용자가
+# 자신의 rclone.conf를 이 경로로 바인드 마운트하기만 하면 되고, 환경변수 설정은 필요 없다.
+_BUNDLED_RCLONE_CONFIG_PATH = '/app/rclone/rclone.conf'
+
 # remote_name -> {'access_token': str, 'expires_at': epoch_seconds}
 _token_cache = {}
 
@@ -43,19 +47,23 @@ _ROOT_RCLONE_CONFIG_FALLBACK = '/root/.config/rclone/rclone.conf'
 
 
 def _rclone_config_args():
-    """RCLONE_CONFIG_PATH(우리 전용) 또는 RCLONE_CONFIG(rclone 자체가 이미 인식하는
-    표준 환경변수명, 2026-08-24 커뮤니티 요청) 중 설정된 값으로 `--config <path>`
-    인자를 반환한다 — 사용자가 rclone.conf를 기본 위치가 아닌 다른 경로에 여러 개
-    두고 쓰는 경우 이 기능이 참조할 파일을 명시적으로 지정할 수 있게 한다.
-    rclone 프로세스는 RCLONE_CONFIG를 환경변수 상속만으로도 스스로 읽지만, 여기서
-    명시적으로 --config를 붙여 어떤 파일을 쓰는지 우리 로그에서도 확정적으로 알 수
-    있게 한다. 둘 다 설정됐다면 RCLONE_CONFIG_PATH가 우선한다.
+    """어떤 rclone.conf를 쓸지 우선순위대로 결정해 `--config <path>` 인자를 반환한다:
 
-    둘 다 없으면 현재 프로세스의 기본 위치($HOME/.config/rclone/rclone.conf)를 그대로
-    맡기되, 그 파일이 없고 root의 표준 위치(/root/.config/rclone/rclone.conf)에는
-    있으면 그걸 대신 쓴다 — 도커에서 media_user로 앱이 돌지만 rclone.conf는
-    root 계정으로 설정된 흔한 사례(2026-08-24 hamsuehun 커뮤니티 리포트)를 사용자가
-    직접 RCLONE_CONFIG_PATH를 지정하지 않아도 구제한다."""
+    1순위: 이미지에 내장된 rclone(Dockerfile)이 보는 고정 경로 _BUNDLED_RCLONE_CONFIG_PATH
+           (/app/rclone/rclone.conf) — 사용자가 이 경로로 자신의 rclone.conf를 바인드
+           마운트하기만 하면 되는, 설정이 필요 없는 기본 경로(2026-08-24 도입).
+    2순위: RCLONE_CONFIG_PATH(우리 전용) 또는 RCLONE_CONFIG(rclone 자체가 이미 인식하는
+           표준 환경변수명, 2026-08-24 커뮤니티 요청) — 도커 밖에 있거나 다른 경로에
+           rclone.conf를 두고 쓰는 기존 사용자를 위해 그대로 유지한다. 둘 다 설정됐다면
+           RCLONE_CONFIG_PATH가 우선한다.
+    3순위: 위 둘 다 없으면 현재 프로세스의 기본 위치($HOME/.config/rclone/rclone.conf)를
+           그대로 맡기되, 그 파일이 없고 root의 표준 위치(/root/.config/rclone/rclone.conf)
+           에는 있으면 그걸 대신 쓴다 — 도커에서 media_user로 앱이 돌지만 rclone.conf는
+           root 계정으로 설정된 흔한 사례(2026-08-24 hamsuehun 커뮤니티 리포트)를 사용자가
+           직접 RCLONE_CONFIG_PATH를 지정하지 않아도 구제한다."""
+    if os.path.isfile(_BUNDLED_RCLONE_CONFIG_PATH):
+        return ['--config', _BUNDLED_RCLONE_CONFIG_PATH]
+
     config_path = (
         os.environ.get('RCLONE_CONFIG_PATH', '').strip()
         or os.environ.get('RCLONE_CONFIG', '').strip()
