@@ -12,6 +12,13 @@ rclone_gdrive_copy.py – rclone.conf에 저장된 Google Drive 리모트를 감
 rclone.conf 경로는 기본적으로 rclone 자신의 기본 탐색 규칙을 따르되, RCLONE_CONFIG_PATH
 환경변수가 설정돼 있으면 모든 rclone CLI 호출에 `--config <path>`로 강제한다 — 인스턴스마다
 rclone.conf를 다른 경로에 따로 두는 사용자를 위한 것(2026-08-24 커뮤니티 피드백).
+
+도커 PUID/PGID 사용 시 이 코드는 media_user로 실행되지만(entrypoint.sh의 gosu), 사용자가
+`docker exec`로 컨테이너에 들어가 rclone.conf를 설정할 때는 기본적으로 root 계정이라
+$HOME이 서로 달라(/home/media_user vs /root) 같은 컨테이너인데도 앱이 그 설정을 못 찾는
+사례가 실제로 보고됐다(2026-08-24, hamsuehun 커뮤니티: media_user 홈엔 rclone.conf가
+아예 없고 root 홈에만 있음). 환경변수도 없고 현재 프로세스 기본 위치에도 파일이 없으면
+root의 표준 위치를 마지막으로 한 번 더 확인해 이 흔한 사례를 사용자 설정 없이 구제한다.
 """
 import json
 import os
@@ -32,6 +39,9 @@ RCLONE_FOLDER_COPY_TIMEOUT = 1800
 _token_cache = {}
 
 
+_ROOT_RCLONE_CONFIG_FALLBACK = '/root/.config/rclone/rclone.conf'
+
+
 def _rclone_config_args():
     """RCLONE_CONFIG_PATH(우리 전용) 또는 RCLONE_CONFIG(rclone 자체가 이미 인식하는
     표준 환경변수명, 2026-08-24 커뮤니티 요청) 중 설정된 값으로 `--config <path>`
@@ -39,12 +49,28 @@ def _rclone_config_args():
     두고 쓰는 경우 이 기능이 참조할 파일을 명시적으로 지정할 수 있게 한다.
     rclone 프로세스는 RCLONE_CONFIG를 환경변수 상속만으로도 스스로 읽지만, 여기서
     명시적으로 --config를 붙여 어떤 파일을 쓰는지 우리 로그에서도 확정적으로 알 수
-    있게 한다. 둘 다 설정됐다면 RCLONE_CONFIG_PATH가 우선한다."""
+    있게 한다. 둘 다 설정됐다면 RCLONE_CONFIG_PATH가 우선한다.
+
+    둘 다 없으면 현재 프로세스의 기본 위치($HOME/.config/rclone/rclone.conf)를 그대로
+    맡기되, 그 파일이 없고 root의 표준 위치(/root/.config/rclone/rclone.conf)에는
+    있으면 그걸 대신 쓴다 — 도커에서 media_user로 앱이 돌지만 rclone.conf는
+    root 계정으로 설정된 흔한 사례(2026-08-24 hamsuehun 커뮤니티 리포트)를 사용자가
+    직접 RCLONE_CONFIG_PATH를 지정하지 않아도 구제한다."""
     config_path = (
         os.environ.get('RCLONE_CONFIG_PATH', '').strip()
         or os.environ.get('RCLONE_CONFIG', '').strip()
     )
-    return ['--config', config_path] if config_path else []
+    if config_path:
+        return ['--config', config_path]
+
+    own_default = os.path.expanduser('~/.config/rclone/rclone.conf')
+    if not os.path.isfile(own_default) and os.path.isfile(_ROOT_RCLONE_CONFIG_FALLBACK):
+        print(f"[RcloneGdriveCopy] 기본 위치 '{own_default}'에 rclone.conf가 없어 "
+              f"'{_ROOT_RCLONE_CONFIG_FALLBACK}'을(를) 대신 사용합니다 "
+              f"(RCLONE_CONFIG_PATH를 지정하면 이 자동 폴백보다 우선합니다).")
+        return ['--config', _ROOT_RCLONE_CONFIG_FALLBACK]
+
+    return []
 
 
 def _rclone_config_dump():

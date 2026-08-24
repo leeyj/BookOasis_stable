@@ -1,4 +1,7 @@
 # CHANGELOG
+## v2.4.3
+- (fix) 도커 PUID 사용 시 앱 계정(media_user)과 rclone.conf를 설정한 계정(root)의 홈 디렉토리가 달라 리모트를 못 찾던 문제 수정 (실험적, DEVELOP=true 전용) | fix the app (media_user) failing to find rclone.conf configured under root's home when running with a Docker PUID (experimental, DEVELOP=true only)
+
 ## v2.4.2
 - (fix) "Drive에서 복사해오기" dest_path 불일치 무음 처리 문제 — 경고 로그 추가 (실험적, DEVELOP=true 전용) | fix "Copy from Drive" silently swallowing dest-path mismatches — added a warning log (experimental, DEVELOP=true only)
 - (feature) `RCLONE_CONFIG_PATH`/`RCLONE_CONFIG` 환경변수로 rclone.conf 경로 직접 지정 (실험적, DEVELOP=true 전용) | add `RCLONE_CONFIG_PATH`/`RCLONE_CONFIG` env vars to set a custom rclone.conf path (experimental, DEVELOP=true only)
