@@ -16,6 +16,27 @@ from utils.drive_helper import is_remote_path, is_gdrive_url, is_rclone_vfs_path
 from utils.engine_signature import ENGINE_NAME, ENGINE_SIGNATURE
 
 
+def _docker_localhost_rc_hint(rc_url):
+    """rc_url의 호스트가 localhost/127.0.0.1이면, 도커 컨테이너 안에서는 그 주소가
+    컨테이너 자기 자신을 가리켜 호스트(또는 다른 컨테이너)의 rclone RC 서버에 연결이
+    거의 항상 실패한다는 힌트를 반환한다 — 도커 사용자 대부분이 RC 연결에 실패한다는
+    커뮤니티 피드백(2026-08-24)의 원인. 로컬(비도커) 설치에서는 정상 동작이라 빈
+    문자열을 반환한다."""
+    try:
+        host = (urllib.parse.urlparse(rc_url).hostname or '').lower()
+    except Exception:
+        return ''
+    if host not in ('localhost', '127.0.0.1'):
+        return ''
+    return (
+        " — 도커 환경이라면 'localhost'는 이 컨테이너 자신을 가리켜 호스트의 rclone RC 서버에"
+        " 닿지 못합니다. 설정 > 라이브러리의 'RC 주소'를 Linux는 host.docker.internal"
+        "(docker-compose에 extra_hosts: host.docker.internal:host-gateway 추가 필요),"
+        " Mac/Windows(Docker Desktop)는 host.docker.internal로, rclone이 별도 컨테이너면"
+        " 그 서비스명으로 바꿔 보세요."
+    )
+
+
 def _is_connection_refused_error(err):
     reason = getattr(err, 'reason', err)
     if isinstance(reason, ConnectionRefusedError):
@@ -85,9 +106,14 @@ def trigger_vfs_refresh(db_path, library_id, physical_path):
 
 def resolve_rc_urls(db_type, row):
     """라이브러리 row의 rclone_rc_url 컬럼(콤마 구분)을 우선 쓰고, 비어있으면 전역
-    설정(RCLONE_RC_URL) -> localhost 기본값 순으로 폴백해 RC 주소 목록을 만든다.
-    trigger_vfs_refresh()와 책 단위 사전복사(gdrive_view_copy_service.py) 양쪽에서 공용."""
-    rc_urls = ["http://localhost:5572"]
+    설정(RCLONE_RC_URL) -> localhost/host.docker.internal 기본값 순으로 폴백해 RC 주소
+    목록을 만든다. trigger_vfs_refresh()와 책 단위 사전복사(gdrive_view_copy_service.py)
+    양쪽에서 공용. host.docker.internal을 기본 후보에 포함하는 이유: 도커 사용자가
+    실사용자 다수인데(2026-08-24 커뮤니티 피드백) 'localhost' 단독으로는 컨테이너 안에서
+    호스트의 rclone RC 서버에 거의 항상 닿지 못한다 — Docker Desktop(Mac/Windows)은 이
+    호스트명을 기본 지원해 설정 없이도 바로 연결되고, Linux는 여전히 compose에
+    extra_hosts 매핑이 필요하다(도달 불가 시 자연히 다음 후보로 폴백하므로 무해)."""
+    rc_urls = ["http://localhost:5572", "http://host.docker.internal:5572"]
     if row and row.get('rclone_rc_url') and str(row['rclone_rc_url']).strip():
         rc_urls = [u.strip().rstrip('/') for u in str(row['rclone_rc_url']).split(',') if u.strip()]
     else:
@@ -225,7 +251,7 @@ def detect_mount_root_via_rc(rc_urls, physical_path):
                 raw_body = resp.read().decode('utf-8')
                 payload = json.loads(raw_body)
         except Exception as e:
-            print(f"[Vfs-MountDetect] RC 서버 '{rc_url}' 조회 실패(다음 후보로 계속): {e}")
+            print(f"[Vfs-MountDetect] RC 서버 '{rc_url}' 조회 실패(다음 후보로 계속): {e}{_docker_localhost_rc_hint(rc_url)}")
             continue
 
         print(f"[Vfs-MountDetect] RC 서버 '{rc_url}' 응답: {raw_body}")
@@ -336,7 +362,7 @@ def refresh_vfs_paths(remote_paths, rc_urls):
                                 safe_url = f"{p.scheme}://****:****@{p.netloc.split('@')[-1]}"
                             except Exception:
                                 safe_url = "[Protected URL]"
-                        print(f"[Scanner-VFS Warning] Server '{safe_url}' path '{rel_path}' refresh attempt ignored or failed: {e}")
+                        print(f"[Scanner-VFS Warning] Server '{safe_url}' path '{rel_path}' refresh attempt ignored or failed: {e}{_docker_localhost_rc_hint(rc_url)}")
 
                 if refreshed:
                     break

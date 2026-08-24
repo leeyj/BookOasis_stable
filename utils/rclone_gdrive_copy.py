@@ -8,8 +8,13 @@ rclone_gdrive_copy.py – rclone.conf에 저장된 Google Drive 리모트를 감
 실제 폴더 전체 복사(3단계)는 아직 포함하지 않는다 — docs/plan_gdrive_server_side_copy.md 참조.
 
 주의: refresh_token/access_token/client_secret 등 민감정보는 어떤 경우에도 로그로 출력하지 않는다.
+
+rclone.conf 경로는 기본적으로 rclone 자신의 기본 탐색 규칙을 따르되, RCLONE_CONFIG_PATH
+환경변수가 설정돼 있으면 모든 rclone CLI 호출에 `--config <path>`로 강제한다 — 인스턴스마다
+rclone.conf를 다른 경로에 따로 두는 사용자를 위한 것(2026-08-24 커뮤니티 피드백).
 """
 import json
+import os
 import subprocess
 import time
 
@@ -27,11 +32,26 @@ RCLONE_FOLDER_COPY_TIMEOUT = 1800
 _token_cache = {}
 
 
+def _rclone_config_args():
+    """RCLONE_CONFIG_PATH(우리 전용) 또는 RCLONE_CONFIG(rclone 자체가 이미 인식하는
+    표준 환경변수명, 2026-08-24 커뮤니티 요청) 중 설정된 값으로 `--config <path>`
+    인자를 반환한다 — 사용자가 rclone.conf를 기본 위치가 아닌 다른 경로에 여러 개
+    두고 쓰는 경우 이 기능이 참조할 파일을 명시적으로 지정할 수 있게 한다.
+    rclone 프로세스는 RCLONE_CONFIG를 환경변수 상속만으로도 스스로 읽지만, 여기서
+    명시적으로 --config를 붙여 어떤 파일을 쓰는지 우리 로그에서도 확정적으로 알 수
+    있게 한다. 둘 다 설정됐다면 RCLONE_CONFIG_PATH가 우선한다."""
+    config_path = (
+        os.environ.get('RCLONE_CONFIG_PATH', '').strip()
+        or os.environ.get('RCLONE_CONFIG', '').strip()
+    )
+    return ['--config', config_path] if config_path else []
+
+
 def _rclone_config_dump():
     """`rclone config dump`를 실행해 파싱된 dict(리모트명 -> 설정)를 반환. 실패 시 None."""
     try:
         result = subprocess.run(
-            ['rclone', 'config', 'dump'],
+            ['rclone'] + _rclone_config_args() + ['config', 'dump'],
             capture_output=True, text=True, timeout=RCLONE_CONFIG_DUMP_TIMEOUT
         )
     except FileNotFoundError:
@@ -242,7 +262,11 @@ def compute_relative_dest_path(physical_path, mount_root):
     "카테고리 복사" 배치 플로우에서 admin이 물리 경로(로컬)와 dest_path(Drive쪽)를 각각
     손으로 입력하다 보니 둘이 겹치는 부분("share" 같은)을 착각해 어긋나는 게 실사용자
     혼란 포인트였다(2026-08-22). mount_root 하나만 알면 물리 경로에서 자동으로 뽑아낼 수
-    있으므로, dest_path를 직접 입력받지 않고 이걸로 계산한다."""
+    있으므로, dest_path를 직접 입력받지 않고 이걸로 계산한다.
+
+    문자열이 정확히 일치하지 않아도, 심볼릭 링크(realpath로 재해석)나 대소문자 차이(도커
+    볼륨 매핑 등)만으로 어긋난 경우는 구제한다 — 둘 다 실사용자 케이스로 확인됨
+    (2026-08-24 커뮤니티 피드백). 그래도 못 맞추면 여전히 None(호출부가 경고 로그를 남김)."""
     physical_path = (physical_path or '').strip()
     mount_root = (mount_root or '').strip()
     if not physical_path or not mount_root:
@@ -254,6 +278,23 @@ def compute_relative_dest_path(physical_path, mount_root):
     prefix = norm_mount + '/'
     if norm_physical.startswith(prefix):
         return norm_physical[len(prefix):]
+
+    try:
+        real_physical = os.path.realpath(physical_path).replace('\\', '/').rstrip('/')
+        real_mount = os.path.realpath(mount_root).replace('\\', '/').rstrip('/')
+    except OSError:
+        real_physical, real_mount = norm_physical, norm_mount
+    if real_physical == real_mount:
+        return ''
+    real_prefix = real_mount + '/'
+    if real_physical.startswith(real_prefix):
+        return real_physical[len(real_prefix):]
+
+    if norm_physical.lower() == norm_mount.lower():
+        return ''
+    if norm_physical.lower().startswith(prefix.lower()):
+        return norm_physical[len(prefix):]
+
     return None
 
 
@@ -318,7 +359,7 @@ def _run_rclone(args, timeout=RCLONE_COPY_TIMEOUT, input_bytes=None):
     """rclone CLI를 서브프로세스로 실행하고 (returncode, stdout, stderr) bytes를 반환한다."""
     try:
         result = subprocess.run(
-            ['rclone'] + list(args),
+            ['rclone'] + _rclone_config_args() + list(args),
             capture_output=True, timeout=timeout, input=input_bytes,
         )
         return result.returncode, result.stdout, result.stderr

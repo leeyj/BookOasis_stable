@@ -7,6 +7,7 @@ import { openBookDetail } from './detail/index.js';
 import { updateLibraryTotalCount } from './book_list.js';
 import { positionMenuAtPoint, hideFloatingMenu, bindFloatingMenuOutsideClose } from './context_menu_manager.js';
 import { state } from './state.js';
+import { formatDurationLong } from './utils/time.js';
 
 function escapeHtml(str) {
   return String(str || '').replace(/[&<>"']/g, (ch) => ({
@@ -15,12 +16,7 @@ function escapeHtml(str) {
 }
 
 function formatDuration(totalSeconds) {
-  const seconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
-  if (seconds <= 0) return '분석전';
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  if (hours > 0) return `${hours}시간 ${minutes}분`;
-  return `${minutes}분`;
+  return formatDurationLong(totalSeconds);
 }
 
 let lastLoadedVideos = [];

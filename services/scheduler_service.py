@@ -287,20 +287,10 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
     except Exception as e_path:
         print(f"[Scanner-Trigger WARNING] Failed to query latest physical_path from DB: {e_path}")
 
+    from utils.time_helper import scan_elapsed
+    from utils.scan_log_helper import write_scan_log
+
     start_time = datetime.now()
-    start_str = start_time.strftime('%Y-%m-%d %H:%M:%S')
-    
-    # 로그 파일 경로 설정
-    log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'logs')
-    os.makedirs(log_dir, exist_ok=True)
-    log_file_path = os.path.join(log_dir, 'scan_history.log')
-    
-    def write_scan_log(message):
-        try:
-            with open(log_file_path, 'a', encoding='utf-8') as f_log:
-                f_log.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}\n")
-        except Exception as ex_log:
-            print(f"[Logger ERROR] Failed to write log file: {ex_log}")
 
     # DB가 현재 최적화(VACUUM 등) 튜닝 진행 중인 경우, 완료될 때까지 안전하게 대기
     from services.db_tuning_service import is_db_tuning
@@ -448,7 +438,7 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
                     write_scan_log("초기 자동 스캔: 설정된 Rclone RC 주소가 없어 VFS 사전 새로고침을 건너뜁니다.")
                     vfs_refreshed_in_wrapper = False
                 else:
-                    rc_urls = ["http://localhost:5572"]
+                    rc_urls = ["http://localhost:5572", "http://host.docker.internal:5572"]
                     rc_url_source = 'default'
 
             # 중복 RC URL 제거 (순서 보존)
@@ -628,10 +618,8 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
                 raise
         
         # 2. 성공 시 'ready' 및 last_scanned_at 기록
-        end_time = datetime.now()
-        duration = (end_time - start_time).total_seconds()
-        end_str = end_time.strftime('%Y-%m-%d %H:%M:%S')
-        
+        duration, end_str = scan_elapsed(start_time)
+
         from repositories.scheduler_repository import SchedulerRepository
         try:
             SchedulerRepository.update_library_scan_success(db_type, library_id, end_str)
@@ -643,8 +631,7 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
         write_scan_log(msg)
     except Exception as e:
         # 3. 실패 시 'failed' 기록
-        end_time = datetime.now()
-        duration = (end_time - start_time).total_seconds()
+        duration, _ = scan_elapsed(start_time)
         try:
             from repositories.scheduler_repository import SchedulerRepository
             SchedulerRepository.update_library_scan_status(db_type, library_id, 'failed')

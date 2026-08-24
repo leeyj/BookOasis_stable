@@ -23,6 +23,10 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - LOG_ARCHIVE_MAX_FILES=10
       - LOG_ARCHIVE_MAX_MB=200
+      # - TZ=Asia/Seoul  # (옵션) 스캔완료시각 등 DB에 기록되는 모든 타임스탬프의 기준 시간대를 바꿉니다.
+      #   주석을 해제하지 않으면 컨테이너는 UTC로 동작하며, 화면에는 브라우저 로컬시간 기준으로
+      #   표시되어 실제 시각과 어긋나 보입니다. 자동 스캔 "크론 예약 시각"은 이 값과 무관하게
+      #   웹 UI 설정 > 일반 > 시스템 타임존을 따로 따르므로, 시간을 맞추려면 두 곳 모두 서울로 설정하세요.
     depends_on:
       - redis
 
@@ -30,4 +34,3 @@ services:
     image: redis:7-alpine
     container_name: bookoasis_redis
     restart: unless-stopped
-      # - TZ=Asia/Seoul  # (옵션) 컨테이너 로그 및 내부 콘솔 시간대를 정렬하려면 주석을 해제하세요. (웹 서비스의 스케줄 크론 주기는 컨테이너 타임존 대신 웹 UI 일반설정의 타임존 설정을 우선 추종합니다.)

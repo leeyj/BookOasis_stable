@@ -1,4 +1,5 @@
 // mini_player_ui.js - 미니 플레이어 UI/드래그/뷰 모드 전담
+import { formatClockDuration } from '../utils/time.js';
 
 export function createMiniPlayerUiController(deps) {
   const {
@@ -53,13 +54,7 @@ export function createMiniPlayerUiController(deps) {
     const raw = Number(track.duration || track.total_duration || 0);
     if (!Number.isFinite(raw) || raw <= 0) return '';
 
-    const sec = Math.floor(raw % 60);
-    const min = Math.floor((raw / 60) % 60);
-    const hour = Math.floor(raw / 3600);
-    if (hour > 0) {
-      return `${hour}:${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
-    }
-    return `${min}:${String(sec).padStart(2, '0')}`;
+    return formatClockDuration(raw);
   }
 
   function applyMiniTrackItemVisual(item, active) {

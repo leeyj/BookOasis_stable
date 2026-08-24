@@ -8,6 +8,11 @@ version: "3.8"
 # ⚠️ Compose는 command: 배열을 병합하지 않고 통째로 덮어씁니다.
 #    버퍼풀 값만 바꾸고 싶어도 아래처럼 전체 옵션 목록을 그대로 복사해서
 #    --innodb-buffer-pool-size 값만 수정해 주세요.
+#
+# ⚠️ .env(GDRIVE_API_KEY 등) 값을 바꾼 뒤 `docker restart`만 하면 반영되지 않습니다.
+#    env_file은 컨테이너를 새로 만들 때만 다시 읽으므로, 값을 바꾼 뒤에는 항상
+#    `docker compose -f ... up -d`로 재생성해야 합니다. 컨테이너 내부에 실제로
+#    반영됐는지는 `docker exec <컨테이너명> env | grep -i gdrive`로 확인할 수 있습니다.
 
 services:
   mariadb:

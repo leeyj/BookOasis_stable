@@ -8,9 +8,9 @@ domain_whitelist_service.py – 사용자별 외부 도메인 허용 목록(화�
 """
 import json
 import re
-from datetime import datetime, timezone
 
 from repositories.settings_repository import SettingsRepository
+from utils.time_helper import utc_now_iso
 
 _SETTINGS_KEY_PREFIX = 'USER_URL_WHITELIST_'
 _MAX_DOMAINS_PER_USER = 100
@@ -131,7 +131,7 @@ class DomainWhitelistService:
 
         entries.append({
             'pattern': pattern,
-            'added_at': datetime.now(timezone.utc).isoformat()
+            'added_at': utc_now_iso()
         })
         SettingsRepository.set_value('general', _settings_key(user_id), json.dumps(entries, ensure_ascii=False))
         return True, ''

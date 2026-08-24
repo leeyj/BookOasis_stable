@@ -1,6 +1,7 @@
 // reports.js - 스캔 에러 리포트 클라이언트 제어 모듈
 import { state } from '../state.js';
 import * as api from '../api.js';
+import { formatRelativeTime } from '../utils/time.js';
 
 let currentReportErrors = [];
 let currentReportPage = 1;
@@ -126,7 +127,7 @@ export async function loadScanHistory() {
 
       const startedAt = item.started_at || item.enqueue_at || '-';
       const finishedAt = item.finished_at || (item.status === 'running' ? '진행 중...' : '-');
-      const relativeTime = item.time_ago || '-';
+      const relativeTime = formatRelativeTime(item.finished_at || item.started_at || item.enqueue_at);
 
       return `
         <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); hover: background: rgba(255,255,255,0.02);">

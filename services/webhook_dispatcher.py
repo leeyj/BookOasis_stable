@@ -7,6 +7,7 @@ import os
 import re
 import urllib.request
 from services.settings_service import SettingsService
+from utils.time_helper import utc_now_iso
 
 try:
     from dotenv import load_dotenv
@@ -99,7 +100,7 @@ def _build_channel_payload(channel, event, payload):
     return {
         'source': 'bookoasis',
         'event': event,
-        'timestamp': datetime.datetime.utcnow().isoformat() + 'Z',
+        'timestamp': utc_now_iso(),
         'payload': payload or {},
     }
 

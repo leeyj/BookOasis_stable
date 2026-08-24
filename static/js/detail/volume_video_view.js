@@ -1,15 +1,9 @@
+import { formatClockDuration } from '../utils/time.js';
+
 export function renderVideoVolumes(orderedBooks, detailMeta = null) {
   const episodes = Array.isArray(orderedBooks) ? [...orderedBooks] : [];
 
-  const toClock = (totalSec) => {
-    const sec = Math.max(0, Math.floor(Number(totalSec) || 0));
-    if (sec <= 0) return '분석전';
-    const h = Math.floor(sec / 3600);
-    const m = Math.floor((sec % 3600) / 60);
-    const s = sec % 60;
-    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-    return `${m}:${String(s).padStart(2, '0')}`;
-  };
+  const toClock = (totalSec) => formatClockDuration(totalSec, { emptyLabel: '분석전' });
 
   episodes.sort((left, right) => {
     const numLeft = Number(left.episode_number) || 0;

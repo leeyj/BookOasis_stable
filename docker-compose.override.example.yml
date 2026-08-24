@@ -1,5 +1,33 @@
 version: "3.8"
 
+# ⚠️ .env(GDRIVE_API_KEY 등) 값을 바꾼 뒤 `docker restart`만 하면 반영되지 않습니다.
+#    env_file은 컨테이너를 새로 만들 때만 다시 읽으므로, 값을 바꾼 뒤에는 항상
+#    `docker compose up -d`로 재생성해야 합니다. 컨테이너 내부에 실제로 반영됐는지는
+#    `docker exec <컨테이너명> env | grep -i gdrive`로 확인할 수 있습니다.
+# ⚠️ environment: 목록은 env_file보다 우선순위가 높습니다. 이미 .env에 넣어둔 키를
+#    여기에 값 없이 또 적으면 빈 값으로 덮어써서 무효화되니, .env로 설정한 키는
+#    environment:에 중복으로 넣지 마세요.
+# ⚠️ rclone으로 마운트한 구글 드라이브 라이브러리를 쓰는 경우(라이브러리 스캔 후
+#    VFS 캐시 갱신, "Drive에서 복사해오기" 등), 이 bookoasis 컨테이너와 rclone(RC)
+#    프로세스가 같은 마운트 경로를 "같은 문자열"로 봐야 합니다. 아래처럼 호스트의
+#    실제 rclone 마운트 경로를 컨테이너 안에도 동일한 하위 경로로 바인딩하세요
+#    (예: 호스트 /mnt/gdrive → 컨테이너 /mnt/gdrive, 별칭/심볼릭 링크 금지).
+#    경로가 컨테이너별로 다를 수밖에 없다면(예: rclone이 호스트에서 직접 실행 중),
+#    "Drive에서 복사해오기" 모달의 마운트 루트 수동 입력 필드로 자동 감지를 우회하세요.
+#      volumes:
+#        - /mnt/gdrive:/mnt/gdrive
+# ⚠️ 설정 > 라이브러리의 "RC 주소"(rclone Remote Control) 기본값은 이제 localhost와
+#    host.docker.internal을 순서대로 시도합니다 — 컨테이너 안의 'localhost'는 이 컨테이너
+#    자신을 가리킬 뿐 호스트의 rclone RC 서버를 가리키지 않아, 도커 사용자 대부분(전체
+#    사용자의 절대다수, 2026-08-24 커뮤니티 피드백)이 이전엔 자동 감지에 실패했습니다.
+#    Docker Desktop(Mac/Windows)은 host.docker.internal이 기본 지원되어 이 폴백만으로 바로
+#    연결되지만, Linux는 아래처럼 extra_hosts를 직접 추가해야 host.docker.internal이
+#    resolve됩니다 (rclone을 호스트에서 직접 실행 중일 때):
+#      extra_hosts:
+#        - "host.docker.internal:host-gateway"
+#    rclone이 별도 컨테이너라면 host.docker.internal 대신 그 서비스명을 RC 주소에
+#    직접 입력하세요(예: http://rclone:5572, 같은 docker network에 있어야 함).
+
 services:
   bookoasis:
     build:
@@ -23,6 +51,10 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - LOG_ARCHIVE_MAX_FILES=10
       - LOG_ARCHIVE_MAX_MB=200
+      # - TZ=Asia/Seoul  # (옵션) 스캔완료시각 등 DB에 기록되는 모든 타임스탬프의 기준 시간대를 바꿉니다.
+      #   주석을 해제하지 않으면 컨테이너는 UTC로 동작하며, 화면에는 브라우저 로컬시간 기준으로
+      #   표시되어 실제 시각과 어긋나 보입니다. 자동 스캔 "크론 예약 시각"은 이 값과 무관하게
+      #   웹 UI 설정 > 일반 > 시스템 타임존을 따로 따르므로, 시간을 맞추려면 두 곳 모두 서울로 설정하세요.
     depends_on:
       - redis
 
@@ -30,4 +62,3 @@ services:
     image: redis:7-alpine
     container_name: bookoasis_redis
     restart: unless-stopped
-      # - TZ=Asia/Seoul  # (옵션) 컨테이너 로그 및 내부 콘솔 시간대를 정렬하려면 주석을 해제하세요. (웹 서비스의 스케줄 크론 주기는 컨테이너 타임존 대신 웹 UI 일반설정의 타임존 설정을 우선 추종합니다.)

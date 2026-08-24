@@ -281,10 +281,10 @@
                                         <input type="number" id="setting-db-pool-size" name="DB_POOL_SIZE" min="1" max="50" value="10" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;" required>
                                     </div>
 
-                                    <!-- 시스템 타임존 -->
+                                    <!-- 크론 스케줄 타임존 -->
                                     <div class="library-form-group">
                                         <label for="setting-timezone" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
-                                            <i class="fa-solid fa-earth-asia" style="color: #34d399; margin-right: 0.3rem;"></i> <span data-i18n="settings.timezone_label">시스템 타임존 (Timezone)</span>
+                                            <i class="fa-solid fa-earth-asia" style="color: #34d399; margin-right: 0.3rem;"></i> <span data-i18n="settings.timezone_label">크론 스케줄 타임존 (Timezone)</span>
                                         </label>
                                         <select id="setting-timezone" name="TIMEZONE" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; cursor: pointer;">
                                             <option value="UTC">UTC (Universal Coordinated Time)</option>
@@ -296,6 +296,7 @@
                                             <option value="Europe/London">Europe/London (런던 시간)</option>
                                             <option value="Europe/Paris">Europe/Paris (파리 시간)</option>
                                         </select>
+                                        <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;" data-i18n="settings.timezone_desc">자동 스캔 등 "몇 시에 실행할지" 크론 예약 시각에만 적용됩니다. 스캔완료시각 등 화면에 표시되는 타임스탬프의 기준시간대를 바꾸려면 docker-compose.yml의 TZ 환경변수를 함께 설정하세요.</p>
                                     </div>
                                 </div>
                             </div>

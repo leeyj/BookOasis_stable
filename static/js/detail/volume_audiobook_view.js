@@ -1,14 +1,9 @@
+import { formatClockDuration } from '../utils/time.js';
+
 export function renderAudiobookVolumes(orderedBooks, detailMeta = null) {
   const books = Array.isArray(orderedBooks) ? [...orderedBooks] : [];
 
-  const toClock = (totalSec) => {
-    const sec = Math.max(0, Math.floor(Number(totalSec) || 0));
-    const h = Math.floor(sec / 3600);
-    const m = Math.floor((sec % 3600) / 60);
-    const s = sec % 60;
-    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-    return `${m}:${String(s).padStart(2, '0')}`;
-  };
+  const toClock = (totalSec) => formatClockDuration(totalSec);
 
   const toSizeMB = (bytes) => {
     const n = Number(bytes) || 0;

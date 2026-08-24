@@ -1,4 +1,10 @@
 # CHANGELOG
+## v2.4.2
+- (fix) "Drive에서 복사해오기" dest_path 불일치 무음 처리 문제 — 경고 로그 추가 (실험적, DEVELOP=true 전용) | fix "Copy from Drive" silently swallowing dest-path mismatches — added a warning log (experimental, DEVELOP=true only)
+- (feature) `RCLONE_CONFIG_PATH`/`RCLONE_CONFIG` 환경변수로 rclone.conf 경로 직접 지정 (실험적, DEVELOP=true 전용) | add `RCLONE_CONFIG_PATH`/`RCLONE_CONFIG` env vars to set a custom rclone.conf path (experimental, DEVELOP=true only)
+- (fix) 마운트 루트 매칭에 심볼릭 링크·대소문자 차이 허용 (실험적, DEVELOP=true 전용) | fix mount-root matching to tolerate symlinks and case differences (experimental, DEVELOP=true only)
+- (fix) 도커 rclone RC 연결 실패 문제 — 기본 후보에 `host.docker.internal` 추가, 실패 로그에 안내 힌트 추가 (실험적, DEVELOP=true 전용) | fix rclone RC connections failing in Docker — added `host.docker.internal` as a default fallback and a hint in failure logs (experimental, DEVELOP=true only)
+
 ## v2.4.1
 - (fix) 도커 환경에서 "Drive에서 복사해오기"의 마운트 루트 자동 감지가 실패하던 문제 — 마운트 루트 직접 입력 필드 추가 (실험적, DEVELOP=true 전용) | fix mount-root auto-detect failing for "Copy from Drive" in Docker setups — added a manual mount-root input field (experimental, DEVELOP=true only)
 

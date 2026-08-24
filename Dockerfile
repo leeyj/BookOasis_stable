@@ -19,11 +19,14 @@ WORKDIR /app
 # 둘 다 Debian에서 amd64 전용 패키지(iGPU/dGPU 자체가 x86 하드웨어라 arm64에는 없음).
 # GHCR 멀티아키텍처 빌드(linux/amd64,linux/arm64)가 arm64에서 apt-get install 시
 # "Unable to locate package"로 실패하는 것을 막기 위해 TARGETARCH가 amd64일 때만 설치한다.
+# tzdata: python:3.10-slim 베이스에는 /usr/share/zoneinfo가 없어, 이게 없으면 docker-compose의
+# TZ 환경변수를 설정해도 조용히 무시되고 컨테이너는 계속 UTC로 동작한다.
 ARG TARGETARCH
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     ffmpeg \
     gosu \
+    tzdata \
     && if [ "$TARGETARCH" = "amd64" ]; then \
          apt-get install -y --no-install-recommends intel-media-va-driver mesa-va-drivers libva2 vainfo; \
        fi \

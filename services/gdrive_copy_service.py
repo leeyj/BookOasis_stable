@@ -91,7 +91,10 @@ class GdriveCopyService:
             mount_root = detect_mount_root(remote, dest_local_path, rc_urls)
             if not mount_root:
                 sq.log(f"[GdriveCopy] 경고: 마운트 루트 자동 감지 실패 — dest_path를 Drive 루트 기준으로 계산합니다. 도커 환경이라면 마운트 루트를 직접 입력해 주세요.")
-        dest_path = compute_relative_dest_path(dest_local_path, mount_root) or ''
+        raw_dest_path = compute_relative_dest_path(dest_local_path, mount_root)
+        if mount_root and raw_dest_path is None:
+            sq.log(f"[GdriveCopy] 경고: dest_local_path='{dest_local_path}'가 감지된 마운트 루트 '{mount_root}' 하위 경로가 아닙니다 — dest_path를 Drive 루트 기준으로 계산합니다. 심볼릭 링크/대소문자/도커 볼륨 매핑 차이를 확인해 주세요.")
+        dest_path = raw_dest_path or ''
 
         sq.log(f"[GdriveCopy] 시작: remote='{remote}', dest_local_path='{dest_local_path}', dest_path='{dest_path}', links={len(source_links)}개")
 

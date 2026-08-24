@@ -6,6 +6,7 @@ import { createAudioPlaybackEngine } from './audio_player_modules/playback_engin
 import { registerAudioPlayerPublicApi } from './audio_player_modules/public_api.js';
 import { createChapterDrawer } from './audio_player_modules/chapter_drawer.js';
 import { remoteLog } from './remote_log.js';
+import { formatClockDuration } from './utils/time.js';
 
 let audioInstance = null;
 let currentAudiobookData = null;
@@ -692,10 +693,7 @@ function saveProgressInternal(isCompleted = false, options = {}) {
 }
 
 function formatTime(sec) {
-  if (!sec || !Number.isFinite(sec) || sec < 0) return '0:00';
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return `${m}:${s < 10 ? '0' : ''}${s}`;
+  return formatClockDuration(sec, { emptyLabel: '0:00' });
 }
 
 function initMediaSession(meta, track) {

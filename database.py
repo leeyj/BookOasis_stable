@@ -1389,7 +1389,7 @@ def _seed_settings_and_admin(conn, cursor, db_type):
             ('TAG_FILTER_SEARCH_SCOPE_ALL', '0'),
             ('SIDEBAR_TOP_CONTROLS', '0'),
             ('HDD_AGGRESSIVE_WARMUP', '0'),
-            ('RCLONE_RC_URL', 'http://localhost:5572'),
+            ('RCLONE_RC_URL', 'http://localhost:5572,http://host.docker.internal:5572'),
             ('LAZY_SCAN_MAX_FILE_SIZE_MB', '300'),
             ('LAZY_SCAN_MAX_BATCH_SIZE_MB', '1024'),
             ('SCAN_IGNORE_PATTERNS', "@eaDir/\n#recycle/\n*.tmp\n*.sample.cbz\n.DS_Store\nThumbs.db\ndesktop.ini"),
@@ -1415,6 +1415,19 @@ def _seed_settings_and_admin(conn, cursor, db_type):
                     new_lines.append(line)
             if changed:
                 cursor.execute("UPDATE settings SET `value` = ? WHERE `key` = 'SCAN_IGNORE_PATTERNS'", ('\n'.join(new_lines),))
+
+        # 기존 DB의 RCLONE_RC_URL이 예전 기본값(localhost 단독)에서 손대지 않은 상태라면
+        # host.docker.internal 폴백 후보를 추가해 마이그레이션한다 — 도커 사용자 대다수가
+        # 컨테이너 안에서 'localhost'가 자기 자신을 가리켜 RC 연결이 실패하는 문제
+        # (2026-08-24 커뮤니티 피드백)를 설정 변경 없이 자동으로 완화한다. 사용자가 이미
+        # 직접 값을 바꿔둔 경우는 건드리지 않는다.
+        cursor.execute("SELECT `value` FROM settings WHERE `key` = 'RCLONE_RC_URL'")
+        rc_row = cursor.fetchone()
+        if rc_row and rc_row[0] == 'http://localhost:5572':
+            cursor.execute(
+                "UPDATE settings SET `value` = ? WHERE `key` = 'RCLONE_RC_URL'",
+                ('http://localhost:5572,http://host.docker.internal:5572',)
+            )
 
         conn.commit()
 

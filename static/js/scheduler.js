@@ -3,6 +3,7 @@ import { state } from './state.js';
 import * as api from './api.js';
 import { bindFloatingMenuOutsideClose, hideFloatingMenu, positionMenuAtElement } from './context_menu_manager.js';
 import { hydrateCronHelperFromCron, onCronHelperModeChange, updateCronHelperSummary, applyCronHelperToInput } from './cron_helper.js';
+import { parseServerDateTime, formatRelativeTime } from './utils/time.js';
 
 function buildStatusBadge(scanStatus) {
   if (scanStatus === 'scanning') {
@@ -23,27 +24,8 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-function parseScanDate(value) {
-  const raw = String(value || '').trim();
-  if (!raw || raw === '-') return null;
-
-  // 서버가 타임존 정보 없이 "YYYY-MM-DD HH:mm:ss" 형태의 로컬 시각을 보내는 경우,
-  // new Date()에 그대로 넘기면 브라우저/엔진에 따라 UTC로 해석되어 KST 기준 9시간 오차가 발생할 수 있다.
-  // 연-월-일-시-분-초 컴포넌트를 직접 읽어 항상 "로컬 시각"으로 고정 생성해 이 모호함을 없앤다.
-  const naiveMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?$/);
-  if (naiveMatch) {
-    const [, y, mo, d, h, mi, s] = naiveMatch.map(Number);
-    const local = new Date(y, mo - 1, d, h, mi, s);
-    return Number.isNaN(local.getTime()) ? null : local;
-  }
-
-  // Z 또는 +09:00 같은 타임존 오프셋이 명시된 표준 ISO 문자열은 그대로 위임
-  const parsed = new Date(raw);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
 function formatLastScan(value) {
-  const scannedAt = parseScanDate(value);
+  const scannedAt = parseServerDateTime(value);
   if (!scannedAt) {
     return {
       relative: i18n.t('settings.scan_never') || '기록 없음',
@@ -51,18 +33,7 @@ function formatLastScan(value) {
     };
   }
 
-  const elapsedMinutes = Math.max(0, Math.floor((Date.now() - scannedAt.getTime()) / 60000));
-  let relative;
-  if (elapsedMinutes < 1) {
-    relative = i18n.t('settings.scan_just_now') || '방금 전';
-  } else if (elapsedMinutes < 60) {
-    relative = i18n.t('settings.scan_minutes_ago', {count: elapsedMinutes});
-  } else if (elapsedMinutes < 1440) {
-    relative = i18n.t('settings.scan_hours_ago', {count: Math.floor(elapsedMinutes / 60)});
-  } else {
-    relative = i18n.t('settings.scan_days_ago', {count: Math.floor(elapsedMinutes / 1440)});
-  }
-
+  const relative = formatRelativeTime(scannedAt);
   const pad = value => String(value).padStart(2, '0');
   const exact = `${pad(scannedAt.getMonth() + 1)}.${pad(scannedAt.getDate())} ${pad(scannedAt.getHours())}:${pad(scannedAt.getMinutes())}`;
   return {relative, exact};
