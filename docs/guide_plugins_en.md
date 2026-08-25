@@ -773,6 +773,38 @@ def _count_books(self, db_type):
     return int((row["cnt"] if row else 0) or 0)
 ```
 
+### Plugin Cache (Redis, Recommended)
+
+To avoid re-calling an external API on every request, plugins can reuse the Redis instance
+the core already sets up. Do not connect with `import redis` directly — use these helpers
+instead. Keys are automatically namespaced per plugin ID, and on deployments without Redis
+configured/reachable, these calls transparently behave as a cache miss (`None`/`False`), so
+the caller always has a safe fallback to the original fetch.
+
+- `self.cache_get(key)` → the stored string, or `None`
+- `self.cache_set(key, value, ttl=None)` → `True` on success (`ttl` is the expiry in seconds)
+- `self.cache_delete(key)` → `True` on success
+
+Values must be strings, so serialize/deserialize structured data yourself with
+`json.dumps`/`json.loads`.
+
+```python
+import json
+
+def get_dashboard_data(self, db_type, limit=10):
+    cache_key = f"ranking:{db_type}:{limit}"
+    cached = self.cache_get(cache_key)
+    if cached:
+        items = json.loads(cached)
+    else:
+        items = self._fetch_from_external_api(limit)  # expensive external call
+        self.cache_set(cache_key, json.dumps(items), ttl=300)  # cache for 5 minutes
+    return {"success": True, "items": items}
+```
+
+See `sample_plugins/metadata/pixiv_ranking/pixiv_ranking.py`'s `get_dashboard_data()` for a
+real example (it used to re-scrape the Pixiv ranking on every widget refresh; now cached 5 min).
+
 ---
 
 ## 8. Activation Flow

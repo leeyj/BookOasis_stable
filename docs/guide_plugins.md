@@ -890,6 +890,37 @@ def _count_books(self, db_type):
     return int((row["cnt"] if row else 0) or 0)
 ```
 
+### 플러그인 캐시 (Redis, 권장)
+
+외부 API를 매번 다시 호출하지 않도록, 코어가 이미 구성해둔 Redis를 재사용할 수 있는
+캐시 헬퍼를 제공합니다. `import redis`로 직접 연결하지 말고 아래 메서드를 사용하십시오
+— 플러그인 ID로 자동 네임스페이스가 분리되고, Redis가 설정/연결되어 있지 않은 배포에서는
+자동으로 캐시 미스(`None`/`False`)로 동작해 항상 원본 조회로 안전하게 폴백됩니다.
+
+- `self.cache_get(key)` → 값(문자열) 또는 `None`
+- `self.cache_set(key, value, ttl=None)` → 성공 시 `True` (`ttl`은 초 단위 만료 시간)
+- `self.cache_delete(key)` → 성공 시 `True`
+
+값은 문자열만 저장할 수 있으므로, 구조화된 데이터는 `json.dumps`/`json.loads`로 직접
+직렬화·역직렬화하십시오.
+
+```python
+import json
+
+def get_dashboard_data(self, db_type, limit=10):
+    cache_key = f"ranking:{db_type}:{limit}"
+    cached = self.cache_get(cache_key)
+    if cached:
+        items = json.loads(cached)
+    else:
+        items = self._fetch_from_external_api(limit)  # 무거운 외부 호출
+        self.cache_set(cache_key, json.dumps(items), ttl=300)  # 5분 캐시
+    return {"success": True, "items": items}
+```
+
+`sample_plugins/metadata/pixiv_ranking/pixiv_ranking.py`의 `get_dashboard_data()`에
+실제 적용 예시가 있습니다(위젯이 열릴 때마다 Pixiv 랭킹을 다시 긁던 것을 5분 캐시로 개선).
+
 ---
 
 ## 8. 등록 및 활성화

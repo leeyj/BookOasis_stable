@@ -1,9 +1,16 @@
 import { state } from '../state.js';
+import { viewerStorage } from './storage.js';
+import { getTxtPageMaxScroll, snapTxtPageScrollLeft } from './txt_page_utils.js';
 
 let overlayVisibilityListenerBound = false;
 let tocEntryRefs = [];
 let activeTocIdx = -1;
 let isTocPanelOpen = false;
+let activeTocTab = 'toc';
+let bookmarksCache = [];
+let bookmarksLoadedForBookId = null;
+let currentOnJumpToChapter = null;
+let lastKnownChunkIdx = 0;
 
 function _debugToc() {
   // Debug hook reserved for temporary TOC troubleshooting.
@@ -38,6 +45,17 @@ function _applyTocPanelState(container, shouldShowButton) {
   container.style.opacity = shouldOpen ? '1' : '0';
   container.style.visibility = shouldOpen ? 'visible' : 'hidden';
   container.style.pointerEvents = shouldOpen ? 'auto' : 'none';
+
+  // 패널이 열려 있는 동안에는 토글 버튼이 원래 자리(패널 안쪽 상단)에 그대로 떠 있으면
+  // 목차/북마크 리스트 내용(특히 오른쪽 정렬된 삭제 아이콘)을 가린다. 패널 폭(300px)만큼
+  // 왼쪽으로 밀어 패널 바깥에 두면 겹치지 않으면서도 여전히 눌러서 닫을 수 있다.
+  const btn = document.getElementById('epub-toc-btn');
+  if (btn) {
+    btn.style.right = shouldOpen
+      ? 'calc(320px + env(safe-area-inset-right, 0px))'
+      : 'calc(20px + env(safe-area-inset-right, 0px))';
+  }
+
   _debugToc('apply-panel-state', {
     shouldShowButton: !!shouldShowButton,
     shouldOpen,
@@ -105,6 +123,15 @@ function _resolveBestTocIndex(chapterIdx) {
 }
 
 export function highlightEpubTocChapter(chapterIdx, options = {}) {
+  // 목차(TOC) 항목 하나가 실제로는 여러 개의 하위 청크(스파인 파일)를 아우르는 경우가
+  // 많아(예: "1장" 헤딩 하나가 청크 7~15를 모두 커버), TOC에서 역산한 activeTocIdx의
+  // chapterIdx는 "가장 가까운 헤딩"일 뿐 실제 렌더링 중인 청크와 다를 수 있다. 북마크는
+  // 반드시 이 함수가 매번 인자로 받는 진짜 청크 인덱스를 써야 한다 — TOC 역산값을 쓰면
+  // 서로 다른 실제 청크가 같은 라벨로 저장되어 복원 시 엉뚱한(대개 훨씬 짧은) 청크로
+  // 점프하는 버그가 생긴다.
+  const resolvedChunkIdx = Number.isFinite(Number(chapterIdx)) ? Number(chapterIdx) : lastKnownChunkIdx;
+  lastKnownChunkIdx = resolvedChunkIdx;
+
   const resolvedIdx = _resolveBestTocIndex(chapterIdx);
   if (resolvedIdx < 0 || resolvedIdx >= tocEntryRefs.length) return;
 
@@ -132,8 +159,9 @@ function syncEpubTocVisibility() {
   // 오버레이는 navigation.js에서 inline style('flex'/'none')로만 토글한다.
   // style 값이 비어 있을 때를 열린 상태로 오인하지 않도록 엄격 비교한다.
   const isOverlayOpen = !!overlayMenu && overlayMenu.style.display === 'flex';
-  const isEpub = (state.currentViewerFormat || '').toLowerCase() === 'epub';
-  const shouldShow = isEpub && isOverlayOpen;
+  const format = (state.currentViewerFormat || '').toLowerCase();
+  // TXT는 실제 목차가 없지만 북마크 탭은 여전히 필요하므로 패널 자체는 EPUB과 동일하게 노출한다.
+  const shouldShow = (format === 'epub' || format === 'txt') && isOverlayOpen;
 
   if (btn) {
     btn.style.display = shouldShow ? 'flex' : 'none';
@@ -145,7 +173,7 @@ function syncEpubTocVisibility() {
   _applyTocPanelState(container, shouldShow);
   _debugToc('sync-visibility', {
     isOverlayOpen,
-    isEpub,
+    format,
     shouldShow,
   });
 }
@@ -173,6 +201,8 @@ function ensureOverlayVisibilityListener() {
 }
 
 export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
+  currentOnJumpToChapter = onJumpToChapter;
+  const currentFormat = (state.currentViewerFormat || '').toLowerCase();
   let container = document.getElementById('epub-toc-container');
   let btn = document.getElementById('epub-toc-btn');
   const hostEl = _getTocHostElement();
@@ -276,9 +306,56 @@ export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
     hostEl.appendChild(btn);
   }
 
-  const headerEl = document.createElement('h3');
-  headerEl.style.cssText = 'margin-top:0; margin-bottom:20px; font-weight:600; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px;';
-  headerEl.textContent = '목차';
+  const tabsEl = document.createElement('div');
+  tabsEl.style.cssText = 'display:flex; gap:6px; margin-bottom:16px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px;';
+
+  const makeTabBtn = (key, iconClass, label) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.tocTab = key;
+    b.style.cssText = `
+      flex: 1; display:flex; align-items:center; justify-content:center; gap:6px;
+      background: transparent; border: none; border-radius: 6px; padding: 8px 6px;
+      color: inherit; opacity: 0.65; cursor: pointer; font-size: 0.85rem; font-weight: 600;
+      transition: background 0.2s, opacity 0.2s;
+    `;
+    b.innerHTML = `<i class="${iconClass}"></i><span>${label}</span>`;
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setActiveTocTab(key);
+    });
+    return b;
+  };
+  const tocTabBtn = makeTabBtn('toc', 'fas fa-list', '목차');
+  const bookmarkTabBtn = makeTabBtn('bookmarks', 'fas fa-bookmark', '북마크');
+  // TXT는 실제 목차가 없다 — chunkText()로 임의 분할한 구간을 "N장"으로 나열하면
+  // 사용자에게 진짜 챕터처럼 오인되어 혼란만 준다. TXT에서는 목차 탭 자체를 숨기고
+  // 북마크 탭만 노출한다(내부적으로는 여전히 같은 구간 단위를 위치 추적에 사용).
+  if (currentFormat !== 'txt') {
+    tabsEl.appendChild(tocTabBtn);
+  }
+  tabsEl.appendChild(bookmarkTabBtn);
+
+  const tocPanelEl = document.createElement('div');
+  tocPanelEl.id = 'epub-toc-tab-toc';
+
+  const bookmarkPanelEl = document.createElement('div');
+  bookmarkPanelEl.id = 'epub-toc-tab-bookmarks';
+  bookmarkPanelEl.style.display = 'none';
+
+  function setActiveTocTab(key) {
+    activeTocTab = key;
+    tocPanelEl.style.display = key === 'toc' ? 'block' : 'none';
+    bookmarkPanelEl.style.display = key === 'bookmarks' ? 'block' : 'none';
+    [tocTabBtn, bookmarkTabBtn].forEach((b) => {
+      const isActive = b.dataset.tocTab === key;
+      b.style.opacity = isActive ? '1' : '0.65';
+      b.style.background = isActive ? 'rgba(168, 85, 247, 0.18)' : 'transparent';
+    });
+    if (key === 'bookmarks') {
+      fetchAndRenderBookmarks();
+    }
+  }
 
   const ul = document.createElement('ul');
   ul.style.cssText = 'list-style:none; padding:0; margin:0; font-size:0.95rem;';
@@ -368,17 +445,32 @@ export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
       ul.appendChild(buildItem(item.title, item.chapter_idx, item.anchor || '', (item.level - 1) * 16, item.level || 1));
     });
   } else {
+    // TXT는 실제 챕터가 아니라 chunkText()의 임의 분할 구간이므로 "N장"이 아니라
+    // "책 위치 N"으로 표기한다 (EPUB에 목차가 없는 경우엔 그래도 진짜 스파인 챕터이므로
+    // 기존 chapter_fallback 표기를 유지).
+    const fallbackKey = currentFormat === 'txt' ? 'viewer.txt_position_fallback' : 'viewer.chapter_fallback';
+    const fallbackDefault = currentFormat === 'txt' ? (n) => `책 위치 ${n}` : (n) => `${n}장`;
     txtChunks.forEach((_, idx) => {
       const fallbackTitle = (window.i18n && typeof window.i18n.t === 'function')
-        ? window.i18n.t('viewer.chapter_fallback', { num: idx + 1 })
-        : `${idx + 1}장`;
+        ? window.i18n.t(fallbackKey, { num: idx + 1 })
+        : fallbackDefault(idx + 1);
       ul.appendChild(buildItem(fallbackTitle, idx, '', 0));
     });
   }
 
+  tocPanelEl.appendChild(ul);
+  bookmarkPanelEl.appendChild(_buildBookmarkEmptyState());
+
   container.innerHTML = '';
-  container.appendChild(headerEl);
-  container.appendChild(ul);
+  container.appendChild(tabsEl);
+  container.appendChild(tocPanelEl);
+  container.appendChild(bookmarkPanelEl);
+
+  // EPUB 새 렌더(새 책)에서는 이전 탭/북마크 캐시 및 현재 청크 추적 상태가 남지 않도록 초기화한다.
+  bookmarksCache = [];
+  bookmarksLoadedForBookId = null;
+  lastKnownChunkIdx = 0;
+  setActiveTocTab(currentFormat === 'txt' ? 'bookmarks' : 'toc');
 
   // EPUB 새 렌더 시 이전 열림 상태가 남지 않도록 항상 닫힌 상태로 초기화한다.
   isTocPanelOpen = false;
@@ -386,6 +478,215 @@ export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
   _debugToc('render-end-reset-closed');
 
   syncEpubTocVisibility();
+}
+
+function _buildBookmarkEmptyState() {
+  const empty = document.createElement('p');
+  empty.className = 'epub-bookmark-empty';
+  empty.style.cssText = 'opacity:0.6; font-size:0.85rem; text-align:center; margin-top:24px;';
+  empty.textContent = '저장된 북마크가 없습니다.';
+  return empty;
+}
+
+function _formatBookmarkLabel(bookmark) {
+  const label = (bookmark && bookmark.label) ? String(bookmark.label).trim() : '';
+  if (label) return label;
+  const idx = Number(bookmark && bookmark.chapter_idx);
+  const isTxt = bookmark && bookmark.format === 'txt';
+  const key = isTxt ? 'viewer.txt_position_fallback' : 'viewer.chapter_fallback';
+  return (window.i18n && typeof window.i18n.t === 'function')
+    ? window.i18n.t(key, { num: idx + 1 })
+    : (isTxt ? `책 위치 ${idx + 1}` : `${idx + 1}장`);
+}
+
+async function fetchAndRenderBookmarks() {
+  const bookmarkPanelEl = document.getElementById('epub-toc-tab-bookmarks');
+  if (!bookmarkPanelEl) return;
+  const bookId = state.activeBookId;
+  const dbType = state.currentLibraryType;
+  if (!bookId) return;
+
+  if (bookmarksLoadedForBookId !== bookId) {
+    try {
+      const res = await fetch(`/api/v1/books/${bookId}/bookmarks?db_type=${dbType}`);
+      const data = await res.json();
+      bookmarksCache = (data && data.success && Array.isArray(data.bookmarks)) ? data.bookmarks : [];
+      bookmarksLoadedForBookId = bookId;
+    } catch (e) {
+      console.error('[Bookmark] 목록 조회 실패:', e);
+      bookmarksCache = [];
+    }
+  }
+
+  _renderBookmarkListInto(bookmarkPanelEl, bookId, dbType);
+}
+
+function _renderBookmarkListInto(bookmarkPanelEl, bookId, dbType) {
+  bookmarkPanelEl.innerHTML = '';
+
+  if (!bookmarksCache.length) {
+    bookmarkPanelEl.appendChild(_buildBookmarkEmptyState());
+    return;
+  }
+
+  const ul = document.createElement('ul');
+  ul.style.cssText = 'list-style:none; padding:0; margin:0; font-size:0.95rem;';
+
+  bookmarksCache.forEach((bookmark) => {
+    const li = document.createElement('li');
+    li.style.cssText = 'display:flex; align-items:center; gap:8px; margin-bottom:12px; line-height:1.4;';
+
+    const a = document.createElement('a');
+    a.href = '#';
+    a.style.cssText = 'flex:1; color:inherit; text-decoration:none; opacity:0.85; transition:opacity 0.2s;';
+    a.textContent = _formatBookmarkLabel(bookmark);
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const jumpOptions = {
+        preferChapterStart: true,
+        percent: Number.isFinite(Number(bookmark.percent)) ? Number(bookmark.percent) : 0,
+      };
+      if (typeof currentOnJumpToChapter === 'function') {
+        currentOnJumpToChapter(Number(bookmark.chapter_idx), '', jumpOptions);
+      }
+    });
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.title = '북마크 삭제';
+    delBtn.innerHTML = '<i class="fas fa-trash-can"></i>';
+    delBtn.style.cssText = 'background:transparent; border:none; color:inherit; opacity:0.55; cursor:pointer; padding:4px; font-size:0.85rem;';
+    delBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        const res = await fetch(`/api/v1/bookmarks/${bookmark.id}?db_type=${dbType}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data && data.success) {
+          bookmarksCache = bookmarksCache.filter((b) => Number(b.id) !== Number(bookmark.id));
+          _renderBookmarkListInto(bookmarkPanelEl, bookId, dbType);
+          if (typeof window.showToast === 'function') window.showToast('북마크가 삭제되었습니다.', 'success');
+        } else if (typeof window.showToast === 'function') {
+          window.showToast((data && data.error) || '북마크 삭제에 실패했습니다.', 'error');
+        }
+      } catch (err) {
+        console.error('[Bookmark] 삭제 실패:', err);
+      }
+    });
+
+    li.appendChild(a);
+    li.appendChild(delBtn);
+    ul.appendChild(li);
+  });
+
+  bookmarkPanelEl.appendChild(ul);
+}
+
+function _captureCurrentChapterPercent(chapterIdx) {
+  const scrollWrapper = document.getElementById('txt-scroll-wrapper');
+  if (!scrollWrapper) return 0;
+  const scrollMode = viewerStorage.getItem('viewer_scroll_mode') || 'page';
+
+  if (scrollMode === 'scroll') {
+    const contentArea = document.getElementById('txt-content-area');
+    const chunkEl = contentArea && contentArea.querySelector(`.txt-scroll-chunk[data-idx="${chapterIdx}"]`);
+    if (!chunkEl || !chunkEl.clientHeight) return 0;
+    const within = scrollWrapper.scrollTop - chunkEl.offsetTop;
+    return Math.max(0, Math.min(100, Math.round((within / chunkEl.clientHeight) * 100)));
+  }
+
+  const maxScroll = getTxtPageMaxScroll(scrollWrapper);
+  if (!maxScroll) return 0;
+  return Math.max(0, Math.min(100, Math.round((scrollWrapper.scrollLeft / maxScroll) * 100)));
+}
+
+function _waitForChapterImagesSettled(chapterIdx) {
+  return new Promise((resolve) => {
+    const contentArea = document.getElementById('txt-content-area');
+    const scrollMode = viewerStorage.getItem('viewer_scroll_mode') || 'page';
+    let scopeEl = contentArea;
+    if (scrollMode === 'scroll' && contentArea) {
+      scopeEl = contentArea.querySelector(`.txt-scroll-chunk[data-idx="${chapterIdx}"]`) || contentArea;
+    }
+    if (!scopeEl) {
+      resolve();
+      return;
+    }
+    const pending = Array.from(scopeEl.querySelectorAll('img')).filter((img) => !img.complete);
+    if (!pending.length) {
+      resolve();
+      return;
+    }
+    let settled = false;
+    let remaining = pending.length;
+    const done = () => {
+      if (settled) return;
+      remaining -= 1;
+      if (remaining <= 0) {
+        settled = true;
+        resolve();
+      }
+    };
+    pending.forEach((img) => {
+      img.addEventListener('load', done, { once: true });
+      img.addEventListener('error', done, { once: true });
+    });
+    setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        resolve();
+      }
+    }, 3000);
+  });
+}
+
+export async function addBookmarkAtCurrentPosition() {
+  const format = (state.currentViewerFormat || '').toLowerCase();
+  if (format !== 'epub' && format !== 'txt') {
+    if (typeof window.showToast === 'function') window.showToast('이 뷰어에서는 북마크를 지원하지 않습니다.', 'error');
+    return;
+  }
+  if (activeTocIdx < 0 || activeTocIdx >= tocEntryRefs.length) {
+    if (typeof window.showToast === 'function') window.showToast('현재 위치를 확인할 수 없습니다.', 'error');
+    return;
+  }
+
+  const ref = tocEntryRefs[activeTocIdx];
+  // 실제 저장/복원에는 TOC에서 역산한 ref.chapterIdx(가장 가까운 헤딩)가 아니라, 현재
+  // 렌더링 중인 진짜 청크 인덱스(lastKnownChunkIdx)를 써야 한다 — 하나의 TOC 헤딩이
+  // 여러 청크를 아우르는 경우 라벨(ref.chapterIdx)과 실제 위치가 어긋난다.
+  const chapterIdx = lastKnownChunkIdx;
+  const label = (ref.anchorEl && ref.anchorEl.textContent) ? ref.anchorEl.textContent.trim() : '';
+  await _waitForChapterImagesSettled(chapterIdx);
+  // 이미지 settle 이후에도 컬럼 레이아웃이 다음 프레임에야 최종 반영되므로 동일하게 2중 rAF로 대기.
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const percent = _captureCurrentChapterPercent(chapterIdx);
+  const bookId = state.activeBookId;
+  const dbType = state.currentLibraryType;
+
+  try {
+    const res = await fetch(`/api/v1/books/${bookId}/bookmarks?db_type=${dbType}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ format, chapter_idx: chapterIdx, percent, label }),
+    });
+    const data = await res.json();
+    if (data && data.success) {
+      bookmarksCache.push({ id: data.bookmark_id, book_id: bookId, format, chapter_idx: chapterIdx, percent, label });
+      bookmarksLoadedForBookId = bookId;
+      if (activeTocTab === 'bookmarks') {
+        const bookmarkPanelEl = document.getElementById('epub-toc-tab-bookmarks');
+        if (bookmarkPanelEl) _renderBookmarkListInto(bookmarkPanelEl, bookId, dbType);
+      }
+      if (typeof window.showToast === 'function') window.showToast('북마크가 추가되었습니다.', 'success');
+    } else if (typeof window.showToast === 'function') {
+      window.showToast((data && data.error) || '북마크 추가에 실패했습니다.', 'error');
+    }
+  } catch (e) {
+    console.error('[Bookmark] 추가 실패:', e);
+    if (typeof window.showToast === 'function') window.showToast('북마크 추가에 실패했습니다.', 'error');
+  }
 }
 
 export function jumpToTxtTocChapter({
@@ -431,6 +732,9 @@ export function jumpToTxtTocChapter({
   const scrollMode = getScrollMode();
   const isPageMode = scrollMode !== 'scroll';
   const preferChapterStart = !!(options && options.preferChapterStart);
+  const restorePercent = (options && Number.isFinite(Number(options.percent)))
+    ? Math.max(0, Math.min(100, Number(options.percent)))
+    : null;
   const overlayMenu = document.getElementById('comic-overlay-menu');
   const scrollWrapper = getScrollWrapper();
 
@@ -484,7 +788,10 @@ export function jumpToTxtTocChapter({
       const targetChunk = scrollWrapper.querySelector(`.txt-scroll-chunk[data-idx="${chapterIdx}"]`);
       selectedChunkEl = targetChunk || null;
       if (targetChunk) {
-        const top = Math.max(0, targetChunk.offsetTop);
+        const chapterTop = Math.max(0, targetChunk.offsetTop);
+        const top = restorePercent !== null
+          ? chapterTop + (restorePercent / 100) * targetChunk.clientHeight
+          : chapterTop;
         scrollWrapper.scrollTo({ top, behavior: 'auto' });
       } else {
         const safeChunkCount = Math.max(1, chunkCount);
@@ -510,7 +817,24 @@ export function jumpToTxtTocChapter({
       }
     }
   } else {
-    renderCurrentChunk(true);
+    const applyPagePercentRestore = () => {
+      if (restorePercent === null || !scrollWrapper) return;
+      // 2중 rAF로 이 콜백 프레임 자체의 레이아웃(컬럼 폭 재계산)이 완전히 반영된
+      // 뒤에 스크롤을 적용한다 — onSettled가 이미지 로드/에러/3초 타임아웃 이후에
+      // 불려도, applyTxtTwoPageTrailingSpacer가 막 갱신한 DOM의 최종 scrollWidth는
+      // 다음 프레임에야 안정적으로 읽힌다.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const maxScroll = getTxtPageMaxScroll(scrollWrapper);
+          if (maxScroll > 0) {
+            scrollWrapper.scrollLeft = Math.round((restorePercent / 100) * maxScroll);
+            snapTxtPageScrollLeft(scrollWrapper);
+          }
+        });
+      });
+    };
+
+    renderCurrentChunk(true, applyPagePercentRestore);
     if (scrollWrapper) {
       scrollWrapper.scrollLeft = 0;
       scrollWrapper.scrollTop = 0;

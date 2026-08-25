@@ -1,4 +1,8 @@
 # CHANGELOG
+## v2.4.5
+- (feature) EPUB/TXT 뷰어에 북마크 기능 추가 — 목차 패널에 "목차/북마크" 탭 신설, 현재 챕터·페이지(스크롤) 위치를 저장하고 클릭 한 번으로 정확한 위치까지 복원 | add bookmarks to the EPUB/TXT viewer — a new "TOC/Bookmarks" tab in the side panel saves the current chapter and page/scroll position, restoring the exact spot on click
+- (feature) 플러그인이 코어 Redis를 재사용해 외부 API 응답을 캐시할 수 있는 헬퍼(`cache_get`/`cache_set`/`cache_delete`) 추가, 플러그인 가이드 문서화 및 pixiv_ranking 샘플 플러그인에 적용 | add plugin-facing cache helpers (`cache_get`/`cache_set`/`cache_delete`) that reuse the core's Redis instance for caching external API responses, documented in the plugin guide and applied to the pixiv_ranking sample plugin
+
 ## v2.4.4
 - (feature) rclone(mod 빌드)을 이미지에 내장 — 별도 설치 없이 `/app/rclone/rclone.conf`로 자신의 rclone.conf만 마운트하면 "Drive에서 복사해오기"가 동작 (실험적, DEVELOP=true 전용) | bundle rclone (mod build) into the image — mount your rclone.conf to `/app/rclone/rclone.conf` and "Copy from Drive" works with no install step (experimental, DEVELOP=true only)
 

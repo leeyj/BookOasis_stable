@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 gdrive_copy_service.py – 구글 드라이브 공유 폴더를 사용자 자신의 드라이브로
-서버사이드 복사(files.copy)해 지정한 로컬 폴더에 내려받는 백그라운드 작업
-(scanner_queue task_type: gdrive_copy).
+서버사이드 복사(rclone CLI backend copyid)해 지정한 로컬 폴더에 내려받는 백그라운드
+작업(scanner_queue task_type: gdrive_copy).
 
 복사는 카테고리와 무관한 독립 동작이다 — "복사해온 파일을 카테고리로 등록해서
 보여줄지"는 순전히 사용자 선택이라, 복사 대상 카테고리를 미리 만들어두게 강제할
@@ -14,10 +14,7 @@ gdrive_copy_service.py – 구글 드라이브 공유 폴더를 사용자 자신
 from repositories.scanner_queue_repository import ScannerQueueRepository
 from utils.drive_helper import fetch_gdrive_folder_files
 from utils.rclone_gdrive_copy import (
-    get_access_token,
-    resolve_dest_folder,
-    find_or_create_folder,
-    copy_file,
+    rclone_copy_file_by_id,
     compute_relative_dest_path,
 )
 
@@ -98,9 +95,6 @@ class GdriveCopyService:
 
         sq.log(f"[GdriveCopy] 시작: remote='{remote}', dest_local_path='{dest_local_path}', dest_path='{dest_path}', links={len(source_links)}개")
 
-        access_token = get_access_token(remote)
-        dest_root_folder_id = resolve_dest_folder(access_token, dest_path, remote)
-
         # 1. 소스 폴더(들)의 파일 목록 수집
         ScannerQueueRepository.update_task_status(task_id, 'running', stage='소스 폴더 목록 조회 중...')
         all_items = []
@@ -111,26 +105,13 @@ class GdriveCopyService:
         if total == 0:
             raise RuntimeError('복사할 파일을 찾지 못했습니다 (지원 확장자: zip/cbz/rar/cbr/epub/pdf/txt/yaml/xml/json).')
 
-        # 2. 목적지 하위 폴더 트리 준비 (rel_folder별 캐시)
-        folder_cache = {'': dest_root_folder_id}
-
-        def resolve_rel_folder(rel_folder):
-            rel_folder = (rel_folder or '').strip('/\\').replace('\\', '/')
-            if rel_folder in folder_cache:
-                return folder_cache[rel_folder]
-            parent_id = dest_root_folder_id
-            parts = [p for p in rel_folder.split('/') if p]
-            built = ''
-            for part in parts:
-                built = f'{built}/{part}' if built else part
-                if built in folder_cache:
-                    parent_id = folder_cache[built]
-                    continue
-                parent_id = find_or_create_folder(access_token, part, parent_id)
-                folder_cache[built] = parent_id
-            return parent_id
-
-        # 3. 파일 순회 복사
+        # 2. 파일 순회 복사 — rclone CLI(backend copyid)로 목적지를 'remote:path' 문법으로
+        # 직접 지정한다(gdrive_view_copy_service.py와 동일 방식, 2026-08-25). 예전 REST
+        # API(files.copy) 방식은 Drive 쪽 시작 폴더를 root_folder_id/마운트 서브경로
+        # 자동 감지로 우리가 직접 추론해야 했는데, 이 감지가 도커에서 실패하면(/proc/mounts를
+        # 못 읽음) 관리자가 로컬 마운트 루트를 수동 입력해도 소용없이 복사된 파일이 로컬에서
+        # 보이는 마운트 서브트리 바깥에 생기는 버그가 있었다(커뮤니티 리포트). rclone CLI는
+        # 자신의 rclone.conf 설정(root_folder_id 포함)을 그대로 써서 이 추론이 필요 없다.
         copied = 0
         failed = []
         for i, item in enumerate(all_items, start=1):
@@ -141,9 +122,11 @@ class GdriveCopyService:
             ScannerQueueRepository.update_task_status(
                 task_id, 'running', stage=f'{i}/{total} 파일 복사 중 ({filename})'
             )
+            rel_folder = (item.get('rel_folder') or '').strip('/\\').replace('\\', '/')
+            segments = [s for s in (dest_path, rel_folder, filename) if s]
+            dest_rclone_path = f"{remote}:{'/'.join(segments)}"
             try:
-                dest_folder_id = resolve_rel_folder(item.get('rel_folder', ''))
-                copy_file(access_token, item['id'], dest_folder_id, dest_name=filename)
+                rclone_copy_file_by_id(remote, item['id'], dest_rclone_path)
                 copied += 1
             except Exception as copy_err:
                 sq.log(f"[GdriveCopy] 파일 복사 실패 ({filename}): {copy_err}")

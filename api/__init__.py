@@ -20,6 +20,7 @@ from api.routes.audiobook_routes import audiobook_bp
 from api.routes.video_routes import video_bp
 from api.routes.collection_routes import collection_bp
 from api.routes.annotation_routes import annotation_bp
+from api.routes.bookmark_routes import bookmark_bp
 from api.routes.plugin_webview_routes import plugin_webview_bp
 
 # 통합 Blueprint (URL prefix 없음 – 각 모듈이 전체 경로를 직접 정의)
@@ -37,5 +38,6 @@ api_bp.register_blueprint(audiobook_bp)
 api_bp.register_blueprint(video_bp)
 api_bp.register_blueprint(collection_bp)
 api_bp.register_blueprint(annotation_bp)
+api_bp.register_blueprint(bookmark_bp)
 # 관리자 전용이 아니라 로그인 사용자 개인별 기능(화이트리스트 기반)이라 admin_bp가 아닌 여기 직접 등록
 api_bp.register_blueprint(plugin_webview_bp)

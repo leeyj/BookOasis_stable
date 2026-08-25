@@ -2,6 +2,7 @@
 import { state } from './state.js';
 import { nextComicPage, prevComicPage, setComicFitMode, toggleComicOverlay, markAsCompleted as markComicAsCompleted, getComicReadingDirection, toggleComicReadingDirection, toggleComicPageStep, comicJumpToFirstPage, comicJumpToLastPage, toggleTapZoneDirection, initTapZoneDirection, toggleComicSplitSpread } from './viewer_comic.js';
 import { prevTxtPage, nextTxtPage, applyTxtSettings, txtJumpToFirstPage, txtJumpToLastPage } from './viewer_txt.js';
+import { addBookmarkAtCurrentPosition } from './viewer/txt_toc.js';
 import { nextPdfPage, prevPdfPage, pdfJumpToFirstPage, pdfJumpToLastPage } from './viewer_pdf.js';
 import { initFullscreenStateSync, isViewerInFullscreen, toggleFullscreenViewer } from './viewer/fullscreen_controller.js';
 import { initViewerSeekBar } from './viewer/seekbar_controller.js';
@@ -554,6 +555,7 @@ function initMediaViewerDelegation() {
     if (action === 'jump-first') return viewerJumpToFirst();
     if (action === 'jump-last') return viewerJumpToLast();
     if (action === 'mark-completed') return markAsCompleted();
+    if (action === 'add-bookmark') return addBookmarkAtCurrentPosition();
     if (action === 'scroll-mode') return window.setScrollMode?.(value || 'page');
     if (action === 'toggle-page-step') return window.toggleComicPageStep?.();
     if (action === 'toggle-center-gap') return window.toggleComicCenterGap?.();

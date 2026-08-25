@@ -743,6 +743,12 @@
     color: #fff;
 }
 
+/* 텍스트 라벨 없이 아이콘만 쓰는 오버레이 액션 버튼 (예: 북마크 추가) —
+   좁은 화면 가로모드에서 버튼 줄 줄바꿈을 피하기 위해 폭을 최소화한다. */
+.btn-overlay-action-icon-only {
+    padding: 0.4rem 0.6rem;
+}
+
 .overlay-fit-group {
     display: flex;
     background: rgba(0, 0, 0, 0.3);

@@ -1041,6 +1041,17 @@ _SCHEMA_SQL = """
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS epub_bookmarks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id INTEGER REFERENCES books(id),
+        user_id INTEGER NOT NULL,
+        format TEXT NOT NULL,
+        chapter_idx INTEGER NOT NULL,
+        percent INTEGER DEFAULT 0,
+        label TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS user_reading_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         book_id INTEGER REFERENCES books(id),
@@ -1216,6 +1227,7 @@ _INDEXES_SQL = """
     CREATE INDEX IF NOT EXISTS idx_collection_items_coll ON collection_items(collection_id);
     CREATE INDEX IF NOT EXISTS idx_plugin_load_events_plugin_time ON plugin_load_events(plugin_id, occurred_at DESC);
     CREATE INDEX IF NOT EXISTS idx_book_annotations_book_user ON book_annotations(book_id, user_id);
+    CREATE INDEX IF NOT EXISTS idx_epub_bookmarks_book_user ON epub_bookmarks(book_id, user_id);
     """
 
 

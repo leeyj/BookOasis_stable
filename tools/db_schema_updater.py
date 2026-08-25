@@ -337,6 +337,18 @@ CREATE TABLE IF NOT EXISTS book_annotations (
     INDEX idx_book_annotations_book_user (book_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
+CREATE TABLE IF NOT EXISTS epub_bookmarks (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    book_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    format VARCHAR(20) NOT NULL,
+    chapter_idx INT NOT NULL,
+    percent INT DEFAULT 0,
+    label VARCHAR(200),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_epub_bookmarks_book_user (book_id, user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
 CREATE TABLE IF NOT EXISTS user_favorites (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
@@ -649,6 +661,8 @@ def _ensure_mariadb_columns():
         ('media_video', 'video_episodes', 'needs_transcode', 'INT DEFAULT 0'),
         ('media_video', 'video_episodes', 'subtitle_path', 'TEXT'),
         ('media_video', 'video_episodes', 'container_verified', 'INT DEFAULT 0'),
+        ('media_general', 'epub_bookmarks', 'percent', 'INT DEFAULT 0'),
+        ('media_adult', 'epub_bookmarks', 'percent', 'INT DEFAULT 0'),
     ]
 
     for db_name, tbl, col_name, col_def in required_columns:

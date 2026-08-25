@@ -311,11 +311,29 @@ class PixivRankingMetadataProvider(BaseMetadataProvider):
                 "error": "Pixiv 로그인 세션(PHPSESSID)이 설정되지 않았습니다.",
             }
 
-        try:
-            contents = self._fetch_ranking(session_id, mode, content, effective_limit)
-        except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError) as e:
-            logger.warning("[pixiv_ranking] 중단: 랭킹 조회 실패: %s", e)
-            return {"success": False, "error": f"랭킹 조회 실패: {e}"}
+        # 위젯이 열릴 때마다(대시보드 새로고침 등) 매번 Pixiv를 다시 긁지 않도록,
+        # 랭킹 목록(썸네일 자체는 용량이 커서 제외)을 mode/content/limit 조합별로
+        # 잠깐 캐시한다. cache_get/cache_set은 BaseMetadataProvider가 제공하는
+        # 플러그인 전용 Redis 캐시 헬퍼 — Redis가 설정 안 돼 있으면 자동으로
+        # 캐시 미스(None)로 처리되어 항상 원본 조회로 폴백한다.
+        cache_key = f"ranking:{mode}:{content}:{effective_limit}"
+        cached = self.cache_get(cache_key)
+        if cached:
+            try:
+                contents = json.loads(cached)
+                logger.warning("[pixiv_ranking] 1/3 캐시 히트: %s", cache_key)
+            except (TypeError, ValueError):
+                contents = None
+        else:
+            contents = None
+
+        if contents is None:
+            try:
+                contents = self._fetch_ranking(session_id, mode, content, effective_limit)
+            except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError) as e:
+                logger.warning("[pixiv_ranking] 중단: 랭킹 조회 실패: %s", e)
+                return {"success": False, "error": f"랭킹 조회 실패: {e}"}
+            self.cache_set(cache_key, json.dumps(contents), ttl=300)
 
         if not contents:
             logger.warning("[pixiv_ranking] 랭킹 결과 0건, 빈 목록 반환")

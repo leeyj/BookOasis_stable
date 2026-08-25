@@ -489,10 +489,10 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
 
       fullText = data;
       txtChunks = chunkText(data, 4000);
-      const tocBtn = document.getElementById('epub-toc-btn');
-      const tocContainer = document.getElementById('epub-toc-container');
-      if (tocBtn) tocBtn.remove();
-      if (tocContainer) tocContainer.remove();
+      // TXT는 실제 목차(TOC)가 없지만, renderEpubToc([])의 폴백 경로(챕터 번호 나열)로
+      // 여전히 패널을 띄운다 — 북마크 탭이 이 패널에 얹혀 있어서, 패널 자체를 없애면
+      // TXT에서는 북마크 기능을 아예 쓸 수 없게 된다.
+      renderEpubToc([]);
 
       let startIdx = initialPageIdx;
 
@@ -581,7 +581,7 @@ function showTxtRestoreLoadingToast(msg = null) {
   }
 }
 
-function renderCurrentChunk(initMode = false) {
+function renderCurrentChunk(initMode = false, onSettled) {
   const contentArea = document.getElementById('txt-content-area');
   const scrollWrapper = document.getElementById('txt-scroll-wrapper');
   if (!contentArea) return;
@@ -653,6 +653,7 @@ function renderCurrentChunk(initMode = false) {
       if (remaining <= 0) {
         settled = true;
         applyTxtTwoPageTrailingSpacer(scrollWrapper, contentArea);
+        if (typeof onSettled === 'function') onSettled();
       }
     };
     pendingImages.forEach(img => {
@@ -665,8 +666,12 @@ function renderCurrentChunk(initMode = false) {
       if (!settled) {
         settled = true;
         applyTxtTwoPageTrailingSpacer(scrollWrapper, contentArea);
+        if (typeof onSettled === 'function') onSettled();
       }
     }, 3000);
+  } else if (typeof onSettled === 'function') {
+    // 대기할 이미지가 없으면 이 시점에 이미 레이아웃이 최종 상태이므로 바로 콜백한다.
+    onSettled();
   }
 
   // 모드 재전환 시 placeholder가 남아도 가시 범위 챕터를 즉시 재요청해 자동 복구한다.

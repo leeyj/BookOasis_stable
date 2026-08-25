@@ -40,6 +40,31 @@ class BaseMetadataProvider(ABC):
         gateway = self.get_db_gateway(db_type)
         return gateway.get_plugin_config(self.id, default=default)
 
+    def cache_get(self, key):
+        """플러그인 전용 Redis 캐시에서 값을 읽는다. 외부 API를 매번 다시
+        긁지 않고 결과를 재사용하고 싶을 때 사용한다 (예: 랭킹/검색 결과를
+        수 분간 캐시). Redis가 설정되어 있지 않으면 항상 None을 반환한다 —
+        호출부는 캐시 미스로 취급해 원본 소스에서 다시 가져오면 된다."""
+        from utils.redis_helper import redis_get
+
+        return redis_get(f"plugin:{self.id}:{key}")
+
+    def cache_set(self, key, value, ttl=None):
+        """플러그인 전용 Redis 캐시에 값을 저장한다. value는 문자열이어야
+        하므로, 구조화된 데이터는 호출부에서 json.dumps()로 직렬화해서
+        넘기고 cache_get() 결과를 json.loads()로 복원한다. ttl(초)을 주면
+        해당 시간 뒤 자동 만료된다. Redis가 없으면 조용히 False를 반환한다
+        (플러그인이 캐시 실패를 치명적 오류로 다룰 필요는 없다)."""
+        from utils.redis_helper import redis_set
+
+        return redis_set(f"plugin:{self.id}:{key}", value, ex=ttl)
+
+    def cache_delete(self, key):
+        """플러그인 전용 Redis 캐시에서 키를 명시적으로 지운다."""
+        from utils.redis_helper import redis_del
+
+        return redis_del(f"plugin:{self.id}:{key}")
+
     def dispatch_webhook(self, event, payload=None, channels=None):
         """플러그인에서 공용 웹훅 디스패처를 호출하는 편의 헬퍼."""
         from services.webhook_dispatcher import dispatch_webhook_event

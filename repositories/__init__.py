@@ -11,6 +11,7 @@ if DBMS in ("mariadb", "mysql"):
     from repositories.mariadb import (
         annotation_repository,
         audiobook_repository,
+        bookmark_repository,
         book_offset_repository,
         book_repository,
         book_scan_repository,
@@ -34,6 +35,7 @@ else:
     from repositories.sqlite import (
         annotation_repository,
         audiobook_repository,
+        bookmark_repository,
         book_offset_repository,
         book_repository,
         book_scan_repository,
@@ -57,6 +59,7 @@ else:
 # 하위 호환성을 위해 sys.modules에 매핑하여 기존 'from repositories.xxx_repository import ...' 임포트 완벽 지원
 sys.modules['repositories.annotation_repository'] = annotation_repository
 sys.modules['repositories.audiobook_repository'] = audiobook_repository
+sys.modules['repositories.bookmark_repository'] = bookmark_repository
 sys.modules['repositories.book_offset_repository'] = book_offset_repository
 sys.modules['repositories.book_repository'] = book_repository
 sys.modules['repositories.book_scan_repository'] = book_scan_repository
@@ -79,6 +82,7 @@ sys.modules['repositories.video_repository'] = video_repository
 # 직속 임포트 노출 지원 (from repositories import BookRepository)
 AnnotationRepository = annotation_repository.AnnotationRepository
 AudiobookRepository = audiobook_repository.AudiobookRepository
+BookmarkRepository = bookmark_repository.BookmarkRepository
 BookOffsetRepository = book_offset_repository.BookOffsetRepository
 BookRepository = book_repository.BookRepository
 BookScanRepository = book_scan_repository.BookScanRepository

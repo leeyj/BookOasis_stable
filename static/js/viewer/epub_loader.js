@@ -42,7 +42,11 @@ export function pickEpubStartIndex(totalChapters, initialPageIdx, serverEpubSess
 }
 
 export function syncActiveEpubToc(currentChunkIdx, scrollIntoView = false) {
-  if ((state.currentViewerFormat || '').toLowerCase() !== 'epub') return;
+  // 이름은 EPUB 전용처럼 보이지만, TXT도 같은 목차/북마크 패널을 공유하므로
+  // (renderEpubToc([]) 폴백 경로) 여기서 막으면 TXT는 activeTocIdx가 갱신되지 않아
+  // 북마크의 "현재 위치 확인" 자체가 항상 실패한다.
+  const format = (state.currentViewerFormat || '').toLowerCase();
+  if (format !== 'epub' && format !== 'txt') return;
   highlightEpubTocChapter(currentChunkIdx, { scrollIntoView });
 }
 
