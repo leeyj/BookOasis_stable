@@ -85,6 +85,10 @@
             </div>
 
             <div class="library-search-center" style="display: flex; gap: 0.5rem; align-items: center;">
+                <div id="group-mode-toggle-group" class="library-toggle-group">
+                    <button class="btn-toggle active" id="btn-group-default" data-role="grouping-mode-toggle" data-group-mode="default" data-i18n="header.group_mode_default">기본</button>
+                    <button class="btn-toggle" id="btn-group-author" data-role="grouping-mode-toggle" data-group-mode="author" data-i18n="header.group_mode_author">작가별</button>
+                </div>
                 <input type="text" id="library-search" data-role="library-search-input" class="form-control input-sm" placeholder="제목, 시리즈, 작가 검색...">
                 <button id="btn-library-search-action" data-role="library-search-action" class="btn-toggle" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; flex-shrink: 0;" data-i18n="common.search">검색</button>
             </div>

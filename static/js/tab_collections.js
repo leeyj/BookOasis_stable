@@ -386,6 +386,26 @@ export function openAddToCollectionModal(itemInfo) {
 }
 
 async function addItemToCollection(collectionId, itemInfo) {
+  if (itemInfo.author_key) {
+    try {
+      const res = await fetch(`/api/v1/collections/${collectionId}/items/by-author?db_type=${state.currentLibraryType || 'general'}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ author_key: itemInfo.author_key })
+      });
+      const data = await res.json();
+      if (data.success) {
+        const skippedText = data.skipped_count > 0 ? ` (이미 있던 ${data.skipped_count}개는 건너뜀)` : '';
+        alert(`컬렉션에 ${data.added_count}개 항목이 추가되었습니다.${skippedText}`);
+      } else {
+        alert(`추가 실패: ${data.error}`);
+      }
+    } catch (e) {
+      alert(`오류: ${e.message}`);
+    }
+    return;
+  }
+
   try {
     const payload = {};
     if (itemInfo.book_id) payload.book_id = itemInfo.book_id;

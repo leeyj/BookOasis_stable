@@ -36,11 +36,13 @@ import { remoteLog } from './remote_log.js';
 
 // 모듈화로 분리한 미디어 타입 토글 및 검색 단축키 제어부 임포트
 import { canAccessLibraryType, applyLibraryTypeToggleVisibility, applyLibraryTypeButtonState, switchLibraryType } from './library_type_toggle.js';
+import { applyGroupModeButtonState, switchGroupMode, restoreGroupModeView } from './author_group_toggle.js';
 import { focusLibrarySearchInput, applySearchShortcutSetting, initLibrarySearchShortcut, handleLibrarySearchAction, handleLibrarySearchKeydown, initLibraryTypeHotkeys } from './search_shortcut_manager.js';
 
 import './viewer/viewer_padding.js';
 import './audio_player.js';
 import './video_library.js';
+import './author_group_context_menu.js';
 import './video_player.js';
 import './plugin_webview_api.js';
 
@@ -49,7 +51,7 @@ function initLibraryShellDelegation() {
 
   document.addEventListener('click', (event) => {
     const target = event && event.target && typeof event.target.closest === 'function'
-      ? event.target.closest('[data-role="mobile-brand-home"], [data-role="sidebar-category-static"], [data-role="desktop-sidebar-toggle"], [data-role="library-search-action"], [data-role="library-open-filter"], [data-role="library-sort-toggle"], [data-role="library-type-toggle"], [data-role="library-filter-reset"], [data-role="detail-back-to-list"]')
+      ? event.target.closest('[data-role="mobile-brand-home"], [data-role="sidebar-category-static"], [data-role="desktop-sidebar-toggle"], [data-role="library-search-action"], [data-role="library-open-filter"], [data-role="library-sort-toggle"], [data-role="library-type-toggle"], [data-role="grouping-mode-toggle"], [data-role="library-filter-reset"], [data-role="detail-back-to-list"]')
       : null;
     if (!target) return;
 
@@ -77,6 +79,9 @@ function initLibraryShellDelegation() {
     }
     if (role === 'library-type-toggle') {
       return switchLibraryType(target.getAttribute('data-library-type') || 'general');
+    }
+    if (role === 'grouping-mode-toggle') {
+      return switchGroupMode(target.getAttribute('data-group-mode') || 'default');
     }
     if (role === 'library-filter-reset') {
       return window.resetAllFilters?.();
@@ -127,6 +132,7 @@ function recoverTopCategoryUiAfterBack() {
   if (libraryControls) libraryControls.style.display = 'flex';
 
   applyLibraryTypeToggleVisibility();
+  applyGroupModeButtonState(state.groupMode);
   // 뷰어 전체화면 종료 등으로 상단 사이드바(햄버거 메뉴)의 표시 상태가
   // 어긋난 채로 남는 경우를 대비해 back 복귀 시점에 항상 강제 재동기화한다.
   syncSidebarResponsiveControls();
@@ -339,6 +345,7 @@ async function initTabMediaLibrary() {
   }
 
   applyLibraryTypeToggleVisibility();
+  applyGroupModeButtonState(state.groupMode);
 
   document.querySelectorAll('.library-modal').forEach(modal => {
     document.body.appendChild(modal);
@@ -369,7 +376,17 @@ async function initTabMediaLibrary() {
       }
     }
     
-    if (event.state && event.state.view === 'detail') {
+    if (event.state && event.state.view === 'group_mode') {
+      const targetType = event.state.type || state.currentLibraryType || 'general';
+      if (state.currentLibraryType !== targetType) {
+        applyLibraryTypeButtonState(targetType);
+      }
+      if (event.state.libraryId && state.currentLibraryId !== event.state.libraryId) {
+        selectCategory(event.state.libraryId, true);
+      }
+      restoreGroupModeView(event.state.mode, event.state.authorKey);
+      handledDetailNavigation = true;
+    } else if (event.state && event.state.view === 'detail') {
       const targetType = event.state.type || state.currentLibraryType || 'general';
       if (state.currentLibraryType !== targetType) {
         applyLibraryTypeButtonState(targetType);
@@ -500,6 +517,11 @@ export async function selectCategory(id, skipHistory = false) {
     } catch (e) {}
   }
   state.currentLibraryId = id;
+  // 카테고리를 새로 선택하면 이전 카테고리에서 남은 작가별 드릴다운 필터를 초기화한다 -
+  // 안 그러면 도서가 훨씬 많은 새 카테고리에서도 이전 드릴다운 결과(예: 3개 시리즈)만
+  // 남아있어 "이 카테고리엔 도서가 몇 개 없다"고 착각하게 된다. (그룹 모드 자체(기본/작가별)는
+  // 유지 - popstate의 group_mode 복원 분기가 이 값을 필요시 다시 채운다.)
+  state.authorKeyFilter = '';
   try {
     localStorage.setItem('last_selected_library_id', id);
   } catch (e) {}

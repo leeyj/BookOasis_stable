@@ -91,6 +91,9 @@ def _build_series_entries(db_type, rows):
         first_with_cover = next((b for b in books if b['cover_image']), None)
         db_cover = first_with_cover['cover_image'] if first_with_cover else None
         updated_at = first_with_cover['cover_updated_at'] if first_with_cover else None
+        # 카드에 실제로 뜨는 커버(first_with_cover)의 정렬값을 써야 그리드에서도
+        # 상세 페이지 권 목록에서 설정한 것과 동일하게 보인다.
+        cover_align = (first_with_cover or {}).get('cover_align') or 'center'
 
         final_cover = resolve_series_cover(
             series_name=series_name,
@@ -132,6 +135,7 @@ def _build_series_entries(db_type, rows):
             'total_tracks': total_tracks,
             'is_completed': is_completed,
             'cover_image': get_cover_image_with_t(final_cover, updated_at),
+            'cover_align': cover_align,
             'is_favorite': any_favorite,
             'metadata_locked': any_locked,
             'latest_added': latest_added,
@@ -140,6 +144,71 @@ def _build_series_entries(db_type, rows):
             'genre': genre,
             'tags': tags,
             'anchor_dir': comp_dir,
+        })
+
+    return entries
+
+
+def _build_author_entries(db_type, rows):
+    """작가별 모음 그리드용 엔트리 생성. 정규화된 작가명(normalize_author_key)으로 묶고,
+    카드 렌더링은 기존 시리즈 카드(createBookCard)를 그대로 재사용할 수 있도록
+    _build_series_entries와 동일한 필드 이름을 채운다."""
+    from repositories.series_search_query import normalize_author_key
+
+    groups = {}
+    order = []
+
+    for row in rows:
+        author_key = normalize_author_key(row['author'])
+        if not author_key:
+            continue
+        if author_key not in groups:
+            groups[author_key] = []
+            order.append(author_key)
+        groups[author_key].append(row)
+
+    entries = []
+    for author_key in order:
+        books = groups[author_key]
+        display_author = next((b['author'] for b in books if b['author']), '') or author_key
+
+        first_with_cover = next((b for b in books if b['cover_image']), None)
+        cover_image = first_with_cover['cover_image'] if first_with_cover else None
+        updated_at = first_with_cover['cover_updated_at'] if first_with_cover else None
+
+        representative = min(books, key=lambda r: r['id'])
+        latest_added = max((b['created_at'] for b in books if b['created_at']), default='')
+        any_favorite = 1 if any((b['is_favorite'] or 0) == 1 for b in books) else 0
+        any_locked = 1 if any((b.get('metadata_locked') or 0) == 1 for b in books) else 0
+        book_count = sum(int(b.get('series_book_count') or b.get('book_count') or 1) for b in books)
+
+        # 카드 제목에 "이현세 (22)"처럼 붙일 시리즈 수(권수가 아니라 시리즈 개수) —
+        # _build_series_entries와 동일한 (library_id, series_name, comp_dir) 그룹핑 기준 재사용.
+        distinct_series = {
+            (b['library_id'], b['series_name'] or '기타 단행본', _comparison_dir_for_book(b['file_path'], b['file_format']))
+            for b in books
+        }
+        series_count = len(distinct_series)
+
+        entries.append({
+            'series_key': f"author:{author_key}",
+            'series_name': display_author,
+            'series_alias': '',
+            'display_name': f"{display_author} ({series_count})",
+            'representative_title': display_author,
+            'author': display_author,
+            'book_count': book_count,
+            'cover_image': get_cover_image_with_t(cover_image, updated_at),
+            'is_favorite': any_favorite,
+            'metadata_locked': any_locked,
+            'latest_added': latest_added,
+            'representative_book_id': representative['id'],
+            'library_id': representative['library_id'],
+            'genre': '',
+            'tags': '',
+            'anchor_dir': '',
+            'author_key': author_key,
+            'is_author_group': True,
         })
 
     return entries
@@ -188,16 +257,19 @@ class SeriesService:
             pass
 
     @staticmethod
-    def get_books_list(db_type, library_id, page, limit, search_query, sort='asc', genre_filters=None, tag_filters=None, user_id=None, role=None):
+    def get_books_list(db_type, library_id, page, limit, search_query, sort='asc', genre_filters=None, tag_filters=None, user_id=None, role=None, group_by=None, author_key=None):
         import time
         t0 = time.perf_counter()
         library_id = _normalize_library_id(library_id)
         favorite_only = library_id == 'favorite'
         normalized_genres = [str(v).strip() for v in (genre_filters or []) if str(v).strip()]
         normalized_tags = [str(v).strip() for v in (tag_filters or []) if str(v).strip()]
+        group_by = (group_by or '').strip().lower()
+        author_key = (author_key or '').strip()
 
         offset = max(0, (page - 1) * limit)
-        requires_full_scan = bool(search_query) or (sort not in ('asc', 'desc'))
+        # 작가별 그룹핑/작가 드릴다운은 인덱스 없는 파이썬 그룹핑이라 항상 전체스캔 경로를 탄다.
+        requires_full_scan = bool(search_query) or (sort not in ('asc', 'desc')) or bool(group_by) or bool(author_key)
 
         now = time.time()
         cache_key = (
@@ -209,6 +281,8 @@ class SeriesService:
             tuple(normalized_tags),
             int(user_id) if user_id else 0,
             str(role or ''),
+            group_by,
+            author_key,
         )
 
         if not requires_full_scan:
@@ -233,7 +307,9 @@ class SeriesService:
             rows = SeriesRepository.fetch_books_for_grouping(
                 db_type,
                 library_id,
-                search_query=search_query or '',
+                # author_key 드릴다운은 정규화 매칭이라 자유텍스트 검색(LIKE)은 적용하지 않고
+                # 스코프(라이브러리/즐겨찾기/장르/태그) 안 전체 행을 가져와 파이썬에서 직접 거른다.
+                search_query=('' if author_key else (search_query or '')),
                 favorite_only=favorite_only,
                 genre_filters=normalized_genres,
                 tag_filters=normalized_tags,
@@ -244,7 +320,14 @@ class SeriesService:
             )
             t2 = time.perf_counter()
 
-            entries = _build_series_entries(db_type, rows)
+            if author_key:
+                from repositories.series_search_query import normalize_author_key
+                rows = [r for r in rows if normalize_author_key(r['author']) == author_key]
+                entries = _build_series_entries(db_type, rows)
+            elif group_by == 'author':
+                entries = _build_author_entries(db_type, rows)
+            else:
+                entries = _build_series_entries(db_type, rows)
             t3 = time.perf_counter()
 
             _sort_entries(entries, sort=sort)

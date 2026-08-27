@@ -25,6 +25,8 @@ export const state = {
   LIMIT: 120,
   searchQuery: '',
   currentSortDirection: localStorage.getItem('library_sort_direction') || 'asc', // 로컬 캐시 연동 (기본값: 오름차순)
+  groupMode: localStorage.getItem('library_group_mode') || 'default', // 'default'(시리즈) | 'author'(작가별 모음)
+  authorKeyFilter: '', // 작가별 카드 클릭 드릴다운용 정규화 작가 키(기본 그리드로 전환 시에만 사용)
   
   // 시스템 전역 설정
   systemSettings: {},

@@ -114,6 +114,25 @@ def add_collection_item(collection_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
+@collection_bp.route('/api/v1/collections/<int:collection_id>/items/by-author', methods=['POST'])
+def add_collection_items_by_author(collection_id):
+    """작가별 모음 카드 - 정규화된 작가 키에 매칭되는 모든 작품을 컬렉션에 일괄 추가"""
+    user_id, role = _get_current_user_info()
+    if not user_id:
+        return jsonify({'error': '로그인이 필요합니다.'}), 401
+
+    db_type = _get_target_db()
+    data = request.get_json() or {}
+    author_key = str(data.get('author_key') or '').strip()
+    if not author_key:
+        return jsonify({'error': 'author_key가 누락되었습니다.'}), 400
+
+    try:
+        result = CollectionService.add_items_by_author(db_type, collection_id, user_id, author_key)
+        return jsonify({'success': True, 'added_count': result['added'], 'skipped_count': result['skipped']})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
 @collection_bp.route('/api/v1/collections/<int:collection_id>/items/<int:item_id>', methods=['DELETE'])
 def remove_collection_item(collection_id, item_id):
     user_id, role = _get_current_user_info()

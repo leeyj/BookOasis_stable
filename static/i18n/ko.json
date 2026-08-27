@@ -344,7 +344,9 @@
     "filter_title": "장르/태그 필터 열기",
     "sort_title": "정렬 조건 변경",
     "sort_asc": "가나다 오름차순",
-    "search_placeholder": "제목·시리즈·별칭 / 작가:작가명 (단축키: {shortcut})"
+    "search_placeholder": "제목·시리즈·별칭 / 작가:작가명 (단축키: {shortcut})",
+    "group_mode_default": "기본",
+    "group_mode_author": "작가별"
   },
   "detail": {
     "back_to_list": "목록으로 돌아가기",

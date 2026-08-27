@@ -1,4 +1,4 @@
-import { buildFallbackCoverUrl, getBookCoverSrc, buildTextCoverDataUri } from '../cover_fallback.js';
+import { buildFallbackCoverUrl, getBookCoverSrc, buildTextCoverDataUri, coverAlignToObjectPosition } from '../cover_fallback.js';
 import { state } from '../state.js';
 import { stripLeadingBracketTags } from '../series_display.js';
 
@@ -99,8 +99,8 @@ export function renderVolumeList(orderedBooks, safeSeriesName, actualLibraryId, 
       : `<button class="btn-read" data-role="detail-continue" data-continue-action="reader" data-book-id="${book.id}" data-file-format="${(book.file_format || '').replace(/"/g, '&quot;')}" data-book-title="${(rawDisplayTitle || '').replace(/"/g, '&quot;')}" data-pages-read="${book.pages_read}" data-total-pages="${book.total_pages}">${readBtnText}</button>`;
 
     volumesHtml += `
-      <div class="volume-card" data-role="detail-volume-open-reader" data-book-id="${book.id}" data-title="${(rawDisplayTitle || '').replace(/"/g, '&quot;')}" data-book-title="${(rawDisplayTitle || '').replace(/"/g, '&quot;')}" data-file-format="${(book.file_format || '').replace(/"/g, '&quot;')}" data-pages-read="${pagesRead}" data-total-pages="${book.total_pages}" data-is-completed="${isCompletedValue ? 1 : 0}" data-page-missing="${noOffsets ? 1 : 0}" style="${unreadOnly && !isNotCompleted ? 'display: none;' : ''}">
-        <img class="volume-thumb" src="${volumeCoverSrc}" alt="cover"
+      <div class="volume-card" data-role="detail-volume-open-reader" data-book-id="${book.id}" data-cover-align="${book.cover_align || 'center'}" data-title="${(rawDisplayTitle || '').replace(/"/g, '&quot;')}" data-book-title="${(rawDisplayTitle || '').replace(/"/g, '&quot;')}" data-file-format="${(book.file_format || '').replace(/"/g, '&quot;')}" data-pages-read="${pagesRead}" data-total-pages="${book.total_pages}" data-is-completed="${isCompletedValue ? 1 : 0}" data-page-missing="${noOffsets ? 1 : 0}" style="${unreadOnly && !isNotCompleted ? 'display: none;' : ''}">
+        <img class="volume-thumb" src="${volumeCoverSrc}" alt="cover" style="object-position: ${coverAlignToObjectPosition(book.cover_align)} center;"
              onerror="if(this.src.indexOf('/covers/fallback')===-1 &amp;&amp; !this.src.startsWith('data:image/svg+xml')){this.src='${volumeFallbackCoverSrc}';}else{this.onerror=null; this.src='${buildTextCoverDataUri({ title: book.title || rawDisplayTitle, format: book.file_format, seed: book.id })}';}">
         <div class="volume-info">
           ${warnBannerHtml}

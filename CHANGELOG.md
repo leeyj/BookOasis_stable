@@ -1,4 +1,8 @@
 # CHANGELOG
+## v2.4.7
+- (feature) 로컬 폴더 실시간 감지 플러그인(`sample_plugins/metadata/local_folder_watch`) 신규 추가 — 로컬 디스크 라이브러리 경로의 파일 변경(생성/삭제/이동)을 감지해 자동으로 스캔 큐에 등록 | add local folder real-time watch plugin (`sample_plugins/metadata/local_folder_watch`) — detects file changes (create/delete/move) in local-disk library paths and automatically queues a scan
+- (feature) 도서(권) 단위 커버 썸네일 정렬(왼쪽/중앙/오른쪽) 설정 추가 — 이중 페이지 스캔본처럼 표지가 한쪽으로 치우친 개별 권을 상세 페이지 권 목록/그리드에서 우클릭으로 보정 가능 | add per-book cover thumbnail alignment (left/center/right) — fix off-center covers on double-page scans from the volume list/grid via right-click
+
 ## v2.4.6
 - (feature) bo.relaySS 중계 서비스(`bo_relay_ss`) 및 카테고리 레벨 상/하 2분할 구글 드라이브 링크 공유 메타데이터 플러그인(`sample_plugins/metadata/bo_relayss`) 신규 추가 | add bo.relaySS relay service (`bo_relay_ss`) and category-level dual split-view Google Drive link sharing metadata plugin (`sample_plugins/metadata/bo_relayss`)
 - (improvement) 만화 뷰어 보기 기능 개선 — 페이지 로딩 지연 및 병목 다수 개선 | improve comic viewer page-loading performance — fixed several loading bottlenecks

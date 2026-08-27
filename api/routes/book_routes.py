@@ -218,6 +218,25 @@ def toggle_book_favorite(book_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@book_routes_bp.route('/api/media/books/<int:book_id>/cover-align', methods=['POST', 'PATCH'])
+@login_required
+def update_book_cover_align(book_id):
+    """도서 1권의 커버 썸네일 정렬(왼쪽/중앙/오른쪽) 변경 — 이중 페이지 스캔본 대응"""
+    db_type = request.form.get('type', 'general')
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+    align = request.form.get('align', 'center').strip()
+
+    try:
+        updated = BookService.update_cover_align(db_type, book_id, align)
+        if not updated:
+            return jsonify({'success': False, 'error': f'해당 book_id={book_id}를 찾을 수 없습니다 (type={db_type}).'}), 404
+        from services.series_service import SeriesService
+        SeriesService.invalidate_all_books_cache()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @book_routes_bp.route('/api/media/series/favorite', methods=['POST', 'PATCH'])
 @login_required
 def toggle_series_favorite_api():
@@ -237,6 +256,31 @@ def toggle_series_favorite_api():
 
     try:
         BookService.update_series_favorite(db_type, series_name, is_favorite, user_id=user_id)
+        from services.series_service import SeriesService
+        SeriesService.invalidate_all_books_cache()
+        return jsonify({'success': True, 'message': _t('api.msg_series_favorite_updated')})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@book_routes_bp.route('/api/media/author/favorite', methods=['POST', 'PATCH'])
+@login_required
+def toggle_author_favorite_api():
+    """작가별 모음 카드 - 해당 작가(정규화 키)의 모든 작품 즐겨찾기 일괄 등록/해제"""
+    db_type = request.form.get('type', 'general')
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+    user_id = session.get('user_id', 1)
+    author_key = request.form.get('author_key', '').strip()
+    try:
+        is_favorite = int(request.form.get('is_favorite', 0))
+    except ValueError:
+        is_favorite = 0
+
+    if not author_key:
+        return jsonify({'success': False, 'error': 'author_key가 누락되었습니다.'}), 400
+
+    try:
+        BookService.update_author_favorite(db_type, author_key, is_favorite, user_id=user_id)
         from services.series_service import SeriesService
         SeriesService.invalidate_all_books_cache()
         return jsonify({'success': True, 'message': _t('api.msg_series_favorite_updated')})

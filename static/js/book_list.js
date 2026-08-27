@@ -59,6 +59,7 @@ export async function loadBooksList(isAppend = false, startPage = null) {
     return;
   }
   const spinner = document.getElementById('infinite-scroll-spinner');
+  container.classList.toggle('author-drilldown-active', !!state.authorKeyFilter);
 
   state.isLoading = true;
   console.log(`[Book-List] loadBooksList 시작 - type=${state.currentLibraryType}, libraryId=${state.currentLibraryId}, isAppend=${isAppend}`);
@@ -94,6 +95,8 @@ export async function loadBooksList(isAppend = false, startPage = null) {
       sort: state.currentSortDirection || 'asc',
       genres: requestFilters.genres,
       tags: requestFilters.tags,
+      groupBy: state.groupMode === 'author' ? 'author' : '',
+      authorKey: state.authorKeyFilter || '',
     });
 
     if (!data.success) {
@@ -182,6 +185,8 @@ export async function loadPreviousBooksPage() {
       sort: state.currentSortDirection || 'asc',
       genres: (state.filterGenres || []).map(normalizeMetadataToken).filter(Boolean),
       tags: (state.filterTags || []).map(normalizeMetadataToken).filter(Boolean),
+      groupBy: state.groupMode === 'author' ? 'author' : '',
+      authorKey: state.authorKeyFilter || '',
     });
 
     if (!data.success) return;

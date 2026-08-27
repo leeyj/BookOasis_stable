@@ -215,6 +215,12 @@ export function showBookContextMenu(x, y, bookId, bookTitle, isVolumeDetail = fa
     addSeriesItem.style.display = seriesName ? '' : 'none';
   }
 
+  // "커버 정렬"은 개별 권(볼륨) 카드에서만 의미가 있음 (시리즈 카드는 어느 권을 정렬할지 모호함)
+  const coverAlignItem = document.getElementById('ctx-cover-align-book');
+  if (coverAlignItem) {
+    coverAlignItem.style.display = isVolumeDetail ? '' : 'none';
+  }
+
   const unreadLabel = document.querySelector('#ctx-unread-book span');
   if (unreadLabel) {
     unreadLabel.textContent = context.markUnreadScope === 'series'
@@ -462,6 +468,8 @@ function resolveBookContextTarget(event) {
 
   const card = event.target.closest('.book-card, .vol-grid-card, .volume-card, .plugin-item-card');
   if (!card) return null;
+  // 작가별 모음 카드는 여러 시리즈의 집계라 단일 책/시리즈 전제 컨텍스트 메뉴 액션이 성립하지 않음
+  if (card.dataset?.isAuthorGroup === '1') return null;
 
   const rawId = card.getAttribute('data-book-id') || card.dataset?.bookId || card.dataset?.id || '';
   const parsedId = Number.parseInt(String(rawId), 10);
@@ -474,7 +482,8 @@ function resolveBookContextTarget(event) {
   const rawLibraryId = card.dataset?.libraryId || '';
   const parsedLibraryId = Number.parseInt(rawLibraryId, 10);
   const libraryId = Number.isFinite(parsedLibraryId) ? parsedLibraryId : null;
-  return { id: parsedId, title, isVolumeDetail, markUnreadScope, seriesName, libraryId };
+  const coverAlign = card.dataset?.coverAlign || 'center';
+  return { id: parsedId, title, isVolumeDetail, markUnreadScope, seriesName, libraryId, coverAlign };
 }
 
 // 카드별 개별 바인딩 누락/재렌더 타이밍 이슈가 있어도 우클릭 메뉴를 보장한다.
@@ -494,6 +503,7 @@ document.addEventListener('contextmenu', (event) => {
     markUnreadScope: target.markUnreadScope,
     seriesName: target.seriesName,
     libraryId: target.libraryId,
+    coverAlign: target.coverAlign,
   });
 }, true);
 
@@ -649,7 +659,10 @@ if (bookMenuEl) {
   bookMenuEl.addEventListener('click', (event) => {
     blockUnderlyingBookCardInteraction(event);
     const item = event.target.closest('.context-menu-item');
-    if (item) {
+    // "커버 정렬"은 여기서 끝나는 액션이 아니라 다른 서브메뉴(volume-cover-align-context-menu)를
+    // 새로 여는 액션이라, 이 억제 타이머를 걸면 700ms 안에 이어지는 다음 카드의 메뉴 클릭이
+    // dismissPointerGuardUntil에 막혀 씹혀버린다(서브메뉴가 안 뜨는 증상) - 제외한다.
+    if (item && item.getAttribute('data-action') !== 'cover-align') {
       // 메뉴 항목 클릭 시 suppress를 충분히 길게 설정 (iOS 지연 이벤트 방어)
       setTimeout(() => {
         hideBookContextMenu({ suppressMs: 700, clearTarget: false });
@@ -697,6 +710,12 @@ if (!window.__bookContextActionBound) {
     if (action === 'add-to-collection') return window.triggerAddToCollectionAction?.();
     if (action === 'add-series-to-collection') return window.triggerAddSeriesToCollectionAction?.();
     if (action === 'mark-unread') return window.triggerMarkAsUnreadAction?.();
+    if (action === 'cover-align') {
+      const bookId = currentTargetBook?.id;
+      const coverAlign = currentTargetBook?.coverAlign;
+      closeBookContextMenu();
+      return window.showVolumeCoverAlignContextMenu?.(lastEventX, lastEventY, bookId, coverAlign);
+    }
   }, true);
   window.__bookContextActionBound = true;
 }

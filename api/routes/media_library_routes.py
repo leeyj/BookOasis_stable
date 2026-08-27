@@ -69,6 +69,8 @@ def get_media_list():
     sort = request.args.get('sort', 'asc').strip().lower()
     genre_filters = _parse_csv_filter_values(request.args.get('genres', ''))
     tag_filters = _parse_csv_filter_values(request.args.get('tags', ''))
+    group_by = request.args.get('group_by', '').strip()
+    author_key = request.args.get('author_key', '').strip()
     user_id = session.get('user_id')
     role = session.get('role')
     try:
@@ -88,7 +90,9 @@ def get_media_list():
             genre_filters=genre_filters,
             tag_filters=tag_filters,
             user_id=user_id,
-            role=role
+            role=role,
+            group_by=group_by,
+            author_key=author_key
         )
         has_more = len(series_list) > limit
         if has_more:

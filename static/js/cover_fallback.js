@@ -180,6 +180,12 @@ export function getBookCoverSrc({ coverImage, title, format, seed } = {}) {
   return buildFallbackCoverUrl({ title, format, seed });
 }
 
+// 도서 1권 단위 커버 정렬값(left/center/right, 이중 페이지 스캔본 대응)을
+// <img> object-position CSS 값으로 변환. 알 수 없는 값은 안전하게 center로 처리.
+export function coverAlignToObjectPosition(align) {
+  return (align === 'left' || align === 'right') ? align : 'center';
+}
+
 export function handleCoverError(img, title = '', format = '') {
   if (!img || img.dataset.fallbackApplied === 'true') return;
   img.dataset.fallbackApplied = 'true';

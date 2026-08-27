@@ -344,7 +344,9 @@
     "filter_title": "Open Genre/Tag Filter",
     "sort_title": "Change Sort Criteria",
     "sort_asc": "Alphabetical Ascending",
-    "search_placeholder": "Title·series·alias / 작가:author (Shortcut: {shortcut})"
+    "search_placeholder": "Title·series·alias / 작가:author (Shortcut: {shortcut})",
+    "group_mode_default": "Default",
+    "group_mode_author": "By Author"
   },
   "detail": {
     "back_to_list": "Back to List",

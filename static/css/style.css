@@ -1488,6 +1488,17 @@ body {
     color: #c084fc;
 }
 
+/* 현재 선택된 값 표시 (예: 커버 정렬 컨텍스트 메뉴의 현재 정렬값) */
+.context-menu-item.active {
+    background: rgba(168, 85, 247, 0.15);
+    color: #fff;
+    font-weight: 600;
+}
+
+.context-menu-item.active i {
+    color: #c084fc;
+}
+
 .context-menu-close-item {
     margin-top: 0.25rem;
     border-top: 1px solid rgba(255, 255, 255, 0.06);
@@ -1931,6 +1942,14 @@ body {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(var(--book-card-width, 160px), 1fr));
     gap: 1.5rem;
+}
+
+/* 작가별 카드를 클릭해 드릴다운(특정 작가로 필터링)한 상태임을 시각적으로 구분 */
+.books-grid.author-drilldown-active {
+    border: 2px solid #a855f7;
+    border-radius: 10px;
+    padding: 1rem;
+    background: rgba(168, 85, 247, 0.05);
 }
 
 .book-card {

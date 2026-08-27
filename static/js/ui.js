@@ -3,7 +3,7 @@ import { state } from './state.js';
 import { openBookDetail } from './modal.js';
 import { openReader } from './viewer.js';
 import { showToast } from './view_manager.js';
-import { buildFallbackCoverUrl, getBookCoverSrc, buildTextCoverDataUri } from './cover_fallback.js';
+import { buildFallbackCoverUrl, getBookCoverSrc, buildTextCoverDataUri, coverAlignToObjectPosition } from './cover_fallback.js';
 import { stripLeadingBracketTags, middleTruncateTitle } from './series_display.js';
 import './scan_activity_status.js';
 
@@ -126,6 +126,7 @@ export function createBookCard(item, options = {}) {
   card.className = 'book-card';
   if (isVideo) card.dataset.role = 'video-course-card';
   card.dataset.bookId = item.id || item.representative_book_id || '';
+  if (item.is_author_group) card.dataset.isAuthorGroup = '1';
 
   const fmt = String(item.file_format || '').toLowerCase();
   const hasTrackCount = Number(item.total_tracks || 0) > 0;
@@ -224,6 +225,8 @@ export function createBookCard(item, options = {}) {
   const lazyPlaceholder = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
   const imgSrc = shouldHideCover ? fallbackCoverSrc : (useLazyLoad ? lazyPlaceholder : coverSrc);
   const imgDataSrcAttr = (!shouldHideCover && useLazyLoad) ? `data-src="${coverSrc}"` : '';
+  // 작가별 모음 카드는 여러 시리즈의 대표 커버가 섞여 있어 단일 book의 정렬값을 적용하지 않음
+  const coverObjectPositionStyle = item.is_author_group ? '' : ` style="object-position: ${coverAlignToObjectPosition(item.cover_align)} center;"`;
 
   // 5. 메타데이터 잠금 배지 구성 (커버 좌측 하단 녹색 자물쇠 아이콘)
   let lockedBadgeHtml = '';
@@ -242,7 +245,7 @@ export function createBookCard(item, options = {}) {
   card.innerHTML = `
     <div class="book-card-cover">
       <div class="book-card-overlay"></div>
-      <img src="${imgSrc}" ${imgDataSrcAttr} alt="${displayTitle}" decoding="async" loading="lazy">
+      <img src="${imgSrc}" ${imgDataSrcAttr} alt="${displayTitle}" decoding="async" loading="lazy"${coverObjectPositionStyle}>
       ${badgeHtml}
       ${favBtnHtml}
       ${lockedBadgeHtml}
@@ -304,14 +307,23 @@ export function createBookCard(item, options = {}) {
       const bookIdRaw = favBtn.getAttribute('data-book-id') || '';
       const parsedBookId = Number.parseInt(bookIdRaw, 10);
       const bookId = Number.isFinite(parsedBookId) ? parsedBookId : null;
-      toggleCardFavoriteEvent(e, favBtn.getAttribute('data-favorite-name') || '', bookId, nextStatus);
+      toggleCardFavoriteEvent(e, favBtn.getAttribute('data-favorite-name') || '', bookId, nextStatus, item.is_author_group ? (item.author_key || '') : null);
     });
   }
 
-  // 우클릭 컨텍스트 메뉴 바인딩 (이 책 스캔용)
+  // 우클릭 컨텍스트 메뉴 바인딩 (이 책 스캔용) — 작가별 모음 카드는 여러 시리즈의 집계라
+  // "이 책 스캔"/"읽지않음으로 변경" 등 단일 책·시리즈 전제 액션이 성립하지 않으므로, 대신
+  // 실제로 성립하는 액션(컬렉션 일괄 추가)만 담은 전용 축소 메뉴(author_group_context_menu.js)를 띄운다.
   card.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     e.stopPropagation();
+
+    if (item.is_author_group) {
+      if (typeof window.showAuthorGroupContextMenu === 'function') {
+        window.showAuthorGroupContextMenu(e.clientX, e.clientY, item);
+      }
+      return;
+    }
 
     // book_id가 존재하는 경우에만 실행 (시리즈 카드인 경우 대리 book_id 설정 가능)
     const targetBookId = item.id || item.representative_book_id || null;
@@ -324,8 +336,18 @@ export function createBookCard(item, options = {}) {
     }
   });
 
-  // 모바일 터치 대응 (롱 프레스 감지)
+  // 모바일 터치 대응 (롱 프레스 감지) — 작가별 모음 카드는 전용 축소 메뉴로 분기
   card.addEventListener('touchstart', (e) => {
+    if (item.is_author_group) {
+      if (typeof window.handleLongPressTouchStart === 'function') {
+        window.handleLongPressTouchStart(e, (x, y) => {
+          if (typeof window.showAuthorGroupContextMenu === 'function') {
+            window.showAuthorGroupContextMenu(x, y, item);
+          }
+        });
+      }
+      return;
+    }
     const targetBookId = item.id || item.representative_book_id || null;
     if (typeof window.handleLongPressTouchStart === 'function') {
       window.handleLongPressTouchStart(e, (x, y) => {
@@ -431,8 +453,11 @@ export function appendBooksGrid(seriesList) {
     const card = createBookCard(item, {
       showVolumeCount: true,
       actionTitle: '이어읽기',
-      onPrimaryClick: (e) => openBookDetail(e, item.series_name, item.library_id, item.representative_book_id, detailDisplayTitle),
+      onPrimaryClick: item.is_author_group
+        ? (e) => window.onAuthorGroupCardClick?.(item)
+        : (e) => openBookDetail(e, item.series_name, item.library_id, item.representative_book_id, detailDisplayTitle),
       onActionClick: (e) => {
+        if (item.is_author_group) return;
         if (typeof window.resumeSeries === 'function') {
           window.resumeSeries(e, item.series_name, item.library_id, item.representative_book_id);
         }
@@ -454,8 +479,11 @@ export function prependBooksGrid(seriesList) {
     const card = createBookCard(item, {
       showVolumeCount: true,
       actionTitle: '이어읽기',
-      onPrimaryClick: (e) => openBookDetail(e, item.series_name, item.library_id, item.representative_book_id, detailDisplayTitle),
+      onPrimaryClick: item.is_author_group
+        ? (e) => window.onAuthorGroupCardClick?.(item)
+        : (e) => openBookDetail(e, item.series_name, item.library_id, item.representative_book_id, detailDisplayTitle),
       onActionClick: (e) => {
+        if (item.is_author_group) return;
         if (typeof window.resumeSeries === 'function') {
           window.resumeSeries(e, item.series_name, item.library_id, item.representative_book_id);
         }
@@ -549,13 +577,13 @@ export function renderDashboardRecentlyAdded(booksList) {
   container.appendChild(fragment);
 }
 
-window.toggleCardFavoriteEvent = async (event, name, bookId, nextStatus) => {
+window.toggleCardFavoriteEvent = async (event, name, bookId, nextStatus, authorKey = null) => {
   if (event) {
     event.stopPropagation();
     event.preventDefault();
   }
 
-  console.log(`[Favorite-Action] 카드 즐겨찾기 별 클릭: name="${name}", bookId=${bookId}, nextStatus=${nextStatus}, currentLibId=${state.currentLibraryId}`);
+  console.log(`[Favorite-Action] 카드 즐겨찾기 별 클릭: name="${name}", bookId=${bookId}, nextStatus=${nextStatus}, authorKey=${authorKey}, currentLibId=${state.currentLibraryId}`);
 
   // 즉시 UI 피드백 반영 (Optimistic Update)
   const btn = event.currentTarget || (event.target && event.target.closest ? event.target.closest('.btn-card-fav-toggle') : null);
@@ -577,7 +605,10 @@ window.toggleCardFavoriteEvent = async (event, name, bookId, nextStatus) => {
   }
 
   let res;
-  if (bookId && state.currentLibraryId === 'history') {
+  if (authorKey) {
+    console.log(`[Favorite-Action] window.toggleAuthorFavoriteAction 호출 (authorKey="${authorKey}", status=${nextStatus})`);
+    res = await window.toggleAuthorFavoriteAction(authorKey, nextStatus);
+  } else if (bookId && state.currentLibraryId === 'history') {
     console.log(`[Favorite-Action] window.toggleFavoriteAction 호출 (bookId=${bookId}, status=${nextStatus})`);
     res = await window.toggleFavoriteAction(bookId, nextStatus);
   } else {

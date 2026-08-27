@@ -78,6 +78,40 @@ class AudiobookRepository:
             conn.close()
 
     @staticmethod
+    def get_all_authors_with_ids():
+        """작가별 모음(정규화 매칭) 일괄 즐겨찾기를 위해 전체 오디오북의 id/author만 가져온다."""
+        conn = database.get_connection('audiobook')
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, author FROM audiobooks WHERE COALESCE(is_deleted, 0) = 0 AND COALESCE(author, '') != ''"
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+
+    @staticmethod
+    def update_favorites_bulk(audiobook_ids, is_favorite):
+        """오디오북 id 목록에 대한 즐겨찾기 상태 일괄 갱신 (작가별 모음 카드 즐겨찾기용).
+        audiobooks.is_favorite은 사용자별이 아니라 엔티티 단일 컬럼이라 user_id가 필요 없다."""
+        if not audiobook_ids:
+            return True
+        conn = database.get_connection('audiobook')
+        cursor = conn.cursor()
+        try:
+            placeholders = ','.join('%s' for _ in audiobook_ids)
+            cursor.execute(
+                f"UPDATE audiobooks SET is_favorite = %s WHERE id IN ({placeholders})",
+                [1 if is_favorite else 0] + list(audiobook_ids)
+            )
+            conn.commit()
+            return True
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    @staticmethod
     def get_audiobook_progress(audiobook_id, user_id):
         conn = database.get_connection('audiobook')
         cursor = conn.cursor()

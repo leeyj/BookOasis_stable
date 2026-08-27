@@ -68,6 +68,14 @@ class BookService:
         return BookRepository.update_favorite(db_type, book_id, is_favorite, user_id)
 
     @staticmethod
+    def update_cover_align(db_type, book_id, align):
+        """도서 1권의 커버 썸네일 정렬(왼쪽/중앙/오른쪽) 변경 — 이중 페이지 스캔본 등
+        표지가 한쪽으로 치우친 개별 권을 위한 book 단위 설정. 오디오북/영상은 대상 아님."""
+        if db_type in ('audiobook', 'video'):
+            return False
+        return BookRepository.update_cover_align(db_type, book_id, align)
+
+    @staticmethod
     def update_series_favorite(db_type, series_name, is_favorite, user_id):
         """특정 시리즈 전체 도서의 즐겨찾기 상태 변경 (사용자별)
         오디오북/영상은 "시리즈"가 곧 단일 엔티티이므로 제목으로 해당 행을 찾아 한 번에 갱신한다."""
@@ -78,3 +86,22 @@ class BookService:
             row = VideoRepository.get_video_by_title_or_folder_name(series_name)
             return VideoRepository.update_favorite(row['id'], is_favorite) if row else False
         return BookRepository.update_series_favorite(db_type, series_name, is_favorite, user_id)
+
+    @staticmethod
+    def update_author_favorite(db_type, author_key, is_favorite, user_id):
+        """작가별 모음 카드의 즐겨찾기 - 정규화된 작가 키(author_key)에 매칭되는
+        해당 작가의 모든 작품을 일괄 즐겨찾기 등록/해제한다.
+        영상 강좌는 author 필드가 항상 비어 있어(작가별 카드 자체가 생성되지 않음) 대상에서 제외."""
+        from repositories.series_search_query import normalize_author_key
+
+        if db_type == 'video':
+            return False
+
+        if db_type == 'audiobook':
+            rows = AudiobookRepository.get_all_authors_with_ids()
+            matched_ids = [r['id'] for r in rows if normalize_author_key(r['author']) == author_key]
+            return AudiobookRepository.update_favorites_bulk(matched_ids, is_favorite)
+
+        rows = BookRepository.get_all_authors_with_ids(db_type)
+        matched_ids = [r['id'] for r in rows if normalize_author_key(r['author']) == author_key]
+        return BookRepository.update_favorites_bulk(db_type, matched_ids, is_favorite, user_id)

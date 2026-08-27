@@ -179,11 +179,12 @@ export function bindDetailInteractions() {
     if (!card) return;
     const title = card.getAttribute('data-title') || '';
     const bookId = Number.parseInt(card.getAttribute('data-book-id') || '', 10);
+    const coverAlign = card.getAttribute('data-cover-align') || 'center';
     if (!Number.isFinite(bookId) || bookId <= 0) return;
     if (typeof window.handleLongPressTouchStart === 'function') {
       window.handleLongPressTouchStart(event, (x, y) => {
         if (typeof window.showBookContextMenu === 'function') {
-          window.showBookContextMenu(x, y, bookId, title, true);
+          window.showBookContextMenu(x, y, bookId, title, true, { coverAlign });
         }
       });
     }

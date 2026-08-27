@@ -84,6 +84,64 @@ class CollectionService:
         return CollectionRepository.add_item_to_collection(db_type, collection_id, book_id, series_name, audiobook_id, video_id)
 
     @staticmethod
+    def add_items_by_author(db_type, collection_id, user_id, author_key):
+        """작가별 모음 카드 - 정규화된 작가 키(author_key)에 매칭되는 해당 작가의 모든 작품을
+        컬렉션에 일괄 추가한다. 시리즈가 있는 작품은 series_name 단위(1개 항목)로,
+        시리즈 없는 단행본은 book_id 단위로 추가한다 (오디오북은 각 작품이 곧 최상위 항목이라
+        book_id 대신 audiobook_id로 추가). 영상 강좌는 author 필드가 항상 비어 있어 대상 없음."""
+        coll = CollectionRepository.get_collection_by_id(db_type, collection_id, user_id=user_id)
+        if not coll:
+            raise ValueError("컬렉션을 찾을 수 없거나 접근 권한이 없습니다.")
+
+        from repositories.series_search_query import normalize_author_key
+
+        added = 0
+        skipped = 0
+
+        if db_type == 'video':
+            return {'added': 0, 'skipped': 0}
+
+        if db_type == 'audiobook':
+            from repositories import AudiobookRepository
+            rows = AudiobookRepository.get_all_authors_with_ids()
+            matched_ids = {r['id'] for r in rows if normalize_author_key(r['author']) == author_key}
+            for audiobook_id in matched_ids:
+                item_id = CollectionRepository.add_item_to_collection(db_type, collection_id, audiobook_id=audiobook_id)
+                if item_id:
+                    added += 1
+                else:
+                    skipped += 1
+            return {'added': added, 'skipped': skipped}
+
+        rows = BookRepository.get_all_authors_with_ids(db_type)
+        matched_series_names = set()
+        matched_standalone_book_ids = set()
+        for r in rows:
+            if normalize_author_key(r['author']) != author_key:
+                continue
+            series_name = str(r.get('series_name') or '').strip()
+            if series_name:
+                matched_series_names.add(series_name)
+            else:
+                matched_standalone_book_ids.add(r['id'])
+
+        for series_name in matched_series_names:
+            item_id = CollectionRepository.add_item_to_collection(db_type, collection_id, series_name=series_name)
+            if item_id:
+                added += 1
+            else:
+                skipped += 1
+
+        for book_id in matched_standalone_book_ids:
+            item_id = CollectionRepository.add_item_to_collection(db_type, collection_id, book_id=book_id)
+            if item_id:
+                added += 1
+            else:
+                skipped += 1
+
+        return {'added': added, 'skipped': skipped}
+
+    @staticmethod
     def remove_item(db_type, collection_id, user_id, item_id):
         coll = CollectionRepository.get_collection_by_id(db_type, collection_id, user_id=user_id)
         if not coll:

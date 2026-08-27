@@ -1,4 +1,4 @@
-import { buildFallbackCoverUrl, getBookCoverSrc } from '../cover_fallback.js';
+import { buildFallbackCoverUrl, getBookCoverSrc, coverAlignToObjectPosition } from '../cover_fallback.js';
 import { stripLeadingBracketTags } from '../series_display.js';
 
 export function renderVolumeGrid(orderedBooks, safeSeriesName, dbType = 'general', options = {}) {
@@ -29,6 +29,7 @@ export function renderVolumeGrid(orderedBooks, safeSeriesName, dbType = 'general
       seed: book.id || book.file_path || `${safeSeriesName}:${imageDisplayTitle}`
     });
     buildFallbackCoverUrl({ id: book.id, title: imageDisplayTitle, format: book.file_format, seed: book.id });
+    const coverObjectPosition = coverAlignToObjectPosition(book.cover_align);
     const progressPercent = totalPages > 0 ? Math.min(100, Math.round((pagesRead / totalPages) * 100)) : 0;
     const isNotCompleted = !isCompletedValue;
     const isDownloadable = ['epub', 'pdf', 'txt', 'text'].includes(format);
@@ -38,6 +39,7 @@ export function renderVolumeGrid(orderedBooks, safeSeriesName, dbType = 'general
          <div class="vol-grid-card${!isCompletedValue && pagesRead === 0 ? ' unread-card' : ''}"
            data-role="detail-volume-open-reader"
            data-book-id="${book.id}"
+           data-cover-align="${book.cover_align || 'center'}"
            data-title="${(rawDisplayTitle || '').replace(/"/g, '&quot;')}"
            data-book-title="${(rawDisplayTitle || '').replace(/"/g, '&quot;')}"
            data-file-format="${(book.file_format || '').replace(/"/g, '&quot;')}"
@@ -47,7 +49,7 @@ export function renderVolumeGrid(orderedBooks, safeSeriesName, dbType = 'general
            style="${unreadOnly && !isNotCompleted ? 'display: none;' : ''}">
         <div class="vol-grid-thumb-container" style="position: relative; width: 100%; aspect-ratio: 1 / 1.45; overflow: hidden; border-radius: 8px;">
           <img class="vol-grid-thumb" src="${coverSrc}" alt="cover" data-title="${(imageDisplayTitle || '').replace(/"/g, '&quot;')}" data-format="${book.file_format || 'text'}"
-               onerror="window.handleCoverError(this)" style="width: 100%; height: 100%; object-fit: cover;">
+               onerror="window.handleCoverError(this)" style="width: 100%; height: 100%; object-fit: cover; object-position: ${coverObjectPosition} center;">
           ${isCompletedValue ? `<span class="vol-grid-completed-dot" title="${completedLabel}" aria-label="${completedLabel}"></span>` : ''}
           ${isDownloadable ? `<a class="vol-grid-download-btn"
              href="/api/media/books/${book.id}/download?type=${dbType}"

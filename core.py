@@ -392,6 +392,10 @@ if not IS_WORKER:
     from services.scheduler_service import SchedulerService
     SchedulerService.start_scheduler()
 
+    # 상시 백그라운드 서비스가 필요한 플러그인(예: 로컬 폴더 워처) 기동
+    from services.metadata_factory import MetadataFactory
+    MetadataFactory.start_all_plugin_background_services()
+
     # ── 선택적 내장 스캐너 워커 기동 ──
     # 우선순위:
     # 1) BOOKOASIS_ENABLE_EMBEDDED_WORKER 명시값(true/false)

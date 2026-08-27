@@ -16,12 +16,14 @@ export async function fetchLibraries(type) {
   return res.json();
 }
 
-export async function fetchBooksList({type, libraryId, page, limit, append, search, sort, genres = [], tags = []}) {
+export async function fetchBooksList({type, libraryId, page, limit, append, search, sort, genres = [], tags = [], groupBy, authorKey}) {
   const searchQuery = search ? `&search=${encodeURIComponent(search)}` : '';
   const sortQuery = sort ? `&sort=${sort}` : '';
   const genresQuery = genres.length > 0 ? `&genres=${encodeURIComponent(genres.join(','))}` : '';
   const tagsQuery = tags.length > 0 ? `&tags=${encodeURIComponent(tags.join(','))}` : '';
-  const url = `/api/media/list?type=${type}&library_id=${libraryId}&page=${page}&limit=${limit}${searchQuery}${sortQuery}${genresQuery}${tagsQuery}&_=${Date.now()}`;
+  const groupByQuery = groupBy ? `&group_by=${encodeURIComponent(groupBy)}` : '';
+  const authorKeyQuery = authorKey ? `&author_key=${encodeURIComponent(authorKey)}` : '';
+  const url = `/api/media/list?type=${type}&library_id=${libraryId}&page=${page}&limit=${limit}${searchQuery}${sortQuery}${genresQuery}${tagsQuery}${groupByQuery}${authorKeyQuery}&_=${Date.now()}`;
   const res = await safeFetch(url, {cache: 'no-store'});
   return res.json();
 }
@@ -156,6 +158,18 @@ export async function deleteLibraryGroup(formData) {
   return res.json();
 }
 
+export async function updateBookCoverAlign(bookId, type, align) {
+  console.log(`[CoverAlign-API] updateBookCoverAlign 호출: bookId=${bookId}, type=${type}, align=${align}`);
+  const formData = new FormData();
+  formData.append('type', type);
+  formData.append('align', align);
+  const res = await fetch(`/api/media/books/${bookId}/cover-align`, {
+    method: 'POST',
+    body: formData
+  });
+  return res.json();
+}
+
 export async function toggleFavorite(type, bookId, isFavorite) {
   console.log(`[Favorite-API] toggleFavorite 호출: type=${type}, bookId=${bookId}, isFavorite=${isFavorite}`);
   const formData = new FormData();
@@ -191,6 +205,25 @@ window.toggleFavoriteAction = async function (bookId, isFavorite) {
 
 window.toggleSeriesFavoriteAction = async function (seriesName, isFavorite) {
   return toggleSeriesFavorite(state.currentLibraryType || 'general', seriesName, isFavorite);
+};
+
+export async function toggleAuthorFavorite(type, authorKey, isFavorite) {
+  console.log(`[Favorite-API] toggleAuthorFavorite 호출: type=${type}, authorKey="${authorKey}", isFavorite=${isFavorite}`);
+  const formData = new FormData();
+  formData.append('type', type);
+  formData.append('author_key', authorKey);
+  formData.append('is_favorite', isFavorite ? 1 : 0);
+  const res = await fetch(`/api/media/author/favorite`, {
+    method: 'POST',
+    body: formData
+  });
+  const data = await res.json();
+  console.log(`[Favorite-API] toggleAuthorFavorite 서버 응답:`, data);
+  return data;
+}
+
+window.toggleAuthorFavoriteAction = async function (authorKey, isFavorite) {
+  return toggleAuthorFavorite(state.currentLibraryType || 'general', authorKey, isFavorite);
 };
 
 export async function scanSingleBook(type, bookId) {

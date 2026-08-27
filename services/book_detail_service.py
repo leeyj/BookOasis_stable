@@ -322,6 +322,7 @@ class BookDetailService:
                 'is_favorite' : b['is_favorite'] or 0,
                 'last_read_at': b['last_read_at'] or '',
                 'metadata_locked': b.get('metadata_locked', 0),
+                'cover_align': b.get('cover_align') or 'center',
             })
         
         # 부모 디렉토리 기반 단행본 격리 필터

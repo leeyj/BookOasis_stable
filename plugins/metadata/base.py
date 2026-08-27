@@ -104,6 +104,12 @@ class BaseMetadataProvider(ABC):
         """스캐너 신규도서 감지 후크 (선택 구현)."""
         return {'success': True, 'skipped': True, 'message': 'scan hook not implemented'}
 
+    def start_background_service(self, db_type):
+        """플러그인 상시 백그라운드 서비스 시작 후크 (선택 구현).
+        앱 부팅 시 활성화된 플러그인에 한해 1회 호출된다. 오래 걸리는 초기화나
+        블로킹 루프는 반드시 자체 스레드로 넘기고 이 메서드는 즉시 반환해야 한다."""
+        return None
+
     @abstractmethod
     def search(self, db_type, query):
         """

@@ -859,7 +859,8 @@ _SCHEMA_SQL = """
         series_alias TEXT,
         title_alias TEXT,
         file_mtime REAL DEFAULT 0.0,
-        file_size INTEGER DEFAULT 0
+        file_size INTEGER DEFAULT 0,
+        cover_align TEXT DEFAULT 'center'
     );
 
     CREATE TABLE IF NOT EXISTS series_summary (

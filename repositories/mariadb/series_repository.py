@@ -122,6 +122,7 @@ class SeriesRepository:
             sql = """
                 SELECT b.id, b.series_name, b.series_alias, b.title, b.title_alias,
                        b.author, b.file_path, b.file_format, b.cover_image, b.cover_updated_at,
+                       COALESCE(b.cover_align, 'center') AS cover_align,
                        EXISTS (
                            SELECT 1 FROM user_favorites uf
                            WHERE uf.book_id = b.id AND uf.user_id = %s
@@ -371,7 +372,7 @@ class SeriesRepository:
 
             sql = f"""
                 SELECT b.id, b.series_name, b.series_alias, b.title, b.title_alias, b.author, b.file_path, b.file_format,
-                       b.cover_image, b.cover_updated_at,
+                       b.cover_image, b.cover_updated_at, COALESCE(b.cover_align, 'center') AS cover_align,
                        0 AS is_favorite,
                        b.created_at,
                        b.genre, b.tags, b.library_id, COALESCE(b.metadata_locked, 0) AS metadata_locked,

@@ -7,6 +7,7 @@ import { updateCurrentCategoryIndicator } from '../category_indicator.js';
 import { detailVolumeViewState } from './volume_controller.js';
 import { encodeDetailParams } from '../url_obfuscator.js';
 import { bindDetailInteractions } from './interactions.js';
+import './volume_context_menu.js';
 
 bindDetailInteractions();
 

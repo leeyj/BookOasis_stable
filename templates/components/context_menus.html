@@ -23,6 +23,7 @@
         <li class="context-menu-item" id="ctx-add-to-collection" data-role="book-context-action" data-action="add-to-collection"><i class="fa-solid fa-bookmark" style="color: #a855f7;"></i> <span data-i18n="context_menu.add_to_collection">컬렉션에 추가</span></li>
         <li class="context-menu-item" id="ctx-add-series-to-collection" data-role="book-context-action" data-action="add-series-to-collection"><i class="fa-solid fa-book-bookmark" style="color: #38bdf8;"></i> <span data-i18n="context_menu.add_series_to_collection">이 시리즈를 컬렉션에 추가</span></li>
         <li class="context-menu-item" id="ctx-unread-book" data-role="book-context-action" data-action="mark-unread"><i class="fa-solid fa-eye-slash" style="color: #ef4444;"></i> <span data-i18n="context_menu.mark_as_unread">읽지 않은 상태로 변경 (0%)</span></li>
+        <li class="context-menu-item" id="ctx-cover-align-book" data-role="book-context-action" data-action="cover-align" style="display: none;"><i class="fa-solid fa-align-left" style="color: #38bdf8;"></i> <span>커버 정렬 (이중 스캔본용)</span></li>
         <li class="context-menu-item context-menu-close-item" data-role="book-context-close"><i class="fa-solid fa-xmark" style="color: #f87171;"></i> <span>닫기</span></li>
     </ul>
 </div>
@@ -38,6 +39,32 @@
         <li class="context-menu-item" data-role="video-context-action" data-action="toggle-favorite"><i class="fa-solid fa-star" style="color: #eab308;"></i> <span id="video-ctx-favorite-label">즐겨찾기 추가</span></li>
         <li class="context-menu-item" data-role="video-context-action" data-action="add-to-collection"><i class="fa-solid fa-folder-plus" style="color: #c084fc;"></i> <span>컬렉션에 추가</span></li>
         <li class="context-menu-item context-menu-close-item" data-role="video-context-close"><i class="fa-solid fa-xmark" style="color: #f87171;"></i> <span>닫기</span></li>
+    </ul>
+</div>
+
+<!-- 작가별 모음 카드 우클릭 컨텍스트 메뉴 (컬렉션 추가 전용 축소 메뉴) -->
+<div id="author-group-context-menu" class="context-menu" style="display: none;">
+    <div class="context-menu-header">
+        <span class="context-menu-title" id="author-group-ctx-title">작가 메뉴</span>
+        <button type="button" class="context-menu-close-btn" data-role="author-group-context-close" aria-label="닫기"><span class="context-menu-close-icon">&times;</span><span class="context-menu-close-text">닫기</span></button>
+    </div>
+    <ul class="context-menu-list">
+        <li class="context-menu-item" data-role="author-group-context-action" data-action="add-to-collection"><i class="fa-solid fa-bookmark" style="color: #a855f7;"></i> <span>이 작가의 모든 작품을 컬렉션에 추가</span></li>
+        <li class="context-menu-item context-menu-close-item" data-role="author-group-context-close"><i class="fa-solid fa-xmark" style="color: #f87171;"></i> <span>닫기</span></li>
+    </ul>
+</div>
+
+<!-- 권(볼륨) 카드 우클릭 컨텍스트 메뉴 (커버 정렬 전용, 이중 페이지 스캔본 대응) -->
+<div id="volume-cover-align-context-menu" class="context-menu" style="display: none;">
+    <div class="context-menu-header">
+        <span class="context-menu-title">커버 정렬</span>
+        <button type="button" class="context-menu-close-btn" data-role="volume-cover-align-context-close" aria-label="닫기"><span class="context-menu-close-icon">&times;</span><span class="context-menu-close-text">닫기</span></button>
+    </div>
+    <ul class="context-menu-list">
+        <li class="context-menu-item" data-role="volume-cover-align-context-action" data-align="left"><i class="fa-solid fa-align-left" style="color: #a855f7;"></i> <span>왼쪽 정렬</span></li>
+        <li class="context-menu-item" data-role="volume-cover-align-context-action" data-align="center"><i class="fa-solid fa-align-center" style="color: #a855f7;"></i> <span>중앙 정렬</span></li>
+        <li class="context-menu-item" data-role="volume-cover-align-context-action" data-align="right"><i class="fa-solid fa-align-right" style="color: #a855f7;"></i> <span>오른쪽 정렬</span></li>
+        <li class="context-menu-item context-menu-close-item" data-role="volume-cover-align-context-close"><i class="fa-solid fa-xmark" style="color: #f87171;"></i> <span>닫기</span></li>
     </ul>
 </div>
 

@@ -508,5 +508,32 @@ class MetadataFactory:
                 return target_class()
         except Exception as e:
             print(f"[MetadataFactory] provider_id '{provider_id}' load failed: {e}")
-            
+
         return cls.get_provider()
+
+    @classmethod
+    def start_all_plugin_background_services(cls):
+        """앱 부팅 시 1회 호출. start_background_service()를 오버라이드한
+        활성화 플러그인에 한해 호출해 상시 백그라운드 서비스(예: 파일시스템 워처)를
+        기동시킨다. 플러그인 하나의 실패가 앱 부팅을 막지 않도록 개별적으로 감싼다."""
+        try:
+            providers = cls.get_available_providers()
+        except Exception as e:
+            print(f"[MetadataFactory] start_all_plugin_background_services: provider list load failed: {e}")
+            return
+
+        for provider_item in providers:
+            if not provider_item.get('enabled'):
+                continue
+            p_id = provider_item.get('id')
+            try:
+                _, target_class = cls._import_provider_module_and_class(p_id)
+                if not target_class:
+                    continue
+                if target_class.start_background_service is BaseMetadataProvider.start_background_service:
+                    continue
+                instance = target_class()
+                instance.start_background_service('general')
+                print(f"[MetadataFactory] Background service started for plugin '{p_id}'")
+            except Exception as e:
+                print(f"[MetadataFactory] Background service start failed for plugin '{p_id}': {e}")

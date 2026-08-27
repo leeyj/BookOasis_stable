@@ -95,6 +95,69 @@ class BookRepository:
             conn.close()
 
     @staticmethod
+    def update_cover_align(db_type, book_id, align):
+        """도서 1권 단위 커버 썸네일 정렬(왼쪽/중앙/오른쪽) 저장 — 이중 페이지 스캔본 대응.
+        존재 여부는 UPDATE의 rowcount로 판단하지 않는다 - MariaDB(pymysql)는 기본적으로
+        "매칭된 행 수"가 아니라 "값이 실제로 바뀐 행 수"를 rowcount로 반환하므로, 이미 같은
+        값으로 설정돼 있으면 행이 분명히 존재해도 rowcount=0이 되어 오탐(404) 처리될 수 있다."""
+        safe_align = align if align in ('left', 'center', 'right') else 'center'
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT id FROM books WHERE id = ?", (book_id,))
+            if not cursor.fetchone():
+                return False
+            cursor.execute("UPDATE books SET cover_align = ? WHERE id = ?", (safe_align, book_id))
+            conn.commit()
+            return True
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    @staticmethod
+    def get_all_authors_with_ids(db_type):
+        """작가별 모음(정규화 매칭) 일괄 즐겨찾기/컬렉션 추가를 위해 전체 도서의
+        id/author/series_name을 가져온다."""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, author, series_name FROM books WHERE COALESCE(is_deleted, 0) = 0 AND COALESCE(author, '') != ''"
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+
+    @staticmethod
+    def update_favorites_bulk(db_type, book_ids, is_favorite, user_id):
+        """도서 id 목록에 대한 즐겨찾기 일괄 등록/해제 (작가별 모음 카드 즐겨찾기용)"""
+        if not book_ids:
+            return True
+        safe_user_id = int(user_id) if user_id is not None and int(user_id) > 0 else 1
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            if int(is_favorite) == 1:
+                cursor.executemany(
+                    "INSERT OR IGNORE INTO user_favorites (user_id, book_id, created_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
+                    [(safe_user_id, book_id) for book_id in book_ids]
+                )
+            else:
+                placeholders = ','.join('?' for _ in book_ids)
+                cursor.execute(
+                    f"DELETE FROM user_favorites WHERE user_id = ? AND book_id IN ({placeholders})",
+                    [safe_user_id] + list(book_ids)
+                )
+            conn.commit()
+            return True
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    @staticmethod
     def update_series_favorite(db_type, series_name, is_favorite, user_id):
         """특정 시리즈의 모든 도서 즐겨찾기 일괄 등록/해제"""
         safe_user_id = int(user_id) if user_id is not None and int(user_id) > 0 else 1
@@ -380,7 +443,8 @@ class BookRepository:
                 SELECT b.id, b.title, b.title_alias, b.series_name, b.series_alias, b.file_format, b.total_pages, b.has_offsets, b.cover_image, b.cover_updated_at,
                        b.file_path, p.pages_read, p.is_completed,
                        CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
-                       b.library_id, p.last_read_at, COALESCE(b.metadata_locked, 0) AS metadata_locked
+                       b.library_id, p.last_read_at, COALESCE(b.metadata_locked, 0) AS metadata_locked,
+                       COALESCE(b.cover_align, 'center') AS cover_align
                 FROM books b
                 LEFT JOIN user_progress p ON b.id = p.book_id AND p.user_id = ?
                 LEFT JOIN user_favorites uf ON b.id = uf.book_id AND uf.user_id = ?
@@ -392,7 +456,8 @@ class BookRepository:
                 SELECT b.id, b.title, b.title_alias, b.series_name, b.series_alias, b.file_format, b.total_pages, b.has_offsets, b.cover_image, b.cover_updated_at,
                        b.file_path, p.pages_read, p.is_completed,
                        CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
-                       b.library_id, p.last_read_at, COALESCE(b.metadata_locked, 0) AS metadata_locked
+                       b.library_id, p.last_read_at, COALESCE(b.metadata_locked, 0) AS metadata_locked,
+                       COALESCE(b.cover_align, 'center') AS cover_align
                 FROM books b
                 LEFT JOIN user_progress p ON b.id = p.book_id AND p.user_id = ?
                 LEFT JOIN user_favorites uf ON b.id = uf.book_id AND uf.user_id = ?
