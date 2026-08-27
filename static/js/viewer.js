@@ -162,7 +162,6 @@ configureInputController({
 });
 
 configureLifecycleController({
-  loadCustomFontsList,
   initViewerSeekBar,
   syncHotspotPointerEvents,
   clearEpubViewer,

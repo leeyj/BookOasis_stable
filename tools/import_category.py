@@ -837,8 +837,8 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
                         cursor.execute("""
                             INSERT INTO book_offsets (
                                 book_id, page_idx, filename, local_header_offset,
-                                compress_size, file_size, compress_type
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                                compress_size, file_size, compress_type, data_offset
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         """, (
                             new_book_id,
                             off.get('page_idx'),
@@ -846,7 +846,8 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
                             off.get('local_header_offset'),
                             off.get('compress_size'),
                             off.get('file_size'),
-                            off.get('compress_type')
+                            off.get('compress_type'),
+                            off.get('data_offset')
                         ))
                         imported_offsets_count += 1
 

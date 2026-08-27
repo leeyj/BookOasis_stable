@@ -645,3 +645,46 @@ def run_annotation_context_menu_plugin_action_api():
         return jsonify({'success': False, 'error': str(ve)}), 400
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@plugin_routes_bp.route('/callback', methods=['GET'])
+@admin_required
+def generic_oauth_callback_api():
+    """서드파티 OAuth 제공자(Spotify 등)가 인가 코드와 함께 리다이렉트해오는 범용 콜백 다리.
+    플러그인은 자체 라우트를 등록할 수 없으므로, 여러 OAuth 연동 플러그인이 이 경로 하나를
+    공유해서 쓴다. 코어는 state에 인코딩된 "{plugin_id}:{nonce}" 형식만 보고 해당 plugin_id의
+    handle_oauth_callback()에 그대로 위임할 뿐, 어떤 서드파티 서비스인지/무엇을 하는지는 전혀
+    모른다 - CSRF nonce 검증 등 실제 로직은 각 플러그인이 자기 책임으로 처리한다."""
+    code = request.args.get('code')
+    state = request.args.get('state', '') or ''
+    error = request.args.get('error')
+    db_type = request.args.get('type', 'general')
+
+    plugin_id = state.split(':', 1)[0] if state else ''
+    if not plugin_id:
+        return "잘못된 콜백 요청입니다 (state 누락).", 400
+
+    try:
+        from services.metadata_factory import MetadataFactory
+        provider = MetadataFactory.get_provider_by_id(plugin_id)
+    except ValueError:
+        return f"플러그인 '{plugin_id}'을(를) 찾을 수 없습니다.", 404
+
+    handler = getattr(provider, 'handle_oauth_callback', None)
+    if not callable(handler):
+        return f"'{plugin_id}' 플러그인은 OAuth 콜백을 지원하지 않습니다.", 400
+
+    try:
+        result = handler(db_type, code, state, error) or {}
+    except Exception as e:
+        result = {'success': False, 'message': f'콜백 처리 중 오류: {e}'}
+
+    ok = bool(result.get('success'))
+    message = result.get('message') or ('연결이 완료되었습니다.' if ok else '연결에 실패했습니다.')
+    color = '#1db954' if ok else '#e74c3c'
+    return f"""<!doctype html><html><head><meta charset="utf-8"><title>연결 결과</title></head>
+<body style="font-family:sans-serif;background:#111;color:#eee;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+  <div style="text-align:center;padding:0 1.5rem;">
+    <h2 style="color:{color};">{message}</h2>
+    <p>이 창(탭)을 닫고 앱으로 돌아가셔도 됩니다.</p>
+  </div>
+</body></html>"""

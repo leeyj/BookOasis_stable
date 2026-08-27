@@ -1,0 +1,244 @@
+.sm-wrap {
+  padding: 1.25rem;
+  color: var(--app-text-primary);
+}
+
+.sm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.sm-header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.sm-header-title i.fa-spotify {
+  font-size: 2.2rem;
+  color: #1db954;
+}
+
+.sm-header-title h2 {
+  margin: 0;
+  font-size: 1.3rem;
+  color: var(--app-text-primary);
+}
+
+.sm-header-title p {
+  margin: 0.15rem 0 0;
+  font-size: 0.88rem;
+  color: var(--app-text-muted);
+}
+
+.sm-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.sm-btn {
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.sm-btn-ghost {
+  background: var(--app-bg-card);
+  color: var(--app-text-secondary);
+}
+
+.sm-btn-ghost:hover {
+  background: var(--app-bg-card-hover);
+}
+
+.sm-btn-primary {
+  background: #1db954;
+  color: #ffffff;
+  border-color: #1db954;
+}
+
+.sm-btn-primary:hover {
+  background: #1ed760;
+}
+
+.sm-btn-ghost.active {
+  background: #1db954;
+  border-color: #1db954;
+  color: #ffffff;
+}
+
+.sm-mood-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.sm-mood-chip {
+  border: 1px solid var(--app-border);
+  background: var(--app-bg-card);
+  color: var(--app-text-secondary);
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.sm-mood-chip:hover {
+  background: var(--app-bg-card-hover);
+}
+
+.sm-mood-chip.active {
+  background: #1db954;
+  border-color: #1db954;
+  color: #ffffff;
+}
+
+.sm-search-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.sm-search-bar select,
+.sm-search-bar input {
+  background: var(--app-input-bg);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-primary);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+}
+
+.sm-search-bar input {
+  flex: 1;
+  min-width: 200px;
+}
+
+.sm-card-play {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 50%;
+  background: #1db954;
+  color: #fff;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.sm-card-cover {
+  position: relative;
+}
+
+.sm-card:hover .sm-card-play {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.sm-status {
+  color: var(--app-text-muted);
+  padding: 1.5rem 0;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.sm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.sm-card {
+  background: var(--app-bg-card);
+  border: 1px solid var(--app-border);
+  border-radius: 10px;
+  overflow: hidden;
+  text-decoration: none;
+  color: var(--app-text-primary);
+  display: flex;
+  flex-direction: column;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.sm-card:hover {
+  background: var(--app-bg-card-hover);
+  transform: translateY(-2px);
+}
+
+.sm-card-cover {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: var(--app-bg-sidebar);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.sm-card-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sm-card-cover i {
+  font-size: 2rem;
+  color: var(--app-text-muted);
+}
+
+.sm-card-body {
+  padding: 0.65rem 0.75rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.sm-card-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: inherit;
+  text-decoration: none;
+}
+
+.sm-card-title:hover {
+  text-decoration: underline;
+}
+
+.sm-card-sub {
+  font-size: 0.8rem;
+  color: var(--app-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sm-card-meta {
+  font-size: 0.75rem;
+  color: var(--app-accent);
+  margin-top: 0.15rem;
+}

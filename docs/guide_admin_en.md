@@ -155,3 +155,30 @@ The official MariaDB image defaults `innodb_buffer_pool_size` to just **128MB**.
   ```sql
   SHOW VARIABLES LIKE 'innodb_buffer_pool_size';
   ```
+
+---
+
+## 9. rclone VFS Mount Tuning (Google Drive & other remote libraries)
+
+When a library's physical path is a remote drive (Google Drive, etc.) mounted via rclone VFS, the **rclone mount options** — separate from BookOasis's own offset-based page streaming — drive a large part of perceived loading speed. With `--vfs-cache-mode full`, rclone caches files locally as sparse files and fetches only the accessed portion from the remote in chunks; if that chunk size is smaller than your typical book file, reading through a single book can trigger a fresh remote fetch every time you cross a chunk boundary.
+
+### ① Chunk doubling and perceived loading
+rclone starts at `--vfs-read-chunk-size` (default 128M; a common custom value is 32M) and doubles the chunk size on every subsequent read past the current chunk (up to `--vfs-read-chunk-size-limit`), issuing a new remote Range request each time. For example, reading a 150–200MB comic archive start to finish with a 32M starting chunk:
+
+```
+32M → +64M (cumulative 96M) → +128M (cumulative 224M, covers to EOF)
+```
+
+That's **3 separate remote requests**, each one showing up to the user as "loading again" mid-read.
+
+### ② Recommended setting
+* First check your library's typical file size distribution (e.g. most manga/webtoon zips being in the 100–200MB range).
+* Raising `--vfs-read-chunk-size` well above that (e.g. `256M`) lets most books get fully cached in a **single** request, effectively eliminating mid-read loading.
+* Smaller files still only pull as many bytes as they actually contain (chunk size is a ceiling, not a fixed download), so there's no bandwidth waste.
+* `--vfs-read-chunk-size-limit` and `--vfs-cache-max-size` are separate settings and don't need to change — this issue comes from the *starting* chunk size being too small, not from the doubling ceiling or total cache size.
+
+### ③ How to apply
+Changing the mount option requires **restarting the rclone mount process** (this is a system-level rclone setting, not a BookOasis config). If you manage the mount yourself, adjust `--vfs-read-chunk-size` in the launch command or systemd unit and restart the mount. A restart can affect file handles that are open at that moment, so apply it during low-traffic hours.
+
+> [!NOTE]
+> The Google Drive API does not support multi-range requests (`Range: bytes=A-B,C-D` in a single request) — it explicitly rejects them with `501 Not Implemented` (verified empirically). So raising the chunk size is the only way to reduce the number of chunk requests per book.

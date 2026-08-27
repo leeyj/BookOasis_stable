@@ -180,6 +180,129 @@ class StreamPageService:
             except Exception as r_err:
                 print(f"[Redis Cache Get ERROR] {r_err}")
 
+        # [IMGDIR Path] 폴더 이미지 직접 스트리밍
+        #
+        # 아래 IMGDIR/Fast Path 두 경로는 호출마다 자신만의 파일 핸들을 열거나(로컬 seek),
+        # 순수 HTTP Range 요청만 한다 — 공유 상태를 만지지 않으므로 파일 단위 락 없이도
+        # 스레드 안전하다. 예전에는 이 두 경로까지 get_zip_read_lock()으로 감싸서, 같은 책의
+        # 여러 페이지 요청(서버 자체 프리페치 스레드풀이든 뷰어의 병렬 프리로드든)이 실제로는
+        # 한 번에 한 페이지씩 완전 직렬로만 처리됐다 — 병렬화를 아무리 늘려도 이 락 앞에서
+        # 전부 줄을 서는 병목이었다. 락이 꼭 필요한 건 [Fallback Path]뿐이다: zip_cache에
+        # 캐싱된 동일 zipfile.ZipFile 인스턴스를 여러 스레드가 동시에 .read()하면 내부 파일
+        # 포인터 상태가 꼬일 수 있기 때문.
+        if file_path.lower().endswith('.imgdir'):
+            folder_path = os.path.dirname(file_path)
+            img_files = get_imgdir_files(folder_path)
+            if page_idx < 0 or page_idx >= len(img_files):
+                return None
+
+            target = img_files[page_idx]
+            try:
+                with open(target, 'rb') as f:
+                    data = f.read()
+                mime, _ = mimetypes.guess_type(target)
+                mime = mime or 'image/jpeg'
+                result = (data, mime)
+                image_cache.put(cache_key, result, len(data))
+
+                # Redis 캐시 저장
+                if redis_cache_key:
+                    try:
+                        from utils.redis_helper import redis_set
+                        import base64
+                        import json
+                        payload = {
+                            'mime': mime,
+                            'data': base64.b64encode(data).decode('utf-8')
+                        }
+                        redis_set(redis_cache_key, json.dumps(payload), ex=3600)
+                    except Exception as r_err:
+                        print(f"[Redis Cache Put ERROR] {r_err}")
+
+                if not is_prefetch and book_id is not None:
+                    StreamPageService._trigger_background_prefetch(file_path, page_idx, db_type, book_id)
+                return result
+            except Exception as e:
+                print(f"[StreamPageService] IMGDIR page extract fail [{target}]: {e}")
+                return None
+
+        # [Fast Path] Zip 오프셋 기반 부분 스트리밍 가속 기동
+        if book_id is not None:
+            try:
+                from repositories.book_offset_repository import BookOffsetRepository
+                row = BookOffsetRepository.get_book_offset(db_type, book_id, page_idx)
+
+                if row:
+                    local_header_offset = row['local_header_offset']
+                    compress_size = row['compress_size']
+                    file_size = row['file_size']
+                    compress_type = row['compress_type']
+                    target_filename = row['filename']
+
+                    raw_bytes = None
+                    if os.path.exists(file_path):
+                        with open(file_path, 'rb') as f:
+                            # 1) 로컬 파일 헤더 분석
+                            f.seek(local_header_offset)
+                            header = f.read(30)
+                            if len(header) == 30:
+                                fn_len = int.from_bytes(header[26:28], 'little')
+                                extra_len = int.from_bytes(header[28:30], 'little')
+                                data_offset = local_header_offset + 30 + fn_len + extra_len
+
+                                # 2) 실제 데이터 조각 Seek & Read
+                                f.seek(data_offset)
+                                raw_bytes = f.read(compress_size)
+                    else:
+                        # 로컬에 파일이 없는 경우(구글 드라이브 gdrive:// 가상 경로) — 전체를
+                        # 다운로드하지 않고, 이 페이지의 압축 바이트만 Range 요청으로 받아온다.
+                        # (row에 스캔 시점 검증된 data_offset이 있으면 1번, 없으면 기존처럼
+                        # 헤더 프로브 + 데이터 조회 2번의 부분 요청)
+                        from utils.drive_helper import is_gdrive_url, split_gdrive_file_id, fetch_gdrive_page_bytes
+                        if is_gdrive_url(file_path):
+                            _, gdrive_file_id = split_gdrive_file_id(file_path)
+                            if gdrive_file_id:
+                                raw_bytes = fetch_gdrive_page_bytes(gdrive_file_id, local_header_offset, compress_size, data_offset=row.get('data_offset'))
+
+                    if raw_bytes is not None:
+                        img_data = None
+                        if compress_type == 0:  # ZIP_STORED
+                            img_data = raw_bytes
+                        elif compress_type == 8:  # ZIP_DEFLATED
+                            import zlib
+
+                            img_data = zlib.decompress(raw_bytes, -zlib.MAX_WBITS)
+
+                        if img_data is not None:
+                            mime, _ = mimetypes.guess_type(target_filename)
+                            mime = mime or 'image/jpeg'
+                            result = (img_data, mime)
+                            image_cache.put(cache_key, result, len(img_data))
+
+                            # Redis 캐시 저장
+                            if redis_cache_key:
+                                try:
+                                    from utils.redis_helper import redis_set
+                                    import base64
+                                    import json
+                                    payload = {
+                                        'mime': mime,
+                                        'data': base64.b64encode(img_data).decode('utf-8')
+                                    }
+                                    redis_set(redis_cache_key, json.dumps(payload), ex=3600)
+                                except Exception as r_err:
+                                    print(f"[Redis Cache Put ERROR] {r_err}")
+
+                            if not is_prefetch and book_id is not None:
+                                StreamPageService._trigger_background_prefetch(file_path, page_idx, db_type, book_id)
+                            return result
+            except Exception as ex_offset:
+                print(
+                    f"[Offset-SpeedRun FAIL] {os.path.basename(file_path)} [{page_idx}]: {ex_offset} (Fallback executed)"
+                )
+
+        # [Fallback Path] — 오프셋 미스캔 도서 등, 여기부터는 공유 zipfile.ZipFile 인스턴스를
+        # 만지므로 파일 단위 락으로 동시 .read() 충돌을 막는다.
         with get_zip_read_lock(file_path):
             cached = image_cache.get(cache_key)
             if cached is not None:
@@ -187,118 +310,6 @@ class StreamPageService:
                     StreamPageService._trigger_background_prefetch(file_path, page_idx, db_type, book_id)
                 return cached
 
-            # [IMGDIR Path] 폴더 이미지 직접 스트리밍
-            if file_path.lower().endswith('.imgdir'):
-                folder_path = os.path.dirname(file_path)
-                img_files = get_imgdir_files(folder_path)
-                if page_idx < 0 or page_idx >= len(img_files):
-                    return None
-
-                target = img_files[page_idx]
-                try:
-                    with open(target, 'rb') as f:
-                        data = f.read()
-                    mime, _ = mimetypes.guess_type(target)
-                    mime = mime or 'image/jpeg'
-                    result = (data, mime)
-                    image_cache.put(cache_key, result, len(data))
-                    
-                    # Redis 캐시 저장
-                    if redis_cache_key:
-                        try:
-                            from utils.redis_helper import redis_set
-                            import base64
-                            import json
-                            payload = {
-                                'mime': mime,
-                                'data': base64.b64encode(data).decode('utf-8')
-                            }
-                            redis_set(redis_cache_key, json.dumps(payload), ex=3600)
-                        except Exception as r_err:
-                            print(f"[Redis Cache Put ERROR] {r_err}")
-                            
-                    if not is_prefetch and book_id is not None:
-                        StreamPageService._trigger_background_prefetch(file_path, page_idx, db_type, book_id)
-                    return result
-                except Exception as e:
-                    print(f"[StreamPageService] IMGDIR page extract fail [{target}]: {e}")
-                    return None
-
-            # [Fast Path] Zip 오프셋 기반 부분 스트리밍 가속 기동
-            if book_id is not None:
-                try:
-                    from repositories.book_offset_repository import BookOffsetRepository
-                    row = BookOffsetRepository.get_book_offset(db_type, book_id, page_idx)
-
-                    if row:
-                        local_header_offset = row['local_header_offset']
-                        compress_size = row['compress_size']
-                        file_size = row['file_size']
-                        compress_type = row['compress_type']
-                        target_filename = row['filename']
-
-                        raw_bytes = None
-                        if os.path.exists(file_path):
-                            with open(file_path, 'rb') as f:
-                                # 1) 로컬 파일 헤더 분석
-                                f.seek(local_header_offset)
-                                header = f.read(30)
-                                if len(header) == 30:
-                                    fn_len = int.from_bytes(header[26:28], 'little')
-                                    extra_len = int.from_bytes(header[28:30], 'little')
-                                    data_offset = local_header_offset + 30 + fn_len + extra_len
-
-                                    # 2) 실제 데이터 조각 Seek & Read
-                                    f.seek(data_offset)
-                                    raw_bytes = f.read(compress_size)
-                        else:
-                            # 로컬에 파일이 없는 경우(구글 드라이브 gdrive:// 가상 경로) — 전체를
-                            # 다운로드하지 않고, 이 페이지의 압축 바이트만 Range 요청으로 받아온다.
-                            # (로컬 파일 헤더 조회 + 데이터 조각 조회, 총 두 번의 부분 요청)
-                            from utils.drive_helper import is_gdrive_url, split_gdrive_file_id, fetch_gdrive_page_bytes
-                            if is_gdrive_url(file_path):
-                                _, gdrive_file_id = split_gdrive_file_id(file_path)
-                                if gdrive_file_id:
-                                    raw_bytes = fetch_gdrive_page_bytes(gdrive_file_id, local_header_offset, compress_size)
-
-                        if raw_bytes is not None:
-                            img_data = None
-                            if compress_type == 0:  # ZIP_STORED
-                                img_data = raw_bytes
-                            elif compress_type == 8:  # ZIP_DEFLATED
-                                import zlib
-
-                                img_data = zlib.decompress(raw_bytes, -zlib.MAX_WBITS)
-
-                            if img_data is not None:
-                                mime, _ = mimetypes.guess_type(target_filename)
-                                mime = mime or 'image/jpeg'
-                                result = (img_data, mime)
-                                image_cache.put(cache_key, result, len(img_data))
-
-                                # Redis 캐시 저장
-                                if redis_cache_key:
-                                    try:
-                                        from utils.redis_helper import redis_set
-                                        import base64
-                                        import json
-                                        payload = {
-                                            'mime': mime,
-                                            'data': base64.b64encode(img_data).decode('utf-8')
-                                        }
-                                        redis_set(redis_cache_key, json.dumps(payload), ex=3600)
-                                    except Exception as r_err:
-                                        print(f"[Redis Cache Put ERROR] {r_err}")
-
-                                if not is_prefetch and book_id is not None:
-                                    StreamPageService._trigger_background_prefetch(file_path, page_idx, db_type, book_id)
-                                return result
-                except Exception as ex_offset:
-                    print(
-                        f"[Offset-SpeedRun FAIL] {os.path.basename(file_path)} [{page_idx}]: {ex_offset} (Fallback executed)"
-                    )
-
-            # [Fallback Path]
             zf = get_zip_file_hybrid(file_path)
             if zf is None:
                 return None
@@ -315,7 +326,7 @@ class StreamPageService:
                 result = (data, mime)
 
                 image_cache.put(cache_key, result, len(data))
-                
+
                 # Redis 캐시 저장
                 if redis_cache_key:
                     try:

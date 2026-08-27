@@ -1077,7 +1077,8 @@ _SCHEMA_SQL = """
         local_header_offset INTEGER,
         compress_size INTEGER,
         file_size INTEGER,
-        compress_type INTEGER
+        compress_type INTEGER,
+        data_offset INTEGER
     );
 
     CREATE TABLE IF NOT EXISTS gdrive_book_copies (

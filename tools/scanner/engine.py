@@ -36,10 +36,47 @@ stop_requested = False
 
 
 def _is_db_locked_error(exc):
+    """SQLite 'database is locked'뿐 아니라 MariaDB의 lock-wait-timeout(1205)/
+    deadlock(1213)도 진짜 '일시적 경합'으로 인식해 재시도 대상으로 잡는다.
+    이 체크가 SQLite만 보던 예전에는, MariaDB에서 진짜 락 경합이 발생해도
+    항상 False로 판정되어 재시도 없이 즉시 실패 처리되는 별개 문제가 있었다."""
     try:
-        return isinstance(exc, sqlite3.OperationalError) and 'locked' in str(exc).lower()
+        if isinstance(exc, sqlite3.OperationalError) and 'locked' in str(exc).lower():
+            return True
+        msg = str(exc).lower()
+        if 'lock wait timeout' in msg or 'deadlock' in msg or 'try restarting transaction' in msg:
+            return True
+        try:
+            import pymysql
+            if isinstance(exc, pymysql.err.OperationalError):
+                code = exc.args[0] if exc.args else None
+                return code in (1205, 1213) or 'lock' in msg
+        except ImportError:
+            pass
+        return False
     except Exception:
         return False
+
+
+# MariaDB VARCHAR(N) 컬럼과 실제 길이 제한을 맞춘 스캐너 메타데이터 필드.
+# SQLite는 TEXT 컬럼이 길이 제한이 없어 조용히 통과하지만, 같은 값을 MariaDB로
+# 보내면 "Data too long for column ..."(1406)으로 INSERT/UPDATE 자체가 실패한다.
+# 스캔 중 사이드카(YAML/XML/JSON) 메타데이터의 author/genre 등에 길이 제한 없이
+# 긁어온 값을 그대로 흘려보내던 것이 원인 — 여기서 한 곳에서 안전하게 자른다.
+_METADATA_FIELD_MAX_LEN = {
+    'title': 500,
+    'series_name': 500,
+    'author': 500,
+    'isbn': 100,
+    'publisher': 255,
+    'release_date': 100,
+    'genre': 255,
+}
+
+
+def _clamp_text(value, max_len):
+    s = value if isinstance(value, str) else ('' if value is None else str(value))
+    return s[:max_len] if len(s) > max_len else s
 
 
 def _commit_with_retry(conn, context_label, max_attempts=12):
@@ -296,11 +333,16 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                 lib_id_int = int(d['library_id']) if d.get('library_id') is not None else None
                 update_data.append((
                     lib_id_int,
-                    d.get('series_name', ''),
+                    _clamp_text(d.get('series_name', ''), _METADATA_FIELD_MAX_LEN['series_name']),
                     d['cover_image'], d['cover_image'], d['cover_image'],
-                    meta.get('author',''), meta.get('isbn',''), meta.get('publisher',''), meta.get('link',''),
-                    score, score, meta.get('summary',''), meta.get('release_date',''),
-                    meta.get('genre',''), meta.get('tags',''),
+                    _clamp_text(meta.get('author', ''), _METADATA_FIELD_MAX_LEN['author']),
+                    _clamp_text(meta.get('isbn', ''), _METADATA_FIELD_MAX_LEN['isbn']),
+                    _clamp_text(meta.get('publisher', ''), _METADATA_FIELD_MAX_LEN['publisher']),
+                    meta.get('link',''),
+                    score, score, meta.get('summary',''),
+                    _clamp_text(meta.get('release_date', ''), _METADATA_FIELD_MAX_LEN['release_date']),
+                    _clamp_text(meta.get('genre', ''), _METADATA_FIELD_MAX_LEN['genre']),
+                    meta.get('tags',''),
                     d.get('file_mtime', 0.0), d.get('file_size', 0),
                     canonical_path(d['full_path'])
                 ))
@@ -316,11 +358,19 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     title, _ = os.path.splitext(d['filename'])
                 lib_id_int = int(d['library_id']) if d.get('library_id') is not None else None
                 insert_data.append((
-                    lib_id_int, title, d['series_name'], meta.get('author',''), meta.get('isbn',''),
+                    lib_id_int,
+                    _clamp_text(title, _METADATA_FIELD_MAX_LEN['title']),
+                    _clamp_text(d['series_name'], _METADATA_FIELD_MAX_LEN['series_name']),
+                    _clamp_text(meta.get('author', ''), _METADATA_FIELD_MAX_LEN['author']),
+                    _clamp_text(meta.get('isbn', ''), _METADATA_FIELD_MAX_LEN['isbn']),
                     canonical_path(d['full_path']), d['file_format'], 100 if d['file_format'] == 'epub' else 0,
-                    d['cover_image'], meta.get('publisher',''), meta.get('link',''),
-                    meta.get('score',0), meta.get('summary',''), meta.get('release_date',''),
-                    meta.get('genre',''), meta.get('tags',''),
+                    d['cover_image'],
+                    _clamp_text(meta.get('publisher', ''), _METADATA_FIELD_MAX_LEN['publisher']),
+                    meta.get('link',''),
+                    meta.get('score',0), meta.get('summary',''),
+                    _clamp_text(meta.get('release_date', ''), _METADATA_FIELD_MAX_LEN['release_date']),
+                    _clamp_text(meta.get('genre', ''), _METADATA_FIELD_MAX_LEN['genre']),
+                    meta.get('tags',''),
                     d.get('file_mtime', 0.0), d.get('file_size', 0)
                 ))
             bulk_insert_books(cur, insert_data)
@@ -437,7 +487,26 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     f"ins={len(pending_inserts)} upd={len(pending_updates)} folders={len(pending_folders)}"
                 )
                 if not is_final:
-                    break
+                    # 락 경합이 아닌 영구적 오류(예: "Data too long for column ..." 같은
+                    # 데이터 오류)는 아무리 다음 체크포인트로 미뤄도 절대 저절로 풀리지
+                    # 않는다. 예전에는 이런 경우도 "락 경합" 문구로 잘못 로그하고 그냥
+                    # pending 버퍼를 비우지 않은 채 True(성공)를 반환해버려서, 같은 배치가
+                    # 다음 체크포인트마다 같은 이유로 계속 실패를 반복하면서도 겉으로는 정상
+                    # 진행되는 것처럼 보이는 문제가 있었다(그 시점 이후 신규/변경 도서가
+                    # 전부 조용히 DB에 반영 안 됨 — 스캔 하나 전체가 사실상 죽어버림).
+                    # 이제는 이 배치만 명시적으로 버려서 그 오염이 이후 배치까지 전파되지
+                    # 않게 하고, 로그도 실제 원인 그대로 남긴 뒤 스캔 자체는 계속 진행한다
+                    # (한 폴더의 데이터 문제로 라이브러리 전체 스캔을 중단시키지 않기 위해).
+                    dropped_ins, dropped_upd, dropped_folders = len(pending_inserts), len(pending_updates), len(pending_folders)
+                    pending_inserts.clear()
+                    pending_updates.clear()
+                    pending_folders.clear()
+                    print(
+                        f"[Scanner ERROR] Non-retryable flush failure — dropping this batch "
+                        f"({dropped_ins} ins, {dropped_upd} upd, {dropped_folders} folders) and continuing scan. "
+                        f"Affected files were NOT saved to the DB this run: {e}"
+                    )
+                    return True
                 return False
             finally:
                 if gate_token:

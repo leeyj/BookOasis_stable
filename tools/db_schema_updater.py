@@ -366,6 +366,7 @@ CREATE TABLE IF NOT EXISTS book_offsets (
     compress_size BIGINT,
     file_size BIGINT,
     compress_type INT,
+    data_offset BIGINT,
     INDEX idx_offsets_book (book_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
@@ -663,6 +664,8 @@ def _ensure_mariadb_columns():
         ('media_video', 'video_episodes', 'container_verified', 'INT DEFAULT 0'),
         ('media_general', 'epub_bookmarks', 'percent', 'INT DEFAULT 0'),
         ('media_adult', 'epub_bookmarks', 'percent', 'INT DEFAULT 0'),
+        ('media_general', 'book_offsets', 'data_offset', 'BIGINT DEFAULT NULL'),
+        ('media_adult', 'book_offsets', 'data_offset', 'BIGINT DEFAULT NULL'),
     ]
 
     for db_name, tbl, col_name, col_def in required_columns:

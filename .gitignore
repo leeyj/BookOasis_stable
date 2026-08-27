@@ -18,6 +18,11 @@ db/*.db
 db/*.db-wal
 db/*.db-shm
 db/*.db-journal
+bo_relay_ss/*.db
+bo_relay_ss/*.db-wal
+bo_relay_ss/*.db-shm
+bo_relay_ss/*.db-journal
+bo_relay_ss/.venv/
 cache/*
 !cache/.gitkeep
 covers/*

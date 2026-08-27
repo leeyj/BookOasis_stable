@@ -127,13 +127,16 @@ function getWholePageObjectUrl(bookId, physicalIndex) {
     return Promise.resolve(blobCacheMap.get(cacheKey));
   }
   const url = FileLoader.getPageStreamUrl(physicalIndex);
-  return fetch(url)
+  // 지금 화면에 띄울 페이지라 최우선 — 동시에 출발하는 프리페치 워커들과 대역폭/커넥션을
+  // 두고 경쟁하면 안 되므로 Fetch Priority Hints로 브라우저에 우선순위를 명시한다
+  // (미지원 브라우저는 이 옵션을 그냥 무시하므로 별도 분기 불필요).
+  return fetch(url, { priority: 'high' })
     .then((res) => {
       if (!res.ok) throw new Error('Fetch fail');
       return res.blob();
     })
     .then((blob) => {
-      const activeBookId = state.currentBookId || (window.state ? window.state.currentBookId : null);
+      const activeBookId = state.activeBookId;
       if (activeBookId !== bookId) throw new Error('book switched');
       const objUrl = URL.createObjectURL(blob);
       blobCacheMap.set(cacheKey, objUrl);
@@ -416,7 +419,6 @@ export function loadComicPage() {
   if (!wrapper) return;
 
   const loadTrace = createComicLoadTrace({
-    bookId: state.currentBookId,
     activeBookId: state.activeBookId,
     currentPage: comicCurrentPage,
     totalPages: comicTotalPages,
@@ -666,6 +668,14 @@ export function loadComicPage() {
     const pageIndices = getComicPageIndices();
     loadTrace.log('page-mode render start', { pageIndices });
 
+    // 현재 페이지(들) 자체의 fetch를 기다리지 않고 다음 페이지 프리페치를 바로 같이 출발시킨다.
+    // 예전엔 현재 페이지 이미지가 로드 완료된 뒤(onload)에야 preloadNextPages()가 시작돼서,
+    // 프리페치 파이프라인이 항상 "현재 페이지 로딩 시간만큼" 늦게 출발했다 — 그래서 처음 펼친
+    // 페이지(들) 다음 페이지부터는 프리페치가 못 따라잡고 매번 로딩이 뜨는 패턴이 반복됐다.
+    // 지금은 현재 페이지 fetch와 다음 페이지 프리페치가 병렬로 같이 출발한다.
+    loadTrace.log('page-mode preload started in parallel with current page fetch', { pageIndices });
+    preloadNextPages();
+
     if (comicLoadingTimer) {
       clearTimeout(comicLoadingTimer);
       comicLoadingTimer = null;
@@ -676,12 +686,10 @@ export function loadComicPage() {
 
     let loadedCount = 0;
     const expectedLoads = pageIndices.length;
-    const hasTwoPageSpread = expectedLoads > 1;
     // 2쪽 보기 모드에서 전체 페이지가 홀수라 마지막 한 장만 남는 경우.
     // (전체 1페이지짜리 도서에서 첫 장을 단독 표시하는 경우는 제외 — 그건 화면 꽉 채움이 맞다)
     const isTwoPageTailSingle = (scrollMode !== 'scroll') && Settings.getComicPageStep() === 2
       && expectedLoads === 1 && comicCurrentPage > 0;
-    let earlyPreloadTriggered = false;
     const imageElements = [];
 
     // 기존 페이지 페어 요소가 이미 렌더링되어 떠 있는지 확인합니다.
@@ -724,11 +732,6 @@ export function loadComicPage() {
           loadedCount,
           expectedLoads
         });
-        if (!earlyPreloadTriggered && hasTwoPageSpread && loadedCount === 1) {
-          earlyPreloadTriggered = true;
-          loadTrace.log('page-mode early preload triggered', { pageIndex });
-          preloadNextPages();
-        }
         if (loadedCount === expectedLoads) {
           if (comicLoadingTimer) {
             clearTimeout(comicLoadingTimer);
@@ -774,10 +777,6 @@ export function loadComicPage() {
               setComicFitMode('height');
             }
           }
-
-          if (!earlyPreloadTriggered) {
-            preloadNextPages();
-          }
         }
       };
 
@@ -794,13 +793,13 @@ export function loadComicPage() {
       };
 
       // 🌟 Blob 캐시 맵에서 Object URL을 즉시 히트하여 브라우저 대기 및 지연 제거 (BookId 바인딩)
-      const currentBookId = state.currentBookId || (window.state ? window.state.currentBookId : null);
+      const currentBookId = state.activeBookId;
       if (splitModeActive) {
         const { physical, side } = splitVirtualIndex(pageIndex);
         loadTrace.log('page image (split) fetch start', { pageIndex, physical, side });
         getSplitCroppedImageUrl(currentBookId, pageIndex, physical, side)
           .then((url) => {
-            const activeBookId = state.currentBookId || (window.state ? window.state.currentBookId : null);
+            const activeBookId = state.activeBookId;
             if (activeBookId !== currentBookId) return;
             loadTrace.log('page image (split) crop ready', { pageIndex, physical, side });
             imgEl.src = url;
@@ -817,7 +816,7 @@ export function loadComicPage() {
         } else {
           loadTrace.log('page image fetch start', { pageIndex, cacheKey });
           getWholePageObjectUrl(currentBookId, pageIndex).then((url) => {
-            const activeBookId = state.currentBookId || (window.state ? window.state.currentBookId : null);
+            const activeBookId = state.activeBookId;
             if (activeBookId !== currentBookId) return;
             loadTrace.log('page image blob ready', { pageIndex });
             imgEl.src = url;
@@ -865,17 +864,20 @@ export function hideSeekbarTooltip() {
   if (tooltip) tooltip.classList.remove('visible');
 }
 
-async function startSequentialPreload(pageList) {
-  const currentBookId = state.currentBookId || (window.state ? window.state.currentBookId : null);
-  currentPreloadQueue = pageList;
-  if (isPreloading) return;
+// 서버 쪽 백그라운드 프리페치(stream_page_service.py)도 스레드풀 4개로 병렬 처리하므로
+// 클라이언트 큐도 같은 폭으로 맞춘다. 순수 직렬(1개씩)로 받으면 페이지당 왕복 지연이 있는
+// 원격(gdrive) 도서에서 빠르게 넘기는 속도를 못 따라가 "1~2페이지 이후 로딩"이 반복됐다.
+const PRELOAD_CONCURRENCY = 4;
 
-  isPreloading = true;
+async function _preloadWorker(currentBookId) {
   while (currentPreloadQueue.length > 0) {
+    // shift()는 동기 호출이라 await 지점이 끼어들기 전에 각 워커가 서로 다른 인덱스를 가져가므로
+    // 별도 락 없이도 워커 간 중복 소비가 발생하지 않는다.
     const nextIdx = currentPreloadQueue.shift();
+    if (nextIdx === undefined) break;
 
-    // 책이 닫혔거나 다른 책으로 전환되었다면 루프 즉시 탈출
-    const activeBookId = state.currentBookId || (window.state ? window.state.currentBookId : null);
+    // 책이 닫혔거나 다른 책으로 전환되었다면 워커 즉시 탈출
+    const activeBookId = state.activeBookId;
     if (activeBookId !== currentBookId) {
       break;
     }
@@ -888,12 +890,14 @@ async function startSequentialPreload(pageList) {
 
     try {
       const url = FileLoader.getPageStreamUrl(nextIdx);
-      const response = await fetch(url);
+      // 현재 페이지 fetch(priority: 'high')에 대역폭/커넥션 우선순위를 양보한다 —
+      // 프리페치를 현재 페이지와 병렬로 미리 출발시키되, 초기 로딩 자체가 느려지지 않도록.
+      const response = await fetch(url, { priority: 'low' });
       if (response.ok) {
         const blob = await response.blob();
-        
+
         // 비동기 fetch가 완료된 시점에 다시 한 번 책 전환 여부 체크
-        const postActiveBookId = state.currentBookId || (window.state ? window.state.currentBookId : null);
+        const postActiveBookId = state.activeBookId;
         if (postActiveBookId !== currentBookId) {
           break;
         }
@@ -905,7 +909,21 @@ async function startSequentialPreload(pageList) {
       console.error(`[Preload-Blob Fail] Page ${nextIdx}:`, e);
     }
   }
-  isPreloading = false;
+}
+
+async function startSequentialPreload(pageList) {
+  const currentBookId = state.activeBookId;
+  currentPreloadQueue = pageList;
+  if (isPreloading) return;
+
+  isPreloading = true;
+  try {
+    await Promise.all(
+      Array.from({ length: PRELOAD_CONCURRENCY }, () => _preloadWorker(currentBookId))
+    );
+  } finally {
+    isPreloading = false;
+  }
 }
 
 function preloadNextPages() {
@@ -931,7 +949,7 @@ function preloadNextPages() {
     }
   }
 
-  // 🌟 순차적 큐 기반 백그라운드 프리로드 시작
+  // 🌟 공유 큐 기반 병렬(4-워커) 백그라운드 프리로드 시작
   startSequentialPreload(pagesToLoad);
 }
 

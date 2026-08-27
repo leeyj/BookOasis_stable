@@ -1,0 +1,47 @@
+<div class="sm-wrap">
+  <div class="sm-header">
+    <div class="sm-header-title">
+      <i class="fa-brands fa-spotify"></i>
+      <div>
+        <h2>스포티파이 무드</h2>
+        <p id="sm-mood-label">지금 이 시간에 어울리는 플레이리스트를 불러오는 중...</p>
+      </div>
+    </div>
+    <div class="sm-header-actions">
+      <button id="sm-my-playlists-btn" class="sm-btn sm-btn-ghost" style="display:none;">
+        <i class="fa-solid fa-user"></i> 내 플레이리스트
+      </button>
+      <button id="sm-connect-btn" class="sm-btn sm-btn-primary" style="display:none;">
+        <i class="fa-brands fa-spotify"></i> Spotify 계정 연결
+      </button>
+      <button id="sm-disconnect-btn" class="sm-btn sm-btn-ghost" style="display:none;"
+        title="연결 해제 (참고: 환경설정 > 플러그인에서 이 플러그인 설정을 다시 저장하면 연결이 끊길 수 있습니다 - 그때는 연결 버튼을 다시 눌러주세요)">
+        <i class="fa-solid fa-link-slash"></i>
+      </button>
+      <button id="sm-refresh-btn" class="sm-btn sm-btn-ghost" title="새로고침">
+        <i class="fa-solid fa-arrows-rotate"></i>
+      </button>
+    </div>
+  </div>
+
+  <div id="sm-mood-picker" class="sm-mood-picker"></div>
+
+  <form id="sm-search-form" class="sm-search-bar">
+    <select id="sm-kind-select">
+      <option value="playlist">플레이리스트</option>
+      <option value="track">트랙</option>
+      <option value="artist">아티스트</option>
+      <option value="album">앨범</option>
+    </select>
+    <input id="sm-search-input" type="text" placeholder="곡, 아티스트, 플레이리스트 검색..." autocomplete="off">
+    <button type="submit" class="sm-btn sm-btn-primary">
+      <i class="fa-solid fa-magnifying-glass"></i> 검색
+    </button>
+    <button type="button" id="sm-clear-search-btn" class="sm-btn sm-btn-ghost" style="display:none;">
+      무드로 돌아가기
+    </button>
+  </form>
+
+  <div id="sm-status" class="sm-status" style="display:none;"></div>
+  <div id="sm-grid" class="sm-grid"></div>
+</div>

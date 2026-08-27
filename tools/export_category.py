@@ -366,7 +366,7 @@ def export_single_category(db_type, library_id, output_path=None):
                         cover_files_to_pack.add(norm_cand)
                         break
 
-            cursor.execute("SELECT page_idx, filename, local_header_offset, compress_size, file_size, compress_type FROM book_offsets WHERE book_id = ?", (book_id,))
+            cursor.execute("SELECT page_idx, filename, local_header_offset, compress_size, file_size, compress_type, data_offset FROM book_offsets WHERE book_id = ?", (book_id,))
             offset_rows = cursor.fetchall()
             if offset_rows:
                 offsets_payload[idx] = [dict(o) for o in offset_rows]

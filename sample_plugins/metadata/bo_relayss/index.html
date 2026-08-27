@@ -1,0 +1,64 @@
+<!-- Bootstrap Icons CDN -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+<div class="bo-relayss-container">
+    <!-- Header Controls & Input Bar (1줄 바) -->
+    <div class="bo-relayss-header">
+        <div class="bo-relayss-bar">
+            <!-- 왼쪽: 조회 버튼 -->
+            <button type="button" id="btnRelayRefresh" class="bo-btn bo-btn-outline">
+                <i class="bi bi-arrow-clockwise"></i> 조회
+            </button>
+            
+            <!-- 1줄 입력 폼: 명칭 | 구글 링크 | 등록 -->
+            <div class="bo-input-group">
+                <div class="bo-input-label"><i class="bi bi-tag-fill"></i> 명칭</div>
+                <input type="text" id="inputLinkTitle" class="bo-input" placeholder="예: 구글 드라이브 공유 폴더 #1">
+                
+                <div class="bo-input-label"><i class="bi bi-google"></i> 구글 링크</div>
+                <input type="url" id="inputGoogleUrl" class="bo-input" placeholder="https://drive.google.com/...">
+                
+                <button type="button" id="btnRegisterLink" class="bo-btn bo-btn-primary">
+                    <i class="bi bi-plus-circle-fill"></i> 등록
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2개 분할 화면 (상/하) -->
+    <div class="bo-relayss-split-view">
+        
+        <!-- 상단 화면: 내가 등록한 명칭 : 구글 링크 (옆에 휴지통으로 언제든 삭제) -->
+        <div class="bo-panel">
+            <div class="bo-panel-header">
+                <div class="bo-panel-title text-info">
+                    <i class="bi bi-bookmark-star-fill"></i> 내가 등록한 구글 링크 리스트
+                </div>
+                <span id="myLinksCount" class="bo-badge bo-badge-info">0개</span>
+            </div>
+            <div class="bo-panel-body" id="myLinksContainer">
+                <div class="bo-empty-state">
+                    <i class="bi bi-hourglass-split"></i>
+                    <p>데이터를 불러오는 중입니다...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 하단 화면 : bo.relayss에 등록된 구글 링크 리스트 -->
+        <div class="bo-panel">
+            <div class="bo-panel-header">
+                <div class="bo-panel-title text-warning">
+                    <i class="bi bi-globe2"></i> bo.relaySS 전체 등록 구글 링크 리스트
+                </div>
+                <span id="allLinksCount" class="bo-badge bo-badge-warning">0개</span>
+            </div>
+            <div class="bo-panel-body" id="allLinksContainer">
+                <div class="bo-empty-state">
+                    <i class="bi bi-hourglass-split"></i>
+                    <p>데이터를 불러오는 중입니다...</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>

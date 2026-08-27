@@ -1,4 +1,8 @@
 # CHANGELOG
+## v2.4.6
+- (feature) bo.relaySS 중계 서비스(`bo_relay_ss`) 및 카테고리 레벨 상/하 2분할 구글 드라이브 링크 공유 메타데이터 플러그인(`sample_plugins/metadata/bo_relayss`) 신규 추가 | add bo.relaySS relay service (`bo_relay_ss`) and category-level dual split-view Google Drive link sharing metadata plugin (`sample_plugins/metadata/bo_relayss`)
+- (improvement) 만화 뷰어 보기 기능 개선 — 페이지 로딩 지연 및 병목 다수 개선 | improve comic viewer page-loading performance — fixed several loading bottlenecks
+
 ## v2.4.5
 - (feature) EPUB/TXT 뷰어에 북마크 기능 추가 — 목차 패널에 "목차/북마크" 탭 신설, 현재 챕터·페이지(스크롤) 위치를 저장하고 클릭 한 번으로 정확한 위치까지 복원 | add bookmarks to the EPUB/TXT viewer — a new "TOC/Bookmarks" tab in the side panel saves the current chapter and page/scroll position, restoring the exact spot on click
 - (feature) 플러그인이 코어 Redis를 재사용해 외부 API 응답을 캐시할 수 있는 헬퍼(`cache_get`/`cache_set`/`cache_delete`) 추가, 플러그인 가이드 문서화 및 pixiv_ranking 샘플 플러그인에 적용 | add plugin-facing cache helpers (`cache_get`/`cache_set`/`cache_delete`) that reuse the core's Redis instance for caching external API responses, documented in the plugin guide and applied to the pixiv_ranking sample plugin

@@ -92,9 +92,9 @@ def save_book_offsets(cursor, book_id, filename, offsets_data):
     cursor.execute("DELETE FROM book_offsets WHERE book_id = %s", (book_id,))
     bulk_data = [(book_id, *offset) for offset in offsets_data]
     cursor.executemany("""
-        INSERT INTO book_offsets 
-        (book_id, page_idx, filename, local_header_offset, compress_size, file_size, compress_type)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO book_offsets
+        (book_id, page_idx, filename, local_header_offset, compress_size, file_size, compress_type, data_offset)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     """, bulk_data)
     
     cursor.execute("""
@@ -178,9 +178,9 @@ def bulk_save_book_offsets(cursor, offsets_data_list):
     cursor.executemany("DELETE FROM book_offsets WHERE book_id = %s", [(bid,) for bid in book_ids])
     
     cursor.executemany("""
-        INSERT INTO book_offsets 
-        (book_id, page_idx, filename, local_header_offset, compress_size, file_size, compress_type)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO book_offsets
+        (book_id, page_idx, filename, local_header_offset, compress_size, file_size, compress_type, data_offset)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     """, offsets_data_list)
     
     from collections import Counter

@@ -35,7 +35,7 @@ CREATE TABLE books (
 CREATE TABLE book_offsets (
     id INTEGER PRIMARY KEY AUTOINCREMENT, book_id INTEGER, page_idx INTEGER,
     filename TEXT, local_header_offset INTEGER, compress_size INTEGER,
-    file_size INTEGER, compress_type INTEGER
+    file_size INTEGER, compress_type INTEGER, data_offset INTEGER
 );
 CREATE TABLE user_progress (
     id INTEGER PRIMARY KEY AUTOINCREMENT, book_id INTEGER, user_id INTEGER,

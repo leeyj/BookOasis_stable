@@ -19,7 +19,7 @@ class BookOffsetRepository:
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT filename, local_header_offset, compress_size, file_size, compress_type
+            SELECT filename, local_header_offset, compress_size, file_size, compress_type, data_offset
             FROM book_offsets
             WHERE book_id = %s AND page_idx = %s
             """,

@@ -20,6 +20,7 @@ db/
 covers/
 cache/
 logs/
+bo_relay_ss/
 docs/archive
 docs/bug
 docs/history

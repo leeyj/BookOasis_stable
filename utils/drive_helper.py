@@ -515,18 +515,33 @@ def fetch_gdrive_zip_offsets(file_id, initial_tail=65536, max_tail=8 * 1024 * 10
     collect_zip_offsets_data()와 동일한 튜플 형식이라 그대로 book_offsets에 저장 가능하다."""
     import io
     import zipfile
-    from tools.scanner.offset import _offsets_from_zipfile
+    from tools.scanner.offset import _offsets_from_zipfile, resolve_data_offset_from_header_bytes
 
     tail_size = initial_tail
     while tail_size <= max_tail:
         tail_bytes, total_size = _gdrive_range_get(file_id, suffix=tail_size)
         buf = io.BytesIO()
-        buf.write(b'\x00' * max(0, total_size - len(tail_bytes)))
+        padding = max(0, total_size - len(tail_bytes))
+        buf.write(b'\x00' * padding)
         buf.write(tail_bytes)
         buf.seek(0)
         try:
             with zipfile.ZipFile(buf) as zf:
-                return _offsets_from_zipfile(zf), total_size
+                rows = _offsets_from_zipfile(zf)
+                # 이미지 자체는 보통 파일 앞~중간에 있어 로컬 헤더가 tail 버퍼 밖인 경우가
+                # 대부분이지만, tail 버퍼 범위 안(= padding 이후)에 걸리는 항목은 추가 요청
+                # 없이(이미 받아둔 바이트 그대로) data_offset을 검증해 채울 수 있다. 범위 밖은
+                # None으로 남겨 서빙 시점에 기존 2-왕복 헤더 프로브로 안전하게 폴백시킨다.
+                buf_bytes = buf.getvalue()
+                out = []
+                for page_idx, filename, header_offset, compress_size, file_size, compress_type in rows:
+                    data_offset = None
+                    if header_offset >= padding:
+                        data_offset = resolve_data_offset_from_header_bytes(
+                            header_offset, buf_bytes[header_offset:header_offset + 30]
+                        )
+                    out.append((page_idx, filename, header_offset, compress_size, file_size, compress_type, data_offset))
+                return out, total_size
         except zipfile.BadZipFile:
             tail_size *= 4
             continue
@@ -534,10 +549,21 @@ def fetch_gdrive_zip_offsets(file_id, initial_tail=65536, max_tail=8 * 1024 * 10
     return [], 0
 
 
-def fetch_gdrive_page_bytes(file_id, header_offset, compress_size):
+def fetch_gdrive_page_bytes(file_id, header_offset, compress_size, data_offset=None):
     """book_offsets에 저장된 오프셋으로, 파일 전체를 받지 않고 페이지 하나의 압축된
     원본 바이트만 Range로 받아온다. 압축 해제는 호출자(stream_page_service.py)가
-    기존 로컬 경로와 동일한 로직(compress_type 기준)으로 처리한다."""
+    기존 로컬 경로와 동일한 로직(compress_type 기준)으로 처리한다.
+
+    data_offset이 스캔 시점에 미리 검증되어 넘어오면(book_offsets.data_offset) 헤더
+    프로브 왕복을 완전히 스킵하고 데이터 Range 요청 1번으로 끝낸다. data_offset이 없거나
+    (구형 스캔 데이터, 스캔 시 계산 실패) 그 위치로 받은 데이터가 유효하지 않으면 기존
+    2-왕복(헤더 프로브 → 데이터) 방식으로 안전하게 폴백한다."""
+    if data_offset is not None:
+        page_bytes, _ = _gdrive_range_get(file_id, start=data_offset, end=data_offset + compress_size - 1)
+        if len(page_bytes) == compress_size:
+            return page_bytes
+        print(f"[gdrive_helper ⚠️] 사전 계산된 data_offset({data_offset})으로 받은 바이트 길이가 어긋나 헤더 프로브로 폴백합니다 (offset={header_offset})")
+
     import struct
 
     # 로컬 파일 헤더(고정 30바이트) + 파일명/추가필드 길이를 안전하게 커버하도록 256바이트 프로브
@@ -546,8 +572,8 @@ def fetch_gdrive_page_bytes(file_id, header_offset, compress_size):
     if sig != b'PK\x03\x04':
         raise ValueError(f'로컬 파일 헤더 시그니처가 올바르지 않습니다 (offset={header_offset})')
 
-    data_offset = header_offset + 30 + fname_len + extra_len
-    page_bytes, _ = _gdrive_range_get(file_id, start=data_offset, end=data_offset + compress_size - 1)
+    resolved_data_offset = header_offset + 30 + fname_len + extra_len
+    page_bytes, _ = _gdrive_range_get(file_id, start=resolved_data_offset, end=resolved_data_offset + compress_size - 1)
     return page_bytes
 
 

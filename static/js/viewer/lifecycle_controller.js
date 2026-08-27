@@ -9,7 +9,6 @@ import { flushProgress, resetPreloadState } from '../viewer_progress.js';
 import { setAnnotationUiEnabled } from './annotation_ui.js';
 
 let deps = {
-  loadCustomFontsList: () => {},
   initViewerSeekBar: () => {},
   syncHotspotPointerEvents: () => {},
   clearEpubViewer: () => {},
@@ -94,8 +93,10 @@ export function openReader(bookId, format, title, pagesRead, totalPages) {
   if (overlayComicFit) overlayComicFit.style.display = 'none';
   if (overlayTxtControls) overlayTxtControls.style.display = 'none';
 
-  deps.loadCustomFontsList();
-
+  // 폰트 목록은 관리자가 업로드할 때만 바뀌는 정적 정보라 페이지 최초 로드 시(viewer.js) 한 번만
+  // 받아오면 충분하다 — 예전엔 여기서 책을 열 때마다 매번 /api/media/fonts를 다시 호출하고
+  // <style>/<select>를 통째로 재빌드했는데, 하필 현재 페이지 fetch와 같은 타이밍이라 대역폭까지
+  // 나눠 먹는 완전히 불필요한 낭비였다.
   const savedFont = localStorage.getItem('viewer_font_family') || 'batang';
   const select = document.getElementById('viewer-font-select');
   if (select) select.value = savedFont;
