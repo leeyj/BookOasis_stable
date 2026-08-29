@@ -66,7 +66,6 @@ export function loadCustomFontsList() {
 
           // 기존 기본 옵션만 남기고 초기화
           select.innerHTML = `
-            <option value="batang">KoPub 바탕</option>
             <option value="gothic">나눔고딕</option>
             <option value="pretendard">Pretendard</option>
           `;
@@ -78,7 +77,7 @@ export function loadCustomFontsList() {
           });
 
           // 현재 선택된 폰트 복원
-          const savedFont = localStorage.getItem('viewer_font_family') || 'batang';
+          const savedFont = localStorage.getItem('viewer_font_family') || 'gothic';
           select.value = savedFont;
         }
         syncViewerThemeUI();

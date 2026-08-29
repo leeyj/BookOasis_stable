@@ -118,7 +118,6 @@ export function updateParagraphSpacing(val) {
 
 // 📌 뷰어 공통 사용 가능 폰트 메타데이터 정의
 export const VIEWER_FONTS = [
-  { name: 'batang', url: '/static/fonts/KoPubWorldBatang_Pro_Medium.woff2' },
   { name: 'gothic', url: '/static/fonts/NanumGothic.woff2' },
   { name: 'pretendard', url: '/static/fonts/Pretendard-Regular.woff2' }
 ];
@@ -130,9 +129,9 @@ export const VIEWER_FONTS = [
  * @param {HTMLElement} element - 적용 대상 엘리먼트 (옵션)
  * @returns {Promise<string>} 로드 완료된 폰트 패밀리 이름
  */
-export function loadAndApplyCustomFont(fontName, fontUrl, element) {
+export function loadAndApplyCustomFont(fontName, fontUrl, element, fallbackFamily = 'sans-serif') {
   const fontFaceName = `CustomFont_${fontName.replace(/\s+/g, '_')}`;
-  
+
   // 이미 로드되었는지 브라우저 폰트 셋 확인
   let exists = false;
   for (let f of document.fonts.values()) {
@@ -141,20 +140,20 @@ export function loadAndApplyCustomFont(fontName, fontUrl, element) {
       break;
     }
   }
-  
+
   if (exists) {
     if (element) {
-      element.style.fontFamily = `'${fontFaceName}', sans-serif`;
+      element.style.fontFamily = `'${fontFaceName}', ${fallbackFamily}`;
     }
     return Promise.resolve(fontFaceName);
   }
-  
+
   console.log(`[Viewer-Settings] Loading custom font: ${fontFaceName} from ${fontUrl}`);
   const fontFace = new FontFace(fontFaceName, `url("${fontUrl}")`);
   return fontFace.load().then(loadedFace => {
     document.fonts.add(loadedFace);
     if (element) {
-      element.style.fontFamily = `'${fontFaceName}', sans-serif`;
+      element.style.fontFamily = `'${fontFaceName}', ${fallbackFamily}`;
     }
     requestAnimationFrame(() => {
       const wrapper = document.getElementById('txt-scroll-wrapper');
@@ -171,9 +170,9 @@ export function loadAndApplyCustomFont(fontName, fontUrl, element) {
     return fontFaceName;
   }).catch(err => {
     console.error(`[Viewer-Settings] Failed to load custom font: ${fontName}`, err);
-    // 실패 시 일반 폰트 패밀리 적용
+    // 실패 시 폴백 폰트 패밀리 적용
     if (element) {
-      element.style.fontFamily = fontName;
+      element.style.fontFamily = fallbackFamily;
     }
     return fontName;
   });

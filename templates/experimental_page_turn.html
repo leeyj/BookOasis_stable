@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Page Turn 실험 (page-flip)</title>
+<script src="/static/lib/page-flip.min.js"></script>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; background: #14171c; color: #e6e8eb;
+    font-family: -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+    overflow: hidden;
+  }
+  #setup {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 12px; z-index: 50; background: #14171c;
+  }
+  #setup.hidden { display: none; }
+  #setup input, #setup select {
+    padding: 8px 10px; border-radius: 6px; border: 1px solid #3a3f47; background: #1e2229; color: #e6e8eb; font-size: 14px;
+  }
+  #setup button {
+    padding: 8px 16px; border-radius: 6px; border: none; background: #4d7cff; color: white; font-weight: 600; cursor: pointer;
+  }
+  #setup .hint { font-size: 12px; color: #8b93a1; max-width: 340px; text-align: center; }
+
+  #stage {
+    position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+  }
+  #book-container {
+    /* 실제 폭은 JS에서 스프레드/단일페이지 여부에 맞춰 계산해서 인라인으로 지정한다 (아래 computeLayout 참고) */
+    width: 560px;
+  }
+  #book { width: 100%; background: #0b0d11; box-shadow: 0 10px 40px rgba(0,0,0,0.5); border-radius: 4px; }
+
+  #hud {
+    position: fixed; left: 0; right: 0; bottom: 16px; display: none; align-items: center; justify-content: center;
+    gap: 14px; z-index: 20;
+  }
+  #hud .pill {
+    background: rgba(20,23,28,0.85); border: 1px solid #333844; border-radius: 999px; padding: 6px 14px; font-size: 13px; color: #c7ccd4;
+  }
+  #hud button {
+    width: 40px; height: 40px; border-radius: 50%; border: 1px solid #3a3f47; background: #1e2229; color: #e6e8eb;
+    font-size: 16px; cursor: pointer;
+  }
+  #hud button:disabled { opacity: 0.3; cursor: default; }
+
+  #tag { position: fixed; top: 10px; left: 12px; font-size: 11px; letter-spacing: .05em; color: #6b7280; z-index: 30; }
+</style>
+</head>
+<body>
+
+<div id="tag">EXPERIMENTAL · page-turn via page-flip (MIT, vendored, isolated — prod viewer unaffected)</div>
+
+<div id="setup">
+  <div style="font-size:16px; font-weight:600;">Page Turn 실험 뷰어</div>
+  <input id="input-book-id" type="text" inputmode="numeric" placeholder="book_id">
+  <select id="input-db-type">
+    <option value="general">general</option>
+    <option value="adult">adult</option>
+  </select>
+  <label style="font-size:12px; color:#8b93a1; display:flex; align-items:center; gap:6px;">
+    <input type="checkbox" id="input-rtl"> RTL (만화 우→좌 읽기, 페이지 배열만 반전하는 임시 처리)
+  </label>
+  <button id="btn-start">열기</button>
+  <div class="hint">이미지 기반(zip/cbz) 도서의 book_id를 입력하세요. 기존 /api/media/stream, /api/media/books/&lt;id&gt;/info API만 읽기 전용으로 사용하며, 프로덕션 뷰어 코드는 전혀 건드리지 않습니다. 페이지 넘김 애니메이션은 오픈소스 page-flip(MIT license, StPageFlip 후속) 라이브러리를 static/lib/에 vendoring해서 그대로 사용합니다.</div>
+</div>
+
+<div id="stage">
+  <div id="book-container">
+    <div id="book"></div>
+  </div>
+</div>
+
+<div id="hud">
+  <button id="btn-prev">&#8249;</button>
+  <span class="pill" id="page-info">- / -</span>
+  <button id="btn-next">&#8250;</button>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var bookId = null;
+  var dbType = 'general';
+  var rtl = false;
+  var totalPages = 0;
+  var pageFlip = null;
+
+  // 단일 페이지 기준 종횡비 (width:height). 실제 px가 아니라 비율로만 쓰인다.
+  var PAGE_W = 560;
+  var PAGE_H = 800;
+  var PAGE_ASPECT = PAGE_H / PAGE_W; // 1.4286
+  var MIN_PAGE_W = 340; // St.PageFlip settings.minWidth 와 반드시 일치시킬 것
+  var MAX_PAGE_W = 700; // St.PageFlip settings.maxWidth 와 반드시 일치시킬 것
+
+  var elSetup = document.getElementById('setup');
+  var elStage = document.getElementById('stage');
+  var elHud = document.getElementById('hud');
+  var elBookContainer = document.getElementById('book-container');
+  var elPageInfo = document.getElementById('page-info');
+  var elBtnPrev = document.getElementById('btn-prev');
+  var elBtnNext = document.getElementById('btn-next');
+
+  function pageUrl(idx) {
+    return '/api/media/stream?book_id=' + encodeURIComponent(bookId) + '&page_idx=' + idx + '&db_type=' + encodeURIComponent(dbType);
+  }
+
+  // 뷰포트 가로/세로를 모두 고려해 컨테이너 폭을 계산한다.
+  // page-flip은 컨테이너 폭이 2*minWidth 이상이면 스프레드(2페이지), 아니면 단일 페이지로 자동 전환하는데,
+  // 두 모드는 폭 대비 높이 계산식이 달라서(스프레드가 훨씬 납작함) CSS만으로는 동시에 안전하게 못 맞춘다.
+  // 그래서 여기서 두 모드의 결과 높이를 직접 계산해 뷰포트에 맞는 쪽을 고르고, 폭을 인라인으로 강제한다.
+  function computeContainerWidth() {
+    var availW = window.innerWidth * 0.94;
+    var availH = (window.innerHeight - 70) * 0.9; // HUD/태그 여백 대략 제외
+
+    var spreadWidth = Math.min(availW, 2 * (availH / PAGE_ASPECT));
+    var spreadPageWidth = spreadWidth / 2;
+
+    if (spreadPageWidth >= MIN_PAGE_W) {
+      return Math.min(spreadWidth, 2 * MAX_PAGE_W);
+    }
+    var portraitWidth = Math.min(availW, availH / PAGE_ASPECT);
+    return Math.min(portraitWidth, MAX_PAGE_W);
+  }
+
+  function applyLayout() {
+    elBookContainer.style.width = computeContainerWidth() + 'px';
+    if (pageFlip) pageFlip.update();
+  }
+
+  var resizeTimer = null;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(applyLayout, 100);
+  });
+
+  function displayPageNumber(internalIdx) {
+    // RTL은 이미지 배열 자체를 반전해서 넣었으므로, 실제 book_id 상의 페이지 번호로 되돌려서 표시
+    return rtl ? (totalPages - internalIdx) : (internalIdx + 1);
+  }
+
+  function updateHud(internalIdx) {
+    elPageInfo.textContent = displayPageNumber(internalIdx) + ' / ' + totalPages;
+    elBtnPrev.disabled = internalIdx <= 0;
+    elBtnNext.disabled = internalIdx >= totalPages - 1;
+  }
+
+  function start() {
+    var idInput = document.getElementById('input-book-id').value.trim();
+    if (!idInput) { alert('book_id를 입력하세요'); return; }
+    bookId = idInput;
+    dbType = document.getElementById('input-db-type').value;
+    rtl = document.getElementById('input-rtl').checked;
+
+    fetch('/api/media/books/' + encodeURIComponent(bookId) + '/info?type=' + encodeURIComponent(dbType))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data.success || !data.total_pages) {
+          alert('total_pages를 가져오지 못했습니다: ' + (data.error || 'unknown'));
+          return;
+        }
+        totalPages = data.total_pages;
+
+        var urls = [];
+        for (var i = 0; i < totalPages; i++) urls.push(pageUrl(i));
+        if (rtl) urls.reverse();
+
+        elSetup.classList.add('hidden');
+        elStage.style.display = 'flex';
+        elHud.style.display = 'flex';
+
+        applyLayout();
+
+        pageFlip = new St.PageFlip(document.getElementById('book'), {
+          width: PAGE_W,
+          height: PAGE_H,
+          size: 'stretch',
+          // 화면이 넓으면 2페이지 펼침(spread)으로, 좁으면 단일 페이지(portrait)로 자동 전환.
+          // 실제 전환 시점(2*minWidth)과 컨테이너 폭(computeContainerWidth)이 항상 같은 기준을
+          // 쓰도록 MIN_PAGE_W/MAX_PAGE_W 상수를 여기 그대로 사용한다.
+          minWidth: MIN_PAGE_W,
+          maxWidth: MAX_PAGE_W,
+          minHeight: MIN_PAGE_W * PAGE_ASPECT,
+          maxHeight: MAX_PAGE_W * PAGE_ASPECT,
+          maxShadowOpacity: 0.55,
+          showCover: true,
+          usePortrait: true,
+          mobileScrollSupport: false,
+          swipeDistance: 20
+        });
+
+        pageFlip.on('flip', function (e) { updateHud(e.data); });
+        pageFlip.loadFromImages(urls);
+        updateHud(0);
+      })
+      .catch(function (err) {
+        alert('요청 실패: ' + err);
+      });
+  }
+
+  elBtnPrev.addEventListener('click', function () { if (pageFlip) pageFlip.flipPrev(); });
+  elBtnNext.addEventListener('click', function () { if (pageFlip) pageFlip.flipNext(); });
+  window.addEventListener('keydown', function (e) {
+    if (!pageFlip) return;
+    if (e.key === 'ArrowRight') pageFlip.flipNext();
+    if (e.key === 'ArrowLeft') pageFlip.flipPrev();
+  });
+
+  document.getElementById('btn-start').addEventListener('click', start);
+  document.getElementById('input-book-id').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') start();
+  });
+})();
+</script>
+</body>
+</html>

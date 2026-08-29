@@ -353,8 +353,8 @@ stop() {
         rm -f "$PID_FILE"
     fi
 
-    # 잔존 gunicorn core:app 프로세스 소탕
-    PIDS=$(find_pids_by_pattern "gunicorn.*core:app")
+    # 잔존 gunicorn core:app 프로세스 소탕 (포트를 명시해 다른 포트의 테스트용 컨테이너 프로세스와 오매칭 방지)
+    PIDS=$(find_pids_by_pattern "gunicorn.*:5930.*core:app")
     if [ -n "$PIDS" ]; then
         echo "[*] 남아있는 미디어 Gunicorn 프로세스 정리 대상: $PIDS"
         for P in $PIDS; do
@@ -403,7 +403,7 @@ status() {
             echo "[-] 미디어 서버: 정지 상태 (오래된 PID 파일 존재)"
         fi
     else
-        PID=$(find_pids_by_pattern "gunicorn.*core:app" | head -n 1)
+        PID=$(find_pids_by_pattern "gunicorn.*:5930.*core:app" | head -n 1)
         if [ -n "$PID" ]; then
             echo "[+] 미디어 서버: 실행 중 (PID: $PID, PID 파일 없음)"
         else

@@ -1,17 +1,32 @@
+import { VIEWER_FONTS } from '../viewer_settings.js';
+
+// 내장 폰트 로드 실패 시(파일 누락/네트워크 오류) 되돌아갈 시스템 폰트 체인
+const BUILTIN_FONT_FALLBACKS = {
+  gothic: "'Nanum Gothic', 'Malgun Gothic', sans-serif",
+  pretendard: "'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+};
+
+// KoPub 바탕은 라이선스 이슈로 기본 번들 제공 중단 — 과거 이 값을 저장해둔
+// 사용자 설정이 깨지지 않도록 순수 CSS 폴백만 남겨둔다 (커스텀 업로드로 대체 권장)
+const LEGACY_FONT_FALLBACKS = {
+  batang: "'Nanum Myeongjo', serif",
+};
+
 export function applyFontFamilyToElement(element, fontKey, customFonts, loadAndApplyCustomFont) {
-  if (fontKey === 'batang') {
-    element.style.fontFamily = "'KoPub Batang', 'Nanum Myeongjo', serif";
-  } else if (fontKey === 'gothic') {
-    element.style.fontFamily = "'Nanum Gothic', 'Malgun Gothic', sans-serif";
-  } else if (fontKey === 'pretendard') {
-    element.style.fontFamily = "'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
+  const builtin = VIEWER_FONTS.find(f => f.name === fontKey);
+  if (builtin) {
+    loadAndApplyCustomFont(builtin.name, builtin.url, element, BUILTIN_FONT_FALLBACKS[fontKey]);
+    return;
+  }
+  if (LEGACY_FONT_FALLBACKS[fontKey]) {
+    element.style.fontFamily = LEGACY_FONT_FALLBACKS[fontKey];
+    return;
+  }
+  const found = (customFonts || []).find(f => f.name === fontKey);
+  if (found) {
+    loadAndApplyCustomFont(found.name, found.url, element);
   } else {
-    const found = (customFonts || []).find(f => f.name === fontKey);
-    if (found) {
-      loadAndApplyCustomFont(found.name, found.url, element);
-    } else {
-      element.style.fontFamily = fontKey;
-    }
+    element.style.fontFamily = fontKey;
   }
 }
 

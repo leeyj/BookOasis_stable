@@ -1,4 +1,9 @@
 # CHANGELOG
+## v2.4.8
+- (fix) 뷰어에서 시크바(진행 슬라이더)를 조작한 뒤 방향키를 누르면 페이지 전환이 아니라 슬라이더 값이 바뀌던 문제 수정 — 조작 종료 시 슬라이더 포커스를 해제 | fix arrow keys moving the seek slider instead of turning pages after interacting with the viewer's progress slider — slider is now blurred once the interaction ends
+- (fix) TXT/EPUB 뷰어 내장 폰트(나눔고딕/Pretendard) 선택이 실제로 적용되지 않던 문제 수정 — 이름만 지정되고 실제 폰트 파일을 로드하지 않아 기기에 해당 폰트가 없으면 조용히 기본 serif/sans-serif로 표시되던 버그, `loadAndApplyCustomFont`로 실제 로드하도록 수정 (폰트 파일은 `static/fonts/`에 별도 추가 필요) | fix built-in viewer fonts (Nanum Gothic/Pretendard) not actually applying in the TXT/EPUB viewer — the name was set without loading the real font file, silently falling back to default serif/sans-serif when not installed on the device; now loaded via `loadAndApplyCustomFont` (font files still need to be added under `static/fonts/`)
+- (breaking) 라이선스 문제로 기본 번들 폰트에서 "KoPub 바탕" 제외 — 필요하면 커스텀 폰트 업로드 기능으로 직접 추가 (기존에 저장된 사용자 설정은 시스템 폰트로 안전하게 폴백) | (breaking) removed "KoPub Batang" from the default bundled fonts due to licensing concerns — add it yourself via custom font upload if needed (existing user settings fall back safely to a system font)
+
 ## v2.4.7
 - (feature) 로컬 폴더 실시간 감지 플러그인(`sample_plugins/metadata/local_folder_watch`) 신규 추가 — 로컬 디스크 라이브러리 경로의 파일 변경(생성/삭제/이동)을 감지해 자동으로 스캔 큐에 등록 | add local folder real-time watch plugin (`sample_plugins/metadata/local_folder_watch`) — detects file changes (create/delete/move) in local-disk library paths and automatically queues a scan
 - (feature) 도서(권) 단위 커버 썸네일 정렬(왼쪽/중앙/오른쪽) 설정 추가 — 이중 페이지 스캔본처럼 표지가 한쪽으로 치우친 개별 권을 상세 페이지 권 목록/그리드에서 우클릭으로 보정 가능 | add per-book cover thumbnail alignment (left/center/right) — fix off-center covers on double-page scans from the volume list/grid via right-click

@@ -10,6 +10,14 @@ TIMESTAMP_REGEX = re.compile(r'^(?:\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]|\d{4}
 DEFAULT_ARCHIVE_MAX_FILES = 10
 DEFAULT_ARCHIVE_MAX_MB = 200
 
+LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO').upper()
+
+
+def debug(*args, **kwargs):
+    """LOG_LEVEL=DEBUG일 때만 출력되는 상세 로그. 운영 컨테이너에서는 기본적으로 무음."""
+    if LOG_LEVEL == 'DEBUG':
+        print('[DEBUG]', *args, **kwargs)
+
 
 def _read_nonnegative_int_env(name, default):
     try:

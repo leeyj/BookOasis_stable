@@ -92,5 +92,10 @@ export function initViewerSeekBar() {
         if (typeof fn === 'function') fn(slider, val);
       }
     }
+
+    // 시크바 조작 종료 후 포커스를 슬라이더에 남겨두면, 이어서 누르는 방향키가
+    // 페이지 전환(handleViewerKeydown)이 아니라 슬라이더 자체의 네이티브 값 변경으로
+    // 소비되어 "키보드로 페이지 전환이 안 된다"는 문제가 생긴다. 조작이 끝나면 포커스를 뗀다.
+    slider.blur();
   });
 }

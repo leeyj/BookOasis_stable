@@ -859,9 +859,9 @@ export function applyTxtSettings(options = {}) {
         element,
         fontKey,
         window.customFonts || [],
-        (name, url, target) => {
+        (name, url, target, fallbackFamily) => {
           import('./viewer_settings.js').then(m => {
-            m.loadAndApplyCustomFont(name, url, target);
+            m.loadAndApplyCustomFont(name, url, target, fallbackFamily);
           });
         }
       );
