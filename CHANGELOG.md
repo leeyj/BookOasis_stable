@@ -1,4 +1,7 @@
 # CHANGELOG
+## v2.4.9
+- (feature) 플러그인용 외부 스트림/이미지 프록시 API 신규 추가 — `getStreamProxyUrl`(HLS 플레이리스트 재작성 + 세그먼트 스트리밍, mixed-content/CORS 우회), `getProxyUrl`(범용 소형 응답 프록시), `getCachedImageUrl`(도메인 무관 외부 로고/썸네일 WebP 로컬 캐싱, 화이트리스트 불필요) | add plugin-facing external stream/image proxy APIs — `getStreamProxyUrl` (HLS playlist rewriting + segment streaming, bypasses mixed-content/CORS), `getProxyUrl` (generic small-response proxy), `getCachedImageUrl` (domain-agnostic external logo/thumbnail WebP caching, no whitelist required)
+
 ## v2.4.8
 - (fix) 뷰어에서 시크바(진행 슬라이더)를 조작한 뒤 방향키를 누르면 페이지 전환이 아니라 슬라이더 값이 바뀌던 문제 수정 — 조작 종료 시 슬라이더 포커스를 해제 | fix arrow keys moving the seek slider instead of turning pages after interacting with the viewer's progress slider — slider is now blurred once the interaction ends
 - (fix) TXT/EPUB 뷰어 내장 폰트(나눔고딕/Pretendard) 선택이 실제로 적용되지 않던 문제 수정 — 이름만 지정되고 실제 폰트 파일을 로드하지 않아 기기에 해당 폰트가 없으면 조용히 기본 serif/sans-serif로 표시되던 버그, `loadAndApplyCustomFont`로 실제 로드하도록 수정 (폰트 파일은 `static/fonts/`에 별도 추가 필요) | fix built-in viewer fonts (Nanum Gothic/Pretendard) not actually applying in the TXT/EPUB viewer — the name was set without loading the real font file, silently falling back to default serif/sans-serif when not installed on the device; now loaded via `loadAndApplyCustomFont` (font files still need to be added under `static/fonts/`)

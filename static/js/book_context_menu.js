@@ -210,6 +210,13 @@ export function showBookContextMenu(x, y, bookId, bookTitle, isVolumeDetail = fa
   const seriesName = String(context.seriesName || (isVolumeDetail ? state.detailSeriesName : '') || '').trim();
   currentTargetBook = { id: bookId, title: bookTitle, isVolumeDetail, ...context, seriesName };
 
+  // "페이지 넘김으로 보기(실험적)"는 이미지 기반 만화(zip/cbz)에서만 의미가 있음
+  const pageTurnItem = document.getElementById('ctx-page-turn-book');
+  if (pageTurnItem) {
+    const fmt = String(context.fileFormat || '').toLowerCase();
+    pageTurnItem.style.display = (fmt === 'zip' || fmt === 'cbz') ? '' : 'none';
+  }
+
   const addSeriesItem = document.getElementById('ctx-add-series-to-collection');
   if (addSeriesItem) {
     addSeriesItem.style.display = seriesName ? '' : 'none';
@@ -319,6 +326,15 @@ export async function triggerBookContextPluginAction(pluginId, actionId) {
     vm.showToast('플러그인 작업 실행 중 오류가 발생했습니다.', 'error');
   }
 }
+
+export function triggerPageTurnAction() {
+  if (!currentTargetBook || !currentTargetBook.id) return;
+  const url = '/experimental/page-turn?book_id=' + encodeURIComponent(currentTargetBook.id) +
+    '&db_type=' + encodeURIComponent(state.currentLibraryType || 'general') + '&format=comic';
+  window.open(url, '_blank');
+  closeBookContextMenu();
+}
+window.triggerPageTurnAction = triggerPageTurnAction;
 
 export async function triggerScanSingleBookAction() {
   if (!currentTargetBook || !currentTargetBook.id) return;
@@ -483,7 +499,8 @@ function resolveBookContextTarget(event) {
   const parsedLibraryId = Number.parseInt(rawLibraryId, 10);
   const libraryId = Number.isFinite(parsedLibraryId) ? parsedLibraryId : null;
   const coverAlign = card.dataset?.coverAlign || 'center';
-  return { id: parsedId, title, isVolumeDetail, markUnreadScope, seriesName, libraryId, coverAlign };
+  const fileFormat = (card.dataset?.fileFormat || '').toLowerCase();
+  return { id: parsedId, title, isVolumeDetail, markUnreadScope, seriesName, libraryId, coverAlign, fileFormat };
 }
 
 // 카드별 개별 바인딩 누락/재렌더 타이밍 이슈가 있어도 우클릭 메뉴를 보장한다.
@@ -504,6 +521,7 @@ document.addEventListener('contextmenu', (event) => {
     seriesName: target.seriesName,
     libraryId: target.libraryId,
     coverAlign: target.coverAlign,
+    fileFormat: target.fileFormat,
   });
 }, true);
 
@@ -709,6 +727,7 @@ if (!window.__bookContextActionBound) {
     if (action === 'search-meta') return window.triggerSearchMetadataAction?.();
     if (action === 'add-to-collection') return window.triggerAddToCollectionAction?.();
     if (action === 'add-series-to-collection') return window.triggerAddSeriesToCollectionAction?.();
+    if (action === 'page-turn') return window.triggerPageTurnAction?.();
     if (action === 'mark-unread') return window.triggerMarkAsUnreadAction?.();
     if (action === 'cover-align') {
       const bookId = currentTargetBook?.id;

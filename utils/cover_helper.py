@@ -64,6 +64,65 @@ def get_or_cache_remote_poster_webp(poster_source, category, library_id=None, ti
         print(f"[Cover-Cache] Poster WebP conversion failed ({poster_source}): {e}")
         return None
 
+def get_or_cache_external_image_webp(url, category, max_bytes=2 * 1024 * 1024, timeout=5):
+    """플러그인이 클라이언트 요청마다 넘기는 임의의 외부 이미지 URL(방송사 로고 등)을
+    안전하게 받아와 WebP로 로컬 캐싱한다. get_or_cache_remote_poster_webp()와 달리
+    - 대상 URL이 (관리자가 스캔 시점에 등록한 값이 아니라) 매 요청마다 클라이언트가 보내는
+      임의 문자열이라 services/ssrf_guard.py로 사설/루프백 IP 여부를 검증하고,
+    - 응답 크기를 max_bytes로 캡해 과도한 다운로드를 막는다.
+    다만 이 리소스들은 도메인이 소스마다 제각각이라(방송사/채널별 CDN) 사용자 화이트리스트
+    등록까지 요구하면 실사용이 불가능해, 도메인 제한 없이 사설 IP만 차단한다(SSRF 최소 방어).
+    실패 시 None을 반환한다."""
+    if not url or not str(url).startswith(('http://', 'https://')):
+        return None
+
+    from tools.scanner.cover import COVERS_DIR
+    cache_dir = os.path.join(COVERS_DIR, category)
+    os.makedirs(cache_dir, exist_ok=True)
+
+    source_hash = hashlib.md5(str(url).encode('utf-8')).hexdigest()
+    cache_path = os.path.join(cache_dir, f"{source_hash}.webp")
+
+    if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
+        return cache_path
+
+    from services.ssrf_guard import (
+        SSRFBlockedError,
+        fetch_public_url_with_redirect_revalidation,
+        read_capped,
+    )
+
+    try:
+        response = fetch_public_url_with_redirect_revalidation(url, method='GET', timeout=timeout)
+    except SSRFBlockedError as e:
+        print(f"[Cover-Cache] External image blocked ({url}): {e.reason}")
+        return None
+    except Exception as e:
+        print(f"[Cover-Cache] External image fetch failed ({url}): {e}")
+        return None
+
+    try:
+        img_data = read_capped(response, max_bytes)
+    except SSRFBlockedError as e:
+        print(f"[Cover-Cache] External image too large ({url}): {e.reason}")
+        return None
+    finally:
+        response.close()
+
+    if not img_data:
+        return None
+
+    try:
+        import io
+        from PIL import Image
+        with Image.open(io.BytesIO(img_data)) as img:
+            img.save(cache_path, "WEBP", quality=80)
+        return cache_path
+    except Exception as e:
+        print(f"[Cover-Cache] External image WebP conversion failed ({url}): {e}")
+        return None
+
+
 def get_cover_image_with_t(cover_image, updated_at):
     """표지 이미지명에 캐시 갱신용 타임스탬프를 덧붙여 반환"""
     if not cover_image:

@@ -991,7 +991,42 @@ window.BookOasisPlugin.downloadToLibrary('https://example.com/book.epub', {
 - 지원 확장자(`.zip .cbz .epub .pdf .txt`)가 아니면 파일은 저장되지만 도서로 임포트되지는 않습니다(`imported_as_book: false`).
 - 반환값(Promise)은 `{ success, filename, imported_as_book, warning?, scan_error? }` 형태입니다.
 
-플러그인 Python 백엔드에서 직접 다운로드/프록시 로직을 새로 구현할 필요 없이 위 두 API를 재사용하십시오. 실제 사용 예시는 아래 참조 구현을 확인하십시오.
+### `window.BookOasisPlugin.getProxyUrl(url)` / `getStreamProxyUrl(url)`
+
+모달을 띄우지 않고 URL 하나를 직접 `fetch()`하거나 `<video>`/`hls.js`/`mpegts.js`에 넘기고 싶을 때 쓰는 저수준 API입니다. 둘 다 화이트리스트 검증 후 프록시 URL 문자열(`Promise<string|null>`)을 돌려주며, 화이트리스트에 없으면 토스트로 안내하고 `null`을 반환합니다.
+
+```js
+const proxyUrl = await window.BookOasisPlugin.getProxyUrl('http://example.com/data.json');
+if (proxyUrl) {
+  const res = await fetch(proxyUrl);
+  // ...
+}
+
+// 실시간 스트림(HLS 등) 재생용
+const streamUrl = await window.BookOasisPlugin.getStreamProxyUrl('http://example.com/live/index.m3u8');
+if (streamUrl) hls.loadSource(streamUrl); // 또는 videoEl.src = streamUrl
+```
+
+- **`getProxyUrl`** → `/api/webview/proxy` 경유. 응답 전체를 서버가 메모리에 캡(15MB)해서 반환하는 방식이라 텍스트/JSON/작은 파일용입니다. `openWebview()`가 내부적으로 쓰는 것과 동일한 프록시입니다.
+- **`getStreamProxyUrl`** → `/api/webview/hls-proxy` 경유. `.m3u8` 플레이리스트는 서버가 받아서 안의 세그먼트/키 URL을 전부 프록시 경유로 재작성해 돌려주고, 세그먼트(`.ts` 등) 요청은 버퍼링 없이 그대로 스트리밍 pass-through됩니다. `Range` 헤더도 업스트림에 전달됩니다. https로 서빙되는 페이지에서 http 스트림을 재생할 때(mixed-content 회피)나 대상 서버가 CORS를 열어주지 않을 때 이 함수를 쓰십시오. 응답 크기 제한이 없으므로(라이브 스트림 전제) 일반 파일 다운로드에는 쓰지 마십시오 — 그 경우 `getProxyUrl` 또는 `downloadToLibrary`를 쓰십시오.
+
+두 함수 모두 실제 네트워크 요청 전에 클라이언트 캐시로 화이트리스트를 먼저 확인해 왕복 없이 빠르게 안내하지만, 최종 검증은 항상 서버가 다시 수행합니다.
+
+### `window.BookOasisPlugin.getCachedImageUrl(url)`
+
+방송사 로고, 아티스트 썸네일, 팟캐스트 아트워크처럼 **소스마다 도메인이 제각각인 외부 이미지**를 `<img src>`에 바로 넣을 수 있는 로컬 캐시 URL 문자열로 바꿔줍니다. 위 두 함수와 달리 **화이트리스트 등록이 필요 없습니다** — 이미지는 실행 가능한 콘텐츠가 아니라 위험도가 낮고, 소스가 도메인 단위로 등록을 요구하기엔 너무 다양하기 때문입니다(서버는 대신 사설/루프백 IP만 차단합니다). 동기 함수라 `await` 없이 바로 씁니다.
+
+```js
+const img = document.createElement('img');
+img.src = window.BookOasisPlugin.getCachedImageUrl(channel.logo) || '/static/img/fallback.png';
+```
+
+- `/api/webview/logo-cache` 경유. 서버가 **최초 1회만** 원본을 받아 WebP로 변환해 로컬에 캐싱하고(캐시 키 = URL의 MD5 해시), 이후 동일 URL 요청은 로컬 파일을 그대로 서빙합니다 — 매번 원본 CDN에 다시 요청하지 않습니다.
+- 응답 크기는 2MB로 캡됩니다(로고/썸네일 전제). 일반 사진/도서 표지 등 큰 이미지에는 적합하지 않습니다.
+- `url`이 비어있거나 `http(s)`가 아니면(원본 소스의 `"None"` 같은 placeholder 문자열 포함) `null`을 반환하므로, 항상 폴백 아이콘/이미지를 준비해두십시오.
+- M3U/IPTV 플레이어뿐 아니라 mp3/팟캐스트 플레이어의 앨범 아트, RSS 리더의 파비콘 등 "여러 외부 도메인에서 자잘한 이미지를 긁어와야 하는" 모든 플러그인에 재사용할 수 있습니다.
+
+플러그인 Python 백엔드에서 직접 다운로드/프록시 로직을 새로 구현할 필요 없이 위 API들을 재사용하십시오. 실제 사용 예시는 아래 참조 구현을 확인하십시오.
 
 ### 참조 구현: `gutenberg_browser` 샘플 플러그인
 

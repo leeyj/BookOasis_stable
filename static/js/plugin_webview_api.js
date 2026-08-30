@@ -149,6 +149,64 @@ export async function openWebview(url) {
 }
 
 /**
+ * 화이트리스트 검증 후 일반 프록시(`/api/webview/proxy`) URL 문자열을 돌려준다.
+ * 모달을 띄우지 않고 텍스트/JSON 등 작은 리소스를 직접 fetch()하려는 플러그인용.
+ * 응답은 15MB로 캡되므로 미디어 스트림에는 쓰지 말 것 — 그 경우 getStreamProxyUrl()을 쓴다.
+ * @param {string} url
+ * @returns {Promise<string|null>} 화이트리스트에 없거나 URL이 잘못됐으면 null(토스트로 안내)
+ */
+export async function getProxyUrl(url) {
+  const host = extractHost(url);
+  if (!host) {
+    if (typeof window.showToast === 'function') window.showToast('URL 형식이 올바르지 않습니다.', 'error');
+    return null;
+  }
+  const patterns = await loadWhitelistCache();
+  if (!hostMatchesWhitelist(host, patterns)) {
+    showWhitelistPrompt(url);
+    return null;
+  }
+  return `/api/webview/proxy?url=${encodeURIComponent(url)}`;
+}
+
+/**
+ * 화이트리스트 검증 후 HLS/스트림 프록시(`/api/webview/hls-proxy`) URL 문자열을 돌려준다.
+ * .m3u8 플레이리스트는 서버가 내부 세그먼트 URL까지 전부 프록시 경유로 재작성해서 돌려주고,
+ * 세그먼트(.ts 등)는 버퍼링 없이 그대로 스트리밍된다 — hls.js/mpegts.js/<video src>에 그대로
+ * 넘기면 된다. https로 서빙되는 페이지에서 http 스트림을 재생할 때(mixed-content 회피)나
+ * 스트림 서버가 CORS를 안 열어준 경우에 이 함수를 쓴다.
+ * @param {string} url
+ * @returns {Promise<string|null>} 화이트리스트에 없거나 URL이 잘못됐으면 null(토스트로 안내)
+ */
+export async function getStreamProxyUrl(url) {
+  const host = extractHost(url);
+  if (!host) {
+    if (typeof window.showToast === 'function') window.showToast('URL 형식이 올바르지 않습니다.', 'error');
+    return null;
+  }
+  const patterns = await loadWhitelistCache();
+  if (!hostMatchesWhitelist(host, patterns)) {
+    showWhitelistPrompt(url);
+    return null;
+  }
+  return `/api/webview/hls-proxy?url=${encodeURIComponent(url)}`;
+}
+
+/**
+ * 방송사 로고처럼 도메인이 제각각인 외부 이미지를 <img src>에 바로 넣을 수 있는 로컬 캐시
+ * URL로 바꿔준다. 화이트리스트 검증을 요구하지 않는다(사설 IP만 서버에서 차단) — 매번
+ * 원본을 다시 받지 않도록 서버가 최초 1회만 WebP로 캐싱해서 이후엔 로컬 파일을 서빙한다.
+ * http(s) URL이 아니면(빈 값, 상대경로, "None" 등 원본 소스의 placeholder 문자열) null을 반환한다.
+ * @param {string} url
+ * @returns {string|null}
+ */
+export function getCachedImageUrl(url) {
+  const host = extractHost(url);
+  if (!host) return null;
+  return `/api/webview/logo-cache?url=${encodeURIComponent(url)}`;
+}
+
+/**
  * 플러그인이 외부 URL의 파일을 지정한 라이브러리로 다운로드+임포트한다.
  * @param {string} url
  * @param {{libraryId: number|string, dbType?: string}} options
@@ -206,3 +264,6 @@ export async function downloadToLibrary(url, options = {}) {
 window.BookOasisPlugin = window.BookOasisPlugin || {};
 window.BookOasisPlugin.openWebview = openWebview;
 window.BookOasisPlugin.downloadToLibrary = downloadToLibrary;
+window.BookOasisPlugin.getProxyUrl = getProxyUrl;
+window.BookOasisPlugin.getStreamProxyUrl = getStreamProxyUrl;
+window.BookOasisPlugin.getCachedImageUrl = getCachedImageUrl;

@@ -86,6 +86,39 @@ def validate_target_url(url, whitelist_patterns):
     return True, '', host
 
 
+def validate_public_http_url(url):
+    """도메인 화이트리스트 없이 scheme + 사설/루프백 IP 여부만 검사한다.
+    로고/아이콘처럼 위험도가 낮고 도메인이 지나치게 다양해(방송사마다 별개 CDN) 매번
+    사용자 화이트리스트 등록을 요구하면 실사용이 불가능한 리소스에 한해 사용한다.
+    반환: (ok: bool, error_code: str, host: str|None)"""
+    try:
+        parts = urlsplit(str(url).strip())
+    except Exception:
+        return False, 'invalid_url', None
+
+    if parts.scheme not in ('http', 'https'):
+        return False, 'invalid_scheme', None
+
+    host = parts.hostname
+    if not host:
+        return False, 'invalid_url', None
+
+    port = parts.port or (443 if parts.scheme == 'https' else 80)
+    try:
+        addr_infos = socket.getaddrinfo(host, port)
+    except Exception:
+        return False, 'dns_resolve_failed', host
+
+    if not addr_infos:
+        return False, 'dns_resolve_failed', host
+
+    for _family, _type, _proto, _canon, sockaddr in addr_infos:
+        if _is_unsafe_ip(sockaddr[0]):
+            return False, 'private_ip_resolved', host
+
+    return True, '', host
+
+
 def fetch_with_redirect_revalidation(url, whitelist_patterns, method='GET',
                                       max_redirects=3, timeout=DEFAULT_TIMEOUT,
                                       extra_headers=None):
@@ -102,6 +135,41 @@ def fetch_with_redirect_revalidation(url, whitelist_patterns, method='GET',
 
     for _ in range(max_redirects + 1):
         ok, reason, host = validate_target_url(current_url, whitelist_patterns)
+        if not ok:
+            raise SSRFBlockedError(reason, host=host)
+
+        response = requests.request(
+            method, current_url, timeout=timeout, allow_redirects=False,
+            stream=True, headers=headers
+        )
+
+        if response.status_code in (301, 302, 303, 307, 308):
+            location = response.headers.get('Location')
+            response.close()
+            if not location:
+                raise SSRFBlockedError('redirect_without_location')
+            current_url = urljoin(current_url, location)
+            continue
+
+        return response
+
+    raise SSRFBlockedError('too_many_redirects')
+
+
+def fetch_public_url_with_redirect_revalidation(url, method='GET', max_redirects=3,
+                                                 timeout=DEFAULT_TIMEOUT, extra_headers=None):
+    """fetch_with_redirect_revalidation의 화이트리스트-없는 버전 (validate_public_http_url 사용).
+    도메인 제한 없이 사설/루프백 IP만 차단한다 — 리다이렉트도 매 hop 재검증한다."""
+    if requests is None:
+        raise SSRFBlockedError('requests_unavailable')
+
+    current_url = url
+    headers = {'User-Agent': 'BookOasis-Webview/1.0'}
+    if extra_headers:
+        headers.update(extra_headers)
+
+    for _ in range(max_redirects + 1):
+        ok, reason, host = validate_public_http_url(current_url)
         if not ok:
             raise SSRFBlockedError(reason, host=host)
 

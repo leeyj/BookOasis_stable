@@ -766,6 +766,58 @@ BookOasis는 외부 수신 서버로 도서 이벤트를 `POST` 전송할 수 �
 
 ---
 
+### 플러그인용 외부 도메인 웹뷰 / 프록시 API (`plugin_webview_routes`)
+플러그인은 자체 Flask 라우트를 등록할 수 없으므로, 외부 URL을 서버에서 대신 fetch해야 하는 플러그인은 아래 코어 공용 엔드포인트를 재사용합니다. 클라이언트에서는 원시 엔드포인트 대신 `window.BookOasisPlugin.getProxyUrl()` / `getStreamProxyUrl()` / `openWebview()` / `downloadToLibrary()`를 쓰는 것이 정석입니다 (자세한 사용법은 [guide_plugins.md §10](./guide_plugins.md#10--외부-도메인-웹뷰--다운로드-api) 참고). 모든 요청은 요청자 본인이 [설정 > 외부 도메인] 탭에 등록한 화이트리스트 + SSRF 방어(`services/ssrf_guard.py`: 사설/루프백/링크로컬 IP 차단, 리다이렉트 매 hop 재검증)를 통과해야 합니다.
+
+#### `[GET]` `/api/webview/whitelist`
+* **설명**: 요청자 본인의 외부 도메인 화이트리스트 목록을 조회합니다.
+* **권한**: `@login_required`
+* **응답 예시 (200 OK)**: `{"success": true, "domains": [{"pattern": "example.com", "added_at": "2026-08-30T00:00:00Z"}]}`
+
+#### `[POST]` `/api/webview/whitelist`
+* **설명**: 도메인 패턴(`example.com` 또는 `*.example.com`)을 화이트리스트에 추가합니다. 이미 등록되어 있으면 멱등하게 성공 처리됩니다.
+* **권한**: `@login_required`
+* **요청 파라미터**: `{"domain": "example.com"}`
+
+#### `[DELETE]` `/api/webview/whitelist`
+* **설명**: 화이트리스트에서 도메인을 제거합니다(존재 여부와 무관하게 항상 성공).
+* **권한**: `@login_required`
+* **요청 파라미터**: `{"domain": "example.com"}` (쿼리스트링 `?domain=`도 허용)
+
+#### `[GET]` `/api/webview/proxy`
+* **설명**: URL 하나를 서버가 대신 fetch해서 그대로 반환하는 범용 프록시. HTML 응답이면 상대경로 자산이 원본 사이트 기준으로 풀리도록 `<base href="...">`를 자동 주입합니다. 텍스트/JSON/작은 파일용이며, 응답 본문 전체를 메모리에 15MB까지 캡해서 읽습니다 — 실시간 스트림에는 쓰지 마십시오(아래 `hls-proxy` 참고).
+* **권한**: `@login_required`
+* **쿼리 파라미터**: `url` (string, 필수) — 대상 URL (`http`/`https`만 허용)
+* **에러**: 화이트리스트 미등록(403), 사설 IP 해석(403), 응답 초과(413), scheme 오류(400) 등 — `{"success": false, "error": "<사유코드>", "message": "<한글 설명>"}`
+
+#### `[GET]` `/api/webview/hls-proxy`
+* **설명**: 실시간 스트림(HLS 등) 재생 전용 프록시. `.m3u8` 플레이리스트는 서버가 받아서 안의 세그먼트/키(`URI="..."`) URL을 전부 이 프록시 경유 URL로 재작성해 돌려주고, 세그먼트(`.ts` 등) 요청은 메모리 버퍼링 없이 그대로 스트리밍 pass-through됩니다. https로 서빙되는 페이지에서 http 스트림을 재생할 때(mixed-content 회피)나 대상 서버가 CORS를 열어주지 않는 경우에 사용합니다.
+* **권한**: `@login_required`
+* **쿼리 파라미터**: `url` (string, 필수) — 대상 `.m3u8`/세그먼트 URL
+* **요청 헤더**: `Range` (선택) — 지정 시 업스트림으로 그대로 전달됩니다.
+* **응답**: 플레이리스트는 재작성된 텍스트(`Content-Type: application/vnd.apple.mpegurl`, `Cache-Control: no-store`), 세그먼트는 원본 `Content-Type`을 유지한 채 스트리밍됩니다. 플레이리스트 텍스트 자체는 2MB로 캡되지만(세그먼트/미디어 바이너리는 캡 없음), 응답 크기 제한이 없으므로(라이브 스트림 전제) 일반 파일 다운로드에는 쓰지 마십시오.
+* **에러**: `/api/webview/proxy`와 동일한 사유코드 체계를 씁니다.
+* **참고 구현**: `test/m3u_player-main/m3u_player/script.js`
+
+#### `[GET]` `/api/webview/logo-cache`
+* **설명**: 방송사 로고/아티스트 썸네일처럼 소스마다 도메인이 제각각인 외부 이미지를 `<img src>`용 로컬 캐시 URL로 서빙합니다. 위 두 엔드포인트와 달리 **화이트리스트 등록이 필요 없습니다** — 이미지는 실행 가능한 콘텐츠가 아니라 위험도가 낮고, 도메인 단위 등록을 요구하면 실사용이 불가능하기 때문입니다. 대신 `services/ssrf_guard.py`(화이트리스트 없는 버전)로 사설/루프백 IP만 차단합니다. 서버는 URL당 **최초 1회만** 원본을 받아 WebP로 변환해 로컬(`covers/plugin_logo/<md5>.webp`)에 캐싱하고, 이후 동일 URL 요청은 로컬 파일을 그대로 서빙합니다(`send_cached_cover_file` — ETag/`Cache-Control: public, max-age=86400`).
+* **권한**: `@login_required`
+* **쿼리 파라미터**: `url` (string, 필수) — 대상 이미지 URL (`http`/`https`만 허용)
+* **응답**: 성공 시 WebP 이미지 바이너리. 실패 시(URL 오류, 사설 IP, 다운로드 실패, 2MB 초과 등) `{"success": false, "error": "fetch_failed", "message": "..."}` + 502.
+* **응답 크기 제한**: 2MB (로고/썸네일 전제 — 일반 사진/큰 이미지에는 부적합)
+* **재사용 예시**: M3U/IPTV 플레이어(방송사 로고)뿐 아니라 mp3/팟캐스트 플레이어의 앨범 아트, RSS 리더의 파비콘 등 여러 외부 도메인에서 자잘한 이미지를 긁어와야 하는 플러그인 전반에 재사용할 수 있습니다.
+
+---
+
+#### `[POST]` `/api/webview/download`
+* **설명**: URL의 파일을 서버가 대신 다운로드해 지정한 라이브러리의 물리 경로에 저장하고, 지원 확장자(`.zip .cbz .epub .pdf .txt`)면 즉시 스캐너로 임포트합니다.
+* **권한**: `@login_required` (+ 대상 `library_id`에 대한 사용자 접근 권한 필요, 실패 시 403)
+* **요청 파라미터**: `{"url": "https://...", "library_id": 12, "db_type": "general"}` (`db_type` 생략 시 `general`)
+* **응답 예시 (200 OK)**: `{"success": true, "filename": "book.epub", "imported_as_book": true}` — 지원 확장자가 아니면 `imported_as_book: false` + `warning: "unsupported_format"`, 임포트는 됐지만 스캔에 실패하면 `scan_error` 필드가 추가됩니다.
+* **응답 크기 제한**: 500MB
+
+---
+
 ## 🛡️ 9. 사용자 권한 관리 & 휴지통 API (`permissions` / `trash`)
 
 ### `[GET]` `/api/admin/permissions`

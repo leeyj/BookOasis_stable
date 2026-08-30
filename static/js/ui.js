@@ -129,6 +129,7 @@ export function createBookCard(item, options = {}) {
   if (item.is_author_group) card.dataset.isAuthorGroup = '1';
 
   const fmt = String(item.file_format || '').toLowerCase();
+  card.dataset.fileFormat = fmt;
   const hasTrackCount = Number(item.total_tracks || 0) > 0;
   const isAudiobook = !isVideo && (
     ['audiobook', 'audio', 'mp3', 'm4a', 'm4b', 'flac', 'aac', 'wav', 'ogg', 'opus'].includes(fmt) ||
@@ -332,6 +333,7 @@ export function createBookCard(item, options = {}) {
         markUnreadScope: options.markUnreadScope || 'book',
         seriesName: item.series_name || '',
         libraryId: item.library_id ?? null,
+        fileFormat: fmt,
       });
     }
   });
@@ -356,6 +358,7 @@ export function createBookCard(item, options = {}) {
             markUnreadScope: options.markUnreadScope || 'book',
             seriesName: item.series_name || '',
             libraryId: item.library_id ?? null,
+            fileFormat: fmt,
           });
         }
       });

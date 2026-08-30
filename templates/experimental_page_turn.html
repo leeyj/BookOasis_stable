@@ -49,6 +49,21 @@
   #hud button:disabled { opacity: 0.3; cursor: default; }
 
   #tag { position: fixed; top: 10px; left: 12px; font-size: 11px; letter-spacing: .05em; color: #6b7280; z-index: 30; }
+
+  #settings-panel {
+    position: fixed; right: 16px; bottom: 76px; width: 260px; z-index: 25;
+    background: rgba(20,23,28,0.95); border: 1px solid #333844; border-radius: 10px;
+    padding: 14px; display: none; flex-direction: column; gap: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  #settings-panel.open { display: flex; }
+  #settings-panel .row { display: flex; flex-direction: column; gap: 4px; }
+  #settings-panel .row-inline { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  #settings-panel label.title { font-size: 12px; color: #c7ccd4; }
+  #settings-panel input[type="range"] { width: 100%; }
+  #settings-panel .hint-small { font-size: 11px; color: #6b7280; }
+  #settings-panel .panel-header { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; color: #e6e8eb; }
+  #settings-panel .panel-close { cursor: pointer; color: #8b93a1; background: none; border: none; font-size: 14px; width: auto; height: auto; }
 </style>
 </head>
 <body>
@@ -62,6 +77,11 @@
     <option value="general">general</option>
     <option value="adult">adult</option>
   </select>
+  <select id="input-format">
+    <option value="comic">zip/cbz (만화, 지원됨)</option>
+    <option value="epub">epub (배관만 — 추후 지원 예정)</option>
+    <option value="txt">txt (배관만 — 추후 지원 예정)</option>
+  </select>
   <label style="font-size:12px; color:#8b93a1; display:flex; align-items:center; gap:6px;">
     <input type="checkbox" id="input-rtl"> RTL (만화 우→좌 읽기, 페이지 배열만 반전하는 임시 처리)
   </label>
@@ -73,12 +93,47 @@
   <div id="book-container">
     <div id="book"></div>
   </div>
+  <div id="unsupported-format-notice" style="display:none; text-align:center; color:#8b93a1; font-size:14px; max-width:360px;">
+    epub/txt 페이지 넘김은 추후 지원 예정입니다.<br>지금은 zip/cbz(만화)만 실제로 렌더링됩니다.
+  </div>
 </div>
 
 <div id="hud">
   <button id="btn-prev">&#8249;</button>
   <span class="pill" id="page-info">- / -</span>
   <button id="btn-next">&#8250;</button>
+  <button id="btn-settings-toggle" title="설정">&#9881;</button>
+</div>
+
+<div id="settings-panel">
+  <div class="panel-header">
+    <span>설정 (실험적)</span>
+    <button type="button" class="panel-close" id="btn-settings-close">&times;</button>
+  </div>
+
+  <div class="row">
+    <label class="title">시크바</label>
+    <input type="range" id="settings-seekbar" min="1" max="1" value="1" step="1">
+  </div>
+
+  <div class="row-inline">
+    <label class="title" for="settings-rtl">RTL (우→좌 읽기)</label>
+    <input type="checkbox" id="settings-rtl">
+  </div>
+
+  <div class="row-inline">
+    <label class="title" for="settings-single-page">1장 보기 강제</label>
+    <input type="checkbox" id="settings-single-page">
+  </div>
+
+  <div class="row">
+    <div class="row-inline">
+      <label class="title" for="settings-speed">넘김 속도</label>
+      <span class="hint-small" id="settings-speed-label">1000ms</span>
+    </div>
+    <input type="range" id="settings-speed" min="200" max="1800" step="100" value="1000">
+    <span class="hint-small">스페이스바로 넘길 때의 애니메이션 시간</span>
+  </div>
 </div>
 
 <script>
@@ -90,24 +145,74 @@
   var rtl = false;
   var totalPages = 0;
   var pageFlip = null;
+  var currentInternalIdx = 0;
+  var flippingTimeMs = 1000;
+  var forceSinglePage = false;
 
   // 단일 페이지 기준 종횡비 (width:height). 실제 px가 아니라 비율로만 쓰인다.
+  // 시작 시 첫 페이지 이미지의 실제 naturalWidth/naturalHeight로 갱신된다(measurePageAspect 참고) —
+  // 책마다 실제 페이지 비율이 다른데 고정값을 쓰면 화면 크기와 무관하게 여백/잘림이 생기던 원인이었다.
   var PAGE_W = 560;
   var PAGE_H = 800;
-  var PAGE_ASPECT = PAGE_H / PAGE_W; // 1.4286
+  var PAGE_ASPECT = PAGE_H / PAGE_W; // 실제 이미지 로드 전 임시 기본값 (1.4286)
   var MIN_PAGE_W = 340; // St.PageFlip settings.minWidth 와 반드시 일치시킬 것
-  var MAX_PAGE_W = 700; // St.PageFlip settings.maxWidth 와 반드시 일치시킬 것
+  // 데스크톱 큰 해상도에서 화면을 못 채우고 여백이 크게 남던 문제 수정 — 이전엔 700이라
+  // 스프레드 폭이 2*700=1400px에서 하드 캡되어 1490px 이상 화면에서는 화면이 넓어져도
+  // 책 크기가 그대로였다. St.PageFlip settings.maxWidth/maxHeight 와 반드시 일치시킬 것.
+  var MAX_PAGE_W = 1400;
 
   var elSetup = document.getElementById('setup');
   var elStage = document.getElementById('stage');
   var elHud = document.getElementById('hud');
   var elBookContainer = document.getElementById('book-container');
+  var elUnsupportedNotice = document.getElementById('unsupported-format-notice');
   var elPageInfo = document.getElementById('page-info');
   var elBtnPrev = document.getElementById('btn-prev');
   var elBtnNext = document.getElementById('btn-next');
+  var elSettingsToggle = document.getElementById('btn-settings-toggle');
+  var elSettingsPanel = document.getElementById('settings-panel');
+  var elSettingsClose = document.getElementById('btn-settings-close');
+  var elSettingsSeekbar = document.getElementById('settings-seekbar');
+  var elSettingsRtl = document.getElementById('settings-rtl');
+  var elSettingsSinglePage = document.getElementById('settings-single-page');
+  var elSettingsSpeed = document.getElementById('settings-speed');
+  var elSettingsSpeedLabel = document.getElementById('settings-speed-label');
 
   function pageUrl(idx) {
     return '/api/media/stream?book_id=' + encodeURIComponent(bookId) + '&page_idx=' + idx + '&db_type=' + encodeURIComponent(dbType);
+  }
+
+  // 첫 페이지 이미지를 실제로 로드해 종횡비를 측정 — 책마다 실제 페이지 크기가 다르므로
+  // 하드코딩된 기본값 대신 이 값으로 PAGE_ASPECT/PAGE_H를 갱신한 뒤에 레이아웃을 계산해야 한다.
+  // 로드 실패/타임아웃 시에는 기존 기본 비율(1.4286)로 조용히 폴백한다.
+  function measurePageAspect(url) {
+    return new Promise(function (resolve) {
+      var img = new Image();
+      var settled = false;
+      var timer = setTimeout(function () {
+        if (settled) return;
+        settled = true;
+        resolve();
+      }, 4000);
+      img.onload = function () {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+          PAGE_W = img.naturalWidth;
+          PAGE_H = img.naturalHeight;
+          PAGE_ASPECT = PAGE_H / PAGE_W;
+        }
+        resolve();
+      };
+      img.onerror = function () {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve();
+      };
+      img.src = url;
+    });
   }
 
   // 뷰포트 가로/세로를 모두 고려해 컨테이너 폭을 계산한다.
@@ -115,8 +220,14 @@
   // 두 모드는 폭 대비 높이 계산식이 달라서(스프레드가 훨씬 납작함) CSS만으로는 동시에 안전하게 못 맞춘다.
   // 그래서 여기서 두 모드의 결과 높이를 직접 계산해 뷰포트에 맞는 쪽을 고르고, 폭을 인라인으로 강제한다.
   function computeContainerWidth() {
-    var availW = window.innerWidth * 0.94;
-    var availH = (window.innerHeight - 70) * 0.9; // HUD/태그 여백 대략 제외
+    var availW = window.innerWidth * 0.98;
+    var availH = (window.innerHeight - 56) * 0.96; // HUD/태그 여백 대략 제외
+
+    // "1장 보기 강제"가 켜져 있으면 스프레드 판단 자체를 건너뛰고 항상 단일 페이지 폭으로 계산한다.
+    if (forceSinglePage) {
+      var forcedPortraitWidth = Math.min(availW, availH / PAGE_ASPECT);
+      return Math.min(forcedPortraitWidth, MAX_PAGE_W);
+    }
 
     var spreadWidth = Math.min(availW, 2 * (availH / PAGE_ASPECT));
     var spreadPageWidth = spreadWidth / 2;
@@ -144,10 +255,138 @@
     return rtl ? (totalPages - internalIdx) : (internalIdx + 1);
   }
 
+  // 시크바/RTL 전환처럼 "물리적 페이지 번호"를 다룰 때, 현재 rtl 설정 기준으로 내부 인덱스로 변환
+  function physicalPageToInternalIdx(physicalPage) {
+    var idx = rtl ? (totalPages - physicalPage) : (physicalPage - 1);
+    return Math.max(0, Math.min(totalPages - 1, idx));
+  }
+
+  // 프로덕션 뷰어(viewer_progress.js saveProgress/flushProgress)와 동일한
+  // POST /api/media/progress 계약을 그대로 재사용한다 — page_idx는 항상 "물리 페이지" 0-idx
+  // 기준(0 = 1페이지)이라 RTL이어도 내부(반전된) idx가 아니라 displayPageNumber() 결과를 저장해야
+  // 프로덕션 뷰어에서 이어볼 때도 같은 지점이 된다.
+  var saveDebounceTimer = null;
+  var pendingSavePhysicalPage = null;
+
+  function scheduleSaveProgress(physicalPage) {
+    if (!bookId || !totalPages) return;
+    pendingSavePhysicalPage = physicalPage;
+    if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
+    saveDebounceTimer = setTimeout(function () { flushSaveProgress(false); }, 3000);
+  }
+
+  function flushSaveProgress(useBeacon) {
+    if (saveDebounceTimer) { clearTimeout(saveDebounceTimer); saveDebounceTimer = null; }
+    if (pendingSavePhysicalPage === null || !bookId || !totalPages) return;
+
+    var payload = JSON.stringify({
+      db_type: dbType,
+      book_id: Number(bookId),
+      page_idx: pendingSavePhysicalPage - 1,
+      total_pages: totalPages,
+      flush_immediately: true
+    });
+    pendingSavePhysicalPage = null;
+
+    if (useBeacon && navigator.sendBeacon) {
+      navigator.sendBeacon('/api/media/progress', new Blob([payload], { type: 'application/json' }));
+      return;
+    }
+    fetch('/api/media/progress', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+      keepalive: true
+    }).catch(function (err) { console.warn('[PageTurn] 진행도 저장 실패:', err); });
+  }
+
+  ['pagehide', 'beforeunload'].forEach(function (evt) {
+    window.addEventListener(evt, function () { flushSaveProgress(true); });
+  });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') flushSaveProgress(true);
+  });
+
   function updateHud(internalIdx) {
-    elPageInfo.textContent = displayPageNumber(internalIdx) + ' / ' + totalPages;
-    elBtnPrev.disabled = internalIdx <= 0;
-    elBtnNext.disabled = internalIdx >= totalPages - 1;
+    currentInternalIdx = internalIdx;
+    var physicalPage = displayPageNumber(internalIdx);
+    elPageInfo.textContent = physicalPage + ' / ' + totalPages;
+    // RTL은 이미지 배열 자체가 반전돼 있어 internalIdx의 증가/감소 방향이 물리 페이지 번호와
+    // 반대이므로, "이전/다음" 버튼의 비활성화 여부는 항상 물리 페이지(읽기 순서) 기준으로 판단한다.
+    elBtnPrev.disabled = physicalPage <= 1;
+    elBtnNext.disabled = physicalPage >= totalPages;
+    if (elSettingsSeekbar) elSettingsSeekbar.value = physicalPage;
+    scheduleSaveProgress(physicalPage);
+  }
+
+  // "다음/이전"은 항상 읽기 진행 방향(물리 페이지 번호 증가/감소) 기준이어야 한다.
+  // RTL이면 이미지 배열이 반전돼 있으므로 raw flipNext/flipPrev를 서로 바꿔 호출해야
+  // 화면상 "다음 페이지" 버튼·스페이스바·오른쪽 화살표가 항상 읽기를 앞으로 진행시킨다.
+  function flipForward() {
+    if (!pageFlip) return;
+    if (rtl) pageFlip.flipPrev(); else pageFlip.flipNext();
+  }
+  function flipBackward() {
+    if (!pageFlip) return;
+    if (rtl) pageFlip.flipNext(); else pageFlip.flipPrev();
+  }
+
+  // pageFlip 생성/재생성을 한 곳에서 담당한다. St.PageFlip은 flippingTime/minWidth 같은 설정을
+  // 런타임에 바꾸는 API가 없어서(getSettings만 있고 setter가 없음), RTL·넘김속도·1장보기 강제 설정이
+  // 바뀔 때마다 destroy() 후 다시 생성하는 방식으로 처리한다 — startIdx로 보던 페이지 위치를 유지한다.
+  function createPageFlip(urls, startIdx) {
+    if (pageFlip && typeof pageFlip.destroy === 'function') {
+      try { pageFlip.destroy(); } catch (e) { /* noop */ }
+    }
+    // destroy()는 St.PageFlip에 넘겼던 #book 엘리먼트 자체를 DOM에서 제거해버리므로
+    // (this.block.remove() 내부 동작) 재사용할 수 없다 — 매번 새 #book을 만들어 다시 붙인다.
+    var bookEl = document.createElement('div');
+    bookEl.id = 'book';
+    elBookContainer.innerHTML = '';
+    elBookContainer.appendChild(bookEl);
+    applyLayout();
+
+    // "1장 보기 강제"는 minWidth를 MAX_PAGE_W보다 크게 잡아 St.PageFlip 내부의
+    // 스프레드 전환 임계값(컨테이너 폭 >= 2*minWidth)을 절대 넘지 못하게 만드는 방식으로 구현한다.
+    var effectiveMinWidth = forceSinglePage ? (MAX_PAGE_W + 1) : MIN_PAGE_W;
+
+    pageFlip = new St.PageFlip(bookEl, {
+      width: PAGE_W,
+      height: PAGE_H,
+      size: 'stretch',
+      minWidth: effectiveMinWidth,
+      maxWidth: MAX_PAGE_W,
+      minHeight: effectiveMinWidth * PAGE_ASPECT,
+      maxHeight: MAX_PAGE_W * PAGE_ASPECT,
+      maxShadowOpacity: 0.55,
+      showCover: true,
+      usePortrait: true,
+      mobileScrollSupport: false,
+      swipeDistance: 20,
+      flippingTime: flippingTimeMs
+    });
+
+    pageFlip.on('flip', function (e) { updateHud(e.data); });
+    pageFlip.loadFromImages(urls);
+
+    var idx = Math.max(0, Math.min(totalPages - 1, startIdx || 0));
+    if (idx > 0 && typeof pageFlip.turnToPage === 'function') {
+      pageFlip.turnToPage(idx);
+    }
+    updateHud(idx);
+  }
+
+  function buildPageUrls() {
+    var urls = [];
+    for (var i = 0; i < totalPages; i++) urls.push(pageUrl(i));
+    if (rtl) urls.reverse();
+    return urls;
+  }
+
+  // RTL/넘김속도/1장보기 강제 설정이 바뀐 뒤 같은 물리 페이지 위치에서 pageFlip을 다시 만든다.
+  function rebuildPageFlip(targetInternalIdx) {
+    if (!totalPages) return;
+    createPageFlip(buildPageUrls(), targetInternalIdx);
   }
 
   function start() {
@@ -156,65 +395,123 @@
     bookId = idInput;
     dbType = document.getElementById('input-db-type').value;
     rtl = document.getElementById('input-rtl').checked;
+    var format = document.getElementById('input-format').value;
 
-    fetch('/api/media/books/' + encodeURIComponent(bookId) + '/info?type=' + encodeURIComponent(dbType))
+    if (format !== 'comic') {
+      // epub/txt는 배관만 준비된 상태 — 실제 page-flip 렌더링은 아직 없음
+      elSetup.classList.add('hidden');
+      elStage.style.display = 'flex';
+      elBookContainer.style.display = 'none';
+      elUnsupportedNotice.style.display = 'block';
+      return;
+    }
+
+    // reader-info는 total_pages와 함께 pages_read(이어보기 지점)도 같이 내려줘서,
+    // 프로덕션 뷰어(renderer.js initRenderer)와 동일한 "이어보기" 지점 계산 기준을 그대로 쓸 수 있다.
+    fetch('/api/media/books/' + encodeURIComponent(bookId) + '/reader-info?type=' + encodeURIComponent(dbType))
       .then(function (r) { return r.json(); })
       .then(function (data) {
-        if (!data.success || !data.total_pages) {
+        var book = data && data.book;
+        if (!data.success || !book || !book.total_pages) {
           alert('total_pages를 가져오지 못했습니다: ' + (data.error || 'unknown'));
           return;
         }
-        totalPages = data.total_pages;
+        totalPages = book.total_pages;
+        var pagesRead = Number(book.pages_read) || 0;
 
-        var urls = [];
-        for (var i = 0; i < totalPages; i++) urls.push(pageUrl(i));
-        if (rtl) urls.reverse();
+        elBookContainer.style.display = '';
+        elUnsupportedNotice.style.display = 'none';
+        elSettingsSeekbar.min = 1;
+        elSettingsSeekbar.max = totalPages;
+        elSettingsRtl.checked = rtl;
+
+        var urls = buildPageUrls();
 
         elSetup.classList.add('hidden');
         elStage.style.display = 'flex';
         elHud.style.display = 'flex';
 
-        applyLayout();
+        // 프로덕션 뷰어와 동일한 이어보기 지점 계산: pagesRead>0이면 마지막으로 읽던 페이지, 아니면 처음부터
+        var startPhysicalPage = pagesRead > 0 ? pagesRead : 1;
+        var startIdx = physicalPageToInternalIdx(startPhysicalPage);
 
-        pageFlip = new St.PageFlip(document.getElementById('book'), {
-          width: PAGE_W,
-          height: PAGE_H,
-          size: 'stretch',
-          // 화면이 넓으면 2페이지 펼침(spread)으로, 좁으면 단일 페이지(portrait)로 자동 전환.
-          // 실제 전환 시점(2*minWidth)과 컨테이너 폭(computeContainerWidth)이 항상 같은 기준을
-          // 쓰도록 MIN_PAGE_W/MAX_PAGE_W 상수를 여기 그대로 사용한다.
-          minWidth: MIN_PAGE_W,
-          maxWidth: MAX_PAGE_W,
-          minHeight: MIN_PAGE_W * PAGE_ASPECT,
-          maxHeight: MAX_PAGE_W * PAGE_ASPECT,
-          maxShadowOpacity: 0.55,
-          showCover: true,
-          usePortrait: true,
-          mobileScrollSupport: false,
-          swipeDistance: 20
+        measurePageAspect(urls[0]).then(function () {
+          createPageFlip(urls, startIdx);
         });
-
-        pageFlip.on('flip', function (e) { updateHud(e.data); });
-        pageFlip.loadFromImages(urls);
-        updateHud(0);
       })
       .catch(function (err) {
         alert('요청 실패: ' + err);
       });
   }
 
-  elBtnPrev.addEventListener('click', function () { if (pageFlip) pageFlip.flipPrev(); });
-  elBtnNext.addEventListener('click', function () { if (pageFlip) pageFlip.flipNext(); });
+  elBtnPrev.addEventListener('click', flipBackward);
+  elBtnNext.addEventListener('click', flipForward);
   window.addEventListener('keydown', function (e) {
     if (!pageFlip) return;
-    if (e.key === 'ArrowRight') pageFlip.flipNext();
-    if (e.key === 'ArrowLeft') pageFlip.flipPrev();
+    // 설정 패널 안의 체크박스/슬라이더/버튼에 포커스가 있을 때는 스페이스/화살표를
+    // 페이지 넘김으로 가로채지 않는다 (체크박스 토글 등 기본 동작을 방해하지 않기 위함).
+    var activeTag = document.activeElement && document.activeElement.tagName;
+    if (activeTag === 'INPUT' || activeTag === 'SELECT' || activeTag === 'TEXTAREA' || activeTag === 'BUTTON') return;
+
+    if (e.key === 'ArrowRight') { flipForward(); return; }
+    if (e.key === 'ArrowLeft') { flipBackward(); return; }
+    if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); flipForward(); }
+  });
+
+  // ── 설정 패널 (RTL 실시간 전환 / 넘김 속도 / 1장 보기 강제 / 시크바) ──
+  elSettingsToggle.addEventListener('click', function () {
+    elSettingsPanel.classList.toggle('open');
+  });
+  elSettingsClose.addEventListener('click', function () {
+    elSettingsPanel.classList.remove('open');
+  });
+
+  elSettingsSeekbar.addEventListener('input', function () {
+    if (!pageFlip || !totalPages) return;
+    var idx = physicalPageToInternalIdx(Number(elSettingsSeekbar.value));
+    pageFlip.turnToPage(idx);
+    updateHud(idx);
+  });
+
+  elSettingsRtl.addEventListener('change', function () {
+    if (!totalPages) return;
+    var physicalPage = displayPageNumber(currentInternalIdx); // 기존 rtl 기준으로 물리 페이지 확보
+    rtl = elSettingsRtl.checked;
+    rebuildPageFlip(physicalPageToInternalIdx(physicalPage));
+  });
+
+  elSettingsSinglePage.addEventListener('change', function () {
+    forceSinglePage = elSettingsSinglePage.checked;
+    rebuildPageFlip(currentInternalIdx);
+  });
+
+  elSettingsSpeed.addEventListener('input', function () {
+    elSettingsSpeedLabel.textContent = elSettingsSpeed.value + 'ms';
+  });
+  elSettingsSpeed.addEventListener('change', function () {
+    flippingTimeMs = Number(elSettingsSpeed.value);
+    if (totalPages) rebuildPageFlip(currentInternalIdx);
   });
 
   document.getElementById('btn-start').addEventListener('click', start);
   document.getElementById('input-book-id').addEventListener('keydown', function (e) {
     if (e.key === 'Enter') start();
   });
+
+  // 뷰어 컨텍스트 메뉴(우클릭/롱프레스)에서 새 탭으로 열 때 설정 폼을 건너뛰고 바로 시작
+  (function autoStartFromQuery() {
+    var params = new URLSearchParams(window.location.search);
+    var qBookId = params.get('book_id');
+    if (!qBookId) return;
+
+    document.getElementById('input-book-id').value = qBookId;
+    var qDbType = params.get('db_type');
+    if (qDbType) document.getElementById('input-db-type').value = qDbType;
+    var qFormat = params.get('format');
+    if (qFormat) document.getElementById('input-format').value = qFormat;
+
+    start();
+  })();
 })();
 </script>
 </body>

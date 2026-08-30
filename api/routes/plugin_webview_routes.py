@@ -12,8 +12,9 @@ SSRF 방어 로직을 통해서만 이루어진다.
 import os
 import re
 import time
+from urllib.parse import quote, urljoin
 
-from flask import Blueprint, request, jsonify, session, Response
+from flask import Blueprint, request, jsonify, session, Response, stream_with_context
 
 from api.auth import login_required
 from repositories.category_repository import CategoryRepository
@@ -129,6 +130,132 @@ def webview_proxy():
     response = Response(body, status=status_code, content_type=content_type)
     # 업스트림 헤더는 content_type 외에는 넘기지 않는다 (임베드를 막는 헤더/쿠키 차단이 목적).
     return response
+
+
+# ─────────────────────────────── HLS(라이브 스트림) 프록시 ───────────────────────────────
+# webview_proxy는 응답 전체를 메모리에 캡(15MB)해서 읽는 방식이라 실시간 방송 스트림에는
+# 못 쓴다. HLS는 플레이리스트(.m3u8) 안에 세그먼트(.ts) URL이 나열되어 있고, 플레이어(hls.js
+# 등)가 그 URL들을 직접 다시 요청하는 구조라, mixed-content(https 페이지 → http 스트림)를
+# 피하려면 플레이리스트 자체를 원본 fetch 후 안의 URL들을 전부 이 프록시 경유로 재작성하고,
+# 세그먼트 요청은 버퍼링 없이 그대로 스트리밍 pass-through 해야 한다.
+
+HLS_PLAYLIST_MAX_BYTES = 2 * 1024 * 1024  # 2MB — 플레이리스트 텍스트 캡 (세그먼트는 미적용)
+HLS_STREAM_CHUNK_SIZE = 65536
+
+_HLS_PLAYLIST_CONTENT_TYPES = {
+    'application/vnd.apple.mpegurl', 'application/x-mpegurl',
+    'audio/mpegurl', 'audio/x-mpegurl',
+}
+_HLS_URI_ATTR_RE = re.compile(r'URI="([^"]+)"')
+
+
+def _rewrite_hls_playlist(text, base_url, proxy_path):
+    def to_proxy(raw_url):
+        abs_url = urljoin(base_url, raw_url.strip())
+        return f"{proxy_path}?url={quote(abs_url, safe='')}"
+
+    def replace_uri_attr(m):
+        return f'URI="{to_proxy(m.group(1))}"'
+
+    out_lines = []
+    for line in text.splitlines():
+        if line.startswith('#'):
+            # EXT-X-KEY / EXT-X-MAP / EXT-X-MEDIA 등에 실린 URI="..." 속성도 프록시로 재작성
+            out_lines.append(_HLS_URI_ATTR_RE.sub(replace_uri_attr, line))
+        elif line.strip():
+            # 주석이 아닌 줄은 세그먼트 또는 하위 플레이리스트(멀티 화질) URL
+            out_lines.append(to_proxy(line))
+        else:
+            out_lines.append(line)
+    return '\n'.join(out_lines)
+
+
+@plugin_webview_bp.route('/api/webview/hls-proxy', methods=['GET'])
+@login_required
+def hls_proxy():
+    url = request.args.get('url')
+    if not url:
+        return jsonify({'success': False, 'error': 'url이 필요합니다.'}), 400
+
+    patterns = DomainWhitelistService.get_patterns(session['user_id'])
+    host = extract_host_from_url(url)
+    if not host:
+        return _error_response('invalid_url', 400)
+
+    extra_headers = {}
+    range_header = request.headers.get('Range')
+    if range_header:
+        extra_headers['Range'] = range_header
+
+    try:
+        upstream = fetch_with_redirect_revalidation(url, patterns, method='GET', extra_headers=extra_headers)
+    except SSRFBlockedError as e:
+        return _error_response(e.reason, host=e.host)
+    except Exception as e:
+        return jsonify({'success': False, 'error': 'fetch_failed', 'message': str(e)}), 502
+
+    content_type = (upstream.headers.get('Content-Type') or '').split(';')[0].strip().lower()
+    final_url = upstream.url or url
+    is_playlist = (
+        content_type in _HLS_PLAYLIST_CONTENT_TYPES
+        or final_url.lower().split('?')[0].endswith('.m3u8')
+    )
+
+    if is_playlist:
+        try:
+            body = read_capped(upstream, HLS_PLAYLIST_MAX_BYTES)
+        except SSRFBlockedError as e:
+            upstream.close()
+            return _error_response(e.reason, 413)
+        status_code = upstream.status_code
+        upstream.close()
+
+        text = body.decode('utf-8', errors='replace')
+        rewritten = _rewrite_hls_playlist(text, final_url, request.path)
+        resp = Response(rewritten, status=status_code, content_type='application/vnd.apple.mpegurl')
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp
+
+    def generate():
+        try:
+            for chunk in upstream.iter_content(chunk_size=HLS_STREAM_CHUNK_SIZE):
+                if chunk:
+                    yield chunk
+        finally:
+            upstream.close()
+
+    resp = Response(
+        stream_with_context(generate()),
+        status=upstream.status_code,
+        content_type=upstream.headers.get('Content-Type', 'application/octet-stream'),
+    )
+    resp.headers['Cache-Control'] = 'no-store'
+    for hop_header in ('Content-Range', 'Accept-Ranges', 'Content-Length'):
+        value = upstream.headers.get(hop_header)
+        if value:
+            resp.headers[hop_header] = value
+    return resp
+
+
+# ─────────────────────────────── 외부 이미지(로고/아이콘) 캐시 프록시 ───────────────────────────────
+# 방송사 로고처럼 소스마다 도메인이 제각각인 외부 이미지는 화이트리스트 등록을 요구하면
+# 실사용이 불가능하다. 대신 매 요청마다 원본을 다시 받아오지 않도록 최초 1회만 WebP로
+# 로컬 캐싱하고(services/ssrf_guard.py로 사설 IP만 차단), 이후에는 로컬 파일을 그대로 서빙한다.
+
+@plugin_webview_bp.route('/api/webview/logo-cache', methods=['GET'])
+@login_required
+def logo_cache_proxy():
+    url = request.args.get('url')
+    if not url:
+        return jsonify({'success': False, 'error': 'url이 필요합니다.'}), 400
+
+    from utils.cover_helper import get_or_cache_external_image_webp
+    cache_path = get_or_cache_external_image_webp(url, 'plugin_logo')
+    if not cache_path:
+        return jsonify({'success': False, 'error': 'fetch_failed', 'message': '이미지를 불러오지 못했습니다.'}), 502
+
+    from api.stream import send_cached_cover_file
+    return send_cached_cover_file(cache_path)
 
 
 def _inject_base_tag(body, encoding, base_url):
