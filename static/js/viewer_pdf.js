@@ -10,6 +10,10 @@ export let pdfTotalPages = 0;
 let isInitializingPdfProgress = false;
 let currentRenderTasks = [];
 let pdfObserver = null;
+// 페이지 넘김 모드에서 새 페이지가 다 그려지기 전엔 렌더 영역을 비우지 않고 이전 페이지를
+// 그대로 보여주기 위한 세대(generation) 번호. 사용자가 렌더 완료 전에 또 페이지를 넘기면
+// 값이 올라가므로, 뒤늦게 도착한 이전 세대의 렌더 결과가 최신 화면을 덮어쓰지 않도록 막는다.
+let pdfRenderGeneration = 0;
 
 export async function initPdfViewer(bookId, pagesRead, totalPages) {
   isInitializingPdfProgress = true;
@@ -110,13 +114,15 @@ export function renderPdfPage() {
     pdfObserver = null;
   }
 
+  const renderGeneration = ++pdfRenderGeneration;
+
   const renderArea = document.getElementById('pdf-render-area');
   if (!renderArea) return;
-  renderArea.innerHTML = ''; // 캔버스 영역 소거
 
   const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
 
   if (scrollMode === 'scroll') {
+    renderArea.innerHTML = ''; // 스크롤 모드는 페이지별 자리표시 캔버스를 통째로 재구성
     // ── 1. 연속 세로 스크롤 모드 (IntersectionObserver 가상화 렌더링) ──
     renderArea.style.overflowY = 'auto';
     renderArea.style.overflowX = 'hidden';
@@ -266,7 +272,12 @@ export function renderPdfPage() {
       : innerWidth;
     const availableHeight = innerHeight;
 
-    pagesToRender.forEach(pageNum => {
+    // 새 페이지 캔버스는 렌더가 끝날 때까지 DOM에 붙이지 않는다(오프스크린 이중 버퍼링).
+    // 예전엔 여기서 즉시 renderArea에 빈 캔버스를 넣고 비동기 렌더를 기다렸는데, 그 사이
+    // (네트워크로 페이지 데이터를 받아오는 시간 포함) 화면이 흰 페이지로 보이는 깜빡임이
+    // 있었다 - 이전 페이지 캔버스를 그대로 둔 채 새 캔버스가 다 그려진 뒤 한 번에
+    // 교체하면 그 공백이 사라진다.
+    const newCanvases = pagesToRender.map(pageNum => {
       const canvas = document.createElement('canvas');
       canvas.className = 'pdf-canvas-element';
       if (removeCenterGap) {
@@ -275,9 +286,17 @@ export function renderPdfPage() {
         canvas.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
       }
       canvas.style.display = 'block';
-      renderArea.appendChild(canvas);
+      return canvas;
+    });
 
-      renderSinglePdfCanvas(pageNum, canvas, availableWidth, availableHeight);
+    Promise.all(
+      pagesToRender.map((pageNum, i) => renderSinglePdfCanvas(pageNum, newCanvases[i], availableWidth, availableHeight))
+    ).then(() => {
+      // 렌더가 진행되는 동안 사용자가 또 페이지를 넘겼다면(세대 번호 불일치) 이 결과는
+      // 이미 낡은 것이므로 화면에 반영하지 않고 버린다.
+      if (renderGeneration !== pdfRenderGeneration) return;
+      renderArea.innerHTML = '';
+      newCanvases.forEach(canvas => renderArea.appendChild(canvas));
     });
   }
 
@@ -288,9 +307,12 @@ export function renderPdfPage() {
   }
 }
 
-// 개별 PDF 페이지 캔버스 렌더링 헬퍼
+// 개별 PDF 페이지 캔버스 렌더링 헬퍼. 호출자(페이지 넘김 모드)가 Promise.all로 여러
+// 페이지의 완료를 함께 기다려 한 번에 화면에 붙일 수 있도록, 성공/실패/취소 어느
+// 경우든 절대 reject하지 않고 항상 resolve하는 프로미스를 반환한다(하나가 실패해도
+// 나머지 정상 페이지의 교체 타이밍이 막히면 안 되므로).
 function renderSinglePdfCanvas(pageNum, canvas, availWidth, availHeight) {
-  pdfDoc.getPage(pageNum).then(page => {
+  return pdfDoc.getPage(pageNum).then(page => {
     const ctx = canvas.getContext('2d');
     const unscaledViewport = page.getViewport({ scale: 1.0 });
 
@@ -307,7 +329,7 @@ function renderSinglePdfCanvas(pageNum, canvas, availWidth, availHeight) {
     const rawDpr = window.devicePixelRatio || 1;
     const dpr = Math.min(isMobile ? 1.5 : 2.0, Math.max(rawDpr, 1.0));
     const viewport = page.getViewport({ scale: scale * dpr });
-    
+
     canvas.width = viewport.width;
     canvas.height = viewport.height;
     canvas.style.width = `${viewport.width / dpr}px`;
@@ -325,7 +347,7 @@ function renderSinglePdfCanvas(pageNum, canvas, availWidth, availHeight) {
     const renderTask = page.render(renderCtx);
     currentRenderTasks.push(renderTask);
 
-    renderTask.promise.then(() => {
+    return renderTask.promise.then(() => {
       currentRenderTasks = currentRenderTasks.filter(t => t !== renderTask);
     }).catch(err => {
       if (err.name !== 'RenderingCancelledException' && err.name !== 'RenderingCancelled') {
@@ -387,6 +409,7 @@ export function nextPdfPage() {
 }
 
 export function clearPdfViewer() {
+  pdfRenderGeneration++; // 진행 중이던 오프스크린 렌더가 나중에 끝나도 화면에 반영되지 않도록 폐기
   if (pdfObserver) {
     pdfObserver.disconnect();
     pdfObserver = null;

@@ -13,7 +13,7 @@ if MEDIA_SERVER_DIR not in sys.path:
 import builtins
 import datetime
 import database
-from tools.scanner.cover import get_series_cover_fallback
+from tools.scanner.cover import get_series_cover_fallback, COVER_THUMB_MAX_W, COVER_THUMB_MAX_H, save_as_thumbnail_webp
 
 # 우아한 종료 시그널 감지 플래그
 stop_requested = False
@@ -604,8 +604,8 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
                             error_type = "BadZipFile"
                         elif "ValueError" in err_msg or "표지" in err_msg:
                             error_type = "NoCover"
-                        elif file_path.lower().endswith('.pdf') and ("mupdf" in err_msg.lower() or "syntax error" in err_msg.lower() or "page tree" in err_msg.lower() or "cannot open" in err_msg.lower() or "fitz" in err_msg.lower()):
-                            error_type = "MuPDFFormatError"
+                        elif file_path.lower().endswith('.pdf') and ("pdfium" in err_msg.lower() or "syntax error" in err_msg.lower() or "page tree" in err_msg.lower() or "cannot open" in err_msg.lower() or "data format error" in err_msg.lower()):
+                            error_type = "PdfiumFormatError"
                             
                         # 실패 상태를 UI에 표시하되 다음 스케줄에서는 다시 추출을 시도합니다.
                         try:
@@ -778,26 +778,40 @@ def get_series_cover_fallback_single(series_name, parent_dir, filename, file_pat
     if file_path.lower().endswith('.pdf'):
 
         try:
-            import fitz
-            doc = fitz.open(file_path)
-            if len(doc) > 0:
-                page = doc.load_page(0)
-                pix = page.get_pixmap()
-                img_data = pix.tobytes("png")
-                
-                from PIL import Image
-                img = Image.open(io.BytesIO(img_data))
-                img.save(local_cover_path, "WEBP", quality=80)
-                
+            import pypdfium2 as pdfium
+            pdf = pdfium.PdfDocument(file_path)
+            if len(pdf) > 0:
+                page = pdf[0]
+                # 표지에 필요한 크기(COVER_THUMB_MAX_W/H)를 훨씬 넘는 배율로 렌더링해봐야
+                # (예: 300dpi+ 스캔 PDF를 원본 mediabox 그대로) 어차피 save_as_thumbnail_webp()가
+                # 저장 직전에 다시 줄이므로 rasterize 시간만 낭비다. 그렇다고 딱 최종 크기로만
+                # 그리면(1x) 축소 과정에서 나던 안티에일리어싱 효과가 없어져 글자가 흐릿해진다 —
+                # 그래서 최종 크기의 PDF_COVER_SUPERSAMPLE배로 살짝 크게 그린 뒤
+                # save_as_thumbnail_webp()의 LANCZOS 리샘플링이 그 여분 해상도로 텍스트 경계를
+                # 부드럽게 다듬으며 축소하게 한다 - 전체 원본 해상도 렌더링보다는 훨씬 싸면서도
+                # 1x 직접 렌더링보다 또렷한, 그 중간 지점.
+                PDF_COVER_SUPERSAMPLE = 2
+                page_w, page_h = page.get_size()
+                scale = float(PDF_COVER_SUPERSAMPLE)
+                if page_w > 0 and page_h > 0:
+                    scale = min(
+                        PDF_COVER_SUPERSAMPLE,
+                        (COVER_THUMB_MAX_W * PDF_COVER_SUPERSAMPLE) / page_w,
+                        (COVER_THUMB_MAX_H * PDF_COVER_SUPERSAMPLE) / page_h,
+                    )
+                bitmap = page.render(scale=scale)
+                img = bitmap.to_pil()
+                save_as_thumbnail_webp(img, local_cover_path)
+
                 del img
-                del pix
-                del page
-                doc.close()
-                del doc
+                del bitmap
+                page.close()
+                pdf.close()
+                del pdf
                 # PDF는 오프셋 구조 없음 — 빈 리스트 반환
                 return (db_cover_path, None, [])
         except Exception as e:
-            print(f"[Lazy-Scanner] PDF fitz 렌더링 실패: {e}")
+            print(f"[Lazy-Scanner] PDF pdfium 렌더링 실패: {e}")
             raise e
     elif file_path.lower().endswith(('.zip', '.cbz')):
         # 이중 압축 사전 감지 차단

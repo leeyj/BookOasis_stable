@@ -68,10 +68,10 @@ class BookInfoService:
 
             elif file_format == 'pdf':
                 try:
-                    import fitz
-                    doc = fitz.open(file_path)
-                    total_pages = doc.page_count
-                    doc.close()
+                    import pypdfium2 as pdfium
+                    pdf = pdfium.PdfDocument(file_path)
+                    total_pages = len(pdf)
+                    pdf.close()
                 except Exception:
                     total_pages = 0
 

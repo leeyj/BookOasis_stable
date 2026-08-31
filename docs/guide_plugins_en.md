@@ -57,7 +57,7 @@ BookOasis media server enforces strict **runtime security constraints**:
 2. **Symlink Restrictions**:
    - Symlinks pointing to paths outside the plugin directory (such as `/etc/passwd` or system files) are forbidden and rejected.
 3. **Package & Core Protection**:
-   - Packages specified in `requirements.txt` are installed into an isolated `libs/` subfolder. Attempts to overwrite core framework packages (`Flask`, `PyMuPDF`, `Pillow`, etc.) are automatically blocked.
+   - Packages specified in `requirements.txt` are installed into an isolated `libs/` subfolder. Attempts to overwrite core framework packages (`Flask`, `pypdfium2`, `Pillow`, etc.) are automatically blocked.
 4. **Unrestricted HTML5 Tags & XSS Mitigation Rules**:
    - Full HTML5 tags (`<canvas>`, `<svg>`, `<table>`, `<form>`, `<input>`, `<button>`) and custom CSS/JS are allowed in `index.html`.
    - Developers must sanitize external 3rd-party API responses before rendering to prevent XSS.
