@@ -742,7 +742,6 @@ body {
     background: var(--app-bg-card);
     border: 1px solid var(--app-border);
     border-radius: 12px;
-    backdrop-filter: var(--app-blur);
     box-shadow: var(--app-shadow);
     flex: 1 1 0%;
     min-height: 0;
@@ -1066,6 +1065,10 @@ body {
     gap: 1.5rem;
     padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
     box-sizing: border-box;
+    /* grid_pruning.js가 뷰포트 위쪽에서 카드를 정리/복원할 때 scrollTop을 직접 정확히
+       보정한다. 브라우저 기본 scroll anchoring이 동시에 개입하면 이중 보정되어 스크롤
+       위치가 몇 줄씩 건너뛰는 것처럼 보일 수 있어(관찰됨) 여기서는 꺼둔다. */
+    overflow-anchor: none;
 }
 
 .btn-sidebar-toggle-desktop:hover {
@@ -1944,6 +1947,13 @@ body {
     gap: 1.5rem;
 }
 
+/* 무한 스크롤로 뷰포트에서 멀어진 카드를 정리(grid_pruning.js)할 때 그 자리를 대신하는
+   spacer - 실제 카드가 차지하던 높이만큼만 유지해 scrollHeight/scrollTop이 흔들리지 않게 한다. */
+.grid-prune-spacer-top {
+    grid-column: 1 / -1;
+    pointer-events: none;
+}
+
 /* 작가별 카드를 클릭해 드릴다운(특정 작가로 필터링)한 상태임을 시각적으로 구분 */
 .books-grid.author-drilldown-active {
     border: 2px solid #a855f7;
@@ -1971,8 +1981,14 @@ body {
     -webkit-touch-callout: none;
     -webkit-user-select: none;
     user-select: none;
-    content-visibility: auto;
-    contain-intrinsic-size: 160px 280px;
+    /* content-visibility:auto는 의도적으로 뺐다. 카드 실제 높이는 제목 줄바꿈(1~2줄)/
+       서브텍스트 유무에 따라 카드마다 달라서(약 257~300px+) contain-intrinsic-size
+       추정치와 항상 어긋나고, "한 번도 완전히 렌더링된 적 없는 행이 스크롤로 처음 완전히
+       드러나는 순간" 그 추정치-실측치 리플로우가 실측으로 재현됐다(auto 크기 기억 키워드나
+       grid_pruning의 DOM 재사용으로도 "이번 세션 첫 노출"인 행 자체는 못 피함). 원래 이
+       속성을 쓴 이유(무한정 쌓이는 DOM의 화면 밖 렌더 비용 절감)는 grid_pruning.js가 DOM
+       개수 자체를 최대 240~360장 정도로 이미 묶어놨기 때문에 지금은 이점이 크지 않다 -
+       리플로우 부작용이 더 크다고 판단해 제거했다. */
 }
 
 
@@ -1993,7 +2009,14 @@ body {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 0.5s ease;
+    opacity: 0;
+    transition: transform 0.5s ease, opacity 0.25s ease;
+}
+
+/* 실제 커버 로드가 끝나면(ui.js wireCoverFadeIn) 붙는 클래스 - 뚝뚝 끊기듯 나타나는 대신
+   부드럽게 fade-in되어 "계속 로딩 중"으로 보이는 체감을 줄인다. */
+.book-card-cover img.is-loaded {
+    opacity: 1;
 }
 
 /* 영상강좌 전용 그리드는 강좌 썸네일이 대체로 가로형이라 16:9로 표시 (책/오디오북 그리드는 기존 비율 유지) */

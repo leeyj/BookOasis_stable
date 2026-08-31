@@ -845,7 +845,9 @@ Note:
 
 Core-provided API for plugins that need to show an external site inside the app, or download a file from an external URL into a library.
 
-**Responsibility**: BookOasis does not provide or recommend any external domain by default. This API only works for domains **the user has explicitly registered** in their own [Settings > External Domains] tab whitelist. Plugins cannot add or bypass this whitelist — registering and using a domain is entirely the user's own responsibility.
+> ⚠️ **`window.BookOasisPlugin` is the only official contract for plugins.** Even if other core functions (e.g. internal view-switching helpers) happen to be reachable on the `window` global beyond what's listed below, those are undocumented implementation details that may be renamed, changed, or removed without notice. If you need functionality that isn't on `window.BookOasisPlugin`, please file an issue instead of relying on other globals directly.
+
+**Responsibility**: BookOasis does not provide or recommend any external domain by default. This API only works for domains **the user has explicitly registered** in their own [Settings > External Domains] tab whitelist. Plugins cannot add or bypass this whitelist — registering and using a domain is entirely the user's own responsibility. Note that registering a domain authorizes both GET reads from it and the POST body relay described below (e.g. license requests) — make sure your user-facing guidance reflects that.
 
 ### `window.BookOasisPlugin.openWebview(url)`
 
@@ -875,7 +877,61 @@ window.BookOasisPlugin.downloadToLibrary('https://example.com/book.epub', {
 - If the extension isn't one of the supported formats (`.zip .cbz .epub .pdf .txt`), the file is still saved but not imported as a book (`imported_as_book: false`).
 - Returns a Promise resolving to `{ success, filename, imported_as_book, warning?, scan_error? }`.
 
-You don't need to implement your own download/proxy logic in the plugin's Python backend — reuse these two APIs instead. See the reference implementation below for a working example.
+### `window.BookOasisPlugin.getProxyUrl(url)` / `getStreamProxyUrl(url)`
+
+Low-level APIs for when you want to `fetch()` a URL directly (or hand it to `<video>`/`hls.js`/`mpegts.js`) without opening a modal. Both check the whitelist first and return a proxy URL string (`Promise<string|null>`) — if the host isn't whitelisted, they show an error toast and return `null`.
+
+```js
+const proxyUrl = await window.BookOasisPlugin.getProxyUrl('http://example.com/data.json');
+if (proxyUrl) {
+  const res = await fetch(proxyUrl);
+  // ...
+}
+
+// For live streams (HLS etc.)
+const streamUrl = await window.BookOasisPlugin.getStreamProxyUrl('http://example.com/live/index.m3u8');
+if (streamUrl) hls.loadSource(streamUrl); // or videoEl.src = streamUrl
+```
+
+- **`getProxyUrl`** → goes through `/api/webview/proxy`. The server caps the full response at 15MB in memory, so it's meant for text/JSON/small files. This is the same proxy `openWebview()` uses internally.
+- **`getStreamProxyUrl`** → goes through `/api/webview/hls-proxy`. For `.m3u8` playlists, the server fetches it and rewrites every segment/key (`URI="..."`) URL inside to go through this proxy; segment (`.ts` etc.) requests are streamed through without buffering. The `Range` header is also forwarded upstream. Use this when playing an http stream from an https page (to avoid mixed-content) or when the target server doesn't allow CORS. There's no response size cap (live streams are assumed), so don't use it for regular file downloads — use `getProxyUrl` or `downloadToLibrary` instead.
+
+Both functions check a client-side whitelist cache first so users get instant feedback without a round trip, but the server always re-validates independently as the actual security boundary.
+
+**When you need a POST with a body** (e.g. DASH/Widevine DRM license requests — external APIs that CORS blocks the browser from POSTing to directly): the URL these functions return is just a string, so simply `fetch()` it yourself with `method: 'POST'` — there's no separate dedicated helper.
+
+```js
+const licenseProxyUrl = await window.BookOasisPlugin.getStreamProxyUrl('https://license.example.com/widevine');
+if (licenseProxyUrl) {
+  const res = await fetch(licenseProxyUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: licenseRequestBytes, // Widevine/PlayReady license request binary
+  });
+  const licenseResponseBytes = await res.arrayBuffer();
+}
+```
+
+- The server relays the request body as-is to the target URL and returns the response as-is, with no caching or rewriting (both `/api/webview/proxy` and `/api/webview/hls-proxy` support this via a shared implementation).
+- The request body is capped at **256KB** and the response body at **1MB** — this is meant for small payloads like license requests, not large uploads/downloads.
+- If you set a `Content-Type` header on the request, it's forwarded upstream as-is.
+- Same as GET, it must pass the whitelist check + SSRF defense (private IP blocking, per-hop redirect re-validation).
+
+### `window.BookOasisPlugin.getCachedImageUrl(url)`
+
+Converts an external image with a domain that varies per source — broadcaster logos, artist thumbnails, podcast artwork — into a local cache URL string you can drop straight into `<img src>`. Unlike the two functions above, **no whitelist registration is required** — images aren't executable content and are low-risk, and requiring per-domain registration for every image source would make this impractical (the server still blocks private/loopback IPs). It's a synchronous function, so just call it directly without `await`.
+
+```js
+const img = document.createElement('img');
+img.src = window.BookOasisPlugin.getCachedImageUrl(channel.logo) || '/static/img/fallback.png';
+```
+
+- Goes through `/api/webview/logo-cache`. The server fetches the original **only once per URL**, converts it to WebP, and caches it locally (cache key = MD5 hash of the URL); subsequent requests for the same URL are served from the local file without re-fetching the original CDN.
+- Response size is capped at 2MB (assumes logos/thumbnails). Not suitable for regular photos or large images.
+- Returns `null` if `url` is empty or not `http(s)` (including placeholder strings like `"None"` from the source data) — always have a fallback icon/image ready.
+- Reusable across any plugin that needs to pull small images from many different external domains — M3U/IPTV player logos, mp3/podcast player album art, RSS reader favicons, and more.
+
+You don't need to implement your own download/proxy logic in the plugin's Python backend — reuse these APIs instead. See the reference implementation below for a working example.
 
 ### Reference implementation: the `gutenberg_browser` sample plugin
 

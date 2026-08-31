@@ -121,14 +121,21 @@ def validate_public_http_url(url):
 
 def fetch_with_redirect_revalidation(url, whitelist_patterns, method='GET',
                                       max_redirects=3, timeout=DEFAULT_TIMEOUT,
-                                      extra_headers=None):
+                                      extra_headers=None, data=None):
     """리다이렉트를 자동으로 따라가지 않고 매 hop마다 재검증하며 요청한다.
     원 요청(플러그인 호출을 유발한 브라우저 요청)의 쿠키/인증 헤더는 전달하지 않는다 —
-    헤더는 이 함수가 처음부터 새로 구성한다."""
+    헤더는 이 함수가 처음부터 새로 구성한다.
+
+    data: POST 등에서 그대로 릴레이할 원 요청의 raw body(bytes). 표준 브라우저 동작과
+    동일하게 301/302/303 리다이렉트는 GET으로 전환하며 본문을 버리고, 307/308만 원래
+    method와 본문을 유지한 채 재요청한다 - 그래야 의도치 않은 중간 리다이렉트 대상에
+    POST 본문이 실려 재전송되는 걸 막는다."""
     if requests is None:
         raise SSRFBlockedError('requests_unavailable')
 
     current_url = url
+    current_method = method
+    current_data = data
     headers = {'User-Agent': 'BookOasis-Webview/1.0'}
     if extra_headers:
         headers.update(extra_headers)
@@ -139,8 +146,8 @@ def fetch_with_redirect_revalidation(url, whitelist_patterns, method='GET',
             raise SSRFBlockedError(reason, host=host)
 
         response = requests.request(
-            method, current_url, timeout=timeout, allow_redirects=False,
-            stream=True, headers=headers
+            current_method, current_url, data=current_data, timeout=timeout,
+            allow_redirects=False, stream=True, headers=headers
         )
 
         if response.status_code in (301, 302, 303, 307, 308):
@@ -149,6 +156,9 @@ def fetch_with_redirect_revalidation(url, whitelist_patterns, method='GET',
             if not location:
                 raise SSRFBlockedError('redirect_without_location')
             current_url = urljoin(current_url, location)
+            if response.status_code in (301, 302, 303) and current_method != 'GET':
+                current_method = 'GET'
+                current_data = None
             continue
 
         return response

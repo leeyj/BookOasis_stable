@@ -19,7 +19,7 @@ def get_or_cache_remote_poster_webp(poster_source, category, library_id=None, ti
     if not poster_source:
         return None
 
-    from tools.scanner.cover import COVERS_DIR
+    from tools.scanner.cover import COVERS_DIR, save_as_thumbnail_webp
     cache_dir = os.path.join(COVERS_DIR, category, str(library_id)) if library_id is not None else os.path.join(COVERS_DIR, category)
     os.makedirs(cache_dir, exist_ok=True)
 
@@ -58,7 +58,7 @@ def get_or_cache_remote_poster_webp(poster_source, category, library_id=None, ti
         import io
         from PIL import Image
         with Image.open(io.BytesIO(img_data)) as img:
-            img.save(cache_path, "WEBP", quality=80)
+            save_as_thumbnail_webp(img, cache_path)
         return cache_path
     except Exception as e:
         print(f"[Cover-Cache] Poster WebP conversion failed ({poster_source}): {e}")
@@ -76,7 +76,7 @@ def get_or_cache_external_image_webp(url, category, max_bytes=2 * 1024 * 1024, t
     if not url or not str(url).startswith(('http://', 'https://')):
         return None
 
-    from tools.scanner.cover import COVERS_DIR
+    from tools.scanner.cover import COVERS_DIR, save_as_thumbnail_webp
     cache_dir = os.path.join(COVERS_DIR, category)
     os.makedirs(cache_dir, exist_ok=True)
 
@@ -116,7 +116,7 @@ def get_or_cache_external_image_webp(url, category, max_bytes=2 * 1024 * 1024, t
         import io
         from PIL import Image
         with Image.open(io.BytesIO(img_data)) as img:
-            img.save(cache_path, "WEBP", quality=80)
+            save_as_thumbnail_webp(img, cache_path)
         return cache_path
     except Exception as e:
         print(f"[Cover-Cache] External image WebP conversion failed ({url}): {e}")

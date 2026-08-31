@@ -408,6 +408,24 @@ active_subprocess = None
 # 실행 중인 subprocess를 취소 요청 감지 후 얼마나 자주 폴링할지 (초)
 _CANCEL_POLL_INTERVAL = 2.0
 
+
+def _lazy_scan_should_yield_to_priority_task(sq, sub_batch_count):
+    """다음 lazy scan 서브-배치를 이어서 돌리기 전에, 라이브러리 스캔 등 우선순위가
+    높은 작업이 대기 중인지 확인한다. 큐가 단일 워커라 실행 중인 서브-배치를 가로챌
+    수는 없지만, 서브-배치 사이 이 지점에서는 양보할 수 있다 - 안 그러면 lazy scan이
+    (커버 리사이즈 백필처럼 원래 몇 시간씩 걸리는 작업 포함) 큐를 계속 점유해서 사용자가
+    요청한 스캔이 한참 뒤로 밀린다. 여기서 양보해도 lazy scan 쪽 진행 상황(체크포인트)은
+    그대로 보존되어 있어 다음 기회에 정확히 이어서 진행된다."""
+    try:
+        from repositories.scanner_queue_repository import ScannerQueueRepository
+        if ScannerQueueRepository.has_pending_priority_task():
+            sq.log(f"⏸️ 대기 중인 우선순위 작업(라이브러리 스캔 등) 감지 - lazy scan 세션 #{sub_batch_count}에서 양보. 다음 기회에 이어서 진행됩니다.")
+            return True
+    except Exception as yield_err:
+        sq.log(f"[Lazy-Scanner] 우선순위 작업 확인 실패 (무시하고 계속 진행): {yield_err}")
+    return False
+
+
 def _process_lazy_scan(sq, task_id):
     global active_subprocess, stop_requested
     from repositories.scanner_queue_repository import ScannerQueueRepository
@@ -511,6 +529,8 @@ def _process_lazy_scan(sq, task_id):
                     ScannerQueueRepository.update_task_status(task['id'], 'exit_pending', stage=f'시간 한도 재기동 (배치 #{sub_batch_count})')
             except Exception as st_err:
                 sq.log(f"[Lazy-Scanner] Intermediate status update warning: {st_err}")
+            if _lazy_scan_should_yield_to_priority_task(sq, sub_batch_count):
+                break
             continue
         elif returncode == 10:
             sq.log(f"⚡ 서브-배치 세션 #{sub_batch_count} 마감 (RAM 환수 완료). 다음 분량을 계속 처리합니다.")
@@ -521,6 +541,8 @@ def _process_lazy_scan(sq, task_id):
                     ScannerQueueRepository.update_task_status(task['id'], 'exit_pending', stage=f'RAM 환수 재기동 (배치 #{sub_batch_count})')
             except Exception as st_err:
                 sq.log(f"[Lazy-Scanner] Intermediate status update warning: {st_err}")
+            if _lazy_scan_should_yield_to_priority_task(sq, sub_batch_count):
+                break
             continue
         elif returncode in (0, -15, -9, None):
             sq.log(f"✅ lazy_scanner completed gracefully (code: {returncode})")

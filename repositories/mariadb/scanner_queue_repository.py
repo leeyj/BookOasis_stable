@@ -397,6 +397,22 @@ class ScannerQueueRepository:
         return dict(row) if row else None
 
     @staticmethod
+    def has_pending_priority_task():
+        """lazy_scan이 아닌 다른(우선순위 높은) 대기 중 작업이 있는지 확인한다.
+        긴 lazy_scan 서브배치 루프(커버 리사이즈 백필 등) 도중에도, 사용자가 요청한
+        라이브러리 스캔 같은 작업이 대기 중이면 lazy_scan이 즉시 양보할 수 있게 하기 위함
+        (single-worker 큐라 실행 중인 작업을 가로챌 수는 없고, 다음 서브-배치로 넘어가기
+        전에 스스로 확인해서 양보하는 방식)."""
+        conn = database.get_connection('general')
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT 1 FROM scanner_tasks WHERE status = 'pending' AND task_type != 'lazy_scan' LIMIT 1"
+        )
+        row = cursor.fetchone()
+        conn.close()
+        return row is not None
+
+    @staticmethod
     def try_acquire_task(task_id, now_str):
         import os
         conn = database.get_connection('general')

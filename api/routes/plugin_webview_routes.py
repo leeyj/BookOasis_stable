@@ -32,6 +32,12 @@ plugin_webview_bp = Blueprint('plugin_webview', __name__)
 WEBVIEW_MAX_BYTES = 15 * 1024 * 1024       # 15MB — 웹뷰로 표시할 페이지 캡
 DOWNLOAD_MAX_BYTES = 500 * 1024 * 1024     # 500MB — 도서 다운로드 캡
 
+# POST 바디 릴레이(DRM 라이선스 요청 등) 전용 캡. 앱 전역 MAX_CONTENT_LENGTH(기본 100MB,
+# core.py)는 일반 업로드 기준이라 이 용도로는 지나치게 넉넉하다 - 실제로 릴레이할 요청/응답은
+# 보통 수 KB~수백 KB 수준이므로 훨씬 타이트하게 별도로 캡한다.
+PROXY_POST_BODY_MAX_BYTES = 256 * 1024       # 256KB — 릴레이할 요청 본문
+PROXY_POST_RESPONSE_MAX_BYTES = 1024 * 1024  # 1MB — 릴레이 응답 본문
+
 _ERROR_MESSAGES = {
     'invalid_url': 'URL 형식이 올바르지 않습니다.',
     'invalid_scheme': 'http/https 주소만 허용됩니다.',
@@ -42,6 +48,7 @@ _ERROR_MESSAGES = {
     'too_many_redirects': '리다이렉트가 너무 많습니다.',
     'response_too_large': '응답 크기가 허용 한도를 초과했습니다.',
     'requests_unavailable': '서버에 requests 모듈이 설치되어 있지 않습니다.',
+    'request_body_too_large': '요청 본문 크기가 허용 한도를 초과했습니다.',
 }
 
 
@@ -53,6 +60,43 @@ def _error_response(reason, status=403, host=None):
         # 사용자가 무엇을 더 등록해야 할지 알 수 있다.
         message = f"허용 목록에 없는 도메인입니다: {host} (설정에서 추가해주세요)"
     return jsonify({'success': False, 'error': reason, 'message': message}), status
+
+
+def _relay_post_body(url, patterns):
+    """POST 바디를 그대로 화이트리스트된 외부 URL로 릴레이하고 응답을 그대로 돌려준다.
+    DRM 라이선스 요청처럼 CORS 때문에 브라우저에서 직접 POST할 수 없는 외부 API를
+    우회하기 위한 용도 - 캐시/플레이리스트 재작성 없이 응답을 그대로 통과시킨다."""
+    body = request.get_data()
+    if len(body) > PROXY_POST_BODY_MAX_BYTES:
+        return _error_response('request_body_too_large', 413)
+
+    extra_headers = {}
+    content_type = request.headers.get('Content-Type')
+    if content_type:
+        extra_headers['Content-Type'] = content_type
+
+    try:
+        upstream = fetch_with_redirect_revalidation(
+            url, patterns, method='POST', extra_headers=extra_headers, data=body,
+        )
+    except SSRFBlockedError as e:
+        return _error_response(e.reason, host=e.host)
+    except Exception as e:
+        return jsonify({'success': False, 'error': 'fetch_failed', 'message': str(e)}), 502
+
+    try:
+        resp_body = read_capped(upstream, PROXY_POST_RESPONSE_MAX_BYTES)
+    except SSRFBlockedError as e:
+        upstream.close()
+        return _error_response(e.reason, 413)
+
+    status_code = upstream.status_code
+    resp_content_type = upstream.headers.get('Content-Type', 'application/octet-stream')
+    upstream.close()
+
+    resp = Response(resp_body, status=status_code, content_type=resp_content_type)
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
 
 
 # ─────────────────────────────── 화이트리스트 CRUD ───────────────────────────────
@@ -93,7 +137,7 @@ def remove_whitelist_domain():
 
 # ─────────────────────────────── 웹뷰 프록시 ───────────────────────────────
 
-@plugin_webview_bp.route('/api/webview/proxy', methods=['GET'])
+@plugin_webview_bp.route('/api/webview/proxy', methods=['GET', 'POST'])
 @login_required
 def webview_proxy():
     url = request.args.get('url')
@@ -104,6 +148,11 @@ def webview_proxy():
     host = extract_host_from_url(url)
     if not host:
         return _error_response('invalid_url', 400)
+
+    # DRM 라이선스 요청 등 바디가 있는 POST는 웹뷰 페이지 렌더링(HTML <base> 태그 주입 등)과
+    # 성격이 완전히 달라서 별도 분기로 처리한다 - 캡/에러코드도 전용으로 분리(_relay_post_body).
+    if request.method == 'POST':
+        return _relay_post_body(url, patterns)
 
     try:
         upstream = fetch_with_redirect_revalidation(url, patterns, method='GET')
@@ -170,7 +219,7 @@ def _rewrite_hls_playlist(text, base_url, proxy_path):
     return '\n'.join(out_lines)
 
 
-@plugin_webview_bp.route('/api/webview/hls-proxy', methods=['GET'])
+@plugin_webview_bp.route('/api/webview/hls-proxy', methods=['GET', 'POST'])
 @login_required
 def hls_proxy():
     url = request.args.get('url')
@@ -181,6 +230,11 @@ def hls_proxy():
     host = extract_host_from_url(url)
     if not host:
         return _error_response('invalid_url', 400)
+
+    # DRM 라이선스 요청 등 바디가 있는 POST는 세그먼트 스트리밍/플레이리스트 재작성과
+    # 성격이 완전히 달라서 별도 분기로 처리한다 - 응답을 그대로(캐시/재작성 없이) 릴레이한다.
+    if request.method == 'POST':
+        return _relay_post_body(url, patterns)
 
     extra_headers = {}
     range_header = request.headers.get('Range')

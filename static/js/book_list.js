@@ -65,7 +65,7 @@ export async function loadBooksList(isAppend = false, startPage = null) {
   console.log(`[Book-List] loadBooksList 시작 - type=${state.currentLibraryType}, libraryId=${state.currentLibraryId}, isAppend=${isAppend}`);
   
   try {
-    const limit = state.LIMIT || 120;
+    const limit = state.LIMIT || 60;
     const targetPage = isAppend ? state.currentPage : (startPage || 1);
     const requestFilters = {
       type: state.currentLibraryType,
@@ -175,7 +175,7 @@ export async function loadPreviousBooksPage() {
   if (spinnerTop) spinnerTop.classList.add('is-loading');
 
   try {
-    const limit = state.LIMIT || 120;
+    const limit = state.LIMIT || 60;
     const data = await api.fetchBooksList({
       type: state.currentLibraryType,
       libraryId: state.currentLibraryId,

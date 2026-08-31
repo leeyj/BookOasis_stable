@@ -961,7 +961,9 @@ def get_dashboard_data(self, db_type, limit=10):
 
 플러그인이 외부 사이트를 앱 내에서 보여주거나, 외부 URL의 파일을 라이브러리로 다운로드해야 할 때 쓰는 코어 제공 API입니다.
 
-**책임 소재**: BookOasis는 어떤 외부 도메인도 기본 제공/추천하지 않습니다. 이 API는 **각 사용자가 [설정 > 외부 도메인] 탭에서 직접 등록한 화이트리스트**에 있는 도메인에 대해서만 동작합니다. 플러그인이 임의로 화이트리스트를 추가/우회할 수 없으며, 어떤 도메인을 등록하고 무엇을 하는지는 전적으로 사용자 본인의 책임입니다.
+> ⚠️ **`window.BookOasisPlugin`이 플러그인에 대한 유일한 공식 계약입니다.** 아래 나열된 함수 외에 `window` 전역에서 다른 코어 함수(예: 특정 뷰 전환 함수)가 우연히 접근 가능하더라도, 이는 문서화되지 않은 내부 구현 세부사항이며 사전 공지 없이 이름이 바뀌거나 동작이 변경되거나 제거될 수 있습니다. 필요한 기능이 `window.BookOasisPlugin`에 없다면 직접 다른 전역을 찾아 쓰지 말고 이슈로 요청해주세요.
+
+**책임 소재**: BookOasis는 어떤 외부 도메인도 기본 제공/추천하지 않습니다. 이 API는 **각 사용자가 [설정 > 외부 도메인] 탭에서 직접 등록한 화이트리스트**에 있는 도메인에 대해서만 동작합니다. 플러그인이 임의로 화이트리스트를 추가/우회할 수 없으며, 어떤 도메인을 등록하고 무엇을 하는지는 전적으로 사용자 본인의 책임입니다. 도메인을 등록하면 그 도메인으로의 GET 읽기뿐 아니라 아래 POST 바디 릴레이(라이선스 요청 등)도 함께 허용된다는 점을 사용자가 인지하도록 안내에 반영하십시오.
 
 ### `window.BookOasisPlugin.openWebview(url)`
 
@@ -1011,6 +1013,25 @@ if (streamUrl) hls.loadSource(streamUrl); // 또는 videoEl.src = streamUrl
 - **`getStreamProxyUrl`** → `/api/webview/hls-proxy` 경유. `.m3u8` 플레이리스트는 서버가 받아서 안의 세그먼트/키 URL을 전부 프록시 경유로 재작성해 돌려주고, 세그먼트(`.ts` 등) 요청은 버퍼링 없이 그대로 스트리밍 pass-through됩니다. `Range` 헤더도 업스트림에 전달됩니다. https로 서빙되는 페이지에서 http 스트림을 재생할 때(mixed-content 회피)나 대상 서버가 CORS를 열어주지 않을 때 이 함수를 쓰십시오. 응답 크기 제한이 없으므로(라이브 스트림 전제) 일반 파일 다운로드에는 쓰지 마십시오 — 그 경우 `getProxyUrl` 또는 `downloadToLibrary`를 쓰십시오.
 
 두 함수 모두 실제 네트워크 요청 전에 클라이언트 캐시로 화이트리스트를 먼저 확인해 왕복 없이 빠르게 안내하지만, 최종 검증은 항상 서버가 다시 수행합니다.
+
+**바디가 있는 POST가 필요한 경우** (DASH/Widevine DRM 라이선스 요청 등, 브라우저에서 직접 POST하면 CORS로 막히는 외부 API): 두 함수가 돌려주는 URL은 그냥 문자열이므로, 받은 URL로 직접 `fetch()`를 POST로 호출하면 됩니다 — 별도의 전용 헬퍼 함수는 없습니다.
+
+```js
+const licenseProxyUrl = await window.BookOasisPlugin.getStreamProxyUrl('https://license.example.com/widevine');
+if (licenseProxyUrl) {
+  const res = await fetch(licenseProxyUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: licenseRequestBytes, // Widevine/PlayReady 라이선스 요청 바이너리
+  });
+  const licenseResponseBytes = await res.arrayBuffer();
+}
+```
+
+- 서버는 요청 바디를 그대로 대상 URL로 릴레이하고 응답을 캐시/재작성 없이 그대로 돌려줍니다(`/api/webview/proxy`, `/api/webview/hls-proxy` 둘 다 지원, 구현 공유).
+- 요청 바디는 **256KB**, 응답 바디는 **1MB**로 캡됩니다 — 큰 파일 업로드/다운로드 용도가 아니라 라이선스 요청처럼 작은 페이로드 전제입니다.
+- 요청 시 `Content-Type` 헤더를 지정하면 그대로 업스트림에 전달됩니다.
+- GET과 동일하게 화이트리스트 + SSRF 방어(사설 IP 차단, 리다이렉트 매 hop 재검증)를 통과해야 합니다.
 
 ### `window.BookOasisPlugin.getCachedImageUrl(url)`
 

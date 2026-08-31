@@ -1,4 +1,7 @@
 # CHANGELOG
+## v2.5.0
+- (improvement) 대시보드 로딩 개선 | improve dashboard loading
+
 ## v2.4.9
 - (feature) 플러그인용 외부 스트림/이미지 프록시 API 신규 추가 — `getStreamProxyUrl`(HLS 플레이리스트 재작성 + 세그먼트 스트리밍, mixed-content/CORS 우회), `getProxyUrl`(범용 소형 응답 프록시), `getCachedImageUrl`(도메인 무관 외부 로고/썸네일 WebP 로컬 캐싱, 화이트리스트 불필요) | add plugin-facing external stream/image proxy APIs — `getStreamProxyUrl` (HLS playlist rewriting + segment streaming, bypasses mixed-content/CORS), `getProxyUrl` (generic small-response proxy), `getCachedImageUrl` (domain-agnostic external logo/thumbnail WebP caching, no whitelist required)
 

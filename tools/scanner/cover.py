@@ -16,6 +16,24 @@ os.makedirs(COVERS_DIR, exist_ok=True)
 
 SUPPORTED_IMAGE_FORMATS = ('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif')
 
+# 실제 화면에 표시되는 커버 크기의 상한(레티나 2배 포함)에 맞춘 값. 그리드 카드 너비는
+# 설정(BOOK_THUMBNAIL_WIDTH, templates/components/settings/general_tab.html)에서 120~240px로
+# 사용자가 직접 조절 가능하고, 도서 상세 볼륨 리스트(.volume-thumb, style.css)는 174x240
+# 고정이라 그보다도 크게 잡아야 한다 - 240px 설정 기준 레티나(x2) = 480x660이 실제 최대
+# 필요 크기. 원본 커버를 그대로 저장하면 브라우저가 화면에 필요한 것보다 훨씬 많은 픽셀을
+# 디코드해야 해서 스크롤 중 커버가 뒤늦게 채워지는 체감으로 이어진다(실측: 표본 커버 평균
+# 해상도 433x576px, 90퍼센타일 640x925px) - 480x660으로도 대부분의 원본보다는 작아 여전히
+# 의미 있게 줄어든다.
+COVER_THUMB_MAX_W = 480
+COVER_THUMB_MAX_H = 660
+
+
+def save_as_thumbnail_webp(img, dest_path, quality=80):
+    """커버를 저장 직전에 표시에 필요한 크기로 축소해 WebP로 저장한다.
+    Image.thumbnail()은 이미 더 작은 이미지는 확대하지 않고 그대로 둔다."""
+    img.thumbnail((COVER_THUMB_MAX_W, COVER_THUMB_MAX_H), Image.LANCZOS)
+    img.save(dest_path, "WEBP", quality=quality)
+
 def extract_epub_cover_direct(epub_path, dest_path):
     """Search cover image in EPUB file, convert to WebP format and save to dest_path"""
     try:
@@ -104,7 +122,7 @@ def extract_epub_cover_direct(epub_path, dest_path):
                     # Save via Pillow WebP encoding
                     try:
                         with Image.open(io.BytesIO(img_data)) as img:
-                            img.save(dest_path, "WEBP", quality=80)
+                            save_as_thumbnail_webp(img, dest_path)
                     except Exception as e:
                         print(f"[Scanner-EPUB-Cover] WebP encoding failed, saving original binary: {e}")
                         with open(dest_path, 'wb') as out_f:
@@ -153,7 +171,7 @@ def download_cover_from_url(file_path, image_url, force=False, library_id=None):
         
         try:
             img = Image.open(io.BytesIO(img_data))
-            img.save(cover_filepath, "WEBP", quality=80)
+            save_as_thumbnail_webp(img, cover_filepath)
         except Exception as e:
             print(f"[Scanner-Cover] URL image WebP encoding failed: {e}. Trying original save.")
             with open(cover_filepath, 'wb') as out_f:
@@ -212,7 +230,7 @@ def extract_cover_from_b64(file_path, cover_b64, force=False, library_id=None):
         # Save via Pillow WebP encoding
         try:
             img = Image.open(io.BytesIO(img_data))
-            img.save(cover_filepath, "WEBP", quality=80)
+            save_as_thumbnail_webp(img, cover_filepath)
         except Exception as e:
             print(f"[Scanner-Cover] Base64 image identify/WebP render failed (binary corruption suspected): {e}. Fallback to cover extraction in original file.")
             return None
@@ -264,7 +282,7 @@ def get_series_cover_fallback(series_name, folder_path, force=False, is_remote=F
     if cand_path:
         try:
             with Image.open(cand_path) as img:
-                img.save(local_cover_path, "WEBP", quality=80)
+                save_as_thumbnail_webp(img, local_cover_path)
             print(f"[Scanner-Cover] Individual book 1:1 mapped cover WebP convert copy complete: {cand_path} -> {local_cover_path}, Force={force}")
             return db_cover_path
         except Exception as e:
@@ -280,7 +298,7 @@ def get_series_cover_fallback(series_name, folder_path, force=False, is_remote=F
     if cand_path:
         try:
             with Image.open(cand_path) as img:
-                img.save(local_cover_path, "WEBP", quality=80)
+                save_as_thumbnail_webp(img, local_cover_path)
             print(f"[Scanner-Cover] Series representative common cover WebP convert copy complete: {cand_path} -> {local_cover_path}, Force={force}")
             return db_cover_path
         except Exception as e:
@@ -336,7 +354,7 @@ def get_series_cover_fallback(series_name, folder_path, force=False, is_remote=F
                             # Save via Pillow WebP encoding
                             try:
                                 with Image.open(io.BytesIO(img_data)) as img:
-                                    img.save(local_cover_path, "WEBP", quality=80)
+                                    save_as_thumbnail_webp(img, local_cover_path)
                             except Exception as e:
                                 print(f"[Scanner-Cover-Auto] WebP encoding failed, saving original binary: {e}")
                                 with open(local_cover_path, 'wb') as img_f:
@@ -392,7 +410,7 @@ def get_imgdir_cover(folder_path, virtual_file_path, force=False, library_id=Non
 
     try:
         with Image.open(candidate) as img:
-            img.save(local_cover_path, "WEBP", quality=80)
+            save_as_thumbnail_webp(img, local_cover_path)
         print(f"[Scanner-Cover-IMGDIR] Cover generated: '{candidate}' -> '{local_cover_path}'")
         return db_cover_path
     except Exception as e:

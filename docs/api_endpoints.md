@@ -784,18 +784,20 @@ BookOasis는 외부 수신 서버로 도서 이벤트를 `POST` 전송할 수 �
 * **권한**: `@login_required`
 * **요청 파라미터**: `{"domain": "example.com"}` (쿼리스트링 `?domain=`도 허용)
 
-#### `[GET]` `/api/webview/proxy`
+#### `[GET, POST]` `/api/webview/proxy`
 * **설명**: URL 하나를 서버가 대신 fetch해서 그대로 반환하는 범용 프록시. HTML 응답이면 상대경로 자산이 원본 사이트 기준으로 풀리도록 `<base href="...">`를 자동 주입합니다. 텍스트/JSON/작은 파일용이며, 응답 본문 전체를 메모리에 15MB까지 캡해서 읽습니다 — 실시간 스트림에는 쓰지 마십시오(아래 `hls-proxy` 참고).
 * **권한**: `@login_required`
 * **쿼리 파라미터**: `url` (string, 필수) — 대상 URL (`http`/`https`만 허용)
-* **에러**: 화이트리스트 미등록(403), 사설 IP 해석(403), 응답 초과(413), scheme 오류(400) 등 — `{"success": false, "error": "<사유코드>", "message": "<한글 설명>"}`
+* **POST(바디 릴레이)**: 요청 바디를 그대로 대상 URL로 릴레이하고 응답을 캐시/재작성 없이 그대로 돌려줍니다 — DRM 라이선스 요청 등 브라우저에서 직접 POST하면 CORS로 막히는 외부 API를 우회할 때 사용합니다. 요청 바디는 256KB, 응답 바디는 1MB로 별도 캡됩니다(앱 전역 업로드 캡보다 훨씬 타이트). `Content-Type` 헤더는 있으면 그대로 업스트림에 전달됩니다.
+* **에러**: 화이트리스트 미등록(403), 사설 IP 해석(403), 응답 초과(413), 요청 바디 초과(413, `request_body_too_large`), scheme 오류(400) 등 — `{"success": false, "error": "<사유코드>", "message": "<한글 설명>"}`
 
-#### `[GET]` `/api/webview/hls-proxy`
+#### `[GET, POST]` `/api/webview/hls-proxy`
 * **설명**: 실시간 스트림(HLS 등) 재생 전용 프록시. `.m3u8` 플레이리스트는 서버가 받아서 안의 세그먼트/키(`URI="..."`) URL을 전부 이 프록시 경유 URL로 재작성해 돌려주고, 세그먼트(`.ts` 등) 요청은 메모리 버퍼링 없이 그대로 스트리밍 pass-through됩니다. https로 서빙되는 페이지에서 http 스트림을 재생할 때(mixed-content 회피)나 대상 서버가 CORS를 열어주지 않는 경우에 사용합니다.
 * **권한**: `@login_required`
-* **쿼리 파라미터**: `url` (string, 필수) — 대상 `.m3u8`/세그먼트 URL
-* **요청 헤더**: `Range` (선택) — 지정 시 업스트림으로 그대로 전달됩니다.
-* **응답**: 플레이리스트는 재작성된 텍스트(`Content-Type: application/vnd.apple.mpegurl`, `Cache-Control: no-store`), 세그먼트는 원본 `Content-Type`을 유지한 채 스트리밍됩니다. 플레이리스트 텍스트 자체는 2MB로 캡되지만(세그먼트/미디어 바이너리는 캡 없음), 응답 크기 제한이 없으므로(라이브 스트림 전제) 일반 파일 다운로드에는 쓰지 마십시오.
+* **쿼리 파라미터**: `url` (string, 필수) — 대상 `.m3u8`/세그먼트 URL(GET) 또는 라이선스 서버 등 POST 대상 URL
+* **요청 헤더**: `Range` (선택, GET) — 지정 시 업스트림으로 그대로 전달됩니다.
+* **응답(GET)**: 플레이리스트는 재작성된 텍스트(`Content-Type: application/vnd.apple.mpegurl`, `Cache-Control: no-store`), 세그먼트는 원본 `Content-Type`을 유지한 채 스트리밍됩니다. 플레이리스트 텍스트 자체는 2MB로 캡되지만(세그먼트/미디어 바이너리는 캡 없음), 응답 크기 제한이 없으므로(라이브 스트림 전제) 일반 파일 다운로드에는 쓰지 마십시오.
+* **POST(바디 릴레이)**: Widevine/PlayReady 등 DASH DRM 라이선스 서버처럼 바디가 있는 POST가 필요하고 CORS로 막히는 외부 엔드포인트를 우회할 때 사용합니다. `/api/webview/proxy`의 POST와 동일한 구현(`_relay_post_body`)을 공유하며, 요청 256KB/응답 1MB 캡도 동일합니다 — 플레이리스트 재작성이나 스트리밍 로직과는 무관하게 응답을 그대로 통과시킵니다.
 * **에러**: `/api/webview/proxy`와 동일한 사유코드 체계를 씁니다.
 * **참고 구현**: `test/m3u_player-main/m3u_player/script.js`
 

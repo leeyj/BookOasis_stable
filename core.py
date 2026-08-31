@@ -130,6 +130,16 @@ if not IS_WORKER:
             return default
         return str(raw).strip().lower() in ('1', 'true', 'yes', 'on')
 
+    # 세션 쿠키 SameSite를 명시적으로 Lax로 고정한다 - 기존엔 설정이 없어 브라우저 기본값에
+    # 암묵적으로 의존했는데, 이걸 명시해두면 앱 전체의 모든 상태변경(POST) 라우트가 고전적인
+    # cross-site form CSRF로부터 구조적으로 보호된다(플러그인마다 개별 CSRF 검증을 넣을 필요
+    # 없음 - 플러그인은 애초에 서버 라우트를 갖지 않으므로 그렇게 할 수도 없다). SESSION_COOKIE_
+    # SECURE는 기본 False로 둔다 - 대부분의 배포가 LAN에서 순수 HTTP로 접속하는데 True로
+    # 고정하면 그 환경에서 세션 쿠키 자체가 전송되지 않아 로그인이 깨진다. 리버스 프록시로
+    # HTTPS를 앞단에 두는 배포는 SESSION_COOKIE_SECURE=1로 명시적으로 켤 수 있다.
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['SESSION_COOKIE_SECURE'] = _env_flag('SESSION_COOKIE_SECURE', False)
+
     def _env_int(name, default, min_value=0, max_value=1000000):
         raw = os.environ.get(name)
         if raw is None:

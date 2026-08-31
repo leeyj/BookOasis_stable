@@ -5,7 +5,23 @@ import { openReader } from './viewer.js';
 import { showToast } from './view_manager.js';
 import { buildFallbackCoverUrl, getBookCoverSrc, buildTextCoverDataUri, coverAlignToObjectPosition } from './cover_fallback.js';
 import { stripLeadingBracketTags, middleTruncateTitle } from './series_display.js';
+import { initGridPruning, resetGridPruning, notifyCardsAppended, notifyCardsPrepended } from './grid_pruning.js';
 import './scan_activity_status.js';
+
+// 커버 이미지가 (플레이스홀더 → 실제 src로) 로드 완료되면 .is-loaded를 붙여 CSS로 fade-in한다.
+// 실제 로딩 시간은 그대로지만, 뚝뚝 끊기듯 팍 나타나는 대신 부드럽게 나타나서 "계속 로딩
+// 중"으로 보이는 체감을 줄인다. 캐시 히트로 이미 로드가 끝난 상태(imgEl.complete)라면
+// load 이벤트가 다시 안 오므로 즉시 처리한다.
+function markCoverLoaded(imgEl) {
+  imgEl.classList.add('is-loaded');
+}
+function wireCoverFadeIn(imgEl) {
+  if (imgEl.complete && imgEl.naturalWidth > 0) {
+    markCoverLoaded(imgEl);
+    return;
+  }
+  imgEl.addEventListener('load', () => markCoverLoaded(imgEl), { once: true });
+}
 
 // 지연 로딩을 위한 단일 싱글톤 IntersectionObserver 인스턴스
 const lazyImageObserver = ('IntersectionObserver' in window)
@@ -14,6 +30,7 @@ const lazyImageObserver = ('IntersectionObserver' in window)
       if (entry.isIntersecting) {
         const lazyImage = entry.target;
         if (lazyImage.dataset.src) {
+          wireCoverFadeIn(lazyImage);
           lazyImage.src = lazyImage.dataset.src;
           lazyImage.removeAttribute('data-src');
         }
@@ -21,10 +38,72 @@ const lazyImageObserver = ('IntersectionObserver' in window)
       }
     });
   }, {
-    rootMargin: '200px 0px',
+    // 200px -> 100px: 동시에 뷰포트 근처로 들어오는 이미지 수를 줄여 디코드 스파이크를
+    // 낮추는 방향으로 조정 (bookoasis_kavita_performance_improvement_proposal.txt #10, A/B 튜닝)
+    rootMargin: '100px 0px',
     threshold: 0.01
   })
   : null;
+
+// 카드마다 개별로 addEventListener를 붙이는 대신, document에 한 번만 등록해 클릭/터치 시점에
+// event.target.closest()로 실제 카드를 찾아 그 카드가 들고 있는 핸들러(_onClick 등, createBookCard
+// 참고)를 호출한다. 카드가 무한 스크롤로 아무리 쌓여도 실제 리스너 수는 늘어나지 않는다.
+let cardEventDelegationBound = false;
+function initCardEventDelegation() {
+  if (cardEventDelegationBound || typeof document === 'undefined') return;
+  cardEventDelegationBound = true;
+
+  document.addEventListener('click', (e) => {
+    const resumeBtn = e.target.closest('.btn-resume-series');
+    if (resumeBtn) {
+      resumeBtn._onClick?.(e);
+      return;
+    }
+    const favBtn = e.target.closest('[data-role="card-favorite-toggle"]');
+    if (favBtn) {
+      favBtn._onClick?.(e);
+      return;
+    }
+    const card = e.target.closest('.book-card');
+    if (card) card._onClick?.(e);
+  });
+
+  document.addEventListener('pointerdown', (e) => {
+    const card = e.target.closest('.book-card');
+    if (card) card._onPointerDown?.(e);
+  });
+
+  document.addEventListener('pointerup', (e) => {
+    const card = e.target.closest('.book-card');
+    if (card) card._onPointerUp?.(e);
+  });
+
+  document.addEventListener('contextmenu', (e) => {
+    const card = e.target.closest('.book-card');
+    if (card) card._onContextMenu?.(e);
+  });
+
+  document.addEventListener('touchstart', (e) => {
+    const card = e.target.closest('.book-card');
+    if (card) card._onTouchStart?.(e);
+  }, { passive: true });
+
+  document.addEventListener('touchmove', (e) => {
+    const card = e.target.closest('.book-card');
+    if (card) card._onTouchMove?.(e);
+  }, { passive: true });
+
+  document.addEventListener('touchend', (e) => {
+    const card = e.target.closest('.book-card');
+    if (card) card._onTouchEnd?.(e);
+  });
+
+  document.addEventListener('touchcancel', (e) => {
+    const card = e.target.closest('.book-card');
+    if (card) card._onTouchCancel?.(e);
+  });
+}
+initCardEventDelegation();
 
 
 
@@ -174,16 +253,19 @@ export function createBookCard(item, options = {}) {
     }
   };
 
-  card.onclick = handlePrimaryClick;
+  // 카드별로 addEventListener를 직접 걸지 않고, 아래 initCardEventDelegation()이 등록한
+  // document 레벨 위임 리스너가 event.target.closest('.book-card')로 찾은 카드에서 이
+  // 프로퍼티를 호출한다. 카드가 계속 append되어도 실제 리스너 수는 늘지 않는다.
+  card._onClick = handlePrimaryClick;
 
   let pointerStartX = 0;
   let pointerStartY = 0;
-  card.onpointerdown = (e) => {
+  card._onPointerDown = (e) => {
     if (e.button !== 0) return;
     pointerStartX = e.clientX;
     pointerStartY = e.clientY;
   };
-  card.onpointerup = (e) => {
+  card._onPointerUp = (e) => {
     if (e.button !== 0) return;
     const diffX = Math.abs(e.clientX - pointerStartX);
     const diffY = Math.abs(e.clientY - pointerStartY);
@@ -226,6 +308,9 @@ export function createBookCard(item, options = {}) {
   const lazyPlaceholder = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
   const imgSrc = shouldHideCover ? fallbackCoverSrc : (useLazyLoad ? lazyPlaceholder : coverSrc);
   const imgDataSrcAttr = (!shouldHideCover && useLazyLoad) ? `data-src="${coverSrc}"` : '';
+  // 최초 렌더링 시 화면에 바로 보이는 앞쪽 카드만 브라우저에 "먼저 받아와" 힌트를 준다
+  // (appendBooksGrid의 highPriorityCount 참고). 무한 스크롤로 뒤에 붙는 카드는 화면 밖이라 해당 없음.
+  const fetchPriorityAttr = options.imagePriority ? ` fetchpriority="${options.imagePriority}"` : '';
   // 작가별 모음 카드는 여러 시리즈의 대표 커버가 섞여 있어 단일 book의 정렬값을 적용하지 않음
   const coverObjectPositionStyle = item.is_author_group ? '' : ` style="object-position: ${coverAlignToObjectPosition(item.cover_align)} center;"`;
 
@@ -246,7 +331,7 @@ export function createBookCard(item, options = {}) {
   card.innerHTML = `
     <div class="book-card-cover">
       <div class="book-card-overlay"></div>
-      <img src="${imgSrc}" ${imgDataSrcAttr} alt="${displayTitle}" decoding="async" loading="lazy"${coverObjectPositionStyle}>
+      <img src="${imgSrc}" ${imgDataSrcAttr} alt="${displayTitle}" decoding="async" loading="lazy"${fetchPriorityAttr}${coverObjectPositionStyle}>
       ${badgeHtml}
       ${favBtnHtml}
       ${lockedBadgeHtml}
@@ -281,18 +366,24 @@ export function createBookCard(item, options = {}) {
       if (lazyImageObserver) {
         lazyImageObserver.observe(imgEl);
       } else {
+        // IntersectionObserver 미지원 환경: 관찰 없이 바로 실제 src로 교체
+        wireCoverFadeIn(imgEl);
         imgEl.src = imgEl.dataset.src;
       }
     }
+  } else if (imgEl) {
+    // lazy-load를 안 쓰거나(useLazyLoad=false) 커버를 숨긴 경우: imgSrc가 처음부터 최종 src이므로
+    // 여기서 바로 fade-in을 건다(이후 dataset.src로의 별도 교체가 없음).
+    wireCoverFadeIn(imgEl);
   }
 
 
 
 
-  // 재생 버튼 클릭 핸들러 명시적 바인딩
+  // 재생 버튼 클릭 핸들러 명시적 바인딩 (실제 리스너는 initCardEventDelegation에서 위임 등록)
   const resumeBtn = card.querySelector('.btn-resume-series');
   if (resumeBtn && typeof options.onActionClick === 'function') {
-    resumeBtn.onclick = (e) => {
+    resumeBtn._onClick = (e) => {
       e.stopPropagation();
       e.preventDefault();
       options.onActionClick(e, item);
@@ -301,7 +392,7 @@ export function createBookCard(item, options = {}) {
 
   const favBtn = card.querySelector('[data-role="card-favorite-toggle"]');
   if (favBtn) {
-    favBtn.addEventListener('click', (e) => {
+    favBtn._onClick = (e) => {
       e.stopPropagation();
       e.preventDefault();
       const nextStatus = Number.parseInt(favBtn.getAttribute('data-next-status') || '0', 10) || 0;
@@ -309,13 +400,13 @@ export function createBookCard(item, options = {}) {
       const parsedBookId = Number.parseInt(bookIdRaw, 10);
       const bookId = Number.isFinite(parsedBookId) ? parsedBookId : null;
       toggleCardFavoriteEvent(e, favBtn.getAttribute('data-favorite-name') || '', bookId, nextStatus, item.is_author_group ? (item.author_key || '') : null);
-    });
+    };
   }
 
   // 우클릭 컨텍스트 메뉴 바인딩 (이 책 스캔용) — 작가별 모음 카드는 여러 시리즈의 집계라
   // "이 책 스캔"/"읽지않음으로 변경" 등 단일 책·시리즈 전제 액션이 성립하지 않으므로, 대신
   // 실제로 성립하는 액션(컬렉션 일괄 추가)만 담은 전용 축소 메뉴(author_group_context_menu.js)를 띄운다.
-  card.addEventListener('contextmenu', (e) => {
+  card._onContextMenu = (e) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -336,10 +427,10 @@ export function createBookCard(item, options = {}) {
         fileFormat: fmt,
       });
     }
-  });
+  };
 
   // 모바일 터치 대응 (롱 프레스 감지) — 작가별 모음 카드는 전용 축소 메뉴로 분기
-  card.addEventListener('touchstart', (e) => {
+  card._onTouchStart = (e) => {
     if (item.is_author_group) {
       if (typeof window.handleLongPressTouchStart === 'function') {
         window.handleLongPressTouchStart(e, (x, y) => {
@@ -363,25 +454,21 @@ export function createBookCard(item, options = {}) {
         }
       });
     }
-  }, { passive: true });
+  };
 
-  card.addEventListener('touchmove', (e) => {
+  card._onTouchMove = (e) => {
     if (typeof window.handleLongPressTouchMove === 'function') {
       window.handleLongPressTouchMove(e);
     }
-  }, { passive: true });
+  };
 
-  card.addEventListener('touchend', (e) => {
+  card._onTouchEnd = (e) => {
     if (typeof window.handleLongPressTouchEnd === 'function') {
       window.handleLongPressTouchEnd(e);
     }
-  });
+  };
 
-  card.addEventListener('touchcancel', (e) => {
-    if (typeof window.handleLongPressTouchEnd === 'function') {
-      window.handleLongPressTouchEnd(e);
-    }
-  });
+  card._onTouchCancel = card._onTouchEnd;
 
   return card;
 }
@@ -391,6 +478,7 @@ export function renderHistoryGrid(booksList) {
   const container = document.getElementById('books-list-container');
   if (!container) return;
 
+  resetGridPruning();
   if (booksList.length === 0) {
     const tNoHistory = window.i18n ? window.i18n.t('common.no_history_books') : '최근에 읽은 도서 내역이 없습니다.';
     container.innerHTML = `<div class="loading-spinner">${tNoHistory}</div>`;
@@ -430,11 +518,39 @@ export function renderHistoryGrid(booksList) {
   container.appendChild(fragment);
 }
 
+// 도서 시리즈 카드 하나 생성 (append/prepend/정리된 카드 복원에서 공용으로 사용)
+// priority: 최초 렌더링 시 화면에 바로 보이는 앞쪽 카드에 "high" 힌트를 주기 위한 옵션
+// (renderBooksGrid -> appendBooksGrid의 highPriorityCount 참고). 무한 스크롤로 뒤에 붙는
+// 카드나 정리(pruning) 후 복원되는 카드는 이미 화면 안/밖 여부가 다르므로 해당 없음(undefined).
+function buildSeriesGridCard(item, priority) {
+  const detailDisplayTitle = resolveCardDisplayTitle(item, true);
+  return createBookCard(item, {
+    showVolumeCount: true,
+    actionTitle: '이어읽기',
+    imagePriority: priority,
+    onPrimaryClick: item.is_author_group
+      ? (e) => window.onAuthorGroupCardClick?.(item)
+      : (e) => openBookDetail(e, item.series_name, item.library_id, item.representative_book_id, detailDisplayTitle),
+    onActionClick: (e) => {
+      if (item.is_author_group) return;
+      if (typeof window.resumeSeries === 'function') {
+        window.resumeSeries(e, item.series_name, item.library_id, item.representative_book_id);
+      }
+    }
+  });
+}
+initGridPruning(buildSeriesGridCard);
+
+// 최초 렌더링 시 fetchpriority="high"를 줄 앞쪽 카드 수 (대략 2행 분량 - 실제 컬럼 수와 무관하게
+// 넉넉히 잡아도, 화면 밖 카드는 어차피 lazy-load가 늦게 실제 요청을 보내므로 부작용이 없다)
+const INITIAL_HIGH_PRIORITY_IMAGE_COUNT = 12;
+
 // 도서 시리즈 목록 렌더링
 export function renderBooksGrid(seriesList) {
   const container = document.getElementById('books-list-container');
   if (!container) return;
 
+  resetGridPruning();
   if (seriesList.length === 0) {
     const tNoBooks = window.i18n ? window.i18n.t('common.no_library_books') : '보관함에 등록된 도서가 없습니다.';
     container.innerHTML = `<div class="loading-spinner">${tNoBooks}</div>`;
@@ -442,33 +558,20 @@ export function renderBooksGrid(seriesList) {
   }
 
   container.innerHTML = '';
-  appendBooksGrid(seriesList);
+  appendBooksGrid(seriesList, INITIAL_HIGH_PRIORITY_IMAGE_COUNT);
 }
 
 // 도서 시리즈 목록 추가 (무한 스크롤 연동)
-export function appendBooksGrid(seriesList) {
+export function appendBooksGrid(seriesList, highPriorityCount = 0) {
   const container = document.getElementById('books-list-container');
   if (!container) return;
 
   const fragment = document.createDocumentFragment();
-  seriesList.forEach(item => {
-    const detailDisplayTitle = resolveCardDisplayTitle(item, true);
-    const card = createBookCard(item, {
-      showVolumeCount: true,
-      actionTitle: '이어읽기',
-      onPrimaryClick: item.is_author_group
-        ? (e) => window.onAuthorGroupCardClick?.(item)
-        : (e) => openBookDetail(e, item.series_name, item.library_id, item.representative_book_id, detailDisplayTitle),
-      onActionClick: (e) => {
-        if (item.is_author_group) return;
-        if (typeof window.resumeSeries === 'function') {
-          window.resumeSeries(e, item.series_name, item.library_id, item.representative_book_id);
-        }
-      }
-    });
-    fragment.appendChild(card);
+  seriesList.forEach((item, index) => {
+    fragment.appendChild(buildSeriesGridCard(item, index < highPriorityCount ? 'high' : undefined));
   });
   container.appendChild(fragment);
+  notifyCardsAppended(seriesList);
 }
 
 // 도서 시리즈 목록 앞쪽에 삽입 (초성 점프 이후 위쪽 무한 스크롤 연동)
@@ -477,24 +580,9 @@ export function prependBooksGrid(seriesList) {
   if (!container) return;
 
   const fragment = document.createDocumentFragment();
-  seriesList.forEach(item => {
-    const detailDisplayTitle = resolveCardDisplayTitle(item, true);
-    const card = createBookCard(item, {
-      showVolumeCount: true,
-      actionTitle: '이어읽기',
-      onPrimaryClick: item.is_author_group
-        ? (e) => window.onAuthorGroupCardClick?.(item)
-        : (e) => openBookDetail(e, item.series_name, item.library_id, item.representative_book_id, detailDisplayTitle),
-      onActionClick: (e) => {
-        if (item.is_author_group) return;
-        if (typeof window.resumeSeries === 'function') {
-          window.resumeSeries(e, item.series_name, item.library_id, item.representative_book_id);
-        }
-      }
-    });
-    fragment.appendChild(card);
-  });
+  seriesList.forEach(item => fragment.appendChild(buildSeriesGridCard(item)));
   container.insertBefore(fragment, container.firstChild);
+  notifyCardsPrepended(seriesList);
 }
 
 // 대시보드 최근 읽은 도서 렌더링

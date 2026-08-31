@@ -101,7 +101,7 @@ async function handleIndexClick(char) {
   if (scrollbarEl) scrollbarEl.classList.add('is-loading');
 
   try {
-    const limit = state.LIMIT || 120;
+    const limit = state.LIMIT || 60;
     const result = await api.fetchJumpPosition({
       type: state.currentLibraryType,
       libraryId: state.currentLibraryId,

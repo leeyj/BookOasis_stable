@@ -1078,6 +1078,122 @@ def run_lazy_video_container_revalidation():
             pass
 
 
+COVER_RESIZE_PROGRESS_FILE = os.path.join(MEDIA_SERVER_DIR, 'cache', 'cover_resize_progress.txt')
+COVER_RESIZE_DONE_SENTINEL = '__DONE__'
+
+
+def _load_lazy_scan_cover_resize_batch_size():
+    """세션당 리사이즈 여부를 확인할 커버 파일 수. 원격 마운트 I/O 없이 로컬 covers/
+    디렉토리만 다루는 순수 CPU 작업이라 개수 기준으로 간단히 배치를 끊는다."""
+    batch_size = 2000
+    try:
+        from repositories.settings_repository import SettingsRepository
+        val = SettingsRepository.get_value('general', 'LAZY_SCAN_COVER_RESIZE_BATCH_SIZE')
+        if val is not None:
+            batch_size = int(str(val).strip() or '2000')
+    except Exception as _re:
+        print(f"[Lazy-Scanner] 커버 리사이즈 배치 크기 설정 로드 실패 (기본 2000장 적용): {_re}")
+    return max(1, batch_size)
+
+
+def run_lazy_cover_resize():
+    """이미 저장돼 있는 커버 이미지 중, 화면 표시 크기보다 훨씬 큰 원본 해상도 그대로
+    저장됐던(리사이즈 로직 도입 이전) 파일을 찾아 축소·재저장하는 1회성 백필.
+
+    신규로 생성되는 커버는 tools/scanner/cover.py의 save_as_thumbnail_webp()가 저장
+    시점에 이미 축소하므로, 여기서는 과거에 저장된 기존 파일만 따라잡으면 된다.
+    원격 마운트(rclone/GDrive)의 원본 도서 파일이 아니라 로컬 covers/ 캐시 파일만
+    다루므로 원격 I/O 지연이 없다 - 그래서 다른 lazy 백필처럼 MB 단위가 아니라
+    "이번 세션에 몇 장을 확인할지" 개수 기준으로 배치를 끊는다.
+
+    재개 지점은 파일 경로 정렬 순서 기준 체크포인트(cache/cover_resize_progress.txt)에
+    저장해서, 세션이 끊겨도(RAM 환수 재기동 등) 처음부터 33만 장을 다시 훑지 않는다.
+    전체를 한 번 다 훑고 나면 완료 마킹을 남겨 이후 세션은 즉시 스킵한다.
+
+    Returns:
+        bool: 이번 세션에서 다 못 끝내 다음 세션에 이어서 할 작업이 남아있으면 True.
+        (__main__에서 이 값을 보고 run_lazy_cover_extraction()이 exit(0)을 하려던 경우도
+        exit(10)로 덮어써서, "더 할 일이 없어졌다"고 스캐너 큐가 오판해 재기동을 멈추지
+        않도록 한다 - 그래야 리사이즈 백필도 이 lazy 스캔 루프에 얹혀 끝까지 진행된다.)
+    """
+    global stop_requested
+    from tools.scanner.cover import COVERS_DIR, COVER_THUMB_MAX_W, COVER_THUMB_MAX_H, save_as_thumbnail_webp
+
+    if not os.path.isdir(COVERS_DIR):
+        return False
+
+    os.makedirs(os.path.dirname(COVER_RESIZE_PROGRESS_FILE), exist_ok=True)
+
+    last_processed = ''
+    if os.path.exists(COVER_RESIZE_PROGRESS_FILE):
+        try:
+            with open(COVER_RESIZE_PROGRESS_FILE, 'r', encoding='utf-8') as f:
+                last_processed = f.read().strip()
+        except Exception:
+            last_processed = ''
+
+    if last_processed == COVER_RESIZE_DONE_SENTINEL:
+        return False
+
+    all_paths = []
+    for root, _dirs, files in os.walk(COVERS_DIR):
+        for fname in files:
+            if fname.lower().endswith(('.webp', '.jpg', '.jpeg', '.png')):
+                all_paths.append(os.path.join(root, fname))
+    all_paths.sort()
+
+    if not all_paths:
+        with open(COVER_RESIZE_PROGRESS_FILE, 'w', encoding='utf-8') as f:
+            f.write(COVER_RESIZE_DONE_SENTINEL)
+        return False
+
+    start_index = 0
+    if last_processed:
+        try:
+            start_index = next(i for i, p in enumerate(all_paths) if p > last_processed)
+        except StopIteration:
+            start_index = len(all_paths)
+
+    batch_size = _load_lazy_scan_cover_resize_batch_size()
+    print(f"[Lazy-Scanner] 🖼️ 기존 커버 리사이즈 백필 진행 ({start_index:,}/{len(all_paths):,} 완료, 이번 세션 최대 {batch_size:,}장 확인)")
+
+    resized_count = 0
+    checked_count = 0
+    last_seen = last_processed
+
+    for path in all_paths[start_index:]:
+        if stop_requested:
+            print("[Lazy-Scanner] ⚠️ 중단 요청 감지. 커버 리사이즈 백필을 안전 중단합니다.")
+            break
+        checked_count += 1
+        last_seen = path
+        try:
+            needs_resize = False
+            with Image.open(path) as img:
+                needs_resize = img.width > COVER_THUMB_MAX_W or img.height > COVER_THUMB_MAX_H
+                if needs_resize:
+                    tmp_path = path + '.resize_tmp'
+                    save_as_thumbnail_webp(img, tmp_path)
+            if needs_resize:
+                os.replace(tmp_path, path)
+                resized_count += 1
+        except Exception as e:
+            print(f"[Lazy-Scanner] 커버 리사이즈 확인/변환 실패(건너뜀): {path}: {e}")
+        if checked_count >= batch_size:
+            break
+
+    if not stop_requested and (start_index + checked_count) >= len(all_paths):
+        with open(COVER_RESIZE_PROGRESS_FILE, 'w', encoding='utf-8') as f:
+            f.write(COVER_RESIZE_DONE_SENTINEL)
+        print(f"[Lazy-Scanner] 🎉 커버 리사이즈 백필 전체 완료 (이번 세션 {resized_count}/{checked_count}건 축소)")
+        return False
+
+    with open(COVER_RESIZE_PROGRESS_FILE, 'w', encoding='utf-8') as f:
+        f.write(last_seen)
+    print(f"[Lazy-Scanner] 🖼️ 커버 리사이즈 백필 이번 세션 종료: {resized_count}/{checked_count}건 축소, 다음 세션에 이어서 진행")
+    return True
+
+
 if __name__ == '__main__':
     # 로그 설정은 영상 백필/표지 스캔 중 어느 쪽이 먼저 실행되든 둘 다 lazy_scanner.log에
     # 남도록 가장 먼저(다른 어떤 print()보다도 앞서) 활성화한다. 예전에는
@@ -1098,14 +1214,20 @@ if __name__ == '__main__':
     parser.add_argument('--db-type', choices=['general', 'adult'], default=None)
     args = parser.parse_args()
 
+    cover_resize_has_more_work = False
     try:
         # run_lazy_cover_extraction()은 끝에서 항상 sys.exit(0/10)을 호출해 SystemExit을 던지므로,
         # 그 뒤에 이어 붙이면 아래 코드는 영원히 실행되지 않는다. 영상 백필은 반드시 먼저 실행한다.
         if args.book_id is None:
             run_lazy_video_duration_backfill()
             run_lazy_video_container_revalidation()
+            cover_resize_has_more_work = run_lazy_cover_resize()
         run_lazy_cover_extraction(target_book_id=args.book_id, target_db_type=args.db_type)
     except SystemExit as se:
+        # 표지 추출은 이미 다 끝나서(exit 0) 스캐너 큐가 이 lazy 스캔 태스크를 끝내려 하더라도,
+        # 커버 리사이즈 백필이 아직 안 끝났으면 exit(10)로 덮어써서 재기동을 계속 요청한다.
+        if se.code == 0 and cover_resize_has_more_work:
+            sys.exit(10)
         sys.exit(se.code)
     except Exception as main_err:
         import traceback

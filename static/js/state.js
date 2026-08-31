@@ -22,7 +22,7 @@ export const state = {
   hasPrevious: false, // firstLoadedPage 이전에 아직 안 불러온 페이지가 있는지
   isLoadingPrevious: false,
   isLoading: false,
-  LIMIT: 120,
+  LIMIT: 60,
   searchQuery: '',
   currentSortDirection: localStorage.getItem('library_sort_direction') || 'asc', // 로컬 캐시 연동 (기본값: 오름차순)
   groupMode: localStorage.getItem('library_group_mode') || 'default', // 'default'(시리즈) | 'author'(작가별 모음)
