@@ -630,7 +630,14 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None):
                     if batch_limit_reached or stop_requested:
                         break
                     if target_book_id is None:
-                        time.sleep(3.0)
+                        # 원격(rclone/GDrive) API 부하 조절용 sleep. 로컬 디스크는 그런
+                        # 제약이 없는데도 예전엔 여기서 원격/로컬 구분 없이 무조건 3초를
+                        # 대기해, 초기 스캔이 커버 추출을 미루는 PDF(tools/scanner/cover.py
+                        # 참고)처럼 이 루프를 대량으로 거치는 포맷에서 로컬임에도 체감상
+                        # 멈춘 것 같은 속도 저하를 유발했다. offset_only 분기(위쪽)와 동일한
+                        # 기준으로 원격일 때만 3초, 로컬은 0.5초로 낮춘다.
+                        _sleep_is_remote = library_remote_map.get(library_id, False)
+                        time.sleep(3.0 if _sleep_is_remote else 0.5)
                 if batch_limit_reached or stop_requested:
                     break
                 

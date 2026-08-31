@@ -1,5 +1,8 @@
 # CHANGELOG
 ## v2.5.0
+- (fix) PDF 등 Lazy 스캔 대상 도서의 로컬 처리 속도가 원격 마운트 수준으로 불필요하게 느리던 문제 수정 — 도서 처리 후 대기 시간을 원격 경로에만 적용 | fix Lazy-scan cover extraction (e.g. PDF) being unnecessarily throttled to remote-mount speed on local disks — the per-book delay now applies only to remote paths
+
+## v2.4.10
 - (improvement) 대시보드 로딩 개선 | improve dashboard loading
 
 ## v2.4.9
