@@ -25,7 +25,7 @@ DB_VIDEO_PATH = os.path.join(DB_DIR, 'media_video.db')
 def _is_hdd_aggressive_warmup_enabled(db_type):
     try:
         from repositories.settings_repository import SettingsRepository
-        val = SettingsRepository.get_value(db_type, 'HDD_AGGRESSIVE_WARMUP')
+        val = SettingsRepository.get_value('HDD_AGGRESSIVE_WARMUP')
         return bool(val and str(val).strip() == '1')
     except Exception as e:
         print(f"[Scanner-WakeUp] HDD 웜업 설정 조회 실패, 기본값(OFF) 사용: {e}")

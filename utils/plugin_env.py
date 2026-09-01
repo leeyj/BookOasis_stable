@@ -18,7 +18,7 @@ def _get_add_plugin_value(db_type='general'):
     """ADD_PLUGIN 설정값(DB 우선, .env/환경변수 폴백)을 그대로 반환합니다."""
     try:
         from services.settings_service import SettingsService
-        return SettingsService.get('ADD_PLUGIN', '', db_type=db_type) or os.environ.get('ADD_PLUGIN', '')
+        return SettingsService.get('ADD_PLUGIN', '') or os.environ.get('ADD_PLUGIN', '')
     except Exception:
         return os.environ.get('ADD_PLUGIN', '')
 

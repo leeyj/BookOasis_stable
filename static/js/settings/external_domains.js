@@ -1,7 +1,19 @@
-// external_domains.js - 사용자별 외부 도메인 허용 목록(화이트리스트) 설정 탭 제어 모듈
+// external_domains.js - 외부 도메인 허용 목록(화이트리스트) 설정 탭 제어 모듈
 //
 // 앱은 어떤 외부 도메인도 기본 제공/추천하지 않는다. 여기서 등록한 도메인만 플러그인의
-// 웹뷰/다운로드 API(plugin_webview_api.js)가 사용할 수 있다 — 등록/책임은 전적으로 사용자 본인.
+// 웹뷰/다운로드 API(plugin_webview_api.js)가 사용할 수 있다 — 전역 단일 목록이며 관리자만
+// 추가/삭제할 수 있다(등록/책임은 관리자 본인). 일반 사용자는 조회만 가능하다.
+
+function isAdminUser() {
+  return !!(window.currentUser && window.currentUser.role === 'admin');
+}
+
+function applyNonAdminExternalDomainsMode() {
+  // 비활성화 표시가 아니라 아예 노출하지 않는다 - 일반 사용자는 추가할 권한이 없으므로
+  // 입력창/버튼 자체를 화면에서 숨긴다.
+  const form = document.getElementById('external-domains-add-form');
+  if (form) form.style.display = 'none';
+}
 
 function escapeHtmlText(value) {
   return String(value || '')
@@ -27,6 +39,9 @@ export async function loadExternalDomainsSettings() {
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'load_failed');
     renderDomainList(data.domains || []);
+    if (!isAdminUser()) {
+      applyNonAdminExternalDomainsMode();
+    }
   } catch (e) {
     console.error('[ExternalDomains] 목록 로드 실패:', e);
     listEl.innerHTML = '<div style="text-align:center; padding:1rem; color:#f43f5e;">목록을 불러오지 못했습니다.</div>';
@@ -42,13 +57,16 @@ function renderDomainList(domains) {
     return;
   }
 
+  const canEdit = isAdminUser();
   listEl.innerHTML = domains.map(d => `
     <div style="display:flex; align-items:center; justify-content:space-between; padding:0.6rem 0.9rem;
                 background:rgba(30,41,59,0.4); border:1px solid rgba(255,255,255,0.06); border-radius:6px; margin-bottom:0.5rem;">
       <span style="color:#e2e8f0; font-size:0.88rem; font-family:monospace;">${escapeHtmlText(d.pattern)}</span>
+      ${canEdit ? `
       <button type="button" class="btn-remove-external-domain" data-domain="${escapeHtmlText(d.pattern)}"
               style="background:none; border:1px solid rgba(244,63,94,0.4); color:#f43f5e; border-radius:5px;
                      padding:0.25rem 0.6rem; font-size:0.78rem; cursor:pointer;">삭제</button>
+      ` : ''}
     </div>
   `).join('');
 }

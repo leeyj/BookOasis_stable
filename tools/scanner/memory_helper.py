@@ -22,7 +22,7 @@ def get_setting_float(key, default_value, db_type='general'):
 
     try:
         from repositories.settings_repository import SettingsRepository
-        val = SettingsRepository.get_value(db_type, key)
+        val = SettingsRepository.get_value(key)
         if val is not None and str(val).strip():
             value = float(val)
             _setting_cache[cache_key] = {'value': value, 'ts': now}

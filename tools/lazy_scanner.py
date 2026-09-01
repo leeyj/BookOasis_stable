@@ -37,7 +37,7 @@ def _load_lazy_scan_no_cover_retry_days():
     days = 7
     try:
         from repositories.settings_repository import SettingsRepository
-        val = SettingsRepository.get_value('general', 'LAZY_SCAN_NO_COVER_RETRY_DAYS')
+        val = SettingsRepository.get_value('LAZY_SCAN_NO_COVER_RETRY_DAYS')
         if val is not None:
             days = int(str(val).strip() or '7')
     except Exception as _re:
@@ -107,7 +107,7 @@ def setup_lazy_scanner_logging():
     write_log = True
     try:
         from repositories.settings_repository import SettingsRepository
-        val = SettingsRepository.get_value('general', 'SCANNER_WRITE_LOG')
+        val = SettingsRepository.get_value('SCANNER_WRITE_LOG')
         if val is not None and str(val).strip() == '0':
             write_log = False
     except Exception:
@@ -152,8 +152,8 @@ def _load_lazy_scan_limits():
     max_batch_mb = 1024.0 # 세션 누적 안전 기본값 (1024MB = 1GB)
     try:
         from repositories.settings_repository import SettingsRepository
-        size_val = SettingsRepository.get_value('general', 'LAZY_SCAN_MAX_FILE_SIZE_MB')
-        batch_val = SettingsRepository.get_value('general', 'LAZY_SCAN_MAX_BATCH_SIZE_MB')
+        size_val = SettingsRepository.get_value('LAZY_SCAN_MAX_FILE_SIZE_MB')
+        batch_val = SettingsRepository.get_value('LAZY_SCAN_MAX_BATCH_SIZE_MB')
         if size_val is not None:
             max_size_mb = float(str(size_val).strip() or '300')
         if batch_val is not None:
@@ -179,7 +179,7 @@ def _load_lazy_scan_probe_workers():
     workers = 4
     try:
         from repositories.settings_repository import SettingsRepository
-        val = SettingsRepository.get_value('general', 'LAZY_SCAN_VIDEO_PROBE_WORKERS')
+        val = SettingsRepository.get_value('LAZY_SCAN_VIDEO_PROBE_WORKERS')
         if val is not None:
             workers = int(str(val).strip() or '4')
     except Exception as _pe:
@@ -858,7 +858,7 @@ def run_lazy_video_duration_backfill():
     MAX_EPISODES_PER_RUN = 300
     try:
         from repositories.settings_repository import SettingsRepository
-        max_ep_val = SettingsRepository.get_value('general', 'LAZY_SCAN_VIDEO_MAX_EPISODES_PER_RUN')
+        max_ep_val = SettingsRepository.get_value('LAZY_SCAN_VIDEO_MAX_EPISODES_PER_RUN')
         if max_ep_val is not None:
             MAX_EPISODES_PER_RUN = int(str(max_ep_val).strip() or '300')
     except Exception as _ve:
@@ -991,7 +991,7 @@ def run_lazy_video_container_revalidation():
     MAX_EPISODES_PER_RUN = 300
     try:
         from repositories.settings_repository import SettingsRepository
-        max_ep_val = SettingsRepository.get_value('general', 'LAZY_SCAN_VIDEO_MAX_EPISODES_PER_RUN')
+        max_ep_val = SettingsRepository.get_value('LAZY_SCAN_VIDEO_MAX_EPISODES_PER_RUN')
         if max_ep_val is not None:
             MAX_EPISODES_PER_RUN = int(str(max_ep_val).strip() or '300')
     except Exception as _ve:
@@ -1109,7 +1109,7 @@ def _load_lazy_scan_cover_resize_batch_size():
     batch_size = 2000
     try:
         from repositories.settings_repository import SettingsRepository
-        val = SettingsRepository.get_value('general', 'LAZY_SCAN_COVER_RESIZE_BATCH_SIZE')
+        val = SettingsRepository.get_value('LAZY_SCAN_COVER_RESIZE_BATCH_SIZE')
         if val is not None:
             batch_size = int(str(val).strip() or '2000')
     except Exception as _re:

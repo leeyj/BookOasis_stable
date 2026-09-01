@@ -18,7 +18,7 @@ except Exception:
 
 def _get_setting_or_env(key, default=''):
     try:
-        value = SettingsService.get(key, '', db_type='general')
+        value = SettingsService.get(key, '')
         if str(value).strip() != '':
             return str(value)
     except Exception:

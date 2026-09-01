@@ -1,0 +1,119 @@
+            {# 체크박스 스위치 행(.settings-checkbox-row) 반복 매크로 - 이 파일에서만 사용 #}
+            {% macro my_checkbox_row(id, name, checked=False, i18n_key=None, extra_class='', input_class='') %}
+            <div class="settings-checkbox-row{% if extra_class %} {{ extra_class }}{% endif %}">
+                <input type="checkbox" id="{{ id }}" name="{{ name }}"{% if input_class %} class="{{ input_class }}"{% endif %}{% if checked %} checked{% endif %}>
+                <label for="{{ id }}"{% if i18n_key %} data-i18n="{{ i18n_key }}"{% endif %}>{{ caller() }}</label>
+            </div>
+            {% endmacro %}
+
+            <!-- 내 설정 탭 (사용자별 개인화 설정 - 관리자가 아니어도 로그인만 하면 사용 가능) -->
+            <div id="settings-tab-my" class="settings-tab-content" style="display: none; flex-direction: column; gap: 1.5rem;">
+                <div class="dashboard-section">
+                    <div class="section-header" style="margin-bottom: 1.2rem;">
+                        <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1.2rem; font-weight: 700;">
+                            <i class="fa-solid fa-user-gear" style="color: #a855f7; margin-right: 0.5rem;"></i> <span data-i18n="settings.my_settings_title">내 설정</span>
+                        </h3>
+                        <p style="font-size: 0.82rem; color: #94a3b8; margin: 0.4rem 0 0 0;" data-i18n="settings.my_settings_subtitle">내 계정에서만 적용되는 화면/열람 취향입니다. 다른 사용자에게는 영향을 주지 않습니다.</p>
+                    </div>
+                    <div style="background: rgba(30, 41, 59, 0.25); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 1.5rem; backdrop-filter: blur(10px); color: #cbd5e1;">
+                        <form id="settings-my-form" style="display: flex; flex-direction: column; gap: 2rem;">
+
+                            <div style="background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(168, 85, 247, 0.2); border-radius: 8px; padding: 1.25rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.2rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.6rem;">
+                                    <i class="fa-solid fa-desktop" style="color: #a855f7; font-size: 1.1rem;"></i>
+                                    <h4 style="margin: 0; color: #fff; font-size: 1rem; font-weight: 700;">화면 및 뷰어 개인화 설정</h4>
+                                </div>
+                                <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+
+                                    <!-- 대시보드 테마 선택 -->
+                                    <div class="library-form-group">
+                                        <label for="my-setting-dashboard-theme" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                            <i class="fa-solid fa-palette" style="color: #a855f7; margin-right: 0.3rem;"></i> <span data-i18n="settings.dashboard_theme_label">대시보드 테마 설정</span>
+                                        </label>
+                                        <select id="my-setting-dashboard-theme" name="DASHBOARD_THEME" data-role="my-dashboard-theme" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; cursor: pointer;">
+                                            <option value="purple" data-i18n="settings.theme_purple">🟣 퍼플 (BookOasis 시그니처 기본)</option>
+                                            <option value="dark" data-i18n="settings.theme_dark">🌙 클래식 다크 (OLED Black)</option>
+                                            <option value="light" data-i18n="settings.theme_light">☀️ 모던 라이트 (Clean White)</option>
+                                            <option value="sepia" data-i18n="settings.theme_sepia">📜 클래식 세피아 (Warm Sepia)</option>
+                                            <option value="blue" data-i18n="settings.theme_blue">🌊 딥 블루 (Midnight Navy)</option>
+                                            <option value="aquamarine" data-i18n="settings.theme_aquamarine">🌊 아쿠아 오렌지 (Kavita Aquamarine)</option>
+                                            <option value="ironman" data-i18n="settings.theme_ironman">🤖 아이언 레드 (Iron Crimson &amp; Gold)</option>
+                                            <option value="epaper" data-i18n="settings.theme_epaper">📖 E-Paper 전용 (전자종이 흑백 고대비)</option>
+                                        </select>
+                                        <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;" data-i18n="settings.dashboard_theme_desc">메인 보관함 및 대시보드 전체 색상 테마를 취향에 맞춰 변경합니다. (E-Paper 테마는 전자책 리더기용 고대비 무그림자 지원)</p>
+                                    </div>
+
+                                     <!-- 대시보드 독서 통계 위젯 표시 체크박스 -->
+                                     <div class="library-form-group">
+                                         <label for="my-setting-show-dashboard-insights" style="font-weight: 700; color: #fff; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                                             <input type="checkbox" id="my-setting-show-dashboard-insights" name="SHOW_DASHBOARD_INSIGHTS" data-role="my-dashboard-insights" checked style="width: 18px; height: 18px; cursor: pointer; accent-color: #a855f7;">
+                                             <i class="fa-solid fa-chart-line" style="color: #38bdf8; margin-right: 0.2rem;"></i> <span data-i18n="settings.show_dashboard_insights">대시보드 독서 통계 위젯 표시</span>
+                                         </label>
+                                         <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.3rem 0 0 1.8rem;" data-i18n="settings.show_dashboard_insights_desc">대시보드 상단에 연속 독서 일수, 진행 중 도서, 독서 목표 및 장르 통계 카드를 노출합니다.</p>
+                                     </div>
+
+                                    <!-- 뷰어 기본 글자 크기 및 글꼴 -->
+                                    <div style="display: flex; gap: 1rem; max-width: 480px; flex-wrap: wrap;">
+                                        <div class="library-form-group" style="flex: 1; min-width: 150px;">
+                                            <label for="my-setting-viewer-font-size" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                                <i class="fa-solid fa-font" style="color: #a855f7; margin-right: 0.3rem;"></i> <span data-i18n="settings.font_size_label">뷰어 기본 글자 크기 (px)</span>
+                                            </label>
+                                            <input type="number" id="my-setting-viewer-font-size" name="VIEWER_FONT_SIZE" min="12" max="36" value="18" style="width: 100%; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
+                                        </div>
+                                        <div class="library-form-group" style="flex: 1; min-width: 200px;">
+                                            <label for="my-setting-viewer-font-family" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                                <i class="fa-solid fa-font-case" style="color: #a855f7; margin-right: 0.3rem;"></i> <span data-i18n="settings.font_family_label">뷰어 기본 글꼴</span>
+                                            </label>
+                                            <select id="my-setting-viewer-font-family" name="VIEWER_FONT_FAMILY" style="width: 100%; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; cursor: pointer;">
+                                                <option value="sans-serif" data-i18n="settings.font_sans">기본 고딕체 (Sans-Serif)</option>
+                                                <option value="serif" data-i18n="settings.font_serif">기본 바탕체 (Serif)</option>
+                                                <option value="monospace" data-i18n="settings.font_mono">기본 고정폭 (Monospace)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <!-- 오디오 미니 플레이어 형태 -->
+                                    <div class="library-form-group">
+                                        <label for="my-setting-audio-mini-player-mode" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                            <i class="fa-solid fa-wave-square" style="color: #a855f7; margin-right: 0.3rem;"></i> <span data-i18n="settings.audio_mini_player_mode_label">오디오 미니 플레이어 형태</span>
+                                        </label>
+                                        <select id="my-setting-audio-mini-player-mode" name="AUDIO_MINI_PLAYER_MODE" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
+                                            <option value="mini" data-i18n="settings.audio_mini_player_mode_mini">기본 미니바 (좌측 상단)</option>
+                                            <option value="right_dock" data-i18n="settings.audio_mini_player_mode_right">우측 오버레이 패널형</option>
+                                        </select>
+                                        <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;" data-i18n="settings.audio_mini_player_mode_desc">기본값은 미니바이며, 우측 오버레이 패널형은 화면 오른쪽에 고정 표시되고 배경 딤 오버레이가 함께 표시됩니다.</p>
+                                    </div>
+
+                                    {% call my_checkbox_row('my-setting-audio-right-dock-dim', 'AUDIO_RIGHT_DOCK_DIM_ENABLED', i18n_key='settings.audio_right_dock_dim_enabled_label') %}오디오 우측 패널 배경 딤 표시{% endcall %}
+                                    <p class="settings-checkbox-desc" data-i18n="settings.audio_right_dock_dim_enabled_desc">해제하면 우측 패널만 표시되고, 메인 화면 배경 딤은 표시되지 않습니다.</p>
+
+                                    <!-- 체크박스 스위치 모음 -->
+                                    <div class="settings-checkbox-group">
+                                        {% call my_checkbox_row('my-setting-show-sidebar-category-all', 'SHOW_SIDEBAR_CATEGORY_ALL', checked=True) %}사이드바에 '전체 도서 보기' 메뉴 표시{% endcall %}
+
+                                        {% call my_checkbox_row('my-setting-hide-completed-in-history', 'HIDE_COMPLETED_IN_HISTORY') %}다 읽은 도서는 최근 읽은 도서에서 삭제{% endcall %}
+
+                                        {% call my_checkbox_row('my-setting-tag-filter-scope-all', 'TAG_FILTER_SEARCH_SCOPE_ALL') %}태그 선택 시 전체 목록에서 조회{% endcall %}
+
+                                        {% call my_checkbox_row('my-setting-show-txt-no-cover-info-banner', 'SHOW_TXT_NO_COVER_INFO_BANNER', checked=True) %}TXT 무커버 안내 배너 표시{% endcall %}
+
+                                        {% call my_checkbox_row('my-setting-smart-recommend-enabled', 'SMART_RECOMMEND_ENABLED', checked=True) %}스마트 추천 기능 사용 <span class="settings-checkbox-hint">(해제 시 사이드바 메뉴에서도 숨김)</span>{% endcall %}
+
+                                        {% call my_checkbox_row('my-setting-book-recommend-enabled', 'BOOK_RECOMMEND_ENABLED', checked=True) %}도서 추천기능 <span class="settings-checkbox-hint">(도서 상세 화면의 '이 작가의 다른 도서' 영역)</span>{% endcall %}
+
+                                        {% call my_checkbox_row('my-setting-detail-volume-grid-view', 'DETAIL_VOLUME_GRID_VIEW') %}도서 상세 목록 그리드로 보기 <span class="settings-checkbox-hint">(커버+제목 그리드 형태)</span>{% endcall %}
+
+                                        {% call my_checkbox_row('my-setting-collapse-detail-genre-tags', 'COLLAPSE_DETAIL_GENRE_TAGS') %}도서 상세 태그/장르 축소 <span class="settings-checkbox-hint">(기본 1개 표출 후 +N 클릭 시 전체 펼침)</span>{% endcall %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 1rem; display: flex; justify-content: flex-end;">
+                                <button type="submit" class="btn-submit" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.7rem 1.8rem; font-size: 0.95rem; font-weight: 700; border-radius: 6px; background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%); color: #fff; border: none; cursor: pointer;">
+                                    <i class="fa-regular fa-floppy-disk"></i> <span data-i18n="settings.btn_save_config">설정 저장</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>

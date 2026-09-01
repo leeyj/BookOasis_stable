@@ -356,7 +356,7 @@ def get_category_plugins_api():
         perm_map = {}
         if user_id and user_role != 'admin':
             from repositories.settings_repository import SettingsRepository
-            perm_map = SettingsRepository.get_settings_by_prefix('general', f"PERM_CATEGORY_{user_id}_plugin_")
+            perm_map = SettingsRepository.get_settings_by_prefix(f"PERM_CATEGORY_{user_id}_plugin_")
 
         plugin_group_map = CategoryService.get_plugin_group_assignments(db_type)
 

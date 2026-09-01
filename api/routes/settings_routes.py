@@ -2,7 +2,7 @@
 """
 settings_routes.py – 시스템 설정 관리 라우터
 """
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session
 from services.settings_service import SettingsService
 from services.scheduler_service import SchedulerService
 from api.auth import admin_required, login_required
@@ -45,20 +45,37 @@ PUBLIC_UI_SETTING_KEYS = (
     'BOOK_RECOMMEND_ENABLED',
 )
 
+# 사용자가 자신의 계정에서 개인화(override)할 수 있는 설정 키.
+# 관리자 전역 설정(DB_POOL_SIZE, LAZY_SCAN_CRON, TIMEZONE, RCLONE_RC_URL, WEBHOOK_TOKEN 등
+# 보안/스캔/시스템 값)은 절대 포함하지 않는다 - 이 목록은 UI/열람 취향에 한정된다.
+USER_OVERRIDABLE_SETTING_KEYS = (
+    'DASHBOARD_THEME',
+    'SHOW_DASHBOARD_INSIGHTS',
+    'VIEWER_FONT_SIZE',
+    'VIEWER_FONT_FAMILY',
+    'DETAIL_VOLUME_GRID_VIEW',
+    'COLLAPSE_DETAIL_GENRE_TAGS',
+    'AUDIO_MINI_PLAYER_MODE',
+    'AUDIO_RIGHT_DOCK_DIM_ENABLED',
+    'SHOW_SIDEBAR_CATEGORY_ALL',
+    'HIDE_COMPLETED_IN_HISTORY',
+    'TAG_FILTER_SEARCH_SCOPE_ALL',
+    'SHOW_TXT_NO_COVER_INFO_BANNER',
+    'SMART_RECOMMEND_ENABLED',
+    'BOOK_RECOMMEND_ENABLED',
+)
+
 @settings_bp.route('/api/media/settings', methods=['GET'])
 @admin_required
 def get_system_settings():
     """모든 시스템 설정값 조회"""
-    # UI 설정(썸네일 크기 등)은 general/adult에만 저장되는데(SettingsService.set() 참고),
-    # settings 테이블 자체는 스키마 초기화 시 모든 DB(audiobook/video 포함)에 동일하게
-    # 생성되면서 기본값이 함께 시드된다. audiobook/video를 그대로 넘기면
-    # SettingsService.get_all()이 그 DB 고유 설정으로 general 값을 "덮어쓰는" 로직 때문에,
-    # 관리자가 저장한 값 대신 시드된 기본값이 나온다 - 그래서 general로 정규화한다.
-    db_type = request.args.get('type', 'general')
-    if db_type in ('audiobook', 'video'):
-        db_type = 'general'
+    # 예전에는 도서관 종류(adult/audiobook/video)별로 settings 테이블을 따로 두고
+    # ?type= 쿼리로 구분했으나, 실제로는 모두 general과 동일하거나(adult) 아무도
+    # 편집한 적 없는 시드 기본값(audiobook/video)뿐이었다. 지금은 general 하나만
+    # 읽고 쓰므로 type 파라미터는 무시한다 - 캐시된 구버전 JS가 여전히 붙여 보내도
+    # 에러 없이 동작하도록 값만 받고 사용하지 않는다.
     try:
-        settings = SettingsService.get_all(db_type)
+        settings = SettingsService.get_all()
         return jsonify({'success': True, 'settings': settings})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -71,12 +88,17 @@ def get_public_ui_settings():
     사용자가 조회 가능). 관리자가 저장한 값이 일반 사용자 세션에도 동일하게 반영되도록
     최초 로드 시 이 엔드포인트를 사용한다.
     """
-    db_type = request.args.get('type', 'general')
-    if db_type in ('audiobook', 'video'):
-        db_type = 'general'
     try:
-        all_settings = SettingsService.get_all(db_type)
-        public_settings = {k: v for k, v in all_settings.items() if k in PUBLIC_UI_SETTING_KEYS}
+        all_settings = SettingsService.get_all()
+        user_id = session.get('user_id')
+        public_settings = {}
+        for k, v in all_settings.items():
+            if k not in PUBLIC_UI_SETTING_KEYS:
+                continue
+            if k in USER_OVERRIDABLE_SETTING_KEYS:
+                public_settings[k] = SettingsService.get_effective(k, user_id=user_id, default=v)
+            else:
+                public_settings[k] = v
         return jsonify({'success': True, 'settings': public_settings})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -120,6 +142,42 @@ def update_system_setting():
                 print(f"[API] Scheduler reloaded due to {key} change: {value}")
             except Exception as e_sched:
                 print(f"[API WARNING] Failed to reload scheduler on {key} change: {e_sched}")
+        return jsonify({'success': True, 'message': _t('api.msg_setting_saved', key=key)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@settings_bp.route('/api/media/settings/user', methods=['GET'])
+@login_required
+def get_user_settings():
+    """호출한 사용자 본인의 설정 오버라이드 + 전역 기본값을 병합한 유효값 반환."""
+    user_id = session.get('user_id')
+    try:
+        effective = {}
+        globals_ = SettingsService.get_all()
+        user_overrides = SettingsService.get_all_user_settings(user_id)
+        for k in USER_OVERRIDABLE_SETTING_KEYS:
+            if k in user_overrides:
+                effective[k] = user_overrides[k]
+            elif k in globals_:
+                effective[k] = globals_[k]
+        return jsonify({'success': True, 'settings': effective, 'overrides': user_overrides})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@settings_bp.route('/api/media/settings/user', methods=['POST'])
+@login_required
+def update_user_setting():
+    """호출한 사용자 본인의 설정 오버라이드 저장 (허용 목록 내 키만)."""
+    user_id = session.get('user_id')
+    key = request.form.get('key', '').strip()
+    value = request.form.get('value', '').strip()
+    if key not in USER_OVERRIDABLE_SETTING_KEYS:
+        return jsonify({'success': False, 'error': f'허용되지 않은 사용자 설정 키입니다: {key}'}), 400
+    max_value_len = SETTING_VALUE_LIMITS.get(key, MAX_SETTING_VALUE_DEFAULT_LENGTH)
+    if len(value) > max_value_len:
+        return jsonify({'success': False, 'error': f'설정 값 길이는 최대 {max_value_len}자까지 허용됩니다. ({key})'}), 400
+    try:
+        SettingsService.set_user_value(user_id, key, value)
         return jsonify({'success': True, 'message': _t('api.msg_setting_saved', key=key)})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

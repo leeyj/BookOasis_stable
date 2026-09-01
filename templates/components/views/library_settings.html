@@ -1,11 +1,17 @@
         <div id="library-settings-view" class="library-view-container" style="display: none; flex-direction: column; gap: 1rem;">
             <!-- 탭 헤더 영역 -->
             <div class="settings-tabs">
-                <button class="settings-tab-btn active" data-settings-tab="schedule">
+                <!-- 관리자 전용 탭들은 JS(applySettingsTabAccessControl, tab_media_library.js에서 호출)가
+                     role를 확인해 노출 여부를 결정하기 전까지 일반 사용자에게 잠깐이라도 보이지 않도록
+                     기본값을 display:none으로 잡아둔다(fail-closed). 관리자는 JS가 즉시 다시 보여준다. -->
+                <button class="settings-tab-btn active" data-settings-tab="schedule" style="display: none;">
                     <i class="fa-solid fa-calendar-days"></i> <span data-i18n="settings.tab_schedule">스캔 스케줄 &amp; 대기열</span>
                 </button>
-                <button class="settings-tab-btn" data-settings-tab="general">
+                <button class="settings-tab-btn" data-settings-tab="general" style="display: none;">
                     <i class="fa-solid fa-sliders"></i> <span data-i18n="settings.tab_general">일반 설정</span>
+                </button>
+                <button class="settings-tab-btn" data-settings-tab="my">
+                    <i class="fa-solid fa-user-gear"></i> <span data-i18n="settings.tab_my">내 설정</span>
                 </button>
                 <button class="settings-tab-btn" data-settings-tab="viewer">
                     <i class="fa-solid fa-book-open"></i> <span data-i18n="settings.tab_viewer">뷰어 설정</span>
@@ -13,13 +19,13 @@
                 <button class="settings-tab-btn" data-settings-tab="keys">
                     <i class="fa-solid fa-keyboard"></i> <span data-i18n="settings.tab_keys">키 설정</span>
                 </button>
-                <button class="settings-tab-btn" data-settings-tab="plugins">
+                <button class="settings-tab-btn" data-settings-tab="plugins" style="display: none;">
                     <i class="fa-solid fa-plug"></i> <span data-i18n="settings.tab_plugins">플러그인 설정</span>
                 </button>
-                <button class="settings-tab-btn" data-settings-tab="reports">
+                <button class="settings-tab-btn" data-settings-tab="reports" style="display: none;">
                     <i class="fa-solid fa-triangle-exclamation"></i> <span data-i18n="settings.tab_reports">스캔 리포트</span>
                 </button>
-                <button class="settings-tab-btn" data-settings-tab="trash">
+                <button class="settings-tab-btn" data-settings-tab="trash" style="display: none;">
                     <i class="fa-solid fa-trash-can"></i> <span data-i18n="settings.tab_trash">삭제 관리</span>
                 </button>
                 <button class="settings-tab-btn" data-settings-tab="external-domains">
@@ -49,6 +55,9 @@
 
             <!-- 2. 일반 설정 탭 -->
             {% include "components/settings/general_tab.html" %}
+
+            <!-- 2.2 내 설정 탭 (사용자별 개인화 설정) -->
+            {% include "components/settings/my_settings_tab.html" %}
 
             <!-- 2.5 뷰어 설정 탭 -->
             {% include "components/settings/viewer_tab.html" %}

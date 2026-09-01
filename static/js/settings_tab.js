@@ -1,5 +1,5 @@
 // settings_tab.js - 환경설정 제어 통합 엔트리포인트 및 프록시 모듈
-import { applySettingsToUI, loadInitialSystemSettings, loadGeneralSettings, submitGeneralSettings } from './settings/general.js';
+import { applySettingsToUI, loadInitialSystemSettings, loadGeneralSettings, submitGeneralSettings, loadMySettings, submitMySettings } from './settings/general.js';
 import { loadPluginsSettings } from './settings/plugins.js';
 import { initReportsTab, loadReportList, loadReportDetail } from './settings/reports.js';
 import { loadUsersList } from './settings/users.js';
@@ -12,6 +12,8 @@ export {
   loadInitialSystemSettings,
   loadGeneralSettings,
   submitGeneralSettings,
+  loadMySettings,
+  submitMySettings,
   loadPluginsSettings,
   initReportsTab,
   loadReportList,
@@ -64,15 +66,34 @@ function setAboutVersionLoadError(dashEl, latestEl, stateEl, messageKey, fallbac
   if (latestEl) latestEl.textContent = text;
 }
 
+// 관리자 전용 설정 탭 목록. switchSettingsTab()의 접근 차단과 applySettingsTabAccessControl()의
+// 탭 버튼 노출 여부가 이 목록 하나를 공유한다 - 둘이 따로 놀면 "버튼은 보이는데 눌러보면
+// 차단"되거나 반대로 "버튼은 없는데 URL 직접 조작하면 열림" 같은 불일치가 생긴다.
+// 'external-domains'는 의도적으로 이 목록에 없음 — 전역 화이트리스트를 일반 사용자도
+// 조회는 할 수 있어야 하므로 탭 자체는 열어두고, 추가/삭제 UI만 관리자 전용으로 숨긴다
+// (external_domains.js의 applyNonAdminExternalDomainsMode 참고).
+export const ADMIN_ONLY_SETTINGS_TABS = ['schedule', 'general', 'plugins', 'reports', 'trash', 'users', 'permissions'];
+
+// 관리자가 아니면 관리자 전용 탭 버튼 자체를 화면에서 숨긴다 (비활성화 표시가 아니라 노출 차단).
+export function applySettingsTabAccessControl() {
+  const isAdmin = !!(window.currentUser && window.currentUser.role === 'admin');
+  document.querySelectorAll('.settings-tab-btn[data-settings-tab]').forEach((btn) => {
+    const tabId = btn.getAttribute('data-settings-tab');
+    if (ADMIN_ONLY_SETTINGS_TABS.includes(tabId)) {
+      btn.style.display = isAdmin ? '' : 'none';
+    }
+  });
+}
+
 // 환경설정 내부 탭 전환 함수
 export function switchSettingsTab(tabId) {
   initSettingsTabDelegation();
   // 일반 사용자는 어드민 전용 탭에 접근하지 못하도록 차단 및 'about'으로 우회
+  // (버튼 자체는 applySettingsTabAccessControl()이 이미 숨기지만, URL 직접 조작 등
+  // 버튼을 거치지 않는 호출에 대비해 여기서도 한 번 더 막는다)
   const isAdmin = window.currentUser && window.currentUser.role === 'admin';
-  const adminOnlyTabs = ['schedule', 'plugins', 'reports', 'users', 'permissions', 'trash'];
-  // 'external-domains'는 의도적으로 이 목록에 없음 — 일반 사용자도 자신의 화이트리스트를 관리해야 함
-  
-  if (!isAdmin && adminOnlyTabs.includes(tabId)) {
+
+  if (!isAdmin && ADMIN_ONLY_SETTINGS_TABS.includes(tabId)) {
     console.warn(`[Settings-Tab] Access denied for tab '${tabId}'. Redirecting to 'about'...`);
     switchSettingsTab('about');
     return;
@@ -109,6 +130,8 @@ export function switchSettingsTab(tabId) {
   // 5. 각 탭 데이터 조회 로드
   if (tabId === 'general') {
     loadGeneralSettings();
+  } else if (tabId === 'my') {
+    loadMySettings();
   } else if (tabId === 'viewer') {
     loadViewerSettings();
   } else if (tabId === 'plugins') {

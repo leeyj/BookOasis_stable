@@ -1,4 +1,10 @@
 # CHANGELOG
+## v2.5.3
+- (feature) 환경설정을 시스템 전역 설정과 "내 설정"(사용자별 개인화) 탭으로 분리, 일반 사용자도 테마/뷰어/사이드바 등 취향 설정을 직접 저장 가능 | split settings into system-wide settings and a "My Settings" tab for per-user personalization — non-admins can now save their own theme/viewer/sidebar preferences
+- (improvement) 일반/성인/오디오북/영상 라이브러리별로 중복 저장되던 시스템 설정을 단일화 | unify system settings that were previously duplicated per library type (general/adult/audiobook/video)
+- (improvement) 외부 도메인 허용 목록을 사용자별 목록에서 관리자 전용 전역 목록으로 전환 | convert the external domain whitelist from a per-user list to an admin-managed global list
+- (improvement) 권한 없는 관리자 전용 설정 탭 버튼이 일반 사용자 화면에 노출되지 않도록 변경 | hide admin-only settings tab buttons entirely for non-admin users instead of just disabling them
+
 ## v2.5.2
 - (improvement) 기본 테마 팔레트를 보라/네이비 톤에서 무채색+블루 포인트 톤으로 변경 | change the default theme palette from purple/navy to a neutral + single blue accent tone
 - (improvement) 상단 툴바를 한 줄 레이아웃으로 재구성하고 필터/정렬 버튼을 아이콘 전용으로 압축 | restructure the top toolbar into a single row and compress the filter/sort buttons to icon-only

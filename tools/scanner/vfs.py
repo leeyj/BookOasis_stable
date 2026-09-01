@@ -119,7 +119,7 @@ def resolve_rc_urls(db_type, row):
     else:
         try:
             from repositories.settings_repository import SettingsRepository
-            val = SettingsRepository.get_value(db_type, 'RCLONE_RC_URL')
+            val = SettingsRepository.get_value('RCLONE_RC_URL')
             if val:
                 rc_urls = [u.strip().rstrip('/') for u in str(val).split(',') if u.strip()]
         except Exception:

@@ -1,10 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-domain_whitelist_service.py – 사용자별 외부 도메인 허용 목록(화이트리스트) 관리
+domain_whitelist_service.py – 외부 도메인 허용 목록(화이트리스트) 관리 (관리자 전용, 전역 단일 목록)
 
-앱은 어떤 외부 도메인도 기본 제공/추천하지 않는다 — 각 사용자가 자신의 책임 하에
-직접 도메인을 추가한다. 플러그인 웹뷰/다운로드 API(api/routes/plugin_webview_routes.py)가
-이 화이트리스트를 근거로 요청을 허용/차단한다.
+앱은 어떤 외부 도메인도 기본 제공/추천하지 않는다 — 관리자가 자신의 책임 하에 직접
+도메인을 추가하며, 등록된 목록은 모든 사용자에게 공통 적용된다. 플러그인 웹뷰/다운로드
+API(api/routes/plugin_webview_routes.py)가 이 화이트리스트를 근거로 요청을 허용/차단한다.
+
+과거에는 사용자별로(USER_URL_WHITELIST_{user_id}) 각자 목록을 관리했으나, 일반 사용자가
+임의 도메인으로 웹뷰/다운로드를 열 수 있는 것은 보안상 바람직하지 않아 관리자가 전역으로
+관리하는 단일 목록으로 전환했다. 기존 사용자별 데이터는 최초 접근 시 전역 목록으로 1회
+병합 마이그레이션되며, 원본 legacy 키는 삭제하지 않고 그대로 둔다(더 이상 읽지 않을 뿐).
 """
 import json
 import re
@@ -12,16 +17,13 @@ import re
 from repositories.settings_repository import SettingsRepository
 from utils.time_helper import utc_now_iso
 
-_SETTINGS_KEY_PREFIX = 'USER_URL_WHITELIST_'
-_MAX_DOMAINS_PER_USER = 100
+_SETTINGS_KEY = 'EXTERNAL_DOMAIN_WHITELIST'
+_LEGACY_PER_USER_PREFIX = 'USER_URL_WHITELIST_'
+_MAX_DOMAINS = 200
 
 _HOSTNAME_RE = re.compile(
     r'^(\*\.)?[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$'
 )
-
-
-def _settings_key(user_id):
-    return f"{_SETTINGS_KEY_PREFIX}{user_id}"
 
 
 def normalize_pattern(raw):
@@ -97,11 +99,12 @@ def extract_host_from_url(url):
 
 class DomainWhitelistService:
     @staticmethod
-    def get_whitelist(user_id):
-        """현재 사용자의 화이트리스트 엔트리 목록을 반환한다 ([{pattern, added_at}, ...])."""
-        raw = SettingsRepository.get_value('general', _settings_key(user_id))
-        if not raw:
-            return []
+    def get_whitelist():
+        """전역 화이트리스트 엔트리 목록을 반환한다 ([{pattern, added_at}, ...])."""
+        raw = SettingsRepository.get_value(_SETTINGS_KEY)
+        if raw is None:
+            # 전역 목록이 아직 없으면(구버전에서 갓 업그레이드) 기존 사용자별 목록을 1회 병합한다.
+            return DomainWhitelistService._migrate_legacy_per_user_entries()
         try:
             data = json.loads(raw)
             if isinstance(data, list):
@@ -111,40 +114,63 @@ class DomainWhitelistService:
         return []
 
     @staticmethod
-    def get_patterns(user_id):
-        """매칭용 패턴 문자열 목록만 반환한다."""
-        return [e['pattern'] for e in DomainWhitelistService.get_whitelist(user_id)]
+    def _migrate_legacy_per_user_entries():
+        """예전 사용자별(USER_URL_WHITELIST_{user_id}) 화이트리스트를 전역 목록 하나로 병합한다.
+        legacy 키 자체는 삭제하지 않는다 - 코드에서 더 이상 읽지 않을 뿐 안전하게 방치."""
+        try:
+            legacy = SettingsRepository.get_settings_by_prefix(_LEGACY_PER_USER_PREFIX)
+            merged = {}
+            for raw in legacy.values():
+                try:
+                    data = json.loads(raw)
+                except Exception:
+                    continue
+                if not isinstance(data, list):
+                    continue
+                for e in data:
+                    if isinstance(e, dict) and e.get('pattern') and e['pattern'] not in merged:
+                        merged[e['pattern']] = e
+            entries = list(merged.values())[:_MAX_DOMAINS]
+        except Exception:
+            entries = []
+        SettingsRepository.set_value(_SETTINGS_KEY, json.dumps(entries, ensure_ascii=False))
+        return entries
 
     @staticmethod
-    def add_domain(user_id, raw_pattern):
-        """도메인을 화이트리스트에 추가한다. (성공 여부, 에러메시지) 튜플 반환."""
+    def get_patterns():
+        """매칭용 패턴 문자열 목록만 반환한다."""
+        return [e['pattern'] for e in DomainWhitelistService.get_whitelist()]
+
+    @staticmethod
+    def add_domain(raw_pattern):
+        """도메인을 전역 화이트리스트에 추가한다. (성공 여부, 에러메시지) 튜플 반환."""
         pattern = normalize_pattern(raw_pattern)
         if not pattern:
             return False, '유효하지 않은 도메인 형식입니다.'
 
-        entries = DomainWhitelistService.get_whitelist(user_id)
+        entries = DomainWhitelistService.get_whitelist()
         if any(e['pattern'] == pattern for e in entries):
             return True, ''  # 이미 존재 — 멱등하게 성공 처리
 
-        if len(entries) >= _MAX_DOMAINS_PER_USER:
-            return False, f'허용 도메인은 최대 {_MAX_DOMAINS_PER_USER}개까지 등록할 수 있습니다.'
+        if len(entries) >= _MAX_DOMAINS:
+            return False, f'허용 도메인은 최대 {_MAX_DOMAINS}개까지 등록할 수 있습니다.'
 
         entries.append({
             'pattern': pattern,
             'added_at': utc_now_iso()
         })
-        SettingsRepository.set_value('general', _settings_key(user_id), json.dumps(entries, ensure_ascii=False))
+        SettingsRepository.set_value(_SETTINGS_KEY, json.dumps(entries, ensure_ascii=False))
         return True, ''
 
     @staticmethod
-    def remove_domain(user_id, pattern):
-        """도메인을 화이트리스트에서 제거한다. 존재 여부와 무관하게 항상 성공(멱등)."""
+    def remove_domain(pattern):
+        """도메인을 전역 화이트리스트에서 제거한다. 존재 여부와 무관하게 항상 성공(멱등)."""
         normalized = normalize_pattern(pattern) or str(pattern or '').strip().lower()
-        entries = DomainWhitelistService.get_whitelist(user_id)
+        entries = DomainWhitelistService.get_whitelist()
         remaining = [e for e in entries if e['pattern'] != normalized]
-        SettingsRepository.set_value('general', _settings_key(user_id), json.dumps(remaining, ensure_ascii=False))
+        SettingsRepository.set_value(_SETTINGS_KEY, json.dumps(remaining, ensure_ascii=False))
         return True
 
     @staticmethod
-    def is_host_whitelisted(user_id, host):
-        return host_matches_whitelist(host, DomainWhitelistService.get_patterns(user_id))
+    def is_host_whitelisted(host):
+        return host_matches_whitelist(host, DomainWhitelistService.get_patterns())

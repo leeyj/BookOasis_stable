@@ -2,10 +2,11 @@
 """
 plugin_webview_routes.py – 플러그인용 외부 도메인 웹뷰/다운로드 API
 
-관리자 전용 기능이 아니라 로그인한 사용자 각자의 개인 화이트리스트 기반 기능이므로
+화이트리스트는 관리자가 관리하는 전역 단일 목록이다(도메인 추가/삭제는 admin_required).
+웹뷰/다운로드/프록시 자체는 로그인한 모든 사용자가 사용할 수 있으므로(login_required)
 admin_bp가 아니라 api_bp에 직접 등록한다 (api/__init__.py 참고).
 
-앱은 어떤 외부 도메인도 기본 제공/추천하지 않는다 — 사용자가 직접 등록한 도메인에
+앱은 어떤 외부 도메인도 기본 제공/추천하지 않는다 — 관리자가 직접 등록한 도메인에
 대해서만 웹뷰 표시/다운로드를 허용한다. 실제 네트워크 요청은 services/ssrf_guard.py의
 SSRF 방어 로직을 통해서만 이루어진다.
 """
@@ -16,7 +17,7 @@ from urllib.parse import quote, urljoin
 
 from flask import Blueprint, request, jsonify, session, Response, stream_with_context
 
-from api.auth import login_required
+from api.auth import login_required, admin_required
 from repositories.category_repository import CategoryRepository
 from services.domain_whitelist_service import DomainWhitelistService, extract_host_from_url
 from services.ssrf_guard import (
@@ -104,35 +105,35 @@ def _relay_post_body(url, patterns):
 @plugin_webview_bp.route('/api/webview/whitelist', methods=['GET'])
 @login_required
 def get_whitelist():
-    domains = DomainWhitelistService.get_whitelist(session['user_id'])
+    domains = DomainWhitelistService.get_whitelist()
     return jsonify({'success': True, 'domains': domains})
 
 
 @plugin_webview_bp.route('/api/webview/whitelist', methods=['POST'])
-@login_required
+@admin_required
 def add_whitelist_domain():
     data = request.get_json(silent=True) or {}
     domain = data.get('domain') or request.form.get('domain')
     if not domain:
         return jsonify({'success': False, 'error': 'domain이 필요합니다.'}), 400
 
-    ok, err = DomainWhitelistService.add_domain(session['user_id'], domain)
+    ok, err = DomainWhitelistService.add_domain(domain)
     if not ok:
         return jsonify({'success': False, 'error': err}), 400
 
-    return jsonify({'success': True, 'domains': DomainWhitelistService.get_whitelist(session['user_id'])})
+    return jsonify({'success': True, 'domains': DomainWhitelistService.get_whitelist()})
 
 
 @plugin_webview_bp.route('/api/webview/whitelist', methods=['DELETE'])
-@login_required
+@admin_required
 def remove_whitelist_domain():
     data = request.get_json(silent=True) or {}
     domain = data.get('domain') or request.args.get('domain')
     if not domain:
         return jsonify({'success': False, 'error': 'domain이 필요합니다.'}), 400
 
-    DomainWhitelistService.remove_domain(session['user_id'], domain)
-    return jsonify({'success': True, 'domains': DomainWhitelistService.get_whitelist(session['user_id'])})
+    DomainWhitelistService.remove_domain(domain)
+    return jsonify({'success': True, 'domains': DomainWhitelistService.get_whitelist()})
 
 
 # ─────────────────────────────── 웹뷰 프록시 ───────────────────────────────
@@ -144,7 +145,7 @@ def webview_proxy():
     if not url:
         return jsonify({'success': False, 'error': 'url이 필요합니다.'}), 400
 
-    patterns = DomainWhitelistService.get_patterns(session['user_id'])
+    patterns = DomainWhitelistService.get_patterns()
     host = extract_host_from_url(url)
     if not host:
         return _error_response('invalid_url', 400)
@@ -226,7 +227,7 @@ def hls_proxy():
     if not url:
         return jsonify({'success': False, 'error': 'url이 필요합니다.'}), 400
 
-    patterns = DomainWhitelistService.get_patterns(session['user_id'])
+    patterns = DomainWhitelistService.get_patterns()
     host = extract_host_from_url(url)
     if not host:
         return _error_response('invalid_url', 400)
@@ -404,7 +405,7 @@ def download_to_library():
     if not allowed:
         return jsonify({'success': False, 'error': '이 라이브러리에 대한 접근 권한이 없습니다.'}), 403
 
-    patterns = DomainWhitelistService.get_patterns(session['user_id'])
+    patterns = DomainWhitelistService.get_patterns()
     host = extract_host_from_url(url)
     if not host:
         return _error_response('invalid_url', 400)

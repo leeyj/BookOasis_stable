@@ -49,7 +49,7 @@ def get_dashboard_insights():
         # DB settings 테이블에서 저장된 연간 목표 권수 읽기
         target_annual_books = 30
         try:
-            val = SettingsRepository.get_value(db_type, 'ANNUAL_READING_GOAL')
+            val = SettingsRepository.get_value('ANNUAL_READING_GOAL')
             if val and str(val).isdigit():
                 target_annual_books = max(1, int(val))
         except Exception as e:
@@ -184,15 +184,11 @@ def save_reading_goal():
             return jsonify({'success': False, 'error': '유효한 목표 권수를 입력해주세요.'}), 400
 
         target_val = max(1, int(target_books))
-        db_type = data.get('library_type', 'general')
-        if db_type not in ('general', 'adult', 'audiobook', 'video'):
-            db_type = 'general'
 
-        for dt in ('general', db_type):
-            try:
-                SettingsRepository.set_value(dt, 'ANNUAL_READING_GOAL', str(target_val))
-            except Exception as e:
-                print(f"[Goal API Save Error] db: {dt}, err: {e}")
+        try:
+            SettingsRepository.set_value('ANNUAL_READING_GOAL', str(target_val))
+        except Exception as e:
+            print(f"[Goal API Save Error] {e}")
 
         return jsonify({'success': True, 'target_books': target_val})
     except Exception as e:

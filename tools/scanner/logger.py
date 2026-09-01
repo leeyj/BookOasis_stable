@@ -11,9 +11,8 @@ def scanner_print_control(db_path):
     write_log = True
     conn = None
     try:
-        db_type = 'adult' if 'adult' in os.path.basename(db_path) else 'general'
         from repositories.settings_repository import SettingsRepository
-        val = SettingsRepository.get_value(db_type, 'SCANNER_WRITE_LOG')
+        val = SettingsRepository.get_value('SCANNER_WRITE_LOG')
         if val is not None and str(val).strip() == '0':
             write_log = False
     except Exception:

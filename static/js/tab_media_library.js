@@ -26,7 +26,7 @@ import { loadBooksList, loadReadingHistory, filterBooks, toggleLibrarySort, resu
 
 // plugin_custom_view.js 임포트
 import { mountCategoryPluginUI } from './plugin_custom_view.js';
-import { switchSettingsTab, loadInitialSystemSettings, loadGeneralSettings, submitGeneralSettings, initReportsTab, loadReportList, loadReportDetail, loadViewerSettings, submitViewerSettings } from './settings_tab.js';
+import { switchSettingsTab, loadInitialSystemSettings, loadGeneralSettings, submitGeneralSettings, initReportsTab, loadReportList, loadReportDetail, loadViewerSettings, submitViewerSettings, applySettingsTabAccessControl } from './settings_tab.js';
 
 // 장르/태그 및 사이드바 제어 모듈
 import { initFloatingFilter, toggleFilterModal } from './genre_tag_filter.js';
@@ -325,26 +325,9 @@ async function initTabMediaLibrary() {
     const usernameEl = document.getElementById('session-username-display');
     if (usernameEl) usernameEl.innerText = state.currentUser.username;
     
-    if (state.currentUser.role === 'admin') {
-      const usersTabBtn = document.getElementById('settings-tab-btn-users');
-      if (usersTabBtn) usersTabBtn.style.display = 'block';
-      const permissionsTabBtn = document.getElementById('settings-tab-btn-permissions');
-      if (permissionsTabBtn) permissionsTabBtn.style.display = 'block';
-      
-      document.querySelectorAll('.settings-tab-btn').forEach(btn => {
-        const onclickAttr = btn.getAttribute('onclick') || '';
-        if (onclickAttr.includes("'schedule'") || onclickAttr.includes("'queue'") || onclickAttr.includes("'general'") || onclickAttr.includes("'plugins'") || onclickAttr.includes("'reports'")) {
-          btn.style.display = 'block';
-        }
-      });
-    } else {
-      document.querySelectorAll('.settings-tab-btn').forEach(btn => {
-        const onclickAttr = btn.getAttribute('onclick') || '';
-        if (onclickAttr.includes("'schedule'") || onclickAttr.includes("'queue'") || onclickAttr.includes("'plugins'") || onclickAttr.includes("'reports'")) {
-          btn.style.display = 'none';
-        }
-      });
-    }
+    // 관리자 전용 설정 탭 버튼은 여기서 한 번에 노출/숨김을 결정한다
+    // (탭별 개별 onclick 분기 대신 data-settings-tab 기반 공용 함수 사용, settings_tab.js 참고)
+    applySettingsTabAccessControl();
   }
 
   applyLibraryTypeToggleVisibility();

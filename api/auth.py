@@ -25,7 +25,7 @@ def _as_bool(value, default=False):
 
 
 def _get_security_option(key, default=''):
-    val = SettingsService.get(key, '', db_type='general')
+    val = SettingsService.get(key, '')
     if str(val).strip() != '':
         return val
     return os.environ.get(key, default)
@@ -129,7 +129,7 @@ def verify_webhook_token(token):
     브라우저 세션 없이 호출하는 read-only 외부 API에서 재사용한다 — 새 토큰을 발급하지 않고
     기존 스캔 웹훅(/api/webhook/scan)과 동일한 시스템 설정값(WEBHOOK_TOKEN)을 공유한다.
     """
-    sys_token = SettingsService.get('WEBHOOK_TOKEN', '', db_type='general') or os.environ.get('WEBHOOK_TOKEN')
+    sys_token = SettingsService.get('WEBHOOK_TOKEN', '') or os.environ.get('WEBHOOK_TOKEN')
     return bool(sys_token) and bool(token) and token == sys_token
 
 def webhook_token_required(f):

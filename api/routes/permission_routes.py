@@ -40,7 +40,7 @@ def _fetch_library_permissions(db_type, include_plugins=False):
         permissions[uid][f"{db_type}_{lid}"] = bool(row['has_access'])
 
     if include_plugins and db_type == 'general':
-        perm_map = SettingsRepository.get_settings_by_prefix(db_type, 'PERM_CATEGORY_')
+        perm_map = SettingsRepository.get_settings_by_prefix('PERM_CATEGORY_')
         user_rows = [u['id'] for u in UserRepository.get_all_users(db_type)]
         for uid in user_rows:
             uid_str = str(uid)
@@ -131,7 +131,7 @@ def update_permission():
         if target_db == 'plugin' or str(library_id).startswith('plugin_'):
             safe_library_id = str(library_id).strip()
             key_perm = f"PERM_CATEGORY_{user_id}_{safe_library_id}"
-            SettingsRepository.set_value('general', key_perm, str(has_access))
+            SettingsRepository.set_value(key_perm, str(has_access))
         else:
             UserRepository.update_category_permission(target_db, user_id, library_id, has_access)
         return jsonify({'success': True, 'message': '권한 정보가 업데이트되었습니다.'})
