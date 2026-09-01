@@ -344,6 +344,30 @@ def update_library_schedule(library_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@library_bp.route('/api/media/libraries/<int:library_id>/schedule-enabled', methods=['POST'])
+@admin_required
+def update_library_schedule_enabled(library_id):
+    """라이브러리 스케줄 ON/OFF - 크론 표현식은 유지한 채 자동 실행만 켜고 끔(수동 스캔은 영향 없음)"""
+    db_type = request.form.get('type', 'general')
+    enabled = request.form.get('enabled') in ('1', 'true', 'on')
+
+    try:
+        CategoryRepository.update_schedule_enabled(db_type, library_id, enabled)
+        row = CategoryRepository.get_library_by_id(db_type, library_id)
+        if not row:
+            return jsonify({'success': False, 'error': _t('api.err_library_not_found')}), 404
+
+        cron_val = row['cron_schedule']
+        if enabled and cron_val:
+            db_path = get_db_path_for_scan(db_type)
+            SchedulerService.register_job(db_type, db_path, library_id, row['physical_path'], cron_val)
+        else:
+            SchedulerService.remove_job(db_type, library_id)
+
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 def _format_library_row(r):
     """DB 행을 JSON 형식으로 변환"""
     return {
@@ -351,6 +375,7 @@ def _format_library_row(r):
         'name': r['name'],
         'physical_path': r['physical_path'],
         'cron_schedule': r['cron_schedule'] or '',
+        'schedule_enabled': int(r['schedule_enabled']) if r['schedule_enabled'] is not None else 1,
         'last_scanned_at': r['last_scanned_at'] or '-',
         'scan_status': r['scan_status'] or 'ready',
         'is_remote': r['is_remote'] or 0,

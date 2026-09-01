@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS libraries (
     name VARCHAR(255) NOT NULL UNIQUE,
     physical_path TEXT NOT NULL,
     cron_schedule VARCHAR(255) DEFAULT NULL,
+    schedule_enabled TINYINT(1) NOT NULL DEFAULT 1,
     last_scanned_at DATETIME DEFAULT NULL,
     scan_status VARCHAR(50) DEFAULT 'ready',
     is_remote INT DEFAULT 0,

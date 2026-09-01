@@ -63,7 +63,7 @@ class SchedulerRepository:
         """크론 스케줄이 설정된 라이브러리 목록 조회"""
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
-        cursor.execute("SELECT id, name, physical_path, cron_schedule FROM libraries WHERE cron_schedule IS NOT NULL AND cron_schedule != ''")
+        cursor.execute("SELECT id, name, physical_path, cron_schedule FROM libraries WHERE cron_schedule IS NOT NULL AND cron_schedule != '' AND schedule_enabled = 1")
         rows = cursor.fetchall()
         conn.close()
         return [dict(row) for row in rows]

@@ -1,0 +1,112 @@
+<!-- 상단 헤더 및 필터 영역
+     view_manager.js의 switchActiveView()가 뷰 전환 시 일부 항목(검색/그룹모드/필터 등)을 숨기지만,
+     이 헤더 자체와 세션탭(#library-type-toggle-group)/환경설정·계정(.library-controls-persistent)은
+     플러그인 화면을 포함한 모든 뷰에서 항상 보이도록 절대 숨기지 않는다. -->
+<div class="library-header">
+    <!-- 데스크톱 전용 사이드바 토글 버튼 -->
+    <button id="btn-sidebar-toggle-desktop" class="btn-sidebar-toggle-desktop" data-role="desktop-sidebar-toggle" title="사이드바 접기/펼치기" style="background: transparent; border: none; color: var(--app-text-muted); font-size: 1.1rem; cursor: pointer; padding: 0.4rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; outline: none; flex-shrink: 0;">
+        <i class="fa-solid fa-bars"></i>
+    </button>
+
+    <!-- 페이지 타이틀/건수: 사이드바 active 항목과 중복돼 화면에는 숨기지만, 다른 뷰(그리드/컬렉션/스마트추천/검색결과)에서
+         JS가 검색결과 건수·컬렉션명 등을 이 위치에 계속 채워 넣으므로 DOM 자체는 유지 -->
+    <h2 class="library-title" style="display: none;">
+        <span class="library-title-main"><i class="fa-solid fa-book-open" style="color: var(--app-accent); margin-right: 0.5rem;"></i> <span id="current-category-indicator" class="current-category-indicator-title" aria-live="polite">도서 보관함</span></span>
+        <i id="header-category-scan-spinner" class="fa-solid fa-circle-notch fa-spin" style="color:var(--app-accent); margin-left:0.6rem; font-size:0.95rem;" title="스캔 진행 중"></i>
+        <span id="library-total-count" style="font-size: 0.9rem; color: var(--app-text-muted); margin-left: 0.8rem; font-weight: normal; white-space: nowrap;"></span>
+    </h2>
+
+    <div class="library-search-box library-search-center">
+        <input type="text" id="library-search" data-role="library-search-input" class="form-control input-sm" placeholder="제목, 시리즈, 작가 검색...">
+        <button id="btn-library-search-action" data-role="library-search-action" class="btn-search-icon"
+            data-i18n-title="common.search" title="검색">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <span data-i18n="common.search" class="sr-only">검색</span>
+        </button>
+    </div>
+
+    <div id="group-mode-toggle-group" class="library-toggle-group library-toggle-group--compact">
+        <button class="btn-toggle active" id="btn-group-default" data-role="grouping-mode-toggle" data-group-mode="default" data-i18n="header.group_mode_default">기본</button>
+        <button class="btn-toggle" id="btn-group-author" data-role="grouping-mode-toggle" data-group-mode="author" data-i18n="header.group_mode_author">작가별</button>
+    </div>
+
+    <!-- 라이브러리 타입(세션) 탭: 페이지의 1차 내비게이션이자 "지금 어느 세션인지" 보여주는 유일한 지표라
+         플러그인 화면을 포함해 어떤 뷰에서도 숨기지 않는다 (view_manager.js 참고) -->
+    <div id="library-type-toggle-group" class="library-toggle-group">
+        <button class="btn-toggle active" id="btn-lib-general" data-role="library-type-toggle" data-library-type="general" data-i18n="header.general_books">일반 도서</button>
+        <button class="btn-toggle" id="btn-lib-adult" data-role="library-type-toggle" data-library-type="adult" data-i18n="header.adult_books">성인 도서</button>
+        <button class="btn-toggle" id="btn-lib-audiobook" data-role="library-type-toggle" data-library-type="audiobook" data-i18n="header.audiobooks">오디오북</button>
+        <button class="btn-toggle" id="btn-lib-video" data-role="library-type-toggle" data-library-type="video" data-i18n="header.videos">영상 강좌</button>
+    </div>
+
+    <!-- 오른쪽 끝 액션 묶음: 상황별(필터/스캔활동)과 상시(환경설정/계정) 그룹이 서로 떨어지지 않도록
+         하나의 컨테이너로 감싸서 이 컨테이너 자체만 오른쪽 끝으로 민다(margin-left:auto는 여기 한 곳에만) -->
+    <div class="library-header-actions">
+    <!-- 필터/스캔활동/정렬: 도서 목록 화면에서만 의미가 있어 뷰에 따라 숨김(view_manager.js) -->
+    <div class="library-controls">
+        <button id="btn-open-filter" data-role="library-open-filter" class="btn-toggle"
+            style="display: flex; align-items: center; gap: 0.3rem;"
+            data-i18n-title="header.filter_title" title="장르/태그 필터 열기">
+            <i class="fa-solid fa-filter"></i> <span data-i18n="header.filter" class="sr-only">필터</span>
+        </button>
+        <div class="scan-activity-wrap">
+            <button id="btn-scan-activity" class="btn-scan-activity" type="button"
+                aria-label="스캔 활동" aria-expanded="false" aria-controls="scan-activity-popover"
+                title="스캔 활동">
+                <i class="fa-solid fa-wave-square" aria-hidden="true"></i>
+                <span id="scan-activity-indicator" class="scan-activity-indicator" aria-hidden="true"></span>
+            </button>
+            <section id="scan-activity-popover" class="scan-activity-popover" hidden aria-live="polite">
+                <header class="scan-activity-header">
+                    <div>
+                        <strong>스캔 활동</strong>
+                        <span id="scan-activity-summary">대기 중</span>
+                    </div>
+                    <button id="btn-close-scan-activity" type="button" aria-label="닫기" title="닫기">
+                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    </button>
+                </header>
+                <div id="scan-activity-list" class="scan-activity-list">
+                    <div class="scan-activity-empty">
+                        <i class="fa-regular fa-circle-check" aria-hidden="true"></i>
+                        <span>진행 중인 스캔이 없습니다.</span>
+                    </div>
+                </div>
+            </section>
+        </div>
+        <button id="btn-lib-sort" data-role="library-sort-toggle" class="btn-toggle"
+            style="display: none; align-items: center; gap: 0.3rem;"
+            data-i18n-title="header.sort_title" title="정렬 조건 변경">
+            <i class="fa-solid fa-sort-alpha-down"></i> <span data-i18n="header.sort_asc" class="sr-only">가나다 오름차순</span>
+        </button>
+    </div>
+
+    <!-- 환경설정/계정: 어떤 뷰에서도 숨기지 않는 상시 그룹 (view_manager.js가 .library-controls는 숨겨도 이 그룹은 건드리지 않음) -->
+    <div class="library-controls-persistent">
+        <!-- 환경설정: 사이드바 하단에 있던 항목을 상단 아이콘으로 이동 (사이드바 클릭 위임 로직 재사용) -->
+        <button id="category-settings" class="btn-header-icon" data-role="sidebar-category-static" data-category-id="settings"
+            data-i18n-title="sidebar.settings" title="환경설정">
+            <i class="fa-solid fa-gear" aria-hidden="true"></i>
+            <span data-i18n="sidebar.settings" class="sr-only">환경설정</span>
+        </button>
+
+        <!-- 계정: 사이드바 하단의 사용자 프로필/로그아웃을 상단 아이콘 + 팝오버로 이동 -->
+        <div class="account-menu-wrap">
+            <button id="btn-account-menu" class="btn-header-icon" type="button"
+                aria-label="계정 메뉴" aria-expanded="false" aria-controls="account-menu-popover" title="계정">
+                <i class="fa-solid fa-circle-user" aria-hidden="true"></i>
+            </button>
+            <section id="account-menu-popover" class="account-menu-popover" hidden aria-live="polite">
+                <div class="account-menu-user">
+                    <i class="fa-solid fa-circle-user" aria-hidden="true"></i>
+                    <span id="session-username-display">-</span>
+                </div>
+                <a href="/logout" data-i18n-title="sidebar.logout_title" title="로그아웃" class="account-menu-logout">
+                    <i class="fa-solid fa-power-off" aria-hidden="true"></i>
+                    <span data-i18n="sidebar.logout_title">로그아웃</span>
+                </a>
+            </section>
+        </div>
+    </div>
+    </div>
+</div>

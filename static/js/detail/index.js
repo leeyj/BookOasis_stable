@@ -7,6 +7,7 @@ import { updateCurrentCategoryIndicator } from '../category_indicator.js';
 import { detailVolumeViewState } from './volume_controller.js';
 import { encodeDetailParams } from '../url_obfuscator.js';
 import { bindDetailInteractions } from './interactions.js';
+import { createBookCard } from '../ui.js';
 import './volume_context_menu.js';
 
 bindDetailInteractions();
@@ -98,9 +99,48 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
         <button class="btn-back-to-list" data-role="detail-back-to-list">
           <i class="fa-solid fa-arrow-left"></i> ${i18n.t('modal.go_back')}
         </button>
-        ${headerHtml}
-        ${volumesSectionHtml}
+        <div class="detail-page-layout">
+          <div class="detail-page-main">
+            ${headerHtml}
+            ${volumesSectionHtml}
+          </div>
+          <aside class="detail-page-sidebar" id="detail-author-sidebar" style="display:none;">
+            <h3 class="detail-sidebar-title">${i18n.t('detail.more_by_author')}</h3>
+            <div class="detail-sidebar-grid" id="detail-author-sidebar-grid"></div>
+          </aside>
+        </div>
       `;
+
+      // "이 작가의 다른 도서" 사이드바 - 본문 렌더링을 막지 않도록 논블로킹으로 로드.
+      // 사이드바는 폭 고정(336px, 카드 2열)이고 본문은 flex:1이라, 사이드바가 없거나
+      // 숨겨져도 본문이 자동으로 남는 공간을 채운다 - 별도 폭 조정 클래스가 필요 없다.
+      (async () => {
+        if (state.bookRecommendEnabled === false) return; // 설정 > 일반설정의 "도서 추천기능" 해제 시 요청 자체를 안 보냄
+        const sidebar = document.getElementById('detail-author-sidebar');
+        const grid = document.getElementById('detail-author-sidebar-grid');
+        if (!sidebar || !grid) return;
+        try {
+          const res = await api.fetchAuthorBooks(state.currentLibraryType || 'general', safeSeriesName, actualLibraryId);
+          if (!res.success || !res.books || res.books.length === 0) return;
+          grid.innerHTML = '';
+          res.books.forEach((item) => {
+            const card = createBookCard({
+              id: item.id,
+              representative_book_id: item.id,
+              series_name: item.series_name,
+              cover_image: item.cover_image,
+              file_format: item.file_format,
+              library_id: item.library_id,
+            }, {
+              onPrimaryClick: (e) => openBookDetail(e, item.series_name, item.library_id ?? actualLibraryId, item.id, item.series_name),
+            });
+            grid.appendChild(card);
+          });
+          sidebar.style.display = '';
+        } catch (err) {
+          console.error('[Detail] 작가의 다른 도서 로드 실패:', err);
+        }
+      })();
 
       // 메타데이터 비동기 로드 추천 후보군 검색
       const triggerRecommendSearch = () => {

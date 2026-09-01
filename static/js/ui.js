@@ -7,6 +7,7 @@ import { buildFallbackCoverUrl, getBookCoverSrc, buildTextCoverDataUri, coverAli
 import { stripLeadingBracketTags, middleTruncateTitle } from './series_display.js';
 import { initGridPruning, resetGridPruning, notifyCardsAppended, notifyCardsPrepended } from './grid_pruning.js';
 import './scan_activity_status.js';
+import './account_menu.js';
 
 // 커버 이미지가 (플레이스홀더 → 실제 src로) 로드 완료되면 .is-loaded를 붙여 CSS로 fade-in한다.
 // 실제 로딩 시간은 그대로지만, 뚝뚝 끊기듯 팍 나타나는 대신 부드럽게 나타나서 "계속 로딩

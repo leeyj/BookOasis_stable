@@ -74,10 +74,18 @@ function buildScheduleRow(lib) {
   const safeCronScheduleAttr = escapeHtml(lib.cron_schedule || '');
   const lastScannedAt = lib.last_scanned_at || '-';
 
+  const scheduleEnabled = lib.schedule_enabled !== 0 && lib.schedule_enabled !== '0';
+
   return `
-    <tr data-library-id="${lib.id}" style="border-bottom: 1px solid rgba(255,255,255,0.05); hover: background: rgba(255,255,255,0.02);">
+    <tr data-library-id="${lib.id}" class="${scheduleEnabled ? '' : 'schedule-row-disabled'}" style="border-bottom: 1px solid rgba(255,255,255,0.05); hover: background: rgba(255,255,255,0.02);">
       <td style="padding: 1rem; font-weight: 600; color: #fff;">${lib.name}</td>
       <td class="schedule-path-cell">${buildCompactPaths(lib.physical_path)}</td>
+      <td style="padding: 1rem; text-align: center;">
+        <div style="position: relative; display: inline-block; width: 44px; height: 24px; vertical-align: middle;">
+          <input type="checkbox" id="sched-enabled-${lib.id}" data-role="schedule-enabled-toggle" data-library-id="${lib.id}" ${scheduleEnabled ? 'checked' : ''} style="opacity: 0; width: 0; height: 0; position: absolute;">
+          <label for="sched-enabled-${lib.id}" class="toggle-switch-slider" title="자동 스케줄 사용 여부 (수동 스캔에는 영향 없음)"></label>
+        </div>
+      </td>
       <td data-role="schedule-status" style="padding: 1rem; text-align: center;">${statusBadge}</td>
       <td data-role="schedule-scan-info" style="padding: 1rem; text-align: center;">${buildLastScanInfo(lastScannedAt, lib.cron_schedule)}</td>
       <td style="padding: 1rem; text-align: center;">
@@ -92,6 +100,30 @@ function buildScheduleRow(lib) {
       </td>
     </tr>
   `;
+}
+
+async function onScheduleEnabledToggle(checkbox) {
+  const libraryId = Number.parseInt(checkbox.dataset.libraryId || '', 10);
+  if (!Number.isFinite(libraryId) || libraryId <= 0) return;
+
+  const enabled = checkbox.checked;
+  const row = checkbox.closest('tr[data-library-id]');
+  checkbox.disabled = true;
+  try {
+    const res = await api.updateLibraryScheduleEnabled(state.currentLibraryType || 'general', libraryId, enabled);
+    if (!res || !res.success) {
+      throw new Error((res && res.error) || 'unknown error');
+    }
+    if (row) row.classList.toggle('schedule-row-disabled', !enabled);
+  } catch (err) {
+    // 실패 시 체크박스를 원래 상태로 되돌림 (서버 상태와 UI 불일치 방지)
+    checkbox.checked = !enabled;
+    if (typeof window.showToast === 'function') {
+      window.showToast(i18n.t('scheduler.toggle_enabled_fail', { error: err.message || err }), 'error');
+    }
+  } finally {
+    checkbox.disabled = false;
+  }
 }
 
 function initScheduleActionDelegation() {
@@ -187,6 +219,9 @@ function initScheduleActionDelegation() {
     }
     if (target.matches('[data-role="schedule-helper-weekday"]')) {
       updateCronHelperSummary();
+    }
+    if (target.matches('[data-role="schedule-enabled-toggle"]')) {
+      onScheduleEnabledToggle(target);
     }
   }, true);
 

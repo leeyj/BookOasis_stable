@@ -124,11 +124,15 @@ function recoverTopCategoryUiAfterBack() {
   const libraryHeader = document.querySelector('.library-header');
   const searchCenter = document.querySelector('.library-search-center');
   const libraryControls = document.querySelector('.library-controls');
+  const groupModeToggle = document.getElementById('group-mode-toggle-group');
+  const libraryTypeToggle = document.getElementById('library-type-toggle-group');
   const sidebarCollapsible = document.getElementById('sidebar-collapsible-content');
 
   if (libraryHeader) libraryHeader.style.display = 'grid';
   if (searchCenter) searchCenter.style.display = 'block';
   if (libraryControls) libraryControls.style.display = 'flex';
+  if (groupModeToggle) groupModeToggle.style.display = 'flex';
+  if (libraryTypeToggle) libraryTypeToggle.style.display = 'flex';
 
   applyLibraryTypeToggleVisibility();
   applyGroupModeButtonState(state.groupMode);

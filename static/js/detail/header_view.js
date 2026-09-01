@@ -404,6 +404,10 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
         </div>
         ${missingPageBannerHtml}
         <div class="detail-score">${stars}</div>
+      </div>
+
+      <!-- 요약/설명 + 액션 버튼: 커버 폭에 갇히지 않도록 전체 너비 별도 줄로 배치(커버 아래 빈 공간 재활용) -->
+      <div id="detail-header-full-row" class="detail-header-full-row">
         <div class="book-summary-wrap${shouldShowSummaryToggle ? ' has-toggle' : ''}">
           <p class="book-summary-text${shouldShowSummaryToggle ? ' is-collapsed' : ''}">${summaryText}</p>
           ${shouldShowSummaryToggle ? `
@@ -413,7 +417,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
           ` : ''}
         </div>
         ${linkHtml}
-        
+
         <!-- 버튼: 이어서 읽기 및 메타정보 찾기 -->
         <div style="display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; align-items: center;">
           ${continueBtnHtml}

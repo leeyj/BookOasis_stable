@@ -5,6 +5,7 @@ import * as api from '../api.js';
 export function toggleMetaEditMode() {
   const viewEl = document.getElementById('detail-header-meta-view');
   const editEl = document.getElementById('detail-header-meta-edit');
+  const fullRowEl = document.getElementById('detail-header-full-row');
   const overlayBtn = document.getElementById('cover-upload-overlay-btn');
   const btnEdit = document.querySelector('.btn-edit-toggle');
 
@@ -13,11 +14,13 @@ export function toggleMetaEditMode() {
     if (isEdit) {
       editEl.style.display = 'none';
       viewEl.style.display = 'flex';
+      if (fullRowEl) fullRowEl.style.display = '';
       if (overlayBtn) overlayBtn.classList.remove('editable');
       if (btnEdit) btnEdit.style.display = 'inline-flex';
     } else {
       editEl.style.display = 'flex';
       viewEl.style.display = 'none';
+      if (fullRowEl) fullRowEl.style.display = 'none';
       if (overlayBtn) overlayBtn.classList.add('editable');
       if (btnEdit) btnEdit.style.display = 'none';
     }

@@ -394,6 +394,26 @@ window.BookOasisPlugin.downloadToLibrary('https://example.com/book.epub', {
 
 플러그인 Python 백엔드에서 직접 다운로드/프록시 로직을 새로 구현할 필요 없이 위 두 API를 재사용하십시오 — 화이트리스트 관리, SSRF 방어, 스캔 트리거가 이미 구현되어 있습니다.
 
+### `window.BookOasisPlugin.getSession()`
+`category_tab` 플러그인은 iframe이 아니라 호스트와 **같은 DOM/JS 컨텍스트**에서 실행되므로(사이드바/설정 화면과 동일한 페이지), 이 함수는 서버 왕복 없이 현재 세션 정보를 동기적으로 즉시 반환합니다.
+
+```js
+const session = window.BookOasisPlugin.getSession();
+// { libraryType: 'general' | 'adult' | 'audiobook' | 'video', categoryId, username, role }
+```
+
+- `libraryType`: 상단 헤더의 일반/성인/오디오북/영상강좌 탭 중 현재 활성 세션.
+- `categoryId`: 현재 선택된 사이드바 카테고리 id (예: `'home'`, `'history'`, 플러그인 자신의 카테고리 id 등).
+- `username` / `role`: 로그인한 사용자 정보. 비로그인 상태이거나 아직 로드 전이면 `null`일 수 있습니다.
+
+세션이 바뀔 때마다 실시간으로 반응하려면 `bookoasis:session-change` 커스텀 이벤트를 구독하십시오 (앱 최초 로드 시 1회 + 세션 전환마다 항상 발생):
+
+```js
+window.addEventListener('bookoasis:session-change', (event) => {
+  console.log('현재 세션:', event.detail.libraryType);
+});
+```
+
 ### 참조 구현: `gutenberg_browser` 샘플 플러그인
 
 - 경로: `plugins/metadata/gutenberg_browser/`

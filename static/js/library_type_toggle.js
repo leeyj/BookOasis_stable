@@ -69,6 +69,10 @@ export function applyLibraryTypeButtonState(type) {
   window.currentLibraryType = safeType;
   document.documentElement.setAttribute('data-library-type', safeType);
 
+  // 초기 로드 1회 + 세션 전환마다 항상 거치는 유일한 지점이라, 플러그인이 세션 변경을
+  // 실시간으로 구독할 수 있도록 여기서 이벤트를 발행한다 (window.BookOasisPlugin.getSession() 참고)
+  window.dispatchEvent(new CustomEvent('bookoasis:session-change', { detail: { libraryType: safeType } }));
+
   document.querySelectorAll('#library-type-toggle-group .btn-toggle').forEach(btn => btn.classList.remove('active'));
   if (safeType === 'general') {
     document.getElementById('btn-lib-general')?.classList.add('active');

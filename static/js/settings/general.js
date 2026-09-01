@@ -88,12 +88,6 @@ function applyNonAdminGeneralSettingsMode() {
   });
 }
 
-function applySidebarTopControlsSetting(enabled) {
-  const sidebarContent = document.getElementById('sidebar-collapsible-content');
-  if (!sidebarContent) return;
-  sidebarContent.classList.toggle('sidebar-controls-top', !!enabled);
-}
-
 export function changeDashboardTheme(themeName) {
   if (!themeName) themeName = 'purple';
   localStorage.setItem('app_dashboard_theme', themeName);
@@ -148,9 +142,6 @@ export function applySettingsToUI(settings) {
   if (settings.SHOW_TXT_NO_COVER_INFO_BANNER !== undefined) {
     state.showTxtNoCoverInfoBanner = (settings.SHOW_TXT_NO_COVER_INFO_BANNER === '1');
   }
-  if (settings.SIDEBAR_TOP_CONTROLS !== undefined) {
-    state.sidebarTopControls = (settings.SIDEBAR_TOP_CONTROLS === '1');
-  }
   if (settings.SHOW_SIDEBAR_CATEGORY_ALL !== undefined) {
     state.showSidebarCategoryAll = (settings.SHOW_SIDEBAR_CATEGORY_ALL !== '0');
   }
@@ -172,6 +163,9 @@ export function applySettingsToUI(settings) {
   if (settings.SMART_RECOMMEND_ENABLED !== undefined) {
     state.smartRecommendEnabled = (settings.SMART_RECOMMEND_ENABLED !== '0');
   }
+  if (settings.BOOK_RECOMMEND_ENABLED !== undefined) {
+    state.bookRecommendEnabled = (settings.BOOK_RECOMMEND_ENABLED !== '0');
+  }
 
   if (typeof window !== 'undefined') {
     window.__audioMiniPlayerMode = state.audioMiniPlayerMode || 'mini';
@@ -180,8 +174,6 @@ export function applySettingsToUI(settings) {
       window.applyAudioMiniPlayerMode(window.__audioMiniPlayerMode);
     }
   }
-
-  applySidebarTopControlsSetting(state.sidebarTopControls === true);
 }
 
 // 최초 로드 시 설정 일괄 호출 적용
@@ -291,11 +283,6 @@ export async function loadGeneralSettings() {
         txtNoCoverBannerEl.checked = (s.SHOW_TXT_NO_COVER_INFO_BANNER !== '0');
       }
 
-      const sidebarTopControlsEl = document.getElementById('setting-sidebar-top-controls');
-      if (sidebarTopControlsEl) {
-        sidebarTopControlsEl.checked = (s.SIDEBAR_TOP_CONTROLS === '1');
-      }
-
       const showCategoryAllEl = document.getElementById('setting-show-sidebar-category-all');
       if (showCategoryAllEl) {
         showCategoryAllEl.checked = (s.SHOW_SIDEBAR_CATEGORY_ALL !== '0');
@@ -329,6 +316,11 @@ export async function loadGeneralSettings() {
       const smartRecommendEnabledEl = document.getElementById('setting-smart-recommend-enabled');
       if (smartRecommendEnabledEl) {
         smartRecommendEnabledEl.checked = (s.SMART_RECOMMEND_ENABLED !== '0');
+      }
+
+      const bookRecommendEnabledEl = document.getElementById('setting-book-recommend-enabled');
+      if (bookRecommendEnabledEl) {
+        bookRecommendEnabledEl.checked = (s.BOOK_RECOMMEND_ENABLED !== '0');
       }
 
       const ffmpegTranscodeArgsEl = document.getElementById('setting-ffmpeg-transcode-args');
@@ -485,7 +477,6 @@ export async function submitGeneralSettings(event) {
   const hideCompleted = document.getElementById('setting-hide-completed-in-history')?.checked ? '1' : '0';
   const tagFilterScopeAll = document.getElementById('setting-tag-filter-scope-all')?.checked ? '1' : '0';
   const showTxtNoCoverInfoBanner = document.getElementById('setting-show-txt-no-cover-info-banner')?.checked ? '1' : '0';
-  const sidebarTopControls = document.getElementById('setting-sidebar-top-controls')?.checked ? '1' : '0';
   const showSidebarCategoryAll = document.getElementById('setting-show-sidebar-category-all')?.checked ? '1' : '0';
   const hddAggressiveWarmup = document.getElementById('setting-hdd-aggressive-warmup')?.checked ? '1' : '0';
   const audioMiniPlayerModeRaw = document.getElementById('setting-audio-mini-player-mode')?.value || 'mini';
@@ -497,6 +488,7 @@ export async function submitGeneralSettings(event) {
   const detailVolumeGridView = document.getElementById('setting-detail-volume-grid-view')?.checked ? '1' : '0';
   const collapseDetailGenreTags = document.getElementById('setting-collapse-detail-genre-tags')?.checked ? '1' : '0';
   const smartRecommendEnabled = document.getElementById('setting-smart-recommend-enabled')?.checked ? '1' : '0';
+  const bookRecommendEnabled = document.getElementById('setting-book-recommend-enabled')?.checked ? '1' : '0';
   const ffmpegTranscodeArgs = document.getElementById('setting-ffmpeg-transcode-args')?.value || '';
   const ffmpegVaapiArgs = document.getElementById('setting-ffmpeg-vaapi-args')?.value || '';
   const ffmpegVaapiDevice = document.getElementById('setting-vaapi-device-path')?.value?.trim() || '/dev/dri/renderD128';
@@ -534,7 +526,6 @@ export async function submitGeneralSettings(event) {
       api.updateSystemSetting('HIDE_COMPLETED_IN_HISTORY', hideCompleted),
       api.updateSystemSetting('TAG_FILTER_SEARCH_SCOPE_ALL', tagFilterScopeAll),
       api.updateSystemSetting('SHOW_TXT_NO_COVER_INFO_BANNER', showTxtNoCoverInfoBanner),
-      api.updateSystemSetting('SIDEBAR_TOP_CONTROLS', sidebarTopControls),
       api.updateSystemSetting('SHOW_SIDEBAR_CATEGORY_ALL', showSidebarCategoryAll),
       api.updateSystemSetting('HDD_AGGRESSIVE_WARMUP', hddAggressiveWarmup),
       api.updateSystemSetting('AUDIO_MINI_PLAYER_MODE', audioMiniPlayerMode),
@@ -544,6 +535,7 @@ export async function submitGeneralSettings(event) {
       api.updateSystemSetting('DETAIL_VOLUME_GRID_VIEW', detailVolumeGridView),
       api.updateSystemSetting('COLLAPSE_DETAIL_GENRE_TAGS', collapseDetailGenreTags),
       api.updateSystemSetting('SMART_RECOMMEND_ENABLED', smartRecommendEnabled),
+      api.updateSystemSetting('BOOK_RECOMMEND_ENABLED', bookRecommendEnabled),
       api.updateSystemSetting('FFMPEG_TRANSCODE_ARGS', ffmpegTranscodeArgs),
       api.updateSystemSetting('FFMPEG_VAAPI_ARGS', ffmpegVaapiArgs),
       api.updateSystemSetting('FFMPEG_VAAPI_DEVICE', ffmpegVaapiDevice)
@@ -569,14 +561,14 @@ export async function submitGeneralSettings(event) {
         HIDE_COMPLETED_IN_HISTORY: hideCompleted,
         TAG_FILTER_SEARCH_SCOPE_ALL: tagFilterScopeAll,
         SHOW_TXT_NO_COVER_INFO_BANNER: showTxtNoCoverInfoBanner,
-        SIDEBAR_TOP_CONTROLS: sidebarTopControls,
         SHOW_SIDEBAR_CATEGORY_ALL: showSidebarCategoryAll,
         HDD_AGGRESSIVE_WARMUP: hddAggressiveWarmup,
         AUDIO_MINI_PLAYER_MODE: audioMiniPlayerMode,
         AUDIO_RIGHT_DOCK_DIM_ENABLED: audioRightDockDimEnabled,
         DETAIL_VOLUME_GRID_VIEW: detailVolumeGridView,
         COLLAPSE_DETAIL_GENRE_TAGS: collapseDetailGenreTags,
-        SMART_RECOMMEND_ENABLED: smartRecommendEnabled
+        SMART_RECOMMEND_ENABLED: smartRecommendEnabled,
+        BOOK_RECOMMEND_ENABLED: bookRecommendEnabled
       });
       loadGeneralSettings();
       if (typeof window.loadLibraries === 'function') {

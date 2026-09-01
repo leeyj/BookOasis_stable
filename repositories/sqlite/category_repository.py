@@ -508,3 +508,22 @@ class CategoryRepository:
         finally:
             conn.close()
 
+    @staticmethod
+    def update_schedule_enabled(db_type, library_id, enabled):
+        """라이브러리 스케줄 ON/OFF - 크론 표현식 자체는 건드리지 않고 자동 실행 여부만 토글"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                UPDATE libraries
+                SET schedule_enabled = ?
+                WHERE id = ?
+            """, (1 if enabled else 0, library_id))
+            conn.commit()
+            return True
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+

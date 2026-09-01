@@ -33,7 +33,6 @@ export const state = {
   hideCompletedInHistory: false,
   tagFilterSearchInAll: false,
   showTxtNoCoverInfoBanner: true,
-  sidebarTopControls: false,
   showSidebarCategoryAll: true,
   hddAggressiveWarmup: false,
   audioMiniPlayerMode: 'mini',
@@ -41,6 +40,7 @@ export const state = {
   detailVolumeGridView: false,      // 도서 상세 목록 그리드 보기 (기본값: 리스트)
   collapseDetailGenreTags: false,   // 태그/장르 축소 (기본값: 해제)
   smartRecommendEnabled: true,      // 스마트 추천 기능 사용 여부 (기본값: 사용)
+  bookRecommendEnabled: true,       // 도서 상세 "이 작가의 다른 도서" 사용 여부 (기본값: 사용)
 
   detailSeriesName: '',
   detailLibraryId: null,

@@ -64,6 +64,12 @@ export async function fetchSmartRecommendations(type, seriesName, libraryId) {
   return res.json();
 }
 
+export async function fetchAuthorBooks(type, seriesName, libraryId) {
+  const libQuery = libraryId ? `&library_id=${encodeURIComponent(libraryId)}` : '';
+  const res = await fetch(`/api/media/author-books?type=${type}&series_name=${encodeURIComponent(seriesName)}${libQuery}&_=${Date.now()}`, {cache: 'no-store'});
+  return res.json();
+}
+
 export async function fetchMediaDetail(type, libraryId, series, representativeBookId = null) {
   let url = `/api/media/detail?type=${type}&library_id=${libraryId}&series=${encodeURIComponent(series)}`;
   if (representativeBookId) {
@@ -343,6 +349,17 @@ export async function updateLibrarySchedule(type, libraryId, cronSchedule, vfsRe
   formData.append('vfs_refresh_before_scan', vfsRefresh);
   formData.append('rclone_rc_url', rcloneRcUrl);
   const res = await fetch(`/api/media/libraries/${libraryId}/schedule`, {
+    method: 'POST',
+    body: formData
+  });
+  return res.json();
+}
+
+export async function updateLibraryScheduleEnabled(type, libraryId, enabled) {
+  const formData = new FormData();
+  formData.append('type', type);
+  formData.append('enabled', enabled ? '1' : '0');
+  const res = await fetch(`/api/media/libraries/${libraryId}/schedule-enabled`, {
     method: 'POST',
     body: formData
   });

@@ -5,7 +5,23 @@
 // 최종 검증은 항상 서버(api/routes/plugin_webview_routes.py)가 수행한다 — 아래 클라이언트
 // 사전 체크는 왕복 없이 빠른 안내를 보여주기 위한 UX용일 뿐, 보안 경계가 아니다.
 
+import { state } from './state.js';
+
 let cachedWhitelistPatterns = null;
+
+// 카테고리탭 플러그인이 "지금 어느 세션(일반/성인/오디오북/영상강좌)에 떠 있는지" 동기적으로
+// 조회할 수 있게 하는 스냅샷. 플러그인은 호스트와 같은 DOM/JS 컨텍스트에서 돌기 때문에(iframe
+// 아님) 서버 왕복 없이 즉시 값을 돌려줄 수 있다. 세션이 바뀔 때마다 반응하려면
+// window.addEventListener('bookoasis:session-change', ({ detail }) => ...)로 구독한다
+// (library_type_toggle.js의 applyLibraryTypeButtonState가 발행).
+function getSession() {
+  return {
+    libraryType: window.currentLibraryType || state.currentLibraryType || 'general',
+    categoryId: state.currentLibraryId,
+    username: state.currentUser?.username ?? window.currentUser?.username ?? null,
+    role: state.currentUser?.role ?? window.currentUser?.role ?? null
+  };
+}
 
 async function loadWhitelistCache() {
   if (cachedWhitelistPatterns) return cachedWhitelistPatterns;
@@ -267,3 +283,4 @@ window.BookOasisPlugin.downloadToLibrary = downloadToLibrary;
 window.BookOasisPlugin.getProxyUrl = getProxyUrl;
 window.BookOasisPlugin.getStreamProxyUrl = getStreamProxyUrl;
 window.BookOasisPlugin.getCachedImageUrl = getCachedImageUrl;
+window.BookOasisPlugin.getSession = getSession;

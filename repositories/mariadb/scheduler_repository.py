@@ -58,7 +58,7 @@ class SchedulerRepository:
     def get_scheduled_libraries(db_type):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
-        cursor.execute("SELECT id, name, physical_path, cron_schedule FROM libraries WHERE cron_schedule IS NOT NULL AND cron_schedule != ''")
+        cursor.execute("SELECT id, name, physical_path, cron_schedule FROM libraries WHERE cron_schedule IS NOT NULL AND cron_schedule != '' AND schedule_enabled = 1")
         rows = cursor.fetchall()
         conn.close()
         return [dict(row) for row in rows]

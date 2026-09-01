@@ -134,8 +134,6 @@
                                     <div class="settings-checkbox-group">
                                         {% call checkbox_row('setting-show-sidebar-category-all', 'SHOW_SIDEBAR_CATEGORY_ALL', checked=True) %}사이드바에 '전체 도서 보기' 메뉴 표시{% endcall %}
 
-                                        {% call checkbox_row('setting-sidebar-top-controls', 'SIDEBAR_TOP_CONTROLS', i18n_key='settings.sidebar_top_controls_label') %}사이드바의 환경설정/계정 메뉴를 상단에 배치{% endcall %}
-
                                         {% call checkbox_row('setting-hide-completed-in-history', 'HIDE_COMPLETED_IN_HISTORY', i18n_key='settings.hide_completed_label') %}다 읽은 도서는 최근 읽은 도서에서 삭제{% endcall %}
 
                                         {% call checkbox_row('setting-tag-filter-scope-all', 'TAG_FILTER_SEARCH_SCOPE_ALL', i18n_key='settings.tag_filter_scope_all_label') %}태그 선택 시 전체 목록에서 조회{% endcall %}
@@ -147,6 +145,8 @@
                                         {% call checkbox_row('setting-collapse-detail-genre-tags', 'COLLAPSE_DETAIL_GENRE_TAGS') %}도서 상세 태그/장르 축소 <span class="settings-checkbox-hint">(기본 1개 표출 후 +N 클릭 시 전체 펼침)</span>{% endcall %}
 
                                         {% call checkbox_row('setting-smart-recommend-enabled', 'SMART_RECOMMEND_ENABLED', checked=True) %}스마트 추천 기능 사용 <span class="settings-checkbox-hint">(해제 시 사이드바 메뉴에서도 숨김)</span>{% endcall %}
+
+                                        {% call checkbox_row('setting-book-recommend-enabled', 'BOOK_RECOMMEND_ENABLED', checked=True) %}도서 추천기능 <span class="settings-checkbox-hint">(도서 상세 화면의 '이 작가의 다른 도서' 영역)</span>{% endcall %}
                                     </div>
                                 </div>
                             </div>

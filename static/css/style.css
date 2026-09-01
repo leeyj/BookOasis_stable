@@ -66,6 +66,11 @@
     white-space: nowrap;
 }
 
+/* 스케줄 OFF 행 - 자동 실행에서 제외됐다는 걸 한눈에 알 수 있게 흐리게 표시 (수동 스캔은 여전히 가능) */
+.schedule-row-disabled {
+    opacity: 0.5;
+}
+
 .ui-hover-insights-edit-btn:hover {
     color: #a855f7 !important;
     background: rgba(168, 85, 247, 0.15) !important;
@@ -104,18 +109,19 @@
 /* 🎨 DASHBOARD THEME SYSTEM (data-app-theme)               */
 /* ======================================================== */
 :root, [data-app-theme="purple"] {
-    --app-bg-main: #0f172a;
-    --app-bg-sidebar: rgba(15, 23, 42, 0.95);
-    --app-bg-card: rgba(30, 41, 59, 0.6);
-    --app-bg-card-hover: rgba(30, 41, 59, 0.85);
-    --app-text-primary: #f8fafc;
-    --app-text-muted: #94a3b8;
-    --app-text-secondary: #cbd5e1;
-    --app-accent: #a855f7;
-    --app-accent-hover: #c084fc;
-    --app-border: rgba(255, 255, 255, 0.1);
+    --app-bg-main: #17181a;
+    --app-bg-sidebar: #131416;
+    --app-bg-card: #202124;
+    --app-bg-card-hover: #26282b;
+    --app-text-primary: #f0f0ef;
+    --app-text-muted: #6a6b6d;
+    --app-text-secondary: #a6a7a9;
+    --app-accent: #4f8ef0;
+    --app-accent-hover: #7db6f0;
+    --app-accent-soft: rgba(79, 142, 240, 0.14);
+    --app-border: rgba(255, 255, 255, 0.08);
     --app-border-light: rgba(255, 255, 255, 0.05);
-    --app-input-bg: rgba(15, 23, 42, 0.6);
+    --app-input-bg: #1c1d20;
     --app-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     --app-blur: blur(10px);
 
@@ -755,7 +761,7 @@ body {
     display: flex;
     flex-direction: row;
     gap: 1.2rem;
-    color: #e2e8f0;
+    color: var(--app-text-primary);
     width: 100%;
     flex: 1 1 0%;
     min-height: 0;
@@ -768,14 +774,14 @@ body {
     width: 220px;
     min-width: 220px;
     flex-shrink: 0;
-    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    border-right: 1px solid var(--app-border-light);
     display: flex;
     flex-direction: column;
     gap: 1rem;
     height: 100%;
     min-height: 0;
     overflow-y: auto;
-    background: linear-gradient(180deg, var(--library-session-sidebar-tint) 0%, transparent 38%);
+    background: linear-gradient(180deg, var(--library-session-sidebar-tint) 0%, transparent 38%), var(--app-bg-sidebar);
     border-radius: 0;
     padding: 0 1.5rem 0 0;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -816,11 +822,11 @@ body {
     background: transparent;
 }
 .library-main-content::-webkit-scrollbar-thumb {
-    background: rgba(168, 85, 247, 0.25);
+    background: var(--app-accent-soft);
     border-radius: 10px;
 }
 .library-main-content::-webkit-scrollbar-thumb:hover {
-    background: rgba(168, 85, 247, 0.5);
+    background: rgba(79, 142, 240, 0.5);
 }
 
 .sidebar-menu .menu-item[draggable="true"] {
@@ -829,8 +835,8 @@ body {
 
 .sidebar-menu .menu-item.dragging {
     opacity: 0.5;
-    background: rgba(168, 85, 247, 0.2);
-    border: 1px dashed #a855f7;
+    background: var(--app-accent-soft);
+    border: 1px dashed var(--app-accent);
 }
 
 .sidebar-title {
@@ -855,7 +861,7 @@ body {
     border-radius: 6px;
     cursor: pointer;
     font-size: 0.9rem;
-    color: #94a3b8;
+    color: var(--app-text-muted);
     transition: all 0.2s ease;
     display: flex;
     align-items: center;
@@ -879,41 +885,33 @@ body {
 }
 
 .sidebar-menu .menu-item.active {
-    background: linear-gradient(135deg, rgba(168, 85, 247, 0.28) 0%, rgba(124, 58, 237, 0.24) 100%);
-    color: #f5e9ff;
-    border: 1px solid rgba(192, 132, 252, 0.62);
-    box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.18), 0 6px 16px rgba(88, 28, 135, 0.28);
+    background: var(--app-bg-card);
+    color: var(--app-text-primary);
+    border: 1px solid var(--app-border);
+    box-shadow: 2px 0 0 var(--app-accent) inset;
     font-weight: 700;
 }
 
 .sidebar-menu .menu-item.active::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 7px;
-    bottom: 7px;
-    width: 4px;
-    border-radius: 0 4px 4px 0;
-    background: #f0abfc;
-    box-shadow: 0 0 10px rgba(240, 171, 252, 0.75);
+    content: none;
 }
 
 .sidebar-menu .menu-item.active i {
-    color: #f0abfc !important;
-    text-shadow: 0 0 8px rgba(240, 171, 252, 0.5);
+    color: var(--app-accent) !important;
+    text-shadow: none;
 }
 
 /* 플러그인 카테고리는 실제 카테고리와 구분되도록 글자색을 다르게 표시 */
 .sidebar-menu .menu-item[data-type="plugin"] {
-    color: #38bdf8;
+    color: var(--app-text-muted);
 }
 
 .sidebar-menu .menu-item[data-type="plugin"]:hover {
-    color: #7dd3fc;
+    color: var(--app-text-primary);
 }
 
 .sidebar-menu .menu-item[data-type="plugin"].active {
-    color: #f0abfc;
+    color: var(--app-accent);
 }
 
 .sidebar-library-group {
@@ -981,7 +979,7 @@ body {
 
 /* 사이드바 "더 보기 / 접기" Plex 스타일 버튼 */
 .sidebar-menu .sidebar-more-btn {
-    color: #a78bfa;
+    color: var(--app-accent-hover);
     font-size: 0.82rem;
     font-weight: 600;
     letter-spacing: 0.01em;
@@ -1000,9 +998,9 @@ body {
 
 .sidebar-menu .sidebar-more-btn:hover {
     opacity: 1;
-    background: rgba(167, 139, 250, 0.1);
-    border-color: rgba(167, 139, 250, 0.25);
-    color: #c4b5fd;
+    background: var(--app-accent-soft);
+    border-color: rgba(79, 142, 240, 0.25);
+    color: var(--app-accent-hover);
 }
 
 .sidebar-menu .sidebar-more-btn i {
@@ -1012,21 +1010,6 @@ body {
 
 .sidebar-menu .sidebar-more-btn:hover i {
     transform: translateX(2px);
-}
-
-/* 사이드바 하단 고정 블록(설정/계정)의 상단 이동 옵션 */
-#sidebar-collapsible-content.sidebar-controls-top {
-    justify-content: flex-start !important;
-}
-
-#sidebar-collapsible-content.sidebar-controls-top .sidebar-settings-wrap {
-    order: -1;
-    margin-top: 0 !important;
-    margin-bottom: 0.8rem;
-    border-top: none !important;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    padding-top: 0;
-    padding-bottom: 0.8rem;
 }
 
 .current-category-indicator-title {
@@ -1113,53 +1096,62 @@ body {
     border-color: #a855f7;
 }
 
-/* 상단 헤더 및 컨트롤 */
+/* 상단 헤더 및 컨트롤 - 목업(시안 D)처럼 한 줄: [사이드바토글] [검색창] [그룹모드] [타입탭] ...스페이서... [필터/스캔] */
 .library-header {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-        "title controls"
-        "search search";
+    display: flex;
     align-items: center;
+    gap: 0.6rem;
     border-bottom: 1px solid var(--library-session-divider);
     box-shadow: inset 0 1px 0 var(--library-session-header-sheen);
     padding-bottom: 1rem;
-    gap: 1rem;
-}
-
-.library-title-wrap {
-    display: flex;
-    align-items: center;
-    min-width: 0;
-    grid-area: title;
+    flex-wrap: wrap;
 }
 
 .library-title {
     margin: 0;
     font-size: 1.5rem;
     font-weight: 700;
-    color: #fff;
-    display: flex;
+    color: var(--app-text-primary);
     align-items: center;
     gap: 0.6rem;
-    text-shadow: 0 0 10px rgba(168, 85, 247, 0.3);
+    text-shadow: none;
+}
+
+/* 오른쪽 끝 액션 묶음(필터/스캔활동 + 환경설정/계정) - margin-left:auto는 이 컨테이너 하나에만
+   줘서 두 하위 그룹이 항상 서로 붙어 있게 한다. 안쪽 그룹 각각에 auto margin을 주면 flex가
+   여유 공간을 두 auto margin에 나눠 분배해서 둘 사이에 불필요한 틈이 생긴다(실제로 겪은 버그).
+   .library-controls가 뷰 전환으로 display:none 되어도 이 래퍼의 auto margin은 그대로 살아있어
+   .library-controls-persistent(환경설정/계정)가 계속 오른쪽 끝에 붙는다. */
+.library-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto;
+    flex-shrink: 0;
 }
 
 .library-controls {
     display: flex;
-    gap: 1rem;
+    gap: 0.4rem;
     align-items: center;
-    justify-self: end;
     flex-wrap: nowrap;
     max-width: 100%;
-    grid-area: controls;
+}
+
+/* 환경설정/계정: 어떤 뷰(플러그인/설정 화면 포함)에서도 숨기지 않는 상시 그룹 */
+.library-controls-persistent {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    flex-shrink: 0;
 }
 
 .library-controls .form-control,
-.library-search-center .form-control {
-    background: rgba(15, 23, 42, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #fff;
+.library-search-box .form-control {
+    box-sizing: border-box;
+    background: var(--app-input-bg);
+    border: 1px solid var(--app-border);
+    color: var(--app-text-primary);
     border-radius: 6px;
     padding: 0.4rem 0.8rem;
     outline: none;
@@ -1169,28 +1161,62 @@ body {
 }
 
 .library-controls .form-control:focus,
-.library-search-center .form-control:focus {
-    border-color: #a855f7;
-    box-shadow: 0 0 8px rgba(168, 85, 247, 0.4);
+.library-search-box .form-control:focus {
+    border-color: var(--app-accent);
+    box-shadow: 0 0 8px var(--app-accent-soft);
 }
 
-.library-search-center {
+/* 검색창 + 검색 버튼을 하나의 필드처럼 묶음 - 버튼은 입력창 우측 안쪽에 아이콘으로만 표시 */
+.library-search-box {
+    position: relative;
+    flex: 1 1 260px;
+    max-width: 480px;
+    min-width: 180px;
+}
+
+.library-search-box .form-control {
     width: 100%;
-    display: flex;
-    justify-content: center;
-    grid-area: search;
+    padding-right: 2.4rem;
 }
 
-.library-search-center .form-control {
-    width: clamp(420px, 56vw, 760px);
-    min-width: 300px;
+.btn-search-icon {
+    position: absolute;
+    top: 50%;
+    right: 4px;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 5px;
+    color: var(--app-text-muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-search-icon:hover {
+    background: var(--app-accent-soft);
+    color: var(--app-accent-hover);
+}
+
+/* 그룹모드(기본/작가별) 토글: 검색창 옆 보조 컨트롤이라 한 단계 더 작게 압축 */
+.library-toggle-group--compact {
+    flex-shrink: 0;
+}
+
+.library-toggle-group--compact .btn-toggle {
+    padding: 0.3rem 0.7rem;
+    font-size: 0.78rem;
 }
 
 /* 일반/성인 토글 버튼 */
 .library-toggle-group {
     display: flex;
-    background: rgba(15, 23, 42, 0.8);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--app-bg-sidebar);
+    border: 1px solid var(--app-border);
     border-radius: 6px;
     padding: 2px;
     flex-shrink: 0;
@@ -1199,7 +1225,7 @@ body {
 .btn-toggle {
     background: transparent;
     border: none;
-    color: #94a3b8;
+    color: var(--app-text-muted);
     padding: 0.4rem 1rem;
     font-size: 0.85rem;
     font-weight: 600;
@@ -1209,9 +1235,31 @@ body {
 }
 
 .btn-toggle.active {
-    background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
-    color: #fff;
-    box-shadow: 0 2px 6px rgba(124, 58, 237, 0.4);
+    background: var(--app-bg-card);
+    color: var(--app-accent-hover);
+    box-shadow: 0 0 0 1px var(--app-accent-soft) inset;
+}
+
+/* 아이콘 전용 컴팩트 버튼 - 라벨 텍스트는 화면에서만 숨기고 title 툴팁으로 접근성 유지 */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* 필터/정렬 아이콘 전용 버튼 - 텍스트 라벨이 숨겨지므로 정사각형 아이콘 버튼으로 압축 */
+#btn-open-filter,
+#btn-lib-sort {
+    width: 34px;
+    height: 34px;
+    padding: 0 !important;
+    justify-content: center;
 }
 
 .scan-activity-wrap {
@@ -1388,6 +1436,90 @@ body {
 @keyframes scanActivityPulse {
     0%, 100% { opacity: 0.55; }
     50% { opacity: 1; }
+}
+
+/* 상단 헤더 아이콘 버튼(환경설정) - 스캔활동 버튼과 동일한 톤으로 통일 */
+.btn-header-icon {
+    position: relative;
+    width: 2.25rem;
+    height: 2.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--app-text-muted);
+    cursor: pointer;
+    font-size: 1rem;
+    flex-shrink: 0;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.btn-header-icon:hover,
+.btn-header-icon[aria-expanded="true"] {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--app-border);
+    color: var(--app-text-primary);
+}
+
+/* 계정 메뉴: 사이드바 하단에 있던 프로필/로그아웃을 상단 아이콘 + 팝오버로 이동 */
+.account-menu-wrap {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.account-menu-popover {
+    position: absolute;
+    z-index: 10020;
+    top: calc(100% + 0.65rem);
+    right: 0;
+    width: min(220px, calc(100vw - 2rem));
+    overflow: hidden;
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    background: var(--app-bg-card);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.48);
+    padding: 0.5rem;
+}
+
+.account-menu-user {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.4rem;
+    color: var(--app-text-primary);
+    font-size: 0.85rem;
+    border-bottom: 1px solid var(--app-border-light);
+    margin-bottom: 0.3rem;
+}
+
+.account-menu-user i {
+    color: var(--app-text-muted);
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.account-menu-user span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.account-menu-logout {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.4rem;
+    border-radius: 5px;
+    color: #f87171;
+    font-size: 0.85rem;
+    text-decoration: none;
+    transition: background 0.2s ease;
+}
+
+.account-menu-logout:hover {
+    background: rgba(239, 68, 68, 0.12);
 }
 
 /* 커스텀 우클릭 컨텍스트 메뉴 */
@@ -1963,8 +2095,8 @@ body {
 }
 
 .book-card {
-    background: rgba(30, 41, 59, 0.85);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: var(--app-bg-card);
+    border: 1px solid var(--app-border-light);
     border-radius: 10px;
     overflow: hidden;
     cursor: pointer;
@@ -1994,15 +2126,15 @@ body {
 
 .book-card:hover {
     transform: translate3d(0, -6px, 0);
-    border-color: #a855f7;
-    box-shadow: 0 10px 20px rgba(168, 85, 247, 0.2);
+    border-color: var(--app-accent);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
 }
 
 .book-card-cover {
     height: var(--book-card-height, 220px);
     position: relative;
     overflow: hidden;
-    background: rgba(15, 23, 42, 0.6);
+    background: var(--app-bg-sidebar);
 }
 
 .book-card-cover img {
@@ -2033,13 +2165,13 @@ body {
     position: absolute;
     top: 8px;
     right: 8px;
-    background: rgba(15, 23, 42, 0.95);
-    color: #e9d5ff;
+    background: rgba(10, 11, 13, 0.75);
+    color: var(--app-text-secondary);
     padding: 0.25rem 0.5rem;
     font-size: 0.7rem;
     font-weight: 700;
     border-radius: 4px;
-    border: 1px solid rgba(168, 85, 247, 0.4);
+    border: 1px solid var(--app-border);
 }
 
 .book-card-info {
@@ -2047,7 +2179,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
-    background: rgba(15, 23, 42, 0.4);
+    background: transparent;
     flex-grow: 1;
 }
 
@@ -2055,7 +2187,7 @@ body {
     margin: 0;
     font-size: 0.8rem;
     font-weight: 700;
-    color: #f1f5f9;
+    color: var(--app-text-primary);
     line-height: 1.35;
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -2097,7 +2229,7 @@ body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%) scale(0.8);
-    background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+    background: var(--app-accent);
     border: none;
     color: #fff;
     width: 48px;
@@ -2108,7 +2240,7 @@ body {
     justify-content: center;
     font-size: 1.25rem;
     cursor: pointer;
-    box-shadow: 0 4px 15px rgba(124, 58, 237, 0.5);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
     opacity: 0;
     pointer-events: none;
     transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -2117,8 +2249,8 @@ body {
 
 .book-card:hover .btn-resume-series:hover {
     transform: translate(-50%, -50%) scale(1.15);
-    box-shadow: 0 6px 20px rgba(168, 85, 247, 0.7);
-    background: linear-gradient(135deg, #b865ff 0%, #8c4aff 100%);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+    background: var(--app-accent-hover);
 }
 
 .book-card:hover .btn-resume-series {
@@ -2156,9 +2288,9 @@ body {
 
 /* 가로 스크롤 네비게이션용 화살표 버튼 */
 .btn-nav-arrow {
-    background: rgba(30, 41, 59, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #cbd5e1;
+    background: var(--app-bg-card);
+    border: 1px solid var(--app-border);
+    color: var(--app-text-secondary);
     width: 28px;
     height: 28px;
     border-radius: 4px;
@@ -2171,10 +2303,10 @@ body {
 }
 
 .btn-nav-arrow:hover {
-    background: #a855f7;
-    border-color: #c084fc;
+    background: var(--app-accent);
+    border-color: var(--app-accent-hover);
     color: #fff;
-    box-shadow: 0 0 8px rgba(168, 85, 247, 0.5);
+    box-shadow: none;
 }
 
 /* 스마트 추천 탭 */
@@ -2395,6 +2527,40 @@ body {
     transform: translateX(-4px);
 }
 
+/* 상세 뷰 2단 레이아웃: 고정폭을 본문이 아니라 사이드바 쪽에 준다 - 사이드바를
+   "정확히 2열" 폭으로 고정하고, 본문은 flex:1로 남는 공간을 전부 채운다. 예전엔
+   본문에 max-width를 고정해서 사이드바가 없거나 좁을 때 오른쪽에 큰 빈 공간이
+   남는 문제가 있었다(실측) - 폭 제약의 주체를 바꿔서 근본적으로 해결. */
+.detail-page-layout {
+    display: flex;
+    align-items: flex-start;
+    gap: 2rem;
+}
+
+.detail-page-main {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* 사이드바 카드 2열 고정 폭 - .detail-sidebar-grid의 2열 트랙(minmax(120px,160px)) x2 + gap */
+.detail-page-sidebar {
+    flex: 0 0 336px;
+    min-width: 0;
+}
+
+.detail-sidebar-title {
+    margin: 0 0 0.9rem 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--app-text-primary);
+}
+
+.detail-sidebar-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(120px, 160px));
+    gap: 0.9rem;
+}
+
 /* 상세 뷰: Kavita 스타일 레이아웃 */
 .detail-header-panel {
     display: flex;
@@ -2425,6 +2591,16 @@ body {
     flex-direction: column;
     gap: 0.7rem;
     min-width: 0;
+}
+
+/* 요약/설명+액션버튼: 커버 옆 메타 칸에 갇히지 않고 항상 새 줄(커버 아래까지 이어짐)로 배치 -
+   .detail-header-panel이 flex-wrap:wrap이라 flex-basis:100%를 주면 무조건 줄바꿈됨 */
+.detail-header-full-row {
+    flex: 1 1 100%;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
 }
 
 .book-detail-title {
@@ -2828,7 +3004,7 @@ body {
 /* 카드 하단 메타 텍스트: 오디오북 챕터/이어읽기 진행률 */
 .book-card-sub-audio {
     font-size: 0.82rem;
-    color: #38bdf8;
+    color: var(--app-accent-hover);
     font-weight: 600;
     margin-top: auto;
     padding-top: 0.2rem;
@@ -2841,7 +3017,7 @@ body {
 /* 카드 하단 메타 텍스트: 영상강좌 에피소드 수 */
 .book-card-sub-video {
     font-size: 0.82rem;
-    color: #c084fc;
+    color: var(--app-accent-hover);
     font-weight: 600;
     margin-top: auto;
     padding-top: 0.2rem;
@@ -2853,7 +3029,7 @@ body {
 
 .book-card-sub-progress {
     font-size: 0.75rem;
-    color: #94a3b8;
+    color: var(--app-text-muted);
     margin: 0.25rem 0 0 0;
 }
 

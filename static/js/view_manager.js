@@ -23,6 +23,10 @@ export function switchActiveView(viewName) {
   const searchCenter = document.querySelector('.library-search-center');
   const libraryControls = document.querySelector('.library-controls');
   const activeFilterBar = document.getElementById('active-filter-bar');
+  // 검색창과 같은 줄에 있던 그룹모드가 별도 요소로 분리돼 있어 searchCenter와 함께 조율.
+  // 세션탭(#library-type-toggle-group)은 "지금 어느 세션인지" 보여주는 유일한 지표라
+  // 플러그인/설정 화면을 포함해 어떤 뷰에서도 숨기지 않는다 - 여기서 조율 대상에서 제외.
+  const groupModeToggle = document.getElementById('group-mode-toggle-group');
 
   // 1. 모든 메인 뷰 컨테이너 숨김 초기화 (자식 뷰 겹침 방지 보장)
   const mainContent = document.querySelector('.library-main-content');
@@ -42,18 +46,19 @@ export function switchActiveView(viewName) {
   
   unmountIndexScrollbar();
 
-  // 상단 검색바/필터 컨트롤 숨김 조율
+  // 상단 검색바/필터 컨트롤 숨김 조율 - 헤더 자체와 세션탭/환경설정·계정은 항상 유지
   if (viewName === 'plugin_custom' || viewName === 'settings' || viewName === 'plugins') {
     if (searchCenter) searchCenter.style.display = 'none';
     if (libraryControls) libraryControls.style.display = 'none';
+    if (groupModeToggle) groupModeToggle.style.display = 'none';
     if (activeFilterBar) activeFilterBar.style.display = 'none';
-    if (viewName === 'plugin_custom' && libraryHeader) {
-      libraryHeader.style.display = 'none';
-    }
   } else {
-    if (libraryHeader) libraryHeader.style.display = 'grid';
-    if (searchCenter) searchCenter.style.display = 'flex';
-    if (libraryControls) libraryControls.style.display = 'flex';
+    // display 값을 하드코딩하지 않고 인라인 override를 제거 - 데스크톱(flex)/모바일(grid) 미디어쿼리별
+    // 실제 레이아웃이 다르므로, 특정 값을 강제하면 좁은 화면에서 레이아웃이 깨진다.
+    if (libraryHeader) libraryHeader.style.removeProperty('display');
+    if (searchCenter) searchCenter.style.removeProperty('display');
+    if (libraryControls) libraryControls.style.removeProperty('display');
+    if (groupModeToggle) groupModeToggle.style.removeProperty('display');
   }
 
   // 2. 요청한 뷰 영역만 선택 활성화 및 정렬 버튼 조율

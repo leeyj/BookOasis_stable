@@ -379,8 +379,11 @@ if not IS_WORKER:
         # 안 되는 문제가 있었다(2026-08-18, 사이드바 디버그 로그가 배포 후에도 안 없어지던 사례).
         # 파일 하나하나 버전을 붙이는 대신, 이 경로 전체를 "매번 서버에 재검증"으로 바꿔서
         # (Last-Modified/ETag 기반 조건부 GET → 변경 없으면 304, 변경됐으면 즉시 새 내용) 근본
-        # 해결한다. /static/lib/**(서드파티 라이브러리)은 별도로 영구 캐시 대상이라 여기서 제외.
-        if request.path.startswith('/static/js/'):
+        # 해결한다. CSS(static/css/**)도 동일하게 <link>가 static_asset_url() 버전 쿼리스트링
+        # 없이 로드되는 경로가 있어 같은 문제가 재현됐다(2026-09-01, 상세페이지 레이아웃 CSS가
+        # 배포 후에도 브라우저에 반영 안 되던 사례) - 같은 이유로 같이 묶는다.
+        # /static/lib/**(서드파티 라이브러리)은 별도로 영구 캐시 대상이라 여기서 제외.
+        if request.path.startswith('/static/js/') or request.path.startswith('/static/css/'):
             response.headers['Cache-Control'] = 'no-cache, must-revalidate'
             return response
 

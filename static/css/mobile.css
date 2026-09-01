@@ -204,54 +204,35 @@
     display: inline;
 }
 
-/* 4. 도서 보관함 헤더 영역 */
+/* 4. 도서 보관함 헤더 영역 - 데스크톱은 한 줄, 모바일은 검색/그룹모드/탭/컨트롤을 세로로 스택 */
+/* (페이지 타이틀/건수는 데스크톱과 마찬가지로 모바일에서도 인라인 display:none으로 숨김 - 별도 grid-area 불필요) */
 .library-header {
     display: grid;
     grid-template-columns: 1fr;
     grid-template-areas:
-        "title"
         "search"
+        "group"
+        "tabs"
         "controls";
     align-items: stretch;
-    gap: 1rem;
+    gap: 0.6rem;
 }
 
-.library-title-wrap {
-    grid-area: title;
+#group-mode-toggle-group {
+    grid-area: group;
+    justify-self: stretch;
+    width: 100%;
 }
 
-.library-title {
+#group-mode-toggle-group .btn-toggle {
+    flex: 1;
+}
+
+#library-type-toggle-group {
+    grid-area: tabs;
+    justify-self: stretch;
+    width: 100%;
     flex-wrap: wrap;
-    align-items: center;
-    row-gap: 0.35rem;
-}
-
-.library-title-main {
-    white-space: nowrap;
-    min-width: 0;
-    flex-shrink: 1;
-}
-
-.library-title-main [data-i18n="header.title"] {
-    white-space: nowrap;
-}
-
-#current-category-indicator {
-    white-space: nowrap;
-    max-width: 46vw;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-#library-total-count {
-    flex-basis: 100%;
-    margin-left: 0 !important;
-    margin-top: 0.1rem;
-    white-space: nowrap;
-}
-
-.library-search-center {
-    grid-area: search;
 }
 
 .library-controls {
@@ -283,6 +264,14 @@
     order: 3; /* 검색창을 맨 뒤로 보냄 */
 }
 
+.library-search-box {
+    grid-area: search;
+    justify-self: stretch;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
 .library-search-center .form-control {
     width: 100%;
     min-width: 0;
@@ -291,7 +280,7 @@
     display: block;
     font-size: 16px;
     line-height: 1.2;
-    padding: 0.45rem 0.7rem;
+    padding: 0.45rem 2.2rem 0.45rem 0.7rem;
     height: auto;
     min-height: 2.35rem;
 }
@@ -431,6 +420,20 @@ body {
 /* 7. 도서 상세 뷰 반응형 레이아웃 튜닝 */
 #book-detail-view {
     padding-bottom: 2rem;
+}
+
+/* 작가의 다른 도서 사이드바 - 좁은 화면에서는 숨김(2단 레이아웃 자체도 1단으로 접음) */
+.detail-page-layout {
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.detail-page-main {
+    max-width: 100%;
+}
+
+.detail-page-sidebar {
+    display: none !important;
 }
 
 .detail-header-panel {

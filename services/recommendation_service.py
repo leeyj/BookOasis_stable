@@ -84,6 +84,29 @@ def _fallback_latest(db_type, library_id, exclude_series_names, limit):
 
 class RecommendationService:
     @staticmethod
+    def get_all_by_author(db_type, series_name, library_id=None, limit=RECOMMEND_LIMIT):
+        """도서 상세 페이지 "이 작가의 다른 도서" 사이드바용.
+
+        get_similar_series()의 author 매칭과 달리 사용자의 읽은 이력을 제외하지 않는다 -
+        상세페이지에서는 이미 읽었거나 읽는 중인 작품도 "작가의 다른 도서"에 포함되어야
+        자연스럽기 때문에, 현재 보고 있는 시리즈 하나만 제외한다.
+        """
+        index_rows = _get_series_index(db_type)
+
+        target_row = next(
+            (r for r in index_rows if r['series_name'] == series_name and (library_id is None or str(r['library_id']) == str(library_id))),
+            None
+        )
+        if target_row is None:
+            target_row = next((r for r in index_rows if r['series_name'] == series_name), None)
+
+        if target_row is None or not target_row['_author_tokens']:
+            return []
+
+        exclude_series_names = {series_name}
+        return _rank_candidates(target_row['_author_tokens'], index_rows, '_author_tokens', exclude_series_names, limit)
+
+    @staticmethod
     def get_similar_series(db_type, series_name, library_id=None, user_id=1, limit=RECOMMEND_LIMIT):
         cache_key = f"cache:smart_rec:v3:{db_type}:{library_id}:{series_name}:{limit}"
         cached = redis_get(cache_key)

@@ -283,6 +283,23 @@ def get_smart_recommendations():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@media_library_routes_bp.route('/api/media/author-books', methods=['GET'])
+@login_required
+def get_author_books():
+    """도서 상세 페이지 "이 작가의 다른 도서" 사이드바 - 현재 시리즈만 제외, 읽은 이력은 제외 안 함"""
+    db_type = request.args.get('type', 'general')
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+    series_name = request.args.get('series_name')
+    library_id = request.args.get('library_id')
+    if not series_name:
+        return jsonify({'success': False, 'error': 'series_name is required'}), 400
+    try:
+        books = RecommendationService.get_all_by_author(db_type, series_name, library_id)
+        return jsonify({'success': True, 'books': books})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @media_library_routes_bp.route('/api/media/recently-added', methods=['GET'])
 @login_required
 def get_media_recently_added():

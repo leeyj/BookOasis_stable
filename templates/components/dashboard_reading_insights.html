@@ -3,15 +3,15 @@
     <div class="insights-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; width: 100%;">
         
         <!-- 1. Reading Streak (연속 독서 일수) -->
-        <div class="insight-card streak-card" style="background: rgba(30, 41, 59, 0.65); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 0.65rem 0.85rem; display: flex; flex-direction: column; justify-content: space-between; backdrop-filter: blur(10px); box-shadow: 0 4px 15px -3px rgba(0, 0, 0, 0.25);">
+        <div class="insight-card streak-card" style="background: var(--app-bg-card); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 0.65rem 0.85rem; display: flex; flex-direction: column; justify-content: space-between; backdrop-filter: blur(10px); box-shadow: 0 4px 15px -3px rgba(0, 0, 0, 0.25);">
             <div style="display: flex; align-items: center; justify-content: space-between;">
-                <span style="font-size: 0.82rem; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 0.4rem;">
+                <span style="font-size: 0.82rem; font-weight: 700; color: var(--app-text-primary); display: flex; align-items: center; gap: 0.4rem;">
                     <i class="fa-solid fa-fire" style="color: #f97316;"></i> <span data-i18n="dashboard.insights_streak">연속 독서 일수</span>
                 </span>
             </div>
             <div style="text-align: center; margin: 0.3rem 0;">
                 <div style="font-size: 1.4rem; font-weight: 800; color: #f97316; line-height: 1;">
-                    <span id="streak-days-count">0</span><span style="font-size: 0.8rem; font-weight: 600; color: #cbd5e1; margin-left: 0.2rem;" data-i18n="dashboard.insights_days_suffix">일 연속</span>
+                    <span id="streak-days-count">0</span><span style="font-size: 0.8rem; font-weight: 600; color: var(--app-text-secondary); margin-left: 0.2rem;" data-i18n="dashboard.insights_days_suffix">일 연속</span>
                 </div>
             </div>
             <div id="streak-dots-container" style="display: flex; justify-content: center; gap: 0.3rem; margin-top: 0.3rem;">
@@ -26,12 +26,12 @@
         </div>
 
         <!-- 2. Currently Reading (현재 읽는 중) -->
-        <div class="insight-card currently-card" style="background: rgba(30, 41, 59, 0.65); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 0.65rem 0.85rem; display: flex; flex-direction: column; backdrop-filter: blur(10px); box-shadow: 0 4px 15px -3px rgba(0, 0, 0, 0.25);">
+        <div class="insight-card currently-card" style="background: var(--app-bg-card); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 0.65rem 0.85rem; display: flex; flex-direction: column; backdrop-filter: blur(10px); box-shadow: 0 4px 15px -3px rgba(0, 0, 0, 0.25);">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem;">
-                <span style="font-size: 0.82rem; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 0.4rem;">
+                <span style="font-size: 0.82rem; font-weight: 700; color: var(--app-text-primary); display: flex; align-items: center; gap: 0.4rem;">
                     <i class="fa-solid fa-book-open-reader" style="color: #38bdf8;"></i> <span data-i18n="dashboard.insights_currently_reading">현재 읽는 중</span>
                 </span>
-                <span style="font-size: 0.7rem; color: #94a3b8;" data-i18n="dashboard.insights_progress">진행률</span>
+                <span style="font-size: 0.7rem; color: var(--app-text-muted);" data-i18n="dashboard.insights_progress">진행률</span>
             </div>
             <div id="currently-reading-list" style="display: flex; flex-direction: column; gap: 0.4rem; flex: 1; justify-content: center;">
                 <div style="text-align: center; color: #64748b; font-size: 0.78rem;" data-i18n="dashboard.insights_no_currently">현재 진행 중인 도서가 없습니다.</div>
@@ -39,12 +39,12 @@
         </div>
 
         <!-- 3. Reading Goal 2026 (연간 독서 목표) -->
-        <div class="insight-card goal-card" style="background: rgba(30, 41, 59, 0.65); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 0.65rem 0.85rem; display: flex; flex-direction: column; align-items: center; justify-content: space-between; backdrop-filter: blur(10px); box-shadow: 0 4px 15px -3px rgba(0, 0, 0, 0.25); position: relative;">
+        <div class="insight-card goal-card" style="background: var(--app-bg-card); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 0.65rem 0.85rem; display: flex; flex-direction: column; align-items: center; justify-content: space-between; backdrop-filter: blur(10px); box-shadow: 0 4px 15px -3px rgba(0, 0, 0, 0.25); position: relative;">
             <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 0.2rem;">
-                <span style="font-size: 0.82rem; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 0.4rem;">
-                    <i class="fa-solid fa-bullseye" style="color: #a855f7;"></i> <span data-i18n="dashboard.insights_reading_goal">연간 목표</span> <span id="insights-year-label">2026</span>
+                <span style="font-size: 0.82rem; font-weight: 700; color: var(--app-text-primary); display: flex; align-items: center; gap: 0.4rem;">
+                    <i class="fa-solid fa-bullseye" style="color: var(--app-accent);"></i> <span data-i18n="dashboard.insights_reading_goal">연간 목표</span> <span id="insights-year-label">2026</span>
                 </span>
-                <button data-role="reading-goal-edit" class="ui-hover-insights-edit-btn" title="목표 권수 수정" style="background: none; border: none; color: #94a3b8; font-size: 0.78rem; cursor: pointer; padding: 0.1rem 0.3rem; border-radius: 4px; transition: all 0.2s;">
+                <button data-role="reading-goal-edit" class="ui-hover-insights-edit-btn" title="목표 권수 수정" style="background: none; border: none; color: var(--app-text-muted); font-size: 0.78rem; cursor: pointer; padding: 0.1rem 0.3rem; border-radius: 4px; transition: all 0.2s;">
                     <i class="fa-solid fa-pen"></i>
                 </button>
             </div>
@@ -52,28 +52,28 @@
             <div class="goal-ring-container" style="position: relative; width: 75px; height: 75px; display: flex; align-items: center; justify-content: center; margin: 0.2rem 0;">
                 <svg width="75" height="75" viewBox="0 0 70 70" style="transform: rotate(-90deg);">
                     <circle cx="35" cy="35" r="27" stroke="rgba(255, 255, 255, 0.1)" stroke-width="6" fill="none" />
-                    <circle id="goal-svg-progress" cx="35" cy="35" r="27" stroke="#a855f7" stroke-width="6" fill="none" stroke-linecap="round" stroke-dasharray="169.6" stroke-dashoffset="120" style="transition: stroke-dashoffset 0.8s ease-in-out;" />
+                    <circle id="goal-svg-progress" cx="35" cy="35" r="27" stroke="var(--app-accent)" stroke-width="6" fill="none" stroke-linecap="round" stroke-dasharray="169.6" stroke-dashoffset="120" style="transition: stroke-dashoffset 0.8s ease-in-out;" />
                 </svg>
                 <div style="position: absolute; text-align: center;">
                     <div style="font-size: 1.05rem; font-weight: 800; color: #ffffff; line-height: 1;">
                         <span id="goal-completed-count">0</span>
                     </div>
-                    <div style="font-size: 0.65rem; color: #94a3b8; margin-top: 0.1rem;">/ <span id="goal-target-count">30</span>권</div>
+                    <div style="font-size: 0.65rem; color: var(--app-text-muted); margin-top: 0.1rem;">/ <span id="goal-target-count">30</span>권</div>
                 </div>
             </div>
 
-            <div style="font-size: 0.75rem; color: #a855f7; font-weight: 700;">
+            <div style="font-size: 0.75rem; color: var(--app-accent); font-weight: 700;">
                 <span id="goal-pct-label">0</span>% <span data-i18n="dashboard.insights_achieved">달성 중!</span>
             </div>
         </div>
 
         <!-- 4. Genre Breakdown 2026 (선호 장르 수평 막대그래프) -->
-        <div class="insight-card genre-card" style="background: rgba(30, 41, 59, 0.65); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 0.65rem 0.85rem; display: flex; flex-direction: column; justify-content: space-between; backdrop-filter: blur(10px); box-shadow: 0 4px 15px -3px rgba(0, 0, 0, 0.25);">
+        <div class="insight-card genre-card" style="background: var(--app-bg-card); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 0.65rem 0.85rem; display: flex; flex-direction: column; justify-content: space-between; backdrop-filter: blur(10px); box-shadow: 0 4px 15px -3px rgba(0, 0, 0, 0.25);">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem;">
-                <span style="font-size: 0.82rem; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 0.4rem;">
+                <span style="font-size: 0.82rem; font-weight: 700; color: var(--app-text-primary); display: flex; align-items: center; gap: 0.4rem;">
                     <i class="fa-solid fa-chart-simple" style="color: #34d399;"></i> <span data-i18n="dashboard.insights_genre_breakdown">선호 장르 통계</span>
                 </span>
-                <span style="font-size: 0.7rem; color: #94a3b8;" data-i18n="dashboard.insights_ratio">비율</span>
+                <span style="font-size: 0.7rem; color: var(--app-text-muted);" data-i18n="dashboard.insights_ratio">비율</span>
             </div>
             <div id="genre-breakdown-list" style="display: flex; flex-direction: column; gap: 0.35rem; flex: 1; justify-content: center;">
                 <div style="text-align: center; color: #64748b; font-size: 0.78rem;" data-i18n="dashboard.insights_no_genre">올해 독서 장르 기록이 없습니다.</div>
