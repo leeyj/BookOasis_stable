@@ -11,8 +11,10 @@ import hashlib
 from PIL import Image
 
 MEDIA_SERVER_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-COVERS_DIR = os.path.join(MEDIA_SERVER_DIR, 'covers')
 DB_DIR = os.path.join(MEDIA_SERVER_DIR, 'db')
+
+from services.cover_storage_service import get_covers_dir
+COVERS_DIR = get_covers_dir()
 
 def get_db_paths():
     """db/ 폴더 내 모든 sqlite db 파일 경로 반환"""

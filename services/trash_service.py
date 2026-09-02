@@ -52,8 +52,8 @@ class TrashService:
                 return True
                 
             # 1.5. 물리적 커버 이미지 파일 소거 준비
-            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            covers_dir = os.path.join(base_dir, 'covers')
+            from services.cover_storage_service import get_covers_dir
+            covers_dir = get_covers_dir()
             
             from utils.redis_helper import redis_acquire_lock, redis_release_lock
 

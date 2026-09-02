@@ -79,8 +79,8 @@ def _build_series_entries(db_type, rows):
             order.append(key)
         groups[key].append(row)
 
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    covers_dir = os.path.join(base_dir, 'covers')
+    from services.cover_storage_service import get_covers_dir
+    covers_dir = get_covers_dir()
 
     entries = []
     for key in order:

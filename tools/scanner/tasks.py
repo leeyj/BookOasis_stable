@@ -351,7 +351,8 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
 
                 # Real-time check if extracted cover is 0 bytes
                 if cover_image:
-                    cover_filepath = os.path.join(MEDIA_SERVER_DIR, 'covers', cover_image)
+                    from services.cover_storage_service import get_covers_dir
+                    cover_filepath = os.path.join(get_covers_dir(), cover_image)
                     if os.path.exists(cover_filepath) and os.path.getsize(cover_filepath) == 0:
                         print(f"[Scanner-DEBUG-Task] ⚠️ Extracted cover file is 0 bytes: {cover_filepath}")
                         try:

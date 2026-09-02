@@ -166,6 +166,38 @@
                             </div>
 
                             <!-- ============================================================ -->
+                            <!-- 🗄️ 커버 저장 경로 (COVER_STORAGE_ROOT)                       -->
+                            <!-- ============================================================ -->
+                            <div style="background: rgba(var(--app-panel-rgb), 0.4); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 8px; padding: 1.25rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.2rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.6rem;">
+                                    <i class="fa-solid fa-hard-drive" style="color: #38bdf8; font-size: 1.1rem;"></i>
+                                    <h4 style="margin: 0; color: var(--app-text-primary); font-size: 1rem; font-weight: 700;">커버 저장 경로</h4>
+                                </div>
+                                <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+                                    <div class="library-form-group">
+                                        <label for="setting-cover-storage-root" style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                            <i class="fa-solid fa-folder-tree" style="color: #38bdf8; margin-right: 0.3rem;"></i> 커버 이미지 저장 루트 경로 (절대경로)
+                                        </label>
+                                        <input type="text" id="setting-cover-storage-root" name="COVER_STORAGE_ROOT" style="width: 100%; max-width: 480px; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;" placeholder="비워두면 기본값(./covers) 사용">
+                                        <p style="font-size: 0.78rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0; line-height: 1.5;">
+                                            비워두면 기존과 동일하게 프로젝트 내 <code>./covers</code>에 저장됩니다. 다른 마운트된
+                                            디스크로 바꾸려면 그 경로의 절대경로를 입력하세요. <strong style="color: #fbbf24;">Docker
+                                            환경이면 이 경로를 컨테이너 안에도 별도 볼륨으로 마운트해야 합니다</strong> (라이브러리
+                                            물리 경로와 동일한 책임 분담). 저장 즉시(재시작 없이) 새 커버부터 이 경로에
+                                            쌓이기 시작하며, <strong>기존에 저장된 커버 파일은 자동으로 옮겨지지 않습니다</strong> —
+                                            아래 버튼으로 명시적으로 이관하세요.
+                                        </p>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap;">
+                                        <button type="button" data-role="cover-storage-migrate" class="btn-toggle" style="background: color-mix(in srgb, #38bdf8 70%, black); color: #fff; border: none; padding: 0.55rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.3rem;">
+                                            <i class="fa-solid fa-truck-fast"></i> 기존 커버 파일을 새 경로로 이관
+                                        </button>
+                                        <span id="cover-storage-migrate-result" style="font-size: 0.82rem; color: var(--app-text-muted);"></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- ============================================================ -->
                             <!-- 🎨 커스텀 테마 (themes/*.yaml)                                -->
                             <!-- ============================================================ -->
                             <div style="background: rgba(var(--app-panel-rgb), 0.4); border: 1px solid color-mix(in srgb, var(--app-accent) 20%, transparent); border-radius: 8px; padding: 1.25rem;">

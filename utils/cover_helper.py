@@ -19,8 +19,10 @@ def get_or_cache_remote_poster_webp(poster_source, category, library_id=None, ti
     if not poster_source:
         return None
 
-    from tools.scanner.cover import COVERS_DIR, save_as_thumbnail_webp
-    cache_dir = os.path.join(COVERS_DIR, category, str(library_id)) if library_id is not None else os.path.join(COVERS_DIR, category)
+    from tools.scanner.cover import save_as_thumbnail_webp
+    from services.cover_storage_service import get_covers_dir
+    covers_dir = get_covers_dir()
+    cache_dir = os.path.join(covers_dir, category, str(library_id)) if library_id is not None else os.path.join(covers_dir, category)
     os.makedirs(cache_dir, exist_ok=True)
 
     source_hash = hashlib.md5(str(poster_source).encode('utf-8')).hexdigest()
@@ -76,8 +78,9 @@ def get_or_cache_external_image_webp(url, category, max_bytes=2 * 1024 * 1024, t
     if not url or not str(url).startswith(('http://', 'https://')):
         return None
 
-    from tools.scanner.cover import COVERS_DIR, save_as_thumbnail_webp
-    cache_dir = os.path.join(COVERS_DIR, category)
+    from tools.scanner.cover import save_as_thumbnail_webp
+    from services.cover_storage_service import get_covers_dir
+    cache_dir = os.path.join(get_covers_dir(), category)
     os.makedirs(cache_dir, exist_ok=True)
 
     source_hash = hashlib.md5(str(url).encode('utf-8')).hexdigest()

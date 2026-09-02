@@ -20,6 +20,7 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 import database
+from services.cover_storage_service import get_covers_dir
 
 def get_db_connection(db_type):
     if not database.is_mariadb_mode():
@@ -143,9 +144,9 @@ def export_single_category(db_type, library_id, output_path=None):
                 if os.path.isabs(poster):
                     cover_candidates.append(poster)
                 cover_candidates.append(os.path.join(BASE_DIR, clean_cover))
-                cover_candidates.append(os.path.join(BASE_DIR, 'covers', clean_cover))
-                cover_candidates.append(os.path.join(BASE_DIR, 'covers', str(library_id), os.path.basename(clean_cover)))
-                cover_candidates.append(os.path.join(BASE_DIR, 'covers', os.path.basename(clean_cover)))
+                cover_candidates.append(os.path.join(get_covers_dir(), clean_cover))
+                cover_candidates.append(os.path.join(get_covers_dir(), str(library_id), os.path.basename(clean_cover)))
+                cover_candidates.append(os.path.join(get_covers_dir(), os.path.basename(clean_cover)))
 
                 for cand in cover_candidates:
                     norm_cand = os.path.normpath(cand)
@@ -246,9 +247,9 @@ def export_single_category(db_type, library_id, output_path=None):
                 if os.path.isabs(poster):
                     cover_candidates.append(poster)
                 cover_candidates.append(os.path.join(BASE_DIR, clean_cover))
-                cover_candidates.append(os.path.join(BASE_DIR, 'covers', clean_cover))
-                cover_candidates.append(os.path.join(BASE_DIR, 'covers', str(library_id), os.path.basename(clean_cover)))
-                cover_candidates.append(os.path.join(BASE_DIR, 'covers', os.path.basename(clean_cover)))
+                cover_candidates.append(os.path.join(get_covers_dir(), clean_cover))
+                cover_candidates.append(os.path.join(get_covers_dir(), str(library_id), os.path.basename(clean_cover)))
+                cover_candidates.append(os.path.join(get_covers_dir(), os.path.basename(clean_cover)))
 
                 for cand in cover_candidates:
                     norm_cand = os.path.normpath(cand)
@@ -352,13 +353,13 @@ def export_single_category(db_type, library_id, output_path=None):
                     cover_candidates.append(cover_img)
 
                 cover_candidates.append(os.path.join(BASE_DIR, clean_cover))
-                cover_candidates.append(os.path.join(BASE_DIR, 'covers', clean_cover))
+                cover_candidates.append(os.path.join(get_covers_dir(), clean_cover))
                 if clean_cover.startswith('covers/'):
                     unprefixed = clean_cover[7:]
-                    cover_candidates.append(os.path.join(BASE_DIR, 'covers', unprefixed))
+                    cover_candidates.append(os.path.join(get_covers_dir(), unprefixed))
                     cover_candidates.append(os.path.join(BASE_DIR, unprefixed))
-                cover_candidates.append(os.path.join(BASE_DIR, 'covers', str(library_id), os.path.basename(clean_cover)))
-                cover_candidates.append(os.path.join(BASE_DIR, 'covers', os.path.basename(clean_cover)))
+                cover_candidates.append(os.path.join(get_covers_dir(), str(library_id), os.path.basename(clean_cover)))
+                cover_candidates.append(os.path.join(get_covers_dir(), os.path.basename(clean_cover)))
 
                 for cand in cover_candidates:
                     norm_cand = os.path.normpath(cand)
@@ -464,7 +465,7 @@ def export_single_category(db_type, library_id, output_path=None):
         zipf.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2, default=json_default))
         zipf.writestr("metadata.json", json.dumps(metadata, ensure_ascii=False, indent=2, default=json_default))
 
-        covers_base = os.path.join(BASE_DIR, 'covers')
+        covers_base = os.path.join(get_covers_dir())
         for cover_path in cover_files_to_pack:
             try:
                 rel_cover = os.path.relpath(cover_path, covers_base).replace('\\', '/')

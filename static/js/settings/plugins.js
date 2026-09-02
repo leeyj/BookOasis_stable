@@ -104,9 +104,6 @@ export async function loadPluginsSettings() {
       applyConfigValues(container, data.plugins);
       initPluginSettingsScripts(container, data.plugins);
 
-      // 토글 스위치 스타일링을 위한 CSS 헤드 인젝트 (최초 1회)
-      injectToggleSwitchCSS();
-
       // 이벤트 바인딩
       bindPluginEvents();
     } else {
@@ -239,39 +236,6 @@ function initPluginSettingsScripts(container, plugins) {
       console.error(`[Plugins-Settings] custom script init failed (${p.id}):`, e);
     }
   });
-}
-
-// 토글 버튼 디자인용 CSS 동적 생성
-function injectToggleSwitchCSS() {
-  if (document.getElementById('plugin-toggle-css')) return;
-  const style = document.createElement('style');
-  style.id = 'plugin-toggle-css';
-  style.innerHTML = `
-    .plugin-toggle-checkbox:checked + .toggle-slider {
-      background-color: var(--app-accent) !important;
-    }
-    .plugin-toggle-checkbox:checked + .toggle-slider:before {
-      transform: translateX(22px);
-    }
-    .toggle-slider:before {
-      position: absolute;
-      content: "";
-      height: 18px;
-      width: 18px;
-      left: 3px;
-      bottom: 3px;
-      background-color: white;
-      transition: .3s;
-      border-radius: 50%;
-    }
-    .plugin-settings-card-header:hover {
-      opacity: 0.85;
-    }
-    .plugin-settings-card-chevron-open {
-      transform: rotate(90deg);
-    }
-  `;
-  document.head.appendChild(style);
 }
 
 function buildPluginReloadStatusText(res) {

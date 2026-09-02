@@ -8,6 +8,7 @@ from utils.sort_helper import natural_sort_key
 from utils.cover_helper import get_cover_image_with_t, resolve_series_cover, invalidate_series_cover_cache
 from utils.redis_helper import redis_delete_pattern
 from utils.permission_clause import build_library_permission_clause
+from services.cover_storage_service import get_covers_dir
 
 class BookDetailService:
     @staticmethod
@@ -251,8 +252,7 @@ class BookDetailService:
         # 실제 covers 폴더 내 시리즈 이미지 갱신 타임스탬프 쿼리
         latest_updated = BookRepository.get_series_latest_updated(db_type, series_name, perm_clause, perm_params)
 
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        covers_dir = os.path.join(base_dir, 'covers')
+        covers_dir = get_covers_dir()
 
         # library_id 정보 결정
         lib_id = None
@@ -347,8 +347,7 @@ class BookDetailService:
             try:
                 cover_image_url = None
                 if cover_file:
-                    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                    covers_dir = os.path.join(base_dir, 'covers')
+                    covers_dir = get_covers_dir()
                     target_covers_dir = os.path.join(covers_dir, 'audiobook')
                     os.makedirs(target_covers_dir, exist_ok=True)
 
@@ -383,8 +382,7 @@ class BookDetailService:
             cover_image_url = None
             # 2. 커버 이미지 파일 업로드 처리
             if cover_file:
-                base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                covers_dir = os.path.join(base_dir, 'covers')
+                covers_dir = get_covers_dir()
                 
                 target_covers_dir = os.path.join(covers_dir, str(library_id))
                 os.makedirs(target_covers_dir, exist_ok=True)

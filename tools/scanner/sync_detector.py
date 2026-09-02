@@ -120,8 +120,8 @@ def handle_deleted_books(cursor, db_books, deleted_paths, target_paths, found_fi
             cursor.execute(f"DELETE FROM books WHERE id IN ({placeholders})", params)
             
             # 커버 이미지 물리 파일 소거
-            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            covers_dir = os.path.join(base_dir, 'covers')
+            from services.cover_storage_service import get_covers_dir
+            covers_dir = get_covers_dir()
             for r in old_deleted_rows:
                 cover_img = r['cover_image']
                 if cover_img:

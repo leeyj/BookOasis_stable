@@ -2,6 +2,7 @@
 """
 settings_routes.py – 시스템 설정 관리 라우터
 """
+import os
 from flask import Blueprint, request, jsonify, session
 from services.settings_service import SettingsService
 from services.scheduler_service import SchedulerService
@@ -130,7 +131,10 @@ def update_system_setting():
                 raise ValueError()
         except ValueError:
             return jsonify({'success': False, 'error': _t('api.err_db_pool_size_range')}), 400
-    
+
+    if key == 'COVER_STORAGE_ROOT' and value and not os.path.isabs(value):
+        return jsonify({'success': False, 'error': '커버 저장 경로는 비워두거나 절대경로여야 합니다.'}), 400
+
     try:
         SettingsService.set(key, value)
         if key == 'DB_POOL_SIZE':
@@ -142,6 +146,9 @@ def update_system_setting():
                 print(f"[API] Scheduler reloaded due to {key} change: {value}")
             except Exception as e_sched:
                 print(f"[API WARNING] Failed to reload scheduler on {key} change: {e_sched}")
+        if key == 'COVER_STORAGE_ROOT':
+            from services.cover_storage_service import invalidate_cache
+            invalidate_cache()
         return jsonify({'success': True, 'message': _t('api.msg_setting_saved', key=key)})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -233,5 +240,28 @@ def rescan_custom_themes():
             'loaded_count': loaded_count,
             'rejected': get_last_rejected(),
         })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@settings_bp.route('/api/media/settings/cover-storage/migrate', methods=['POST'])
+@admin_required
+def migrate_cover_storage():
+    """기본 커버 경로(./covers)에 남은 파일을 현재 설정된 커버 저장 루트로 백그라운드 이관 (관리자 전용)."""
+    try:
+        from services.cover_storage_service import start_migration
+        started, error = start_migration()
+        if not started:
+            return jsonify({'success': False, 'error': error}), 400
+        return jsonify({'success': True, 'message': '커버 파일 이관을 시작했습니다.'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@settings_bp.route('/api/media/settings/cover-storage/migrate/status', methods=['GET'])
+@admin_required
+def get_cover_storage_migrate_status():
+    """진행 중인/마지막 커버 이관 상태 조회 (관리자 전용)."""
+    try:
+        from services.cover_storage_service import get_migration_status
+        return jsonify({'success': True, 'status': get_migration_status()})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

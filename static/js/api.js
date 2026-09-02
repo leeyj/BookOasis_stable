@@ -408,6 +408,18 @@ export async function rescanCustomThemes() {
   return res.json();
 }
 
+// 기본 커버 경로(./covers)에 남은 파일을 현재 설정된 커버 저장 루트로 이관 시작 (관리자 전용)
+export async function migrateCoverStorage() {
+  const res = await fetch('/api/media/settings/cover-storage/migrate', { method: 'POST' });
+  return res.json();
+}
+
+// 커버 이관 진행상황 조회 (관리자 전용)
+export async function fetchCoverStorageMigrateStatus() {
+  const res = await fetch('/api/media/settings/cover-storage/migrate/status');
+  return res.json();
+}
+
 export async function fetchMetadataPlugins() {
   const res = await fetch('/api/media/metadata/plugins');
   return res.json();

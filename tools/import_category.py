@@ -20,6 +20,7 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 import database
+from services.cover_storage_service import get_covers_dir
 
 def get_db_connection(db_type):
     if not database.is_mariadb_mode():
@@ -347,7 +348,7 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
                 print(f"[!] Error creating target directory '{tp}': {e}")
 
     # 3. 커버 이미지 복원 (target_library_id 폴더 하위로 복원)
-    covers_dir = os.path.join(BASE_DIR, 'covers')
+    covers_dir = get_covers_dir()
     lib_covers_dir = os.path.join(covers_dir, str(target_library_id))
     os.makedirs(lib_covers_dir, exist_ok=True)
 

@@ -128,8 +128,8 @@ class AladinMetadataProvider(BaseMetadataProvider):
 
             if cover_url:
                 try:
-                    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-                    covers_dir = os.path.join(base_dir, 'covers', str(library_id))
+                    from services.cover_storage_service import get_covers_dir
+                    covers_dir = os.path.join(get_covers_dir(), str(library_id))
                     os.makedirs(covers_dir, exist_ok=True)
 
                     filename = os.path.basename(file_path)

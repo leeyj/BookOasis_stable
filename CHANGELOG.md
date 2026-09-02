@@ -1,4 +1,10 @@
 # CHANGELOG
+## v2.5.5
+- (feature) 사용자가 YAML 파일로 커스텀 테마를 등록할 수 있는 기능 추가 (`themes/` 디렉토리에 넣으면 자동 인식, 관리자 재스캔 버튼 지원) | add support for user-authored custom themes via YAML files dropped into `themes/` (auto-detected, with an admin rescan button)
+- (feature) 커버 이미지 저장 경로를 다른 마운트 디스크로 바꿀 수 있는 설정 추가, 기존 커버 파일을 새 경로로 옮기는 이관 도구 포함 | add a configurable cover image storage path for routing to a separate mounted disk, including a tool to migrate existing cover files to the new location
+- (fix) e-paper 등 일부 테마에서 불투명 배경 위 텍스트가 배경과 같은 색이라 안 보이던 문제 수정 | fix text becoming invisible against opaque backgrounds in some themes (e.g. e-paper) due to matching colors
+- (chore) DB 스키마 마이그레이션 로직 중복 정리 및 설정 화면 JS 모듈 분리 등 소스 정리 | source cleanup: consolidate duplicated DB schema migration logic and split up the settings-page JS module
+
 ## v2.5.4
 - (feature) 뷰어 오버레이 조작 패널에 드래그로 위치를 옮길 수 있는 앵커 추가 | add a drag handle to the viewer's overlay control panel so it can be repositioned
 - (feature) PDF/만화 뷰어 2쪽보기 모드에 "한 장 밀기" 기능 추가 — (9,10)(11,12)처럼 고정되던 페이지 짝을 한 장씩 밀어 원하는 스프레드(예: 10,11)를 볼 수 있음, 단축키 Shift+스페이스/방향키 지원 | add a "shift by one page" control to PDF/comic viewer two-page spread mode — nudges the fixed page pairing (e.g. (9,10)(11,12)) by one page so a spread like (10,11) can be viewed, with a Shift+Space/Arrow keyboard shortcut

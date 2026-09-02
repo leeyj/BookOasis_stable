@@ -210,7 +210,8 @@ def _build_scan_targets(db_type, books, library_remote_map):
             # 커버 경로 자체가 없음
             cover_missing = True
         else:
-            cover_filepath = os.path.join(MEDIA_SERVER_DIR, 'covers', cover_image)
+            from services.cover_storage_service import get_covers_dir
+            cover_filepath = os.path.join(get_covers_dir(), cover_image)
             if not os.path.exists(cover_filepath) or os.path.getsize(cover_filepath) == 0:
                 # 커버 경로는 있지만 실제 파일이 없거나 0바이트
                 cover_missing = True
@@ -691,13 +692,14 @@ def get_series_cover_fallback_single(series_name, parent_dir, filename, file_pat
     """
     import io
     import hashlib
-    from tools.scanner.cover import COVERS_DIR, extract_cover_from_b64, download_cover_from_url
+    from tools.scanner.cover import extract_cover_from_b64, download_cover_from_url
+    from services.cover_storage_service import get_covers_dir
 
     # 커버 캐시 파일명은 DB에 저장된 원본(가상) 경로 기준으로 안정적으로 키잉해야 하므로,
     # 로컬 경로로 치환하기 전에 먼저 해시를 계산한다.
     book_hash = hashlib.md5(file_path.encode('utf-8')).hexdigest()
     cover_filename = f"book_{book_hash}.webp"
-    local_cover_path = os.path.join(COVERS_DIR, str(library_id), cover_filename)
+    local_cover_path = os.path.join(get_covers_dir(), str(library_id), cover_filename)
     db_cover_path = f"{library_id}/{cover_filename}"
 
     os.makedirs(os.path.dirname(local_cover_path), exist_ok=True)
@@ -1138,9 +1140,11 @@ def run_lazy_cover_resize():
         않도록 한다 - 그래야 리사이즈 백필도 이 lazy 스캔 루프에 얹혀 끝까지 진행된다.)
     """
     global stop_requested
-    from tools.scanner.cover import COVERS_DIR, COVER_THUMB_MAX_W, COVER_THUMB_MAX_H, save_as_thumbnail_webp
+    from tools.scanner.cover import COVER_THUMB_MAX_W, COVER_THUMB_MAX_H, save_as_thumbnail_webp
+    from services.cover_storage_service import get_covers_dir
+    covers_dir = get_covers_dir()
 
-    if not os.path.isdir(COVERS_DIR):
+    if not os.path.isdir(covers_dir):
         return False
 
     os.makedirs(os.path.dirname(COVER_RESIZE_PROGRESS_FILE), exist_ok=True)
@@ -1157,7 +1161,7 @@ def run_lazy_cover_resize():
         return False
 
     all_paths = []
-    for root, _dirs, files in os.walk(COVERS_DIR):
+    for root, _dirs, files in os.walk(covers_dir):
         for fname in files:
             if fname.lower().endswith(('.webp', '.jpg', '.jpeg', '.png')):
                 all_paths.append(os.path.join(root, fname))

@@ -1,12 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-db_schema_updater.py - 데이터베이스 스키마 단일 관리(Single Source of Truth) 및 동기화 도구
+db_schema_updater.py - DB 스키마 업데이트 CLI 진입점 (entrypoint.sh / manage.sh에서 서브프로세스로 실행)
+
+실제 컬럼/인덱스 diff + 백필 로직은 services/db_migration_service.py의
+run_full_migration()으로 옮겨졌다 (database.py의 init_databases()도 같은 함수를 호출 -
+두 진입점이 서로 다른 마이그레이션 로직을 갖고 있다가 갈라졌던 문제를 없앴다).
+이 파일은 이제 (1) MariaDB 초기 테이블 생성(MARIADB_CENTRAL_SCHEMA, 여전히 SQLite용
+_SCHEMA_SQL과 별도 유지)과 (2) SQLite WAL 체크포인트 마감처럼, run_full_migration()이
+다루지 않는 진짜 이 파일만의 관심사만 남긴 얇은 CLI 래퍼다.
 """
 import os
 import sys
 import sqlite3
-import re
-import html
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -31,12 +36,13 @@ try:
         DB_ADULT_PATH,
         DB_AUDIOBOOK_PATH,
         DB_VIDEO_PATH,
-        init_databases,
-        get_connection,
-        auto_migrate_schema,
-        cleanup_legacy_fts_index,
-        _SCHEMA_SQL,
-        _INDEXES_SQL
+    )
+    # _ensure_mariadb_columns/_ensure_mariadb_indexes는 이제 여기 정의돼 있지 않지만,
+    # tools/migrator_sqlite_to_mariadb.py가 이 모듈에서 직접 import하므로 재노출 유지.
+    from services.db_migration_service import (
+        run_full_migration,
+        _ensure_mariadb_columns,
+        _ensure_mariadb_indexes,
     )
 except ImportError as e:
     print(f"[오류] database.py 모듈을 임포트할 수 없습니다: {e}")
@@ -483,282 +489,6 @@ CREATE TABLE IF NOT EXISTS plugin_load_events (
 """
 
 
-def _backfill_audiobook_last_listened_at_sqlite(conn):
-    """SQLite audiobook_progress의 last_listened_at 누락분 보정"""
-    try:
-        cur = conn.cursor()
-        cur.execute("""
-            UPDATE audiobook_progress
-            SET last_listened_at = COALESCE(
-                (SELECT a.updated_at FROM audiobooks a WHERE a.id = audiobook_progress.audiobook_id),
-                CURRENT_TIMESTAMP
-            )
-            WHERE (last_listened_at IS NULL OR TRIM(COALESCE(last_listened_at, '')) = '')
-              AND (COALESCE(current_time, 0) > 0 OR COALESCE(is_completed, 0) = 1)
-        """)
-        conn.commit()
-        changed = cur.rowcount or 0
-        if changed > 0:
-            print(f"  [+] SQLite audiobook_progress last_listened_at 보정 완료: {changed}건")
-    except Exception as e:
-        print(f"  [경고] SQLite audiobook_progress last_listened_at 보정 실패: {e}")
-
-
-def _backfill_html_entities_video_titles_sqlite(conn):
-    """videos.title/description, video_episodes.title에 남아있는 미해제 HTML 엔티티
-    (예: '&lt;강좌명&gt;')를 1회성으로 정리한다.
-
-    show.yaml을 생성하는 외부(커뮤니티) 스크래핑 도구 상당수가 강좌 플랫폼 웹페이지에서
-    긁어온 제목/설명의 HTML 엔티티를 디코딩하지 않고 그대로 저장해, 이미 스캔된 기존
-    데이터에 '&lt;', '&amp;', '&#x27;' 같은 원문이 섞여 있는 경우가 있었다. video_scanner.py의
-    show.yaml 파싱 단계는 이제 html.unescape()를 적용하지만, 그건 앞으로의 신규 스캔에만
-    적용되므로 이미 저장된 기존 행은 별도로 여기서 보정해야 한다."""
-    try:
-        cur = conn.cursor()
-        changed = 0
-        cur.execute("SELECT id, title, description FROM videos WHERE title LIKE '%&%;%' OR description LIKE '%&%;%'")
-        for row in cur.fetchall():
-            new_title = html.unescape(row['title'] or '')
-            new_desc = html.unescape(row['description'] or '')
-            if new_title != row['title'] or new_desc != row['description']:
-                cur.execute("UPDATE videos SET title = ?, description = ? WHERE id = ?", (new_title, new_desc, row['id']))
-                changed += 1
-        conn.commit()
-
-        ep_changed = 0
-        cur.execute("SELECT id, title FROM video_episodes WHERE title LIKE '%&%;%'")
-        for row in cur.fetchall():
-            new_title = html.unescape(row['title'] or '')
-            if new_title != row['title']:
-                cur.execute("UPDATE video_episodes SET title = ? WHERE id = ?", (new_title, row['id']))
-                ep_changed += 1
-        conn.commit()
-
-        if changed > 0 or ep_changed > 0:
-            print(f"  [+] SQLite video HTML 엔티티 제목 보정 완료: videos {changed}건, video_episodes {ep_changed}건")
-    except Exception as e:
-        print(f"  [경고] SQLite video HTML 엔티티 제목 보정 실패: {e}")
-
-
-def _backfill_html_entities_video_titles_mariadb():
-    """videos.title/description, video_episodes.title의 미해제 HTML 엔티티를 1회성으로 정리한다
-    (SQLite 버전과 동일한 이유 — 위 _backfill_html_entities_video_titles_sqlite 참고)."""
-    try:
-        from tools.migrator_sqlite_to_mariadb import connect_mariadb
-        conn = connect_mariadb('media_video')
-        cur = conn.cursor()
-        changed = 0
-        cur.execute("SELECT id, title, description FROM videos WHERE title LIKE '%&%;%' OR description LIKE '%&%;%'")
-        for row in cur.fetchall():
-            new_title = html.unescape(row['title'] or '')
-            new_desc = html.unescape(row['description'] or '')
-            if new_title != row['title'] or new_desc != row['description']:
-                cur.execute("UPDATE videos SET title = %s, description = %s WHERE id = %s", (new_title, new_desc, row['id']))
-                changed += 1
-        conn.commit()
-
-        ep_changed = 0
-        cur.execute("SELECT id, title FROM video_episodes WHERE title LIKE '%&%;%'")
-        for row in cur.fetchall():
-            new_title = html.unescape(row['title'] or '')
-            if new_title != row['title']:
-                cur.execute("UPDATE video_episodes SET title = %s WHERE id = %s", (new_title, row['id']))
-                ep_changed += 1
-        conn.commit()
-
-        if changed > 0 or ep_changed > 0:
-            print(f"  [+] MariaDB video HTML 엔티티 제목 보정 완료: videos {changed}건, video_episodes {ep_changed}건")
-        conn.close()
-    except Exception as e:
-        print(f"  [경고] MariaDB video HTML 엔티티 제목 보정 실패: {e}")
-
-
-def _backfill_audiobook_last_listened_at_mariadb():
-    """MariaDB audiobook_progress의 last_listened_at 누락분 보정"""
-    try:
-        from tools.migrator_sqlite_to_mariadb import connect_mariadb
-        conn = connect_mariadb('media_audiobook')
-        cur = conn.cursor()
-        cur.execute("""
-            UPDATE audiobook_progress p
-            LEFT JOIN audiobooks a ON a.id = p.audiobook_id
-            SET p.last_listened_at = COALESCE(a.updated_at, CURRENT_TIMESTAMP)
-            WHERE (p.last_listened_at IS NULL OR TRIM(CAST(p.last_listened_at AS CHAR)) = '' OR p.last_listened_at = '0000-00-00 00:00:00')
-              AND (COALESCE(p.current_time, 0) > 0 OR COALESCE(p.is_completed, 0) = 1)
-        """)
-        conn.commit()
-        changed = cur.rowcount or 0
-        if changed > 0:
-            print(f"  [+] MariaDB audiobook_progress last_listened_at 보정 완료: {changed}건")
-        conn.close()
-    except Exception as e:
-        print(f"  [경고] MariaDB audiobook_progress last_listened_at 보정 실패: {e}")
-
-    col_collations = [
-        ('media_general', 'books', 'file_path', 'VARCHAR(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL'),
-        ('media_adult', 'books', 'file_path', 'VARCHAR(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL'),
-        ('media_audiobook', 'audiobooks', 'folder_path', 'VARCHAR(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL'),
-    ]
-    for db_name, tbl, col_name, col_def in col_collations:
-        try:
-            conn = connect_mariadb(db_name)
-            cur = conn.cursor()
-            cur.execute(f"ALTER TABLE `{tbl}` MODIFY COLUMN `{col_name}` {col_def}")
-            conn.commit()
-            conn.close()
-        except Exception:
-            pass
-
-
-def _ensure_mariadb_columns():
-    """기존 MariaDB 데이터베이스의 테이블에 누락된 필수 컬럼 자동 ALTER TABLE 보강"""
-    from tools.migrator_sqlite_to_mariadb import connect_mariadb
-
-    # 구형 tracks 테이블 RENAME 처리
-    try:
-        conn = connect_mariadb('media_audiobook')
-        cur = conn.cursor()
-        cur.execute("SHOW TABLES LIKE 'tracks'")
-        has_old = bool(cur.fetchone())
-        cur.execute("SHOW TABLES LIKE 'audiobook_tracks'")
-        has_new = bool(cur.fetchone())
-        if has_old and not has_new:
-            cur.execute("RENAME TABLE `tracks` TO `audiobook_tracks`")
-            conn.commit()
-            print("  [+] MariaDB 구형 테이블 `tracks` ➔ `audiobook_tracks` 자동 RENAME 완료.")
-        conn.close()
-    except Exception as e:
-        print(f"  [!] MariaDB 구형 테이블 RENAME 검사 중 오류: {e}")
-
-    required_columns = [
-        ('media_general', 'libraries', 'group_id', 'BIGINT DEFAULT NULL'),
-        ('media_adult', 'libraries', 'group_id', 'BIGINT DEFAULT NULL'),
-        ('media_audiobook', 'libraries', 'group_id', 'BIGINT DEFAULT NULL'),
-        ('media_general', 'libraries', 'sort_order', 'INT DEFAULT 0'),
-        ('media_adult', 'libraries', 'sort_order', 'INT DEFAULT 0'),
-        ('media_audiobook', 'libraries', 'sort_order', 'INT DEFAULT 0'),
-        ('media_general', 'libraries', 'gdrive_copy_remote', 'VARCHAR(255) DEFAULT NULL'),
-        ('media_adult', 'libraries', 'gdrive_copy_remote', 'VARCHAR(255) DEFAULT NULL'),
-        ('media_audiobook', 'libraries', 'gdrive_copy_remote', 'VARCHAR(255) DEFAULT NULL'),
-        ('media_general', 'libraries', 'gdrive_view_local_mirror_path', 'TEXT'),
-        ('media_adult', 'libraries', 'gdrive_view_local_mirror_path', 'TEXT'),
-        ('media_audiobook', 'libraries', 'gdrive_view_local_mirror_path', 'TEXT'),
-        ('media_audiobook', 'audiobooks', 'code', 'VARCHAR(255)'),
-        ('media_audiobook', 'audiobooks', 'poster', 'TEXT'),
-        ('media_audiobook', 'audiobooks', 'premiered', 'VARCHAR(100)'),
-        ('media_audiobook', 'audiobooks', 'ratings', 'VARCHAR(50)'),
-        ('media_audiobook', 'audiobooks', 'author_intro', 'TEXT'),
-        ('media_audiobook', 'audiobooks', 'folder_name', 'VARCHAR(500)'),
-        ('media_audiobook', 'audiobooks', 'file_type', 'VARCHAR(50)'),
-        ('media_audiobook', 'audiobooks', 'deleted_at', 'DATETIME DEFAULT NULL'),
-        ('media_audiobook', 'audiobook_tracks', 'track_code', 'VARCHAR(100)'),
-        ('media_audiobook', 'audiobook_tracks', 'filename', 'VARCHAR(500)'),
-        ('media_audiobook', 'audiobook_tracks', 'file_mtime', 'DOUBLE DEFAULT 0.0'),
-        ('media_audiobook', 'audiobook_tracks', 'format', 'VARCHAR(50)'),
-        ('media_general', 'books', 'series_alias', 'VARCHAR(500)'),
-        ('media_general', 'books', 'title_alias', 'VARCHAR(500)'),
-        ('media_general', 'books', 'file_mtime', 'DOUBLE DEFAULT 0.0'),
-        ('media_general', 'books', 'file_size', 'BIGINT DEFAULT 0'),
-        ('media_general', 'books', 'cover_align', "VARCHAR(10) DEFAULT 'center'"),
-        ('media_adult', 'books', 'series_alias', 'VARCHAR(500)'),
-        ('media_adult', 'books', 'title_alias', 'VARCHAR(500)'),
-        ('media_adult', 'books', 'file_mtime', 'DOUBLE DEFAULT 0.0'),
-        ('media_adult', 'books', 'file_size', 'BIGINT DEFAULT 0'),
-        ('media_adult', 'books', 'cover_align', "VARCHAR(10) DEFAULT 'center'"),
-        ('media_general', 'collections', 'updated_at', 'DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
-        ('media_adult', 'collections', 'updated_at', 'DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
-        ('media_general', 'users', 'has_video_access', 'INT DEFAULT 1'),
-        ('media_adult', 'users', 'has_video_access', 'INT DEFAULT 1'),
-        ('media_audiobook', 'users', 'has_video_access', 'INT DEFAULT 1'),
-        ('media_general', 'collection_items', 'video_id', 'BIGINT DEFAULT NULL'),
-        ('media_adult', 'collection_items', 'video_id', 'BIGINT DEFAULT NULL'),
-        ('media_audiobook', 'collection_items', 'video_id', 'BIGINT DEFAULT NULL'),
-        ('media_video', 'video_episodes', 'needs_transcode', 'INT DEFAULT 0'),
-        ('media_video', 'video_episodes', 'subtitle_path', 'TEXT'),
-        ('media_video', 'video_episodes', 'container_verified', 'INT DEFAULT 0'),
-        ('media_general', 'epub_bookmarks', 'percent', 'INT DEFAULT 0'),
-        ('media_adult', 'epub_bookmarks', 'percent', 'INT DEFAULT 0'),
-        ('media_general', 'book_offsets', 'data_offset', 'BIGINT DEFAULT NULL'),
-        ('media_adult', 'book_offsets', 'data_offset', 'BIGINT DEFAULT NULL'),
-    ]
-
-    for db_name, tbl, col_name, col_def in required_columns:
-        try:
-            conn = connect_mariadb(db_name)
-            cur = conn.cursor()
-            cur.execute(f"SHOW COLUMNS FROM `{tbl}` WHERE Field = %s", (col_name,))
-            if not cur.fetchone():
-                cur.execute(f"ALTER TABLE `{tbl}` ADD COLUMN `{col_name}` {col_def}")
-                conn.commit()
-                print(f"  [+] MariaDB 누락 컬럼 자동 보강 완료: `{db_name}`.`{tbl}`.{col_name}")
-            conn.close()
-        except Exception as e:
-            print(f"  [!] MariaDB 컬럼 보강 실패: `{db_name}`.`{tbl}`.{col_name} ({col_def}) -> {e}")
-
-    # 구버전(테이블명이 `tracks`였던 시절)부터 계속 업그레이드해온 DB는 audiobook_tracks.title이
-    # 그 시절 정의(NOT NULL, 기본값 없음) 그대로 남아있을 수 있다. 현재 앱은 트랙을 filename으로
-    # 표시하며 INSERT 시 title을 채우지 않으므로, 이런 구형 컬럼이 남아있는 DB에서는 신규 오디오북을
-    # 추가할 때마다 (1364, "Field 'title' doesn't have a default value")로 저장이 실패한다.
-    legacy_column_relaxations = [
-        ('media_audiobook', 'audiobook_tracks', 'title', 'VARCHAR(500) NULL'),
-    ]
-    for db_name, tbl, col_name, new_col_def in legacy_column_relaxations:
-        try:
-            conn = connect_mariadb(db_name)
-            cur = conn.cursor()
-            cur.execute(f"SHOW COLUMNS FROM `{tbl}` WHERE Field = %s", (col_name,))
-            row = cur.fetchone()
-            if row and str(row.get('Null')).upper() == 'NO' and row.get('Default') is None:
-                cur.execute(f"ALTER TABLE `{tbl}` MODIFY COLUMN `{col_name}` {new_col_def}")
-                conn.commit()
-                print(f"  [+] MariaDB 구형 스키마 보정 완료: `{db_name}`.`{tbl}`.{col_name} (NOT NULL 제약 해제)")
-            conn.close()
-        except Exception as e:
-            print(f"  [!] MariaDB 구형 컬럼 제약 보정 실패: `{db_name}`.`{tbl}`.{col_name} -> {e}")
-
-
-def _ensure_mariadb_indexes():
-    from tools.migrator_sqlite_to_mariadb import connect_mariadb
-
-    required_indexes = [
-        ('media_general', 'books', 'idx_books_lib_del_series', 'CREATE INDEX idx_books_lib_del_series ON books (library_id, is_deleted, series_name(255), id)'),
-        ('media_general', 'books', 'idx_books_lib_del_title', 'CREATE INDEX idx_books_lib_del_title ON books (library_id, is_deleted, title(255), id)'),
-        ('media_adult', 'books', 'idx_books_lib_del_series', 'CREATE INDEX idx_books_lib_del_series ON books (library_id, is_deleted, series_name(255), id)'),
-        ('media_adult', 'books', 'idx_books_lib_del_title', 'CREATE INDEX idx_books_lib_del_title ON books (library_id, is_deleted, title(255), id)'),
-        ('media_audiobook', 'audiobooks', 'idx_audiobooks_lib_del', 'CREATE INDEX idx_audiobooks_lib_del ON audiobooks (library_id, is_deleted, title(255), id)'),
-        ('media_video', 'videos', 'idx_videos_lib_del', 'CREATE INDEX idx_videos_lib_del ON videos (library_id, is_deleted, title(255), id)'),
-        ('media_general', 'libraries', 'idx_libraries_group_id', 'CREATE INDEX idx_libraries_group_id ON libraries (group_id)'),
-        ('media_adult', 'libraries', 'idx_libraries_group_id', 'CREATE INDEX idx_libraries_group_id ON libraries (group_id)'),
-        ('media_audiobook', 'libraries', 'idx_libraries_group_id', 'CREATE INDEX idx_libraries_group_id ON libraries (group_id)'),
-        ('media_general', 'libraries', 'idx_libraries_group_order', 'CREATE INDEX idx_libraries_group_order ON libraries (group_id, sort_order)'),
-        ('media_adult', 'libraries', 'idx_libraries_group_order', 'CREATE INDEX idx_libraries_group_order ON libraries (group_id, sort_order)'),
-        ('media_audiobook', 'libraries', 'idx_libraries_group_order', 'CREATE INDEX idx_libraries_group_order ON libraries (group_id, sort_order)'),
-        ('media_general', 'books', 'idx_books_series_name', 'CREATE INDEX idx_books_series_name ON books (series_name(255))'),
-        ('media_general', 'books', 'idx_books_series_alias', 'CREATE INDEX idx_books_series_alias ON books (series_alias(255))'),
-        ('media_general', 'books', 'idx_books_library_id', 'CREATE INDEX idx_books_library_id ON books (library_id)'),
-        ('media_general', 'books', 'idx_books_title', 'CREATE INDEX idx_books_title ON books (title(255))'),
-        ('media_general', 'books', 'idx_books_isbn', 'CREATE INDEX idx_books_isbn ON books (isbn)'),
-        ('media_adult', 'books', 'idx_books_series_name', 'CREATE INDEX idx_books_series_name ON books (series_name(255))'),
-        ('media_adult', 'books', 'idx_books_series_alias', 'CREATE INDEX idx_books_series_alias ON books (series_alias(255))'),
-        ('media_adult', 'books', 'idx_books_library_id', 'CREATE INDEX idx_books_library_id ON books (library_id)'),
-        ('media_adult', 'books', 'idx_books_title', 'CREATE INDEX idx_books_title ON books (title(255))'),
-        ('media_adult', 'books', 'idx_books_isbn', 'CREATE INDEX idx_books_isbn ON books (isbn)'),
-    ]
-
-    for db_name, tbl, idx_name, idx_sql in required_indexes:
-        try:
-            conn = connect_mariadb(db_name)
-            cur = conn.cursor()
-            cur.execute(f"SHOW INDEX FROM `{tbl}` WHERE Key_name = %s", (idx_name,))
-            if not cur.fetchone():
-                cur.execute(idx_sql)
-                conn.commit()
-                print(f"  [+] MariaDB 고속 성능 인덱스 생성 완료: `{db_name}`.`{tbl}`.{idx_name}")
-            conn.close()
-        except Exception as e:
-            print(f"  [!] MariaDB 인덱스 생성 실패: `{db_name}`.`{tbl}`.{idx_name} -> {e}")
-
-
 def run_schema_update():
     print("=" * 60)
     print(" 데이터베이스 최신 스키마 강제 업데이트 및 동기화 도구")
@@ -773,10 +503,7 @@ def run_schema_update():
             for db_type, config in DB_MAP.items():
                 dbname = config['mariadb_db']
                 init_schema(db_type, dbname)
-            _ensure_mariadb_columns()
-            _ensure_mariadb_indexes()
-            _backfill_audiobook_last_listened_at_mariadb()
-            _backfill_html_entities_video_titles_mariadb()
+            run_full_migration()
             print("[+] MariaDB 데이터베이스, 스키마 및 고속 복합 인덱스 검사 완료.")
         except Exception as ex:
             print(f"[!] MariaDB 스키마 검사 중 경고: {ex}")
@@ -798,90 +525,39 @@ def run_schema_update():
             size_mb = os.path.getsize(db_path) / (1024 * 1024)
             print(f"    -> [확인] DB 파일 존재함 (크기: {size_mb:.2f} MB)")
 
-    print("\n[*] 1단계: 데이터베이스 기본 초기화 및 기본 마이그레이션 실행 중...")
+    print("\n[*] 1단계: 데이터베이스 초기화 및 스키마/인덱스/백필 마이그레이션 실행 중...")
     try:
-        init_databases()
-        print(" -> [성공] 데이터베이스 기본 초기화 완료.")
+        run_full_migration()
+        print(" -> [성공] 데이터베이스 마이그레이션 완료.")
     except Exception as e:
-        print(f" -> [실패] 데이터베이스 초기화 중 오류 발생: {e}")
+        print(f" -> [실패] 데이터베이스 마이그레이션 중 오류 발생: {e}")
 
-    print("\n[*] 2단계: 개별 데이터베이스 강제 스키마 갱신 및 WAL 정리 시작...")
-
-    # 예전엔 database.py 소스 텍스트를 정규식(re.search)으로 긁어 schema/indexes_schema
-    # 변수를 찾았으나, 이는 database.py의 정확한 변수명에 암묵적으로 의존하는 취약한 결합이었다
-    # (실제로 database.py의 init_databases() 리팩터링 중 지역 변수 schema/indexes_schema가
-    # 모듈 상수 _SCHEMA_SQL/_INDEXES_SQL로 이름이 바뀌면서 이 정규식이 아무 것도 매칭하지
-    # 못해 SQLite 모드의 자동 컬럼 보강/인덱스 생성이 조용히 스킵되는 회귀가 발생했었다).
-    # database.py에서 직접 import해서 항상 실제 값과 동기화되도록 수정.
-    schema_text = _SCHEMA_SQL
-    indexes_text = _INDEXES_SQL
-
+    print("\n[*] 2단계: WAL 체크포인트 마감 중...")
     for db_key, db_path in [('general', DB_GENERAL_PATH), ('adult', DB_ADULT_PATH), ('audiobook', DB_AUDIOBOOK_PATH), ('video', DB_VIDEO_PATH)]:
         if not os.path.exists(db_path):
             continue
 
-        print(f"\n[+] {db_key.upper()} DB 상세 점검 및 마이그레이션:")
         conn = None
         try:
             conn = sqlite3.connect(db_path, timeout=30.0)
-            conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
-            print(f"  - DB 연결 및 무결성 확인 중...")
             cursor.execute("PRAGMA integrity_check")
             integrity = cursor.fetchone()[0]
-            print(f"    -> integrity_check 결과: {integrity}")
-
             if integrity != 'ok':
-                print(f"    -> [경고] 무결성 이상이 감지되었습니다! 스키마 동기화에 영향이 있을 수 있습니다.")
+                print(f"  - [경고] {db_key.upper()} DB 무결성 이상이 감지되었습니다: {integrity}")
 
-            if schema_text:
-                print(f"  - 스키마 내 누락 컬럼 자동 탐지 및 추가 중...")
-                auto_migrate_schema(conn, schema_text)
-                conn.commit()
-
-            if db_key == 'audiobook':
-                print(f"  - audiobook_progress last_listened_at 누락분 보정 중...")
-                _backfill_audiobook_last_listened_at_sqlite(conn)
-
-            if db_key == 'video':
-                print(f"  - video/video_episodes HTML 엔티티 제목 보정 중...")
-                _backfill_html_entities_video_titles_sqlite(conn)
-
-            if indexes_text:
-                print(f"  - 스키마 내 누락 인덱스 자동 생성 중...")
-                for query in indexes_text.split(';'):
-                    query = query.strip()
-                    if query:
-                        try:
-                            cursor.execute(query)
-                        except sqlite3.OperationalError as idx_err:
-                            if "already exists" not in str(idx_err).lower():
-                                print(f"    -> 인덱스 생성 에러 ({query[:30]}...): {idx_err}")
-                conn.commit()
-
-            print(f"  - 구형 FTS5 가상 테이블 및 그림자 세그먼트 정리 중...")
-            try:
-                from database import cleanup_legacy_fts_index
-                cleanup_legacy_fts_index(conn)
-                print(f"    -> 구형 FTS5 가상 테이블 정리 완료.")
-            except Exception as fts_err:
-                print(f"    -> FTS5 정리 통과: {fts_err}")
-
-            print(f"  - WAL 체크포인트(TRUNCATE) 수행 중...")
             cursor.execute("PRAGMA wal_checkpoint(TRUNCATE)")
             conn.commit()
-            print(f"    -> WAL 체크포인트 완료 및 임시 저널 파일 병합 완료.")
+            print(f"  - {db_key.upper()} DB WAL 체크포인트(TRUNCATE) 완료.")
 
         except Exception as db_err:
-            print(f"  - [오류] {db_key.upper()} DB 작업 중 문제 발생: {db_err}")
+            print(f"  - [오류] {db_key.upper()} DB WAL 체크포인트 중 문제 발생: {db_err}")
             if conn:
                 conn.rollback()
         finally:
             if conn:
                 conn.close()
-
-    print("\n[*] 3단계: WAL 체크포인트 마감 완료 (SQLite C-Engine 세션 동기화 정돈 완료).")
 
     print("\n" + "=" * 60)
     print(" 데이터베이스 스키마 및 마이그레이션 동기화가 성공적으로 완료되었습니다!")

@@ -9,10 +9,7 @@ import io
 import xml.etree.ElementTree as ET
 from PIL import Image
 from tools.scanner.folder_image import find_common_cover, find_individual_cover
-
-MEDIA_SERVER_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-COVERS_DIR = os.path.join(MEDIA_SERVER_DIR, 'covers')
-os.makedirs(COVERS_DIR, exist_ok=True)
+from services.cover_storage_service import get_covers_dir
 
 SUPPORTED_IMAGE_FORMATS = ('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif')
 
@@ -146,11 +143,11 @@ def download_cover_from_url(file_path, image_url, force=False, library_id=None):
     cover_filename = f"book_{book_hash}.webp"
     
     if library_id is not None:
-        dest_dir = os.path.join(COVERS_DIR, str(library_id))
+        dest_dir = os.path.join(get_covers_dir(), str(library_id))
         os.makedirs(dest_dir, exist_ok=True)
         db_cover_path = f"{library_id}/{cover_filename}"
     else:
-        dest_dir = COVERS_DIR
+        dest_dir = get_covers_dir()
         db_cover_path = cover_filename
         
     cover_filepath = os.path.join(dest_dir, cover_filename)
@@ -214,11 +211,11 @@ def extract_cover_from_b64(file_path, cover_b64, force=False, library_id=None):
         cover_filename = f"book_{book_hash}.webp"
         
         if library_id is not None:
-            dest_dir = os.path.join(COVERS_DIR, str(library_id))
+            dest_dir = os.path.join(get_covers_dir(), str(library_id))
             os.makedirs(dest_dir, exist_ok=True)
             db_cover_path = f"{library_id}/{cover_filename}"
         else:
-            dest_dir = COVERS_DIR
+            dest_dir = get_covers_dir()
             db_cover_path = cover_filename
             
         cover_filepath = os.path.join(dest_dir, cover_filename)
@@ -265,11 +262,11 @@ def get_series_cover_fallback(series_name, folder_path, force=False, is_remote=F
         cover_filename = f"series_{series_hash}.webp"
 
     if library_id is not None:
-        dest_dir = os.path.join(COVERS_DIR, str(library_id))
+        dest_dir = os.path.join(get_covers_dir(), str(library_id))
         os.makedirs(dest_dir, exist_ok=True)
         db_cover_path = f"{library_id}/{cover_filename}"
     else:
-        dest_dir = COVERS_DIR
+        dest_dir = get_covers_dir()
         db_cover_path = cover_filename
 
     local_cover_path = os.path.join(dest_dir, cover_filename)
@@ -384,11 +381,11 @@ def get_imgdir_cover(folder_path, virtual_file_path, force=False, library_id=Non
     cover_filename = f"book_{cover_hash}.webp"
 
     if library_id is not None:
-        dest_dir = os.path.join(COVERS_DIR, str(library_id))
+        dest_dir = os.path.join(get_covers_dir(), str(library_id))
         os.makedirs(dest_dir, exist_ok=True)
         db_cover_path = f"{library_id}/{cover_filename}"
     else:
-        dest_dir = COVERS_DIR
+        dest_dir = get_covers_dir()
         db_cover_path = cover_filename
 
     local_cover_path = os.path.join(dest_dir, cover_filename)

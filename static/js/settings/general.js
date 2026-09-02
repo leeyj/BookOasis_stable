@@ -1,9 +1,15 @@
-// general.js - 일반 환경설정 클라이언트 제어 모듈
+// general.js - "일반 설정"/"내 설정" 탭의 폼 로드·저장 오케스트레이션 + 이벤트 위임 진입점
+//
+// 테마/커버저장소이관/단축키녹화/VAAPI점검·스캐너트리거처럼 서로 무관한 관심사는
+// 각자의 파일(theme_settings.js, cover_storage_settings.js, shortcut_recorder.js,
+// system_actions.js)로 분리돼 있다. 이 파일은 "일반 설정"/"내 설정" 두 폼 자체의
+// 로드/저장 흐름과, 그 폼에서 발생하는 이벤트를 각 모듈로 위임하는 역할만 담당한다.
 import { state } from '../state.js';
 import * as api from '../api.js';
-
-let tempShortcut = null;
-let isRecordingShortcut = false;
+import { changeDashboardTheme, populateCustomThemeOptions, rescanCustomThemesUi, toggleDashboardInsightsSetting } from './theme_settings.js';
+import { startCoverStorageMigration } from './cover_storage_settings.js';
+import { getTempShortcut, setTempShortcut, initShortcutRecorderEvents } from './shortcut_recorder.js';
+import { runVaapiCheck, triggerLazyScanNow } from './system_actions.js';
 
 function initGeneralDelegation() {
   if (window.__generalDelegationBound) return;
@@ -45,6 +51,15 @@ function initGeneralDelegation() {
     if (!target) return;
     event.preventDefault();
     rescanCustomThemesUi();
+  }, true);
+
+  document.addEventListener('click', (event) => {
+    const target = event && event.target && typeof event.target.closest === 'function'
+      ? event.target.closest('[data-role="cover-storage-migrate"]')
+      : null;
+    if (!target) return;
+    event.preventDefault();
+    startCoverStorageMigration();
   }, true);
 
   document.addEventListener('change', (event) => {
@@ -98,81 +113,6 @@ function applyNonAdminGeneralSettingsMode() {
       el.title = '관리자 권한에서만 변경 가능합니다.';
     }
   });
-}
-
-export function changeDashboardTheme(themeName) {
-  if (!themeName) themeName = 'purple';
-  localStorage.setItem('app_dashboard_theme', themeName);
-  document.documentElement.setAttribute('data-app-theme', themeName);
-}
-
-let customThemesLoaded = false;
-
-// themes/*.yaml 검증 통과분을 테마 선택 드롭다운에 동적으로 추가한다.
-// (플러그인 신뢰 경계와 동일하게, label은 반드시 textContent로만 넣는다 - innerHTML 금지)
-export async function populateCustomThemeOptions() {
-  if (customThemesLoaded) return;
-  const themeSelect = document.getElementById('my-setting-dashboard-theme');
-  if (!themeSelect) return;
-  try {
-    const data = await api.fetchCustomThemes();
-    if (!data || !data.success || !Array.isArray(data.themes)) return;
-    data.themes.forEach((theme) => {
-      if (!theme || !theme.id || themeSelect.querySelector(`option[value="${CSS.escape(theme.id)}"]`)) return;
-      const opt = document.createElement('option');
-      opt.value = theme.id;
-      opt.textContent = theme.label || theme.id;
-      themeSelect.appendChild(opt);
-    });
-    customThemesLoaded = true;
-    // 옵션이 이제서야 추가됐으므로, 이미 선택돼 있어야 할 커스텀 테마가 있다면 반영
-    const savedTheme = localStorage.getItem('app_dashboard_theme') || 'purple';
-    if (themeSelect.querySelector(`option[value="${CSS.escape(savedTheme)}"]`)) {
-      themeSelect.value = savedTheme;
-    }
-  } catch (e) {
-    console.error('[Settings] 커스텀 테마 목록 로드 실패:', e);
-  }
-}
-
-async function rescanCustomThemesUi() {
-  const resultEl = document.getElementById('custom-theme-rescan-result');
-  try {
-    const data = await api.rescanCustomThemes();
-    if (!data || !data.success) throw new Error((data && data.error) || '알 수 없는 오류');
-    customThemesLoaded = false;
-    await populateCustomThemeOptions();
-    if (resultEl) {
-      const rejected = Array.isArray(data.rejected) ? data.rejected : [];
-      let msg = `로드됨: ${data.loaded_count}개`;
-      if (rejected.length > 0) {
-        msg += ` / 거부됨: ${rejected.length}개 (${rejected.map((r) => `${r.file}: ${r.reason}`).join(', ')})`;
-      }
-      resultEl.textContent = msg;
-      resultEl.style.color = rejected.length > 0 ? '#f87171' : 'var(--app-text-muted)';
-    }
-  } catch (e) {
-    console.error('[Settings] 커스텀 테마 재스캔 실패:', e);
-    if (resultEl) {
-      resultEl.textContent = `재스캔 실패: ${e.message || e}`;
-      resultEl.style.color = '#f87171';
-    }
-  }
-}
-
-export function toggleDashboardInsightsSetting(enabled) {
-  const isShow = !!enabled;
-  localStorage.setItem('show_dashboard_insights', isShow ? '1' : '0');
-  
-  const container = document.querySelector('.dashboard-insights-container');
-  const divider = document.getElementById('dashboard-insights-divider');
-  if (container) container.style.display = isShow ? 'block' : 'none';
-  if (divider) divider.style.display = isShow ? 'block' : 'none';
-}
-
-if (typeof window !== 'undefined') {
-  window.changeDashboardTheme = changeDashboardTheme;
-  window.toggleDashboardInsightsSetting = toggleDashboardInsightsSetting;
 }
 
 // 설정값을 CSS 변수 및 메모리 상태에 적용하는 헬퍼 함수
@@ -292,8 +232,6 @@ async function migrateLocalOnlyUserSettingsOnce() {
   }
 }
 
-
-
 // 일반 환경설정 로드
 export async function loadGeneralSettings() {
   initGeneralDelegation();
@@ -323,10 +261,10 @@ export async function loadGeneralSettings() {
 
       const dbPoolSizeEl = document.getElementById('setting-db-pool-size');
       if (dbPoolSizeEl) dbPoolSizeEl.value = s.DB_POOL_SIZE || '10';
-      
+
       const scannerLogEl = document.getElementById('setting-scanner-write-log');
       if (scannerLogEl) scannerLogEl.value = s.SCANNER_WRITE_LOG || '1';
-      
+
       const lazyCronEl = document.getElementById('setting-lazy-scan-cron');
       if (lazyCronEl) lazyCronEl.value = s.LAZY_SCAN_CRON || '0 3 * * *';
 
@@ -345,9 +283,12 @@ export async function loadGeneralSettings() {
       const scanIgnorePatternsEl = document.getElementById('setting-scan-ignore-patterns');
       if (scanIgnorePatternsEl) scanIgnorePatternsEl.value = s.SCAN_IGNORE_PATTERNS !== undefined ? s.SCAN_IGNORE_PATTERNS : "@eaDir/\n#recycle/\n*.tmp\n*.sample.cbz\n.DS_Store\nThumbs.db\ndesktop.ini";
 
+      const coverStorageRootEl = document.getElementById('setting-cover-storage-root');
+      if (coverStorageRootEl) coverStorageRootEl.value = s.COVER_STORAGE_ROOT || '';
+
       const timezoneEl = document.getElementById('setting-timezone');
       if (timezoneEl) timezoneEl.value = s.TIMEZONE || 'UTC';
-      
+
       const recentBooksEl = document.getElementById('setting-recent-books-limit');
       if (recentBooksEl) recentBooksEl.value = s.RECENT_BOOKS_LIMIT || '30';
 
@@ -383,14 +324,14 @@ export async function loadGeneralSettings() {
       // 프록시 헤더 인증 (SSO) 설정
       const proxyAuthEl = document.getElementById('setting-proxy-header-auth');
       if (proxyAuthEl) proxyAuthEl.value = s.PROXY_HEADER_AUTH || '0';
-      
+
       // 만화 뷰어 로딩 지연 시간 (LocalStorage)
       const comicDelayEl = document.getElementById('setting-comic-loading-delay');
       if (comicDelayEl) {
         const delayStr = localStorage.getItem('comic_loading_delay');
         comicDelayEl.value = (delayStr !== null) ? parseInt(delayStr, 10) : '700';
       }
-      
+
       // 🌟 도서관 검색 단축키 설정 로드
       const shortcutDisplay = document.getElementById('setting-search-shortcut-display');
       if (shortcutDisplay) {
@@ -404,86 +345,18 @@ export async function loadGeneralSettings() {
         if (!saved) {
           saved = { ctrlKey: false, altKey: true, shiftKey: false, metaKey: false, key: '`', code: 'Backquote', display: 'Alt + `' };
         }
-        tempShortcut = saved;
+        setTempShortcut(saved);
         shortcutDisplay.value = saved.display;
       }
 
       initShortcutRecorderEvents();
-      
+
       // UI 즉시 갱신
       applySettingsToUI(s);
     }
   } catch (err) {
     console.error('설정 로드 에러:', err);
   }
-}
-
-// 🌟 단축키 레코더 이벤트 리스너 바인딩 헬퍼
-function initShortcutRecorderEvents() {
-  const btnRecord = document.getElementById('btn-record-shortcut');
-  const btnReset = document.getElementById('btn-reset-shortcut');
-  const displayEl = document.getElementById('setting-search-shortcut-display');
-  if (!btnRecord || !btnReset || !displayEl) return;
-
-  if (btnRecord.__bound) return;
-  btnRecord.__bound = true;
-
-  btnRecord.addEventListener('click', () => {
-    if (isRecordingShortcut) return;
-    isRecordingShortcut = true;
-    btnRecord.innerText = '입력 대기...';
-    displayEl.value = '원하는 단축키 조합을 누르세요...';
-
-    const onKeyDown = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      const isModifierOnly = ['control', 'alt', 'shift', 'meta'].includes(e.key.toLowerCase());
-
-      const parts = [];
-      if (e.ctrlKey) parts.push('Ctrl');
-      if (e.altKey) parts.push('Alt');
-      if (e.shiftKey) parts.push('Shift');
-      if (e.metaKey) parts.push('Win');
-
-      if (isModifierOnly) {
-        displayEl.value = parts.join(' + ') + ' + ...';
-      } else {
-        let keyDisplay = e.key;
-        if (e.code === 'Space') keyDisplay = 'Space';
-        else if (e.code === 'Backquote') keyDisplay = '`';
-        else if (keyDisplay.length === 1) keyDisplay = keyDisplay.toUpperCase();
-
-        parts.push(keyDisplay);
-        const finalDisplay = parts.join(' + ');
-
-        tempShortcut = {
-          ctrlKey: e.ctrlKey,
-          altKey: e.altKey,
-          shiftKey: e.shiftKey,
-          metaKey: e.metaKey,
-          key: e.key,
-          code: e.code,
-          display: finalDisplay
-        };
-
-        displayEl.value = finalDisplay;
-
-        // 대기 종료
-        isRecordingShortcut = false;
-        btnRecord.innerText = '기록 시작';
-        window.removeEventListener('keydown', onKeyDown, true);
-      }
-    };
-
-    window.addEventListener('keydown', onKeyDown, true);
-  });
-
-  btnReset.addEventListener('click', () => {
-    if (isRecordingShortcut) return;
-    tempShortcut = { ctrlKey: false, altKey: true, shiftKey: false, metaKey: false, key: '`', code: 'Backquote', display: 'Alt + `' };
-    displayEl.value = tempShortcut.display;
-  });
 }
 
 // 일반 환경설정 저장
@@ -499,7 +372,7 @@ export async function submitGeneralSettings(event) {
     }
     return;
   }
-  
+
   const thumbWidth = document.getElementById('setting-thumbnail-width')?.value || '160';
   const pageLimit = document.getElementById('setting-page-limit')?.value || '60';
   const dbPoolSize = document.getElementById('setting-db-pool-size')?.value || '5';
@@ -517,6 +390,7 @@ export async function submitGeneralSettings(event) {
   const hddAggressiveWarmup = document.getElementById('setting-hdd-aggressive-warmup')?.checked ? '1' : '0';
   const proxyAuth = document.getElementById('setting-proxy-header-auth')?.value || '0';
   const rcloneRcUrl = document.getElementById('setting-rclone-rc-url')?.value || 'http://localhost:5572';
+  const coverStorageRoot = document.getElementById('setting-cover-storage-root')?.value?.trim() || '';
   const timezone = document.getElementById('setting-timezone')?.value || 'UTC';
   const ffmpegTranscodeArgs = document.getElementById('setting-ffmpeg-transcode-args')?.value || '';
   const ffmpegVaapiArgs = document.getElementById('setting-ffmpeg-vaapi-args')?.value || '';
@@ -524,13 +398,14 @@ export async function submitGeneralSettings(event) {
 
   try {
     // 🌟 단축키 설정 영구 저장 및 활성화
+    const tempShortcut = getTempShortcut();
     if (tempShortcut) {
       localStorage.setItem('settings_search_shortcut', JSON.stringify(tempShortcut));
       if (typeof window.applySearchShortcutSetting === 'function') {
         window.applySearchShortcutSetting();
       }
     }
-    
+
     // LocalStorage 만화 지연 시간
     localStorage.setItem('comic_loading_delay', comicDelay);
 
@@ -546,6 +421,7 @@ export async function submitGeneralSettings(event) {
       api.updateSystemSetting('LAZY_SCAN_VIDEO_MAX_EPISODES_PER_RUN', lazyVideoMaxEpisodes),
       api.updateSystemSetting('LAZY_SCAN_VIDEO_PROBE_WORKERS', lazyVideoProbeWorkers),
       api.updateSystemSetting('SCAN_IGNORE_PATTERNS', scanIgnorePatterns),
+      api.updateSystemSetting('COVER_STORAGE_ROOT', coverStorageRoot),
       api.updateSystemSetting('TIMEZONE', timezone),
       api.updateSystemSetting('RECENT_BOOKS_LIMIT', recentBooks),
       api.updateSystemSetting('SYSTEM_MEM_LIMIT', sysMem),
@@ -557,10 +433,10 @@ export async function submitGeneralSettings(event) {
       api.updateSystemSetting('FFMPEG_VAAPI_ARGS', ffmpegVaapiArgs),
       api.updateSystemSetting('FFMPEG_VAAPI_DEVICE', ffmpegVaapiDevice)
     ];
-    
+
     const results = await Promise.all(promises);
     const failed = results.find(r => !r.success);
-    
+
     if (!failed) {
       // 로컬 스토리지에 만화 뷰어 로딩 지연 시간 저장
       localStorage.setItem('comic_loading_delay', comicDelay);
@@ -570,7 +446,7 @@ export async function submitGeneralSettings(event) {
       } else {
         alert(i18n.t('settings.general_save_done'));
       }
-      
+
       // UI 실시간 갱신 적용
       applySettingsToUI({
         BOOK_THUMBNAIL_WIDTH: thumbWidth,
@@ -713,93 +589,3 @@ export async function submitMySettings(event) {
     alert(i18n.t('settings.general_server_error'));
   }
 }
-
-export async function runVaapiCheck() {
-  const btn = document.getElementById('btn-check-vaapi');
-  const resultEl = document.getElementById('vaapi-check-result');
-  const devicePathEl = document.getElementById('setting-vaapi-device-path');
-  if (!resultEl) return;
-
-  const devicePath = devicePathEl?.value?.trim() || '/dev/dri/renderD128';
-
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 점검 중...';
-  }
-  resultEl.style.display = 'block';
-  resultEl.style.background = 'rgba(15, 23, 42, 0.6)';
-  resultEl.style.border = '1px solid rgba(255,255,255,0.1)';
-  resultEl.style.color = '#cbd5e1';
-  resultEl.textContent = '점검 중입니다...';
-
-  try {
-    const data = await api.checkVaapiSupport(devicePath);
-    if (!data.success) {
-      resultEl.style.border = '1px solid rgba(239, 68, 68, 0.4)';
-      resultEl.style.color = '#fca5a5';
-      resultEl.textContent = `점검 실패: ${data.error || '알 수 없는 오류'}`;
-      return;
-    }
-
-    const overallLabel = {
-      ok: '✅ 사용 가능 (VAAPI 하드웨어 가속을 바로 쓸 수 있습니다)',
-      partial: '⚠️ 부분적으로 확인됨 (ffmpeg/디바이스는 준비됐지만 vainfo로 실동작 확인은 실패했습니다)',
-      unavailable: '❌ 사용 불가 (아래 상세 내역에서 어느 단계가 막혔는지 확인하세요)',
-      error: '❌ ffmpeg를 찾을 수 없습니다',
-    }[data.overall] || data.overall;
-
-    const colorMap = { ok: '#34d399', partial: '#fbbf24', unavailable: '#f87171', error: '#f87171' };
-    resultEl.style.border = `1px solid ${colorMap[data.overall] || 'rgba(255,255,255,0.1)'}`;
-    resultEl.style.color = '#e2e8f0';
-
-    const lines = [overallLabel, '', ...(data.detail || [])];
-    if (data.vainfo_output) {
-      lines.push('', '[vainfo 출력 일부]', data.vainfo_output.split('\n').slice(0, 12).join('\n'));
-    }
-    resultEl.textContent = lines.join('\n');
-
-    // 점검한 디바이스 경로를 그대로 저장 - 실제 스트리밍 시(_detect_vaapi_available)도
-    // 이 값을 참조하므로, 점검 결과와 실사용 판단 기준이 항상 같은 경로를 보게 만든다.
-    try {
-      await api.updateSystemSetting('FFMPEG_VAAPI_DEVICE', devicePath);
-    } catch (saveErr) {
-      console.error('[Settings] VAAPI 디바이스 경로 저장 실패:', saveErr);
-    }
-  } catch (e) {
-    console.error('[Settings] VAAPI 점검 요청 실패:', e);
-    resultEl.style.border = '1px solid rgba(239, 68, 68, 0.4)';
-    resultEl.style.color = '#fca5a5';
-    resultEl.textContent = '서버 요청 중 오류가 발생했습니다.';
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> 지금 점검';
-    }
-  }
-}
-
-window.runVaapiCheck = runVaapiCheck;
-
-export async function triggerLazyScanNow() {
-  try {
-    if (typeof window.showToast === 'function') {
-      window.showToast(i18n.t('settings.general_scanner_start'), 'info');
-    }
-    const res = await api.triggerLazyScan();
-    if (res.success) {
-      if (typeof window.showToast === 'function') {
-        window.showToast(res.message, 'success');
-      } else {
-        alert(res.message);
-      }
-    } else {
-      alert(i18n.t('settings.general_scanner_fail', {error: res.error}));
-    }
-  } catch (err) {
-    console.error('Lazy 스캔 즉시 실행 중 에러:', err);
-    alert(i18n.t('settings.general_server_error'));
-  }
-}
-
-window.triggerLazyScanNow = triggerLazyScanNow;
-
