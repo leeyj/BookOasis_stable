@@ -59,7 +59,7 @@ function ensureToggleButton() {
     'top:calc(108px + env(safe-area-inset-top, 0px))',
     'width:20px', 'height:20px', 'border-radius:50%', 'z-index:10004',
     'background:rgba(15,23,42,0.7)', 'border:1px solid rgba(255,255,255,0.15)',
-    'color:#fff', 'font-size:0.7rem', 'cursor:pointer', 'backdrop-filter:blur(8px)',
+    'color: var(--app-text-primary)', 'font-size:0.7rem', 'cursor:pointer', 'backdrop-filter:blur(8px)',
     'display:flex', 'align-items:center', 'justify-content:center', 'transition:all 0.2s ease',
     'padding:0',
   ].join(';');

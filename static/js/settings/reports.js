@@ -58,7 +58,7 @@ export async function initReportsTab() {
   fileSelect.innerHTML = `<option value="">${window.i18n ? window.i18n.t('settings.report_select_report') : '-- 리포트 선택 --'}</option>`;
   tableBody.innerHTML = `
     <tr>
-      <td colspan="3" style="padding: 2rem; text-align: center; color: #94a3b8;">
+      <td colspan="3" style="padding: 2rem; text-align: center; color: var(--app-text-muted);">
         <i class="fa-solid fa-info-circle" style="margin-right: 0.3rem;"></i> ${window.i18n ? window.i18n.t('settings.report_empty_message') : '카테고리와 리포트를 선택하여 상세 오류 내역을 확인하십시오.'}
       </td>
     </tr>
@@ -87,7 +87,7 @@ export async function loadScanHistory() {
 
   tbody.innerHTML = `
     <tr>
-      <td colspan="6" style="padding: 2rem; text-align: center; color: #94a3b8;">
+      <td colspan="6" style="padding: 2rem; text-align: center; color: var(--app-text-muted);">
         <i class="fa-solid fa-circle-notch fa-spin" style="margin-right: 0.3rem; color: #a855f7;"></i> 최근 스캔 이력을 불러오는 중...
       </td>
     </tr>
@@ -100,7 +100,7 @@ export async function loadScanHistory() {
     if (!data.success || !Array.isArray(data.history) || data.history.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="6" style="padding: 2rem; text-align: center; color: #94a3b8;">
+          <td colspan="6" style="padding: 2rem; text-align: center; color: var(--app-text-muted);">
             <i class="fa-solid fa-info-circle" style="margin-right: 0.3rem;"></i> 최근 기록된 스캔 작업 이력이 없습니다.
           </td>
         </tr>
@@ -114,7 +114,7 @@ export async function loadScanHistory() {
         ? `<span style="display: inline-block; padding: 0.2rem 0.5rem; background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 4px; font-size: 0.75rem; font-weight: 600;">크론 자동</span>`
         : `<span style="display: inline-block; padding: 0.2rem 0.5rem; background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 4px; font-size: 0.75rem; font-weight: 600;">수동 실행</span>`;
 
-      let statusBadge = `<span style="color: #94a3b8;">대기</span>`;
+      let statusBadge = `<span style="color: var(--app-text-muted);">대기</span>`;
       if (item.status === 'completed') {
         statusBadge = `<span style="color: #4ade80; font-weight: 600;"><i class="fa-solid fa-circle-check"></i> 완료</span>`;
       } else if (item.status === 'running') {
@@ -131,10 +131,10 @@ export async function loadScanHistory() {
 
       return `
         <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); hover: background: rgba(255,255,255,0.02);">
-          <td style="padding: 0.8rem 1rem; font-weight: 600; color: #f8fafc;">${item.library_name}</td>
+          <td style="padding: 0.8rem 1rem; font-weight: 600; color: var(--app-text-primary);">${item.library_name}</td>
           <td style="padding: 0.8rem 1rem; text-align: center; color: #a855f7; font-weight: 600; font-size: 0.82rem;">${relativeTime}</td>
-          <td style="padding: 0.8rem 1rem; text-align: center; color: #94a3b8; font-family: monospace; font-size: 0.8rem;">${startedAt}</td>
-          <td style="padding: 0.8rem 1rem; text-align: center; color: #94a3b8; font-family: monospace; font-size: 0.8rem;">${finishedAt}</td>
+          <td style="padding: 0.8rem 1rem; text-align: center; color: var(--app-text-muted); font-family: monospace; font-size: 0.8rem;">${startedAt}</td>
+          <td style="padding: 0.8rem 1rem; text-align: center; color: var(--app-text-muted); font-family: monospace; font-size: 0.8rem;">${finishedAt}</td>
           <td style="padding: 0.8rem 1rem; text-align: center;">${triggerBadge}</td>
           <td style="padding: 0.8rem 1rem; text-align: center; font-size: 0.8rem;">${statusBadge}</td>
         </tr>
@@ -166,7 +166,7 @@ export async function loadReportList() {
   fileSelect.innerHTML = `<option value="">${window.i18n ? window.i18n.t('settings.report_select_report') : '-- 리포트 선택 --'}</option>`;
   tableBody.innerHTML = `
     <tr>
-      <td colspan="3" style="padding: 2rem; text-align: center; color: #94a3b8;">
+      <td colspan="3" style="padding: 2rem; text-align: center; color: var(--app-text-muted);">
         <i class="fa-solid fa-info-circle" style="margin-right: 0.3rem;"></i> ${window.i18n ? window.i18n.t('settings.report_empty_message') : '리포트를 선택하여 상세 오류 내역을 확인하십시오.'}
       </td>
     </tr>
@@ -216,7 +216,7 @@ export async function loadReportDetail() {
   if (!filename) {
     tableBody.innerHTML = `
       <tr>
-        <td colspan="3" style="padding: 2rem; text-align: center; color: #94a3b8;">
+        <td colspan="3" style="padding: 2rem; text-align: center; color: var(--app-text-muted);">
           <i class="fa-solid fa-info-circle" style="margin-right: 0.3rem;"></i> 리포트를 선택하여 상세 오류 내역을 확인하십시오.
         </td>
       </tr>
@@ -325,15 +325,15 @@ function renderReportPage() {
 
     html += `
       <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.2s;">
-        <td style="padding: 0.8rem 1rem; color: #f1f5f9; font-weight: 600; word-break: break-all;">${err.filename || ''}</td>
+        <td style="padding: 0.8rem 1rem; color: var(--app-text-primary); font-weight: 600; word-break: break-all;">${err.filename || ''}</td>
         <td style="padding: 0.8rem 1rem; text-align: center; vertical-align: middle;">
           <span style="background: ${typeBadgeColor}; color: ${typeTextColor}; font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 4px; border: 1px solid ${typeTextColor}33;">
             ${err.error_type || 'Unknown'}
           </span>
         </td>
-        <td style="padding: 0.8rem 1rem; color: #94a3b8; font-size: 0.82rem; line-height: 1.4; word-break: break-all;">
-          <div style="color: #cbd5e1; margin-bottom: 0.2rem; font-weight: 500;">${msg}</div>
-          <div style="font-size: 0.74rem; opacity: 0.6; color: #64748b;"><i class="fa-regular fa-folder" style="margin-right: 0.2rem;"></i>${err.file_path || ''}</div>
+        <td style="padding: 0.8rem 1rem; color: var(--app-text-muted); font-size: 0.82rem; line-height: 1.4; word-break: break-all;">
+          <div style="color: var(--app-text-muted); margin-bottom: 0.2rem; font-weight: 500;">${msg}</div>
+          <div style="font-size: 0.74rem; opacity: 0.6; color: var(--app-text-muted);"><i class="fa-regular fa-folder" style="margin-right: 0.2rem;"></i>${err.file_path || ''}</div>
         </td>
       </tr>
     `;
@@ -344,7 +344,7 @@ function renderReportPage() {
     let paginationHtml = '';
     
     if (currentReportPage > 1) {
-      paginationHtml += `<button data-role="report-page" data-page="${currentReportPage - 1}" class="btn-toggle" style="padding: 0.4rem 0.8rem; background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.1); color: #cbd5e1; border-radius: 4px; cursor: pointer;">이전</button>`;
+      paginationHtml += `<button data-role="report-page" data-page="${currentReportPage - 1}" class="btn-toggle" style="padding: 0.4rem 0.8rem; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-muted); border-radius: 4px; cursor: pointer;">이전</button>`;
     }
     
     const maxPagesToShow = 5;
@@ -357,13 +357,13 @@ function renderReportPage() {
     
     for (let i = startPage; i <= endPage; i++) {
       const isActive = i === currentReportPage 
-        ? 'background: #a855f7; color: #fff; border: 1px solid #a855f7;' 
-        : 'background: rgba(30, 41, 59, 0.6); color: #cbd5e1; border: 1px solid rgba(255,255,255,0.1);';
+        ? 'background: #a855f7; color: var(--app-text-primary); border: 1px solid #a855f7;' 
+        : 'background: rgba(var(--app-panel-rgb), 0.6); color: var(--app-text-muted); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1);';
       paginationHtml += `<button data-role="report-page" data-page="${i}" class="btn-toggle" style="padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; ${isActive}">${i}</button>`;
     }
     
     if (currentReportPage < totalPages) {
-      paginationHtml += `<button data-role="report-page" data-page="${currentReportPage + 1}" class="btn-toggle" style="padding: 0.4rem 0.8rem; background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.1); color: #cbd5e1; border-radius: 4px; cursor: pointer;">다음</button>`;
+      paginationHtml += `<button data-role="report-page" data-page="${currentReportPage + 1}" class="btn-toggle" style="padding: 0.4rem 0.8rem; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-muted); border-radius: 4px; cursor: pointer;">다음</button>`;
     }
     
     paginationContainer.innerHTML = paginationHtml;

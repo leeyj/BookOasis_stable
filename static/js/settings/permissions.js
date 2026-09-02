@@ -94,8 +94,8 @@ function renderMatrixHeader(headerRow, users) {
   users.forEach(user => {
     headerHTML += `
       <th style="padding:1rem; text-align:center; min-width:100px;">
-        <div style="font-weight:700; color:#fff;">${user.username}</div>
-        <div style="font-size:0.75rem; color:#94a3b8;">(${user.role})</div>
+        <div style="font-weight:700; color: var(--app-text-primary);">${user.username}</div>
+        <div style="font-size:0.75rem; color: var(--app-text-muted);">(${user.role})</div>
       </th>
     `;
   });
@@ -106,8 +106,8 @@ function renderMatrixBody(users, categories, permissions, targetDb) {
   return (categories || []).map(cat => {
     let rowHTML = `
       <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-        <td style="padding:1rem; color:#fff;">
-          <i class="fa-solid fa-folder" style="color:#94a3b8; margin-right:0.5rem;"></i>${cat.name}
+        <td style="padding:1rem; color: var(--app-text-primary);">
+          <i class="fa-solid fa-folder" style="color: var(--app-text-muted); margin-right:0.5rem;"></i>${cat.name}
         </td>
     `;
 
@@ -141,8 +141,8 @@ function renderAdultBody(users) {
     const isDisabled = user.username === 'admin' ? 'disabled' : '';
     return `
       <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-        <td style="padding:0.9rem 1rem; color:#fff; font-weight:700;">${user.username}</td>
-        <td style="padding:0.9rem 1rem; text-align:center; color:#94a3b8;">${user.role}</td>
+        <td style="padding:0.9rem 1rem; color: var(--app-text-primary); font-weight:700;">${user.username}</td>
+        <td style="padding:0.9rem 1rem; text-align:center; color: var(--app-text-muted);">${user.role}</td>
         <td style="padding:0.9rem 1rem; text-align:center;">
           <label style="display:inline-flex; align-items:center; gap:0.5rem; color:#c084fc; font-weight:700;">
             <input type="checkbox" class="permission-chk-adult" data-user-id="${user.id}" ${isChecked} ${isDisabled}

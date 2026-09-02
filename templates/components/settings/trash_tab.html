@@ -2,8 +2,8 @@
 <div id="settings-tab-trash" class="settings-tab-content" style="display: none; flex-direction: column; gap: 1rem;">
     <div class="trash-header-container" style="display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06); padding: 0.75rem 1rem; border-radius: 8px;">
         <div style="display: flex; align-items: center; gap: 0.75rem;">
-            <label style="font-size: 0.875rem; color: #94a3b8; font-weight: 500;">DB 선택:</label>
-            <select id="trash-db-type" data-role="trash-db-type" style="background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc; padding: 0.35rem 1.5rem 0.35rem 0.75rem; border-radius: 6px; font-size: 0.875rem; outline: none; cursor: pointer;">
+            <label style="font-size: 0.875rem; color: var(--app-text-muted); font-weight: 500;">DB 선택:</label>
+            <select id="trash-db-type" data-role="trash-db-type" style="background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.1); color: var(--app-text-primary); padding: 0.35rem 1.5rem 0.35rem 0.75rem; border-radius: 6px; font-size: 0.875rem; outline: none; cursor: pointer;">
                 <option value="general">일반 도서 DB</option>
                 <option value="adult">성인 도서 DB</option>
                 <option value="audiobook">오디오북 DB</option>
@@ -24,26 +24,26 @@
     </div>
 
     <!-- 삭제 감지 목록 테이블 -->
-    <div class="settings-table-wrapper" style="flex: 1; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; overflow-x: auto; background: rgba(30, 41, 59, 0.2); backdrop-filter: blur(10px);">
+    <div class="settings-table-wrapper" style="flex: 1; border: 1px solid rgba(var(--app-panel-border-rgb), 0.06); border-radius: 8px; overflow-x: auto; background: rgba(var(--app-panel-rgb), 0.2); backdrop-filter: blur(10px);">
         <div style="max-height: 450px; overflow-y: auto;">
-            <table class="settings-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.875rem; color: #cbd5e1;">
+            <table class="settings-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.875rem; color: var(--app-text-muted);">
                 <thead>
                     <tr style="background: rgba(255, 255, 255, 0.02); border-bottom: 1px solid rgba(255, 255, 255, 0.06); position: sticky; top: 0; z-index: 1;">
                         <th style="padding: 0.75rem 1rem; width: 40px; text-align: center;">
                             <input type="checkbox" id="trash-select-all" data-role="trash-select-all" style="cursor: pointer; width: 15px; height: 15px; accent-color: #3b82f6;">
                         </th>
-                        <th style="padding: 0.75rem 1rem; font-weight: 600; color: #94a3b8;">도서명</th>
-                        <th style="padding: 0.75rem 1rem; font-weight: 600; color: #94a3b8;">원래 경로</th>
-                        <th style="padding: 0.75rem 1rem; font-weight: 600; color: #94a3b8; width: 130px;">카테고리</th>
-                        <th style="padding: 0.75rem 1rem; font-weight: 600; color: #94a3b8; width: 160px;">감지 시각</th>
-                        <th style="padding: 0.75rem 1rem; font-weight: 600; color: #94a3b8; width: 120px; text-align: center;">제어</th>
+                        <th style="padding: 0.75rem 1rem; font-weight: 600; color: var(--app-text-muted);">도서명</th>
+                        <th style="padding: 0.75rem 1rem; font-weight: 600; color: var(--app-text-muted);">원래 경로</th>
+                        <th style="padding: 0.75rem 1rem; font-weight: 600; color: var(--app-text-muted); width: 130px;">카테고리</th>
+                        <th style="padding: 0.75rem 1rem; font-weight: 600; color: var(--app-text-muted); width: 160px;">감지 시각</th>
+                        <th style="padding: 0.75rem 1rem; font-weight: 600; color: var(--app-text-muted); width: 120px; text-align: center;">제어</th>
                     </tr>
                 </thead>
                 <tbody id="trash-list-body">
                     <!-- Dynamic rendering via settings_trash.js -->
                 </tbody>
             </table>
-            <div id="trash-empty-state" style="display: none; padding: 3rem 1rem; text-align: center; color: #64748b;">
+            <div id="trash-empty-state" style="display: none; padding: 3rem 1rem; text-align: center; color: var(--app-text-muted);">
                 <i class="fa-solid fa-trash-arrow-up" style="font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.5;"></i>
                 <p style="font-size: 0.95rem; margin: 0;">휴지통이 비어있습니다.</p>
                 <p style="font-size: 0.8rem; margin: 0.25rem 0 0 0; color: #475569;">스캔 도중 물리적으로 유실된 도서가 여기에 표시됩니다.</p>

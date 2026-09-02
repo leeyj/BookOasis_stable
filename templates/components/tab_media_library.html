@@ -135,12 +135,12 @@
 
     <!-- 카테고리 이관(이동) 중 전체 화면 잠금 로딩 모달 -->
     <div id="migration-dimmer-modal" class="library-modal" style="display: none; z-index: 10005; background: rgba(9, 13, 22, 0.7); backdrop-filter: blur(8px); align-items: center; justify-content: center; flex-direction: column;">
-        <div style="background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(255, 255, 255, 0.08); padding: 2.5rem 3rem; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); text-align: center; color: #fff; max-width: 450px; width: 90%;">
+        <div style="background: rgba(var(--app-panel-rgb), 0.9); border: 1px solid rgba(var(--app-panel-border-rgb), 0.08); padding: 2.5rem 3rem; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); text-align: center; color: var(--app-text-primary); max-width: 450px; width: 90%;">
             <div style="font-size: 2.5rem; color: #f59e0b; margin-bottom: 1.5rem;">
                 <i class="fa-solid fa-circle-notch fa-spin"></i>
             </div>
             <h3 style="margin: 0 0 0.8rem 0; font-size: 1.25rem; font-weight: 700;">카테고리 데이터 이동 중</h3>
-            <p style="margin: 0; color: #94a3b8; font-size: 0.9rem; line-height: 1.5; word-break: keep-all;">
+            <p style="margin: 0; color: var(--app-text-muted); font-size: 0.9rem; line-height: 1.5; word-break: keep-all;">
                 보관함 간 데이터를 안전하게 이동하고 있습니다.<br>
                 데이터 용량에 따라 수초에서 수십초가 걸릴 수 있으니, 완료될 때까지 브라우저 창을 닫지 마십시오.
             </p>
@@ -149,15 +149,15 @@
 
     <!-- 휴지통 비우기 / 영구 삭제 작업 중 전체 화면 잠금 오버레이 -->
     <div id="trash-loading-overlay" style="display: none; position: fixed; inset: 0; z-index: 10010; background: rgba(9, 13, 22, 0.75); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); align-items: center; justify-content: center; flex-direction: column;">
-        <div style="background: rgba(30, 41, 59, 0.92); border: 1px solid rgba(239, 68, 68, 0.25); padding: 2.5rem 3rem; border-radius: 14px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(239, 68, 68, 0.1); text-align: center; color: #fff; max-width: 460px; width: 90%;">
+        <div style="background: rgba(var(--app-panel-rgb), 0.92); border: 1px solid rgba(239, 68, 68, 0.25); padding: 2.5rem 3rem; border-radius: 14px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(239, 68, 68, 0.1); text-align: center; color: var(--app-text-primary); max-width: 460px; width: 90%;">
             <div style="font-size: 2.8rem; color: #f87171; margin-bottom: 1.4rem;">
                 <i class="fa-solid fa-trash-can fa-beat-fade"></i>
             </div>
-            <h3 style="margin: 0 0 0.7rem 0; font-size: 1.2rem; font-weight: 700; color: #f1f5f9;">도서 데이터 삭제 중</h3>
-            <p id="trash-loading-overlay-msg" style="margin: 0 0 1.2rem 0; color: #94a3b8; font-size: 0.875rem; line-height: 1.6; word-break: keep-all;">
+            <h3 style="margin: 0 0 0.7rem 0; font-size: 1.2rem; font-weight: 700; color: var(--app-text-primary);">도서 데이터 삭제 중</h3>
+            <p id="trash-loading-overlay-msg" style="margin: 0 0 1.2rem 0; color: var(--app-text-muted); font-size: 0.875rem; line-height: 1.6; word-break: keep-all;">
                 잠시만 기다려 주세요.
             </p>
-            <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; color: #64748b; font-size: 0.78rem;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; color: var(--app-text-muted); font-size: 0.78rem;">
                 <i class="fa-solid fa-circle-notch fa-spin" style="color: #f87171;"></i>
                 <span>완료될 때까지 다른 작업을 진행하지 마십시오.</span>
             </div>

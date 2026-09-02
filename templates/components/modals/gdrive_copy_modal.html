@@ -8,7 +8,7 @@
             <span class="library-modal-close" data-role="gdrive-copy-modal-close">&times;</span>
         </div>
         <form id="gdrive-copy-form">
-            <div style="margin-bottom: 0.8rem; padding: 0.6rem 0.8rem; background: rgba(59, 130, 246, 0.08); border-left: 3px solid #60a5fa; border-radius: 4px; color: #cbd5e1; font-size: 0.82rem;">
+            <div style="margin-bottom: 0.8rem; padding: 0.6rem 0.8rem; background: rgba(59, 130, 246, 0.08); border-left: 3px solid #60a5fa; border-radius: 4px; color: var(--app-text-muted); font-size: 0.82rem;">
                 복사는 카테고리와 무관하게 바로 실행됩니다. 복사가 끝난 뒤, 저장한 폴더를 가리키는 일반 카테고리를 만들면(또는 이미 있다면 재스캔하면) 평소처럼 목록에 나타납니다.
             </div>
             <div class="library-form-group">
@@ -16,7 +16,7 @@
                 <select id="gdrive-copy-form-remote" name="remote" required>
                     <option value="">사용 안 함</option>
                 </select>
-                <div id="gdrive-copy-form-remote-empty" style="display: none; margin-top: 0.4rem; color: #94a3b8; font-size: 0.85rem;">쓰기 가능한 rclone Drive 리모트를 찾지 못했습니다.</div>
+                <div id="gdrive-copy-form-remote-empty" style="display: none; margin-top: 0.4rem; color: var(--app-text-muted); font-size: 0.85rem;">쓰기 가능한 rclone Drive 리모트를 찾지 못했습니다.</div>
             </div>
             <div class="library-form-group">
                 <label for="gdrive-copy-form-rclone-url">Rclone RC API 주소 (마운트 루트 자동 감지용)</label>
@@ -30,11 +30,11 @@
                         <i class="fa-solid fa-magnifying-glass"></i> 마운트 루트 확인
                     </button>
                 </div>
-                <div id="gdrive-copy-form-dest-path-hint" style="margin-top: 0.3rem; color: #94a3b8; font-size: 0.8rem;">폴더가 아직 없어도 괜찮습니다 — Drive 쪽 목적지 폴더는 이 경로에서 마운트 루트를 뺀 나머지로 자동 생성됩니다.</div>
+                <div id="gdrive-copy-form-dest-path-hint" style="margin-top: 0.3rem; color: var(--app-text-muted); font-size: 0.8rem;">폴더가 아직 없어도 괜찮습니다 — Drive 쪽 목적지 폴더는 이 경로에서 마운트 루트를 뺀 나머지로 자동 생성됩니다.</div>
                 <div id="gdrive-copy-form-mount-root-override-group" style="display: none; margin-top: 0.6rem;">
                     <label for="gdrive-copy-form-mount-root-override" style="font-size: 0.85rem;">마운트 루트 직접 입력 (자동 감지 실패 시)</label>
                     <input type="text" id="gdrive-copy-form-mount-root-override" name="mount_root_override" maxlength="1024" placeholder="예: /mnt/guiman">
-                    <div style="margin-top: 0.3rem; color: #94a3b8; font-size: 0.8rem;">도커 컨테이너로 실행 중이면 이 서버(BookOasis)와 rclone RC 서버가 서로 다른 경로 관점을 가질 수 있어 자동 감지가 원천적으로 안 될 수 있습니다. 이 리모트가 실제로 마운트된 로컬 경로(위 저장 경로의 접두사)를 직접 입력하면 자동 감지 없이 그대로 사용됩니다.</div>
+                    <div style="margin-top: 0.3rem; color: var(--app-text-muted); font-size: 0.8rem;">도커 컨테이너로 실행 중이면 이 서버(BookOasis)와 rclone RC 서버가 서로 다른 경로 관점을 가질 수 있어 자동 감지가 원천적으로 안 될 수 있습니다. 이 리모트가 실제로 마운트된 로컬 경로(위 저장 경로의 접두사)를 직접 입력하면 자동 감지 없이 그대로 사용됩니다.</div>
                 </div>
             </div>
             <div class="library-form-group">

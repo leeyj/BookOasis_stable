@@ -76,7 +76,7 @@ function getQueueTaskTypeName(type, t) {
 function getQueueStageBadge(task, t) {
     if (task.role === 'pending') {
         return `
-            <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 4px; background-color: rgba(255, 255, 255, 0.1); color: #cbd5e1; font-size: 0.85rem;">
+            <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 4px; background-color: rgba(255, 255, 255, 0.1); color: var(--app-text-muted); font-size: 0.85rem;">
                 <i class="fa-solid fa-hourglass-half"></i> ${t('queue.status_pending')}
             </span>
         `;
@@ -154,11 +154,11 @@ function buildQueueRowInnerHtml(task, index, t) {
 
     if (task.role === 'running') {
         return `
-            <td style="padding: 1rem; color: #e2e8f0;">${index}</td>
+            <td style="padding: 1rem; color: var(--app-text-primary);">${index}</td>
             <td style="padding: 1rem;">${statusHtml}</td>
-            <td style="padding: 1rem; color: #e2e8f0;">${getQueueTaskTypeName(task.type, t)}</td>
-            <td style="padding: 1rem; color: #f8fafc; font-weight: 500;">${task.library_name || t('queue.system')}</td>
-            <td style="padding: 1rem; color: #94a3b8; font-size: 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+            <td style="padding: 1rem; color: var(--app-text-primary);">${getQueueTaskTypeName(task.type, t)}</td>
+            <td style="padding: 1rem; color: var(--app-text-primary); font-weight: 500;">${task.library_name || t('queue.system')}</td>
+            <td style="padding: 1rem; color: var(--app-text-muted); font-size: 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
                 <span>시작: ${task.started_at || '-'}</span>
                 ${cancelButton}
             </td>
@@ -166,11 +166,11 @@ function buildQueueRowInnerHtml(task, index, t) {
     }
 
     return `
-        <td style="padding: 1rem; color: #94a3b8;">${index}</td>
+        <td style="padding: 1rem; color: var(--app-text-muted);">${index}</td>
         <td style="padding: 1rem; display: flex; align-items: center; gap: 8px;">${statusHtml}${cancelButton}</td>
-        <td style="padding: 1rem; color: #e2e8f0;">${getQueueTaskTypeName(task.type, t)}</td>
-        <td style="padding: 1rem; color: #e2e8f0;">${task.library_name || t('queue.system')}</td>
-        <td style="padding: 1rem; color: #94a3b8; font-size: 0.85rem;">등록: ${task.enqueued_at || '-'}</td>
+        <td style="padding: 1rem; color: var(--app-text-primary);">${getQueueTaskTypeName(task.type, t)}</td>
+        <td style="padding: 1rem; color: var(--app-text-primary);">${task.library_name || t('queue.system')}</td>
+        <td style="padding: 1rem; color: var(--app-text-muted); font-size: 0.85rem;">등록: ${task.enqueued_at || '-'}</td>
     `;
 }
 
@@ -192,7 +192,7 @@ function renderQueueTable(queueData) {
 
     const rows = normalizeQueueRows(queueData);
     if (rows.length === 0) {
-        tbody.innerHTML = `<tr data-queue-empty="true"><td colspan="5" style="padding: 3rem; text-align: center; color: #94a3b8;"><i class="fa-solid fa-check-circle" style="font-size: 2rem; margin-bottom: 1rem; display: block; color: #22c55e;"></i>${t('queue.empty')}</td></tr>`;
+        tbody.innerHTML = `<tr data-queue-empty="true"><td colspan="5" style="padding: 3rem; text-align: center; color: var(--app-text-muted);"><i class="fa-solid fa-check-circle" style="font-size: 2rem; margin-bottom: 1rem; display: block; color: #22c55e;"></i>${t('queue.empty')}</td></tr>`;
         return;
     }
 

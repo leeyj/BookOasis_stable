@@ -31,6 +31,9 @@ export function initTapZoneDirection(...args) { return Settings.initTapZoneDirec
 export function getComicSplitSpread(...args) { return Settings.getComicSplitSpread.apply(null, args); }
 export function toggleComicSplitSpread(...args) { return Settings.toggleComicSplitSpread.apply(null, args); }
 export function initSplitSpread(...args) { return Settings.initSplitSpread.apply(null, args); }
+export function getSpreadShiftOffset(...args) { return Settings.getSpreadShiftOffset.apply(null, args); }
+export function toggleSpreadShiftOffset(...args) { return Settings.toggleSpreadShiftOffset.apply(null, args); }
+export function resetSpreadShiftOffset(...args) { return Settings.resetSpreadShiftOffset.apply(null, args); }
 export function syncSplitSpreadMode(...args) { return Renderer.syncSplitSpreadMode.apply(null, args); }
 export function syncSplitSpreadModeForScrollMode(...args) { return Renderer.syncSplitSpreadModeForScrollMode.apply(null, args); }
 export function getPhysicalProgress(...args) { return Renderer.getPhysicalProgress.apply(null, args); }

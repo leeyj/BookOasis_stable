@@ -67,16 +67,16 @@ function renderPlayerModal(startTime = 0) {
   const hasPrev = currentEpisodeIndex > 0;
   const hasNext = currentEpisodeIndex >= 0 && currentEpisodeIndex < currentEpisodes.length - 1;
 
-  const transportBtnStyle = (enabled) => `padding:0.7rem 1rem; border-radius:8px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#fff; font-weight:700; cursor:${enabled ? 'pointer' : 'not-allowed'}; opacity:${enabled ? '1' : '0.35'}; display:flex; align-items:center; justify-content:center;`;
+  const transportBtnStyle = (enabled) => `padding:0.7rem 1rem; border-radius:8px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color: var(--app-text-primary); font-weight:700; cursor:${enabled ? 'pointer' : 'not-allowed'}; opacity:${enabled ? '1' : '0.35'}; display:flex; align-items:center; justify-content:center;`;
 
   overlay.innerHTML = `
     <div style="width:min(1100px, 100%); display:flex; flex-direction:column; gap:0.8rem;">
-      <div style="display:flex; justify-content:space-between; align-items:center; color:#e2e8f0;">
+      <div style="display:flex; justify-content:space-between; align-items:center; color: var(--app-text-primary);">
         <div>
-          <div style="font-size:0.8rem; color:#94a3b8;">${escapeHtml(currentMeta.series_name || currentMeta.title || '')}</div>
+          <div style="font-size:0.8rem; color: var(--app-text-muted);">${escapeHtml(currentMeta.series_name || currentMeta.title || '')}</div>
           <div style="font-size:1rem; font-weight:700;">#${episode.episode_number} ${escapeHtml(episode.title)}</div>
         </div>
-        <button data-role="video-player-close" style="background:none; border:none; color:#94a3b8; font-size:1.6rem; cursor:pointer;">&times;</button>
+        <button data-role="video-player-close" style="background:none; border:none; color: var(--app-text-muted); font-size:1.6rem; cursor:pointer;">&times;</button>
       </div>
       <video id="video-player-el" controls autoplay playsinline webkit-playsinline style="width:100%; max-height:70vh; background:#000; border-radius:8px;"
              src="/api/media/videos/${currentMeta.id}/episodes/${episode.id}/stream">${episode.has_subtitle ? `<track kind="subtitles" src="/api/media/videos/${currentMeta.id}/episodes/${episode.id}/subtitle" srclang="ko" label="자막" default>` : ''}</video>

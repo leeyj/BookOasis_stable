@@ -35,7 +35,7 @@ export async function loadPluginsSettings() {
 
         const card = document.createElement('div');
         card.className = 'plugin-settings-card';
-        card.style.cssText = 'background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.2rem;';
+        card.style.cssText = 'background: rgba(var(--app-panel-rgb), 0.4); border: 1px solid rgba(var(--app-panel-border-rgb), 0.08); border-radius: 8px; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.2rem;';
 
         // 플러그인별 카드 및 폼 템플릿 구성
         // 접힌 상태(기본값)에서는 이름/ID/토글만 보이는 한 줄 헤더만 남고, 설명·설정 폼·저장 버튼은
@@ -45,13 +45,13 @@ export async function loadPluginsSettings() {
         card.innerHTML = `
               <div class="plugin-settings-card-header" data-role="plugin-card-toggle" data-plugin-id="${p.id}" style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0; flex-wrap: wrap; gap: 0.8rem; cursor: pointer;">
                   <div style="display: flex; align-items: center; gap: 0.6rem; min-width: 0;">
-                      <i class="fa-solid fa-chevron-right plugin-settings-card-chevron" data-plugin-chevron="${p.id}" style="color: #64748b; font-size: 0.8rem; transition: transform 0.2s; flex-shrink: 0;"></i>
+                      <i class="fa-solid fa-chevron-right plugin-settings-card-chevron" data-plugin-chevron="${p.id}" style="color: var(--app-text-muted); font-size: 0.8rem; transition: transform 0.2s; flex-shrink: 0;"></i>
                       <div style="min-width: 0;">
-                          <h4 style="margin: 0; color: #fff; font-size: 1.05rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                          <h4 style="margin: 0; color: var(--app-text-primary); font-size: 1.05rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                               ${escapeHtmlText(p.name)}
                               ${hasConfigurableBody ? '<span style="font-size: 0.68rem; font-weight: 600; color: #c4b5fd; background: rgba(168,85,247,0.15); border: 1px solid rgba(168,85,247,0.4); border-radius: 4px; padding: 0.1rem 0.4rem;">설정 있음</span>' : ''}
                           </h4>
-                          <span style="font-size: 0.75rem; color: #94a3b8;">플러그인 고유 ID: ${escapeHtmlText(p.id)}</span>
+                          <span style="font-size: 0.75rem; color: var(--app-text-muted);">플러그인 고유 ID: ${escapeHtmlText(p.id)}</span>
                       </div>
                   </div>
                   <!-- ON/OFF 활성화 토글 -->
@@ -76,7 +76,7 @@ export async function loadPluginsSettings() {
                       ` : (schema.length > 0 ? schema.map(f => {
                         const curVal = config[f.key];
                         return renderSchemaField(f, curVal);
-                      }).join('') : '<p style="font-size: 0.82rem; color: #94a3b8; margin: 0;">이 플러그인은 별도의 추가 설정값이 필요하지 않습니다.</p>')}
+                      }).join('') : '<p style="font-size: 0.82rem; color: var(--app-text-muted); margin: 0;">이 플러그인은 별도의 추가 설정값이 필요하지 않습니다.</p>')}
 
                       ${(hasCustomSettingsUi || schema.length > 0) ? `
                       <div style="margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1rem;">
@@ -91,7 +91,7 @@ export async function loadPluginsSettings() {
                         <button type="button" class="plugin-sample-update-btn" data-plugin-id="${p.id}" style="display: inline-flex; align-items: center; gap: 0.45rem; width: fit-content; padding: 0.5rem 1.0rem; font-size: 0.8rem; border-radius: 6px; border: 1px solid rgba(56,189,248,0.5); background: rgba(2,132,199,0.22); color: #dbeafe; cursor: pointer;">
                           <i class="fa-solid fa-cloud-arrow-down"></i> 샘플 업데이트 (${p.id})
                         </button>
-                        <span id="plugin-sample-update-status-${p.id}" style="font-size: 0.78rem; color: #94a3b8;">업데이트 가능 조건: 현재 버전 &lt; GitHub 버전</span>
+                        <span id="plugin-sample-update-status-${p.id}" style="font-size: 0.78rem; color: var(--app-text-muted);">업데이트 가능 조건: 현재 버전 &lt; GitHub 버전</span>
                       </div>
                       ` : ''}
                   </form>
@@ -110,7 +110,7 @@ export async function loadPluginsSettings() {
       // 이벤트 바인딩
       bindPluginEvents();
     } else {
-      container.innerHTML = '<div style="text-align: center; padding: 2rem; color: #94a3b8;">로드된 메타데이터 플러그인이 없습니다.</div>';
+      container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--app-text-muted);">로드된 메타데이터 플러그인이 없습니다.</div>';
     }
   } catch (err) {
     console.error('플러그인 목록 조회 에러:', err);
@@ -139,7 +139,7 @@ function escapeHtmlText(value) {
 function renderSchemaField(f, curVal) {
   const label = f.label || f.key;
   const required = !!f.required;
-  const descHtml = f.description ? `<p style="font-size: 0.76rem; color: #94a3b8; margin: 0.4rem 0 0 0;">${f.description}</p>` : '';
+  const descHtml = f.description ? `<p style="font-size: 0.76rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0;">${f.description}</p>` : '';
   const key = f.key || '';
   const type = (f.type || 'text').toLowerCase();
 
@@ -147,10 +147,10 @@ function renderSchemaField(f, curVal) {
     const checked = curVal === true || curVal === '1' || curVal === 1 || curVal === 'true';
     return `
       <div class="library-form-group" style="margin: 0;">
-        <label style="font-weight: 700; color: #fff; font-size: 0.88rem; margin-bottom: 0.4rem; display: block;">
+        <label style="font-weight: 700; color: var(--app-text-primary); font-size: 0.88rem; margin-bottom: 0.4rem; display: block;">
           ${label} ${required ? '<span style="color:#f43f5e;">*</span>' : ''}
         </label>
-        <label style="display:flex; align-items:center; gap:0.5rem; color:#cbd5e1;">
+        <label style="display:flex; align-items:center; gap:0.5rem; color: var(--app-text-muted);">
           <input type="checkbox" name="${key}" ${checked ? 'checked' : ''}>
           <span>사용</span>
         </label>
@@ -164,10 +164,10 @@ function renderSchemaField(f, curVal) {
     const cur = curVal ?? f.default ?? '';
     return `
       <div class="library-form-group" style="margin: 0;">
-        <label style="font-weight: 700; color: #fff; font-size: 0.88rem; margin-bottom: 0.4rem; display: block;">
+        <label style="font-weight: 700; color: var(--app-text-primary); font-size: 0.88rem; margin-bottom: 0.4rem; display: block;">
           ${label} ${required ? '<span style="color:#f43f5e;">*</span>' : ''}
         </label>
-        <select name="${key}" ${required ? 'required' : ''} style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; transition: border-color 0.2s;">
+        <select name="${key}" ${required ? 'required' : ''} style="width: 100%; max-width: 480px; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; transition: border-color 0.2s;">
           ${options.map(opt => {
             const val = typeof opt === 'object' ? opt.value : opt;
             const text = typeof opt === 'object' ? (opt.label || opt.value) : opt;
@@ -184,10 +184,10 @@ function renderSchemaField(f, curVal) {
   const value = curVal ?? f.default ?? '';
   return `
     <div class="library-form-group" style="margin: 0;">
-      <label style="font-weight: 700; color: #fff; font-size: 0.88rem; margin-bottom: 0.4rem; display: block;">
+      <label style="font-weight: 700; color: var(--app-text-primary); font-size: 0.88rem; margin-bottom: 0.4rem; display: block;">
         ${label} ${required ? '<span style="color:#f43f5e;">*</span>' : ''}
       </label>
-      <input type="${inputType}" name="${key}" value="${escapeHtmlAttr(value)}" ${required ? 'required' : ''} style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; transition: border-color 0.2s;">
+      <input type="${inputType}" name="${key}" value="${escapeHtmlAttr(value)}" ${required ? 'required' : ''} style="width: 100%; max-width: 480px; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; transition: border-color 0.2s;">
       ${descHtml}
     </div>
   `;
@@ -481,15 +481,15 @@ async function loadSamplePluginsList() {
   try {
     const data = await api.fetchSamplePlugins();
     if (!data.success || !data.samples || data.samples.length === 0) {
-      list.innerHTML = '<div style="text-align: center; padding: 1.5rem; color: #94a3b8;">설치 가능한 샘플 플러그인이 없습니다.</div>';
+      list.innerHTML = '<div style="text-align: center; padding: 1.5rem; color: var(--app-text-muted);">설치 가능한 샘플 플러그인이 없습니다.</div>';
       return;
     }
 
     list.innerHTML = data.samples.map((s) => `
-      <div class="sample-plugin-item" style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.9rem 1rem; background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px;">
+      <div class="sample-plugin-item" style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.9rem 1rem; background: rgba(var(--app-panel-rgb), 0.4); border: 1px solid rgba(var(--app-panel-border-rgb), 0.08); border-radius: 8px;">
         <div style="min-width: 0;">
-          <div style="color: #fff; font-weight: 600; font-size: 0.92rem;">${escapeHtmlText(s.name)}</div>
-          <div style="color: #94a3b8; font-size: 0.75rem;">${escapeHtmlText(s.id)}</div>
+          <div style="color: var(--app-text-primary); font-weight: 600; font-size: 0.92rem;">${escapeHtmlText(s.name)}</div>
+          <div style="color: var(--app-text-muted); font-size: 0.75rem;">${escapeHtmlText(s.id)}</div>
         </div>
         ${s.installed
           ? `<span style="flex-shrink: 0; font-size: 0.8rem; color: #4ade80; font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem;"><i class="fa-solid fa-check"></i> 설치됨</span>`

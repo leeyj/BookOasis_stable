@@ -322,9 +322,9 @@
 }
 
 .btn-fit.active {
-    background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
-    color: #fff;
-    box-shadow: 0 2px 6px rgba(124, 58, 237, 0.4);
+    background: linear-gradient(135deg, var(--app-accent) 0%, color-mix(in srgb, var(--app-accent) 70%, black) 100%);
+    color: var(--app-accent-contrast);
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--app-accent) 40%, transparent);
 }
 
 .btn-fit:hover:not(.active) {
@@ -532,6 +532,7 @@
 }
 
 .overlay-controls-panel {
+    position: relative;
     background: rgba(10, 25, 47, 0.92);
     backdrop-filter: blur(12px);
     border: 1px solid rgba(59, 130, 246, 0.25);
@@ -545,6 +546,43 @@
     box-sizing: border-box;
     box-shadow: 0 10px 30px rgba(2, 132, 199, 0.25), 0 0 15px rgba(59, 130, 246, 0.15);
     animation: zoomIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 오버레이 패널을 원하는 위치로 옮길 수 있는 작은 앵커. 패널 상단 중앙에 살짝 걸치도록 배치. */
+.overlay-drag-handle {
+    position: absolute;
+    top: -0.9rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2.4rem;
+    height: 1.1rem;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(10, 25, 47, 0.92);
+    border: 1px solid rgba(59, 130, 246, 0.35);
+    border-radius: 999px;
+    color: #64748b;
+    font-size: 0.7rem;
+    cursor: grab;
+    touch-action: none;
+    z-index: 1;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.overlay-drag-handle:hover {
+    background: rgba(59, 130, 246, 0.25);
+    border-color: rgba(59, 130, 246, 0.6);
+    color: #e0f2fe;
+}
+
+.overlay-drag-handle.is-dragging,
+.overlay-drag-handle:active {
+    cursor: grabbing;
+    background: rgba(59, 130, 246, 0.35);
+    border-color: #38bdf8;
+    color: #e0f2fe;
 }
 
 /* 📌 뷰어 오버레이 탭 헤더 및 콘텐츠 */
@@ -1592,8 +1630,8 @@
 }
 
 input:checked + .toggle-switch-slider {
-    background: linear-gradient(135deg, #a855f7 0%, #38bdf8 100%);
-    border-color: rgba(168, 85, 247, 0.4);
+    background: linear-gradient(135deg, var(--app-accent) 0%, color-mix(in srgb, var(--app-accent) 60%, white) 100%);
+    border-color: color-mix(in srgb, var(--app-accent) 40%, transparent);
 }
 
 input:checked + .toggle-switch-slider::before {

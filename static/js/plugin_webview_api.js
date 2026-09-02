@@ -92,9 +92,9 @@ function ensureWebviewModal() {
                 border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; overflow: hidden;
                 display: flex; flex-direction: column;">
       <div style="display: flex; align-items: center; justify-content: space-between;
-                  padding: 0.6rem 1rem; background: rgba(30,41,59,0.9); border-bottom: 1px solid rgba(255,255,255,0.08);">
-        <span id="plugin-webview-modal-title" style="color: #cbd5e1; font-size: 0.85rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
-        <button type="button" data-role="plugin-webview-close" style="background: none; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer; padding: 0 0.3rem;">✕</button>
+                  padding: 0.6rem 1rem; background: rgba(var(--app-panel-rgb), 0.9); border-bottom: 1px solid rgba(var(--app-panel-border-rgb), 0.08);">
+        <span id="plugin-webview-modal-title" style="color: var(--app-text-muted); font-size: 0.85rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+        <button type="button" data-role="plugin-webview-close" style="background: none; border: none; color: var(--app-text-muted); font-size: 1.2rem; cursor: pointer; padding: 0 0.3rem;">✕</button>
       </div>
       <div id="plugin-webview-modal-body" style="flex: 1; position: relative; background: #fff;">
         <iframe id="plugin-webview-iframe" style="width: 100%; height: 100%; border: none;"></iframe>

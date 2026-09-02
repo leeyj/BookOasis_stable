@@ -445,6 +445,8 @@
     "split_spread_title": "페이지 분할 보기 전환",
     "split_spread_off": "분할 끔",
     "split_spread_on": "분할 켬",
+    "shift_spread": "한 장 밀기",
+    "shift_spread_title": "두 페이지 짝을 한 장 밀어서 보기 (Shift+스페이스/방향키)",
     "spacing_settings": "뷰어 여백 상세 설정",
     "spacing_settings_short": "여백 조절",
     "padding_vertical": "상하 여백",

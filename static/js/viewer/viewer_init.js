@@ -7,6 +7,7 @@ export async function initViewer(bookId, pagesRead, totalPages) {
   // 초기 설정
   Settings.initReadingDirection();
   Settings.initPageStep();
+  Settings.resetSpreadShiftOffset(); // 이전 책에서 켜뒀던 "한 장 밀기" 보정이 새 책에 남지 않도록 초기화
 
   // 렌더러 초기화—현재 로딩 및 상태 설정을 renderer가 담당
   await Renderer.initRenderer(bookId, pagesRead, totalPages);

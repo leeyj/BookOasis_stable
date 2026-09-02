@@ -83,7 +83,7 @@ export async function loadUsersList() {
   const tbody = document.getElementById('settings-users-list');
   if (!tbody) return;
 
-  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:2rem; color:#94a3b8;"><i class="fa-solid fa-circle-notch fa-spin"></i> 사용자 목록 로드 중...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:2rem; color: var(--app-text-muted);"><i class="fa-solid fa-circle-notch fa-spin"></i> 사용자 목록 로드 중...</td></tr>';
 
   try {
     const res = await fetch(`/api/admin/users?type=${state.currentLibraryType}`);
@@ -91,7 +91,7 @@ export async function loadUsersList() {
 
     if (data.success) {
       if (data.users.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:2rem; color:#94a3b8;">${window.i18n ? window.i18n.t('settings.user_no_users') : '등록된 사용자가 없습니다.'}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:2rem; color: var(--app-text-muted);">${window.i18n ? window.i18n.t('settings.user_no_users') : '등록된 사용자가 없습니다.'}</td></tr>`;
         return;
       }
 
@@ -104,17 +104,17 @@ export async function loadUsersList() {
         const isSelf = Number(user.id) === myUserId;
         const safeUsernameAttr = escapeHtml(user.username || '');
         const deleteBtn = isSelf
-          ? `<span style="color:#64748b; font-size:0.8rem; display:inline-flex; align-items:center; justify-content:center; height:32px; padding:0 0.5rem;">${window.i18n ? window.i18n.t('settings.user_cannot_delete') : '삭제불가'}</span>`
-          : `<button data-role="user-delete" data-user-id="${user.id}" data-username="${safeUsernameAttr}" class="btn-settings-action" style="background:#ef4444; color:#fff; border:none; padding:0.4rem 0.75rem; border-radius:6px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:0.3rem; height:32px; white-space:nowrap;"><i class="fa-solid fa-trash-can"></i> ${window.i18n ? window.i18n.t('settings.user_delete') : '삭제'}</button>`;
+          ? `<span style="color: var(--app-text-muted); font-size:0.8rem; display:inline-flex; align-items:center; justify-content:center; height:32px; padding:0 0.5rem;">${window.i18n ? window.i18n.t('settings.user_cannot_delete') : '삭제불가'}</span>`
+          : `<button data-role="user-delete" data-user-id="${user.id}" data-username="${safeUsernameAttr}" class="btn-settings-action" style="background:#ef4444; color: var(--app-text-primary); border:none; padding:0.4rem 0.75rem; border-radius:6px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:0.3rem; height:32px; white-space:nowrap;"><i class="fa-solid fa-trash-can"></i> ${window.i18n ? window.i18n.t('settings.user_delete') : '삭제'}</button>`;
 
         const resetPwdBtn = user.role === 'admin'
-          ? `<button data-role="user-change-password" data-user-id="${user.id}" class="btn-settings-action" style="background:#3b82f6; color:#fff; border:none; padding:0.4rem 0.75rem; border-radius:6px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:0.3rem; height:32px; white-space:nowrap;"><i class="fa-solid fa-key"></i> ${window.i18n ? window.i18n.t('settings.admin_change_pwd') : '비번 변경'}</button>`
-          : `<button data-role="user-reset-password" data-user-id="${user.id}" class="btn-settings-action" style="background:#f59e0b; color:#fff; border:none; padding:0.4rem 0.75rem; border-radius:6px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:0.3rem; height:32px; white-space:nowrap;"><i class="fa-solid fa-unlock-keyhole"></i> ${window.i18n ? window.i18n.t('settings.user_reset_pwd') : '초기 비번 재설정'}</button>`;
+          ? `<button data-role="user-change-password" data-user-id="${user.id}" class="btn-settings-action" style="background:#3b82f6; color: var(--app-text-primary); border:none; padding:0.4rem 0.75rem; border-radius:6px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:0.3rem; height:32px; white-space:nowrap;"><i class="fa-solid fa-key"></i> ${window.i18n ? window.i18n.t('settings.admin_change_pwd') : '비번 변경'}</button>`
+          : `<button data-role="user-reset-password" data-user-id="${user.id}" class="btn-settings-action" style="background:#f59e0b; color: var(--app-text-primary); border:none; padding:0.4rem 0.75rem; border-radius:6px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:0.3rem; height:32px; white-space:nowrap;"><i class="fa-solid fa-unlock-keyhole"></i> ${window.i18n ? window.i18n.t('settings.user_reset_pwd') : '초기 비번 재설정'}</button>`;
 
         return `
           <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
             <td style="padding:0.8rem 1rem;">${user.id}</td>
-            <td style="padding:0.8rem 1rem; font-weight:700; color:#fff;">${user.username}</td>
+            <td style="padding:0.8rem 1rem; font-weight:700; color: var(--app-text-primary);">${user.username}</td>
             <td style="padding:0.8rem 1rem;"><span class="badge" style="background:rgba(168,85,247,0.1); color:#c084fc; border:1px solid rgba(168,85,247,0.2); padding:0.2rem 0.5rem; border-radius:4px; font-size:0.75rem;">${user.role}</span></td>
             <td style="padding:0.8rem 1rem; text-align:center;">${isDefault}</td>
             <td style="padding:0.8rem 1rem; text-align:right;">

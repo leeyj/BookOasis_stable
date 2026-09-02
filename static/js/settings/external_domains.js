@@ -32,7 +32,7 @@ export async function loadExternalDomainsSettings() {
   const listEl = document.getElementById('external-domains-list');
   if (!listEl) return;
 
-  listEl.innerHTML = '<div style="text-align:center; padding:1rem; color:#94a3b8;">불러오는 중...</div>';
+  listEl.innerHTML = '<div style="text-align:center; padding:1rem; color: var(--app-text-muted);">불러오는 중...</div>';
 
   try {
     const res = await fetch('/api/webview/whitelist');
@@ -53,15 +53,15 @@ function renderDomainList(domains) {
   if (!listEl) return;
 
   if (!domains.length) {
-    listEl.innerHTML = '<div style="text-align:center; padding:1.2rem; color:#94a3b8; font-size:0.85rem;">등록된 허용 도메인이 없습니다. 아래에서 추가해주세요.</div>';
+    listEl.innerHTML = '<div style="text-align:center; padding:1.2rem; color: var(--app-text-muted); font-size:0.85rem;">등록된 허용 도메인이 없습니다. 아래에서 추가해주세요.</div>';
     return;
   }
 
   const canEdit = isAdminUser();
   listEl.innerHTML = domains.map(d => `
     <div style="display:flex; align-items:center; justify-content:space-between; padding:0.6rem 0.9rem;
-                background:rgba(30,41,59,0.4); border:1px solid rgba(255,255,255,0.06); border-radius:6px; margin-bottom:0.5rem;">
-      <span style="color:#e2e8f0; font-size:0.88rem; font-family:monospace;">${escapeHtmlText(d.pattern)}</span>
+                background: rgba(var(--app-panel-rgb), 0.4); border:1px solid rgba(var(--app-panel-border-rgb), 0.06); border-radius:6px; margin-bottom:0.5rem;">
+      <span style="color: var(--app-text-primary); font-size:0.88rem; font-family:monospace;">${escapeHtmlText(d.pattern)}</span>
       ${canEdit ? `
       <button type="button" class="btn-remove-external-domain" data-domain="${escapeHtmlText(d.pattern)}"
               style="background:none; border:1px solid rgba(244,63,94,0.4); color:#f43f5e; border-radius:5px;

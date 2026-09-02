@@ -28,11 +28,11 @@ function ensureModal() {
     'border-radius:10px', 'box-shadow:0 12px 32px rgba(0,0,0,0.5)',
   ].join(';');
   box.innerHTML = `
-    <div data-role="plugin-prompt-title" style="font-weight:600; font-size:1rem; color:#f8fafc;"></div>
-    <div data-role="plugin-prompt-message" style="font-size:0.82rem; color:#94a3b8; display:none;"></div>
-    <textarea data-role="plugin-prompt-input" style="width:100%; box-sizing:border-box; background:#0f172a; color:#e2e8f0; border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:0.55rem; font:inherit; resize:vertical;"></textarea>
+    <div data-role="plugin-prompt-title" style="font-weight:600; font-size:1rem; color: var(--app-text-primary);"></div>
+    <div data-role="plugin-prompt-message" style="font-size:0.82rem; color: var(--app-text-muted); display:none;"></div>
+    <textarea data-role="plugin-prompt-input" style="width:100%; box-sizing:border-box; background:#0f172a; color: var(--app-text-primary); border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:0.55rem; font:inherit; resize:vertical;"></textarea>
     <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:0.2rem;">
-      <button type="button" data-role="plugin-prompt-cancel" style="cursor:pointer; padding:0.45rem 1rem; border-radius:6px; border:1px solid rgba(255,255,255,0.15); background:transparent; color:#cbd5e1; font:inherit;">취소</button>
+      <button type="button" data-role="plugin-prompt-cancel" style="cursor:pointer; padding:0.45rem 1rem; border-radius:6px; border:1px solid rgba(255,255,255,0.15); background:transparent; color: var(--app-text-muted); font:inherit;">취소</button>
       <button type="button" data-role="plugin-prompt-submit" style="cursor:pointer; padding:0.45rem 1rem; border-radius:6px; border:none; background:#fbbf24; color:#1e293b; font-weight:600; font:inherit;"></button>
     </div>
   `;

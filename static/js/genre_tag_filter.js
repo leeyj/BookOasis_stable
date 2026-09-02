@@ -258,7 +258,7 @@ function renderChips() {
         const noResultText = (window.i18n && typeof window.i18n.t === 'function')
             ? window.i18n.t('filter.no_results', '검색 결과가 없습니다.')
             : '검색 결과가 없습니다.';
-        wrapper.innerHTML = `<span style="font-size: 0.8rem; color: #64748b; margin: 1rem auto;">${noResultText}</span>`;
+        wrapper.innerHTML = `<span style="font-size: 0.8rem; color: var(--app-text-muted); margin: 1rem auto;">${noResultText}</span>`;
         return;
     }
 

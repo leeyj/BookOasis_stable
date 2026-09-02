@@ -1,6 +1,7 @@
 // input_controller.js - keyboard/wheel/hotspot/click input handlers for viewer
 import { state } from '../state.js';
 import { shouldUseAndroidHotspotTouchFallback } from './platform_profile.js';
+import { enableMenuDrag } from '../context_menu_manager.js';
 
 let _deps = {
   toggleFullscreenViewer: null,
@@ -9,6 +10,7 @@ let _deps = {
   nextPage: null,
   prevPage: null,
   toggleComicOverlay: null,
+  shiftSpreadByOne: null,
 };
 
 let keyboardListenerInitialized = false;
@@ -120,6 +122,14 @@ function handleViewerKeydown(e) {
     e.preventDefault();
     callDep('closeMediaViewer');
     if (typeof window.showDashboardView === 'function') window.showDashboardView();
+    return;
+  }
+
+  // Shift + Space/좌우 방향키: 2쪽보기 정렬을 한 장 밀어서 보정 (예: (9,10)(11,12) → (10,11)).
+  // 일반 다음/이전 넘김(같은 키, Shift 없음)보다 먼저 가로채야 한다.
+  if (e.shiftKey && (isSpaceKey || isArrowRight || isArrowLeft)) {
+    e.preventDefault();
+    callDep('shiftSpreadByOne');
     return;
   }
 
@@ -359,6 +369,12 @@ export function initViewerClickToggle() {
   const viewerBody = document.getElementById('viewer-body-container');
   if (!viewerBody || viewerClickToggleInited) return;
   viewerClickToggleInited = true;
+
+  const overlayPanel = document.querySelector('.overlay-controls-panel');
+  const overlayDragHandle = document.querySelector('[data-role="overlay-drag-handle"]');
+  if (overlayPanel && overlayDragHandle) {
+    enableMenuDrag(overlayPanel, overlayDragHandle);
+  }
 
   const OVERLAY_INTERACTIVE_SELECTOR = 'button, input, select, textarea, label, a, [role="button"], [data-overlay-keep-open]';
 

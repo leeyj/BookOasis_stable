@@ -78,7 +78,7 @@ function buildScheduleRow(lib) {
 
   return `
     <tr data-library-id="${lib.id}" class="${scheduleEnabled ? '' : 'schedule-row-disabled'}" style="border-bottom: 1px solid rgba(255,255,255,0.05); hover: background: rgba(255,255,255,0.02);">
-      <td style="padding: 1rem; font-weight: 600; color: #fff;">${lib.name}</td>
+      <td style="padding: 1rem; font-weight: 600; color: var(--app-text-primary);">${lib.name}</td>
       <td class="schedule-path-cell">${buildCompactPaths(lib.physical_path)}</td>
       <td style="padding: 1rem; text-align: center;">
         <div style="position: relative; display: inline-block; width: 44px; height: 24px; vertical-align: middle;">
@@ -253,7 +253,7 @@ export async function loadLibrarySchedules() {
     const data = await api.fetchLibrarySchedules(state.currentLibraryType);
     if (data.success) {
       if (data.libraries.length === 0) {
-        container.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:2rem; color:#94a3b8;">${i18n.t('settings.no_categories')}</td></tr>`;
+        container.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:2rem; color: var(--app-text-muted);">${i18n.t('settings.no_categories')}</td></tr>`;
         return;
       }
 
@@ -456,11 +456,11 @@ export function openScanSettingsModal(libraryId, name, isRemote, rcloneRcUrl, cr
   const rcloneContainer = document.getElementById('scan-settings-rclone-container');
   if (isRemote === 1) {
     rcloneContainer.innerHTML = `
-      <input type="text" id="scan-settings-rclone" class="form-control" style="width: 100%; box-sizing: border-box; background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 0.5rem 0.8rem; border-radius: 6px;" value="${rcloneRcUrl || ''}" placeholder="예: http://localhost:5572">
+      <input type="text" id="scan-settings-rclone" class="form-control" style="width: 100%; box-sizing: border-box; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.5rem 0.8rem; border-radius: 6px;" value="${rcloneRcUrl || ''}" placeholder="예: http://localhost:5572">
     `;
   } else {
     rcloneContainer.innerHTML = `
-      <span style="font-size: 0.88rem; color: #64748b;"><i class="fa-solid fa-ban"></i> ${i18n.t('settings.not_required_local') || '불필요 (로컬스토리지)'}</span>
+      <span style="font-size: 0.88rem; color: var(--app-text-muted);"><i class="fa-solid fa-ban"></i> ${i18n.t('settings.not_required_local') || '불필요 (로컬스토리지)'}</span>
     `;
   }
 
@@ -475,7 +475,7 @@ export function openScanSettingsModal(libraryId, name, isRemote, rcloneRcUrl, cr
     `;
   } else {
     vfsContainer.innerHTML = `
-      <div style="font-size: 0.85rem; color: #64748b; margin-top: 0.5rem;">
+      <div style="font-size: 0.85rem; color: var(--app-text-muted); margin-top: 0.5rem;">
         <i class="fa-solid fa-hard-drive"></i> ${i18n.t('settings.local_storage') || '로컬 스토리지'}
       </div>
     `;

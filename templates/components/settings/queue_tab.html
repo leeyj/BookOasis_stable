@@ -1,10 +1,10 @@
 <div class="dashboard-section">
     <div class="queue-section-header" style="margin-bottom: 1.2rem; display: flex; justify-content: space-between; align-items: center;">
         <div>
-            <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1.2rem; font-weight: 700;">
+            <h3 class="section-title" style="margin: 0; color: var(--app-text-primary); font-size: 1.2rem; font-weight: 700;">
                 <i class="fa-solid fa-list-ul" style="color: #3b82f6; margin-right: 0.5rem;"></i> <span data-i18n="queue.title">스캔 예약(Queue) 대기열 조회</span>
             </h3>
-            <p data-i18n="queue.desc" style="font-size: 0.82rem; color: #94a3b8; margin: 0.4rem 0 0 0;">현재 시스템에서 실행 중이거나 대기 중인 모든 스캐너 작업의 순서와 상태를 실시간으로 보여줍니다.</p>
+            <p data-i18n="queue.desc" style="font-size: 0.82rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0;">현재 시스템에서 실행 중이거나 대기 중인 모든 스캐너 작업의 순서와 상태를 실시간으로 보여줍니다.</p>
         </div>
         <div class="queue-header-buttons" style="display: flex; gap: 0.5rem;">
             <button class="action-btn" data-role="queue-clear" style="padding: 0.4rem 1rem; background-color: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 6px; color: #fca5a5; font-weight: 600; cursor: pointer; transition: all 0.2s;">
@@ -16,10 +16,10 @@
         </div>
     </div>
 
-    <div class="settings-table-wrapper" style="background: rgba(30, 41, 59, 0.25); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; overflow: hidden; backdrop-filter: blur(10px);">
+    <div class="settings-table-wrapper" style="background: rgba(var(--app-panel-rgb), 0.25); border: 1px solid rgba(var(--app-panel-border-rgb), 0.05); border-radius: 8px; overflow: hidden; backdrop-filter: blur(10px);">
         <table class="settings-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
             <thead>
-                <tr style="background: rgba(15, 23, 42, 0.4); border-bottom: 1px solid rgba(255,255,255,0.08); color: #94a3b8;">
+                <tr style="background: rgba(var(--app-panel-rgb), 0.4); border-bottom: 1px solid rgba(var(--app-panel-border-rgb), 0.08); color: var(--app-text-muted);">
                     <th data-i18n="queue.col_index" style="padding: 1rem; width: 60px;">순번</th>
                     <th data-i18n="queue.col_status" style="padding: 1rem; width: 150px;">상태</th>
                     <th data-i18n="queue.col_type" style="padding: 1rem; width: 150px;">작업 종류</th>
@@ -29,7 +29,7 @@
             </thead>
             <tbody id="queue-table-body">
                 <tr>
-                    <td colspan="5" style="padding: 2rem; text-align: center; color: #94a3b8;"><span data-i18n="queue.loading">데이터를 불러오는 중입니다...</span></td>
+                    <td colspan="5" style="padding: 2rem; text-align: center; color: var(--app-text-muted);"><span data-i18n="queue.loading">데이터를 불러오는 중입니다...</span></td>
                 </tr>
             </tbody>
         </table>

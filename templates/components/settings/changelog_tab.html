@@ -1,12 +1,12 @@
             <!-- 7. 업데이트 내역 (Changelog) 탭 -->
             <div id="settings-tab-changelog" class="settings-tab-content" style="display: none; flex-direction: column; gap: 1rem;">
-                <h3 style="margin-top: 0; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; font-size: 1.1rem; color: #f8fafc;">
+                <h3 style="margin-top: 0; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; font-size: 1.1rem; color: var(--app-text-primary);">
                     <i class="fa-solid fa-clock-rotate-left" style="color: #60a5fa;"></i> <span data-i18n="settings.tab_changelog">업데이트 내역</span>
                 </h3>
-                <p style="color: #94a3b8; font-size: 0.85rem; margin-top: 0; margin-bottom: 1rem;" data-i18n="settings.changelog_desc">BookOasis의 최근 업데이트 및 패치 노트를 확인합니다.</p>
+                <p style="color: var(--app-text-muted); font-size: 0.85rem; margin-top: 0; margin-bottom: 1rem;" data-i18n="settings.changelog_desc">BookOasis의 최근 업데이트 및 패치 노트를 확인합니다.</p>
                 
-                <div id="changelog-container" style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 1.5rem; color: #e2e8f0; font-size: 0.9rem; line-height: 1.6; max-height: 60vh; overflow-y: auto;">
-                    <div id="changelog-loading" style="text-align: center; padding: 2rem; color: #94a3b8;">
+                <div id="changelog-container" style="background: rgba(var(--app-panel-rgb), 0.4); border: 1px solid rgba(var(--app-panel-border-rgb), 0.08); border-radius: 8px; padding: 1.5rem; color: var(--app-text-primary); font-size: 0.9rem; line-height: 1.6; max-height: 60vh; overflow-y: auto;">
+                    <div id="changelog-loading" style="text-align: center; padding: 2rem; color: var(--app-text-muted);">
                         <i class="fa-solid fa-circle-notch fa-spin fa-2x" style="margin-bottom: 1rem;"></i>
                         <div data-i18n="settings.changelog_loading">패치 노트를 불러오는 중입니다...</div>
                     </div>
@@ -21,7 +21,7 @@
                     padding-bottom: 0.3em;
                     margin-top: 1.5em;
                     margin-bottom: 1em;
-                    color: #f8fafc;
+                    color: var(--app-text-primary);
                 }
                 #changelog-content.markdown-body h1 { font-size: 1.5em; }
                 #changelog-content.markdown-body h2 { font-size: 1.25em; }

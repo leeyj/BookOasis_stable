@@ -148,7 +148,7 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
         const recList = document.getElementById('recommend-candidates-list');
         if (recSection && recList) {
           recSection.style.display = 'block';
-          recList.innerHTML = `<div style="font-size:0.75rem; color:#64748b;"><i class="fa-solid fa-circle-notch fa-spin"></i> 추천 후보를 찾는 중...</div>`;
+          recList.innerHTML = `<div style="font-size:0.75rem; color: var(--app-text-muted);"><i class="fa-solid fa-circle-notch fa-spin"></i> 추천 후보를 찾는 중...</div>`;
           api.fetchMetaRecommend(state.currentLibraryType, seriesName).then(res => {
             if (res.success && res.recommends && res.recommends.length > 0) {
               recList.innerHTML = renderRecommendList(res.recommends, seriesName);
@@ -188,7 +188,7 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
                 });
               });
             } else {
-              recList.innerHTML = `<div style="font-size:0.75rem; color:#64748b;">${i18n.t('modal.no_recommend')}</div>`;
+              recList.innerHTML = `<div style="font-size:0.75rem; color: var(--app-text-muted);">${i18n.t('modal.no_recommend')}</div>`;
             }
           }).catch(err => {
             console.error('추천 데이터 로드 실패:', err);

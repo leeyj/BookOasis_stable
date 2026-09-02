@@ -9,6 +9,7 @@ This is the central technical documentation and task history archive portal for 
 
 * **개발 워크플로우 (Development Process)**:
   - [개발 워크플로우 (workflow.md)](./workflow.md): 프로젝트 개발 히스토리 및 작업 세션 요약 / Technical development timeline and work session summaries.
+  - [테마 외부화 작업 인수인계 (handover_theme_process.md)](./handover_theme_process.md): 진행 중인 테마 하드코딩 제거 작업의 완료/잔여 현황, 확립된 치환 규칙, 다음 세션 시작점 / In-progress handover doc for the theme-hardcoding cleanup effort — done/remaining scope, established conversion rules, and where to resume.
 
 * **사용자 및 어드민 가이드 (Guides)**:
   - [설치 가이드 (guide_installation.md)](./guide_installation.md) / [English (guide_installation_en.md)](./guide_installation_en.md): 설치 요구사항, 빠른 구동법, 리버스 프록시 연동 / Prerequisites, startup bat files, and reverse proxy configs.

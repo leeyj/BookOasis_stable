@@ -49,6 +49,7 @@
             </div>
             
             <div class="overlay-controls-panel">
+                <button type="button" class="overlay-drag-handle" data-role="overlay-drag-handle" data-overlay-keep-open title="패널 위치 이동" aria-label="패널 위치 이동"><i class="fa-solid fa-grip-lines"></i></button>
                 <!-- 탭 네비게이션 헤더 -->
                 <div class="overlay-tab-nav">
                     <button class="overlay-tab-btn active" id="tab-btn-nav" data-role="viewer-action" data-action="overlay-tab" data-value="nav">
@@ -97,6 +98,12 @@
                         <!-- 1장/2장 보기 -->
                         <button id="btn-comic-page-step" class="btn-overlay-fit" data-role="viewer-action" data-action="toggle-page-step" title="1장/2장 보기 전환">
                             <i class="fa-solid fa-file-lines"></i> <span id="comic-page-step-label">1장</span>
+                        </button>
+
+                        <!-- 2쪽보기 정렬 한 장 밀기: 예) (9,10)(11,12)로 짝지어지던 스프레드를 (10,11)로 보정.
+                             2쪽보기일 때만 노출(reader_settings.js의 syncComicPageStepUI가 표시 제어). -->
+                        <button id="btn-spread-shift" class="btn-overlay-fit" data-role="viewer-action" data-action="shift-spread" data-i18n-title="viewer.shift_spread_title" title="두 페이지 짝을 한 장 밀어서 보기" style="display: none;">
+                            <i class="fa-solid fa-arrows-left-right"></i> <span data-i18n="viewer.shift_spread">한 장 밀기</span>
                         </button>
 
                         <!-- 다음 버튼부터 줄바꿈 (컨트롤이 많아 한 줄에 다 안 들어감) -->
@@ -242,33 +249,33 @@
         <!-- 뷰어 여백 설정 퀵 조절 패널 -->
         <div id="viewer-padding-overlay-panel" class="viewer-padding-panel" style="display: none; z-index: 10004;">
             <div class="padding-panel-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.5rem; margin-bottom: 0.75rem;">
-                <h4 style="margin: 0; color: #fff; font-size: 0.88rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
+                <h4 style="margin: 0; color: var(--app-text-primary); font-size: 0.88rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
                     <i class="fa-solid fa-arrows-up-down-left-right" style="color: #a855f7;"></i>
                     <span data-i18n="viewer.spacing_settings">뷰어 여백 상세 설정</span>
                 </h4>
-                <span class="padding-panel-close" data-role="viewer-action" data-action="toggle-padding-panel" style="cursor: pointer; color: #94a3b8; font-size: 1.2rem; font-weight: bold;">&times;</span>
+                <span class="padding-panel-close" data-role="viewer-action" data-action="toggle-padding-panel" style="cursor: pointer; color: var(--app-text-muted); font-size: 1.2rem; font-weight: bold;">&times;</span>
             </div>
             <div class="padding-panel-body">
                 <!-- 소설/텍스트 조절 폼 (TXT, EPUB) -->
                 <div id="quick-padding-novel-group" style="display: none; flex-direction: column; gap: 0.6rem;">
                     <!-- 1. 상단 여백 -->
                     <div class="quick-padding-row" style="display: flex; flex-direction: column; gap: 0.2rem;">
-                        <label style="font-size: 0.76rem; color: #cbd5e1; display: flex; justify-content: space-between;"><span data-i18n="settings.padding_top_label">상단 여백</span> <span><span id="quick-novel-top-val">40</span>px</span></label>
+                        <label style="font-size: 0.76rem; color: var(--app-text-muted); display: flex; justify-content: space-between;"><span data-i18n="settings.padding_top_label">상단 여백</span> <span><span id="quick-novel-top-val">40</span>px</span></label>
                         <input type="range" id="quick-novel-top-slider" min="0" max="200" step="5" value="40" style="width: 100%; cursor: pointer; accent-color: #a855f7;">
                     </div>
                     <!-- 2. 하단 여백 -->
                     <div class="quick-padding-row" style="display: flex; flex-direction: column; gap: 0.2rem;">
-                        <label style="font-size: 0.76rem; color: #cbd5e1; display: flex; justify-content: space-between;"><span data-i18n="settings.padding_bottom_label">하단 여백</span> <span><span id="quick-novel-bottom-val">60</span>px</span></label>
+                        <label style="font-size: 0.76rem; color: var(--app-text-muted); display: flex; justify-content: space-between;"><span data-i18n="settings.padding_bottom_label">하단 여백</span> <span><span id="quick-novel-bottom-val">60</span>px</span></label>
                         <input type="range" id="quick-novel-bottom-slider" min="0" max="200" step="5" value="60" style="width: 100%; cursor: pointer; accent-color: #a855f7;">
                     </div>
                     <!-- 3. 좌측 여백 -->
                     <div class="quick-padding-row" style="display: flex; flex-direction: column; gap: 0.2rem;">
-                        <label style="font-size: 0.76rem; color: #cbd5e1; display: flex; justify-content: space-between;"><span data-i18n="settings.padding_left_label">좌측 여백</span> <span><span id="quick-novel-left-val">20</span>px</span></label>
+                        <label style="font-size: 0.76rem; color: var(--app-text-muted); display: flex; justify-content: space-between;"><span data-i18n="settings.padding_left_label">좌측 여백</span> <span><span id="quick-novel-left-val">20</span>px</span></label>
                         <input type="range" id="quick-novel-left-slider" min="0" max="200" step="5" value="20" style="width: 100%; cursor: pointer; accent-color: #a855f7;">
                     </div>
                     <!-- 4. 우측 여백 -->
                     <div class="quick-padding-row" style="display: flex; flex-direction: column; gap: 0.2rem;">
-                        <label style="font-size: 0.76rem; color: #cbd5e1; display: flex; justify-content: space-between;"><span data-i18n="settings.padding_right_label">우측 여백</span> <span><span id="quick-novel-right-val">20</span>px</span></label>
+                        <label style="font-size: 0.76rem; color: var(--app-text-muted); display: flex; justify-content: space-between;"><span data-i18n="settings.padding_right_label">우측 여백</span> <span><span id="quick-novel-right-val">20</span>px</span></label>
                         <input type="range" id="quick-novel-right-slider" min="0" max="200" step="5" value="20" style="width: 100%; cursor: pointer; accent-color: #a855f7;">
                     </div>
                 </div>
@@ -288,7 +295,7 @@
                 <div id="viewer-common-spinner" class="comic-loading-spinner"></div>
                 <p id="viewer-common-text" class="comic-loading-text" data-i18n="viewer.downloading">다운로드 중...</p>
                 <p id="viewer-common-sub" class="comic-loading-sub" data-i18n="viewer.downloading_sub">Google Drive에서 파일을 가져오고 있습니다.<br>잠시만 기다려 주세요.</p>
-                <button id="viewer-common-close-btn" class="btn-overlay-fit" style="display: none; margin-top: 1rem; border: 1px solid rgba(255,255,255,0.2); padding: 0.5rem 1rem; background: rgba(255,255,255,0.1); color: #fff; cursor: pointer; border-radius: 4px;" data-role="viewer-action" data-action="close" data-i18n="common.close">닫기</button>
+                <button id="viewer-common-close-btn" class="btn-overlay-fit" style="display: none; margin-top: 1rem; border: 1px solid rgba(255,255,255,0.2); padding: 0.5rem 1rem; background: rgba(255,255,255,0.1); color: var(--app-text-primary); cursor: pointer; border-radius: 4px;" data-role="viewer-action" data-action="close" data-i18n="common.close">닫기</button>
             </div>
         </div>
 
@@ -298,8 +305,8 @@
                 <p class="comic-loading-text" data-i18n="viewer.episode_finished">현재 편을 다 읽었습니다.</p>
                 <p id="viewer-next-episode-title" class="comic-loading-sub" style="color: #a855f7; font-weight: bold; font-size: 1.05rem;"><span data-i18n="viewer.next_episode">다음 편: </span><span id="viewer-next-episode-dynamic">...</span></p>
                 <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-                    <button id="viewer-next-episode-confirm-btn" class="btn-overlay-fit" style="border: 1px solid #a855f7; padding: 0.5rem 1.2rem; background: #a855f7; color: #fff; cursor: pointer; border-radius: 4px; font-weight: bold;" data-i18n="viewer.continue_reading">이어서 보기</button>
-                    <button id="viewer-next-episode-cancel-btn" class="btn-overlay-fit" style="border: 1px solid rgba(255,255,255,0.2); padding: 0.5rem 1.2rem; background: rgba(255,255,255,0.1); color: #fff; cursor: pointer; border-radius: 4px;" data-i18n="common.close">닫기</button>
+                    <button id="viewer-next-episode-confirm-btn" class="btn-overlay-fit" style="border: 1px solid #a855f7; padding: 0.5rem 1.2rem; background: #a855f7; color: var(--app-text-primary); cursor: pointer; border-radius: 4px; font-weight: bold;" data-i18n="viewer.continue_reading">이어서 보기</button>
+                    <button id="viewer-next-episode-cancel-btn" class="btn-overlay-fit" style="border: 1px solid rgba(255,255,255,0.2); padding: 0.5rem 1.2rem; background: rgba(255,255,255,0.1); color: var(--app-text-primary); cursor: pointer; border-radius: 4px;" data-i18n="common.close">닫기</button>
                 </div>
             </div>
         </div>

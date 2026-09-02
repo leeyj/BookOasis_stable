@@ -10,62 +10,62 @@
             <div id="settings-tab-general" class="settings-tab-content" style="display: none; flex-direction: column; gap: 1.5rem;">
                 <div class="dashboard-section">
                     <div class="section-header" style="margin-bottom: 1.2rem;">
-                        <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1.2rem; font-weight: 700;">
-                            <i class="fa-solid fa-screwdriver-wrench" style="color: #a855f7; margin-right: 0.5rem;"></i> <span data-i18n="settings.general_title">기본 시스템 설정</span>
+                        <h3 class="section-title" style="margin: 0; color: var(--app-text-primary); font-size: 1.2rem; font-weight: 700;">
+                            <i class="fa-solid fa-screwdriver-wrench" style="color: var(--app-accent); margin-right: 0.5rem;"></i> <span data-i18n="settings.general_title">기본 시스템 설정</span>
                         </h3>
-                        <p style="font-size: 0.82rem; color: #94a3b8; margin: 0.4rem 0 0 0;" data-i18n="settings.general_subtitle">북오아시스 미디어 서버의 전반적인 환경설정을 직접 관리할 수 있습니다.</p>
+                        <p style="font-size: 0.82rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0;" data-i18n="settings.general_subtitle">북오아시스 미디어 서버의 전반적인 환경설정을 직접 관리할 수 있습니다.</p>
                     </div>
-                    <div style="background: rgba(30, 41, 59, 0.25); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 1.5rem; backdrop-filter: blur(10px); color: #cbd5e1;">
+                    <div style="background: rgba(var(--app-panel-rgb), 0.25); border: 1px solid rgba(var(--app-panel-border-rgb), 0.05); border-radius: 8px; padding: 1.5rem; backdrop-filter: blur(10px); color: var(--app-text-muted);">
                         <form id="settings-general-form" style="display: flex; flex-direction: column; gap: 2rem;">
 
                             <!-- ============================================================ -->
                             <!-- 🎨 1. 화면 및 뷰어 환경 설정 (UI & Viewer Settings)          -->
                             <!-- ============================================================ -->
-                            <div style="background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(168, 85, 247, 0.2); border-radius: 8px; padding: 1.25rem;">
+                            <div style="background: rgba(var(--app-panel-rgb), 0.4); border: 1px solid color-mix(in srgb, var(--app-accent) 20%, transparent); border-radius: 8px; padding: 1.25rem;">
                                 <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.2rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.6rem;">
-                                    <i class="fa-solid fa-desktop" style="color: #a855f7; font-size: 1.1rem;"></i>
-                                    <h4 style="margin: 0; color: #fff; font-size: 1rem; font-weight: 700;">화면 및 뷰어 환경 설정</h4>
+                                    <i class="fa-solid fa-desktop" style="color: var(--app-accent); font-size: 1.1rem;"></i>
+                                    <h4 style="margin: 0; color: var(--app-text-primary); font-size: 1rem; font-weight: 700;">화면 및 뷰어 환경 설정</h4>
                                 </div>
                                 <div style="display: flex; flex-direction: column; gap: 1.25rem;">
 
                                     <!-- 도서 카드 너비 슬라이더 -->
                                     <div class="library-form-group">
-                                        <label for="setting-thumbnail-width" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
-                                            <i class="fa-solid fa-image" style="color: #a855f7; margin-right: 0.3rem;"></i> <span data-i18n="settings.thumb_width_label">보관함 도서 카드 너비</span>: <span id="setting-thumbnail-width-val" style="color: #c084fc;">160</span>px
+                                        <label for="setting-thumbnail-width" style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                            <i class="fa-solid fa-image" style="color: var(--app-accent); margin-right: 0.3rem;"></i> <span data-i18n="settings.thumb_width_label">보관함 도서 카드 너비</span>: <span id="setting-thumbnail-width-val" style="color: var(--app-accent-hover);">160</span>px
                                         </label>
-                                        <input type="range" id="setting-thumbnail-width" name="BOOK_THUMBNAIL_WIDTH" min="120" max="240" step="10" value="160" data-role="general-thumbnail-width" style="width: 100%; max-width: 480px; cursor: pointer; accent-color: #a855f7;">
-                                        <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;" data-i18n="settings.thumb_width_desc">보관함의 도서 커버 크기를 120px ~ 240px 범위 내에서 본인 모니터 해상도에 최적화하여 조절합니다.</p>
+                                        <input type="range" id="setting-thumbnail-width" name="BOOK_THUMBNAIL_WIDTH" min="120" max="240" step="10" value="160" data-role="general-thumbnail-width" style="width: 100%; max-width: 480px; cursor: pointer; accent-color: var(--app-accent);">
+                                        <p style="font-size: 0.78rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0;" data-i18n="settings.thumb_width_desc">보관함의 도서 커버 크기를 120px ~ 240px 범위 내에서 본인 모니터 해상도에 최적화하여 조절합니다.</p>
                                     </div>
 
                                     <!-- 페이지당 로드 수 제한 -->
                                     <div class="library-form-group">
-                                        <label for="setting-page-limit" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
-                                            <i class="fa-solid fa-list-ol" style="color: #a855f7; margin-right: 0.3rem;"></i> <span data-i18n="settings.page_limit_label">1회당 도서 로딩 수 (Limit)</span>
+                                        <label for="setting-page-limit" style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                            <i class="fa-solid fa-list-ol" style="color: var(--app-accent); margin-right: 0.3rem;"></i> <span data-i18n="settings.page_limit_label">1회당 도서 로딩 수 (Limit)</span>
                                         </label>
-                                        <select id="setting-page-limit" name="PAGE_LIMIT" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; cursor: pointer;">
+                                        <select id="setting-page-limit" name="PAGE_LIMIT" style="width: 100%; max-width: 480px; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; cursor: pointer;">
                                             <option value="30" data-i18n="settings.limit_30">30개씩 불러오기</option>
                                             <option value="60" data-i18n="settings.limit_60">60개씩 불러오기 (기본값)</option>
                                             <option value="90" data-i18n="settings.limit_90">90개씩 불러오기</option>
                                             <option value="120" data-i18n="settings.limit_120">120개씩 불러오기 (고해상도 권장)</option>
                                         </select>
-                                        <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;" data-i18n="settings.page_limit_desc">무한 스크롤 및 보관함 로딩 시 한 화면에 렌더링할 도서 카드의 단위 개수입니다.</p>
+                                        <p style="font-size: 0.78rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0;" data-i18n="settings.page_limit_desc">무한 스크롤 및 보관함 로딩 시 한 화면에 렌더링할 도서 카드의 단위 개수입니다.</p>
                                     </div>
 
                                     <!-- 만화 뷰어 로딩 지연 시간 -->
                                     <div class="library-form-group">
-                                        <label for="setting-comic-loading-delay" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
-                                            <i class="fa-solid fa-hourglass-start" style="color: #a855f7; margin-right: 0.3rem;"></i> <span data-i18n="settings.comic_delay_label">만화 뷰어 로딩 지연 시간 (ms)</span>
+                                        <label for="setting-comic-loading-delay" style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                            <i class="fa-solid fa-hourglass-start" style="color: var(--app-accent); margin-right: 0.3rem;"></i> <span data-i18n="settings.comic_delay_label">만화 뷰어 로딩 지연 시간 (ms)</span>
                                         </label>
-                                        <input type="number" id="setting-comic-loading-delay" name="COMIC_LOADING_DELAY" min="0" max="5000" step="50" value="700" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
-                                        <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;" data-i18n="settings.comic_delay_desc">이미지 로드 시작 후 로딩 오버레이가 나타날 때까지 대기할 지연 시간입니다.</p>
+                                        <input type="number" id="setting-comic-loading-delay" name="COMIC_LOADING_DELAY" min="0" max="5000" step="50" value="700" style="width: 100%; max-width: 480px; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
+                                        <p style="font-size: 0.78rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0;" data-i18n="settings.comic_delay_desc">이미지 로드 시작 후 로딩 오버레이가 나타날 때까지 대기할 지연 시간입니다.</p>
                                     </div>
 
                                     <!-- 최근 읽은 도서 개수 설정 -->
                                     <div class="library-form-group">
-                                        <label for="setting-recent-books-limit" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
-                                            <i class="fa-solid fa-clock-rotate-left" style="color: #a855f7; margin-right: 0.3rem;"></i> <span data-i18n="settings.recent_limit_label">최근 읽은 도서 노출 개수</span>
+                                        <label for="setting-recent-books-limit" style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                            <i class="fa-solid fa-clock-rotate-left" style="color: var(--app-accent); margin-right: 0.3rem;"></i> <span data-i18n="settings.recent_limit_label">최근 읽은 도서 노출 개수</span>
                                         </label>
-                                        <input type="number" id="setting-recent-books-limit" name="RECENT_BOOKS_LIMIT" min="10" max="100" value="30" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
+                                        <input type="number" id="setting-recent-books-limit" name="RECENT_BOOKS_LIMIT" min="10" max="100" value="30" style="width: 100%; max-width: 480px; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
                                     </div>
 
                                 </div>
@@ -74,21 +74,21 @@
                             <!-- ============================================================ -->
                             <!-- ⚡ 2. 백그라운드 스캐너 설정 (Scanner & Queue Settings)        -->
                             <!-- ============================================================ -->
-                            <div style="background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 8px; padding: 1.25rem;">
+                            <div style="background: rgba(var(--app-panel-rgb), 0.4); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 8px; padding: 1.25rem;">
                                 <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.2rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.6rem;">
                                     <i class="fa-solid fa-bolt" style="color: #38bdf8; font-size: 1.1rem;"></i>
-                                    <h4 style="margin: 0; color: #fff; font-size: 1rem; font-weight: 700;">백그라운드 스캐너 설정</h4>
+                                    <h4 style="margin: 0; color: var(--app-text-primary); font-size: 1rem; font-weight: 700;">백그라운드 스캐너 설정</h4>
                                 </div>
                                 <div style="display: flex; flex-direction: column; gap: 1.25rem;">
 
                                     <!-- Lazy 표지 스캐너 크론 주기 -->
                                     <div class="library-form-group">
-                                        <label for="setting-lazy-scan-cron" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                        <label for="setting-lazy-scan-cron" style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
                                             <i class="fa-solid fa-clock" style="color: #38bdf8; margin-right: 0.3rem;"></i> <span data-i18n="settings.lazy_cron_label">Lazy 표지 스캐너 백그라운드 구동 주기 (Cron식)</span>
                                         </label>
                                         <div style="display: flex; gap: 0.5rem; align-items: center; max-width: 480px; width: 100%; flex-wrap: wrap;">
-                                            <input type="text" id="setting-lazy-scan-cron" name="LAZY_SCAN_CRON" value="0 3 * * *" style="flex: 1; min-width: 200px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;" required>
-                                            <button type="button" data-role="general-lazy-scan-now" class="btn-toggle" style="background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%); color: #fff; border: none; padding: 0.6rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.3rem; height: 38px;">
+                                            <input type="text" id="setting-lazy-scan-cron" name="LAZY_SCAN_CRON" value="0 3 * * *" style="flex: 1; min-width: 200px; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;" required>
+                                            <button type="button" data-role="general-lazy-scan-now" class="btn-toggle" style="background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%); color: var(--app-text-primary); border: none; padding: 0.6rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.3rem; height: 38px;">
                                                 <i class="fa-solid fa-play"></i> <span data-i18n="settings.btn_run_now">지금 실행</span>
                                             </button>
                                         </div>
@@ -96,56 +96,56 @@
 
                                     <!-- Lazy 스캐너 개별 파일 크기 제한 -->
                                     <div class="library-form-group">
-                                        <label for="setting-lazy-scan-max-file-size" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                        <label for="setting-lazy-scan-max-file-size" style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
                                             <i class="fa-solid fa-weight-hanging" style="color: #38bdf8; margin-right: 0.3rem;"></i> Lazy 스캐너 개별 파일 크기 제한 (MB)
                                         </label>
                                         <div style="display: flex; gap: 0.5rem; align-items: center; max-width: 480px; width: 100%;">
-                                            <input type="number" id="setting-lazy-scan-max-file-size" name="LAZY_SCAN_MAX_FILE_SIZE_MB" min="0" max="10240" value="300" style="flex: 1; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
-                                            <span style="color: #94a3b8; font-size: 0.85rem; white-space: nowrap;">MB</span>
+                                            <input type="number" id="setting-lazy-scan-max-file-size" name="LAZY_SCAN_MAX_FILE_SIZE_MB" min="0" max="10240" value="300" style="flex: 1; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
+                                            <span style="color: var(--app-text-muted); font-size: 0.85rem; white-space: nowrap;">MB</span>
                                         </div>
-                                        <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;">이 크기를 초과하는 ZIP/CBZ 파일은 스캔을 건너뛰고 오류 리포트에 기록합니다. <strong style="color: #fbbf24;">0 = 제한 없음.</strong> (기본값: 300 MB)</p>
+                                        <p style="font-size: 0.78rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0;">이 크기를 초과하는 ZIP/CBZ 파일은 스캔을 건너뛰고 오류 리포트에 기록합니다. <strong style="color: #fbbf24;">0 = 제한 없음.</strong> (기본값: 300 MB)</p>
                                     </div>
 
                                     <!-- Lazy 스캐너 1회 세션 누적 용량 한도 -->
                                     <div class="library-form-group">
-                                        <label for="setting-lazy-scan-max-batch-size" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                        <label for="setting-lazy-scan-max-batch-size" style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
                                             <i class="fa-solid fa-layer-group" style="color: #38bdf8; margin-right: 0.3rem;"></i> Lazy 스캐너 1회 세션 누적 용량 한도 (MB)
                                         </label>
                                         <div style="display: flex; gap: 0.5rem; align-items: center; max-width: 480px; width: 100%;">
-                                            <input type="number" id="setting-lazy-scan-max-batch-size" name="LAZY_SCAN_MAX_BATCH_SIZE_MB" min="0" max="51200" value="1024" style="flex: 1; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
-                                            <span style="color: #94a3b8; font-size: 0.85rem; white-space: nowrap;">MB</span>
+                                            <input type="number" id="setting-lazy-scan-max-batch-size" name="LAZY_SCAN_MAX_BATCH_SIZE_MB" min="0" max="51200" value="1024" style="flex: 1; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
+                                            <span style="color: var(--app-text-muted); font-size: 0.85rem; white-space: nowrap;">MB</span>
                                         </div>
-                                        <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;">1회 백그라운드 스캔 회차에서 처리할 수 있는 최대 누적 파일 용량입니다. <strong style="color: #fbbf24;">0 = 제한 없음.</strong> (기본값: 1024 MB)</p>
+                                        <p style="font-size: 0.78rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0;">1회 백그라운드 스캔 회차에서 처리할 수 있는 최대 누적 파일 용량입니다. <strong style="color: #fbbf24;">0 = 제한 없음.</strong> (기본값: 1024 MB)</p>
                                     </div>
 
                                     <div class="library-form-group">
-                                        <label for="setting-lazy-scan-video-max-episodes" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                        <label for="setting-lazy-scan-video-max-episodes" style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
                                             <i class="fa-solid fa-clapperboard" style="color: #38bdf8; margin-right: 0.3rem;"></i> Lazy 스캐너 영상 강좌 재생시간 분석 1회 처리량 (건)
                                         </label>
                                         <div style="display: flex; gap: 0.5rem; align-items: center; max-width: 480px; width: 100%;">
-                                            <input type="number" id="setting-lazy-scan-video-max-episodes" name="LAZY_SCAN_VIDEO_MAX_EPISODES_PER_RUN" min="1" max="2000" value="300" style="flex: 1; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
-                                            <span style="color: #94a3b8; font-size: 0.85rem; white-space: nowrap;">건</span>
+                                            <input type="number" id="setting-lazy-scan-video-max-episodes" name="LAZY_SCAN_VIDEO_MAX_EPISODES_PER_RUN" min="1" max="2000" value="300" style="flex: 1; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
+                                            <span style="color: var(--app-text-muted); font-size: 0.85rem; white-space: nowrap;">건</span>
                                         </div>
-                                        <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;">1회 Lazy 스캔 실행마다 ffprobe로 재생시간/해상도를 분석할 영상 강좌 에피소드 최대 건수입니다. 원격 드라이브에서 느린 파일이 섞여 있으면 값이 클수록 책 커버 스캔이 그만큼 늦게 시작됩니다. (기본값: 300건, 서버가 자주 재시작되는 환경이라면 값을 줄이세요)</p>
+                                        <p style="font-size: 0.78rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0;">1회 Lazy 스캔 실행마다 ffprobe로 재생시간/해상도를 분석할 영상 강좌 에피소드 최대 건수입니다. 원격 드라이브에서 느린 파일이 섞여 있으면 값이 클수록 책 커버 스캔이 그만큼 늦게 시작됩니다. (기본값: 300건, 서버가 자주 재시작되는 환경이라면 값을 줄이세요)</p>
                                     </div>
 
                                     <div class="library-form-group">
-                                        <label for="setting-lazy-scan-video-probe-workers" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                        <label for="setting-lazy-scan-video-probe-workers" style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
                                             <i class="fa-solid fa-gauge-high" style="color: #38bdf8; margin-right: 0.3rem;"></i> Lazy 스캐너 영상 재생시간 분석 동시 처리 개수
                                         </label>
                                         <div style="display: flex; gap: 0.5rem; align-items: center; max-width: 480px; width: 100%;">
-                                            <input type="number" id="setting-lazy-scan-video-probe-workers" name="LAZY_SCAN_VIDEO_PROBE_WORKERS" min="1" max="16" value="4" style="flex: 1; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
-                                            <span style="color: #94a3b8; font-size: 0.85rem; white-space: nowrap;">개</span>
+                                            <input type="number" id="setting-lazy-scan-video-probe-workers" name="LAZY_SCAN_VIDEO_PROBE_WORKERS" min="1" max="16" value="4" style="flex: 1; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
+                                            <span style="color: var(--app-text-muted); font-size: 0.85rem; white-space: nowrap;">개</span>
                                         </div>
-                                        <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;">ffprobe 분석을 몇 개씩 동시에 돌릴지입니다. ffprobe는 파일을 읽어들이는 대기 시간이 대부분이라, 원격(rclone) 드라이브에서 값을 올리면 처리 속도가 크게 빨라집니다. 너무 높이면 원격 저장소 쪽 동시 요청 제한에 걸릴 수 있습니다. (기본값: 4)</p>
+                                        <p style="font-size: 0.78rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0;">ffprobe 분석을 몇 개씩 동시에 돌릴지입니다. ffprobe는 파일을 읽어들이는 대기 시간이 대부분이라, 원격(rclone) 드라이브에서 값을 올리면 처리 속도가 크게 빨라집니다. 너무 높이면 원격 저장소 쪽 동시 요청 제한에 걸릴 수 있습니다. (기본값: 4)</p>
                                     </div>
 
                                     <!-- 스캐너 실행 로그 저장 옵션 -->
                                     <div class="library-form-group">
-                                        <label for="setting-scanner-write-log" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                        <label for="setting-scanner-write-log" style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
                                             <i class="fa-solid fa-terminal" style="color: #38bdf8; margin-right: 0.3rem;"></i> <span data-i18n="settings.scanner_log_label">스캐너 실행 로그 저장 옵션 (media_server.log)</span>
                                         </label>
-                                        <select id="setting-scanner-write-log" name="SCANNER_WRITE_LOG" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; cursor: pointer;">
+                                        <select id="setting-scanner-write-log" name="SCANNER_WRITE_LOG" style="width: 100%; max-width: 480px; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; cursor: pointer;">
                                             <option value="1" data-i18n="settings.log_dev">로그 실시간 출력 및 파일 기록 (개발 모드)</option>
                                             <option value="0" data-i18n="settings.log_prod">로그 출력 감추기 (운영 권장 / 용량 절약 모드)</option>
                                         </select>
@@ -153,11 +153,11 @@
 
                                     <!-- 스캔 제외 패턴 설정 (Scan Ignore Patterns) -->
                                     <div class="library-form-group">
-                                        <label for="setting-scan-ignore-patterns" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                        <label for="setting-scan-ignore-patterns" style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
                                             <i class="fa-solid fa-filter-circle-xmark" style="color: #ef4444; margin-right: 0.3rem;"></i> <span data-i18n="settings.scan_ignore_patterns_label">스캔 제외 패턴 (Scan Ignore Patterns)</span>
                                         </label>
-                                        <textarea id="setting-scan-ignore-patterns" name="SCAN_IGNORE_PATTERNS" rows="5" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; font-family: monospace; font-size: 0.85rem; line-height: 1.4; resize: vertical;" placeholder="@eaDir&#10;#recycle&#10;*.tmp&#10;*.sample.cbz"></textarea>
-                                        <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0; line-height: 1.5;" data-i18n="settings.scan_ignore_patterns_desc">도서 스캔 시 제외할 <strong>파일 및 디렉토리 패턴을 한 줄에 하나씩</strong> 입력하세요.<br><strong>디렉토리는 끝에 /</strong>를 붙여 명시할 수 있습니다. (예: <code>@eaDir/</code>, <code>#recycle/</code>, <code>*.tmp</code>, <code>*.sample.cbz</code>)<br>폴더 내 <strong>.bookoasisignore 파일</strong>로도 개별 설정 가능합니다.</p>
+                                        <textarea id="setting-scan-ignore-patterns" name="SCAN_IGNORE_PATTERNS" rows="5" style="width: 100%; max-width: 480px; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; font-family: monospace; font-size: 0.85rem; line-height: 1.4; resize: vertical;" placeholder="@eaDir&#10;#recycle&#10;*.tmp&#10;*.sample.cbz"></textarea>
+                                        <p style="font-size: 0.78rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0; line-height: 1.5;" data-i18n="settings.scan_ignore_patterns_desc">도서 스캔 시 제외할 <strong>파일 및 디렉토리 패턴을 한 줄에 하나씩</strong> 입력하세요.<br><strong>디렉토리는 끝에 /</strong>를 붙여 명시할 수 있습니다. (예: <code>@eaDir/</code>, <code>#recycle/</code>, <code>*.tmp</code>, <code>*.sample.cbz</code>)<br>폴더 내 <strong>.bookoasisignore 파일</strong>로도 개별 설정 가능합니다.</p>
                                     </div>
 
                                     <!-- HDD 적극 웜업 설정 -->
@@ -168,45 +168,45 @@
                             <!-- ============================================================ -->
                             <!-- ⚙️ 3. 시스템 및 메모리 리소스 (System & Memory Resources)     -->
                             <!-- ============================================================ -->
-                            <div style="background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(52, 211, 153, 0.2); border-radius: 8px; padding: 1.25rem;">
+                            <div style="background: rgba(var(--app-panel-rgb), 0.4); border: 1px solid rgba(52, 211, 153, 0.2); border-radius: 8px; padding: 1.25rem;">
                                 <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.2rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.6rem;">
                                     <i class="fa-solid fa-microchip" style="color: #34d399; font-size: 1.1rem;"></i>
-                                    <h4 style="margin: 0; color: #fff; font-size: 1rem; font-weight: 700;">시스템 및 메모리 리소스 설정</h4>
+                                    <h4 style="margin: 0; color: var(--app-text-primary); font-size: 1rem; font-weight: 700;">시스템 및 메모리 리소스 설정</h4>
                                 </div>
                                 <div style="display: flex; flex-direction: column; gap: 1.25rem;">
 
                                     <!-- 스캐너 시스템 여유 메모리 하한 -->
                                     <div class="library-form-group">
-                                        <label for="setting-system-mem-limit" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                        <label for="setting-system-mem-limit" style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
                                             <i class="fa-solid fa-memory" style="color: #34d399; margin-right: 0.3rem;"></i> <span data-i18n="settings.sys_mem_label">스캐너 시스템 여유 메모리 하한 (MB)</span>
                                         </label>
-                                        <input type="number" id="setting-system-mem-limit" name="SYSTEM_MEM_LIMIT" min="512" max="16384" step="256" value="1536" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
-                                        <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;" data-i18n="settings.sys_mem_desc">시스템 가용 메모리가 이 값 미만으로 떨어지면 스캔을 중단합니다. (기본 1536MB)</p>
+                                        <input type="number" id="setting-system-mem-limit" name="SYSTEM_MEM_LIMIT" min="512" max="16384" step="256" value="1536" style="width: 100%; max-width: 480px; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
+                                        <p style="font-size: 0.78rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0;" data-i18n="settings.sys_mem_desc">시스템 가용 메모리가 이 값 미만으로 떨어지면 스캔을 중단합니다. (기본 1536MB)</p>
                                     </div>
 
                                     <!-- 스캐너 프로세스 최대 메모리 사용량 -->
                                     <div class="library-form-group">
-                                        <label for="setting-process-rss-limit" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                        <label for="setting-process-rss-limit" style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
                                             <i class="fa-solid fa-server" style="color: #34d399; margin-right: 0.3rem;"></i> <span data-i18n="settings.proc_rss_label">스캐너 프로세스 최대 메모리 사용량 (MB)</span>
                                         </label>
-                                        <input type="number" id="setting-process-rss-limit" name="PROCESS_RSS_LIMIT" min="512" max="16384" step="256" value="2048" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
-                                        <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;" data-i18n="settings.proc_rss_desc">프로세스 점유 메모리가 이 값을 초과할 경우 스캔을 안전 재시작합니다. (기본 2048MB)</p>
+                                        <input type="number" id="setting-process-rss-limit" name="PROCESS_RSS_LIMIT" min="512" max="16384" step="256" value="2048" style="width: 100%; max-width: 480px; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
+                                        <p style="font-size: 0.78rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0;" data-i18n="settings.proc_rss_desc">프로세스 점유 메모리가 이 값을 초과할 경우 스캔을 안전 재시작합니다. (기본 2048MB)</p>
                                     </div>
 
                                     <!-- DB 커넥션 풀 크기 -->
                                     <div class="library-form-group">
-                                        <label for="setting-db-pool-size" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                        <label for="setting-db-pool-size" style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
                                             <i class="fa-solid fa-database" style="color: #34d399; margin-right: 0.3rem;"></i> <span data-i18n="settings.db_pool_label">DB 커넥션 풀 크기 (최대 50개 제한)</span>
                                         </label>
-                                        <input type="number" id="setting-db-pool-size" name="DB_POOL_SIZE" min="1" max="50" value="10" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;" required>
+                                        <input type="number" id="setting-db-pool-size" name="DB_POOL_SIZE" min="1" max="50" value="10" style="width: 100%; max-width: 480px; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;" required>
                                     </div>
 
                                     <!-- 크론 스케줄 타임존 -->
                                     <div class="library-form-group">
-                                        <label for="setting-timezone" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                        <label for="setting-timezone" style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
                                             <i class="fa-solid fa-earth-asia" style="color: #34d399; margin-right: 0.3rem;"></i> <span data-i18n="settings.timezone_label">크론 스케줄 타임존 (Timezone)</span>
                                         </label>
-                                        <select id="setting-timezone" name="TIMEZONE" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; cursor: pointer;">
+                                        <select id="setting-timezone" name="TIMEZONE" style="width: 100%; max-width: 480px; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; cursor: pointer;">
                                             <option value="UTC">UTC (Universal Coordinated Time)</option>
                                             <option value="Asia/Seoul">Asia/Seoul (한국 표준시, KST)</option>
                                             <option value="Asia/Tokyo">Asia/Tokyo (일본 표준시)</option>
@@ -216,7 +216,7 @@
                                             <option value="Europe/London">Europe/London (런던 시간)</option>
                                             <option value="Europe/Paris">Europe/Paris (파리 시간)</option>
                                         </select>
-                                        <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;" data-i18n="settings.timezone_desc">자동 스캔 등 "몇 시에 실행할지" 크론 예약 시각에만 적용됩니다. 스캔완료시각 등 화면에 표시되는 타임스탬프의 기준시간대를 바꾸려면 docker-compose.yml의 TZ 환경변수를 함께 설정하세요.</p>
+                                        <p style="font-size: 0.78rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0;" data-i18n="settings.timezone_desc">자동 스캔 등 "몇 시에 실행할지" 크론 예약 시각에만 적용됩니다. 스캔완료시각 등 화면에 표시되는 타임스탬프의 기준시간대를 바꾸려면 docker-compose.yml의 TZ 환경변수를 함께 설정하세요.</p>
                                     </div>
                                 </div>
                             </div>
@@ -224,27 +224,27 @@
                             <!-- ============================================================ -->
                             <!-- 🔐 4. 네트워크 및 보안 설정 (Network & Security Settings)    -->
                             <!-- ============================================================ -->
-                            <div style="background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(248, 113, 113, 0.2); border-radius: 8px; padding: 1.25rem;">
+                            <div style="background: rgba(var(--app-panel-rgb), 0.4); border: 1px solid rgba(248, 113, 113, 0.2); border-radius: 8px; padding: 1.25rem;">
                                 <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.2rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.6rem;">
                                     <i class="fa-solid fa-shield-halved" style="color: #f87171; font-size: 1.1rem;"></i>
-                                    <h4 style="margin: 0; color: #fff; font-size: 1rem; font-weight: 700;">네트워크 및 보안 설정</h4>
+                                    <h4 style="margin: 0; color: var(--app-text-primary); font-size: 1rem; font-weight: 700;">네트워크 및 보안 설정</h4>
                                 </div>
                                 <div style="display: flex; flex-direction: column; gap: 1.25rem;">
 
                                     <!-- rclone 원격 제어 주소 -->
                                     <div class="library-form-group">
-                                        <label for="setting-rclone-rc-url" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                        <label for="setting-rclone-rc-url" style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
                                             <i class="fa-solid fa-network-wired" style="color: #f87171; margin-right: 0.3rem;"></i> <span data-i18n="settings.rclone_rc_label">rclone 원격 제어(RC) API 주소</span>
                                         </label>
-                                        <input type="text" id="setting-rclone-rc-url" name="RCLONE_RC_URL" value="http://localhost:5572" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
+                                        <input type="text" id="setting-rclone-rc-url" name="RCLONE_RC_URL" value="http://localhost:5572" style="width: 100%; max-width: 480px; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
                                     </div>
 
                                     <!-- Proxy Header Auth (SSO) -->
                                     <div class="library-form-group" style="background: rgba(239, 68, 68, 0.05); padding: 1rem; border-radius: 6px; border: 1px dashed rgba(239, 68, 68, 0.3);">
-                                        <label for="setting-proxy-header-auth" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                        <label for="setting-proxy-header-auth" style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
                                             <i class="fa-solid fa-lock" style="color: #ef4444; margin-right: 0.3rem;"></i> <span data-i18n="settings.proxy_auth_label">Proxy Header Auth (리버스 프록시 자동 로그인)</span>
                                         </label>
-                                        <select id="setting-proxy-header-auth" name="PROXY_HEADER_AUTH" style="width: 100%; max-width: 480px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; cursor: pointer;">
+                                        <select id="setting-proxy-header-auth" name="PROXY_HEADER_AUTH" style="width: 100%; max-width: 480px; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; cursor: pointer;">
                                             <option value="0" data-i18n="settings.disabled_default">비활성화 (기본값)</option>
                                             <option value="1" data-i18n="settings.enabled_risk">활성화 (위험성 인지 후 사용)</option>
                                         </select>
@@ -258,15 +258,15 @@
                             <!-- ============================================================ -->
                             <!-- 🎬 5. 영상 강좌 트랜스코딩 설정 (Video Transcoding, 실험적)  -->
                             <!-- ============================================================ -->
-                            <div style="background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(192, 132, 252, 0.2); border-radius: 8px; padding: 1.25rem;">
+                            <div style="background: rgba(var(--app-panel-rgb), 0.4); border: 1px solid rgba(192, 132, 252, 0.2); border-radius: 8px; padding: 1.25rem;">
                                 <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.2rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.6rem;">
-                                    <i class="fa-solid fa-film" style="color: #c084fc; font-size: 1.1rem;"></i>
-                                    <h4 style="margin: 0; color: #fff; font-size: 1rem; font-weight: 700;">영상 강좌 트랜스코딩 설정 (실험적)</h4>
+                                    <i class="fa-solid fa-film" style="color: var(--app-accent-hover); font-size: 1.1rem;"></i>
+                                    <h4 style="margin: 0; color: var(--app-text-primary); font-size: 1rem; font-weight: 700;">영상 강좌 트랜스코딩 설정 (실험적)</h4>
                                 </div>
                                 <div style="display: flex; flex-direction: column; gap: 1.25rem;">
 
-                                    <div style="background: rgba(192, 132, 252, 0.08); border: 1px dashed rgba(192, 132, 252, 0.3); border-radius: 6px; padding: 0.8rem 1rem; font-size: 0.8rem; color: #cbd5e1; line-height: 1.7;">
-                                        <strong style="color: #c084fc;">자동 재생 정책 (수동 스위치 없음)</strong><br>
+                                    <div style="background: rgba(192, 132, 252, 0.08); border: 1px dashed rgba(192, 132, 252, 0.3); border-radius: 6px; padding: 0.8rem 1rem; font-size: 0.8rem; color: var(--app-text-muted); line-height: 1.7;">
+                                        <strong style="color: var(--app-accent-hover);">자동 재생 정책 (수동 스위치 없음)</strong><br>
                                         1) 브라우저가 원본을 직접 재생할 수 있으면(mp4/webm + H.264/VP8/VP9 + AAC/Opus 등) 항상 원본을 그대로 스트리밍합니다.<br>
                                         2) 직접 재생이 안 되는 파일(MKV 컨테이너 등)만 아래 ffmpeg 폴백을 자동으로 거칩니다.<br>
                                         3) 폴백 시 기본은 CPU(libx264) 인코딩이며, 아래 점검에서 VAAPI가 감지되면 자동으로 VAAPI 인코딩을 사용합니다.<br>
@@ -275,28 +275,28 @@
 
                                     <!-- VAAPI 지원 여부 체크 -->
                                     <div class="library-form-group">
-                                        <label style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
-                                            <i class="fa-solid fa-microchip" style="color: #c084fc; margin-right: 0.3rem;"></i> 하드웨어 가속(VAAPI) 사용 가능 여부 점검
+                                        <label style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                            <i class="fa-solid fa-microchip" style="color: var(--app-accent-hover); margin-right: 0.3rem;"></i> 하드웨어 가속(VAAPI) 사용 가능 여부 점검
                                         </label>
                                         <div style="display: flex; gap: 0.5rem; align-items: center; max-width: 480px; width: 100%; flex-wrap: wrap;">
-                                            <input type="text" id="setting-vaapi-device-path" name="FFMPEG_VAAPI_DEVICE" value="/dev/dri/renderD128" style="flex: 1; min-width: 200px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; font-family: monospace; font-size: 0.85rem;">
-                                            <button type="button" id="btn-check-vaapi" style="background: linear-gradient(135deg, #c084fc 0%, #7c3aed 100%); color: #fff; border: none; padding: 0.6rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.3rem; height: 38px;">
+                                            <input type="text" id="setting-vaapi-device-path" name="FFMPEG_VAAPI_DEVICE" value="/dev/dri/renderD128" style="flex: 1; min-width: 200px; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; font-family: monospace; font-size: 0.85rem;">
+                                            <button type="button" id="btn-check-vaapi" style="background: linear-gradient(135deg, var(--app-accent) 0%, color-mix(in srgb, var(--app-accent) 70%, black) 100%); color: var(--app-accent-contrast); border: none; padding: 0.6rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.3rem; height: 38px;">
                                                 <i class="fa-solid fa-magnifying-glass"></i> 지금 점검
                                             </button>
                                         </div>
                                         <div id="vaapi-check-result" style="display: none; margin-top: 0.6rem; padding: 0.8rem 1rem; border-radius: 6px; font-size: 0.82rem; line-height: 1.6; white-space: pre-wrap; font-family: monospace; max-width: 700px; max-height: 260px; overflow-y: auto;"></div>
-                                        <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;">서버(컨테이너)에서 ffmpeg가 VAAPI 하드웨어 가속을 실제로 사용할 수 있는지(빌드 지원 + 인코더 + <code>/dev/dri</code> 디바이스 패스스루 + vainfo 드라이버 응답)를 단계별로 점검합니다. 도커라면 <code>docker-compose.yml</code>에 <code>devices: - /dev/dri:/dev/dri</code>가 있어야 디바이스가 잡힙니다. <strong style="color: #c084fc;">점검 버튼을 누르면 이 서버 경로 값도 함께 저장되고, 결과가 즉시 실제 스트리밍 판단에도 반영됩니다.</strong></p>
+                                        <p style="font-size: 0.78rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0;">서버(컨테이너)에서 ffmpeg가 VAAPI 하드웨어 가속을 실제로 사용할 수 있는지(빌드 지원 + 인코더 + <code>/dev/dri</code> 디바이스 패스스루 + vainfo 드라이버 응답)를 단계별로 점검합니다. 도커라면 <code>docker-compose.yml</code>에 <code>devices: - /dev/dri:/dev/dri</code>가 있어야 디바이스가 잡힙니다. <strong style="color: var(--app-accent-hover);">점검 버튼을 누르면 이 서버 경로 값도 함께 저장되고, 결과가 즉시 실제 스트리밍 판단에도 반영됩니다.</strong></p>
                                     </div>
 
                                     <!-- CPU/기타 GPU 폴백 인코딩 파라미터 -->
                                     <div class="library-form-group">
-                                        <label for="setting-ffmpeg-transcode-args" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
-                                            <i class="fa-solid fa-terminal" style="color: #c084fc; margin-right: 0.3rem;"></i> 기본 폴백 인코딩 파라미터 (VAAPI 미감지 시 사용)
+                                        <label for="setting-ffmpeg-transcode-args" style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                            <i class="fa-solid fa-terminal" style="color: var(--app-accent-hover); margin-right: 0.3rem;"></i> 기본 폴백 인코딩 파라미터 (VAAPI 미감지 시 사용)
                                         </label>
-                                        <textarea id="setting-ffmpeg-transcode-args" name="FFMPEG_TRANSCODE_ARGS" rows="2" style="width: 100%; max-width: 700px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; font-family: monospace; font-size: 0.85rem; line-height: 1.4; resize: vertical;" placeholder="-c:v libx264 -preset veryfast -crf 23 -c:a aac -b:a 128k"></textarea>
-                                        <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0; line-height: 1.6;">
+                                        <textarea id="setting-ffmpeg-transcode-args" name="FFMPEG_TRANSCODE_ARGS" rows="2" style="width: 100%; max-width: 700px; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; font-family: monospace; font-size: 0.85rem; line-height: 1.4; resize: vertical;" placeholder="-c:v libx264 -preset veryfast -crf 23 -c:a aac -b:a 128k"></textarea>
+                                        <p style="font-size: 0.78rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0; line-height: 1.6;">
                                             비워두면 기본값(<code>-c:v libx264 -preset veryfast -crf 23 -c:a aac -b:a 128k</code>, CPU 소프트웨어 인코딩)을 사용합니다. 입력/출력 파일 인자는 서버가 자동으로 붙이므로 중간 인코딩 옵션만 적으세요.<br>
-                                            <strong style="color: #c084fc;">NVIDIA GPU(NVENC, 예: P600 등)가 있다면</strong> VAAPI 전용 자동 판별은 별도로 만들지 않았으니, 이 필드에 직접 NVENC 옵션을 넣으면 됩니다(호스트에 NVIDIA 드라이버 + <code>nvidia-container-toolkit</code> 설치 및 <code>docker-compose.yml</code>의 NVIDIA GPU 예약 설정 활성화가 선행되어야 함):<br>
+                                            <strong style="color: var(--app-accent-hover);">NVIDIA GPU(NVENC, 예: P600 등)가 있다면</strong> VAAPI 전용 자동 판별은 별도로 만들지 않았으니, 이 필드에 직접 NVENC 옵션을 넣으면 됩니다(호스트에 NVIDIA 드라이버 + <code>nvidia-container-toolkit</code> 설치 및 <code>docker-compose.yml</code>의 NVIDIA GPU 예약 설정 활성화가 선행되어야 함):<br>
                                             <code>-c:v h264_nvenc -preset p4 -tune ll -c:a aac -b:a 128k</code><br>
                                             ffmpeg가 이 서버에서 NVENC를 실제로 쓸 수 있는지는 <code>ffmpeg -h encoder=h264_nvenc</code> 및 <code>nvidia-smi</code> 명령을 컨테이너 안에서 직접 실행해 확인하세요(VAAPI처럼 자동 점검 버튼은 제공하지 않습니다).
                                         </p>
@@ -304,17 +304,17 @@
 
                                     <!-- VAAPI 폴백 인코딩 파라미터 -->
                                     <div class="library-form-group">
-                                        <label for="setting-ffmpeg-vaapi-args" style="font-weight: 700; color: #fff; font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
-                                            <i class="fa-solid fa-microchip" style="color: #c084fc; margin-right: 0.3rem;"></i> VAAPI 폴백 인코딩 파라미터 (VAAPI 감지 시)
+                                        <label for="setting-ffmpeg-vaapi-args" style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                            <i class="fa-solid fa-microchip" style="color: var(--app-accent-hover); margin-right: 0.3rem;"></i> VAAPI 폴백 인코딩 파라미터 (VAAPI 감지 시)
                                         </label>
-                                        <textarea id="setting-ffmpeg-vaapi-args" name="FFMPEG_VAAPI_ARGS" rows="2" style="width: 100%; max-width: 700px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; font-family: monospace; font-size: 0.85rem; line-height: 1.4; resize: vertical;" placeholder="-vf format=nv12,hwupload -c:v h264_vaapi -qp 24 -c:a aac -b:a 128k"></textarea>
-                                        <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.4rem 0 0 0;">비워두면 기본값(<code>-vf format=nv12,hwupload -c:v h264_vaapi -qp 24 -c:a aac -b:a 128k</code>)을 사용합니다. <code>-vaapi_device</code> 옵션은 위 디바이스 경로 값을 서버가 자동으로 붙이므로 여기엔 적지 않아도 됩니다.</p>
+                                        <textarea id="setting-ffmpeg-vaapi-args" name="FFMPEG_VAAPI_ARGS" rows="2" style="width: 100%; max-width: 700px; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; font-family: monospace; font-size: 0.85rem; line-height: 1.4; resize: vertical;" placeholder="-vf format=nv12,hwupload -c:v h264_vaapi -qp 24 -c:a aac -b:a 128k"></textarea>
+                                        <p style="font-size: 0.78rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0;">비워두면 기본값(<code>-vf format=nv12,hwupload -c:v h264_vaapi -qp 24 -c:a aac -b:a 128k</code>)을 사용합니다. <code>-vaapi_device</code> 옵션은 위 디바이스 경로 값을 서버가 자동으로 붙이므로 여기엔 적지 않아도 됩니다.</p>
                                     </div>
                                 </div>
                             </div>
 
                             <div style="margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 1rem; display: flex; justify-content: flex-end;">
-                                <button type="submit" class="btn-submit" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.7rem 1.8rem; font-size: 0.95rem; font-weight: 700; border-radius: 6px; background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%); color: #fff; border: none; cursor: pointer;">
+                                <button type="submit" class="btn-submit" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.7rem 1.8rem; font-size: 0.95rem; font-weight: 700; border-radius: 6px; background: linear-gradient(135deg, var(--app-accent) 0%, color-mix(in srgb, var(--app-accent) 70%, black) 100%); color: var(--app-accent-contrast); border: none; cursor: pointer;">
                                     <i class="fa-regular fa-floppy-disk"></i> <span data-i18n="settings.btn_save_config">설정 저장</span>
                                 </button>
                             </div>

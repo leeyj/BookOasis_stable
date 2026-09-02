@@ -103,17 +103,17 @@ function renderVideoCourseCards(videos, libraryId, emptyMessage) {
         <img src="/api/media/videos/${v.id}/cover" alt="${escapeHtml(v.title)}" decoding="async" loading="lazy">
         <div class="book-badge-count">${v.total_episodes || 0}편</div>
         <button class="btn-card-fav-toggle" data-role="video-course-add-collection" title="컬렉션에 추가"
-                style="position:absolute; top:8px; left:8px; background:rgba(15,23,42,0.75); border:none; color:#c084fc; width:1.9rem; height:1.9rem; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:2;">
+                style="position:absolute; top:8px; left:8px; background: rgba(var(--app-panel-rgb), 0.75); border:none; color:#c084fc; width:1.9rem; height:1.9rem; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:2;">
           <i class="fa-solid fa-folder-plus"></i>
         </button>
         <button class="btn-card-fav-toggle ${isFav ? 'active' : ''}" data-role="video-course-favorite" data-next-status="${isFav ? 0 : 1}" title="즐겨찾기 토글"
-                style="position:absolute; top:8px; right:8px; background:rgba(15,23,42,0.75); border:none; color:${isFav ? '#eab308' : '#94a3b8'}; width:1.9rem; height:1.9rem; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:2;">
+                style="position:absolute; top:8px; right:8px; background: rgba(var(--app-panel-rgb), 0.75); border:none; color:${isFav ? '#eab308' : '#94a3b8'}; width:1.9rem; height:1.9rem; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:2;">
           <i class="${isFav ? 'fa-solid' : 'fa-regular'} fa-star"></i>
         </button>
       </div>
       <div class="book-card-info">
         <p class="book-card-title" title="${escapeHtml(v.title)}">${escapeHtml(v.title)}</p>
-        <span style="font-size:0.72rem; color:#94a3b8;">${formatDuration(v.total_duration)}</span>
+        <span style="font-size:0.72rem; color: var(--app-text-muted);">${formatDuration(v.total_duration)}</span>
       </div>
     </div>
   `;

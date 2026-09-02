@@ -110,7 +110,7 @@ export function renderVolumeList(orderedBooks, safeSeriesName, actualLibraryId, 
             ${isCompleted}
             ${favBtnHtml}
           </div>
-          <span class="volume-path" style="font-size: 0.72rem; color: #64748b; word-break: break-all; margin-top: 0.15rem; display: block;">(${pathDisplay})</span>
+          <span class="volume-path" style="font-size: 0.72rem; color: var(--app-text-muted); word-break: break-all; margin-top: 0.15rem; display: block;">(${pathDisplay})</span>
           <div class="volume-meta-row">
             <span class="vol-meta"><i class="fa-regular fa-file"></i> ${book.total_pages}p</span>
             <span class="vol-meta"><i class="fa-regular fa-clock"></i> ${i18n.t('detail.time_est', { minutes: Math.max(1, Math.ceil(book.total_pages / 40)) })}</span>

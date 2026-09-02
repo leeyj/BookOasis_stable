@@ -232,7 +232,7 @@ export async function loadPathBrowserItems() {
   
   // UI 업데이트
   if (inputEl) inputEl.value = pathBrowserCurrentPath;
-  listEl.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 2rem;">로딩 중...</div>';
+  listEl.innerHTML = '<div style="text-align: center; color: var(--app-text-muted); padding: 2rem;">로딩 중...</div>';
   
   try {
     const params = new URLSearchParams();
@@ -251,7 +251,7 @@ export async function loadPathBrowserItems() {
     if (inputEl) inputEl.value = pathBrowserCurrentPath;
     
     if (items.length === 0) {
-      listEl.innerHTML = '<div style="color: #94a3b8; padding: 1rem; text-align: center;">하위 디렉토리가 없습니다.</div>';
+      listEl.innerHTML = '<div style="color: var(--app-text-muted); padding: 1rem; text-align: center;">하위 디렉토리가 없습니다.</div>';
       return;
     }
     

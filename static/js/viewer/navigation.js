@@ -292,9 +292,10 @@ export function nextComicPage() {
     const step = Settings.getComicPageStep ? Settings.getComicPageStep() : 1;
     const totalPages = Renderer.getComicTotalPages();
     const currentPage = Renderer.getComicCurrentPage();
+    const shiftOffset = (step === 2 && Settings.getSpreadShiftOffset) ? Settings.getSpreadShiftOffset() : 0;
 
-    // 두쪽 보기(step === 2)일 때 화면에 노출 중인 마지막 페이지 인덱스
-    const displayEndPage = (step === 2) ? Math.min(currentPage + 1, totalPages - 1) : currentPage;
+    // 두쪽 보기(step === 2)일 때 화면에 노출 중인 마지막 페이지 인덱스 ("한 장 밀기" 보정 반영)
+    const displayEndPage = (step === 2) ? Math.min(currentPage + shiftOffset + 1, totalPages - 1) : currentPage;
 
     // 이미 마지막 페이지까지 노출 중인 경우 다음 권 불러오기 발동
     if (displayEndPage >= totalPages - 1) {

@@ -22,7 +22,7 @@ export async function mountCategoryPluginUI(pluginId) {
   updateCurrentCategoryIndicator(`plugin_${pluginId}`);
 
   container.innerHTML = `
-    <div class="loading-spinner" style="padding: 4rem 1rem; text-align: center; color: #94a3b8; width: 100%;">
+    <div class="loading-spinner" style="padding: 4rem 1rem; text-align: center; color: var(--app-text-muted); width: 100%;">
       <i class="fa-solid fa-circle-notch fa-spin fa-2x" style="color: #c084fc;"></i>
       <div style="margin-top: 1rem; font-size: 0.95rem;">플러그인 전용 화면을 불러오는 중...</div>
     </div>
@@ -78,10 +78,10 @@ export async function mountCategoryPluginUI(pluginId) {
     container.innerHTML = `
       <div class="custom-plugin-page-container" style="padding: 1.5rem 2rem; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; min-height: 80vh;">
         <div class="custom-plugin-page-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 1rem;">
-          <h2 style="margin: 0; color: #f8fafc; font-size: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 0.6rem;">
+          <h2 style="margin: 0; color: var(--app-text-primary); font-size: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 0.6rem;">
             <i class="${icon}" style="color: #c084fc;"></i> <span>${title}</span>
           </h2>
-          <span style="color: #64748b; font-size: 0.85rem;">제공: ${escapeHtml(pluginInfo.name || 'BookOasis Plugin')}</span>
+          <span style="color: var(--app-text-muted); font-size: 0.85rem;">제공: ${escapeHtml(pluginInfo.name || 'BookOasis Plugin')}</span>
         </div>
         <div id="custom-plugin-body-${pluginId}" class="custom-plugin-page-body" style="width: 100%; flex: 1;">
         </div>
@@ -118,67 +118,67 @@ function renderStatsDashboardCustomView(container, stats) {
 
   container.innerHTML = `
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.2rem; margin-bottom: 2rem;">
-      <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 1.2rem; display: flex; align-items: center; gap: 1rem;">
+      <div style="background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.08); border-radius: 12px; padding: 1.2rem; display: flex; align-items: center; gap: 1rem;">
         <div style="width: 50px; height: 50px; border-radius: 10px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
           <i class="fa-solid fa-book-open"></i>
         </div>
         <div>
-          <div style="color: #94a3b8; font-size: 0.85rem; font-weight: 500;">총 보유 시리즈 / 도서</div>
-          <div style="color: #f8fafc; font-size: 1.4rem; font-weight: 700; margin-top: 0.2rem;">${series} 시리즈 / ${books} 권</div>
+          <div style="color: var(--app-text-muted); font-size: 0.85rem; font-weight: 500;">총 보유 시리즈 / 도서</div>
+          <div style="color: var(--app-text-primary); font-size: 1.4rem; font-weight: 700; margin-top: 0.2rem;">${series} 시리즈 / ${books} 권</div>
         </div>
       </div>
 
-      <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 1.2rem; display: flex; align-items: center; gap: 1rem;">
+      <div style="background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.08); border-radius: 12px; padding: 1.2rem; display: flex; align-items: center; gap: 1rem;">
         <div style="width: 50px; height: 50px; border-radius: 10px; background: rgba(168, 85, 247, 0.15); color: #a855f7; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
           <i class="fa-solid fa-chart-line"></i>
         </div>
         <div>
-          <div style="color: #94a3b8; font-size: 0.85rem; font-weight: 500;">주간 완독 현황</div>
-          <div style="color: #f8fafc; font-size: 1.4rem; font-weight: 700; margin-top: 0.2rem;">이번주 ${weekCompleted} 권</div>
+          <div style="color: var(--app-text-muted); font-size: 0.85rem; font-weight: 500;">주간 완독 현황</div>
+          <div style="color: var(--app-text-primary); font-size: 1.4rem; font-weight: 700; margin-top: 0.2rem;">이번주 ${weekCompleted} 권</div>
         </div>
       </div>
 
-      <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 1.2rem; display: flex; align-items: center; gap: 1rem;">
+      <div style="background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.08); border-radius: 12px; padding: 1.2rem; display: flex; align-items: center; gap: 1rem;">
         <div style="width: 50px; height: 50px; border-radius: 10px; background: rgba(34, 197, 94, 0.15); color: #4ade80; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
           <i class="fa-solid fa-circle-check"></i>
         </div>
         <div>
-          <div style="color: #94a3b8; font-size: 0.85rem; font-weight: 500;">월간 완독 도서</div>
-          <div style="color: #f8fafc; font-size: 1.4rem; font-weight: 700; margin-top: 0.2rem;">이번달 ${monthCompleted} 권</div>
+          <div style="color: var(--app-text-muted); font-size: 0.85rem; font-weight: 500;">월간 완독 도서</div>
+          <div style="color: var(--app-text-primary); font-size: 1.4rem; font-weight: 700; margin-top: 0.2rem;">이번달 ${monthCompleted} 권</div>
         </div>
       </div>
 
-      <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 1.2rem; display: flex; align-items: center; gap: 1rem;">
+      <div style="background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.08); border-radius: 12px; padding: 1.2rem; display: flex; align-items: center; gap: 1rem;">
         <div style="width: 50px; height: 50px; border-radius: 10px; background: rgba(251, 146, 60, 0.15); color: #fb923c; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
           <i class="fa-solid fa-file-lines"></i>
         </div>
         <div>
-          <div style="color: #94a3b8; font-size: 0.85rem; font-weight: 500;">주간 읽은 페이지 수</div>
-          <div style="color: #f8fafc; font-size: 1.4rem; font-weight: 700; margin-top: 0.2rem;">${weekPages} Page</div>
+          <div style="color: var(--app-text-muted); font-size: 0.85rem; font-weight: 500;">주간 읽은 페이지 수</div>
+          <div style="color: var(--app-text-primary); font-size: 1.4rem; font-weight: 700; margin-top: 0.2rem;">${weekPages} Page</div>
         </div>
       </div>
     </div>
 
     <!-- 포맷 분석 영역 -->
-    <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 1.5rem;">
-      <h3 style="margin: 0 0 1rem 0; color: #cbd5e1; font-size: 1.1rem;">보유 미디어 파일 포맷 분석</h3>
+    <div style="background: rgba(var(--app-panel-rgb), 0.4); border: 1px solid rgba(var(--app-panel-border-rgb), 0.05); border-radius: 12px; padding: 1.5rem;">
+      <h3 style="margin: 0 0 1rem 0; color: var(--app-text-muted); font-size: 1.1rem;">보유 미디어 파일 포맷 분석</h3>
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
-        <div style="background: rgba(15, 23, 42, 0.6); border-radius: 8px; padding: 1rem; text-align: center;">
+        <div style="background: rgba(var(--app-panel-rgb), 0.6); border-radius: 8px; padding: 1rem; text-align: center;">
           <div style="color: #38bdf8; font-size: 1.5rem; font-weight: 700;">${zipCnt.toLocaleString()}</div>
-          <div style="color: #94a3b8; font-size: 0.8rem; margin-top: 0.2rem;">압축 파일 (ZIP/CBZ/RAR)</div>
+          <div style="color: var(--app-text-muted); font-size: 0.8rem; margin-top: 0.2rem;">압축 파일 (ZIP/CBZ/RAR)</div>
         </div>
-        <div style="background: rgba(15, 23, 42, 0.6); border-radius: 8px; padding: 1rem; text-align: center;">
+        <div style="background: rgba(var(--app-panel-rgb), 0.6); border-radius: 8px; padding: 1rem; text-align: center;">
           <div style="color: #a855f7; font-size: 1.5rem; font-weight: 700;">${epubCnt.toLocaleString()}</div>
-          <div style="color: #94a3b8; font-size: 0.8rem; margin-top: 0.2rem;">전자책 (EPUB/TXT)</div>
+          <div style="color: var(--app-text-muted); font-size: 0.8rem; margin-top: 0.2rem;">전자책 (EPUB/TXT)</div>
         </div>
-        <div style="background: rgba(15, 23, 42, 0.6); border-radius: 8px; padding: 1rem; text-align: center;">
+        <div style="background: rgba(var(--app-panel-rgb), 0.6); border-radius: 8px; padding: 1rem; text-align: center;">
           <div style="color: #4ade80; font-size: 1.5rem; font-weight: 700;">${pdfCnt.toLocaleString()}</div>
-          <div style="color: #94a3b8; font-size: 0.8rem; margin-top: 0.2rem;">문서 파일 (PDF)</div>
+          <div style="color: var(--app-text-muted); font-size: 0.8rem; margin-top: 0.2rem;">문서 파일 (PDF)</div>
         </div>
         ${(m4bCnt || mp3Cnt) ? `
-        <div style="background: rgba(15, 23, 42, 0.6); border-radius: 8px; padding: 1rem; text-align: center;">
+        <div style="background: rgba(var(--app-panel-rgb), 0.6); border-radius: 8px; padding: 1rem; text-align: center;">
           <div style="color: #fb923c; font-size: 1.5rem; font-weight: 700;">${(m4bCnt + mp3Cnt).toLocaleString()}</div>
-          <div style="color: #94a3b8; font-size: 0.8rem; margin-top: 0.2rem;">오디오북 (M4B/MP3)</div>
+          <div style="color: var(--app-text-muted); font-size: 0.8rem; margin-top: 0.2rem;">오디오북 (M4B/MP3)</div>
         </div>
         ` : ''}
       </div>
@@ -188,7 +188,7 @@ function renderStatsDashboardCustomView(container, stats) {
 
 function renderCustomPluginGridItems(container, items) {
   if (!items || items.length === 0) {
-    container.innerHTML = '<div style="padding: 3rem; color: #94a3b8; text-align: center;">표시할 항목이 없습니다.</div>';
+    container.innerHTML = '<div style="padding: 3rem; color: var(--app-text-muted); text-align: center;">표시할 항목이 없습니다.</div>';
     return;
   }
 
@@ -201,13 +201,13 @@ function renderCustomPluginGridItems(container, items) {
     const isExternal = link && link !== '#';
 
     html += `
-      <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; transition: transform 0.2s, box-shadow 0.2s;" class="custom-plugin-card">
+      <div style="background: rgba(var(--app-panel-rgb), 0.5); border: 1px solid rgba(var(--app-panel-border-rgb), 0.06); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; transition: transform 0.2s, box-shadow 0.2s;" class="custom-plugin-card">
         <a href="${isExternal ? link : '#'}" ${isExternal ? 'target="_blank" rel="noopener noreferrer"' : ''} style="display: block; width: 100%; aspect-ratio: 3/4; overflow: hidden; background: #0f172a; position: relative;">
           <img src="${cover}" alt="${title}" style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s;" loading="lazy">
         </a>
         <div style="padding: 0.8rem; display: flex; flex-direction: column; gap: 0.3rem; flex: 1; justify-content: space-between;">
-          <a href="${isExternal ? link : '#'}" ${isExternal ? 'target="_blank" rel="noopener noreferrer"' : ''} style="color: #f8fafc; font-size: 0.9rem; font-weight: 600; text-decoration: none; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;" title="${title}">${title}</a>
-          <span style="color: #94a3b8; font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${author}</span>
+          <a href="${isExternal ? link : '#'}" ${isExternal ? 'target="_blank" rel="noopener noreferrer"' : ''} style="color: var(--app-text-primary); font-size: 0.9rem; font-weight: 600; text-decoration: none; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;" title="${title}">${title}</a>
+          <span style="color: var(--app-text-muted); font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${author}</span>
         </div>
       </div>
     `;

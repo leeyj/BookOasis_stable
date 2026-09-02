@@ -38,7 +38,7 @@ class CategoryRepository:
         return [dict(row) for row in rows]
 
     @staticmethod
-    def add_library_group(db_type, name, icon='fa-folder', color='#a855f7'):
+    def add_library_group(db_type, name, icon='fa-folder', color=None):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:

@@ -84,11 +84,11 @@ export async function loadDashboardInsights(libraryType = 'general') {
           });
 
           return `
-            <div class="currently-book-item ui-hover-currently-book" data-role="currently-reading-book" data-book-id="${book.id}" data-file-format="${escapeHtml(resolvedFmt)}" data-book-title="${escapeHtml(book.title)}" data-pages-read="${book.current_page || book.pages_read || 0}" data-total-pages="${book.total_pages || 0}" style="display: flex; align-items: center; gap: 0.5rem; background: rgba(15, 23, 42, 0.4); padding: 0.35rem 0.5rem; border-radius: 8px; cursor: pointer; transition: background 0.2s;">
+            <div class="currently-book-item ui-hover-currently-book" data-role="currently-reading-book" data-book-id="${book.id}" data-file-format="${escapeHtml(resolvedFmt)}" data-book-title="${escapeHtml(book.title)}" data-pages-read="${book.current_page || book.pages_read || 0}" data-total-pages="${book.total_pages || 0}" style="display: flex; align-items: center; gap: 0.5rem; background: rgba(var(--app-panel-rgb), 0.4); padding: 0.35rem 0.5rem; border-radius: 8px; cursor: pointer; transition: background 0.2s;">
               <img src="${coverSrc}" onerror="this.onerror=null; this.src='${fallbackSrc}';" alt="Cover" style="width: 26px; height: 36px; object-fit: cover; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
               <div style="flex: 1; min-width: 0;">
-                <div style="font-size: 0.78rem; font-weight: 700; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(book.title)}</div>
-                <div style="font-size: 0.68rem; color: #94a3b8; margin-bottom: 0.2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(book.author)}</div>
+                <div style="font-size: 0.78rem; font-weight: 700; color: var(--app-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(book.title)}</div>
+                <div style="font-size: 0.68rem; color: var(--app-text-muted); margin-bottom: 0.2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(book.author)}</div>
                 <div style="width: 100%; height: 4px; background: rgba(255, 255, 255, 0.1); border-radius: 2px; overflow: hidden;">
                   <div style="width: ${book.progress_pct}%; height: 100%; background: #38bdf8; border-radius: 2px;"></div>
                 </div>
@@ -98,7 +98,7 @@ export async function loadDashboardInsights(libraryType = 'general') {
           `;
         }).join('');
       } else {
-        currentlyContainer.innerHTML = `<div style="text-align: center; color: #64748b; font-size: 0.78rem; padding: 0.4rem 0;" data-i18n="dashboard.insights_no_currently">${(window.t && window.t('dashboard.insights_no_currently')) || '현재 진행 중인 도서가 없습니다.'}</div>`;
+        currentlyContainer.innerHTML = `<div style="text-align: center; color: var(--app-text-muted); font-size: 0.78rem; padding: 0.4rem 0;" data-i18n="dashboard.insights_no_currently">${(window.t && window.t('dashboard.insights_no_currently')) || '현재 진행 중인 도서가 없습니다.'}</div>`;
       }
     }
 
@@ -130,7 +130,7 @@ export async function loadDashboardInsights(libraryType = 'general') {
       if (Array.isArray(data.genre_breakdown) && data.genre_breakdown.length > 0) {
         genreContainer.innerHTML = data.genre_breakdown.map(g => `
           <div class="genre-item" style="display: flex; flex-direction: column; gap: 0.15rem;">
-            <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: #cbd5e1; font-weight: 600;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--app-text-muted); font-weight: 600;">
               <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;">${escapeHtml(g.name)}</span>
               <span style="color: ${g.color}; font-weight: 700;">${g.pct}%</span>
             </div>
@@ -140,7 +140,7 @@ export async function loadDashboardInsights(libraryType = 'general') {
           </div>
         `).join('');
       } else {
-        genreContainer.innerHTML = `<div style="text-align: center; color: #64748b; font-size: 0.78rem;" data-i18n="dashboard.insights_no_genre">${(window.t && window.t('dashboard.insights_no_genre')) || '올해 독서 장르 기록이 없습니다.'}</div>`;
+        genreContainer.innerHTML = `<div style="text-align: center; color: var(--app-text-muted); font-size: 0.78rem;" data-i18n="dashboard.insights_no_genre">${(window.t && window.t('dashboard.insights_no_genre')) || '올해 독서 장르 기록이 없습니다.'}</div>`;
       }
     }
 

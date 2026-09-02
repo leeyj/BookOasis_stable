@@ -445,6 +445,8 @@
     "split_spread_title": "Toggle split-page view",
     "split_spread_off": "Split Off",
     "split_spread_on": "Split On",
+    "shift_spread": "Shift by 1",
+    "shift_spread_title": "Shift the two-page pairing by one page (Shift+Space/Arrow)",
     "spacing_settings": "Spacing Settings",
     "spacing_settings_short": "Spacing",
     "padding_vertical": "Vert. Margin",

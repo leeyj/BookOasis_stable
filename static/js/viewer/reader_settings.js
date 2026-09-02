@@ -128,14 +128,55 @@ function syncComicPageStepUI() {
   const btn = document.getElementById('btn-comic-page-step');
   const label = document.getElementById('comic-page-step-label');
   const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
+  const isTwoPageActive = comicPageStep === 2 && scrollMode !== 'scroll';
   if (btn) {
-    btn.classList.toggle('active', comicPageStep === 2 && scrollMode !== 'scroll');
+    btn.classList.toggle('active', isTwoPageActive);
     btn.setAttribute('data-step', String(comicPageStep));
     btn.title = scrollMode === 'scroll' ? '스크롤 모드에서는 1장씩만 적용됩니다' : (comicPageStep === 2 ? '2장씩 보기' : '1장씩 보기');
   }
   if (label) {
     label.textContent = scrollMode === 'scroll' ? '1장' : `${comicPageStep}장`;
   }
+
+  // 2쪽보기가 아니면 "한 장 밀기" 정렬 보정은 의미가 없다 - 버튼을 숨기고 상태도 리셋한다.
+  const shiftBtn = document.getElementById('btn-spread-shift');
+  if (shiftBtn) shiftBtn.style.display = isTwoPageActive ? '' : 'none';
+  if (!isTwoPageActive && spreadShiftOffset !== 0) {
+    resetSpreadShiftOffset();
+  }
+}
+
+// ──────────────────────────────────────────────────
+// 2쪽보기 정렬 "한 장 밀기" — 예: (9,10)(11,12)로 짝지어지던 스프레드를
+// (10,11)로 볼 수 있도록 짝의 기준을 한 장 밀어서 보정한다 (comic/pdf 뷰어 공용).
+// 페이지 이동 자체(진행률 저장 기준)는 건드리지 않고 화면에 보여줄 짝만 바꾼다.
+// ──────────────────────────────────────────────────
+
+export let spreadShiftOffset = 0; // 0 또는 1
+
+export function getSpreadShiftOffset() {
+  return spreadShiftOffset;
+}
+
+export function toggleSpreadShiftOffset() {
+  const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
+  if (scrollMode === 'scroll' || comicPageStep !== 2) return spreadShiftOffset; // 2쪽보기가 아니면 무의미
+  spreadShiftOffset = spreadShiftOffset === 0 ? 1 : 0;
+  syncSpreadShiftOffsetUI();
+  return spreadShiftOffset;
+}
+
+// 책을 새로 열 때마다 호출해서 이전 책의 정렬 보정이 새 책에 남아있지 않도록 한다.
+export function resetSpreadShiftOffset() {
+  spreadShiftOffset = 0;
+  syncSpreadShiftOffsetUI();
+}
+
+function syncSpreadShiftOffsetUI() {
+  const btn = document.getElementById('btn-spread-shift');
+  if (!btn) return;
+  btn.classList.toggle('active', spreadShiftOffset === 1);
+  btn.title = spreadShiftOffset === 1 ? '페이지 정렬 원래대로' : '두 페이지 짝을 한 장 밀어서 보기';
 }
 
 // ──────────────────────────────────────────────────

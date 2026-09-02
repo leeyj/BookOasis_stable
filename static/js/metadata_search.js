@@ -71,7 +71,7 @@ export async function openMetadataSearchModal(bookId, defaultQuery, seriesMode =
   cleanQuery = cleanQuery.replace(/\[.*?\]|\(.*?\)/g, '').trim();
   
   input.value = cleanQuery;
-  container.innerHTML = `<div style="text-align: center; padding: 2rem; color: #94a3b8;">${i18n.t('metadata_search.init_message')}</div>`;
+  container.innerHTML = `<div style="text-align: center; padding: 2rem; color: var(--app-text-muted);">${i18n.t('metadata_search.init_message')}</div>`;
   
   modal.style.display = 'flex';
   
@@ -152,16 +152,16 @@ function renderMetadataResults(books, source) {
     const coverSrc = escapeHtml(book.cover || fallbackCoverSrc);
     
     html += `
-      <div class="metadata-result-card" style="display: flex; gap: 1rem; background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 1rem; cursor: pointer; transition: all 0.2s;" data-index="${idx}">
-        <div style="flex-shrink: 0; width: 80px; height: 110px; background: rgba(15, 23, 42, 0.5); border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+      <div class="metadata-result-card" style="display: flex; gap: 1rem; background: rgba(var(--app-panel-rgb), 0.4); border: 1px solid rgba(var(--app-panel-border-rgb), 0.06); border-radius: 8px; padding: 1rem; cursor: pointer; transition: all 0.2s;" data-index="${idx}">
+        <div style="flex-shrink: 0; width: 80px; height: 110px; background: rgba(var(--app-panel-rgb), 0.5); border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
           <img src="${coverSrc}" alt="Cover" style="width: 100%; height: 100%; object-fit: cover;" onerror="if(this.src!== fallbackCoverSrc){this.src=fallbackCoverSrc;}else{this.onerror=null;}">
         </div>
         <div style="flex: 1; display: flex; flex-direction: column; gap: 0.3rem;">
-          <h4 style="margin: 0; color: #fff; font-size: 0.95rem; font-weight: 700;">${safeTitle}</h4>
-          <div style="font-size: 0.8rem; color: #94a3b8;">
+          <h4 style="margin: 0; color: var(--app-text-primary); font-size: 0.95rem; font-weight: 700;">${safeTitle}</h4>
+          <div style="font-size: 0.8rem; color: var(--app-text-muted);">
             <span>${i18n.t('metadata_search.book_meta', {author: safeAuthor, publisher: safePublisher, pubDate: safePubDate})}</span>
           </div>
-          <p style="margin: 0.3rem 0 0 0; font-size: 0.78rem; color: #cbd5e1; line-height: 1.4;">${desc}</p>
+          <p style="margin: 0.3rem 0 0 0; font-size: 0.78rem; color: var(--app-text-muted); line-height: 1.4;">${desc}</p>
         </div>
       </div>
     `;

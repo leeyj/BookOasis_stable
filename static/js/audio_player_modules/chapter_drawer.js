@@ -17,8 +17,8 @@ export function createChapterDrawer(deps) {
     const currentTrackIndex = getCurrentTrackIndex();
     container.innerHTML = tracks.map((t, idx) => {
       const isPlaying = idx === currentTrackIndex;
-      const activeStyle = isPlaying ? 'background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8;' : 'background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); color: #e2e8f0;';
-      const playIcon = isPlaying ? '<i class="fa-solid fa-volume-high" style="color: #38bdf8;"></i>' : `<span style="font-size: 0.8rem; color: #64748b;">${t.track_number || (idx + 1)}</span>`;
+      const activeStyle = isPlaying ? 'background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8;' : 'background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); color: var(--app-text-primary);';
+      const playIcon = isPlaying ? '<i class="fa-solid fa-volume-high" style="color: #38bdf8;"></i>' : `<span style="font-size: 0.8rem; color: var(--app-text-muted);">${t.track_number || (idx + 1)}</span>`;
 
       return `
         <div data-role="audio-chapter-track" data-track-id="${t.id}" style="display: flex; align-items: center; justify-content: space-between; padding: 0.8rem 1rem; border-radius: 12px; cursor: pointer; transition: all 0.2s; ${activeStyle}">
@@ -26,7 +26,7 @@ export function createChapterDrawer(deps) {
             ${playIcon}
             <span style="font-size: 0.9rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${t.title}</span>
           </div>
-          <span style="font-size: 0.8rem; color: #94a3b8; font-family: monospace;">${t.time_str || ''}</span>
+          <span style="font-size: 0.8rem; color: var(--app-text-muted); font-family: monospace;">${t.time_str || ''}</span>
         </div>
       `;
     }).join('');

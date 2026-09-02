@@ -2,21 +2,21 @@
 <div id="settings-tab-external-domains" class="settings-tab-content" style="display: none; flex-direction: column; gap: 1.5rem;">
     <div class="dashboard-section">
         <div class="section-header" style="margin-bottom: 1.2rem;">
-            <h3 class="section-title" style="margin: 0; color: #fff; font-size: 1.2rem; font-weight: 700;">
-                <i class="fa-solid fa-globe" style="color: #a855f7; margin-right: 0.5rem;"></i> 외부 도메인 허용 목록
+            <h3 class="section-title" style="margin: 0; color: var(--app-text-primary); font-size: 1.2rem; font-weight: 700;">
+                <i class="fa-solid fa-globe" style="color: var(--app-accent); margin-right: 0.5rem;"></i> 외부 도메인 허용 목록
             </h3>
-            <p style="font-size: 0.82rem; color: #94a3b8; margin: 0.4rem 0 0 0;">
+            <p style="font-size: 0.82rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0;">
                 플러그인이 외부 사이트를 웹뷰로 열거나 파일을 다운로드하려면, 먼저 해당 도메인을 여기에 등록해야 합니다.
                 이 목록은 <strong>모든 사용자에게 공통 적용되는 전역 목록</strong>이며, 관리자만 추가/삭제할 수 있습니다.
                 <strong>본 소프트웨어는 어떤 외부 도메인도 기본 제공하거나 추천하지 않습니다</strong> — 등록하는 도메인과
                 그 이용에 대한 책임은 전적으로 관리자 본인에게 있습니다.
             </p>
         </div>
-        <div style="background: rgba(30, 41, 59, 0.25); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 1.5rem; backdrop-filter: blur(10px); color: #cbd5e1;">
+        <div style="background: rgba(var(--app-panel-rgb), 0.25); border: 1px solid rgba(var(--app-panel-border-rgb), 0.05); border-radius: 8px; padding: 1.5rem; backdrop-filter: blur(10px); color: var(--app-text-muted);">
             <form id="external-domains-add-form" style="display: flex; gap: 0.6rem; margin-bottom: 1.2rem;">
                 <input type="text" id="external-domains-input" placeholder="example.com 또는 *.example.com"
-                       style="flex: 1; padding: 0.55rem 0.8rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.12);
-                              background: rgba(15,23,42,0.6); color: #fff; font-size: 0.85rem;">
+                       style="flex: 1; padding: 0.55rem 0.8rem; border-radius: 6px; border: 1px solid rgba(var(--app-panel-border-rgb), 0.12);
+                              background: rgba(var(--app-panel-rgb), 0.6); color: var(--app-text-primary); font-size: 0.85rem;">
                 <button type="submit" class="btn-submit" style="padding: 0.55rem 1.2rem; font-size: 0.85rem;">
                     <i class="fa-solid fa-plus"></i> 추가
                 </button>

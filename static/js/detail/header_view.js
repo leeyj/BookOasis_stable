@@ -100,7 +100,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
 
     genreRowHtml = `
       <div class="detail-genre-row" style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
-        <span style="font-size: 0.8rem; font-weight: 700; color: #94a3b8; margin-right: 0.2rem;">장르:</span>
+        <span style="font-size: 0.8rem; font-weight: 700; color: var(--app-text-muted); margin-right: 0.2rem;">장르:</span>
         ${visibleItemsHtml}
         ${toggleBtnHtml}
       </div>
@@ -133,7 +133,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
 
     tagRowHtml = `
       <div class="detail-tag-row" style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
-        <span style="font-size: 0.8rem; font-weight: 700; color: #94a3b8; margin-right: 0.2rem;">태그:</span>
+        <span style="font-size: 0.8rem; font-weight: 700; color: var(--app-text-muted); margin-right: 0.2rem;">태그:</span>
         ${visibleItemsHtml}
         ${toggleBtnHtml}
       </div>
@@ -291,7 +291,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
     const resumeStartTime = (meta && Number(meta.current_time) > 0) ? Number(meta.current_time) : (continueTarget.pages_read || 0);
     const continueAction = isVideoBtnContext ? 'video' : (isAudioContext ? 'audio' : 'reader');
     continueBtnHtml = `
-      <button class="ridi-link-btn" style="margin: 0; background: ${btnColor}; border-color: ${btnBorder}; font-weight: bold; color: #fff; display: inline-flex; align-items: center; gap: 0.3rem;"
+      <button class="ridi-link-btn" style="margin: 0; background: ${btnColor}; border-color: ${btnBorder}; font-weight: bold; color: var(--app-text-primary); display: inline-flex; align-items: center; gap: 0.3rem;"
               data-role="detail-continue"
               data-continue-action="${continueAction}"
               data-audiobook-id="${(meta && meta.id) ? meta.id : (continueTarget.audiobook_id || continueTarget.id || '')}"
@@ -385,7 +385,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
       <div id="detail-header-meta-view" class="detail-header-meta">
         <h3 class="book-detail-title" style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
           ${meta.series_alias || visibleTitle}
-          ${meta.series_alias ? `<span style="font-size: 0.85rem; color: #94a3b8; font-weight: normal;">(${visibleTitle})</span>` : ''}
+          ${meta.series_alias ? `<span style="font-size: 0.85rem; color: var(--app-text-muted); font-weight: normal;">(${visibleTitle})</span>` : ''}
           ${audiobookCompletedBadgeHtml}
           ${seriesFavBtnHtml}
           ${editToggleBtnHtml}
@@ -430,7 +430,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
 
       <!-- 편집 모드 (수동 입력 폼) -->
       <div id="detail-header-meta-edit" class="detail-header-meta" style="display: none;">
-        <h3 class="book-detail-title" style="margin-bottom: 0.5rem; font-size: 1.3rem;">${i18n.t('detail.edit_title')} <span style="font-size: 0.8rem; color: #94a3b8; font-weight: normal; margin-left: 0.5rem;">${i18n.t('detail.edit_subtitle')}</span></h3>
+        <h3 class="book-detail-title" style="margin-bottom: 0.5rem; font-size: 1.3rem;">${i18n.t('detail.edit_title')} <span style="font-size: 0.8rem; color: var(--app-text-muted); font-weight: normal; margin-left: 0.5rem;">${i18n.t('detail.edit_subtitle')}</span></h3>
         <div class="edit-meta-form-group">
           <div class="edit-meta-row-item">
             <label>시리즈 별칭 (Alias)</label>
@@ -472,10 +472,10 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
       </div>
       
       <!-- 유사 메타데이터 추천 영역 -->
-      <div id="meta-recommend-section" style="display:none; margin-top: 1rem; padding: 1rem; background: rgba(30, 41, 59, 0.5); border: 1px dashed rgba(168, 85, 247, 0.4); border-radius: 8px; width: 100%;">
+      <div id="meta-recommend-section" style="display:none; margin-top: 1rem; padding: 1rem; background: rgba(var(--app-panel-rgb), 0.5); border: 1px dashed rgba(168, 85, 247, 0.4); border-radius: 8px; width: 100%;">
         <h5 style="margin: 0 0 0.8rem 0; color: #c084fc; font-size: 0.85rem;"><i class="fa-solid fa-wand-magic-sparkles"></i> ${i18n.t('detail.title_recommend')}</h5>
         <div id="recommend-candidates-list" style="display: flex; flex-direction: column; gap: 0.6rem;">
-          <div style="font-size:0.75rem; color:#64748b;"><i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('detail.loading_recommend')}</div>
+          <div style="font-size:0.75rem; color: var(--app-text-muted);"><i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('detail.loading_recommend')}</div>
         </div>
       </div>
     </div>

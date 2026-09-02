@@ -113,7 +113,7 @@ function renderLibraryItem(lib, isPinned) {
   const groupId = lib.group_id == null ? '' : String(lib.group_id);
   const safeGdriveCopyRemote = escapeHtml(lib.gdrive_copy_remote || '');
   const safeGdriveViewMirrorPath = escapeHtml(lib.gdrive_view_local_mirror_path || '');
-  return `<li class="menu-item ${isActive}" data-type="custom" data-role="sidebar-category-dynamic" data-id="${lib.id}" data-category-id="${lib.id}" data-name="${safeName}" data-path="${safePath}" data-remote="${lib.is_remote || 0}" data-rclone-url="${safeRclone}" data-icon="${safeIcon}" data-color="${safeColor}" data-hide-cover="${hideCover}" data-group-id="${groupId}" data-gdrive-copy-remote="${safeGdriveCopyRemote}" data-gdrive-view-local-mirror-path="${safeGdriveViewMirrorPath}" ${draggableAttr} style="display: flex; align-items: center; justify-content: space-between;"><span style="display: inline-flex; align-items: center; gap: 0.6rem;"><i class="fa-solid ${safeIcon}" style="color: ${safeColor};"></i> ${safeName}</span><i class="fa-solid fa-circle-notch fa-spin category-scan-spinner" style="display:none; color:#c084fc; font-size:0.75rem; margin-left:auto;" title="스캔 진행 중"></i></li>`;
+  return `<li class="menu-item ${isActive}" data-type="custom" data-role="sidebar-category-dynamic" data-id="${lib.id}" data-category-id="${lib.id}" data-name="${safeName}" data-path="${safePath}" data-remote="${lib.is_remote || 0}" data-rclone-url="${safeRclone}" data-icon="${safeIcon}" data-color="${safeColor}" data-hide-cover="${hideCover}" data-group-id="${groupId}" data-gdrive-copy-remote="${safeGdriveCopyRemote}" data-gdrive-view-local-mirror-path="${safeGdriveViewMirrorPath}" ${draggableAttr} style="display: flex; align-items: center; justify-content: space-between;"><span style="display: inline-flex; align-items: center; gap: 0.6rem;"><i class="fa-solid ${safeIcon}" style="color: ${safeColor};"></i> ${safeName}</span><i class="fa-solid fa-circle-notch fa-spin category-scan-spinner" style="display:none; color:var(--app-accent-hover); font-size:0.75rem; margin-left:auto;" title="스캔 진행 중"></i></li>`;
 }
 
 function renderPluginItem(cp) {
@@ -297,19 +297,19 @@ export async function loadLibraries() {
     if (data.success) {
       state.libraryGroups = Array.isArray(data.groups) ? data.groups : [];
       const isPinned = localStorage.getItem('category_order_pinned') !== 'false';
-      const pinBtnStyle = isPinned 
-        ? "color: #a855f7; transform: none;" 
-        : "color: #94a3b8; transform: rotate(45deg);";
+      const pinBtnStyle = isPinned
+        ? "color: var(--app-accent); transform: none;"
+        : "color: var(--app-text-muted); transform: rotate(45deg);";
       const pinTitle = isPinned ? i18n.t('category.pin_pinned') : i18n.t('category.pin_unpinned');
-      
+
       const isAdmin = isCurrentUserAdmin();
-      const addBtnHtml = isAdmin 
-        ? `<button data-role="sidebar-add-library" style="background: none; border: none; color: #a855f7; cursor: pointer; padding: 0.2rem 0.4rem; font-size: 0.9rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px;" title="${i18n.t('category.add_new_tooltip')}">
+      const addBtnHtml = isAdmin
+        ? `<button data-role="sidebar-add-library" style="background: none; border: none; color: var(--app-accent); cursor: pointer; padding: 0.2rem 0.4rem; font-size: 0.9rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px;" title="${i18n.t('category.add_new_tooltip')}">
             <i class="fa-solid fa-plus"></i>
           </button>`
         : '';
       const addGroupBtnHtml = isAdmin
-        ? `<button data-role="sidebar-add-library-group" style="background: none; border: none; color: #a855f7; cursor: pointer; padding: 0.2rem 0.4rem; font-size: 0.9rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px;" title="그룹 추가">
+        ? `<button data-role="sidebar-add-library-group" style="background: none; border: none; color: var(--app-accent); cursor: pointer; padding: 0.2rem 0.4rem; font-size: 0.9rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px;" title="그룹 추가">
             <i class="fa-solid fa-folder-plus"></i>
           </button>`
         : '';
@@ -341,7 +341,7 @@ export async function loadLibraries() {
 
       html += `<li class="menu-item ${state.currentLibraryId === 'history' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-history" data-id="history" data-category-id="history"><i class="fa-solid fa-clock-rotate-left"></i> ${tHistory}</li>`;
       html += `<li class="menu-item ${state.currentLibraryId === 'favorite' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-favorite" data-id="favorite" data-category-id="favorite"><i class="fa-solid fa-star" style="color: #eab308;"></i> ${tFavorite}</li>`;
-      html += `<li class="menu-item ${state.currentLibraryId === 'collection' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-collection" data-id="collection" data-category-id="collection"><i class="fa-solid fa-bookmark" style="color: #a855f7;"></i> ${tCollection}</li>`;
+      html += `<li class="menu-item ${state.currentLibraryId === 'collection' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-collection" data-id="collection" data-category-id="collection"><i class="fa-solid fa-bookmark" style="color: var(--app-accent);"></i> ${tCollection}</li>`;
       if (state.smartRecommendEnabled !== false) {
         html += `<li class="menu-item ${state.currentLibraryId === 'smart_rec' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-smart-rec" data-id="smart_rec" data-category-id="smart_rec"><i class="fa-solid fa-wand-magic-sparkles" style="color: #34d399;"></i> ${tSmartRec}</li>`;
       }
@@ -413,7 +413,7 @@ export async function loadLibraries() {
         const isCollapsed = !containsActive && localStorage.getItem(getGroupCollapsedStorageKey(groupId)) === 'true';
         const safeGroupName = escapeHtml(group.name || '');
         const safeGroupIcon = escapeHtml(group.icon || 'fa-folder');
-        const safeGroupColor = escapeHtml(group.color || '#a855f7');
+        const safeGroupColor = escapeHtml(group.color || 'var(--app-accent)');
         html += `<li class="sidebar-library-group${isCollapsed ? ' collapsed' : ''}" data-type="group-container" data-library-group-id="${groupId}">
           <button type="button" class="menu-item sidebar-group-header" data-type="group" data-role="sidebar-group-toggle" data-id="${groupId}" data-name="${safeGroupName}" aria-expanded="${isCollapsed ? 'false' : 'true'}">
             <span><i class="fa-solid fa-chevron-down sidebar-group-chevron"></i><i class="fa-solid ${safeGroupIcon}" style="color:${safeGroupColor};"></i>${safeGroupName}</span>

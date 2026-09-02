@@ -6,7 +6,7 @@
 // 붙일 수 있다 — 이 프로젝트는 훅과 API만 제공하고 실제 연동은 커뮤니티 플러그인에 맡긴다.
 import { state } from '../state.js';
 import * as api from '../api.js';
-import { positionMenuAtPoint, hideFloatingMenu, isFloatingMenuOpen } from '../context_menu_manager.js';
+import { positionMenuAtPoint, hideFloatingMenu, isFloatingMenuOpen, enableMenuDrag } from '../context_menu_manager.js';
 import { setAnnotationMarker } from './annotation_anchor.js';
 import { updateAnnotationLocal } from './annotation_state.js';
 
@@ -44,7 +44,10 @@ function ensureMenu() {
   menu.style.display = 'none';
   menu.innerHTML = `
     <div class="context-menu-header">
-      <span class="context-menu-title">하이라이트 메뉴</span>
+      <span class="context-menu-header-left">
+        <span class="context-menu-drag-handle" data-role="annotation-context-drag" title="메뉴 위치 이동" aria-hidden="true"><i class="fa-solid fa-grip-lines"></i></span>
+        <span class="context-menu-title">하이라이트 메뉴</span>
+      </span>
       <button type="button" class="context-menu-close-btn" data-role="annotation-context-close" aria-label="닫기"><span class="context-menu-close-icon">&times;</span><span class="context-menu-close-text">닫기</span></button>
     </div>
     <ul class="context-menu-list">
@@ -62,6 +65,8 @@ function ensureMenu() {
     hideAnnotationContextMenu();
     if (target && typeof deleteHandler === 'function') deleteHandler(target.id);
   });
+
+  enableMenuDrag(menu, menu.querySelector('[data-role="annotation-context-drag"]'));
 
   return menu;
 }

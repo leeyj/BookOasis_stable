@@ -2,7 +2,8 @@
 import { state } from './state.js';
 import { showViewerLoading, hideViewerLoading, showViewerError } from './view_manager.js';
 import { saveProgress } from './viewer_progress.js';
-import { getComicPageStep, getComicReadingDirection } from './viewer_comic.js';
+import { getComicPageStep, getComicReadingDirection, getSpreadShiftOffset, resetSpreadShiftOffset } from './viewer_comic.js';
+import { initPageStep } from './viewer/reader_settings.js';
 
 export let pdfDoc = null;
 export let pdfCurrentPage = 1;
@@ -17,6 +18,10 @@ let pdfRenderGeneration = 0;
 
 export async function initPdfViewer(bookId, pagesRead, totalPages) {
   isInitializingPdfProgress = true;
+  resetSpreadShiftOffset(); // 이전 책에서 켜뒀던 "한 장 밀기" 보정이 새 책에 남지 않도록 초기화
+  // 만화 뷰어를 거치지 않고 PDF를 세션 첫 책으로 열어도 2쪽보기 버튼/한 장 밀기 버튼
+  // 표시 상태(display)가 저장된 설정값과 어긋나지 않도록 여기서도 동기화한다.
+  initPageStep();
   console.log(`[Viewer-Pdf] initPdfViewer - PDF 렌더링 요청: bookId=${bookId}, pagesRead=${pagesRead}, totalPages=${totalPages}`);
   
   document.getElementById('pdf-viewer-container').style.display = 'flex';
@@ -231,11 +236,14 @@ export function renderPdfPage() {
 
     const step = (typeof getComicPageStep === 'function') ? getComicPageStep() : 1;
     const direction = (typeof getComicReadingDirection === 'function') ? getComicReadingDirection() : 'ltr';
+    const shiftOffset = (step === 2 && typeof getSpreadShiftOffset === 'function') ? getSpreadShiftOffset() : 0;
 
     let pagesToRender = [];
     if (step === 2) {
-      let p1 = pdfCurrentPage;
-      let p2 = pdfCurrentPage + 1;
+      // "한 장 밀기" 보정 - 진행률 저장 기준인 pdfCurrentPage는 그대로 두고, 화면에 짝지어
+      // 보여줄 페이지의 기준점만 밀어서 예: (9,10)(11,12) 정렬을 (10,11)로 바꿔 볼 수 있게 한다.
+      let p1 = Math.min(pdfCurrentPage + shiftOffset, pdfTotalPages);
+      let p2 = p1 + 1;
       if (p2 <= pdfTotalPages) {
         if (direction === 'rtl') {
           pagesToRender = [p2, p1];

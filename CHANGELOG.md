@@ -1,7 +1,11 @@
 # CHANGELOG
+## v2.5.4
+- (feature) 뷰어 오버레이 조작 패널에 드래그로 위치를 옮길 수 있는 앵커 추가 | add a drag handle to the viewer's overlay control panel so it can be repositioned
+- (feature) PDF/만화 뷰어 2쪽보기 모드에 "한 장 밀기" 기능 추가 — (9,10)(11,12)처럼 고정되던 페이지 짝을 한 장씩 밀어 원하는 스프레드(예: 10,11)를 볼 수 있음, 단축키 Shift+스페이스/방향키 지원 | add a "shift by one page" control to PDF/comic viewer two-page spread mode — nudges the fixed page pairing (e.g. (9,10)(11,12)) by one page so a spread like (10,11) can be viewed, with a Shift+Space/Arrow keyboard shortcut
+
 ## v2.5.3
 - (feature) 환경설정을 시스템 전역 설정과 "내 설정"(사용자별 개인화) 탭으로 분리, 일반 사용자도 테마/뷰어/사이드바 등 취향 설정을 직접 저장 가능 | split settings into system-wide settings and a "My Settings" tab for per-user personalization — non-admins can now save their own theme/viewer/sidebar preferences
-- (improvement) 일반/성인/오디오북/영상 라이브러리별로 중복 저장되던 시스템 설정을 단일화 | unify system settings that were previously duplicated per library type (general/adult/audiobook/video)
+- (improvement) 일반/성인/오디오북/영상 DB에 각각 중복 저장되던 시스템 설정값을 general DB 하나로 단일화 (라이브러리 DB 구조 자체는 기존과 동일) | unify system settings values into a single store on the general DB, previously duplicated across the general/adult/audiobook/video databases (the library DB structure itself is unchanged)
 - (improvement) 외부 도메인 허용 목록을 사용자별 목록에서 관리자 전용 전역 목록으로 전환 | convert the external domain whitelist from a per-user list to an admin-managed global list
 - (improvement) 권한 없는 관리자 전용 설정 탭 버튼이 일반 사용자 화면에 노출되지 않도록 변경 | hide admin-only settings tab buttons entirely for non-admin users instead of just disabling them
 

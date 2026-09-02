@@ -1,9 +1,9 @@
 // viewer.js – 미디어 뷰어 라이프사이클 및 단축키 코어 조율기
 import { state } from './state.js';
-import { nextComicPage, prevComicPage, setComicFitMode, toggleComicOverlay, markAsCompleted as markComicAsCompleted, getComicReadingDirection, toggleComicReadingDirection, toggleComicPageStep, comicJumpToFirstPage, comicJumpToLastPage, toggleTapZoneDirection, initTapZoneDirection, toggleComicSplitSpread } from './viewer_comic.js';
+import { nextComicPage, prevComicPage, setComicFitMode, toggleComicOverlay, markAsCompleted as markComicAsCompleted, getComicReadingDirection, toggleComicReadingDirection, toggleComicPageStep, comicJumpToFirstPage, comicJumpToLastPage, toggleTapZoneDirection, initTapZoneDirection, toggleComicSplitSpread, toggleSpreadShiftOffset, loadComicPage } from './viewer_comic.js';
 import { prevTxtPage, nextTxtPage, applyTxtSettings, txtJumpToFirstPage, txtJumpToLastPage } from './viewer_txt.js';
 import { addBookmarkAtCurrentPosition } from './viewer/txt_toc.js';
-import { nextPdfPage, prevPdfPage, pdfJumpToFirstPage, pdfJumpToLastPage } from './viewer_pdf.js';
+import { nextPdfPage, prevPdfPage, pdfJumpToFirstPage, pdfJumpToLastPage, renderPdfPage } from './viewer_pdf.js';
 import { initFullscreenStateSync, isViewerInFullscreen, toggleFullscreenViewer } from './viewer/fullscreen_controller.js';
 import { initViewerSeekBar } from './viewer/seekbar_controller.js';
 import {
@@ -151,6 +151,19 @@ export function nextPage() {
   }
 }
 
+// 2쪽보기 정렬 "한 장 밀기" 통합 조율 - 예: (9,10)(11,12)로 짝지어지던 스프레드를
+// (10,11)로 볼 수 있도록 한 장 밀어서 보정한다. comic/pdf 뷰어에서만 의미가 있다
+// (EPUB/TXT는 스프레드 개념이 없으므로 아무 동작도 하지 않는다).
+export function shiftSpreadByOne() {
+  console.log('[Viewer-Core] shiftSpreadByOne() called');
+  toggleSpreadShiftOffset();
+  if (document.getElementById('comic-viewer-container').style.display !== 'none') {
+    loadComicPage();
+  } else if (document.getElementById('pdf-viewer-container').style.display !== 'none') {
+    renderPdfPage();
+  }
+}
+
 configureInputController({
   toggleFullscreenViewer,
   isViewerInFullscreen,
@@ -158,6 +171,7 @@ configureInputController({
   nextPage,
   prevPage,
   toggleComicOverlay,
+  shiftSpreadByOne,
 });
 
 configureLifecycleController({
@@ -303,9 +317,9 @@ window.setScrollMode = function (mode) {
   `;
   banner.innerHTML = `
     <div style="
-      background: rgba(15, 23, 42, 0.95);
+      background: rgba(var(--app-panel-rgb), 0.95);
       border: 1px solid rgba(168, 85, 247, 0.6);
-      color: #fff;
+      color: var(--app-text-primary);
       padding: 0.9rem 2rem;
       border-radius: 50px;
       font-size: 1rem;
@@ -556,6 +570,7 @@ function initMediaViewerDelegation() {
     if (action === 'add-bookmark') return addBookmarkAtCurrentPosition();
     if (action === 'scroll-mode') return window.setScrollMode?.(value || 'page');
     if (action === 'toggle-page-step') return window.toggleComicPageStep?.();
+    if (action === 'shift-spread') return shiftSpreadByOne();
     if (action === 'toggle-center-gap') return window.toggleComicCenterGap?.();
     if (action === 'toggle-reading-direction') return window.toggleComicReadingDirection?.();
     if (action === 'toggle-tap-zone-direction') return toggleTapZoneDirection();

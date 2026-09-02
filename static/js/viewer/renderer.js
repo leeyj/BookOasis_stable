@@ -380,11 +380,17 @@ export function updatePageInfo() {
 
 function getComicDisplayPageIndex(basePage) {
   const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
-  const displayPage = (scrollMode === 'scroll' || Settings.getComicPageStep() !== 2)
-    ? basePage
+  const isTwoPage = scrollMode !== 'scroll' && Settings.getComicPageStep() === 2;
+  // "한 장 밀기" 보정 - 스프레드 짝의 기준(basePage)만 화면 표시용으로 밀어준다.
+  // 진행률 저장에 쓰이는 실제 comicCurrentPage는 건드리지 않는다.
+  const shiftedBase = isTwoPage
+    ? Math.min(basePage + Settings.getSpreadShiftOffset(), Math.max(0, comicTotalPages - 1))
+    : basePage;
+  const displayPage = !isTwoPage
+    ? shiftedBase
     : (Settings.getComicReadingDirection() === 'rtl'
-      ? Math.min(basePage + 1, Math.max(0, comicTotalPages - 1))
-      : basePage);
+      ? Math.min(shiftedBase + 1, Math.max(0, comicTotalPages - 1))
+      : shiftedBase);
   return displayPage;
 }
 

@@ -787,7 +787,7 @@ _SCHEMA_SQL = """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL UNIQUE,
         icon TEXT DEFAULT 'fa-folder',
-        color TEXT DEFAULT '#a855f7',
+        color TEXT DEFAULT NULL,
         sort_order INTEGER DEFAULT 0
     );
 
@@ -1525,6 +1525,21 @@ def _backfill_audiobook_last_listened_at(conn, cursor, db_type):
         print(f"[DB-Migration ERROR] audiobook_progress last_listened_at backfill failed: {audio_backfill_err}")
 
 
+def _backfill_library_group_default_color(conn, cursor):
+    """그룹 색상을 고르는 UI가 아직 없어 지금까지 모든 그룹이 스키마 기본값 '#a855f7'로
+    저장돼 테마를 켜도 사이드바 그룹 아이콘만 항상 보라색으로 고정되던 문제를 보정한다.
+    색을 NULL로 되돌리면 프런트가 자체적으로 var(--app-accent)(현재 테마 강조색)를
+    fallback으로 사용하므로 앞으로는 테마를 따라간다. 리터럴 기본값과 정확히 일치하는
+    행만 건드리므로(향후 색상 선택 UI가 생겨도) 반복 실행해도 안전하다."""
+    try:
+        cursor.execute("UPDATE library_groups SET color = NULL WHERE color = '#a855f7'")
+        conn.commit()
+        if (cursor.rowcount or 0) > 0:
+            print(f"[DB-Migration] library_groups - reset hardcoded default color on {cursor.rowcount} rows")
+    except Exception as color_backfill_err:
+        print(f"[DB-Migration ERROR] library_groups default color backfill failed: {color_backfill_err}")
+
+
 def _rebuild_series_summary_if_needed(conn, db_type):
     """MariaDB 환경에서 시리즈 요약 테이블이 아직 준비 안 됐으면 최초 1회 생성한다.
 
@@ -1563,6 +1578,7 @@ def init_databases():
         _seed_settings_and_admin(conn, cursor, db_type)
         _seed_category_permissions(conn, cursor)
         _backfill_audiobook_last_listened_at(conn, cursor, db_type)
+        _backfill_library_group_default_color(conn, cursor)
         _rebuild_series_summary_if_needed(conn, db_type)
 
         conn.close()

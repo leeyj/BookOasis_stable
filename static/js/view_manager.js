@@ -178,9 +178,9 @@ export function showToast(message, type = 'success') {
       bottom: 2rem;
       left: 50%;
       transform: translateX(-50%) translateY(20px);
-      background: rgba(15, 23, 42, 0.95);
+      background: rgba(var(--app-panel-rgb), 0.95);
       border: 1px solid rgba(168, 85, 247, 0.5);
-      color: #fff;
+      color: var(--app-text-primary);
       padding: 0.75rem 1.5rem;
       border-radius: 50px;
       font-size: 0.9rem;

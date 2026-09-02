@@ -18,15 +18,15 @@ export async function renderCollectionsView() {
   if (!container) return;
   container.innerHTML = `
     <div style="grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-      <h3 style="margin:0; font-size:1.1rem; color: #f8fafc; display:flex; align-items:center; gap:0.5rem;">
+      <h3 style="margin:0; font-size:1.1rem; color: var(--app-text-primary); display:flex; align-items:center; gap:0.5rem;">
         <i class="fa-solid fa-bookmark" style="color: #a855f7;"></i> 나만의 컬렉션 목록
       </h3>
-      <button id="btn-create-collection-main" class="btn-toggle active" style="padding: 0.4rem 0.9rem; font-size: 0.88rem; background: var(--color-accent); color:#fff; border:none; border-radius:6px; cursor:pointer;">
+      <button id="btn-create-collection-main" class="btn-toggle active" style="padding: 0.4rem 0.9rem; font-size: 0.88rem; background: var(--color-accent); color: var(--app-text-primary); border:none; border-radius:6px; cursor:pointer;">
         <i class="fa-solid fa-plus"></i> 새 컬렉션 만들기
       </button>
     </div>
     <div id="collections-grid-list" style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.2rem;">
-      <div style="grid-column:1/-1; text-align:center; padding:3rem; color:#94a3b8;"><i class="fa-solid fa-circle-notch fa-spin"></i> 컬렉션을 불러오는 중...</div>
+      <div style="grid-column:1/-1; text-align:center; padding:3rem; color: var(--app-text-muted);"><i class="fa-solid fa-circle-notch fa-spin"></i> 컬렉션을 불러오는 중...</div>
     </div>
   `;
 
@@ -49,9 +49,9 @@ export async function renderCollectionsView() {
       document.getElementById('collections-grid-list').innerHTML = `
         <div style="grid-column: 1 / -1; text-align: center; padding: 4rem 1rem; background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.1); border-radius: 12px;">
           <i class="fa-solid fa-bookmark" style="font-size: 3rem; color: #475569; margin-bottom: 1rem;"></i>
-          <h4 style="margin: 0 0 0.5rem 0; color: #cbd5e1;">아직 생성된 컬렉션이 없습니다.</h4>
-          <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 1.5rem;">도서 우클릭 메뉴에서 [컬렉션에 추가]를 눌러 나만의 묶음을 만들어 보세요!</p>
-          <button onclick="document.getElementById('btn-create-collection-main').click()" class="btn-toggle active" style="padding: 0.5rem 1.2rem; font-size: 0.9rem; background: var(--color-accent); border:none; border-radius:6px; color:#fff; cursor:pointer;">
+          <h4 style="margin: 0 0 0.5rem 0; color: var(--app-text-muted);">아직 생성된 컬렉션이 없습니다.</h4>
+          <p style="color: var(--app-text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">도서 우클릭 메뉴에서 [컬렉션에 추가]를 눌러 나만의 묶음을 만들어 보세요!</p>
+          <button onclick="document.getElementById('btn-create-collection-main').click()" class="btn-toggle active" style="padding: 0.5rem 1.2rem; font-size: 0.9rem; background: var(--color-accent); border:none; border-radius:6px; color: var(--app-text-primary); cursor:pointer;">
             <i class="fa-solid fa-plus"></i> 지금 첫 컬렉션 만들기
           </button>
         </div>
@@ -63,19 +63,19 @@ export async function renderCollectionsView() {
     collections.forEach(coll => {
       const color = coll.color || '#7c3aed';
       html += `
-        <div class="collection-card-item" data-coll-id="${coll.id}" style="background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 1.2rem; cursor: pointer; transition: all 0.2s ease; position: relative; display: flex; flex-direction: column; justify-content: space-between;">
+        <div class="collection-card-item" data-coll-id="${coll.id}" style="background: rgba(var(--app-panel-rgb), 0.7); border: 1px solid rgba(var(--app-panel-border-rgb), 0.08); border-radius: 12px; padding: 1.2rem; cursor: pointer; transition: all 0.2s ease; position: relative; display: flex; flex-direction: column; justify-content: space-between;">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.8rem;">
             <span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: ${color};"></span>
             <div style="display: flex; gap: 0.4rem;">
-              <button class="btn-edit-coll" data-coll-id="${coll.id}" title="컬렉션 수정" style="background:transparent; border:none; color:#94a3b8; cursor:pointer; font-size:0.85rem;"><i class="fa-solid fa-pen"></i></button>
+              <button class="btn-edit-coll" data-coll-id="${coll.id}" title="컬렉션 수정" style="background:transparent; border:none; color: var(--app-text-muted); cursor:pointer; font-size:0.85rem;"><i class="fa-solid fa-pen"></i></button>
               <button class="btn-delete-coll" data-coll-id="${coll.id}" title="컬렉션 삭제" style="background:transparent; border:none; color:#ef4444; cursor:pointer; font-size:0.85rem;"><i class="fa-solid fa-trash-can"></i></button>
             </div>
           </div>
           <div>
-            <h4 style="margin: 0 0 0.4rem 0; color: #f8fafc; font-size: 1.05rem; word-break: break-word;">${escapeHtml(coll.name)}</h4>
-            <p style="margin: 0; color: #94a3b8; font-size: 0.82rem; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${coll.description ? escapeHtml(coll.description) : '설명 없음'}</p>
+            <h4 style="margin: 0 0 0.4rem 0; color: var(--app-text-primary); font-size: 1.05rem; word-break: break-word;">${escapeHtml(coll.name)}</h4>
+            <p style="margin: 0; color: var(--app-text-muted); font-size: 0.82rem; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${coll.description ? escapeHtml(coll.description) : '설명 없음'}</p>
           </div>
-          <div style="margin-top: 1.2rem; padding-top: 0.8rem; border-top: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: #cbd5e1;">
+          <div style="margin-top: 1.2rem; padding-top: 0.8rem; border-top: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--app-text-muted);">
             <span><i class="fa-solid fa-book" style="color:${color}; margin-right:0.3rem;"></i> ${coll.item_count || 0}개 항목</span>
             <span style="color: var(--color-accent); font-weight: 500;">열기 <i class="fa-solid fa-chevron-right" style="font-size:0.75rem;"></i></span>
           </div>
@@ -127,7 +127,7 @@ export async function renderCollectionDetail(collectionId) {
   if (scrollSpinner) scrollSpinner.style.display = 'none';
 
   if (!container) return;
-  container.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:3rem; color:#94a3b8;"><i class="fa-solid fa-circle-notch fa-spin"></i> 컬렉션 상세 정보를 불러오는 중...</div>`;
+  container.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:3rem; color: var(--app-text-muted);"><i class="fa-solid fa-circle-notch fa-spin"></i> 컬렉션 상세 정보를 불러오는 중...</div>`;
 
   try {
     const res = await fetch(`/api/v1/collections/${collectionId}?db_type=${state.currentLibraryType || 'general'}`);
@@ -146,18 +146,18 @@ export async function renderCollectionDetail(collectionId) {
     container.innerHTML = '';
 
     const headerCard = document.createElement('div');
-    headerCard.style.cssText = 'grid-column: 1 / -1; background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 1.2rem 1.5rem; margin-bottom: 1.2rem;';
+    headerCard.style.cssText = 'grid-column: 1 / -1; background: rgba(var(--app-panel-rgb), 0.5); border: 1px solid rgba(var(--app-panel-border-rgb), 0.08); border-radius: 12px; padding: 1.2rem 1.5rem; margin-bottom: 1.2rem;';
     headerCard.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
         <button id="btn-back-to-collections" class="btn-toggle" style="padding:0.35rem 0.8rem; font-size:0.85rem; border-radius:6px; cursor:pointer;">
           <i class="fa-solid fa-arrow-left"></i> 컬렉션 목록으로 돌아가기
         </button>
-        <span style="font-size:0.8rem; color:#94a3b8; background:rgba(255,255,255,0.05); padding:0.2rem 0.6rem; border-radius:12px;">
+        <span style="font-size:0.8rem; color: var(--app-text-muted); background:rgba(255,255,255,0.05); padding:0.2rem 0.6rem; border-radius:12px;">
           <i class="fa-solid fa-circle" style="color:${coll.color || '#7c3aed'}; font-size:0.6rem; margin-right:0.3rem;"></i> ${escapeHtml(coll.name)}
         </span>
       </div>
-      <h2 style="margin:0.5rem 0 0.3rem 0; color:#f8fafc;">${escapeHtml(coll.name)}</h2>
-      <p style="margin:0; color:#94a3b8; font-size:0.9rem;">${coll.description ? escapeHtml(coll.description) : '등록된 설명이 없습니다.'}</p>
+      <h2 style="margin:0.5rem 0 0.3rem 0; color: var(--app-text-primary);">${escapeHtml(coll.name)}</h2>
+      <p style="margin:0; color: var(--app-text-muted); font-size:0.9rem;">${coll.description ? escapeHtml(coll.description) : '등록된 설명이 없습니다.'}</p>
     `;
 
     const itemsGrid = document.createElement('div');
@@ -166,7 +166,7 @@ export async function renderCollectionDetail(collectionId) {
 
     if (items.length === 0) {
       itemsGrid.innerHTML = `
-        <div style="grid-column: 1 / -1; text-align: center; padding: 3rem 1rem; color: #94a3b8;">
+        <div style="grid-column: 1 / -1; text-align: center; padding: 3rem 1rem; color: var(--app-text-muted);">
           <i class="fa-solid fa-folder-open" style="font-size: 2.5rem; color: #475569; margin-bottom: 0.8rem;"></i>
           <p style="margin:0;">컬렉션에 등록된 항목이 없습니다. 도서/시리즈 우클릭 메뉴에서 [컬렉션에 추가]를 눌러보세요.</p>
         </div>
@@ -258,25 +258,25 @@ export function openCreateCollectionModal(onCreated) {
 
   const modalHtml = `
     <div id="modal-create-collection" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
-      <div style="background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; width: 90%; max-width: 420px; padding: 1.5rem; color: #f8fafc; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
+      <div style="background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; width: 90%; max-width: 420px; padding: 1.5rem; color: var(--app-text-primary); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
         <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
           <i class="fa-solid fa-bookmark" style="color: #a855f7;"></i> 새 컬렉션 생성
         </h3>
         <div style="margin-bottom: 1rem;">
-          <label style="display: block; font-size: 0.85rem; color: #cbd5e1; margin-bottom: 0.3rem;">컬렉션 이름</label>
-          <input type="text" id="input-coll-name" placeholder="예: 심리학 도서 모음" style="width: 100%; box-sizing: border-box; padding: 0.6rem; background: rgba(15,23,42,0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; outline: none;">
+          <label style="display: block; font-size: 0.85rem; color: var(--app-text-muted); margin-bottom: 0.3rem;">컬렉션 이름</label>
+          <input type="text" id="input-coll-name" placeholder="예: 심리학 도서 모음" style="width: 100%; box-sizing: border-box; padding: 0.6rem; background: rgba(var(--app-panel-rgb), 0.8); border: 1px solid rgba(var(--app-panel-border-rgb), 0.15); border-radius: 6px; color: var(--app-text-primary); outline: none;">
         </div>
         <div style="margin-bottom: 1rem;">
-          <label style="display: block; font-size: 0.85rem; color: #cbd5e1; margin-bottom: 0.3rem;">설명 (선택)</label>
-          <textarea id="input-coll-desc" placeholder="컬렉션에 대한 간단한 설명..." style="width: 100%; box-sizing: border-box; padding: 0.6rem; background: rgba(15,23,42,0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; outline: none; resize: vertical; height: 60px;"></textarea>
+          <label style="display: block; font-size: 0.85rem; color: var(--app-text-muted); margin-bottom: 0.3rem;">설명 (선택)</label>
+          <textarea id="input-coll-desc" placeholder="컬렉션에 대한 간단한 설명..." style="width: 100%; box-sizing: border-box; padding: 0.6rem; background: rgba(var(--app-panel-rgb), 0.8); border: 1px solid rgba(var(--app-panel-border-rgb), 0.15); border-radius: 6px; color: var(--app-text-primary); outline: none; resize: vertical; height: 60px;"></textarea>
         </div>
         <div style="margin-bottom: 1.5rem;">
-          <label style="display: block; font-size: 0.85rem; color: #cbd5e1; margin-bottom: 0.3rem;">테마 색상</label>
+          <label style="display: block; font-size: 0.85rem; color: var(--app-text-muted); margin-bottom: 0.3rem;">테마 색상</label>
           <input type="color" id="input-coll-color" value="#7c3aed" style="width: 60px; height: 35px; border: none; background: transparent; cursor: pointer;">
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 0.6rem;">
-          <button id="btn-cancel-coll-modal" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.08); border: none; border-radius: 6px; color: #cbd5e1; cursor: pointer;">취소</button>
-          <button id="btn-save-coll-modal" style="padding: 0.5rem 1.2rem; background: var(--color-accent); border: none; border-radius: 6px; color: #fff; font-weight: 600; cursor: pointer;">생성하기</button>
+          <button id="btn-cancel-coll-modal" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.08); border: none; border-radius: 6px; color: var(--app-text-muted); cursor: pointer;">취소</button>
+          <button id="btn-save-coll-modal" style="padding: 0.5rem 1.2rem; background: var(--color-accent); border: none; border-radius: 6px; color: var(--app-text-primary); font-weight: 600; cursor: pointer;">생성하기</button>
         </div>
       </div>
     </div>
@@ -332,15 +332,15 @@ export function openAddToCollectionModal(itemInfo) {
 
       let listHtml = '';
       if (collections.length === 0) {
-        listHtml = `<div style="text-align:center; padding:1.5rem; color:#94a3b8;">생성된 컬렉션이 없습니다. 아래 버튼으로 먼저 생성해 보세요.</div>`;
+        listHtml = `<div style="text-align:center; padding:1.5rem; color: var(--app-text-muted);">생성된 컬렉션이 없습니다. 아래 버튼으로 먼저 생성해 보세요.</div>`;
       } else {
         collections.forEach(c => {
           listHtml += `
-            <div class="coll-select-option" data-coll-id="${c.id}" style="padding: 0.8rem; background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; margin-bottom: 0.5rem; cursor: pointer; display: flex; align-items: center; justify-content: space-between; transition: background 0.2s;">
-              <span style="display:flex; align-items:center; gap:0.5rem; color:#f8fafc; font-size:0.95rem;">
+            <div class="coll-select-option" data-coll-id="${c.id}" style="padding: 0.8rem; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.08); border-radius: 8px; margin-bottom: 0.5rem; cursor: pointer; display: flex; align-items: center; justify-content: space-between; transition: background 0.2s;">
+              <span style="display:flex; align-items:center; gap:0.5rem; color: var(--app-text-primary); font-size:0.95rem;">
                 <i class="fa-solid fa-circle" style="color:${c.color || '#7c3aed'}; font-size:0.6rem;"></i> ${escapeHtml(c.name)}
               </span>
-              <span style="font-size:0.8rem; color:#94a3b8;">(${c.item_count || 0}개)</span>
+              <span style="font-size:0.8rem; color: var(--app-text-muted);">(${c.item_count || 0}개)</span>
             </div>
           `;
         });
@@ -348,7 +348,7 @@ export function openAddToCollectionModal(itemInfo) {
 
       const modalHtml = `
         <div id="modal-add-to-collection" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
-          <div style="background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; width: 90%; max-width: 400px; padding: 1.5rem; color: #f8fafc; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
+          <div style="background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; width: 90%; max-width: 400px; padding: 1.5rem; color: var(--app-text-primary); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
             <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
               <i class="fa-solid fa-plus-circle" style="color: #a855f7;"></i> 컬렉션에 추가
             </h3>
@@ -357,7 +357,7 @@ export function openAddToCollectionModal(itemInfo) {
             </div>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 0.8rem; border-top: 1px solid rgba(255,255,255,0.08);">
               <button id="btn-new-coll-inside" style="padding: 0.4rem 0.8rem; background: rgba(168,85,247,0.2); border: 1px solid var(--color-accent); border-radius: 6px; color: #c084fc; cursor: pointer; font-size: 0.85rem;"><i class="fa-solid fa-plus"></i> 새 컬렉션</button>
-              <button id="btn-close-add-coll" style="padding: 0.4rem 1rem; background: rgba(255,255,255,0.08); border: none; border-radius: 6px; color: #cbd5e1; cursor: pointer; font-size: 0.85rem;">닫기</button>
+              <button id="btn-close-add-coll" style="padding: 0.4rem 1rem; background: rgba(255,255,255,0.08); border: none; border-radius: 6px; color: var(--app-text-muted); cursor: pointer; font-size: 0.85rem;">닫기</button>
             </div>
           </div>
         </div>
@@ -462,25 +462,25 @@ function openEditCollectionModal(coll) {
 
   const modalHtml = `
     <div id="modal-create-collection" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
-      <div style="background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; width: 90%; max-width: 420px; padding: 1.5rem; color: #f8fafc; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
+      <div style="background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; width: 90%; max-width: 420px; padding: 1.5rem; color: var(--app-text-primary); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
         <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
           <i class="fa-solid fa-pen" style="color: #a855f7;"></i> 컬렉션 수정
         </h3>
         <div style="margin-bottom: 1rem;">
-          <label style="display: block; font-size: 0.85rem; color: #cbd5e1; margin-bottom: 0.3rem;">컬렉션 이름</label>
-          <input type="text" id="input-coll-name" value="${escapeHtml(coll.name)}" style="width: 100%; box-sizing: border-box; padding: 0.6rem; background: rgba(15,23,42,0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; outline: none;">
+          <label style="display: block; font-size: 0.85rem; color: var(--app-text-muted); margin-bottom: 0.3rem;">컬렉션 이름</label>
+          <input type="text" id="input-coll-name" value="${escapeHtml(coll.name)}" style="width: 100%; box-sizing: border-box; padding: 0.6rem; background: rgba(var(--app-panel-rgb), 0.8); border: 1px solid rgba(var(--app-panel-border-rgb), 0.15); border-radius: 6px; color: var(--app-text-primary); outline: none;">
         </div>
         <div style="margin-bottom: 1rem;">
-          <label style="display: block; font-size: 0.85rem; color: #cbd5e1; margin-bottom: 0.3rem;">설명</label>
-          <textarea id="input-coll-desc" style="width: 100%; box-sizing: border-box; padding: 0.6rem; background: rgba(15,23,42,0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; outline: none; resize: vertical; height: 60px;">${coll.description ? escapeHtml(coll.description) : ''}</textarea>
+          <label style="display: block; font-size: 0.85rem; color: var(--app-text-muted); margin-bottom: 0.3rem;">설명</label>
+          <textarea id="input-coll-desc" style="width: 100%; box-sizing: border-box; padding: 0.6rem; background: rgba(var(--app-panel-rgb), 0.8); border: 1px solid rgba(var(--app-panel-border-rgb), 0.15); border-radius: 6px; color: var(--app-text-primary); outline: none; resize: vertical; height: 60px;">${coll.description ? escapeHtml(coll.description) : ''}</textarea>
         </div>
         <div style="margin-bottom: 1.5rem;">
-          <label style="display: block; font-size: 0.85rem; color: #cbd5e1; margin-bottom: 0.3rem;">테마 색상</label>
+          <label style="display: block; font-size: 0.85rem; color: var(--app-text-muted); margin-bottom: 0.3rem;">테마 색상</label>
           <input type="color" id="input-coll-color" value="${coll.color || '#7c3aed'}" style="width: 60px; height: 35px; border: none; background: transparent; cursor: pointer;">
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 0.6rem;">
-          <button id="btn-cancel-coll-modal" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.08); border: none; border-radius: 6px; color: #cbd5e1; cursor: pointer;">취소</button>
-          <button id="btn-save-coll-modal" style="padding: 0.5rem 1.2rem; background: var(--color-accent); border: none; border-radius: 6px; color: #fff; font-weight: 600; cursor: pointer;">저장하기</button>
+          <button id="btn-cancel-coll-modal" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.08); border: none; border-radius: 6px; color: var(--app-text-muted); cursor: pointer;">취소</button>
+          <button id="btn-save-coll-modal" style="padding: 0.5rem 1.2rem; background: var(--color-accent); border: none; border-radius: 6px; color: var(--app-text-primary); font-weight: 600; cursor: pointer;">저장하기</button>
         </div>
       </div>
     </div>
