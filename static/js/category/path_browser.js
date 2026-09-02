@@ -277,7 +277,7 @@ export async function loadPathBrowserItems() {
       
       const icon = item.name === '..' ? 'fa-arrow-up' : 'fa-folder';
       itemEl.innerHTML = `
-        <i class="fa-solid ${icon}" style="color: #a855f7; flex-shrink: 0;"></i>
+        <i class="fa-solid ${icon}" style="color: var(--app-accent); flex-shrink: 0;"></i>
         <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(item.name)}</span>
       `;
       listEl.appendChild(itemEl);

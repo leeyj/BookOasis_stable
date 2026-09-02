@@ -396,6 +396,18 @@ export async function updateUserSetting(key, value) {
   return res.json();
 }
 
+// themes/*.yaml 검증 통과분의 id/label 목록 (테마 선택 드롭다운 동적 렌더링용)
+export async function fetchCustomThemes() {
+  const res = await fetch('/api/media/settings/custom-themes');
+  return res.json();
+}
+
+// themes/ 디렉토리 다시 스캔 (관리자 전용)
+export async function rescanCustomThemes() {
+  const res = await fetch('/api/media/settings/custom-themes/rescan', { method: 'POST' });
+  return res.json();
+}
+
 export async function fetchMetadataPlugins() {
   const res = await fetch('/api/media/metadata/plugins');
   return res.json();

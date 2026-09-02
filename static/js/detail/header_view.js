@@ -236,7 +236,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
   if (continueTarget) {
     let btnLabel = '';
     let btnColor = '#7c3aed';
-    let btnBorder = '#a855f7';
+    let btnBorder = 'var(--app-accent)';
     let iconClass = 'fa-solid fa-play';
     const continueFmt = String(continueTarget.file_format || '').toLowerCase();
     const isAudioContext = state.currentLibraryType === 'audiobook' || ['audiobook', 'mp3', 'm4a', 'm4b', 'flac', 'aac', 'wav', 'ogg', 'opus', 'wma'].includes(continueFmt);
@@ -421,7 +421,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
         <!-- 버튼: 이어서 읽기 및 메타정보 찾기 -->
         <div style="display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; align-items: center;">
           ${continueBtnHtml}
-          ${isVideoContext ? '' : `<button id="btn-manual-meta-search" class="ridi-link-btn" style="display:none; margin: 0; background: #7c3aed; border-color: #a855f7;"><i class="fa-solid fa-wand-magic-sparkles"></i> ${i18n.t('detail.btn_recommend_match')}</button>`}
+          ${isVideoContext ? '' : `<button id="btn-manual-meta-search" class="ridi-link-btn" style="display:none; margin: 0; background: color-mix(in srgb, var(--app-accent) 70%, black); border-color: var(--app-accent);"><i class="fa-solid fa-wand-magic-sparkles"></i> ${i18n.t('detail.btn_recommend_match')}</button>`}
           ${pluginMetaSearchBtnHtml}
           ${rescanSeriesBtnHtml}
           ${markSeriesCompletedBtnHtml}
@@ -473,7 +473,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
       
       <!-- 유사 메타데이터 추천 영역 -->
       <div id="meta-recommend-section" style="display:none; margin-top: 1rem; padding: 1rem; background: rgba(var(--app-panel-rgb), 0.5); border: 1px dashed rgba(168, 85, 247, 0.4); border-radius: 8px; width: 100%;">
-        <h5 style="margin: 0 0 0.8rem 0; color: #c084fc; font-size: 0.85rem;"><i class="fa-solid fa-wand-magic-sparkles"></i> ${i18n.t('detail.title_recommend')}</h5>
+        <h5 style="margin: 0 0 0.8rem 0; color: var(--app-accent-hover); font-size: 0.85rem;"><i class="fa-solid fa-wand-magic-sparkles"></i> ${i18n.t('detail.title_recommend')}</h5>
         <div id="recommend-candidates-list" style="display: flex; flex-direction: column; gap: 0.6rem;">
           <div style="font-size:0.75rem; color: var(--app-text-muted);"><i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('detail.loading_recommend')}</div>
         </div>

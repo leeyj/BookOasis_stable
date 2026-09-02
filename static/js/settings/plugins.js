@@ -12,7 +12,7 @@ export async function loadPluginsSettings() {
     return;
   }
 
-  container.innerHTML = '<div style="text-align: center; padding: 2rem; color: #a855f7;"><i class="fa-solid fa-circle-notch fa-spin fa-2x"></i><br><br>플러그인 목록 로드 중...</div>';
+  container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--app-accent);"><i class="fa-solid fa-circle-notch fa-spin fa-2x"></i><br><br>플러그인 목록 로드 중...</div>';
 
   try {
     console.log('[Plugins-Settings] api.fetchMetadataPluginsForManagement() API 호출 시작');
@@ -248,7 +248,7 @@ function injectToggleSwitchCSS() {
   style.id = 'plugin-toggle-css';
   style.innerHTML = `
     .plugin-toggle-checkbox:checked + .toggle-slider {
-      background-color: #a855f7 !important;
+      background-color: var(--app-accent) !important;
     }
     .plugin-toggle-checkbox:checked + .toggle-slider:before {
       transform: translateX(22px);
@@ -476,7 +476,7 @@ function closeSamplePluginsModal() {
 async function loadSamplePluginsList() {
   const list = document.getElementById('sample-plugins-list');
   if (!list) return;
-  list.innerHTML = '<div style="text-align: center; padding: 1.5rem; color: #a855f7;"><i class="fa-solid fa-circle-notch fa-spin"></i></div>';
+  list.innerHTML = '<div style="text-align: center; padding: 1.5rem; color: var(--app-accent);"><i class="fa-solid fa-circle-notch fa-spin"></i></div>';
 
   try {
     const data = await api.fetchSamplePlugins();

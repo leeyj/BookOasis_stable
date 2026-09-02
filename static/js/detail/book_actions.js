@@ -27,7 +27,7 @@ export function showGlobalLoadingSpinner(message = '처리 중입니다. 잠시�
     `;
     overlay.innerHTML = `
       <div style="background: rgba(var(--app-panel-rgb), 0.95); padding: 2rem 2.5rem; border-radius: 16px; border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); text-align: center; max-width: 90vw; width: 400px;">
-        <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 2.5rem; color: #a855f7; margin-bottom: 1.2rem;"></i>
+        <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 2.5rem; color: var(--app-accent); margin-bottom: 1.2rem;"></i>
         <div id="global-loading-overlay-msg" style="font-size: 1rem; font-weight: 600; color: var(--app-text-primary); line-height: 1.5; word-break: keep-all;">${message}</div>
         <div style="font-size: 0.8rem; color: var(--app-text-muted); margin-top: 0.8rem;">작업이 진행되는 동안 잠시만 기다려 주세요</div>
       </div>

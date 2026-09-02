@@ -330,7 +330,7 @@ window.setScrollMode = function (mode) {
       align-items: center;
       gap: 0.5rem;
     ">
-      <i class="fa-solid fa-arrows-rotate" style="color:#a855f7; font-size:1rem;"></i>
+      <i class="fa-solid fa-arrows-rotate" style="color:var(--app-accent); font-size:1rem;"></i>
       보기 모드 전환 중...
     </div>
   `;

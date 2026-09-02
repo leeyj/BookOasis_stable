@@ -1,6 +1,87 @@
 # 테마 외부화(플러그인 커스텀 테마 등록) 작업 인수인계
 
-작성일: 2026-09-02 (세션 종료 시점 스냅샷)
+작성일: 2026-09-02 (세션 종료 시점 스냅샷) / 갱신: 2026-09-02 2차 세션
+
+## 0-1. 2차 세션 진행 요약 (다음 세션은 여기부터 읽을 것)
+
+4번 섹션의 A(CSS 파일 자체 룰의 패널 배경)와 B(시그니처 퍼플 리터럴)를 전부 처리 완료했다.
+추가로 처리 도중 **핸드오버에 기록되지 않았던 새 발견**이 있었다:
+
+- **`style.css`/`tab_media_library_viewer.css` 자체 룰 바디의 일반 텍스트색 하드코딩**
+  (`#fff`/`#ffffff`/`#f8fafc`/`#f1f5f9`/`#e2e8f0` → text-primary, `#94a3b8`/`#cbd5e1`/`#64748b`
+  → text-muted) 약 119곳. 1차 세션은 템플릿/JS의 인라인 `style=`만 훑었고 이 두 CSS 파일
+  "자체 룰"은 놓치고 있었다. 사용자 확인 후 이번 세션에서 전부 치환 완료.
+- **⚠️ 함정(3번 항목) 사례 추가 발견 및 수정**: 다음 5곳이 "불투명 accent 배경 + 잘못된
+  텍스트색(`var(--app-text-primary)` 또는 리터럴 `#fff`/`white`)" 조합이었다 — 전부
+  `var(--app-accent-contrast)`로 재수정함:
+  - `static/js/settings/reports.js`의 페이지네이션 활성 버튼
+  - `templates/components/media_viewer.html`의 `viewer-next-episode-confirm-btn`
+  - `static/css/tab_media_library_viewer.css`의 `.filter-chip-item.active`, `.btn-filter-apply`,
+    `.seekbar-tooltip`, `.btn-nav:hover`
+  - `static/css/style.css`의 `.btn-resume-series`, `.btn-nav-arrow:hover`
+  - 이 패턴은 새 하드코딩을 변수로 치환할 때마다 재발할 수 있는 종류의 버그이니, 앞으로도
+    "불투명 accent 배경 위 텍스트인가?"를 항상 먼저 확인할 것.
+- **결정 사항**: `login.css`(로그인 화면)/`tv.css`(TV 모드)는 사용자가 명시적으로 **테마
+  외부화 스코프에서 계속 제외**하기로 결정함 (독립 페이지로 유지). 4번 섹션의 D 항목은
+  이제 "제외 확정"으로 종료.
+- 남은 것: `templates/index.html`의 의도적 예외 4곳(변경 없음, 계속 유지), `login.css`/`tv.css`
+  (스코프 제외 확정), **E(8개 테마 시각 회귀 테스트)는 여전히 미착수** — 다음 세션 최우선 순위.
+
+## 0-2. 2차 세션 실배포 테스트 후 버그 리포트 + 수정 (같은 세션 이어서)
+
+사용자가 위 작업을 실배포해서 테스트: 대시보드/도서상세/설정 등 테마 전환은 정상, **단 e-paper
+테마에서 설정 탭의 "현재 선택된" 활성 버튼 글자가 안 보임**을 확인. 원인 조사 결과 훨씬 넓은
+범위의 "불투명 배경 + 잘못된 텍스트색" 버그가 발견되어 전부 수정함:
+
+- **직접 원인**: `[data-app-theme="epaper"] .settings-tab-btn.active { background: #000000; color:
+  var(--app-text-primary); }` — epaper의 `--app-text-primary`가 `#000000`이라 검정 배경에 검정
+  글자. `var(--app-accent-contrast)`(epaper에서 `#ffffff`)로 수정.
+- **같은 파일에서 동일 패턴 6곳 추가 발견 및 수정**: epaper `.sidebar-menu .menu-item.active`(+
+  자식 선택자), light/sepia/aquamarine/ironman의 `.settings-tab-btn.active` — 전부 테마별
+  `!important` 오버라이드 블록으로, 1차 세션의 "색상 하드코딩 → 변수" 일괄 치환 당시 "이 배경이
+  불투명 accent/고정색 채움인가"를 확인 안 하고 넘어간 영역. 전부 `var(--app-accent-contrast)`로
+  수정.
+- **더 넓은 스캔 결과**: "고정 리터럴 배경(테마 무관) + `var(--app-text-primary)` 텍스트" 조합을
+  `static/css/*.css` 룰 바디 + `templates/**/*.html`, `static/js/**/*.js`의 인라인 `style=`
+  전체에서 재스캔 → 아래 15곳 추가 발견 및 수정:
+  - `style.css`: `.btn-settings-save`(#7c3aed 배경 → accent 다크변형+accent-contrast로 전환),
+    `.ridi-link-btn`/`:hover`, `.btn-download`, `.btn-active-filter-reset:hover`,
+    `.vol-grid-download-btn:hover` → 전부 고정 `#fff` 텍스트로
+  - `tab_media_library_viewer.css`: `.overlay-close-btn:hover`, `.overlay-tab-btn.active`,
+    `.overlay-select`, `.btn-overlay-fit.active`, `.btn-nav`, `.btn-txt-ctrl:hover`,
+    `.txt-reader-theme-dark`/`-black` → 고정 `#fff`/`#f1f5f9` 텍스트로 (reader 프리셋은
+    light/sepia/epaper/white 프리셋처럼 앱 테마와 무관한 고정 팔레트가 원래 의도였음)
+  - `templates/components/modals/library_modal.html`의 경로 선택 버튼(`#a855f7` 배경) →
+    `var(--app-accent)`+`var(--app-accent-contrast)` (진짜 accent였음)
+  - `general_tab.html`(지금 스캔 버튼), `trash_tab.html`(DB 선택 select) → 고정 텍스트/
+    `var(--app-input-bg)`로
+  - `static/js/detail_render.js`의 추천 메타 적용 버튼(#7c3aed) → accent 다크변형 패턴
+  - `static/js/settings/users.js`의 삭제/비번변경/비번초기화 버튼 3곳 → 고정 `#fff`
+  - `static/js/tab_collections.js`의 모달 박스 3곳(`#1e293b` 고정) → `rgba(var(--app-panel-rgb),
+    1)`로 아예 테마 추종하도록 전환 (텍스트는 그대로 `var(--app-text-primary)` 유지 — 배경을
+    고쳤으므로 이제 맞음)
+  - `static/js/viewer/plugin_prompt_modal.js`의 모달 박스(`#1e293b`)/입력창(`#0f172a`) →
+    박스는 `rgba(var(--app-panel-rgb), 1)`, 입력창은 `var(--app-input-bg)`로 테마 추종 전환
+- **⚠️ 새로운 설계 원칙 확정 (사용자 결정, 향후 계속 적용할 것)**: 오디오북 풀스크린 몰입형
+  플레이어(`audio_player_modal.html`)와 만화/미디어 뷰어 모달(`media_viewer.html`의
+  `.viewer-modal`/`.comic-loading-overlay` 등, `tab_media_library_viewer.css`에 정의)은
+  **의도적으로 앱 테마와 무관하게 항상 어두운 "극장판" 배경**으로 설계된 영역이다. 사용자가
+  "항상 어두운 채로 고정"을 선택함에 따라:
+  - `audio_player_modal.html` 전체(33곳)의 `var(--app-text-primary)`→`#f1f5f9`,
+    `var(--app-text-muted)`→`#94a3b8`로 고정 치환 완료 (이 파일은 `var(--app-panel-rgb)`/
+    `var(--app-accent)`를 단 한 번도 안 쓰고 있었음 — 배경 전체가 원래 고정 팔레트 설계)
+  - `media_viewer.html`의 `#viewer-common-close-btn`/`#viewer-next-episode-cancel-btn`
+    (부모가 `.comic-loading-overlay`, 배경 고정 `rgba(9,13,22,0.92)`) → `#f1f5f9`로 고정
+  - **앞으로 이 두 영역(오디오 플레이어, 만화/미디어 뷰어 모달) 안에 새 UI를 추가할 때는
+    `var(--app-*)` 테마 변수를 쓰지 말고 고정 다크 팔레트(#f1f5f9 텍스트, #94a3b8 뮤트텍스트
+    등)를 그대로 따를 것.** 반대로 `.viewer-padding-panel`처럼 이미 `rgba(var(--app-panel-rgb),
+    X)`를 쓰는 하위 패널(뷰어 여백 설정 등)은 정상적으로 테마를 따라가야 하므로 그대로 둠 —
+    "뷰어 모달 = 무조건 다크"가 아니라 "그 모달의 배경 자체가 고정 리터럴인 하위 요소만" 대상.
+- 이 조사에서 확인된 것: 이런 종류의 버그(불투명/고정 배경 위에 실수로 테마 텍스트 변수를 쓴 것)는
+  1차 세션의 일괄 치환 방식 자체의 구조적 위험이었다. 앞으로 유사 치환을 할 때는 항상 "이 배경이
+  (a) 테마를 따라가는 배경인지 (b) 고정 리터럴/accent 배경인지"부터 확인하고, (b)라면 텍스트도
+  그에 맞는 고정색 또는 `var(--app-accent-contrast)`를 쓸 것 — 3번 섹션의 "함정" 규칙을 이제
+  이렇게 일반화해서 기억할 것.
 
 ## 0. 왜 이 작업을 시작했나
 
@@ -137,7 +218,7 @@ ironman/epaper), 실제 색상은 템플릿/JS 곳곳에 인라인 `style="color
   (flexbox로 auto-배치되던 요소도 첫 드래그 시점에 `position:fixed`로 스냅) 구현.
   테마 작업은 아니지만 같은 세션에 했고 CHANGELOG v2.5.4에 기록됨. 참고로만 남김.
 
-## 4. 아직 안 된 것 (다음 세션 시작점)
+## 4. 아직 안 된 것 (다음 세션 시작점) — ⚠️ A/B/D는 2차 세션에서 완료/확정됨, 아래는 1차 세션 종료 시점 스냅샷 그대로 보존 (0-1 참고)
 
 아래는 세션 종료 시점에 실제로 grep 돌려서 확인한 **정확한 잔여 수치**다. 다음 세션에서
 아래 명령을 다시 돌려서 최신 상태를 재확인하고 시작할 것:
@@ -210,22 +291,73 @@ grep -rc 'rgba(30, 41, 59\|rgba(15, 23, 42' static/css/*.css | grep -v ':0$'
 
 ## 6. 다음 세션 진행 순서 제안
 
-1. 위 4번 섹션의 grep 명령으로 최신 잔여 현황 재확인
-2. **A(CSS 파일 자체 룰 바디)부터 처리** — 인라인 style보다 파급력이 크고(여러 요소가 같은
-   클래스 공유), 아직 전혀 손 안 댄 영역이라 우선순위 높음
-3. B(나머지 22개 파일의 리터럴 퍼플) — `context_menus.html`/`media_viewer.html`처럼 사용자가
-   자주 보는 화면부터
-4. login.css/tv.css는 사용자에게 스코프 포함 여부 먼저 물어볼 것 (독립 페이지라 톤이 달라도
-   되는지 불확실)
-5. 여기까지 끝나면 E(8개 테마 시각 회귀 테스트) 한 번 정식으로 진행
-6. **그 다음에야** 원래 목표였던 플러그인 테마 등록 기능 설계 재개:
-   - `theme_manifest` 클래스 속성 (플러그인) → `metadata_factory.py`가 `category_tab`과
-     같은 방식으로 수집 → API로 노출
-   - 플러그인이 넘기는 값은 **변수 dict만 화이트리스트로 허용, raw CSS 주입은 절대 금지**
-     (플러그인 신뢰 경계 문제 — 세미-트러스트 서드파티 코드가 CSS로 오버레이/UI 스푸핑 하는
-     걸 막기 위함, 이전에 검토했던 내용)
-   - `my_settings_tab.html`의 `<select>` 옵션 하드코딩(8개 테마 `<option>`)을 JS 동적
-     렌더링으로 교체해야 플러그인 테마가 실제로 드롭다운에 나타날 수 있음
+1. ~~위 4번 섹션의 grep 명령으로 최신 잔여 현황 재확인~~ — 완료 (0-1 참고)
+2. ~~A(CSS 파일 자체 룰 바디)부터 처리~~ — 완료
+3. ~~B(나머지 22개 파일의 리터럴 퍼플)~~ — 완료 (템플릿/JS 전체 + style.css/
+   tab_media_library_viewer.css 자체 룰까지, 텍스트색 하드코딩 119곳 포함)
+4. ~~login.css/tv.css 스코프 포함 여부~~ — 사용자가 **제외(독립 유지)**로 확정
+5. ~~E(8개 테마 시각 회귀 테스트)~~ — 완료. 사용자가 실배포 환경에서 8개 테마 전부 직접 확인,
+   "매우 잘 된다"고 확정. epaper 버그(0-2 참고)까지 실제로 재배포해서 재확인 완료.
+6. ~~플러그인 테마 등록 기능 설계~~ — **방향 전환 후 구현 완료 (2026-09-02 3차 세션)**.
+   자세한 내용은 0-3 참고.
+
+## 0-3. 3차 세션: "플러그인 테마 등록" → "테마 파일(YAML) 등록"으로 방향 전환 + 구현
+
+원래 계획(6번 항목)은 플러그인 클래스에 `theme_manifest` 속성을 선언하는 방식이었으나,
+사용자가 "테마 1개당 플러그인 1개는 비효율적"이라는 문제를 제기해 **설계를 전면 교체**했다:
+플러그인(실행 코드)이 아니라 `themes/` 디렉토리에 놓는 순수 YAML 데이터 파일로 테마를
+등록하는 방식. 코드를 실행하지 않는 데이터 파일이라 신뢰 경계가 오히려 더 단순해졌다
+(화이트리스트 키 + 정규식 값 검증만으로 raw CSS 주입을 막음 — 플러그인 신뢰 문제 자체가
+사라짐).
+
+**사용자 결정 2가지 (재논의 불필요, 그대로 따를 것):**
+- 테마 파일이 `themes/`에 있으면 관리자 승인/개별 토글 없이 **곧바로** 노출된다.
+- 재적용은 **서버 재시작이 아니라 "재스캔" 버튼**으로 한다 (관리자 전용).
+
+**구현된 것 (전부 완료, 미배포 상태 — 다음 세션은 실배포 테스트부터):**
+- `services/custom_theme_service.py` — `themes/*.yaml`/`*.yml` 스캔·검증·CSS 생성.
+  화이트리스트는 8개 내장 테마가 실제로 쓰는 15개 `--app-*` 변수(`app-shadow`/`app-blur`는
+  box-shadow/filter 문법이 열려있어 의도적으로 제외 — 스펙에서 아예 미지원). 하나라도
+  검증 실패하면 그 파일 전체를 거부(부분 적용 금지). `id`가 내장 8개 테마와 겹치면 거부.
+  값 검증: 13개는 hex색(`^#[0-9a-fA-F]{3,8}$`), `app-panel-rgb`/`app-panel-border-rgb`는
+  `R, G, B`(0-255) 트리플릿만 허용.
+- `themes/README.md` — 사용자용 작성 가이드 (스펙 표, 각 변수 역할 설명, 재스캔 안내)
+- `themes/example.yaml.sample` — 예시 템플릿 (`.yaml`로 안 끝나서 자동 로드 안 됨, 참고용)
+- API 3개, 전부 `api/routes/settings_routes.py`에 추가 (기존 `settings_bp` 재사용, 새 블루프린트
+  안 만듦):
+  - `GET /api/media/settings/custom-themes` (`@login_required`) — id/label 목록
+  - `GET /api/media/settings/custom-themes.css` (`@login_required`) — 검증 통과분을
+    `[data-app-theme="id"] { --app-x: value; }` CSS로 렌더링, `Cache-Control: no-cache`
+  - `POST /api/media/settings/custom-themes/rescan` (`@admin_required`) — 재스캔 트리거,
+    `{loaded_count, rejected: [{file, reason}]}` 반환
+- `templates/components/tab_media_library.html`에 위 CSS 라우트를 `<link>` 태그로 추가
+  (기존 `style.css`/`tab_media_library_viewer.css`와 같은 자리, 같은 패턴)
+- `static/js/api.js`에 `fetchCustomThemes()` / `rescanCustomThemes()` 추가
+- `static/js/settings/general.js`:
+  - `populateCustomThemeOptions()` — `applySettingsToUI()`에서 호출, `my-setting-dashboard-theme`
+    select에 `<option>` 동적 추가 (label은 **반드시 textContent로만** 넣음, innerHTML 금지 —
+    사용자가 작성한 문자열이라 XSS 방지 원칙 적용)
+  - `rescanCustomThemesUi()` — 재스캔 버튼 클릭 핸들러, 결과(로드/거부 개수+사유)를
+    `#custom-theme-rescan-result`에 표시
+- `templates/components/settings/general_tab.html`에 "커스텀 테마" 카드 추가 (재스캔 버튼 +
+  결과 표시 영역) — 이 탭 전체가 이미 관리자 전용으로 비활성화되는 폼(`settings-general-form`)
+  안이라 별도 권한 체크 코드 불필요
+
+**검증 완료 (Python 스크립트로):**
+- 정상 테마 파일 로드 성공, CSS 생성 정확함
+- `id: purple`(내장 테마 이름 충돌) → 거부 확인
+- 화이트리스트에 없는 키(`raw-css-injection: "url(javascript:alert(1))"`) → 거부 확인
+- `node --check`로 `api.js`/`general.js` 문법 오류 없음 확인, Flask 앱 임포트 체인 정상
+
+**다음 세션에서 할 것:**
+- 사용자가 직접 실배포 환경에서 테스트 (요청에 따라 이번 세션은 브라우저 구동 테스트 생략함):
+  1. `themes/example.yaml.sample`을 `.yaml`로 복사 → 재스캔 → "내 설정" 드롭다운에 뜨는지
+  2. 선택 시 실제로 해당 색상이 적용되는지 (특히 `app-accent-contrast` 직접 계산해서 넣게
+     했으므로, 사용자가 대비 계산을 틀리게 넣으면 그 테마 안에서 이 세션에서 고친 것과
+     동일한 "불투명 accent 배경 위 텍스트 안 보임" 버그가 재현될 수 있음 — 이건 사용자의
+     테마 파일 책임 영역이므로 README에 이미 강조해뒀음)
+  3. 화이트리스트/정규식 위반 파일을 실제로 넣고 재스캔 결과에 사유가 잘 뜨는지
+- 통과하면 CHANGELOG 반영 (버전 번호는 사용자가 정할 것)
 
 ## 7. 관련 메모리 (auto-memory, 이 세션 밖 영구 저장)
 

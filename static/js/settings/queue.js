@@ -69,7 +69,7 @@ window.loadQueueStatus = loadQueueStatus;
 function getQueueTaskTypeName(type, t) {
     if (type === 'library_scan') return `<span style="color: #60a5fa;"><i class="fa-solid fa-folder-tree"></i> ${t('queue.type_lib')}</span>`;
     if (type === 'cover_scan') return `<span style="color: #4ade80;"><i class="fa-solid fa-image"></i> ${t('queue.type_cover')}</span>`;
-    if (type === 'lazy_scan') return `<span style="color: #c084fc;"><i class="fa-solid fa-moon"></i> ${t('queue.type_lazy')}</span>`;
+    if (type === 'lazy_scan') return `<span style="color: var(--app-accent-hover);"><i class="fa-solid fa-moon"></i> ${t('queue.type_lazy')}</span>`;
     return type;
 }
 
@@ -93,7 +93,7 @@ function getQueueStageBadge(task, t) {
 
     if (task.stage === 'book_scan' || task.stage === 'db_scan') {
         return `
-            <span style="display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 6px 12px; border-radius: 6px; background-color: rgba(168, 85, 247, 0.15); color: #c084fc; font-size: 0.82rem; font-weight: 600; line-height: 1.3; text-align: center; width: 100%; box-sizing: border-box;">
+            <span style="display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 6px 12px; border-radius: 6px; background-color: color-mix(in srgb, var(--app-accent) 15%, transparent); color: var(--app-accent-hover); font-size: 0.82rem; font-weight: 600; line-height: 1.3; text-align: center; width: 100%; box-sizing: border-box;">
                 <span><i class="fa-solid fa-spinner fa-spin"></i> ${t('queue.status_running')}</span>
                 <span style="font-size: 0.72rem; opacity: 0.85;">(${t('queue.status_books') || t('queue.status_scan') || '도서 스캔'})</span>
             </span>

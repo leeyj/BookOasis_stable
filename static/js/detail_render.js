@@ -46,7 +46,7 @@ export function renderRecommendList(recommends, seriesName) {
       <div class="recommend-card" style="display: flex; flex-direction: column; gap: 0.3rem; padding: 0.6rem; background: rgba(var(--app-panel-rgb), 0.4); border: 1px solid rgba(var(--app-panel-border-rgb), 0.05); border-radius: 6px;">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
           <strong style="font-size: 0.85rem; color: var(--app-text-primary);">${recDisplaySeries}</strong>
-          <button class="btn-apply-meta" data-source-id="${rec.id}" style="padding: 0.2rem 0.6rem; font-size: 0.72rem; font-weight: 700; color: var(--app-text-primary); background: #7c3aed; border: none; border-radius: 4px; cursor: pointer; transition: background 0.2s;">${i18n.t('detail.btn_apply_meta')}</button>
+          <button class="btn-apply-meta" data-source-id="${rec.id}" style="padding: 0.2rem 0.6rem; font-size: 0.72rem; font-weight: 700; color: var(--app-accent-contrast); background: color-mix(in srgb, var(--app-accent) 70%, black); border: none; border-radius: 4px; cursor: pointer; transition: background 0.2s;">${i18n.t('detail.btn_apply_meta')}</button>
         </div>
         <div style="font-size: 0.72rem; color: var(--app-text-muted);">
           <span>${i18n.t('detail.text_author', { author: rec.author })}</span> | <span>${i18n.t('detail.text_publisher', { publisher: rec.publisher })}</span>

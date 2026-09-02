@@ -2,6 +2,7 @@
 <link rel="stylesheet" href="{{ static_asset_url('css/style.css') }}">
 <link rel="stylesheet" href="{{ static_asset_url('css/tab_media_library_viewer.css') }}">
 <link rel="stylesheet" href="{{ static_asset_url('css/mobile.css') }}" media="screen and (max-width: 1200px)">
+<link rel="stylesheet" href="/api/media/settings/custom-themes.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 <script>
@@ -92,7 +93,7 @@
     <!-- 플로팅 장르/태그 필터 모달 -->
     <div id="floating-filter-modal" class="floating-filter-modal" style="display: none;">
         <div class="filter-modal-header" id="filter-modal-header">
-            <span class="filter-modal-title"><i class="fa-solid fa-filter" style="color: #c084fc;"></i> <span data-i18n="filter.modal_title">상세 필터</span></span>
+            <span class="filter-modal-title"><i class="fa-solid fa-filter" style="color: var(--app-accent-hover);"></i> <span data-i18n="filter.modal_title">상세 필터</span></span>
             <div class="filter-modal-header-actions">
                 <button class="btn-filter-icon" id="btn-filter-reset" data-i18n-title="filter.reset_all" title="필터 전체 초기화"><i class="fa-solid fa-rotate-left"></i></button>
                 <button class="btn-filter-icon" id="btn-filter-close" data-i18n-title="common.close" title="닫기"><i class="fa-solid fa-xmark"></i></button>

@@ -196,3 +196,42 @@ def trigger_lazy_scan_api():
         return jsonify({'success': True, 'message': _t('api.msg_lazy_scanner_triggered')})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@settings_bp.route('/api/media/settings/custom-themes', methods=['GET'])
+@login_required
+def get_custom_themes():
+    """themes/*.yaml 검증 통과분의 id/label 목록 (테마 선택 드롭다운 동적 렌더링용)."""
+    try:
+        from services.custom_theme_service import get_themes
+        themes = [{'id': t['id'], 'label': t['label']} for t in get_themes()]
+        return jsonify({'success': True, 'themes': themes})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@settings_bp.route('/api/media/settings/custom-themes.css', methods=['GET'])
+@login_required
+def get_custom_themes_css():
+    """검증 통과한 커스텀 테마들을 [data-app-theme="id"] CSS 블록으로 렌더링."""
+    try:
+        from flask import Response
+        from services.custom_theme_service import generate_css
+        response = Response(generate_css(), mimetype='text/css')
+        response.headers['Cache-Control'] = 'no-cache, must-revalidate'
+        return response
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@settings_bp.route('/api/media/settings/custom-themes/rescan', methods=['POST'])
+@admin_required
+def rescan_custom_themes():
+    """themes/ 디렉토리를 다시 스캔해 캐시를 갱신 (관리자 전용)."""
+    try:
+        from services.custom_theme_service import load_themes, get_last_rejected
+        loaded_count, rejected_count = load_themes()
+        return jsonify({
+            'success': True,
+            'loaded_count': loaded_count,
+            'rejected': get_last_rejected(),
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500

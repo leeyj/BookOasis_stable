@@ -15,7 +15,7 @@
     overflow: hidden;
     border: 0;
     background: transparent;
-    color: #94a3b8;
+    color: var(--app-text-muted);
     font-family: monospace;
     font-size: 0.8rem;
     line-height: 1.5;
@@ -51,8 +51,8 @@
 }
 
 .schedule-cron-dot.enabled {
-    background: #a855f7;
-    box-shadow: 0 0 7px rgba(168, 85, 247, 0.65);
+    background: var(--app-accent);
+    box-shadow: 0 0 7px color-mix(in srgb, var(--app-accent) 65%, transparent);
 }
 
 .schedule-cron-dot.disabled {
@@ -61,7 +61,7 @@
 }
 
 .schedule-scan-time {
-    color: #cbd5e1;
+    color: var(--app-text-muted);
     font-size: 0.8rem;
     white-space: nowrap;
 }
@@ -72,8 +72,8 @@
 }
 
 .ui-hover-insights-edit-btn:hover {
-    color: #a855f7 !important;
-    background: rgba(168, 85, 247, 0.15) !important;
+    color: var(--app-accent) !important;
+    background: color-mix(in srgb, var(--app-accent) 15%, transparent) !important;
 }
 
 .ui-hover-audio-scale:hover {
@@ -81,7 +81,7 @@
 }
 
 .ui-hover-audio-color:hover {
-    color: #fff !important;
+    color: var(--app-text-primary) !important;
 }
 
 .ui-hover-audio-play:hover {
@@ -251,7 +251,7 @@ html[data-library-type="video"] #sidebar-categories [data-id="plugins"] {
 
 [data-app-theme="light"] .settings-tab-btn.active {
     background: #6366f1 !important;
-    color: #ffffff !important;
+    color: var(--app-accent-contrast) !important;
 }
 
 [data-app-theme="light"] select,
@@ -369,7 +369,7 @@ html[data-library-type="video"] #sidebar-categories [data-id="plugins"] {
 
 [data-app-theme="sepia"] .settings-tab-btn.active {
     background: #b45309 !important;
-    color: #ffffff !important;
+    color: var(--app-accent-contrast) !important;
     border-color: #92400e !important;
     box-shadow: 0 2px 8px rgba(180, 83, 9, 0.25) !important;
 }
@@ -505,7 +505,7 @@ html[data-library-type="video"] #sidebar-categories [data-id="plugins"] {
 
 [data-app-theme="aquamarine"] .settings-tab-btn.active {
     background: #e47d0d !important;
-    color: #ffffff !important;
+    color: var(--app-accent-contrast) !important;
     border-color: #cd700b !important;
     box-shadow: 0 0 12px rgba(228, 125, 13, 0.4) !important;
 }
@@ -550,7 +550,7 @@ html[data-library-type="video"] #sidebar-categories [data-id="plugins"] {
 
 [data-app-theme="ironman"] .settings-tab-btn.active {
     background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
-    color: #ffffff !important;
+    color: var(--app-accent-contrast) !important;
     border-color: #ef4444 !important;
     box-shadow: 0 0 15px rgba(220, 38, 38, 0.4) !important;
 }
@@ -632,12 +632,12 @@ html[data-library-type="video"] #sidebar-categories [data-id="plugins"] {
 
 [data-app-theme="epaper"] .sidebar-menu .menu-item.active {
     background: #000000 !important;
-    color: #ffffff !important;
+    color: var(--app-accent-contrast) !important;
     border: 1px solid #000000 !important;
 }
 
 [data-app-theme="epaper"] .sidebar-menu .menu-item.active * {
-    color: #ffffff !important;
+    color: var(--app-accent-contrast) !important;
 }
 
 [data-app-theme="epaper"] .settings-tab-btn {
@@ -648,7 +648,7 @@ html[data-library-type="video"] #sidebar-categories [data-id="plugins"] {
 
 [data-app-theme="epaper"] .settings-tab-btn.active {
     background: #000000 !important;
-    color: #ffffff !important;
+    color: var(--app-accent-contrast) !important;
 }
 
 [data-app-theme="epaper"] select,
@@ -822,7 +822,7 @@ body {
 .sidebar-title {
     font-size: 1.1rem;
     font-weight: 700;
-    color: #fff;
+    color: var(--app-text-primary);
     margin: 0;
     padding-bottom: 0.5rem;
 }
@@ -861,7 +861,7 @@ body {
 
 .sidebar-menu .menu-item:hover {
     background: rgba(255, 255, 255, 0.04);
-    color: #fff;
+    color: var(--app-text-primary);
 }
 
 .sidebar-menu .menu-item.active {
@@ -995,7 +995,7 @@ body {
 .current-category-indicator-title {
     font-size: 1.5rem;
     font-weight: 700;
-    color: #fff;
+    color: var(--app-text-primary);
     letter-spacing: -0.01em;
 }
 
@@ -1035,7 +1035,7 @@ body {
 }
 
 .btn-sidebar-toggle-desktop:hover {
-    color: #a855f7 !important;
+    color: var(--app-accent) !important;
 }
 
 /* 킷오스크 모드: /tv 등 외부 브라우징 화면에서 딥링크로 접속 시 사이드바/헤더를 완전히 숨기고 리더/플러그인 화면만 노출 */
@@ -1063,7 +1063,7 @@ body {
     background: rgba(15, 15, 20, 0.7);
     backdrop-filter: blur(8px);
     border: 1px solid rgba(255, 255, 255, 0.15);
-    color: #f8fafc;
+    color: var(--app-text-primary);
     font-size: 1.1rem;
     display: flex;
     align-items: center;
@@ -1072,8 +1072,8 @@ body {
 }
 
 .kiosk-back-btn:hover {
-    color: #a855f7;
-    border-color: #a855f7;
+    color: var(--app-accent);
+    border-color: var(--app-accent);
 }
 
 /* 상단 헤더 및 컨트롤 - 목업(시안 D)처럼 한 줄: [사이드바토글] [검색창] [그룹모드] [타입탭] ...스페이서... [필터/스캔] */
@@ -1258,7 +1258,7 @@ body {
     border: 1px solid transparent;
     border-radius: 4px;
     background: transparent;
-    color: #94a3b8;
+    color: var(--app-text-muted);
     cursor: pointer;
     font-size: 1rem;
     transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
@@ -1268,7 +1268,7 @@ body {
 .btn-scan-activity[aria-expanded="true"] {
     background: rgba(255, 255, 255, 0.06);
     border-color: rgba(255, 255, 255, 0.12);
-    color: #e2e8f0;
+    color: var(--app-text-primary);
 }
 
 .btn-scan-activity.is-active > i {
@@ -1323,7 +1323,7 @@ body {
 }
 
 .scan-activity-header strong {
-    color: #f1f5f9;
+    color: var(--app-text-primary);
     font-size: 0.92rem;
 }
 
@@ -1506,7 +1506,7 @@ body {
 .context-menu {
     position: absolute;
     z-index: 10000;
-    background: rgba(15, 23, 42, 0.95);
+    background: rgba(var(--app-panel-rgb), 0.95);
     border: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     border-radius: 8px;
@@ -1549,18 +1549,18 @@ body {
 
 .context-menu-drag-handle:hover {
     background: rgba(255, 255, 255, 0.08);
-    color: #e2e8f0;
+    color: var(--app-text-primary);
 }
 
 .context-menu-drag-handle.is-dragging,
 .context-menu-drag-handle:active {
     cursor: grabbing;
     background: rgba(168, 85, 247, 0.2);
-    color: #e2e8f0;
+    color: var(--app-text-primary);
 }
 
 .context-menu-title {
-    color: #cbd5e1;
+    color: var(--app-text-muted);
     font-size: 0.8rem;
     font-weight: 700;
     letter-spacing: 0.02em;
@@ -1576,7 +1576,7 @@ body {
     border: none;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.08);
-    color: #e2e8f0;
+    color: var(--app-text-primary);
     font-size: 0.78rem;
     line-height: 1;
     cursor: pointer;
@@ -1599,7 +1599,7 @@ body {
 
 .context-menu-close-btn:hover {
     background: rgba(239, 68, 68, 0.2);
-    color: #fff;
+    color: var(--app-text-primary);
     transform: scale(1.04);
 }
 
@@ -1616,7 +1616,7 @@ body {
 
 .context-menu-item {
     padding: 0.6rem 1rem;
-    color: #cbd5e1;
+    color: var(--app-text-muted);
     font-size: 0.85rem;
     cursor: pointer;
     display: flex;
@@ -1626,40 +1626,40 @@ body {
 }
 
 .context-menu-item:hover {
-    background: rgba(168, 85, 247, 0.2);
-    color: #fff;
+    background: color-mix(in srgb, var(--app-accent) 20%, transparent);
+    color: var(--app-text-primary);
 }
 
 .context-menu-item i {
     width: 14px;
-    color: #94a3b8;
+    color: var(--app-text-muted);
 }
 
 .context-menu-item:hover i {
-    color: #c084fc;
+    color: var(--app-accent-hover);
 }
 
 /* 현재 선택된 값 표시 (예: 커버 정렬 컨텍스트 메뉴의 현재 정렬값) */
 .context-menu-item.active {
-    background: rgba(168, 85, 247, 0.15);
-    color: #fff;
+    background: color-mix(in srgb, var(--app-accent) 15%, transparent);
+    color: var(--app-text-primary);
     font-weight: 600;
 }
 
 .context-menu-item.active i {
-    color: #c084fc;
+    color: var(--app-accent-hover);
 }
 
 .context-menu-close-item {
     margin-top: 0.25rem;
     border-top: 1px solid rgba(255, 255, 255, 0.06);
-    color: #f8fafc;
+    color: var(--app-text-primary);
     font-weight: 700;
 }
 
 .context-menu-close-item:hover {
     background: rgba(248, 113, 113, 0.16);
-    color: #fff;
+    color: var(--app-text-primary);
 }
 
 .context-menu-close-item i {
@@ -1674,7 +1674,7 @@ body {
 
 .plugin-context-menu-group-title {
     padding: 0.45rem 1rem 0.35rem 1rem;
-    color: #94a3b8;
+    color: var(--app-text-muted);
     font-size: 0.72rem;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -1724,7 +1724,7 @@ body {
     width: 100%;
     height: 100%;
     overflow: auto;
-    background-color: rgba(15, 23, 42, 0.75);
+    background-color: rgba(var(--app-panel-rgb), 0.75);
     backdrop-filter: blur(8px);
     display: flex;
     align-items: center;
@@ -1738,14 +1738,14 @@ body {
 }
 
 .library-modal-content {
-    background: rgba(30, 41, 59, 0.9);
+    background: rgba(var(--app-panel-rgb), 0.9);
     border: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
     border-radius: 12px;
     width: 100%;
     max-width: 480px;
     padding: 1.5rem;
-    color: #e2e8f0;
+    color: var(--app-text-primary);
     animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -1784,18 +1784,18 @@ body {
     margin: 0;
     font-size: 1.2rem;
     font-weight: 700;
-    color: #fff;
+    color: var(--app-text-primary);
 }
 
 .library-modal-close {
     font-size: 1.5rem;
-    color: #94a3b8;
+    color: var(--app-text-muted);
     cursor: pointer;
     transition: color 0.2s;
 }
 
 .library-modal-close:hover {
-    color: #fff;
+    color: var(--app-text-primary);
 }
 
 .library-form-group {
@@ -1808,15 +1808,15 @@ body {
 .library-form-group label {
     font-size: 0.85rem;
     font-weight: 600;
-    color: #94a3b8;
+    color: var(--app-text-muted);
 }
 
 .library-form-group input,
 .library-form-group select,
 .library-form-group textarea {
-    background: rgba(15, 23, 42, 0.6);
+    background: rgba(var(--app-panel-rgb), 0.6);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #fff;
+    color: var(--app-text-primary);
     border-radius: 6px;
     padding: 0.6rem 0.8rem;
     font-size: 0.9rem;
@@ -1828,8 +1828,8 @@ body {
 .library-form-group input:focus,
 .library-form-group select:focus,
 .library-form-group textarea:focus {
-    border-color: #a855f7;
-    box-shadow: 0 0 8px rgba(168, 85, 247, 0.4);
+    border-color: var(--app-accent);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--app-accent) 40%, transparent);
 }
 
 .library-form-group-row {
@@ -1843,7 +1843,7 @@ body {
 
 .library-form-group-row input[type="checkbox"] {
     cursor: pointer;
-    accent-color: #a855f7;
+    accent-color: var(--app-accent);
     width: 1.1rem;
     height: 1.1rem;
     flex-shrink: 0;
@@ -1854,7 +1854,7 @@ body {
     cursor: pointer;
     font-weight: normal;
     margin: 0;
-    color: #cbd5e1;
+    color: var(--app-text-muted);
     font-size: 0.88rem;
     white-space: nowrap;
 }
@@ -1873,7 +1873,7 @@ body {
 
 .settings-checkbox-row input[type="checkbox"] {
     cursor: pointer;
-    accent-color: #a855f7;
+    accent-color: var(--app-accent);
     width: 1.1rem;
     height: 1.1rem;
     margin: 0;
@@ -1886,20 +1886,20 @@ body {
 .settings-checkbox-row label {
     cursor: pointer;
     font-weight: 700;
-    color: #fff;
+    color: var(--app-text-primary);
     font-size: 0.9rem;
     margin: 0;
 }
 
 .settings-checkbox-hint {
-    color: #64748b;
+    color: var(--app-text-muted);
     font-weight: 400;
     font-size: 0.8rem;
 }
 
 .settings-checkbox-desc {
     font-size: 0.78rem;
-    color: #94a3b8;
+    color: var(--app-text-muted);
     margin: -0.35rem 0 0 1.65rem;
 }
 
@@ -1919,9 +1919,9 @@ body {
 }
 
 .btn-cancel {
-    background: rgba(30, 41, 59, 0.6);
+    background: rgba(var(--app-panel-rgb), 0.6);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #cbd5e1;
+    color: var(--app-text-muted);
     padding: 0.5rem 1.2rem;
     border-radius: 6px;
     cursor: pointer;
@@ -1932,7 +1932,7 @@ body {
 
 .btn-cancel:hover {
     background: rgba(255, 255, 255, 0.05);
-    color: #fff;
+    color: var(--app-text-primary);
 }
 
 .btn-submit {
@@ -1969,9 +1969,9 @@ body {
 }
 
 .cron-input {
-    background: rgba(15, 23, 42, 0.6);
+    background: rgba(var(--app-panel-rgb), 0.6);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #fff;
+    color: var(--app-text-primary);
     border-radius: 4px;
     padding: 0.35rem 0.6rem;
     font-size: 0.85rem;
@@ -1981,8 +1981,8 @@ body {
 }
 
 .cron-input:focus {
-    border-color: #a855f7;
-    box-shadow: 0 0 6px rgba(168, 85, 247, 0.3);
+    border-color: var(--app-accent);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--app-accent) 30%, transparent);
 }
 
 .btn-settings-action {
@@ -1996,8 +1996,8 @@ body {
 }
 
 .btn-settings-save {
-    background: #7c3aed;
-    color: #fff;
+    background: color-mix(in srgb, var(--app-accent) 70%, black);
+    color: var(--app-accent-contrast);
     margin-right: 0.4rem;
 }
 
@@ -2008,13 +2008,13 @@ body {
 
 .btn-settings-scan {
     background: rgba(255, 255, 255, 0.08);
-    color: #e2e8f0;
+    color: var(--app-text-primary);
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .btn-settings-scan:hover {
     background: rgba(255, 255, 255, 0.15);
-    color: #fff;
+    color: var(--app-text-primary);
 }
 
 .badge-scan-status {
@@ -2055,9 +2055,9 @@ body {
 }
 
 .settings-tab-btn {
-    background: rgba(30, 41, 59, 0.4);
+    background: rgba(var(--app-panel-rgb), 0.4);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    color: #94a3b8;
+    color: var(--app-text-muted);
     padding: 0.5rem 1.2rem;
     font-size: 0.88rem;
     font-weight: 600;
@@ -2073,15 +2073,15 @@ body {
 
 .settings-tab-btn:hover {
     background: rgba(255, 255, 255, 0.06);
-    color: #fff;
+    color: var(--app-text-primary);
     border-color: rgba(255, 255, 255, 0.15);
 }
 
 .settings-tab-btn.active {
-    background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(124, 58, 237, 0.2) 100%);
-    color: #c084fc;
-    border: 1px solid rgba(168, 85, 247, 0.4);
-    box-shadow: 0 0 12px rgba(168, 85, 247, 0.15);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--app-accent) 20%, transparent) 0%, color-mix(in srgb, color-mix(in srgb, var(--app-accent) 70%, black) 20%, transparent) 100%);
+    color: var(--app-accent-hover);
+    border: 1px solid color-mix(in srgb, var(--app-accent) 40%, transparent);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--app-accent) 15%, transparent);
 }
 
 
@@ -2104,10 +2104,10 @@ body {
 
 /* 작가별 카드를 클릭해 드릴다운(특정 작가로 필터링)한 상태임을 시각적으로 구분 */
 .books-grid.author-drilldown-active {
-    border: 2px solid #a855f7;
+    border: 2px solid var(--app-accent);
     border-radius: 10px;
     padding: 1rem;
-    background: rgba(168, 85, 247, 0.05);
+    background: color-mix(in srgb, var(--app-accent) 5%, transparent);
 }
 
 .book-card {
@@ -2217,7 +2217,7 @@ body {
     grid-column: 1 / -1;
     text-align: center;
     padding: 3rem;
-    color: #64748b;
+    color: var(--app-text-muted);
     font-size: 1rem;
 }
 
@@ -2247,7 +2247,7 @@ body {
     transform: translate(-50%, -50%) scale(0.8);
     background: var(--app-accent);
     border: none;
-    color: #fff;
+    color: var(--app-accent-contrast);
     width: 48px;
     height: 48px;
     border-radius: 50%;
@@ -2321,7 +2321,7 @@ body {
 .btn-nav-arrow:hover {
     background: var(--app-accent);
     border-color: var(--app-accent-hover);
-    color: #fff;
+    color: var(--app-accent-contrast);
     box-shadow: none;
 }
 
@@ -2341,7 +2341,7 @@ body {
 
 .smart-rec-loading {
     padding: 2rem;
-    color: #94a3b8;
+    color: var(--app-text-muted);
 }
 
 .smart-rec-loading--centered {
@@ -2369,11 +2369,11 @@ body {
 
 .smart-rec-empty-state-title {
     margin: 0 0 0.5rem 0;
-    color: #cbd5e1;
+    color: var(--app-text-muted);
 }
 
 .smart-rec-empty-state-desc {
-    color: #64748b;
+    color: var(--app-text-muted);
     font-size: 0.9rem;
 }
 
@@ -2386,7 +2386,7 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 10px;
     cursor: pointer;
-    color: #cbd5e1;
+    color: var(--app-text-muted);
     max-width: 220px;
     transition: all 0.15s ease;
 }
@@ -2394,7 +2394,7 @@ body {
 .smart-rec-tab.active {
     background: rgba(52, 211, 153, 0.15);
     border-color: #34d399;
-    color: #f8fafc;
+    color: var(--app-text-primary);
 }
 
 .smart-rec-tab-cover {
@@ -2426,7 +2426,7 @@ body {
 .smart-rec-section-title {
     margin: 0;
     font-size: 1rem;
-    color: #f8fafc;
+    color: var(--app-text-primary);
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -2439,7 +2439,7 @@ body {
 .smart-rec-fallback-note {
     font-size: 0.78rem;
     font-weight: 400;
-    color: #64748b;
+    color: var(--app-text-muted);
 }
 
 .section-nav-btns--hidden {
@@ -2447,19 +2447,19 @@ body {
 }
 
 .smart-rec-section-empty {
-    color: #64748b;
+    color: var(--app-text-muted);
     font-size: 0.88rem;
     padding: 0.5rem 0 1rem 0;
 }
 
 /* 대시보드 통계 카드 */
 .dashboard-stats-card {
-    background: rgba(30, 41, 59, 0.3);
+    background: rgba(var(--app-panel-rgb), 0.3);
     border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 8px;
     padding: 2.2rem;
     text-align: center;
-    color: #94a3b8;
+    color: var(--app-text-muted);
     font-size: 0.9rem;
     backdrop-filter: blur(10px);
 }
@@ -2469,7 +2469,7 @@ body {
     position: absolute;
     top: 8px;
     left: 8px;
-    background: rgba(15, 23, 42, 0.65);
+    background: rgba(var(--app-panel-rgb), 0.65);
     border: 1px solid rgba(255, 255, 255, 0.15);
     color: #eab308;
     width: 34px;
@@ -2499,7 +2499,7 @@ body {
 
 .book-card:hover .btn-card-fav-toggle:hover {
     transform: scale(1.15);
-    background: rgba(15, 23, 42, 0.9);
+    background: rgba(var(--app-panel-rgb), 0.9);
     border-color: #eab308;
     box-shadow: 0 0 10px rgba(234, 179, 8, 0.4);
 }
@@ -2583,7 +2583,7 @@ body {
     flex-wrap: wrap;
     gap: 1.8rem;
     align-items: flex-start;
-    background: rgba(15, 23, 42, 0.4);
+    background: rgba(var(--app-panel-rgb), 0.4);
     border: 1px solid rgba(255,255,255,0.07);
     border-radius: 12px;
     padding: 1.5rem;
@@ -2623,7 +2623,7 @@ body {
     margin: 0;
     font-size: 1.6rem;
     font-weight: 800;
-    color: #fff;
+    color: var(--app-text-primary);
     line-height: 1.2;
 }
 
@@ -2635,18 +2635,18 @@ body {
 }
 
 .badge {
-    background: rgba(168, 85, 247, 0.2);
-    color: #c084fc;
+    background: color-mix(in srgb, var(--app-accent) 20%, transparent);
+    color: var(--app-accent-hover);
     padding: 0.2rem 0.6rem;
     border-radius: 4px;
     font-size: 0.75rem;
     font-weight: 700;
-    border: 1px solid rgba(168, 85, 247, 0.4);
+    border: 1px solid color-mix(in srgb, var(--app-accent) 40%, transparent);
 }
 
 .meta-item {
     font-size: 0.82rem;
-    color: #94a3b8;
+    color: var(--app-text-muted);
     display: flex;
     align-items: center;
     gap: 0.3rem;
@@ -2661,8 +2661,8 @@ body {
 .book-summary-text {
     font-size: 0.88rem;
     line-height: 1.65;
-    color: #cbd5e1;
-    background: rgba(15, 23, 42, 0.3);
+    color: var(--app-text-muted);
+    background: rgba(var(--app-panel-rgb), 0.3);
     padding: 0.8rem 1rem;
     border-radius: 6px;
     white-space: pre-wrap;
@@ -2693,7 +2693,7 @@ body {
 .book-summary-toggle {
     border: none;
     background: transparent;
-    color: #cbd5e1;
+    color: var(--app-text-muted);
     border-radius: 0;
     font-size: 0.78rem;
     font-weight: 700;
@@ -2721,7 +2721,7 @@ body {
 }
 
 .book-summary-toggle:hover {
-    color: #f8fafc;
+    color: var(--app-text-primary);
 }
 
 /* 표지 수동 업로드 컨테이너 및 오버레이 */
@@ -2748,7 +2748,7 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(15, 23, 42, 0.85);
+    background: rgba(var(--app-panel-rgb), 0.85);
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -2757,7 +2757,7 @@ body {
     opacity: 0;
     transition: opacity 0.2s ease;
     z-index: 10;
-    color: #fff;
+    color: var(--app-text-primary);
     font-size: 0.85rem;
     font-weight: 600;
     cursor: pointer;
@@ -2770,10 +2770,10 @@ body {
 /* 수동 에디터 편집 폼 */
 .edit-meta-input, .edit-meta-textarea {
     width: 100%;
-    background: rgba(15, 23, 42, 0.6);
+    background: rgba(var(--app-panel-rgb), 0.6);
     border: 1px solid rgba(168, 85, 247, 0.3);
     border-radius: 6px;
-    color: #f1f5f9;
+    color: var(--app-text-primary);
     font-size: 0.9rem;
     padding: 0.5rem 0.7rem;
     outline: none;
@@ -2781,8 +2781,8 @@ body {
 }
 
 .edit-meta-input:focus, .edit-meta-textarea:focus {
-    border-color: #a855f7;
-    box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.25);
+    border-color: var(--app-accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 25%, transparent);
 }
 
 .edit-meta-textarea {
@@ -2803,7 +2803,7 @@ body {
 .edit-meta-row-item label {
     font-size: 0.8rem;
     font-weight: 700;
-    color: #c084fc;
+    color: var(--app-accent-hover);
 }
 
 /* 편집 폼 그룹 */
@@ -2825,7 +2825,7 @@ body {
     align-self: flex-start;
     background: #1e293b;
     border: 1px solid #475569;
-    color: #f1f5f9;
+    color: #fff;
     padding: 0.4rem 1rem;
     border-radius: 6px;
     text-decoration: none;
@@ -2852,7 +2852,7 @@ body {
     margin: 0;
     font-size: 1rem;
     font-weight: 700;
-    color: #f1f5f9;
+    color: var(--app-text-primary);
     display: flex;
     align-items: center;
     gap: 0.6rem;
@@ -2890,8 +2890,8 @@ body {
     min-height: 32px;
     padding: 0.35rem 0.7rem;
     border: 1px solid rgba(148, 163, 184, 0.35);
-    background: rgba(15, 23, 42, 0.55);
-    color: #94a3b8;
+    background: rgba(var(--app-panel-rgb), 0.55);
+    color: var(--app-text-muted);
     font-size: 0.78rem;
     font-weight: 700;
     cursor: pointer;
@@ -2921,19 +2921,19 @@ body {
 
 .volumes-empty-filter {
     padding: 2rem 1rem;
-    color: #94a3b8;
+    color: var(--app-text-muted);
     text-align: center;
     border: 1px dashed rgba(148, 163, 184, 0.25);
     border-radius: 8px;
 }
 
 .vol-count-badge {
-    background: rgba(168, 85, 247, 0.25);
-    color: #c084fc;
+    background: color-mix(in srgb, var(--app-accent) 25%, transparent);
+    color: var(--app-accent-hover);
     font-size: 0.75rem;
     padding: 0.15rem 0.5rem;
     border-radius: 20px;
-    border: 1px solid rgba(168, 85, 247, 0.3);
+    border: 1px solid color-mix(in srgb, var(--app-accent) 30%, transparent);
 }
 
 .volumes-list {
@@ -2944,7 +2944,7 @@ body {
 
 /* Audiobook detail tabs/table UX */
 .ab-volumes-shell {
-    background: rgba(15, 23, 42, 0.36);
+    background: rgba(var(--app-panel-rgb), 0.36);
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 12px;
     padding: 0.9rem;
@@ -3080,8 +3080,8 @@ body {
 
 .ab-tab-btn {
     border: 1px solid rgba(148, 163, 184, 0.3);
-    background: rgba(15, 23, 42, 0.55);
-    color: #94a3b8;
+    background: rgba(var(--app-panel-rgb), 0.55);
+    color: var(--app-text-muted);
     border-radius: 999px;
     font-size: 0.8rem;
     font-weight: 700;
@@ -3101,7 +3101,7 @@ body {
     line-height: 1.25rem;
     text-align: center;
     font-size: 0.74rem;
-    color: #e2e8f0;
+    color: var(--app-text-primary);
 }
 
 .ab-tab-btn.active,
@@ -3127,7 +3127,7 @@ body {
     width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
-    background: rgba(15, 23, 42, 0.28);
+    background: rgba(var(--app-panel-rgb), 0.28);
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 10px;
     overflow: hidden;
@@ -3143,12 +3143,12 @@ body {
     font-size: 0.84rem;
     line-height: 1.32;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    color: #e2e8f0;
+    color: var(--app-text-primary);
 }
 
 .ab-detail-table th {
     text-align: left;
-    color: #cbd5e1;
+    color: var(--app-text-muted);
     font-size: 0.78rem;
     font-weight: 700;
 }
@@ -3213,7 +3213,7 @@ body {
 }
 
 .ab-stat-card {
-    background: rgba(15, 23, 42, 0.44);
+    background: rgba(var(--app-panel-rgb), 0.44);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 10px;
     padding: 0.7rem 0.8rem;
@@ -3223,12 +3223,12 @@ body {
 }
 
 .ab-stat-card .k {
-    color: #94a3b8;
+    color: var(--app-text-muted);
     font-size: 0.75rem;
 }
 
 .ab-stat-card strong {
-    color: #f8fafc;
+    color: var(--app-text-primary);
     font-size: 1.02rem;
 }
 
@@ -3237,7 +3237,7 @@ body {
     display: flex;
     align-items: center;
     gap: 1rem;
-    background: rgba(15, 23, 42, 0.45);
+    background: rgba(var(--app-panel-rgb), 0.45);
     border: 1px solid rgba(255,255,255,0.06);
     border-radius: 8px;
     padding: 0.7rem 1rem;
@@ -3248,7 +3248,7 @@ body {
 }
 
 .volume-card:hover {
-    background: rgba(30, 41, 59, 0.7);
+    background: rgba(var(--app-panel-rgb), 0.7);
     border-color: rgba(168, 85, 247, 0.4);
     transform: translateX(2px);
 }
@@ -3281,7 +3281,7 @@ body {
 .volume-title {
     font-size: 0.92rem;
     font-weight: 700;
-    color: #f1f5f9;
+    color: var(--app-text-primary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -3305,7 +3305,7 @@ body {
 
 .vol-meta {
     font-size: 0.75rem;
-    color: #64748b;
+    color: var(--app-text-muted);
     display: flex;
     align-items: center;
     gap: 0.25rem;
@@ -3321,7 +3321,7 @@ body {
 
 .volume-progress-bar {
     height: 100%;
-    background: linear-gradient(90deg, #a855f7, #7c3aed);
+    background: linear-gradient(90deg, var(--app-accent) 0%, color-mix(in srgb, var(--app-accent) 70%, black) 100%);
     border-radius: 2px;
     transition: width 0.4s ease;
     min-width: 2px;
@@ -3329,7 +3329,7 @@ body {
 
 .chapter-progress-text {
     font-size: 0.72rem;
-    color: #64748b;
+    color: var(--app-text-muted);
 }
 
 .btn-read {
@@ -3447,7 +3447,7 @@ body {
 .btn-rescan-book:hover {
     background: rgba(234, 179, 8, 0.28);
     border-color: #f59e0b;
-    color: #fff;
+    color: var(--app-text-primary);
     box-shadow: 0 0 8px rgba(234, 179, 8, 0.25);
 }
 
@@ -3469,7 +3469,7 @@ body {
     flex-direction: column;
     gap: 1px;
     z-index: 100;
-    background: rgba(15, 23, 42, 0.4);
+    background: rgba(var(--app-panel-rgb), 0.4);
     backdrop-filter: blur(8px);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 20px;
@@ -3486,7 +3486,7 @@ body {
 .alphabet-item {
     font-size: 0.65rem;
     font-weight: 600;
-    color: #94a3b8;
+    color: var(--app-text-muted);
     cursor: pointer;
     text-align: center;
     padding: 2px 4px;
@@ -3496,7 +3496,7 @@ body {
 }
 
 .alphabet-item:hover {
-    color: #fff;
+    color: var(--app-text-primary);
     background: rgba(168, 85, 247, 0.8);
     transform: scale(1.2);
 }
@@ -3575,7 +3575,7 @@ body {
     align-items: center;
     background: rgba(0, 0, 0, 0.4);
     border: 1px solid rgba(255, 255, 255, 0.4);
-    color: #ffffff;
+    color: var(--app-text-primary);
     padding: 0.3rem 0.6rem;
     border-radius: 6px;
     font-size: 0.8rem;
@@ -3586,7 +3586,7 @@ body {
 
 .active-filter-item .filter-remove-btn {
     cursor: pointer;
-    color: #cbd5e1;
+    color: var(--app-text-muted);
     transition: color 0.2s ease;
     display: inline-flex;
     align-items: center;
@@ -3594,11 +3594,11 @@ body {
 }
 
 .active-filter-item .filter-remove-btn:hover {
-    color: #ffffff;
+    color: var(--app-text-primary);
 }
 
 .btn-active-filter-reset {
-    background: rgba(15, 23, 42, 0.85);
+    background: rgba(var(--app-panel-rgb), 0.85);
     border: 1px solid #ef4444;
     color: #f87171;
     font-size: 0.75rem;
@@ -3616,7 +3616,7 @@ body {
 
 .btn-active-filter-reset:hover {
     background: #ef4444;
-    color: #ffffff;
+    color: #fff;
     border-color: #fca5a5;
     box-shadow: 0 4px 12px rgba(239, 68, 68, 0.5);
 }
@@ -3624,7 +3624,7 @@ body {
 /* 대시보드 플러그인 위젯 카드 (공통 데스크) */
 .plugin-widget-subtitle {
     margin-top: 0.35rem;
-    color: #94a3b8;
+    color: var(--app-text-muted);
     font-size: 0.78rem;
 }
 
@@ -3636,7 +3636,7 @@ body {
 .plugin-card {
     flex: 1 1 350px;
     min-width: 320px;
-    background: rgba(30, 41, 59, 0.4);
+    background: rgba(var(--app-panel-rgb), 0.4);
     border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 8px;
     padding: 1rem;
@@ -3647,7 +3647,7 @@ body {
 
 .plugin-card-header {
     margin: 0 0 0.7rem 0;
-    color: #cbd5e1;
+    color: var(--app-text-muted);
     font-size: 1rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     padding-bottom: 0.5rem;
@@ -3677,7 +3677,7 @@ body {
 
 .plugin-card-provider {
     font-size: 0.75rem;
-    color: #64748b;
+    color: var(--app-text-muted);
     font-weight: normal;
     flex-shrink: 0;
 }
@@ -3723,19 +3723,19 @@ body {
 
 .plugins-tab-content .section-title {
     margin: 0;
-    color: #fff;
+    color: var(--app-text-primary);
     font-size: 1.2rem;
     font-weight: 700;
 }
 
 .plugins-tab-content .section-title i {
-    color: #a855f7;
+    color: var(--app-accent);
     margin-right: 0.5rem;
 }
 
 .plugin-tab-provider {
     font-size: 0.8rem;
-    color: #64748b;
+    color: var(--app-text-muted);
 }
 
 .plugin-tab-widget-body {
@@ -3750,7 +3750,7 @@ body {
 .dashboard-metric-card {
     padding: 0.85rem 0.9rem;
     border-radius: 8px;
-    background: rgba(15, 23, 42, 0.55);
+    background: rgba(var(--app-panel-rgb), 0.55);
     border: 1px solid rgba(148, 163, 184, 0.15);
     display: flex;
     flex-direction: column;
@@ -3758,20 +3758,20 @@ body {
 }
 
 .dashboard-metric-label {
-    color: #94a3b8;
+    color: var(--app-text-muted);
     font-size: 0.8rem;
     white-space: pre-line;
 }
 
 .dashboard-metric-value {
-    color: #f8fafc;
+    color: var(--app-text-primary);
     font-size: 1.15rem;
     line-height: 1.35;
     white-space: pre-line;
 }
 
 .dashboard-metric-desc {
-    color: #64748b;
+    color: var(--app-text-muted);
     font-size: 0.74rem;
     white-space: pre-line;
 }
@@ -3813,7 +3813,7 @@ body {
 }
 
 .plugin-item-title {
-    color: #f8fafc;
+    color: var(--app-text-primary);
     font-size: 0.95rem;
     font-weight: 600;
     text-decoration: none;
@@ -3823,7 +3823,7 @@ body {
 }
 
 .plugin-item-meta {
-    color: #94a3b8;
+    color: var(--app-text-muted);
     font-size: 0.8rem;
     white-space: nowrap;
     overflow: hidden;
@@ -3838,12 +3838,12 @@ body {
 }
 
 .plugin-item-publisher {
-    color: #64748b;
+    color: var(--app-text-muted);
     font-size: 0.75rem;
 }
 
 .plugin-item-pubdate {
-    color: #a855f7;
+    color: var(--app-accent);
     font-size: 0.75rem;
 }
 
@@ -3918,7 +3918,7 @@ body {
     align-items: baseline;
     gap: 0.5rem;
     font-size: 0.8rem;
-    color: #e2e8f0;
+    color: var(--app-text-primary);
     flex-wrap: wrap;
 }
 
@@ -3938,20 +3938,20 @@ body {
 
 .plugin-health-detail-id {
     font-weight: 600;
-    color: #f1f5f9;
+    color: var(--app-text-primary);
     flex-shrink: 0;
 }
 
 .plugin-health-detail-message {
-    color: #94a3b8;
+    color: var(--app-text-muted);
     word-break: break-all;
 }
 
 /* Drag and Drop Sortable Plugins Style */
 .plugin-card.dragging {
   opacity: 0.45;
-  border: 1px dashed #a855f7 !important;
-  background: rgba(168, 85, 247, 0.05) !important;
+  border: 1px dashed var(--app-accent) !important;
+  background: color-mix(in srgb, var(--app-accent) 5%, transparent) !important;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3) !important;
 }
 
@@ -3990,7 +3990,7 @@ body {
   aspect-ratio: 2 / 3;
   object-fit: cover;
   border-radius: 5px;
-  background: rgba(30, 41, 59, 0.6);
+  background: rgba(var(--app-panel-rgb), 0.6);
   display: block;
 }
 
@@ -4000,8 +4000,8 @@ body {
   bottom: 8px;
   right: 8px;
   z-index: 5;
-  background: rgba(15, 23, 42, 0.85);
-  color: #f8fafc;
+  background: rgba(var(--app-panel-rgb), 0.85);
+  color: var(--app-text-primary);
   border: 1px solid rgba(255, 255, 255, 0.2);
   width: 32px;
   height: 32px;
@@ -4027,7 +4027,7 @@ body {
 .volumes-list-grid .vol-grid-title {
   width: 100%;
   font-size: 0.72rem;
-  color: #cbd5e1;
+  color: var(--app-text-muted);
   text-align: center;
   line-height: 1.35;
   overflow: hidden;
@@ -4050,7 +4050,7 @@ body {
 }
 .volumes-list-grid .vol-grid-progress-bar {
   height: 100%;
-  background: linear-gradient(90deg, #a855f7, #3b82f6);
+  background: linear-gradient(90deg, var(--app-accent), #3b82f6);
   border-radius: 2px;
   transition: width 0.3s;
 }

@@ -23,7 +23,7 @@ export async function mountCategoryPluginUI(pluginId) {
 
   container.innerHTML = `
     <div class="loading-spinner" style="padding: 4rem 1rem; text-align: center; color: var(--app-text-muted); width: 100%;">
-      <i class="fa-solid fa-circle-notch fa-spin fa-2x" style="color: #c084fc;"></i>
+      <i class="fa-solid fa-circle-notch fa-spin fa-2x" style="color: var(--app-accent-hover);"></i>
       <div style="margin-top: 1rem; font-size: 0.95rem;">플러그인 전용 화면을 불러오는 중...</div>
     </div>
   `;
@@ -79,7 +79,7 @@ export async function mountCategoryPluginUI(pluginId) {
       <div class="custom-plugin-page-container" style="padding: 1.5rem 2rem; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; min-height: 80vh;">
         <div class="custom-plugin-page-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 1rem;">
           <h2 style="margin: 0; color: var(--app-text-primary); font-size: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 0.6rem;">
-            <i class="${icon}" style="color: #c084fc;"></i> <span>${title}</span>
+            <i class="${icon}" style="color: var(--app-accent-hover);"></i> <span>${title}</span>
           </h2>
           <span style="color: var(--app-text-muted); font-size: 0.85rem;">제공: ${escapeHtml(pluginInfo.name || 'BookOasis Plugin')}</span>
         </div>
@@ -129,7 +129,7 @@ function renderStatsDashboardCustomView(container, stats) {
       </div>
 
       <div style="background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.08); border-radius: 12px; padding: 1.2rem; display: flex; align-items: center; gap: 1rem;">
-        <div style="width: 50px; height: 50px; border-radius: 10px; background: rgba(168, 85, 247, 0.15); color: #a855f7; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+        <div style="width: 50px; height: 50px; border-radius: 10px; background: color-mix(in srgb, var(--app-accent) 15%, transparent); color: var(--app-accent); display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
           <i class="fa-solid fa-chart-line"></i>
         </div>
         <div>
@@ -168,7 +168,7 @@ function renderStatsDashboardCustomView(container, stats) {
           <div style="color: var(--app-text-muted); font-size: 0.8rem; margin-top: 0.2rem;">압축 파일 (ZIP/CBZ/RAR)</div>
         </div>
         <div style="background: rgba(var(--app-panel-rgb), 0.6); border-radius: 8px; padding: 1rem; text-align: center;">
-          <div style="color: #a855f7; font-size: 1.5rem; font-weight: 700;">${epubCnt.toLocaleString()}</div>
+          <div style="color: var(--app-accent); font-size: 1.5rem; font-weight: 700;">${epubCnt.toLocaleString()}</div>
           <div style="color: var(--app-text-muted); font-size: 0.8rem; margin-top: 0.2rem;">전자책 (EPUB/TXT)</div>
         </div>
         <div style="background: rgba(var(--app-panel-rgb), 0.6); border-radius: 8px; padding: 1rem; text-align: center;">

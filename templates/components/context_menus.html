@@ -1,7 +1,7 @@
 <!-- 우클릭 커스텀 컨텍스트 메뉴 -->
 <div id="library-context-menu" class="context-menu" style="display: none;">
     <ul class="context-menu-list">
-        <li class="context-menu-item" id="ctx-scan-category" data-role="library-context-action" data-action="scan"><i class="fa-solid fa-rotate" style="color: #a855f7;"></i> <span data-i18n="context_menu.scan_now">지금 스캔</span></li>
+        <li class="context-menu-item" id="ctx-scan-category" data-role="library-context-action" data-action="scan"><i class="fa-solid fa-rotate" style="color: var(--app-accent);"></i> <span data-i18n="context_menu.scan_now">지금 스캔</span></li>
         <li class="context-menu-item" id="ctx-force-scan-category" data-role="library-context-action" data-action="force-scan"><i class="fa-solid fa-arrows-rotate" style="color: #ea580c;"></i> <span data-i18n="context_menu.force_rescan">강제 재스캔 (전체)</span></li>
         <li class="context-menu-item" id="ctx-scan-covers-category" data-role="library-context-action" data-action="scan-covers"><i class="fa-solid fa-image" style="color: #3b82f6;"></i> <span data-i18n="context_menu.refresh_cover">표지 새로고침</span></li>
         <li class="context-menu-item" id="ctx-cancel-scan-category" data-role="library-context-action" data-action="cancel-scan"><i class="fa-solid fa-circle-stop" style="color: #ef4444;"></i> <span data-i18n="context_menu.cancel_scan">스캔 중단</span></li>
@@ -18,9 +18,9 @@
         <button type="button" class="context-menu-close-btn" data-role="book-context-close" aria-label="닫기"><span class="context-menu-close-icon">&times;</span><span class="context-menu-close-text">닫기</span></button>
     </div>
     <ul class="context-menu-list">
-        <li class="context-menu-item" id="ctx-scan-book" data-role="book-context-action" data-action="scan"><i class="fa-solid fa-barcode" style="color: #a855f7;"></i> <span data-i18n="context_menu.scan_book_now">이 책 즉시 스캔 (표지/메타)</span></li>
+        <li class="context-menu-item" id="ctx-scan-book" data-role="book-context-action" data-action="scan"><i class="fa-solid fa-barcode" style="color: var(--app-accent);"></i> <span data-i18n="context_menu.scan_book_now">이 책 즉시 스캔 (표지/메타)</span></li>
         <li class="context-menu-item" id="ctx-search-meta-book" data-role="book-context-action" data-action="search-meta"><i class="fa-solid fa-magnifying-glass" style="color: #3b82f6;"></i> <span data-i18n="context_menu.search_metadata">메타정보 검색</span></li>
-        <li class="context-menu-item" id="ctx-add-to-collection" data-role="book-context-action" data-action="add-to-collection"><i class="fa-solid fa-bookmark" style="color: #a855f7;"></i> <span data-i18n="context_menu.add_to_collection">컬렉션에 추가</span></li>
+        <li class="context-menu-item" id="ctx-add-to-collection" data-role="book-context-action" data-action="add-to-collection"><i class="fa-solid fa-bookmark" style="color: var(--app-accent);"></i> <span data-i18n="context_menu.add_to_collection">컬렉션에 추가</span></li>
         <li class="context-menu-item" id="ctx-add-series-to-collection" data-role="book-context-action" data-action="add-series-to-collection"><i class="fa-solid fa-book-bookmark" style="color: #38bdf8;"></i> <span data-i18n="context_menu.add_series_to_collection">이 시리즈를 컬렉션에 추가</span></li>
         <li class="context-menu-item" id="ctx-unread-book" data-role="book-context-action" data-action="mark-unread"><i class="fa-solid fa-eye-slash" style="color: #ef4444;"></i> <span data-i18n="context_menu.mark_as_unread">읽지 않은 상태로 변경 (0%)</span></li>
         <li class="context-menu-item" id="ctx-cover-align-book" data-role="book-context-action" data-action="cover-align" style="display: none;"><i class="fa-solid fa-align-left" style="color: #38bdf8;"></i> <span>커버 정렬 (이중 스캔본용)</span></li>
@@ -38,7 +38,7 @@
     <ul class="context-menu-list">
         <li class="context-menu-item" data-role="video-context-action" data-action="open-detail"><i class="fa-solid fa-circle-info" style="color: #38bdf8;"></i> <span>상세보기</span></li>
         <li class="context-menu-item" data-role="video-context-action" data-action="toggle-favorite"><i class="fa-solid fa-star" style="color: #eab308;"></i> <span id="video-ctx-favorite-label">즐겨찾기 추가</span></li>
-        <li class="context-menu-item" data-role="video-context-action" data-action="add-to-collection"><i class="fa-solid fa-folder-plus" style="color: #c084fc;"></i> <span>컬렉션에 추가</span></li>
+        <li class="context-menu-item" data-role="video-context-action" data-action="add-to-collection"><i class="fa-solid fa-folder-plus" style="color: var(--app-accent-hover);"></i> <span>컬렉션에 추가</span></li>
         <li class="context-menu-item context-menu-close-item" data-role="video-context-close"><i class="fa-solid fa-xmark" style="color: #f87171;"></i> <span>닫기</span></li>
     </ul>
 </div>
@@ -50,7 +50,7 @@
         <button type="button" class="context-menu-close-btn" data-role="author-group-context-close" aria-label="닫기"><span class="context-menu-close-icon">&times;</span><span class="context-menu-close-text">닫기</span></button>
     </div>
     <ul class="context-menu-list">
-        <li class="context-menu-item" data-role="author-group-context-action" data-action="add-to-collection"><i class="fa-solid fa-bookmark" style="color: #a855f7;"></i> <span>이 작가의 모든 작품을 컬렉션에 추가</span></li>
+        <li class="context-menu-item" data-role="author-group-context-action" data-action="add-to-collection"><i class="fa-solid fa-bookmark" style="color: var(--app-accent);"></i> <span>이 작가의 모든 작품을 컬렉션에 추가</span></li>
         <li class="context-menu-item context-menu-close-item" data-role="author-group-context-close"><i class="fa-solid fa-xmark" style="color: #f87171;"></i> <span>닫기</span></li>
     </ul>
 </div>
@@ -62,9 +62,9 @@
         <button type="button" class="context-menu-close-btn" data-role="volume-cover-align-context-close" aria-label="닫기"><span class="context-menu-close-icon">&times;</span><span class="context-menu-close-text">닫기</span></button>
     </div>
     <ul class="context-menu-list">
-        <li class="context-menu-item" data-role="volume-cover-align-context-action" data-align="left"><i class="fa-solid fa-align-left" style="color: #a855f7;"></i> <span>왼쪽 정렬</span></li>
-        <li class="context-menu-item" data-role="volume-cover-align-context-action" data-align="center"><i class="fa-solid fa-align-center" style="color: #a855f7;"></i> <span>중앙 정렬</span></li>
-        <li class="context-menu-item" data-role="volume-cover-align-context-action" data-align="right"><i class="fa-solid fa-align-right" style="color: #a855f7;"></i> <span>오른쪽 정렬</span></li>
+        <li class="context-menu-item" data-role="volume-cover-align-context-action" data-align="left"><i class="fa-solid fa-align-left" style="color: var(--app-accent);"></i> <span>왼쪽 정렬</span></li>
+        <li class="context-menu-item" data-role="volume-cover-align-context-action" data-align="center"><i class="fa-solid fa-align-center" style="color: var(--app-accent);"></i> <span>중앙 정렬</span></li>
+        <li class="context-menu-item" data-role="volume-cover-align-context-action" data-align="right"><i class="fa-solid fa-align-right" style="color: var(--app-accent);"></i> <span>오른쪽 정렬</span></li>
         <li class="context-menu-item context-menu-close-item" data-role="volume-cover-align-context-close"><i class="fa-solid fa-xmark" style="color: #f87171;"></i> <span>닫기</span></li>
     </ul>
 </div>
@@ -76,7 +76,7 @@
         <span id="schedule-action-last-scan" style="font-size: 0.82rem; color: var(--app-text-muted); font-family: monospace;">-</span>
     </div>
     <ul class="context-menu-list">
-        <li class="context-menu-item" id="schedule-action-scan"><i class="fa-solid fa-play" style="color: #a855f7;"></i> <span data-i18n="settings.btn_scan">스캔</span></li>
+        <li class="context-menu-item" id="schedule-action-scan"><i class="fa-solid fa-play" style="color: var(--app-accent);"></i> <span data-i18n="settings.btn_scan">스캔</span></li>
         <li class="context-menu-item" id="schedule-action-force"><i class="fa-solid fa-arrows-rotate" style="color: #ea580c;"></i> <span data-i18n="settings.btn_force_scan">강제 스캔</span></li>
         <li class="context-menu-item context-menu-close-item" id="schedule-action-close"><i class="fa-solid fa-xmark" style="color: #f87171;"></i> <span data-i18n="common.close">닫기</span></li>
     </ul>

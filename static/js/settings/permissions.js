@@ -144,9 +144,9 @@ function renderAdultBody(users) {
         <td style="padding:0.9rem 1rem; color: var(--app-text-primary); font-weight:700;">${user.username}</td>
         <td style="padding:0.9rem 1rem; text-align:center; color: var(--app-text-muted);">${user.role}</td>
         <td style="padding:0.9rem 1rem; text-align:center;">
-          <label style="display:inline-flex; align-items:center; gap:0.5rem; color:#c084fc; font-weight:700;">
+          <label style="display:inline-flex; align-items:center; gap:0.5rem; color:var(--app-accent-hover); font-weight:700;">
             <input type="checkbox" class="permission-chk-adult" data-user-id="${user.id}" ${isChecked} ${isDisabled}
-                   style="cursor:pointer; width:1.2rem; height:1.2rem; accent-color:#a855f7;">
+                   style="cursor:pointer; width:1.2rem; height:1.2rem; accent-color:var(--app-accent);">
             <span>성인 서재 접근 허용</span>
           </label>
         </td>

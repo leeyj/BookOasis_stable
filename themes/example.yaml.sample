@@ -1,0 +1,20 @@
+# 이 파일은 예시입니다. 실제로 로드되게 하려면 파일명을 *.yaml 로 바꾸고
+# id/label/색상값을 원하는 대로 수정하세요. 자세한 설명은 README.md 참고.
+id: midnight_lavender
+label: "🌸 미드나잇 라벤더"
+vars:
+  app-bg-main: "#1a1625"
+  app-bg-sidebar: "#211c30"
+  app-bg-card: "#2a2438"
+  app-bg-card-hover: "#332b45"
+  app-text-primary: "#f3f0fa"
+  app-text-muted: "#a89cc8"
+  app-text-secondary: "#c9bce0"
+  app-accent: "#c084fc"
+  app-accent-hover: "#d8b4fe"
+  app-accent-contrast: "#1a1625"
+  app-border: "#3d3450"
+  app-border-light: "#332b45"
+  app-input-bg: "#211c30"
+  app-panel-rgb: "42, 36, 56"
+  app-panel-border-rgb: "255, 255, 255"

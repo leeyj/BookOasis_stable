@@ -19,7 +19,7 @@ export async function renderCollectionsView() {
   container.innerHTML = `
     <div style="grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
       <h3 style="margin:0; font-size:1.1rem; color: var(--app-text-primary); display:flex; align-items:center; gap:0.5rem;">
-        <i class="fa-solid fa-bookmark" style="color: #a855f7;"></i> 나만의 컬렉션 목록
+        <i class="fa-solid fa-bookmark" style="color: var(--app-accent);"></i> 나만의 컬렉션 목록
       </h3>
       <button id="btn-create-collection-main" class="btn-toggle active" style="padding: 0.4rem 0.9rem; font-size: 0.88rem; background: var(--color-accent); color: var(--app-text-primary); border:none; border-radius:6px; cursor:pointer;">
         <i class="fa-solid fa-plus"></i> 새 컬렉션 만들기
@@ -258,9 +258,9 @@ export function openCreateCollectionModal(onCreated) {
 
   const modalHtml = `
     <div id="modal-create-collection" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
-      <div style="background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; width: 90%; max-width: 420px; padding: 1.5rem; color: var(--app-text-primary); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
+      <div style="background: rgba(var(--app-panel-rgb), 1); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); border-radius: 12px; width: 90%; max-width: 420px; padding: 1.5rem; color: var(--app-text-primary); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
         <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
-          <i class="fa-solid fa-bookmark" style="color: #a855f7;"></i> 새 컬렉션 생성
+          <i class="fa-solid fa-bookmark" style="color: var(--app-accent);"></i> 새 컬렉션 생성
         </h3>
         <div style="margin-bottom: 1rem;">
           <label style="display: block; font-size: 0.85rem; color: var(--app-text-muted); margin-bottom: 0.3rem;">컬렉션 이름</label>
@@ -348,15 +348,15 @@ export function openAddToCollectionModal(itemInfo) {
 
       const modalHtml = `
         <div id="modal-add-to-collection" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
-          <div style="background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; width: 90%; max-width: 400px; padding: 1.5rem; color: var(--app-text-primary); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
+          <div style="background: rgba(var(--app-panel-rgb), 1); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); border-radius: 12px; width: 90%; max-width: 400px; padding: 1.5rem; color: var(--app-text-primary); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
             <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
-              <i class="fa-solid fa-plus-circle" style="color: #a855f7;"></i> 컬렉션에 추가
+              <i class="fa-solid fa-plus-circle" style="color: var(--app-accent);"></i> 컬렉션에 추가
             </h3>
             <div style="margin-bottom: 1rem; max-height: 240px; overflow-y: auto;">
               ${listHtml}
             </div>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 0.8rem; border-top: 1px solid rgba(255,255,255,0.08);">
-              <button id="btn-new-coll-inside" style="padding: 0.4rem 0.8rem; background: rgba(168,85,247,0.2); border: 1px solid var(--color-accent); border-radius: 6px; color: #c084fc; cursor: pointer; font-size: 0.85rem;"><i class="fa-solid fa-plus"></i> 새 컬렉션</button>
+              <button id="btn-new-coll-inside" style="padding: 0.4rem 0.8rem; background: color-mix(in srgb, var(--app-accent) 20%, transparent); border: 1px solid var(--app-accent); border-radius: 6px; color: var(--app-accent-hover); cursor: pointer; font-size: 0.85rem;"><i class="fa-solid fa-plus"></i> 새 컬렉션</button>
               <button id="btn-close-add-coll" style="padding: 0.4rem 1rem; background: rgba(255,255,255,0.08); border: none; border-radius: 6px; color: var(--app-text-muted); cursor: pointer; font-size: 0.85rem;">닫기</button>
             </div>
           </div>
@@ -462,9 +462,9 @@ function openEditCollectionModal(coll) {
 
   const modalHtml = `
     <div id="modal-create-collection" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
-      <div style="background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; width: 90%; max-width: 420px; padding: 1.5rem; color: var(--app-text-primary); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
+      <div style="background: rgba(var(--app-panel-rgb), 1); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); border-radius: 12px; width: 90%; max-width: 420px; padding: 1.5rem; color: var(--app-text-primary); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
         <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
-          <i class="fa-solid fa-pen" style="color: #a855f7;"></i> 컬렉션 수정
+          <i class="fa-solid fa-pen" style="color: var(--app-accent);"></i> 컬렉션 수정
         </h3>
         <div style="margin-bottom: 1rem;">
           <label style="display: block; font-size: 0.85rem; color: var(--app-text-muted); margin-bottom: 0.3rem;">컬렉션 이름</label>

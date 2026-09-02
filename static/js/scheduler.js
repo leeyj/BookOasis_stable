@@ -247,7 +247,7 @@ export async function loadLibrarySchedules() {
   initScheduleActionDelegation();
   const container = document.getElementById('settings-libraries-list');
   if (!container) return;
-  container.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:2rem; color:#a855f7;"><i class="fa-solid fa-circle-notch fa-spin fa-2x"></i><br><span style="display:inline-block; margin-top:0.5rem;">${i18n.t('settings.loading_schedules')}</span></td></tr>`;
+  container.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:2rem; color:var(--app-accent);"><i class="fa-solid fa-circle-notch fa-spin fa-2x"></i><br><span style="display:inline-block; margin-top:0.5rem;">${i18n.t('settings.loading_schedules')}</span></td></tr>`;
   
   try {
     const data = await api.fetchLibrarySchedules(state.currentLibraryType);
@@ -451,7 +451,7 @@ export function openScanSettingsModal(libraryId, name, isRemote, rcloneRcUrl, cr
   }
   hydrateCronHelperFromCron(cronSchedule);
   
-  document.getElementById('scan-settings-modal-title').innerHTML = `<i class="fa-solid fa-gears" style="color: #a855f7; margin-right: 0.5rem;"></i> [${name}] 스캔 설정`;
+  document.getElementById('scan-settings-modal-title').innerHTML = `<i class="fa-solid fa-gears" style="color: var(--app-accent); margin-right: 0.5rem;"></i> [${name}] 스캔 설정`;
 
   const rcloneContainer = document.getElementById('scan-settings-rclone-container');
   if (isRemote === 1) {
@@ -468,8 +468,8 @@ export function openScanSettingsModal(libraryId, name, isRemote, rcloneRcUrl, cr
   if (isRemote === 1) {
     const checked = vfsRefresh === 1 ? 'checked' : '';
     vfsContainer.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: #c084fc; margin-top: 0.5rem;">
-        <input type="checkbox" id="scan-settings-vfs-refresh" style="cursor: pointer; accent-color: #a855f7; width: auto;" ${checked}>
+      <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--app-accent-hover); margin-top: 0.5rem;">
+        <input type="checkbox" id="scan-settings-vfs-refresh" style="cursor: pointer; accent-color: var(--app-accent); width: auto;" ${checked}>
         <label for="scan-settings-vfs-refresh" style="cursor: pointer; margin: 0;">${i18n.t('settings.vfs_refresh_before_scan') || '스캔 전 VFS 캐시 새로고침'}</label>
       </div>
     `;

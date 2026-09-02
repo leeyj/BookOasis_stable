@@ -110,7 +110,7 @@ export async function performMetadataSearch() {
   }
   
   const selectedSourceName = sourceSelect.options[sourceSelect.selectedIndex]?.text || i18n.t('metadata_search.default_source');
-  container.innerHTML = `<div style="text-align: center; padding: 2rem; color: #a855f7;"><i class="fa-solid fa-circle-notch fa-spin fa-2x"></i><br><br>${i18n.t('metadata_search.searching', {source: selectedSourceName})}</div>`;
+  container.innerHTML = `<div style="text-align: center; padding: 2rem; color: var(--app-accent);"><i class="fa-solid fa-circle-notch fa-spin fa-2x"></i><br><br>${i18n.t('metadata_search.searching', {source: selectedSourceName})}</div>`;
   
   try {
     const data = await api.searchMetadata(state.currentLibraryType, query, source);
@@ -173,7 +173,7 @@ function renderMetadataResults(books, source) {
   cards.forEach(card => {
     card.addEventListener('mouseenter', () => {
       card.style.background = 'rgba(168, 85, 247, 0.1)';
-      card.style.borderColor = '#a855f7';
+      card.style.borderColor = 'var(--app-accent)';
     });
     card.addEventListener('mouseleave', () => {
       card.style.background = 'rgba(30, 41, 59, 0.4)';
