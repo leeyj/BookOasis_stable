@@ -2,7 +2,7 @@
 ## v2.5.6
 - (fix) 모바일(안드로이드 Chrome)에서 새로고침/뒤로가기 시 상단 검색창이 화면 밖으로 스크롤된 채 시작해 브라우저 주소창에 가려 보이던 문제 수정 | fix the mobile (Android Chrome) top search bar starting scrolled off-screen behind the browser's address bar after a reload or back navigation
 - (fix) iOS에서 만화 스크롤 모드로 마지막 페이지(다음권/닫기) 상태일 때 뷰어를 닫으면 배경이 예전 스크롤 위치에 고정되어 화면이 안 움직이고 터치도 안 먹던 문제 수정 | fix the iOS comic scroll-mode viewer leaving the background page stuck at a stale scroll position and unresponsive to touch when closed from the last-page (next episode/close) overlay
-- (security) 메타데이터 플러그인 코드에서 subprocess/os.system 등으로 외부 프로세스를 띄우려는 시도를 로드 시점에 정적 검사해 차단 | block metadata plugin code from spawning external processes (subprocess, os.system, etc.) via a static check performed at load time
+- (security) 메타데이터 플러그인의 subprocess/os.system 등 외부 프로세스 실행을 기본 차단하고, `ALLOW_PLUGIN_SUBPROCESS=true` 설정 시에만 허용하되 파일 로그로만 기록 | block metadata plugins from spawning external processes (subprocess, os.system, etc.) by default; allow only when `ALLOW_PLUGIN_SUBPROCESS=true` is set, logging each case to a file only
 
 ## v2.5.5
 - (feature) 사용자가 YAML 파일로 커스텀 테마를 등록할 수 있는 기능 추가 (`themes/` 디렉토리에 넣으면 자동 인식, 관리자 재스캔 버튼 지원) | add support for user-authored custom themes via YAML files dropped into `themes/` (auto-detected, with an admin rescan button)

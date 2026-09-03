@@ -6,6 +6,7 @@ import importlib
 import subprocess
 import hashlib
 import traceback
+from datetime import datetime
 from flask import json
 from plugins.metadata.base import BaseMetadataProvider
 
@@ -20,10 +21,37 @@ _FORBIDDEN_OS_PROCESS_CALLS = {
     'posix_spawn', 'posix_spawnp',
 }
 
+_PLUGIN_SUBPROCESS_LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'logs')
+_PLUGIN_SUBPROCESS_LOG_FILE = os.path.join(_PLUGIN_SUBPROCESS_LOG_DIR, 'plugin_subprocess_allowed.log')
+
+
+def _is_plugin_subprocess_allowed():
+    return os.environ.get('ALLOW_PLUGIN_SUBPROCESS', 'false').strip().lower() == 'true'
+
+
+def _log_plugin_subprocess_allowed(provider_name, forbidden_hits):
+    """ALLOW_PLUGIN_SUBPROCESS=true로 우회 로드를 허용한 건은 대시보드/응답에 노출하지 않고
+    파일 로그로만 남긴다 - 관리자가 나중에 조사할 수 있도록 하되 평시 UI에는 드러내지 않기로 합의됨."""
+    try:
+        os.makedirs(_PLUGIN_SUBPROCESS_LOG_DIR, exist_ok=True)
+        with open(_PLUGIN_SUBPROCESS_LOG_FILE, 'a', encoding='utf-8') as f_log:
+            ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            f_log.write(f"[{ts}] plugin={provider_name}\n")
+            for hit in forbidden_hits:
+                f_log.write(f"    {hit}\n")
+    except Exception as ex_log:
+        print(f"[PluginSubprocessLog ERROR] Failed to write log file: {ex_log}")
+
 
 def _find_forbidden_calls_in_source(source, filename):
     """플러그인 소스 코드에서 subprocess 임포트/os.system류 프로세스 실행 호출을 정적 검사한다.
-    문자열/주석에 우연히 등장한 단어를 오탐하지 않도록 정규식이 아닌 AST를 사용한다."""
+    문자열/주석에 우연히 등장한 단어를 오탐하지 않도록 정규식이 아닌 AST를 사용한다.
+
+    한계(정적 검사이므로 명시적으로 인지하고 있어야 함): 이 검사는 `import subprocess`,
+    `os.system(...)` 처럼 정직하게 작성된 형태만 잡는다. `importlib.import_module('sub'+'process')`,
+    `getattr(os, 'sy'+'stem')`, ctypes로 직접 시스템콜, base64로 인코딩한 코드를 exec()하는 식의
+    "작정한 우회"는 탐지하지 못한다 - 실수로/무심코 subprocess를 쓴 플러그인을 막는 용도이지,
+    악의적으로 탐지를 회피하려는 코드에 대한 샌드박스가 아니다."""
     hits = []
     try:
         tree = ast.parse(source, filename=filename)
@@ -50,10 +78,15 @@ def _find_forbidden_calls_in_source(source, filename):
     return hits
 
 
-def _scan_plugin_for_forbidden_subprocess_usage(plugin_dir, single_file=None):
-    """plugin_dir(폴더형) 또는 single_file(단일 파일형) 플러그인 소스에서 subprocess 사용을 찾아
-    발견 시 SecurityError를 던져 로드를 차단한다. libs/(pip install --target 산출물)는 서드파티
-    의존성 코드라 검사 대상에서 제외한다 - 검사 대상은 어디까지나 플러그인 작성자 본인 코드."""
+def _scan_plugin_for_forbidden_subprocess_usage(plugin_dir, single_file=None, provider_name=None):
+    """plugin_dir(폴더형) 또는 single_file(단일 파일형) 플러그인 소스에서 subprocess 사용을 찾는다.
+
+    기본(ALLOW_PLUGIN_SUBPROCESS 미설정/false): 발견 시 SecurityError로 로드 자체를 차단한다.
+    ALLOW_PLUGIN_SUBPROCESS=true: 플러그인 확장성을 위해 로드는 허용하되, 어떤 플러그인이 어떤
+    호출을 썼는지 logs/plugin_subprocess_allowed.log에만 기록한다(대시보드 등에는 노출하지 않음).
+
+    libs/(pip install --target 산출물)는 서드파티 의존성 코드라 검사 대상에서 제외한다 -
+    검사 대상은 어디까지나 플러그인 작성자 본인 코드."""
     forbidden_hits = []
 
     if plugin_dir and os.path.isdir(plugin_dir):
@@ -77,10 +110,16 @@ def _scan_plugin_for_forbidden_subprocess_usage(plugin_dir, single_file=None):
         except Exception:
             pass
 
-    if forbidden_hits:
-        raise SecurityError(
-            "[SecurityAlert] Plugin blocked: subprocess/process-spawn usage detected:\n" + "\n".join(forbidden_hits)
-        )
+    if not forbidden_hits:
+        return
+
+    if _is_plugin_subprocess_allowed():
+        _log_plugin_subprocess_allowed(provider_name or plugin_dir or single_file, forbidden_hits)
+        return
+
+    raise SecurityError(
+        "[SecurityAlert] Plugin blocked: subprocess/process-spawn usage detected:\n" + "\n".join(forbidden_hits)
+    )
 
 def _get_core_requirements():
     return {'flask', 'pillow', 'pymupdf', 'psutil', 'redis', 'requests', 'rclone'}
@@ -219,7 +258,7 @@ class MetadataFactory:
         single_file = os.path.join(base_dir, 'plugins', 'metadata', f'{provider_name}.py')
         # 코어 자체(ffmpeg/rclone 호출 등)는 이 경로를 거치지 않으므로 영향 없음 - 여기서 검사하는
         # 대상은 어디까지나 plugins/metadata/<id> 아래 설치된 서드파티 플러그인 코드뿐이다.
-        _scan_plugin_for_forbidden_subprocess_usage(plugin_dir, single_file)
+        _scan_plugin_for_forbidden_subprocess_usage(plugin_dir, single_file, provider_name=provider_name)
 
         if os.path.isdir(plugin_dir):
             ensure_plugin_dependencies(plugin_dir)
