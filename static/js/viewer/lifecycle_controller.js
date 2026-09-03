@@ -194,9 +194,11 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false) {
   if (!isTransitioning) {
     const menu = document.getElementById('comic-overlay-menu');
     let savedScrollY = 0;
-    if (menu && menu.dataset.iosBodyLock === 'true') {
+    const wasIosBodyLocked = !!(menu && menu.dataset.iosBodyLock === 'true');
+    if (wasIosBodyLocked) {
       savedScrollY = parseInt(menu.dataset.savedBodyScrollY || '0', 10);
-      menu.dataset.iosBodyLock = 'false';
+      delete menu.dataset.savedBodyScrollY;
+      delete menu.dataset.iosBodyLock;
     }
 
     viewerModal.classList.remove('fullscreen-mode');
@@ -207,6 +209,18 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false) {
     // body 및 documentElement 인라인 스크롤 락 스타일만 안전 소거 (CSS 변수 유실 방지)
     document.body.style.removeProperty('overflow');
     document.documentElement.style.removeProperty('overflow');
+
+    // navigation.js::toggleComicOverlay()가 iOS 스크롤 모드에서 오버레이를 열 때 건
+    // position:fixed/top/width 스크롤 락은 오버레이를 다시 닫는 경로에서만 풀린다.
+    // 마지막 페이지(다음권 이어보기/닫기 오버레이)처럼 락이 걸린 채로 뷰어 자체가
+    // closeMediaViewer()로 바로 닫히면 이 스타일이 지워지지 않아 body가 옛 스크롤
+    // 위치에 고정된 채 남고(화면이 예전 상태로 보임), position:fixed라 스크롤/탭도
+    // 먹통이 되던 버그가 있었다 - 여기서도 동일하게 정리해준다.
+    if (wasIosBodyLocked) {
+      document.body.style.removeProperty('position');
+      document.body.style.removeProperty('top');
+      document.body.style.removeProperty('width');
+    }
 
     if (state.systemSettings) {
       import('../settings/general.js').then(m => {

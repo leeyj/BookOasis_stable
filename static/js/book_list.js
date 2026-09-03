@@ -305,16 +305,23 @@ export function updateSortButtonUI() {
   const currentSort = state.currentSortDirection || 'asc';
   // 아이콘 전용 압축 버튼이라 라벨 텍스트는 항상 sr-only로 감싼다 - 그냥 텍스트 노드로
   // 넣으면 34px 정사각 버튼 안에서 글자가 줄바꿈되며 깨져 보인다(title 툴팁으로 접근성 유지).
+  // title에는 다음 상태 안내가 아니라 "현재 정렬 상태"를 넣는다 - 아이콘만 봐서는
+  // 지금 어떤 정렬인지 구분이 안 된다는 사용자 혼란 피드백 반영.
+  let currentLabelKey = 'book_list.sort_asc';
   if (currentSort === 'asc') {
+    currentLabelKey = 'book_list.sort_asc';
     btn.innerHTML = `<i class="fa-solid fa-sort-alpha-down"></i> <span class="sr-only">${i18n.t('book_list.sort_asc')}</span>`;
   } else if (currentSort === 'desc') {
+    currentLabelKey = 'book_list.sort_desc';
     btn.innerHTML = `<i class="fa-solid fa-sort-alpha-up"></i> <span class="sr-only">${i18n.t('book_list.sort_desc')}</span>`;
   } else if (currentSort === 'date_desc') {
+    currentLabelKey = 'book_list.sort_date_desc';
     btn.innerHTML = `<i class="fa-solid fa-sort-numeric-down-alt"></i> <span class="sr-only">${i18n.t('book_list.sort_date_desc')}</span>`;
   } else if (currentSort === 'date_asc') {
+    currentLabelKey = 'book_list.sort_date_asc';
     btn.innerHTML = `<i class="fa-solid fa-sort-numeric-up"></i> <span class="sr-only">${i18n.t('book_list.sort_date_asc')}</span>`;
   }
-  btn.title = i18n.t('header.sort_title');
+  btn.title = `${i18n.t('header.sort_title')}: ${i18n.t(currentLabelKey)}`;
 }
 
 export function toggleLibrarySort() {

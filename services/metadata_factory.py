@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
+import ast
 import importlib
 import subprocess
 import hashlib
@@ -10,6 +11,76 @@ from plugins.metadata.base import BaseMetadataProvider
 
 class SecurityError(PermissionError):
     pass
+
+# os.system/popen/exec*/spawn*도 subprocess 모듈 없이 프로세스를 띄우는 우회 경로라 함께 차단한다.
+_FORBIDDEN_OS_PROCESS_CALLS = {
+    'system', 'popen', 'popen2', 'popen3', 'popen4',
+    'execl', 'execle', 'execlp', 'execlpe', 'execv', 'execve', 'execvp', 'execvpe',
+    'spawnl', 'spawnle', 'spawnlp', 'spawnlpe', 'spawnv', 'spawnve', 'spawnvp', 'spawnvpe',
+    'posix_spawn', 'posix_spawnp',
+}
+
+
+def _find_forbidden_calls_in_source(source, filename):
+    """플러그인 소스 코드에서 subprocess 임포트/os.system류 프로세스 실행 호출을 정적 검사한다.
+    문자열/주석에 우연히 등장한 단어를 오탐하지 않도록 정규식이 아닌 AST를 사용한다."""
+    hits = []
+    try:
+        tree = ast.parse(source, filename=filename)
+    except SyntaxError as e:
+        return [f"{filename}: 소스 파싱 실패 ({e})"]
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == 'subprocess' or alias.name.startswith('subprocess.'):
+                    hits.append(f"{filename}:{node.lineno}: subprocess import 발견")
+        elif isinstance(node, ast.ImportFrom):
+            if node.module and (node.module == 'subprocess' or node.module.startswith('subprocess.')):
+                hits.append(f"{filename}:{node.lineno}: subprocess import 발견")
+        elif isinstance(node, ast.Call):
+            func = node.func
+            if isinstance(func, ast.Attribute) and func.attr in _FORBIDDEN_OS_PROCESS_CALLS:
+                if isinstance(func.value, ast.Name) and func.value.id == 'os':
+                    hits.append(f"{filename}:{node.lineno}: os.{func.attr}() 호출 발견")
+            elif isinstance(func, ast.Name) and func.id in ('__import__',):
+                if node.args and isinstance(node.args[0], ast.Constant) and node.args[0].value == 'subprocess':
+                    hits.append(f"{filename}:{node.lineno}: __import__('subprocess') 발견")
+
+    return hits
+
+
+def _scan_plugin_for_forbidden_subprocess_usage(plugin_dir, single_file=None):
+    """plugin_dir(폴더형) 또는 single_file(단일 파일형) 플러그인 소스에서 subprocess 사용을 찾아
+    발견 시 SecurityError를 던져 로드를 차단한다. libs/(pip install --target 산출물)는 서드파티
+    의존성 코드라 검사 대상에서 제외한다 - 검사 대상은 어디까지나 플러그인 작성자 본인 코드."""
+    forbidden_hits = []
+
+    if plugin_dir and os.path.isdir(plugin_dir):
+        for root, dirs, files in os.walk(plugin_dir):
+            dirs[:] = [d for d in dirs if d != 'libs']
+            for fname in files:
+                if not fname.endswith('.py'):
+                    continue
+                fpath = os.path.join(root, fname)
+                try:
+                    with open(fpath, 'r', encoding='utf-8', errors='replace') as f:
+                        source = f.read()
+                except Exception:
+                    continue
+                forbidden_hits.extend(_find_forbidden_calls_in_source(source, fpath))
+    elif single_file and os.path.isfile(single_file):
+        try:
+            with open(single_file, 'r', encoding='utf-8', errors='replace') as f:
+                source = f.read()
+            forbidden_hits.extend(_find_forbidden_calls_in_source(source, single_file))
+        except Exception:
+            pass
+
+    if forbidden_hits:
+        raise SecurityError(
+            "[SecurityAlert] Plugin blocked: subprocess/process-spawn usage detected:\n" + "\n".join(forbidden_hits)
+        )
 
 def _get_core_requirements():
     return {'flask', 'pillow', 'pymupdf', 'psutil', 'redis', 'requests', 'rclone'}
@@ -145,6 +216,11 @@ class MetadataFactory:
     def _import_provider_module_and_class(cls, provider_name):
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         plugin_dir = os.path.join(base_dir, 'plugins', 'metadata', provider_name)
+        single_file = os.path.join(base_dir, 'plugins', 'metadata', f'{provider_name}.py')
+        # 코어 자체(ffmpeg/rclone 호출 등)는 이 경로를 거치지 않으므로 영향 없음 - 여기서 검사하는
+        # 대상은 어디까지나 plugins/metadata/<id> 아래 설치된 서드파티 플러그인 코드뿐이다.
+        _scan_plugin_for_forbidden_subprocess_usage(plugin_dir, single_file)
+
         if os.path.isdir(plugin_dir):
             ensure_plugin_dependencies(plugin_dir)
 

@@ -45,6 +45,14 @@ import './author_group_context_menu.js';
 import './video_player.js';
 import './plugin_webview_api.js';
 
+// 새로고침/뒤로가기 시 브라우저가 이전 스크롤 위치(내부 스크롤 컨테이너 포함)를
+// 되살리면서 .library-main-content가 scrollTop 0이 아닌 채로 시작해 상단 검색창이
+// 화면 밖으로 밀리는 경우가 있어(안드로이드 Chrome), 자동 복원을 끄고
+// sidebar_manager.js의 resetScrollIfHeaderHidden()이 항상 0에서 시작하게 한다.
+if ('scrollRestoration' in history) {
+  history.scrollRestoration = 'manual';
+}
+
 function initLibraryShellDelegation() {
   if (window.__libraryShellDelegationBound) return;
 

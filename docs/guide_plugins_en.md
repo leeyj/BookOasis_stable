@@ -61,6 +61,9 @@ BookOasis media server enforces strict **runtime security constraints**:
 4. **Unrestricted HTML5 Tags & XSS Mitigation Rules**:
    - Full HTML5 tags (`<canvas>`, `<svg>`, `<table>`, `<form>`, `<input>`, `<button>`) and custom CSS/JS are allowed in `index.html`.
    - Developers must sanitize external 3rd-party API responses before rendering to prevent XSS.
+5. **Process-Spawn Protection**:
+   - Plugin Python code may not call `import subprocess`, `os.system()`, `os.popen()`, or any `os.exec*`/`os.spawn*` variant. `MetadataFactory` statically scans plugin source before loading and refuses to load (raising `SecurityError`) if any such call is found.
+   - This check applies only to the plugin author's own code under `plugins/metadata/{plugin_id}/`, not to third-party packages installed into `libs/` via `requirements.txt`, nor to BookOasis core (ffmpeg/rclone, etc.).
 
 ### 🎨 Dual-UI Serving Architecture
 

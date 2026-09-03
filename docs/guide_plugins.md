@@ -62,6 +62,9 @@ plugins/metadata/
 4. **HTML5 풀 태그 지원 및 동적 데이터 XSS 방어 규칙**:
    - 카테고리 뷰 UI(`index.html`)에서는 `<canvas>`, `<svg>`, `<table>`, `<form>`, `<input>`, `<button>` 등 모든 HTML5 태그와 커스텀 CSS/JS가 100% 허용됩니다.
    - 단, 외부 3rd-party API나 사용자 입력값을 뷰포트에 동적 삽입할 경우 `textContent`나 안전한 에스케이프 기능을 사용하여 XSS 공격이 발생하지 않도록 개발자가 방어 코드를 작성해야 합니다.
+5. **서브프로세스 실행 차단 (Process-Spawn Protection)**:
+   - 플러그인 파이썬 코드는 `import subprocess`, `os.system()`, `os.popen()`, `os.exec*`/`os.spawn*` 등 외부 프로세스를 새로 띄우는 호출을 포함할 수 없습니다. `MetadataFactory`가 플러그인 소스를 로드 전에 정적 검사하며, 하나라도 발견되면 `SecurityError`로 로딩 자체를 거부합니다.
+   - 이 검사는 `plugins/metadata/{plugin_id}/` 아래 플러그인 작성자 코드에만 적용되며, `requirements.txt`로 설치된 `libs/` 하위 서드파티 패키지나 북오아시스 코어(ffmpeg/rclone 등)는 대상이 아닙니다.
 
 ### 🎨 듀얼 UI (Dual-UI) 서빙 아키텍처
 
