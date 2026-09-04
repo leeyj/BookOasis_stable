@@ -468,6 +468,11 @@ export async function submitGeneralSettings(event) {
 
 // 내 설정(사용자별 개인화) 탭 로드
 export async function loadMySettings() {
+  // 테마/대시보드 위젯 표시 등 이 탭의 change 이벤트 위임은 initGeneralDelegation()이 담당하는데,
+  // 원래 "일반 설정"(관리자 전용) 탭을 먼저 열어야만 바인딩됐다. 이 탭을 먼저 여는 사용자
+  // (관리자 전용 탭에 접근 불가능한 일반 사용자 포함)는 테마를 선택해도 아무 반응이 없었음 -
+  // 여기서도 호출해 두 진입점 중 어느 쪽이 먼저 열려도 바인딩되도록 한다(멱등, 최초 1회만 실행).
+  initGeneralDelegation();
   try {
     const res = await api.fetchUserSettings();
     if (!res.success || !res.settings) return;

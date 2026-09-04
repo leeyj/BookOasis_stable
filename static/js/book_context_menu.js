@@ -302,7 +302,15 @@ export async function triggerBookContextPluginAction(pluginId, actionId) {
       return;
     }
 
-    if (res.open_url) {
+    if (res.open_category) {
+      // 외부 새 탭이 아니라 앱 내부의 카테고리 플러그인 풀페이지로 바로 이동하는 경우
+      // (예: 'plugin_<plugin_id>'). 미리 열어둔 placeholder 팝업은 필요 없으므로 닫는다.
+      if (pendingPopup) {
+        pendingPopup.close();
+      }
+      const tml = await import('./tab_media_library.js');
+      tml.selectCategory(res.open_category);
+    } else if (res.open_url) {
       if (pendingPopup) {
         pendingPopup.location.href = res.open_url;
       } else {

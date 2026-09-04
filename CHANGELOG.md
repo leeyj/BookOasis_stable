@@ -1,4 +1,8 @@
 # CHANGELOG
+## v2.5.7
+- (fix) e-paper 테마에서 불투명 배경 버튼 글자가 안 보이던 문제들을 근본 수정 — 원인이었던 전역 텍스트색 강제 규칙 제거 | fundamentally fix invisible button text on opaque backgrounds in the e-paper theme by removing the overly broad global text-color rule that caused it
+- (feature) 실험적 페이지 넘김(page-flip) 뷰어에 순차 로딩 진행률 표시와 읽기 방향/속도 설정 기억 기능 추가 | add sequential loading progress display and persisted reading-direction/speed preferences to the experimental page-flip viewer
+
 ## v2.5.6
 - (fix) 모바일(안드로이드 Chrome)에서 새로고침/뒤로가기 시 상단 검색창이 화면 밖으로 스크롤된 채 시작해 브라우저 주소창에 가려 보이던 문제 수정 | fix the mobile (Android Chrome) top search bar starting scrolled off-screen behind the browser's address bar after a reload or back navigation
 - (fix) iOS에서 만화 스크롤 모드로 마지막 페이지(다음권/닫기) 상태일 때 뷰어를 닫으면 배경이 예전 스크롤 위치에 고정되어 화면이 안 움직이고 터치도 안 먹던 문제 수정 | fix the iOS comic scroll-mode viewer leaving the background page stuck at a stale scroll position and unresponsive to touch when closed from the last-page (next episode/close) overlay

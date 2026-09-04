@@ -38,7 +38,10 @@
   #hud {
     position: fixed; left: 0; right: 0; bottom: 16px; display: none; align-items: center; justify-content: center;
     gap: 14px; z-index: 20;
+    opacity: 0; pointer-events: none; transition: opacity .15s ease;
   }
+  #hud.ready { display: flex; }
+  #hud.visible { opacity: 1; pointer-events: auto; }
   #hud .pill {
     background: rgba(20,23,28,0.85); border: 1px solid #333844; border-radius: 999px; padding: 6px 14px; font-size: 13px; color: #c7ccd4;
   }
@@ -48,7 +51,19 @@
   }
   #hud button:disabled { opacity: 0.3; cursor: default; }
 
-  #tag { position: fixed; top: 10px; left: 12px; font-size: 11px; letter-spacing: .05em; color: #6b7280; z-index: 30; }
+  #load-progress {
+    position: fixed; inset: 0; z-index: 40; display: none; align-items: center; justify-content: center;
+    flex-direction: column; gap: 10px; background: #14171c;
+  }
+  #load-progress.visible { display: flex; }
+  #load-progress .hint { font-size: 13px; color: #8b93a1; }
+
+  #bg-load-badge {
+    position: fixed; top: 10px; right: 12px; z-index: 30; display: none;
+    font-size: 11px; color: #8b93a1; background: rgba(20,23,28,0.85);
+    border: 1px solid #333844; border-radius: 999px; padding: 4px 10px;
+  }
+  #bg-load-badge.visible { display: block; }
 
   #settings-panel {
     position: fixed; right: 16px; bottom: 76px; width: 260px; z-index: 25;
@@ -67,8 +82,6 @@
 </style>
 </head>
 <body>
-
-<div id="tag">EXPERIMENTAL · page-turn via page-flip (MIT, vendored, isolated — prod viewer unaffected)</div>
 
 <div id="setup">
   <div style="font-size:16px; font-weight:600;">Page Turn 실험 뷰어</div>
@@ -97,6 +110,13 @@
     epub/txt 페이지 넘김은 추후 지원 예정입니다.<br>지금은 zip/cbz(만화)만 실제로 렌더링됩니다.
   </div>
 </div>
+
+<div id="load-progress">
+  <div id="load-progress-text">페이지 불러오는 중... 0 / 0</div>
+  <div class="hint">한꺼번에 요청하지 않고 소수씩 순차 로드합니다 (서버 보호)</div>
+</div>
+
+<div id="bg-load-badge"></div>
 
 <div id="hud">
   <button id="btn-prev">&#8249;</button>
@@ -177,9 +197,172 @@
   var elSettingsSinglePage = document.getElementById('settings-single-page');
   var elSettingsSpeed = document.getElementById('settings-speed');
   var elSettingsSpeedLabel = document.getElementById('settings-speed-label');
+  var elLoadProgress = document.getElementById('load-progress');
+  var elLoadProgressText = document.getElementById('load-progress-text');
+  var elBgLoadBadge = document.getElementById('bg-load-badge');
+
+  // RTL/넘김속도는 사용자 취향(만화책 방향, 선호 속도)이라 책마다 매번 다시 켜지 않도록
+  // localStorage에 저장해 다음 방문에도 유지한다. 우클릭 메뉴로 바로 열리는 경로(설정 폼을
+  // 건너뛰는 autoStartFromQuery)에서도 반영되도록, start()가 값을 읽어가기 전에
+  // input-rtl 체크박스/flippingTimeMs를 미리 채워둔다.
+  var STORAGE_KEY_RTL = 'pageturn.rtl';
+  var STORAGE_KEY_SPEED = 'pageturn.speed';
+
+  function loadStoredPrefs() {
+    try {
+      var storedRtl = localStorage.getItem(STORAGE_KEY_RTL);
+      if (storedRtl !== null) {
+        document.getElementById('input-rtl').checked = (storedRtl === '1');
+      }
+      var storedSpeed = Number(localStorage.getItem(STORAGE_KEY_SPEED));
+      if (storedSpeed > 0) {
+        flippingTimeMs = storedSpeed;
+        elSettingsSpeed.value = storedSpeed;
+        elSettingsSpeedLabel.textContent = storedSpeed + 'ms';
+      }
+    } catch (e) {
+      // localStorage 접근 불가 환경(프라이빗 모드 등) — 조용히 기본값 사용
+    }
+  }
+  loadStoredPrefs();
 
   function pageUrl(idx) {
     return '/api/media/stream?book_id=' + encodeURIComponent(bookId) + '&page_idx=' + idx + '&db_type=' + encodeURIComponent(dbType);
+  }
+
+  // 물리 페이지(0-idx) 순서 기준 상태. loadedFlags[i]가 true가 되기 전까지 physicalPageSrcs[i]는
+  // PLACEHOLDER_SRC(순수 인메모리 data URI, 네트워크 요청 없음)이고, 로드가 끝나면 실제 blob
+  // object URL로 교체된다. rtl 전환/설정 변경 시에도 이 두 배열은 그대로 두고 순서만 뒤집어 재사용한다.
+  var physicalPageSrcs = [];
+  var loadedFlags = [];
+
+  var PLACEHOLDER_SRC = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="560" height="800"><rect width="100%" height="100%" fill="#1c2027"/></svg>'
+  );
+
+  // page-flip 라이브러리는 loadFromImages/updateFromImages에 넘긴 URL마다 즉시 new Image().src를
+  // 걸어 전부 동시에 fetch한다 — 페이지 수가 많은 만화를 열면 같은 zip 파일에 대한 서버 측
+  // 파일 단위 락(get_zip_read_lock)에 수십~수백 개 요청이 한꺼번에 몰려, 이 서버가 쓰는
+  // gunicorn 워커/스레드(제한된 개수)를 전부 잡아먹어 다른 모든 사용자 요청까지 멎게
+  // 만드는 사고가 있었다(서버 마비). 그래서 여기서는 라이브러리에 넘기기 전에 우리가
+  // 직접 소수 동시성(CONCURRENCY)으로만 순차 fetch해서 blob object URL로 바꿔둔다 —
+  // page-flip 쪽에서는 이미 메모리에 있는 blob URL이라 추가 네트워크 요청이 발생하지 않는다.
+  var FETCH_CONCURRENCY = 3;
+
+  function fetchPageAsObjectUrl(idx) {
+    return fetch(pageUrl(idx)).then(function (res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.blob();
+    }).then(function (blob) {
+      return URL.createObjectURL(blob);
+    }).catch(function (err) {
+      console.warn('[PageTurn] 페이지 로드 실패, 원본 URL로 폴백 (idx=' + idx + '):', err);
+      return pageUrl(idx); // 실패 시 브라우저가 직접 요청하도록 원본 URL 그대로 사용
+    });
+  }
+
+  function initPlaceholders(count) {
+    physicalPageSrcs = new Array(count);
+    loadedFlags = new Array(count);
+    for (var i = 0; i < count; i++) {
+      physicalPageSrcs[i] = PLACEHOLDER_SRC;
+      loadedFlags[i] = false;
+    }
+  }
+
+  function markPageLoaded(idx, src) {
+    physicalPageSrcs[idx] = src;
+    loadedFlags[idx] = true;
+  }
+
+  // 시작 페이지(startPhysicalIdx)를 기준으로 앞쪽을 우선하며 앞/뒤를 번갈아 채우는 로드 순서.
+  // 독자는 대부분 앞으로 읽어나가지만, 스프레드 짝 페이지나 되돌아가기를 위해 뒤쪽도 섞어 둔다.
+  function buildPriorityOrder(startIdx, count) {
+    var order = [startIdx];
+    var hi = startIdx + 1;
+    var lo = startIdx - 1;
+    while (lo >= 0 || hi < count) {
+      if (hi < count) order.push(hi++);
+      if (lo >= 0) order.push(lo--);
+    }
+    return order;
+  }
+
+  // idxs를 concurrency만큼만 동시에, 지정한 순서 그대로 순차 로드한다 (초기 화면용 — 작은 배열 전용).
+  function loadIndicesThrottled(idxs, concurrency, onEach) {
+    var i = 0;
+    function next() {
+      if (i >= idxs.length) return Promise.resolve();
+      var idx = idxs[i++];
+      return fetchPageAsObjectUrl(idx).then(function (src) {
+        markPageLoaded(idx, src);
+        if (onEach) onEach();
+        return next();
+      });
+    }
+    var workers = [];
+    for (var w = 0; w < Math.min(concurrency, idxs.length); w++) workers.push(next());
+    return Promise.all(workers);
+  }
+
+  // 초기 화면에 필요한 소수 페이지 이후 나머지는 배경에서 계속 채운다. queue는 언제든
+  // bumpPriority()로 재정렬될 수 있는 공유 배열이라, flip으로 다가올 페이지를 앞당겨 받을 수 있다.
+  var bgQueue = [];
+  var bgRefreshTimer = null;
+  var bgDirty = false;
+  var bgDoneCount = 0;
+  var bgTotalCount = 0;
+
+  function scheduleBgRefresh() {
+    bgDirty = true;
+    if (bgRefreshTimer) return;
+    bgRefreshTimer = setTimeout(function () {
+      bgRefreshTimer = null;
+      if (bgDirty && pageFlip) {
+        bgDirty = false;
+        pageFlip.updateFromImages(buildPageUrls());
+      }
+    }, 400);
+  }
+
+  function bumpPriority(idx) {
+    if (idx < 0 || idx >= loadedFlags.length || loadedFlags[idx]) return;
+    var pos = bgQueue.indexOf(idx);
+    if (pos > 0) {
+      bgQueue.splice(pos, 1);
+      bgQueue.unshift(idx);
+    }
+  }
+
+  function startBackgroundLoad(remainingOrder) {
+    bgQueue = remainingOrder.slice();
+    bgDoneCount = 0;
+    bgTotalCount = remainingOrder.length;
+    if (bgTotalCount === 0) return Promise.resolve();
+
+    elBgLoadBadge.classList.add('visible');
+    elBgLoadBadge.textContent = '나머지 페이지 불러오는 중 (' + bgDoneCount + '/' + bgTotalCount + ')';
+
+    function runOne() {
+      if (bgQueue.length === 0) return Promise.resolve();
+      var idx = bgQueue.shift();
+      if (loadedFlags[idx]) return runOne();
+      return fetchPageAsObjectUrl(idx).then(function (src) {
+        markPageLoaded(idx, src);
+        bgDoneCount++;
+        elBgLoadBadge.textContent = '나머지 페이지 불러오는 중 (' + bgDoneCount + '/' + bgTotalCount + ')';
+        scheduleBgRefresh();
+        return runOne();
+      });
+    }
+
+    var workers = [];
+    for (var w = 0; w < Math.min(FETCH_CONCURRENCY, bgTotalCount); w++) workers.push(runOne());
+    return Promise.all(workers).then(function () {
+      if (bgRefreshTimer) { clearTimeout(bgRefreshTimer); bgRefreshTimer = null; }
+      if (bgDirty && pageFlip) { bgDirty = false; pageFlip.updateFromImages(buildPageUrls()); }
+      elBgLoadBadge.classList.remove('visible');
+    });
   }
 
   // 첫 페이지 이미지를 실제로 로드해 종횡비를 측정 — 책마다 실제 페이지 크기가 다르므로
@@ -319,6 +502,29 @@
     scheduleSaveProgress(physicalPage);
   }
 
+  // 하단 메뉴는 기본적으로 숨겨두고, 화면(책이 놓인 영역) 중앙을 탭/클릭하면 나타난다 —
+  // 만화 리더에서 흔한 "탭해서 컨트롤 표시" 패턴. page-flip 라이브러리는 mousedown/mouseup(및
+  // touchstart/touchend)만 자체적으로 사용하므로, 여기서는 겹치지 않는 pointerdown/pointerup으로
+  // 드래그(페이지 넘김 제스처)와 단순 탭을 구분해 처리한다.
+  function setControlsVisible(visible) {
+    elHud.classList.toggle('visible', visible);
+    if (!visible) elSettingsPanel.classList.remove('open');
+  }
+
+  var tapStartPos = null;
+  elStage.addEventListener('pointerdown', function (e) {
+    tapStartPos = { x: e.clientX, y: e.clientY };
+  });
+  elStage.addEventListener('pointerup', function (e) {
+    if (!tapStartPos) return;
+    var dx = e.clientX - tapStartPos.x;
+    var dy = e.clientY - tapStartPos.y;
+    tapStartPos = null;
+    if (Math.sqrt(dx * dx + dy * dy) > 8) return; // 드래그/스와이프는 탭으로 치지 않음
+    if (!elHud.classList.contains('ready')) return; // 아직 로딩 중이면 무시
+    setControlsVisible(!elHud.classList.contains('visible'));
+  });
+
   // "다음/이전"은 항상 읽기 진행 방향(물리 페이지 번호 증가/감소) 기준이어야 한다.
   // RTL이면 이미지 배열이 반전돼 있으므로 raw flipNext/flipPrev를 서로 바꿔 호출해야
   // 화면상 "다음 페이지" 버튼·스페이스바·오른쪽 화살표가 항상 읽기를 앞으로 진행시킨다.
@@ -366,7 +572,13 @@
       flippingTime: flippingTimeMs
     });
 
-    pageFlip.on('flip', function (e) { updateHud(e.data); });
+    pageFlip.on('flip', function (e) {
+      updateHud(e.data);
+      // 지금 보이는 페이지 근처를 최우선으로 앞당겨, 빨리 넘기는 사용자가 플레이스홀더를
+      // 오래 보지 않도록 한다. 아직 안 온 페이지면 로드 완료 시 scheduleBgRefresh가 반영한다.
+      var physicalIdx = displayPageNumber(e.data) - 1;
+      [physicalIdx - 1, physicalIdx, physicalIdx + 1, physicalIdx + 2].forEach(bumpPriority);
+    });
     pageFlip.loadFromImages(urls);
 
     var idx = Math.max(0, Math.min(totalPages - 1, startIdx || 0));
@@ -377,8 +589,8 @@
   }
 
   function buildPageUrls() {
-    var urls = [];
-    for (var i = 0; i < totalPages; i++) urls.push(pageUrl(i));
+    // 실제 네트워크 요청 없이, 이미 로드해 둔 physicalPageSrcs 순서만 rtl에 맞춰 뒤집어 재사용한다.
+    var urls = physicalPageSrcs.slice();
     if (rtl) urls.reverse();
     return urls;
   }
@@ -425,18 +637,37 @@
         elSettingsSeekbar.max = totalPages;
         elSettingsRtl.checked = rtl;
 
-        var urls = buildPageUrls();
-
         elSetup.classList.add('hidden');
         elStage.style.display = 'flex';
-        elHud.style.display = 'flex';
 
         // 프로덕션 뷰어와 동일한 이어보기 지점 계산: pagesRead>0이면 마지막으로 읽던 페이지, 아니면 처음부터
         var startPhysicalPage = pagesRead > 0 ? pagesRead : 1;
         var startIdx = physicalPageToInternalIdx(startPhysicalPage);
+        var startPhysicalIdx = startPhysicalPage - 1;
 
-        measurePageAspect(urls[0]).then(function () {
-          createPageFlip(urls, startIdx);
+        initPlaceholders(totalPages);
+        // 시작 페이지 근처부터 앞/뒤로 번갈아 채우는 순서 — 책 전체를 다 받을 때까지 기다리지 않고
+        // 시작 지점 주변 몇 페이지만 오면 바로 펼쳐 보여준 뒤, 나머지는 배경에서 계속 채운다.
+        var order = buildPriorityOrder(startPhysicalIdx, totalPages);
+        var INITIAL_WINDOW = Math.min(totalPages, 6);
+        var initialIdxs = order.slice(0, INITIAL_WINDOW);
+        var remainingOrder = order.slice(INITIAL_WINDOW);
+
+        elLoadProgress.classList.add('visible');
+        elLoadProgressText.textContent = '펼치는 중... 0 / ' + initialIdxs.length;
+        var initialDone = 0;
+
+        loadIndicesThrottled(initialIdxs, FETCH_CONCURRENCY, function () {
+          initialDone++;
+          elLoadProgressText.textContent = '펼치는 중... ' + initialDone + ' / ' + initialIdxs.length;
+        }).then(function () {
+          elLoadProgress.classList.remove('visible');
+          elHud.classList.add('ready');
+          var urls = buildPageUrls();
+          return measurePageAspect(urls[startIdx]).then(function () {
+            createPageFlip(urls, startIdx);
+            startBackgroundLoad(remainingOrder);
+          });
         });
       })
       .catch(function (err) {
@@ -469,6 +700,10 @@
   elSettingsSeekbar.addEventListener('input', function () {
     if (!pageFlip || !totalPages) return;
     var idx = physicalPageToInternalIdx(Number(elSettingsSeekbar.value));
+    // turnToPage()는 flipController를 거치지 않아 'flip' 이벤트가 발생하지 않으므로,
+    // 시크바로 아직 안 온 페이지에 점프할 때는 여기서 직접 우선순위를 앞당겨야 한다.
+    var physicalIdx = displayPageNumber(idx) - 1;
+    [physicalIdx - 1, physicalIdx, physicalIdx + 1, physicalIdx + 2].forEach(bumpPriority);
     pageFlip.turnToPage(idx);
     updateHud(idx);
   });
@@ -477,6 +712,7 @@
     if (!totalPages) return;
     var physicalPage = displayPageNumber(currentInternalIdx); // 기존 rtl 기준으로 물리 페이지 확보
     rtl = elSettingsRtl.checked;
+    try { localStorage.setItem(STORAGE_KEY_RTL, rtl ? '1' : '0'); } catch (e) { /* noop */ }
     rebuildPageFlip(physicalPageToInternalIdx(physicalPage));
   });
 
@@ -490,6 +726,7 @@
   });
   elSettingsSpeed.addEventListener('change', function () {
     flippingTimeMs = Number(elSettingsSpeed.value);
+    try { localStorage.setItem(STORAGE_KEY_SPEED, String(flippingTimeMs)); } catch (e) { /* noop */ }
     if (totalPages) rebuildPageFlip(currentInternalIdx);
   });
 

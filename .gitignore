@@ -56,4 +56,11 @@ docs/operator_deployment_private.md
 # Prettier Ignore
 .prettierignore
 
+# Plugin-local runtime data (personal content, not sample fixtures).
+# reading_review ships from sample_plugins/ but its runtime DB is created
+# wherever it's actually installed/run from (sample folder, or plugins/metadata/
+# after "install from sample") — ignore the data file in both locations.
+sample_plugins/metadata/reading_review/reading_reviews.sqlite3*
+plugins/metadata/reading_review/reading_reviews.sqlite3*
+
 

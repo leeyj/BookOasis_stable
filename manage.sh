@@ -145,8 +145,9 @@ start() {
     mkdir -p "$APP_DIR/cache"
     mkdir -p "$APP_DIR/logs"
     
-    # Gunicorn을 통해 5930 포트로 백그라운드 기동 (Nginx 정적 서빙 연동으로 스레드 4개만으로도 쾌속 동작)
-    nohup env PYTHONUNBUFFERED=1 BOOKOASIS_ENABLE_EMBEDDED_WORKER=false python3 -m gunicorn -w 1 --threads 4 --max-requests 1000 --max-requests-jitter 100 --timeout 300 -b 0.0.0.0:5930 core:app > "$LOG_FILE" 2>&1 &
+    # Gunicorn을 통해 5930 포트로 백그라운드 기동 (Docker CMD와 동일하게 스레드 12개 — 스레드 4개일 때
+    # 한 요청이 파일 락 대기로 오래 묶이면 다른 사용자 요청 전부가 막히는 사고가 있었다)
+    nohup env PYTHONUNBUFFERED=1 BOOKOASIS_ENABLE_EMBEDDED_WORKER=false python3 -m gunicorn -w 1 --threads 12 --max-requests 1000 --max-requests-jitter 100 --timeout 300 -b 0.0.0.0:5930 core:app > "$LOG_FILE" 2>&1 &
 
 
     

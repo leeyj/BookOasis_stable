@@ -1,0 +1,135 @@
+<div class="rr-container">
+  <div class="rr-header-banner">
+    <div class="rr-title-group">
+      <h2><i class="fa-solid fa-feather-pointed"></i> 독후감 아카이브</h2>
+      <p class="rr-subtitle">읽은 책에 별점과 태그, Markdown으로 생각을 남기고 나만의 독서 기록으로 쌓아보세요. 언제든 파일로 내보낼 수 있어요.</p>
+    </div>
+    <div class="rr-type-actions">
+      <button class="rr-type-btn active" data-type="general"><i class="fa-solid fa-book"></i> 일반</button>
+      <button class="rr-type-btn" data-type="adult"><i class="fa-solid fa-lock"></i> 성인</button>
+      <button class="rr-type-btn" data-type="audiobook"><i class="fa-solid fa-headphones"></i> 오디오북</button>
+      <button class="rr-type-btn" data-type="video"><i class="fa-solid fa-film"></i> 영상</button>
+    </div>
+  </div>
+
+  <div class="rr-tabs">
+    <button class="rr-tab active" data-tab="write"><i class="fa-solid fa-pen-to-square"></i> 독후감 쓰기</button>
+    <button class="rr-tab" data-tab="list"><i class="fa-solid fa-list"></i> 내 독후감</button>
+    <button class="rr-tab" data-tab="stats"><i class="fa-solid fa-chart-simple"></i> 통계</button>
+  </div>
+
+  <!-- ── 쓰기 탭 ── -->
+  <div class="rr-panel" data-panel="write">
+    <div class="rr-write-grid">
+      <div class="rr-book-picker">
+        <label class="rr-label">책 검색</label>
+        <input type="text" id="rr-book-search" class="rr-input" placeholder="제목/작가/시리즈로 검색...">
+        <div class="rr-book-results" id="rr-book-results"></div>
+
+        <div class="rr-selected-book" id="rr-selected-book" hidden>
+          <img id="rr-selected-cover" class="rr-selected-cover" alt="cover">
+          <div class="rr-selected-info">
+            <strong id="rr-selected-title">-</strong>
+            <span id="rr-selected-author" class="rr-muted">-</span>
+          </div>
+          <button type="button" class="rr-btn rr-btn-ghost" id="rr-clear-selected"><i class="fa-solid fa-xmark"></i> 다시 선택</button>
+        </div>
+      </div>
+
+      <form class="rr-form" id="rr-review-form">
+        <input type="hidden" id="rr-review-id">
+        <label class="rr-label">책 제목 <span class="rr-required">*</span></label>
+        <input type="text" id="rr-book-title" class="rr-input" placeholder="검색으로 선택하거나 직접 입력" required>
+
+        <label class="rr-label">별점</label>
+        <div class="rr-star-picker" id="rr-star-picker" data-value="0">
+          <i class="fa-solid fa-star" data-star="1"></i>
+          <i class="fa-solid fa-star" data-star="2"></i>
+          <i class="fa-solid fa-star" data-star="3"></i>
+          <i class="fa-solid fa-star" data-star="4"></i>
+          <i class="fa-solid fa-star" data-star="5"></i>
+        </div>
+
+        <div class="rr-form-row">
+          <div>
+            <label class="rr-label">완독일</label>
+            <input type="date" id="rr-finished-date" class="rr-input">
+          </div>
+          <div>
+            <label class="rr-label">태그 (쉼표로 구분)</label>
+            <input type="text" id="rr-tags" class="rr-input" placeholder="예: SF, 감동, 재독">
+          </div>
+        </div>
+
+        <label class="rr-checkbox-row">
+          <input type="checkbox" id="rr-spoiler"> 스포일러 포함 (본문에 표시 배지 추가)
+        </label>
+
+        <div class="rr-body-header">
+          <label class="rr-label rr-label-inline">독후감 본문 (Markdown 지원)</label>
+          <div class="rr-body-mode-toggle" id="rr-body-mode-toggle" data-mode="edit">
+            <button type="button" class="rr-mode-btn active" data-mode="edit"><i class="fa-solid fa-pen"></i> 편집</button>
+            <button type="button" class="rr-mode-btn" data-mode="preview"><i class="fa-solid fa-eye"></i> 미리보기</button>
+          </div>
+        </div>
+        <textarea id="rr-body" class="rr-textarea" rows="10" placeholder="이 책에서 느낀 점을 자유롭게 적어보세요... (# 제목, **굵게**, - 목록 같은 Markdown 문법을 쓸 수 있어요)"></textarea>
+        <div class="rr-md-preview" id="rr-body-preview" hidden></div>
+
+        <div class="rr-form-actions">
+          <button type="button" class="rr-btn rr-btn-ghost" id="rr-export-current"><i class="fa-solid fa-file-export"></i> 이 독후감 내보내기</button>
+          <button type="button" class="rr-btn rr-btn-ghost" id="rr-reset-form"><i class="fa-solid fa-eraser"></i> 초기화</button>
+          <button type="submit" class="rr-btn rr-btn-primary"><i class="fa-solid fa-floppy-disk"></i> 저장</button>
+        </div>
+        <p class="rr-save-status" id="rr-save-status"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── 목록 탭 ── -->
+  <div class="rr-panel" data-panel="list" hidden>
+    <div class="rr-list-toolbar">
+      <input type="text" id="rr-list-search" class="rr-input" placeholder="책 제목/태그/본문 검색...">
+      <select id="rr-list-sort" class="rr-input rr-select">
+        <option value="recent">최근 작성순</option>
+        <option value="rating">별점 높은순</option>
+        <option value="title">책 제목순</option>
+      </select>
+      <select id="rr-list-min-rating" class="rr-input rr-select">
+        <option value="0">전체 별점</option>
+        <option value="1">★1 이상</option>
+        <option value="2">★2 이상</option>
+        <option value="3">★3 이상</option>
+        <option value="4">★4 이상</option>
+        <option value="5">★5</option>
+      </select>
+      <button type="button" class="rr-btn rr-btn-ghost" id="rr-export-all"><i class="fa-solid fa-file-zipper"></i> 지금 목록 내보내기 (.zip)</button>
+    </div>
+    <div class="rr-review-list" id="rr-review-list">
+      <p class="rr-empty">불러오는 중입니다...</p>
+    </div>
+  </div>
+
+  <!-- ── 통계 탭 ── -->
+  <div class="rr-panel" data-panel="stats" hidden>
+    <div class="rr-stats-cards">
+      <div class="rr-stat-card">
+        <span class="rr-stat-label">총 독후감</span>
+        <strong class="rr-stat-value" id="rr-stat-total">-</strong>
+      </div>
+      <div class="rr-stat-card">
+        <span class="rr-stat-label">평균 별점</span>
+        <strong class="rr-stat-value" id="rr-stat-avg">-</strong>
+      </div>
+    </div>
+    <div class="rr-stats-panels">
+      <div class="rr-panel-box">
+        <h3><i class="fa-solid fa-tags"></i> 자주 쓴 태그</h3>
+        <div class="rr-tag-cloud" id="rr-tag-cloud"><p class="rr-empty">데이터 없음</p></div>
+      </div>
+      <div class="rr-panel-box">
+        <h3><i class="fa-solid fa-chart-column"></i> 월별 작성 추이 (최근 6개월)</h3>
+        <div class="rr-month-bars" id="rr-month-bars"><p class="rr-empty">데이터 없음</p></div>
+      </div>
+    </div>
+  </div>
+</div>

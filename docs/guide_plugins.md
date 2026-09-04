@@ -391,6 +391,30 @@ def get_context_menu_items(self, db_type, context):
 - 컨텍스트 메뉴는 `plugin_name` 기준으로 자동 그룹화되어 섹션/구분선 UI로 출력됩니다.
 - 같은 플러그인이 여러 항목을 반환하면 한 그룹 아래로 묶여 표시됩니다.
 
+#### 앱 내부의 카테고리 플러그인 화면으로 바로 이동 (`open_category`)
+
+`open_url`은 항상 새 탭/팝업으로 여는 외부 링크용입니다. 대신 이 플러그인 자신의
+`category_tab` 풀페이지 UI로 **같은 탭에서 바로 이동**시키고 싶다면(예: "이 책으로
+독후감 쓰기" 클릭 → 사이드바 이동 없이 곧장 작성 화면으로), 반환값에 `open_url`
+대신 `open_category`를 실어 보내면 됩니다.
+
+```python
+return {
+    'success': True,
+    'message': '독후감 아카이브로 이동합니다.',
+    'open_category': f'plugin_{self.id}',  # 'plugin_<plugin_id>' 고정 규격
+}
+```
+
+- `open_category`가 있으면 `open_url`보다 우선 처리되며, 새 팝업을 열지 않고
+  `selectCategory('plugin_<plugin_id>')`로 화면만 전환합니다.
+- 이 값은 "어느 화면으로 갈지"만 알려줄 뿐 "어떤 책 때문에 왔는지"는 넘겨주지
+  않습니다. 특정 책 컨텍스트를 이어서 보여주고 싶다면(작성 폼 자동 채우기 등),
+  플러그인이 자신의 저장소에 "마지막으로 선택된 책" 같은 상태를 별도로 기록해두고
+  풀페이지 UI가 로드될 때 그 상태를 조회해 반영하십시오. 실전 예시는
+  `sample_plugins/metadata/reading_review/reading_review.py`의 `_action_open_reading_review()`/
+  `get_focus` 액션과 `script.js`의 `checkFocus()`를 참고하십시오.
+
 `context` 기본 필드:
 
 - `book_id`
@@ -1111,6 +1135,135 @@ async function prefetchLibrary(dbType, libraryId, bookIds) {
 
 - 두 기능 모두 `.env`의 `DEVELOP=true` 게이트를 그대로 따릅니다 — 운영자가 이 플래그를 켜지 않은 서버에서는 위 엔드포인트가 전부 404를 반환합니다.
 - `/api/gdrive-view-copy/prefetch`는 실제 Drive API 호출(서버사이드 `files.copy`)을 유발하므로, 무분별하게 대량의 책을 한꺼번에 prefetch하는 플러그인은 서버의 `GDRIVE_API_KEY`(설정된 경우) 또는 원본 공유 파일의 다운로드 어뷰즈 쿼터를 소진시킬 위험이 있습니다 — 사용자가 명시적으로 트리거한 소규모 배치(예: "이 시리즈만" 수십 권 단위)로 제한하는 것을 권장합니다.
+
+---
+
+## 12. 🤖 플러그인에서 LLM(AI 모델) 연동하기 (가이드)
+
+커뮤니티에서 자주 나오는 질문: "플러그인이 LLM(ChatGPT/Claude/로컬 Ollama 등)을 붙일 수 있나?" —
+**됩니다, 그것도 코어 변경 없이 지금 당장.** 플러그인 파이썬 코드는 일반 서버사이드 코드와
+동일하게 아웃바운드 네트워크 접근 권한을 그대로 가지고 있습니다(`naver_book`, `spotify_mood`
+같은 기존 샘플이 이미 외부 REST API를 `requests`로 직접 호출하는 것과 같은 성격).
+
+이 문서는 **코어가 제공하는 기능이 아니라 패턴 가이드**입니다 — 코어는 특정 LLM 벤더나
+공용 API 키를 대신 관리해주지 않습니다. 이유: 사용하는 모델·제공자·과금 방식이 운영자마다
+전부 다르고(OpenAI, Anthropic, 로컬 Ollama/LM Studio, OpenRouter 등), 코어가 하나의 공용
+연결을 관리하기 시작하면 "어느 플러그인까지 그 연결을 쓰게 허용할지", "토큰 비용을 어떻게
+나눌지" 같은 운영 책임이 코어로 넘어옵니다. 그래서 **각 플러그인이 자기 API 키/엔드포인트를
+`config_schema`로 직접 관리**하는 것을 권장 패턴으로 둡니다.
+
+참고로 위 "서브프로세스 실행 차단"(2장 보안 제약 사항)은 `subprocess`/`os.system`류 프로세스
+실행만 막을 뿐 일반 HTTP 요청과는 무관하고, `services/domain_whitelist_service.py`의 도메인
+화이트리스트는 브라우저에서 여는 iframe 웹뷰 프록시 전용이라 플러그인 파이썬 코드가 서버에서
+직접 보내는 요청에는 적용되지 않습니다 — 그래서 아래 예시가 별도 허가 없이 그대로 동작합니다.
+
+### 12.1 권장 설정 스키마
+
+```python
+config_schema = [
+    {"key": "LLM_PROVIDER", "label": "LLM 제공자", "type": "select", "default": "openai_compatible",
+     "options": [
+         {"value": "openai_compatible", "label": "OpenAI 호환 (OpenAI/Ollama/LM Studio/OpenRouter 등)"},
+         {"value": "anthropic", "label": "Anthropic (Claude)"},
+     ]},
+    {"key": "LLM_BASE_URL", "label": "API 엔드포인트", "type": "text",
+     "default": "https://api.openai.com/v1"},  # 로컬 Ollama라면 예: http://localhost:11434/v1
+    {"key": "LLM_API_KEY", "label": "API 키", "type": "password", "required": False},  # 로컬 서버는 보통 불필요
+    {"key": "LLM_MODEL", "label": "모델 이름", "type": "text", "default": "gpt-4o-mini"},
+]
+```
+
+`LLM_BASE_URL`을 하드코딩하지 말고 항상 설정값으로 받으십시오 — 로컬 Ollama처럼 키가 필요 없는
+제공자도 있고, 같은 OpenAI 호환 스펙이라도 사용자마다 실제 접속 주소가 다릅니다. 이 저장소는
+공개 저장소이므로 실제 API 키를 기본값으로 박아두지 마십시오 — 위 예시처럼 빈 문자열/설명
+텍스트만 기본값으로 두어야 합니다.
+
+### 12.2 호출 헬퍼 (OpenAI 호환 + Anthropic 두 갈래로 충분)
+
+프로바이더별 SDK를 전부 지원하려 하지 말고, **"OpenAI 호환 Chat Completions" 하나만 제대로
+지원**하면 OpenAI 자체는 물론 Ollama(`/v1/chat/completions` 호환 모드), LM Studio, OpenRouter 등
+상당수를 한 번에 커버합니다. Anthropic Messages API만 요청 바디 스펙이 달라서 분기 하나 더
+둡니다.
+
+```python
+import requests
+
+
+class MyLlmPoweredProvider(BaseMetadataProvider):
+    # ... id/name/config_schema 등은 위 12.1 참고 ...
+
+    def _call_llm(self, db_type, system_prompt, user_prompt):
+        cfg = self.get_plugin_config(db_type, default={})
+        provider = cfg.get("LLM_PROVIDER", "openai_compatible")
+        model = cfg.get("LLM_MODEL") or "gpt-4o-mini"
+        api_key = cfg.get("LLM_API_KEY") or ""
+        base_url = (cfg.get("LLM_BASE_URL") or "https://api.openai.com/v1").rstrip("/")
+
+        try:
+            if provider == "anthropic":
+                res = requests.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers={
+                        "x-api-key": api_key,
+                        "anthropic-version": "2023-06-01",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": model or "claude-3-5-haiku-latest",
+                        "max_tokens": 1024,
+                        "system": system_prompt,
+                        "messages": [{"role": "user", "content": user_prompt}],
+                    },
+                    timeout=30,
+                )
+                res.raise_for_status()
+                data = res.json()
+                text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
+                return {"success": True, "text": text}
+
+            # OpenAI 호환 (OpenAI, Ollama, LM Studio, OpenRouter 등)
+            headers = {"Content-Type": "application/json"}
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
+            res = requests.post(
+                f"{base_url}/chat/completions",
+                headers=headers,
+                json={
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                },
+                timeout=30,
+            )
+            res.raise_for_status()
+            data = res.json()
+            text = data["choices"][0]["message"]["content"]
+            return {"success": True, "text": text}
+        except requests.RequestException as e:
+            return {"success": False, "error": f"LLM 호출 실패: {e}"}
+        except (KeyError, IndexError, TypeError) as e:
+            return {"success": False, "error": f"LLM 응답 형식이 예상과 다릅니다: {e}"}
+```
+
+이 `_call_llm()`을 `run_context_menu_action()`의 액션 중 하나(예: `ai_feedback`)로 노출하면,
+§6에서 설명한 "컨텍스트 메뉴 액션을 풀페이지 UI의 범용 RPC 채널로 재사용하는 패턴"과 그대로
+합쳐져서 "이 텍스트에 대해 AI 피드백/요약/번역 받기" 같은 버튼을 만들 수 있습니다.
+
+### 12.3 유의 사항
+
+- **타임아웃을 반드시 지정**하십시오(`timeout=30` 등). LLM 호출은 수 초~수십 초가 걸릴 수 있고,
+  타임아웃이 없으면 요청 스레드가 무한정 붙잡힐 수 있습니다.
+- **사용자 콘텐츠를 그대로 전송하기 전에** 이 서버가 개인 홈서버라도, 프롬프트에 민감한 개인정보
+  (실명, 주소 등)를 자동으로 섞어 넣지 않도록 주의하십시오 — 외부 LLM API로 나가는 데이터입니다.
+- 응답 텍스트를 화면에 그대로 `innerHTML`로 꽂지 말고, HTML로 렌더링해야 한다면 2장의 "동적 데이터
+  XSS 방어" 원칙대로 이스케이프하거나 필요한 최소 범위만 마크다운 렌더러를 통해 표시하십시오 —
+  LLM 응답도 결국 신뢰할 수 없는 외부 입력입니다.
+- `requirements.txt`로 공식 SDK(`openai`, `anthropic` 패키지 등)를 설치해 더 견고한 클라이언트를
+  쓸 수도 있습니다 — 2장의 패키지 격리 규칙에 따라 해당 플러그인 전용 `libs/`에만 설치되며 코어
+  라이브러리와 충돌하지 않습니다. 다만 대부분의 경우 위 예시처럼 `requests` 직접 호출만으로도
+  충분합니다(추가 의존성이 없다는 것 자체가 배포/설치 실패 지점을 줄여줍니다).
 
 ---
 

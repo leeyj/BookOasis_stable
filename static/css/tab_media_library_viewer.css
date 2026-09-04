@@ -533,9 +533,9 @@
 
 .overlay-controls-panel {
     position: relative;
-    background: rgba(10, 25, 47, 0.92);
+    background: rgba(var(--app-panel-rgb), 0.92);
     backdrop-filter: blur(12px);
-    border: 1px solid rgba(59, 130, 246, 0.25);
+    border: 1px solid color-mix(in srgb, var(--app-accent) 25%, transparent);
     border-radius: 10px;
     padding: 0.8rem 1.2rem;
     display: flex;
@@ -544,7 +544,7 @@
     align-self: center;
     max-width: 95vw;
     box-sizing: border-box;
-    box-shadow: 0 10px 30px rgba(2, 132, 199, 0.25), 0 0 15px rgba(59, 130, 246, 0.15);
+    box-shadow: 0 10px 30px color-mix(in srgb, var(--app-accent) 25%, transparent), 0 0 15px color-mix(in srgb, var(--app-accent) 15%, transparent);
     animation: zoomIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -560,8 +560,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(10, 25, 47, 0.92);
-    border: 1px solid rgba(59, 130, 246, 0.35);
+    background: rgba(var(--app-panel-rgb), 0.92);
+    border: 1px solid color-mix(in srgb, var(--app-accent) 35%, transparent);
     border-radius: 999px;
     color: var(--app-text-muted);
     font-size: 0.7rem;
@@ -572,24 +572,24 @@
 }
 
 .overlay-drag-handle:hover {
-    background: rgba(59, 130, 246, 0.25);
-    border-color: rgba(59, 130, 246, 0.6);
-    color: #e0f2fe;
+    background: color-mix(in srgb, var(--app-accent) 25%, transparent);
+    border-color: color-mix(in srgb, var(--app-accent) 60%, transparent);
+    color: var(--app-accent-hover);
 }
 
 .overlay-drag-handle.is-dragging,
 .overlay-drag-handle:active {
     cursor: grabbing;
-    background: rgba(59, 130, 246, 0.35);
-    border-color: #38bdf8;
-    color: #e0f2fe;
+    background: color-mix(in srgb, var(--app-accent) 35%, transparent);
+    border-color: var(--app-accent);
+    color: var(--app-accent-hover);
 }
 
 /* 📌 뷰어 오버레이 탭 헤더 및 콘텐츠 */
 .overlay-tab-nav {
     display: flex;
     gap: 6px;
-    border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+    border-bottom: 1px solid color-mix(in srgb, var(--app-accent) 20%, transparent);
     padding-bottom: 0.5rem;
     margin-bottom: 0.4rem;
     justify-content: center;
@@ -597,8 +597,8 @@
 }
 
 .overlay-tab-btn {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(var(--app-panel-border-rgb), 0.05);
+    border: 1px solid rgba(var(--app-panel-border-rgb), 0.08);
     color: var(--app-text-muted);
     padding: 0.35rem 0.85rem;
     font-size: 0.78rem;
@@ -612,16 +612,16 @@
 }
 
 .overlay-tab-btn:hover {
-    background: rgba(59, 130, 246, 0.15);
-    color: #e0f2fe;
-    border-color: rgba(59, 130, 246, 0.4);
+    background: color-mix(in srgb, var(--app-accent) 15%, transparent);
+    color: var(--app-accent-hover);
+    border-color: color-mix(in srgb, var(--app-accent) 40%, transparent);
 }
 
 .overlay-tab-btn.active {
-    background: linear-gradient(135deg, #2563eb, #0284c7);
-    color: #fff;
-    border-color: #38bdf8;
-    box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+    background: linear-gradient(135deg, var(--app-accent) 0%, color-mix(in srgb, var(--app-accent) 70%, black) 100%);
+    color: var(--app-accent-contrast);
+    border-color: var(--app-accent);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--app-accent) 40%, transparent);
 }
 
 .overlay-tab-content {
@@ -635,9 +635,9 @@
 }
 
 .overlay-select {
-    background: #0f172a;
-    color: #fff;
-    border: 1px solid rgba(59, 130, 246, 0.3);
+    background: var(--app-input-bg);
+    color: var(--app-text-primary);
+    border: 1px solid color-mix(in srgb, var(--app-accent) 30%, transparent);
     padding: 0.35rem 0.5rem;
     border-radius: 4px;
     font-size: 0.8rem;
@@ -647,7 +647,7 @@
 }
 
 .overlay-select:focus, .overlay-select:hover {
-    border-color: #38bdf8;
+    border-color: var(--app-accent);
 }
 
 .overlay-margin-container {
@@ -660,7 +660,7 @@
 .overlay-slider {
     width: 100%;
     cursor: pointer;
-    accent-color: #3b82f6;
+    accent-color: var(--app-accent);
 }
 
 /* 오버레이 컨트롤 패널 각 행 */
@@ -693,7 +693,7 @@
     gap: 0.6rem;
     align-items: center;
     justify-content: center;
-    border-top: 1px solid rgba(59, 130, 246, 0.15);
+    border-top: 1px solid color-mix(in srgb, var(--app-accent) 15%, transparent);
     padding-top: 0.4rem;
 }
 
@@ -711,7 +711,7 @@
 
 /* 너비 현재값 배지 */
 .overlay-width-value {
-    color: #38bdf8;
+    color: var(--app-accent-hover);
     font-size: 0.75rem;
     font-weight: 700;
     min-width: 38px;
@@ -740,9 +740,9 @@
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: #3b82f6;
+    background: var(--app-accent);
     cursor: pointer;
-    box-shadow: 0 0 6px rgba(59, 130, 246, 0.65);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--app-accent) 65%, transparent);
     transition: transform 0.15s;
 }
 
@@ -754,10 +754,10 @@
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: #3b82f6;
+    background: var(--app-accent);
     cursor: pointer;
     border: none;
-    box-shadow: 0 0 6px rgba(59, 130, 246, 0.65);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--app-accent) 65%, transparent);
 }
 
 .btn-overlay-action {
@@ -776,8 +776,8 @@
 }
 
 .btn-overlay-action:hover {
-    background: rgba(59, 130, 246, 0.25);
-    border-color: #3b82f6;
+    background: color-mix(in srgb, var(--app-accent) 25%, transparent);
+    border-color: var(--app-accent);
     color: var(--app-text-primary);
 }
 
@@ -808,9 +808,9 @@
 }
 
 .btn-overlay-fit.active {
-    background: linear-gradient(135deg, #2563eb, #0284c7);
-    color: #fff;
-    box-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
+    background: linear-gradient(135deg, var(--app-accent) 0%, color-mix(in srgb, var(--app-accent) 70%, black) 100%);
+    color: var(--app-accent-contrast);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--app-accent) 40%, transparent);
 }
 
 .overlay-footer {
@@ -1031,9 +1031,9 @@
 }
 
 .btn-nav {
-    background: #1e293b;
-    border: 1px solid #475569;
-    color: #fff;
+    background: rgba(var(--app-panel-rgb), 0.6);
+    border: 1px solid rgba(var(--app-panel-border-rgb), 0.3);
+    color: var(--app-text-primary);
     padding: 0.4rem 1.2rem;
     border-radius: 4px;
     cursor: pointer;
@@ -1250,8 +1250,11 @@
 .comic-loading-spinner {
     width: 56px;
     height: 56px;
-    border: 4px solid color-mix(in srgb, var(--app-accent) 20%, transparent);
-    border-top-color: var(--app-accent);
+    /* 이 오버레이는 배경(rgba(9,13,22,0.92))이 테마와 무관하게 항상 어둡게 고정된 곳이라
+       var(--app-accent) 대신 고정 밝은 색을 쓴다 - e-paper 등 accent가 어두운 테마에서는
+       var(--app-accent)를 쓰면 어두운 배경 위에서 스피너가 안 보이게 된다. */
+    border: 4px solid rgba(255, 255, 255, 0.15);
+    border-top-color: #f1f5f9;
     border-radius: 50%;
     animation: comic-spin 0.9s linear infinite;
 }
@@ -1263,7 +1266,7 @@
 }
 
 .comic-loading-text {
-    color: var(--app-text-primary);
+    color: #f1f5f9;
     font-size: 1.1rem;
     font-weight: 600;
     margin: 0;
@@ -1271,7 +1274,7 @@
 }
 
 .comic-loading-sub {
-    color: var(--app-text-muted);
+    color: #94a3b8;
     font-size: 0.85rem;
     text-align: center;
     line-height: 1.6;

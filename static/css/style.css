@@ -604,6 +604,12 @@ html[data-library-type="video"] #sidebar-categories [data-id="plugins"] {
     filter: none !important;
 }
 
+/* 2026-09: 예전에는 여기에 span/div도 있었다 - "테마 외부화" 이전, 아직 대부분의 텍스트가
+   var(--app-text-primary) 대신 하드코딩된 색을 쓰던 시절 만든 임시 안전망이었다. 지금은
+   본문 텍스트가 body { color: var(--app-text-primary) } 상속으로 이미 검정이 되므로 불필요해졌고,
+   오히려 불투명 accent 배경 위에 span으로 감싼 흰 글자(.overlay-tab-btn.active 등 다수)를
+   전부 검정으로 덮어써서 안 보이게 만드는 원인이었다(2026-09-05 세션에서 여러 건 발견).
+   span/div를 제거하고 남은 것들만 유지한다 - 이것들은 실제로 필요한 컴포넌트별 조정. */
 [data-app-theme="epaper"] .sidebar-title,
 [data-app-theme="epaper"] .sidebar-menu .menu-item,
 [data-app-theme="epaper"] .section-title,
@@ -614,9 +620,7 @@ html[data-library-type="video"] #sidebar-categories [data-id="plugins"] {
 [data-app-theme="epaper"] h3,
 [data-app-theme="epaper"] h4,
 [data-app-theme="epaper"] h5,
-[data-app-theme="epaper"] p,
-[data-app-theme="epaper"] span,
-[data-app-theme="epaper"] div {
+[data-app-theme="epaper"] p {
     color: #000000 !important;
 }
 
@@ -636,10 +640,6 @@ html[data-library-type="video"] #sidebar-categories [data-id="plugins"] {
     border: 1px solid #000000 !important;
 }
 
-[data-app-theme="epaper"] .sidebar-menu .menu-item.active * {
-    color: var(--app-accent-contrast) !important;
-}
-
 [data-app-theme="epaper"] .settings-tab-btn {
     background: #ffffff !important;
     color: #000000 !important;
@@ -650,6 +650,14 @@ html[data-library-type="video"] #sidebar-categories [data-id="plugins"] {
     background: #000000 !important;
     color: var(--app-accent-contrast) !important;
 }
+
+/* 2026-09-05 세션에서 이 아래에 .overlay-tab-btn.active/.btn-overlay-fit.active/.btn-fit.active/
+   .seekbar-tooltip/.filter-chip-item.active/.btn-submit/.btn-record-key/#btn-record-shortcut/
+   [data-role="general-lazy-scan-now"] 하나하나에 " * { color: var(--app-accent-contrast) !important }"
+   패치를 반복해서 쌓았었다 - 위쪽 블랑켓 div/span 규칙(제거됨) 때문에 각 컴포넌트 자체 CSS가
+   이미 올바르게 var(--app-accent-contrast)를 쓰고 있어도 안 보이던 것이었다. 블랑켓 규칙을
+   없앤 지금은 각 컴포넌트 CSS가 상속을 통해 그대로 정상 동작하므로 이 패치들은 전부 불필요해져
+   삭제했다 - 새 컴포넌트를 추가할 때 또 이 목록에 줄을 추가하지 말 것. */
 
 [data-app-theme="epaper"] select,
 [data-app-theme="epaper"] input[type="text"],
@@ -689,9 +697,7 @@ html[data-library-type="video"] #sidebar-categories [data-id="plugins"] {
 
 [data-app-theme="epaper"] .library-modal-header h3,
 [data-app-theme="epaper"] .library-modal-content label,
-[data-app-theme="epaper"] .library-modal-content p,
-[data-app-theme="epaper"] .library-modal-content span,
-[data-app-theme="epaper"] .library-modal-content div {
+[data-app-theme="epaper"] .library-modal-content p {
     color: #000000 !important;
 }
 

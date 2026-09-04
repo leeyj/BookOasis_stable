@@ -132,7 +132,13 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
               file_format: item.file_format,
               library_id: item.library_id,
             }, {
+              actionTitle: '이어읽기',
               onPrimaryClick: (e) => openBookDetail(e, item.series_name, item.library_id ?? actualLibraryId, item.id, item.series_name),
+              onActionClick: (e) => {
+                if (typeof window.resumeSeries === 'function') {
+                  window.resumeSeries(e, item.series_name, item.library_id ?? actualLibraryId, item.id);
+                }
+              },
             });
             grid.appendChild(card);
           });
