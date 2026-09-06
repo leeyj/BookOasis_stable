@@ -19,7 +19,8 @@ This document describes the current plugin standard for BookOasis metadata/dashb
 | :--- | :--- | :--- | :--- |
 | 1.0.0 ~ 1.0.4 | `search`, `apply` | `dashboard_widget`, `get_dashboard_data` | Both folder-based and single-file plugins supported |
 | 1.0.5 ~ 1.0.6 | `search`, `apply` | `get_context_menu_items`, `run_context_menu_action`, `update_manifest` | Context menu and sample update support |
-| 1.0.7+ (current) | `search`, `apply` | `on_scan_new_books_detected`, `dispatch_webhook`, `update_manifest` | Standard event webhooks (`book.new/read/finish`) recommended |
+| 1.0.7 | `search`, `apply` | `on_scan_new_books_detected`, `dispatch_webhook`, `update_manifest` | Standard event webhooks (`book.new/read/finish`) recommended |
+| 1.0.8+ (current) | `search`, `apply` | `detail_sidebar_widget`, `get_detail_sidebar_data` | Added book detail page sidebar widget contract ("More by this author", etc.) |
 
 Compatibility rules:
 
@@ -91,6 +92,7 @@ Recommended class attributes:
 - `config_schema` (list): settings form schema (used for auto-generated form)
 - `dashboard_widget` (dict or None): dashboard widget metadata
 - `category_tab` (dict or None): category-level plugin manifest (`title`, `icon`, `order`, `sessions`)
+- `detail_sidebar_widget` (dict or None): book detail page sidebar widget manifest (`title`, `order`, `sessions`)
 - `update_manifest` (dict or None): plugin-owned update declaration contract
 
 ### Category-Level Plugins Specification
@@ -134,6 +136,47 @@ Return shape:
 
 - Success: `{'success': True, 'items': [...]}`
 - Failure: `{'success': False, 'error': '...'}`
+
+### Book Detail Page Sidebar Widgets
+
+To mount a widget in the book detail page's right sidebar (formerly the core-hardcoded "More by
+this author" section), declare `detail_sidebar_widget`. If multiple plugins declare it, their
+sections simply stack in `order` - unlike category-level plugins, this is not a single slot that
+plugins compete for.
+
+```python
+class MyDetailSidebarPlugin(BaseMetadataProvider):
+    id = "my_detail_widget"
+    name = "Music for this book"
+    is_searchable = False
+
+    detail_sidebar_widget = {
+        "title": "Music for this book",
+        "order": 60,
+        "sessions": "all"  # same rule as category_tab - defaults to general only if omitted
+    }
+
+    def get_detail_sidebar_data(self, db_type, context):
+        # context: series_name, library_id, book_id, author, genre, tags
+        return {
+            "success": True,
+            "items": [
+                {"item_type": "metric", "metric": "Suggested mood", "value": "Mellow jazz"},
+            ],
+        }
+```
+
+`get_detail_sidebar_data(self, db_type, context)` returns the exact same `items` schema as the
+dashboard widget's `get_dashboard_data` - no new schema to learn:
+
+- `item_type: "metric"` + `metric`/`value`/`description`: a free-form card unrelated to any book. Creative widgets that never touch a core book id (e.g. "play music matching this book") are fully supported this way.
+- an item with `link` (external URL): renders as a simple card that opens in a new tab. The core does not validate the URL's existence, so it can point anywhere.
+- `book_id`/`series_name` (optionally `library_id`, `file_format`, `cover`, `title`): a card linked to a core book. Clicking opens the detail page, and a "Resume" button appears when `file_format` is present. A non-existent `book_id` just fails open gracefully like a dead link, so no pre-validation is required.
+- Including `title` in the response overrides the manifest's default section title dynamically (e.g. switching to "Similar tags" based on the book's genre).
+
+Reference implementation: [sample_plugins/metadata/author_other_books](../sample_plugins/metadata/author_other_books/author_other_books.py) - a straight port of the old core-hardcoded "More by this author" feature. Admins can copy this folder into `plugins/metadata/` to enable it, and plugin authors can use it as a starting point for other algorithms (related books, similar tags, etc.).
+
+**Performance note**: `get_detail_sidebar_data()` is called every time a book detail page opens. Re-running an expensive aggregate query over the whole books table on every call makes the widget noticeably slow to appear - as the `author_other_books` sample does, strongly consider caching the result for a TTL via `self.cache_get()`/`self.cache_set()` (the plugin's dedicated Redis cache).
 
 ### Plugin-Owned Update Contract (`update_manifest`)
 

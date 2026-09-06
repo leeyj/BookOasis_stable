@@ -1,4 +1,12 @@
 # CHANGELOG
+## v2.5.8
+- (fix) 플러그인 카테고리 매니페스트에서 `order: 0`이 무시되고, 매니페스트 하나의 오류가 전체 동적 카테고리 목록을 무너뜨리던 문제 수정 | fix plugin category manifests ignoring `order: 0` and a single malformed manifest breaking the entire dynamic category list
+- (fix) 사이드바 "컬렉션" 카테고리에 누락되어 있던 다국어(i18n) 번역 키 추가 | add the missing i18n translation key for the sidebar "Collection" category
+- (fix) "내 설정" 탭의 도서 상세 그리드 보기 등 사용자 개인화 체크박스들이 저장해도 적용되지 않던 문제 수정 — 전역 설정에 값이 없는 사용자 전용 설정이 공개 설정 API 응답에서 통째로 누락되던 버그와, 저장 직후 메모리 상태가 갱신되지 않던 버그를 함께 수정 | fix "My Settings" personalization checkboxes (e.g. detail volume grid view) not taking effect after saving — fixed both a public-settings API bug that dropped user-only overrides with no global default, and stale in-memory state right after saving
+- (breaking) 도서 상세 페이지의 "이 작가의 다른 도서" 사이드바를 코어에서 완전히 분리해 `detail_sidebar_widget` 플러그인 계약으로 전환 — 참조 구현은 `sample_plugins/metadata/author_other_books`로 제공되며, 필요 시 `plugins/metadata/`로 복사해 활성화해야 함 | (breaking) fully separate the book detail page's "More by this author" sidebar from core into a `detail_sidebar_widget` plugin contract — the reference implementation ships as `sample_plugins/metadata/author_other_books` and must be copied into `plugins/metadata/` to enable it
+- (feature) 여러 플러그인이 도서 상세 사이드바에 위젯을 동시에 등록할 수 있으며(순서대로 병렬 표시), 대시보드 위젯과 동일한 아이템 스키마(도서 연결/외부 링크/자유 형식 카드)를 공유해 "관련도서", "유사한 태그 도서"는 물론 도서와 무관한 위젯도 자유롭게 구현 가능 | add support for multiple plugins to register book detail sidebar widgets simultaneously (stacked in order), sharing the same item schema as dashboard widgets (book-linked / external link / free-form card) so "related books", "similar tags", or even non-book widgets can be built freely
+- (fix) 도서 상세 사이드바 위젯이 3초 이상 늦게 뜨던 문제 수정 — 목록/데이터 조회 API를 1회 왕복으로 통합하고, 기본 제공 플러그인의 전체 테이블 스캔 쿼리에 Redis 캐시(TTL 30분)를 추가 | fix book detail sidebar widgets taking 3+ seconds to appear — merged the list/data API calls into a single round trip and added a 30-minute Redis cache to the bundled plugin's full-table-scan query
+
 ## v2.5.7
 - (fix) e-paper 테마에서 불투명 배경 버튼 글자가 안 보이던 문제들을 근본 수정 — 원인이었던 전역 텍스트색 강제 규칙 제거 | fundamentally fix invisible button text on opaque backgrounds in the e-paper theme by removing the overly broad global text-color rule that caused it
 - (feature) 실험적 페이지 넘김(page-flip) 뷰어에 순차 로딩 진행률 표시와 읽기 방향/속도 설정 기억 기능 추가 | add sequential loading progress display and persisted reading-direction/speed preferences to the experimental page-flip viewer

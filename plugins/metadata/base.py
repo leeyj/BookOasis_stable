@@ -11,6 +11,10 @@ class BaseMetadataProvider(ABC):
     config_schema = []
     enabled = True
     dashboard_widget = None
+    # 도서 상세 페이지 사이드바에 위젯을 마운트하려면 선언 (선택).
+    # Example:
+    # detail_sidebar_widget = {"title": "이 작가의 다른 도서", "order": 50, "sessions": "all"}
+    detail_sidebar_widget = None
     # Optional self-update contract declared by each plugin.
     # Example:
     # {
@@ -99,6 +103,21 @@ class BaseMetadataProvider(ABC):
     def get_dashboard_data(self, db_type, limit=10):
         """대시보드 위젯 데이터 공통 계약 (위젯을 쓰는 플러그인에서 override)."""
         return {'success': False, 'error': 'dashboard widget not implemented'}
+
+    def get_detail_sidebar_data(self, db_type, context):
+        """도서 상세 페이지 사이드바 위젯 데이터 계약 (detail_sidebar_widget을 쓰는 플러그인에서 override).
+
+        Args:
+            db_type (str): 'general'/'adult'/'audiobook'/'video'
+            context (dict): series_name, library_id, book_id, author, genre, tags
+
+        Returns:
+            dict: {'success': True, 'title': str(선택, 미지정 시 manifest title 사용),
+                   'items': list[dict]} - items는 대시보드 위젯과 동일한 아이템 스키마
+                   (book_id/series_name으로 내부 도서 연결, 'link'로 외부 URL 연결,
+                   item_type='metric'으로 도서와 무관한 자유 형식 카드 표시).
+        """
+        return {'success': False, 'error': 'detail sidebar widget not implemented'}
 
     def on_scan_new_books_detected(self, db_type, payload):
         """스캐너 신규도서 감지 후크 (선택 구현)."""

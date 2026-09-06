@@ -53,6 +53,9 @@ logs/*
 # Private operator docs (local only, not published)
 docs/operator_deployment_private.md
 
+# Thesis research data (personal, never published)
+thesis_data/
+
 # Prettier Ignore
 .prettierignore
 

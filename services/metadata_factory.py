@@ -555,6 +555,7 @@ class MetadataFactory:
                 p_schema = getattr(target_class, 'config_schema', [])
                 p_widget = getattr(target_class, 'dashboard_widget', None)
                 p_category_tab = getattr(target_class, 'category_tab', None)
+                p_detail_sidebar_widget = getattr(target_class, 'detail_sidebar_widget', None)
                 p_update_manifest = getattr(target_class, 'update_manifest', None)
 
                 enabled_key = f"PLUGIN_ENABLED_{p_id}"
@@ -577,6 +578,7 @@ class MetadataFactory:
                     'config': config_data,
                     'dashboard_widget': p_widget,
                     'category_tab': p_category_tab,
+                    'detail_sidebar_widget': p_detail_sidebar_widget,
                     'update_manifest': p_update_manifest,
                 }
 

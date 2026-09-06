@@ -64,9 +64,11 @@ export async function fetchSmartRecommendations(type, seriesName, libraryId) {
   return res.json();
 }
 
-export async function fetchAuthorBooks(type, seriesName, libraryId) {
+// 도서 상세 페이지 사이드바에 마운트할 활성화된 위젯(플러그인)의 데이터를 한 번에 조회
+// (예전 "이 작가의 다른 도서"는 sample_plugins/metadata/author_other_books 플러그인으로 분리됨)
+export async function fetchDetailSidebarWidgets(type, seriesName, libraryId) {
   const libQuery = libraryId ? `&library_id=${encodeURIComponent(libraryId)}` : '';
-  const res = await fetch(`/api/media/author-books?type=${type}&series_name=${encodeURIComponent(seriesName)}${libQuery}&_=${Date.now()}`, {cache: 'no-store'});
+  const res = await fetch(`/api/media/detail-sidebar-widgets?type=${type}&series_name=${encodeURIComponent(seriesName)}${libQuery}&_=${Date.now()}`, {cache: 'no-store'});
   return res.json();
 }
 

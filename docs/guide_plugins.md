@@ -4,6 +4,8 @@
 
 > 주의: 이 문서는 `plugins/metadata/` 외부 연동 플러그인 가이드입니다. 스캐너 로컬 파서 개발은 [스캐너 파서 개발 가이드](./guide_scanner_parser.md)를 따르십시오.
 
+> 참고: 화면 우측 하단 등에 캐릭터를 띄워두고 LLM과 채팅하며 도서를 추천받는 "오버레이 마스코트" 유형 플러그인은 이 문서의 계약 위에 [오버레이 마스코트 플러그인 가이드](./guide_overlay_mascot_plugin.md)를 추가로 참고하십시오.
+
 ---
 
 ## 1. 핵심 원칙 (중요)
@@ -20,7 +22,8 @@
 | :--- | :--- | :--- | :--- |
 | 1.0.0 ~ 1.0.4 | `search`, `apply` | `dashboard_widget`, `get_dashboard_data` | 폴더 기반/단일 파일 모두 허용 |
 | 1.0.5 ~ 1.0.6 | `search`, `apply` | `get_context_menu_items`, `run_context_menu_action`, `update_manifest` | 컨텍스트 메뉴/샘플 업데이트 지원 |
-| 1.0.7+ (현재) | `search`, `apply` | `on_scan_new_books_detected`, `dispatch_webhook`, `update_manifest` | 표준 이벤트 웹훅(`book.new/read/finish`) 병행 운영 권장 |
+| 1.0.7 | `search`, `apply` | `on_scan_new_books_detected`, `dispatch_webhook`, `update_manifest` | 표준 이벤트 웹훅(`book.new/read/finish`) 병행 운영 권장 |
+| 1.0.8+ (현재) | `search`, `apply` | `detail_sidebar_widget`, `get_detail_sidebar_data` | 도서 상세 페이지 사이드바("이 작가의 다른 도서" 등) 위젯 계약 추가 |
 
 호환성 원칙:
 
@@ -214,6 +217,7 @@ window.addEventListener('message', (event) => {
 - `config_schema` (list): 설정 폼 스키마 (기본 자동 생성 폼용)
 - `dashboard_widget` (dict 또는 None): 대시보드 위젯 메타 (공통 데스크 카드 또는 단독 탭 뷰 구성 정보)
 - `category_tab` (dict 또는 None): 카테고리 레벨 플러그인 매니페스트 (사이드바 카테고리 1등 시민 메뉴 등록 정보: `title`, `icon`, `order`, `sessions`)
+- `detail_sidebar_widget` (dict 또는 None): 도서 상세 페이지 사이드바 위젯 매니페스트 (`title`, `order`, `sessions`)
 - `update_manifest` (dict 또는 None): 플러그인 내부 업데이트 선언 계약
 
 ### 카테고리 레벨 플러그인 (Category-Level Plugins) 규격
@@ -257,6 +261,47 @@ class MyCategoryPlugin(BaseMetadataProvider):
 
 - 성공: `{'success': True, 'items': [...]}`
 - 실패: `{'success': False, 'error': '...'}`
+
+### 도서 상세 페이지 사이드바 위젯 (Detail Sidebar Widgets)
+
+도서 상세 페이지 우측 사이드바(예전엔 "이 작가의 다른 도서"가 코어에 하드코딩되어 있던 영역)에
+위젯을 마운트하려면 `detail_sidebar_widget`을 선언합니다. 여러 플러그인이 동시에 선언하면
+`order` 순서대로 여러 섹션이 나란히 쌓여 표시됩니다(카테고리 레벨 플러그인처럼 단일 슬롯을
+두고 경쟁하지 않습니다).
+
+```python
+class MyDetailSidebarPlugin(BaseMetadataProvider):
+    id = "my_detail_widget"
+    name = "이 책과 어울리는 음악"
+    is_searchable = False
+
+    detail_sidebar_widget = {
+        "title": "이 책과 어울리는 음악",
+        "order": 60,
+        "sessions": "all"  # category_tab과 동일 규칙 - 생략 시 general에만 노출
+    }
+
+    def get_detail_sidebar_data(self, db_type, context):
+        # context: series_name, library_id, book_id, author, genre, tags
+        return {
+            "success": True,
+            "items": [
+                {"item_type": "metric", "metric": "추천 무드", "value": "잔잔한 재즈"},
+            ],
+        }
+```
+
+`get_detail_sidebar_data(self, db_type, context)` 반환 규격은 대시보드 위젯(`get_dashboard_data`)의
+`items`와 완전히 동일한 스키마를 공유합니다 - 학습 비용 없이 그대로 재사용할 수 있습니다:
+
+- `item_type: "metric"` + `metric`/`value`/`description`: 도서와 무관한 자유 형식 카드. "이 도서에 맞는 음악 재생하기"처럼 코어 DB의 book id를 참조하지 않는 창의적인 위젯도 이 형태로 얼마든지 가능합니다.
+- `link`(외부 URL이 있는 항목): 새 탭으로 여는 단순 링크 카드. 존재 여부를 코어가 검증하지 않으므로 완전히 자유로운 URL을 반환할 수 있습니다.
+- `book_id`/`series_name`(+선택적 `library_id`, `file_format`, `cover`, `title`): 코어 도서로 연결되는 카드. 클릭 시 상세 페이지로 이동하고, `file_format`이 있으면 "이어읽기" 버튼도 표시됩니다. 존재하지 않는 book_id를 반환해도 클릭 시 정상적인 열기 실패로 처리될 뿐이라 사전 검증은 필요 없습니다.
+- 응답에 `title`을 실으면 섹션 제목을 manifest 기본값 대신 동적으로 덮어씁니다(예: 도서 장르에 따라 "유사한 태그 도서"로 문구를 바꾸는 등).
+
+참조 구현: [sample_plugins/metadata/author_other_books](../sample_plugins/metadata/author_other_books/author_other_books.py) - 코어에 있던 "이 작가의 다른 도서" 기능을 그대로 이관한 예제입니다. 관리자가 필요하면 이 폴더를 `plugins/metadata/`로 복사해 활성화하면 되고, "관련도서"/"유사한 태그 도서" 등 다른 알고리즘을 원하면 이 파일을 참고해 자유롭게 대체하면 됩니다.
+
+**성능 주의**: `get_detail_sidebar_data()`는 도서 상세 페이지를 열 때마다 호출됩니다. 전체 도서 테이블을 훑는 집계 쿼리처럼 무거운 연산을 매번 재실행하면 위젯이 눈에 띄게 늦게 뜹니다 - `author_other_books` 샘플처럼 `self.cache_get()`/`self.cache_set()`(플러그인 전용 Redis 캐시)로 결과를 TTL 동안 재사용하는 것을 강력히 권장합니다.
 
 ### 플러그인 내부 업데이트 계약 (`update_manifest`)
 

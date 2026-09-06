@@ -278,10 +278,7 @@ export function filterBooks() {
     return;
   }
 
-  const searchBtn = document.getElementById('btn-library-search-action');
-  if (searchBtn) {
-    searchBtn.innerText = query ? i18n.t('common.reset') : i18n.t('common.search');
-  }
+  updateSearchActionButtonUI(query);
   
   if (query && state.currentLibraryId === 'history') {
     state.currentLibraryId = 'all';
@@ -297,6 +294,20 @@ export function filterBooks() {
     state.hasMore = true;
     loadBooksList(false);
   }, 220);
+}
+
+// 아이콘 전용 압축 버튼이라 라벨 텍스트를 innerText로 넣으면 34px 정사각 버튼 안에서
+// 글자가 세로로 줄바꿈되며 깨져 보인다 - updateSortButtonUI와 동일하게 아이콘+sr-only로 표시한다.
+export function updateSearchActionButtonUI(query) {
+  const btn = document.getElementById('btn-library-search-action');
+  if (!btn) return;
+  if (query) {
+    btn.innerHTML = `<i class="fa-solid fa-xmark" aria-hidden="true"></i> <span class="sr-only">${i18n.t('common.reset')}</span>`;
+    btn.title = i18n.t('common.reset');
+  } else {
+    btn.innerHTML = `<i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> <span class="sr-only">${i18n.t('common.search')}</span>`;
+    btn.title = i18n.t('common.search');
+  }
 }
 
 export function updateSortButtonUI() {

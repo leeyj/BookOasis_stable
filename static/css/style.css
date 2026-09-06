@@ -2583,6 +2583,37 @@ body {
     gap: 0.9rem;
 }
 
+/* 사이드바 위젯(플러그인)이 여러 개일 때 섹션 간 여백 - 첫 섹션은 위 여백 없음 */
+.detail-sidebar-widget-section + .detail-sidebar-widget-section {
+    margin-top: 1.8rem;
+}
+
+/* 사이드바 위젯의 외부 링크형 아이템(도서 연결이 아닌 자유 형식 카드) */
+.detail-sidebar-link-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.6rem;
+    border-radius: 8px;
+    background: rgba(var(--app-panel-rgb), 0.55);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    text-decoration: none;
+    color: var(--app-text-primary);
+}
+
+.detail-sidebar-link-card-cover {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    border-radius: 6px;
+}
+
+.detail-sidebar-link-card-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
 /* 상세 뷰: Kavita 스타일 레이아웃 */
 .detail-header-panel {
     display: flex;

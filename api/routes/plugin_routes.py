@@ -338,6 +338,69 @@ def get_dashboard_widget_data_api(plugin_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@plugin_routes_bp.route('/api/media/detail-sidebar-widgets', methods=['GET'])
+@login_required
+def get_detail_sidebar_widgets_api():
+    """도서 상세 페이지 사이드바에 마운트할 활성화된 위젯(플러그인)의 데이터를 한 번에 반환합니다.
+
+    예전엔 "목록 조회 → 위젯별 데이터 조회"로 나뉘어 있어 위젯이 하나뿐인 기본 설치
+    상태에서도 상세 페이지를 열 때마다 불필요한 왕복이 1회 더 발생했다 - 사이드바는
+    항상 목록과 데이터를 동시에 필요로 하므로 단일 호출로 합쳐 체감 로딩 속도를 개선했다.
+    """
+    db_type = request.args.get('type', 'general').strip()
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+
+    context = {
+        'series_name': request.args.get('series_name', ''),
+        'library_id': request.args.get('library_id') or None,
+        'book_id': request.args.get('book_id') or None,
+        'author': request.args.get('author', ''),
+        'genre': request.args.get('genre', ''),
+        'tags': request.args.get('tags', ''),
+    }
+
+    try:
+        from services.metadata_factory import MetadataFactory
+        providers = MetadataFactory.get_available_providers()
+
+        active_widgets = []
+        for p in providers:
+            if not p.get('enabled'):
+                continue
+            widget = p.get('detail_sidebar_widget')
+            if not isinstance(widget, dict):
+                continue
+            if db_type not in _resolve_plugin_sessions(widget):
+                continue
+
+            active_widgets.append({
+                'id': p.get('id'),
+                'title': widget.get('title') or p.get('name'),
+                'order': int(widget.get('order') or 50),
+            })
+        active_widgets.sort(key=lambda x: x['order'])
+
+        widgets_with_data = []
+        for widget in active_widgets:
+            try:
+                provider = MetadataFactory.get_provider_by_id(widget['id'])
+                result = provider.get_detail_sidebar_data(db_type, context)
+            except Exception as plugin_err:
+                print(f"[detail-sidebar-widgets] Skipping widget '{widget['id']}' due to error: {plugin_err}")
+                continue
+            if not result.get('success') or not result.get('items'):
+                continue
+            widgets_with_data.append({
+                'id': widget['id'],
+                'title': result.get('title') or widget['title'],
+                'items': result['items'],
+            })
+
+        return jsonify({'success': True, 'widgets': widgets_with_data}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @plugin_routes_bp.route('/api/media/category-plugins', methods=['GET'])
 def get_category_plugins_api():
     """사이드바 및 뷰포트에 마운트할 활성화된 카테고리 레벨 플러그인 목록을 반환합니다."""
@@ -362,34 +425,47 @@ def get_category_plugins_api():
 
         active_category_plugins = []
         for p in providers:
-            if not p.get('enabled'):
-                continue
-            cat_tab = p.get('category_tab')
-            if not isinstance(cat_tab, dict):
-                continue
-
-            # 플러그인이 매니페스트의 'sessions'로 자신이 노출될 세션을 선언한다
-            # (예: sessions=['adult']면 일반 도서 사이드바에는 뜨지 않음, 'all'이면
-            # 4개 세션 전체). 선언이 없으면 하위 호환을 위해 general에만 노출된다.
-            if db_type not in _resolve_plugin_sessions(cat_tab):
-                continue
-
-            plugin_cat_id = f"plugin_{p.get('id')}"
-            if user_id and user_role != 'admin':
-                perm_key = f"PERM_CATEGORY_{user_id}_{plugin_cat_id}"
-                if perm_map.get(perm_key) == '0':
+            try:
+                if not p.get('enabled'):
+                    continue
+                cat_tab = p.get('category_tab')
+                if not isinstance(cat_tab, dict):
                     continue
 
-            active_category_plugins.append({
-                'id': p.get('id'),
-                'name': p.get('name'),
-                'category_id': plugin_cat_id,
-                'title': cat_tab.get('title') or p.get('name'),
-                'icon': cat_tab.get('icon') or 'fa-solid fa-puzzle-piece',
-                'order': int(cat_tab.get('order') or 50),
-                'ui': p.get('ui'),
-                'group_id': plugin_group_map.get(p.get('id'))
-            })
+                # 플러그인이 매니페스트의 'sessions'로 자신이 노출될 세션을 선언한다
+                # (예: sessions=['adult']면 일반 도서 사이드바에는 뜨지 않음, 'all'이면
+                # 4개 세션 전체). 선언이 없으면 하위 호환을 위해 general에만 노출된다.
+                if db_type not in _resolve_plugin_sessions(cat_tab):
+                    continue
+
+                plugin_cat_id = f"plugin_{p.get('id')}"
+                if user_id and user_role != 'admin':
+                    perm_key = f"PERM_CATEGORY_{user_id}_{plugin_cat_id}"
+                    if perm_map.get(perm_key) == '0':
+                        continue
+
+                raw_order = cat_tab.get('order')
+                try:
+                    order_val = int(raw_order) if raw_order is not None else 50
+                except (TypeError, ValueError):
+                    order_val = 50
+
+                active_category_plugins.append({
+                    'id': p.get('id'),
+                    'name': p.get('name'),
+                    'category_id': plugin_cat_id,
+                    'title': cat_tab.get('title') or p.get('name'),
+                    'icon': cat_tab.get('icon') or 'fa-solid fa-puzzle-piece',
+                    'order': order_val,
+                    'ui': p.get('ui'),
+                    'group_id': plugin_group_map.get(p.get('id'))
+                })
+            except Exception as plugin_err:
+                # 개별 플러그인 매니페스트 오류로 인해 사이드바 전체 동적 카테고리가
+                # 통째로 렌더링 실패하는 것을 방지 (한 플러그인 문제가 다른 정상
+                # 플러그인의 동적 카테고리 노출까지 막지 않도록 격리)
+                print(f"[category-plugins] Skipping plugin '{p.get('id')}' due to error: {plugin_err}")
+                continue
 
         active_category_plugins.sort(key=lambda x: x['order'])
         return jsonify({'success': True, 'category_plugins': active_category_plugins}), 200

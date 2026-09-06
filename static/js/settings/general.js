@@ -579,6 +579,21 @@ export async function submitMySettings(event) {
       } else {
         alert(i18n.t('settings.general_save_done'));
       }
+      // 저장 직후 페이지 새로고침 없이도 반영되도록 메모리 상태(state.*)를 즉시 갱신한다.
+      // loadMySettings()는 폼 체크박스 표시만 되돌려줄 뿐 state.detailVolumeGridView 등은
+      // 갱신하지 않아서, 예전엔 새로고침 전까지 "그리드로 보기" 등이 동작하지 않았다.
+      applySettingsToUI({
+        AUDIO_MINI_PLAYER_MODE: audioMiniPlayerMode,
+        AUDIO_RIGHT_DOCK_DIM_ENABLED: audioRightDockDimEnabled,
+        DETAIL_VOLUME_GRID_VIEW: detailVolumeGridView,
+        COLLAPSE_DETAIL_GENRE_TAGS: collapseDetailGenreTags,
+        SHOW_SIDEBAR_CATEGORY_ALL: showSidebarCategoryAll,
+        HIDE_COMPLETED_IN_HISTORY: hideCompleted,
+        TAG_FILTER_SEARCH_SCOPE_ALL: tagFilterScopeAll,
+        SHOW_TXT_NO_COVER_INFO_BANNER: showTxtNoCoverInfoBanner,
+        SMART_RECOMMEND_ENABLED: smartRecommendEnabled,
+        BOOK_RECOMMEND_ENABLED: bookRecommendEnabled
+      });
       loadMySettings();
       if (typeof window.loadLibraries === 'function') {
         window.loadLibraries();

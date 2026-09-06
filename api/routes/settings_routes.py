@@ -93,13 +93,18 @@ def get_public_ui_settings():
         all_settings = SettingsService.get_all()
         user_id = session.get('user_id')
         public_settings = {}
-        for k, v in all_settings.items():
-            if k not in PUBLIC_UI_SETTING_KEYS:
-                continue
+        # 전역 settings 테이블에 행이 아예 없는 키(관리자 화면에 대응 필드가 없는
+        # 사용자 전용 설정, 예: DETAIL_VOLUME_GRID_VIEW)는 all_settings에 없어서
+        # 예전 방식(all_settings.items()를 순회하며 필터링)으로는 사용자가 저장한
+        # override 값이 있어도 응답에서 통째로 누락됐다. PUBLIC_UI_SETTING_KEYS를
+        # 기준으로 순회해야 그런 키의 override도 정상적으로 내려간다.
+        for k in PUBLIC_UI_SETTING_KEYS:
             if k in USER_OVERRIDABLE_SETTING_KEYS:
-                public_settings[k] = SettingsService.get_effective(k, user_id=user_id, default=v)
-            else:
-                public_settings[k] = v
+                effective = SettingsService.get_effective(k, user_id=user_id, default=all_settings.get(k))
+                if effective is not None:
+                    public_settings[k] = effective
+            elif k in all_settings:
+                public_settings[k] = all_settings[k]
         return jsonify({'success': True, 'settings': public_settings})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

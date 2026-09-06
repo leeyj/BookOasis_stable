@@ -1,0 +1,60 @@
+.rm-wrap {
+  padding: 1.5rem;
+  max-width: 640px;
+}
+
+.rm-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.rm-header i {
+  font-size: 1.5rem;
+  color: var(--app-accent, #7c5cff);
+  margin-top: 0.2rem;
+}
+
+.rm-header h2 {
+  margin: 0 0 0.25rem;
+}
+
+.rm-header p {
+  margin: 0;
+  color: var(--app-text-secondary, #999);
+  font-size: 0.9rem;
+}
+
+.rm-note {
+  background: var(--app-bg-card, #1e1e2e);
+  border: 1px solid var(--app-border, #333);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.rm-note p {
+  margin: 0 0 0.5rem;
+}
+
+.rm-note p:last-child {
+  margin-bottom: 0;
+}
+
+.rm-status {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--app-text-secondary, #999);
+}
+
+/*
+ * 마스코트 오버레이(#reading-mate-mascot)의 CSS는 여기 두지 않는다.
+ * 이 style.css는 category_tab 컨테이너 안에 <style id="plugin-custom-style-...">
+ * 로 주입되는데, 다른 사이드바 탭으로 이동하면 코어가 그 컨테이너의 innerHTML을
+ * 통째로 갈아치우면서 이 <style> 태그도 함께 사라진다. 반면 마스코트 자신은
+ * document.body에 옮겨 붙어 탭을 넘어가도 살아남아야 하므로, 마스코트 전용
+ * CSS는 script.js에서 document.head에 직접 <style>을 주입해 독립적으로
+ * 살려둔다 (script.js의 ensureMascotStyle() 참고).
+ */

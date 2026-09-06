@@ -4,7 +4,7 @@
 // 그리드 콘텐츠(강좌 카드)만 전용 렌더러로 대체한다. 카드 클릭은 오디오북과 동일하게 공용 상세화면
 // 파이프라인(openBookDetail)을 그대로 타서, 상세화면/에피소드 목록/재생시간 저장 UI가 오디오북과 일치한다.
 import { openBookDetail } from './detail/index.js';
-import { updateLibraryTotalCount } from './book_list.js';
+import { updateLibraryTotalCount, updateSearchActionButtonUI } from './book_list.js';
 import { positionMenuAtPoint, hideFloatingMenu, bindFloatingMenuOutsideClose } from './context_menu_manager.js';
 import { state } from './state.js';
 import { formatDurationLong } from './utils/time.js';
@@ -278,10 +278,7 @@ export function filterVideoCourses() {
   const searchInput = document.getElementById('library-search');
   const query = (searchInput?.value || '').toLowerCase().trim();
 
-  const searchBtn = document.getElementById('btn-library-search-action');
-  if (searchBtn) {
-    searchBtn.innerText = query ? (window.i18n?.t('common.reset') || '초기화') : (window.i18n?.t('common.search') || '검색');
-  }
+  updateSearchActionButtonUI(query);
 
   const filtered = query
     ? lastLoadedVideos.filter(v => (v.title || '').toLowerCase().includes(query))

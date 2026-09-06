@@ -104,47 +104,50 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
             ${headerHtml}
             ${volumesSectionHtml}
           </div>
-          <aside class="detail-page-sidebar" id="detail-author-sidebar" style="display:none;">
-            <h3 class="detail-sidebar-title">${i18n.t('detail.more_by_author')}</h3>
-            <div class="detail-sidebar-grid" id="detail-author-sidebar-grid"></div>
-          </aside>
+          <aside class="detail-page-sidebar" id="detail-widget-sidebar" style="display:none;"></aside>
         </div>
       `;
 
-      // "이 작가의 다른 도서" 사이드바 - 본문 렌더링을 막지 않도록 논블로킹으로 로드.
+      // 도서 상세 사이드바 위젯(플러그인) 로드 - 본문 렌더링을 막지 않도록 논블로킹으로 로드.
+      // 예전엔 "이 작가의 다른 도서"가 코어에 하드코딩돼 있었으나, 플러그인 개발자들이
+      // "관련도서"/"유사한 태그 도서" 등 다른 알고리즘이나 아예 다른 성격의 위젯(예: 이 책에
+      // 어울리는 음악 추천)으로 자유롭게 교체하고 싶다는 요청이 많아 detail_sidebar_widget
+      // 플러그인 계약으로 완전히 분리했다 - 코어 기본값은 sample_plugins/metadata/
+      // author_other_books 참조 구현이며, 설치 여부는 관리자의 선택이다.
       // 사이드바는 폭 고정(336px, 카드 2열)이고 본문은 flex:1이라, 사이드바가 없거나
       // 숨겨져도 본문이 자동으로 남는 공간을 채운다 - 별도 폭 조정 클래스가 필요 없다.
       (async () => {
-        if (state.bookRecommendEnabled === false) return; // 설정 > 일반설정의 "도서 추천기능" 해제 시 요청 자체를 안 보냄
-        const sidebar = document.getElementById('detail-author-sidebar');
-        const grid = document.getElementById('detail-author-sidebar-grid');
-        if (!sidebar || !grid) return;
+        if (state.bookRecommendEnabled === false) return; // 설정 > 내 설정의 "도서 추천기능" 해제 시 요청 자체를 안 보냄
+        const sidebar = document.getElementById('detail-widget-sidebar');
+        if (!sidebar) return;
         try {
-          const res = await api.fetchAuthorBooks(state.currentLibraryType || 'general', safeSeriesName, actualLibraryId);
-          if (!res.success || !res.books || res.books.length === 0) return;
-          grid.innerHTML = '';
-          res.books.forEach((item) => {
-            const card = createBookCard({
-              id: item.id,
-              representative_book_id: item.id,
-              series_name: item.series_name,
-              cover_image: item.cover_image,
-              file_format: item.file_format,
-              library_id: item.library_id,
-            }, {
-              actionTitle: '이어읽기',
-              onPrimaryClick: (e) => openBookDetail(e, item.series_name, item.library_id ?? actualLibraryId, item.id, item.series_name),
-              onActionClick: (e) => {
-                if (typeof window.resumeSeries === 'function') {
-                  window.resumeSeries(e, item.series_name, item.library_id ?? actualLibraryId, item.id);
-                }
-              },
+          // 목록 조회 + 위젯별 데이터 조회 2회 왕복이던 것을 서버에서 한 번에 묶어 반환하도록
+          // 통합 - 위젯이 1개뿐인 기본 설치 상태에서도 상세 페이지를 열 때마다 불필요한
+          // 네트워크 왕복이 추가되는 걸 막는다.
+          const res = await api.fetchDetailSidebarWidgets(state.currentLibraryType || 'general', safeSeriesName, actualLibraryId);
+          if (!res.success || !Array.isArray(res.widgets) || res.widgets.length === 0) return;
+
+          let sectionsRendered = 0;
+          res.widgets.forEach((widget) => {
+            if (!Array.isArray(widget.items) || widget.items.length === 0) return;
+
+            const section = document.createElement('div');
+            section.className = 'detail-sidebar-widget-section';
+            section.dataset.pluginId = widget.id;
+            section.innerHTML = `<h3 class="detail-sidebar-title">${escapeHtml(widget.title)}</h3><div class="detail-sidebar-grid"></div>`;
+            const grid = section.querySelector('.detail-sidebar-grid');
+
+            widget.items.forEach((item) => {
+              grid.appendChild(renderDetailSidebarWidgetItem(item, actualLibraryId));
             });
-            grid.appendChild(card);
+
+            sidebar.appendChild(section);
+            sectionsRendered += 1;
           });
-          sidebar.style.display = '';
+
+          if (sectionsRendered > 0) sidebar.style.display = '';
         } catch (err) {
-          console.error('[Detail] 작가의 다른 도서 로드 실패:', err);
+          console.error('[Detail] 사이드바 위젯 로드 실패:', err);
         }
       })();
 
@@ -257,6 +260,66 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
       <div class="loading-spinner">${i18n.t('modal.load_detail_error')}</div>
     `;
   }
+}
+
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+// 도서 상세 사이드바 위젯 아이템 1개 렌더링.
+// 대시보드 위젯(dashboard_widget)과 동일한 아이템 스키마를 공유한다:
+// - item_type: 'metric' -> 도서와 무관한 자유 형식 카드 (예: "이 도서 무드 음악")
+// - link(외부 URL) -> 새 탭으로 여는 단순 링크 카드
+// - book_id/series_name -> 코어 도서로 연결되는 카드(클릭 시 상세 이동, "이어읽기" 지원)
+function renderDetailSidebarWidgetItem(item, fallbackLibraryId) {
+  if (item && (item.item_type === 'metric' || item.metric)) {
+    const el = document.createElement('div');
+    el.className = 'dashboard-metric-card';
+    const metric = escapeHtml(item.metric || item.title || '');
+    const value = escapeHtml(item.value || '');
+    const desc = item.description ? `<span class="dashboard-metric-desc">${escapeHtml(item.description)}</span>` : '';
+    el.innerHTML = `<span class="dashboard-metric-label">${metric}</span><strong class="dashboard-metric-value">${value}</strong>${desc}`;
+    return el;
+  }
+
+  const link = item && item.link;
+  if (link && link !== '#') {
+    const el = document.createElement('a');
+    el.className = 'detail-sidebar-link-card';
+    el.href = link;
+    el.target = '_blank';
+    el.rel = 'noopener noreferrer';
+    el.innerHTML = `
+      ${item.cover ? `<img class="detail-sidebar-link-card-cover" src="${escapeHtml(item.cover)}" alt="">` : ''}
+      <span class="detail-sidebar-link-card-title">${escapeHtml(item.title || link)}</span>
+    `;
+    return el;
+  }
+
+  const seriesName = item && item.series_name;
+  const libraryId = (item && item.library_id != null) ? item.library_id : fallbackLibraryId;
+  const bookId = item && item.book_id;
+  return createBookCard({
+    id: bookId,
+    representative_book_id: bookId,
+    series_name: seriesName || item.title || '',
+    cover_image: item.cover,
+    file_format: item.file_format,
+    library_id: libraryId,
+  }, {
+    actionTitle: '이어읽기',
+    onPrimaryClick: (e) => openBookDetail(e, seriesName || item.title, libraryId, bookId, seriesName || item.title),
+    onActionClick: (e) => {
+      if (typeof window.resumeSeries === 'function') {
+        window.resumeSeries(e, seriesName, libraryId, bookId);
+      }
+    },
+  });
 }
 
 // 상세 뷰 → 그리드 뷰/대시보드 복귀

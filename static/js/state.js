@@ -40,7 +40,7 @@ export const state = {
   detailVolumeGridView: false,      // 도서 상세 목록 그리드 보기 (기본값: 리스트)
   collapseDetailGenreTags: false,   // 태그/장르 축소 (기본값: 해제)
   smartRecommendEnabled: true,      // 스마트 추천 기능 사용 여부 (기본값: 사용)
-  bookRecommendEnabled: true,       // 도서 상세 "이 작가의 다른 도서" 사용 여부 (기본값: 사용)
+  bookRecommendEnabled: true,       // 도서 상세 사이드바 위젯(플러그인의 detail_sidebar_widget) 사용 여부 (기본값: 사용)
 
   detailSeriesName: '',
   detailLibraryId: null,
