@@ -5,6 +5,8 @@ import ast
 import importlib
 import subprocess
 import hashlib
+import threading
+import time
 import traceback
 from datetime import datetime
 from flask import json
@@ -181,6 +183,20 @@ class MetadataFactory:
     _loaded_provider_name = None
     _last_known_load_status = {}  # provider_name -> 'success'|'error' (프로세스 생애주기 동안의 마지막 기록 상태, DB 중복 기록 방지용)
 
+    # 플러그인 discovery(디렉토리 스캔 + subprocess 사용 보안 스캔 + import) 결과 캐시.
+    # 대시보드/카테고리 플러그인/위젯 등 여러 API가 요청마다 get_available_providers()를
+    # 부르는데, 그때마다 설치된 모든 플러그인의 .py 소스를 통째로 다시 읽어 정규식 스캔하고
+    # 재import하는 비용이 그대로 반복돼 플러그인이 늘어날수록 체감 지연이 커졌다. 이 서버는
+    # gunicorn 1-worker/4-thread로 운영되므로(project_page_turn_experiment_pilot 메모 참고)
+    # Redis 없이 프로세스 메모리 캐시만으로 충분히 공유된다.
+    # TTL을 짧게(기본 30초) 둔 이유: 관리자가 SSH로 plugins/metadata/에 파일을 직접 넣거나
+    # 지우는 경로(샘플 설치 UI를 거치지 않는 경우)는 아래 명시적 invalidate 훅이 못 잡으므로,
+    # 최악의 경우에도 이 시간 안에는 스스로 새로고침되도록 하기 위함이다.
+    _discovery_cache = None
+    _discovery_cache_at = 0.0
+    _discovery_ttl_seconds = 30.0
+    _discovery_lock = threading.Lock()
+
     @classmethod
     def hot_reload_plugin(cls, plugin_id=None):
         """
@@ -188,6 +204,7 @@ class MetadataFactory:
         plugin_id가 주어지면 해당 패키지 하위 모듈만 언로드합니다.
         """
         importlib.invalidate_caches()
+        cls.invalidate_discovery_cache()
 
         target = str(plugin_id or '').strip()
         removed_modules = []
@@ -359,7 +376,27 @@ class MetadataFactory:
             print(f"[MetadataFactory] Failed to record plugin load status ({provider_name}): {e}")
 
     @classmethod
-    def _discover_provider_classes(cls):
+    def _discover_provider_classes(cls, force_refresh=False):
+        """설치된 플러그인 목록을 (provider_name, target_class) 튜플로 반환. 결과는 프로세스
+        메모리에 TTL 캐시된다 - force_refresh=True는 관리자가 명시적으로 "새로고침"을 요청한
+        경우(플러그인 로드 상태 패널)에만 사용해서 캐시를 건너뛰고 즉시 재스캔한다."""
+        if not force_refresh and cls._discovery_cache is not None:
+            if (time.monotonic() - cls._discovery_cache_at) < cls._discovery_ttl_seconds:
+                return cls._discovery_cache
+
+        with cls._discovery_lock:
+            # 락 대기 중 다른 스레드가 이미 갱신했으면 재사용 (동시 요청 폭주 시 중복 스캔 방지)
+            if not force_refresh and cls._discovery_cache is not None:
+                if (time.monotonic() - cls._discovery_cache_at) < cls._discovery_ttl_seconds:
+                    return cls._discovery_cache
+
+            discovered = cls._discover_provider_classes_uncached()
+            cls._discovery_cache = discovered
+            cls._discovery_cache_at = time.monotonic()
+            return discovered
+
+    @classmethod
+    def _discover_provider_classes_uncached(cls):
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         plugins_dir = os.path.join(base_dir, 'plugins', 'metadata')
         discovered = []
@@ -397,6 +434,13 @@ class MetadataFactory:
                 cls._record_load_status(provider_name, 'error', e)
 
         return discovered
+
+    @classmethod
+    def invalidate_discovery_cache(cls):
+        """plugins/metadata/ 아래 파일이 바뀐 뒤(설치/업데이트/삭제) 다음 조회부터 즉시
+        반영되도록 discovery 캐시를 비운다. hot_reload_plugin()이 이미 이 시점들을 알고
+        있으므로 거기서 함께 호출된다 - 별도 호출부를 추가로 늘릴 필요 없음."""
+        cls._discovery_cache = None
 
     @classmethod
     def get_provider(cls) -> BaseMetadataProvider:
@@ -554,6 +598,7 @@ class MetadataFactory:
                 p_searchable = getattr(target_class, 'is_searchable', True)
                 p_schema = getattr(target_class, 'config_schema', [])
                 p_widget = getattr(target_class, 'dashboard_widget', None)
+                p_home_widget = getattr(target_class, 'home_widget', None)
                 p_category_tab = getattr(target_class, 'category_tab', None)
                 p_detail_sidebar_widget = getattr(target_class, 'detail_sidebar_widget', None)
                 p_update_manifest = getattr(target_class, 'update_manifest', None)
@@ -577,6 +622,7 @@ class MetadataFactory:
                     'config_schema': p_schema,
                     'config': config_data,
                     'dashboard_widget': p_widget,
+                    'home_widget': p_home_widget,
                     'category_tab': p_category_tab,
                     'detail_sidebar_widget': p_detail_sidebar_widget,
                     'update_manifest': p_update_manifest,

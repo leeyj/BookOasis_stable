@@ -11,6 +11,21 @@ class BaseMetadataProvider(ABC):
     config_schema = []
     enabled = True
     dashboard_widget = None
+    # 사용자가 설정에서 "홈 화면 플러그인 배치 모드"를 켰을 때만 실제 홈 대시보드에 노출되는
+    # 위젯 선언 (선택). dashboard_widget([플러그인] 공통 데스크 탭용)과는 별개 계약이다 —
+    # 이름이 비슷해 혼동하기 쉬우니 주의. 데이터 조회는 get_dashboard_data()를 그대로 재사용한다.
+    # Example:
+    # home_widget = {
+    #     'title': '오늘의 추천곡',
+    #     'subtitle': 'Karaoke Plugin',
+    #     'icon': 'fa-solid fa-music',
+    #     'order': 60,
+    #     'limit': 10,
+    #     'sessions': 'all',  # _resolve_plugin_sessions()와 동일 규칙 (all / 리스트 / 미지정→general)
+    #     'layout': 'grid',  # 'full'(기본, 1열 전체 차지) | 'grid'(카드처럼 다른 grid 위젯과 한 행에 나란히 배치)
+    #     'size': 2,  # 'grid'일 때만 의미 있음. 1(기본)/2/3 - auto-fill 컬럼 기준 몇 칸을 이어 붙일지
+    # }
+    home_widget = None
     # 도서 상세 페이지 사이드바에 위젯을 마운트하려면 선언 (선택).
     # Example:
     # detail_sidebar_widget = {"title": "이 작가의 다른 도서", "order": 50, "sessions": "all"}

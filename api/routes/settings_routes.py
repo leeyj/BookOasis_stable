@@ -23,6 +23,7 @@ SETTING_VALUE_LIMITS = {
     'PROXY_HEADER_TRUSTED_IPS': 2048,
     'WEBHOOK_TOKEN': 512,
     'WEBHOOK_EVENT_SECRET': 1024,
+    'HOME_WIDGET_LAYOUT': 8192,
 }
 
 # applySettingsToUI()가 모든 로그인 사용자의 화면 렌더링/동작에 사용하는 값들.
@@ -44,6 +45,7 @@ PUBLIC_UI_SETTING_KEYS = (
     'COLLAPSE_DETAIL_GENRE_TAGS',
     'SMART_RECOMMEND_ENABLED',
     'BOOK_RECOMMEND_ENABLED',
+    'HOME_DASHBOARD_PLUGIN_MODE',
 )
 
 # 사용자가 자신의 계정에서 개인화(override)할 수 있는 설정 키.
@@ -64,6 +66,8 @@ USER_OVERRIDABLE_SETTING_KEYS = (
     'SHOW_TXT_NO_COVER_INFO_BANNER',
     'SMART_RECOMMEND_ENABLED',
     'BOOK_RECOMMEND_ENABLED',
+    'HOME_DASHBOARD_PLUGIN_MODE',
+    'HOME_WIDGET_LAYOUT',
 )
 
 @settings_bp.route('/api/media/settings', methods=['GET'])

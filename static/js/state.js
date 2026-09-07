@@ -41,6 +41,7 @@ export const state = {
   collapseDetailGenreTags: false,   // 태그/장르 축소 (기본값: 해제)
   smartRecommendEnabled: true,      // 스마트 추천 기능 사용 여부 (기본값: 사용)
   bookRecommendEnabled: true,       // 도서 상세 사이드바 위젯(플러그인의 detail_sidebar_widget) 사용 여부 (기본값: 사용)
+  homeDashboardPluginMode: false,   // 홈 화면을 코어+플러그인 위젯 혼합 배치 모드로 전환 (기본값: 클래식 고정 레이아웃)
 
   detailSeriesName: '',
   detailLibraryId: null,

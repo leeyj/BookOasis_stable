@@ -23,7 +23,8 @@
 | 1.0.0 ~ 1.0.4 | `search`, `apply` | `dashboard_widget`, `get_dashboard_data` | 폴더 기반/단일 파일 모두 허용 |
 | 1.0.5 ~ 1.0.6 | `search`, `apply` | `get_context_menu_items`, `run_context_menu_action`, `update_manifest` | 컨텍스트 메뉴/샘플 업데이트 지원 |
 | 1.0.7 | `search`, `apply` | `on_scan_new_books_detected`, `dispatch_webhook`, `update_manifest` | 표준 이벤트 웹훅(`book.new/read/finish`) 병행 운영 권장 |
-| 1.0.8+ (현재) | `search`, `apply` | `detail_sidebar_widget`, `get_detail_sidebar_data` | 도서 상세 페이지 사이드바("이 작가의 다른 도서" 등) 위젯 계약 추가 |
+| 1.0.8 | `search`, `apply` | `detail_sidebar_widget`, `get_detail_sidebar_data` | 도서 상세 페이지 사이드바("이 작가의 다른 도서" 등) 위젯 계약 추가 |
+| 1.0.9+ (현재) | `search`, `apply` | `home_widget` | 사용자가 "홈 화면 플러그인 배치 모드"를 켰을 때만 노출되는 실제 홈 대시보드 위젯 계약 추가 (§5-1) |
 
 호환성 원칙:
 
@@ -215,7 +216,8 @@ window.addEventListener('message', (event) => {
 - `name` (str): UI 표시명
 - `is_searchable` (bool): 수동 메타데이터 검색 모달 노출 여부
 - `config_schema` (list): 설정 폼 스키마 (기본 자동 생성 폼용)
-- `dashboard_widget` (dict 또는 None): 대시보드 위젯 메타 (공통 데스크 카드 또는 단독 탭 뷰 구성 정보)
+- `dashboard_widget` (dict 또는 None): 대시보드 위젯 메타 (**[플러그인] 공통 데스크 탭** 카드 또는 단독 탭 뷰 구성 정보 — 실제 홈 화면이 아님, §5 참고)
+- `home_widget` (dict 또는 None): 사용자가 "내 설정 > 홈 화면 플러그인 배치 모드"를 켰을 때만 **실제 홈 대시보드**에 노출되는 위젯 매니페스트 (§5-1 참고). `dashboard_widget`과 이름이 비슷해 혼동하기 쉬우니 주의 — 둘은 별개 계약이며 원하면 동시에 선언해도 된다.
 - `category_tab` (dict 또는 None): 카테고리 레벨 플러그인 매니페스트 (사이드바 카테고리 1등 시민 메뉴 등록 정보: `title`, `icon`, `order`, `sessions`)
 - `detail_sidebar_widget` (dict 또는 None): 도서 상세 페이지 사이드바 위젯 매니페스트 (`title`, `order`, `sessions`)
 - `update_manifest` (dict 또는 None): 플러그인 내부 업데이트 선언 계약
@@ -401,6 +403,74 @@ def get_dashboard_data(self, db_type, limit=10):
 
 - 외부 공개 메서드는 `get_dashboard_data()`만 유지
 - 플러그인 내부 구현은 private helper(`_fetch_items`)로 분리
+
+---
+
+## 5-1. 홈 대시보드 위젯 계약 (`home_widget`)
+
+`dashboard_widget`은 **[플러그인] 공통 데스크 탭**(별도 사이드바 메뉴)에만 카드를 꽂는다. 사용자가
+접속했을 때 가장 먼저 보는 **실제 홈 화면**(독서 인사이트/최근 읽은 도서/신규 추가 도서가 있는
+그 화면)에 위젯을 노출하려면 별도로 `home_widget`을 선언해야 한다.
+
+단, `home_widget`은 **사용자가 "내 설정 > 홈 화면 플러그인 배치 모드"를 켰을 때만** 노출된다.
+이 모드가 꺼져 있는(기본값) 사용자에게는 코어가 기존 고정 레이아웃을 그대로 보여주고,
+`home_widget`을 선언한 플러그인이 있어도 아무 영향이 없다 — 즉 플러그인을 설치했다고 해서
+플러그인을 쓰지 않는 사용자의 홈 화면이 강제로 바뀌지 않는다.
+
+플러그인 배치 모드를 켠 사용자에게도 `home_widget`이 자동으로 나타나지는 않는다. 설치된
+플러그인이 많아질수록 원치 않는 위젯까지 전부 뜨는 걸 막기 위해, 홈 화면 하단의 "+ 위젯
+추가" 목록에서 사용자가 직접 골라야 레이아웃에 들어간다(제거도 카드의 × 버튼으로 마찬가지
+방식). 즉 플러그인 개발자 입장에서는 "설치 = 즉시 노출"이 아니라 "설치 = 카탈로그에 등장"이라는
+점을 기억해 둘 것.
+
+```python
+home_widget = {
+    'title': '오늘의 추천곡',
+    'subtitle': 'Karaoke Plugin',
+    'icon': 'fa-solid fa-music',
+    'order': 60,       # 코어 3섹션은 각각 10/20/30을 쓴다 - 그보다 큰 값을 주면 기본적으로 뒤에 배치됨
+    'limit': 10,
+    'sessions': 'all',  # _resolve_plugin_sessions()와 동일 규칙 (all / 리스트 / 미지정→general)
+    'layout': 'grid',  # 'full'(기본) | 'grid' - 아래 설명 참고
+    'size': 2,  # 'grid'일 때만 의미 있음. 1(기본)/2/3 - 아래 설명 참고
+}
+
+def get_dashboard_data(self, db_type, limit=10):
+    # dashboard_widget과 동일한 메서드를 그대로 재사용한다 - 신규 메서드 불필요
+    return {'success': True, 'items': []}
+```
+
+### 배치 형태 (`layout`)
+
+홈 화면은 CSS Grid 컨테이너라, 위젯마다 `layout`을 선언해 1열을 통째로 차지할지 여러 위젯이
+카드 형태로 한 행에 나란히 배치될지 고를 수 있다.
+
+- `'full'` (기본값, 미지정 시): 코어 3섹션(독서 인사이트/최근 읽은 도서/신규 추가 도서)과 같은
+  방식 — 화면 전체 폭을 차지하는 1개 행.
+- `'grid'`: 다른 `layout: 'grid'` 위젯들과 함께 `minmax(320px, 1fr)` 그리드 셀에 카드 형태로
+  배치되어, 화면 폭이 충분하면 여러 개가 한 행에 나란히 보인다. `size`로 몇 칸을 이어 붙일지
+  고를 수 있다: `1`(기본, 셀 1개) / `2`(2개) / `3`(3개). 화면이 좁아 그만큼 컬럼이 없으면
+  그리드가 알아서 다음 줄로 넘긴다.
+
+플러그인 배치 모드가 켜진 사용자는 홈 화면에서 코어 위젯(독서 인사이트/최근 읽은 도서/신규
+추가 도서)과 `home_widget` 플러그인 카드를 함께 드래그로 재배치할 수 있으며, 순서는 기기 간
+동기화를 위해 서버(사용자 개인화 설정)에 저장된다. 자세한 배경/설계는
+[docs/plan_home_dashboard_pluginization.md](./plan_home_dashboard_pluginization.md)를 참고하십시오.
+
+### 권장: `get_dashboard_data()`는 빠르게, 느리면 반드시 캐싱
+
+홈 화면 레이아웃(카드 배치 순서/폭)은 서버가 페이지 렌더링 시점에 이미 확정해서 내려주므로
+더 이상 화면이 재배치되며 흔들리는 일은 없다. 하지만 각 카드의 **내용물**은 카드 껍데기가
+보인 뒤 `get_dashboard_data()` 결과가 도착해야 채워지는 구조라, 이 메서드가 느린 플러그인은
+그 카드만 로딩 스피너가 오래 남아있게 된다(다른 위젯이나 코어 섹션에는 영향 없음 - 위젯별로
+독립적으로 병렬 fetch된다).
+
+- 외부 API를 호출하는 플러그인은 반드시 `self.cache_get()`/`self.cache_set()`(Redis, TTL 지정
+  가능)로 결과를 캐싱해서, 매 홈 화면 로드마다 외부 API를 다시 때리지 않게 하십시오.
+- DB 조회가 무거우면(전체 테이블 스캔 등) 캐싱뿐 아니라 쿼리 자체를 가볍게 하거나 인덱스를
+  확인하십시오 (`sample_plugins/metadata/stats_dashboard`가 참고할 만한 예시).
+- 절대 `get_dashboard_data()` 안에서 초 단위로 걸리는 동기 네트워크 호출을 캐싱 없이 매번
+  수행하지 마십시오 - 사용자가 홈 화면을 열 때마다(세션 전환 포함) 호출되는 경로입니다.
 
 ---
 

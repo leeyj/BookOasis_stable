@@ -5,10 +5,9 @@ from services.metadata_service import MetadataService
 from services.plugin_service import PluginService
 from api.auth import login_required, check_adult_permission, admin_required, webhook_token_required
 from utils.i18n import _t
+from utils.plugin_session_helper import PLUGIN_SESSION_TYPES, resolve_plugin_sessions as _resolve_plugin_sessions
 
 plugin_routes_bp = Blueprint('media_plugin_routes', __name__)
-
-PLUGIN_SESSION_TYPES = {'general', 'adult', 'audiobook', 'video'}
 
 
 def _get_current_user_id_for_annotation():
@@ -22,26 +21,6 @@ def _get_current_user_id_for_annotation():
             user_id = user_dict.get('id')
             role = user_dict.get('role')
     return user_id, role
-
-
-def _resolve_plugin_sessions(category_tab):
-    """플러그인 매니페스트(category_tab)의 'sessions' 필드로 노출 세션을 결정한다.
-    - 'all': 4개 세션(general/adult/audiobook/video) 전체에 노출
-    - 리스트(예: ['adult']): 명시된 세션에만 노출
-    - 미지정: 하위 호환을 위해 기존 동작과 동일하게 'general'에만 노출
-    """
-    raw = category_tab.get('sessions')
-    if raw is None:
-        return {'general'}
-    if isinstance(raw, str):
-        if raw.strip().lower() == 'all':
-            return set(PLUGIN_SESSION_TYPES)
-        raw = [raw]
-    if isinstance(raw, (list, tuple, set)):
-        resolved = {str(s).strip().lower() for s in raw if str(s).strip().lower() in PLUGIN_SESSION_TYPES}
-        if resolved:
-            return resolved
-    return {'general'}
 
 @plugin_routes_bp.route('/api/media/metadata/plugins', methods=['GET'])
 @admin_required
@@ -57,8 +36,10 @@ def _build_plugin_load_status_payload():
     from services.metadata_factory import MetadataFactory
     from repositories.plugin_repository import PluginRepository
 
-    # 조회 시점 기준 최신 상태를 보장하기 위해 discovery를 1회 갱신(성공/실패 상태 변화가 있으면 DB에 즉시 반영됨)
-    MetadataFactory._discover_provider_classes()
+    # 조회 시점 기준 최신 상태를 보장하기 위해 discovery를 1회 강제 갱신한다(캐시를 건너뜀) -
+    # 이 패널은 SSH로 plugins/metadata/에 직접 파일을 넣거나 지운 경우까지 관리자가 즉시
+    # 확인하려는 용도라, 성공/실패 상태 변화가 있으면 DB에도 바로 반영된다.
+    MetadataFactory._discover_provider_classes(force_refresh=True)
 
     statuses = PluginRepository.get_latest_load_status('general')
     error_count = sum(1 for s in statuses if s.get('status') == 'error')
@@ -335,6 +316,24 @@ def get_dashboard_widget_data_api(plugin_id):
         return jsonify(result), status_code
     except ValueError as ve:
         return jsonify({'success': False, 'error': str(ve)}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@plugin_routes_bp.route('/api/media/home-layout', methods=['GET'])
+def get_home_layout_api():
+    """사용자가 '내 설정 > 홈 화면 플러그인 배치 모드'를 켠 경우에만 실제 홈 대시보드에
+    노출할 위젯 순서/숨김 상태를 계산해 반환한다. 코어 3섹션(독서 인사이트/최근 읽은
+    도서/신규 추가 도서)도 home_widget 플러그인과 동일한 취급의 '빌트인 위젯'으로 섞어
+    배치한다 (docs/plan_home_dashboard_pluginization.md 참고). 모드가 꺼져 있으면 프론트가
+    기존 고정 레이아웃을 그대로 쓰도록 위젯 목록 없이 mode만 반환한다."""
+    db_type = request.args.get('type', 'general').strip()
+    user_id = session.get('user_id')
+
+    try:
+        from services.home_dashboard_service import HomeDashboardService
+
+        layout = HomeDashboardService.get_layout(user_id, db_type)
+        return jsonify({'success': True, **layout}), 200
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

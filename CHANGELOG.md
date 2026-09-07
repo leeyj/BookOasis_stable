@@ -1,4 +1,7 @@
 # CHANGELOG
+## v2.5.9
+- (feature) 홈 대시보드에 신규 `home_widget` 플러그인 계약 추가 — "내 설정"에서 켜면 코어 위젯(독서 인사이트/최근 읽은 도서/신규 추가 도서)과 플러그인 위젯을 홈 화면에서 함께 드래그로 재배치 가능, 기본값은 기존 고정 레이아웃 그대로 유지. 위젯마다 `layout: 'full'`(1열 전체)/`'grid'`(카드처럼 한 행에 나란히, `size`로 1~3칸 폭 선택 가능)을 선언 가능. 플러그인 위젯은 자동 노출 대신 "+ 위젯 추가" 목록에서 직접 골라야 하고, 코어 섹션(최근/신규 등)도 × 버튼으로 닫았다가 나중에 다시 추가 가능 | add a new `home_widget` plugin contract for the home dashboard — opt in via "My Settings" to drag-reorder core widgets (reading insights/recently read/newly added) together with plugin widgets right on the home screen; default stays the existing fixed layout. Each widget can declare `layout: 'full'` (spans the row) or `'grid'` (sits as a card alongside others, with `size` choosing a 1-3 column span). Plugin widgets must be picked from a "+ Add widget" list rather than appearing automatically, and core sections (recent/new, etc.) can likewise be closed with an × and re-added later
+
 ## v2.5.8
 - (fix) 플러그인 카테고리 매니페스트에서 `order: 0`이 무시되고, 매니페스트 하나의 오류가 전체 동적 카테고리 목록을 무너뜨리던 문제 수정 | fix plugin category manifests ignoring `order: 0` and a single malformed manifest breaking the entire dynamic category list
 - (fix) 사이드바 "컬렉션" 카테고리에 누락되어 있던 다국어(i18n) 번역 키 추가 | add the missing i18n translation key for the sidebar "Collection" category

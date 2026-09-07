@@ -4011,6 +4011,118 @@ body {
     word-break: break-all;
 }
 
+/* 홈 대시보드 플러그인 배치 모드 - 코어 섹션/플러그인 위젯 공용 컨테이너.
+   CSS Grid라서 'grid'로 선언된 위젯들은 auto-fill 컬럼에 맞춰 자동으로 한 행에
+   나란히 배치되고, 'full'로 선언된(코어 3섹션 포함) 위젯은 grid-column을 전체
+   폭으로 span해서 기존처럼 1열을 다 차지한다. */
+.home-widget-stack {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 0.9rem;
+  align-items: start;
+  transition: opacity 0.12s ease;
+}
+
+/* 플러그인 배치 모드 레이아웃이 확정되기 전까지 통째로 숨겨둔다 - 코어 3섹션은 정적 HTML에
+   항상 존재해서, 숨기지 않으면 기본 배치로 먼저 그려졌다가 재배치되는 리플로우가 그대로
+   보인다. loadHomeDashboardLayout()이 순서/카드 삽입을 다 끝낸 뒤 이 클래스를 제거한다. */
+.home-widget-stack--loading {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.home-widget-slot--full {
+  grid-column: 1 / -1;
+}
+
+/* 'grid' 위젯 전용 폭 단계 (home_widget의 'size': 1(기본)/2/3) - auto-fill 컬럼 기준으로
+   몇 칸을 이어 붙일지. 화면이 좁아 컬럼이 부족하면 그리드가 알아서 다음 줄로 넘긴다. */
+.home-widget-slot--span-2 {
+  grid-column: span 2;
+}
+
+.home-widget-slot--span-3 {
+  grid-column: span 3;
+}
+
+/* 구분선은 고정 <hr>이 아니라 이 클래스로 표현한다 - 재정렬/숨김 시에도
+   refreshHomeWidgetDividers()가 "보이는 'full' 슬롯 중 첫 번째가 아님"을 판단해서
+   토글해주기 때문에 순서가 바뀌어도 항상 올바른 위치에만 구분선이 남는다.
+   'grid' 위젯끼리는 카드 자체 테두리로 구분되므로 divider를 적용하지 않는다. */
+.home-widget-slot--divider {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 0.9rem;
+}
+
+.home-widget-slot.dragging {
+  opacity: 0.45;
+  border: 1px dashed var(--app-accent) !important;
+  background: color-mix(in srgb, var(--app-accent) 5%, transparent) !important;
+}
+
+/* 홈 화면 플러그인 배치 모드 - "+ 위젯 추가" 카탈로그 (아직 레이아웃에 없는 home_widget 플러그인) */
+.home-widget-catalog {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px dashed rgba(255, 255, 255, 0.12);
+}
+
+.home-widget-catalog-label {
+  font-size: 0.82rem;
+  color: var(--app-text-muted);
+  margin-right: 0.2rem;
+}
+
+.home-widget-catalog-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  border: 1px dashed color-mix(in srgb, var(--app-accent) 50%, transparent);
+  background: transparent;
+  color: var(--app-text-primary);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.home-widget-catalog-btn:hover {
+  background: color-mix(in srgb, var(--app-accent) 12%, transparent);
+}
+
+.home-widget-catalog-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* 위젯 제거(×) 버튼 - 코어 섹션(최근/신규)에도 붙어있지만, 클래식 모드(플러그인 배치
+   모드가 꺼진 상태)에서는 눌러도 반영할 방법이 없으므로 기본은 숨겨두고, dashboard.js가
+   #home-widget-stack에 .home-widget-stack--plugin-mode를 붙였을 때만 보여준다.
+   .plugin-card-header가 pointer-events:none이라(드래그 핸들 통일용) 이 버튼만 명시적으로
+   되살려준다. */
+.home-widget-remove-btn {
+  display: none;
+  background: transparent;
+  border: none;
+  color: var(--app-text-muted);
+  cursor: pointer;
+  padding: 0.1rem 0.3rem;
+  pointer-events: auto;
+  flex-shrink: 0;
+}
+
+.home-widget-stack--plugin-mode .home-widget-remove-btn {
+  display: inline-flex;
+  align-items: center;
+}
+
+.home-widget-remove-btn:hover {
+  color: #f87171;
+}
+
 /* Drag and Drop Sortable Plugins Style */
 .plugin-card.dragging {
   opacity: 0.45;

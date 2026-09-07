@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Paged.js EPUB 페이지네이션 실측 테스트</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+  // paged.polyfill.js는 기본값이 auto:true라서, 아무 설정 없이 로드하면 로드 즉시
+  // 이 문서 자신의 <body> 전체(컨트롤 UI 포함)를 통째로 페이지네이션 대상으로 삼아
+  // wrapContent()가 body.innerHTML을 비워버린다 - 반드시 스크립트 로드 전에 auto:false로
+  // 꺼두고, 버튼 클릭 시 수동으로 new Paged.Previewer().preview(...)를 호출한다.
+  window.PagedConfig = { auto: false };
+</script>
+<script src="/static/lib/paged.polyfill.js"></script>
+<script src="/static/lib/page-flip.min.js"></script>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%;
+    background: #0f1115;
+    color: #e6e8eb;
+    font-family: -apple-system, "Malgun Gothic", sans-serif;
+    overflow: hidden; /* 실제 리더처럼 화면을 꽉 채우고, 스크롤은 book 내부(#stage-wrap)에만 둔다 */
+  }
+  select, input[type="number"], input[type="range"] { background: #0f1115; color: #e6e8eb; border: 1px solid #2a2e37; border-radius: 4px; padding: 0.3rem 0.5rem; }
+  button {
+    background: #3861fb; color: #fff; border: none; border-radius: 4px;
+    padding: 0.4rem 0.9rem; font-size: 0.82rem; font-weight: 600; cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.secondary { background: #2a2e37; }
+
+  /* ── 설정 호버 패널: 평소엔 코너의 작은 탭만 보이고, 그 위에 마우스를 올리면(hover)
+     패널 전체가 펼쳐진다. 실제 리더 화면에서 상단바가 항상 자리를 차지하지 않고 필요할
+     때만 나타나는 것과 같은 패턴 - 화면은 항상 book이 꽉 채운다. */
+  #settings-hover-zone {
+    position: fixed; top: 0; left: 0; z-index: 30;
+    width: 100%;
+  }
+  #settings-tab {
+    position: absolute; top: 0; left: 0;
+    background: rgba(23, 26, 33, 0.9);
+    border: 1px solid #2a2e37; border-top: none; border-left: none;
+    border-radius: 0 0 8px 0;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.78rem; color: #9aa4b2;
+  }
+  #settings-panel {
+    max-height: 0;
+    overflow: hidden;
+    background: #171a21;
+    border-bottom: 1px solid #2a2e37;
+    transition: max-height 0.15s ease;
+  }
+  #settings-hover-zone:hover #settings-panel { max-height: 400px; overflow: auto; }
+  #controls {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem;
+    padding: 0.8rem 1rem;
+  }
+  #controls label { font-size: 0.82rem; color: #9aa4b2; display: flex; align-items: center; gap: 0.35rem; }
+  #status {
+    padding: 0 1rem 0.8rem 1rem;
+    font-size: 0.8rem;
+    color: #9aa4b2;
+    white-space: pre-wrap;
+  }
+  #status .metric { color: #4ade80; font-weight: 700; }
+  #status .err { color: #f87171; font-weight: 700; }
+
+  /* ── 하단 넘김 컨트롤: 실제 리더처럼 화면 위에 떠 있는 얇은 오버레이 바.
+     book 레이아웃 공간을 차지하지 않도록 fixed로 띄운다. */
+  #nav {
+    position: fixed; left: 0; right: 0; bottom: 16px; z-index: 20;
+    display: flex; align-items: center; justify-content: center; gap: 0.8rem;
+  }
+  #nav button, #nav span {
+    background: rgba(23, 26, 33, 0.85);
+    border: 1px solid #2a2e37;
+  }
+  #nav span {
+    display: inline-flex; align-items: center;
+    padding: 0.4rem 0.9rem; border-radius: 999px;
+    font-size: 0.8rem; color: #9aa4b2;
+  }
+  #nav button { border-radius: 999px; }
+
+  /* ── 재계산 중 로딩 오버레이: §4 결정("재계산 중 UX = 로딩 표시")의 실제 구현.
+     화면 전체를 덮어 클릭을 가로채므로, 재계산 도중 넘김 버튼을 눌러서 곧 파괴될
+     이전 pageFlip 인스턴스를 건드리는 오동작을 막는다(실측으로 확인된 문제). #nav보다
+     높은 z-index로 그 버튼들 위까지 확실히 덮는다. */
+  #loading-overlay {
+    display: none;
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(15, 17, 21, 0.75);
+    align-items: center; justify-content: center;
+    flex-direction: column; gap: 0.8rem;
+  }
+  #loading-overlay.visible { display: flex; }
+  #loading-overlay .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid #2a2e37; border-top-color: #3861fb;
+    border-radius: 50%;
+    animation: pf-spin 0.8s linear infinite;
+  }
+  #loading-overlay .label { font-size: 0.9rem; color: #e6e8eb; }
+  @keyframes pf-spin { to { transform: rotate(360deg); } }
+
+  /* 화면을 꽉 채우는 book 무대 - 실제 리더 환경에 가깝게 상하좌우 전체를 차지한다. */
+  #stage-wrap, #flip-stage-wrap {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    /* auto였을 때 넘김 애니메이션 중 종이가 휘어지는 3D 변형이 컨테이너 경계를 순간적으로
+       살짝 벗어나면서 스크롤바가 생겼다 사라지길 반복해 화면이 흔들리는 문제가 있었다 -
+       book은 화면 크기에 맞춰 계산되어 정상적으로는 넘칠 일이 없으므로 hidden으로 고정. */
+    overflow: hidden;
+  }
+  /* #stage-wrap은 화면에 보일 게 없는(오프스크린) 순수 준비 영역이라, 위/아래에 떠 있는
+     설정 패널이나 넘김 버튼의 클릭을 가로채지 않도록 클릭을 투과시킨다. */
+  #stage-wrap { pointer-events: none; }
+  /* Paged.js가 이 컨테이너 내부에 .pagedjs_pages > .pagedjs_page 구조를 생성한다.
+     page-flip 초기화 전까지만 쓰는 "원본 페이지 소스" 영역이라 화면에는 안 보이게 둔다 -
+     display:none은 금지(§ 아래 주석 참고)이므로 화면 밖으로 밀어내는 방식을 쓴다. */
+  #paged-target {
+    background: #fff;
+    position: absolute;
+    left: -99999px;
+    top: 0;
+  }
+  /* 페이지 표시/숨김은 CSS가 아니라 렌더링이 끝난 뒤 JS에서 인라인 style로만 제어한다.
+     Paged.js는 렌더링 도중 각 .pagedjs_page에 실제 내용을 채우며 오버플로를 측정하는데,
+     이 시점에 display:none이 걸려 있으면 offsetParent가 null이 되어
+     "Cannot read properties of null (reading 'getBoundingClientRect')" 오류로 죽는다. */
+  #paged-target .pagedjs_page {
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+  }
+  #flip-book-container {
+    width: 560px; /* 실제 폭은 JS applyLayout()에서 스프레드/단일페이지에 맞춰 인라인으로 재계산 */
+  }
+  #flip-book { width: 100%; }
+  /* .pagedjs_page 자체는 배경이 투명하다 - 지금까지 흰 페이지로 보였던 건 이 페이지가
+     #paged-target(흰 배경)의 자식일 때뿐이었고, page-flip이 어두운 배경의 #flip-book으로
+     옮기고 나면 검은 글씨가 어두운 body 배경에 그대로 비쳐 안 보이는 문제였다(실측으로 확인:
+     [PF-SCAN] 로그에서 페이지 backgroundColor가 투명임을 확인). */
+  #flip-book .pagedjs_page { background: #fff; }
+</style>
+</head>
+<body>
+
+<div id="settings-hover-zone">
+  <div id="settings-tab">⚙ 설정 (마우스를 올리면 펼쳐짐)</div>
+  <div id="settings-panel">
+    <div id="controls">
+      <label>EPUB 파일
+        <select id="file-select"></select>
+      </label>
+      <label>로드할 챕터 수
+        <input type="number" id="chapter-count" value="3" min="1" max="999" style="width: 70px;">
+      </label>
+      <label>페이지 폭(px)
+        <input type="number" id="page-width" value="420" min="200" max="1000" style="width: 70px;">
+      </label>
+      <label>페이지 높이(px)
+        <input type="number" id="page-height" value="620" min="300" max="1400" style="width: 70px;">
+      </label>
+      <label>본문 글자크기(px)
+        <input type="number" id="font-size" value="17" min="10" max="40" style="width: 60px;">
+      </label>
+      <button id="btn-fit-screen" class="secondary" type="button">현재 화면 크기로 맞추기</button>
+      <button id="btn-run">① 로드 + 페이지네이션 실행</button>
+      <button id="btn-repaginate" class="secondary" disabled>② 같은 콘텐츠로 재계산(리사이즈 시뮬레이션)</button>
+      <button id="btn-sanity" class="secondary">③ page-flip 단독 테스트(Paged.js 없이 더미 3페이지)</button>
+      <span style="width:1px; align-self:stretch; background:#2a2e37;"></span>
+      <button id="btn-save-loc" class="secondary" type="button">④ 현재 위치 저장</button>
+      <button id="btn-goto-loc" class="secondary" type="button">저장한 위치로 이동</button>
+      <span id="loc-indicator" style="font-size:0.78rem; color:#9aa4b2;">저장된 위치 없음</span>
+    </div>
+    <div id="controls">
+      <label>⑤ 시작 챕터 idx
+        <input type="number" id="window-start-chapter" value="4" min="0" max="998" style="width: 60px;">
+      </label>
+      <label>윈도우 크기(챕터 수)
+        <input type="number" id="window-size" value="3" min="1" max="20" style="width: 60px;">
+      </label>
+      <button id="btn-window-start" type="button">슬라이딩 윈도우 모드 시작</button>
+      <span id="window-indicator" style="font-size:0.78rem; color:#9aa4b2;">윈도우 모드 꺼짐</span>
+    </div>
+    <div id="status">파일을 고르고 "로드 + 페이지네이션 실행"을 눌러주세요.</div>
+  </div>
+</div>
+
+<div id="nav" style="display:none;">
+  <button id="btn-prev" class="secondary">◀ 이전</button>
+  <span id="page-indicator">- / -</span>
+  <button id="btn-next" class="secondary">다음 ▶</button>
+</div>
+
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="label" id="loading-overlay-label">페이지네이션 중...</div>
+</div>
+
+<div id="stage-wrap">
+  <div id="paged-target"></div>
+</div>
+
+<div id="flip-stage-wrap" style="display:none;">
+  <div id="flip-book-container">
+    <div id="flip-book"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var elFileSelect = document.getElementById('file-select');
+  var elChapterCount = document.getElementById('chapter-count');
+  var elPageWidth = document.getElementById('page-width');
+  var elPageHeight = document.getElementById('page-height');
+  var elFontSize = document.getElementById('font-size');
+  var elBtnRun = document.getElementById('btn-run');
+  var elBtnRepaginate = document.getElementById('btn-repaginate');
+  var elBtnSanity = document.getElementById('btn-sanity');
+  var elBtnFitScreen = document.getElementById('btn-fit-screen');
+  var elBtnSaveLoc = document.getElementById('btn-save-loc');
+  var elBtnGotoLoc = document.getElementById('btn-goto-loc');
+  var elLocIndicator = document.getElementById('loc-indicator');
+  var elLoadingOverlay = document.getElementById('loading-overlay');
+  var elLoadingOverlayLabel = document.getElementById('loading-overlay-label');
+  var elWindowStartChapter = document.getElementById('window-start-chapter');
+  var elWindowSize = document.getElementById('window-size');
+  var elBtnWindowStart = document.getElementById('btn-window-start');
+  var elWindowIndicator = document.getElementById('window-indicator');
+
+  // ── §3 채택 방향("슬라이딩 윈도우") 스파이크 테스트 상태.
+  // 챕터 단위로 근사한다(§4에서 "화면 채우는 만큼 동적으로"라고 정했지만, 그 정밀 버퍼 크기는
+  // 별도 과제 - 여기서는 "챕터 경계를 넘으면 앞/뒤를 편입하고 오래된 건 버린다"는 핵심 동작
+  // 자체가 되는지만 검증한다).
+  var winFilename = null;
+  var winSize = 3;
+  var winStart = null, winEnd = null; // 현재 로드된 챕터 범위(포함)
+  var winTotalChapters = 0;
+  var winChapterHtml = {}; // chapterIdx -> 태그된 HTML (재요청 방지 캐시)
+  var winActive = false;
+  var winShiftInProgress = false;
+
+  // §4 결정("재계산 중 UX = 로딩 표시")의 실제 구현. 실측으로 확인된 문제: 재계산(페이지네이션)이
+  // 진행되는 동안에도 넘김 버튼이 그대로 눌려서, 곧 destroy될 이전 pageFlip 인스턴스를 건드리며
+  // 오동작했다 - 오버레이가 화면 전체를 덮어 클릭을 가로채므로 이 문제를 근본적으로 막는다.
+  function setLoading(visible, label) {
+    elLoadingOverlayLabel.textContent = label || '페이지네이션 중...';
+    elLoadingOverlay.classList.toggle('visible', !!visible);
+  }
+  var savedLocator = null;
+  var elStatus = document.getElementById('status');
+  var elTarget = document.getElementById('paged-target');
+  var elNav = document.getElementById('nav');
+  var elBtnPrev = document.getElementById('btn-prev');
+  var elBtnNext = document.getElementById('btn-next');
+  var elPageIndicator = document.getElementById('page-indicator');
+  var elFlipStageWrap = document.getElementById('flip-stage-wrap');
+  var elFlipBookContainer = document.getElementById('flip-book-container');
+
+  var lastLoadedHtml = null; // 재계산(②) 버튼용으로 챕터 fetch 결과를 재사용
+  var totalPages = 0;
+  var lastPreviewer = null; // 직전 Previewer의 주입 <style> 정리용 (아래 runPagination 참고)
+
+  // ── page-flip(St.PageFlip) 연동 — 결정: 로딩/재계산 완료 후, 실제 "페이지를 넘기는" 상호작용부터
+  // page-flip이 개입한다(로딩 중엔 위 로딩 표시만). 만화 page-turn 파일럿(templates/experimental_page_turn.html)의
+  // 검증된 레이아웃 계산 방식을 그대로 재사용 - 컨테이너 폭에 따라 스프레드(2페이지)/단일페이지를
+  // 자동 전환하되, 2페이지 스프레드가 기본 목표이므로 화면을 넉넉히 채우도록 계산한다.
+  var pageFlip = null;
+  var CUR_PAGE_W = 420;
+  var CUR_PAGE_H = 620;
+
+  // Paged.js가 만든 .pagedjs_page는 이미 pageWidth x pageHeight로 절대좌표 기반 고정 레이아웃이
+  // 끝난 상태라, St.PageFlip이 이 박스를 늘리거나 줄이면(size:'stretch') 내부 콘텐츠는 그대로인 채
+  // 바깥 박스만 커져서 대부분 빈 공간만 남는 문제가 실측 중 확인됨 - 반드시 size:'fixed'로 원본
+  // 픽셀 크기 그대로 표시해야 한다. 그래서 컨테이너 폭도 "늘어날 여지" 없이 스프레드 목표(2페이지)
+  // 기준으로 정확히 2 x pageWidth를 맞추는 것을 우선한다.
+  function computeContainerWidth() {
+    // 설정 패널은 hover로만 펼쳐지는 오버레이라 평소엔 화면 공간을 전혀 차지하지 않는다 -
+    // 실제 리더처럼 화면 전체를 book 영역으로 쓴다. 하단 넘김 바(#nav)만 살짝 겹칠 수 있어
+    // 약간의 여유만 둔다.
+    var availW = window.innerWidth * 0.96;
+    var availH = window.innerHeight * 0.94;
+    var maxWidthByHeight = 2 * (availH / (CUR_PAGE_H / CUR_PAGE_W));
+
+    var spreadWidth = 2 * CUR_PAGE_W;
+    if (spreadWidth <= availW && spreadWidth <= maxWidthByHeight) {
+      return spreadWidth; // 화면이 충분히 넓으면 항상 2페이지 스프레드
+    }
+    // 화면이 좁으면 St.PageFlip이 자체적으로 단일 페이지(portrait)로 폴백한다 (usePortrait:true)
+    return Math.min(availW, maxWidthByHeight, spreadWidth);
+  }
+
+  function applyLayout() {
+    elFlipBookContainer.style.width = computeContainerWidth() + 'px';
+    if (pageFlip) pageFlip.update();
+  }
+
+  var resizeTimer = null;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(applyLayout, 100);
+  });
+
+  function rectStr(el) {
+    if (!el) return 'null';
+    var r = el.getBoundingClientRect();
+    return 'x=' + r.x.toFixed(1) + ' y=' + r.y.toFixed(1) + ' w=' + r.width.toFixed(1) + ' h=' + r.height.toFixed(1);
+  }
+
+  function initPageFlip(pageWidth, pageHeight) {
+    console.log('[PF] ── initPageFlip 시작 ──', { pageWidth: pageWidth, pageHeight: pageHeight });
+
+    var pages = elTarget.querySelectorAll('.pagedjs_page');
+    console.log('[PF] .pagedjs_page 개수:', pages.length);
+    if (pages.length) {
+      console.log('[PF] pages[0] rect(이동 전, #paged-target 안에서):', rectStr(pages[0]));
+      console.log('[PF] pages[0] computed size:', getComputedStyle(pages[0]).width, getComputedStyle(pages[0]).height);
+      console.log('[PF] pages[0] outerHTML 앞부분:', pages[0].outerHTML.slice(0, 300));
+    }
+    if (!pages.length) { console.warn('[PF] pagedjs_page가 하나도 없어서 중단'); return; }
+
+    if (pageFlip && typeof pageFlip.destroy === 'function') {
+      console.log('[PF] 기존 pageFlip destroy()');
+      try { pageFlip.destroy(); } catch (e) { console.warn('[PF] destroy 실패(무시):', e); }
+    }
+    // destroy()가 넘겨받은 #flip-book 엘리먼트 자체를 DOM에서 제거해버리므로 매번 새로 만든다.
+    var bookEl = document.createElement('div');
+    bookEl.id = 'flip-book';
+    elFlipBookContainer.innerHTML = '';
+    elFlipBookContainer.appendChild(bookEl);
+
+    // 단독 테스트(③)로 확인됨: St.PageFlip 공식 예제는 페이지 엘리먼트가 loadFromHTML() 호출
+    // *이전에* 이미 block(bookEl)의 직계 자식이어야 한다 - #paged-target처럼 전혀 다른 곳에
+    // 있는 엘리먼트를 그대로 넘기면 나중에 내부적으로 옮겨지긴 해도(형제 로그에서 확인됨)
+    // 표시 로직이 제대로 안 걸려 .stf__item이 계속 display:none로 남는다. 그래서 여기서
+    // 미리 bookEl로 옮겨 넣은 뒤, bookEl 기준으로 다시 조회해서 loadFromHTML에 넘긴다.
+    var pageArray = Array.prototype.slice.call(pages);
+    pageArray.forEach(function (p) { bookEl.appendChild(p); });
+    pages = bookEl.querySelectorAll('.pagedjs_page');
+    console.log('[PF] 사전 이동 완료 - bookEl 직계 자식 수:', bookEl.children.length, '/ 재조회된 pages.length:', pages.length);
+
+    // St.PageFlip도 Paged.js와 마찬가지로 초기화 시점에 컨테이너 크기를 실측한다 -
+    // display:none 상태에서 생성하면 같은 부류의 getBoundingClientRect 오류가 난다.
+    // 반드시 컨테이너를 먼저 보여준 뒤에 new St.PageFlip(...)을 호출해야 한다.
+    elFlipStageWrap.style.display = 'flex';
+
+    CUR_PAGE_W = pageWidth;
+    CUR_PAGE_H = pageHeight;
+    applyLayout();
+
+    console.log('[PF] elFlipStageWrap rect:', rectStr(elFlipStageWrap));
+    console.log('[PF] elFlipBookContainer rect (applyLayout 직후):', rectStr(elFlipBookContainer), 'style.width=', elFlipBookContainer.style.width);
+    console.log('[PF] bookEl(#flip-book) rect (new St.PageFlip 호출 전):', rectStr(bookEl));
+
+    pageFlip = new St.PageFlip(bookEl, {
+      width: pageWidth,
+      height: pageHeight,
+      size: 'fixed', // Paged.js 페이지는 이미 픽셀 고정 레이아웃 완료 상태 - 절대 늘리지 않는다
+      maxShadowOpacity: 0.55,
+      showCover: true,
+      usePortrait: true,
+      mobileScrollSupport: false,
+      swipeDistance: 20
+    });
+
+    console.log('[PF] new St.PageFlip() 완료. bookEl rect:', rectStr(bookEl), 'bookEl.children.length=', bookEl.children.length);
+    console.log('[PF] bookEl.innerHTML 앞부분:', bookEl.innerHTML.slice(0, 500));
+
+    pageFlip.on('flip', function (e) {
+      console.log('[PF] flip 이벤트 idx=', e.data);
+      elPageIndicator.textContent = (e.data + 1) + ' / ' + pages.length;
+      if (winActive) maybeShiftWindow();
+    });
+
+    try {
+      pageFlip.loadFromHTML(pages);
+      console.log('[PF] loadFromHTML() 완료, 에러 없음');
+    } catch (err) {
+      console.error('[PF] loadFromHTML() 에러:', err);
+    }
+
+    console.log('[PF] loadFromHTML 직후 bookEl rect:', rectStr(bookEl), 'children=', bookEl.children.length);
+    if (bookEl.firstElementChild) {
+      console.log('[PF] bookEl 1단계 자식 태그:', bookEl.firstElementChild.tagName, bookEl.firstElementChild.className);
+      console.log('[PF] bookEl 1단계 자식 rect:', rectStr(bookEl.firstElementChild));
+      console.log('[PF] bookEl 1단계 자식 computed display/visibility:',
+        getComputedStyle(bookEl.firstElementChild).display, getComputedStyle(bookEl.firstElementChild).visibility);
+    }
+    console.log('[PF] getOrientation():', typeof pageFlip.getOrientation === 'function' ? pageFlip.getOrientation() : 'n/a');
+    console.log('[PF] getBoundingClientRect(document.getElementById("flip-book")):', rectStr(document.getElementById('flip-book')));
+    // 원본 페이지가 실제로 #flip-book 쪽으로 옮겨갔는지(move) 아니면 #paged-target에 그대로
+    // 남아있는지(clone 안 됨 = 버그) 확인
+    console.log('[PF] loadFromHTML 이후 #paged-target에 남은 .pagedjs_page 수(0이어야 정상 이동):',
+      elTarget.querySelectorAll('.pagedjs_page').length);
+
+    // bookEl 아래를 끝까지 내려가며 각 레벨의 태그/클래스/인라인 style/계산된 display,
+    // visibility, opacity, rect를 전부 찍는다 - "구조는 다 맞는데 왜 안 보이나"를 눈으로
+    // 추적하기 위한 목적. 자식이 여러 개면 첫 번째 자식만 계속 따라 내려간다.
+    (function walk(el, depth) {
+      if (!el || depth > 12) return;
+      var cs = getComputedStyle(el);
+      var r = el.getBoundingClientRect();
+      console.log(
+        '[PF-TREE] '.padEnd(2) + '  '.repeat(depth) + '<' + el.tagName.toLowerCase() + (el.className ? '.' + String(el.className).replace(/ /g, '.') : '') + '>',
+        'inline-style="' + (el.getAttribute('style') || '') + '"',
+        '| computed: display=' + cs.display + ' visibility=' + cs.visibility + ' opacity=' + cs.opacity + ' transform=' + cs.transform + ' overflow=' + cs.overflow,
+        '| rect: w=' + r.width.toFixed(0) + ' h=' + r.height.toFixed(0) + ' x=' + r.x.toFixed(0) + ' y=' + r.y.toFixed(0),
+        '| childElementCount=' + el.childElementCount
+      );
+      if (el.childElementCount > 1) {
+        for (var i = 1; i < el.children.length && i < 4; i++) {
+          var sib = el.children[i];
+          var sr = sib.getBoundingClientRect();
+          console.log('[PF-TREE]   '.repeat(1) + '  '.repeat(depth) + '  (형제 #' + i + ') <' + sib.tagName.toLowerCase() + '.' + String(sib.className).replace(/ /g, '.') + '>',
+            'display=' + getComputedStyle(sib).display, 'rect w=' + sr.width.toFixed(0) + ' h=' + sr.height.toFixed(0));
+        }
+      }
+      walk(el.firstElementChild, depth + 1);
+    })(bookEl, 0);
+
+    logVisibleItems('loadFromHTML 직후');
+
+    elPageIndicator.textContent = '1 / ' + pages.length;
+    elNav.style.display = 'flex';
+  }
+
+  // firstElementChild만 따라 내려가는 위 walk()는 DOM 순서상 항상 0번 페이지(표지)로만
+  // 도달해서, showCover:true일 때 표지 자체가 의도적으로 닫힌 상태(숨김)인 것과 "페이지가
+  // 다 안 보이는 실제 버그"를 구분 못하는 맹점이 있었다 - 전체 .stf__item을 순회해서
+  // display:none이 아닌 게 하나라도 있는지 직접 확인한다.
+  function logVisibleItems(label) {
+    var items = document.querySelectorAll('#flip-book .stf__item');
+    var visible = [];
+    items.forEach(function (it, i) {
+      var cs = getComputedStyle(it);
+      if (cs.display !== 'none') {
+        var r = it.getBoundingClientRect();
+        visible.push(
+          i + ':' + cs.display +
+          ' rect(x=' + r.x.toFixed(0) + ' y=' + r.y.toFixed(0) + ' w=' + r.width.toFixed(0) + ' h=' + r.height.toFixed(0) + ')' +
+          ' opacity=' + cs.opacity + ' z=' + cs.zIndex + ' transform=' + cs.transform +
+          ' bg=' + cs.backgroundColor
+        );
+      }
+    });
+    console.log('[PF-SCAN] ' + label + ' - 전체 .stf__item ' + items.length + '개 중 display!=none:', visible.length);
+    visible.slice(0, 6).forEach(function (v) { console.log('[PF-SCAN]   ' + v); });
+
+    // .stf__parent 안의 canvas가 페이지 위를 덮고 있을 가능성 확인 - canvas는 항상
+    // width:100%/height:100%로 절대 배치되므로, 내용이 그려져 있으면 그 아래 페이지를 가릴 수 있다.
+    var canvases = document.querySelectorAll('#flip-book canvas');
+    canvases.forEach(function (c, i) {
+      var r = c.getBoundingClientRect();
+      var cs = getComputedStyle(c);
+      console.log('[PF-SCAN] canvas #' + i + ' rect:', rectStr(c), 'z=' + cs.zIndex, 'opacity=' + cs.opacity,
+        '| non-transparent 픽셀 확인:', canvasHasContent(c));
+    });
+
+    // flip-book 및 그 조상들 중 overflow:hidden으로 잘라내는 곳이 있는지, 그 크기가
+    // 실제로 페이지들을 담을 만큼 충분한지 확인
+    var el = document.getElementById('flip-book');
+    while (el && el !== document.body) {
+      var ecs = getComputedStyle(el);
+      if (ecs.overflow === 'hidden' || ecs.overflowX === 'hidden' || ecs.overflowY === 'hidden') {
+        console.log('[PF-SCAN] overflow:hidden 조상 발견:', el.id || el.className, rectStr(el));
+      }
+      el = el.parentElement;
+    }
+  }
+
+  // §4 결정("위치 보존 = 챕터 idx + 챕터 내 오프셋") 검증용 - 페이지 인덱스가 재계산마다
+  // 바뀌어도 텍스트상의 같은 지점을 다시 찾아갈 수 있는지 확인한다. getCurrentPageIndex()로
+  // 얻은 페이지 인덱스가 loadFromHTML에 넘긴 순서(DOM 순서)와 일치한다는 전제.
+  function getCurrentLocator() {
+    if (!pageFlip) return null;
+    var idx = pageFlip.getCurrentPageIndex();
+    var items = document.querySelectorAll('#flip-book .stf__item');
+    var page = items[idx];
+    if (!page) return null;
+    var el = page.querySelector('[data-loc]');
+    return el ? el.getAttribute('data-loc') : null;
+  }
+
+  function goToLocator(locator) {
+    if (!pageFlip || !locator) return false;
+    var items = document.querySelectorAll('#flip-book .stf__item');
+    console.log('[LOC] goToLocator("' + locator + '") 시작 - getPageCount()=' +
+      (typeof pageFlip.getPageCount === 'function' ? pageFlip.getPageCount() : 'n/a') +
+      ' items.length=' + items.length);
+
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].querySelector('[data-loc="' + locator + '"]')) {
+        console.log('[LOC] 매칭 페이지 발견: DOM 순서 인덱스=' + i, '해당 페이지 첫 data-loc 목록:',
+          Array.prototype.map.call(items[i].querySelectorAll('[data-loc]'), function (el) { return el.getAttribute('data-loc'); }).slice(0, 5));
+
+        pageFlip.turnToPage(i);
+
+        // turnToPage()는 즉시 반영이므로 바로, 그리고 한 프레임 뒤에도 실제 도달한 인덱스를
+        // 검증한다 - turnToPage(i)의 i가 getCurrentPageIndex()와 같은 좌표계인지 직접 확인.
+        var afterIdx = pageFlip.getCurrentPageIndex();
+        console.log('[LOC] turnToPage(' + i + ') 호출 직후 getCurrentPageIndex()=' + afterIdx);
+        setTimeout(function () {
+          // 스프레드(2페이지) 모드에서는 getCurrentPageIndex()가 "현재 스프레드의 왼쪽 페이지"만
+          // 대표로 보고하는 것으로 보인다(turnToPage(12) 호출 후 11을 보고하는 게 실측됨) - 그래서
+          // 왼쪽 인덱스 하나만 보면 오른쪽 페이지에 실제로 떠 있는 target을 "불일치"로 오판할 수
+          // 있다. 현재 인덱스와 바로 다음 인덱스(스프레드의 반대쪽 페이지) 둘 다 확인한다.
+          var idx2 = pageFlip.getCurrentPageIndex();
+          var curItems = document.querySelectorAll('#flip-book .stf__item');
+          // 페이지 하나에 챕터 제목 + 여러 문단이 같이 들어있을 수 있어서, "첫 번째 data-loc만
+          // 본다"는 식으로는 그 페이지 안에 target이 실제로 있는데도 다른 게 먼저 잡혀 "불일치"로
+          // 오판할 수 있다(실측으로 확인) - 정확히 해당 locator를 가진 요소가 있는지로 확인한다.
+          var candidates = [idx2, idx2 + 1];
+          var foundAt = -1;
+          var locsFound = [];
+          candidates.forEach(function (ci) {
+            var p = curItems[ci];
+            if (!p) return;
+            var firstLoc = p.querySelector('[data-loc]');
+            locsFound.push(ci + ':' + (firstLoc ? firstLoc.getAttribute('data-loc') : null));
+            if (p.querySelector('[data-loc="' + locator + '"]')) foundAt = ci;
+          });
+          console.log('[LOC] 100ms 뒤 getCurrentPageIndex()=' + idx2 + ', 스프레드 양쪽 첫 data-loc:', locsFound,
+            foundAt >= 0 ? ('✅ 일치(idx=' + foundAt + '에 정확히 존재)') : ('❌ 불일치(요청=' + locator + ')'));
+        }, 100);
+
+        console.log('[LOC] 위치 복원 성공: locator=' + locator + ' -> page idx=' + i);
+        return true;
+      }
+    }
+    console.warn('[LOC] locator를 포함한 페이지를 못 찾음:', locator);
+    return false;
+  }
+
+  elBtnSaveLoc.addEventListener('click', function () {
+    savedLocator = getCurrentLocator();
+    elLocIndicator.textContent = savedLocator ? ('저장됨: ' + savedLocator) : '저장 실패(위치 없음)';
+    console.log('[LOC] 저장:', savedLocator);
+  });
+
+  elBtnGotoLoc.addEventListener('click', function () {
+    if (!savedLocator) { setStatus('<span class="err">먼저 위치를 저장하세요</span>'); return; }
+    var ok = goToLocator(savedLocator);
+    setStatus(ok
+      ? '저장된 위치(' + savedLocator + ')로 이동 완료'
+      : '<span class="err">저장된 위치(' + savedLocator + ')를 현재 페이지들 안에서 못 찾음</span>');
+  });
+
+  function canvasHasContent(canvas) {
+    try {
+      var ctx = canvas.getContext('2d');
+      if (!ctx || !canvas.width || !canvas.height) return 'canvas 크기 0 또는 컨텍스트 없음';
+      var data = ctx.getImageData(0, 0, Math.min(canvas.width, 50), Math.min(canvas.height, 50)).data;
+      for (var i = 3; i < data.length; i += 4) {
+        if (data[i] !== 0) return true; // alpha != 0인 픽셀 존재
+      }
+      return false;
+    } catch (e) {
+      return '확인 불가(' + e.message + ')';
+    }
+  }
+
+  function setStatus(html) {
+    elStatus.innerHTML = html;
+  }
+
+  function fmtMs(ms) {
+    return ms.toFixed(0) + 'ms';
+  }
+
+  async function loadFileList() {
+    try {
+      var res = await fetch('/experimental/pagedjs-test/api/files');
+      var data = await res.json();
+      if (!data.success) {
+        setStatus('<span class="err">파일 목록 로드 실패: ' + (data.error || '') + '</span>');
+        return;
+      }
+      // 파일 항목이 이제 {id: "서브디렉토리/파일명", label: "표시용 텍스트(크기 포함)"} 객체다 -
+      // id에 슬래시가 포함된다는 점이 이후 fetch 호출들의 encodeURIComponent(filename)과
+      // 자연스럽게 맞물린다(슬래시도 그대로 인코딩됨).
+      elFileSelect.innerHTML = data.files.map(function (f) {
+        var id = f.id || f;
+        var label = f.label || f;
+        return '<option value="' + id + '">' + label + '</option>';
+      }).join('');
+    } catch (e) {
+      setStatus('<span class="err">파일 목록 요청 실패: ' + e + '</span>');
+    }
+  }
+
+  // §4 설계 결정("위치 보존 방식 = 챕터 idx + 챕터 내 문자 오프셋")이 실제로 동작하는지
+  // 검증하기 위한 위치 마커. 문자 단위 오프셋까지는 아니고 문단(블록 레벨 요소) 단위로 근사한다 -
+  // Paged.js가 문단을 여러 페이지에 걸쳐 쪼갤 수 있어 정확한 문자 오프셋 복원은 더 정교한 처리가
+  // 필요하지만(실전 구현 과제), "챕터+문단 인덱스로 재계산 후에도 같은 지점을 찾아갈 수 있는가"는
+  // 이 근사만으로도 검증 가능하다.
+  function tagParagraphsWithLocator(html, chapterIdx) {
+    var tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    var blocks = tmp.querySelectorAll('p, div');
+    blocks.forEach(function (el, pIdx) {
+      el.setAttribute('data-loc', 'ch' + chapterIdx + '-p' + pIdx);
+    });
+    return tmp.innerHTML;
+  }
+
+  // 챕터 하나를 fetch+태깅해서 <section> 래퍼 HTML로 만든다. 대량 로드(fetchChapters)와
+  // 슬라이딩 윈도우(윈도우 편입/폐기) 양쪽이 공유하는 최소 단위.
+  // 챕터 HTML 안의 <img>는 book_id 기반 프로덕션 엔드포인트(/api/media/epub-image?book_id=None&...)를
+  // 가리키고 있다 - 이 테스트 파일들은 DB에 등록 안 된 book이라 book_id가 없어서(=None) 여태
+  // 이미지가 깨져 보였다. 이미지가 많은 EPUB(예: epub_size_bench의 496MB짜리)을 실측하려면
+  // 실제 이미지 로딩 비용이 빠지면 의미가 없으므로, src를 테스트 전용 이미지 엔드포인트로 치환한다.
+  function rewriteImageSrcForTest(html, filename) {
+    return html.replace(/src="\/api\/media\/epub-image\?[^"]*[?&]path=([^"&]*)[^"]*"/g, function (m, encodedPath) {
+      return 'src="/experimental/pagedjs-test/api/epub-image?file=' + encodeURIComponent(filename) + '&path=' + encodedPath + '"';
+    });
+  }
+
+  async function buildChapterSectionHtml(filename, idx) {
+    var res = await fetch('/experimental/pagedjs-test/api/chapter?file=' + encodeURIComponent(filename) + '&idx=' + idx);
+    var data = await res.json();
+    if (!data.success) {
+      console.warn('챕터 ' + idx + ' 로드 실패:', data.error);
+      return null;
+    }
+    data.chapter.content = rewriteImageSrcForTest(data.chapter.content, filename);
+    var taggedContent = tagParagraphsWithLocator(data.chapter.content, idx);
+    // 챕터 래퍼(<section>) 자체에는 data-loc을 달지 않는다 - DOM 순서상 조상이 자손보다
+    // 먼저 나와서, page.querySelector('[data-loc]')가 실제 문단(ch4-p5 등)까지 못 내려가고
+    // 항상 이 래퍼만 찾아버리는 문제가 있었다(실측으로 확인: 재계산 후 항상 챕터 맨 앞으로
+    // 복원됨). 제목(<h2>)에는 그 자체로 별도 마커를 달아 챕터 첫 페이지 이동은 유지한다.
+    return '<section class="chapter" data-chapter-idx="' + idx + '"><h2 data-loc="ch' + idx + '-title">' +
+      (data.chapter.title || ('Chapter ' + (idx + 1))) + '</h2>' + taggedContent + '</section>';
+  }
+
+  async function fetchChapters(filename, count) {
+    var metaRes = await fetch('/experimental/pagedjs-test/api/meta?file=' + encodeURIComponent(filename));
+    var metaData = await metaRes.json();
+    if (!metaData.success) throw new Error('meta 실패: ' + metaData.error);
+    var totalChapters = metaData.meta.total_chapters;
+    var n = Math.min(count, totalChapters);
+
+    var htmlParts = [];
+    for (var i = 0; i < n; i++) {
+      var sectionHtml = await buildChapterSectionHtml(filename, i);
+      if (sectionHtml) htmlParts.push(sectionHtml);
+    }
+    return { html: htmlParts.join('\n'), totalChapters: totalChapters, loadedChapters: n, title: metaData.meta.title };
+  }
+
+  function updateWindowIndicator() {
+    elWindowIndicator.textContent = winActive
+      ? ('윈도우: [' + winStart + ', ' + winEnd + '] / 전체 ' + winTotalChapters + '챕터' + (winShiftInProgress ? ' (백그라운드 프리페치 중...)' : ''))
+      : '윈도우 모드 꺼짐';
+    // 백그라운드 프리페치가 #paged-target(공용 오프스크린 영역)을 쓰는 동안 ①/②를 못 누르게 해서
+    // 같은 영역을 동시에 건드리는 충돌을 막는다.
+    elBtnRun.disabled = winShiftInProgress;
+    elBtnRepaginate.disabled = winShiftInProgress || !lastLoadedHtml;
+  }
+
+  function buildWindowHtml() {
+    var parts = [];
+    for (var i = winStart; i <= winEnd; i++) {
+      if (winChapterHtml[i]) parts.push(winChapterHtml[i]);
+    }
+    return parts.join('\n');
+  }
+
+  async function startWindowMode() {
+    var filename = elFileSelect.value;
+    if (!filename) { setStatus('<span class="err">파일을 선택하세요</span>'); return; }
+    var startCh = parseInt(elWindowStartChapter.value, 10) || 0;
+    winSize = parseInt(elWindowSize.value, 10) || 3;
+    var pageWidth = parseInt(elPageWidth.value, 10) || 420;
+    var pageHeight = parseInt(elPageHeight.value, 10) || 620;
+    var fontSize = parseInt(elFontSize.value, 10) || 17;
+
+    elBtnWindowStart.disabled = true;
+    setLoading(true, '윈도우 초기 로드 중...');
+    try {
+      var metaRes = await fetch('/experimental/pagedjs-test/api/meta?file=' + encodeURIComponent(filename));
+      var metaData = await metaRes.json();
+      if (!metaData.success) throw new Error('meta 실패: ' + metaData.error);
+      winTotalChapters = metaData.meta.total_chapters;
+      winFilename = filename;
+      winChapterHtml = {};
+      winStart = winEnd = Math.max(0, Math.min(startCh, winTotalChapters - 1));
+
+      var html0 = await buildChapterSectionHtml(filename, winStart);
+      if (html0) winChapterHtml[winStart] = html0;
+
+      // 시작 챕터 하나만 두고, 목표 윈도우 크기(winSize)에 맞을 때까지 앞으로 채운다 -
+      // "읽기 시작 지점부터 앞으로 미리 버퍼를 채워둔다"는 자연스러운 초기 상태.
+      while ((winEnd - winStart + 1) < winSize && winEnd < winTotalChapters - 1) {
+        winEnd++;
+        var h = await buildChapterSectionHtml(filename, winEnd);
+        if (h) winChapterHtml[winEnd] = h;
+      }
+
+      winActive = true;
+      updateWindowIndicator();
+      console.log('[WIN] 윈도우 모드 시작: [' + winStart + ', ' + winEnd + '] / 전체 ' + winTotalChapters);
+
+      lastLoadedHtml = buildWindowHtml(); // ②(같은 콘텐츠로 재계산) 버튼과도 호환되도록 동기화
+      var result = await runPagination(lastLoadedHtml, pageWidth, pageHeight, fontSize, '윈도우 초기 로드');
+      setStatus(
+        '윈도우 모드 시작: 챕터 [' + winStart + ', ' + winEnd + '] (전체 ' + winTotalChapters + '개)\n' +
+        '페이지네이션: <span class="metric">' + fmtMs(result.elapsedMs) + '</span>, 결과 페이지 수: <span class="metric">' + result.totalPages + '</span>\n' +
+        '페이지를 넘겨서 챕터 경계를 넘어가면 자동으로 윈도우가 이동합니다 (콘솔의 [WIN] 로그 참고).'
+      );
+      elBtnRepaginate.disabled = false;
+    } catch (e) {
+      setStatus('<span class="err">윈도우 시작 오류: ' + e + '</span>');
+      console.error(e);
+    } finally {
+      elBtnWindowStart.disabled = false;
+    }
+  }
+
+  elBtnWindowStart.addEventListener('click', startWindowMode);
+
+  // 챕터 경계를 넘어갈 때 윈도우를 앞/뒤로 미는 핵심 로직. flip 이벤트마다 호출되지만,
+  // 대부분은 아무 조건도 안 걸려 즉시 리턴하므로 비용이 없다.
+  //
+  // 실사용 피드백 반영(2026-09-06): 처음엔 "윈도우 끝에 도달한 순간"에만 재계산을 걸었더니
+  // 챕터 경계마다 로딩이 튀어나와 거슬렸다. 만화 뷰어의 스크롤 프리로드와 같은 원리로,
+  // **끝에서 한 챕터 전(버퍼가 아직 남아있을 때)** 미리 백그라운드에서 준비해두고, 화면에는
+  // 그 결과를 "바꿔치기"하는 짧은 순간만 로딩을 보여준다 - paginateOnly()는 오프스크린이라
+  // 오버레이 없이 돌리고, swapInFlipBook()만 오버레이로 감싼다.
+  async function maybeShiftWindow() {
+    if (!winActive || winShiftInProgress) return;
+    var loc = getCurrentLocator();
+    if (!loc) return;
+    var m = /^ch(\d+)-/.exec(loc);
+    if (!m) return;
+    var curChapter = parseInt(m[1], 10);
+
+    // winEnd(정확히 끝)가 아니라 winEnd-1(한 챕터 전)부터 미리 준비 시작 - 사용자가 실제
+    // 경계에 도달할 때쯤엔 이미 백그라운드 준비가 끝나 있을 가능성이 높다.
+    var needForward = (curChapter >= winEnd - 1) && (winEnd < winTotalChapters - 1);
+    var needBackward = (curChapter <= winStart + 1) && (winStart > 0);
+    if (!needForward && !needBackward) return;
+
+    winShiftInProgress = true;
+    updateWindowIndicator();
+    var direction = needForward ? '앞으로(다음 챕터 편입, 프리페치)' : '뒤로(이전 챕터 편입, 프리페치)';
+    console.log('[WIN] 챕터 경계 근접 감지(현재 챕터=' + curChapter + ', 윈도우=[' + winStart + ',' + winEnd + ']) - ' + direction);
+
+    try {
+      if (needForward) {
+        winEnd++;
+        if (!winChapterHtml[winEnd]) {
+          var hf = await buildChapterSectionHtml(winFilename, winEnd);
+          if (hf) winChapterHtml[winEnd] = hf;
+        }
+        if ((winEnd - winStart + 1) > winSize) {
+          delete winChapterHtml[winStart];
+          console.log('[WIN] 챕터 ' + winStart + ' 폐기(윈도우 크기 초과)');
+          winStart++;
+        }
+      } else {
+        winStart--;
+        if (!winChapterHtml[winStart]) {
+          var hb = await buildChapterSectionHtml(winFilename, winStart);
+          if (hb) winChapterHtml[winStart] = hb;
+        }
+        if ((winEnd - winStart + 1) > winSize) {
+          delete winChapterHtml[winEnd];
+          console.log('[WIN] 챕터 ' + winEnd + ' 폐기(윈도우 크기 초과)');
+          winEnd--;
+        }
+      }
+
+      console.log('[WIN] 새 윈도우: [' + winStart + ', ' + winEnd + '] - 백그라운드 페이지네이션 시작(오버레이 없음)');
+      lastLoadedHtml = buildWindowHtml();
+
+      var pageWidth = parseInt(elPageWidth.value, 10) || 420;
+      var pageHeight = parseInt(elPageHeight.value, 10) || 620;
+      var fontSize = parseInt(elFontSize.value, 10) || 17;
+
+      // 여기가 제일 오래 걸리는 구간이지만 #paged-target은 원래 오프스크린이라 사용자는
+      // 지금 보고 있는 책을 그대로 계속 읽을 수 있다.
+      var result = await paginateOnly(lastLoadedHtml, pageWidth, pageHeight, fontSize);
+      console.log('[WIN] 백그라운드 페이지네이션 완료(' + fmtMs(result.elapsedMs) + ', ' + result.totalPages + '페이지) - 화면 바꿔치기 시작');
+
+      // 준비하는 동안 사용자가 계속 페이지를 넘겼을 수 있으니, "바꿔치기 직전 시점"의 실제
+      // 현재 위치를 다시 읽어서 그 위치로 복원한다(프리페치 시작 시점 위치가 아니라).
+      var locatorAtSwap = getCurrentLocator();
+
+      swapInFlipBook(pageWidth, pageHeight);
+      var restored = locatorAtSwap ? goToLocator(locatorAtSwap) : false;
+
+      console.log('[WIN] 화면 바꿔치기 완료, 위치 복원(' + locatorAtSwap + '): ' + (restored ? '성공' : '실패'));
+      setStatus(
+        '윈도우 이동: [' + winStart + ', ' + winEnd + '] (챕터 ' + curChapter + ' 경계 근접, 프리페치됨)\n' +
+        '백그라운드 재계산: <span class="metric">' + fmtMs(result.elapsedMs) + '</span>, 페이지 수: <span class="metric">' + result.totalPages + '</span>\n' +
+        '위치 복원: ' + (restored ? '<span class="metric">성공</span>' : '<span class="err">실패</span>')
+      );
+    } catch (e) {
+      console.error('[WIN] 윈도우 이동 실패:', e);
+    } finally {
+      winShiftInProgress = false;
+      updateWindowIndicator();
+    }
+  }
+
+  function buildPagedCss(pageWidth, pageHeight, fontSize) {
+    // size를 물리 인쇄 크기가 아니라 뷰어 컨테이너 픽셀값으로 지정 - 리더 시나리오 실측이 목적.
+    return (
+      '@page { size: ' + pageWidth + 'px ' + pageHeight + 'px; margin: 28px 24px; }' +
+      'body { font-family: "Malgun Gothic", sans-serif; font-size: ' + fontSize + 'px; line-height: 1.7; color: #111; }' +
+      'h2 { font-size: 1.15em; margin: 0 0 0.8em 0; }' +
+      'p { margin: 0 0 0.9em 0; }'
+    );
+  }
+
+  function buildPagedSource(bodyHtml) {
+    // CSS(특히 @page)는 여기(content 문자열의 <style>)에 심어도 실제로는 적용되지 않는다 -
+    // preview(content, stylesheets, renderTo)에서 stylesheets=[]를 넘기면(빈 배열은 truthy라
+    // "!stylesheets"가 false가 됨) Polisher.add()가 인자 없이 호출되어 CSS가 전혀 등록되지
+    // 않는다. 실측으로 확인됨: @page 크기를 지정해도 무시되고 Paged.js 기본값(8.5in x 11in,
+    // 96dpi 기준 816x1056px)으로 페이지가 만들어졌다. CSS는 반드시 stylesheets 인자로
+    // {키: cssText} 형태로 넘겨야 한다 (아래 buildPagedCss + runPagination 참고).
+    return '<body>' + bodyHtml + '</body>';
+  }
+
+  // Paged.js 페이지네이션만 수행하고 화면(page-flip)은 건드리지 않는다 - #paged-target은
+  // 원래부터 화면 밖(오프스크린)이라 이 단계는 로딩 오버레이 없이 백그라운드에서 돌려도
+  // 사용자가 보는 현재 책에 전혀 영향을 주지 않는다. §5-6(아래) 참고: 폰트/리사이즈처럼
+  // "지금 보는 책 자체를 다시 그려야 하는" 명시적 재계산은 이걸 감쌀 runPagination()을 쓰고,
+  // 챕터 경계 프리페치처럼 "다음에 필요할 콘텐츠를 미리 준비"하는 경우는 이 함수만 백그라운드로
+  // 돌린 뒤 준비가 끝났을 때만 짧게 swapInFlipBook()으로 화면을 바꿔치기한다.
+  async function paginateOnly(bodyHtml, pageWidth, pageHeight, fontSize) {
+    elTarget.innerHTML = '';
+
+    // Paged.js의 Polisher.setup()은 매 preview() 호출마다 <style> 태그를 새로 만들어
+    // document.head에 추가하고, 이전 것은 절대 스스로 안 지운다 - Previewer를 재사용/재생성
+    // 하는 코드에서 이걸 안 치우면 재계산할 때마다 head에 스타일시트가 계속 쌓이면서
+    // 매 실행이 이전보다 느려진다(실측: 재계산이 최초 실행보다 오히려 2배 이상 느렸던 원인).
+    // Polisher.destroy()가 정확히 이 styleEl.remove()를 해주므로 새 Previewer를 만들기 전에
+    // 반드시 직전 것부터 정리한다.
+    if (lastPreviewer && lastPreviewer.polisher) {
+      try { lastPreviewer.polisher.destroy(); } catch (e) { /* 이미 정리됐으면 무시 */ }
+    }
+
+    var source = buildPagedSource(bodyHtml);
+    var css = buildPagedCss(pageWidth, pageHeight, fontSize);
+
+    var t0 = performance.now();
+    var previewer = new Paged.Previewer();
+    lastPreviewer = previewer;
+    var flow = await previewer.preview(source, [{ 'pagedjs-test-inline': css }], elTarget);
+    var t1 = performance.now();
+    totalPages = flow.total;
+
+    return { elapsedMs: t1 - t0, totalPages: flow.total };
+  }
+
+  // 이미 paginateOnly()로 준비된 #paged-target 결과를 실제 보이는 page-flip 책으로
+  // 바꿔치기한다. 이 부분(destroy + loadFromHTML)만 화면에 지장을 주므로, 오버레이는 이 짧은
+  // 구간에만 씌운다.
+  function swapInFlipBook(pageWidth, pageHeight) {
+    setLoading(true, '화면 갱신 중...');
+    elNav.style.pointerEvents = 'none';
+    try {
+      initPageFlip(pageWidth, pageHeight);
+    } finally {
+      elNav.style.pointerEvents = '';
+      setLoading(false);
+    }
+  }
+
+  // 폰트 크기/리사이즈처럼 "지금 보고 있는 책 자체를 명시적으로 다시 그려야 하는" 경우 전용 -
+  // 준비부터 화면 반영까지 통째로 로딩 오버레이로 막는다(§4 결정: 재계산 중엔 상호작용 차단).
+  async function runPagination(bodyHtml, pageWidth, pageHeight, fontSize, label) {
+    setLoading(true, (label || '페이지네이션') + ' 중... (넘김 버튼이 잠시 비활성화됩니다)');
+    elNav.style.pointerEvents = 'none';
+    try {
+      var result = await paginateOnly(bodyHtml, pageWidth, pageHeight, fontSize);
+      // 로딩(페이지네이션) 자체는 page-flip과 무관하게 로딩 표시로 처리하고, 결과가 나온 뒤에야
+      // page-flip을 초기화한다 - "로딩 후 페이지 넘길 때부터 page-flip 개입" 결정을 그대로 반영.
+      initPageFlip(pageWidth, pageHeight);
+      return { elapsedMs: result.elapsedMs, totalPages: result.totalPages, label: label };
+    } finally {
+      elNav.style.pointerEvents = '';
+      setLoading(false);
+    }
+  }
+
+  elBtnPrev.addEventListener('click', function () {
+    if (pageFlip) pageFlip.flipPrev();
+    setTimeout(function () { logVisibleItems('◀ 이전 클릭 후'); }, 50);
+  });
+  elBtnNext.addEventListener('click', function () {
+    if (pageFlip) pageFlip.flipNext();
+    setTimeout(function () { logVisibleItems('다음 ▶ 클릭 후'); }, 50);
+  });
+  window.addEventListener('keydown', function (e) {
+    if (!pageFlip) return;
+    var activeTag = document.activeElement && document.activeElement.tagName;
+    if (activeTag === 'INPUT' || activeTag === 'SELECT' || activeTag === 'TEXTAREA' || activeTag === 'BUTTON') return;
+    if (e.key === 'ArrowRight') { pageFlip.flipNext(); return; }
+    if (e.key === 'ArrowLeft') { pageFlip.flipPrev(); }
+  });
+
+  // Paged.js를 완전히 배제하고, StPageFlip 공식 예제와 동일한 구조(plain div, block의 직계
+  // 자식, data-density="hard" 표지)로 순수 텍스트 3페이지만 넘겨서 라이브러리 자체가 이 환경에서
+  // 정상 동작하는지 확인한다. 이게 안 보이면 라이브러리/환경 문제, 보이면 Paged.js가 만드는
+  // 복잡한 절대좌표 중첩 DOM 쪽 문제로 범위를 좁힐 수 있다.
+  elBtnSanity.addEventListener('click', function () {
+    console.log('[PF-SANITY] ── 시작 (Paged.js 없이 순수 텍스트 3페이지) ──');
+
+    if (pageFlip && typeof pageFlip.destroy === 'function') {
+      try { pageFlip.destroy(); } catch (e) { /* noop */ }
+    }
+    var bookEl = document.createElement('div');
+    bookEl.id = 'flip-book';
+    elFlipBookContainer.innerHTML = '';
+    elFlipBookContainer.appendChild(bookEl);
+    elFlipStageWrap.style.display = 'flex';
+
+    var pageDefs = [
+      { text: '표지', density: 'hard' },
+      { text: '첫 번째 페이지', density: null },
+      { text: '두 번째 페이지', density: null },
+      { text: '세 번째 페이지', density: null },
+      { text: '뒤표지', density: 'hard' }
+    ];
+    pageDefs.forEach(function (def) {
+      var p = document.createElement('div');
+      p.className = 'my-page';
+      p.style.background = '#fff';
+      p.style.color = '#111';
+      p.style.display = 'flex';
+      p.style.alignItems = 'center';
+      p.style.justifyContent = 'center';
+      p.style.fontSize = '28px';
+      p.textContent = def.text;
+      if (def.density) p.dataset.density = def.density;
+      bookEl.appendChild(p); // 공식 예제처럼 block의 직계 자식으로 미리 넣어둔다
+    });
+
+    CUR_PAGE_W = 400;
+    CUR_PAGE_H = 600;
+    applyLayout();
+    console.log('[PF-SANITY] bookEl 자식 수(미리 넣어둔 5페이지):', bookEl.children.length);
+
+    pageFlip = new St.PageFlip(bookEl, {
+      width: 400,
+      height: 600,
+      size: 'fixed',
+      showCover: true,
+      usePortrait: true,
+      mobileScrollSupport: false
+    });
+    pageFlip.on('flip', function (e) {
+      console.log('[PF-SANITY] flip idx=', e.data);
+      elPageIndicator.textContent = (e.data + 1) + ' / ' + pageDefs.length;
+    });
+    pageFlip.loadFromHTML(document.querySelectorAll('.my-page'));
+
+    console.log('[PF-SANITY] loadFromHTML 완료. bookEl rect:', rectStr(bookEl), 'children=', bookEl.children.length);
+    logVisibleItems('[SANITY] loadFromHTML 직후');
+
+    elPageIndicator.textContent = '1 / ' + pageDefs.length;
+    elNav.style.display = 'flex';
+  });
+
+  // size:'fixed'는 화면 크기가 커져도 페이지 자체를 늘려주지 않는다(텍스트 줄바꿈이 페이지네이션
+  // 시점 크기로 고정되기 때문에 의도적으로 그렇게 막아둔 것) - 화면을 실제로 꽉 채우려면
+  // "페이지네이션을 실행하기 전에" 페이지 폭/높이 자체를 화면 크기에 맞게 키워야 한다.
+  // 이 버튼은 현재 창 크기 기준으로 그 값을 계산해서 입력칸에 채워주기만 하고, 실제 반영은
+  // 여전히 ①(또는 재계산이면 ②)을 눌러야 한다.
+  elBtnFitScreen.addEventListener('click', function () {
+    var curW = parseInt(elPageWidth.value, 10) || 420;
+    var curH = parseInt(elPageHeight.value, 10) || 620;
+    var aspect = curH / curW;
+
+    var availW = window.innerWidth * 0.94;
+    var availH = window.innerHeight * 0.86; // 하단 넘김 바 오버레이 여유
+
+    var pageWidth = Math.min(availH / aspect, availW / 2);
+    var pageHeight = pageWidth * aspect;
+
+    elPageWidth.value = Math.round(pageWidth);
+    elPageHeight.value = Math.round(pageHeight);
+    setStatus('현재 화면 기준으로 페이지 크기를 ' + Math.round(pageWidth) + ' x ' + Math.round(pageHeight) + 'px로 계산했습니다. "①' +
+      (elBtnRepaginate.disabled ? ' 로드 + 페이지네이션 실행' : '" 또는 "② 같은 콘텐츠로 재계산') + '"을 눌러 적용하세요.');
+  });
+
+  elBtnRun.addEventListener('click', async function () {
+    var filename = elFileSelect.value;
+    if (!filename) { setStatus('<span class="err">파일을 선택하세요</span>'); return; }
+    var count = parseInt(elChapterCount.value, 10) || 1;
+    var pageWidth = parseInt(elPageWidth.value, 10) || 420;
+    var pageHeight = parseInt(elPageHeight.value, 10) || 620;
+    var fontSize = parseInt(elFontSize.value, 10) || 17;
+
+    elBtnRun.disabled = true;
+    elBtnRepaginate.disabled = true;
+    setStatus('챕터 로드 중...');
+
+    try {
+      var fetchT0 = performance.now();
+      var loaded = await fetchChapters(filename, count);
+      var fetchT1 = performance.now();
+      lastLoadedHtml = loaded.html;
+
+      setStatus('"' + loaded.title + '" - 챕터 ' + loaded.loadedChapters + '/' + loaded.totalChapters + '개 로드 완료 (' + fmtMs(fetchT1 - fetchT0) + '). 페이지네이션 실행 중...');
+
+      var result = await runPagination(loaded.html, pageWidth, pageHeight, fontSize, '최초 실행');
+
+      setStatus(
+        '"' + loaded.title + '" - 챕터 ' + loaded.loadedChapters + '/' + loaded.totalChapters + '개\n' +
+        '챕터 fetch: <span class="metric">' + fmtMs(fetchT1 - fetchT0) + '</span>\n' +
+        '페이지네이션(' + result.label + '): <span class="metric">' + fmtMs(result.elapsedMs) + '</span>\n' +
+        '결과 페이지 수: <span class="metric">' + result.totalPages + '</span>'
+      );
+      elBtnRepaginate.disabled = false;
+    } catch (e) {
+      setStatus('<span class="err">오류: ' + e + '</span>');
+      console.error(e);
+    } finally {
+      elBtnRun.disabled = false;
+    }
+  });
+
+  elBtnRepaginate.addEventListener('click', async function () {
+    if (!lastLoadedHtml) return;
+    var pageWidth = parseInt(elPageWidth.value, 10) || 420;
+    var pageHeight = parseInt(elPageHeight.value, 10) || 620;
+    var fontSize = parseInt(elFontSize.value, 10) || 17;
+
+    // §4 결정("위치 보존") 실검증 - 재계산으로 페이지 번호가 완전히 바뀌기 전에 현재
+    // 위치(챕터+문단 로케이터)를 기록해두고, 재계산이 끝나면 그 로케이터로 자동 복귀를
+    // 시도한다. 페이지 번호가 아니라 텍스트상의 같은 지점으로 돌아왔는지 눈으로 확인 가능.
+    var locatorBefore = getCurrentLocator();
+    console.log('[LOC] 재계산 전 위치:', locatorBefore);
+
+    elBtnRepaginate.disabled = true;
+    setStatus('같은 콘텐츠로 재계산 중... (글자크기/폭 변경 시나리오 실측)');
+    try {
+      var result = await runPagination(lastLoadedHtml, pageWidth, pageHeight, fontSize, '재계산');
+
+      var restored = locatorBefore ? goToLocator(locatorBefore) : false;
+
+      setStatus(
+        '재계산 완료\n' +
+        '페이지네이션(' + result.label + '): <span class="metric">' + fmtMs(result.elapsedMs) + '</span>\n' +
+        '결과 페이지 수: <span class="metric">' + result.totalPages + '</span>\n' +
+        '위치 복원(' + (locatorBefore || '없음') + '): ' + (restored
+          ? '<span class="metric">성공</span>'
+          : '<span class="err">실패(또는 저장된 위치 없음)</span>')
+      );
+    } catch (e) {
+      setStatus('<span class="err">재계산 오류: ' + e + '</span>');
+      console.error(e);
+    } finally {
+      elBtnRepaginate.disabled = false;
+    }
+  });
+
+  loadFileList();
+})();
+</script>
+</body>
+</html>

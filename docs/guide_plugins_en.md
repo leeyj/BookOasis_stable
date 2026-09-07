@@ -20,7 +20,8 @@ This document describes the current plugin standard for BookOasis metadata/dashb
 | 1.0.0 ~ 1.0.4 | `search`, `apply` | `dashboard_widget`, `get_dashboard_data` | Both folder-based and single-file plugins supported |
 | 1.0.5 ~ 1.0.6 | `search`, `apply` | `get_context_menu_items`, `run_context_menu_action`, `update_manifest` | Context menu and sample update support |
 | 1.0.7 | `search`, `apply` | `on_scan_new_books_detected`, `dispatch_webhook`, `update_manifest` | Standard event webhooks (`book.new/read/finish`) recommended |
-| 1.0.8+ (current) | `search`, `apply` | `detail_sidebar_widget`, `get_detail_sidebar_data` | Added book detail page sidebar widget contract ("More by this author", etc.) |
+| 1.0.8 | `search`, `apply` | `detail_sidebar_widget`, `get_detail_sidebar_data` | Added book detail page sidebar widget contract ("More by this author", etc.) |
+| 1.0.9+ (current) | `search`, `apply` | `home_widget` | Added the actual home-dashboard widget contract, shown only when a user turns on "home dashboard plugin layout mode" (§5-1) |
 
 Compatibility rules:
 
@@ -90,7 +91,8 @@ Recommended class attributes:
 - `name` (str): display name
 - `is_searchable` (bool): show in manual metadata search modal
 - `config_schema` (list): settings form schema (used for auto-generated form)
-- `dashboard_widget` (dict or None): dashboard widget metadata
+- `dashboard_widget` (dict or None): widget metadata for the **[Plugins] common desk tab** or an exclusive tab — not the actual home screen, see §5
+- `home_widget` (dict or None): widget manifest shown on the **actual home dashboard**, but only when the user has turned on "home dashboard plugin layout mode" (see §5-1). Easy to confuse with `dashboard_widget` — they are separate contracts and a plugin may declare both.
 - `category_tab` (dict or None): category-level plugin manifest (`title`, `icon`, `order`, `sessions`)
 - `detail_sidebar_widget` (dict or None): book detail page sidebar widget manifest (`title`, `order`, `sessions`)
 - `update_manifest` (dict or None): plugin-owned update declaration contract
@@ -277,6 +279,76 @@ Recommendation:
 
 - Keep `get_dashboard_data()` as the only public dashboard entrypoint.
 - Keep provider-specific fetch logic in private helpers (e.g. `_fetch_items`).
+
+---
+
+## 5-1. Home Dashboard Widget Contract (`home_widget`)
+
+`dashboard_widget` only places a card in the dedicated **[Plugins] common desk tab** (a separate
+sidebar menu). To show a widget on the **actual home screen** users land on first (the one with
+reading insights, recently read, and newly added), declare a separate `home_widget`.
+
+Crucially, `home_widget` is only shown **when a user turns on "My Settings > Home Dashboard Plugin
+Layout Mode"**. Users who leave that off (the default) keep seeing the existing fixed layout, and
+a plugin declaring `home_widget` has zero effect on them — installing a plugin never forces a
+change onto users who aren't using it.
+
+Even for users who did turn plugin layout mode on, `home_widget` still doesn't appear
+automatically. As more plugins get installed, auto-showing every one of them would clutter the
+home screen with widgets nobody asked for — so a widget only joins the layout once the user picks
+it from the "+ Add widget" picker at the bottom of the home screen (removing it works the same
+way, via the × button on the card). In other words, for plugin authors: installing a plugin means
+"it shows up in the catalog," not "it shows up on the home screen."
+
+```python
+home_widget = {
+    'title': "Today's Pick",
+    'subtitle': 'Karaoke Plugin',
+    'icon': 'fa-solid fa-music',
+    'order': 60,       # the 3 core sections use 10/20/30 - a larger value places you after them by default
+    'limit': 10,
+    'sessions': 'all',  # same rule as _resolve_plugin_sessions() (all / a list / omitted → general)
+    'layout': 'grid',  # 'full' (default) | 'grid' - see below
+    'size': 2,  # only matters for 'grid'. 1 (default) / 2 / 3 - see below
+}
+
+def get_dashboard_data(self, db_type, limit=10):
+    # reuses the same method as dashboard_widget - no new method required
+    return {'success': True, 'items': []}
+```
+
+### Layout (`layout`)
+
+The home screen is a CSS Grid container, so each widget declares whether it takes a full row or
+sits as a card alongside other widgets in the same row.
+
+- `'full'` (default when omitted): same treatment as the 3 core sections — spans the entire
+  width as its own row.
+- `'grid'`: placed as a card into the `minmax(320px, 1fr)` grid alongside other `layout: 'grid'`
+  widgets, so several can sit side by side when there's room. `size` picks how many cells to
+  span: `1` (default), `2`, or `3` - the grid wraps to the next row on its own when the screen is
+  too narrow for that many columns.
+
+Users with plugin layout mode on can drag-reorder core widgets (reading insights/recently
+read/newly added) together with `home_widget` plugin cards right on the home screen; the order is
+saved server-side (not `localStorage`) so it stays consistent across devices. See
+[docs/plan_home_dashboard_pluginization.md](./plan_home_dashboard_pluginization.md) for the full
+design background.
+
+### Recommendation: keep `get_dashboard_data()` fast, and cache it if it isn't
+
+The home screen's layout (card order/width) is now decided server-side at page render time, so it
+never reflows on you anymore. But each card's **content** still only appears once
+`get_dashboard_data()` resolves after the card shell is already shown - a slow plugin only keeps
+its own card spinning (widgets fetch independently and in parallel, so it never blocks other
+widgets or the core sections).
+
+- If your plugin calls an external API, cache the result with `self.cache_get()`/`self.cache_set()`
+  (Redis-backed, TTL configurable) so you're not re-hitting that API on every home screen load.
+- If a DB query is heavy (e.g. a full table scan), cache it and make sure it's actually indexed
+  (see `sample_plugins/metadata/stats_dashboard` for a reasonable example).
+- Never do an uncached, multi-second synchronous network call inside `get_dashboard_data()` - this
+  path runs every time a user opens the home screen, including on every session-type switch.
 
 ---
 

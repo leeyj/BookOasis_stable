@@ -26,9 +26,10 @@ export async function loadDashboardInsights(libraryType = 'general') {
   try {
     const isShow = (localStorage.getItem('show_dashboard_insights') !== '0');
     const container = document.querySelector('.dashboard-insights-container');
-    const divider = document.getElementById('dashboard-insights-divider');
+    const slot = document.querySelector('[data-widget-id="core.reading_insights"]');
     if (container) container.style.display = isShow ? 'block' : 'none';
-    if (divider) divider.style.display = isShow ? 'block' : 'none';
+    if (slot) slot.style.display = isShow ? '' : 'none';
+    window.refreshHomeWidgetDividers?.();
     if (!isShow) return;
 
     const res = await fetch(`/api/dashboard/insights?library_type=${encodeURIComponent(libraryType)}`);

@@ -50,7 +50,25 @@ def index():
     settings = {}
     view_log_enabled = os.environ.get('VIEW_LOG', 'false').lower() == 'true'
     develop_mode = os.environ.get('DEVELOP', 'false').lower() == 'true'
-    return render_template('index.html', active_page='media_library', settings=settings, view_log_enabled=view_log_enabled, develop_mode=develop_mode)
+
+    # 홈 대시보드 "플러그인 배치 모드"가 켜진 사용자는, 코어 3섹션이 기본 배치로 먼저
+    # 그려졌다가 JS가 뒤늦게 재배치/카드 삽입을 하면서 눈에 띄는 리플로우가 생겼었다.
+    # 최초 페이지 로드 시점의 세션은 어차피 'general'(기본 랜딩)인 경우가 대부분이므로,
+    # 서버가 이 시점에 이미 최종 순서로 HTML을 그려서 그 문제를 근본적으로 없앤다.
+    # localStorage에 저장된 마지막 세션 타입(성인/오디오북 등)은 서버가 알 수 없으므로
+    # 그 경우엔 static/js/dashboard.js가 기존처럼 클라이언트에서 재조회/재배치한다
+    # (services/home_dashboard_service.py 참고 - 두 경로가 같은 함수를 공유해 순서가 어긋나지 않음).
+    try:
+        from services.home_dashboard_service import HomeDashboardService
+        home_layout = HomeDashboardService.get_layout(session.get('user_id'), 'general')
+    except Exception as e:
+        print(f"[Index] 홈 대시보드 초기 레이아웃 계산 실패, 클래식 레이아웃으로 폴백: {e}")
+        home_layout = {'mode': 'classic', 'widgets': [], 'catalog': []}
+
+    return render_template(
+        'index.html', active_page='media_library', settings=settings,
+        view_log_enabled=view_log_enabled, develop_mode=develop_mode, home_layout=home_layout,
+    )
 
 @system_bp.route('/api/system/status', methods=['GET'])
 @login_required

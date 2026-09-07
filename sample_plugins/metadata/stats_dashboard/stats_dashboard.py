@@ -18,6 +18,18 @@ class StatsDashboardMetadataProvider(BaseMetadataProvider):
         "limit": 3,
         "all_desk_tab": True,
     }
+    # home_widget 참조 구현: 사용자가 "내 설정 > 홈 화면 플러그인 배치 모드"를 켰을 때만
+    # 실제 홈 대시보드에도 노출된다. get_dashboard_data()를 그대로 재사용하므로 신규
+    # 메서드가 필요 없다 (docs/guide_plugins.md §5-1 참고).
+    home_widget = {
+        "title": "독서 통계",
+        "subtitle": "주간/월간 독서 및 라이브러리 요약",
+        "provider": "BookOasis",
+        "icon": "fa-solid fa-chart-column",
+        "order": 60,
+        "limit": 3,
+        "sessions": "all",
+    }
     category_tab = {
         "title": "독서 통계 센터",
         "icon": "fa-solid fa-chart-column",

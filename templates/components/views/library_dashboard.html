@@ -1,4 +1,70 @@
 <!-- templates/components/views/library_dashboard.html -->
+{% set home_layout = home_layout|default({'mode': 'classic', 'widgets': [], 'catalog': []}) %}
+
+{% macro core_reading_insights_slot(hidden=False) %}
+<div class="home-widget-slot home-widget-slot--full" id="home-widget-core.reading_insights" data-widget-id="core.reading_insights"{% if hidden %} style="display:none;"{% endif %}>
+    {% include "components/dashboard_reading_insights.html" %}
+</div>
+{% endmacro %}
+
+{% macro core_recent_slot(hidden=False) %}
+<div class="dashboard-section home-widget-slot home-widget-slot--full" id="home-widget-core.recent" data-widget-id="core.recent"{% if hidden %} style="display:none;"{% endif %}>
+    <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
+        <h3 class="section-title" style="margin: 0; color: var(--app-text-primary); font-size: 1rem; font-weight: 700;"><i class="fa-solid fa-clock-rotate-left" style="color: var(--app-accent); margin-right: 0.5rem;"></i> <span id="dashboard-recent-title" data-i18n="dashboard.recent_title">최근 읽은 도서</span><span id="dashboard-recent-title-suffix" style="margin-left: 0.35rem; font-size: 0.82em; font-weight: 500; color: var(--app-text-muted);">(시리즈기준)</span></h3>
+        <div class="section-nav-btns" style="display: flex; gap: 0.5rem; align-items: center;">
+            <button data-scroll-row-nav="dashboard-history-row" data-dir="left" class="btn-nav-arrow" data-i18n-title="common.prev" title="이전"><i class="fa-solid fa-chevron-left"></i></button>
+            <button data-scroll-row-nav="dashboard-history-row" data-dir="right" class="btn-nav-arrow" data-i18n-title="common.next" title="다음"><i class="fa-solid fa-chevron-right"></i></button>
+            <button type="button" class="home-widget-remove-btn" data-remove-widget-id="core.recent" title="홈 화면에서 위젯 제거"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+    </div>
+    <div class="dashboard-row-container" id="dashboard-history-row">
+        <!-- JS에 의해 채워짐 -->
+    </div>
+</div>
+{% endmacro %}
+
+{% macro core_new_slot(hidden=False) %}
+<div class="dashboard-section home-widget-slot home-widget-slot--full" id="home-widget-core.new" data-widget-id="core.new"{% if hidden %} style="display:none;"{% endif %}>
+    <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
+        <h3 class="section-title" style="margin: 0; color: var(--app-text-primary); font-size: 1rem; font-weight: 700;"><i class="fa-solid fa-square-plus" style="color: var(--app-accent); margin-right: 0.5rem;"></i> <span id="dashboard-new-title" data-i18n="dashboard.new_books_title">신규 추가 도서</span></h3>
+        <div class="section-nav-btns" style="display: flex; gap: 0.5rem; align-items: center;">
+            <button data-scroll-row-nav="dashboard-new-row" data-dir="left" class="btn-nav-arrow" data-i18n-title="common.prev" title="이전"><i class="fa-solid fa-chevron-left"></i></button>
+            <button data-scroll-row-nav="dashboard-new-row" data-dir="right" class="btn-nav-arrow" data-i18n-title="common.next" title="다음"><i class="fa-solid fa-chevron-right"></i></button>
+            <button type="button" class="home-widget-remove-btn" data-remove-widget-id="core.new" title="홈 화면에서 위젯 제거"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+    </div>
+    <div class="dashboard-row-container" id="dashboard-new-row">
+        <!-- JS에 의해 채워짐 -->
+    </div>
+</div>
+{% endmacro %}
+
+{% macro core_slot(widget_id, hidden=False) %}
+{%- if widget_id == 'core.reading_insights' -%}{{ core_reading_insights_slot(hidden) }}
+{%- elif widget_id == 'core.recent' -%}{{ core_recent_slot(hidden) }}
+{%- elif widget_id == 'core.new' -%}{{ core_new_slot(hidden) }}
+{%- endif -%}
+{% endmacro %}
+
+{% macro plugin_widget_card(w) %}
+{%- if w.layout == 'grid' and w.size == 2 -%}{% set layout_class = ' home-widget-slot--span-2' %}
+{%- elif w.layout == 'grid' and w.size == 3 -%}{% set layout_class = ' home-widget-slot--span-3' %}
+{%- elif w.layout == 'grid' -%}{% set layout_class = '' %}
+{%- else -%}{% set layout_class = ' home-widget-slot--full' %}
+{%- endif -%}
+<div class="plugin-card home-widget-slot{{ layout_class }}" id="home-widget-{{ w.id }}" data-widget-id="{{ w.id }}" data-widget-kind="plugin" data-plugin-id="{{ w.plugin_id }}" data-limit="{{ w.limit }}"{% if w.hidden %} style="display:none;"{% endif %}>
+    <h4 class="plugin-card-header">
+        <span class="plugin-card-header-title"><i class="{{ w.icon or 'fa-solid fa-puzzle-piece' }}"></i><span class="plugin-card-header-title-text">{{ w.title }}</span></span>
+        <span class="plugin-card-provider">제공: {{ w.provider or w.title }}</span>
+        <button type="button" class="home-widget-remove-btn" data-remove-widget-id="{{ w.id }}" title="홈 화면에서 위젯 제거"><i class="fa-solid fa-xmark"></i></button>
+    </h4>
+    {% if w.subtitle %}<div class="plugin-widget-subtitle">{{ w.subtitle }}</div>{% endif %}
+    <div id="home-widget-content-{{ w.id }}" class="plugin-widget-body">
+        <div class="loading-spinner loading-spinner--widget"><i class="fa-solid fa-circle-notch fa-spin"></i> 위젯 데이터를 불러오는 중...</div>
+    </div>
+</div>
+{% endmacro %}
+
 <div id="library-dashboard-view" style="display: none; flex-direction: column; gap: 0.9rem;">
     <!-- -1. 플러그인 로드 상태 알림 패널 (관리자 전용, 기본 숨김 – JS가 role 확인 후 데이터 채워서 노출) -->
     <div id="plugin-health-panel" class="plugin-health-panel" style="display: none;">
@@ -11,41 +77,44 @@
         <div id="plugin-health-panel-details" class="plugin-health-panel-details" style="display: none;"></div>
     </div>
 
-    <!-- 0. 독서 동기부여 위젯 라인 (Reading Insights) -->
-    {% include "components/dashboard_reading_insights.html" %}
-
-    <!-- 위젯 & 최근 읽은 도서 사이 얇은 구분선 -->
-    <hr id="dashboard-insights-divider" style="border: none; border-top: 1px solid rgba(255, 255, 255, 0.08); margin: 0.1rem 0;" />
-
-    <!-- 1. 최근 읽은 도서 섹션 -->
-    <div class="dashboard-section">
-        <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
-            <h3 class="section-title" style="margin: 0; color: var(--app-text-primary); font-size: 1rem; font-weight: 700;"><i class="fa-solid fa-clock-rotate-left" style="color: var(--app-accent); margin-right: 0.5rem;"></i> <span id="dashboard-recent-title" data-i18n="dashboard.recent_title">최근 읽은 도서</span><span id="dashboard-recent-title-suffix" style="margin-left: 0.35rem; font-size: 0.82em; font-weight: 500; color: var(--app-text-muted);">(시리즈기준)</span></h3>
-            <div class="section-nav-btns" style="display: flex; gap: 0.5rem;">
-                <button data-scroll-row-nav="dashboard-history-row" data-dir="left" class="btn-nav-arrow" data-i18n-title="common.prev" title="이전"><i class="fa-solid fa-chevron-left"></i></button>
-                <button data-scroll-row-nav="dashboard-history-row" data-dir="right" class="btn-nav-arrow" data-i18n-title="common.next" title="다음"><i class="fa-solid fa-chevron-right"></i></button>
-            </div>
-        </div>
-        <div class="dashboard-row-container" id="dashboard-history-row">
-            <!-- JS에 의해 채워짐 -->
-        </div>
+    <!-- 코어 3섹션 + (홈 플러그인 배치 모드 시) 플러그인 위젯이 이 안에서 함께 재배치된다.
+         서버(services/home_dashboard_service.py)가 최초 로드 시점에 이미 최종 순서를 계산해서
+         여기 그대로 렌더링한다 - 예전엔 코어 위젯이 기본 배치로 먼저 그려졌다가 JS가 나중에
+         재배치/카드 삽입을 하면서 눈에 띄는 리플로우가 있었는데, 서버가 처음부터 올바른 순서로
+         내려주면 그 문제 자체가 생기지 않는다. localStorage에 저장된 세션 타입이 'general'이
+         아니면(성인/오디오북 등) 서버는 알 수 없으므로, 그 경우엔 static/js/dashboard.js의
+         loadHomeDashboardLayout()이 기존처럼 /api/media/home-layout을 다시 조회해 재배치한다
+         (data-ssr-type이 실제 targetType과 다르면 JS가 이걸 감지해서 재조회로 넘어간다).
+         CSS Grid라서 위젯마다 'full'(1열 전체 차지)/'grid'(카드처럼 한 행에 나란히) 중 선언대로
+         자동으로 자리를 잡는다. docs/plan_home_dashboard_pluginization.md 참고. -->
+    <div id="home-widget-stack" class="home-widget-stack{% if home_layout.mode == 'plugin' %} home-widget-stack--plugin-mode{% endif %}" data-ssr-mode="{{ home_layout.mode }}" data-ssr-type="general">
+{% if home_layout.mode == 'plugin' %}
+{% set rendered_ids = home_layout.widgets | map(attribute='id') | list %}
+{% for w in home_layout.widgets %}
+{% if w.kind == 'core' %}{{ core_slot(w.id, hidden=w.hidden) }}{% else %}{{ plugin_widget_card(w) }}{% endif %}
+{% endfor %}
+{% for cid in ['core.reading_insights', 'core.recent', 'core.new'] %}
+{% if cid not in rendered_ids %}{{ core_slot(cid, hidden=True) }}{% endif %}
+{% endfor %}
+{% else %}
+{{ core_reading_insights_slot() }}
+{{ core_recent_slot() }}
+{{ core_new_slot() }}
+{% endif %}
     </div>
 
-    <!-- 최근 읽은 도서 & 신규 추가 도서 사이 얇은 구분선 -->
-    <hr style="border: none; border-top: 1px solid rgba(255, 255, 255, 0.08); margin: 0.1rem 0;" />
-
-    <!-- 2. 신규 추가 도서 섹션 -->
-    <div class="dashboard-section">
-        <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
-            <h3 class="section-title" style="margin: 0; color: var(--app-text-primary); font-size: 1rem; font-weight: 700;"><i class="fa-solid fa-square-plus" style="color: var(--app-accent); margin-right: 0.5rem;"></i> <span id="dashboard-new-title" data-i18n="dashboard.new_books_title">신규 추가 도서</span></h3>
-            <div class="section-nav-btns" style="display: flex; gap: 0.5rem;">
-                <button data-scroll-row-nav="dashboard-new-row" data-dir="left" class="btn-nav-arrow" data-i18n-title="common.prev" title="이전"><i class="fa-solid fa-chevron-left"></i></button>
-                <button data-scroll-row-nav="dashboard-new-row" data-dir="right" class="btn-nav-arrow" data-i18n-title="common.next" title="다음"><i class="fa-solid fa-chevron-right"></i></button>
-            </div>
-        </div>
-        <div class="dashboard-row-container" id="dashboard-new-row">
-            <!-- JS에 의해 채워짐 -->
-        </div>
+    <!-- 홈 화면 플러그인 배치 모드에서, 아직 추가하지 않은 home_widget 플러그인을 고르는 UI.
+         서버가 최초 렌더 시 이미 채워두고(catalog), 이후 세션 전환/추가/제거 시에는
+         dashboard.js의 renderHomeWidgetCatalog()가 /api/media/home-layout 결과로 다시 그린다. -->
+    <div id="home-widget-catalog" class="home-widget-catalog"{% if not home_layout.catalog %} style="display: none;"{% else %} style="display: flex;"{% endif %}>
+{% if home_layout.catalog %}
+        <span class="home-widget-catalog-label"><i class="fa-solid fa-plus"></i> 위젯 추가:</span>
+{% for c in home_layout.catalog %}
+        <button type="button" class="home-widget-catalog-btn" data-add-widget-id="{{ c.id }}">
+            <i class="{{ c.icon or 'fa-solid fa-puzzle-piece' }}"></i> {{ c.title }}
+        </button>
+{% endfor %}
+{% endif %}
     </div>
 
     <div style="display: flex; justify-content: flex-end; margin-top: 0.5rem; padding-bottom: 0;">

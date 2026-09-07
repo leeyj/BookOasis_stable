@@ -66,9 +66,10 @@ export function toggleDashboardInsightsSetting(enabled) {
   localStorage.setItem('show_dashboard_insights', isShow ? '1' : '0');
 
   const container = document.querySelector('.dashboard-insights-container');
-  const divider = document.getElementById('dashboard-insights-divider');
+  const slot = document.querySelector('[data-widget-id="core.reading_insights"]');
   if (container) container.style.display = isShow ? 'block' : 'none';
-  if (divider) divider.style.display = isShow ? 'block' : 'none';
+  if (slot) slot.style.display = isShow ? '' : 'none';
+  window.refreshHomeWidgetDividers?.();
 }
 
 if (typeof window !== 'undefined') {

@@ -398,6 +398,12 @@ export async function updateUserSetting(key, value) {
   return res.json();
 }
 
+// 홈 화면 플러그인 배치 모드일 때의 위젯 순서/숨김 상태 조회 (꺼져 있으면 mode:'classic')
+export async function fetchHomeLayout(dbType) {
+  const res = await fetch(`/api/media/home-layout?type=${dbType}`);
+  return res.json();
+}
+
 // themes/*.yaml 검증 통과분의 id/label 목록 (테마 선택 드롭다운 동적 렌더링용)
 export async function fetchCustomThemes() {
   const res = await fetch('/api/media/settings/custom-themes');

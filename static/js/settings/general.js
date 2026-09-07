@@ -10,6 +10,7 @@ import { changeDashboardTheme, populateCustomThemeOptions, rescanCustomThemesUi,
 import { startCoverStorageMigration } from './cover_storage_settings.js';
 import { getTempShortcut, setTempShortcut, initShortcutRecorderEvents } from './shortcut_recorder.js';
 import { runVaapiCheck, triggerLazyScanNow } from './system_actions.js';
+import { loadHomeDashboardLayout } from '../dashboard.js';
 
 function initGeneralDelegation() {
   if (window.__generalDelegationBound) return;
@@ -172,6 +173,9 @@ export function applySettingsToUI(settings) {
   }
   if (settings.BOOK_RECOMMEND_ENABLED !== undefined) {
     state.bookRecommendEnabled = (settings.BOOK_RECOMMEND_ENABLED !== '0');
+  }
+  if (settings.HOME_DASHBOARD_PLUGIN_MODE !== undefined) {
+    state.homeDashboardPluginMode = (settings.HOME_DASHBOARD_PLUGIN_MODE === '1');
   }
 
   if (typeof window !== 'undefined') {
@@ -523,6 +527,9 @@ export async function loadMySettings() {
 
     const bookRecommendEnabledEl = document.getElementById('my-setting-book-recommend-enabled');
     if (bookRecommendEnabledEl) bookRecommendEnabledEl.checked = (s.BOOK_RECOMMEND_ENABLED !== '0');
+
+    const homeDashboardPluginModeEl = document.getElementById('my-setting-home-dashboard-plugin-mode');
+    if (homeDashboardPluginModeEl) homeDashboardPluginModeEl.checked = (s.HOME_DASHBOARD_PLUGIN_MODE === '1');
   } catch (err) {
     console.error('[Settings] 내 설정 로드 에러:', err);
   }
@@ -547,6 +554,7 @@ export async function submitMySettings(event) {
   const showTxtNoCoverInfoBanner = document.getElementById('my-setting-show-txt-no-cover-info-banner')?.checked ? '1' : '0';
   const smartRecommendEnabled = document.getElementById('my-setting-smart-recommend-enabled')?.checked ? '1' : '0';
   const bookRecommendEnabled = document.getElementById('my-setting-book-recommend-enabled')?.checked ? '1' : '0';
+  const homeDashboardPluginMode = document.getElementById('my-setting-home-dashboard-plugin-mode')?.checked ? '1' : '0';
 
   try {
     // 테마/대시보드 표시는 로컬스토리지에도 즉시 반영 (change 핸들러와 별개로 폼 제출 시에도 보장)
@@ -569,7 +577,8 @@ export async function submitMySettings(event) {
       api.updateUserSetting('TAG_FILTER_SEARCH_SCOPE_ALL', tagFilterScopeAll),
       api.updateUserSetting('SHOW_TXT_NO_COVER_INFO_BANNER', showTxtNoCoverInfoBanner),
       api.updateUserSetting('SMART_RECOMMEND_ENABLED', smartRecommendEnabled),
-      api.updateUserSetting('BOOK_RECOMMEND_ENABLED', bookRecommendEnabled)
+      api.updateUserSetting('BOOK_RECOMMEND_ENABLED', bookRecommendEnabled),
+      api.updateUserSetting('HOME_DASHBOARD_PLUGIN_MODE', homeDashboardPluginMode)
     ]);
     const failed = results.find(r => !r.success);
 
@@ -592,11 +601,18 @@ export async function submitMySettings(event) {
         TAG_FILTER_SEARCH_SCOPE_ALL: tagFilterScopeAll,
         SHOW_TXT_NO_COVER_INFO_BANNER: showTxtNoCoverInfoBanner,
         SMART_RECOMMEND_ENABLED: smartRecommendEnabled,
-        BOOK_RECOMMEND_ENABLED: bookRecommendEnabled
+        BOOK_RECOMMEND_ENABLED: bookRecommendEnabled,
+        HOME_DASHBOARD_PLUGIN_MODE: homeDashboardPluginMode
       });
       loadMySettings();
       if (typeof window.loadLibraries === 'function') {
         window.loadLibraries();
+      }
+      // 홈 화면에 있는 상태에서 모드를 바꾼 경우 새로고침 없이 바로 반영
+      if (state.currentLibraryId === 'home') {
+        loadHomeDashboardLayout(state.currentLibraryType || 'general').catch((e) => {
+          console.error('[Settings] 홈 위젯 레이아웃 즉시 반영 실패:', e);
+        });
       }
       if (smartRecommendEnabled === '0' && state.currentLibraryId === 'smart_rec' && typeof window.selectCategory === 'function') {
         window.selectCategory('home');

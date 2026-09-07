@@ -293,7 +293,19 @@ export async function loadLibraries() {
   const sidebar = document.getElementById('sidebar-categories');
   if (!sidebar) return;
   try {
-    const data = await api.fetchLibraries(state.currentLibraryType);
+    // 두 요청 모두 이 시점 기준으로 즉시 병렬 발사한다 - category-plugins는 원래 라이브러리
+    // 목록을 다 받은 "뒤에" 순차로 조회했는데, 세션(일반/성인/오디오북 등) 전환마다 이
+    // 두 왕복이 그대로 직렬로 쌓여 체감 지연의 큰 축이었다. 실제 사용은 아래 그룹 렌더링
+    // 시점이라 그때까지 기다렸다가 await해도 결과는 동일하다.
+    const librariesPromise = api.fetchLibraries(state.currentLibraryType);
+    const categoryPluginsPromise = fetch(`/api/media/category-plugins?type=${state.currentLibraryType}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .catch((e) => {
+        console.warn('[Category] Failed to fetch category plugins:', e);
+        return null;
+      });
+
+    const data = await librariesPromise;
     if (data.success) {
       state.libraryGroups = Array.isArray(data.groups) ? data.groups : [];
       const isPinned = localStorage.getItem('category_order_pinned') !== 'false';
@@ -376,18 +388,12 @@ export async function loadLibraries() {
         librariesByGroup.get(groupKey).push(lib);
       });
 
-      // 동적 카테고리 레벨 플러그인 탭 조회 (그룹 렌더링보다 먼저 수행해야 그룹 내부에 배치 가능)
+      // 동적 카테고리 레벨 플러그인 탭 - libraries와 이미 병렬로 요청해둔 결과를 여기서 받는다
+      // (그룹 렌더링보다 먼저 수행해야 그룹 내부에 배치 가능)
       let categoryPlugins = [];
-      try {
-        const catPluginRes = await fetch(`/api/media/category-plugins?type=${state.currentLibraryType}`);
-        if (catPluginRes.ok) {
-          const catPluginData = await catPluginRes.json();
-          if (catPluginData.success && Array.isArray(catPluginData.category_plugins)) {
-            categoryPlugins = catPluginData.category_plugins;
-          }
-        }
-      } catch (e) {
-        console.warn('[Category] Failed to fetch category plugins:', e);
+      const catPluginData = await categoryPluginsPromise;
+      if (catPluginData && catPluginData.success && Array.isArray(catPluginData.category_plugins)) {
+        categoryPlugins = catPluginData.category_plugins;
       }
 
       const validGroupIds = new Set(state.libraryGroups.map((g) => String(g.id)));
