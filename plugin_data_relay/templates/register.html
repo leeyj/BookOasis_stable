@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plugin Data Relay - 플러그인 등록</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            min-height: 100vh;
+            padding: 40px 16px;
+        }
+        .form-card {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 32px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+        .field-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .form-control, .form-select {
+            background-color: #0f172a;
+            color: #f8fafc;
+            border: 1px solid #334155;
+        }
+        .form-control:focus, .form-select:focus {
+            background-color: #0f172a;
+            color: #f8fafc;
+            border-color: #2563eb;
+            box-shadow: none;
+        }
+        .btn-primary {
+            background-color: #2563eb;
+            border: none;
+        }
+        .btn-primary:hover {
+            background-color: #3b82f6;
+        }
+        .secret-box {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            background-color: #0f172a;
+            color: #38bdf8;
+            border: 1px solid #334155;
+            padding: 12px;
+            border-radius: 8px;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="form-card">
+        <div class="text-center mb-4">
+            <i class="bi bi-puzzle-fill text-info display-4 mb-2"></i>
+            <h4 class="fw-bold">플러그인 데이터 릴레이 등록</h4>
+            <p class="text-muted small">plugin_id와 최대 {{ max_fields }}개의 필드를 정의하면 전용 저장 테이블이 자동 생성됩니다.</p>
+            <p class="text-muted small">개발자 계정이 없으신가요? <a href="/regi_user" class="text-info">여기서 먼저 등록</a>하세요.</p>
+        </div>
+
+        <div id="alertBox"></div>
+
+        <form id="registerForm">
+            <div class="mb-3">
+                <label class="form-label small fw-bold">Developer ID</label>
+                <input type="text" class="form-control" id="developerId" placeholder="/regi_user에서 발급받은 developer_id" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-bold">Developer Secret</label>
+                <input type="text" class="form-control" id="developerSecret" placeholder="/regi_user에서 발급받은 developer_secret" required>
+            </div>
+            <hr class="border-secondary">
+            <div class="mb-3">
+                <label class="form-label small fw-bold">Plugin ID</label>
+                <input type="text" class="form-control" id="pluginId" placeholder="예: my_game_plugin (영문/숫자/밑줄, 31자 이내)" required>
+                <div class="form-text text-secondary">본인 BookOasis 플러그인의 <code>id</code>와 동일하게 입력하는 것을 권장합니다.</div>
+            </div>
+
+            <label class="form-label small fw-bold">필드 정의 (최소 1개, 최대 {{ max_fields }}개)</label>
+            <div id="fieldsContainer"></div>
+            <button type="button" class="btn btn-outline-info btn-sm mb-3" id="addFieldBtn">
+                <i class="bi bi-plus-lg me-1"></i>필드 추가
+            </button>
+
+            <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">
+                <i class="bi bi-check-circle me-1"></i>등록
+            </button>
+        </form>
+    </div>
+
+    <script>
+        const MAX_FIELDS = {{ max_fields }};
+        const fieldsContainer = document.getElementById('fieldsContainer');
+        const addFieldBtn = document.getElementById('addFieldBtn');
+        const alertBox = document.getElementById('alertBox');
+
+        function addFieldRow() {
+            if (fieldsContainer.children.length >= MAX_FIELDS) return;
+            const row = document.createElement('div');
+            row.className = 'field-row';
+            row.innerHTML = `
+                <input type="text" class="form-control field-name" placeholder="필드명 (예: score)">
+                <select class="form-select field-type" style="max-width: 140px;">
+                    <option value="TEXT">TEXT</option>
+                    <option value="INTEGER">INTEGER</option>
+                    <option value="REAL">REAL</option>
+                </select>
+                <button type="button" class="btn btn-outline-danger remove-field"><i class="bi bi-x-lg"></i></button>
+            `;
+            row.querySelector('.remove-field').addEventListener('click', () => row.remove());
+            fieldsContainer.appendChild(row);
+        }
+
+        addFieldBtn.addEventListener('click', addFieldRow);
+        addFieldRow();
+
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            alertBox.innerHTML = '';
+
+            const developerId = document.getElementById('developerId').value.trim();
+            const developerSecret = document.getElementById('developerSecret').value.trim();
+            const pluginId = document.getElementById('pluginId').value.trim();
+            const fields = Array.from(fieldsContainer.querySelectorAll('.field-row')).map(row => ({
+                name: row.querySelector('.field-name').value.trim(),
+                type: row.querySelector('.field-type').value,
+            })).filter(f => f.name);
+
+            if (!fields.length) {
+                alertBox.innerHTML = `<div class="alert alert-danger py-2 small">필드를 1개 이상 입력하세요.</div>`;
+                return;
+            }
+
+            const res = await fetch('/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    developer_id: developerId,
+                    developer_secret: developerSecret,
+                    plugin_id: pluginId,
+                    fields,
+                }),
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                alertBox.innerHTML = `
+                    <div class="alert alert-success small">
+                        <div class="fw-bold mb-2"><i class="bi bi-hourglass-split me-1"></i>등록 신청 완료! 관리자 승인 후 사용 가능합니다. plugin_secret은 지금만 표시되니 반드시 저장하세요.</div>
+                        <div class="secret-box">${data.plugin_secret}</div>
+                    </div>`;
+            } else {
+                alertBox.innerHTML = `<div class="alert alert-danger py-2 small"><i class="bi bi-exclamation-triangle-fill me-1"></i>${data.message}</div>`;
+            }
+        });
+    </script>
+</body>
+</html>

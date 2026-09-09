@@ -10,6 +10,13 @@ MEDIA_SERVER_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if MEDIA_SERVER_DIR not in sys.path:
     sys.path.append(MEDIA_SERVER_DIR)
 
+# scanner_queue.py가 이 파일을 별도 OS 프로세스(subprocess.Popen)로 띄우므로 여기서도
+# 개별적으로 호출해야 한다 - 자세한 이유는 utils/encoding_helper.py 참고 (Windows
+# CP949 콘솔에서 setup_lazy_scanner_logging()의 custom_print가 이모지/한글을 콘솔에
+# 직접 출력할 때 깨지거나 UnicodeEncodeError가 나는 문제 방지).
+from utils.encoding_helper import force_utf8_stdio
+force_utf8_stdio()
+
 import builtins
 import datetime
 import database

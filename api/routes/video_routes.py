@@ -524,6 +524,29 @@ def video_progress_api(vid):
         return jsonify({'success': True, 'progress': progress_row})
 
 
+def _count_active_ffmpeg_processes():
+    """/proc를 스캔해 현재 컨테이너 안에서 실행 중인 ffmpeg 프로세스 수를 센다(procps 같은
+    별도 패키지 설치 없이 확인 가능). VAAPI 점검이 간헐적으로 8초 타임아웃 나는 현상이
+    커뮤니티에서 보고됐는데, 점검 자체가 쓰는 명령(-hwaccels 등)은 GPU/디바이스를 전혀
+    건드리지 않는 가벼운 조회라 디바이스 경합으로는 설명이 안 되고, 실제로는 다른 영상이
+    이미 CPU 트랜스코딩 중이어서 저사양 환경의 CPU 스케줄링 경합으로 이 점검용 ffmpeg조차
+    8초 안에 못 끝나는 것으로 추정된다. 원인 파악을 위해 점검 결과에 이 수치를 노출한다."""
+    count = 0
+    try:
+        for pid in os.listdir('/proc'):
+            if not pid.isdigit():
+                continue
+            try:
+                with open(f'/proc/{pid}/comm', 'r') as f:
+                    if f.read().strip() == 'ffmpeg':
+                        count += 1
+            except (OSError, PermissionError):
+                continue
+    except OSError:
+        return None
+    return count
+
+
 def _run_cmd(cmd, timeout=8):
     """서브프로세스를 실행하고 (returncode, 출력) 튜플을 반환. 실행 파일이 없으면 (None, 에러메시지)."""
     try:
@@ -555,9 +578,16 @@ def check_vaapi_support():
         'device_exists': os.path.exists(device_path),
         'vainfo_found': False,
         'vainfo_output': None,
+        'active_ffmpeg_count': None,
         'overall': 'unavailable',
         'detail': [],
     }
+
+    active_ffmpeg_count = _count_active_ffmpeg_processes()
+    result['active_ffmpeg_count'] = active_ffmpeg_count
+    if active_ffmpeg_count is not None:
+        note = ' (CPU 경합으로 이 점검 자체가 타임아웃될 수 있음)' if active_ffmpeg_count > 0 else ''
+        result['detail'].append(f'[동시 실행 중인 ffmpeg] {active_ffmpeg_count}개{note}')
 
     rc, out = _run_cmd(['ffmpeg', '-hide_banner', '-hwaccels'])
     if rc is None:

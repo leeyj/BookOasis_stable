@@ -572,8 +572,15 @@ class MetadataFactory:
         return providers
 
     @classmethod
-    def get_available_providers(cls):
-        """Return all discovered providers (including non-searchable) with enabled/config state."""
+    def get_available_providers(cls, include_view_ui=True, include_settings_ui=True):
+        """Return all discovered providers (including non-searchable) with enabled/config state.
+
+        include_view_ui/include_settings_ui: 대부분의 호출부(사이드바 카테고리 탭, 대시보드
+        위젯 목록, 권한 매트릭스 등)는 category_tab/home_widget 같은 가벼운 메타데이터만
+        필요한데도, 예전엔 여기서 플러그인마다 무조건 UI 번들 파일(index.html/style.css/
+        script.js, settings.*)을 디스크에서 읽어 응답에 실어 날랐다 - 사이드바 부문 전환마다
+        느껴지던 지연의 실제 원인. 번들 파일 자체가 필요한 소수 호출부만 명시적으로 True를
+        넘기도록 하고, 기본값은 기존 동작과 동일하게 유지한다."""
         providers = []
 
         import database
@@ -628,13 +635,15 @@ class MetadataFactory:
                     'update_manifest': p_update_manifest,
                 }
 
-                settings_ui = cls._load_plugin_ui_bundle(p_id, target='settings')
-                if settings_ui:
-                    provider_item['settings_ui'] = settings_ui
+                if include_settings_ui:
+                    settings_ui = cls._load_plugin_ui_bundle(p_id, target='settings')
+                    if settings_ui:
+                        provider_item['settings_ui'] = settings_ui
 
-                view_ui = cls._load_plugin_ui_bundle(p_id, target='view')
-                if view_ui:
-                    provider_item['ui'] = view_ui
+                if include_view_ui:
+                    view_ui = cls._load_plugin_ui_bundle(p_id, target='view')
+                    if view_ui:
+                        provider_item['ui'] = view_ui
 
                 providers.append(provider_item)
             except Exception as e:
@@ -680,7 +689,7 @@ class MetadataFactory:
         활성화 플러그인에 한해 호출해 상시 백그라운드 서비스(예: 파일시스템 워처)를
         기동시킨다. 플러그인 하나의 실패가 앱 부팅을 막지 않도록 개별적으로 감싼다."""
         try:
-            providers = cls.get_available_providers()
+            providers = cls.get_available_providers(include_view_ui=False, include_settings_ui=False)
         except Exception as e:
             print(f"[MetadataFactory] start_all_plugin_background_services: provider list load failed: {e}")
             return

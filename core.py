@@ -8,6 +8,11 @@ from urllib.parse import urlencode
 from dotenv import load_dotenv
 load_dotenv()
 
+# 다른 어떤 print()보다 먼저 실행되어야 한다 - Windows(특히 한국어 로캘, CP949) 콘솔에서
+# 로그의 한글/이모지가 깨지거나 UnicodeEncodeError가 나는 문제의 근본 수정.
+from utils.encoding_helper import force_utf8_stdio
+force_utf8_stdio()
+
 from utils.engine_signature import ENGINE_NAME, ENGINE_SIGNATURE, ENGINE_LICENSE
 
 # 자식 워커 프로세스 여부 감지

@@ -99,7 +99,9 @@ def get_metadata_plugins_manage_api():
     """환경설정 > 플러그인 관리에 표시할 전체 메타데이터 플러그인 목록 조회"""
     try:
         from services.metadata_factory import MetadataFactory
-        plugins = MetadataFactory.get_available_providers()
+        # 이 화면은 플러그인별 커스텀 설정 패널(settings_ui)만 렌더링하고 카테고리
+        # 뷰 번들(view ui)은 안 쓰므로 view는 뺀다.
+        plugins = MetadataFactory.get_available_providers(include_view_ui=False)
         return jsonify({'success': True, 'plugins': plugins})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -271,7 +273,7 @@ def get_dashboard_widgets_api():
     db_type = request.args.get('type', 'general').strip()
     try:
         from services.metadata_factory import MetadataFactory
-        providers = MetadataFactory.get_available_providers()
+        providers = MetadataFactory.get_available_providers(include_view_ui=False, include_settings_ui=False)
 
         active_widgets = []
         for p in providers:
@@ -361,7 +363,7 @@ def get_detail_sidebar_widgets_api():
 
     try:
         from services.metadata_factory import MetadataFactory
-        providers = MetadataFactory.get_available_providers()
+        providers = MetadataFactory.get_available_providers(include_view_ui=False, include_settings_ui=False)
 
         active_widgets = []
         for p in providers:
@@ -413,7 +415,10 @@ def get_category_plugins_api():
     try:
         from services.metadata_factory import MetadataFactory
         from services.category_service import CategoryService
-        providers = MetadataFactory.get_available_providers()
+        # 사이드바는 name/icon/order 등 가벼운 메타데이터만 필요하다 - UI 번들은 실제로
+        # 화면을 열 때 /api/media/plugins/<id>/ui가 따로 불러온다 (아래 category_tab 조립부
+        # 참고, 'ui' 필드를 응답에 넣지 않는 이유이기도 하다).
+        providers = MetadataFactory.get_available_providers(include_view_ui=False, include_settings_ui=False)
 
         perm_map = {}
         if user_id and user_role != 'admin':
@@ -456,7 +461,6 @@ def get_category_plugins_api():
                     'title': cat_tab.get('title') or p.get('name'),
                     'icon': cat_tab.get('icon') or 'fa-solid fa-puzzle-piece',
                     'order': order_val,
-                    'ui': p.get('ui'),
                     'group_id': plugin_group_map.get(p.get('id'))
                 })
             except Exception as plugin_err:
@@ -498,7 +502,7 @@ def get_book_context_menu_plugin_items_api():
     try:
         from services.metadata_factory import MetadataFactory
 
-        providers = MetadataFactory.get_available_providers()
+        providers = MetadataFactory.get_available_providers(include_view_ui=False, include_settings_ui=False)
         merged_items = []
 
         for provider_meta in providers:
@@ -629,7 +633,7 @@ def get_annotation_context_menu_plugin_items_api():
     try:
         from services.metadata_factory import MetadataFactory
 
-        providers = MetadataFactory.get_available_providers()
+        providers = MetadataFactory.get_available_providers(include_view_ui=False, include_settings_ui=False)
         merged_items = []
 
         for provider_meta in providers:

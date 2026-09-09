@@ -9,6 +9,11 @@ import { triggerAddLibrary, triggerAddLibraryGroup } from './crud_controller.js'
 // 고정 포함 전체 15개 이상부터 "더 보기" 버튼 노출
 const SIDEBAR_MORE_THRESHOLD = 15;
 
+// 부문(일반/성인/오디오북/영상) 빠른 연속 전환 시, 먼저 보낸 요청이 나중에 도착해
+// 최신 사이드바를 오래된 내용으로 덮어쓰는 것을 막기 위한 레이스 가드.
+// static/js/dashboard.js의 dashboardLoadToken/pluginsLoadToken과 동일한 관례.
+let sidebarLoadToken = 0;
+
 function getLegacyCustomOrderStorageKey(libraryType) {
   return `libraries_order_${libraryType}`;
 }
@@ -292,6 +297,7 @@ export async function loadLibraries() {
   window.loadLibraries = loadLibraries;
   const sidebar = document.getElementById('sidebar-categories');
   if (!sidebar) return;
+  const requestToken = ++sidebarLoadToken;
   try {
     // 두 요청 모두 이 시점 기준으로 즉시 병렬 발사한다 - category-plugins는 원래 라이브러리
     // 목록을 다 받은 "뒤에" 순차로 조회했는데, 세션(일반/성인/오디오북 등) 전환마다 이
@@ -438,6 +444,10 @@ export async function loadLibraries() {
       ungroupedPlugins.forEach((cp) => {
         html += renderPluginItem(cp);
       });
+
+      // 이 요청이 대기하는 동안 더 최근 부문 전환이 시작됐다면, 지금 막 완성한 이
+      // html은 이미 낡은 부문 것이므로 사이드바에 반영하지 않고 조용히 버린다.
+      if (requestToken !== sidebarLoadToken) return;
 
       sidebar.innerHTML = html;
       applySavedMixedOrder(sidebar);

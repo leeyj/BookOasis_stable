@@ -390,7 +390,14 @@ def run_scanner_worker_loop():
                         except Exception as summary_err:
                             sq.log(f"Series summary rebuild failed: db={summary_db_type}, error={summary_err}")
                     from services.series_service import SeriesService
-                    SeriesService.invalidate_all_books_cache()
+                    # 이 워커는 core.py가 subprocess.Popen으로 띄운 별도 OS 프로세스라
+                    # 로컬 clear()만으로는 실제 요청을 받는 웹(Flask) 프로세스의 캐시가
+                    # 지워지지 않는다. db_type을 넘겨 공유 epoch를 올려야 웹 프로세스도
+                    # 스스로 무효화를 감지한다 (series_service.py의 "크로스 프로세스
+                    # 캐시 무효화 신호" 참고) - 그래야 스캔 직후 새 표지가 재스캔 없이도
+                    # 보인다.
+                    for bumped_db_type in recent_added_db_types:
+                        SeriesService.invalidate_all_books_cache(db_type=bumped_db_type)
                 except Exception as cache_err:
                     sq.log(f"Failed to invalidate recently_added cache: {cache_err}")
 
@@ -449,7 +456,11 @@ def _process_lazy_scan(sq, task_id):
             env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True
+            # text=True만 쓰면 이 파이프를 부모 프로세스의 로캘 기본 인코딩(한국어
+            # Windows에서는 CP949)으로 디코딩한다 - 자식 쪽에서 UTF-8을 강제해도 이
+            # 디코딩 단계는 별개라 stderr 중계(크래시 로그) 텍스트가 깨질 수 있었다.
+            encoding='utf-8',
+            errors='replace'
         )
         stdout_data = ""
         stderr_data = ""

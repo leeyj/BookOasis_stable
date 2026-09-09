@@ -3,6 +3,7 @@ import os
 import re
 import hashlib
 import json
+import time
 from utils.cover_helper import get_cover_image_with_t, resolve_series_cover
 from repositories.series_repository import SeriesRepository
 
@@ -243,9 +244,82 @@ _TOTALS_CACHE = {}
 _TOTALS_CACHE_TTL = 30.0
 _TOTALS_REDIS_TTL = 300
 
+# ── [크로스 프로세스 캐시 무효화 신호] ──
+# 스캐너는 core.py의 start_scanner_worker_process()가 subprocess.Popen으로 띄우는
+# 완전히 별도의 OS 프로세스라, 스캔이 끝나서 이 워커 프로세스 안에서 위 3개
+# 전역 dict를 clear()해도 실제 요청을 받는 웹(Flask) 프로세스의 캐시는 그대로
+# 남는다 - 이게 "스캔 직후 커버가 안 보이다가 재스캔하면 보인다"는 버그의 원인이었다.
+# 그렇다고 캐시 자체(수천 건짜리 시리즈 목록)를 통째로 Redis에 올리면 Redis 미설정
+# 배포(REDIS_URL 없음 - utils/redis_helper.py 참고)에서는 무효화가 여전히 안 되고,
+# Redis가 있어도 매 요청마다 큰 payload 직렬화 비용만 늘어난다. 대신 "값이 바뀌었다"는
+# 신호(epoch)만 아주 저렴하게(Redis 있으면 Redis, 없으면 항상 존재하는 settings
+# 테이블) 공유하고, 각 웹 프로세스가 몇 초에 한 번씩만 그 신호를 확인해 필요할 때만
+# 자기 로컬 캐시를 비운다.
+_BOOKS_CACHE_EPOCH_CHECK_INTERVAL = 3.0
+_local_epoch_seen = {}
+_local_epoch_checked_at = {}
+
+
+def _books_cache_epoch_settings_key(db_type):
+    return f'BOOKS_CACHE_EPOCH_{db_type}'
+
+
+def _read_shared_books_cache_epoch(db_type):
+    """Redis가 있으면 Redis에서, 없으면 항상 단일 general DB로 고정되는 settings
+    테이블(SettingsRepository 참고)에서 공유 epoch 값을 읽는다."""
+    try:
+        from utils.redis_helper import redis_get
+        val = redis_get(f'cache:books_epoch:{db_type}')
+        if val is not None:
+            return val
+    except Exception:
+        pass
+    try:
+        from services.settings_service import SettingsService
+        return SettingsService.get(_books_cache_epoch_settings_key(db_type), '') or ''
+    except Exception:
+        return ''
+
+
+def _bump_shared_books_cache_epoch(db_type):
+    """스캐너 워커 등 다른 프로세스에서 도서 목록이 바뀌었음을 알릴 때 호출한다."""
+    new_epoch = str(time.time())
+    try:
+        from utils.redis_helper import redis_set
+        redis_set(f'cache:books_epoch:{db_type}', new_epoch, ex=86400)
+    except Exception:
+        pass
+    try:
+        from services.settings_service import SettingsService
+        SettingsService.set(_books_cache_epoch_settings_key(db_type), new_epoch)
+    except Exception:
+        pass
+    _local_epoch_seen[db_type] = new_epoch
+    _local_epoch_checked_at[db_type] = time.time()
+
+
+def _sync_local_books_cache_with_shared_epoch(db_type):
+    """이 프로세스의 로컬 캐시가 다른 프로세스의 무효화를 놓치지 않았는지 확인한다.
+    매 요청마다 확인하면 로컬 캐시를 두는 의미가 없어지므로
+    _BOOKS_CACHE_EPOCH_CHECK_INTERVAL 간격으로만 저렴하게 확인(스로틀링)한다."""
+    now = time.time()
+    if now - _local_epoch_checked_at.get(db_type, 0.0) < _BOOKS_CACHE_EPOCH_CHECK_INTERVAL:
+        return
+    _local_epoch_checked_at[db_type] = now
+    current_epoch = _read_shared_books_cache_epoch(db_type)
+    seen_epoch = _local_epoch_seen.get(db_type)
+    if seen_epoch is not None and seen_epoch != current_epoch:
+        _ALL_BOOKS_CACHE.clear()
+        _LIST_QUERY_CACHE.clear()
+        _TOTALS_CACHE.clear()
+    _local_epoch_seen[db_type] = current_epoch
+
+
 class SeriesService:
     @staticmethod
-    def invalidate_all_books_cache():
+    def invalidate_all_books_cache(db_type=None):
+        """도서 목록 캐시를 비운다. db_type을 넘기면 다른 프로세스(스캐너 워커 등)에도
+        전달되도록 공유 epoch를 갱신한다 - 위 "크로스 프로세스 캐시 무효화 신호" 참고."""
         global _ALL_BOOKS_CACHE, _LIST_QUERY_CACHE, _TOTALS_CACHE
         _ALL_BOOKS_CACHE.clear()
         _LIST_QUERY_CACHE.clear()
@@ -255,11 +329,14 @@ class SeriesService:
             redis_delete_pattern('cache:series_totals:*')
         except Exception:
             pass
+        if db_type:
+            _bump_shared_books_cache_epoch(db_type)
 
     @staticmethod
     def get_books_list(db_type, library_id, page, limit, search_query, sort='asc', genre_filters=None, tag_filters=None, user_id=None, role=None, group_by=None, author_key=None):
         import time
         t0 = time.perf_counter()
+        _sync_local_books_cache_with_shared_epoch(db_type)
         library_id = _normalize_library_id(library_id)
         favorite_only = library_id == 'favorite'
         normalized_genres = [str(v).strip() for v in (genre_filters or []) if str(v).strip()]
@@ -378,6 +455,7 @@ class SeriesService:
         캐시(_LIST_QUERY_CACHE)를 재사용하여, 반복 점프 시 재계산 비용을 없앱니다.
         """
         import time
+        _sync_local_books_cache_with_shared_epoch(db_type)
         library_id = _normalize_library_id(library_id)
         favorite_only = library_id == 'favorite'
         normalized_genres = [str(v).strip() for v in (genre_filters or []) if str(v).strip()]
@@ -446,6 +524,7 @@ class SeriesService:
     @staticmethod
     def get_books_totals(db_type, library_id, search_query='', genre_filters=None, tag_filters=None, user_id=None, role=None):
         import time
+        _sync_local_books_cache_with_shared_epoch(db_type)
         library_id = _normalize_library_id(library_id)
         favorite_only = library_id == 'favorite'
         normalized_genres = [str(value).strip() for value in (genre_filters or []) if str(value).strip()]
@@ -509,6 +588,7 @@ class SeriesService:
         """Kavita 방식의 선로드를 위해 특정 라이브러리의 전체 시리즈 목록을 페이징 없이 경량 조회"""
         import time
         t0 = time.perf_counter()
+        _sync_local_books_cache_with_shared_epoch(db_type)
         library_id = _normalize_library_id(library_id)
         favorite_only = library_id == 'favorite'
         

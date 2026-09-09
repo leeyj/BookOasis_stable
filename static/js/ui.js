@@ -31,9 +31,14 @@ const lazyImageObserver = ('IntersectionObserver' in window)
       if (entry.isIntersecting) {
         const lazyImage = entry.target;
         if (lazyImage.dataset.src) {
-          wireCoverFadeIn(lazyImage);
+          // 주의: src를 먼저 바꾼 뒤 wireCoverFadeIn을 걸어야 한다. 순서가 바뀌면
+          // wireCoverFadeIn이 아직 플레이스홀더(1x1 GIF, 항상 즉시 complete) 기준으로
+          // "이미 로드됨"을 감지해 is-loaded를 바로 붙여버리고, 정작 실제 커버 이미지의
+          // load/error에는 아무 리스너도 안 걸리는 상태가 된다 - 이 경우 실제 이미지가
+          // 느리게 뜨거나 실패하면 카드가 계속 빈 배경(검은색 계열)으로 남는다.
           lazyImage.src = lazyImage.dataset.src;
           lazyImage.removeAttribute('data-src');
+          wireCoverFadeIn(lazyImage);
         }
         observer.unobserve(lazyImage);
       }
@@ -368,8 +373,10 @@ export function createBookCard(item, options = {}) {
         lazyImageObserver.observe(imgEl);
       } else {
         // IntersectionObserver 미지원 환경: 관찰 없이 바로 실제 src로 교체
-        wireCoverFadeIn(imgEl);
+        // (src를 먼저 바꾼 뒤 wireCoverFadeIn을 걸어야 하는 이유는 위 lazyImageObserver
+        // 콜백의 주석 참고 - 순서가 바뀌면 플레이스홀더 기준으로 즉시 is-loaded가 붙는다)
         imgEl.src = imgEl.dataset.src;
+        wireCoverFadeIn(imgEl);
       }
     }
   } else if (imgEl) {
@@ -678,7 +685,12 @@ window.toggleCardFavoriteEvent = async (event, name, bookId, nextStatus, authorK
   console.log(`[Favorite-Action] 카드 즐겨찾기 별 클릭: name="${name}", bookId=${bookId}, nextStatus=${nextStatus}, authorKey=${authorKey}, currentLibId=${state.currentLibraryId}`);
 
   // 즉시 UI 피드백 반영 (Optimistic Update)
-  const btn = event.currentTarget || (event.target && event.target.closest ? event.target.closest('.btn-card-fav-toggle') : null);
+  // 주의: 이 핸들러는 document에 위임 등록된 클릭 리스너(initCardEventDelegation) 안에서
+  // favBtn._onClick(e)로 "수동 호출"되므로, 이벤트 디스패치상의 event.currentTarget은
+  // 실제 리스너가 붙은 document를 계속 가리킨다(document는 truthy라 예전엔 fallback으로
+  // 못 내려가 btn=document가 되고 document.classList가 undefined라 에러가 났었음).
+  // 따라서 실제 버튼 엘리먼트는 항상 target.closest로 찾아야 한다.
+  const btn = event.target && event.target.closest ? event.target.closest('.btn-card-fav-toggle') : null;
   let originalClass = '';
   let originalActive = false;
   if (btn) {

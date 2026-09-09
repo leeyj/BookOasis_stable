@@ -105,7 +105,7 @@ def _commit_with_retry(conn, context_label, max_attempts=12):
 def _dispatch_new_books_to_plugin_hooks(db_type, event_payload):
     """Call optional on_scan_new_books_detected hook on each enabled metadata plugin."""
     try:
-        providers = MetadataFactory.get_available_providers()
+        providers = MetadataFactory.get_available_providers(include_view_ui=False, include_settings_ui=False)
     except Exception as discover_err:
         print(f"[Scanner-PluginHook] provider discovery failed: {discover_err}")
         return

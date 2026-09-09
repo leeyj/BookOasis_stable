@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plugin Data Relay - 관리자 파널</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            min-height: 100vh;
+        }
+        .navbar {
+            background-color: #1e293b;
+            border-bottom: 1px solid #334155;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        .stat-card {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        }
+        .stat-title {
+            color: #94a3b8;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        .stat-number {
+            font-size: 32px;
+            font-weight: 800;
+            line-height: 1;
+        }
+        .main-card {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+        }
+        .table {
+            color: #f8fafc !important;
+            --bs-table-bg: transparent !important;
+            --bs-table-accent-bg: transparent !important;
+            --bs-table-striped-bg: transparent !important;
+            --bs-table-hover-bg: #334155 !important;
+            --bs-table-border-color: #334155 !important;
+            border-color: #334155 !important;
+            margin-bottom: 0;
+        }
+        .table th {
+            background-color: #0f172a !important;
+            color: #94a3b8 !important;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 12px 16px;
+            border-bottom: 2px solid #334155 !important;
+        }
+        .table td {
+            background-color: transparent !important;
+            color: #f8fafc !important;
+            padding: 14px 16px;
+            border-bottom: 1px solid #334155 !important;
+            vertical-align: middle;
+        }
+        .plugin-id-text {
+            color: #f8fafc !important;
+            font-weight: 700;
+            font-size: 15px;
+        }
+        .field-badge {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            background-color: #0f172a;
+            color: #38bdf8;
+            border: 1px solid #334155;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            display: inline-block;
+            margin: 2px;
+        }
+        .field-type {
+            color: #fbbf24;
+        }
+        .status-badge {
+            font-size: 12px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 20px;
+        }
+        .status-pending {
+            background-color: rgba(251, 191, 36, 0.15);
+            color: #fbbf24;
+            border: 1px solid #fbbf24;
+        }
+        .status-approved {
+            background-color: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+            border: 1px solid #22c55e;
+        }
+        .status-rejected {
+            background-color: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+            border: 1px solid #ef4444;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark mb-4">
+        <div class="container-fluid px-4">
+            <span class="navbar-brand mb-0 h1 d-flex align-items-center">
+                <i class="bi bi-diagram-3-fill text-info me-2 fs-4"></i>
+                <span class="fw-bold">Plugin Data Relay Dashboard</span>
+            </span>
+            <div class="d-flex align-items-center gap-3">
+                <a href="/register" class="btn btn-outline-info btn-sm px-3">
+                    <i class="bi bi-plus-circle me-1"></i>플러그인 등록
+                </a>
+                <a href="/admin/logout" class="btn btn-outline-danger btn-sm px-3">
+                    <i class="bi bi-box-arrow-right me-1"></i>로그아웃
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-4">
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <div class="stat-card">
+                    <div class="stat-title"><i class="bi bi-puzzle-fill me-1"></i>등록된 총 플러그인</div>
+                    <div class="stat-number text-info">{{ plugins|length }}개</div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="stat-card">
+                    <div class="stat-title"><i class="bi bi-database-fill me-1"></i>총 저장 레코드</div>
+                    <div class="stat-number text-warning">{{ plugins|sum(attribute='record_count') }}개</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-card">
+            <h5 class="fw-bold mb-3 text-light d-flex align-items-center">
+                <i class="bi bi-table text-info me-2"></i>플러그인별 스키마 및 사용 현황
+            </h5>
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width: 12%;">Plugin ID</th>
+                            <th style="width: 10%;">Developer</th>
+                            <th style="width: 9%;">상태</th>
+                            <th style="width: 27%;">필드 스키마 (최대 5개)</th>
+                            <th style="width: 8%;">사용자 수</th>
+                            <th style="width: 8%;">레코드 수</th>
+                            <th style="width: 12%;">등록일시</th>
+                            <th style="width: 22%;">승인 관리</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if plugins %}
+                            {% for plugin in plugins %}
+                            <tr>
+                                <td><span class="plugin-id-text"><i class="bi bi-puzzle me-1 text-info"></i>{{ plugin.plugin_id }}</span></td>
+                                <td><span class="text-secondary small"><i class="bi bi-person-badge me-1"></i>{{ plugin.developer_id or '-' }}</span></td>
+                                <td>
+                                    {% if plugin.status == 'approved' %}
+                                        <span class="status-badge status-approved"><i class="bi bi-check-circle-fill me-1"></i>승인됨</span>
+                                    {% elif plugin.status == 'rejected' %}
+                                        <span class="status-badge status-rejected"><i class="bi bi-x-circle-fill me-1"></i>거부됨</span>
+                                    {% else %}
+                                        <span class="status-badge status-pending"><i class="bi bi-hourglass-split me-1"></i>승인대기</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% for field in plugin.fields %}
+                                    <span class="field-badge">{{ field.field_name }} <span class="field-type">({{ field.field_type }})</span></span>
+                                    {% endfor %}
+                                </td>
+                                <td>{{ plugin.user_count }}명</td>
+                                <td>{{ plugin.record_count }}개</td>
+                                <td><span class="text-secondary small">{{ plugin.created_at }}</span></td>
+                                <td>
+                                    {% if plugin.status != 'approved' %}
+                                    <form method="POST" action="/admin/plugins/{{ plugin.plugin_id }}/approve" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-outline-success"><i class="bi bi-check-lg"></i> 승인</button>
+                                    </form>
+                                    {% endif %}
+                                    {% if plugin.status != 'rejected' %}
+                                    <form method="POST" action="/admin/plugins/{{ plugin.plugin_id }}/reject" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-lg"></i> 거부</button>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="8" class="text-center py-5 text-secondary">
+                                    <i class="bi bi-inbox display-5 d-block mb-2"></i>
+                                    등록된 플러그인이 없습니다.
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

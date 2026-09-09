@@ -13,14 +13,21 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+// 부문/카테고리를 빠르게 연속 전환하면 먼저 연 플러그인 화면의 비동기 로딩이 나중에
+// 끝나면서, 이미 다른 화면으로 넘어간 컨테이너를 낡은 내용으로 덮어쓸 수 있다.
+// static/js/dashboard.js의 dashboardLoadToken과 동일한 관례로 방지한다.
+let pluginViewLoadToken = 0;
+
 export async function mountCategoryPluginUI(pluginId) {
   const container = document.getElementById('library-plugin-custom-view');
   if (!container) return;
+  const requestToken = ++pluginViewLoadToken;
 
   // 1. 뷰 전환: plugin_custom 뷰 활성화 (플러그인 데스크 탭바 및 공통 헤더 컨트롤 전면 숨김)
   switchActiveView('plugin_custom');
   updateCurrentCategoryIndicator(`plugin_${pluginId}`);
 
+  if (requestToken !== pluginViewLoadToken) return;
   container.innerHTML = `
     <div class="loading-spinner" style="padding: 4rem 1rem; text-align: center; color: var(--app-text-muted); width: 100%;">
       <i class="fa-solid fa-circle-notch fa-spin fa-2x" style="color: var(--app-accent-hover);"></i>
@@ -33,6 +40,7 @@ export async function mountCategoryPluginUI(pluginId) {
     const resUi = await fetch(`/api/media/plugins/${encodeURIComponent(pluginId)}/ui`);
     if (resUi.ok) {
       const dataUi = await resUi.json();
+      if (requestToken !== pluginViewLoadToken) return;
       if (dataUi.success && dataUi.bundle) {
         const bundle = dataUi.bundle;
         let html = '';
@@ -58,6 +66,7 @@ export async function mountCategoryPluginUI(pluginId) {
     // 3. 번들이 없는 경우: get_dashboard_data API를 호출하여 독립 카테고리 풀페이지 뷰로 렌더링
     const resData = await fetch(`/api/media/dashboard/widgets/${encodeURIComponent(pluginId)}/data?type=${state.currentLibraryType}&limit=50`);
     const data = await resData.json();
+    if (requestToken !== pluginViewLoadToken) return;
 
     if (!data.success) {
       container.innerHTML = `<div style="padding: 3rem; color: #ef4444; text-align: center; width: 100%;">플러그인 데이터를 불러오지 못했습니다: ${escapeHtml(data.error || '오류')}</div>`;
@@ -67,6 +76,7 @@ export async function mountCategoryPluginUI(pluginId) {
     // 카테고리 정보 조회
     const resCat = await fetch(`/api/media/category-plugins?type=${state.currentLibraryType}`);
     const catData = await resCat.json();
+    if (requestToken !== pluginViewLoadToken) return;
     const pluginInfo = (catData.category_plugins || []).find(p => p.id === pluginId) || {};
     const title = escapeHtml(pluginInfo.title || pluginInfo.name || pluginId);
     const icon = escapeHtml(pluginInfo.icon || 'fa-solid fa-puzzle-piece');

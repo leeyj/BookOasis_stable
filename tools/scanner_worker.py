@@ -10,6 +10,11 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
+# core.py와 별도의 OS 프로세스이므로 여기서도 개별적으로 호출해야 한다 - 자세한
+# 이유는 utils/encoding_helper.py 참고 (Windows CP949 콘솔 한글/이모지 깨짐 방지).
+from utils.encoding_helper import force_utf8_stdio
+force_utf8_stdio()
+
 from services.scanner_queue import run_scanner_worker_loop
 
 if __name__ == '__main__':

@@ -17,7 +17,7 @@ def _fetch_library_permissions(db_type, include_plugins=False):
     if include_plugins and db_type == 'general':
         try:
             from services.metadata_factory import MetadataFactory
-            providers = MetadataFactory.get_available_providers()
+            providers = MetadataFactory.get_available_providers(include_view_ui=False, include_settings_ui=False)
             for p in providers:
                 if p.get('enabled') and p.get('category_tab'):
                     cat_tab = p.get('category_tab')

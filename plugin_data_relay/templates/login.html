@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plugin Data Relay - 관리자 로그인</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #e2e8f0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-card {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 400px;
+            padding: 32px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+        .btn-primary {
+            background-color: #2563eb;
+            border: none;
+        }
+        .btn-primary:hover {
+            background-color: #3b82f6;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="text-center mb-4">
+            <i class="bi bi-shield-lock-fill text-info display-4 mb-2"></i>
+            <h4 class="fw-bold">Plugin Data Relay Admin</h4>
+            <p class="text-muted small">관리자 인증이 필요합니다.</p>
+        </div>
+
+        {% if error %}
+        <div class="alert alert-danger py-2 small" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-1"></i> {{ error }}
+        </div>
+        {% endif %}
+
+        <form method="POST" action="/admin/login">
+            <div class="mb-3">
+                <label for="password" class="form-label text-light small fw-bold">관리자 비밀번호</label>
+                <input type="password" class="form-control bg-dark text-light border-secondary" id="password" name="password" placeholder="비밀번호를 입력하세요" required autofocus>
+            </div>
+            <button type="submit" class="btn btn-primary w-100 py-2 fw-bold mt-2">
+                <i class="bi bi-box-arrow-in-right me-1"></i> 로그인
+            </button>
+        </form>
+    </div>
+</body>
+</html>

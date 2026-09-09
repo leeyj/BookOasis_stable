@@ -47,7 +47,7 @@ class HomeDashboardService:
             return {'mode': 'classic', 'widgets': [], 'catalog': []}
 
         from services.metadata_factory import MetadataFactory
-        providers = MetadataFactory.get_available_providers()
+        providers = MetadataFactory.get_available_providers(include_view_ui=False, include_settings_ui=False)
 
         available = {k: dict(v) for k, v in _CORE_WIDGET_DEFS.items()}
 

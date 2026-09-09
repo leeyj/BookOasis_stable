@@ -9,6 +9,12 @@ echo.
 
 cd /d "%~dp0"
 
+:: 콘솔 코드페이지를 UTF-8로 전환하고, Python 자체도 UTF-8 모드로 기동해 한국어
+:: Windows(기본 코드페이지 CP949)에서 로그의 한글/이모지가 깨지거나 print()가
+:: UnicodeEncodeError를 내는 문제를 근본적으로 막는다 (utils/encoding_helper.py 참고).
+chcp 65001 >nul
+set "PYTHONUTF8=1"
+
 :: 단일 프로세스 실행(Windows)에서 큐 처리 워커를 함께 기동
 set "BOOKOASIS_ENABLE_EMBEDDED_WORKER=true"
 
