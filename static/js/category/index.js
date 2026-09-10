@@ -200,6 +200,121 @@ export function applySidebarShowMore(sidebar, currentLibraryId) {
       sidebar.appendChild(moreBtn);
     }
   }
+  normalizeSidebarBareLabels(moreBtn);
+}
+
+// 사이드바가 접힘(아이콘 전용 레일) 상태일 때는 가상 그룹의 하위 카테고리들이 CSS로
+// 완전히 숨겨져 있어(style.css .library-sidebar.collapsed .sidebar-library-group-items)
+// 그룹 아이콘을 눌러도 펼칠 공간이 없다. 대신 그룹 아이콘 옆에 하위 카테고리 목록을
+// 보여주는 플라이아웃 팝업을 띄운다. 원본 목록(Sortable.js 드래그 바인딩이 걸린)은 건드리지
+// 않고 내용만 복제해서 보여주며, 클릭은 기존 전역 delegation(sidebar-category-dynamic)이
+// data-category-id만 보고 그대로 처리해준다.
+let sidebarGroupFlyoutEl = null;
+
+function closeSidebarGroupFlyout() {
+  if (sidebarGroupFlyoutEl) {
+    sidebarGroupFlyoutEl.remove();
+    sidebarGroupFlyoutEl = null;
+    document.removeEventListener('click', handleSidebarGroupFlyoutOutsideClick, true);
+    document.removeEventListener('keydown', handleSidebarGroupFlyoutEscape, true);
+  }
+}
+
+function handleSidebarGroupFlyoutOutsideClick(event) {
+  if (!sidebarGroupFlyoutEl) return;
+  if (sidebarGroupFlyoutEl.contains(event.target)) return;
+  if (event.target.closest && event.target.closest('[data-role="sidebar-group-toggle"]')) return;
+  closeSidebarGroupFlyout();
+}
+
+function handleSidebarGroupFlyoutEscape(event) {
+  if (event.key === 'Escape') closeSidebarGroupFlyout();
+}
+
+function openSidebarGroupFlyout(groupToggle, groupContainer) {
+  const wasOpenForSameGroup = sidebarGroupFlyoutEl && sidebarGroupFlyoutEl.dataset.groupId === groupToggle.dataset.id;
+  closeSidebarGroupFlyout();
+  if (wasOpenForSameGroup) return; // 같은 그룹 아이콘을 다시 누르면 닫기만 함
+
+  const itemsList = groupContainer.querySelector('.sidebar-library-group-items');
+  if (!itemsList) return;
+
+  const flyout = document.createElement('div');
+  flyout.className = 'sidebar-group-flyout';
+  flyout.dataset.groupId = groupToggle.dataset.id;
+
+  const title = document.createElement('div');
+  title.className = 'sidebar-group-flyout-title';
+  title.textContent = groupToggle.dataset.name || '';
+  flyout.appendChild(title);
+
+  const list = document.createElement('ul');
+  list.className = 'sidebar-menu sidebar-group-flyout-list';
+  list.innerHTML = itemsList.innerHTML;
+  // 원본 목록과 id가 중복되지 않도록 복제본에서는 id를 제거 (클릭 처리는 data-category-id로 충분)
+  list.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
+  flyout.appendChild(list);
+
+  document.body.appendChild(flyout);
+
+  // 하위 카테고리가 많으면 화면 아래를 침범하니, 항목 5개 높이로 캡을 걸고 그 이상은 스크롤
+  const MAX_VISIBLE_ITEMS = 5;
+  const firstItem = list.children[0];
+  if (firstItem && list.children.length > MAX_VISIBLE_ITEMS) {
+    const itemHeight = firstItem.getBoundingClientRect().height;
+    const gap = Number.parseFloat(getComputedStyle(list).rowGap || getComputedStyle(list).gap || '0') || 0;
+    list.style.maxHeight = `${itemHeight * MAX_VISIBLE_ITEMS + gap * (MAX_VISIBLE_ITEMS - 1)}px`;
+    list.style.overflowY = 'auto';
+  }
+
+  const rect = groupToggle.getBoundingClientRect();
+  const flyoutRect = flyout.getBoundingClientRect();
+  let top = rect.top;
+  if (top + flyoutRect.height > window.innerHeight - 8) {
+    top = Math.max(8, window.innerHeight - flyoutRect.height - 8);
+  }
+  flyout.style.top = `${top}px`;
+  flyout.style.left = `${rect.right + 8}px`;
+
+  sidebarGroupFlyoutEl = flyout;
+
+  // 플라이아웃 안의 항목 클릭 시(선택 처리는 전역 delegation이 하고) 팝업만 닫아준다
+  flyout.addEventListener('click', (event) => {
+    if (event.target.closest('[data-role="sidebar-category-dynamic"]')) {
+      closeSidebarGroupFlyout();
+    }
+  });
+
+  // 다음 tick에 바인딩해야 지금 이 클릭 이벤트 자체가 바로 outside-click으로 잡히지 않는다
+  window.setTimeout(() => {
+    document.addEventListener('click', handleSidebarGroupFlyoutOutsideClick, true);
+    document.addEventListener('keydown', handleSidebarGroupFlyoutEscape, true);
+  }, 0);
+}
+
+// 아이콘 뒤에 붙는 라벨 텍스트가 <span>이 아니라 그냥 텍스트 노드로 있는 항목이 많다
+// (예: "<i class='...'></i> ${title}"). 접힘(아이콘 레일) 모드에서 이 텍스트를 감출 때
+// CSS만으로는 텍스트 노드를 선택할 수 없어 지금까지 font-size:0 트릭을 썼는데, 공백
+// 텍스트 노드(아이콘과 라벨 사이 띄어쓰기)가 폭을 조금이라도 차지해 아이콘이 중앙에서
+// 미묘하게 밀려 보이는 문제가 있었다. 그래서 렌더링 시점에 한 번, 의미 없는 공백은
+// 아예 제거하고(아이콘-라벨 간격은 이미 flex gap이 담당) 실제 라벨 텍스트는 <span>으로
+// 감싸서 display:none으로 완전히(폭 0으로) 감출 수 있게 정규화한다.
+function normalizeSidebarBareLabels(root) {
+  if (!root) return;
+  const targets = root.querySelectorAll('.menu-item, .menu-item > span, .sidebar-group-header, .sidebar-group-header > span, .sidebar-more-btn');
+  targets.forEach((el) => {
+    Array.from(el.childNodes).forEach((node) => {
+      if (node.nodeType !== Node.TEXT_NODE) return;
+      if (!node.textContent.trim()) {
+        node.remove();
+        return;
+      }
+      const span = document.createElement('span');
+      span.className = 'sidebar-bare-label';
+      span.textContent = node.textContent.trim();
+      node.replaceWith(span);
+    });
+  });
 }
 
 function initDynamicSidebarDelegation() {
@@ -249,8 +364,16 @@ function initDynamicSidebarDelegation() {
     if (groupToggle) {
       event.preventDefault();
       event.stopPropagation();
-      const groupId = groupToggle.dataset.id;
       const groupContainer = groupToggle.closest('[data-library-group-id]');
+      const sidebarEl = document.querySelector('.library-sidebar');
+
+      // 아이콘 전용 레일(접힘) 상태에선 하위 카테고리를 펼칠 공간이 없으니 플라이아웃 팝업으로 대신 보여준다
+      if (sidebarEl && sidebarEl.classList.contains('collapsed')) {
+        if (groupContainer) openSidebarGroupFlyout(groupToggle, groupContainer);
+        return;
+      }
+
+      const groupId = groupToggle.dataset.id;
       const isCollapsed = groupContainer?.classList.toggle('collapsed') || false;
       groupToggle.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
       localStorage.setItem(getGroupCollapsedStorageKey(groupId), isCollapsed ? 'true' : 'false');
@@ -450,6 +573,7 @@ export async function loadLibraries() {
       if (requestToken !== sidebarLoadToken) return;
 
       sidebar.innerHTML = html;
+      normalizeSidebarBareLabels(sidebar);
       applySavedMixedOrder(sidebar);
       const activeItem = document.getElementById(`category-${state.currentLibraryId}`) || sidebar.querySelector(`[data-id="${state.currentLibraryId}"]`);
       state.currentLibraryHideCovers = !!(activeItem && activeItem.dataset && activeItem.dataset.type === 'custom' && activeItem.dataset.hideCover === '1');

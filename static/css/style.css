@@ -773,15 +773,65 @@ body {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* 데스크톱 사이드바 접힌 상태 */
+/* 데스크톱 사이드바 접힌 상태 - 완전히 숨기지 않고 아이콘만 남는 좁은 레일로 전환
+   (텍스트 라벨은 title 속성 툴팁으로 대체, sidebar_manager.js의 syncCollapsedSidebarTooltips 참고) */
 .library-sidebar.collapsed {
-    width: 0 !important;
-    min-width: 0 !important;
-    padding: 0 !important;
-    border-right: none !important;
-    overflow: hidden !important;
-    opacity: 0;
-    pointer-events: none;
+    width: 60px !important;
+    min-width: 60px !important;
+    padding: 0 0.4rem !important;
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.library-sidebar.collapsed .sidebar-header-wrapper {
+    justify-content: center !important;
+}
+
+.library-sidebar.collapsed .sidebar-title span {
+    display: none;
+}
+
+.library-sidebar.collapsed .menu-item,
+.library-sidebar.collapsed .sidebar-group-header,
+.library-sidebar.collapsed .sidebar-more-btn {
+    /* 왼쪽 정렬은 아이콘들이 좁은 레일 한쪽에 몰려 보여 오히려 더 어색해서 중앙 정렬로 되돌림 */
+    justify-content: center !important;
+    padding: 0.5rem 0;
+    gap: 0;
+}
+
+/* category/index.js가 그리는 항목들은 라벨이 <span>이 아니라 아이콘 뒤 맨 텍스트로 붙어있는
+   경우가 많다(정적 HTML과 마크업이 다름). normalizeSidebarBareLabels()가 렌더링 시점에
+   그 텍스트만 <span class="sidebar-bare-label">로 감싸고 의미 없는 공백은 제거해둔다
+   (아이콘까지 함께 감싸는 바깥 span은 건드리지 않음 - 통째로 숨기면 아이콘도 같이 사라짐).
+   여기서는 라벨만 폭을 완전히 0으로 만드는 display:none으로 깔끔하게 감춘다(font-size:0으로
+   글자만 눌렀을 때는 공백 텍스트 노드의 잔여 폭 때문에 아이콘이 중앙에서 미묘하게 밀려 보였다). */
+.library-sidebar.collapsed .sidebar-bare-label,
+.library-sidebar.collapsed .sidebar-more-btn > span {
+    display: none;
+}
+
+/* home 항목의 핀/그룹추가 등 부가 버튼 묶음은 좁은 아이콘 레일에 넣기엔 과함
+   (인라인 style="display:inline-flex"가 붙어있어 !important 없이는 안 먹힘) */
+.library-sidebar.collapsed .menu-item > div {
+    display: none !important;
+}
+
+/* Home 항목은 상단 로고 클릭으로도 홈 이동이 되므로, 좁은 레일에서는 중복이라 아예 숨김 */
+.library-sidebar.collapsed #category-home {
+    display: none !important;
+}
+
+/* 그룹 펼침/접기 화살표, 항목 수 배지는 레일 모드에서 의미가 없어 아이콘 복원 대상에서도 제외 */
+.library-sidebar.collapsed .sidebar-group-chevron,
+.library-sidebar.collapsed .sidebar-group-header small {
+    display: none !important;
+}
+
+/* 중첩된 사용자 정의 그룹의 하위 항목까지 아이콘 레일에 다 펼치면 좁은 폭에서 뭉개지므로,
+   접힘 모드에서는 최상위 아이콘까지만 보여주고 하위 목록은 숨긴다 (펼치면 다시 보임) */
+.library-sidebar.collapsed .sidebar-library-group-items {
+    display: none !important;
 }
 
 /* 사이드바 전용 얇고 미려한 스크롤바 디자인 */
@@ -963,6 +1013,47 @@ body {
     font-size: 0.9rem;
 }
 
+/* 사이드바 접힘(아이콘 레일) 상태에서 가상 그룹 아이콘 클릭 시 뜨는 하위 카테고리 팝업
+   (category/index.js의 openSidebarGroupFlyout 참고) */
+.sidebar-group-flyout {
+    position: fixed;
+    z-index: 4000;
+    min-width: 200px;
+    max-width: 260px;
+    /* 안전장치로만 두는 상한 - 실제 5개 높이 제한은 JS가 .sidebar-group-flyout-list에
+       직접 max-height를 계산해서 건다(항목마다 높이가 조금씩 달라질 수 있어서) */
+    max-height: 90vh;
+    background: var(--app-bg-card-hover);
+    border: 1px solid var(--app-border);
+    border-radius: 10px;
+    box-shadow: var(--app-shadow);
+    padding: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    animation: zoomIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sidebar-group-flyout-title {
+    flex-shrink: 0;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--app-text-muted);
+    padding: 0.3rem 0.6rem 0.5rem;
+    border-bottom: 1px solid var(--app-border);
+    margin-bottom: 0.4rem;
+}
+
+.sidebar-group-flyout-list {
+    gap: 0.15rem;
+    min-height: 0;
+}
+
+.sidebar-group-flyout-list .menu-item {
+    font-size: 0.88rem;
+    white-space: nowrap;
+}
+
 /* 사이드바 "더 보기 / 접기" Plex 스타일 버튼 */
 .sidebar-menu .sidebar-more-btn {
     color: var(--app-accent-hover);
@@ -1082,14 +1173,17 @@ body {
     border-color: var(--app-accent);
 }
 
-/* 상단 헤더 및 컨트롤 - 목업(시안 D)처럼 한 줄: [사이드바토글] [검색창] [그룹모드] [타입탭] ...스페이서... [필터/스캔] */
+/* 상단 헤더 및 컨트롤 - 목업(시안 D)처럼 한 줄: [사이드바토글] [검색창] [그룹모드] [타입탭] ...스페이서... [필터/스캔]
+   화면 가장자리에 붙은 flat bar가 아니라, 커뮤니티 요청대로 독립된 floating 바(둥근 카드) 형태로 띄운다. */
 .library-header {
     display: flex;
     align-items: center;
     gap: 0.6rem;
-    border-bottom: 1px solid var(--library-session-divider);
-    box-shadow: inset 0 1px 0 var(--library-session-header-sheen);
-    padding-bottom: 1rem;
+    background: var(--app-bg-card-hover);
+    border: 1px solid var(--app-border);
+    border-radius: 14px;
+    box-shadow: var(--app-shadow);
+    padding: 0.4rem 1rem;
     flex-wrap: wrap;
 }
 
@@ -4051,6 +4145,22 @@ body {
    'grid' 위젯끼리는 카드 자체 테두리로 구분되므로 divider를 적용하지 않는다. */
 .home-widget-slot--divider {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 0.9rem;
+}
+
+/* 단색 배경 피로감 완화: 무늬 대신 섹션 카드에 옅은 톤 대비를 준다.
+   빗살무늬는 반복 패턴이 오히려 시야 피로를 유발할 수 있어 제외하고,
+   배경(app-bg-card)보다 살짝 밝은 app-bg-card-hover 톤으로 섹션 영역을 구분한다. */
+.dashboard-section {
+  background: var(--app-bg-card-hover);
+  border: 1px solid var(--app-border);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+}
+
+/* 카드 자체 테두리가 구분선 역할을 하므로, 기존 상단 divider 라인은 중복이라 제거 */
+.home-widget-slot--divider.dashboard-section {
+  border-top: none;
   padding-top: 0.9rem;
 }
 

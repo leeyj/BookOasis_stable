@@ -119,7 +119,7 @@ def _normalize_series_text(name):
     return re.sub(r'^\[(?:단행|연재|소설|만화|웹툰|일반)\]\s*', '', str(name)).strip()
 
 
-def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_folder_mtimes, is_remote=False, library_id=None, db_files_cache=None, library_root=None, gdrive_file_ids=None):
+def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_folder_mtimes, is_remote=False, library_id=None, db_files_cache=None, library_root=None, gdrive_file_ids=None, db_type=None, db_book_ids=None):
     """Independent I/O scan task per folder (DB independent, pure FS/I/O scaling)"""
     root = canonical_path(root)
     print(f"[Scanner-DEBUG-Task] 📂 entering process_folder_task - folder: '{root}'")
@@ -362,10 +362,18 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
                         cover_image = None  # Invalidate to include in error report collection
                 
                 # EPUB 사전 캐싱 (Pre-caching) 트리거
+                # get_epub_meta()는 book_id가 있어야만(캐시 키를 만들 수 있어야만) 실제로
+                # Redis에 결과를 써서 캐싱한다. 이 시점은 아직 신규 도서를 DB에 insert하기
+                # 전(폴더 단위 순수 I/O 스캔 - 실제 insert/update 분기 및 커밋은 나중에
+                # engine.py의 as_completed 루프+process_batch에서 일괄 처리됨)라, 신규 도서는
+                # book_id가 없어 캐싱이 스킵된다. 다만 재스캔되는 "기존" 도서는 스캔 시작
+                # 시점에 이미 조회해둔 db_book_ids(파일 경로 -> book id)로 알 수 있으므로,
+                # 이 경우엔 실제로 캐시를 채워 이후 뷰어가 처음 열 때부터 바로 히트하게 한다.
                 if file_format == 'epub' and not is_remote:
                     try:
                         from services.text_epub_content_service import TextEpubContentService
-                        TextEpubContentService.get_epub_meta(full_path, None, db_type)
+                        existing_book_id = db_book_ids.get(full_path) if db_book_ids else None
+                        TextEpubContentService.get_epub_meta(full_path, existing_book_id, db_type)
                     except Exception as pre_err:
                         print(f"[Scanner-EPUB-Precache] Notice: {pre_err}")
 

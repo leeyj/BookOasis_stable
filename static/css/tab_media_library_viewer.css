@@ -484,7 +484,9 @@
     /* iOS Safari에서 빈 배경 터치도 오버레이 닫기 대상으로 받기 위해 auto 유지 */
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    /* 항상 화면 중앙에 뜨던 조작 패널을 상단 탭 메뉴 바로 아래로 고정.
+       footer(시크바)만 margin-top: auto로 하단에 붙인다. */
+    justify-content: flex-start;
 }
 
 .comic-overlay-menu>* {
@@ -493,23 +495,26 @@
 }
 
 .overlay-header {
+    position: relative;
     background: rgba(var(--app-panel-rgb), 0.85);
     backdrop-filter: blur(10px);
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    padding: 0.8rem 1.5rem;
+    padding: 0.6rem 3.75rem 0.6rem 3rem;
     display: flex;
-    justify-content: space-between;
+    /* 닫기 버튼을 absolute로 빼서, 탭 버튼 그룹이 오른쪽에 오도록 함.
+       오른쪽 패딩을 닫기 버튼 폭보다 넉넉히 줘서 '여백' 탭과 겹치지 않게 함. */
+    justify-content: flex-end;
     align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
     animation: slideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.overlay-title {
-    color: var(--app-text-primary);
-    font-size: 1rem;
-    font-weight: 700;
-}
-
 .overlay-close-btn {
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
     background: rgba(239, 68, 68, 0.25);
     border: 1px solid rgba(239, 68, 68, 0.5);
     color: #fca5a5;
@@ -541,58 +546,19 @@
     display: flex;
     flex-direction: column;
     gap: 0.6rem;
-    align-self: center;
-    max-width: 95vw;
+    align-self: flex-end;
+    margin-top: 0.3rem;
+    max-width: min(95vw, 480px);
     box-sizing: border-box;
     box-shadow: 0 10px 30px color-mix(in srgb, var(--app-accent) 25%, transparent), 0 0 15px color-mix(in srgb, var(--app-accent) 15%, transparent);
     animation: zoomIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* 오버레이 패널을 원하는 위치로 옮길 수 있는 작은 앵커. 패널 상단 중앙에 살짝 걸치도록 배치. */
-.overlay-drag-handle {
-    position: absolute;
-    top: -0.9rem;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 2.4rem;
-    height: 1.1rem;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(var(--app-panel-rgb), 0.92);
-    border: 1px solid color-mix(in srgb, var(--app-accent) 35%, transparent);
-    border-radius: 999px;
-    color: var(--app-text-muted);
-    font-size: 0.7rem;
-    cursor: grab;
-    touch-action: none;
-    z-index: 1;
-    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-
-.overlay-drag-handle:hover {
-    background: color-mix(in srgb, var(--app-accent) 25%, transparent);
-    border-color: color-mix(in srgb, var(--app-accent) 60%, transparent);
-    color: var(--app-accent-hover);
-}
-
-.overlay-drag-handle.is-dragging,
-.overlay-drag-handle:active {
-    cursor: grabbing;
-    background: color-mix(in srgb, var(--app-accent) 35%, transparent);
-    border-color: var(--app-accent);
-    color: var(--app-accent-hover);
-}
-
-/* 📌 뷰어 오버레이 탭 헤더 및 콘텐츠 */
+/* 📌 뷰어 오버레이 탭 헤더 및 콘텐츠 (탭 버튼은 상단 헤더에 상시 노출) */
 .overlay-tab-nav {
     display: flex;
     gap: 6px;
-    border-bottom: 1px solid color-mix(in srgb, var(--app-accent) 20%, transparent);
-    padding-bottom: 0.5rem;
-    margin-bottom: 0.4rem;
-    justify-content: center;
+    justify-content: flex-start;
     flex-wrap: wrap;
 }
 
@@ -822,6 +788,9 @@
     flex-direction: column;
     align-items: center;
     gap: 0.5rem;
+    /* 패널이 더 이상 justify-content: space-between으로 중앙에 밀리지 않으므로,
+       시크바(footer)는 margin-top: auto로 직접 하단에 고정한다. */
+    margin-top: auto;
     animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 

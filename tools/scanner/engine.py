@@ -545,7 +545,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
 
     with ThreadPoolExecutor(max_workers=threads_to_use) as executor:
         futures = {
-            executor.submit(process_folder_task, root, files, force, db_meta_full, db_offsets_cached, db_folder_mtimes, is_remote, library_id, db_files_cache, t_path, file_ids): root
+            executor.submit(process_folder_task, root, files, force, db_meta_full, db_offsets_cached, db_folder_mtimes, is_remote, library_id, db_files_cache, t_path, file_ids, db_type, db_books): root
             for root, files, t_path, file_ids in tasks
         }
         

@@ -99,12 +99,43 @@ export function syncSidebarMenuState() {
   content.hidden = !isOpen;
 }
 
+// category/index.js가 그리는 항목들은 라벨이 <span>으로 감싸여 있지 않고 아이콘 뒤에 맨
+// 텍스트로 붙어있는 경우가 많다(정적 HTML 마크업과 다름). 그래서 querySelector('span')만으론
+// 라벨을 못 얻는 항목이 많아, 아이콘/버튼/배지 등 텍스트가 아닌 요소를 다 걷어낸 나머지
+// 텍스트를 라벨로 취급한다.
+function extractMenuItemLabel(item) {
+  const clone = item.cloneNode(true);
+  clone.querySelectorAll('i, button, small, div').forEach((el) => el.remove());
+  return clone.textContent.replace(/\s+/g, ' ').trim();
+}
+
+// 접힘(아이콘 전용) 모드에서는 텍스트 라벨이 사라지므로, 남은 아이콘에 네이티브 title
+// 툴팁으로 라벨을 대신 붙여준다. 펼침 상태에서는 라벨이 이미 보이니 title은 제거한다
+// (그대로 두면 마우스오버 시 텍스트와 중복되는 브라우저 기본 툴팁이 뜬다).
+function syncCollapsedSidebarTooltips(sidebar) {
+  if (!sidebar) return;
+  const isCollapsed = sidebar.classList.contains('collapsed');
+  const items = sidebar.querySelectorAll('.menu-item, .sidebar-group-header, .sidebar-more-btn');
+  items.forEach((item) => {
+    if (!isCollapsed) {
+      item.removeAttribute('title');
+      return;
+    }
+    if (!item.dataset.fullLabel) {
+      const label = extractMenuItemLabel(item);
+      if (label) item.dataset.fullLabel = label;
+    }
+    if (item.dataset.fullLabel) item.setAttribute('title', item.dataset.fullLabel);
+  });
+}
+
 export function toggleDesktopSidebar() {
   const sidebar = document.querySelector('.library-sidebar');
   if (sidebar) {
     sidebar.classList.toggle('collapsed');
     const isCollapsed = sidebar.classList.contains('collapsed');
     localStorage.setItem('desktopSidebarCollapsed', isCollapsed ? 'true' : 'false');
+    syncCollapsedSidebarTooltips(sidebar);
   }
 }
 
@@ -147,6 +178,8 @@ function initSidebarCategorySync() {
   // 카테고리 목록이 innerHTML로 다시 렌더링된 뒤, 열린 상태라면 높이를 즉시 재측정
   window.addEventListener('library:categories-rendered', () => {
     syncSidebarMenuState();
+    // 새로 그려진 항목들(플러그인 카테고리 등)에도 접힘 모드면 title 툴팁을 다시 채워준다
+    syncCollapsedSidebarTooltips(document.querySelector('.library-sidebar'));
   });
 
   window.__sidebarCategorySyncBound = true;
@@ -264,6 +297,7 @@ export function restoreDesktopSidebarState() {
     const sidebar = document.querySelector('.library-sidebar');
     if (isCollapsed && sidebar) {
       sidebar.classList.add('collapsed');
+      syncCollapsedSidebarTooltips(sidebar);
     }
   }
 }

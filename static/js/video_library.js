@@ -100,7 +100,7 @@ function renderVideoCourseCards(videos, libraryId, emptyMessage) {
     <div class="book-card" data-role="video-course-card" data-video-id="${v.id}" data-video-title="${escapeHtml(v.title)}">
       <div class="book-card-cover">
         <div class="book-card-overlay"></div>
-        <img src="/api/media/videos/${v.id}/cover" alt="${escapeHtml(v.title)}" decoding="async" loading="lazy">
+        <img src="/api/media/videos/${v.id}/cover" alt="${escapeHtml(v.title)}" decoding="async" loading="lazy" onload="this.classList.add('is-loaded')">
         <div class="book-badge-count">${v.total_episodes || 0}편</div>
         <button class="btn-card-fav-toggle" data-role="video-course-add-collection" title="컬렉션에 추가"
                 style="position:absolute; top:8px; left:8px; background: rgba(var(--app-panel-rgb), 0.75); border:none; color:var(--app-accent-hover); width:1.9rem; height:1.9rem; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:2;">

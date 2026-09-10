@@ -44,13 +44,7 @@
         <!-- Kavita 스타일 플로팅 조작 오버레이 메뉴 (탭 형식 개편 & 푸른색 테마) -->
         <div id="comic-overlay-menu" class="comic-overlay-menu" style="display: none; z-index: 10003;">
             <div class="overlay-header">
-                <span class="overlay-title" id="overlay-title-text" data-i18n="viewer.reading">독서 중...</span>
-                <button class="overlay-close-btn" data-role="viewer-action" data-action="close" data-i18n-title="viewer.close_fullscreen" title="뷰어 닫기">&times;</button>
-            </div>
-            
-            <div class="overlay-controls-panel">
-                <button type="button" class="overlay-drag-handle" data-role="overlay-drag-handle" data-overlay-keep-open title="패널 위치 이동" aria-label="패널 위치 이동"><i class="fa-solid fa-grip-lines"></i></button>
-                <!-- 탭 네비게이션 헤더 -->
+                <!-- 탭 네비게이션: 항상 상단에 노출되는 메뉴 버튼들 (예전엔 화면 중앙 카드 안에 있었음) -->
                 <div class="overlay-tab-nav">
                     <button class="overlay-tab-btn active" id="tab-btn-nav" data-role="viewer-action" data-action="overlay-tab" data-value="nav">
                         <i class="fa-solid fa-compass"></i> <span data-i18n="viewer.tab_nav">이동</span>
@@ -65,7 +59,10 @@
                         <i class="fa-solid fa-arrows-up-down-left-right"></i> <span data-i18n="viewer.tab_margin">여백</span>
                     </button>
                 </div>
+                <button class="overlay-close-btn" data-role="viewer-action" data-action="close" data-i18n-title="viewer.close_fullscreen" title="뷰어 닫기">&times;</button>
+            </div>
 
+            <div class="overlay-controls-panel">
                 <!-- 탭 1: 탐색 / 이동 -->
                 <div class="overlay-tab-content active" id="overlay-tab-nav">
                     <div class="overlay-controls-row">

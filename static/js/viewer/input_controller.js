@@ -1,7 +1,6 @@
 // input_controller.js - keyboard/wheel/hotspot/click input handlers for viewer
 import { state } from '../state.js';
 import { shouldUseAndroidHotspotTouchFallback } from './platform_profile.js';
-import { enableMenuDrag } from '../context_menu_manager.js';
 
 let _deps = {
   toggleFullscreenViewer: null,
@@ -369,12 +368,6 @@ export function initViewerClickToggle() {
   const viewerBody = document.getElementById('viewer-body-container');
   if (!viewerBody || viewerClickToggleInited) return;
   viewerClickToggleInited = true;
-
-  const overlayPanel = document.querySelector('.overlay-controls-panel');
-  const overlayDragHandle = document.querySelector('[data-role="overlay-drag-handle"]');
-  if (overlayPanel && overlayDragHandle) {
-    enableMenuDrag(overlayPanel, overlayDragHandle);
-  }
 
   const OVERLAY_INTERACTIVE_SELECTOR = 'button, input, select, textarea, label, a, [role="button"], [data-overlay-keep-open]';
 

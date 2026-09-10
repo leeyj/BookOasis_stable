@@ -50,8 +50,15 @@ def _get_allowed_roots():
     if os.name == 'nt':
         for drive_letter in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ':
             drive_path = f"{drive_letter}:\\"
-            if os.path.exists(drive_path):
+            if not os.path.exists(drive_path):
+                continue
+            try:
                 roots.append(_norm_abs(drive_path))
+            except OSError:
+                # rclone FUSE 마운트 등 일부 드라이브는 존재는 하지만 realpath()가
+                # WinError 1005("볼륨에 인식된 파일 시스템이 없습니다")로 실패할 수 있다.
+                # 이런 드라이브 하나 때문에 나머지 정상 드라이브 탐색까지 막히면 안 되므로 건너뛴다.
+                continue
         return roots
 
     return [_norm_abs('/')]
@@ -118,8 +125,14 @@ def _browse_local(path):
     try:
         entries = os.listdir(resolved_path)
         for entry in entries:
-            full_path = _norm_abs(os.path.join(resolved_path, entry))
-            if os.path.isdir(full_path):
+            try:
+                full_path = _norm_abs(os.path.join(resolved_path, entry))
+                is_dir = os.path.isdir(full_path)
+            except OSError:
+                # 끊어진 정션/심볼릭 링크나 인식 불가 파일시스템으로 연결된 항목 하나가
+                # realpath()에서 실패해도 나머지 항목 목록까지 통째로 날리지 않는다.
+                continue
+            if is_dir:
                 dirs.append({
                     'name': entry,
                     'path': full_path,
