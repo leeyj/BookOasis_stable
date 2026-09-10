@@ -30,6 +30,14 @@ class BaseMetadataProvider(ABC):
     # Example:
     # detail_sidebar_widget = {"title": "이 작가의 다른 도서", "order": 50, "sessions": "all"}
     detail_sidebar_widget = None
+    # 도서 상세 페이지 본문(표지/제목/시놉시스/볼륨 목록) 전체를 이 플러그인의 커스텀 화면으로
+    # 대체할 수 있다고 선언 (선택). detail_sidebar_widget과 달리 여러 플러그인이 동시에 활성화될
+    # 수 없는 "단일 슬롯 교체" 계약 — 세션(session)별로 관리자가 설정 화면에서 활성 플러그인을
+    # 하나만 선택한다(기본값은 항상 코어 내장 화면). 플러그인 디렉토리의 detail/index.html,
+    # detail/style.css, detail/script.js 번들이 category_tab과 동일한 방식으로 서빙된다.
+    # Example:
+    # detail_view = {"title": "AniList 스타일 상세", "sessions": "all"}
+    detail_view = None
     # Optional self-update contract declared by each plugin.
     # Example:
     # {

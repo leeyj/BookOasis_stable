@@ -1,0 +1,118 @@
+.dvd-root {
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+}
+
+.dvd-banner {
+    position: relative;
+    width: 100%;
+    height: 260px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+}
+
+.dvd-banner-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.dvd-banner-gradient {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+.dvd-hero {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-end;
+    padding: 0 0.5rem;
+    margin-top: -90px;
+    position: relative;
+    z-index: 1;
+}
+
+.dvd-cover {
+    width: 150px;
+    height: 210px;
+    object-fit: cover;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.08);
+    border: 2px solid rgba(255, 255, 255, 0.08);
+}
+
+.dvd-hero-info {
+    flex: 1;
+    min-width: 240px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-bottom: 0.3rem;
+}
+
+.dvd-title {
+    margin: 0;
+    font-size: 1.7rem;
+    font-weight: 800;
+    color: var(--app-text-primary);
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+.dvd-summary {
+    margin: 0.2rem 0 0 0;
+    font-size: 0.88rem;
+    line-height: 1.6;
+    color: var(--app-text-secondary, var(--app-text-primary));
+    white-space: pre-wrap;
+    max-width: 780px;
+}
+
+.dvd-volumes-title {
+    margin: 0;
+    padding: 0 0.5rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--app-text-primary);
+}
+
+.dvd-volumes-row {
+    display: flex;
+    gap: 0.9rem;
+    overflow-x: auto;
+    padding: 0 1.5rem 1rem 1.5rem;
+}
+
+.dvd-volume-card {
+    flex-shrink: 0;
+    width: 110px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.dvd-volume-card img {
+    width: 110px;
+    height: 155px;
+    object-fit: cover;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    transition: transform 0.2s ease;
+}
+
+.dvd-volume-card:hover img {
+    transform: scale(1.04);
+}
+
+.dvd-volume-card span {
+    font-size: 0.76rem;
+    color: var(--app-text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

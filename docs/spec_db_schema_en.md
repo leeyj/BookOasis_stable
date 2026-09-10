@@ -82,8 +82,10 @@ Library roots and scan/runtime options.
 
 - PK: `id`
 - Main FK: `group_id -> library_groups.id`
-- Columns: `name`, `physical_path`, `cron_schedule`, `last_scanned_at`, `scan_status`, `is_remote`, `vfs_refresh_before_scan`, `rclone_rc_url`, `icon`, `color`, `hide_cover`, `group_id`, `sort_order`
+- Columns: `name`, `physical_path`, `cron_schedule`, `last_scanned_at`, `scan_status`, `is_remote`, `vfs_refresh_before_scan`, `rclone_rc_url`, `icon`, `color`, `hide_cover`, `hide_title`, `cover_aspect_ratio`, `group_id`, `sort_order`
 - `hide_cover`: stores whether cover rendering should be hidden at library/category level (`INTEGER DEFAULT 0`).
+- `hide_title`: per-category toggle to hide the grid card title text and show thumbnail only (Netflix style). UI only exposed for general/adult book sessions (`INTEGER DEFAULT 0`).
+- `cover_aspect_ratio`: per-category grid card cover aspect ratio. Only `'4:3'` (default) or `'16:9'` allowed (`TEXT DEFAULT '4:3'`).
 - Note: production DB files may contain legacy migration residue columns.
 
 ### books
@@ -95,7 +97,8 @@ Book metadata and file identity.
 - Major columns:
   - Identity/path: `id`, `library_id`, `file_path`, `file_format`
   - Metadata: `title`, `series_name`, `author`, `isbn`, `publisher`, `summary`, `genre`, `tags`, `link`, `release_date`, `score`
-  - Viewer/cover: `total_pages`, `cover_image`, `cover_updated_at`, `has_offsets`
+  - Viewer/cover: `total_pages`, `cover_image`, `cover_updated_at`, `cover_align`, `has_offsets`
+  - Banner: `banner_image`, `banner_updated_at` - optional detail-page hero image. Stored at `covers/<library_id>/banner_<hash>.webp` using the same file-path MD5 hash as the cover. The scanner fills it from a loose `banner.<ext>` file in the folder or a `banner` (Base64) field in the metadata YAML - left empty if neither is present (unlike the cover, it never force-extracts from inside a zip/epub)
   - State/protection: `metadata_locked`, `created_at`
   - Sort/alias: `series_alias`, `title_alias`
   - Runtime extensions: `is_deleted`, `deleted_at`, `file_mtime`, `file_size`
@@ -361,7 +364,10 @@ CREATE TABLE IF NOT EXISTS books (
     series_alias TEXT,
     title_alias TEXT,
     file_mtime REAL DEFAULT 0.0,
-    file_size INTEGER DEFAULT 0
+    file_size INTEGER DEFAULT 0,
+    cover_align TEXT DEFAULT 'center',
+    banner_image TEXT,
+    banner_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS series_summary (
@@ -678,6 +684,9 @@ CREATE TABLE IF NOT EXISTS books (
     title_alias VARCHAR(500),
     file_mtime DOUBLE DEFAULT 0.0,
     file_size BIGINT DEFAULT 0,
+    cover_align VARCHAR(10) DEFAULT 'center',
+    banner_image TEXT,
+    banner_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uq_books_file_path (file_path(500)),
     INDEX idx_books_series_name (series_name(255)),
     INDEX idx_books_series_alias (series_alias(255)),

@@ -142,6 +142,8 @@ class CategoryService:
             'icon': r['icon'] or 'fa-book',
             'color': r['color'] or '#94a3b8',
             'hide_cover': r['hide_cover'] or 0,
+            'hide_title': r.get('hide_title') or 0,
+            'cover_aspect_ratio': r.get('cover_aspect_ratio') or '4:3',
             'group_id': r.get('group_id'),
             'sort_order': r.get('sort_order') or 0,
             'gdrive_copy_remote': r.get('gdrive_copy_remote') or '',
@@ -206,6 +208,12 @@ class CategoryService:
         return '\n'.join([line for line in lines if line])
 
     @staticmethod
+    def _normalize_cover_aspect_ratio(cover_aspect_ratio):
+        """카테고리 그리드 커버 비율. 임의 커스텀 비율은 지원하지 않고 정해진 두 값만 허용한다."""
+        value = str(cover_aspect_ratio or '4:3').strip()
+        return value if value in ('4:3', '16:9') else '4:3'
+
+    @staticmethod
     def _validate_gdrive_requirements(physical_path, gdrive_copy_remote, gdrive_view_local_mirror_path):
         """공유 링크가 포함된 카테고리는 책을 열 때마다 그 1권만 개인 드라이브로
         복사해 보여주는 뷰어 전용 용도로만 쓰인다 — 폴더 전체를 미리 복사해두는
@@ -223,7 +231,7 @@ class CategoryService:
             raise ValueError('리모트의 로컬 마운트 루트를 확보하지 못했습니다. 리모트가 실제로 마운트돼 있는지 확인하거나 직접 입력해 주세요.')
 
     @staticmethod
-    def add_library(db_type, name, physical_path, is_remote=0, rclone_rc_url=None, icon='fa-book', color='#94a3b8', hide_cover=0, group_id=None, gdrive_copy_remote=None, gdrive_view_local_mirror_path=None):
+    def add_library(db_type, name, physical_path, is_remote=0, rclone_rc_url=None, icon='fa-book', color='#94a3b8', hide_cover=0, group_id=None, gdrive_copy_remote=None, gdrive_view_local_mirror_path=None, cover_aspect_ratio='4:3', hide_title=0):
         name = str(name or '').strip()
         if not name:
             raise ValueError('카테고리 이름은 비워둘 수 없습니다.')
@@ -232,10 +240,11 @@ class CategoryService:
         CategoryService._validate_gdrive_requirements(physical_path, gdrive_copy_remote, gdrive_view_local_mirror_path)
         physical_path = CategoryService._clean_physical_path(physical_path)
         group_id = CategoryService._normalize_group_id(db_type, group_id)
-        return CategoryRepository.add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_view_local_mirror_path)
+        cover_aspect_ratio = CategoryService._normalize_cover_aspect_ratio(cover_aspect_ratio)
+        return CategoryRepository.add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_view_local_mirror_path, cover_aspect_ratio, hide_title)
 
     @staticmethod
-    def edit_library(db_type, library_id, name, physical_path, is_remote=0, rclone_rc_url=None, icon='fa-book', color='#94a3b8', hide_cover=0, group_id=None, gdrive_copy_remote=None, gdrive_view_local_mirror_path=None):
+    def edit_library(db_type, library_id, name, physical_path, is_remote=0, rclone_rc_url=None, icon='fa-book', color='#94a3b8', hide_cover=0, group_id=None, gdrive_copy_remote=None, gdrive_view_local_mirror_path=None, cover_aspect_ratio='4:3', hide_title=0):
         name = str(name or '').strip()
         if not name:
             raise ValueError('카테고리 이름은 비워둘 수 없습니다.')
@@ -244,7 +253,8 @@ class CategoryService:
         CategoryService._validate_gdrive_requirements(physical_path, gdrive_copy_remote, gdrive_view_local_mirror_path)
         physical_path = CategoryService._clean_physical_path(physical_path)
         group_id = CategoryService._normalize_group_id(db_type, group_id)
-        CategoryRepository.edit_library(db_type, library_id, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_view_local_mirror_path)
+        cover_aspect_ratio = CategoryService._normalize_cover_aspect_ratio(cover_aspect_ratio)
+        CategoryRepository.edit_library(db_type, library_id, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_view_local_mirror_path, cover_aspect_ratio, hide_title)
 
     @staticmethod
     def delete_library(db_type, library_id):

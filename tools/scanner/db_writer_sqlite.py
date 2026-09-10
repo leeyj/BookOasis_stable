@@ -4,11 +4,13 @@ db_writer_sqlite.py – SQLite 전용 스캐너 DB 업서트/배치 라이터
 """
 import os
 
-def update_book_metadata(cursor, full_path, cover_image, merged_meta, series_name='', force=False):
+def update_book_metadata(cursor, full_path, cover_image, merged_meta, series_name='', force=False, banner_image=None):
     """Execute merge update for existing book info and local metadata in SQLite"""
     common_args = (
         cover_image,
         cover_image, cover_image,
+        banner_image or '',
+        banner_image or '', banner_image or '',
         merged_meta['author'],
         merged_meta.get('isbn', ''),
         merged_meta['publisher'],
@@ -26,6 +28,8 @@ def update_book_metadata(cursor, full_path, cover_image, merged_meta, series_nam
                 series_name  = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE series_name END,
                 cover_image  = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), cover_image) ELSE cover_image END,
                 cover_updated_at = CASE WHEN COALESCE(metadata_locked, 0) = 0 AND ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
+                banner_image = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), banner_image) ELSE banner_image END,
+                banner_updated_at = CASE WHEN COALESCE(metadata_locked, 0) = 0 AND ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE banner_updated_at END,
                 author       = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), author) ELSE author END,
                 isbn         = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), isbn) ELSE isbn END,
                 publisher    = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), publisher) ELSE publisher END,
@@ -43,6 +47,8 @@ def update_book_metadata(cursor, full_path, cover_image, merged_meta, series_nam
                 series_name  = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE series_name END,
                 cover_image  = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), cover_image) ELSE cover_image END,
                 cover_updated_at = CASE WHEN COALESCE(metadata_locked, 0) = 0 AND ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
+                banner_image = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), banner_image) ELSE banner_image END,
+                banner_updated_at = CASE WHEN COALESCE(metadata_locked, 0) = 0 AND ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE banner_updated_at END,
                 author       = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), author) ELSE author END,
                 isbn         = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), isbn) ELSE isbn END,
                 publisher    = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), publisher) ELSE publisher END,
@@ -114,6 +120,8 @@ def bulk_update_books(cursor, update_data_list, force=False):
                 series_name  = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE series_name END,
                 cover_image  = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), cover_image) ELSE cover_image END,
                 cover_updated_at = CASE WHEN COALESCE(metadata_locked, 0) = 0 AND ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
+                banner_image = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), banner_image) ELSE banner_image END,
+                banner_updated_at = CASE WHEN COALESCE(metadata_locked, 0) = 0 AND ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE banner_updated_at END,
                 author       = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), author) ELSE author END,
                 isbn         = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), isbn) ELSE isbn END,
                 publisher    = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), publisher) ELSE publisher END,
@@ -137,6 +145,8 @@ def bulk_update_books(cursor, update_data_list, force=False):
                 series_name  = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE series_name END,
                 cover_image  = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), cover_image) ELSE cover_image END,
                 cover_updated_at = CASE WHEN COALESCE(metadata_locked, 0) = 0 AND ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
+                banner_image = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), banner_image) ELSE banner_image END,
+                banner_updated_at = CASE WHEN COALESCE(metadata_locked, 0) = 0 AND ? != '' AND ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE banner_updated_at END,
                 author       = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), author) ELSE author END,
                 isbn         = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), isbn) ELSE isbn END,
                 publisher    = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), publisher) ELSE publisher END,
@@ -158,14 +168,15 @@ def bulk_insert_books(cursor, insert_data_list):
     if not insert_data_list: return
     cursor.executemany("""
         INSERT INTO books 
-        (library_id, title, series_name, author, isbn, file_path, file_format, total_pages, cover_image, publisher, link, score, summary, release_date, genre, tags, file_mtime, file_size, is_deleted) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+        (library_id, title, series_name, author, isbn, file_path, file_format, total_pages, cover_image, banner_image, publisher, link, score, summary, release_date, genre, tags, file_mtime, file_size, is_deleted) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
         ON CONFLICT(file_path) DO UPDATE SET
             library_id   = EXCLUDED.library_id,
             is_deleted   = 0,
             title        = EXCLUDED.title,
             series_name  = EXCLUDED.series_name,
             cover_image  = CASE WHEN COALESCE(books.metadata_locked, 0) = 0 THEN COALESCE(NULLIF(EXCLUDED.cover_image, ''), books.cover_image) ELSE books.cover_image END,
+            banner_image = CASE WHEN COALESCE(books.metadata_locked, 0) = 0 THEN COALESCE(NULLIF(EXCLUDED.banner_image, ''), books.banner_image) ELSE books.banner_image END,
             file_mtime   = EXCLUDED.file_mtime,
             file_size    = EXCLUDED.file_size
     """, insert_data_list)

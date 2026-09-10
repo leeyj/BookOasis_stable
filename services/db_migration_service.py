@@ -221,7 +221,9 @@ _SCHEMA_SQL = """
         group_id INTEGER DEFAULT NULL,
         sort_order INTEGER DEFAULT 0,
         gdrive_copy_remote TEXT DEFAULT NULL,
-        gdrive_view_local_mirror_path TEXT DEFAULT NULL
+        gdrive_view_local_mirror_path TEXT DEFAULT NULL,
+        cover_aspect_ratio TEXT DEFAULT '4:3',
+        hide_title INTEGER DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS plugin_group_assignments (
@@ -274,7 +276,9 @@ _SCHEMA_SQL = """
         title_alias TEXT,
         file_mtime REAL DEFAULT 0.0,
         file_size INTEGER DEFAULT 0,
-        cover_align TEXT DEFAULT 'center'
+        cover_align TEXT DEFAULT 'center',
+        banner_image TEXT,
+        banner_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS series_summary (

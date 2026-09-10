@@ -8,6 +8,7 @@ import { stripLeadingBracketTags, middleTruncateTitle } from './series_display.j
 import { initGridPruning, resetGridPruning, notifyCardsAppended, notifyCardsPrepended } from './grid_pruning.js';
 import './scan_activity_status.js';
 import './account_menu.js';
+import './book_card_info_popup.js';
 
 // 커버 이미지가 (플레이스홀더 → 실제 src로) 로드 완료되면 .is-loaded를 붙여 CSS로 fade-in한다.
 // 실제 로딩 시간은 그대로지만, 뚝뚝 끊기듯 팍 나타나는 대신 부드럽게 나타나서 "계속 로딩
@@ -210,6 +211,8 @@ export function createBookCard(item, options = {}) {
   const card = document.createElement('div');
   card.className = 'book-card';
   if (isVideo) card.dataset.role = 'video-course-card';
+  // 영상강좌는 항상 16:9 강제, 그 외(일반/성인/오디오북)는 카테고리별 커버 비율 설정을 따른다
+  card.dataset.coverRatio = isVideo ? '16-9' : (state.currentLibraryAspectRatio === '16:9' ? '16-9' : '4-3');
   card.dataset.bookId = item.id || item.representative_book_id || '';
   if (item.is_author_group) card.dataset.isAuthorGroup = '1';
 
@@ -229,6 +232,15 @@ export function createBookCard(item, options = {}) {
   card.dataset.markUnreadScope = options.markUnreadScope || 'book';
   card.dataset.seriesName = rawSeriesName;
   card.dataset.libraryId = item.library_id ?? '';
+  card.dataset.bookCount = parseInt(item.book_count, 10) || 1;
+
+  // 제목 감추기(넷플릭스 스타일)와 카드 정보 팝업(...)은 일반/성인 도서 카드 전용 기능
+  const isBookCard = !isVideo && !isAudiobook;
+  const shouldHideTitle = isBookCard && !!state.currentLibraryHideTitles;
+  if (shouldHideTitle) {
+    card.classList.add('book-card--hide-title');
+    card.title = displayTitle;
+  }
   const fallbackCoverSrc = buildFallbackCoverUrl({
     title: displayTitle,
     format: coverFormat,
@@ -250,7 +262,7 @@ export function createBookCard(item, options = {}) {
     if (now - lastClickTime < 200) return; // 중복 호출 방지
     lastClickTime = now;
 
-    if (e.target.closest('.btn-resume-series') || e.target.closest('.btn-card-fav-toggle')) {
+    if (e.target.closest('.btn-resume-series') || e.target.closest('.btn-card-fav-toggle') || e.target.closest('.book-card-kebab-btn')) {
       return;
     }
     console.log('[BookCard] Triggering handlePrimaryClick!', item);
@@ -334,6 +346,10 @@ export function createBookCard(item, options = {}) {
     ? `<span class="book-card-audiobook-completed" title="${i18n.t('detail.audiobook_completed')}" aria-label="${i18n.t('detail.audiobook_completed')}"></span>`
     : '';
 
+  const infoKebabHtml = isBookCard
+    ? `<button class="book-card-kebab-btn" data-role="card-info-kebab" title="정보"><i class="fa-solid fa-ellipsis"></i></button>`
+    : '';
+
   card.innerHTML = `
     <div class="book-card-cover">
       <div class="book-card-overlay"></div>
@@ -342,6 +358,7 @@ export function createBookCard(item, options = {}) {
       ${favBtnHtml}
       ${lockedBadgeHtml}
       ${audiobookCompletedDotHtml}
+      ${infoKebabHtml}
 
       <button class="btn-resume-series" title="${options.actionTitle || '읽기'}">
         <i class="fa-solid fa-book-open"></i>

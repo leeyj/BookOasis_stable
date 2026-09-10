@@ -306,8 +306,8 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
             INSERT INTO libraries (
                 name, physical_path, cron_schedule, scan_status, is_remote,
                 vfs_refresh_before_scan, rclone_rc_url, icon, color, hide_cover,
-                group_id, sort_order
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                group_id, sort_order, cover_aspect_ratio, hide_title
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             target_lib_name,
             db_physical_path,
@@ -320,7 +320,9 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
             lib_info.get('color', '#94a3b8'),
             lib_info.get('hide_cover', 0),
             lib_info.get('group_id'),
-            lib_info.get('sort_order', 0)
+            lib_info.get('sort_order', 0),
+            lib_info.get('cover_aspect_ratio', '4:3') if lib_info.get('cover_aspect_ratio') in ('4:3', '16:9') else '4:3',
+            1 if lib_info.get('hide_title') else 0
         ))
         target_library_id = cursor.lastrowid
         conn.commit()

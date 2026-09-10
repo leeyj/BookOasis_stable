@@ -106,8 +106,10 @@ export async function loadPluginsSettings() {
 
       // 이벤트 바인딩
       bindPluginEvents();
+      loadDetailViewProviderSettings(data.plugins);
     } else {
       container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--app-text-muted);">로드된 메타데이터 플러그인이 없습니다.</div>';
+      loadDetailViewProviderSettings([]);
     }
   } catch (err) {
     console.error('플러그인 목록 조회 에러:', err);
@@ -115,6 +117,89 @@ export async function loadPluginsSettings() {
   }
 
   initSamplePluginsModal();
+}
+
+// category_tab/detail_sidebar_widget과 동일한 세션 노출 규칙(utils/plugin_session_helper.py의
+// resolve_plugin_sessions 서버측 로직을 그대로 반영): 생략 시 general만, 'all'이면 4개 세션 전체,
+// 배열이면 그 세션들만.
+const DETAIL_VIEW_SESSIONS = ['general', 'adult', 'audiobook', 'video'];
+function resolvePluginSessionsClient(manifest) {
+  const sessions = manifest && manifest.sessions;
+  if (sessions === 'all') return DETAIL_VIEW_SESSIONS;
+  if (Array.isArray(sessions) && sessions.length > 0) {
+    return sessions.filter((s) => DETAIL_VIEW_SESSIONS.includes(s));
+  }
+  return ['general'];
+}
+
+const DETAIL_VIEW_SESSION_LABELS = {
+  general: '일반 도서',
+  adult: '성인 도서',
+  audiobook: '오디오북',
+  video: '영상강좌',
+};
+
+// 세션별 도서 상세페이지 렌더러 선택 UI 로드 (detail_view를 선언한 플러그인 + 코어 기본값)
+export async function loadDetailViewProviderSettings(plugins) {
+  const container = document.getElementById('settings-detail-view-provider-rows');
+  if (!container) return;
+
+  const detailViewPlugins = (plugins || []).filter((p) => p.enabled && p.detail_view && typeof p.detail_view === 'object');
+
+  let currentValues = {};
+  try {
+    const settingsRes = await api.fetchSystemSettings();
+    if (settingsRes && settingsRes.success) {
+      currentValues = settingsRes.settings || {};
+    }
+  } catch (err) {
+    console.error('[Plugins-Settings] 상세페이지 렌더러 현재 설정값 조회 실패:', err);
+  }
+
+  container.innerHTML = DETAIL_VIEW_SESSIONS.map((sessionKey) => {
+    const settingKey = `DETAIL_VIEW_PROVIDER_${sessionKey.toUpperCase()}`;
+    const currentVal = currentValues[settingKey] || 'core';
+    const eligiblePlugins = detailViewPlugins.filter((p) => resolvePluginSessionsClient(p.detail_view).includes(sessionKey));
+    const options = ['<option value="core">기본(코어)</option>']
+      .concat(eligiblePlugins.map((p) => `<option value="${escapeHtmlAttr(p.id)}" ${String(currentVal) === p.id ? 'selected' : ''}>${escapeHtmlText(p.detail_view.title || p.name)}</option>`));
+    // 현재 저장된 값이 더 이상 유효하지 않은 플러그인 id면(비활성화/삭제) 코어로 표시
+    const coreSelected = currentVal === 'core' || !eligiblePlugins.some((p) => p.id === currentVal);
+    if (coreSelected) {
+      options[0] = '<option value="core" selected>기본(코어)</option>';
+    }
+    return `
+      <div class="library-form-group-row" style="display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap;">
+        <label style="font-weight: 700; color: var(--app-text-primary); font-size: 0.88rem; min-width: 90px;">${DETAIL_VIEW_SESSION_LABELS[sessionKey]}</label>
+        <select class="detail-view-provider-select" data-session="${sessionKey}" data-setting-key="${settingKey}" style="flex: 1; min-width: 200px; max-width: 360px; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.5rem 0.7rem; border-radius: 6px;">
+          ${options.join('')}
+        </select>
+        ${eligiblePlugins.length === 0 ? '<span style="font-size: 0.76rem; color: var(--app-text-muted);">이 세션에서 detail_view를 선언한 활성 플러그인이 없습니다.</span>' : ''}
+      </div>
+    `;
+  }).join('');
+
+  container.querySelectorAll('.detail-view-provider-select').forEach((select) => {
+    select.addEventListener('change', async (e) => {
+      const sessionKey = e.target.dataset.session;
+      const settingKey = e.target.dataset.settingKey;
+      const value = e.target.value;
+      try {
+        const res = await api.updateSystemSetting(settingKey, value);
+        if (res.success) {
+          // 저장 직후 새로고침 없이 바로 반영되도록 메모리 상태도 즉시 갱신
+          // (안 그러면 openBookDetail()이 여전히 페이지 로드 시점의 구값을 참조해
+          // "선택은 했는데 화면이 안 바뀐다"는 혼란을 준다).
+          state.detailViewProviders[sessionKey] = value;
+          if (typeof window.showToast === 'function') window.showToast('저장되었습니다. 도서 상세페이지를 다시 열면 반영됩니다.', 'success');
+        } else {
+          alert(res.error || '저장 실패');
+        }
+      } catch (err) {
+        console.error('[Plugins-Settings] 상세페이지 렌더러 설정 저장 에러:', err);
+        alert('서버와 통신 중 오류가 발생했습니다.');
+      }
+    });
+  });
 }
 
 function escapeHtmlAttr(value) {

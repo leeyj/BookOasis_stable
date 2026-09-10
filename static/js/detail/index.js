@@ -85,28 +85,60 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
         detailVolumeViewState.sortOrder = 'oldest';
       }
 
-      // 컴포넌트 렌더러 모듈 호출
-      const headerHtml = renderDetailHeader(meta, books, safeSeriesName, actualLibraryId, safeDisplayTitle);
-      const volumesSectionHtml = renderVolumesList(
-        books,
-        safeSeriesName,
-        actualLibraryId,
-        state.currentLibraryType || 'general',
-        detailVolumeViewState
-      );
+      // 상세페이지 본문 렌더러 결정: 이 세션에 코어가 아닌 플러그인이 지정돼 있으면
+      // 그 플러그인의 detail_view UI 번들로 header+volumes 영역을 통째로 대체한다.
+      // 실패/미지정 시 항상 기존 코어 렌더링으로 폴백한다 (기본값 100% 유지).
+      const detailViewPluginId = (state.detailViewProviders && state.detailViewProviders[state.currentLibraryType]) || 'core';
+      let pluginDetailBundle = null;
+      if (detailViewPluginId !== 'core') {
+        try {
+          const bundleRes = await api.fetchPluginDetailUiBundle(detailViewPluginId);
+          if (bundleRes && bundleRes.success && bundleRes.bundle) {
+            pluginDetailBundle = bundleRes.bundle;
+          }
+        } catch (err) {
+          console.error(`[Detail] 플러그인 상세뷰 번들 로드 실패 (${detailViewPluginId}):`, err);
+        }
+      }
+
+      let mainContentHtml;
+      if (pluginDetailBundle) {
+        mainContentHtml = (pluginDetailBundle.css ? `<style id="plugin-detail-view-style-${detailViewPluginId}">${pluginDetailBundle.css}</style>` : '')
+          + (pluginDetailBundle.html || '');
+      } else {
+        // 컴포넌트 렌더러 모듈 호출 (기본 코어 렌더링)
+        const headerHtml = renderDetailHeader(meta, books, safeSeriesName, actualLibraryId, safeDisplayTitle);
+        const volumesSectionHtml = renderVolumesList(
+          books,
+          safeSeriesName,
+          actualLibraryId,
+          state.currentLibraryType || 'general',
+          detailVolumeViewState
+        );
+        mainContentHtml = headerHtml + volumesSectionHtml;
+      }
 
       detailView.innerHTML = `
         <button class="btn-back-to-list" data-role="detail-back-to-list">
           <i class="fa-solid fa-arrow-left"></i> ${i18n.t('modal.go_back')}
         </button>
         <div class="detail-page-layout">
-          <div class="detail-page-main">
-            ${headerHtml}
-            ${volumesSectionHtml}
+          <div class="detail-page-main" id="detail-page-main-content">
+            ${mainContentHtml}
           </div>
           <aside class="detail-page-sidebar" id="detail-widget-sidebar" style="display:none;"></aside>
         </div>
       `;
+
+      if (pluginDetailBundle && pluginDetailBundle.js) {
+        try {
+          const mainEl = document.getElementById('detail-page-main-content');
+          const scriptFn = new Function('pluginId', 'container', 'context', pluginDetailBundle.js);
+          scriptFn(detailViewPluginId, mainEl, { meta, books, seriesName: safeSeriesName, libraryId: actualLibraryId });
+        } catch (err) {
+          console.error(`[Detail] 플러그인 상세뷰 스크립트 실행 오류 (${detailViewPluginId}):`, err);
+        }
+      }
 
       // 도서 상세 사이드바 위젯(플러그인) 로드 - 본문 렌더링을 막지 않도록 논블로킹으로 로드.
       // 예전엔 "이 작가의 다른 도서"가 코어에 하드코딩돼 있었으나, 플러그인 개발자들이

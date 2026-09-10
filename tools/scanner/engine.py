@@ -154,14 +154,19 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
 
     cursor.execute(f"""
         SELECT id, file_path, has_offsets,
-               cover_image, author, publisher, summary, file_mtime, file_size
+               cover_image, author, publisher, summary, file_mtime, file_size, banner_image
         FROM books WHERE library_id = ?{scope_clause}
     """, scope_params)
     all_rows = cursor.fetchall()
-    db_books = {}          
-    db_meta_full = set()   
-    db_offsets_cached = set() 
+    db_books = {}
+    db_meta_full = set()
+    db_offsets_cached = set()
     db_files_cache = {}
+    # 배너가 아직 없는 기존 도서 경로 집합 - 커버/메타데이터가 이미 다 채워져 있어 평소엔
+    # "변경 없음"으로 스킵되는 파일이라도, 폴더에 새로 배너가 감지되면 이 집합을 근거로
+    # 스킵을 풀어 배너만이라도 반영되게 한다(공유 드라이브 담당자가 나중에 배너만 추가하는
+    # 흔한 시나리오 - 안 그러면 강제 재스캔 전까진 영원히 배너가 DB에 반영되지 않는다).
+    db_banner_missing = set()
     for row in all_rows:
         norm_path = canonical_path(row['file_path'])
         db_books[norm_path] = row['id']
@@ -171,6 +176,8 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
         if (row['cover_image'] and not row['cover_image'].startswith('series_') and
                 row['author'] and row['publisher'] and row['summary']):
             db_meta_full.add(norm_path)
+        if not row['banner_image']:
+            db_banner_missing.add(norm_path)
 
     cursor.execute("SELECT folder_path, dir_mtime, meta_mtime FROM folder_mtimes")
     db_folder_mtimes = {canonical_path(row['folder_path']): (row['dir_mtime'], row['meta_mtime']) for row in cursor.fetchall()}
@@ -331,10 +338,12 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                 meta = d['merged_meta']
                 score = meta.get('score', 0)
                 lib_id_int = int(d['library_id']) if d.get('library_id') is not None else None
+                banner_image = d.get('banner_image')
                 update_data.append((
                     lib_id_int,
                     _clamp_text(d.get('series_name', ''), _METADATA_FIELD_MAX_LEN['series_name']),
                     d['cover_image'], d['cover_image'], d['cover_image'],
+                    banner_image, banner_image, banner_image,
                     _clamp_text(meta.get('author', ''), _METADATA_FIELD_MAX_LEN['author']),
                     _clamp_text(meta.get('isbn', ''), _METADATA_FIELD_MAX_LEN['isbn']),
                     _clamp_text(meta.get('publisher', ''), _METADATA_FIELD_MAX_LEN['publisher']),
@@ -365,6 +374,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     _clamp_text(meta.get('isbn', ''), _METADATA_FIELD_MAX_LEN['isbn']),
                     canonical_path(d['full_path']), d['file_format'], 100 if d['file_format'] == 'epub' else 0,
                     d['cover_image'],
+                    d.get('banner_image'),
                     _clamp_text(meta.get('publisher', ''), _METADATA_FIELD_MAX_LEN['publisher']),
                     meta.get('link',''),
                     meta.get('score',0), meta.get('summary',''),
@@ -572,7 +582,11 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                 batch_item_count = 0
                 for item in res['results']:
                     full_path = item['full_path']
-                    if item['skip']:
+                    # 이 파일 자체(커버/오프셋/메타)는 변경이 없어 평소엔 건너뛰지만, 이번 스캔에서
+                    # 배너가 새로 감지됐고 DB에는 아직 배너가 없는 기존 도서라면 스킵을 풀어
+                    # 배너만이라도 반영한다.
+                    banner_only_update = bool(item.get('banner_image')) and full_path in db_banner_missing
+                    if item['skip'] and not banner_only_update:
                         continue
 
                     filename = item['filename']
@@ -580,13 +594,14 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     series_name = item['series_name']
                     title = item.get('title')
                     cover_image = item['cover_image']
+                    banner_image = item.get('banner_image')
                     offsets_data = item['offsets_data']
                     is_offset_only = item.get('offset_only', False)
 
                     if full_path in db_books:
                         pending_updates.append({
                             "action": "update", "library_id": library_id, "is_offset_only": is_offset_only, "full_path": full_path,
-                            "cover_image": cover_image, "merged_meta": merged_meta, "offsets_data": offsets_data,
+                            "cover_image": cover_image, "banner_image": banner_image, "merged_meta": merged_meta, "offsets_data": offsets_data,
                             "filename": filename, "series_name": series_name, "file_mtime": item.get('file_mtime', 0.0), "file_size": item.get('file_size', 0)
                         })
                     else:
@@ -594,7 +609,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                             "action": "insert", "library_id": library_id, "full_path": full_path,
                             "filename": filename, "file_format": file_format, "series_name": series_name,
                             "title": title,
-                            "cover_image": cover_image, "merged_meta": merged_meta, "offsets_data": offsets_data,
+                            "cover_image": cover_image, "banner_image": banner_image, "merged_meta": merged_meta, "offsets_data": offsets_data,
                             "file_mtime": item.get('file_mtime', 0.0), "file_size": item.get('file_size', 0)
                         })
                         detected_new_books.append({

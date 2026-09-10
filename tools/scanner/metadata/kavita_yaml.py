@@ -99,7 +99,7 @@ def read_file_with_timeout(file_path, is_remote, timeout=10):
 KNOWN_KAVITA_KEYS = {
     'title', 'series', 'author', 'publisher', 'summary', 'description', 'isbn',
     'score', 'link', 'genre', 'genres', 'tags', 'tag', 'cover_b64_map', 'meta',
-    'search', 'person publisher', 'person writers', 'web links', 'writer'
+    'search', 'person publisher', 'person writers', 'web links', 'writer', 'banner'
 }
 
 
@@ -190,6 +190,7 @@ def parse_kavita_yaml(folder_path, files=None, is_remote=False):
         'genre': '',
         'tags': '',
         'cover_b64_map': {},
+        'banner_b64': None,
         'has_yaml': False,
         'parser_warnings': []
     }
@@ -343,6 +344,12 @@ def parse_kavita_yaml(folder_path, files=None, is_remote=False):
                 meta['link'] = meta['link'] or src.get('Web Links') or src.get('link') or ''
                 meta['tags'] = meta['tags'] or _parse_list_or_str(src.get('Tags') or src.get('tags') or src.get('tag'))
                 meta['genre'] = meta['genre'] or _parse_list_or_str(src.get('Genres') or src.get('genre'))
+                # 배너 이미지(Base64) - 공유 드라이브 도서관리 담당자와 합의된 필드.
+                # cover처럼 파일별 매핑(files.<name>.cover)이 아니라 시리즈/폴더 전체에
+                # 대표 하나만 있으면 되는 개념이라 top-level 단일 값으로 취급한다.
+                banner_val = src.get('banner') or src.get('Banner')
+                if not meta['banner_b64'] and banner_val and isinstance(banner_val, str) and len(banner_val) > 100:
+                    meta['banner_b64'] = banner_val
 
             search_list = data.get('search', [])
             if search_list and isinstance(search_list, list) and len(search_list) > 0:

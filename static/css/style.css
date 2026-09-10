@@ -124,6 +124,7 @@
     --app-border-light: rgba(255, 255, 255, 0.05);
     --app-input-bg: #1c1d20;
     --app-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    --app-shadow-elevated: 0 14px 40px rgba(0, 0, 0, 0.45);
     --app-blur: blur(10px);
     --app-panel-rgb: 30, 41, 59;
     --app-panel-border-rgb: 255, 255, 255;
@@ -187,6 +188,7 @@ html[data-library-type="video"] #sidebar-categories [data-id="plugins"] {
     --app-border-light: #2a2a2a;
     --app-input-bg: #1a1a1a;
     --app-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --app-shadow-elevated: 0 14px 34px rgba(0, 0, 0, 0.65);
     --app-blur: none;
     --app-panel-rgb: 36, 36, 36;
     --app-panel-border-rgb: 255, 255, 255;
@@ -207,6 +209,7 @@ html[data-library-type="video"] #sidebar-categories [data-id="plugins"] {
     --app-border-light: #e2e8f0;
     --app-input-bg: #f8fafc;
     --app-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    --app-shadow-elevated: 0 10px 26px rgba(15, 23, 42, 0.14);
     --app-blur: none;
     --app-panel-rgb: 255, 255, 255;
     --app-panel-border-rgb: 226, 232, 240;
@@ -331,6 +334,7 @@ html[data-library-type="video"] #sidebar-categories [data-id="plugins"] {
     --app-border-light: #ebdcc0;
     --app-input-bg: #fdf7eb;
     --app-shadow: 0 4px 12px rgba(67, 52, 34, 0.08);
+    --app-shadow-elevated: 0 10px 24px rgba(67, 52, 34, 0.18);
     --app-blur: none;
     --app-panel-rgb: 244, 228, 193;
     --app-panel-border-rgb: 230, 211, 173;
@@ -466,6 +470,7 @@ html[data-library-type="video"] #sidebar-categories [data-id="plugins"] {
     --app-border-light: rgba(100, 255, 218, 0.08);
     --app-input-bg: #071324;
     --app-shadow: 0 10px 30px -10px rgba(2, 12, 27, 0.7);
+    --app-shadow-elevated: 0 16px 40px -8px rgba(2, 12, 27, 0.85);
     --app-blur: blur(8px);
     --app-panel-rgb: 17, 34, 64;
     --app-panel-border-rgb: 255, 255, 255;
@@ -486,6 +491,7 @@ html[data-library-type="video"] #sidebar-categories [data-id="plugins"] {
     --app-border-light: rgba(255, 255, 255, 0.08);
     --app-input-bg: rgba(10, 26, 33, 0.6);
     --app-shadow: 0 8px 24px rgba(7, 20, 28, 0.4);
+    --app-shadow-elevated: 0 14px 34px rgba(7, 20, 28, 0.55);
     --app-blur: blur(8px);
     --app-panel-rgb: 25, 58, 72;
     --app-panel-border-rgb: 255, 255, 255;
@@ -531,6 +537,7 @@ html[data-library-type="video"] #sidebar-categories [data-id="plugins"] {
     --app-border-light: rgba(220, 38, 38, 0.15);
     --app-input-bg: rgba(24, 24, 27, 0.8);
     --app-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 15px rgba(220, 38, 38, 0.15);
+    --app-shadow-elevated: 0 16px 40px rgba(0, 0, 0, 0.9), 0 0 22px rgba(220, 38, 38, 0.25);
     --app-blur: blur(8px);
     --app-panel-rgb: 28, 25, 23;
     --app-panel-border-rgb: 255, 255, 255;
@@ -576,6 +583,7 @@ html[data-library-type="video"] #sidebar-categories [data-id="plugins"] {
     --app-border-light: #444444;
     --app-input-bg: #ffffff;
     --app-shadow: none;
+    --app-shadow-elevated: none;
     --app-blur: none;
     --app-panel-rgb: 255, 255, 255;
     --app-panel-border-rgb: 0, 0, 0;
@@ -789,6 +797,13 @@ body {
 
 .library-sidebar.collapsed .sidebar-title span {
     display: none;
+}
+
+/* 접힌 레일에서는 텍스트가 사라져 로고 아이콘만 남는데, 기존 40px가 "너무 안 보인다"는
+   커뮤니티 피드백이 있어(2026-09-11) 좁은 레일(60px) 안에서 여유 있게 키운다. */
+.library-sidebar.collapsed .sidebar-title img {
+    width: 52px !important;
+    height: 52px !important;
 }
 
 .library-sidebar.collapsed .menu-item,
@@ -1185,6 +1200,29 @@ body {
     box-shadow: var(--app-shadow);
     padding: 0.4rem 1rem;
     flex-wrap: wrap;
+    /* .library-main-content(overflow-y:auto)의 첫 자식이라 그 안에서 그대로 스티키가
+       동작한다 - 커뮤니티에서 계속 논의되던 "스크롤해도 검색/세션탭/설정이 안 보인다"
+       요청 반영. position:fixed는 과거 모바일 visualViewport/핀치줌과 얽혀 재발한 전례가
+       있어(mobile.css .btn-sidebar-toggle 이력 참고) 의도적으로 피하고 sticky만 사용한다. */
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    transition: transform 0.25s ease, opacity 0.25s ease, box-shadow 0.2s ease;
+}
+
+/* 아래로 스크롤할 때만 header_scroll_behavior.js가 붙이는 클래스 - 위로 스크롤하거나
+   맨 위 근처(threshold 이내)면 다시 나타난다. */
+.library-header.library-header--hidden {
+    transform: translateY(calc(-100% - 1rem));
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* 맨 위(scrollTop≈0)에서 살짝만 스크롤해도 header_scroll_behavior.js가 붙이는 클래스 -
+   평소엔 플랫하다가 스크롤 중엔 그림자를 진하게 키워 그리드 위에 "떠 있는" 입체감을 준다.
+   box-shadow 값 교체만 하는 클래스 토글이라 매 프레임 리플로우 없이 GPU 합성으로 처리된다. */
+.library-header.library-header--elevated {
+    box-shadow: var(--app-shadow-elevated, var(--app-shadow));
 }
 
 .library-title {
@@ -1772,6 +1810,31 @@ body {
     background: rgba(255, 255, 255, 0.08);
 }
 
+.book-info-popup-body {
+    padding: 0.25rem 0.85rem 0.75rem 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.book-info-popup-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.book-info-popup-label {
+    font-size: 0.72rem;
+    color: var(--app-text-muted);
+    font-weight: 700;
+}
+
+.book-info-popup-value {
+    font-size: 0.82rem;
+    color: var(--app-text-primary);
+    word-break: break-all;
+}
+
 .plugin-context-menu-group-title {
     padding: 0.45rem 1rem 0.35rem 1rem;
     color: var(--app-text-muted);
@@ -2273,8 +2336,51 @@ body {
     aspect-ratio: 16 / 9;
 }
 
+/* 카테고리별 커버 화면비율 설정(4:3 기본 / 16:9 선택) - ui.js createBookCard가 카드마다 굽는 data-cover-ratio */
+.book-card[data-cover-ratio="16-9"] .book-card-cover {
+    height: auto;
+    aspect-ratio: 16 / 9;
+}
+
 .book-card:hover .book-card-cover img {
     transform: scale3d(1.08, 1.08, 1);
+}
+
+/* 제목 감추기(넷플릭스 스타일) - 카드 하단 제목/서브텍스트 영역을 통째로 숨겨 썸네일만 노출 */
+.book-card.book-card--hide-title .book-card-info {
+    display: none;
+}
+
+/* 카드 정보 팝업(...) 트리거 - 썸네일 우하단, 평소엔 숨겨두고 카드 hover 시에만 노출 */
+.book-card-kebab-btn {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    width: 26px;
+    height: 26px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(10, 11, 13, 0.75);
+    color: var(--app-text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, background 0.2s ease;
+    z-index: 4;
+}
+
+.book-card:hover .book-card-kebab-btn {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.book-card-kebab-btn:hover {
+    background: var(--app-accent);
+    color: var(--app-accent-contrast);
 }
 
 .book-badge-count {

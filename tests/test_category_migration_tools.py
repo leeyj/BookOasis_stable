@@ -20,7 +20,8 @@ CREATE TABLE libraries (
     cron_schedule TEXT, last_scanned_at TEXT, scan_status TEXT DEFAULT 'ready',
     is_remote INTEGER DEFAULT 0, vfs_refresh_before_scan INTEGER DEFAULT 0,
     rclone_rc_url TEXT, icon TEXT, color TEXT, hide_cover INTEGER DEFAULT 0,
-    group_id INTEGER DEFAULT NULL, sort_order INTEGER DEFAULT 0
+    group_id INTEGER DEFAULT NULL, sort_order INTEGER DEFAULT 0,
+    cover_aspect_ratio TEXT DEFAULT '4:3', hide_title INTEGER DEFAULT 0
 );
 CREATE TABLE books (
     id INTEGER PRIMARY KEY AUTOINCREMENT, library_id INTEGER, title TEXT,

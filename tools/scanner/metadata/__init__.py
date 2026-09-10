@@ -27,6 +27,7 @@ def _base_meta():
         'genre': '',
         'tags': '',
         'cover_b64_map': {},
+        'banner_b64': None,
         'cover_image_url': '',
         'is_webtoon': False,
         'has_yaml': False,

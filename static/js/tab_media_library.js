@@ -6,6 +6,7 @@ import { updateCurrentCategoryIndicator } from './category_indicator.js';
 import { openReader, closeMediaViewer, toggleFullscreenViewer, setComicFitMode, changeFontSize, toggleReaderTheme, initKeyboardListener, nextComicPage, prevComicPage, nextPdfPage, prevPdfPage, epubPrevPage, epubNextPage, prevTxtPage, nextTxtPage } from './viewer.js';
 import { switchActiveView } from './view_manager.js';
 import { flushProgress } from './viewer_progress.js';
+import './header_scroll_behavior.js';
 
 // category.js CRUD 임포트
 import { loadLibraries, triggerAddLibrary, triggerEditLibrary, triggerDeleteLibrary, closeLibraryModal, submitLibraryForm, triggerScanLibrary, triggerScanLibraryCovers, triggerCancelScanLibrary } from './category.js';
@@ -515,6 +516,8 @@ export async function selectCategory(id, skipHistory = false) {
     if (sidebarEl) applySidebarShowMore(sidebarEl, id);
   }
   state.currentLibraryHideCovers = !!(activeItem && activeItem.dataset && activeItem.dataset.type === 'custom' && activeItem.dataset.hideCover === '1');
+  state.currentLibraryAspectRatio = (activeItem && activeItem.dataset && activeItem.dataset.coverAspectRatio === '16:9') ? '16:9' : '4:3';
+  state.currentLibraryHideTitles = !!(activeItem && activeItem.dataset && activeItem.dataset.type === 'custom' && activeItem.dataset.hideTitle === '1');
   updateCurrentCategoryIndicator(id, activeItem);
 
   // 정렬 버튼 라벨을 실제 상태(state.currentSortDirection)와 동기화.

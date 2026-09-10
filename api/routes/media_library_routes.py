@@ -6,6 +6,7 @@ from flask import Blueprint, request, jsonify, session
 from services.category_service import CategoryService
 from services.series_service import SeriesService
 from services.book_detail_service import BookDetailService
+from services.book_info_service import BookInfoService
 from services.reading_history_service import ReadingHistoryService
 from services.library_service import LibraryService
 from services.recommendation_service import RecommendationService
@@ -218,6 +219,34 @@ def get_media_detail():
             representative_book_id=representative_book_id
         )
         return jsonify({'success': True, 'meta': meta, 'books': books_list})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@media_library_routes_bp.route('/api/media/card-info', methods=['GET'])
+@login_required
+def get_media_card_info():
+    """그리드 카드 '...' 아이콘 클릭 시 표시할 읽기전용 정보(제목/실제경로/도서 수/파일 크기) 조회"""
+    db_type = request.args.get('type', 'general')
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+    book_id = request.args.get('book_id')
+    series_name = request.args.get('series_name', '')
+    library_id = request.args.get('library_id')
+
+    try:
+        book_id = int(book_id) if book_id else None
+    except (TypeError, ValueError):
+        book_id = None
+    try:
+        library_id = int(library_id) if library_id else None
+    except (TypeError, ValueError):
+        library_id = None
+
+    try:
+        info = BookInfoService.get_card_summary(db_type, book_id=book_id, series_name=series_name, library_id=library_id)
+        if not info:
+            return jsonify({'success': False, 'error': '정보를 찾을 수 없습니다.'}), 404
+        return jsonify({'success': True, **info})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

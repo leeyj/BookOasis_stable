@@ -21,6 +21,33 @@ class BookInfoService:
         }
 
     @staticmethod
+    def get_card_summary(db_type, book_id=None, series_name=None, library_id=None):
+        """그리드 카드 '...' 정보 팝업용: 시리즈면 도서 수/전체 용량 합산, 단일 도서면 그 파일의 경로/용량만 반환"""
+        series_name = str(series_name or '').strip()
+        if series_name:
+            row = BookRepository.get_card_summary_by_series(db_type, series_name, library_id)
+            if not row or not row.get('book_count'):
+                return None
+            return {
+                'title': series_name,
+                'physical_path': os.path.dirname(row.get('sample_path') or ''),
+                'book_count': int(row.get('book_count') or 0),
+                'total_size': int(row.get('total_size') or 0),
+            }
+
+        if not book_id:
+            return None
+        row = BookRepository.get_card_summary_by_book_id(db_type, book_id)
+        if not row:
+            return None
+        return {
+            'title': row.get('title') or '',
+            'physical_path': row.get('file_path') or '',
+            'book_count': 1,
+            'total_size': int(row.get('file_size') or 0),
+        }
+
+    @staticmethod
     def get_reader_info(db_type, book_id, user_id=None):
         """킷오스크 모드 등에서 openReader()를 book_id만으로 즉시 호출하기 위한 메타 조회"""
         row = BookRepository.get_book_reader_info(db_type, book_id, user_id=user_id)

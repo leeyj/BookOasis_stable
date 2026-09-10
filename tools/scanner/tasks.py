@@ -8,7 +8,7 @@ if MEDIA_SERVER_DIR not in sys.path:
 
 import gc
 from tools.scanner.metadata import parse_info_xml, parse_kavita_yaml, parse_series_json, parse_comicinfo_from_cbz, merge_local_metadata, is_consonant_folder
-from tools.scanner.cover import get_series_cover_fallback, get_imgdir_cover, extract_cover_from_b64, download_cover_from_url
+from tools.scanner.cover import get_series_cover_fallback, get_imgdir_cover, extract_cover_from_b64, download_cover_from_url, get_folder_banner
 from tools.scanner.offset import collect_zip_offsets_data
 from tools.scanner.path_utils import canonical_path, join_canonical
 
@@ -249,6 +249,18 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
     series_cover_url = merged_meta.get('cover_image_url', '') if is_json_only_webtoon else ''
     shared_cover_image = None
 
+    # 배너는 표지와 달리 권마다 다를 필요 없는 시리즈/폴더 단위 히어로 이미지라, 폴더당
+    # 한 번만 확보해 그 폴더의 모든 도서 결과에 동일하게 반영한다 (공유 드라이브 도서관리
+    # 담당자와 합의된 범위: 메타 YAML의 banner 필드 우선, 없으면 폴더 내 loose banner.<ext>,
+    # 둘 다 없으면 표지처럼 zip/epub 내부를 강제로 뒤지지 않고 그냥 비워둔다).
+    shared_banner_image = None
+    if not is_remote and media_files:
+        try:
+            banner_seed_path = _full_path_for(root, media_files[0], gdrive_file_ids)
+            shared_banner_image = get_folder_banner(banner_seed_path, root, banner_b64=merged_meta.get('banner_b64'), force=force, library_id=library_id)
+        except Exception as e:
+            print(f"[Scanner-DEBUG-Task] ⚠️ Banner extraction failed ('{root}'): {e}")
+
     import zipfile
     results = []
     errors = list(parser_warnings)
@@ -443,6 +455,7 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
             'series_name': series_name,
             'title': None,
             'cover_image': cover_image,
+            'banner_image': shared_banner_image,
             'offsets_data': offsets_data,
             'skip': skip,
             'offset_only': offset_only,  # Whether it's offset-only fast path
@@ -456,6 +469,7 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
         imgdir_series_name = _normalize_series_text(parent_folder) if parent_folder else series_name
         imgdir_title = os.path.basename(root)
         imgdir_cover = None
+        imgdir_banner = shared_banner_image
         if not imgdir_skip:
             try:
                 imgdir_cover = get_imgdir_cover(root, imgdir_virtual_path, force=force, library_id=library_id)
@@ -467,6 +481,11 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
                     'error_type': 'NoCover',
                     'message': f"IMGDIR cover extraction failed: {str(e)}"
                 })
+            if imgdir_banner is None and not is_remote:
+                try:
+                    imgdir_banner = get_folder_banner(imgdir_virtual_path, root, banner_b64=merged_meta.get('banner_b64'), force=force, library_id=library_id)
+                except Exception as e:
+                    print(f"[Scanner-DEBUG-Task] ⚠️ IMGDIR banner extraction failed ('{root}'): {e}")
 
         f_mtime = 0.0
         f_size = 0
@@ -487,6 +506,7 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
             'series_name': imgdir_series_name,
             'title': imgdir_title,
             'cover_image': imgdir_cover,
+            'banner_image': imgdir_banner,
             'offsets_data': [],
             'skip': imgdir_skip,
             'offset_only': False,

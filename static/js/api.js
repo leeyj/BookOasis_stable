@@ -82,6 +82,22 @@ export async function fetchMediaDetail(type, libraryId, series, representativeBo
   return res.json();
 }
 
+// 도서 상세페이지 본문을 대체하는 플러그인(detail_view)의 UI 번들 조회
+export async function fetchPluginDetailUiBundle(pluginId) {
+  const res = await fetch(`/api/media/plugins/${encodeURIComponent(pluginId)}/detail-ui`, {cache: 'no-store'});
+  return res.json();
+}
+
+// 그리드 카드 '...' 정보 팝업용: 제목/실제경로/도서 수/파일 크기 조회
+export async function fetchBookCardInfo(type, { bookId, seriesName, libraryId } = {}) {
+  const params = new URLSearchParams({ type });
+  if (bookId) params.set('book_id', bookId);
+  if (seriesName) params.set('series_name', seriesName);
+  if (libraryId !== undefined && libraryId !== null && libraryId !== '') params.set('library_id', libraryId);
+  const res = await fetch(`/api/media/card-info?${params.toString()}`, {cache: 'no-store'});
+  return res.json();
+}
+
 export async function fetchMetaRecommend(type, series) {
   const res = await fetch(`/api/media/meta/recommend?type=${type}&series=${encodeURIComponent(series)}`);
   return res.json();

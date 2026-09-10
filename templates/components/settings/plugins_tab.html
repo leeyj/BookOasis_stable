@@ -16,6 +16,20 @@
                         <!-- JS를 통해 동적 생성 -->
                     </div>
                 </div>
+
+                <!-- 도서 상세페이지 렌더러: 세션별로 코어 기본 화면 대신 detail_view를 선언한 플러그인의
+                     화면을 쓰도록 선택. 기본값은 항상 '기본(코어)' -->
+                <div class="dashboard-section" id="settings-detail-view-provider-section">
+                    <div class="section-header" style="margin-bottom: 1.2rem;">
+                        <h3 class="section-title" style="margin: 0; color: var(--app-text-primary); font-size: 1.2rem; font-weight: 700;">
+                            <i class="fa-solid fa-book-open-reader" style="color: var(--app-accent); margin-right: 0.5rem;"></i> 도서 상세페이지 렌더러
+                        </h3>
+                        <p style="font-size: 0.82rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0;">세션(카테고리 종류)별로 도서 상세페이지 본문을 코어 기본 화면 대신 <code>detail_view</code>를 선언한 플러그인의 커스텀 화면으로 대체합니다. 기본값은 항상 "기본(코어)"이며, 사이드바 위젯은 이 설정과 무관하게 그대로 유지됩니다.</p>
+                    </div>
+                    <div id="settings-detail-view-provider-rows" style="display: flex; flex-direction: column; gap: 1rem;">
+                        <!-- JS를 통해 동적 생성 (일반/성인/오디오북/영상강좌 4개 행) -->
+                    </div>
+                </div>
             </div>
 
             <!-- 샘플 플러그인 설치 모달 -->

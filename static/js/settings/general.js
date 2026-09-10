@@ -177,6 +177,12 @@ export function applySettingsToUI(settings) {
   if (settings.HOME_DASHBOARD_PLUGIN_MODE !== undefined) {
     state.homeDashboardPluginMode = (settings.HOME_DASHBOARD_PLUGIN_MODE === '1');
   }
+  ['general', 'adult', 'audiobook', 'video'].forEach((sessionKey) => {
+    const settingKey = `DETAIL_VIEW_PROVIDER_${sessionKey.toUpperCase()}`;
+    if (settings[settingKey] !== undefined) {
+      state.detailViewProviders[sessionKey] = settings[settingKey] || 'core';
+    }
+  });
 
   if (typeof window !== 'undefined') {
     window.__audioMiniPlayerMode = state.audioMiniPlayerMode || 'mini';

@@ -74,6 +74,39 @@ class BookRepository:
         return [dict(row) for row in rows]
 
     @staticmethod
+    def get_card_summary_by_series(db_type, series_name, library_id=None):
+        """그리드 카드 정보 팝업용: 시리즈 내 도서 수/전체 파일 용량/대표 경로 집계"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        where = ["COALESCE(is_deleted, 0) = 0", "series_name = ?"]
+        params = [series_name]
+        if library_id is not None:
+            where.append("library_id = ?")
+            params.append(library_id)
+        sql = f"""
+            SELECT COUNT(*) AS book_count, SUM(file_size) AS total_size, MIN(file_path) AS sample_path
+            FROM books
+            WHERE {' AND '.join(where)}
+        """
+        cursor.execute(sql, params)
+        row = cursor.fetchone()
+        conn.close()
+        return dict(row) if row else None
+
+    @staticmethod
+    def get_card_summary_by_book_id(db_type, book_id):
+        """그리드 카드 정보 팝업용: 단일 도서의 제목/경로/파일 용량 조회"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT title, file_path, file_size FROM books WHERE id = ? AND COALESCE(is_deleted, 0) = 0",
+            (book_id,)
+        )
+        row = cursor.fetchone()
+        conn.close()
+        return dict(row) if row else None
+
+    @staticmethod
     def update_favorite(db_type, book_id, is_favorite, user_id):
         """특정 도서 즐겨찾기 등록/해제"""
         conn = database.get_connection(db_type)
@@ -441,6 +474,7 @@ class BookRepository:
         if use_lib:
             query = f"""
                 SELECT b.id, b.title, b.title_alias, b.series_name, b.series_alias, b.file_format, b.total_pages, b.has_offsets, b.cover_image, b.cover_updated_at,
+                       b.banner_image, b.banner_updated_at,
                        b.file_path, p.pages_read, p.is_completed,
                        CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
                        b.library_id, p.last_read_at, COALESCE(b.metadata_locked, 0) AS metadata_locked,
@@ -454,6 +488,7 @@ class BookRepository:
         else:
             query = f"""
                 SELECT b.id, b.title, b.title_alias, b.series_name, b.series_alias, b.file_format, b.total_pages, b.has_offsets, b.cover_image, b.cover_updated_at,
+                       b.banner_image, b.banner_updated_at,
                        b.file_path, p.pages_read, p.is_completed,
                        CASE WHEN uf.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
                        b.library_id, p.last_read_at, COALESCE(b.metadata_locked, 0) AS metadata_locked,

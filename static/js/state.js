@@ -4,6 +4,9 @@ export const state = {
   currentLibraryType: 'general',
   currentLibraryId: 'home', // 기본값: 홈 화면 (Kavita 대시보드)
   currentLibraryHideCovers: false,
+  currentLibraryAspectRatio: '4:3',
+  currentLibraryHideTitles: false,
+  detailViewProviders: { general: 'core', adult: 'core', audiobook: 'core', video: 'core' },
   libraryGroups: [],
 
   // 도서 데이터

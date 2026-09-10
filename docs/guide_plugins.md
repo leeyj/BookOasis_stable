@@ -24,7 +24,8 @@
 | 1.0.5 ~ 1.0.6 | `search`, `apply` | `get_context_menu_items`, `run_context_menu_action`, `update_manifest` | 컨텍스트 메뉴/샘플 업데이트 지원 |
 | 1.0.7 | `search`, `apply` | `on_scan_new_books_detected`, `dispatch_webhook`, `update_manifest` | 표준 이벤트 웹훅(`book.new/read/finish`) 병행 운영 권장 |
 | 1.0.8 | `search`, `apply` | `detail_sidebar_widget`, `get_detail_sidebar_data` | 도서 상세 페이지 사이드바("이 작가의 다른 도서" 등) 위젯 계약 추가 |
-| 1.0.9+ (현재) | `search`, `apply` | `home_widget` | 사용자가 "홈 화면 플러그인 배치 모드"를 켰을 때만 노출되는 실제 홈 대시보드 위젯 계약 추가 (§5-1) |
+| 1.0.9 | `search`, `apply` | `home_widget` | 사용자가 "홈 화면 플러그인 배치 모드"를 켰을 때만 노출되는 실제 홈 대시보드 위젯 계약 추가 (§5-1) |
+| 1.1.0+ (현재) | `search`, `apply` | `detail_view` | 도서 상세 페이지 본문 전체를 대체하는 커스텀 화면 계약 추가 (세션별 단일 슬롯) |
 
 호환성 원칙:
 
@@ -220,6 +221,7 @@ window.addEventListener('message', (event) => {
 - `home_widget` (dict 또는 None): 사용자가 "내 설정 > 홈 화면 플러그인 배치 모드"를 켰을 때만 **실제 홈 대시보드**에 노출되는 위젯 매니페스트 (§5-1 참고). `dashboard_widget`과 이름이 비슷해 혼동하기 쉬우니 주의 — 둘은 별개 계약이며 원하면 동시에 선언해도 된다.
 - `category_tab` (dict 또는 None): 카테고리 레벨 플러그인 매니페스트 (사이드바 카테고리 1등 시민 메뉴 등록 정보: `title`, `icon`, `order`, `sessions`)
 - `detail_sidebar_widget` (dict 또는 None): 도서 상세 페이지 사이드바 위젯 매니페스트 (`title`, `order`, `sessions`)
+- `detail_view` (dict 또는 None): 도서 상세 페이지 본문 전체를 대체하는 커스텀 화면 매니페스트 (`title`, `sessions`) - §"도서 상세 페이지 본문 전체 대체" 참고
 - `update_manifest` (dict 또는 None): 플러그인 내부 업데이트 선언 계약
 
 ### 카테고리 레벨 플러그인 (Category-Level Plugins) 규격
@@ -304,6 +306,49 @@ class MyDetailSidebarPlugin(BaseMetadataProvider):
 참조 구현: [sample_plugins/metadata/author_other_books](../sample_plugins/metadata/author_other_books/author_other_books.py) - 코어에 있던 "이 작가의 다른 도서" 기능을 그대로 이관한 예제입니다. 관리자가 필요하면 이 폴더를 `plugins/metadata/`로 복사해 활성화하면 되고, "관련도서"/"유사한 태그 도서" 등 다른 알고리즘을 원하면 이 파일을 참고해 자유롭게 대체하면 됩니다.
 
 **성능 주의**: `get_detail_sidebar_data()`는 도서 상세 페이지를 열 때마다 호출됩니다. 전체 도서 테이블을 훑는 집계 쿼리처럼 무거운 연산을 매번 재실행하면 위젯이 눈에 띄게 늦게 뜹니다 - `author_other_books` 샘플처럼 `self.cache_get()`/`self.cache_set()`(플러그인 전용 Redis 캐시)로 결과를 TTL 동안 재사용하는 것을 강력히 권장합니다.
+
+### 도서 상세 페이지 본문 전체 대체 (Detail View)
+
+`detail_sidebar_widget`이 사이드바의 "한 섹션"만 차지하는 것과 달리, `detail_view`는 도서 상세
+페이지의 **본문(표지/제목/시놉시스/볼륨 목록 전체)** 을 플러그인의 커스텀 HTML/CSS/JS로 완전히
+대체합니다. `category_tab`처럼 "단일 슬롯 교체" 계약이라, 세션(일반 도서/성인 서재/오디오북/영상
+강좌)마다 관리자가 **설정 > 플러그인 관리 > 도서 상세페이지 렌더러**에서 활성화할 플러그인을
+하나만 선택합니다. 기본값은 항상 코어 내장 화면이며, 사이드바 위젯(`detail_sidebar_widget`)은
+어느 쪽을 선택하든 그대로 유지됩니다(별도 슬롯이라 영향받지 않음).
+
+```python
+class MyDetailViewPlugin(BaseMetadataProvider):
+    id = "my_detail_view"
+    name = "AniList 스타일 상세"
+    is_searchable = False
+
+    detail_view = {
+        "title": "AniList 스타일 상세",
+        "sessions": "all"  # category_tab과 동일 규칙 - 생략 시 general에만 노출
+    }
+```
+
+플러그인 디렉토리에 `detail/index.html`, `detail/style.css`, `detail/script.js`를 두면
+`category_tab`의 `index.html`/`style.css`/`script.js`와 동일한 방식(HTML5 전체 태그/CSS/JS
+100% 허용)으로 서빙됩니다. `detail/script.js`는 다음 시그니처로 실행됩니다:
+
+```javascript
+// detail/script.js
+// pluginId: 이 플러그인의 id
+// container: 상세페이지 본문 영역 DOM 엘리먼트(#detail-page-main-content) - detail/index.html이
+//            이미 주입된 상태로 전달됨
+// context: { meta, books, seriesName, libraryId } - meta/books는 기존 /api/media/detail 응답과
+//          동일한 구조(도서 목록, 표지, 시놉시스 등)
+function render(pluginId, container, context) {
+    const { meta, books } = context;
+    container.querySelector('.my-title').textContent = meta.series_name;
+    // books.forEach(...)로 볼륨 목록을 원하는 레이아웃으로 직접 렌더링
+}
+render(pluginId, container, context);
+```
+
+번들 로드는 `GET /api/media/plugins/<plugin_id>/detail-ui`로 이루어지며, `detail_view`를
+선언하지 않은 플러그인이나 비활성화된 플러그인에는 404를 반환합니다.
 
 ### 플러그인 내부 업데이트 계약 (`update_manifest`)
 

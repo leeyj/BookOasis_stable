@@ -69,6 +69,20 @@
     </ul>
 </div>
 
+<!-- 도서 카드 정보 팝업 (읽기전용): 제목/실제경로/도서 수/파일 크기, 카드의 '...' 아이콘 클릭 시 노출 -->
+<div id="book-info-popup" class="context-menu" style="display: none; min-width: 260px; max-width: 360px;">
+    <div class="context-menu-header">
+        <span class="context-menu-title">도서 정보</span>
+        <button type="button" class="context-menu-close-btn" data-role="book-info-popup-close" aria-label="닫기"><span class="context-menu-close-icon">&times;</span></button>
+    </div>
+    <div class="book-info-popup-body">
+        <div class="book-info-popup-row"><span class="book-info-popup-label">제목</span><span class="book-info-popup-value" id="book-info-popup-title"></span></div>
+        <div class="book-info-popup-row"><span class="book-info-popup-label">실제 경로</span><span class="book-info-popup-value" id="book-info-popup-path"></span></div>
+        <div class="book-info-popup-row" id="book-info-popup-count-row"><span class="book-info-popup-label">도서 수</span><span class="book-info-popup-value" id="book-info-popup-count"></span></div>
+        <div class="book-info-popup-row"><span class="book-info-popup-label">파일 크기</span><span class="book-info-popup-value" id="book-info-popup-size"></span></div>
+    </div>
+</div>
+
 <!-- 스케줄 작업용 컨텍스트 메뉴 -->
 <div id="schedule-action-context-menu" class="context-menu" style="display: none; min-width: 200px;">
     <div class="context-menu-header" style="padding: 0.35rem 0.85rem 0.55rem 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;">

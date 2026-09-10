@@ -82,8 +82,10 @@ BookOasis는 **SQLite(기본값)** 와 **MariaDB/MySQL(엔터프라이즈 권장
 
 - PK: `id`
 - 주요 FK: `group_id -> library_groups.id`
-- 컬럼: `name`, `physical_path`, `cron_schedule`, `last_scanned_at`, `scan_status`, `is_remote`, `vfs_refresh_before_scan`, `rclone_rc_url`, `icon`, `color`, `hide_cover`, `group_id`, `sort_order`
+- 컬럼: `name`, `physical_path`, `cron_schedule`, `last_scanned_at`, `scan_status`, `is_remote`, `vfs_refresh_before_scan`, `rclone_rc_url`, `icon`, `color`, `hide_cover`, `hide_title`, `cover_aspect_ratio`, `group_id`, `sort_order`
 - `hide_cover`: 카테고리 단위로 대표/목록 커버 렌더링을 숨길지 여부를 저장 (`INTEGER DEFAULT 0`)
+- `hide_title`: 카테고리 단위로 그리드 카드의 제목 텍스트를 숨기고 썸네일만 표시할지 여부 (넷플릭스 스타일). 일반/성인 도서 세션에서만 UI 노출 (`INTEGER DEFAULT 0`)
+- `cover_aspect_ratio`: 카테고리 단위 그리드 카드 커버 화면비율. `'4:3'`(기본) 또는 `'16:9'`만 허용 (`TEXT DEFAULT '4:3'`)
 - 참고: 운영 DB에는 과거 마이그레이션 잔여 컬럼이 남아 있을 수 있음
 
 ### books
@@ -95,7 +97,8 @@ BookOasis는 **SQLite(기본값)** 와 **MariaDB/MySQL(엔터프라이즈 권장
 - 주요 컬럼:
   - 식별/경로: `id`, `library_id`, `file_path`, `file_format`
   - 메타: `title`, `series_name`, `author`, `isbn`, `publisher`, `summary`, `genre`, `tags`, `link`, `release_date`, `score`
-  - 뷰어/커버: `total_pages`, `cover_image`, `cover_updated_at`, `has_offsets`
+  - 뷰어/커버: `total_pages`, `cover_image`, `cover_updated_at`, `cover_align`, `has_offsets`
+  - 배너: `banner_image`, `banner_updated_at` - 상세 페이지 히어로 이미지용(선택). 표지와 동일한 파일경로 MD5 해시로 `covers/<library_id>/banner_<hash>.webp`에 저장되며, 스캐너가 폴더 내 `banner.<ext>` 파일 또는 메타 YAML의 `banner`(Base64) 필드에서 채운다 - 둘 다 없으면 비워둠(표지처럼 zip/epub 내부를 강제 추출하지 않음)
   - 상태/보호: `metadata_locked`, `created_at`
   - 정렬/별칭: `series_alias`, `title_alias`
   - 운영 확장: `is_deleted`, `deleted_at`, `file_mtime`, `file_size`
@@ -360,7 +363,10 @@ CREATE TABLE IF NOT EXISTS books (
     series_alias TEXT,
     title_alias TEXT,
     file_mtime REAL DEFAULT 0.0,
-    file_size INTEGER DEFAULT 0
+    file_size INTEGER DEFAULT 0,
+    cover_align TEXT DEFAULT 'center',
+    banner_image TEXT,
+    banner_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS series_summary (
@@ -677,6 +683,9 @@ CREATE TABLE IF NOT EXISTS books (
     title_alias VARCHAR(500),
     file_mtime DOUBLE DEFAULT 0.0,
     file_size BIGINT DEFAULT 0,
+    cover_align VARCHAR(10) DEFAULT 'center',
+    banner_image TEXT,
+    banner_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uq_books_file_path (file_path(500)),
     INDEX idx_books_series_name (series_name(255)),
     INDEX idx_books_series_alias (series_alias(255)),

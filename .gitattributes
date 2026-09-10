@@ -1,0 +1,4 @@
+# 원격 리눅스 서버에 그대로 업로드/실행되는 셸 스크립트는 Windows(core.autocrlf=true)
+# 작업 디렉토리에서도 항상 LF를 유지해야 한다. CRLF로 저장되면 셔뱅(#!/bin/bash\r)이
+# 깨져 원격에서 "bad interpreter: /bin/bash^M" 오류로 배포가 실패한다.
+*.sh text eol=lf

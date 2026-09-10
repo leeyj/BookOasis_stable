@@ -533,7 +533,10 @@
     border-color: #f87171;
     color: #fff;
     box-shadow: 0 0 12px rgba(239, 68, 68, 0.6);
-    transform: scale(1.05);
+    /* 베이스 규칙의 translateY(-50%)를 유지한 채로 scale만 얹어야 한다 - transform은
+       속성 전체가 교체되므로 여기서 scale(1.05)만 쓰면 세로 중앙 정렬이 풀려 버튼이
+       위로 튀어 올라 호버하자마자 클릭이 빗나가는 원인이었다. */
+    transform: translateY(-50%) scale(1.05);
 }
 
 .overlay-controls-panel {

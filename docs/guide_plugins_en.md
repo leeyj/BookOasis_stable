@@ -21,7 +21,8 @@ This document describes the current plugin standard for BookOasis metadata/dashb
 | 1.0.5 ~ 1.0.6 | `search`, `apply` | `get_context_menu_items`, `run_context_menu_action`, `update_manifest` | Context menu and sample update support |
 | 1.0.7 | `search`, `apply` | `on_scan_new_books_detected`, `dispatch_webhook`, `update_manifest` | Standard event webhooks (`book.new/read/finish`) recommended |
 | 1.0.8 | `search`, `apply` | `detail_sidebar_widget`, `get_detail_sidebar_data` | Added book detail page sidebar widget contract ("More by this author", etc.) |
-| 1.0.9+ (current) | `search`, `apply` | `home_widget` | Added the actual home-dashboard widget contract, shown only when a user turns on "home dashboard plugin layout mode" (§5-1) |
+| 1.0.9 | `search`, `apply` | `home_widget` | Added the actual home-dashboard widget contract, shown only when a user turns on "home dashboard plugin layout mode" (§5-1) |
+| 1.1.0+ (current) | `search`, `apply` | `detail_view` | Added a contract for replacing the entire book detail page body with a custom screen (single slot per session) |
 
 Compatibility rules:
 
@@ -95,6 +96,7 @@ Recommended class attributes:
 - `home_widget` (dict or None): widget manifest shown on the **actual home dashboard**, but only when the user has turned on "home dashboard plugin layout mode" (see §5-1). Easy to confuse with `dashboard_widget` — they are separate contracts and a plugin may declare both.
 - `category_tab` (dict or None): category-level plugin manifest (`title`, `icon`, `order`, `sessions`)
 - `detail_sidebar_widget` (dict or None): book detail page sidebar widget manifest (`title`, `order`, `sessions`)
+- `detail_view` (dict or None): manifest for replacing the entire book detail page body with a custom screen (`title`, `sessions`) - see "Replacing the Entire Book Detail Page Body" below
 - `update_manifest` (dict or None): plugin-owned update declaration contract
 
 ### Category-Level Plugins Specification
@@ -179,6 +181,49 @@ dashboard widget's `get_dashboard_data` - no new schema to learn:
 Reference implementation: [sample_plugins/metadata/author_other_books](../sample_plugins/metadata/author_other_books/author_other_books.py) - a straight port of the old core-hardcoded "More by this author" feature. Admins can copy this folder into `plugins/metadata/` to enable it, and plugin authors can use it as a starting point for other algorithms (related books, similar tags, etc.).
 
 **Performance note**: `get_detail_sidebar_data()` is called every time a book detail page opens. Re-running an expensive aggregate query over the whole books table on every call makes the widget noticeably slow to appear - as the `author_other_books` sample does, strongly consider caching the result for a TTL via `self.cache_get()`/`self.cache_set()` (the plugin's dedicated Redis cache).
+
+### Replacing the Entire Book Detail Page Body (Detail View)
+
+Unlike `detail_sidebar_widget`, which only occupies one section of the sidebar, `detail_view` lets
+a plugin completely replace the book detail page's **body** (cover/title/synopsis/volume list).
+Like `category_tab`, this is a "single slot" contract: for each session (general/adult/audiobook/
+video), the admin picks at most one active plugin from **Settings > Plugin Management > Book
+Detail Page Renderer**. The default is always the built-in core screen, and the sidebar widgets
+(`detail_sidebar_widget`) keep working regardless of which renderer is selected (separate slot).
+
+```python
+class MyDetailViewPlugin(BaseMetadataProvider):
+    id = "my_detail_view"
+    name = "AniList-style Detail"
+    is_searchable = False
+
+    detail_view = {
+        "title": "AniList-style Detail",
+        "sessions": "all"  # same rule as category_tab - defaults to general only if omitted
+    }
+```
+
+Place `detail/index.html`, `detail/style.css`, `detail/script.js` in the plugin's directory and
+they are served the same way as `category_tab`'s `index.html`/`style.css`/`script.js` (100%
+unrestricted HTML5/CSS/JS). `detail/script.js` runs with this signature:
+
+```javascript
+// detail/script.js
+// pluginId: this plugin's id
+// container: the detail page body element (#detail-page-main-content), already populated with
+//            detail/index.html's markup
+// context: { meta, books, seriesName, libraryId } - meta/books share the same shape as the
+//          existing /api/media/detail response (volume list, covers, synopsis, etc.)
+function render(pluginId, container, context) {
+    const { meta, books } = context;
+    container.querySelector('.my-title').textContent = meta.series_name;
+    // render the volume list in whatever layout you want with books.forEach(...)
+}
+render(pluginId, container, context);
+```
+
+The bundle is served from `GET /api/media/plugins/<plugin_id>/detail-ui`, which returns 404 for
+plugins that don't declare `detail_view` or are disabled.
 
 ### Plugin-Owned Update Contract (`update_manifest`)
 

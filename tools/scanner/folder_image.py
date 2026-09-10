@@ -35,3 +35,21 @@ def find_common_cover(folder_path):
         if os.path.exists(cand_path) and os.path.getsize(cand_path) > 0:
             return cand_path
     return None
+
+
+COMMON_BANNER_NAMES = (
+    'banner.jpg', 'banner.jpeg', 'banner.png', 'banner.webp', 'banner.bmp', 'banner.gif',
+)
+
+
+def find_common_banner(folder_path):
+    """Return the first loose banner image file (banner.jpg/png/webp/...) directly in the folder.
+    공유 드라이브 도서관리 담당자와 합의된 배너 이미지 지원 - 없으면 그냥 None (배너는 필수가 아님)."""
+    if not folder_path:
+        return None
+
+    for cand in COMMON_BANNER_NAMES:
+        cand_path = os.path.join(folder_path, cand)
+        if os.path.exists(cand_path) and os.path.getsize(cand_path) > 0:
+            return cand_path
+    return None

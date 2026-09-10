@@ -323,9 +323,11 @@ class MetadataFactory:
     @classmethod
     def _load_plugin_ui_bundle(cls, provider_name, target='view'):
         """
-        플러그인 UI 번들 서빙 (target='view' | 'settings')
+        플러그인 UI 번들 서빙 (target='view' | 'settings' | 'detail')
         - target='view': index.html, style.css, script.js (카테고리 메인 뷰포트용)
         - target='settings': settings.html, settings.css, settings.js (환경설정 탭 커스텀 폼용)
+        - target='detail': detail/index.html, detail/style.css, detail/script.js (도서 상세페이지
+          본문 대체용 - category_tab의 view 번들과 파일명이 겹치지 않도록 detail/ 서브디렉토리 사용)
         """
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         plugin_dir = os.path.join(base_dir, 'plugins', 'metadata', provider_name)
@@ -338,6 +340,12 @@ class MetadataFactory:
                 'html': 'settings.html',
                 'css': 'settings.css',
                 'js': 'settings.js',
+            }
+        elif target == 'detail':
+            file_map = {
+                'html': 'detail/index.html',
+                'css': 'detail/style.css',
+                'js': 'detail/script.js',
             }
         else:
             file_map = {
@@ -572,7 +580,7 @@ class MetadataFactory:
         return providers
 
     @classmethod
-    def get_available_providers(cls, include_view_ui=True, include_settings_ui=True):
+    def get_available_providers(cls, include_view_ui=True, include_settings_ui=True, include_detail_ui=False):
         """Return all discovered providers (including non-searchable) with enabled/config state.
 
         include_view_ui/include_settings_ui: 대부분의 호출부(사이드바 카테고리 탭, 대시보드
@@ -608,6 +616,7 @@ class MetadataFactory:
                 p_home_widget = getattr(target_class, 'home_widget', None)
                 p_category_tab = getattr(target_class, 'category_tab', None)
                 p_detail_sidebar_widget = getattr(target_class, 'detail_sidebar_widget', None)
+                p_detail_view = getattr(target_class, 'detail_view', None)
                 p_update_manifest = getattr(target_class, 'update_manifest', None)
 
                 enabled_key = f"PLUGIN_ENABLED_{p_id}"
@@ -632,6 +641,7 @@ class MetadataFactory:
                     'home_widget': p_home_widget,
                     'category_tab': p_category_tab,
                     'detail_sidebar_widget': p_detail_sidebar_widget,
+                    'detail_view': p_detail_view,
                     'update_manifest': p_update_manifest,
                 }
 
@@ -644,6 +654,11 @@ class MetadataFactory:
                     view_ui = cls._load_plugin_ui_bundle(p_id, target='view')
                     if view_ui:
                         provider_item['ui'] = view_ui
+
+                if include_detail_ui and p_detail_view:
+                    detail_ui = cls._load_plugin_ui_bundle(p_id, target='detail')
+                    if detail_ui:
+                        provider_item['detail_ui'] = detail_ui
 
                 providers.append(provider_item)
             except Exception as e:

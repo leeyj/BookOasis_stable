@@ -274,6 +274,12 @@ class BookDetailService:
             candidates_rows=books_rows
         )
 
+        # 배너는 표지처럼 대체 후보를 뒤지지 않는다(공유 드라이브 도서관리 담당자 합의 범위 -
+        # 필수 아님) - 시리즈 내 아무 권이나 배너가 있으면 그걸 대표 배너로 사용
+        banner_row = next((b for b in books_rows if b.get('banner_image')), None)
+        final_banner = banner_row['banner_image'] if banner_row else None
+        banner_updated = banner_row['banner_updated_at'] if banner_row else None
+
         def _val(row, key, default=''):
             return row[key] if row and row[key] else default
 
@@ -290,7 +296,8 @@ class BookDetailService:
             'genre'    : _val(meta_row, 'genre',      ''),
             'tags'     : _val(meta_row, 'tags',       ''),
             'metadata_locked': meta_row.get('metadata_locked', 0) if meta_row else (1 if any(b.get('metadata_locked', 0) == 1 for b in books_rows) else 0),
-            'cover_image': get_cover_image_with_t(final_cover, latest_updated)
+            'cover_image': get_cover_image_with_t(final_cover, latest_updated),
+            'banner_image': get_cover_image_with_t(final_banner, banner_updated) if final_banner else ''
         }
 
         books_list = []

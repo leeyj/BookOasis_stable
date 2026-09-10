@@ -14,6 +14,19 @@ async function reloadLibrarySidebar() {
   }
 }
 
+function updateCoverRatioRowVisibility() {
+  // 영상강좌 카테고리는 이미 16:9로 강제 고정되어 있어 이 토글이 무의미하므로 숨긴다.
+  const row = document.getElementById('library-form-cover-ratio-row');
+  if (row) row.style.display = state.currentLibraryType === 'video' ? 'none' : '';
+}
+
+function updateHideTitleRowVisibility() {
+  // 제목 감추기(넷플릭스 스타일)는 일반/성인 도서 그리드 전용 기능이다.
+  const row = document.getElementById('library-form-hide-title-row');
+  const isBookSession = state.currentLibraryType === 'general' || state.currentLibraryType === 'adult';
+  if (row) row.style.display = isBookSession ? '' : 'none';
+}
+
 const MAX_LIBRARY_NAME_LENGTH = 25;
 const MAX_LIBRARY_PATHS = 20;
 const MAX_LIBRARY_PATH_LINE_LENGTH = 1024;
@@ -131,6 +144,14 @@ export function triggerAddLibrary() {
 
   const hideCoverEl = document.getElementById('library-form-hide-cover');
   if (hideCoverEl) hideCoverEl.checked = false;
+
+  const coverRatio43El = document.getElementById('library-form-cover-ratio-4-3');
+  if (coverRatio43El) coverRatio43El.checked = true;
+  updateCoverRatioRowVisibility();
+
+  const hideTitleEl = document.getElementById('library-form-hide-title');
+  if (hideTitleEl) hideTitleEl.checked = false;
+  updateHideTitleRowVisibility();
 
   const gdriveViewMirrorEl = document.getElementById('library-form-gdrive-view-mirror-path');
   if (gdriveViewMirrorEl) gdriveViewMirrorEl.value = '';
@@ -272,6 +293,16 @@ export async function triggerEditLibrary() {
   const hideCoverVal = libraryItem?.dataset?.hideCover || '0';
   const hideCoverEl = document.getElementById('library-form-hide-cover');
   if (hideCoverEl) hideCoverEl.checked = (hideCoverVal === '1');
+
+  const coverRatioVal = libraryItem?.dataset?.coverAspectRatio === '16:9' ? '16:9' : '4:3';
+  const coverRatioEl = document.getElementById(coverRatioVal === '16:9' ? 'library-form-cover-ratio-16-9' : 'library-form-cover-ratio-4-3');
+  if (coverRatioEl) coverRatioEl.checked = true;
+  updateCoverRatioRowVisibility();
+
+  const hideTitleVal = libraryItem?.dataset?.hideTitle || '0';
+  const hideTitleEl = document.getElementById('library-form-hide-title');
+  if (hideTitleEl) hideTitleEl.checked = (hideTitleVal === '1');
+  updateHideTitleRowVisibility();
 
   // 체크박스 변경 감지 바인딩 (최초 1회)
   if (remoteEl && !remoteEl.dataset.listenerBound) {
@@ -447,6 +478,8 @@ export async function submitLibraryForm(event) {
   formData.set('is_remote', isRemoteChecked ? '1' : '0');
   const hideCoverChecked = document.getElementById('library-form-hide-cover')?.checked;
   formData.set('hide_cover', hideCoverChecked ? '1' : '0');
+  const hideTitleChecked = document.getElementById('library-form-hide-title')?.checked;
+  formData.set('hide_title', hideTitleChecked ? '1' : '0');
 
   const id = formData.get('id');
   const isEdit = !!id;

@@ -8,7 +8,7 @@ import base64
 import io
 import xml.etree.ElementTree as ET
 from PIL import Image
-from tools.scanner.folder_image import find_common_cover, find_individual_cover
+from tools.scanner.folder_image import find_common_cover, find_individual_cover, find_common_banner
 from services.cover_storage_service import get_covers_dir
 
 SUPPORTED_IMAGE_FORMATS = ('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif')
@@ -24,11 +24,16 @@ SUPPORTED_IMAGE_FORMATS = ('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif')
 COVER_THUMB_MAX_W = 480
 COVER_THUMB_MAX_H = 660
 
+# 배너는 상세 페이지 상단 가로형 히어로 이미지 용도라 세로형 커버와는 종횡비가 다르다.
+# 실제 표시 폭(상세 페이지 본문 너비, 대략 900~1100px)의 레티나(x2) 기준.
+BANNER_THUMB_MAX_W = 1600
+BANNER_THUMB_MAX_H = 700
 
-def save_as_thumbnail_webp(img, dest_path, quality=80):
-    """커버를 저장 직전에 표시에 필요한 크기로 축소해 WebP로 저장한다.
+
+def save_as_thumbnail_webp(img, dest_path, quality=80, max_w=COVER_THUMB_MAX_W, max_h=COVER_THUMB_MAX_H):
+    """이미지를 저장 직전에 표시에 필요한 크기로 축소해 WebP로 저장한다.
     Image.thumbnail()은 이미 더 작은 이미지는 확대하지 않고 그대로 둔다."""
-    img.thumbnail((COVER_THUMB_MAX_W, COVER_THUMB_MAX_H), Image.LANCZOS)
+    img.thumbnail((max_w, max_h), Image.LANCZOS)
     img.save(dest_path, "WEBP", quality=quality)
 
 def extract_epub_cover_direct(epub_path, dest_path):
@@ -240,6 +245,99 @@ def extract_cover_from_b64(file_path, cover_b64, force=False, library_id=None):
         print(f"[Scanner] Cover restore failed ({file_path}): {e}")
         traceback.print_exc()
         return None
+
+def extract_banner_from_b64(file_path, banner_b64, force=False, library_id=None):
+    """메타 YAML의 banner 필드(Base64)를 디코드해 covers/{library_id}/banner_{hash}.webp로 저장.
+    커버와 동일한 파일경로 MD5 해시를 쓰되 접두사만 banner_로 다르다 - 커버/배너가 항상 같은
+    파일명 세트로 짝지어져 캐시 무효화(파일 재해시) 로직을 그대로 재사용할 수 있다."""
+    try:
+        import re
+        if "," in banner_b64:
+            banner_b64 = banner_b64.split(",", 1)[1]
+        banner_b64 = re.sub(r'[^A-Za-z0-9+/=_-]', '', banner_b64)
+        banner_b64 = banner_b64.rstrip('=')
+        if len(banner_b64) % 4 == 1:
+            banner_b64 = banner_b64[:-1]
+        missing_padding = len(banner_b64) % 4
+        if missing_padding:
+            banner_b64 += '=' * (4 - missing_padding)
+
+        img_data = base64.b64decode(banner_b64)
+
+        book_hash = hashlib.md5(file_path.encode('utf-8')).hexdigest()
+        banner_filename = f"banner_{book_hash}.webp"
+
+        if library_id is not None:
+            dest_dir = os.path.join(get_covers_dir(), str(library_id))
+            os.makedirs(dest_dir, exist_ok=True)
+            db_banner_path = f"{library_id}/{banner_filename}"
+        else:
+            dest_dir = get_covers_dir()
+            db_banner_path = banner_filename
+
+        banner_filepath = os.path.join(dest_dir, banner_filename)
+
+        if not force and os.path.exists(banner_filepath) and os.path.getsize(banner_filepath) > 0:
+            return db_banner_path
+
+        try:
+            img = Image.open(io.BytesIO(img_data))
+            save_as_thumbnail_webp(img, banner_filepath, max_w=BANNER_THUMB_MAX_W, max_h=BANNER_THUMB_MAX_H)
+        except Exception as e:
+            print(f"[Scanner-Banner] Base64 image identify/WebP render failed: {e}")
+            return None
+
+        print(f"[Scanner-Banner] YAML banner restore complete (WebP): '{file_path}' -> '{banner_filepath}', Force={force}")
+        del img_data
+        return db_banner_path
+    except Exception as e:
+        print(f"[Scanner-Banner] Banner restore failed ({file_path}): {e}")
+        return None
+
+
+def get_folder_banner(file_path, folder_path, banner_b64=None, force=False, library_id=None):
+    """배너 이미지 확보 - 공유 드라이브 도서관리 담당자와 합의된 범위:
+    1) 메타 YAML의 banner 필드(Base64)가 있으면 그것을 사용
+    2) 없으면 폴더 안에 loose banner.<ext> 파일이 있는지 확인해 사용
+    3) 둘 다 없으면 아무것도 안 함(커버처럼 zip/epub 내부에서 강제 추출하지 않음 - 배너는 선택 사항)
+    """
+    if banner_b64:
+        result = extract_banner_from_b64(file_path, banner_b64, force=force, library_id=library_id)
+        if result:
+            return result
+
+    banner_hash = hashlib.md5(file_path.encode('utf-8')).hexdigest()
+    banner_filename = f"banner_{banner_hash}.webp"
+    if library_id is not None:
+        dest_dir = os.path.join(get_covers_dir(), str(library_id))
+        db_banner_path = f"{library_id}/{banner_filename}"
+    else:
+        dest_dir = get_covers_dir()
+        db_banner_path = banner_filename
+    local_banner_path = os.path.join(dest_dir, banner_filename)
+
+    if not force and os.path.exists(local_banner_path) and os.path.getsize(local_banner_path) > 0:
+        return db_banner_path
+
+    cand_path = find_common_banner(folder_path)
+    if not cand_path:
+        return None
+
+    try:
+        os.makedirs(dest_dir, exist_ok=True)
+        with Image.open(cand_path) as img:
+            save_as_thumbnail_webp(img, local_banner_path, max_w=BANNER_THUMB_MAX_W, max_h=BANNER_THUMB_MAX_H)
+        print(f"[Scanner-Banner] Folder banner WebP convert copy complete: {cand_path} -> {local_banner_path}, Force={force}")
+        return db_banner_path
+    except Exception as e:
+        print(f"[Scanner-Banner] Folder banner WebP convert failed: {e}. Trying general copy.")
+        try:
+            shutil.copy2(cand_path, local_banner_path)
+            return db_banner_path
+        except Exception as e2:
+            print(f"[Scanner-Banner] Folder banner copy backup also failed: {e2}")
+            return None
+
 
 def get_series_cover_fallback(series_name, folder_path, force=False, is_remote=False, filename=None, file_path=None, library_id=None):
     """Check if cache cover corresponding to series name (or individual book filename) exists,

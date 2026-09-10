@@ -150,6 +150,10 @@ def add_media_library():
     is_remote_val = request.form.get('is_remote')
     is_remote = parse_remote_flag(is_remote_val, target_paths)
     hide_cover = 1 if request.form.get('hide_cover', '0') in ('1', 'true', 'True', 'on') else 0
+    hide_title = 1 if request.form.get('hide_title', '0') in ('1', 'true', 'True', 'on') else 0
+    cover_aspect_ratio = request.form.get('cover_aspect_ratio', '4:3').strip()
+    if cover_aspect_ratio not in ('4:3', '16:9'):
+        cover_aspect_ratio = '4:3'
     rclone_rc_url = normalize_rclone_url(request.form.get('rclone_rc_url'))
     icon = request.form.get('icon', 'fa-book').strip() or 'fa-book'
     color = request.form.get('color', '#94a3b8').strip() or '#94a3b8'
@@ -161,7 +165,7 @@ def add_media_library():
         return jsonify({'success': False, 'error': str(error)}), 400
 
     try:
-        library_id = CategoryService.add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_view_local_mirror_path)
+        library_id = CategoryService.add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_view_local_mirror_path, cover_aspect_ratio, hide_title)
     except ValueError as e:
         return jsonify({'success': False, 'error': str(e)}), 400
     except sqlite3.IntegrityError:
@@ -219,6 +223,10 @@ def edit_media_library():
         return jsonify({'success': False, 'error': f'카테고리 이름은 최대 {MAX_LIBRARY_NAME_LENGTH}자까지 허용됩니다.'}), 400
     
     hide_cover = 1 if request.form.get('hide_cover', '0') in ('1', 'true', 'True', 'on') else 0
+    hide_title = 1 if request.form.get('hide_title', '0') in ('1', 'true', 'True', 'on') else 0
+    cover_aspect_ratio = request.form.get('cover_aspect_ratio', '4:3').strip()
+    if cover_aspect_ratio not in ('4:3', '16:9'):
+        cover_aspect_ratio = '4:3'
     rclone_rc_url = normalize_rclone_url(request.form.get('rclone_rc_url'))
     icon = request.form.get('icon', 'fa-book').strip() or 'fa-book'
     color = request.form.get('color', '#94a3b8').strip() or '#94a3b8'
@@ -237,7 +245,7 @@ def edit_media_library():
         print(f"[API Warning] Failed to fetch old library: {e}")
 
     try:
-        CategoryService.edit_library(db_type, int(library_id), name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_view_local_mirror_path)
+        CategoryService.edit_library(db_type, int(library_id), name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_view_local_mirror_path, cover_aspect_ratio, hide_title)
     except ValueError as e:
         return jsonify({'success': False, 'error': str(e)}), 400
     except sqlite3.IntegrityError:

@@ -487,6 +487,24 @@ def get_plugin_ui_bundle_api(plugin_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@plugin_routes_bp.route('/api/media/plugins/<plugin_id>/detail-ui', methods=['GET'])
+@login_required
+def get_plugin_detail_ui_bundle_api(plugin_id):
+    """도서 상세페이지 본문을 대체하는 플러그인 UI 번들(detail/index.html 등)을 반환합니다.
+    detail_view를 선언한 플러그인에 한해서만 제공한다."""
+    try:
+        from services.metadata_factory import MetadataFactory
+        provider = MetadataFactory.get_provider_by_id(plugin_id)
+        if not provider or not getattr(provider, 'detail_view', None):
+            return jsonify({'success': False, 'error': 'This plugin does not declare a detail_view'}), 404
+
+        bundle = MetadataFactory._load_plugin_ui_bundle(plugin_id, target='detail')
+        if not bundle:
+            return jsonify({'success': False, 'error': 'Detail UI bundle not found'}), 404
+        return jsonify({'success': True, 'plugin_id': plugin_id, 'bundle': bundle}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @plugin_routes_bp.route('/api/media/context-menu/book/plugins', methods=['POST'])
 @login_required
 def get_book_context_menu_plugin_items_api():

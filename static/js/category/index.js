@@ -115,10 +115,12 @@ function renderLibraryItem(lib, isPinned) {
   const safeIcon = escapeHtml(lib.icon || 'fa-book');
   const safeColor = escapeHtml(lib.color || '#94a3b8');
   const hideCover = Number(lib.hide_cover || 0) ? 1 : 0;
+  const hideTitle = Number(lib.hide_title || 0) ? 1 : 0;
+  const coverAspectRatio = lib.cover_aspect_ratio === '16:9' ? '16:9' : '4:3';
   const groupId = lib.group_id == null ? '' : String(lib.group_id);
   const safeGdriveCopyRemote = escapeHtml(lib.gdrive_copy_remote || '');
   const safeGdriveViewMirrorPath = escapeHtml(lib.gdrive_view_local_mirror_path || '');
-  return `<li class="menu-item ${isActive}" data-type="custom" data-role="sidebar-category-dynamic" data-id="${lib.id}" data-category-id="${lib.id}" data-name="${safeName}" data-path="${safePath}" data-remote="${lib.is_remote || 0}" data-rclone-url="${safeRclone}" data-icon="${safeIcon}" data-color="${safeColor}" data-hide-cover="${hideCover}" data-group-id="${groupId}" data-gdrive-copy-remote="${safeGdriveCopyRemote}" data-gdrive-view-local-mirror-path="${safeGdriveViewMirrorPath}" ${draggableAttr} style="display: flex; align-items: center; justify-content: space-between;"><span style="display: inline-flex; align-items: center; gap: 0.6rem;"><i class="fa-solid ${safeIcon}" style="color: ${safeColor};"></i> ${safeName}</span><i class="fa-solid fa-circle-notch fa-spin category-scan-spinner" style="display:none; color:var(--app-accent-hover); font-size:0.75rem; margin-left:auto;" title="스캔 진행 중"></i></li>`;
+  return `<li class="menu-item ${isActive}" data-type="custom" data-role="sidebar-category-dynamic" data-id="${lib.id}" data-category-id="${lib.id}" data-name="${safeName}" data-path="${safePath}" data-remote="${lib.is_remote || 0}" data-rclone-url="${safeRclone}" data-icon="${safeIcon}" data-color="${safeColor}" data-hide-cover="${hideCover}" data-hide-title="${hideTitle}" data-cover-aspect-ratio="${coverAspectRatio}" data-group-id="${groupId}" data-gdrive-copy-remote="${safeGdriveCopyRemote}" data-gdrive-view-local-mirror-path="${safeGdriveViewMirrorPath}" ${draggableAttr} style="display: flex; align-items: center; justify-content: space-between;"><span style="display: inline-flex; align-items: center; gap: 0.6rem;"><i class="fa-solid ${safeIcon}" style="color: ${safeColor};"></i> ${safeName}</span><i class="fa-solid fa-circle-notch fa-spin category-scan-spinner" style="display:none; color:var(--app-accent-hover); font-size:0.75rem; margin-left:auto;" title="스캔 진행 중"></i></li>`;
 }
 
 function renderPluginItem(cp) {
@@ -407,6 +409,10 @@ function initDynamicSidebarDelegation() {
       console.log('[Category-Delegation] 동적 카테고리 항목 클릭 감지됨:', catId, dynamicItem);
       event.preventDefault();
       event.stopPropagation();
+      // 플라이아웃 내부 항목 클릭은 이 캡처 단계 stopPropagation() 때문에 플라이아웃 자체의
+      // 버블 단계 클릭 리스너(openSidebarGroupFlyout 참고)까지 이벤트가 도달하지 못해 닫히지
+      // 않던 버그 - 카테고리 전환이 확정된 시점(여기)에서 직접 닫아준다.
+      closeSidebarGroupFlyout();
       selectCategory(catId);
       return;
     }
@@ -577,6 +583,8 @@ export async function loadLibraries() {
       applySavedMixedOrder(sidebar);
       const activeItem = document.getElementById(`category-${state.currentLibraryId}`) || sidebar.querySelector(`[data-id="${state.currentLibraryId}"]`);
       state.currentLibraryHideCovers = !!(activeItem && activeItem.dataset && activeItem.dataset.type === 'custom' && activeItem.dataset.hideCover === '1');
+      state.currentLibraryAspectRatio = (activeItem && activeItem.dataset && activeItem.dataset.coverAspectRatio === '16:9') ? '16:9' : '4:3';
+      state.currentLibraryHideTitles = !!(activeItem && activeItem.dataset && activeItem.dataset.type === 'custom' && activeItem.dataset.hideTitle === '1');
       updateCurrentCategoryIndicator(state.currentLibraryId, activeItem);
       bindSidebarContextMenu();
       bindDragAndDropEvents(!isPinned);

@@ -214,6 +214,23 @@
                         <label for="library-form-hide-cover">이 카테고리 커버 감추기</label>
                     </div>
 
+                    <div id="library-form-hide-title-row" class="library-form-group-row" style="margin-top: 0.4rem;">
+                        <input type="checkbox" id="library-form-hide-title" name="hide_title">
+                        <label for="library-form-hide-title">제목 감추기 (썸네일만 표시, 넷플릭스 스타일)</label>
+                    </div>
+
+                    <div id="library-form-cover-ratio-row" class="library-form-group-row" style="margin-top: 0.6rem;">
+                        <label style="margin-right: 0.6rem;">커버 화면비율</label>
+                        <label style="font-weight: normal; margin-right: 0.8rem;">
+                            <input type="radio" name="cover_aspect_ratio" value="4:3" id="library-form-cover-ratio-4-3" checked>
+                            기본(4:3)
+                        </label>
+                        <label style="font-weight: normal;">
+                            <input type="radio" name="cover_aspect_ratio" value="16:9" id="library-form-cover-ratio-16-9">
+                            와이드(16:9)
+                        </label>
+                    </div>
+
                     <label data-i18n="modal.category_icon_label" style="margin-top: 1rem; display: block;">카테고리 아이콘</label>
                     <div class="category-icon-selector" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem; margin-top: 0.4rem;">
                         <div class="icon-option active" data-role="library-icon-option" data-icon="fa-book"><i class="fa-solid fa-book"></i></div>
