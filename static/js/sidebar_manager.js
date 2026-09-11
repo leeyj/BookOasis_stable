@@ -26,15 +26,9 @@ export function syncSidebarResponsiveControls() {
     desktopBtn.style.setProperty('display', mobile ? 'none' : 'flex', 'important');
   }
   if (brandHome) {
-    if (mobile) {
-      brandHome.setAttribute('role', 'button');
-      brandHome.setAttribute('tabindex', '0');
-      brandHome.setAttribute('aria-label', 'BookOasis 홈으로 이동');
-    } else {
-      brandHome.removeAttribute('role');
-      brandHome.removeAttribute('tabindex');
-      brandHome.removeAttribute('aria-label');
-    }
+    brandHome.setAttribute('role', 'button');
+    brandHome.setAttribute('tabindex', '0');
+    brandHome.setAttribute('aria-label', 'BookOasis 홈으로 이동');
   }
 }
 

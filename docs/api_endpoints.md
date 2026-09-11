@@ -734,6 +734,51 @@ BookOasis는 외부 수신 서버로 도서 이벤트를 `POST` 전송할 수 �
 
 ---
 
+### `[GET]` `/api/media/detail-sidebar-widgets`
+* **설명**: 도서 상세 페이지 사이드바에 마운트할, `detail_sidebar_widget`을 선언한 활성화된 플러그인들의 위젯 데이터를 한 번에 반환합니다(목록 조회 + 데이터 조회를 한 호출로 통합). 여러 플러그인이 선언하면 `order` 오름차순으로 정렬되어 나란히 쌓입니다. 자세한 계약 설명은 [guide_plugins.md](./guide_plugins.md)의 "도서 상세 페이지 사이드바 위젯" 절 참고.
+* **권한**: `@login_required`
+* **쿼리 파라미터**:
+  | 파라미터명 | 타입 | 필수여부 | 설명 |
+  | :--- | :--- | :--- | :--- |
+  | `type` | string | 선택 | DB 구분 (`general`/`adult`/`audiobook`/`video`, 기본값: `general`) |
+  | `series_name` | string | 선택 | 대상 시리즈명 (플러그인의 `get_detail_sidebar_data(db_type, context)`에 `context.series_name`으로 전달) |
+  | `library_id` | integer | 선택 | 대상 카테고리 ID (`context.library_id`로 전달) |
+  | `book_id` | integer | 선택 | 대상 대표 도서 ID (`context.book_id`로 전달) |
+  | `author` / `genre` / `tags` | string | 선택 | 참고용 부가 컨텍스트 (`context`에 그대로 전달) |
+* **응답 예시 (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "widgets": [
+      {
+        "id": "author_other_books",
+        "title": "이 작가의 다른 도서",
+        "items": [
+          {"book_id": 42, "series_name": "다른 시리즈", "library_id": 1, "cover": "/covers/xxx.webp", "file_format": "zip"}
+        ]
+      }
+    ]
+  }
+  ```
+* **아이템 스키마**: 대시보드 위젯(`/api/media/dashboard/widgets/<plugin_id>/data`)의 `items`와 동일한 공용 스키마를 공유합니다 - `item_type: "metric"`(자유 형식 카드), `link`(외부 URL 카드), `book_id`/`series_name`(+선택적 `library_id`/`file_format`/`cover`/`title`, 코어 도서로 연결되는 카드) 세 종류.
+* **비고**: `items`가 비어 있는 플러그인은 응답의 `widgets` 배열에서 제외됩니다(프런트가 빈 섹션을 그리지 않음). 플러그인 중 하나가 예외를 던져도 나머지 플러그인 응답에는 영향 없이 해당 플러그인만 건너뜁니다.
+
+---
+
+### `[GET]` `/api/media/smart-recommend-widgets`
+* **설명**: "스마트 추천" 화면(사이드바 메뉴, 최근 읽은 시리즈마다 코어가 장르/태그/작가 겹침으로 추천을 계산해 보여주는 화면)에 덧붙일, `smart_recommend_widget`을 선언한 활성화된 플러그인들의 섹션 데이터를 반환합니다. `/api/media/detail-sidebar-widgets`와 완전히 동일한 집계 방식이며(화면만 다름), 응답 스키마도 동일합니다. 프런트(`tab_smart_recommend.js`)는 이 위젯들을 코어 기본 섹션(장르/태그/작가)보다 먼저, `order` 오름차순으로 렌더링합니다.
+* **권한**: `@login_required`
+* **쿼리 파라미터**:
+  | 파라미터명 | 타입 | 필수여부 | 설명 |
+  | :--- | :--- | :--- | :--- |
+  | `type` | string | 선택 | DB 구분 (기본값: `general`) |
+  | `series_name` | string | 선택 | 대상 시리즈명 (`context.series_name`으로 전달) |
+  | `library_id` | integer | 선택 | 대상 카테고리 ID (`context.library_id`로 전달) |
+* **응답 예시 / 아이템 스키마**: `/api/media/detail-sidebar-widgets`와 동일. `context`에는 `series_name`/`library_id`만 담겨 전달됩니다(도서 상세 사이드바보다 정보가 적음에 주의).
+* **참조 구현**: [sample_plugins/metadata/series_official_relations](../sample_plugins/metadata/series_official_relations/) - `detail_sidebar_widget`과 `smart_recommend_widget`을 동시에 채우는 예제.
+
+---
+
 ### `[GET]` `/api/media/plugins/load-status`
 * **설명**: 관리자 대시보드 상단 플러그인 상태 패널용 API. 조회 시점에 플러그인 discovery를 1회 갱신한 뒤, 플러그인별 최신 로드 성공/실패 상태와 최근 상태 변화 이력을 반환합니다. 세션 쿠키 인증이라 외부 프로그램은 대신 `/api/webhook/plugins/status`(토큰 인증)를 사용해야 합니다.
 * **권한**: `@admin_required`
@@ -763,6 +808,35 @@ BookOasis는 외부 수신 서버로 도서 이벤트를 `POST` 전송할 수 �
 ### `[POST]` `/api/media/metadata/plugins/save-config`
 * **설명**: 플러그인 환경설정 카드 폼에서 변경된 스키마 설정값(`config_schema`)을 저장합니다.
 * **권한**: `@admin_required`
+
+---
+
+### 도서 컨텍스트 메뉴 플러그인 액션 API (범용 플러그인 RPC)
+도서 카드(대시보드/목록/상세 공통) 우클릭 메뉴에 플러그인 항목을 노출/실행하기 위한 API 쌍입니다.
+`action_id`/`context`는 호출자가 완전히 자유롭게 구성할 수 있어, 실제 도서 컨텍스트 메뉴가 아닌
+**플러그인 자신의 설정 화면(`settings.js`)에서도 그대로 재사용해 임의의 백엔드 동작(예: "지금
+동기화" 버튼)을 트리거하는 범용 RPC 경로로 흔히 쓰입니다** - 이 경우 새 코어 라우트를 만들
+필요 없이 `run_context_menu_action(db_type, action_id, context)`에 원하는 `action_id`를 자체
+정의해서 처리하면 됩니다. 참조 구현: [sample_plugins/metadata/series_official_relations](../sample_plugins/metadata/series_official_relations/)의 `sync_now`/`sync_status` 액션.
+
+#### `[POST]` `/api/media/context-menu/book/plugins`
+* **설명**: 활성화된 플러그인들의 `get_context_menu_items(db_type, context)`를 모두 호출해 도서 컨텍스트 메뉴 항목을 동적으로 조회합니다. `plugin_name` 기준으로 프런트에서 자동 그룹화됩니다.
+* **권한**: `@login_required`
+* **요청 바디 (JSON)**: `{"type": "general", "context": {"book_id": 1, "book_title": "...", "is_volume_detail": false, "library_id": 1}}`
+* **응답 예시 (200 OK)**: `{"success": true, "items": [{"plugin_id": "naver_book", "plugin_name": "네이버 도서 검색", "id": "open_vendor_search", "label": "벤더 사이트에서 제목 검색", "icon": "fa-solid fa-up-right-from-square"}]}`
+
+#### `[POST]` `/api/media/context-menu/book/plugins/action`
+* **설명**: 선택된 플러그인 액션을 실행합니다 - `provider.run_context_menu_action(db_type, action_id, context)`을 그대로 호출하고 반환값을 그대로 응답으로 돌려줍니다.
+* **권한**: `@login_required` (관리자 전용으로 제한하고 싶은 액션은 플러그인 코드 내부에서 `flask.session.get('role') == 'admin'`으로 직접 체크해야 함 - 라우트 자체는 admin 여부를 구분하지 않음)
+* **요청 바디 (JSON)**:
+  | 필드 | 타입 | 필수여부 | 설명 |
+  | :--- | :--- | :--- | :--- |
+  | `type` | string | 선택 | DB 구분 (기본값: `general`) |
+  | `plugin_id` | string | 필수 | 대상 플러그인 ID |
+  | `action_id` | string | 필수 | 플러그인이 자체 정의한 액션 식별자 (자유 문자열) |
+  | `context` | object | 선택 | 플러그인에 그대로 전달되는 임의의 JSON 객체 |
+* **응답**: 플러그인의 `run_context_menu_action()` 반환값을 그대로 전달 (`{'success': True, 'message': ..., 'open_url': ...}` 또는 `{'success': False, 'error': ...}` 등 - 플러그인마다 자유). `success: false`면 HTTP 400으로 응답합니다.
+* **비고**: EPUB/TXT 하이라이트(주석) 컨텍스트 메뉴에는 동일한 구조의 `/api/media/context-menu/annotation/plugins`(목록)와 `/api/media/context-menu/annotation/plugins/action`(실행)이 있습니다 - `context`에 `annotation_id`/`book_id`/`quote`/`note` 등이 자동으로 채워져 전달된다는 점만 다릅니다.
 
 ---
 

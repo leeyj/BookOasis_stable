@@ -16,6 +16,27 @@ function initPermissionDelegation() {
     switchPermissionSessionTab(sessionId);
   }, true);
 
+  document.addEventListener('click', (event) => {
+    const toggleBtn = event && event.target && typeof event.target.closest === 'function'
+      ? event.target.closest('.permission-col-toggle-all')
+      : null;
+    if (!toggleBtn) return;
+
+    event.preventDefault();
+    const userId = toggleBtn.getAttribute('data-user-id');
+    const table = toggleBtn.closest('table');
+    if (!table) return;
+
+    const checkboxes = table.querySelectorAll(`.permission-chk-category[data-user-id="${userId}"]:not(:disabled)`);
+    const shouldCheck = !Array.from(checkboxes).every(chk => chk.checked);
+
+    checkboxes.forEach(chk => {
+      if (chk.checked === shouldCheck) return;
+      chk.checked = shouldCheck;
+      chk.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  }, true);
+
   window.__permissionDelegationBound = true;
 }
 
@@ -92,10 +113,15 @@ function renderSessionTabs(sessions) {
 function renderMatrixHeader(headerRow, users) {
   let headerHTML = '<th style="padding:1rem; width:25%;">카테고리 이름</th>';
   users.forEach(user => {
+    const isAdmin = user.username === 'admin';
     headerHTML += `
       <th style="padding:1rem; text-align:center; min-width:100px;">
         <div style="font-weight:700; color: var(--app-text-primary);">${user.username}</div>
-        <div style="font-size:0.75rem; color: var(--app-text-muted);">(${user.role})</div>
+        <div style="font-size:0.75rem; color: var(--app-text-muted); margin-bottom:${isAdmin ? '0' : '0.4rem'};">(${user.role})</div>
+        ${isAdmin ? '' : `
+        <button type="button" class="permission-col-toggle-all" data-user-id="${user.id}"
+                style="font-size:0.68rem; padding:0.15rem 0.5rem; border-radius:4px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.05); color: var(--app-text-muted); cursor:pointer;">전체선택/해제</button>
+        `}
       </th>
     `;
   });

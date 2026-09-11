@@ -32,6 +32,17 @@
 - 코어는 **필수 계약**만 보장합니다.
 - 선택 계약은 코어 버전에 따라 미지원일 수 있으므로, 플러그인 내부에서 기능 감지(fallback) 처리하는 것을 권장합니다.
 
+### 플러그인 ID 네이밍 규칙 (충돌 회피 철학)
+
+BookOasis 플러그인 생태계는 **중앙 승인/발급 기관이 없는 완전 자율 생태계**를 지향합니다. Jellyfin처럼 서버가 GUID를 발급해주는 방식은 채택하지 않습니다 — 개발자가 등록 절차 없이 자유롭게 플러그인을 만들고 배포할 수 있어야 한다는 게 우선 원칙입니다.
+
+다만 두 개발자가 우연히 같은 `id`를 고르면 충돌(설정 키/라우트/DB 저장 위치가 겹침)이 발생할 수 있습니다. 이를 막기 위해 **자기 자신이 이미 소유권을 증명할 수 있는 문자열을 네임스페이스 접두사로 자율적으로 붙일 것**을 권장합니다.
+
+- 권장 형식: `<개발자 네임스페이스>.<플러그인 이름>` (예: `leeyj.spotify_mood`, GitHub 아이디나 개인 도메인처럼 이미 본인만 쓸 수 있음이 자연히 보장되는 문자열)
+- 이 접두사는 npm/pip 패키지명과 같은 신뢰 모델입니다 — 중앙이 발급/검증하지 않고, 개발자가 스스로 이미 유일함을 증명 가능한 이름을 골라 쓰는 방식입니다.
+- 화면에 보이는 `name`(표시 이름)은 자유롭게 중복되어도 무방합니다. 실제 식별/충돌 방지는 오직 `id`로만 이뤄집니다.
+- 충돌 감지는 **설치 시점에 로컬에서** 이뤄집니다 — 이미 같은 `id`의 플러그인이 존재하면 설치를 막고 경고를 표시할 뿐, 어떤 서버도 `id` 발급을 중앙에서 승인하거나 거부하지 않습니다.
+
 ---
 
 ## 2. 디렉토리 구조 규격
@@ -213,7 +224,7 @@ window.addEventListener('message', (event) => {
 
 필수/권장 필드:
 
-- `id` (str): 고유 식별자
+- `id` (str): 고유 식별자 — 네임스페이스 접두사 규칙은 §1 "플러그인 ID 네이밍 규칙" 참고
 - `name` (str): UI 표시명
 - `is_searchable` (bool): 수동 메타데이터 검색 모달 노출 여부
 - `config_schema` (list): 설정 폼 스키마 (기본 자동 생성 폼용)
@@ -221,6 +232,7 @@ window.addEventListener('message', (event) => {
 - `home_widget` (dict 또는 None): 사용자가 "내 설정 > 홈 화면 플러그인 배치 모드"를 켰을 때만 **실제 홈 대시보드**에 노출되는 위젯 매니페스트 (§5-1 참고). `dashboard_widget`과 이름이 비슷해 혼동하기 쉬우니 주의 — 둘은 별개 계약이며 원하면 동시에 선언해도 된다.
 - `category_tab` (dict 또는 None): 카테고리 레벨 플러그인 매니페스트 (사이드바 카테고리 1등 시민 메뉴 등록 정보: `title`, `icon`, `order`, `sessions`)
 - `detail_sidebar_widget` (dict 또는 None): 도서 상세 페이지 사이드바 위젯 매니페스트 (`title`, `order`, `sessions`)
+- `smart_recommend_widget` (dict 또는 None): "스마트 추천" 화면(최근 읽은 시리즈 기준 추천, §"스마트 추천 화면 확장" 참고) 전용 위젯 매니페스트 (`title`, `order`, `sessions`) - `detail_sidebar_widget`과 완전히 같은 사고방식이지만 화면이 다르다
 - `detail_view` (dict 또는 None): 도서 상세 페이지 본문 전체를 대체하는 커스텀 화면 매니페스트 (`title`, `sessions`) - §"도서 상세 페이지 본문 전체 대체" 참고
 - `update_manifest` (dict 또는 None): 플러그인 내부 업데이트 선언 계약
 
@@ -306,6 +318,44 @@ class MyDetailSidebarPlugin(BaseMetadataProvider):
 참조 구현: [sample_plugins/metadata/author_other_books](../sample_plugins/metadata/author_other_books/author_other_books.py) - 코어에 있던 "이 작가의 다른 도서" 기능을 그대로 이관한 예제입니다. 관리자가 필요하면 이 폴더를 `plugins/metadata/`로 복사해 활성화하면 되고, "관련도서"/"유사한 태그 도서" 등 다른 알고리즘을 원하면 이 파일을 참고해 자유롭게 대체하면 됩니다.
 
 **성능 주의**: `get_detail_sidebar_data()`는 도서 상세 페이지를 열 때마다 호출됩니다. 전체 도서 테이블을 훑는 집계 쿼리처럼 무거운 연산을 매번 재실행하면 위젯이 눈에 띄게 늦게 뜹니다 - `author_other_books` 샘플처럼 `self.cache_get()`/`self.cache_set()`(플러그인 전용 Redis 캐시)로 결과를 TTL 동안 재사용하는 것을 강력히 권장합니다.
+
+### 스마트 추천 화면 확장 (Smart Recommend Widgets)
+
+"스마트 추천" 화면(사이드바 메뉴, 최근 읽은 시리즈 탭마다 코어가 장르/태그/작가 겹침 기준으로
+추천을 계산해 보여주는 화면)에도 `detail_sidebar_widget`과 똑같은 방식으로 플러그인 섹션을
+덧붙일 수 있습니다. `smart_recommend_widget`을 선언하고 `get_smart_recommend_data(self, db_type,
+context)`를 구현하십시오 - `context`에는 `series_name`, `library_id`만 담겨 옵니다(도서 상세
+사이드바보다 정보가 적음). 반환 규격과 아이템 스키마(`book_id`/`link`/`item_type: "metric"`)는
+`get_detail_sidebar_data()`와 완전히 동일합니다.
+
+```python
+class MySmartRecommendPlugin(BaseMetadataProvider):
+    id = "my_smart_recommend"
+    name = "커스텀 추천"
+    is_searchable = False
+
+    smart_recommend_widget = {
+        "title": "커스텀 추천",
+        "order": 10,  # 코어 기본 섹션(장르/태그/작가)보다 낮은 값을 주면 그 위에 먼저 노출됨
+        "sessions": "all",
+    }
+
+    def get_smart_recommend_data(self, db_type, context):
+        series_name = context.get("series_name")
+        library_id = context.get("library_id")
+        return {"success": True, "items": [...]}
+```
+
+여러 플러그인이 동시에 `smart_recommend_widget`을 선언하면 `order` 순서대로 나란히 쌓이고,
+코어 기본 섹션(장르/태그/작가)은 플러그인 섹션들 뒤에 항상 고정 노출됩니다.
+
+참조 구현: [sample_plugins/metadata/series_official_relations](../sample_plugins/metadata/series_official_relations/) -
+커뮤니티가 공유하는 시리즈 관계 DB(시퀄/프리퀄/스핀오프 등)를 매칭해 `detail_sidebar_widget`과
+`smart_recommend_widget`을 동시에 채우는 예제입니다. 플러그인 전용 테이블을
+`self.get_db_gateway(db_type).execute("CREATE TABLE IF NOT EXISTS ...")`로 스스로 만들어
+쓰는 패턴(코어 스키마 파일을 전혀 건드리지 않음)과, 설정 화면의 "지금 동기화" 버튼이
+도서 컨텍스트 메뉴용 범용 RPC 엔드포인트(`run_context_menu_action`)를 재사용해 별도의
+코어 라우트 없이 백그라운드 동기화를 트리거하는 패턴을 함께 참고할 만합니다.
 
 ### 도서 상세 페이지 본문 전체 대체 (Detail View)
 

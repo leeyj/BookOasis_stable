@@ -1,0 +1,65 @@
+.sor-settings-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+}
+
+.sor-desc {
+    margin: 0;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    color: var(--app-text-muted);
+}
+
+.sor-field label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--app-text-primary);
+}
+
+.sor-field input {
+    width: 100%;
+    max-width: 480px;
+    background: var(--app-input-bg, rgba(0,0,0,0.2));
+    border: 1px solid var(--app-border, rgba(255,255,255,0.1));
+    color: var(--app-text-primary);
+    padding: 0.6rem 0.8rem;
+    border-radius: 6px;
+    outline: none;
+    font-family: monospace;
+    font-size: 0.85rem;
+}
+
+.sor-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    flex-wrap: wrap;
+}
+
+.sor-sync-btn {
+    background: var(--app-accent);
+    color: var(--app-accent-contrast, #fff);
+    border: none;
+    padding: 0.55rem 1rem;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.sor-sync-btn:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.sor-status {
+    font-size: 0.82rem;
+    color: var(--app-text-muted);
+    line-height: 1.6;
+}

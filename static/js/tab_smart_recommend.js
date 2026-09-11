@@ -113,13 +113,35 @@ async function renderRecommendationsFor(seriesItem) {
   bodyEl.innerHTML = `<div class="smart-rec-loading smart-rec-loading--centered"><i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('smart_recommend.loading')}</div>`;
 
   try {
-    const data = await api.fetchSmartRecommendations(state.currentLibraryType || 'general', seriesItem.series_name, seriesItem.library_id);
+    const dbType = state.currentLibraryType || 'general';
+    const [data, pluginData] = await Promise.all([
+      api.fetchSmartRecommendations(dbType, seriesItem.series_name, seriesItem.library_id),
+      api.fetchSmartRecommendWidgets(dbType, seriesItem.series_name, seriesItem.library_id).catch(() => ({ success: false })),
+    ]);
     if (!data.success) {
       bodyEl.innerHTML = `<div class="smart-rec-error">${i18n.t('smart_recommend.error', { error: data.error || '' })}</div>`;
       return;
     }
 
     bodyEl.innerHTML = '';
+
+    // 플러그인이 붙이는 섹션(예: 공식 연관작)을 코어 기본 섹션보다 먼저 배치.
+    // 아이템 스키마는 detail_sidebar_widget과 동일(book_id/cover) - buildSection이 기대하는
+    // 형태(id/cover_image)로 맞춰준다.
+    if (pluginData && pluginData.success && Array.isArray(pluginData.widgets)) {
+      pluginData.widgets.forEach((widget) => {
+        const items = (widget.items || []).map((item) => ({
+          id: item.book_id,
+          series_name: item.series_name || item.title,
+          library_id: item.library_id,
+          file_format: item.file_format,
+          cover_image: item.cover,
+        }));
+        if (items.length === 0) return;
+        bodyEl.appendChild(buildSection(`smart-rec-plugin-${widget.id}`, widget.title, 'fa-puzzle-piece', items, false));
+      });
+    }
+
     bodyEl.appendChild(buildSection('smart-rec-genre', i18n.t('smart_recommend.similar_genre'), 'fa-tags', data.genre || [], data.genre_is_fallback));
     bodyEl.appendChild(buildSection('smart-rec-tags', i18n.t('smart_recommend.similar_tags'), 'fa-hashtag', data.tags || [], data.tags_is_fallback));
     bodyEl.appendChild(buildSection('smart-rec-author', i18n.t('smart_recommend.same_author'), 'fa-feather-pointed', data.author || [], false));

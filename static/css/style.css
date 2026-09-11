@@ -896,6 +896,7 @@ body {
     color: var(--app-text-primary);
     margin: 0;
     padding-bottom: 0.5rem;
+    cursor: pointer;
 }
 
 .sidebar-menu {

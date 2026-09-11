@@ -30,6 +30,14 @@ class BaseMetadataProvider(ABC):
     # Example:
     # detail_sidebar_widget = {"title": "이 작가의 다른 도서", "order": 50, "sessions": "all"}
     detail_sidebar_widget = None
+    # "스마트 추천" 화면(최근 읽은 시리즈 기준 추천, tab_smart_recommend.js)에 코어 기본 제공
+    # 장르/태그/작가 섹션과 나란히 플러그인 전용 섹션을 추가하려면 선언 (선택).
+    # detail_sidebar_widget과 동일한 사고방식이지만 화면이 다르다 - 상세페이지 사이드바가
+    # 아니라 스마트 추천 탭에 노출된다. get_smart_recommend_data(db_type, context)를 구현해야
+    # 한다 (get_detail_sidebar_data와 동일한 items 스키마 공유 - metric/link/book_id 카드).
+    # Example:
+    # smart_recommend_widget = {"title": "공식 연관작", "order": 10, "sessions": "all"}
+    smart_recommend_widget = None
     # 도서 상세 페이지 본문(표지/제목/시놉시스/볼륨 목록) 전체를 이 플러그인의 커스텀 화면으로
     # 대체할 수 있다고 선언 (선택). detail_sidebar_widget과 달리 여러 플러그인이 동시에 활성화될
     # 수 없는 "단일 슬롯 교체" 계약 — 세션(session)별로 관리자가 설정 화면에서 활성 플러그인을

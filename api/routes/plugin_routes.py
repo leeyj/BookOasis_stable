@@ -402,6 +402,62 @@ def get_detail_sidebar_widgets_api():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@plugin_routes_bp.route('/api/media/smart-recommend-widgets', methods=['GET'])
+@login_required
+def get_smart_recommend_widgets_api():
+    """"스마트 추천" 화면(최근 읽은 시리즈 기준, tab_smart_recommend.js)에 코어 기본 제공
+    장르/태그/작가 섹션과 나란히 붙일 플러그인 섹션 데이터를 한 번에 반환합니다.
+    get_detail_sidebar_widgets_api()와 완전히 동일한 집계 방식 - 화면만 다르다."""
+    db_type = request.args.get('type', 'general').strip()
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+
+    context = {
+        'series_name': request.args.get('series_name', ''),
+        'library_id': request.args.get('library_id') or None,
+    }
+
+    try:
+        from services.metadata_factory import MetadataFactory
+        providers = MetadataFactory.get_available_providers(include_view_ui=False, include_settings_ui=False)
+
+        active_widgets = []
+        for p in providers:
+            if not p.get('enabled'):
+                continue
+            widget = p.get('smart_recommend_widget')
+            if not isinstance(widget, dict):
+                continue
+            if db_type not in _resolve_plugin_sessions(widget):
+                continue
+
+            active_widgets.append({
+                'id': p.get('id'),
+                'title': widget.get('title') or p.get('name'),
+                'order': int(widget.get('order') or 50),
+            })
+        active_widgets.sort(key=lambda x: x['order'])
+
+        widgets_with_data = []
+        for widget in active_widgets:
+            try:
+                provider = MetadataFactory.get_provider_by_id(widget['id'])
+                result = provider.get_smart_recommend_data(db_type, context)
+            except Exception as plugin_err:
+                print(f"[smart-recommend-widgets] Skipping widget '{widget['id']}' due to error: {plugin_err}")
+                continue
+            if not result.get('success') or not result.get('items'):
+                continue
+            widgets_with_data.append({
+                'id': widget['id'],
+                'title': result.get('title') or widget['title'],
+                'items': result['items'],
+            })
+
+        return jsonify({'success': True, 'widgets': widgets_with_data}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @plugin_routes_bp.route('/api/media/category-plugins', methods=['GET'])
 def get_category_plugins_api():
     """사이드바 및 뷰포트에 마운트할 활성화된 카테고리 레벨 플러그인 목록을 반환합니다."""

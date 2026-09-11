@@ -67,8 +67,7 @@ function initLibraryShellDelegation() {
 
     const role = target.getAttribute('data-role');
     if (role === 'mobile-brand-home') {
-      if (window.matchMedia('(max-width: 1200px)').matches) return selectCategory('home');
-      return;
+      return selectCategory('home');
     }
     if (role === 'sidebar-category-static') {
       return selectCategory(target.getAttribute('data-category-id') || 'home');
@@ -102,7 +101,7 @@ function initLibraryShellDelegation() {
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
     const target = event.target?.closest?.('[data-role="mobile-brand-home"]');
-    if (!target || !window.matchMedia('(max-width: 1200px)').matches) return;
+    if (!target) return;
     event.preventDefault();
     selectCategory('home');
   });

@@ -577,6 +577,14 @@ export async function triggerLazyScan() {
   return res.json();
 }
 
+// "스마트 추천" 화면에 플러그인이 덧붙이는 섹션 데이터 조회 (smart_recommend_widget 계약).
+// get_detail_sidebar_data와 동일한 items 스키마(book_id/cover/series_name/library_id/file_format)를 공유한다.
+export async function fetchSmartRecommendWidgets(type, seriesName, libraryId) {
+  const libQuery = libraryId ? `&library_id=${encodeURIComponent(libraryId)}` : '';
+  const res = await fetch(`/api/media/smart-recommend-widgets?type=${type}&series_name=${encodeURIComponent(seriesName)}${libQuery}`, { cache: 'no-store' });
+  return res.json();
+}
+
 export async function checkVaapiSupport(devicePath) {
   const query = devicePath ? `?device=${encodeURIComponent(devicePath)}` : '';
   const res = await fetch(`/api/media/videos/check-vaapi${query}`, { cache: 'no-store' });

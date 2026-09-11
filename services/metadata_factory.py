@@ -616,6 +616,7 @@ class MetadataFactory:
                 p_home_widget = getattr(target_class, 'home_widget', None)
                 p_category_tab = getattr(target_class, 'category_tab', None)
                 p_detail_sidebar_widget = getattr(target_class, 'detail_sidebar_widget', None)
+                p_smart_recommend_widget = getattr(target_class, 'smart_recommend_widget', None)
                 p_detail_view = getattr(target_class, 'detail_view', None)
                 p_update_manifest = getattr(target_class, 'update_manifest', None)
 
@@ -641,6 +642,7 @@ class MetadataFactory:
                     'home_widget': p_home_widget,
                     'category_tab': p_category_tab,
                     'detail_sidebar_widget': p_detail_sidebar_widget,
+                    'smart_recommend_widget': p_smart_recommend_widget,
                     'detail_view': p_detail_view,
                     'update_manifest': p_update_manifest,
                 }

@@ -1,4 +1,7 @@
 # CHANGELOG
+## v2.6.3
+- (feature) "스마트 추천" 화면에 플러그인 섹션을 추가할 수 있는 신규 `smart_recommend_widget` 계약 추가 — `detail_sidebar_widget`과 동일한 방식으로 코어 기본 장르/태그/작가 섹션 앞에 플러그인 섹션이 노출됨 | add a new `smart_recommend_widget` plugin contract for the Smart Recommend screen — works just like `detail_sidebar_widget`, rendering plugin sections ahead of the core genre/tags/author sections
+
 ## v2.6.2
 - (feature) 도서 보관함 상단 헤더(검색/세션탭/설정)를 스크롤 중에도 계속 보이도록 상단 고정 — 아래로 스크롤하면 살짝 숨겨 좁은 화면 공간을 확보하고, 위로 스크롤하거나 맨 위 근처로 오면 즉시 다시 노출 | make the library top header (search/session tabs/settings) stick to the top while scrolling — it hides on scroll-down to reclaim screen space and reappears instantly on scroll-up or near the top
 - (feature) 위 상단 헤더가 맨 위에서는 플랫하다가, 스크롤이 시작되면 그림자가 진해지며 입체감 있게 떠 보이는 효과 추가 | add a subtle elevation effect to the sticky header — flat at the very top, with a deeper shadow once scrolling begins

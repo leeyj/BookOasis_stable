@@ -1,0 +1,20 @@
+<div class="sor-settings-panel">
+  <p class="sor-desc">
+    커뮤니티가 공유하는 시리즈 관계 파일을 읽어, 우리 라이브러리 시리즈명과 정확히 일치하는
+    것만 "공식 연관작"으로 반영합니다. 파일은 헤더가 있는 CSV로,
+    <code>series_title,related_title,relation_type</code> 3컬럼만 있으면 됩니다
+    (relation_type 예: sequel/prequel/spin_off/side_story/adaptation/alternative/main_story/other).
+    중복 제거·정제는 원본 제공자 쪽에서 끝내고 보내주는 걸 가정합니다 - 이 플러그인은 우리
+    라이브러리와의 매칭만 담당합니다. 파일이 갱신될 때마다 아래 버튼으로 다시 동기화하세요.
+  </p>
+
+  <div class="sor-field">
+    <label for="sor-source-path">원본 관계 파일 경로 (CSV)</label>
+    <input id="sor-source-path" type="text" name="SOURCE_DB_PATH" placeholder="/path/to/series_relations.csv">
+  </div>
+
+  <div class="sor-actions">
+    <button type="button" class="sor-sync-btn" data-role="sor-sync-now">지금 동기화</button>
+    <span class="sor-status" data-role="sor-status"></span>
+  </div>
+</div>

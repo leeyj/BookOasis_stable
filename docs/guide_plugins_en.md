@@ -29,6 +29,17 @@ Compatibility rules:
 - Core guarantees only the **required contract**.
 - Optional hooks may be unavailable in older cores; implement plugin-side feature detection/fallbacks.
 
+### Plugin ID Naming Convention (Collision Avoidance Philosophy)
+
+The BookOasis plugin ecosystem aims to be **fully autonomous, with no central approval or issuing authority**. We deliberately do not adopt a Jellyfin-style model where the server issues a GUID — developers should be able to build and distribute plugins freely, with no registration process required.
+
+That said, two developers can independently pick the same `id`, causing a real collision (overlapping settings keys, routes, or DB storage locations). To avoid this, plugins should self-declare a **namespace prefix using a string they can already prove ownership of**, without any central registry.
+
+- Recommended format: `<developer namespace>.<plugin name>` (e.g. `leeyj.spotify_mood` — a GitHub handle or personal domain works well, since it's naturally unique to that developer already).
+- This uses the same trust model as npm/pip package naming — no central authority issues or verifies the prefix; developers just pick something they can already show is theirs.
+- The user-facing `name` (display name) may duplicate freely. Only `id` is used for actual identity/collision avoidance.
+- Collision detection happens **locally, at install time** — if a plugin with the same `id` already exists, installation is blocked with a warning. No server centrally approves or rejects `id` values.
+
 ---
 
 ## 2. Directory Structure
@@ -88,7 +99,7 @@ All providers must inherit [plugins/metadata/base.py](../plugins/metadata/base.p
 
 Recommended class attributes:
 
-- `id` (str): plugin identifier
+- `id` (str): plugin identifier — see §1 "Plugin ID Naming Convention" for the namespace-prefix rule
 - `name` (str): display name
 - `is_searchable` (bool): show in manual metadata search modal
 - `config_schema` (list): settings form schema (used for auto-generated form)
@@ -96,6 +107,7 @@ Recommended class attributes:
 - `home_widget` (dict or None): widget manifest shown on the **actual home dashboard**, but only when the user has turned on "home dashboard plugin layout mode" (see §5-1). Easy to confuse with `dashboard_widget` — they are separate contracts and a plugin may declare both.
 - `category_tab` (dict or None): category-level plugin manifest (`title`, `icon`, `order`, `sessions`)
 - `detail_sidebar_widget` (dict or None): book detail page sidebar widget manifest (`title`, `order`, `sessions`)
+- `smart_recommend_widget` (dict or None): manifest for a widget on the "Smart Recommend" screen (recent-series-based recommendations) — same idea as `detail_sidebar_widget`, different screen. Implement `get_smart_recommend_data(self, db_type, context)` (context only carries `series_name`/`library_id`); the item schema is identical to `get_detail_sidebar_data()`.
 - `detail_view` (dict or None): manifest for replacing the entire book detail page body with a custom screen (`title`, `sessions`) - see "Replacing the Entire Book Detail Page Body" below
 - `update_manifest` (dict or None): plugin-owned update declaration contract
 
@@ -181,6 +193,45 @@ dashboard widget's `get_dashboard_data` - no new schema to learn:
 Reference implementation: [sample_plugins/metadata/author_other_books](../sample_plugins/metadata/author_other_books/author_other_books.py) - a straight port of the old core-hardcoded "More by this author" feature. Admins can copy this folder into `plugins/metadata/` to enable it, and plugin authors can use it as a starting point for other algorithms (related books, similar tags, etc.).
 
 **Performance note**: `get_detail_sidebar_data()` is called every time a book detail page opens. Re-running an expensive aggregate query over the whole books table on every call makes the widget noticeably slow to appear - as the `author_other_books` sample does, strongly consider caching the result for a TTL via `self.cache_get()`/`self.cache_set()` (the plugin's dedicated Redis cache).
+
+### Smart Recommend Widgets
+
+The "Smart Recommend" screen (sidebar menu; per recently-read-series tab, core computes
+recommendations from genre/tags/author overlap) can be extended the same way as the detail
+sidebar. Declare `smart_recommend_widget` and implement `get_smart_recommend_data(self, db_type,
+context)` - `context` only carries `series_name`/`library_id` (less than the detail sidebar gets).
+Return shape and item schema (`book_id`/`link`/`item_type: "metric"`) are identical to
+`get_detail_sidebar_data()`.
+
+```python
+class MySmartRecommendPlugin(BaseMetadataProvider):
+    id = "my_smart_recommend"
+    name = "Custom Recommendations"
+    is_searchable = False
+
+    smart_recommend_widget = {
+        "title": "Custom Recommendations",
+        "order": 10,  # lower than the core sections (genre/tags/author) places it above them
+        "sessions": "all",
+    }
+
+    def get_smart_recommend_data(self, db_type, context):
+        series_name = context.get("series_name")
+        library_id = context.get("library_id")
+        return {"success": True, "items": [...]}
+```
+
+When multiple plugins declare `smart_recommend_widget`, their sections stack by `order`; the core's
+own genre/tags/author sections always render after all plugin sections.
+
+Reference implementation: [sample_plugins/metadata/series_official_relations](../sample_plugins/metadata/series_official_relations/) -
+matches a community-shared series-relations DB (sequel/prequel/spin-off, etc.) and populates both
+`detail_sidebar_widget` and `smart_recommend_widget` from it. Worth studying for two patterns: a
+plugin creating and owning its own table via
+`self.get_db_gateway(db_type).execute("CREATE TABLE IF NOT EXISTS ...")` (core schema files never
+know about it), and a settings-page "Sync now" button that triggers a background sync by reusing
+the generic book-context-menu RPC endpoint (`run_context_menu_action`) instead of adding a new core
+route.
 
 ### Replacing the Entire Book Detail Page Body (Detail View)
 
