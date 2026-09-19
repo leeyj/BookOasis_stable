@@ -666,7 +666,11 @@ def _update_batch_book_scan_stage(sq, task_id, stage):
 
 
 def _process_batch_book_scan(sq, task_id, db_type='general', book_ids=None, **_kwargs):
-    """선택 도서를 순차 재스캔하며 현재 순번/작품명을 큐 진행 단계에 기록한다."""
+    """선택 도서를 재스캔하며 현재 순번/작품명을 큐 진행 단계에 기록한다.
+
+    PDF는 도서마다 프로세스를 따로 띄우지 않고 배치 안의 PDF 전부를 격리 프로세스 한 번으로 묶어
+    표지를 추출한다(시리즈 스캔이 PDF 수만큼 동시 프로세스를 만들지 않도록). 나머지는 순차 처리한다.
+    """
     from repositories.book_scan_repository import BookScanRepository
     from services.book_scan_service import BookScanService
 
@@ -681,22 +685,58 @@ def _process_batch_book_scan(sq, task_id, db_type='general', book_ids=None, **_k
     if not ids:
         raise ValueError('다중 스캔 작업에 유효한 도서 ID가 없습니다.')
 
-    succeeded = 0
-    failures = []
     total = len(ids)
-    for index, book_id in enumerate(ids, start=1):
-        title = f'도서 ID {book_id}'
+    books = {}
+    for book_id in ids:
         try:
-            book = BookScanRepository.get_book_basic_info_raw(db_type, book_id)
-            if book and book.get('title'):
-                title = str(book['title']).strip() or title
+            books[book_id] = BookScanRepository.get_book_basic_info_raw(db_type, book_id) or {}
         except Exception as lookup_error:
+            books[book_id] = {}
             sq.log(f"Batch scan title lookup failed for book_id={book_id}: {lookup_error}")
 
+    def get_title(book_id):
+        return str((books.get(book_id) or {}).get('title') or '').strip() or f'도서 ID {book_id}'
+
+    document_ids = []
+    for book_id in ids:
+        book = books.get(book_id) or {}
+        if (str(book.get('file_format') or '').lower() == 'pdf'
+                or str(book.get('file_path') or '').lower().endswith('.pdf')):
+            document_ids.append(book_id)
+
+    succeeded = 0
+    failures = []
+    if document_ids:
+        _update_batch_book_scan_stage(
+            sq, task_id, f'PDF 표지 일괄 추출 시작 · 0/{len(document_ids)}권'
+        )
+        try:
+            _document_ok, document_message, document_covers = BookScanService.scan_document_books(
+                db_type, document_ids, task_id=task_id
+            )
+            sq.log(f"Isolated PDF batch scan finished: {document_message}")
+            for book_id in document_ids:
+                if (document_covers or {}).get(book_id):
+                    succeeded += 1
+                else:
+                    failure = f'{get_title(book_id)}: PDF 표지를 추출하지 못했습니다.'
+                    failures.append(failure)
+                    sq.log(f"Batch document cover scan failed: {failure}")
+        except Exception as scan_error:
+            for book_id in document_ids:
+                failure = f'{get_title(book_id)}: {scan_error}'
+                failures.append(failure)
+                sq.log(f"Batch document cover scan raised an exception: {failure}")
+
+    completed = len(document_ids)
+    for index, book_id in enumerate(ids, start=1):
+        if book_id in document_ids:
+            continue
+        title = get_title(book_id)
         _update_batch_book_scan_stage(
             sq,
             task_id,
-            f'선택 도서 스캔 {index}/{total} · {title} (완료 {index - 1}/{total})',
+            f'선택 도서 스캔 {index}/{total} · {title} (완료 {completed}/{total})',
         )
         try:
             success, message, _cover_image = BookScanService.scan_single_book(db_type, book_id)
@@ -710,8 +750,9 @@ def _process_batch_book_scan(sq, task_id, db_type='general', book_ids=None, **_k
             failure = f'{title}: {scan_error}'
             failures.append(failure)
             sq.log(f"Batch book scan raised an exception: {failure}")
+        completed += 1
 
-    single_title = f' · {title}' if total == 1 else ''
+    single_title = f' · {get_title(ids[0])}' if total == 1 else ''
     summary = f'선택 도서 스캔 완료{single_title} · 성공 {succeeded}/{total}, 실패 {len(failures)}'
     _update_batch_book_scan_stage(sq, task_id, summary)
     sq.log(summary)

@@ -36,6 +36,7 @@
   | `is_remote` | string | 선택 | 원격 마운트 여부 (`1` / `0`) |
   | `rclone_rc_url` | string | 선택 | Rclone Remote Control 주소 (예: `http://localhost:5572`) |
   | `group_id` | integer | 선택 | 가상 상위 그룹 ID. 비우면 미분류로 저장 |
+  | `content_kind` | string | 선택 | 카테고리 속성 코드(`manga`, `book` 등, 아래 "카테고리 속성 API" 참고). 생략하거나 비우면 `unspecified`(미지정). 목록에 없는 코드는 400 |
 
 * **응답 예시 (200 OK)**:
   ```json
@@ -61,6 +62,18 @@
   | `is_remote` | string | 선택 | 원격 연결 사용 플래그 |
   | `rclone_rc_url` | string | 선택 | Rclone 원격 API 서버 Endpoint 주소 |
   | `group_id` | integer | 선택 | 변경할 가상 상위 그룹 ID. 비우면 미분류로 이동 |
+  | `content_kind` | string | 선택 | 변경할 카테고리 속성 코드. **필드를 보내지 않으면 기존 값을 유지**하고, 빈 문자열이면 미지정으로 바꿉니다 |
+
+---
+
+### 카테고리 속성 API (`content_kind`)
+카테고리를 만화·도서·잡지처럼 분류하는 값입니다. 코어는 값을 저장하고 노출하기만 하며, 연관작품 검색 같은 분류 기준은 플러그인이 이 값을 읽어 사용합니다. 종류 목록은 세션(DB)마다 있고 관리자가 정의합니다.
+* `POST /api/media/library-kinds/add`: `type`, `code`(영문 소문자로 시작하는 소문자·숫자·`-`·`_` 24자 이내, 생성 후 변경 불가), `name`(25자 이내, 고유)으로 종류 추가
+* `POST /api/media/library-kinds/edit`: `type`, `code`, `name`으로 이름 변경
+* `POST /api/media/library-kinds/delete`: `type`, `code`로 삭제. **기본 종류(`manga`/`novel`/`book`/`magazine`)와 사용 중인 종류는 삭제할 수 없습니다**(사용 중이면 사용하는 카테고리 수를 알려 줍니다)
+* **권한**: 모두 `@admin_required`
+* **조회**: `GET /api/media/libraries` 응답의 `kinds`(`[{code, name, is_builtin, sort_order}]`)와 각 `libraries[].content_kind`(코드, 기본 `unspecified`)·`libraries[].content_kind_name`(표시 이름)을 사용합니다.
+* **기본 종류**: 일반·성인 DB에는 `manga`(만화)·`novel`(소설)·`book`(도서)·`magazine`(잡지)가 시딩됩니다(이름만 변경 가능). 오디오북·영상 DB는 빈 목록으로 시작합니다.
 
 ---
 
@@ -156,7 +169,11 @@
     "success": true,
     "libraries": [
       { "id": "home", "name": "전체보기", "physical_path": "" },
-      { "id": 1, "name": "판타지 소설", "physical_path": "/data/novel" }
+      { "id": 1, "name": "판타지 소설", "physical_path": "/data/novel", "content_kind": "novel", "content_kind_name": "소설" }
+    ],
+    "kinds": [
+      { "code": "manga", "name": "만화", "is_builtin": 1, "sort_order": 1 },
+      { "code": "novel", "name": "소설", "is_builtin": 1, "sort_order": 2 }
     ]
   }
   ```

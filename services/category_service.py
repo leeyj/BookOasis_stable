@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import re
 import database
 from repositories.category_repository import CategoryRepository
 
@@ -39,7 +40,83 @@ def apply_running_scan_status(libraries, db_type, queue_status):
     return libraries
 
 
+UNSPECIFIED_LIBRARY_KIND = 'unspecified'
+LIBRARY_KIND_CODE_PATTERN = re.compile(r'^[a-z][a-z0-9_-]{0,23}$')
+MAX_LIBRARY_KIND_NAME_LENGTH = 25
+
+
 class CategoryService:
+    @staticmethod
+    def get_library_kinds(db_type):
+        return CategoryRepository.get_library_kinds(db_type)
+
+    @staticmethod
+    def _clean_library_kind_name(name):
+        clean_name = str(name or '').strip()
+        if not clean_name:
+            raise ValueError('속성 이름은 비워둘 수 없습니다.')
+        if len(clean_name) > MAX_LIBRARY_KIND_NAME_LENGTH:
+            raise ValueError(f'속성 이름은 {MAX_LIBRARY_KIND_NAME_LENGTH}자를 초과할 수 없습니다.')
+        return clean_name
+
+    @staticmethod
+    def add_library_kind(db_type, code, name):
+        clean_code = str(code or '').strip().lower()
+        if not LIBRARY_KIND_CODE_PATTERN.match(clean_code) or clean_code == UNSPECIFIED_LIBRARY_KIND:
+            raise ValueError('속성 코드는 영문 소문자로 시작하는 소문자·숫자·-·_ 조합 24자 이내여야 합니다(예: webtoon).')
+        clean_name = CategoryService._clean_library_kind_name(name)
+        existing = CategoryRepository.get_library_kinds(db_type)
+        if any(kind['code'] == clean_code for kind in existing):
+            raise ValueError('같은 코드의 속성이 이미 있습니다.')
+        if any(kind['name'] == clean_name for kind in existing):
+            raise ValueError('같은 이름의 속성이 이미 있습니다.')
+        CategoryRepository.add_library_kind(db_type, clean_code, clean_name)
+        return clean_code
+
+    @staticmethod
+    def edit_library_kind(db_type, code, name):
+        clean_code = str(code or '').strip().lower()
+        clean_name = CategoryService._clean_library_kind_name(name)
+        existing = CategoryRepository.get_library_kinds(db_type)
+        if any(kind['name'] == clean_name and kind['code'] != clean_code for kind in existing):
+            raise ValueError('같은 이름의 속성이 이미 있습니다.')
+        CategoryRepository.edit_library_kind(db_type, clean_code, clean_name)
+
+    @staticmethod
+    def delete_library_kind(db_type, code):
+        CategoryRepository.delete_library_kind(db_type, str(code or '').strip().lower())
+
+    @staticmethod
+    def ensure_library_kind(db_type, code, name=None):
+        """다른 DB로 카테고리를 옮기거나 가져올 때, 그 DB의 속성 목록에 없는 코드를 사용자 정의 속성으로 만들어
+        속성이 조용히 사라지지 않게 한다. 코드 형식이 올바르지 않으면 '미지정'으로 돌려 보낸다."""
+        clean_code = str(code or '').strip().lower()
+        if clean_code in ('', UNSPECIFIED_LIBRARY_KIND) or not LIBRARY_KIND_CODE_PATTERN.match(clean_code):
+            return UNSPECIFIED_LIBRARY_KIND
+        existing = CategoryRepository.get_library_kinds(db_type)
+        if any(kind['code'] == clean_code for kind in existing):
+            return clean_code
+        base_name = str(name or '').strip()[:MAX_LIBRARY_KIND_NAME_LENGTH] or clean_code
+        used_names = {kind['name'] for kind in existing}
+        unique_name = base_name
+        if unique_name in used_names:
+            unique_name = f"{base_name[:MAX_LIBRARY_KIND_NAME_LENGTH - len(clean_code) - 3]} ({clean_code})"
+        CategoryRepository.add_library_kind(db_type, clean_code, unique_name)
+        return clean_code
+
+    @staticmethod
+    def _normalize_content_kind(db_type, content_kind, keep_when_missing=False):
+        """라이브러리에 저장할 속성 코드를 검증한다. None이면(keep_when_missing) 기존 값 유지를 뜻하는 None을 그대로
+        돌려주고, 빈 값/'unspecified'는 '미지정'으로, 그 외에는 이 세션의 속성 목록에 있는 코드여야 한다."""
+        if content_kind is None:
+            return None if keep_when_missing else UNSPECIFIED_LIBRARY_KIND
+        value = str(content_kind).strip().lower()
+        if value in ('', UNSPECIFIED_LIBRARY_KIND):
+            return UNSPECIFIED_LIBRARY_KIND
+        if not any(kind['code'] == value for kind in CategoryRepository.get_library_kinds(db_type)):
+            raise ValueError(f"알 수 없는 속성입니다: {value}")
+        return value
+
     @staticmethod
     def get_library_groups(db_type):
         return CategoryRepository.get_library_groups(db_type)
@@ -134,6 +211,7 @@ class CategoryService:
 
         from services.series_service import SeriesService
         totals_by_library = SeriesService.get_library_totals_bulk(db_type)
+        kind_names = {kind['code']: kind['name'] for kind in CategoryRepository.get_library_kinds(db_type)}
 
         return [{
             'id': r['id'],
@@ -149,6 +227,8 @@ class CategoryService:
             'hide_cover': r['hide_cover'] or 0,
             'hide_title': r.get('hide_title') or 0,
             'cover_aspect_ratio': r.get('cover_aspect_ratio') or '4:3',
+            'content_kind': r.get('content_kind') or UNSPECIFIED_LIBRARY_KIND,
+            'content_kind_name': kind_names.get(r.get('content_kind') or UNSPECIFIED_LIBRARY_KIND, ''),
             'group_id': r.get('group_id'),
             'sort_order': r.get('sort_order') or 0,
             'gdrive_copy_remote': r.get('gdrive_copy_remote') or '',
@@ -236,7 +316,7 @@ class CategoryService:
             raise ValueError('리모트의 로컬 마운트 루트를 확보하지 못했습니다. 리모트가 실제로 마운트돼 있는지 확인하거나 직접 입력해 주세요.')
 
     @staticmethod
-    def add_library(db_type, name, physical_path, is_remote=0, rclone_rc_url=None, icon='fa-book', color='#94a3b8', hide_cover=0, group_id=None, gdrive_copy_remote=None, gdrive_view_local_mirror_path=None, cover_aspect_ratio='4:3', hide_title=0):
+    def add_library(db_type, name, physical_path, is_remote=0, rclone_rc_url=None, icon='fa-book', color='#94a3b8', hide_cover=0, group_id=None, gdrive_copy_remote=None, gdrive_view_local_mirror_path=None, cover_aspect_ratio='4:3', hide_title=0, content_kind=None):
         name = str(name or '').strip()
         if not name:
             raise ValueError('카테고리 이름은 비워둘 수 없습니다.')
@@ -246,10 +326,11 @@ class CategoryService:
         physical_path = CategoryService._clean_physical_path(physical_path)
         group_id = CategoryService._normalize_group_id(db_type, group_id)
         cover_aspect_ratio = CategoryService._normalize_cover_aspect_ratio(cover_aspect_ratio)
-        return CategoryRepository.add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_view_local_mirror_path, cover_aspect_ratio, hide_title)
+        content_kind = CategoryService._normalize_content_kind(db_type, content_kind)
+        return CategoryRepository.add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_view_local_mirror_path, cover_aspect_ratio, hide_title, content_kind)
 
     @staticmethod
-    def edit_library(db_type, library_id, name, physical_path, is_remote=0, rclone_rc_url=None, icon='fa-book', color='#94a3b8', hide_cover=0, group_id=None, gdrive_copy_remote=None, gdrive_view_local_mirror_path=None, cover_aspect_ratio='4:3', hide_title=0):
+    def edit_library(db_type, library_id, name, physical_path, is_remote=0, rclone_rc_url=None, icon='fa-book', color='#94a3b8', hide_cover=0, group_id=None, gdrive_copy_remote=None, gdrive_view_local_mirror_path=None, cover_aspect_ratio='4:3', hide_title=0, content_kind=None):
         name = str(name or '').strip()
         if not name:
             raise ValueError('카테고리 이름은 비워둘 수 없습니다.')
@@ -259,7 +340,9 @@ class CategoryService:
         physical_path = CategoryService._clean_physical_path(physical_path)
         group_id = CategoryService._normalize_group_id(db_type, group_id)
         cover_aspect_ratio = CategoryService._normalize_cover_aspect_ratio(cover_aspect_ratio)
-        CategoryRepository.edit_library(db_type, library_id, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_view_local_mirror_path, cover_aspect_ratio, hide_title)
+        # content_kind를 넘기지 않으면(None) 기존 속성을 유지한다.
+        content_kind = CategoryService._normalize_content_kind(db_type, content_kind, keep_when_missing=True)
+        CategoryRepository.edit_library(db_type, library_id, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_view_local_mirror_path, cover_aspect_ratio, hide_title, content_kind)
 
     @staticmethod
     def delete_library(db_type, library_id):
@@ -399,6 +482,13 @@ class CategoryService:
         if CategoryRepository.check_duplicate_name(to_type, lib["name"]):
             raise ValueError(f"이동하려는 대상에 이미 동일한 이름('{lib['name']}')의 카테고리가 존재합니다.")
             
+        # 2-1. 카테고리 속성: 대상 DB의 속성 목록에 없는 코드는 같은 이름의 사용자 정의 속성으로 만들어 둔다
+        # (트랜잭션이 libraries 행을 통째로 복사하므로 content_kind 코드가 그대로 따라간다).
+        source_kind = lib.get('content_kind') or UNSPECIFIED_LIBRARY_KIND
+        if source_kind != UNSPECIFIED_LIBRARY_KIND:
+            source_names = {kind['code']: kind['name'] for kind in CategoryRepository.get_library_kinds(from_type)}
+            lib['content_kind'] = CategoryService.ensure_library_kind(to_type, source_kind, source_names.get(source_kind))
+
         # 3. 이관을 위한 소스 DB 도서 데이터 수집
         books = CategoryRepository.get_books_by_library_raw(from_type, library_id)
         

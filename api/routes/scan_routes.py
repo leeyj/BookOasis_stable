@@ -8,6 +8,7 @@ from services.book_scan_service import BookScanService
 from api.auth import admin_required
 from utils.i18n import _t
 import database
+from services.batch_book_scan_targets import resolve_batch_book_scan_targets
 
 scan_bp = Blueprint('scan', __name__)
 LAZY_SCAN_DB_TYPES = {'general', 'adult', 'audiobook'}
@@ -153,6 +154,11 @@ def enqueue_batch_book_scan():
     db_type = str(payload.get('type') or 'general').strip().lower()
     if db_type not in ('general', 'adult'):
         return jsonify({'success': False, 'error': '일반/성인 도서만 다중 스캔할 수 있습니다.'}), 400
+    # scope는 요청이 명시한다(기본 book) - 시리즈 카드는 대표 권 ID만 보내므로 서버가 같은 시리즈의
+    # 모든 권으로 확장한다. ID 개수로 스코프를 추정하지 않는다(상세 화면의 단일 권과 구분이 안 됨).
+    scan_scope = str(payload.get('scope') or 'book').strip().lower()
+    if scan_scope not in ('book', 'series'):
+        return jsonify({'success': False, 'error': '지원하지 않는 스캔 범위입니다.'}), 400
 
     raw_book_ids = payload.get('book_ids')
     if not isinstance(raw_book_ids, list) or not raw_book_ids:
@@ -177,18 +183,16 @@ def enqueue_batch_book_scan():
     try:
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
-        placeholders = ', '.join('?' for _ in book_ids)
-        cursor.execute(
-            f'SELECT id, library_id, title FROM books WHERE id IN ({placeholders})',
-            tuple(book_ids),
-        )
-        rows = cursor.fetchall()
-        found_ids = {int(row['id']) for row in rows}
-        if found_ids != set(book_ids):
-            return jsonify({'success': False, 'error': '요청한 도서 중 현재 데이터베이스에서 찾을 수 없는 항목이 있습니다.'}), 404
+        try:
+            rows = resolve_batch_book_scan_targets(cursor, book_ids, scope=scan_scope)
+        except LookupError as error:
+            return jsonify({'success': False, 'error': str(error)}), 404
+        if len(rows) > 500:
+            return jsonify({'success': False, 'error': '시리즈 스캔은 한 번에 최대 500권까지 가능합니다.'}), 400
+        book_ids = [int(row['id']) for row in rows]
 
         library_ids = {row['library_id'] for row in rows if row['library_id'] is not None}
-        task_kwargs = {'db_type': db_type, 'book_ids': book_ids}
+        task_kwargs = {'db_type': db_type, 'book_ids': book_ids, 'scope': scan_scope}
         if len(rows) == len(book_ids) and len(library_ids) == 1:
             task_kwargs['library_id'] = next(iter(library_ids))
         if len(book_ids) == 1:
@@ -201,13 +205,15 @@ def enqueue_batch_book_scan():
                 'error': '같은 다중 도서 스캔 작업이 이미 실행 중이거나 대기 중입니다.',
             }), 409
 
+        if scan_scope == 'series':
+            message = f'시리즈 전체 {len(book_ids)}권의 스캔을 대기열에 추가했습니다.'
+        elif len(book_ids) == 1:
+            message = '도서 스캔을 대기열에 추가했습니다.'
+        else:
+            message = f'선택한 {len(book_ids)}개 작품의 스캔을 대기열에 추가했습니다.'
         return jsonify({
             'success': True,
-            'message': (
-                '도서 스캔을 대기열에 추가했습니다. 스캔 활동에서 진행 상황을 확인할 수 있습니다.'
-                if len(book_ids) == 1 else
-                f'선택한 {len(book_ids)}개 작품의 스캔을 대기열에 추가했습니다. 스캔 활동에서 진행 상황을 확인할 수 있습니다.'
-            ),
+            'message': message + ' 스캔 활동에서 진행 상황을 확인할 수 있습니다.',
         }), 202
     except Exception as error:
         return jsonify({'success': False, 'error': str(error)}), 500

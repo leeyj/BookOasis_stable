@@ -2189,6 +2189,128 @@ body {
     color: var(--app-text-primary);
 }
 
+/* 카테고리 속성 관리 모달 (library_kinds_modal.html) */
+.library-kind-list {
+    list-style: none;
+    margin: 0 0 1rem;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.library-kind-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 0.8rem;
+    background: rgba(var(--app-panel-rgb), 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+}
+
+.library-kind-name {
+    flex: 1;
+    min-width: 0;
+    font-weight: 600;
+    color: var(--app-text-primary);
+    overflow-wrap: anywhere;
+}
+
+.library-kind-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+    color: var(--app-text-muted);
+    background: rgba(255, 255, 255, 0.06);
+    padding: 0.1rem 0.45rem;
+    border-radius: 4px;
+}
+
+.library-kind-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    color: var(--app-accent);
+    background: color-mix(in srgb, var(--app-accent) 18%, transparent);
+    white-space: nowrap;
+}
+
+.library-kind-actions {
+    display: inline-flex;
+    gap: 0.4rem;
+}
+
+.library-kind-empty {
+    padding: 0.8rem;
+    text-align: center;
+    color: var(--app-text-muted);
+}
+
+.library-kind-btn {
+    background: rgba(var(--app-panel-rgb), 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: var(--app-text-primary);
+    padding: 0.3rem 0.7rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.library-kind-btn:hover {
+    border-color: var(--app-accent);
+    color: var(--app-accent);
+}
+
+.library-kind-btn--danger:hover {
+    border-color: #ef4444;
+    color: #ef4444;
+}
+
+.library-kind-btn--primary {
+    padding: 0.5rem 1rem;
+    color: var(--app-accent);
+    border-color: color-mix(in srgb, var(--app-accent) 50%, transparent);
+    background: color-mix(in srgb, var(--app-accent) 15%, transparent);
+}
+
+.library-kind-add-form {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding-top: 0.8rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.library-kind-input {
+    flex: 1;
+    min-width: 140px;
+    background: rgba(var(--app-panel-rgb), 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--app-text-primary);
+    border-radius: 6px;
+    padding: 0.55rem 0.8rem;
+    font-size: 0.9rem;
+    outline: none;
+    transition: all 0.3s ease;
+    color-scheme: dark;
+}
+
+.library-kind-input:focus {
+    border-color: var(--app-accent);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--app-accent) 40%, transparent);
+}
+
+.library-kind-help {
+    margin: 0 0 0.9rem;
+    color: var(--app-text-muted);
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
 .btn-submit {
     background: linear-gradient(135deg, var(--app-accent) 0%, color-mix(in srgb, var(--app-accent) 70%, black) 100%);
     border: none;

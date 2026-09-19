@@ -5,6 +5,7 @@ import { selectCategory } from '../tab_media_library.js';
 import { currentTargetLibrary } from './context_menu.js';
 import { updateRemoteWarning, enableVFSCheckForRemote, loadGdriveCopyRemotes, detectGdriveMountRoot } from './path_browser.js';
 import { loadVideoLibraryView } from '../video_library.js';
+import { buildKindOptionsHtml } from './kind_options.js';
 
 async function reloadLibrarySidebar() {
   if (state.currentLibraryType === 'video') {
@@ -44,6 +45,21 @@ function populateLibraryGroupSelect(selectedGroupId = '') {
   }).join('');
   select.value = selected;
 }
+
+// 카테고리 속성(content_kind) 선택지. 저장된 코드가 목록에 없으면 원문으로 보여 값이 바뀌지 않게 한다.
+function populateContentKindSelect(selectedCode = '') {
+  const select = document.getElementById('library-form-content-kind');
+  if (!select) return;
+  const translated = window.i18n?.t?.('modal.content_kind_unspecified');
+  const unspecifiedLabel = translated && translated !== 'modal.content_kind_unspecified' ? translated : '미지정';
+  select.innerHTML = buildKindOptionsHtml(state.libraryKinds, selectedCode, unspecifiedLabel);
+  select.value = !selectedCode || selectedCode === 'unspecified' ? '' : String(selectedCode);
+}
+
+// 속성 관리 모달에서 종류를 추가/변경/삭제하면 열려 있는 라이브러리 모달의 선택지도 새로 채운다.
+window.addEventListener('library:kinds-changed', () => {
+  populateContentKindSelect(document.getElementById('library-form-content-kind')?.value || '');
+});
 
 export async function triggerAddLibraryGroup() {
   const name = prompt('새 그룹 이름을 입력하세요.');
@@ -106,6 +122,7 @@ export function triggerAddLibrary() {
   form.reset();
   document.getElementById('library-form-id').value = '';
   populateLibraryGroupSelect('');
+  populateContentKindSelect('');
   const remoteEl = document.getElementById('library-form-remote');
   if (remoteEl) {
     remoteEl.checked = false;
@@ -230,6 +247,7 @@ export async function triggerEditLibrary() {
   document.getElementById('library-form-name').value = name;
   const groupIdVal = libraryItem?.dataset?.groupId || '';
   populateLibraryGroupSelect(groupIdVal);
+  populateContentKindSelect(libraryItem?.dataset?.contentKind || '');
   
   const pathVal = libraryItem?.dataset?.path || '';
   document.getElementById('library-form-path').value = pathVal;

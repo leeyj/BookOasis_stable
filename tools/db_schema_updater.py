@@ -60,6 +60,13 @@ CREATE TABLE IF NOT EXISTS library_groups (
     sort_order INT DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
+CREATE TABLE IF NOT EXISTS library_kinds (
+    code VARCHAR(24) PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    is_builtin TINYINT(1) NOT NULL DEFAULT 0,
+    sort_order INT DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
 CREATE TABLE IF NOT EXISTS libraries (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL UNIQUE,
@@ -78,6 +85,7 @@ CREATE TABLE IF NOT EXISTS libraries (
     sort_order INT DEFAULT 0,
     gdrive_copy_remote VARCHAR(255) DEFAULT NULL,
     gdrive_view_local_mirror_path TEXT DEFAULT NULL,
+    content_kind VARCHAR(24) NOT NULL DEFAULT 'unspecified',
     INDEX idx_libraries_group_id (group_id),
     INDEX idx_libraries_group_order (group_id, sort_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

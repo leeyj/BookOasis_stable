@@ -42,7 +42,13 @@ def get_media_libraries():
             group for group in CategoryService.get_library_groups(db_type)
             if role == 'admin' or group.get('id') in visible_group_ids
         ]
-        return jsonify({'success': True, 'libraries': libraries, 'groups': groups})
+        try:
+            kinds = CategoryService.get_library_kinds(db_type)
+        except Exception as kinds_error:
+            # 속성 테이블이 아직 없는 DB(업그레이드 직후 마이그레이션 전)에서도 카테고리 목록은 보여야 한다.
+            print(f"[Libraries] 카테고리 속성 목록 조회 실패(빈 목록으로 대체): {kinds_error}")
+            kinds = []
+        return jsonify({'success': True, 'libraries': libraries, 'groups': groups, 'kinds': kinds})
     except sqlite3.OperationalError as e:
         msg = str(e)
         lock_like = ('locked' in msg.lower()) or ('pool exhausted' in msg.lower()) or ('timeout waiting for connection' in msg.lower())

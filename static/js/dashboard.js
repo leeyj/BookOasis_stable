@@ -137,6 +137,9 @@ export async function loadDashboardData() {
     }
   }
 }
+// 스캔 완료(scan_activity_status.js)와 홈에서의 즐겨찾기 토글(ui.js)이 window.loadDashboardData()로
+// 홈을 갱신하려 하는데, 이 전역이 없어서 그 호출들이 조용히 무시되고 있었다.
+window.loadDashboardData = loadDashboardData;
 
 
 let homeLayoutLoadToken = 0;

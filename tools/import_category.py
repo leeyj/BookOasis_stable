@@ -92,6 +92,32 @@ def upsert_record(cursor, table, key_columns, values):
     return cursor.lastrowid
 
 
+def resolve_content_kind(cursor, lib_info):
+    """가져올 카테고리의 속성 코드를 이 DB에서 쓸 수 있는 코드로 바꾼다. 이 DB의 속성 목록에 없는 코드는
+    패키지에 든 이름(없으면 코드)으로 사용자 정의 속성을 새로 만들어 속성이 사라지지 않게 하고,
+    코드 형식이 올바르지 않거나 테이블이 없으면 '미지정'으로 둔다."""
+    import re
+    code = str(lib_info.get('content_kind') or '').strip().lower()
+    if not code or code == 'unspecified' or not re.match(r'^[a-z][a-z0-9_-]{0,23}$', code):
+        return 'unspecified'
+    try:
+        cursor.execute("SELECT code FROM library_kinds WHERE code = ?", (code,))
+        if cursor.fetchone():
+            return code
+        base_name = (str(lib_info.get('content_kind_name') or '').strip() or code)[:25]
+        cursor.execute("SELECT 1 FROM library_kinds WHERE name = ?", (base_name,))
+        name = f"{base_name[:25 - len(code) - 3]} ({code})" if cursor.fetchone() else base_name
+        cursor.execute(
+            "INSERT INTO library_kinds (code, name, is_builtin, sort_order) VALUES (?, ?, 0, "
+            "COALESCE((SELECT MAX(sort_order) + 1 FROM library_kinds), 0))",
+            (code, name),
+        )
+        return code
+    except Exception as kind_err:
+        print(f"[!] Could not resolve content kind '{code}' ({kind_err}); importing as unspecified.")
+        return 'unspecified'
+
+
 def invalidate_series_summary(cursor, library_id):
     cursor.execute("DELETE FROM series_summary WHERE library_id = ?", (library_id,))
     cursor.execute("SELECT id FROM series_summary_state WHERE id = 1")
@@ -302,28 +328,30 @@ def import_category(input_path, target_paths_raw, db_type=None, name=None, merge
             print(f"[!] Library name collision detected. Renamed new category to: '{target_lib_name}'")
 
         db_physical_path = "\n".join(target_paths)
-        cursor.execute("""
-            INSERT INTO libraries (
-                name, physical_path, cron_schedule, scan_status, is_remote,
-                vfs_refresh_before_scan, rclone_rc_url, icon, color, hide_cover,
-                group_id, sort_order, cover_aspect_ratio, hide_title
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            target_lib_name,
-            db_physical_path,
-            lib_info.get('cron_schedule'),
-            'ready',
-            lib_info.get('is_remote', 0),
-            lib_info.get('vfs_refresh_before_scan', 0),
-            lib_info.get('rclone_rc_url'),
-            lib_info.get('icon', 'fa-book'),
-            lib_info.get('color', '#94a3b8'),
-            lib_info.get('hide_cover', 0),
-            lib_info.get('group_id'),
-            lib_info.get('sort_order', 0),
-            lib_info.get('cover_aspect_ratio', '4:3') if lib_info.get('cover_aspect_ratio') in ('4:3', '16:9') else '4:3',
-            1 if lib_info.get('hide_title') else 0
-        ))
+        library_columns = [
+            ('name', target_lib_name),
+            ('physical_path', db_physical_path),
+            ('cron_schedule', lib_info.get('cron_schedule')),
+            ('scan_status', 'ready'),
+            ('is_remote', lib_info.get('is_remote', 0)),
+            ('vfs_refresh_before_scan', lib_info.get('vfs_refresh_before_scan', 0)),
+            ('rclone_rc_url', lib_info.get('rclone_rc_url')),
+            ('icon', lib_info.get('icon', 'fa-book')),
+            ('color', lib_info.get('color', '#94a3b8')),
+            ('hide_cover', lib_info.get('hide_cover', 0)),
+            ('group_id', lib_info.get('group_id')),
+            ('sort_order', lib_info.get('sort_order', 0)),
+            ('cover_aspect_ratio', lib_info.get('cover_aspect_ratio', '4:3') if lib_info.get('cover_aspect_ratio') in ('4:3', '16:9') else '4:3'),
+            ('hide_title', 1 if lib_info.get('hide_title') else 0),
+        ]
+        # 카테고리 속성 컬럼은 최신 스키마에만 있다 - 구버전 DB로 가져올 때는 넣지 않는다.
+        if 'content_kind' in get_table_columns(cursor, 'libraries'):
+            library_columns.append(('content_kind', resolve_content_kind(cursor, lib_info)))
+        cursor.execute(
+            f"INSERT INTO libraries ({', '.join(name for name, _ in library_columns)}) "
+            f"VALUES ({', '.join('?' for _ in library_columns)})",
+            tuple(value for _, value in library_columns),
+        )
         target_library_id = cursor.lastrowid
         conn.commit()
         print(f"[+] Created new library in DB (ID: {target_library_id}, Name: '{target_lib_name}')")

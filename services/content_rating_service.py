@@ -119,18 +119,20 @@ class ContentRatingService:
         return [kw.strip().lower() for kw in raw.split(',') if kw.strip()]
 
     @staticmethod
-    def genre_tag_matches_adult(genre, tags):
-        keywords = ContentRatingService.get_adult_keywords()
+    def genre_tag_matches_adult(genre, tags, adult_keywords=None):
+        # 목록처럼 시리즈 수만큼 반복 호출하는 곳은 get_adult_keywords()를 한 번만 읽어서 넘긴다 -
+        # 생략하면 호출마다 설정 테이블을 조회한다.
+        keywords = adult_keywords if adult_keywords is not None else ContentRatingService.get_adult_keywords()
         if not keywords:
             return False
         combined = f"{genre or ''} {tags or ''}".lower()
         return any(kw in combined for kw in keywords)
 
     @staticmethod
-    def compute_effective_level(books_lv, genre, tags):
+    def compute_effective_level(books_lv, genre, tags, adult_keywords=None):
         """books_lv와 성인 장르/태그 키워드 매치 결과 중 더 높은 등급을 최종 등급으로 채택"""
         level = ContentRatingService.normalize_books_lv(books_lv)
-        if ContentRatingService.genre_tag_matches_adult(genre, tags):
+        if ContentRatingService.genre_tag_matches_adult(genre, tags, adult_keywords):
             level = max(level, LEVEL_18)
         return level
 

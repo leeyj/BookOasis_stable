@@ -1168,6 +1168,28 @@ def _count_books(self, db_type):
     return int((row["cnt"] if row else 0) or 0)
 ```
 
+### 카테고리 속성 읽기 (`content_kind`, 분류 기준)
+
+카테고리(라이브러리)에는 관리자가 지정한 **속성**(만화·도서·잡지 등)이 있어서, 여러 카테고리에 걸쳐 검색·매칭하는 플러그인(예: 연관작품)이 "같은 제목이지만 어느 종류의 카테고리인지"를 구분하는 기준으로 쓸 수 있습니다. 코어는 값을 저장·노출하기만 합니다.
+
+- **저장 위치:** `libraries.content_kind`(코드 문자열, 기본 `'unspecified'`)와, 종류 목록 `library_kinds(code, name, is_builtin, sort_order)`. 세션(DB)마다 별도입니다.
+- **HTTP:** `GET /api/media/libraries` 응답의 `libraries[].content_kind`·`content_kind_name`, 최상위 `kinds`.
+- **코드 계약(추가만 가능):**
+  - 기본 코드 `manga`·`novel`·`book`·`magazine`은 일반·성인 DB에서 삭제되지 않으며 의미가 고정됩니다(표시 이름은 관리자가 바꿀 수 있으니 이름이 아니라 **코드**로 판단하십시오).
+  - 관리자가 추가한 코드는 그 설치에서만 의미가 있습니다. **모르는 코드는 불투명 문자열로 취급**하고(같은 코드끼리만 "같은 종류"), 값이 `unspecified`이거나 비어 있으면 미지정으로 처리하십시오.
+  - 기본 종류가 없는 DB(오디오북·영상)나 아직 지정하지 않은 카테고리가 있을 수 있으므로, 속성이 없다고 실패하지 말고 지정된 경우에만 분류에 활용하십시오.
+
+```python
+def _library_kinds(self, db_type):
+    gateway = self.get_db_gateway(db_type)
+    rows = gateway.fetch_all("SELECT id, content_kind FROM libraries") or []
+    return {row["id"]: row["content_kind"] for row in rows}
+
+# 같은 제목의 후보 중 만화 카테고리에 속한 것만 고르기
+kinds = self._library_kinds(db_type)
+manga_candidates = [c for c in candidates if kinds.get(c["library_id"]) == "manga"]
+```
+
 ### 플러그인 캐시 (Redis, 권장)
 
 외부 API를 매번 다시 호출하지 않도록, 코어가 이미 구성해둔 Redis를 재사용할 수 있는

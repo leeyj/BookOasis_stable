@@ -5,9 +5,114 @@ import { openReader } from './viewer.js';
 import { initInfiniteScrollObserver } from './infinite_scroll.js';
 import { stripLeadingBracketTags } from './series_display.js';
 import { mountIndexScrollbar, unmountIndexScrollbar } from './index_scrollbar.js';
+import { BookListRefreshState, getLoadedPageRange } from './book_list_refresh_state.js';
+import { resolveSearchNavigation } from './search_navigation.js';
 
 let filterDebounceTimer = null;
 let totalsRequestSerial = 0;
+const bookListRefreshState = new BookListRefreshState();
+let refreshAfterCurrentLoad = false;
+
+function isBookListViewActive() {
+  const currentId = String(state.currentLibraryId || '');
+  return !(
+    ['home', 'history', 'collection', 'smart_rec', 'settings', 'plugins'].includes(currentId)
+    || currentId.startsWith('plugin_')
+  );
+}
+
+function getBookListKey(type = state.currentLibraryType, libraryId = state.currentLibraryId) {
+  return `${String(type || 'general')}:${String(libraryId ?? '')}`;
+}
+
+function isDetailViewVisible() {
+  const detailView = document.getElementById('book-detail-view');
+  return !!detailView && detailView.style.display !== 'none';
+}
+
+// 목록을 불러오는 도중 들어온 갱신 요청은 버리지 않고, 로딩이 끝난 직후 한 번 다시 확인한다.
+function flushQueuedBookListRefresh() {
+  if (!refreshAfterCurrentLoad) return;
+  refreshAfterCurrentLoad = false;
+  setTimeout(() => refreshBooksListIfStale(), 0);
+}
+
+function captureBookListScrollPosition() {
+  const mainContent = document.querySelector('.library-main-content');
+  const mainTop = Number(mainContent?.scrollTop || 0);
+  const documentTop = Number(window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0);
+  return {
+    scrollTop: mainTop > 0 ? mainTop : documentTop,
+    scrollUseDocument: !mainContent || (mainTop === 0 && documentTop > 0),
+  };
+}
+
+function restoreBookListScrollPosition(position, type, libraryId) {
+  const restore = () => {
+    if (state.currentLibraryType !== type || String(state.currentLibraryId || '') !== libraryId) return;
+    const top = Math.max(0, Number(position.scrollTop) || 0);
+    const mainContent = document.querySelector('.library-main-content');
+    if (position.scrollUseDocument) {
+      window.scrollTo(0, top);
+      document.documentElement.scrollTop = top;
+      document.body.scrollTop = top;
+    } else if (mainContent) {
+      mainContent.scrollTop = top;
+    }
+  };
+  requestAnimationFrame(restore);
+  setTimeout(restore, 80);
+}
+
+// 스캔 전에 화면에 로드돼 있던 페이지 범위(firstPage..lastPage)를 다시 불러오고 스크롤을 복원한다.
+async function loadBookListToPosition(type, libraryId, firstPage, lastPage, position) {
+  await loadBooksList(false, firstPage, { keepCurrentGrid: true });
+  while (
+    state.currentLibraryType === type
+    && String(state.currentLibraryId || '') === libraryId
+    && state.hasMore
+    && state.currentPage <= lastPage
+  ) {
+    const nextPage = state.currentPage;
+    await loadBooksList(true);
+    if (state.currentPage === nextPage && state.hasMore) break;
+  }
+  restoreBookListScrollPosition(position, type, libraryId);
+}
+
+// 스캔 종료 시 호출한다. 이미 목록 요청이 진행 중이면 그 요청이 끝난 뒤 최신 목록으로 다시
+// 불러오도록 예약해서(버리지 않고) 스캔 완료 알림이 유실되지 않게 한다.
+export function invalidateBookListAfterScan() {
+  bookListRefreshState.invalidate(getBookListKey());
+  return refreshBooksListIfStale();
+}
+
+// 상세 화면이 열려 있는 동안에는 그 밑의 그리드가 그대로 남아 있으므로 네트워크 요청을 미루고,
+// 목록으로 돌아올 때 그사이 무효화된 목록만 다시 불러온다.
+export function refreshBooksListIfStale() {
+  const listKey = getBookListKey();
+  if (!bookListRefreshState.isStale(listKey) || !isBookListViewActive() || isDetailViewVisible()) return false;
+
+  if (state.isLoading || state.isLoadingPrevious) {
+    refreshAfterCurrentLoad = true;
+    return false;
+  }
+
+  refreshAfterCurrentLoad = false;
+  const { firstPage, lastPage } = getLoadedPageRange(
+    state.firstLoadedPage,
+    state.currentPage,
+    state.hasMore,
+  );
+  loadBookListToPosition(
+    state.currentLibraryType,
+    String(state.currentLibraryId || ''),
+    firstPage,
+    lastPage,
+    captureBookListScrollPosition(),
+  ).catch((error) => console.warn('[Book-List] 스캔 후 목록 갱신 실패:', error));
+  return true;
+}
 
 export function normalizeMetadataToken(token) {
   if (!token) return '';
@@ -40,7 +145,7 @@ export function updateLibraryTotalCount(items, totals = null) {
 }
 
 // 1. 도서 시리즈 목록 로드
-export async function loadBooksList(isAppend = false, startPage = null) {
+export async function loadBooksList(isAppend = false, startPage = null, options = {}) {
   const currentId = state.currentLibraryId || '';
   if (['home', 'collection', 'settings', 'plugins'].includes(currentId) || currentId.startsWith('plugin_')) {
     console.warn(`[Book-List] loadBooksList skipped: currentLibraryId=${currentId} is not a book list category.`);
@@ -58,6 +163,11 @@ export async function loadBooksList(isAppend = false, startPage = null) {
     return;
   }
   const spinner = document.getElementById('infinite-scroll-spinner');
+  // 요청 시점의 목록/무효화 버전을 기억해 두었다가, 응답이 오래된 것이면 최신 무효화를 지우지 않게 한다.
+  const requestType = state.currentLibraryType;
+  const requestLibraryId = String(state.currentLibraryId || '');
+  const requestListKey = getBookListKey(requestType, requestLibraryId);
+  const requestRefreshVersion = bookListRefreshState.beginRequest(requestListKey);
   container.classList.toggle('author-drilldown-active', !!state.authorKeyFilter);
 
   state.isLoading = true;
@@ -80,9 +190,12 @@ export async function loadBooksList(isAppend = false, startPage = null) {
       state.hasMore = true;
       state.firstLoadedPage = targetPage;
       state.hasPrevious = targetPage > 1;
-      container.innerHTML = `<div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('book_list.loading')}</div>`;
-      const countSpan = document.getElementById('library-total-count');
-      if (countSpan) countSpan.innerText = '';
+      // 스캔 후 자동 갱신(keepCurrentGrid)은 기존 그리드를 유지한 채 교체해 깜빡임을 줄인다.
+      if (!options.keepCurrentGrid) {
+        container.innerHTML = `<div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('book_list.loading')}</div>`;
+        const countSpan = document.getElementById('library-total-count');
+        if (countSpan) countSpan.innerText = '';
+      }
     }
 
     const data = await api.fetchBooksList({
@@ -111,6 +224,12 @@ export async function loadBooksList(isAppend = false, startPage = null) {
     } else {
       state.currentBooksData = incomingSeries;
       renderBooksGrid(state.currentBooksData);
+    }
+
+    const isSameList = state.currentLibraryType === requestType
+      && String(state.currentLibraryId || '') === requestLibraryId;
+    if (!isAppend && isSameList) {
+      bookListRefreshState.markLoaded(requestListKey, requestRefreshVersion);
     }
 
     state.filteredBooksData = state.currentBooksData;
@@ -149,6 +268,7 @@ export async function loadBooksList(isAppend = false, startPage = null) {
   }
   } finally {
     state.isLoading = false;
+    flushQueuedBookListRefresh();
   }
 
   // 렌더링 및 스피너 상태 결정 완료 후 무한 스크롤 옵저버 재바인딩
@@ -214,6 +334,7 @@ export async function loadPreviousBooksPage() {
   } finally {
     state.isLoadingPrevious = false;
     if (spinnerTop) spinnerTop.classList.remove('is-loading');
+    flushQueuedBookListRefresh();
   }
 }
 
@@ -287,13 +408,15 @@ export function filterBooks() {
 
   // 홈/최근 읽은 도서에서 검색을 시작하면 전체보기로 이동하되, 이 검색 진입점은
   // history에 남겨 브라우저 뒤로가기/앞으로가기가 원래 화면과 검색 결과를 복원하게 한다.
-  if (query && ['home', 'history'].includes(state.currentLibraryId) && typeof window.selectCategory === 'function') {
-    const searchNavigationFrom = state.currentLibraryId;
-    window.selectCategory('all', false, {
-      preserveSearch: true,
-      searchNavigationFrom,
-      searchQuery: rawQuery,
-    });
+  // 시리즈 상세가 열려 있을 때도 같은 방식으로 검색 결과 화면으로 이동한다(search_navigation.js 참고).
+  const searchNavigation = resolveSearchNavigation({
+    query,
+    rawQuery,
+    libraryId: state.currentLibraryId,
+    detailVisible: isDetailViewVisible(),
+  });
+  if (searchNavigation && typeof window.selectCategory === 'function') {
+    window.selectCategory(searchNavigation.categoryId, false, searchNavigation.options);
     return;
   }
 

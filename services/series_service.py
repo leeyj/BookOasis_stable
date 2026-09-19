@@ -70,6 +70,10 @@ def _normalize_library_id(library_id):
 def _build_series_entries(db_type, rows):
     from services.content_rating_service import ContentRatingService
 
+    # 성인 키워드 설정은 시리즈마다 DB에서 다시 읽지 않고 여기서 한 번만 읽는다 (전체 목록/초성 이동처럼
+    # 수만 시리즈를 한 번에 만들 때 설정 조회가 빌드 시간의 절반을 차지했다).
+    adult_keywords = ContentRatingService.get_adult_keywords() if db_type in ('general', 'adult') else None
+
     groups = {}
     order = []
 
@@ -158,7 +162,7 @@ def _build_series_entries(db_type, rows):
             'genre': genre,
             'tags': tags,
             'books_lv': books_lv,
-            'content_rating_level': ContentRatingService.compute_effective_level(books_lv, genre, tags) if db_type in ('general', 'adult') else 0,
+            'content_rating_level': ContentRatingService.compute_effective_level(books_lv, genre, tags, adult_keywords) if db_type in ('general', 'adult') else 0,
             'publication_status': publication_status,
             'publication_status_label': {'0': '연재', '1': '휴재', '2': '완결'}.get(publication_status, '알 수 없음'),
             'anchor_dir': comp_dir,
@@ -504,6 +508,7 @@ class SeriesService:
         if cached and (now - cached[0] < _LIST_QUERY_CACHE_TTL):
             entries = cached[1]
         else:
+            t_fetch = time.perf_counter()
             rows = SeriesRepository.fetch_books_for_grouping(
                 db_type,
                 library_id,
@@ -516,9 +521,13 @@ class SeriesService:
                 limit=None,
                 offset=None
             )
+            t_build = time.perf_counter()
             entries = _build_series_entries(db_type, rows)
+            t_sort = time.perf_counter()
             _sort_entries(entries, sort=sort_key)
+            t_done = time.perf_counter()
             _LIST_QUERY_CACHE[cache_key] = (now, entries)
+            print(f"[PERF-PROFILE] find_jump_position(lib={library_id}) CACHE MISS TOTAL: {(t_done-t_fetch)*1000:.1f}ms | SQL-Fetch({len(rows)}rows): {(t_build-t_fetch)*1000:.1f}ms | BuildSeries({len(entries)}entries): {(t_sort-t_build)*1000:.1f}ms | Sort: {(t_done-t_sort)*1000:.1f}ms")
 
         target = str(target_char or '').strip()
         total = len(entries)

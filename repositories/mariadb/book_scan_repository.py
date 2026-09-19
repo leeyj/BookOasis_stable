@@ -3,6 +3,7 @@
 book_scan_repository.py – MariaDB 전용 도서(books) 및 오프셋(book_offsets) 백그라운드 스캔 데이터 액세스 레이어
 """
 import database
+from repositories.book_metadata_fill import empty_guard_sql, is_empty_value, sanitize_fill_candidates
 
 class BookScanRepository:
     @staticmethod
@@ -78,6 +79,44 @@ class BookScanRepository:
         except Exception as e:
             conn.rollback()
             raise e
+        finally:
+            conn.close()
+
+    @staticmethod
+    def fill_empty_book_metadata(db_type, book_id, fields):
+        """파일 내장 메타데이터로 도서의 "비어 있는" 컬럼만 채운다(덮어쓰지 않음, 잠긴 도서는 무변경).
+        채운 컬럼 이름 목록을 반환한다."""
+        candidates = sanitize_fill_candidates(fields)
+        if not candidates:
+            return []
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            columns = list(candidates)
+            cursor.execute(
+                f"SELECT COALESCE(metadata_locked, 0) AS is_locked, {', '.join(columns)} FROM books WHERE id = %s",
+                (book_id,)
+            )
+            row = cursor.fetchone()
+            if not row or int(row['is_locked'] or 0) == 1:
+                return []
+            to_fill = [column for column in columns if is_empty_value(column, row[column])]
+            if not to_fill:
+                return []
+            # SELECT와 UPDATE 사이에 다른 쓰기가 끼어들어도 덮어쓰지 않도록 UPDATE에도 같은 조건을 둔다.
+            assignments = ', '.join(
+                f"{column} = CASE WHEN {empty_guard_sql(column)} THEN %s ELSE {column} END"
+                for column in to_fill
+            )
+            cursor.execute(
+                f"UPDATE books SET {assignments} WHERE id = %s AND COALESCE(metadata_locked, 0) = 0",
+                tuple(candidates[column] for column in to_fill) + (book_id,)
+            )
+            conn.commit()
+            return to_fill
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             conn.close()
 

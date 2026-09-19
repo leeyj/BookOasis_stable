@@ -47,6 +47,16 @@ function getLazyScanSeriesTarget(book) {
   return { libraryId, seriesName };
 }
 
+// 스캔 범위: 시리즈 카드(대표 권 ID만 넘어옴)일 때만 'series'로 서버가 모든 권으로 확장한다.
+// 상세 화면의 개별 권 메뉴는 seriesName이 채워져 있어도 그 권 하나만 대상이다.
+function getBookScanScope(book) {
+  const selectedBooks = Array.isArray(book?.selectedBooks) ? book.selectedBooks : [];
+  if (selectedBooks.length > 1) {
+    return selectedBooks.every(item => item.markUnreadScope === 'series') ? 'series' : 'book';
+  }
+  return !book?.isVolumeDetail && book?.markUnreadScope === 'series' ? 'series' : 'book';
+}
+
 export function invalidateMetadataPluginsCache() {
   cachedSearchPlugins = null;
   // metadata_search.js 등 외부 모듈 캐시 무효화가 필요한 경우 트리거
@@ -228,6 +238,16 @@ export function showBookContextMenu(x, y, bookId, bookTitle, isVolumeDetail = fa
   const isMultiSelection = selectedBooks.length > 1;
   const seriesName = String(context.seriesName || (isVolumeDetail ? state.detailSeriesName : '') || '').trim();
   currentTargetBook = { id: bookId, title: bookTitle, isVolumeDetail, ...context, selectedBooks, seriesName };
+
+  const scanLabel = bookMenu.querySelector('#ctx-scan-book span[data-i18n]');
+  if (scanLabel) {
+    const scanScope = getBookScanScope(currentTargetBook);
+    const scanLabelKey = isMultiSelection
+      ? (scanScope === 'series' ? 'context_menu.scan_selected_series_now' : 'context_menu.scan_selected_now')
+      : (scanScope === 'series' ? 'context_menu.scan_series_now' : 'context_menu.scan_book_now');
+    scanLabel.dataset.i18n = scanLabelKey;
+    scanLabel.textContent = window.i18n?.t(scanLabelKey) || scanLabel.textContent;
+  }
 
   const menuTitle = bookMenu.querySelector('.context-menu-title');
   if (menuTitle) menuTitle.textContent = isMultiSelection ? `도서 메뉴 (${selectedBooks.length}개 선택)` : '도서 메뉴';
@@ -413,12 +433,14 @@ export async function triggerScanSingleBookAction() {
   const { id, title } = currentTargetBook;
 
   const selectedBooks = Array.isArray(currentTargetBook.selectedBooks) ? currentTargetBook.selectedBooks : [];
+  const scanScope = getBookScanScope(currentTargetBook);
   if (selectedBooks.length > 1) {
     const vm = await import('./view_manager.js');
     try {
       const result = await api.enqueueBatchBookScan(
         state.currentLibraryType,
-        selectedBooks.map(book => book.id)
+        selectedBooks.map(book => book.id),
+        { scope: scanScope }
       );
       if (!result?.success) {
         vm.showToast(result?.error || '다중 도서 스캔 요청에 실패했습니다.', 'error');
@@ -437,7 +459,7 @@ export async function triggerScanSingleBookAction() {
   
   import('./view_manager.js').then(async (vm) => {
     try {
-      const result = await api.enqueueBatchBookScan(state.currentLibraryType, [id]);
+      const result = await api.enqueueBatchBookScan(state.currentLibraryType, [id], { scope: scanScope });
       if (!result?.success) {
         vm.showToast(result?.error || `"${title}" 스캔 요청에 실패했습니다.`, 'error');
         return;

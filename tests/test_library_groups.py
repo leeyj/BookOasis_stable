@@ -35,6 +35,9 @@ def test_non_admin_only_receives_groups_with_visible_libraries():
     ), patch(
         'api.routes.media_library_routes.CategoryService.get_library_groups',
         return_value=groups,
+    ), patch(
+        'api.routes.media_library_routes.CategoryService.get_library_kinds',
+        return_value=[],
     ):
         response = client.get('/api/media/libraries?type=general')
 

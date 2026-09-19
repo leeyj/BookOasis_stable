@@ -204,6 +204,13 @@ _SCHEMA_SQL = """
         sort_order INTEGER DEFAULT 0
     );
 
+    CREATE TABLE IF NOT EXISTS library_kinds (
+        code TEXT PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        is_builtin INTEGER NOT NULL DEFAULT 0,
+        sort_order INTEGER DEFAULT 0
+    );
+
     CREATE TABLE IF NOT EXISTS libraries (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL UNIQUE,
@@ -223,7 +230,8 @@ _SCHEMA_SQL = """
         gdrive_copy_remote TEXT DEFAULT NULL,
         gdrive_view_local_mirror_path TEXT DEFAULT NULL,
         cover_aspect_ratio TEXT DEFAULT '4:3',
-        hide_title INTEGER DEFAULT 0
+        hide_title INTEGER DEFAULT 0,
+        content_kind TEXT NOT NULL DEFAULT 'unspecified'
     );
 
     CREATE TABLE IF NOT EXISTS plugin_group_assignments (
@@ -948,6 +956,38 @@ def _seed_category_permissions(conn, cursor):
         print(f"[DB-Migration ERROR] user_category_permissions seeding failed: {seed_err}")
 
 
+# 카테고리 속성(libraries.content_kind)의 기본 종류. 코드는 플러그인이 기댈 수 있는 공통 값이라 고정하고
+# (관리자는 이름만 바꿀 수 있고 삭제할 수 없다), 관리자가 추가한 종류는 그 설치에서만 의미가 있다.
+BUILTIN_LIBRARY_KINDS = (
+    ('manga', '만화'),
+    ('novel', '소설'),
+    ('book', '도서'),
+    ('magazine', '잡지'),
+)
+
+
+def _seed_library_kinds(conn, cursor, db_type):
+    """도서 세션(general/adult)에 기본 속성 종류를 심는다. 코드 기준으로 멱등이며, 관리자가 바꾼 이름은 덮어쓰지
+    않는다. 오디오북/영상 세션은 빈 목록으로 시작한다."""
+    if db_type not in ('general', 'adult'):
+        return
+    try:
+        for sort_order, (code, name) in enumerate(BUILTIN_LIBRARY_KINDS, start=1):
+            cursor.execute("SELECT code FROM library_kinds WHERE code = ?", (code,))
+            if cursor.fetchone():
+                continue
+            # 관리자가 같은 이름의 종류를 이미 만들어 둔 경우 UNIQUE 충돌을 피하려고 이름에 코드를 붙인다.
+            cursor.execute("SELECT 1 FROM library_kinds WHERE name = ?", (name,))
+            seed_name = f"{name} ({code})" if cursor.fetchone() else name
+            cursor.execute(
+                "INSERT INTO library_kinds (code, name, is_builtin, sort_order) VALUES (?, ?, 1, ?)",
+                (code, seed_name, sort_order)
+            )
+        conn.commit()
+    except Exception as seed_err:
+        print(f"[DB-Migration ERROR] library_kinds seeding failed ({db_type}): {seed_err}")
+
+
 def _backfill_library_group_default_color(conn, cursor):
     """그룹 색상을 고르는 UI가 아직 없어 지금까지 모든 그룹이 스키마 기본값 '#a855f7'로
     저장돼 테마를 켜도 사이드바 그룹 아이콘만 항상 보라색으로 고정되던 문제를 보정한다.
@@ -1134,6 +1174,10 @@ def _ensure_mariadb_columns():
         ('media_general', 'libraries', 'sort_order', 'INT DEFAULT 0'),
         ('media_adult', 'libraries', 'sort_order', 'INT DEFAULT 0'),
         ('media_audiobook', 'libraries', 'sort_order', 'INT DEFAULT 0'),
+        ('media_general', 'libraries', 'content_kind', "VARCHAR(24) NOT NULL DEFAULT 'unspecified'"),
+        ('media_adult', 'libraries', 'content_kind', "VARCHAR(24) NOT NULL DEFAULT 'unspecified'"),
+        ('media_audiobook', 'libraries', 'content_kind', "VARCHAR(24) NOT NULL DEFAULT 'unspecified'"),
+        ('media_video', 'libraries', 'content_kind', "VARCHAR(24) NOT NULL DEFAULT 'unspecified'"),
         ('media_general', 'libraries', 'gdrive_copy_remote', 'VARCHAR(255) DEFAULT NULL'),
         ('media_adult', 'libraries', 'gdrive_copy_remote', 'VARCHAR(255) DEFAULT NULL'),
         ('media_audiobook', 'libraries', 'gdrive_copy_remote', 'VARCHAR(255) DEFAULT NULL'),
@@ -1295,6 +1339,7 @@ def run_full_migration():
         _create_indexes_and_cleanup_fts(conn, cursor, _INDEXES_SQL)
         _seed_settings_and_admin(conn, cursor, db_type)
         _seed_category_permissions(conn, cursor)
+        _seed_library_kinds(conn, cursor, db_type)
         _backfill_audiobook_last_listened_at(conn, cursor, db_type)
         _backfill_library_group_default_color(conn, cursor)
         if db_type == 'video' and not database.is_mariadb_mode():

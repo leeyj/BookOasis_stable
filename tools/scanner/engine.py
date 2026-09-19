@@ -26,6 +26,8 @@ from tools.scanner.memory_helper import check_memory_exceeded
 from tools.scanner.path_utils import canonical_path, join_canonical
 from tools.scanner.db_writer import update_book_metadata, insert_new_book_v2, save_book_offsets, bulk_update_books, bulk_insert_books, bulk_save_book_offsets
 from tools.scanner.tasks import process_folder_task, process_folder_covers, SUPPORTED_FORMATS, SUPPORTED_IMAGE_FORMATS, IMGDIR_VIRTUAL_FILENAME
+from utils.library_scan_progress import LibraryScanProgress, count_scan_units
+from tools.scanner.folder_image import clear_folder_listing_cache
 from tools.scanner.sync_detector import detect_and_handle_book_movement, handle_deleted_books
 
 MAX_SCANNER_THREADS = 4
@@ -135,8 +137,12 @@ def _dispatch_new_books_to_plugin_hooks(db_type, event_payload):
         except Exception as hook_err:
             print(f"[Scanner-PluginHook] provider={meta.get('id')} failed: {hook_err}")
 
-def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_type, target_paths, is_remote, threads_to_use, library_errors, path_scope=None):
+def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_type, target_paths, is_remote, threads_to_use, library_errors, path_scope=None, progress_callback=None):
     cursor = conn.cursor()
+    # 스캔 활동창용 진행 알림(폴더 탐색 수, 처리 완료 도서 파일 수). 콜백이 없으면 아무 일도 하지 않는다.
+    progress = LibraryScanProgress(progress_callback)
+    # 폴더 표지 조회 캐시(folder_image.py)를 비워서 이번 스캔이 최신 폴더 내용을 보게 한다.
+    clear_folder_listing_cache()
 
     def log_pool_stats(tag):
         try:
@@ -246,6 +252,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     found_file_paths.add(encode_gdrive_file_id(join_canonical(v_root, fn), file_ids.get(fn)))
                 tasks.append((v_root, fnames, t_path, file_ids))
 
+            progress.folder_visited(len(grouped_files))
             print(f"[Scanner] 구글 드라이브 원격 도서 총 {len(g_files)}개 ({len(grouped_files)}개 폴더) 감지 완료!")
             continue
 
@@ -254,6 +261,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
             continue
         for root, dirs, files in os.walk(t_path, onerror=_walk_onerror):
             root = canonical_path(root)
+            progress.folder_visited()
 
             # Local .bookoasisignore 파일 체크
             local_ig = os.path.join(root, '.bookoasisignore')
@@ -299,6 +307,14 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
         # ── [Book movement detection and history preservation layer - pre-process before thread execution] ──
         deleted_paths = detect_and_handle_book_movement(cursor, db_books, found_file_paths, db_meta_full, db_offsets_cached)
         _commit_with_retry(conn, 'pre-move-detection')
+
+    # 폴더별 도서 파일 수로 전체 처리량을 확정해 진행률의 분모로 쓴다.
+    progress_units = {}
+    for task_root, task_files, _task_path, _task_file_ids in tasks:
+        progress_units[task_root] = progress_units.get(task_root, 0) + count_scan_units(
+            task_files, SUPPORTED_FORMATS, SUPPORTED_IMAGE_FORMATS
+        )
+    progress.start_processing(progress_units)
 
     # 2. Run thread pool and streaming process (as_completed)
     print(f"[Scanner] Multithread scan pool created (threads: {threads_to_use})")
@@ -582,6 +598,8 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                 print("[Scanner] ⚠️ 스캔 중단 요청(SIGTERM/SIGINT)이 감지되었습니다. 루프를 탈출하여 현재까지의 변경점만 DB에 쓰고 마감합니다.")
                 break
             root_folder = futures[fut]
+            # 결과 처리 방식(변경 없음 건너뜀/정상/예외)과 상관없이 이 폴더는 처리가 끝났다.
+            progress.finish(root_folder)
             try:
                 res = fut.result()
 

@@ -28,42 +28,43 @@ This document summarizes the latest code-based schema snapshot (**as of 2026-08-
 
 ## 2. Shared Table List
 
-Tables common to both engines and all 3 DBs (23 total):
+Tables common to both engines and all 3 DBs (24 total):
 
 **Library / Book Core**
 1. `library_groups`
-2. `libraries`
-3. `books`
-4. `book_offsets`
-5. `series_summary`
-6. `series_summary_state`
+2. `library_kinds`
+3. `libraries`
+4. `books`
+5. `book_offsets`
+6. `series_summary`
+7. `series_summary_state`
 
 **Audiobook**
-7. `audiobooks`
-8. `audiobook_tracks`
-9. `audiobook_progress`
-10. `audiobook_track_progress`
+8. `audiobooks`
+9. `audiobook_tracks`
+10. `audiobook_progress`
+11. `audiobook_track_progress`
 
 **User / Progress**
-11. `users`
-12. `user_progress`
-13. `user_reading_log`
-14. `user_favorites`
-15. `user_category_permissions`
+12. `users`
+13. `user_progress`
+14. `user_reading_log`
+15. `user_favorites`
+16. `user_category_permissions`
 
 **Collections**
-16. `collections`
-17. `collection_items`
+17. `collections`
+18. `collection_items`
 
 **Scanner / Ops**
-18. `scanner_tasks`
-19. `scan_history`
-20. `scanner_progress`
-21. `folder_mtimes`
+19. `scanner_tasks`
+20. `scan_history`
+21. `scanner_progress`
+22. `folder_mtimes`
 
 **Settings / Plugins**
-22. `settings`
-23. `plugin_load_events`
+23. `settings`
+24. `plugin_load_events`
 
 ---
 
@@ -76,14 +77,23 @@ Top-level grouping for libraries (sidebar folder grouping).
 - PK: `id`
 - Columns: `name`, `icon`, `color`, `sort_order`
 
+### library_kinds
+
+List of category type values (manga / book / magazine, ...). One table per session DB, defined by the administrator.
+
+- PK: `code` (lowercase slug, `^[a-z][a-z0-9_-]{0,23}$`, immutable once created)
+- Columns: `name` (display name, UNIQUE, max 25 chars), `is_builtin`, `sort_order`
+- The four built-in kinds (`manga`/`novel`/`book`/`magazine`) are seeded only in the general/adult DBs (`is_builtin=1`); they can be renamed but not deleted. The audiobook/video DBs start with an empty list.
+
 ### libraries
 
 Library roots and scan/runtime options.
 
 - PK: `id`
 - Main FK: `group_id -> library_groups.id`
-- Columns: `name`, `physical_path`, `cron_schedule`, `last_scanned_at`, `scan_status`, `is_remote`, `vfs_refresh_before_scan`, `rclone_rc_url`, `icon`, `color`, `hide_cover`, `hide_title`, `cover_aspect_ratio`, `group_id`, `sort_order`
+- Columns: `name`, `physical_path`, `cron_schedule`, `last_scanned_at`, `scan_status`, `is_remote`, `vfs_refresh_before_scan`, `rclone_rc_url`, `icon`, `color`, `hide_cover`, `hide_title`, `cover_aspect_ratio`, `content_kind`, `group_id`, `sort_order`
 - `hide_cover`: stores whether cover rendering should be hidden at library/category level (`INTEGER DEFAULT 0`).
+- `content_kind`: category type code (logical reference to `library_kinds.code`). Defaults to `'unspecified'`. Plugins can read it as a classification criterion (e.g. telling manga from books in related-works search) (`TEXT NOT NULL DEFAULT 'unspecified'`, `VARCHAR(24)` on MariaDB).
 - `hide_title`: per-category toggle to hide the grid card title text and show thumbnail only (Netflix style). UI only exposed for general/adult book sessions (`INTEGER DEFAULT 0`).
 - `cover_aspect_ratio`: per-category grid card cover aspect ratio. Only `'4:3'` (default) or `'16:9'` allowed (`TEXT DEFAULT '4:3'`).
 - Note: production DB files may contain legacy migration residue columns.
@@ -305,6 +315,13 @@ CREATE TABLE IF NOT EXISTS library_groups (
     sort_order INTEGER DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS library_kinds (
+    code TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    is_builtin INTEGER NOT NULL DEFAULT 0,
+    sort_order INTEGER DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS libraries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
@@ -319,7 +336,8 @@ CREATE TABLE IF NOT EXISTS libraries (
     color TEXT DEFAULT '#94a3b8',
     hide_cover INTEGER DEFAULT 0,
     group_id INTEGER DEFAULT NULL,
-    sort_order INTEGER DEFAULT 0
+    sort_order INTEGER DEFAULT 0,
+    content_kind TEXT NOT NULL DEFAULT 'unspecified'
 );
 
 CREATE TABLE IF NOT EXISTS scanner_tasks (
@@ -620,6 +638,13 @@ CREATE TABLE IF NOT EXISTS library_groups (
     sort_order INT DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
+CREATE TABLE IF NOT EXISTS library_kinds (
+    code VARCHAR(24) PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    is_builtin TINYINT(1) NOT NULL DEFAULT 0,
+    sort_order INT DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
 CREATE TABLE IF NOT EXISTS libraries (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL UNIQUE,
@@ -635,6 +660,7 @@ CREATE TABLE IF NOT EXISTS libraries (
     hide_cover INT DEFAULT 0,
     group_id BIGINT DEFAULT NULL,
     sort_order INT DEFAULT 0,
+    content_kind VARCHAR(24) NOT NULL DEFAULT 'unspecified',
     INDEX idx_libraries_group_id (group_id),
     INDEX idx_libraries_group_order (group_id, sort_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

@@ -8,6 +8,7 @@ export const state = {
   currentLibraryHideTitles: false,
   detailViewProviders: { general: 'core', adult: 'core', audiobook: 'core', video: 'core' },
   libraryGroups: [],
+  libraryKinds: [],
 
   // 도서 데이터
   currentBooksData: [],
@@ -48,6 +49,7 @@ export const state = {
   homeDashboardPluginMode: false,   // 홈 화면을 코어+플러그인 위젯 혼합 배치 모드로 전환 (기본값: 클래식 고정 레이아웃)
 
   detailSeriesName: '',
+  detailBookIds: [],
   detailLibraryId: null,
   detailRepresentativeBookId: null,
   detailDisplayTitle: '',

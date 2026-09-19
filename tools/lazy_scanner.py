@@ -246,11 +246,22 @@ def _load_lazy_scan_probe_workers():
     return max(1, workers)
 
 
-def _build_scan_targets(db_type, books, library_remote_map, allow_remote_offset_only=False):
+def _has_valid_cover_file(cover_image):
+    """DB에 기록된 표지 파일이 실제로 존재하고 비어 있지 않은지 확인한다."""
+    if not cover_image or cover_image == 'NO_COVER':
+        return False
+    from services.cover_storage_service import get_covers_dir
+    cover_filepath = os.path.join(get_covers_dir(), cover_image)
+    return os.path.exists(cover_filepath) and os.path.getsize(cover_filepath) > 0
+
+
+def _build_scan_targets(db_type, books, library_remote_map, allow_remote_offset_only=False,
+                        force_cover_book_ids=None):
     """DB에서 1차 선별된 후보 도서들을 실제 물리 파일 상태까지 점검해 최종 스캔
     대상 목록((book, offset_only) 튜플 리스트)으로 좁힌다. conn/세션 누적 상태와
     무관한 순수 필터링 단계라 별도 함수로 분리해도 안전하다."""
     targets = []
+    force_cover_book_ids = {int(book_id) for book_id in (force_cover_book_ids or ())}
     for book in books:
         if stop_requested:
             print(f"[Lazy-Scanner] ⚠️ DB({db_type}) 파일 물리 점검 도중 중단 요청(SIGTERM/SIGINT) 감지. 점검을 중단합니다.")
@@ -285,6 +296,10 @@ def _build_scan_targets(db_type, books, library_remote_map, allow_remote_offset_
                 offset_missing = True
 
         metadata_locked = int(book['metadata_locked'] or 0) == 1
+        # 사용자가 즉시 요청한 EPUB/PDF는 표지가 이미 있어도 다시 추출한다(--force-document-covers).
+        # 이걸 안 하면 표지가 있는 PDF의 "즉시 스캔"이 "완전히 처리된 도서"로 건너뛰어져 아무 일도 안 한다.
+        if int(book['id']) in force_cover_book_ids and file_format in ('epub', 'pdf') and not metadata_locked:
+            cover_missing = True
         if metadata_locked and cover_missing:
             if not offset_missing:
                 print(f"[Lazy-Scanner] 메타데이터 잠금으로 커버 자동 갱신 스킵: {os.path.basename(file_path)}")
@@ -353,11 +368,15 @@ def _group_targets_by_folder(targets):
 
 def run_lazy_cover_extraction(target_book_id=None, target_db_type=None,
                               target_book_ids=None, target_library_id=None,
-                              target_series_name=None, task_id=None):
+                              target_series_name=None, task_id=None,
+                              force_document_covers=False):
     global stop_requested
 
     if target_book_id is not None:
         target_book_ids = [target_book_id]
+
+    if force_document_covers and target_book_ids is None:
+        raise ValueError("문서 표지 강제 추출에는 명시적인 도서 ID가 필요합니다.")
 
     if target_series_name is not None:
         target_series_name = str(target_series_name).strip()
@@ -389,6 +408,12 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None,
 
         # ── 최대 스캔 허용 파일 크기(MB) 및 세션 누적 제한(MB) 설정 로드 ──
         max_size_mb, max_batch_mb = _load_lazy_scan_limits()
+        force_cover_book_ids = target_book_ids if force_document_covers else None
+        if force_cover_book_ids:
+            # 사용자가 즉시 요청한 문서 묶음은 파일별 크기 제한은 유지하되, 세션 누적 용량 제한으로
+            # 중간에 끊기지 않게 한다 - 도서 ID를 지정한 실행에는 "다음 회차"가 없어 뒤 권이 빠진다.
+            max_batch_mb = 0
+            print("[Lazy-Scanner] 선택 문서 즉시 스캔: 파일별 크기 제한은 유지하고 세션 누적 용량 제한은 적용하지 않습니다.")
 
         no_cover_retry_days = _load_lazy_scan_no_cover_retry_days()
         if no_cover_retry_days > 0:
@@ -461,6 +486,7 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None,
                 books,
                 library_remote_map,
                 allow_remote_offset_only=(target_book_ids is not None or target_library_id is not None),
+                force_cover_book_ids=force_cover_book_ids,
             )
             
             folder_groups = _group_targets_by_folder(targets)
@@ -723,17 +749,22 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None,
                             # 커버 추출 실패는 NO_COVER로 기록하고, 동시에 실패한 ZIP 오프셋은
                             # 재시도 간격 정책을 따르도록 -1로 둔다. 오프셋 전용 오류는 위에서
                             # 분리했으므로 이미 정상인 커버 상태는 건드리지 않는다.
-                            try:
-                                cursor.execute("""
-                                    UPDATE books SET
-                                        cover_image = 'NO_COVER',
-                                        cover_updated_at = CURRENT_TIMESTAMP,
-                                        has_offsets = CASE WHEN (COALESCE(total_pages, 0) = 0 OR COALESCE(has_offsets, 0) = 0) THEN -1 ELSE has_offsets END
-                                    WHERE id = ?
-                                """, (book_id,))
-                                conn.commit()
-                            except Exception as db_mark_err:
-                                print(f"[Lazy-Scanner WARNING] 실패 상태 마킹 중 무시된 에러: {db_mark_err}")
+                            # 강제 재추출(--force-document-covers)처럼 이미 정상 표지가 있던 도서는
+                            # 이 실패 한 번으로 표지를 잃으면 안 되므로 NO_COVER로 덮어쓰지 않는다.
+                            if _has_valid_cover_file(book['cover_image']):
+                                print(f"[Lazy-Scanner] 기존 정상 표지를 유지합니다(재추출 실패는 NO_COVER로 기록하지 않음): {filename}")
+                            else:
+                                try:
+                                    cursor.execute("""
+                                        UPDATE books SET
+                                            cover_image = 'NO_COVER',
+                                            cover_updated_at = CURRENT_TIMESTAMP,
+                                            has_offsets = CASE WHEN (COALESCE(total_pages, 0) = 0 OR COALESCE(has_offsets, 0) = 0) THEN -1 ELSE has_offsets END
+                                        WHERE id = ?
+                                    """, (book_id,))
+                                    conn.commit()
+                                except Exception as db_mark_err:
+                                    print(f"[Lazy-Scanner WARNING] 실패 상태 마킹 중 무시된 에러: {db_mark_err}")
 
                         lib_errors[library_id].append({
                             'file_path': file_path,
@@ -1359,10 +1390,13 @@ if __name__ == '__main__':
     parser.add_argument('--series-name', type=str, default=None)
     parser.add_argument('--db-type', choices=['general', 'adult', 'audiobook'], default=None)
     parser.add_argument('--task-id', type=int, default=None)
+    parser.add_argument('--force-document-covers', action='store_true')
     args = parser.parse_args()
 
     if args.book_id is not None and args.book_ids:
         parser.error('--book-id와 --book-ids는 함께 사용할 수 없습니다.')
+    if args.force_document_covers and args.book_id is None and not args.book_ids:
+        parser.error('--force-document-covers에는 --book-id 또는 --book-ids가 필요합니다.')
     if args.library_id is not None and (args.book_id is not None or args.book_ids):
         parser.error('--library-id와 도서 ID 옵션은 함께 사용할 수 없습니다.')
     if args.series_name is not None and (args.book_id is not None or args.book_ids):
@@ -1391,6 +1425,7 @@ if __name__ == '__main__':
             target_series_name=args.series_name,
             target_db_type=args.db_type,
             task_id=args.task_id,
+            force_document_covers=args.force_document_covers,
         )
     except SystemExit as se:
         # 표지 추출은 이미 다 끝나서(exit 0) 스캐너 큐가 이 lazy 스캔 태스크를 끝내려 하더라도,

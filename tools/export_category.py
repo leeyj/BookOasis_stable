@@ -427,6 +427,16 @@ def export_single_category(db_type, library_id, output_path=None):
         "covers_count": len(cover_files_to_pack)
     }
 
+    # 카테고리 속성(content_kind)은 코드와 함께 표시 이름도 내보낸다 - 가져오는 쪽 DB에 없는 코드는 이 이름으로 만든다.
+    content_kind_name = ''
+    try:
+        cursor.execute("SELECT name FROM library_kinds WHERE code = ?", (library.get('content_kind') or 'unspecified',))
+        kind_row = cursor.fetchone()
+        if kind_row:
+            content_kind_name = kind_row['name'] if not isinstance(kind_row, (tuple, list)) else kind_row[0]
+    except Exception:
+        content_kind_name = ''
+
     metadata = {
         "library": {
             "id": library_id,
@@ -442,6 +452,8 @@ def export_single_category(db_type, library_id, output_path=None):
             "hide_cover": library.get('hide_cover', 0),
             "hide_title": library.get('hide_title', 0),
             "cover_aspect_ratio": library.get('cover_aspect_ratio', '4:3'),
+            "content_kind": library.get('content_kind') or 'unspecified',
+            "content_kind_name": content_kind_name,
             "group_id": library.get('group_id'),
             "sort_order": library.get('sort_order', 0)
         },

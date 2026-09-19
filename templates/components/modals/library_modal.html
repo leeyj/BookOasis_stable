@@ -20,6 +20,16 @@
                 </div>
             </div>
             <div class="library-form-group">
+                <label for="library-form-content-kind" data-i18n="modal.content_kind_label">속성</label>
+                <div style="display: flex; gap: 0.5rem;">
+                    <select id="library-form-content-kind" name="content_kind" style="flex: 1;">
+                        <option value="" data-i18n="modal.content_kind_unspecified">미지정</option>
+                    </select>
+                    <button type="button" id="btn-manage-kinds" class="library-kind-btn" data-role="library-manage-kinds" data-i18n="modal.content_kind_manage">속성 관리</button>
+                </div>
+                <small style="display: block; margin-top: 0.25rem; color: var(--app-text-muted);" data-i18n="modal.content_kind_help">만화·도서·잡지처럼 카테고리를 분류하는 값입니다(선택). 연관작품 검색 등 플러그인이 분류 기준으로 사용할 수 있습니다.</small>
+            </div>
+            <div class="library-form-group">
                 <label for="library-form-path" id="library-form-path-label">서버 물리 경로{% if develop_mode %} / 구글 드라이브 공유 링크{% endif %} (엔터로 여러 개 입력 가능{% if develop_mode %}, 혼합 가능{% endif %})</label>
                 <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
                     <textarea id="library-form-path" name="physical_path" required rows="3" maxlength="8192" placeholder="예: C:\library\fantasy&#10;/home/user/manga{% if develop_mode %}&#10;https://drive.google.com/drive/folders/1A2B3C4D5E6F7G8H9I{% endif %}" style="flex: 1;"></textarea>

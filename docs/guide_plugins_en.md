@@ -1028,6 +1028,28 @@ def _count_books(self, db_type):
     return int((row["cnt"] if row else 0) or 0)
 ```
 
+### Reading the category type (`content_kind`, classification criterion)
+
+Each category (library) can carry a **type** assigned by the administrator (manga, book, magazine, ...). Plugins that search or match across categories (e.g. related works) can use it to tell which kind of category a same-titled series belongs to. The core only stores and exposes the value.
+
+- **Storage:** `libraries.content_kind` (code string, default `'unspecified'`) and the type list `library_kinds(code, name, is_builtin, sort_order)`, one per session DB.
+- **HTTP:** `libraries[].content_kind` / `content_kind_name` and the top-level `kinds` in the `GET /api/media/libraries` response.
+- **Code contract (additive only):**
+  - The built-in codes `manga`, `novel`, `book` and `magazine` are never deleted from the general/adult DBs and their meaning is fixed (display names can be renamed by the admin, so decide by **code**, not by name).
+  - Codes added by an administrator only have meaning on that installation. **Treat unknown codes as opaque strings** (only identical codes are "the same kind"), and treat `unspecified` or an empty value as not classified.
+  - Some DBs (audiobook/video) have no built-in kinds and some categories are unclassified, so never fail when the type is missing; use it for classification only when it is set.
+
+```python
+def _library_kinds(self, db_type):
+    gateway = self.get_db_gateway(db_type)
+    rows = gateway.fetch_all("SELECT id, content_kind FROM libraries") or []
+    return {row["id"]: row["content_kind"] for row in rows}
+
+# keep only the same-titled candidates that belong to a manga category
+kinds = self._library_kinds(db_type)
+manga_candidates = [c for c in candidates if kinds.get(c["library_id"]) == "manga"]
+```
+
 ### Plugin Cache (Redis, Recommended)
 
 To avoid re-calling an external API on every request, plugins can reuse the Redis instance

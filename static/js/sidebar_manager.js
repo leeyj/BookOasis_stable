@@ -1,5 +1,6 @@
 // sidebar_manager.js – 모바일/데스크톱 사이드바 토글 및 상태 유지 관리
 let lastToggleTime = 0;
+let mobileNavigationToken = 0;
 const MOBILE_BREAKPOINT = 1200;
 
 function isMobileLayout() {
@@ -88,6 +89,29 @@ export function toggleSidebarMenu() {
 export function closeSidebarMenuForMobile() {
   if (!isMobileLayout()) return;
   setSidebarMenuOpen(false);
+}
+
+// 모바일에서 메뉴 항목을 누르면 데이터 조회나 기존 목록 정리보다 먼저 메뉴를 닫는다.
+// category/index.js의 동적 메뉴 delegation은 캡처 단계에서 이벤트 전파를 중단하므로 위의
+// sidebar 버블 리스너(initSidebarAutoClose)가 실행되지 않고, 홈/기록 이동은 selectCategory()가
+// 진행률 저장을 await한 뒤에야 끝의 닫기 이벤트에 도달한다. 또 같은 이벤트 작업 안에서 바로
+// 무거운 화면 전환을 시작하면 메뉴 닫힘이 다음 페인트까지 보이지 않아 메뉴가 멈춘 것처럼
+// 느껴진다. 한 프레임을 양보한 뒤 가장 최근 이동 요청만 실행한다(연속 탭 시 앞선 요청은 취소).
+export function runAfterMobileSidebarClose(callback) {
+  if (typeof callback !== 'function') return;
+  if (!isMobileLayout()) {
+    callback();
+    return;
+  }
+
+  const token = ++mobileNavigationToken;
+  closeSidebarMenuForMobile();
+  window.requestAnimationFrame(() => {
+    window.setTimeout(() => {
+      if (token !== mobileNavigationToken) return;
+      callback();
+    }, 0);
+  });
 }
 
 export function syncSidebarMenuState() {

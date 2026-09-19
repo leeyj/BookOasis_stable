@@ -85,8 +85,10 @@ def _run_db_self_recovery(db_type):
         print(f"[Scanner-SelfHealing ERROR] Auto recovery failed: {rec_err}")
 
 @scanner_print_control_decorator
-def scan_library(db_path, library_id, physical_path, force=False, skip_vfs_refresh=False):
-    """Scan library path and sync DB with file system (force full reindex if force=True)"""
+def scan_library(db_path, library_id, physical_path, force=False, skip_vfs_refresh=False, progress_callback=None):
+    """Scan library path and sync DB with file system (force full reindex if force=True).
+
+    progress_callback(phase, **details): 스캔 활동창용 진행 알림(utils/library_scan_progress.py). 선택 사항."""
     print(f"🚀🚀🚀 [ScannerEngine] Core scan_library EXECUTING! DB Path={db_path}, Library ID={library_id}, Path='{physical_path}', Force={force}")
     
     library_errors = []
@@ -195,7 +197,7 @@ def scan_library(db_path, library_id, physical_path, force=False, skip_vfs_refre
 
     conn = database.get_connection(db_type)
     try:
-        _scan_library_internal(conn, db_path, library_id, physical_path, force, db_type, target_paths, is_remote, threads_to_use, library_errors)
+        _scan_library_internal(conn, db_path, library_id, physical_path, force, db_type, target_paths, is_remote, threads_to_use, library_errors, progress_callback=progress_callback)
     finally:
         try:
             conn.close()

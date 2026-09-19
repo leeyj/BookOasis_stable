@@ -2,6 +2,7 @@
 
 import { loadLibraries, toggleCategoryOrderPin, bindDragAndDropEvents, saveNewOrder } from './category/index.js';
 import { currentTargetLibrary, setCurrentTargetLibrary, bindSidebarContextMenu, showContextMenu } from './category/context_menu.js';
+import './category/kind_manager.js';
 import {
   triggerAddLibrary,
   triggerEditLibrary,

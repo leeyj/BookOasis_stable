@@ -9,6 +9,7 @@ let lastIsHeaderScanning = false;
 let scanLatchTimerMap = new Map();
 let latestSystemStatus = null;
 let refreshStatusPoll = null;
+let seenRecentBatchScanIds = null;
 
 export function refreshSystemStatus() {
   return refreshStatusPoll ? refreshStatusPoll() : Promise.resolve();
@@ -185,7 +186,7 @@ function applyCategoryScanSpinnersState() {
   });
 }
 
-function updateCategoryScanSpinners(data) {
+function updateCategoryScanSpinners(data, scanRefresh = {}) {
   const now = Date.now();
   const currentActiveLibIds = new Set();
   let isGlobalOrCurrentLibScanning = false;
@@ -232,6 +233,18 @@ function updateCategoryScanSpinners(data) {
   } else {
     if (wasScanningPrevious) {
       wasScanningPrevious = false;
+      // 스캔이 끝난 라이브러리의 상세 화면이 열려 있으면 그 상세도 함께 갱신한다
+      // (아래에서 scanLatchTimerMap을 비우기 전의 활성 목록으로 판단해야 한다).
+      const detailView = document.getElementById('book-detail-view');
+      const detailLibraryKey = `${state.currentLibraryType}:${state.detailLibraryId}`;
+      const shouldRefreshDetail = Boolean(
+        !scanRefresh.detailRefreshed
+        && detailView
+        && detailView.style.display !== 'none'
+        && state.detailSeriesName
+        && state.detailBookIds?.length
+        && (lastActiveLibIds.has(detailLibraryKey) || lastIsHeaderScanning)
+      );
       scanLatchTimerMap.clear();
       console.log('[ScanSpinner] 🏁 백그라운드 스캔 완수. 리스트 자동 갱신');
       if (state.currentLibraryId === 'home') {
@@ -239,7 +252,22 @@ function updateCategoryScanSpinners(data) {
       } else if (state.currentLibraryId === 'history') {
         if (typeof window.loadReadingHistory === 'function') window.loadReadingHistory();
       } else if (state.currentLibraryId !== 'settings') {
-        if (typeof window.loadBooksList === 'function') window.loadBooksList(false);
+        if (scanRefresh.listInvalidated) {
+          // 같은 폴링에서 완료된 도서 스캔이 이미 이 목록을 무효화했다 - 이중 갱신하지 않는다.
+        } else if (typeof window.invalidateBookListAfterScan === 'function') {
+          window.invalidateBookListAfterScan();
+        } else if (typeof window.loadBooksList === 'function') {
+          window.loadBooksList(false);
+        }
+      }
+      if (shouldRefreshDetail && typeof window.openBookDetail === 'function') {
+        window.openBookDetail(
+          null,
+          state.detailSeriesName,
+          state.detailLibraryId,
+          state.detailRepresentativeBookId,
+          state.detailDisplayTitle
+        );
       }
     }
   }
@@ -260,6 +288,78 @@ function updateCategoryScanSpinners(data) {
   applyCategoryScanSpinnersState();
 }
 
+function isRecentlyFinishedScan(task) {
+  const finishedAt = parseServerDateTime(task?.finished_at);
+  if (!finishedAt) return false;
+  const age = Date.now() - finishedAt.getTime();
+  return age >= -60000 && age <= 120000;
+}
+
+// 2초 폴링 사이에 끝나 is_active 전환을 못 본 빠른 도서 스캔(단일/시리즈 즉시 스캔)도
+// 서버가 내려주는 recent_book_scans로 감지해서 현재 목록과 열려 있는 상세를 갱신한다.
+function refreshDetailAfterBookScan(data) {
+  const none = { listInvalidated: false, detailRefreshed: false };
+  const recentScans = (Array.isArray(data?.raw_status?.recent_book_scans)
+    ? data.raw_status.recent_book_scans
+    : []).filter(task => task?.type === 'batch_book_scan');
+  const currentIds = new Set(recentScans.map(task => String(task.id ?? task.key ?? '')));
+
+  const isInitialStatus = seenRecentBatchScanIds === null;
+  const newlyFinished = recentScans.filter(task =>
+    ['completed', 'failed', 'cancelled'].includes(task?.status)
+    && (isInitialStatus
+      ? isRecentlyFinishedScan(task)
+      : !seenRecentBatchScanIds.has(String(task.id ?? task.key ?? '')))
+  );
+  seenRecentBatchScanIds = currentIds;
+  if (!newlyFinished.length) return none;
+
+  const currentType = String(state.currentLibraryType || 'general');
+  const currentLibraryId = String(state.currentLibraryId || '');
+  const affectsList = newlyFinished.some(task => {
+    const kwargs = task.kwargs || {};
+    const taskLibraryId = kwargs.library_id;
+    return String(kwargs.db_type || 'general') === currentType
+      && (
+        taskLibraryId == null
+        || currentLibraryId === 'all'
+        || currentLibraryId === 'favorite'
+        || String(taskLibraryId) === currentLibraryId
+      );
+  });
+  let listInvalidated = false;
+  if (affectsList && typeof window.invalidateBookListAfterScan === 'function') {
+    window.invalidateBookListAfterScan();
+    listInvalidated = true;
+  }
+
+  const detailView = document.getElementById('book-detail-view');
+  if (typeof window.openBookDetail !== 'function'
+      || !detailView || detailView.style.display === 'none'
+      || !state.detailBookIds?.length) {
+    return { listInvalidated, detailRefreshed: false };
+  }
+
+  const detailBookIds = new Set(state.detailBookIds.map(id => String(id)));
+  const affectsDetail = newlyFinished.some(task => {
+    const kwargs = task.kwargs || {};
+    if (String(kwargs.db_type || 'general') !== currentType) return false;
+    const scannedIds = Array.isArray(kwargs.book_ids) ? kwargs.book_ids : [];
+    return scannedIds.some(id => detailBookIds.has(String(id)));
+  });
+  if (!affectsDetail) return { listInvalidated, detailRefreshed: false };
+
+  console.log('[ScanDetailRefresh] 도서 스캔 완료로 열린 상세 페이지를 갱신합니다.');
+  window.openBookDetail(
+    null,
+    state.detailSeriesName,
+    state.detailLibraryId,
+    state.detailRepresentativeBookId,
+    state.detailDisplayTitle
+  );
+  return { listInvalidated, detailRefreshed: true };
+}
+
 window.addEventListener('library:categories-rendered', () => {
   applyCategoryScanSpinnersState();
 });
@@ -271,7 +371,8 @@ export function startSystemStatusPolling() {
     try {
       const res = await fetch(`/api/system/status?type=${state.currentLibraryType}`);
       const data = await res.json();
-      updateCategoryScanSpinners(data);
+      const scanRefresh = refreshDetailAfterBookScan(data);
+      updateCategoryScanSpinners(data, scanRefresh);
       renderScanActivity(data);
     } catch (err) {
       console.error('[ScanSpinner] 상태 조회 실패:', err);

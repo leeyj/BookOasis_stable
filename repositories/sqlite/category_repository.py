@@ -103,6 +103,69 @@ class CategoryRepository:
             conn.close()
 
     @staticmethod
+    def get_library_kinds(db_type):
+        with database.connection(db_type) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT code, name, is_builtin, sort_order FROM library_kinds ORDER BY sort_order ASC, name ASC")
+            rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+
+    @staticmethod
+    def add_library_kind(db_type, code, name):
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "INSERT INTO library_kinds (code, name, is_builtin, sort_order) VALUES (?, ?, 0, COALESCE((SELECT MAX(sort_order) + 1 FROM library_kinds), 0))",
+                (code, name)
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    @staticmethod
+    def edit_library_kind(db_type, code, name):
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("UPDATE library_kinds SET name = ? WHERE code = ?", (name, code))
+            if cursor.rowcount == 0:
+                raise ValueError('속성을 찾을 수 없습니다.')
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    @staticmethod
+    def delete_library_kind(db_type, code):
+        """기본 속성이나 사용 중인 속성은 삭제하지 않는다(사용 중이면 몇 개 카테고리가 쓰는지 알려 준다)."""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT is_builtin FROM library_kinds WHERE code = ?", (code,))
+            row = cursor.fetchone()
+            if not row:
+                raise ValueError('속성을 찾을 수 없습니다.')
+            if int(row['is_builtin'] or 0) == 1:
+                raise ValueError('기본 속성은 삭제할 수 없습니다. 이름만 바꿀 수 있습니다.')
+            cursor.execute("SELECT COUNT(*) AS used FROM libraries WHERE content_kind = ?", (code,))
+            used = int(cursor.fetchone()['used'] or 0)
+            if used > 0:
+                raise ValueError(f'{used}개 카테고리가 이 속성을 사용 중이라 삭제할 수 없습니다.')
+            cursor.execute("DELETE FROM library_kinds WHERE code = ?", (code,))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    @staticmethod
     def get_plugin_group_assignments(db_type):
         with database.connection(db_type) as conn:
             cursor = conn.cursor()
@@ -173,17 +236,17 @@ class CategoryRepository:
             conn.close()
 
     @staticmethod
-    def add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id=None, gdrive_copy_remote=None, gdrive_view_local_mirror_path=None, cover_aspect_ratio='4:3', hide_title=0):
+    def add_library(db_type, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id=None, gdrive_copy_remote=None, gdrive_view_local_mirror_path=None, cover_aspect_ratio='4:3', hide_title=0, content_kind='unspecified'):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
             cursor.execute(
                 """
                 INSERT INTO libraries
-                (name, physical_path, scan_status, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_view_local_mirror_path, cover_aspect_ratio, hide_title)
-                VALUES (?, ?, 'ready', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (name, physical_path, scan_status, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_view_local_mirror_path, cover_aspect_ratio, hide_title, content_kind)
+                VALUES (?, ?, 'ready', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_view_local_mirror_path, cover_aspect_ratio, hide_title)
+                (name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_view_local_mirror_path, cover_aspect_ratio, hide_title, content_kind)
             )
             lib_id = cursor.lastrowid
             conn.commit()
@@ -195,17 +258,18 @@ class CategoryRepository:
             conn.close()
 
     @staticmethod
-    def edit_library(db_type, library_id, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id=None, gdrive_copy_remote=None, gdrive_view_local_mirror_path=None, cover_aspect_ratio='4:3', hide_title=0):
+    def edit_library(db_type, library_id, name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id=None, gdrive_copy_remote=None, gdrive_view_local_mirror_path=None, cover_aspect_ratio='4:3', hide_title=0, content_kind=None):
+        """content_kind=None이면 기존 속성을 유지한다(인자를 생략한 호출이 값을 지우지 않도록)."""
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
             cursor.execute(
                 """
                 UPDATE libraries
-                SET name = ?, physical_path = ?, is_remote = ?, rclone_rc_url = ?, icon = ?, color = ?, hide_cover = ?, group_id = ?, gdrive_copy_remote = ?, gdrive_view_local_mirror_path = ?, cover_aspect_ratio = ?, hide_title = ?
+                SET name = ?, physical_path = ?, is_remote = ?, rclone_rc_url = ?, icon = ?, color = ?, hide_cover = ?, group_id = ?, gdrive_copy_remote = ?, gdrive_view_local_mirror_path = ?, cover_aspect_ratio = ?, hide_title = ?, content_kind = COALESCE(?, content_kind)
                 WHERE id = ?
                 """,
-                (name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_view_local_mirror_path, cover_aspect_ratio, hide_title, library_id)
+                (name, physical_path, is_remote, rclone_rc_url, icon, color, hide_cover, group_id, gdrive_copy_remote, gdrive_view_local_mirror_path, cover_aspect_ratio, hide_title, content_kind, library_id)
             )
             conn.commit()
         except Exception as e:

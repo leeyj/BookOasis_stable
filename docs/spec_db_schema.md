@@ -28,42 +28,43 @@ BookOasis는 **SQLite(기본값)** 와 **MariaDB/MySQL(엔터프라이즈 권장
 
 ## 2. 공통 테이블 목록
 
-두 엔진·3개 DB 공통 테이블 (총 23개):
+두 엔진·3개 DB 공통 테이블 (총 24개):
 
 **도서/라이브러리 핵심**
 1. `library_groups`
-2. `libraries`
-3. `books`
-4. `book_offsets`
-5. `series_summary`
-6. `series_summary_state`
+2. `library_kinds`
+3. `libraries`
+4. `books`
+5. `book_offsets`
+6. `series_summary`
+7. `series_summary_state`
 
 **오디오북**
-7. `audiobooks`
-8. `audiobook_tracks`
-9. `audiobook_progress`
-10. `audiobook_track_progress`
+8. `audiobooks`
+9. `audiobook_tracks`
+10. `audiobook_progress`
+11. `audiobook_track_progress`
 
 **사용자/진행률**
-11. `users`
-12. `user_progress`
-13. `user_reading_log`
-14. `user_favorites`
-15. `user_category_permissions`
+12. `users`
+13. `user_progress`
+14. `user_reading_log`
+15. `user_favorites`
+16. `user_category_permissions`
 
 **컬렉션**
-16. `collections`
-17. `collection_items`
+17. `collections`
+18. `collection_items`
 
 **스캐너/운영**
-18. `scanner_tasks`
-19. `scan_history`
-20. `scanner_progress`
-21. `folder_mtimes`
+19. `scanner_tasks`
+20. `scan_history`
+21. `scanner_progress`
+22. `folder_mtimes`
 
 **설정/플러그인**
-22. `settings`
-23. `plugin_load_events`
+23. `settings`
+24. `plugin_load_events`
 
 ---
 
@@ -76,14 +77,23 @@ BookOasis는 **SQLite(기본값)** 와 **MariaDB/MySQL(엔터프라이즈 권장
 - PK: `id`
 - 컬럼: `name`, `icon`, `color`, `sort_order`
 
+### library_kinds
+
+카테고리 속성(만화/도서/잡지 등)의 종류 목록. 세션(DB)마다 하나이며 관리자가 정의한다.
+
+- PK: `code` (소문자 slug, `^[a-z][a-z0-9_-]{0,23}$`, 만든 뒤 변경 불가)
+- 컬럼: `name`(표시 이름, UNIQUE, 25자 이내), `is_builtin`, `sort_order`
+- 기본 종류 4개(`manga`/`novel`/`book`/`magazine`)는 일반·성인 DB에만 시딩되며(`is_builtin=1`) 이름만 변경할 수 있고 삭제할 수 없다. 오디오북·영상 DB는 빈 목록으로 시작한다.
+
 ### libraries
 
 라이브러리 루트 및 스캔 설정.
 
 - PK: `id`
 - 주요 FK: `group_id -> library_groups.id`
-- 컬럼: `name`, `physical_path`, `cron_schedule`, `last_scanned_at`, `scan_status`, `is_remote`, `vfs_refresh_before_scan`, `rclone_rc_url`, `icon`, `color`, `hide_cover`, `hide_title`, `cover_aspect_ratio`, `group_id`, `sort_order`
+- 컬럼: `name`, `physical_path`, `cron_schedule`, `last_scanned_at`, `scan_status`, `is_remote`, `vfs_refresh_before_scan`, `rclone_rc_url`, `icon`, `color`, `hide_cover`, `hide_title`, `cover_aspect_ratio`, `content_kind`, `group_id`, `sort_order`
 - `hide_cover`: 카테고리 단위로 대표/목록 커버 렌더링을 숨길지 여부를 저장 (`INTEGER DEFAULT 0`)
+- `content_kind`: 카테고리 속성 코드(`library_kinds.code`, 논리 참조). 기본값 `'unspecified'`(미지정). 플러그인이 분류 기준(예: 연관작품 검색에서 만화/도서 구분)으로 읽을 수 있다 (`TEXT NOT NULL DEFAULT 'unspecified'`, MariaDB는 `VARCHAR(24)`)
 - `hide_title`: 카테고리 단위로 그리드 카드의 제목 텍스트를 숨기고 썸네일만 표시할지 여부 (넷플릭스 스타일). 일반/성인 도서 세션에서만 UI 노출 (`INTEGER DEFAULT 0`)
 - `cover_aspect_ratio`: 카테고리 단위 그리드 카드 커버 화면비율. `'4:3'`(기본) 또는 `'16:9'`만 허용 (`TEXT DEFAULT '4:3'`)
 - 참고: 운영 DB에는 과거 마이그레이션 잔여 컬럼이 남아 있을 수 있음
@@ -304,6 +314,13 @@ CREATE TABLE IF NOT EXISTS library_groups (
     sort_order INTEGER DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS library_kinds (
+    code TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    is_builtin INTEGER NOT NULL DEFAULT 0,
+    sort_order INTEGER DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS libraries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
@@ -318,7 +335,8 @@ CREATE TABLE IF NOT EXISTS libraries (
     color TEXT DEFAULT '#94a3b8',
     hide_cover INTEGER DEFAULT 0,
     group_id INTEGER DEFAULT NULL,
-    sort_order INTEGER DEFAULT 0
+    sort_order INTEGER DEFAULT 0,
+    content_kind TEXT NOT NULL DEFAULT 'unspecified'
 );
 
 CREATE TABLE IF NOT EXISTS scanner_tasks (
@@ -619,6 +637,13 @@ CREATE TABLE IF NOT EXISTS library_groups (
     sort_order INT DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
+CREATE TABLE IF NOT EXISTS library_kinds (
+    code VARCHAR(24) PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    is_builtin TINYINT(1) NOT NULL DEFAULT 0,
+    sort_order INT DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
 CREATE TABLE IF NOT EXISTS libraries (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL UNIQUE,
@@ -634,6 +659,7 @@ CREATE TABLE IF NOT EXISTS libraries (
     hide_cover INT DEFAULT 0,
     group_id BIGINT DEFAULT NULL,
     sort_order INT DEFAULT 0,
+    content_kind VARCHAR(24) NOT NULL DEFAULT 'unspecified',
     INDEX idx_libraries_group_id (group_id),
     INDEX idx_libraries_group_order (group_id, sort_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

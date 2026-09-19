@@ -25,6 +25,8 @@ import { openMetadataSearchModal, closeMetadataSearchModal, performMetadataSearc
 // book_list.js 임포트
 import {
   loadBooksList,
+  invalidateBookListAfterScan,
+  refreshBooksListIfStale,
   loadReadingHistory,
   filterBooks,
   toggleLibrarySort,
@@ -41,7 +43,7 @@ import { switchSettingsTab, loadInitialSystemSettings, loadGeneralSettings, subm
 
 // 장르/태그 및 사이드바 제어 모듈
 import { initFloatingFilter, toggleFilterModal } from './genre_tag_filter.js';
-import { initSidebarInteractions, restoreDesktopSidebarState, toggleDesktopSidebar, syncSidebarResponsiveControls } from './sidebar_manager.js';
+import { initSidebarInteractions, restoreDesktopSidebarState, toggleDesktopSidebar, syncSidebarResponsiveControls, runAfterMobileSidebarClose } from './sidebar_manager.js';
 import { decodeDetailParams } from './url_obfuscator.js';
 
 // 모듈화로 분리한 미디어 타입 토글 및 검색 단축키 제어부 임포트
@@ -77,10 +79,11 @@ function initLibraryShellDelegation() {
 
     const role = target.getAttribute('data-role');
     if (role === 'mobile-brand-home') {
-      return selectCategory('home');
+      return runAfterMobileSidebarClose(() => selectCategory('home'));
     }
     if (role === 'sidebar-category-static') {
-      return selectCategory(target.getAttribute('data-category-id') || 'home');
+      const categoryId = target.getAttribute('data-category-id') || 'home';
+      return runAfterMobileSidebarClose(() => selectCategory(categoryId));
     }
     if (role === 'desktop-sidebar-toggle') {
       return toggleDesktopSidebar();
@@ -868,6 +871,9 @@ export async function selectCategory(id, skipHistory = false, options = {}) {
 window.selectCategory = selectCategory;
 window.switchLibraryType = switchLibraryType;
 window.filterBooks = filterBooks;
+// 스캔 완료(scan_activity_status.js)와 상세→목록 복귀(detail/index.js)에서 호출하는 목록 갱신 훅
+window.invalidateBookListAfterScan = invalidateBookListAfterScan;
+window.refreshBooksListIfStale = refreshBooksListIfStale;
 window.openReader = openReader;
 window.openBookDetail = openBookDetail;
 window.goBackToList = goBackToList;

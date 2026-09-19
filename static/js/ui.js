@@ -7,6 +7,10 @@ import { buildFallbackCoverUrl, getBookCoverSrc, buildTextCoverDataUri, coverAli
 import { stripLeadingBracketTags, middleTruncateTitle } from './series_display.js';
 import { initGridPruning, resetGridPruning, notifyCardsAppended, notifyCardsPrepended } from './grid_pruning.js';
 import { clearBookSelection, syncBookSelectionCard } from './book_selection.js';
+import {
+  readNextFavoriteStatus, applyFavoriteState, snapshotFavoriteState, restoreFavoriteState,
+  isFavoritePending, setFavoritePending,
+} from './favorite_toggle.js';
 import './scan_activity_status.js';
 import './account_menu.js';
 import './category_info_popover.js';
@@ -436,7 +440,8 @@ export function createBookCard(item, options = {}) {
     favBtn._onClick = (e) => {
       e.stopPropagation();
       e.preventDefault();
-      const nextStatus = Number.parseInt(favBtn.getAttribute('data-next-status') || '0', 10) || 0;
+      // 저장된 data-next-status가 아니라 지금 별 상태에서 계산한다(성공 후 속성이 낡아 해제가 안 되던 문제).
+      const nextStatus = readNextFavoriteStatus(favBtn);
       const bookIdRaw = favBtn.getAttribute('data-book-id') || '';
       const parsedBookId = Number.parseInt(bookIdRaw, 10);
       const bookId = Number.isFinite(parsedBookId) ? parsedBookId : null;
@@ -733,39 +738,39 @@ window.toggleCardFavoriteEvent = async (event, name, bookId, nextStatus, authorK
   // 실제 리스너가 붙은 document를 계속 가리킨다(document는 truthy라 예전엔 fallback으로
   // 못 내려가 btn=document가 되고 document.classList가 undefined라 에러가 났었음).
   // 따라서 실제 버튼 엘리먼트는 항상 target.closest로 찾아야 한다.
-  const btn = event.target && event.target.closest ? event.target.closest('.btn-card-fav-toggle') : null;
-  let originalClass = '';
-  let originalActive = false;
+  const btn = event && event.target && event.target.closest ? event.target.closest('.btn-card-fav-toggle') : null;
+  // 요청이 끝나기 전 재클릭은 무시한다(엇갈린 요청 방지).
+  if (btn && isFavoritePending(btn)) return;
+  const requestedStatus = Number(nextStatus) === 1 ? 1 : 0;
+  let snapshot = null;
   if (btn) {
-    originalActive = btn.classList.contains('active');
-    const icon = btn.querySelector('i');
-    if (icon) {
-      originalClass = icon.className;
-      if (nextStatus === 1) {
-        btn.classList.add('active');
-        icon.className = 'fa-solid fa-star';
-      } else {
-        btn.classList.remove('active');
-        icon.className = 'fa-regular fa-star';
-      }
-    }
+    snapshot = snapshotFavoriteState(btn);
+    setFavoritePending(btn, true);
+    applyFavoriteState(btn, requestedStatus === 1);
   }
 
   let res;
-  if (authorKey) {
-    console.log(`[Favorite-Action] window.toggleAuthorFavoriteAction 호출 (authorKey="${authorKey}", status=${nextStatus})`);
-    res = await window.toggleAuthorFavoriteAction(authorKey, nextStatus);
-  } else if (bookId && state.currentLibraryId === 'history') {
-    console.log(`[Favorite-Action] window.toggleFavoriteAction 호출 (bookId=${bookId}, status=${nextStatus})`);
-    res = await window.toggleFavoriteAction(bookId, nextStatus);
-  } else {
-    console.log(`[Favorite-Action] window.toggleSeriesFavoriteAction 호출 (name="${name}", status=${nextStatus})`);
-    res = await window.toggleSeriesFavoriteAction(name, nextStatus);
+  try {
+    if (authorKey) {
+      console.log(`[Favorite-Action] window.toggleAuthorFavoriteAction 호출 (authorKey="${authorKey}", status=${requestedStatus})`);
+      res = await window.toggleAuthorFavoriteAction(authorKey, requestedStatus);
+    } else if (bookId && state.currentLibraryId === 'history') {
+      console.log(`[Favorite-Action] window.toggleFavoriteAction 호출 (bookId=${bookId}, status=${requestedStatus})`);
+      res = await window.toggleFavoriteAction(bookId, requestedStatus);
+    } else {
+      console.log(`[Favorite-Action] window.toggleSeriesFavoriteAction 호출 (name="${name}", status=${requestedStatus})`);
+      res = await window.toggleSeriesFavoriteAction(name, requestedStatus);
+    }
+  } catch (error) {
+    // 네트워크 오류나 JSON이 아닌 응답이면 API 래퍼가 예외를 던진다 - 실패로 처리해 화면을 되돌린다.
+    console.error('[Favorite-Action] 즐겨찾기 요청 실패:', error);
+    res = { success: false };
   }
+  if (btn) setFavoritePending(btn, false);
   console.log(`[Favorite-Action] 토글 API 응답 결과:`, res);
 
   if (res && res.success) {
-    const statusText = nextStatus === 1 ? '등록' : '해제';
+    const statusText = requestedStatus === 1 ? '등록' : '해제';
     showToast(`"${name}" 즐겨찾기가 ${statusText}되었습니다.`, 'success');
 
     if (state.currentLibraryId === 'home') {
@@ -777,12 +782,7 @@ window.toggleCardFavoriteEvent = async (event, name, bookId, nextStatus, authorK
     }
   } else {
     // 실패 시 UI 복원
-    if (btn) {
-      if (originalActive) btn.classList.add('active');
-      else btn.classList.remove('active');
-      const icon = btn.querySelector('i');
-      if (icon) icon.className = originalClass;
-    }
+    if (btn && snapshot) restoreFavoriteState(btn, snapshot);
     showToast('즐겨찾기 업데이트에 실패했습니다.', 'error');
   }
 };

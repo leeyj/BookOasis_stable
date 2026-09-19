@@ -199,6 +199,22 @@ export async function assignPluginGroups(items, type) {
   return res.json();
 }
 
+// 카테고리 속성(만화/도서/잡지 등) 종류 관리 (관리자 전용)
+export async function addLibraryKind(formData) {
+  const res = await safeFetch('/api/media/library-kinds/add', {method: 'POST', body: formData});
+  return res.json();
+}
+
+export async function editLibraryKind(formData) {
+  const res = await safeFetch('/api/media/library-kinds/edit', {method: 'POST', body: formData});
+  return res.json();
+}
+
+export async function deleteLibraryKind(formData) {
+  const res = await safeFetch('/api/media/library-kinds/delete', {method: 'POST', body: formData});
+  return res.json();
+}
+
 export async function addLibraryGroup(formData) {
   const res = await safeFetch('/api/media/library-groups/add', {method: 'POST', body: formData});
   return res.json();
@@ -292,11 +308,12 @@ export async function scanSingleBook(type, bookId) {
   return res.json();
 }
 
-export async function enqueueBatchBookScan(type, bookIds) {
+// scope: 'book'(넘긴 ID 그대로) | 'series'(각 ID가 속한 시리즈의 모든 권으로 서버가 확장)
+export async function enqueueBatchBookScan(type, bookIds, { scope = 'book' } = {}) {
   const res = await fetch('/api/media/books/scan-batch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type, book_ids: bookIds })
+    body: JSON.stringify({ type, book_ids: bookIds, scope })
   });
   return res.json();
 }

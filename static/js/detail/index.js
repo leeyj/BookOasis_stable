@@ -74,6 +74,7 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
       state.detailSeriesName = safeSeriesName;
       state.detailLibraryId = actualLibraryId;
       state.detailRepresentativeBookId = representativeBookId || (books.length > 0 ? books[0].id : null);
+      state.detailBookIds = books.map(book => Number(book.id)).filter(Number.isFinite);
       state.detailDisplayTitle = safeDisplayTitle;
       state.detailMeta = meta;
       updateCurrentCategoryIndicator(actualLibraryId);
@@ -538,6 +539,11 @@ export function goBackToList(triggerBack = true) {
     } catch (e) {
       console.warn('[goBackToList] failed to restore scroll', e);
     }
+  }
+
+  // 상세를 보는 동안 스캔이 끝났다면 그사이 무효화된 목록만 지금 다시 불러온다.
+  if (state.currentLibraryId !== 'home' && typeof window.refreshBooksListIfStale === 'function') {
+    window.refreshBooksListIfStale();
   }
 
   // 상세 뷰 해시(#detail)가 남아있는 경우 브라우저 외부/홈으로 튕김(history.back) 없이 해시만 안전하게 제거

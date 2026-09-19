@@ -295,6 +295,11 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
     # DB가 현재 최적화(VACUUM 등) 튜닝 진행 중인 경우, 완료될 때까지 안전하게 대기
     from services.db_tuning_service import is_db_tuning
     import time
+    from utils.library_scan_progress import ThrottledStageReporter
+
+    # 스캔 활동창에 "폴더 탐색 중 · N개 방문" → "도서 파일 done/total (P%)"를 2초 간격으로 보여준다.
+    scan_task_key = f'library_scan_{db_type}_{library_id}'
+    scan_progress_reporter = ThrottledStageReporter(lambda text: _update_task_stage(scan_task_key, text))
 
     def is_connection_refused_error(err):
         reason = getattr(err, 'reason', err)
@@ -572,8 +577,8 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
     except Exception as db_err:
         print(f"[Scanner-Trigger] VFS 옵션 DB 조회 Error: {db_err}")
     
-    # 큐 세부 진행 단계를 도서 스캔 중으로 기록
-    _update_task_stage(f"library_scan_{db_type}_{library_id}", 'book_scan')
+    # 내부 enum('book_scan') 대신 사용자에게 의미 있는 현재 단계를 먼저 표시한다.
+    scan_progress_reporter('discover', count=0)
 
     try:
         # 로컬(비원격) 경로는 스캔이 매우 빠르게 끝나 flush 타이밍 경합이 발생하기 쉬워
@@ -597,7 +602,13 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
 
         for attempt in range(1, max_scan_attempts + 1):
             try:
-                scan_library(db_path, library_id, physical_path, force=force, skip_vfs_refresh=vfs_refreshed_in_wrapper)
+                # 재시도는 스캔을 처음부터 다시 시작하므로 이전 시도의 진행 표시 상태를 비운다.
+                scan_progress_reporter.reset()
+                scan_library(
+                    db_path, library_id, physical_path, force=force,
+                    skip_vfs_refresh=vfs_refreshed_in_wrapper,
+                    progress_callback=scan_progress_reporter,
+                )
                 break
             except Exception as scan_err:
                 if attempt < max_scan_attempts and is_transient_scan_error(scan_err):
