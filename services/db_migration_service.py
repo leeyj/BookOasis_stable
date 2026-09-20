@@ -714,6 +714,20 @@ def _connect_and_init_schema(db_type, schema):
     try:
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
+        if database.is_mariadb_mode():
+            # 신규 테이블 DDL은 MariaDB 방언의 MARIADB_CENTRAL_SCHEMA에만 정확히 정의돼 있다.
+            # SQLite용 schema는 TEXT PRIMARY KEY 등으로 MariaDB에서 실패하므로(과거엔 조용히
+            # 무시돼 신규 테이블이 누락됨), db_schema_updater를 거치지 않는 시작 경로에서도
+            # 중앙 스키마를 먼저 적용한다.
+            from tools.db_schema_updater import MARIADB_CENTRAL_SCHEMA
+            for stmt in (s.strip() for s in MARIADB_CENTRAL_SCHEMA.split(';')):
+                if not stmt:
+                    continue
+                try:
+                    cursor._cursor.execute(stmt)
+                except Exception as ddl_err:
+                    print(f"[DB-Migration ERROR] '{db_type}' 중앙 스키마 적용 실패: {ddl_err} | {stmt[:80]!r}")
+            conn.commit()
         cursor.executescript(schema)
         conn.commit()
     except Exception as conn_err:

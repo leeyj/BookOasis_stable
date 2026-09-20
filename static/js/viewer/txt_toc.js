@@ -5,6 +5,7 @@ import { getTxtPageMaxScroll, snapTxtPageScrollLeft } from './txt_page_utils.js'
 let overlayVisibilityListenerBound = false;
 let tocEntryRefs = [];
 let activeTocIdx = -1;
+let pinnedTocIdx = -1;
 let isTocPanelOpen = false;
 let activeTocTab = 'toc';
 let bookmarksCache = [];
@@ -94,6 +95,12 @@ function _resolveBestTocIndex(chapterIdx) {
   const target = Number.isFinite(chapterIdx) ? chapterIdx : parseInt(chapterIdx, 10);
   if (!Number.isFinite(target)) return -1;
   if (!Array.isArray(tocEntryRefs) || tocEntryRefs.length === 0) return -1;
+
+  // 0) 같은 스파인 챕터 안에 목차 항목이 여러 개인 경우(예: "제2부" + 하위 "소인들 곁에서" 모두
+  //    page-63.html), 챕터 번호만으로는 첫 항목(부모)만 골라지므로 사용자가 직접 클릭한 항목을 우선한다.
+  if (pinnedTocIdx >= 0 && pinnedTocIdx < tocEntryRefs.length && tocEntryRefs[pinnedTocIdx].chapterIdx === target) {
+    return pinnedTocIdx;
+  }
 
   // 1) Exact chapter index match.
   const exact = tocEntryRefs.findIndex(ref => ref.chapterIdx === target);
@@ -361,8 +368,10 @@ export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
   ul.style.cssText = 'list-style:none; padding:0; margin:0; font-size:0.95rem;';
   tocEntryRefs = [];
   activeTocIdx = -1;
+  pinnedTocIdx = -1;
 
   const buildItem = (title, chapterIdx, anchor, paddingLeft, level = 1) => {
+    const entryIdx = tocEntryRefs.length;
     const li = document.createElement('li');
     li.style.cssText = `padding-left:${paddingLeft}px; margin-bottom:12px; line-height:1.4;`;
     li.dataset.chapterIdx = String(chapterIdx);
@@ -390,6 +399,7 @@ export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
       if (now - lastJumpAt < 250) return;
       lastJumpAt = now;
       const isTopLevelChapter = Number(level || 1) <= 1;
+      pinnedTocIdx = entryIdx;
       _debugToc('toc-item-jump', { chapterIdx, hasAnchor: !!anchor, source });
       onJumpToChapter(chapterIdx, anchor, {
         preferChapterStart: isTopLevelChapter,

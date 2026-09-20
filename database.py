@@ -322,6 +322,11 @@ class MariadbCursorWrapper:
 
         converted = sql
 
+        # 0. SQLite AUTOINCREMENT ➔ MariaDB AUTO_INCREMENT (DDL 전용)
+        if 'AUTOINCREMENT' in converted.upper() and 'CREATE' in clean_sql:
+            import re
+            converted = re.sub(r'\bAUTOINCREMENT\b', 'AUTO_INCREMENT', converted, flags=re.IGNORECASE)
+
         # 1. ? 바인딩 파라미터를 PyMySQL용 %s로 변환
         if '?' in converted:
             converted = converted.replace('?', '%s')
@@ -378,8 +383,18 @@ class MariadbCursorWrapper:
         for stmt in statements:
             try:
                 self.execute(stmt)
-            except Exception:
-                pass
+            except Exception as e:
+                # 이미 존재/방언 차이로 인한 실패는 흔하므로, 테이블이 끝내 생성되지 못한
+                # CREATE TABLE 실패만 원인이 남도록 로그로 알린다.
+                m = re.match(r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?(\w+)`?', stmt, re.IGNORECASE)
+                if m:
+                    try:
+                        self._cursor.execute("SHOW TABLES LIKE %s", (m.group(1),))
+                        exists = bool(self._cursor.fetchall())
+                    except Exception:
+                        exists = False
+                    if not exists:
+                        print(f"[DB ERROR] executescript CREATE TABLE 실패 ({m.group(1)}): {e}")
 
     def fetchone(self):
         row = self._cursor.fetchone()

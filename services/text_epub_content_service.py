@@ -60,6 +60,15 @@ class _EPUBBodyHTMLParser(HTMLParser):
                     self.output.append(f'<{tag_lower} id="{safe_id}">')
                 else:
                     self.output.append(f'<{tag_lower}>')
+        elif self.recording:
+            # 허용되지 않는 태그(<a id="..."></a>, <span id>, <section id> 등)는 태그 자체는 버리되,
+            # 목차(NCX/nav)가 가리키는 앵커 id는 보존해야 하위 목차 항목이 정확한 위치로 이동한다.
+            # 빈 <a id="p26_t1"></a> 로 위치만 표시하는 EPUB이 흔해서, 이게 유실되면 하위 항목 클릭이
+            # 앵커를 못 찾고 챕터 시작으로만 이동한다.
+            attrs_dict = dict(attrs)
+            anchor_id = attrs_dict.get('id') or (attrs_dict.get('name') if tag_lower == 'a' else None)
+            if anchor_id:
+                self.output.append(f'<span id="{html.escape(str(anchor_id), quote=True)}"></span>')
 
     def handle_endtag(self, tag):
         tag_lower = tag.lower()
@@ -379,7 +388,8 @@ class TextEpubContentService:
 
     @staticmethod
     def _chapter_cache_key(db_type, book_id, chapter_idx):
-        return f"cache:epub:ch:book:{db_type}:{book_id}:{chapter_idx}" if book_id else None
+        # v2: 비허용 태그(<a id>)의 앵커 id를 보존하도록 바뀌어, 예전 캐시(앵커 유실본)를 재사용하지 않도록 버전을 올림
+        return f"cache:epub:ch:book:v2:{db_type}:{book_id}:{chapter_idx}" if book_id else None
 
     @staticmethod
     def _get_cached_chapter(db_type, book_id, chapter_idx):

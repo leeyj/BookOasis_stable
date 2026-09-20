@@ -1,4 +1,10 @@
 # CHANGELOG
+## v2.7.4
+- (fix) MariaDB에서 신규 테이블(`library_kinds`, `mcp_pending_changes`)이 생성되지 않아 사이드바 라이브러리/카테고리가 사라지던 이슈 수정 | fix new tables (`library_kinds`, `mcp_pending_changes`) not being created on MariaDB, which made sidebar libraries/categories disappear
+- (improvement) MariaDB 테이블 생성 실패가 조용히 무시되지 않고 로그에 남도록 개선 | log MariaDB CREATE TABLE failures instead of silently ignoring them
+- (fix) EPUB 목차의 하위 항목(예: "제2부 > 강변에서")이 앵커 없이 챕터 시작으로만 이동하던 이슈 수정 (`<a id>` 앵커 보존) | fix EPUB TOC sub-items still jumping to the chapter start (preserve `<a id>` anchors in chapter HTML)
+- (fix) EPUB 목차에서 하위 항목을 선택해도 상위 항목이 하이라이트되던 이슈 수정 | fix EPUB TOC highlighting the parent item after selecting a sub-item
+
 ## v2.7.3
 - (fix) 시리즈 카드에서 스캔 시 대표 도서 1권만 처리되던 이슈 수정 (시리즈 전체 스캔) | fix series-card scan processing only the representative book (scan the whole series)
 - (fix) 스캔 완료 후 목록/상세 화면이 갱신되지 않던 이슈 수정 | fix library list and detail view not refreshing after a scan completes
@@ -12,6 +18,7 @@
 - (fix) 시리즈 상세 화면에서 검색해도 결과가 보이지 않던 이슈 수정 (검색 결과로 이동, 뒤로가기로 상세 복귀) | fix searching from a series detail view showing no results (now opens results; Back returns to the detail)
 - (fix) 폴더 표지(cover.jpg 등)·배너를 대소문자 구분 없이 찾고(Windows에서 만든 `Cover.JPG` 등), 폴더 목록을 한 번만 읽어 원격 마운트의 파일 확인 호출을 줄임 | find folder covers/banners case-insensitively (e.g. `Cover.JPG` on Linux) and read the folder listing once instead of probing every candidate name
 - (feature) 카테고리 속성(만화/도서/잡지 등) 추가 - 관리자가 종류를 정의하고 카테고리마다 선택 지정, 플러그인이 분류 기준으로 읽을 수 있도록 API/DB로 노출 (기본 종류 4개, 신규 생성 시 입력은 선택) | add category types (manga/book/magazine, ...): admin-defined kinds assignable per category, exposed via API/DB as a classification criterion for plugins (4 built-in kinds; optional when creating a category)
+
 
 ## v2.7.2
 - (fix) 최신 추가순 카테고리 로딩이 느린 이슈 수정 (목록의 has_metadata 계산 제거, `include_has_metadata=1`로 선택 계산) | fix slow category loading on newest-first sort (drop has_metadata from list queries; opt-in via `include_has_metadata=1`)
