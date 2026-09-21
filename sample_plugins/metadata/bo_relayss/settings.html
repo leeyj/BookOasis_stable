@@ -1,9 +1,7 @@
-<!-- Bootstrap Icons CDN -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
 <div class="bo-settings-card">
     <div class="bo-settings-header">
-        <i class="bi bi-gear-fill"></i> bo.relaySS 플러그인 환경설정
+        <i class="fa-solid fa-gear"></i> bo.relaySS 플러그인 환경설정
     </div>
 
     <form id="boRelayssSettingsForm">
@@ -27,7 +25,7 @@
             <div class="bo-input-btn-group">
                 <input type="text" class="bo-field-input bo-token-input" id="relayssSecretToken" readonly placeholder="[생성] 버튼을 눌러 토큰을 발급받으세요.">
                 <button class="bo-btn bo-btn-gen" type="button" id="btnGenerateToken">
-                    <i class="bi bi-arrow-repeat"></i> 생성
+                    <i class="fa-solid fa-arrows-rotate"></i> 생성
                 </button>
             </div>
             <div class="bo-field-help">사용자 식별코드 및 도메인 주소 입력 후 [생성] 버튼을 누르면 32자리 인증 토큰이 생성됩니다.</div>
@@ -36,10 +34,10 @@
         <!-- 4) bo.relaySS 접속 테스트 & 상태 표시 -->
         <div class="bo-settings-footer">
             <button type="button" class="bo-btn bo-btn-test" id="btnTestConnection">
-                <i class="bi bi-plug-fill"></i> bo.relaySS 접속 테스트
+                <i class="fa-solid fa-plug"></i> bo.relaySS 접속 테스트
             </button>
             <div id="connectionStatusBadge" class="bo-status-badge status-init">
-                <i class="bi bi-question-circle"></i> 접속 미확인
+                <i class="fa-regular fa-circle-question"></i> 접속 미확인
             </div>
         </div>
     </form>

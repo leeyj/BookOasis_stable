@@ -20,17 +20,17 @@ stream_bp = Blueprint('media_stream', __name__)
 
 
 BASE_DIR  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from services.cover_storage_service import get_covers_dir
+from services.cover_storage_service import get_covers_dir, BOSS_KEY_IMAGE_NAME
 
 
 def _seed_default_boss_key_image():
     """보스키(Alt+Q) 위장 화면 이미지를 covers/ 아래로 최초 1회 복사한다.
     covers/ 는 사용자 볼륨(git 비추적)이라, 이후 사용자가 같은 파일명으로
     직접 덮어쓰면 UI 없이도 위장 화면 이미지를 임의로 교체할 수 있다."""
-    dest = os.path.join(get_covers_dir(), 'fake_screen.png')
+    dest = os.path.join(get_covers_dir(), BOSS_KEY_IMAGE_NAME)
     if os.path.exists(dest):
         return
-    src = os.path.join(BASE_DIR, 'static', 'images', 'fake_screen.png')
+    src = os.path.join(BASE_DIR, 'static', 'images', BOSS_KEY_IMAGE_NAME)
     if not os.path.exists(src):
         return
     try:

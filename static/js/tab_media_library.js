@@ -49,6 +49,7 @@ import { decodeDetailParams } from './url_obfuscator.js';
 // 모듈화로 분리한 미디어 타입 토글 및 검색 단축키 제어부 임포트
 import { canAccessLibraryType, applyLibraryTypeToggleVisibility, applyLibraryTypeButtonState, switchLibraryType } from './library_type_toggle.js';
 import { applyGroupModeButtonState, switchGroupMode, restoreGroupModeView } from './author_group_toggle.js';
+import { openSearchOverlay } from './search_overlay.js';
 import { focusLibrarySearchInput, applySearchShortcutSetting, initLibrarySearchShortcut, handleLibrarySearchAction, handleLibrarySearchKeydown, initLibraryTypeHotkeys } from './search_shortcut_manager.js';
 
 import './viewer/viewer_padding.js';
@@ -90,6 +91,9 @@ function initLibraryShellDelegation() {
     }
     if (role === 'library-search-action') {
       return handleLibrarySearchAction();
+    }
+    if (role === 'library-search-detail') {
+      return openSearchOverlay(document.getElementById('library-search')?.value || '');
     }
     if (role === 'library-open-filter') {
       return toggleFilterModal();

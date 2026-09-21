@@ -1,6 +1,7 @@
 import re
 
 AUTHOR_PREFIX = '작가:'
+TOPIC_PREFIX = '주제:'
 COVER_ARTIST_PREFIX = '그림작가:'
 COVER_ARTIST_PREFIX_ALIASES = ('cover_artist:',)
 
@@ -10,6 +11,8 @@ def parse_series_search_query(search_query):
     for prefix in (COVER_ARTIST_PREFIX, *COVER_ARTIST_PREFIX_ALIASES):
         if query.lower().startswith(prefix.lower()):
             return 'cover_artist', query[len(prefix):].strip()
+    if query.startswith(TOPIC_PREFIX):
+        return 'topic', query[len(TOPIC_PREFIX):].strip()
     if query.startswith(AUTHOR_PREFIX):
         return 'author', query[len(AUTHOR_PREFIX):].strip()
     return 'title', query

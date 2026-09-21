@@ -467,7 +467,6 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
           ${unlockBtnHtml}
         </h3>
         <div class="detail-meta">
-          <span class="badge">${escapeHtml(meta.series_alias || visibleTitle)}</span>
           <span class="meta-item"><i class="fa-solid fa-pen-nib"></i> ${escapeHtml(meta.author || '-')}</span>
           <span class="meta-item"><i class="fa-solid fa-barcode"></i> ${identifierLabel}: ${identifierValue}</span>
           <span class="meta-item"><i class="fa-solid fa-building"></i> ${escapeHtml(meta.publisher || '-')}</span>

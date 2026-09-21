@@ -1289,8 +1289,11 @@ def run_lazy_cover_resize():
         않도록 한다 - 그래야 리사이즈 백필도 이 lazy 스캔 루프에 얹혀 끝까지 진행된다.)
     """
     global stop_requested
-    from tools.scanner.cover import COVER_THUMB_MAX_W, COVER_THUMB_MAX_H, save_as_thumbnail_webp
-    from services.cover_storage_service import get_covers_dir
+    from tools.scanner.cover import (
+        COVER_THUMB_MAX_W, COVER_THUMB_MAX_H, BANNER_THUMB_MAX_W, BANNER_THUMB_MAX_H,
+        save_as_thumbnail_webp,
+    )
+    from services.cover_storage_service import get_covers_dir, USER_MANAGED_COVER_FILES
     covers_dir = get_covers_dir()
 
     if not os.path.isdir(covers_dir):
@@ -1311,9 +1314,14 @@ def run_lazy_cover_resize():
 
     all_paths = []
     for root, _dirs, files in os.walk(covers_dir):
+        is_root = os.path.normpath(root) == os.path.normpath(covers_dir)
         for fname in files:
-            if fname.lower().endswith(('.webp', '.jpg', '.jpeg', '.png')):
-                all_paths.append(os.path.join(root, fname))
+            if not fname.lower().endswith(('.webp', '.jpg', '.jpeg', '.png')):
+                continue
+            # 보스키 위장 화면 등 표지가 아닌 사용자 관리 이미지는 축소하면 해상도가 깨진다.
+            if is_root and fname.lower() in USER_MANAGED_COVER_FILES:
+                continue
+            all_paths.append(os.path.join(root, fname))
     all_paths.sort()
 
     if not all_paths:
@@ -1343,11 +1351,16 @@ def run_lazy_cover_resize():
         last_seen = path
         try:
             needs_resize = False
+            # 배너는 저장 시점에도 표지보다 큰 상한(가로형 히어로)을 쓰므로 백필도 같은 상한을 따른다.
+            if os.path.basename(path).startswith('banner_'):
+                max_w, max_h = BANNER_THUMB_MAX_W, BANNER_THUMB_MAX_H
+            else:
+                max_w, max_h = COVER_THUMB_MAX_W, COVER_THUMB_MAX_H
             with Image.open(path) as img:
-                needs_resize = img.width > COVER_THUMB_MAX_W or img.height > COVER_THUMB_MAX_H
+                needs_resize = img.width > max_w or img.height > max_h
                 if needs_resize:
                     tmp_path = path + '.resize_tmp'
-                    save_as_thumbnail_webp(img, tmp_path)
+                    save_as_thumbnail_webp(img, tmp_path, max_w=max_w, max_h=max_h)
             if needs_resize:
                 os.replace(tmp_path, path)
                 resized_count += 1

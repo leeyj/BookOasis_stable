@@ -33,6 +33,8 @@ class BookInfoService:
                 'physical_path': os.path.dirname(row.get('sample_path') or ''),
                 'book_count': int(row.get('book_count') or 0),
                 'total_size': int(row.get('total_size') or 0),
+                'formats': [f for f in str(row.get('formats') or '').split(',') if f],
+                'added_at': str(row.get('latest_added') or ''),
             }
 
         if not book_id:
@@ -45,6 +47,8 @@ class BookInfoService:
             'physical_path': row.get('file_path') or '',
             'book_count': 1,
             'total_size': int(row.get('file_size') or 0),
+            'formats': [str(row.get('file_format') or '').lower()] if row.get('file_format') else [],
+            'added_at': str(row.get('created_at') or ''),
         }
 
     @staticmethod

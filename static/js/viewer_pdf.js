@@ -68,7 +68,7 @@ export async function initPdfViewer(bookId, pagesRead, totalPages) {
     url: url,
     disableAutoFetch: true,  // 브라우저가 전체 파일을 백그라운드에서 전부 받는 행위 억제
     disableStream: false,    // 스트림 단위로 조각 수신 허용
-    cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/cmaps/',
+    cMapUrl: '/static/lib/pdfjs/cmaps/',
     cMapPacked: true
   }).promise
     .then(doc => { 

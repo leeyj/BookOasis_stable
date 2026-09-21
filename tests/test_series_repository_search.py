@@ -103,6 +103,50 @@ class SeriesRepositorySearchTest(unittest.TestCase):
 
         self.assertEqual([row['id'] for row in rows], [1])
 
+    def test_episode_title_match_reports_matched_title(self):
+        rows = SeriesRepository.fetch_books_for_grouping(
+            'general', 10, search_query='도굴왕', user_id=1, role='admin'
+        )
+
+        self.assertEqual(rows[0]['matched_title'], '[연재] 도굴왕 001')
+
+    def test_matched_title_is_none_without_search(self):
+        rows = SeriesRepository.fetch_books_for_grouping('general', 10, user_id=1, role='admin')
+
+        self.assertTrue(all(row['matched_title'] is None for row in rows))
+
+    def test_series_entries_carry_match_info_only_for_episode_matches(self):
+        from services.series_service import _build_series_entries
+
+        rows = SeriesRepository.fetch_books_for_grouping(
+            'general', 10, search_query='도굴왕', user_id=1, role='admin'
+        )
+        entries = _build_series_entries('general', rows, '도굴왕')
+        self.assertEqual(entries[0]['match_info']['field'], 'episode')
+        self.assertEqual(entries[0]['match_info']['count'], 2)
+
+        rows = SeriesRepository.fetch_books_for_grouping(
+            'general', 10, search_query='무림', user_id=1, role='admin'
+        )
+        entries = _build_series_entries('general', rows, '무림')
+        self.assertNotIn('match_info', entries[0])
+
+    def test_topic_prefix_matches_genre_and_tags_only(self):
+        conn = sqlite3.connect(self.db_path)
+        conn.execute("UPDATE books SET genre = '슬라임물', tags = '이세계' WHERE id = 2")
+        conn.commit()
+        conn.close()
+
+        rows = SeriesRepository.fetch_books_for_grouping(
+            'general', 10, search_query='주제:이세계', user_id=1, role='admin'
+        )
+        self.assertEqual([row['id'] for row in rows], [2])
+
+        rows = SeriesRepository.fetch_books_for_grouping(
+            'general', 10, search_query='주제:도굴왕', user_id=1, role='admin'
+        )
+        self.assertEqual(rows, [])
+
     def test_natural_search_does_not_match_author(self):
         rows = SeriesRepository.fetch_books_for_grouping(
             'general', 10, search_query='도굴왕 작가', user_id=1, role='admin'

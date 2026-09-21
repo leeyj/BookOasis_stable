@@ -116,6 +116,24 @@ def get_media_list():
             err_msg = '스캔 작업으로 데이터베이스가 잠시 바쁩니다. 잠시 후 다시 시도해 주세요.'
         return jsonify({'success': False, 'error': err_msg}), 500
 
+@media_library_routes_bp.route('/api/media/search/overlay', methods=['GET'])
+@login_required
+def get_media_search_overlay():
+    """Ctrl+Enter 검색 오버레이: 제목/주제/회차별 매칭 결과를 한 번에 반환"""
+    db_type = request.args.get('type', 'general')
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+    library_id = request.args.get('library_id')
+    query = request.args.get('q', '').strip()
+    try:
+        result = SeriesService.search_overlay(
+            db_type, library_id, query,
+            user_id=session.get('user_id'), role=session.get('role')
+        )
+        return jsonify({'success': True, **result})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @media_library_routes_bp.route('/api/media/list/jump', methods=['GET'])
 @login_required
 def get_media_list_jump_position():
@@ -235,6 +253,9 @@ def get_media_detail():
 @login_required
 def get_media_card_info():
     """그리드 카드 '...' 아이콘 클릭 시 표시할 읽기전용 정보(제목/실제경로/도서 수/파일 크기) 조회"""
+    # 서버 파일 경로가 노출되므로 관리자 전용
+    if session.get('role') != 'admin':
+        return jsonify({'success': False, 'error': 'admin only'}), 403
     db_type = request.args.get('type', 'general')
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403

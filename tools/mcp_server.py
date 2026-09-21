@@ -41,22 +41,69 @@ def _quiet(fn, *args, **kwargs):
         return fn(*args, **kwargs)
 
 
-@mcp.tool()
-def search_books(query: str, db_type: str = "general", library_id: str = "all",
-                  genre: str = "", tags: str = "", limit: int = 20) -> dict:
-    """서재에서 제목/시리즈명으로 시리즈를 검색합니다(단행본이 아니라 시리즈 단위로 묶여 반환됨).
-    db_type: general(일반 도서) / adult(성인 서재) / audiobook(오디오북).
-    genre/tags는 콤마로 구분된 필터 문자열입니다(선택)."""
-    def _run():
-        from services.series_service import SeriesService
-        genre_filters = [g.strip() for g in genre.split(',') if g.strip()] if genre else None
-        tag_filters = [t.strip() for t in tags.split(',') if t.strip()] if tags else None
-        results = SeriesService.get_books_list(
-            db_type, library_id, page=1, limit=limit, search_query=query,
-            genre_filters=genre_filters, tag_filters=tag_filters,
+_BOOK_DB_TYPES = ('general', 'adult', 'audiobook')
+_SEARCH_SORT_VALUES = ('asc', 'desc', 'date_asc', 'date_desc')
+
+
+def _check_book_args(db_type, sort='asc'):
+    """search_books/get_random_book 공통 인자 검증. video는 이 도구들이 다루지 않는다."""
+    if db_type not in _BOOK_DB_TYPES:
+        raise ValueError(
+            f"db_type은 {'/'.join(_BOOK_DB_TYPES)} 중 하나여야 합니다 (video는 run_readonly_query/call_api 사용): {db_type}"
         )
-        return {'total_returned': len(results), 'series': results}
-    return _quiet(_run)
+    sort_key = (sort or 'asc').lower()
+    if sort_key not in _SEARCH_SORT_VALUES:
+        raise ValueError(f"sort는 {'/'.join(_SEARCH_SORT_VALUES)} 중 하나여야 합니다: {sort}")
+    return sort_key
+
+
+def _search_books_impl(query, db_type, library_id, genre, tags, limit, sort):
+    from services.series_service import SeriesService
+    sort_key = _check_book_args(db_type, sort)
+    genre_filters = [g.strip() for g in genre.split(',') if g.strip()] if genre else None
+    tag_filters = [t.strip() for t in tags.split(',') if t.strip()] if tags else None
+    # get_books_list는 has_more 판별용으로 limit+1건을 돌려주므로 요청한 개수만큼 자른다.
+    results = SeriesService.get_books_list(
+        db_type, library_id, page=1, limit=limit, search_query=query,
+        sort=sort_key, genre_filters=genre_filters, tag_filters=tag_filters,
+    )[:limit]
+    return {'total_returned': len(results), 'series': results}
+
+
+def _get_random_book_impl(db_type, library_id):
+    import random
+    from services.series_service import SeriesService
+    _check_book_args(db_type)
+    totals = SeriesService.get_books_totals(db_type, library_id)
+    total = int(totals.get('total_series_count') or 0)
+    if total <= 0:
+        return {'series': None, 'message': '해당 서재에 시리즈가 없습니다.'}
+    index = random.randint(0, total - 1)
+    rows = SeriesService.get_books_list(db_type, library_id, page=index + 1, limit=1, search_query='')
+    if not rows:
+        # 총계 캐시가 실제 개수보다 커서 범위를 벗어난 경우 첫 페이지로 한 번 재시도
+        rows = SeriesService.get_books_list(db_type, library_id, page=1, limit=1, search_query='')
+    return {'series': rows[0] if rows else None, 'picked_index': index, 'total_series_count': total}
+
+
+@mcp.tool()
+def search_books(query: str = "", db_type: str = "general", library_id: str = "all",
+                  genre: str = "", tags: str = "", limit: int = 20, sort: str = "asc") -> dict:
+    """서재에서 제목/시리즈명으로 시리즈를 검색합니다(단행본이 아니라 시리즈 단위로 묶여 반환됨).
+    db_type: general(일반 도서) / adult(성인 서재) / audiobook(오디오북) - video(영상 강좌)는
+    이 도구가 다루지 않으므로 video는 run_readonly_query나 call_api를 쓰세요.
+    genre/tags는 콤마로 구분된 필터 문자열입니다(선택).
+    sort: asc(기본, 가나다순) / desc(가나다 역순) / date_desc(최근 추가순) / date_asc(오래된 추가순).
+    "최근 추가된 책 N개"처럼 정렬이 필요한 질문엔 query를 비우고 sort="date_desc", limit=N을 주세요.
+    "아무 책이나/무작위" 요청엔 이 도구 대신 get_random_book을 쓰세요(이 도구는 항상 같은 순서로 반환)."""
+    return _quiet(_search_books_impl, query, db_type, library_id, genre, tags, limit, sort)
+
+
+@mcp.tool()
+def get_random_book(db_type: str = "general", library_id: str = "all") -> dict:
+    """서재에서 시리즈 1개를 서버에서 무작위로 골라 반환합니다(호출할 때마다 결과가 다름).
+    db_type: general / adult / audiobook (video는 다루지 않음). "아무 책이나 보여줘"류 요청에 쓰세요."""
+    return _quiet(_get_random_book_impl, db_type, library_id)
 
 
 @mcp.tool()
@@ -151,7 +198,8 @@ def read_logs(log_name: str = "media_server.log", lines: int = 200, search: str 
 def call_api(path: str, query_params: dict = None, max_response_chars: int = 20000) -> dict:
     """BookOasis의 기존 GET REST API를 그대로 호출합니다 (사용 가능한 경로 목록은
     docs/api_endpoints.md 참고). 예: path="/api/media/list", query_params={"type": "general",
-    "library_id": "all", "limit": 5}. 진단 툴이 커버하지 못하는 기존 기능(상세정보, 장르/태그
+    "library_id": "all", "limit": 5} (type을 꼭 넣을 것 - 생략하면 video 등 다른 타입이 섞여
+    나올 수 있음. 도서 목록/최근 추가순은 가능하면 search_books를 쓰세요). 진단 툴이 커버하지 못하는 기존 기능(상세정보, 장르/태그
     목록, 스캔 상태, 플러그인 목록 등)을 새 코드 없이 그대로 재사용할 때 쓰세요.
     GET만 가능합니다 - 이 툴 자체가 다른 HTTP 메서드를 호출할 방법을 제공하지 않습니다.
     내부적으로 관리자 세션으로 인증되어 호출되므로 성인 서재/admin_only 플러그인 데이터도

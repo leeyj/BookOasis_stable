@@ -84,7 +84,8 @@ mcp dev tools/mcp_server.py
 
 | Tool | Description |
 | :--- | :--- |
-| `search_books` | Search series by title/series name (genre/tag filters supported) |
+| `search_books` | Search series by title/series name (genre/tag filters, `sort`: asc/desc/date_desc/date_asc; video excluded) |
+| `get_random_book` | Pick one series at random on the server (video excluded) |
 | `get_library_stats` | Total and per-category series/book counts |
 | `find_missing_cover` | Books with no cover image |
 | `find_missing_genre_and_tags` | Books with both genre and tags empty |

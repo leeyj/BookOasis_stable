@@ -22,7 +22,12 @@
     </h2>
 
     <div class="library-search-box library-search-center">
-        <input type="text" id="library-search" data-role="library-search-input" class="form-control input-sm" placeholder="제목, 시리즈, 작가 검색...">
+        <input type="text" id="library-search" data-role="library-search-input" class="form-control input-sm" enterkeyhint="search" placeholder="제목, 시리즈, 작가 검색...">
+        <button id="btn-library-search-detail" data-role="library-search-detail" class="btn-search-icon btn-search-detail" style="display: none;"
+            data-i18n-title="search_overlay.open_detail" title="결과 상세 보기 (Enter)">
+            <i class="fa-solid fa-table-list" aria-hidden="true"></i>
+            <span data-i18n="search_overlay.open_detail" class="sr-only">결과 상세 보기</span>
+        </button>
         <button id="btn-library-search-action" data-role="library-search-action" class="btn-search-icon"
             data-i18n-title="common.search" title="검색">
             <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>

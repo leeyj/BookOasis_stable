@@ -709,6 +709,26 @@
     "save_error": "오류: {error}",
     "save_server_error": "서버 연결 오류가 발생했습니다."
   },
+  "search_overlay": {
+    "open_detail": "결과 상세 보기 (Enter)",
+    "section_series": "제목",
+    "section_topic": "주제",
+    "section_episode": "회차",
+    "empty": "일치하는 항목이 없습니다.",
+    "loading": "검색 중...",
+    "load_fail": "검색 결과를 불러오지 못했습니다."
+  },
+  "card_info": {
+    "title": "정보",
+    "path": "도서 경로",
+    "category": "카테고리",
+    "added": "추가일",
+    "format": "포맷",
+    "loading": "불러오는 중...",
+    "load_fail": "정보를 불러오지 못했습니다.",
+    "formats_more": "{first} 외 {count}종",
+    "unspecified": "미지정"
+  },
   "book_list": {
     "total_count": "(전체: {seriesCount} 시리즈 / {bookCount} 권)",
     "total_count_audiobook": "(전체: {seriesCount} 시리즈 / {bookCount} 트랙)",

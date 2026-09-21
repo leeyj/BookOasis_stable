@@ -433,6 +433,8 @@ export function filterBooks() {
 // 아이콘 전용 압축 버튼이라 라벨 텍스트를 innerText로 넣으면 34px 정사각 버튼 안에서
 // 글자가 세로로 줄바꿈되며 깨져 보인다 - updateSortButtonUI와 동일하게 아이콘+sr-only로 표시한다.
 export function updateSearchActionButtonUI(query) {
+  const detailBtn = document.getElementById('btn-library-search-detail');
+  if (detailBtn) detailBtn.style.display = query ? '' : 'none';
   const btn = document.getElementById('btn-library-search-action');
   if (!btn) return;
   if (query) {

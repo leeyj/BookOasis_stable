@@ -1,0 +1,239 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - generic [ref=e3]:
+      - link [ref=e4] [cursor=pointer]:
+        - /url: index.html
+        - img "BookOasis" [ref=e6]
+        - text: BookOasis
+      - list [ref=e7]:
+        - listitem [ref=e8]:
+          - link "Home" [ref=e9] [cursor=pointer]:
+            - /url: index.html
+        - listitem [ref=e10]:
+          - link "Services" [ref=e11] [cursor=pointer]:
+            - /url: services.html
+        - listitem [ref=e12]:
+          - link "Docs" [ref=e13] [cursor=pointer]:
+            - /url: docs.html
+        - listitem [ref=e14]:
+          - link "Wiki" [ref=e15] [cursor=pointer]:
+            - /url: wiki.html
+      - generic [ref=e16]:
+        - group "Language" [ref=e17]:
+          - link "한국어" [ref=e18] [cursor=pointer]:
+            - /url: ../docs.html
+          - generic [aria-hidden] [ref=e19]: "|"
+          - link "English" [ref=e20] [cursor=pointer]:
+            - /url: docs.html
+        - link "GitHub" [ref=e21] [cursor=pointer]:
+          - /url: https://github.com/leeyj/BookOasis_stable
+  - banner [ref=e25]:
+    - generic [ref=e26]:
+      - heading "Docs" [level=1] [ref=e27]
+      - paragraph [ref=e28]: BookOasis puts as much care into its documentation as into its code. From installation and operations to plugin development, the API, and DB specs, everything is maintained in the repository alongside the code, and the main documents come in English editions.
+  - generic [ref=e30]:
+    - generic [ref=e31]:
+      - strong [ref=e32]: 65+
+      - text: Markdown docs
+    - generic [ref=e33]:
+      - strong [ref=e34]: "13"
+      - text: English editions
+    - generic [ref=e35]:
+      - text: Kept in the
+      - strong [ref=e36]: same repository
+      - text: as the code
+    - generic [ref=e37]:
+      - text: Docs
+      - strong [ref=e38]: updated with
+      - text: feature changes
+  - generic [ref=e40]:
+    - generic [ref=e41]:
+      - heading "Getting started" [level=2] [ref=e42]
+      - paragraph [ref=e43]: Everything you need to install BookOasis and find your way around.
+    - generic [ref=e44]:
+      - generic [ref=e45]:
+        - generic [ref=e46]: README_EN.md
+        - heading "Getting started guide" [level=3] [ref=e52]
+        - paragraph [ref=e53]: Installation, how to run it, and the basic setup. The best place to start.
+        - generic [ref=e54]:
+          - link "View on GitHub" [ref=e55] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/README_EN.md
+          - link "KO" [ref=e56] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/README.md
+      - generic [ref=e57]:
+        - generic [ref=e58]: docs/guide_installation_en.md
+        - heading "Installation guide" [level=3] [ref=e64]
+        - paragraph [ref=e65]: Step-by-step installation for Docker and native environments.
+        - generic [ref=e66]:
+          - link "View on GitHub" [ref=e67] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/guide_installation_en.md
+          - link "KO" [ref=e68] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/guide_installation.md
+      - generic [ref=e69]:
+        - generic [ref=e70]: docs/guide_admin_en.md
+        - heading "Admin guide" [level=3] [ref=e76]
+        - paragraph [ref=e77]: Managing accounts, libraries, scan settings, and other operational features.
+        - generic [ref=e78]:
+          - link "View on GitHub" [ref=e79] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/guide_admin_en.md
+          - link "KO" [ref=e80] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/guide_admin.md
+      - generic [ref=e81]:
+        - generic [ref=e82]: docs/spec_feature_overview_en.md
+        - heading "Feature overview" [level=3] [ref=e88]
+        - paragraph [ref=e89]: A specification summarizing everything BookOasis offers at a glance.
+        - generic [ref=e90]:
+          - link "View on GitHub" [ref=e91] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/spec_feature_overview_en.md
+          - link "KO" [ref=e92] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/spec_feature_overview.md
+  - generic [ref=e94]:
+    - generic [ref=e95]:
+      - heading "Operations & migration" [level=2] [ref=e96]
+      - paragraph [ref=e97]: For moving servers or switching backends.
+    - generic [ref=e98]:
+      - generic [ref=e99]:
+        - generic [ref=e100]: docs/move_to_mariadb.md
+        - heading "Moving to MariaDB" [level=3] [ref=e106]
+        - paragraph [ref=e107]: The procedure for safely moving from SQLite to MariaDB.
+        - generic [ref=e108]:
+          - link "View on GitHub" [ref=e109] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/move_to_mariadb.md
+          - generic [ref=e110]: Korean only
+      - generic [ref=e111]:
+        - generic [ref=e112]: docs/migration_guide_en.md
+        - heading "Migration guide" [level=3] [ref=e118]
+        - paragraph [ref=e119]: What to check when moving servers and transferring data.
+        - generic [ref=e120]:
+          - link "View on GitHub" [ref=e121] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/migration_guide_en.md
+          - link "KO" [ref=e122] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/migration_guide.md
+      - generic [ref=e123]:
+        - generic [ref=e124]: docs/guide_category_migration_en.md
+        - heading "Category migration" [level=3] [ref=e130]
+        - paragraph [ref=e131]: How to export your category layout and import it on another server.
+        - generic [ref=e132]:
+          - link "View on GitHub" [ref=e133] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/guide_category_migration_en.md
+          - link "KO" [ref=e134] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/guide_category_migration.md
+  - generic [ref=e136]:
+    - generic [ref=e137]:
+      - heading "Extending & development" [level=2] [ref=e138]
+      - paragraph [ref=e139]: For developers building plugins and external integrations.
+    - generic [ref=e140]:
+      - generic [ref=e141]:
+        - generic [ref=e142]: docs/guide_plugins_en.md
+        - heading "Plugin development guide" [level=3] [ref=e148]
+        - paragraph [ref=e149]: Explains the plugin contract, manifest authoring, and namespace rules.
+        - generic [ref=e150]:
+          - link "View on GitHub" [ref=e151] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/guide_plugins_en.md
+          - link "KO" [ref=e152] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/guide_plugins.md
+      - generic [ref=e153]:
+        - generic [ref=e154]: docs/plugin_checklist_en.md
+        - heading "Plugin checklist" [level=3] [ref=e160]
+        - paragraph [ref=e161]: Items to verify before you publish a plugin.
+        - generic [ref=e162]:
+          - link "View on GitHub" [ref=e163] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/plugin_checklist_en.md
+          - link "KO" [ref=e164] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/plugin_checklist.md
+      - generic [ref=e165]:
+        - generic [ref=e166]: docs/guide_mcp_server_en.md
+        - heading "MCP server guide" [level=3] [ref=e172]
+        - paragraph [ref=e173]: How to connect AI clients to your library, and how approval works.
+        - generic [ref=e174]:
+          - link "View on GitHub" [ref=e175] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/guide_mcp_server_en.md
+          - link "KO" [ref=e176] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/guide_mcp_server.md
+      - generic [ref=e177]:
+        - generic [ref=e178]: docs/guide_opds_en.md
+        - heading "OPDS guide" [level=3] [ref=e184]
+        - paragraph [ref=e185]: How to open your library from external reader apps via OPDS.
+        - generic [ref=e186]:
+          - link "View on GitHub" [ref=e187] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/guide_opds_en.md
+          - link "KO" [ref=e188] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/guide_opds.md
+      - generic [ref=e189]:
+        - generic [ref=e190]: docs/guide_architecture_en.md
+        - heading "Architecture overview" [level=3] [ref=e196]
+        - paragraph [ref=e197]: The boundary between core and plugins, and the overall structure.
+        - generic [ref=e198]:
+          - link "View on GitHub" [ref=e199] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/guide_architecture_en.md
+          - link "KO" [ref=e200] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/guide_architecture.md
+      - generic [ref=e201]:
+        - generic [ref=e202]: docs/guide_scanner_parser.md
+        - heading "Scanner & parser guide" [level=3] [ref=e208]
+        - paragraph [ref=e209]: How folder scanning works and how to implement and extend per-format parsers.
+        - generic [ref=e210]:
+          - link "View on GitHub" [ref=e211] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/guide_scanner_parser.md
+          - generic [ref=e212]: Korean only
+  - generic [ref=e214]:
+    - generic [ref=e215]:
+      - heading "Specifications" [level=2] [ref=e216]
+      - paragraph [ref=e217]: Reference documents that define how things behave.
+    - generic [ref=e218]:
+      - generic [ref=e219]:
+        - generic [ref=e220]: docs/api_endpoints.md
+        - heading "API reference" [level=3] [ref=e226]
+        - paragraph [ref=e227]: The complete list of REST endpoints for library, scan, and media queries.
+        - generic [ref=e228]:
+          - link "View on GitHub" [ref=e229] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/api_endpoints.md
+          - generic [ref=e230]: Korean only
+      - generic [ref=e231]:
+        - generic [ref=e232]: docs/spec_db_schema_en.md
+        - heading "DB schema spec" [level=3] [ref=e238]
+        - paragraph [ref=e239]: The table structure maintained across both SQLite and MariaDB.
+        - generic [ref=e240]:
+          - link "View on GitHub" [ref=e241] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/spec_db_schema_en.md
+          - link "KO" [ref=e242] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/spec_db_schema.md
+      - generic [ref=e243]:
+        - generic [ref=e244]: docs/spec_scanner_logic_en.md
+        - heading "Scanner logic spec" [level=3] [ref=e250]
+        - paragraph [ref=e251]: The rules the scan pipeline uses to judge and process files.
+        - generic [ref=e252]:
+          - link "View on GitHub" [ref=e253] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/spec_scanner_logic_en.md
+          - link "KO" [ref=e254] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable/blob/main/docs/spec_scanner_logic.md
+  - generic [ref=e257]:
+    - heading "More stories live in the Wiki" [level=2] [ref=e258]
+    - paragraph [ref=e259]: Ever-growing content such as troubleshooting, community guides, and the plugin list lives in the Wiki.
+    - link "Go to the Wiki" [ref=e261] [cursor=pointer]:
+      - /url: wiki.html
+  - contentinfo [ref=e265]:
+    - generic [ref=e266]:
+      - generic [ref=e267]:
+        - link [ref=e268] [cursor=pointer]:
+          - /url: index.html
+          - img "BookOasis" [ref=e270]
+          - text: BookOasis
+        - paragraph [ref=e271]: Self-hosted ebook & comic library server.
+      - list [ref=e272]:
+        - listitem [ref=e273]:
+          - link "Home" [ref=e274] [cursor=pointer]:
+            - /url: index.html
+        - listitem [ref=e275]:
+          - link "Services" [ref=e276] [cursor=pointer]:
+            - /url: services.html
+        - listitem [ref=e277]:
+          - link "Docs" [ref=e278] [cursor=pointer]:
+            - /url: docs.html
+        - listitem [ref=e279]:
+          - link "Wiki" [ref=e280] [cursor=pointer]:
+            - /url: wiki.html
+        - listitem [ref=e281]:
+          - link "GitHub" [ref=e282] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable
+    - generic [ref=e283]: An open-source project released under the AGPLv3 license.

@@ -71,6 +71,13 @@ function initCardEventDelegation() {
       resumeBtn._onClick?.(e);
       return;
     }
+    const infoBtn = e.target.closest('[data-role="card-info-toggle"]');
+    if (infoBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      import('./card_info_menu.js').then((m) => m.toggleCardInfoMenu(infoBtn));
+      return;
+    }
     const favBtn = e.target.closest('[data-role="card-favorite-toggle"]');
     if (favBtn) {
       favBtn._onClick?.(e);
@@ -277,7 +284,7 @@ export function createBookCard(item, options = {}) {
     if (now - lastClickTime < 200) return; // 중복 호출 방지
     lastClickTime = now;
 
-    if (e.target.closest('.btn-resume-series') || e.target.closest('.btn-card-fav-toggle') || e.target.closest('.book-card-select-toggle')) {
+    if (e.target.closest('.btn-resume-series') || e.target.closest('.btn-card-fav-toggle') || e.target.closest('.btn-card-info-toggle') || e.target.closest('.book-card-select-toggle')) {
       return;
     }
     console.log('[BookCard] Triggering handlePrimaryClick!', item);
@@ -338,6 +345,14 @@ export function createBookCard(item, options = {}) {
     </button>
   `;
 
+  // 관리자 전용 정보 버튼(도서경로/카테고리/추가일/포맷). 메뉴는 클릭 때 지연 생성/조회한다.
+  // 도서 카드(오디오북/영상 제외)만, 작가별 모음 카드는 대상이 아니다.
+  const currentUser = state.currentUser || window.currentUser || {};
+  const isAdminUser = String(currentUser.role || '').trim().toLowerCase() === 'admin';
+  const infoBtnHtml = (isAdminUser && isBookCard && !item.is_author_group && card.dataset.bookId)
+    ? `<button type="button" class="btn-card-info-toggle" data-role="card-info-toggle" title="정보" aria-label="정보"><i class="fa-solid fa-ellipsis"></i></button>`
+    : '';
+
   const lazyPlaceholder = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
   const imgSrc = shouldHideCover ? fallbackCoverSrc : (useLazyLoad ? lazyPlaceholder : coverSrc);
   const imgDataSrcAttr = (!shouldHideCover && useLazyLoad) ? `data-src="${coverSrc}"` : '';
@@ -380,6 +395,7 @@ export function createBookCard(item, options = {}) {
       ${badgeHtml}
       ${favBtnHtml}
       ${lockedBadgeHtml}
+      ${infoBtnHtml}
       ${audiobookCompletedDotHtml}
       ${resumeButtonHtml}
     </div>
@@ -571,7 +587,7 @@ export function renderHistoryGrid(booksList) {
 // priority: 최초 렌더링 시 화면에 바로 보이는 앞쪽 카드에 "high" 힌트를 주기 위한 옵션
 // (renderBooksGrid -> appendBooksGrid의 highPriorityCount 참고). 무한 스크롤로 뒤에 붙는
 // 카드나 정리(pruning) 후 복원되는 카드는 이미 화면 안/밖 여부가 다르므로 해당 없음(undefined).
-function buildSeriesGridCard(item, priority) {
+export function buildSeriesGridCard(item, priority) {
   const detailDisplayTitle = resolveCardDisplayTitle(item, true);
   const currentLibraryId = String(state.currentLibraryId ?? '');
   const isSpecialCategory = ['home', 'history', 'plugins', 'settings'].includes(currentLibraryId)

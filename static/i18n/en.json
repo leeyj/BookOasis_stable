@@ -709,6 +709,26 @@
     "save_error": "Error: {error}",
     "save_server_error": "A server connection error occurred."
   },
+  "search_overlay": {
+    "open_detail": "View detailed results (Enter)",
+    "section_series": "Title",
+    "section_topic": "Topic",
+    "section_episode": "Episode",
+    "empty": "No matches.",
+    "loading": "Searching...",
+    "load_fail": "Failed to load search results."
+  },
+  "card_info": {
+    "title": "Info",
+    "path": "Path",
+    "category": "Category",
+    "added": "Added",
+    "format": "Format",
+    "loading": "Loading...",
+    "load_fail": "Failed to load info.",
+    "formats_more": "{first} +{count} more",
+    "unspecified": "Unspecified"
+  },
   "book_list": {
     "total_count": "(Total: {seriesCount} series / {bookCount} books)",
     "total_count_audiobook": "(Total: {seriesCount} series / {bookCount} tracks)",

@@ -1,4 +1,18 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Noto+Sans+KR:wght@300;400;700&display=swap');
+/* Fonts are bundled locally so the login page works on closed (offline) networks. */
+@font-face {
+    font-family: 'Outfit';
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url('/static/fonts/Outfit-latin-wght.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Pretendard';
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url('/static/fonts/Pretendard-Regular.woff2') format('woff2');
+}
 
 :root {
     --color-bg: #090d16;
@@ -19,7 +33,7 @@ body {
         radial-gradient(circle at 90% 80%, rgba(59, 130, 246, 0.15), transparent 40%);
     background-attachment: fixed;
     color: var(--color-text);
-    font-family: 'Outfit', 'Noto Sans KR', sans-serif;
+    font-family: 'Outfit', 'Pretendard', 'Noto Sans KR', sans-serif;
     margin: 0;
     display: flex;
     align-items: center;

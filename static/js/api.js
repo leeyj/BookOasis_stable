@@ -28,6 +28,21 @@ export async function fetchBooksList({type, libraryId, page, limit, append, sear
   return res.json();
 }
 
+export async function fetchCardInfo({type, bookId, seriesName, libraryId}) {
+  const params = new URLSearchParams({type});
+  if (seriesName) params.set('series_name', seriesName);
+  else if (bookId) params.set('book_id', bookId);
+  if (libraryId) params.set('library_id', libraryId);
+  const res = await safeFetch(`/api/media/card-info?${params.toString()}`, {cache: 'no-store'});
+  return res.json();
+}
+
+export async function fetchSearchOverlay({type, libraryId, query}) {
+  const url = `/api/media/search/overlay?type=${type}&library_id=${libraryId}&q=${encodeURIComponent(query)}&_=${Date.now()}`;
+  const res = await safeFetch(url, {cache: 'no-store'});
+  return res.json();
+}
+
 export async function fetchJumpPosition({type, libraryId, search, sort, genres = [], tags = [], char, limit}) {
   const searchQuery = search ? `&search=${encodeURIComponent(search)}` : '';
   const sortQuery = sort ? `&sort=${sort}` : '';

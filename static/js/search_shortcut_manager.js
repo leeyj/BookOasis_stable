@@ -1,6 +1,7 @@
 /* search_shortcut_manager.js – 검색 창 포커싱, 단축키(Alt+`) 및 미디어 타입 핫키 전담 모듈 */
 import { filterBooks } from './book_list.js';
 import { switchLibraryType } from './library_type_toggle.js';
+import { openSearchOverlay } from './search_overlay.js';
 
 let searchShortcutConfig = { ctrlKey: false, altKey: true, shiftKey: false, metaKey: false, key: '`', code: 'Backquote', display: 'Alt + `' };
 
@@ -107,6 +108,13 @@ export function handleLibrarySearchAction() {
 export function handleLibrarySearchKeydown(event) {
   if (event.key === 'Enter') {
     event.preventDefault();
+    // 한글 등 IME 조합 중의 Enter는 글자 확정용이므로 오버레이를 열지 않는다
+    if (event.isComposing || event.keyCode === 229) return;
+    const query = String(event.target?.value || '').trim();
+    if (query) {
+      openSearchOverlay(query);
+      return;
+    }
     if (typeof window.filterBooks === 'function') window.filterBooks();
     else filterBooks();
   } else if (event.key === 'Escape') {

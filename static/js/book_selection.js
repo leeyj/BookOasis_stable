@@ -79,6 +79,8 @@ function updateToolbar() {
   const count = selectedCards.size;
   const element = ensureToolbar();
   element.hidden = count === 0;
+  // 다중 선택 중에는 카드 정보 버튼 등 개별 카드 보조 버튼을 숨긴다 (CSS에서 이 클래스를 참조)
+  document.body.classList.toggle('book-selection-active', count > 0);
   const summary = element.querySelector('[data-role="book-selection-summary"]');
   if (summary) summary.textContent = `${count}개 선택`;
 }

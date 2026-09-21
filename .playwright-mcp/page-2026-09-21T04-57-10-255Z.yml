@@ -1,0 +1,128 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - generic [ref=e3]:
+      - link [ref=e4] [cursor=pointer]:
+        - /url: index.html
+        - img "BookOasis" [ref=e6]
+        - text: BookOasis
+      - list [ref=e7]:
+        - listitem [ref=e8]:
+          - link "Home" [ref=e9] [cursor=pointer]:
+            - /url: index.html
+        - listitem [ref=e10]:
+          - link "Services" [ref=e11] [cursor=pointer]:
+            - /url: services.html
+        - listitem [ref=e12]:
+          - link "Docs" [ref=e13] [cursor=pointer]:
+            - /url: docs.html
+        - listitem [ref=e14]:
+          - link "Wiki" [ref=e15] [cursor=pointer]:
+            - /url: wiki.html
+      - generic [ref=e16]:
+        - group "Language" [ref=e17]:
+          - link "한국어" [ref=e18] [cursor=pointer]:
+            - /url: ../services.html
+          - generic [aria-hidden] [ref=e19]: "|"
+          - link "English" [ref=e20] [cursor=pointer]:
+            - /url: services.html
+        - link "GitHub" [ref=e21] [cursor=pointer]:
+          - /url: https://github.com/leeyj/BookOasis_stable
+  - banner [ref=e25]:
+    - generic [ref=e26]:
+      - heading "Services" [level=1] [ref=e27]
+      - paragraph [ref=e28]: What BookOasis actually does. The core handles only what running a library requires; plugins take care of extensions.
+  - generic [ref=e31]:
+    - generic [ref=e32]:
+      - heading "Library management" [level=2] [ref=e33]
+      - paragraph [ref=e34]: Periodically scans your folders to detect new books and changes. Covers, metadata, and even reading progress are managed automatically.
+      - list [ref=e35]:
+        - listitem [ref=e36]: · Auto-scan based on watched folders
+        - listitem [ref=e37]: · Automatic organization by category and series
+        - listitem [ref=e38]: · Cross-device resume (reading progress sync)
+    - generic [ref=e39]:
+      - generic [ref=e40]: Library
+      - img "Actual screen showing sidebar categories and recently read books (UI shown in Korean)"
+  - generic [ref=e47]:
+    - generic [ref=e48]:
+      - heading "Many formats, on any screen" [level=2] [ref=e49]
+      - paragraph [ref=e50]: Read EPUB, PDF, comics (CBZ), and text novels as one consistent experience instead of separate viewers. It carries over to mobile browsers as well.
+      - generic [ref=e51]: EPUB · Page turning PDF · Thumbnail rendering CBZ · Comic viewer TXT · Chapter navigation
+    - generic [ref=e52]:
+      - img "Actual BookOasis screen in a mobile browser (UI shown in Korean)"
+  - generic [ref=e55]:
+    - generic [ref=e56]:
+      - generic [ref=e57]: Extensions
+      - heading "A library that grows with plugins" [level=2] [ref=e58]
+      - paragraph [ref=e59]: The core acts only as a data gateway; features such as metadata providers, recommendation widgets, and context menus are built as contract-based plugins. Enter a GitHub repository URL on the plugin board and it installs right away.
+      - generic [ref=e60]:
+        - generic [ref=e61]: Metadata providers
+        - generic [ref=e62]: Recommendation widgets
+        - generic [ref=e63]: Context menu actions
+        - generic [ref=e64]: Paid / closed-source plugins not supported
+    - generic [ref=e65]:
+      - generic [ref=e66]: Plugin board
+      - img "Actual plugin board screen showing registered plugins and install status (UI shown in Korean)"
+  - generic [ref=e72]:
+    - generic [ref=e73]:
+      - heading "Self-host anywhere" [level=2] [ref=e74]
+      - paragraph [ref=e75]: "Docker, native, or remote mounts: it all works the same way."
+    - generic [ref=e76]:
+      - generic [ref=e77]:
+        - heading "Docker Compose" [level=3] [ref=e82]
+        - paragraph [ref=e83]: Bring up the application and database containers together and be running in minutes.
+      - generic [ref=e84]:
+        - heading "Native install" [level=3] [ref=e88]
+        - paragraph [ref=e89]: Install straight into a Python environment and integrate with a server you already run.
+      - generic [ref=e90]:
+        - heading "Remote mount tuning" [level=3] [ref=e94]
+        - paragraph [ref=e95]: Tuned for scan speed even on high-latency storage, such as Google Drive mounted with rclone.
+      - generic [ref=e96]:
+        - heading "Works on air-gapped networks" [level=3] [ref=e101]
+        - paragraph [ref=e102]: Every script, font, and icon the UI needs ships with the server, so nothing is fetched from a CDN. Scanning and reading work on isolated internal networks. Only optional features (update check, GitHub plugin install, webhooks, Google Drive) need internet.
+  - generic [ref=e104]:
+    - generic [ref=e105]:
+      - heading "AI workflows with MCP" [level=2] [ref=e106]
+      - paragraph [ref=e107]: AI clients can read your library and propose changes when needed. Every write goes through an approval queue.
+    - generic [ref=e108]:
+      - generic [ref=e109]:
+        - generic [ref=e110]: Read
+        - heading "Query tools" [level=3] [ref=e111]
+        - paragraph [ref=e112]: Exposes read-only features such as search, statistics, and logs as they are.
+      - generic [ref=e113]:
+        - generic [ref=e114]: Write
+        - heading "Approval queue" [level=3] [ref=e115]
+        - paragraph [ref=e116]: When cleanup work is proposed, it is applied only after a person reviews it.
+      - generic [ref=e117]:
+        - generic [ref=e118]: Connect
+        - heading "Local stdio" [level=3] [ref=e119]
+        - paragraph [ref=e120]: A connection method that runs only inside your own server, with no external transmission.
+  - generic [ref=e123]:
+    - heading "More details in the docs" [level=2] [ref=e124]
+    - paragraph [ref=e125]: API, plugin development, and the DB schema are all covered on the docs page.
+    - link "Get started" [ref=e127] [cursor=pointer]:
+      - /url: docs.html
+  - contentinfo [ref=e131]:
+    - generic [ref=e132]:
+      - generic [ref=e133]:
+        - link [ref=e134] [cursor=pointer]:
+          - /url: index.html
+          - img "BookOasis" [ref=e136]
+          - text: BookOasis
+        - paragraph [ref=e137]: Self-hosted ebook & comic library server.
+      - list [ref=e138]:
+        - listitem [ref=e139]:
+          - link "Home" [ref=e140] [cursor=pointer]:
+            - /url: index.html
+        - listitem [ref=e141]:
+          - link "Services" [ref=e142] [cursor=pointer]:
+            - /url: services.html
+        - listitem [ref=e143]:
+          - link "Docs" [ref=e144] [cursor=pointer]:
+            - /url: docs.html
+        - listitem [ref=e145]:
+          - link "Wiki" [ref=e146] [cursor=pointer]:
+            - /url: wiki.html
+        - listitem [ref=e147]:
+          - link "GitHub" [ref=e148] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable
+    - generic [ref=e149]: An open-source project released under the AGPLv3 license.

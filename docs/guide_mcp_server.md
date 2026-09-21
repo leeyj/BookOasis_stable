@@ -92,7 +92,8 @@ mcp dev tools/mcp_server.py
 
 | 툴 | 설명 |
 | :--- | :--- |
-| `search_books` | 제목/시리즈명으로 시리즈 검색 (장르/태그 필터 지원) |
+| `search_books` | 제목/시리즈명으로 시리즈 검색 (장르/태그 필터, `sort`: asc/desc/date_desc/date_asc 지원; video 제외) |
+| `get_random_book` | 서재에서 시리즈 1개를 서버에서 무작위로 선택 (video 제외) |
 | `get_library_stats` | 전체 및 카테고리별 시리즈 수·도서 권수 통계 |
 | `find_missing_cover` | 표지 이미지가 없는 도서 목록 |
 | `find_missing_genre_and_tags` | 장르·태그가 모두 비어있는 도서 목록 |

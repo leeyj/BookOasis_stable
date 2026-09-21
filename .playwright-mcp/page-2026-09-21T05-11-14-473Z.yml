@@ -1,0 +1,195 @@
+- generic [active] [ref=f4e1]:
+  - navigation [ref=f4e2]:
+    - generic [ref=f4e3]:
+      - link [ref=f4e4] [cursor=pointer]:
+        - /url: index.html
+        - img "BookOasis" [ref=f4e6]
+        - text: BookOasis
+      - list [ref=f4e7]:
+        - listitem [ref=f4e8]:
+          - link "Home" [ref=f4e9] [cursor=pointer]:
+            - /url: index.html
+        - listitem [ref=f4e10]:
+          - link "Services" [ref=f4e11] [cursor=pointer]:
+            - /url: services.html
+        - listitem [ref=f4e12]:
+          - link "Docs" [ref=f4e13] [cursor=pointer]:
+            - /url: docs.html
+        - listitem [ref=f4e14]:
+          - link "Wiki" [ref=f4e15] [cursor=pointer]:
+            - /url: wiki.html
+      - generic [ref=f4e16]:
+        - group "Language" [ref=f4e17]:
+          - link "한국어" [ref=f4e18] [cursor=pointer]:
+            - /url: ../index.html
+          - generic [aria-hidden] [ref=f4e19]: "|"
+          - link "English" [ref=f4e20] [cursor=pointer]:
+            - /url: index.html
+        - link "GitHub" [ref=f4e21] [cursor=pointer]:
+          - /url: https://github.com/leeyj/BookOasis_stable
+  - banner [ref=f4e25]:
+    - generic [ref=f4e26]:
+      - generic [ref=f4e27]:
+        - heading "Scattered books and comics, gathered into one library." [level=1] [ref=f4e28]: Scattered books and comics,gathered into one library.
+        - paragraph [ref=f4e29]: BookOasis is an open-source media server for hosting and organizing your own ebooks and comics. Point it at a folder, and it scans it so you can read right in the browser.
+        - generic [ref=f4e30]:
+          - link "Get started" [ref=f4e31] [cursor=pointer]:
+            - /url: docs.html
+          - link "GitHub" [ref=f4e35] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable
+      - generic [ref=f4e39]:
+        - generic [ref=f4e40]: my-server.local/bookoasis
+        - img "Actual screenshot of the BookOasis home screen (UI shown in Korean)" [ref=f4e45]
+  - generic [ref=f4e47]:
+    - generic [ref=f4e48]:
+      - strong [ref=f4e49]: SQLite
+      - text: ·
+      - strong [ref=f4e50]: MariaDB
+      - text: dual backend
+    - generic [ref=f4e51]:
+      - strong [ref=f4e52]: EPUB
+      - text: ·
+      - strong [ref=f4e53]: PDF
+      - text: ·
+      - strong [ref=f4e54]: CBZ
+      - text: ·
+      - strong [ref=f4e55]: TXT
+      - text: supported
+    - generic [ref=f4e56]:
+      - strong [ref=f4e57]: AGPLv3
+      - text: open source
+    - generic [ref=f4e58]: Docker deployment supported
+  - generic [ref=f4e59]:
+    - list "Tech stack" [ref=f4e60]:
+      - listitem [ref=f4e61]:
+        - generic [ref=f4e62]: build
+        - generic [ref=f4e63]: none
+      - listitem [ref=f4e64]:
+        - generic [ref=f4e65]: npm
+        - generic [ref=f4e66]: zero deps
+      - listitem [ref=f4e67]:
+        - generic [ref=f4e68]: frontend
+        - generic [ref=f4e69]: vanilla js
+      - listitem [ref=f4e70]:
+        - generic [ref=f4e71]: backend
+        - generic [ref=f4e72]: python · flask
+      - listitem [ref=f4e73]:
+        - generic [ref=f4e74]: database
+        - generic [ref=f4e75]: sqlite | mariadb
+      - listitem [ref=f4e76]:
+        - generic [ref=f4e77]: deploy
+        - generic [ref=f4e78]: docker optional
+      - listitem [ref=f4e79]:
+        - generic [ref=f4e80]: ai
+        - generic [ref=f4e81]: mcp built-in
+      - listitem [ref=f4e82]:
+        - generic [ref=f4e83]: extend
+        - generic [ref=f4e84]: plugin-first
+      - listitem [ref=f4e85]:
+        - generic [ref=f4e86]: network
+        - generic [ref=f4e87]: air-gap ready
+      - listitem [ref=f4e88]:
+        - generic [ref=f4e89]: telemetry
+        - generic [ref=f4e90]: none
+      - listitem [ref=f4e91]:
+        - generic [ref=f4e92]: license
+        - generic [ref=f4e93]: agpl v3
+    - paragraph [ref=f4e94]:
+      - text: No npm. No bundler. No CDN.
+      - strong [ref=f4e95]: Runs on air-gapped networks.
+  - generic [ref=f4e97]:
+    - generic [ref=f4e98]:
+      - heading "One library is all you need" [level=2] [ref=f4e99]
+      - paragraph [ref=f4e100]: From scanning to reading, organizing, and extending. Core features live in the core; everything else is open to plugins.
+    - generic [ref=f4e101]:
+      - generic [ref=f4e102]:
+        - heading "Auto-scan & organize" [level=3] [ref=f4e107]
+        - paragraph [ref=f4e108]: Periodically scans your folders to detect new books and fills in covers and metadata automatically. Keeps your library organized by category and series.
+      - generic [ref=f4e109]:
+        - heading "Many formats" [level=3] [ref=f4e116]
+        - paragraph [ref=f4e117]: Read EPUB, PDF, comics (CBZ), and text novels seamlessly in a single viewer.
+      - generic [ref=f4e118]:
+        - heading "Plugin ecosystem" [level=3] [ref=f4e123]
+        - paragraph [ref=f4e124]: Extend through standard contracts, from metadata providers to widgets and context menus. 47 community plugins are currently registered.
+      - generic [ref=f4e125]:
+        - heading "SQLite or MariaDB" [level=3] [ref=f4e131]
+        - paragraph [ref=f4e132]: Keep a single-user server light with SQLite, or scale large libraries up with MariaDB. Features stay identical when you switch backends.
+  - generic [ref=f4e135]:
+    - generic [ref=f4e136]:
+      - generic [ref=f4e137]: AI integration
+      - heading "Ask your library with MCP" [level=2] [ref=f4e138]
+      - paragraph [ref=f4e139]: BookOasis ships with a built-in MCP server. AI clients like Claude can read your library data and, through an approval step, even propose cleanup work.
+      - generic [ref=f4e140]:
+        - generic [ref=f4e141]: Read-only tools
+        - generic [ref=f4e142]: Approval queue
+        - generic [ref=f4e143]: Local stdio
+    - generic [ref=f4e144]:
+      - generic [ref=f4e145]: "# .mcp.json"
+      - generic [ref=f4e146]: "\"bookoasis\": {"
+      - generic [ref=f4e147]: "\"command\": \"python\","
+      - generic [ref=f4e148]: "\"args\": [\"tools/mcp_server.py\"]"
+      - generic [ref=f4e149]: "}"
+  - generic [ref=f4e151]:
+    - generic [ref=f4e152]:
+      - heading "Three steps to get started" [level=2] [ref=f4e153]
+      - paragraph [ref=f4e154]: Getting from install to your first library doesn't take long.
+    - generic [ref=f4e155]:
+      - generic [ref=f4e156]:
+        - generic [ref=f4e157]: "01"
+        - heading "Install" [level=3] [ref=f4e158]
+        - paragraph [ref=f4e159]: Run BookOasis with Docker or in a Python environment.
+      - generic [ref=f4e160]:
+        - generic [ref=f4e161]: "02"
+        - heading "Connect folders" [level=3] [ref=f4e162]
+        - paragraph [ref=f4e163]: Register the folders holding your ebooks and comics as libraries.
+      - generic [ref=f4e164]:
+        - generic [ref=f4e165]: "03"
+        - heading "Read" [level=3] [ref=f4e166]
+        - paragraph [ref=f4e167]: Once the scan finishes, start reading in the browser and pick up where you left off.
+    - generic "Install command examples" [ref=f4e168]:
+      - tablist [ref=f4e173]:
+        - tab "Docker · MariaDB + Redis" [selected] [ref=f4e174] [cursor=pointer]
+        - tab "Docker · SQLite + Redis" [ref=f4e175] [cursor=pointer]
+        - tab "Native Python" [ref=f4e176] [cursor=pointer]
+      - tabpanel "Docker · MariaDB + Redis" [ref=f4e177]: "# app + MariaDB + Redis, all in containers $ git clone https://github.com/leeyj/BookOasis_stable.git && cd BookOasis_stable $ cp .env.example .env # set SECRET_KEY $ cp docker-compose.override.example.yml docker-compose.override.yml # set your library path $ docker compose -f docker-compose.mariadb.ghcr.yml -f docker-compose.override.yml up -d # → http://localhost:5930"
+      - note [ref=f4e178]:
+        - generic [ref=f4e179]: Caution
+        - paragraph [ref=f4e180]:
+          - text: Default passwords are not recommended. The DB passwords in the compose file (
+          - code [ref=f4e181]: root_pass
+          - text: ","
+          - code [ref=f4e182]: bookoasis_pass
+          - text: ) are placeholders. Change them before any real use.
+  - generic [ref=f4e185]:
+    - heading "Put your own library on your own server" [level=2] [ref=f4e186]
+    - paragraph [ref=f4e187]: The source is public on GitHub, licensed under AGPLv3.
+    - generic [ref=f4e188]:
+      - link "Get started" [ref=f4e189] [cursor=pointer]:
+        - /url: docs.html
+      - link "Explore services" [ref=f4e193] [cursor=pointer]:
+        - /url: services.html
+  - contentinfo [ref=f4e195]:
+    - generic [ref=f4e196]:
+      - generic [ref=f4e197]:
+        - link [ref=f4e198] [cursor=pointer]:
+          - /url: index.html
+          - img "BookOasis" [ref=f4e200]
+          - text: BookOasis
+        - paragraph [ref=f4e201]: Self-hosted ebook & comic library server.
+      - list [ref=f4e202]:
+        - listitem [ref=f4e203]:
+          - link "Home" [ref=f4e204] [cursor=pointer]:
+            - /url: index.html
+        - listitem [ref=f4e205]:
+          - link "Services" [ref=f4e206] [cursor=pointer]:
+            - /url: services.html
+        - listitem [ref=f4e207]:
+          - link "Docs" [ref=f4e208] [cursor=pointer]:
+            - /url: docs.html
+        - listitem [ref=f4e209]:
+          - link "Wiki" [ref=f4e210] [cursor=pointer]:
+            - /url: wiki.html
+        - listitem [ref=f4e211]:
+          - link "GitHub" [ref=f4e212] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable
+    - generic [ref=f4e213]: An open-source project released under the AGPLv3 license.

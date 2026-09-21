@@ -1,4 +1,11 @@
 # CHANGELOG
+## v2.7.5
+- (improvement) MCP `search_books`에 `sort`(최근 추가순 등) 추가, `get_random_book` 도구 추가 | MCP `search_books` gains a `sort` option (e.g. newest first) and a new `get_random_book` tool
+- (fix) 표지 리사이즈 백필이 보스키 위장 화면(`fake_screen.png`)과 배너까지 축소해 해상도가 깨지던 이슈 수정 | fix the cover resize backfill also shrinking the boss-key decoy image (`fake_screen.png`) and banners, which degraded their resolution
+- (fix) MCP `search_books`가 요청한 limit보다 1건 더 반환하던 이슈 수정 | fix MCP `search_books` returning one more result than `limit`
+- (improvement) 검색창에서 Enter로 제목/주제/회차별 검색 결과를 가로 행 오버레이로 표시, `주제:` 검색(장르/태그) 추가, 책 상세 화면에서 검색하면 목록으로 이동 | Enter in the search box opens an overlay with title/topic/episode result rows, add `주제:` (genre/tag) search prefix, and searching from the book detail view now navigates to the list
+- (improvement) 관리자 전용: 카드 좌측 하단 `...` 버튼(호버 시 표시)으로 도서 경로/카테고리/추가일/포맷 확인, 카드 잠금 배지는 하단 중앙으로 이동 | admin-only `...` button on card bottom-left (shown on hover) showing path/category/added date/format; the lock badge moves to bottom-center
+
 ## v2.7.4
 - (fix) MariaDB에서 신규 테이블(`library_kinds`, `mcp_pending_changes`)이 생성되지 않아 사이드바 라이브러리/카테고리가 사라지던 이슈 수정 | fix new tables (`library_kinds`, `mcp_pending_changes`) not being created on MariaDB, which made sidebar libraries/categories disappear
 - (improvement) MariaDB 테이블 생성 실패가 조용히 무시되지 않고 로그에 남도록 개선 | log MariaDB CREATE TABLE failures instead of silently ignoring them

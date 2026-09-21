@@ -19,6 +19,11 @@ import threading
 MEDIA_SERVER_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_COVERS_DIR = os.path.join(MEDIA_SERVER_DIR, 'covers')
 
+# covers/ 루트에 놓이는 사용자 관리 이미지(표지가 아님). 표지 전용 처리(리사이즈 백필 등)가
+# 건드리면 안 된다 - 원본 해상도 그대로 화면 전체에 쓰이는 이미지라서다.
+BOSS_KEY_IMAGE_NAME = 'fake_screen.png'
+USER_MANAGED_COVER_FILES = (BOSS_KEY_IMAGE_NAME,)
+
 _dir_cache = None
 _ensured_paths = set()
 _warned_broken_paths = set()

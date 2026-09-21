@@ -1,0 +1,195 @@
+- generic [active] [ref=f3e1]:
+  - navigation [ref=f3e2]:
+    - generic [ref=f3e3]:
+      - link [ref=f3e4] [cursor=pointer]:
+        - /url: index.html
+        - img "BookOasis" [ref=f3e6]
+        - text: BookOasis
+      - list [ref=f3e7]:
+        - listitem [ref=f3e8]:
+          - link "홈" [ref=f3e9] [cursor=pointer]:
+            - /url: index.html
+        - listitem [ref=f3e10]:
+          - link "서비스" [ref=f3e11] [cursor=pointer]:
+            - /url: services.html
+        - listitem [ref=f3e12]:
+          - link "문서" [ref=f3e13] [cursor=pointer]:
+            - /url: docs.html
+        - listitem [ref=f3e14]:
+          - link "Wiki" [ref=f3e15] [cursor=pointer]:
+            - /url: wiki.html
+      - generic [ref=f3e16]:
+        - group "Language" [ref=f3e17]:
+          - link "한국어" [ref=f3e18] [cursor=pointer]:
+            - /url: index.html
+          - generic [aria-hidden] [ref=f3e19]: "|"
+          - link "English" [ref=f3e20] [cursor=pointer]:
+            - /url: en/index.html
+        - link "GitHub" [ref=f3e21] [cursor=pointer]:
+          - /url: https://github.com/leeyj/BookOasis_stable
+  - banner [ref=f3e25]:
+    - generic [ref=f3e26]:
+      - generic [ref=f3e27]:
+        - heading "흩어진 책과 만화를, 하나의 서재로." [level=1] [ref=f3e28]: 흩어진 책과 만화를,하나의 서재로.
+        - paragraph [ref=f3e29]: BookOasis는 전자책과 만화를 직접 호스팅하고 정리하는 오픈소스 미디어 서버입니다. 폴더를 지정하면 스캔하고, 브라우저에서 바로 읽습니다.
+        - generic [ref=f3e30]:
+          - link "시작하기" [ref=f3e31] [cursor=pointer]:
+            - /url: docs.html
+          - link "GitHub" [ref=f3e35] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable
+      - generic [ref=f3e39]:
+        - generic [ref=f3e40]: my-server.local/bookoasis
+        - img "BookOasis 홈 화면 실제 스크린샷" [ref=f3e45]
+  - generic [ref=f3e47]:
+    - generic [ref=f3e48]:
+      - strong [ref=f3e49]: SQLite
+      - text: ·
+      - strong [ref=f3e50]: MariaDB
+      - text: 듀얼 백엔드
+    - generic [ref=f3e51]:
+      - strong [ref=f3e52]: EPUB
+      - text: ·
+      - strong [ref=f3e53]: PDF
+      - text: ·
+      - strong [ref=f3e54]: CBZ
+      - text: ·
+      - strong [ref=f3e55]: TXT
+      - text: 지원
+    - generic [ref=f3e56]:
+      - strong [ref=f3e57]: AGPLv3
+      - text: 오픈소스
+    - generic [ref=f3e58]: Docker 배포 지원
+  - generic [ref=f3e59]:
+    - list "기술 스택" [ref=f3e60]:
+      - listitem [ref=f3e61]:
+        - generic [ref=f3e62]: build
+        - generic [ref=f3e63]: none
+      - listitem [ref=f3e64]:
+        - generic [ref=f3e65]: npm
+        - generic [ref=f3e66]: zero deps
+      - listitem [ref=f3e67]:
+        - generic [ref=f3e68]: frontend
+        - generic [ref=f3e69]: vanilla js
+      - listitem [ref=f3e70]:
+        - generic [ref=f3e71]: backend
+        - generic [ref=f3e72]: python · flask
+      - listitem [ref=f3e73]:
+        - generic [ref=f3e74]: database
+        - generic [ref=f3e75]: sqlite | mariadb
+      - listitem [ref=f3e76]:
+        - generic [ref=f3e77]: deploy
+        - generic [ref=f3e78]: docker optional
+      - listitem [ref=f3e79]:
+        - generic [ref=f3e80]: ai
+        - generic [ref=f3e81]: mcp built-in
+      - listitem [ref=f3e82]:
+        - generic [ref=f3e83]: extend
+        - generic [ref=f3e84]: plugin-first
+      - listitem [ref=f3e85]:
+        - generic [ref=f3e86]: network
+        - generic [ref=f3e87]: air-gap ready
+      - listitem [ref=f3e88]:
+        - generic [ref=f3e89]: telemetry
+        - generic [ref=f3e90]: none
+      - listitem [ref=f3e91]:
+        - generic [ref=f3e92]: license
+        - generic [ref=f3e93]: agpl v3
+    - paragraph [ref=f3e94]:
+      - text: npm 없음. 번들러 없음. CDN 없음.
+      - strong [ref=f3e95]: 폐쇄망에서도 그대로 실행합니다.
+  - generic [ref=f3e97]:
+    - generic [ref=f3e98]:
+      - heading "서재 하나로 충분합니다" [level=2] [ref=f3e99]
+      - paragraph [ref=f3e100]: 스캔부터 열람, 분류, 확장까지. 핵심 기능은 코어에, 나머지는 플러그인으로 열려 있습니다.
+    - generic [ref=f3e101]:
+      - generic [ref=f3e102]:
+        - heading "자동 스캔 & 정리" [level=3] [ref=f3e107]
+        - paragraph [ref=f3e108]: 지정한 폴더를 주기적으로 스캔해 신간을 감지하고, 표지와 메타데이터를 자동으로 채웁니다. 카테고리와 시리즈로 정리된 서재를 유지합니다.
+      - generic [ref=f3e109]:
+        - heading "다양한 포맷" [level=3] [ref=f3e116]
+        - paragraph [ref=f3e117]: EPUB, PDF, 만화(CBZ), 텍스트 소설까지 한 뷰어 안에서 이어서 읽습니다.
+      - generic [ref=f3e118]:
+        - heading "플러그인 생태계" [level=3] [ref=f3e123]
+        - paragraph [ref=f3e124]: 메타데이터 제공자, 위젯, 컨텍스트 메뉴까지 표준 계약으로 확장합니다. 현재 47개의 커뮤니티 플러그인이 등록되어 있습니다.
+      - generic [ref=f3e125]:
+        - heading "SQLite 또는 MariaDB" [level=3] [ref=f3e131]
+        - paragraph [ref=f3e132]: 1인 서버는 SQLite로 가볍게, 대규모 라이브러리는 MariaDB로 확장합니다. 백엔드를 바꿔도 기능은 동일합니다.
+  - generic [ref=f3e135]:
+    - generic [ref=f3e136]:
+      - generic [ref=f3e137]: AI 연동
+      - heading "MCP로 서재에 질문하기" [level=2] [ref=f3e138]
+      - paragraph [ref=f3e139]: BookOasis는 자체 MCP 서버를 내장합니다. Claude 같은 AI 클라이언트가 서재 데이터를 읽고, 승인 절차를 거쳐 정리 작업까지 제안할 수 있습니다.
+      - generic [ref=f3e140]:
+        - generic [ref=f3e141]: 읽기 전용 툴
+        - generic [ref=f3e142]: 승인 대기열
+        - generic [ref=f3e143]: 로컬 stdio
+    - generic [ref=f3e144]:
+      - generic [ref=f3e145]: "# .mcp.json"
+      - generic [ref=f3e146]: "\"bookoasis\": {"
+      - generic [ref=f3e147]: "\"command\": \"python\","
+      - generic [ref=f3e148]: "\"args\": [\"tools/mcp_server.py\"]"
+      - generic [ref=f3e149]: "}"
+  - generic [ref=f3e151]:
+    - generic [ref=f3e152]:
+      - heading "시작은 세 단계면 충분합니다" [level=2] [ref=f3e153]
+      - paragraph [ref=f3e154]: 설치부터 첫 서재 구성까지 오래 걸리지 않습니다.
+    - generic [ref=f3e155]:
+      - generic [ref=f3e156]:
+        - generic [ref=f3e157]: "01"
+        - heading "설치" [level=3] [ref=f3e158]
+        - paragraph [ref=f3e159]: Docker 또는 파이썬 환경에서 BookOasis를 실행합니다.
+      - generic [ref=f3e160]:
+        - generic [ref=f3e161]: "02"
+        - heading "폴더 연결" [level=3] [ref=f3e162]
+        - paragraph [ref=f3e163]: 전자책과 만화가 있는 폴더를 라이브러리로 등록합니다.
+      - generic [ref=f3e164]:
+        - generic [ref=f3e165]: "03"
+        - heading "감상" [level=3] [ref=f3e166]
+        - paragraph [ref=f3e167]: 스캔이 끝나면 브라우저에서 바로 읽고 이어보기를 시작합니다.
+    - generic "설치 명령어 예시" [ref=f3e168]:
+      - tablist [ref=f3e173]:
+        - tab "Docker · MariaDB + Redis" [selected] [ref=f3e174] [cursor=pointer]
+        - tab "Docker · SQLite + Redis" [ref=f3e175] [cursor=pointer]
+        - tab "Native Python" [ref=f3e176] [cursor=pointer]
+      - tabpanel "Docker · MariaDB + Redis" [ref=f3e177]: "# app + MariaDB + Redis, all in containers $ git clone https://github.com/leeyj/BookOasis_stable.git && cd BookOasis_stable $ cp .env.example .env # set SECRET_KEY $ cp docker-compose.override.example.yml docker-compose.override.yml # set your library path $ docker compose -f docker-compose.mariadb.ghcr.yml -f docker-compose.override.yml up -d # → http://localhost:5930"
+      - note [ref=f3e178]:
+        - generic [ref=f3e179]: 주의
+        - paragraph [ref=f3e180]:
+          - text: 기본 비밀번호는 권장하지 않습니다. compose 파일에 들어 있는 DB 비밀번호(
+          - code [ref=f3e181]: root_pass
+          - text: ","
+          - code [ref=f3e182]: bookoasis_pass
+          - text: )는 예시 값이므로, 실제로 사용하기 전에 반드시 변경하세요.
+  - generic [ref=f3e185]:
+    - heading "내 서버에, 내 서재를 올려보세요" [level=2] [ref=f3e186]
+    - paragraph [ref=f3e187]: 소스는 GitHub에 공개되어 있고, 라이선스는 AGPLv3입니다.
+    - generic [ref=f3e188]:
+      - link "시작하기" [ref=f3e189] [cursor=pointer]:
+        - /url: docs.html
+      - link "서비스 자세히 보기" [ref=f3e193] [cursor=pointer]:
+        - /url: services.html
+  - contentinfo [ref=f3e195]:
+    - generic [ref=f3e196]:
+      - generic [ref=f3e197]:
+        - link [ref=f3e198] [cursor=pointer]:
+          - /url: index.html
+          - img "BookOasis" [ref=f3e200]
+          - text: BookOasis
+        - paragraph [ref=f3e201]: 자체 호스팅 전자책 & 만화 라이브러리 서버.
+      - list [ref=f3e202]:
+        - listitem [ref=f3e203]:
+          - link "홈" [ref=f3e204] [cursor=pointer]:
+            - /url: index.html
+        - listitem [ref=f3e205]:
+          - link "서비스" [ref=f3e206] [cursor=pointer]:
+            - /url: services.html
+        - listitem [ref=f3e207]:
+          - link "문서" [ref=f3e208] [cursor=pointer]:
+            - /url: docs.html
+        - listitem [ref=f3e209]:
+          - link "Wiki" [ref=f3e210] [cursor=pointer]:
+            - /url: wiki.html
+        - listitem [ref=f3e211]:
+          - link "GitHub" [ref=f3e212] [cursor=pointer]:
+            - /url: https://github.com/leeyj/BookOasis_stable
+    - generic [ref=f3e213]: AGPLv3 라이선스로 배포되는 오픈소스 프로젝트입니다.

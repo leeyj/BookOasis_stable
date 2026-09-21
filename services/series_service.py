@@ -67,8 +67,12 @@ def _normalize_library_id(library_id):
     return library_id
 
 
-def _build_series_entries(db_type, rows):
+def _build_series_entries(db_type, rows, search_query=''):
     from services.content_rating_service import ContentRatingService
+    from repositories.series_search_query import parse_series_search_query
+
+    search_mode, search_term = parse_series_search_query(search_query)
+    search_term = search_term.lower() if search_mode == 'title' else ''
 
     # 성인 키워드 설정은 시리즈마다 DB에서 다시 읽지 않고 여기서 한 번만 읽는다 (전체 목록/초성 이동처럼
     # 수만 시리즈를 한 번에 만들 때 설정 조회가 빌드 시간의 절반을 차지했다).
@@ -141,7 +145,14 @@ def _build_series_entries(db_type, rows):
 
         book_count = sum(int(b.get('series_book_count') or b.get('book_count') or 1) for b in books)
 
-        entries.append({
+        # 시리즈명/별칭이 검색어와 무관한데 회차 제목만 일치해 걸린 경우, 카드에 그 근거를 표시한다.
+        match_info = None
+        if search_term and not any(search_term in str(v or '').lower() for v in (series_name, series_alias)):
+            matched_title = next((b.get('matched_title') for b in books if b.get('matched_title')), None)
+            if matched_title:
+                match_info = {'field': 'episode', 'text': matched_title, 'count': book_count}
+
+        entry = {
             'series_key': f"{lib_id}:{series_key}",
             'series_name': series_name,
             'series_alias': series_alias,
@@ -166,7 +177,10 @@ def _build_series_entries(db_type, rows):
             'publication_status': publication_status,
             'publication_status_label': {'0': '연재', '1': '휴재', '2': '완결'}.get(publication_status, '알 수 없음'),
             'anchor_dir': comp_dir,
-        })
+        }
+        if match_info:
+            entry['match_info'] = match_info
+        entries.append(entry)
 
     return entries
 
@@ -354,6 +368,33 @@ class SeriesService:
             _bump_shared_books_cache_epoch(db_type)
 
     @staticmethod
+    def search_overlay(db_type, library_id, query, user_id=None, role=None, per_row=30):
+        """Ctrl+Enter 검색 오버레이용: 같은 검색어를 제목/주제/회차 세 갈래로 나눠 돌려준다.
+        - series: 시리즈명·별칭이 일치 (match_info 없음)
+        - episode: 회차 제목만 일치 (match_info 있음)
+        - topic: 장르/태그가 일치 (일반/성인 라이브러리만)"""
+        query = (query or '').strip()
+        empty = {'series': [], 'episode': [], 'topic': []}
+        if not query:
+            return empty
+
+        def _fetch(q):
+            return SeriesService.get_books_list(
+                db_type, library_id, 1, 1000, q, 'asc', user_id=user_id, role=role
+            )
+
+        matched = _fetch(query)
+        result = {
+            'series': [e for e in matched if 'match_info' not in e][:per_row],
+            'episode': [e for e in matched if 'match_info' in e][:per_row],
+            'topic': [],
+        }
+        if db_type in ('general', 'adult'):
+            from repositories.series_search_query import TOPIC_PREFIX
+            result['topic'] = _fetch(f'{TOPIC_PREFIX}{query}')[:per_row]
+        return result
+
+    @staticmethod
     def get_books_list(db_type, library_id, page, limit, search_query, sort='asc', genre_filters=None, tag_filters=None, user_id=None, role=None, group_by=None, author_key=None, include_has_metadata=False):
         import time
         t0 = time.perf_counter()
@@ -428,11 +469,11 @@ class SeriesService:
             if author_key:
                 from repositories.series_search_query import normalize_author_key
                 rows = [r for r in rows if normalize_author_key(r['author']) == author_key]
-                entries = _build_series_entries(db_type, rows)
+                entries = _build_series_entries(db_type, rows, search_query)
             elif group_by == 'author':
                 entries = _build_author_entries(db_type, rows)
             else:
-                entries = _build_series_entries(db_type, rows)
+                entries = _build_series_entries(db_type, rows, search_query)
             t3 = time.perf_counter()
 
             _sort_entries(entries, sort=sort)
@@ -463,7 +504,7 @@ class SeriesService:
         )
         t2 = time.perf_counter()
 
-        entries = _build_series_entries(db_type, rows)
+        entries = _build_series_entries(db_type, rows, search_query)
         t3 = time.perf_counter()
 
         _sort_entries(entries, sort=sort)

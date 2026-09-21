@@ -3,11 +3,11 @@
 <link rel="stylesheet" href="{{ static_asset_url('css/tab_media_library_viewer.css') }}">
 <link rel="stylesheet" href="{{ static_asset_url('css/mobile.css') }}" media="screen and (max-width: 1200px)">
 <link rel="stylesheet" href="/api/media/settings/custom-themes.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<script src="{{ static_asset_url('lib/jszip/jszip.min.js') }}"></script>
+<script src="{{ static_asset_url('lib/pdfjs/pdf.min.js') }}"></script>
 <script>
     // pdfjs worker 설정
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '{{ static_asset_url('lib/pdfjs/pdf.worker.min.js') }}';
 </script>
 
 <div class="media-library-container">

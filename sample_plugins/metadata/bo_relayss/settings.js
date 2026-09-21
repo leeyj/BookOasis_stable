@@ -86,7 +86,7 @@
             }
 
             statusBadge.className = "bo-status-badge status-loading";
-            statusBadge.innerHTML = '<i class="bi bi-hourglass-split"></i> 접속 확인 중...';
+            statusBadge.innerHTML = '<i class="fa-solid fa-hourglass-half"></i> 접속 확인 중...';
 
             try {
                 const response = await fetch(`${config.domain_url}/api/verify`, {
@@ -101,17 +101,17 @@
                 const data = await response.json();
                 if (response.ok && data.success) {
                     statusBadge.className = "bo-status-badge status-success";
-                    statusBadge.innerHTML = '<i class="bi bi-check-circle-fill"></i> 접속 성공';
+                    statusBadge.innerHTML = '<i class="fa-solid fa-circle-check"></i> 접속 성공';
                     alert(`[접속 성공] ${data.message}`);
                 } else {
                     statusBadge.className = "bo-status-badge status-error";
-                    statusBadge.innerHTML = '<i class="bi bi-x-circle-fill"></i> 접속 실패';
+                    statusBadge.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> 접속 실패';
                     alert(`[접속 실패] ${data.message || '서버 응답 오류'}`);
                 }
             } catch (err) {
                 console.error("[bo.relaySS] Connection test error:", err);
                 statusBadge.className = "bo-status-badge status-error";
-                statusBadge.innerHTML = '<i class="bi bi-exclamation-triangle-fill"></i> 연결 오류';
+                statusBadge.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> 연결 오류';
                 alert(`[접속 오류] bo.relaySS 서버에 연결할 수 없습니다.\n도메인 주소를 확인하세요: ${err.message}`);
             }
         });

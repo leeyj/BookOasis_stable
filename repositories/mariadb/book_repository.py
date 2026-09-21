@@ -90,7 +90,8 @@ class BookRepository:
                 where.append("library_id = %s")
                 params.append(library_id)
             sql = f"""
-                SELECT COUNT(*) AS book_count, SUM(file_size) AS total_size, MIN(file_path) AS sample_path
+                SELECT COUNT(*) AS book_count, SUM(file_size) AS total_size, MIN(file_path) AS sample_path,
+                       GROUP_CONCAT(DISTINCT LOWER(file_format)) AS formats, MAX(created_at) AS latest_added
                 FROM books
                 WHERE {' AND '.join(where)}
             """
@@ -104,7 +105,7 @@ class BookRepository:
         with database.connection(db_type) as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT title, file_path, file_size FROM books WHERE id = %s AND COALESCE(is_deleted, 0) = 0",
+                "SELECT title, file_path, file_size, file_format, created_at FROM books WHERE id = %s AND COALESCE(is_deleted, 0) = 0",
                 (book_id,)
             )
             row = cursor.fetchone()

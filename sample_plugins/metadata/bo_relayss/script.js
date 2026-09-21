@@ -30,7 +30,7 @@
     function renderConfigAlert() {
         const html = `
             <div class="bo-alert">
-                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <i class="fa-solid fa-triangle-exclamation me-2"></i>
                 <strong>플러그인 설정이 필요합니다</strong><br>
                 [설정] ⚙️ -> [플러그인] -> <strong>bo.relaySS</strong>에서 사용자 식별코드, 도메인 주소 및 32자리 인증 토큰을 생성하십시오.
             </div>
@@ -67,7 +67,7 @@
     function renderMyLinks(links) {
         myLinksCount.textContent = `${links.length}개`;
         if (links.length === 0) {
-            myLinksContainer.innerHTML = `<div class="bo-empty-state"><i class="bi bi-inbox"></i><p>등록한 구글 링크가 없습니다.</p></div>`;
+            myLinksContainer.innerHTML = `<div class="bo-empty-state"><i class="fa-solid fa-inbox"></i><p>등록한 구글 링크가 없습니다.</p></div>`;
             return;
         }
 
@@ -79,11 +79,11 @@
                         <span class="bo-item-title">${escapeHtml(link.title)}</span>
                         <span style="color: #64748b;">:</span>
                         <a href="${escapeHtml(link.google_url)}" target="_blank" class="bo-item-link">
-                            ${escapeHtml(link.google_url)} <i class="bi bi-box-arrow-up-right small"></i>
+                            ${escapeHtml(link.google_url)} <i class="fa-solid fa-arrow-up-right-from-square small"></i>
                         </a>
                     </div>
                     <button type="button" class="bo-btn-delete btn-delete-link" data-id="${link.id}" title="삭제">
-                        <i class="bi bi-trash-fill"></i> 삭제
+                        <i class="fa-solid fa-trash"></i> 삭제
                     </button>
                 </li>
             `;
@@ -105,7 +105,7 @@
     function renderAllLinks(links) {
         allLinksCount.textContent = `${links.length}개`;
         if (links.length === 0) {
-            allLinksContainer.innerHTML = `<div class="bo-empty-state"><i class="bi bi-inbox"></i><p>bo.relaySS에 등록된 링크가 없습니다.</p></div>`;
+            allLinksContainer.innerHTML = `<div class="bo-empty-state"><i class="fa-solid fa-inbox"></i><p>bo.relaySS에 등록된 링크가 없습니다.</p></div>`;
             return;
         }
 
@@ -118,7 +118,7 @@
                         <span class="bo-item-title" style="color: #fbbf24;">${escapeHtml(link.title)}</span>
                         <span style="color: #64748b;">:</span>
                         <a href="${escapeHtml(link.google_url)}" target="_blank" class="bo-item-link">
-                            ${escapeHtml(link.google_url)} <i class="bi bi-box-arrow-up-right small"></i>
+                            ${escapeHtml(link.google_url)} <i class="fa-solid fa-arrow-up-right-from-square small"></i>
                         </a>
                     </div>
                     <span style="color: #64748b; font-size: 12px;">${link.created_at || ''}</span>
