@@ -395,7 +395,7 @@ class SeriesService:
         return result
 
     @staticmethod
-    def get_books_list(db_type, library_id, page, limit, search_query, sort='asc', genre_filters=None, tag_filters=None, user_id=None, role=None, group_by=None, author_key=None, include_has_metadata=False):
+    def get_books_list(db_type, library_id, page, limit, search_query, sort='asc', genre_filters=None, tag_filters=None, user_id=None, role=None, group_by=None, author_key=None, include_has_metadata=False, return_has_more=False):
         import time
         t0 = time.perf_counter()
         _sync_local_books_cache_with_shared_epoch(db_type)
@@ -438,7 +438,10 @@ class SeriesService:
             cached = _LIST_QUERY_CACHE.get(cache_key)
             if cached and (now - cached[0] < _LIST_QUERY_CACHE_TTL):
                 entries = cached[1]
-                return entries[offset:offset + limit + 1]
+                sliced = entries[offset:offset + limit + 1]
+                if return_has_more:
+                    return sliced, len(sliced) > limit
+                return sliced
         else:
             cached = _LIST_QUERY_CACHE.get(cache_key)
             if cached and (now - cached[0] < _LIST_QUERY_CACHE_TTL):
@@ -446,6 +449,8 @@ class SeriesService:
                 paged = entries[offset:offset + limit + 1]
                 t_cached = time.perf_counter()
                 print(f"[PERF-PROFILE] get_books_list(lib={library_id}, page={page}) QUERY-CACHE HIT ({len(entries)}entries): {(t_cached-t0)*1000:.1f}ms")
+                if return_has_more:
+                    return paged, len(paged) > limit
                 return paged
 
             t1 = time.perf_counter()
@@ -482,6 +487,8 @@ class SeriesService:
             _LIST_QUERY_CACHE[cache_key] = (now, entries)
             paged = entries[offset:offset + limit + 1]
             print(f"[PERF-PROFILE] get_books_list(lib={library_id}, page={page}) FULL-SCAN CACHE BUILD TOTAL: {(t4-t0)*1000:.1f}ms | SQL-Fetch({len(rows)}rows): {(t2-t1)*1000:.1f}ms | BuildSeries({len(entries)}entries): {(t3-t2)*1000:.1f}ms | Sort: {(t4-t3)*1000:.1f}ms")
+            if return_has_more:
+                return paged, len(paged) > limit
             return paged
 
         sql_limit = limit + 1
@@ -511,8 +518,17 @@ class SeriesService:
         t4 = time.perf_counter()
 
         paged = entries if sql_limit is not None else entries[offset:offset + limit + 1]
-        
+        # [v2.7.6 버그수정] has_more를 그룹핑 후 entries 개수(len(paged) > limit)로 판정하면,
+        # 오디오북/영상처럼 여러 row(예: 같은 제목의 분권)가 한 시리즈로 묶이는 경우 이 페이지의
+        # 원본 도서 행(sql_limit개)이 실제로는 limit보다 적은 개수의 시리즈로 뭉쳐질 수 있어
+        # (예: 61행 fetch → 58시리즈로 그룹핑) 실제로는 수천 개가 더 남아있어도 has_more가
+        # False로 잘못 판정되어 무한 스크롤이 그 자리에서 영구히 멈췄다(2846개 중 58개에서
+        # 중단된 실제 사례). 원본 행 개수(len(rows))가 sql_limit을 채웠는지로 판정해야
+        # 그룹핑 손실과 무관하게 "이 뒤로 더 있는지"를 정확히 알 수 있다.
+        raw_has_more = len(rows) > limit
         print(f"[PERF-PROFILE] get_books_list(lib={library_id}, page={page}) TOTAL: {(t4-t0)*1000:.1f}ms | SQL-Fetch({len(rows)}rows): {(t2-t1)*1000:.1f}ms | BuildSeries({len(entries)}entries): {(t3-t2)*1000:.1f}ms | Sort: {(t4-t3)*1000:.1f}ms")
+        if return_has_more:
+            return paged, raw_has_more
         return paged
 
     @staticmethod

@@ -1,8 +1,13 @@
 # CHANGELOG
+## v2.7.7
+- (fix) 오디오북/영상 강좌 목록에서, 같은 제목으로 여러 권이 한 시리즈로 묶이는 경우 무한 스크롤이 실제로는 수천 개가 남았어도 중간에 영구히 멈추던 이슈 수정 | fix audiobook/video list infinite scroll permanently stopping partway through even with thousands of series remaining, when multiple rows collapse into one grouped series
+
+
 ## v2.7.6
 - (fix) 오디오북/영상 강좌 표지가 없을 때 뜨는 대체 이미지에 캐시 헤더가 없어 매 요청마다 재생성되던 이슈 수정, 커버 API의 중복 DB 조회 제거 | fix the audiobook/video fallback cover image missing cache headers (regenerated on every request), and remove a duplicate DB lookup in the cover API
 - (fix) 카드 썸네일이 원본 비율과 안 맞으면 이미지를 늘려서 채우던 것을 되돌리고 크롭 방식으로 복원 (필요하면 커버 정렬 메뉴 사용) | revert card thumbnails stretching mismatched-ratio covers to fill the frame; back to cropping (use the cover-align menu if needed)
 - (improvement) 메인 목록에서 개별 권 카드를 다중 선택하면 "커버 정렬"을 한 번에 일괄 적용 가능 (시리즈 집계 카드는 제외) | multi-selecting individual volume cards in the main list now lets "cover align" be applied to all of them at once (series-aggregate cards excluded)
+
 
 ## v2.7.5
 - (improvement) MCP `search_books`에 `sort`(최근 추가순 등) 추가, `get_random_book` 도구 추가 | MCP `search_books` gains a `sort` option (e.g. newest first) and a new `get_random_book` tool

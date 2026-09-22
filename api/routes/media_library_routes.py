@@ -89,7 +89,7 @@ def get_media_list():
         page, limit = 1, 30
 
     try:
-        series_list = SeriesService.get_books_list(
+        series_list, has_more = SeriesService.get_books_list(
             db_type,
             library_id,
             page,
@@ -102,9 +102,9 @@ def get_media_list():
             role=role,
             group_by=group_by,
             author_key=author_key,
-            include_has_metadata=include_has_metadata
+            include_has_metadata=include_has_metadata,
+            return_has_more=True
         )
-        has_more = len(series_list) > limit
         if has_more:
             series_list = series_list[:limit]
         t_end = time.perf_counter()
