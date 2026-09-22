@@ -306,7 +306,7 @@ def _send_audio_range_response(file_path):
         return rv
 
 
-def _has_audiobook_library_access(aid):
+def _has_audiobook_library_access(aid, row=None):
     user_id = session.get('user_id')
     role = session.get('role')
     if role == 'admin':
@@ -314,9 +314,11 @@ def _has_audiobook_library_access(aid):
     if not user_id:
         return False
 
-    from repositories.audiobook_repository import AudiobookRepository
     from repositories.category_repository import CategoryRepository
-    ab = AudiobookRepository.get_audiobook_by_id(aid)
+    ab = row
+    if ab is None:
+        from repositories.audiobook_repository import AudiobookRepository
+        ab = AudiobookRepository.get_audiobook_by_id(aid)
     if not ab or not ab.get('library_id'):
         return False
     return CategoryRepository.check_user_category_access('audiobook', user_id, ab['library_id'])
@@ -324,11 +326,11 @@ def _has_audiobook_library_access(aid):
 @audiobook_bp.route('/api/media/audiobooks/<int:aid>/cover', methods=['GET'])
 def get_audiobook_cover(aid):
     """오디오북 대표 앨범 포스터 이미지 서빙"""
-    if not _has_audiobook_library_access(aid):
-        return jsonify({'success': False, 'error': '오디오북 접근 권한이 없습니다.'}), 403
-
     from repositories.audiobook_repository import AudiobookRepository
     row = AudiobookRepository.get_audiobook_by_id(aid)
+
+    if not _has_audiobook_library_access(aid, row=row):
+        return jsonify({'success': False, 'error': '오디오북 접근 권한이 없습니다.'}), 403
 
     if row and row.get('poster'):
         from utils.cover_helper import get_or_cache_remote_poster_webp
@@ -337,11 +339,16 @@ def get_audiobook_cover(aid):
             from api.stream import send_cached_cover_file
             return send_cached_cover_file(cache_path)
 
-    # Fallback SVG 생성
+    # Fallback SVG 생성 (만화/영상 커버와 동일하게 캐시 헤더 부여 - 그리드에 표지 없는
+    # 항목이 몰려 있으면 매 리로드마다 재생성/재요청이 팬아웃되어 gunicorn 스레드를
+    # 고갈시켰던 문제라 캐싱이 핵심 수정 지점)
     title = row.get('title') if row else 'Audiobook'
-    from api.stream import _build_fallback_svg
+    from api.stream import _build_fallback_svg, _hash_string
     svg_data = _build_fallback_svg(title, file_format='audiobook', seed=str(aid))
-    return Response(svg_data, mimetype='image/svg+xml')
+    res = Response(svg_data, mimetype='image/svg+xml')
+    res.headers['Cache-Control'] = 'public, max-age=86400'
+    res.set_etag(str(_hash_string(f"{title}|audiobook|{aid}")))
+    return res
 
 @audiobook_bp.route('/api/media/audiobooks/<int:aid>/tracks/<int:tid>/stream', methods=['GET'])
 @login_required

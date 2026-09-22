@@ -33,6 +33,7 @@ function targetFromCard(card) {
     libraryId: Number.isFinite(parsedLibraryId) ? parsedLibraryId : null,
     fileFormat: String(card.dataset.fileFormat || '').toLowerCase(),
     coverAlign: card.dataset.coverAlign || 'center',
+    bookCount: parseInt(card.dataset.bookCount, 10) || 1,
     isVolumeDetail: false,
     selectionKey: `${getScope()}:${parsedLibraryId || ''}:${id}`,
   };

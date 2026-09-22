@@ -255,7 +255,7 @@ def _stream_transcoded_video(file_path, video_id=None, episode_id=None):
     return rv
 
 
-def _has_video_library_access(vid):
+def _has_video_library_access(vid, row=None):
     user_id = session.get('user_id')
     role = session.get('role')
     if role == 'admin':
@@ -263,9 +263,10 @@ def _has_video_library_access(vid):
     if not user_id:
         return False
 
-    from repositories.video_repository import VideoRepository
     from repositories.category_repository import CategoryRepository
-    row = VideoRepository.get_video_by_id(vid)
+    if row is None:
+        from repositories.video_repository import VideoRepository
+        row = VideoRepository.get_video_by_id(vid)
     if not row or not row.get('library_id'):
         return False
     return CategoryRepository.check_user_category_access('video', user_id, row['library_id'])
@@ -315,11 +316,11 @@ def get_video_detail_api(vid):
 @video_bp.route('/api/media/videos/<int:vid>/cover', methods=['GET'])
 def get_video_cover(vid):
     """강좌 대표 포스터 이미지 서빙"""
-    if not _has_video_library_access(vid):
-        return jsonify({'success': False, 'error': '영상 강좌 접근 권한이 없습니다.'}), 403
-
     from repositories.video_repository import VideoRepository
     row = VideoRepository.get_video_by_id(vid)
+
+    if not _has_video_library_access(vid, row=row):
+        return jsonify({'success': False, 'error': '영상 강좌 접근 권한이 없습니다.'}), 403
 
     if row and row.get('poster'):
         from utils.cover_helper import get_or_cache_remote_poster_webp
@@ -328,11 +329,14 @@ def get_video_cover(vid):
             from api.stream import send_cached_cover_file
             return send_cached_cover_file(cache_path)
 
-    # Fallback SVG 생성
+    # Fallback SVG 생성 (캐시 헤더 부여 이유는 오디오북 커버 라우트와 동일)
     title = row.get('title') if row else 'Video'
-    from api.stream import _build_fallback_svg
+    from api.stream import _build_fallback_svg, _hash_string
     svg_data = _build_fallback_svg(title, file_format='video', seed=str(vid))
-    return Response(svg_data, mimetype='image/svg+xml')
+    res = Response(svg_data, mimetype='image/svg+xml')
+    res.headers['Cache-Control'] = 'public, max-age=86400'
+    res.set_etag(str(_hash_string(f"{title}|video|{vid}")))
+    return res
 
 
 @video_bp.route('/api/media/videos/<int:vid>/episodes/<int:eid>/stream', methods=['GET'])

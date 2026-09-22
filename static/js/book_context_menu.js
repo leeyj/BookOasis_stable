@@ -279,10 +279,24 @@ export function showBookContextMenu(x, y, bookId, bookTitle, isVolumeDetail = fa
     addSeriesItem.style.display = (isMultiSelection ? allSelectedHaveSeries : !!seriesName) ? '' : 'none';
   }
 
-  // "커버 정렬"은 개별 권(볼륨) 카드에서만 의미가 있음 (시리즈 카드는 어느 권을 정렬할지 모호함)
+  // "커버 정렬"은 개별 권(볼륨) 카드에서만 의미가 있음 (시리즈 집계 카드는 어느 권을 정렬할지
+  // 모호함) - 메인 그리드에서도 book_count===1(집계가 아닌 개별 권 카드)이면 허용하고,
+  // 다중 선택은 선택된 전부가 개별 권일 때만 허용해 한 번에 일괄 정렬할 수 있게 한다.
   const coverAlignItem = document.getElementById('ctx-cover-align-book');
   if (coverAlignItem) {
-    coverAlignItem.style.display = (!isMultiSelection && isVolumeDetail) ? '' : 'none';
+    const targetBookCount = Number(context.bookCount) > 0 ? Number(context.bookCount) : 1;
+    const multiAllSingleBooks = isMultiSelection
+      && selectedBooks.every(book => (Number(book.bookCount) || 1) <= 1);
+    const showCoverAlign = isVolumeDetail
+      || (!isMultiSelection && targetBookCount <= 1)
+      || multiAllSingleBooks;
+    coverAlignItem.style.display = showCoverAlign ? '' : 'none';
+    const coverAlignLabel = coverAlignItem.querySelector('span');
+    if (coverAlignLabel) {
+      coverAlignLabel.textContent = multiAllSingleBooks
+        ? `선택한 ${selectedBooks.length}개 커버 정렬 (이중 스캔본용)`
+        : '커버 정렬 (이중 스캔본용)';
+    }
   }
 
   const readToggleItem = document.getElementById('ctx-unread-book');
@@ -714,12 +728,16 @@ function resolveBookContextTarget(event) {
   const libraryId = Number.isFinite(parsedLibraryId) ? parsedLibraryId : null;
   const coverAlign = card.dataset?.coverAlign || 'center';
   const fileFormat = (card.dataset?.fileFormat || '').toLowerCase();
+  // 시리즈 집계 카드(여러 권을 대표)는 book_count > 1 - "커버 정렬"은 어느 권을 정렬할지
+  // 모호해지므로 이 값으로 개별 권 카드인지 판별한다 (상세뷰 .vol-grid-card/.volume-card는
+  // book_count 속성이 없어 기본값 1로 취급 - 애초에 개별 권이라 항상 명확함).
+  const bookCount = parseInt(card.dataset?.bookCount, 10) || 1;
   // .book-card(ui.js)는 data-has-progress를 직접 갖고 있지만, 상세뷰의 .vol-grid-card/.volume-card는
   // data-pages-read/data-is-completed만 있으므로 그걸로 동일하게 계산한다.
   const hasProgress = card.dataset?.hasProgress !== undefined
     ? card.dataset.hasProgress === '1'
     : (card.dataset?.isCompleted === '1' || Number(card.dataset?.pagesRead || 0) > 0);
-  return { id: parsedId, title, isVolumeDetail, markUnreadScope, seriesName, libraryId, coverAlign, fileFormat, hasProgress };
+  return { id: parsedId, title, isVolumeDetail, markUnreadScope, seriesName, libraryId, coverAlign, bookCount, fileFormat, hasProgress };
 }
 
 // 카드별 개별 바인딩 누락/재렌더 타이밍 이슈가 있어도 우클릭 메뉴를 보장한다.
@@ -749,6 +767,7 @@ document.addEventListener('contextmenu', (event) => {
     seriesName: target.seriesName,
     libraryId: target.libraryId,
     coverAlign: target.coverAlign,
+    bookCount: target.bookCount,
     fileFormat: target.fileFormat,
     hasProgress: target.hasProgress,
     selectedBooks,
@@ -990,8 +1009,10 @@ if (!window.__bookContextActionBound) {
     if (action === 'cover-align') {
       const bookId = currentTargetBook?.id;
       const coverAlign = currentTargetBook?.coverAlign;
+      const selectedBooks = Array.isArray(currentTargetBook?.selectedBooks) ? currentTargetBook.selectedBooks : [];
+      const bulkBookIds = selectedBooks.length > 1 ? selectedBooks.map(book => book.id) : null;
       closeBookContextMenu();
-      return window.showVolumeCoverAlignContextMenu?.(lastEventX, lastEventY, bookId, coverAlign);
+      return window.showVolumeCoverAlignContextMenu?.(lastEventX, lastEventY, bookId, coverAlign, bulkBookIds);
     }
   }, true);
   window.__bookContextActionBound = true;

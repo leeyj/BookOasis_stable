@@ -2544,9 +2544,10 @@ body {
 .book-card-cover img {
     width: 100%;
     height: 100%;
-    /* Kavita처럼 썸네일 프레임을 빈틈없이 채운다. 원본 비율과 프레임 비율 차이는
-       소폭 늘려 맞추며, 잘림이나 흐림 배경 띠를 만들지 않는다. */
-    object-fit: fill;
+    /* object-fit: fill로 프레임을 빈틈없이 채우던 실험은 원본 비율이 안 맞는 표지가
+       찌그러져 보여 되돌렸다(v2.7.6) - 비율 차이는 크롭으로 흡수하고, 보이는 부분을
+       조정하고 싶으면 "커버 정렬"(우클릭 메뉴, object-position) 기능을 쓰게 한다. */
+    object-fit: cover;
     position: relative;
     z-index: 1;
     opacity: 0;
