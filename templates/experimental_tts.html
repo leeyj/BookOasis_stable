@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>TTS 실험 (Supertonic 3)</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; background: #14171c; color: #e6e8eb;
+    font-family: -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 16px 16px 48px; }
+  h1 { font-size: 18px; margin: 4px 0 2px; }
+  .sub { color: #8b93a1; font-size: 13px; margin-bottom: 14px; }
+  section { background: #1b1f26; border: 1px solid #2a2f37; border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
+  section h2 { font-size: 14px; margin: 0 0 8px; color: #b9c0cc; }
+  .banner { background: #4a2a12; border: 1px solid #8a4b1c; color: #ffd8b0; border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 13px; display: none; }
+  dl.kv { display: grid; grid-template-columns: max-content 1fr; gap: 3px 12px; margin: 0; font-size: 13px; }
+  dl.kv dt { color: #8b93a1; } dl.kv dd { margin: 0; word-break: break-all; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  label { font-size: 13px; color: #b9c0cc; display: flex; gap: 6px; align-items: center; }
+  select, input[type=number] {
+    padding: 6px 8px; border-radius: 6px; border: 1px solid #3a3f47; background: #1e2229; color: #e6e8eb; font-size: 14px; max-width: 100%;
+  }
+  button {
+    padding: 8px 14px; border-radius: 6px; border: none; background: #3563e0; color: #fff; font-weight: 600; font-size: 14px; cursor: pointer;
+  }
+  button.secondary { background: #2d333d; }
+  button:disabled { opacity: .45; cursor: default; }
+  .bar { height: 8px; background: #2a2f37; border-radius: 4px; overflow: hidden; margin: 8px 0 4px; }
+  .bar > div { height: 100%; width: 100%; background: #4d7cff; transform: scaleX(0); transform-origin: left; transition: transform .2s; }
+  #now { font-size: 18px; line-height: 1.6; min-height: 3.2em; margin: 6px 0 10px; }
+  #context { font-size: 13px; color: #8b93a1; line-height: 1.5; }
+  .controls { display: flex; gap: 8px; justify-content: center; margin: 10px 0; }
+  .controls button { min-width: 56px; font-size: 18px; }
+  input[type=range] { width: 100%; }
+  .stats { font-size: 12px; color: #8b93a1; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+  audio { width: 100%; margin-top: 8px; }
+  #log { font: 12px/1.45 ui-monospace, Consolas, monospace; white-space: pre-wrap; max-height: 220px; overflow: auto; color: #9aa3b0; margin: 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="bookTitle">TTS 실험</h1>
+  <div class="sub" id="bookSub">브라우저에서 직접 음성을 만들어 읽어 줍니다. 서버 CPU는 쓰지 않습니다.</div>
+  <div class="banner" id="insecure">HTTPS가 아닌 주소로 접속했습니다. 이 상태에서는 WebGPU, 멀티스레드, 모델 캐시가 모두 꺼져 실시간보다 느립니다. HTTPS 주소(예: Cloudflare 도메인)로 열어 주세요.</div>
+
+  <section id="pickSection" style="display:none">
+    <h2>도서 선택</h2>
+    <div class="row">
+      <label>book_id <input type="number" id="pickId" min="1" style="width:110px"></label>
+      <label>DB <select id="pickDb"><option value="general">general</option><option value="adult">adult</option></select></label>
+      <button id="pickGo">열기</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>환경</h2>
+    <dl class="kv" id="env"></dl>
+  </section>
+
+  <section>
+    <h2>모델 (약 400MB, 한 번 받으면 브라우저에 저장)</h2>
+    <div class="row">
+      <label>백엔드 <select id="backend"><option value="auto">자동</option><option value="webgpu">WebGPU</option><option value="wasm">WASM</option></select></label>
+      <button id="loadBtn">모델 불러오기</button>
+    </div>
+    <div class="bar"><div id="dlBar"></div></div>
+    <dl class="kv" id="loadInfo"></dl>
+  </section>
+
+  <section>
+    <h2>읽기</h2>
+    <div class="row" style="margin-bottom:8px">
+      <label id="chapterWrap" style="display:none">챕터 <select id="chapter"></select></label>
+      <label>음성 <select id="voice"></select></label>
+      <label>품질 <select id="steps"><option value="2">2 (빠름)</option><option value="4">4</option><option value="8" selected>8 (기본)</option></select></label>
+      <label>속도 <select id="speed"><option value="0.9">0.9</option><option value="1.05" selected>1.05</option><option value="1.2">1.2</option><option value="1.4">1.4</option></select></label>
+      <label id="autoNextWrap" style="display:none"><input type="checkbox" id="autoNext" checked> 다음 챕터 이어서</label>
+    </div>
+    <div id="now">모델을 불러온 뒤 재생을 누르세요.</div>
+    <div id="context"></div>
+    <div class="controls">
+      <button class="secondary" id="prevBtn" title="이전 문장" disabled>⏮</button>
+      <button id="playBtn" disabled>▶</button>
+      <button class="secondary" id="nextBtn" title="다음 문장" disabled>⏭</button>
+    </div>
+    <input type="range" id="seek" min="0" max="0" value="0" disabled>
+    <div class="stats">
+      <span id="stPos">0 / 0</span>
+      <span id="stBuf">버퍼 0초</span>
+      <span id="stSpeed">생성 속도 -</span>
+      <span id="stStall">끊김 0회</span>
+    </div>
+    <audio id="player" controls preload="auto"></audio>
+  </section>
+
+  <section>
+    <h2 class="row" style="justify-content:space-between">로그 <button class="secondary" id="copyLog" style="padding:4px 10px;font-size:12px">로그 복사</button></h2>
+    <pre id="log"></pre>
+  </section>
+</main>
+
+<script type="module">
+import { ort, loadCfgs, loadTextProcessor, loadVoiceStyle, TextToSpeech, writeWavFile } from '/static/lib/supertonic/st_helper.js';
+import {
+  MODEL_BASE, MODEL_FALLBACK_BASE, MODEL_REVISION, ONNX_MODELS, VOICES, modelUrl, htmlToText, segmentForTts, pieceAtOffset, resumableFetch, speakableText,
+  positionKey, lastChapterKey, loadResume, savePosition, AheadPlanner,
+} from '/static/js/tts/tts_core.js';
+import { makeAnchor, resolveOffset, chunkStarts } from '/static/js/viewer/text_position_utils.js';
+import { chunkText } from '/static/js/viewer/txt_text_utils.js';
+
+const $ = (id) => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+const bookId = params.get('book_id');
+const dbType = params.get('db_type') || 'general';
+const CACHE_NAME = `bo-tts-supertonic3-${MODEL_REVISION.slice(0, 8)}`;
+const TOTAL_MODEL_BYTES = 398_000_000;
+const MAX_PIECE_CHARS = 120;
+const storage = (() => { try { return window.localStorage; } catch (e) { return null; } })();
+const t0 = performance.now();
+
+function log(msg) {
+  const line = `[${((performance.now() - t0) / 1000).toFixed(1)}s] ${msg}`;
+  $('log').textContent += line + '\n';
+  $('log').scrollTop = 1e9;
+}
+function kv(el, obj) {
+  el.replaceChildren(...Object.entries(obj).flatMap(([k, v]) => {
+    const dt = document.createElement('dt'); dt.textContent = k;
+    const dd = document.createElement('dd'); dd.textContent = v;
+    return [dt, dd];
+  }));
+}
+
+// ---- 상태 ----
+const book = { title: '', format: '', chapters: [], chapter: 0 };
+const planner = new AheadPlanner({ targetSec: 300, maxPieces: 60 });
+const S = {
+  tts: null, style: null, styleVoice: null,
+  pieces: [], cur: 0, genNext: 0, clips: new Map(),
+  token: 0, active: false, waiting: false, stallStart: null, stalls: 0, playedInRun: false, userPaused: false, resumeTries: 0, pendingOffset: 0,
+  text: '', segments: [], sync: null, syncApplied: false,
+  genSec: 0, audioSec: 0,
+};
+let wake = null;
+const wakeGenerator = () => { if (wake) { const w = wake; wake = null; w(); } };
+
+// 같은 ORT 세션에 추론이 겹치지 않도록 한 번에 하나씩만 돌린다 (위치 이동 직후 이전 루프가 아직 끝나지 않았을 때)
+let inferChain = Promise.resolve();
+function inferExclusive(fn) {
+  const run = inferChain.then(fn, fn);
+  inferChain = run.catch(() => {});
+  return run;
+}
+
+// ---- 1. 환경 ----
+async function detectEnv() {
+  let webgpu = '없음';
+  if (navigator.gpu) {
+    try {
+      const a = await navigator.gpu.requestAdapter();
+      webgpu = a ? `있음${a.info?.vendor ? ` (${a.info.vendor} ${a.info.architecture || ''})` : ''}` : '어댑터 없음';
+    } catch (e) { webgpu = '오류: ' + e.message; }
+  }
+  const threads = self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 1) : 1;
+  ort.env.wasm.wasmPaths = '/tts/ort/';
+  ort.env.wasm.numThreads = threads;
+  if (!self.isSecureContext) $('insecure').style.display = 'block';
+  kv($('env'), {
+    'HTTPS(보안 컨텍스트)': self.isSecureContext ? '예' : '아니오',
+    '교차 출처 격리': self.crossOriginIsolated ? `예 (WASM ${threads}스레드)` : '아니오 (WASM 1스레드)',
+    'WebGPU': webgpu,
+    '모델 캐시': 'caches' in self ? '사용 가능' : '불가',
+  });
+  return webgpu.startsWith('있음');
+}
+
+// ---- 2. 도서 텍스트 ----
+async function getJson(url) {
+  const res = await fetch(url, { credentials: 'same-origin' });
+  if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
+  return res.json();
+}
+
+async function loadBookInfo() {
+  const info = await getJson(`/api/media/books/${encodeURIComponent(bookId)}/reader-info?type=${encodeURIComponent(dbType)}`);
+  if (!info.success) throw new Error(info.error || '도서 정보를 가져오지 못했습니다');
+  book.title = info.book.title;
+  book.format = String(info.book.file_format || '').toLowerCase();
+  $('bookTitle').textContent = book.title;
+  $('bookSub').textContent = `${book.format.toUpperCase()} · ${dbType} · #${bookId}`;
+  document.title = `TTS · ${book.title}`;
+  if (book.format === 'epub') {
+    const meta = await getJson(`/api/media/epub/meta?db_type=${encodeURIComponent(dbType)}&book_id=${encodeURIComponent(bookId)}`);
+    const titles = new Map();
+    for (const t of meta.toc || []) if (!titles.has(t.chapter_idx)) titles.set(t.chapter_idx, t.title);
+    book.chapters = Array.from({ length: meta.total_chapters || 0 }, (_, i) => titles.get(i) || `${i + 1}번째 항목`);
+    $('chapter').replaceChildren(...book.chapters.map((t, i) => new Option(`${i + 1}. ${t}`, String(i))));
+    $('chapterWrap').style.display = ''; $('autoNextWrap').style.display = '';
+    let last = 0;
+    try { last = Number(storage?.getItem(lastChapterKey(dbType, bookId))) || 0; } catch (e) { last = 0; }
+    const synced = syncChapter();
+    if (synced !== null) last = synced;
+    book.chapter = Math.min(Math.max(0, last), Math.max(0, book.chapters.length - 1));
+    $('chapter').value = String(book.chapter);
+  } else if (book.format !== 'txt') {
+    throw new Error(`TXT/EPUB만 지원합니다 (이 도서: ${book.format})`);
+  }
+}
+
+async function loadText() {
+  let text;
+  if (book.format === 'epub') {
+    const ch = await getJson(`/api/media/epub/chapter?db_type=${encodeURIComponent(dbType)}&book_id=${encodeURIComponent(bookId)}&chapter_idx=${book.chapter}`);
+    text = htmlToText(ch.content);
+  } else {
+    const res = await fetch(`/api/media/txt?db_type=${encodeURIComponent(dbType)}&book_id=${encodeURIComponent(bookId)}`, { credentials: 'same-origin' });
+    if (!res.ok) throw new Error(`본문을 가져오지 못했습니다: HTTP ${res.status}`);
+    text = await res.text();
+  }
+  S.text = text;
+  S.segments = segmentForTts(text, MAX_PIECE_CHARS);
+  S.pieces = S.segments.map((s) => s.text);
+  const key = positionKey(dbType, bookId, book.chapter);
+  const resume = loadResume(storage, key, S.pieces.length);
+  S.cur = resume.piece;
+  S.pendingOffset = resume.offset;
+  const synced = syncStartPiece(text);
+  if (synced) {
+    // 같은 조각이면 이 기기에 남은 조각 안 위치(초)까지 이어서, 아니면 조각 처음부터
+    if (synced.piece !== S.cur) S.pendingOffset = 0;
+    S.cur = synced.piece;
+    if (synced.notice) notice(synced.notice);
+  }
+  $('seek').max = String(Math.max(0, S.pieces.length - 1));
+  $('seek').value = String(S.cur);
+  const at = S.cur || S.pendingOffset ? `, ${S.cur + 1}번째 조각 ${S.pendingOffset.toFixed(1)}초부터 이어 듣기` : '';
+  log(`본문 ${text.length.toLocaleString()}자 → ${S.pieces.length.toLocaleString()}조각${at}${synced ? ` (${synced.source})` : ''}`);
+  renderNow();
+}
+
+// ---- 읽기↔듣기 위치 동기화 (/api/media/tts/position) ----
+// 페이지를 처음 열 때 한 번만 적용한다. 더 최근 쪽(읽기/듣기)을 따르고 알린다.
+function syncChapter() {
+  const st = S.sync;
+  if (!st || S.syncApplied || book.format !== 'epub') return null;
+  if (st.latest === 'read') return st.read.chapter_idx;
+  if (st.latest === 'listen') return st.listen.chapter_idx;
+  if (st.latest === 'legacy' && st.legacy.epub_index !== null && st.legacy.epub_index !== undefined) return st.legacy.epub_index;
+  return null;
+}
+
+function syncStartPiece(text) {
+  const st = S.sync;
+  if (!st || S.syncApplied || !S.segments.length) return null;
+  S.syncApplied = true;
+  if (st.latest === 'read') {
+    return { piece: pieceAtOffset(S.segments, resolveOffset(text, st.read)), notice: '읽던 위치에서 시작합니다', source: '읽던 위치' };
+  }
+  if (st.latest === 'listen') {
+    return { piece: pieceAtOffset(S.segments, resolveOffset(text, st.listen)), source: '듣던 위치' };
+  }
+  if (st.latest === 'legacy' && book.format === 'txt' && st.legacy.pages_read > 0) {
+    // 이 기능 이전의 읽기 진도: 뷰어의 4000자 페이지 시작 위치
+    const starts = chunkStarts(chunkText(text, 4000));
+    const offset = starts[Math.min(starts.length - 1, st.legacy.pages_read - 1)] || 0;
+    return { piece: pieceAtOffset(S.segments, offset), notice: '읽던 위치에서 시작합니다', source: '읽던 페이지' };
+  }
+  return null;
+}
+
+async function fetchSync() {
+  try {
+    const res = await fetch(`/api/media/tts/position?db_type=${encodeURIComponent(dbType)}&book_id=${encodeURIComponent(bookId)}&_ts=${Date.now()}`, { cache: 'no-store' });
+    const data = res.ok ? await res.json() : null;
+    S.sync = data && data.success ? data.state : null;
+  } catch (e) { S.sync = null; }
+  const saved = S.sync && S.sync.settings;
+  if (saved) {
+    // 다른 기기에서 쓰던 음성 설정을 이어받는다
+    if (saved.voice && VOICES.includes(saved.voice)) $('voice').value = saved.voice;
+    if (saved.steps) $('steps').value = String(saved.steps);
+    if (saved.speed) $('speed').value = String(saved.speed);
+  }
+}
+
+function notice(msg) {
+  log(msg);
+  $('bookSub').textContent = `${$('bookSub').textContent} · ${msg}`;
+}
+
+// 듣기 위치 서버 저장: 조각이 바뀔 때(10초 간격 제한) + 일시정지/화면 이탈 시 즉시
+let lastListenReport = 0;
+function reportListen(force = false, useBeacon = false) {
+  if (!S.segments || !S.segments.length || !S.playedInRun) return;
+  const now = Date.now();
+  if (!force && now - lastListenReport < 10_000) return;
+  lastListenReport = now;
+  const seg = S.segments[S.cur];
+  if (!seg) return;
+  const body = JSON.stringify({
+    db_type: dbType, book_id: Number(bookId), kind: 'listen',
+    chapter_idx: book.format === 'epub' ? book.chapter : 0,
+    char_offset: seg.start, text_len: S.text.length, anchor: makeAnchor(S.text, seg.start),
+    voice: $('voice').value, steps: Number($('steps').value), speed: Number($('speed').value),
+  });
+  try {
+    if (useBeacon && navigator.sendBeacon) { navigator.sendBeacon('/api/media/tts/position', new Blob([body], { type: 'application/json' })); return; }
+    fetch('/api/media/tts/position', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {});
+  } catch (e) { /* 동기화 실패는 재생에 영향 없음 */ }
+}
+
+// ---- 3. 모델 ----
+async function loadModel(hasWebGpu) {
+  $('loadBtn').disabled = true;
+  let cache = null;
+  if ('caches' in self) { try { cache = await caches.open(CACHE_NAME); } catch (e) { cache = null; } }
+  const received = new Map();
+  let fromCacheAll = true;
+  const td = performance.now();
+  try {
+    const bufs = [];
+    for (const m of ONNX_MODELS) {
+      log(`${m}.onnx 받는 중`);
+      const { buffer, fromCache, attempts, fromFallback } = await resumableFetch(modelUrl(`onnx/${m}.onnx`), {
+        cache,
+        fallbackUrl: `${MODEL_FALLBACK_BASE}/onnx/${m}.onnx`,
+        onProgress: ({ received: got }) => {
+          received.set(m, got);
+          const sum = [...received.values()].reduce((a, b) => a + b, 0);
+          $('dlBar').style.transform = `scaleX(${Math.min(1, sum / TOTAL_MODEL_BYTES)})`;
+        },
+      });
+      fromCacheAll = fromCacheAll && fromCache;
+      if (attempts > 1) log(`${m}.onnx: 끊겨서 ${attempts - 1}번 이어 받음`);
+      if (fromFallback) log(`${m}.onnx: HF 직접 다운로드가 막혀 서버에서 받음`);
+      bufs.push(buffer);
+    }
+    const dlSec = (performance.now() - td) / 1000;
+    const want = $('backend').value;
+    const eps = want === 'auto' ? (hasWebGpu ? ['webgpu', 'wasm'] : ['wasm']) : [want];
+    let sessions = null, used = null;
+    const ts = performance.now();
+    for (const ep of eps) {
+      try {
+        sessions = [];
+        for (let i = 0; i < ONNX_MODELS.length; i++) {
+          sessions.push(await ort.InferenceSession.create(new Uint8Array(bufs[i]), { executionProviders: [ep], graphOptimizationLevel: 'all' }));
+        }
+        used = ep; break;
+      } catch (e) { log(`${ep} 세션 실패: ${e.message}`); }
+    }
+    if (!used) throw new Error('모든 백엔드에서 세션 생성 실패');
+    const onnxDir = `${MODEL_BASE}/onnx`;
+    S.tts = new TextToSpeech(await loadCfgs(onnxDir), await loadTextProcessor(onnxDir), ...sessions);
+    $('dlBar').style.transform = 'scaleX(1)';
+    kv($('loadInfo'), {
+      '백엔드': used.toUpperCase(),
+      '다운로드': fromCacheAll ? `브라우저 캐시에서 ${dlSec.toFixed(1)}초` : `${dlSec.toFixed(1)}초`,
+      '세션 준비': `${((performance.now() - ts) / 1000).toFixed(1)}초`,
+    });
+    log(`모델 준비 완료 (${used})`);
+    for (const id of ['playBtn', 'prevBtn', 'nextBtn', 'seek']) $(id).disabled = false;
+  } catch (e) {
+    log('모델 로드 실패: ' + e.message);
+    $('loadBtn').disabled = false;
+  }
+}
+
+async function ensureStyle() {
+  const voice = $('voice').value;
+  if (S.styleVoice !== voice) {
+    S.style = await loadVoiceStyle([modelUrl(`voice_styles/${voice}.json`)]);
+    S.styleVoice = voice;
+  }
+  return S.style;
+}
+
+// ---- 4. 생성 + 재생 ----
+const player = $('player');
+
+function releaseClip(i) {
+  const clip = S.clips.get(i);
+  if (clip) { URL.revokeObjectURL(clip.url); S.clips.delete(i); }
+  planner.onPlayed(i);
+}
+
+function clearClips() {
+  for (const i of [...S.clips.keys()]) releaseClip(i);
+  planner.reset();
+}
+
+async function generatorLoop(token) {
+  while (S.active && token === S.token) {
+    if (S.genNext >= S.pieces.length) return;
+    if (!planner.shouldGenerate()) { await new Promise((r) => { wake = r; }); continue; }
+    const i = S.genNext;
+    const style = await ensureStyle();
+    const steps = Number($('steps').value), speed = Number($('speed').value);
+    const ts = performance.now();
+    let result;
+    try {
+      result = await inferExclusive(() => S.tts._infer([speakableText(S.pieces[i])], ['ko'], style, steps, speed));
+    } catch (e) {
+      log(`${i + 1}번째 조각 생성 실패: ${e.message} — 건너뜀`);
+      S.genNext = i + 1; continue;
+    }
+    if (token !== S.token) return; // 그 사이 위치가 바뀌었으면 버린다
+    const genSec = (performance.now() - ts) / 1000;
+    const pad = new Array(Math.floor(0.25 * S.tts.sampleRate)).fill(0);
+    const wav = result.wav.concat(pad);
+    const audioSec = wav.length / S.tts.sampleRate;
+    S.clips.set(i, { url: URL.createObjectURL(new Blob([writeWavFile(wav, S.tts.sampleRate)], { type: 'audio/wav' })), audioSec });
+    planner.onGenerated(i, audioSec);
+    S.genSec += genSec; S.audioSec += audioSec;
+    S.genNext = i + 1;
+    renderStats();
+    if (document.hidden || i < 3) log(`생성 #${i + 1} ${genSec.toFixed(1)}초${document.hidden ? ' (화면 꺼짐 중)' : ''}`);
+    if (S.waiting && S.cur === i) playCurrent();
+  }
+}
+
+function playCurrent() {
+  const clip = S.clips.get(S.cur);
+  renderNow();
+  // 이어 듣기 위치를 아직 못 틀었으면 그 위치를 유지해 둔다 (대기 중 새로고침 대비)
+  savePosition(storage, positionKey(dbType, bookId, book.chapter), S.cur,
+    S.pendingOffset ? { total: S.pieces.length, offset: S.pendingOffset + 2.5 } : { total: S.pieces.length });
+  if (!clip) {
+    S.waiting = true;
+    if (S.stallStart === null) S.stallStart = performance.now();
+    return;
+  }
+  // 재생 시작/위치 이동 직후의 첫 대기는 끊김이 아니라 준비 시간이므로 세지 않는다
+  if (S.waiting && S.stallStart !== null && S.playedInRun) {
+    S.stalls++;
+    log(`끊김 ${((performance.now() - S.stallStart) / 1000).toFixed(1)}초 후 재개`);
+  }
+  S.waiting = false; S.stallStart = null; S.playedInRun = true; S.resumeTries = 0;
+  reportListen();
+  player.dataset.prime = '0';
+  player.src = clip.url;
+  const offset = S.pendingOffset;
+  S.pendingOffset = 0;
+  if (offset > 0 && offset < clip.audioSec - 0.5) {
+    player.addEventListener('loadedmetadata', () => { player.currentTime = offset; }, { once: true });
+    log(`${S.cur + 1}번째 조각 ${offset.toFixed(1)}초부터 재생`);
+  }
+  player.play().catch((e) => log(`재생 실패 #${S.cur + 1}: ${e.name} ${e.message}`));
+}
+
+// 위치 이동/설정 변경: 만들어 둔 오디오를 버리고 i번째부터 다시 생성한다
+function restartAt(i, keepOffset = false) {
+  if (!keepOffset) S.pendingOffset = 0; // 사용자가 위치/설정을 바꾸면 조각 처음부터
+  S.token++;
+  wakeGenerator();
+  if (S.active && player.dataset.prime !== '1') player.pause();
+  clearClips();
+  S.cur = Math.max(0, Math.min(i, S.pieces.length - 1));
+  S.genNext = S.cur;
+  S.waiting = false; S.stallStart = null; S.playedInRun = false;
+  if (!S.active) { renderNow(); return; }
+  if (!S.pieces.length) { onFinished(); return; } // 표지뿐인 EPUB 항목 등
+  generatorLoop(S.token);
+  playCurrent();
+}
+
+function primeAudio() {
+  // 첫 재생은 버튼 클릭(사용자 제스처) 안에서 열어 두어야 이후 자동 재생이 허용된다
+  player.dataset.prime = '1';
+  player.src = URL.createObjectURL(new Blob([writeWavFile(new Array(2400).fill(0), 24000)], { type: 'audio/wav' }));
+  player.play().catch(() => {});
+}
+
+async function togglePlay() {
+  if (!S.tts) return; // 본문이 빈 챕터(표지 등)는 restartAt이 다음 챕터로 넘긴다
+  if (!S.active) {
+    S.active = true;
+    primeAudio();
+    setMediaSession();
+    restartAt(S.cur, true);
+  } else if (player.paused) {
+    S.userPaused = false;
+    player.play().catch((e) => log('재생 실패: ' + e.message));
+  } else {
+    S.userPaused = true;
+    player.pause();
+  }
+  renderPlayBtn();
+}
+
+player.addEventListener('ended', () => {
+  if (player.dataset.prime === '1') { player.dataset.prime = '0'; if (!S.waiting) playCurrent(); return; }
+  releaseClip(S.cur);
+  wakeGenerator();
+  if (S.cur + 1 < S.pieces.length) { S.cur++; playCurrent(); return; }
+  onFinished();
+});
+
+function onFinished() {
+  savePosition(storage, positionKey(dbType, bookId, book.chapter), 0, { total: S.pieces.length, finished: true });
+  if (book.format === 'epub' && $('autoNext').checked && book.chapter + 1 < book.chapters.length) {
+    log('챕터 끝 — 다음 챕터로');
+    changeChapter(book.chapter + 1, true);
+  } else {
+    S.active = false; log('끝까지 읽었습니다'); renderPlayBtn();
+  }
+}
+for (const ev of ['play', 'pause']) player.addEventListener(ev, renderPlayBtn);
+
+// 화면이 꺼진 동안 조각을 갈아 끼운 직후 OS/브라우저가 재생을 멈추는 경우가 있다
+// (삼성 인터넷, #17 재생 0.1초 뒤 pause — 2026-09-24 실측). 사용자가 멈춘 게 아니면 다시 튼다.
+player.addEventListener('pause', () => {
+  if (player.dataset.prime === '1' || player.ended || !S.active || S.userPaused || S.waiting) return;
+  const clip = S.clips.get(S.cur);
+  if (!clip || player.src !== clip.url) return; // 위치 이동 중
+  if (S.resumeTries >= 3) { log(`자동 재개 포기 #${S.cur + 1}`); return; }
+  S.resumeTries++;
+  setTimeout(() => {
+    if (!player.paused || S.userPaused || !S.active) return;
+    log(`예상 밖 일시정지 → 자동 재개 시도 ${S.resumeTries} #${S.cur + 1}${document.hidden ? ' (화면 꺼짐)' : ''}`);
+    player.play().catch((e) => log(`자동 재개 실패: ${e.name} ${e.message}`));
+  }, 300);
+});
+player.addEventListener('playing', () => { S.userPaused = false; });
+
+// 조각 안 재생 위치까지 저장한다 — 일시정지 순간, 화면을 떠날 때, 재생 중 3초마다.
+// 조각 시작 시 저장만으로는 조각이 바뀌는 순간과 겹치면 한 조각 어긋날 수 있다.
+function saveOffset() {
+  if (player.dataset.prime === '1' || player.ended || !S.pieces.length) return;
+  const clip = S.clips.get(S.cur);
+  if (!clip || player.src !== clip.url) return;
+  savePosition(storage, positionKey(dbType, bookId, book.chapter), S.cur, { total: S.pieces.length, offset: player.currentTime });
+}
+let lastOffsetSave = 0;
+player.addEventListener('pause', saveOffset);
+player.addEventListener('timeupdate', () => {
+  const now = performance.now();
+  if (now - lastOffsetSave > 3000) { lastOffsetSave = now; saveOffset(); }
+});
+window.addEventListener('pagehide', () => { saveOffset(); reportListen(true, true); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { saveOffset(); reportListen(true, true); } });
+player.addEventListener('pause', () => { if (S.userPaused) reportListen(true); });
+document.addEventListener('visibilitychange', () => log(document.hidden ? '화면 꺼짐/백그라운드' : '화면 다시 보임'));
+
+// ---- 진단: 화면 끈 상태에서 다음 조각으로 못 넘어가는 원인 추적용 ----
+for (const ev of ['ended', 'playing', 'pause', 'waiting', 'stalled', 'error']) {
+  player.addEventListener(ev, () => {
+    if (player.dataset.prime === '1') return;
+    if (ev === 'playing' && !document.hidden) return; // 화면 켜진 동안의 정상 재생은 생략
+    const err = ev === 'error' && player.error ? ` code=${player.error.code}` : '';
+    log(`[audio] ${ev} #${S.cur + 1} @${player.currentTime.toFixed(1)}s${document.hidden ? ' (화면 꺼짐)' : ''}${err}`);
+  });
+}
+// 메인 스레드가 막히면(WASM 스레드 대기 등) 타이머가 제때 돌지 못한다 — 지연을 기록한다
+let beat = performance.now();
+setInterval(() => {
+  const now = performance.now();
+  const lag = now - beat - 1000;
+  if (lag > 1500) log(`메인 스레드 ${(lag / 1000).toFixed(1)}초 지연${document.hidden ? ' (화면 꺼짐)' : ''}`);
+  beat = now;
+}, 1000);
+$('copyLog').onclick = async () => {
+  const text = `${navigator.userAgent}
+${$('env').innerText}
+${$('loadInfo').innerText}
+---
+${$('log').textContent}`;
+  try { await navigator.clipboard.writeText(text); $('copyLog').textContent = '복사됨'; }
+  catch (e) { const r = document.createRange(); r.selectNodeContents($('log')); getSelection().removeAllRanges(); getSelection().addRange(r); }
+};
+
+async function changeChapter(idx, keepPlaying) {
+  book.chapter = idx;
+  $('chapter').value = String(idx);
+  try { storage?.setItem(lastChapterKey(dbType, bookId), String(idx)); } catch (e) { /* 무시 */ }
+  const wasActive = keepPlaying && S.active;
+  S.token++; wakeGenerator(); clearClips(); S.active = false;
+  await loadText();
+  if (wasActive) { S.active = true; setMediaSession(); restartAt(S.cur, true); }
+  renderPlayBtn();
+}
+
+function setMediaSession() {
+  if (!('mediaSession' in navigator)) return;
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: book.title || 'BookOasis TTS',
+    artist: book.format === 'epub' ? book.chapters[book.chapter] || '' : '',
+    album: 'BookOasis TTS',
+  });
+  const h = navigator.mediaSession.setActionHandler.bind(navigator.mediaSession);
+  try {
+    // OS가 보낸 요청인지 로그로 구분할 수 있게 남긴다 (알림창/이어폰 버튼/오디오 포커스)
+    h('play', () => { log('[세션] 재생 요청'); S.userPaused = false; player.play(); });
+    h('pause', () => { log('[세션] 일시정지 요청'); S.userPaused = true; player.pause(); });
+    h('previoustrack', () => { log('[세션] 이전 요청'); restartAt(S.cur - 1); });
+    h('nexttrack', () => { log('[세션] 다음 요청'); restartAt(S.cur + 1); });
+  } catch (e) { /* 일부 브라우저는 핸들러 일부만 지원 */ }
+}
+
+// ---- 화면 ----
+function renderNow() {
+  const n = S.pieces.length;
+  $('now').textContent = n ? S.pieces[S.cur] : '읽을 본문이 없습니다.';
+  const ctx = $('context');
+  ctx.replaceChildren();
+  for (let k = S.cur + 1; k < Math.min(n, S.cur + 3); k++) {
+    const div = document.createElement('div'); div.className = 'next'; div.textContent = S.pieces[k]; ctx.append(div);
+  }
+  $('seek').value = String(S.cur);
+  $('stPos').textContent = `${n ? S.cur + 1 : 0} / ${n.toLocaleString()}`;
+  renderStats();
+}
+
+function renderStats() {
+  $('stBuf').textContent = `버퍼 ${Math.round(planner.bufferedSec)}초`;
+  $('stSpeed').textContent = S.genSec > 0 ? `생성 속도 ${(S.audioSec / S.genSec).toFixed(1)}배` : '생성 속도 -';
+  $('stStall').textContent = `끊김 ${S.stalls}회`;
+}
+
+function renderPlayBtn() {
+  $('playBtn').textContent = S.active && !player.paused ? '⏸' : '▶';
+}
+
+// ---- 이벤트 연결 ----
+$('voice').replaceChildren(...VOICES.map((v) => new Option(v, v)));
+$('voice').value = 'F1';
+$('loadBtn').onclick = () => loadModel(state.hasWebGpu);
+$('playBtn').onclick = togglePlay;
+$('prevBtn').onclick = () => restartAt(S.cur - 1);
+$('nextBtn').onclick = () => restartAt(S.cur + 1);
+$('seek').onchange = () => restartAt(Number($('seek').value));
+for (const id of ['voice', 'steps', 'speed']) $(id).onchange = () => { S.genSec = 0; S.audioSec = 0; restartAt(S.cur); };
+$('chapter').onchange = () => changeChapter(Number($('chapter').value), true);
+$('pickGo').onclick = () => {
+  const id = $('pickId').value;
+  if (id) location.search = `?book_id=${encodeURIComponent(id)}&db_type=${encodeURIComponent($('pickDb').value)}`;
+};
+
+const state = { hasWebGpu: false };
+(async () => {
+  state.hasWebGpu = await detectEnv();
+  if (!bookId) { $('pickSection').style.display = ''; return; }
+  try {
+    await fetchSync();
+    await loadBookInfo();
+    await loadText();
+  } catch (e) {
+    log('도서 불러오기 실패: ' + e.message);
+    $('now').textContent = e.message;
+    return;
+  }
+  if (await modelCached()) {
+    log('브라우저에 저장된 모델이 있어 바로 불러옵니다');
+    await loadModel(state.hasWebGpu);
+    if (S.tts) $('now').textContent = S.pieces[S.cur] || $('now').textContent;
+  }
+})();
+
+async function modelCached() {
+  if (!('caches' in self)) return false;
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    const hits = await Promise.all(ONNX_MODELS.map((m) => cache.match(modelUrl(`onnx/${m}.onnx`))));
+    return hits.every(Boolean);
+  } catch (e) {
+    return false;
+  }
+}
+</script>
+</body>
+</html>

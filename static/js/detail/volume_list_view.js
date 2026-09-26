@@ -2,6 +2,7 @@ import { buildFallbackCoverUrl, getBookCoverSrc, buildTextCoverDataUri, coverAli
 import { state } from '../state.js';
 import { stripLeadingBracketTags } from '../series_display.js';
 import { canDownloadFiles } from '../library_type_toggle.js';
+import { canListen } from '../tts_launcher.js';
 
 export function renderVolumeList(orderedBooks, safeSeriesName, actualLibraryId, dbType = 'general', options = {}) {
   const books = Array.isArray(orderedBooks) ? orderedBooks : [];
@@ -90,14 +91,22 @@ export function renderVolumeList(orderedBooks, safeSeriesName, actualLibraryId, 
     ` : '';
 
     const isDownloadable = ['epub', 'pdf', 'txt', 'text'].includes(format) && canDownloadFiles();
-    const readBtnHtml = isDownloadable
-      ? `<div class="btn-read-row">
-           <button class="btn-read" data-role="detail-continue" data-continue-action="reader" data-book-id="${book.id}" data-file-format="${(book.file_format || '').replace(/"/g, '&quot;')}" data-book-title="${(rawDisplayTitle || '').replace(/"/g, '&quot;')}" data-pages-read="${book.pages_read}" data-total-pages="${book.total_pages}">${readBtnText}</button>
-           <a class="btn-download" href="/api/media/books/${book.id}/download?type=${dbType}" download title="${i18n.t('detail.btn_download')}" data-role="detail-download-link">
-             <i class="fa-solid fa-download"></i> ${i18n.t('detail.btn_download')}
-           </a>
-         </div>`
-      : `<button class="btn-read" data-role="detail-continue" data-continue-action="reader" data-book-id="${book.id}" data-file-format="${(book.file_format || '').replace(/"/g, '&quot;')}" data-book-title="${(rawDisplayTitle || '').replace(/"/g, '&quot;')}" data-pages-read="${book.pages_read}" data-total-pages="${book.total_pages}">${readBtnText}</button>`;
+    // 음성으로 듣기는 브라우저에서 텍스트를 합성하므로 TXT/EPUB만
+    const isListenable = canListen(format);
+    const readBtn = `<button class="btn-read" data-role="detail-continue" data-continue-action="reader" data-book-id="${book.id}" data-file-format="${(book.file_format || '').replace(/"/g, '&quot;')}" data-book-title="${(rawDisplayTitle || '').replace(/"/g, '&quot;')}" data-pages-read="${book.pages_read}" data-total-pages="${book.total_pages}">${readBtnText}</button>`;
+    const listenBtn = isListenable
+      ? `<button class="btn-listen" data-role="detail-listen" data-book-id="${book.id}" data-db-type="${dbType}" title="${i18n.t('context_menu.tts_listen')}">
+           <i class="fa-solid fa-headphones"></i> ${i18n.t('tts.viewer_listen')}
+         </button>`
+      : '';
+    const downloadBtn = isDownloadable
+      ? `<a class="btn-download" href="/api/media/books/${book.id}/download?type=${dbType}" download title="${i18n.t('detail.btn_download')}" data-role="detail-download-link">
+           <i class="fa-solid fa-download"></i> ${i18n.t('detail.btn_download')}
+         </a>`
+      : '';
+    const readBtnHtml = (listenBtn || downloadBtn)
+      ? `<div class="btn-read-row">${readBtn}${listenBtn}${downloadBtn}</div>`
+      : readBtn;
 
     volumesHtml += `
       <div class="volume-card" data-role="detail-volume-open-reader" data-book-id="${book.id}" data-cover-align="${book.cover_align || 'center'}" data-title="${(rawDisplayTitle || '').replace(/"/g, '&quot;')}" data-book-title="${(rawDisplayTitle || '').replace(/"/g, '&quot;')}" data-file-format="${(book.file_format || '').replace(/"/g, '&quot;')}" data-pages-read="${pagesRead}" data-total-pages="${book.total_pages}" data-is-completed="${isCompletedValue ? 1 : 0}" data-page-missing="${noOffsets ? 1 : 0}" style="${unreadOnly && !isNotCompleted ? 'display: none;' : ''}">

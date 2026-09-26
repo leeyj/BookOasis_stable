@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#111418">
+<title>듣기</title>
+<style>
+  @font-face { font-family: "Pretendard"; src: url("/static/fonts/Pretendard-Regular.woff2") format("woff2"); font-display: swap; }
+
+  :root {
+    --bg: #111418; --surface: #1a1e24; --surface-2: #232830; --line: #2b313a;
+    --text: #d8dce2; --muted: #8b939f; --strong: #f4f6f8;
+    --accent: #8fb3ff; --accent-ink: #0d1a33;
+    --hl-bg: #f5c451; --hl-text: #1c1500; --pick: rgba(143, 179, 255, .8); /* 남색 배경의 보색: 호박색 */
+    --shadow: 0 -8px 28px rgba(0, 0, 0, .35);
+    --font-size: 19px; --dock-h: 148px;
+    color-scheme: dark;
+  }
+  :root[data-theme="light"] {
+    --bg: #fbfaf7; --surface: #ffffff; --surface-2: #f1efea; --line: #e3e0d8;
+    --text: #2a2d31; --muted: #7a7f86; --strong: #111315;
+    --accent: #3563e0; --accent-ink: #ffffff;
+    --hl-bg: #ffe14d; --hl-text: #1a1600; --pick: rgba(53, 99, 224, .7); /* 흰 배경: 노란 형광펜 */
+    --shadow: 0 -8px 24px rgba(40, 36, 28, .10);
+    color-scheme: light;
+  }
+  :root[data-theme="sepia"] {
+    --bg: #f3ead7; --surface: #faf3e3; --surface-2: #ebe0c8; --line: #dccfb2;
+    --text: #3d3226; --muted: #86755f; --strong: #231a10;
+    --accent: #9a5b1c; --accent-ink: #fff8ec;
+    --hl-bg: #8fd3f0; --hl-text: #0b2230; --pick: rgba(154, 91, 28, .7); /* 미색 배경의 보색: 하늘색 */
+    --shadow: 0 -8px 24px rgba(80, 60, 30, .12);
+    color-scheme: light;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body { font-family: "Pretendard", -apple-system, "Segoe UI", "Malgun Gothic", sans-serif; }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+  button:disabled { opacity: .4; cursor: default; }
+  [hidden] { display: none !important; }
+  svg { display: block; }
+
+  /* ---- 상단 바 ---- */
+  .top {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; align-items: center; gap: 6px;
+    padding: calc(env(safe-area-inset-top) + 6px) 8px 6px;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  }
+  .icon-btn { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; color: var(--muted); flex: none; }
+  .icon-btn:hover { background: var(--surface-2); color: var(--strong); }
+  .titles { flex: 1; min-width: 0; text-align: center; }
+  #bookTitle { font-size: 15px; font-weight: 600; color: var(--strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #chapterBtn {
+    max-width: 100%; font-size: 12.5px; color: var(--muted);
+    display: inline-flex; align-items: center; gap: 3px; padding: 2px 6px; border-radius: 6px;
+  }
+  #chapterBtn span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #chapterBtn:not(:disabled):hover { background: var(--surface-2); }
+  .dev-btn { display: block; margin: 4px auto 0; font-size: 12px; color: var(--muted); padding: 6px 12px; border: 1px solid var(--line); border-radius: 8px; }
+
+  .banner { margin: 10px 16px 0; padding: 10px 12px; border-radius: 10px; font-size: 13px; line-height: 1.5; background: #4a2a12; color: #ffd8b0; }
+
+  /* ---- 본문 (스크롤 전용) ---- */
+  .reader { padding: 28px 20px calc(var(--dock-h) + 45vh); }
+  #text {
+    max-width: 38em; margin: 0 auto;
+    font-size: var(--font-size); line-height: 1.85; letter-spacing: -.003em;
+    word-break: keep-all; overflow-wrap: anywhere;
+  }
+  #text p { margin: 0 0 .95em; }
+  #text .scene { text-align: center; color: var(--muted); }
+  .s { border-radius: .3em; transition: background-color .25s, color .25s; cursor: pointer; }
+  .s.cur {
+    background: var(--hl-bg); color: var(--hl-text);
+    box-decoration-break: clone; -webkit-box-decoration-break: clone;
+    padding: .08em .18em; margin: 0 -.18em;
+  }
+  .s.pick { outline: 2px dashed var(--pick); outline-offset: 2px; }
+  .placeholder { max-width: 38em; margin: 18vh auto 0; text-align: center; color: var(--muted); font-size: 15px; line-height: 1.7; }
+
+  /* ---- 떠 있는 버튼들 ---- */
+  .float {
+    position: fixed; left: 50%; transform: translateX(-50%); z-index: 25;
+    bottom: calc(var(--dock-h) + 12px);
+  }
+  #toCurrent {
+    display: flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 999px;
+    background: var(--surface); color: var(--strong); font-size: 13.5px; font-weight: 600;
+    border: 1px solid var(--line); box-shadow: 0 6px 20px rgba(0,0,0,.25);
+  }
+  #toCurrent i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  #jumpChip {
+    display: flex; align-items: center; gap: 10px; width: min(92vw, 520px);
+    padding: 8px 8px 8px 14px; border-radius: 14px;
+    background: var(--surface); border: 1px solid var(--line); box-shadow: 0 6px 20px rgba(0,0,0,.25);
+  }
+  #jumpText { flex: 1; min-width: 0; font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #jumpGo { flex: none; padding: 8px 12px; border-radius: 10px; background: var(--accent); color: var(--accent-ink); font-size: 13px; font-weight: 700; }
+
+  /* ---- 하단 플레이어 ---- */
+  .dock {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    background: var(--surface); box-shadow: var(--shadow);
+    border-top: 1px solid var(--line); border-radius: 18px 18px 0 0;
+    padding: 12px 16px calc(env(safe-area-inset-bottom) + 12px);
+  }
+  .dock-inner { max-width: 560px; margin: 0 auto; }
+  .model-card { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; padding: 2px 2px 12px; }
+  .model-card strong { font-size: 14px; color: var(--strong); display: block; }
+  .model-card span { font-size: 12.5px; color: var(--muted); }
+  #loadBtn { padding: 9px 16px; border-radius: 10px; background: var(--accent); color: var(--accent-ink); font-size: 14px; font-weight: 700; }
+  .bar { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: var(--surface-2); overflow: hidden; margin-top: 8px; }
+  .bar > div { height: 100%; background: var(--accent); transform: scaleX(0); transform-origin: left; transition: transform .2s; }
+
+  .scrub input[type=range] {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 22px; margin: 0; background: transparent; cursor: pointer;
+  }
+  .scrub input[type=range]::-webkit-slider-runnable-track {
+    height: 4px; border-radius: 2px;
+    background: linear-gradient(to right, var(--accent) var(--p, 0%), var(--surface-2) var(--p, 0%));
+  }
+  .scrub input[type=range]::-moz-range-track { height: 4px; border-radius: 2px; background: var(--surface-2); }
+  .scrub input[type=range]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--accent); }
+  .scrub input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px; border-radius: 50%; background: var(--accent); border: 0;
+  }
+  .scrub input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 0; }
+  .scrub input[type=range]:disabled { opacity: .5; cursor: default; }
+  .scrub-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; margin-top: 2px; }
+  #status { color: var(--accent); text-align: center; flex: 1; }
+
+  .controls { display: grid; grid-template-columns: 1fr auto auto auto 1fr; align-items: center; gap: 10px; margin-top: 8px; }
+  .controls .side { justify-self: start; }
+  .controls .side.end { justify-self: end; }
+  .ctl { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; color: var(--strong); }
+  .ctl:not(:disabled):hover { background: var(--surface-2); }
+  .play { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); }
+  .play:not(:disabled):active { transform: scale(.96); }
+  .chip { min-width: 52px; height: 34px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--line); font-size: 13px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+  .play .spin { width: 26px; height: 26px; border-radius: 50%; border: 3px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---- 바텀 시트 ---- */
+  .backdrop { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.4); }
+  .sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 41; max-height: 78vh; overflow: auto;
+    background: var(--surface); border-radius: 18px 18px 0 0; box-shadow: var(--shadow);
+    padding: 8px 20px calc(env(safe-area-inset-bottom) + 20px);
+  }
+  .sheet-inner { max-width: 560px; margin: 0 auto; }
+  .grabber { width: 36px; height: 4px; border-radius: 2px; background: var(--line); margin: 4px auto 14px; }
+  .sheet h3 { margin: 0 0 14px; font-size: 16px; color: var(--strong); }
+  .field { margin-bottom: 18px; }
+  .field > label, .field > .label { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 8px; }
+  .seg-group { display: flex; gap: 6px; flex-wrap: wrap; }
+  .seg-group button { flex: 1; min-width: 56px; padding: 9px 8px; border-radius: 10px; background: var(--surface-2); font-size: 13.5px; }
+  #voiceGroup { display: grid; grid-template-columns: repeat(5, 1fr); }
+  .seg-group button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+  .field > label.toggle { display: flex; margin: 0; color: var(--text); align-items: center; justify-content: space-between; font-size: 14px; }
+  .toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
+  .chapter-list { list-style: none; margin: 0; padding: 0; }
+  .chapter-list button { width: 100%; text-align: left; padding: 12px 4px; border-bottom: 1px solid var(--line); font-size: 14.5px; display: flex; gap: 10px; }
+  .chapter-list button .n { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 2.2em; }
+  .chapter-list button[aria-current="true"] { color: var(--accent); font-weight: 700; }
+
+  /* ---- 개발용 로그 오버레이 ---- */
+  .dev {
+    position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column;
+    background: rgba(8, 10, 13, .93); color: #cfd5de;
+    padding: calc(env(safe-area-inset-top) + 10px) 14px calc(env(safe-area-inset-bottom) + 10px);
+    font-size: 12.5px;
+  }
+  .dev-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .dev-head strong { flex: 1; font-size: 14px; color: #fff; }
+  .dev-head button, .dev-head a { padding: 6px 10px; border-radius: 8px; background: #252a33; color: #dfe4ea; font-size: 12px; text-decoration: none; }
+  .dev-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; margin-bottom: 10px; }
+  .dev-card { background: #161a20; border: 1px solid #2a2f37; border-radius: 10px; padding: 8px 10px; }
+  .dev-card h4 { margin: 0 0 6px; font-size: 11.5px; color: #8b93a1; font-weight: 600; }
+  dl.kv { display: grid; grid-template-columns: max-content 1fr; gap: 2px 10px; margin: 0; }
+  dl.kv dt { color: #8b93a1; } dl.kv dd { margin: 0; word-break: break-all; }
+  .dev select { padding: 4px 6px; border-radius: 6px; border: 1px solid #3a3f47; background: #1e2229; color: #e6e8eb; }
+  #log { flex: 1; min-height: 0; overflow: auto; margin: 0; padding: 8px 10px; border-radius: 10px; background: #0c0e11; border: 1px solid #22272e; font: 11.5px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; color: #9aa3b0; }
+
+  .tap-start {
+    position: fixed; inset: 0; z-index: 45; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+    background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+    color: var(--strong); font-size: 17px; font-weight: 700; width: 100%;
+  }
+  .tap-start span.circle { width: 96px; height: 96px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); box-shadow: 0 10px 30px rgba(0,0,0,.3); }
+  .toast {
+    position: fixed; left: 50%; top: calc(env(safe-area-inset-top) + 64px); transform: translateX(-50%); z-index: 50;
+    padding: 9px 16px; border-radius: 999px; background: var(--strong); color: var(--bg); font-size: 13px; font-weight: 600;
+    box-shadow: 0 6px 20px rgba(0,0,0,.25); transition: opacity .3s; pointer-events: none;
+  }
+  @media (prefers-reduced-motion: reduce) { .s, .bar > div, .toast { transition: none; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <span class="icon-btn" aria-hidden="true"></span><!-- 제목을 가운데에 두기 위한 자리 (오른쪽 닫기 버튼과 같은 너비) -->
+  <div class="titles">
+    <div id="bookTitle" data-i18n="tts.page_title">듣기</div>
+    <button id="chapterBtn" disabled hidden><span id="chapterName"></span>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+  </div>
+  <button class="icon-btn" id="closeBtn" data-i18n-aria="tts.close" aria-label="닫기">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+  </button>
+</header>
+
+<div class="banner" id="insecure" hidden data-i18n="tts.insecure">HTTPS가 아닌 주소로 접속했습니다. WebGPU, 멀티스레드, 모델 캐시가 모두 꺼져 실시간보다 느립니다. HTTPS 주소로 열어 주세요.</div>
+
+<main class="reader" id="reader">
+  <article id="text"><p class="placeholder" data-i18n="tts.loading_text">본문을 불러오는 중…</p></article>
+</main>
+
+<button class="float" id="toCurrent" hidden><i></i><span data-i18n="tts.to_current">읽는 곳으로</span></button>
+<div class="float" id="jumpChip" hidden><span id="jumpText"></span><button id="jumpGo" data-i18n="tts.listen_from_here">여기부터 듣기</button></div>
+
+<footer class="dock" id="dock">
+  <div class="dock-inner">
+    <div class="model-card" id="modelCard" hidden>
+      <div><strong id="mcTitle" data-i18n="tts.model_needed">음성 모델이 필요합니다</strong><span id="mcSub" data-i18n="tts.model_needed_sub">약 400MB · 처음 한 번만 받고 브라우저에 저장합니다</span></div>
+      <button id="loadBtn" data-i18n="tts.model_download">받기</button>
+      <div class="bar"><div id="dlBar"></div></div>
+    </div>
+    <div class="scrub">
+      <input type="range" id="seek" min="0" max="0" value="0" disabled data-i18n-aria="tts.position" aria-label="읽는 위치">
+      <div class="scrub-meta"><span id="pct">0%</span><span id="status"></span><span id="pos">0 / 0</span></div>
+    </div>
+    <div class="controls">
+      <button class="chip side" id="settingsBtn" data-i18n-aria="tts.settings" aria-label="설정">Aa</button>
+      <button class="ctl" id="prevBtn" data-i18n-aria="tts.prev_sentence" aria-label="이전 문장" disabled>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM20 5.5v13a.5.5 0 0 1-.77.42L9.5 12.42a.5.5 0 0 1 0-.84l9.73-6.5A.5.5 0 0 1 20 5.5z"/></svg>
+      </button>
+      <button class="play" id="playBtn" data-i18n-aria="tts.play" aria-label="재생" disabled>
+        <svg id="icPlay" width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.6v12.8a.6.6 0 0 0 .92.5l10.1-6.4a.6.6 0 0 0 0-1l-10.1-6.4A.6.6 0 0 0 8 5.6z"/></svg>
+        <svg id="icPause" width="28" height="28" viewBox="0 0 24 24" fill="currentColor" hidden><rect x="6" y="5" width="4.2" height="14" rx="1.2"/><rect x="13.8" y="5" width="4.2" height="14" rx="1.2"/></svg>
+        <span class="spin" id="icWait" hidden></span>
+      </button>
+      <button class="ctl" id="nextBtn" data-i18n-aria="tts.next_sentence" aria-label="다음 문장" disabled>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5.5v13a.5.5 0 0 0 .77.42l9.73-6.5a.5.5 0 0 0 0-.84L4.77 5.08A.5.5 0 0 0 4 5.5z"/></svg>
+      </button>
+      <button class="chip side end" id="speedBtn" data-i18n-aria="tts.speed" aria-label="속도">1.05×</button>
+    </div>
+  </div>
+</footer>
+
+<div class="backdrop" id="backdrop" hidden></div>
+
+<section class="sheet" id="settingsSheet" hidden data-i18n-aria="tts.settings" aria-label="설정">
+  <div class="sheet-inner">
+    <div class="grabber"></div>
+    <h3 data-i18n="tts.settings_title">듣기 설정</h3>
+    <div class="field"><div class="label" data-i18n="tts.voice">음성</div><div class="seg-group" id="voiceGroup"></div></div>
+    <div class="field"><div class="label" data-i18n="tts.speed">속도</div><div class="seg-group" id="speedGroup"></div></div>
+    <div class="field"><div class="label" data-i18n="tts.quality">음질 (높을수록 자연스럽지만 느림)</div><div class="seg-group" id="stepsGroup"></div></div>
+    <div class="field" id="autoNextField" hidden><label class="toggle"><span data-i18n="tts.auto_next">챕터가 끝나면 다음 챕터 이어서</span> <input type="checkbox" id="autoNext" checked></label></div>
+    <h3 style="margin-top:8px" data-i18n="tts.display">화면</h3>
+    <div class="field"><div class="label" data-i18n="tts.font_size">글자 크기</div><div class="seg-group" id="fontGroup"></div></div>
+    <div class="field"><div class="label" data-i18n="tts.theme">테마</div><div class="seg-group" id="themeGroup"></div></div>
+    <div class="field"><label class="toggle"><span data-i18n="tts.follow">읽는 문장 따라 자동 스크롤</span> <input type="checkbox" id="followToggle" checked></label></div>
+    <button class="dev-btn" id="devBtn" type="button" data-i18n="tts.dev_title">개발 로그</button>
+  </div>
+</section>
+
+<section class="sheet" id="chapterSheet" hidden data-i18n-aria="tts.chapters" aria-label="챕터">
+  <div class="sheet-inner">
+    <div class="grabber"></div>
+    <h3 data-i18n="tts.chapters">챕터</h3>
+    <ul class="chapter-list" id="chapterList"></ul>
+  </div>
+</section>
+
+<section class="dev" id="devOverlay" hidden>
+  <div class="dev-head">
+    <strong data-i18n="tts.dev_title">개발 로그</strong>
+    <a href="#" id="testLink" data-i18n="tts.dev_test_page">테스트 화면</a>
+    <button id="copyLog" data-i18n="tts.dev_copy">로그 복사</button>
+    <button id="closeDev" data-i18n="common.close">닫기</button>
+  </div>
+  <div class="dev-grid">
+    <div class="dev-card"><h4 data-i18n="tts.dev_env">환경</h4><dl class="kv" id="env"></dl></div>
+    <div class="dev-card"><h4 data-i18n="tts.dev_model">모델</h4><dl class="kv" id="loadInfo"></dl>
+      <div style="margin-top:6px"><span data-i18n="tts.dev_backend">백엔드</span> <select id="backend"><option value="auto" data-i18n="tts.dev_backend_auto">자동</option><option value="webgpu">WebGPU</option><option value="wasm">WASM</option></select> <span style="color:#8b93a1" data-i18n="tts.dev_backend_note">(다음 로드부터)</span></div>
+    </div>
+    <div class="dev-card"><h4 data-i18n="tts.dev_playback">재생</h4><dl class="kv" id="stats"></dl></div>
+  </div>
+  <pre id="log"></pre>
+</section>
+
+<button class="tap-start" id="tapStart" hidden><span class="circle"><svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.6v12.8a.6.6 0 0 0 .92.5l10.1-6.4a.6.6 0 0 0 0-1l-10.1-6.4A.6.6 0 0 0 8 5.6z"/></svg></span><span data-i18n="tts.tap_to_listen">탭해서 듣기</span></button>
+<div class="toast" id="toast" hidden></div>
+<audio id="player" preload="auto" hidden></audio>
+
+<script src="{{ static_asset_url('js/i18n.js') }}"></script>
+<script type="module" src="{{ static_asset_url('js/tts/tts_player.js') }}"></script>
+</body>
+</html>

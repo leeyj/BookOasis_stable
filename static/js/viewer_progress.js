@@ -1,5 +1,6 @@
 // viewer_progress.js – 독서 진행률 API 전송 디바운싱 및 동기화 모듈
 import { state } from './state.js';
+import { noteReadActivity, flushReadReport } from './viewer/tts_sync.js';
 
 let progressTimeout = null;
 let pendingProgress = null;
@@ -39,6 +40,9 @@ export function saveProgress(bookId, pageIdx, totalPages, extraData = null) {
       triggerPreloadNextBook(bookId);
     }
   }
+
+  // TXT/EPUB은 듣기(TTS)와 맞출 세밀한 읽기 위치도 따로 보고한다 (30초에 한 번)
+  noteReadActivity();
 
   // 기존 예약 제거 후 3초 뒤 전송
   if (progressTimeout) {
@@ -92,6 +96,8 @@ function triggerPreloadNextBook(bookId) {
  * @param {boolean} flushImmediately - 응답 전에 해당 진행도를 DB에 즉시 반영할지 여부
  */
 export function flushProgress(useBeacon = false, flushImmediately = false) {
+  // 이탈(beacon)·뷰어 닫기(flushImmediately) 때만 즉시 보고 — 3초 디바운스 flush마다 보내면 30초 스로틀이 무의미해진다
+  if (useBeacon || flushImmediately) flushReadReport(useBeacon);
   if (!pendingProgress) return Promise.resolve(null);
 
   const data = { ...pendingProgress };

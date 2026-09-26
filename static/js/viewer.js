@@ -3,6 +3,8 @@ import { state } from './state.js';
 import { nextComicPage, prevComicPage, setComicFitMode, toggleComicOverlay, markAsCompleted as markComicAsCompleted, getComicReadingDirection, toggleComicReadingDirection, toggleComicPageStep, comicJumpToFirstPage, comicJumpToLastPage, toggleTapZoneDirection, initTapZoneDirection, toggleComicSplitSpread, toggleSpreadShiftOffset, loadComicPage } from './viewer_comic.js';
 import { prevTxtPage, nextTxtPage, applyTxtSettings, txtJumpToFirstPage, txtJumpToLastPage } from './viewer_txt.js';
 import { addBookmarkAtCurrentPosition } from './viewer/txt_toc.js';
+import { reportReadNow } from './viewer/tts_sync.js';
+import { openListen } from './tts_launcher.js';
 import { nextPdfPage, prevPdfPage, pdfJumpToFirstPage, pdfJumpToLastPage, renderPdfPage } from './viewer_pdf.js';
 import { initFullscreenStateSync, isViewerInFullscreen, toggleFullscreenViewer } from './viewer/fullscreen_controller.js';
 import { initViewerSeekBar } from './viewer/seekbar_controller.js';
@@ -568,6 +570,7 @@ function initMediaViewerDelegation() {
     if (action === 'jump-last') return viewerJumpToLast();
     if (action === 'mark-completed') return markAsCompleted();
     if (action === 'add-bookmark') return addBookmarkAtCurrentPosition();
+    if (action === 'listen') return openListenFromViewer();
     if (action === 'scroll-mode') return window.setScrollMode?.(value || 'page');
     if (action === 'toggle-page-step') return window.toggleComicPageStep?.();
     if (action === 'shift-spread') return shiftSpreadByOne();
@@ -666,3 +669,10 @@ window.openReader = openReader;
 window.markAsCompleted = markAsCompleted;
 window.toggleComicOverlay = toggleComicOverlay;
 export { toggleComicOverlay, setComicFitMode, nextComicPage, prevComicPage, nextPdfPage, prevPdfPage, prevTxtPage, nextTxtPage };
+
+// 뷰어의 "듣기" 버튼 (TXT/EPUB). 팝업 차단을 피하려고 클릭 순간 빈 탭부터 열고, 읽던 위치를 저장한 뒤
+// 듣기 화면으로 보낸다 — 듣기 화면은 더 최근 쪽 위치에서 시작하므로 방금 읽던 문장부터 읽는다.
+function openListenFromViewer() {
+  if (!state.activeBookId) return;
+  return openListen(state.activeBookId, state.currentLibraryType || 'general', { beforeOpen: reportReadNow });
+}

@@ -64,8 +64,26 @@
     will-change: transform;
 }
 
+.sidebar-header-wrapper {
+    /* 로고는 왼쪽, ⋯·☰는 오른쪽에 붙여서 (인라인 space-between이면 ☰가 가운데로 떠 있었다) */
+    justify-content: flex-start !important;
+    gap: 0.35rem;
+}
+
+#btn-category-info-mobile {
+    order: 1;
+    width: 2.3rem;
+    height: 2.3rem;
+    padding: 0;
+}
+
+#btn-sidebar-toggle {
+    order: 2; /* 햄버거는 맨 오른쪽 끝 */
+}
+
 .sidebar-title {
     margin: 0 !important;
+    margin-right: auto !important;
     line-height: 1.2;
     cursor: pointer;
     user-select: none;
@@ -232,7 +250,18 @@
     grid-area: tabs;
     justify-self: stretch;
     width: 100%;
-    flex-wrap: wrap;
+    flex-wrap: nowrap; /* 탭 4개는 항상 한 줄 — 줄바꿈되면 마지막 탭만 아래로 떨어져 보기 불편했다 */
+}
+
+#library-type-toggle-group .btn-toggle {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0.45rem 0.2rem;
+    font-size: 0.82rem;
+    line-height: 1.2;
+    white-space: normal;  /* 영어처럼 긴 이름은 버튼 안에서 두 줄로 */
+    word-break: keep-all;
+    text-align: center;
 }
 
 .library-controls {
@@ -527,7 +556,8 @@ body {
     justify-content: center;
 }
 
-.btn-read-row .btn-download {
+.btn-read-row .btn-download,
+.btn-read-row .btn-listen {
     flex: 1;
     justify-content: center;
 }

@@ -20,7 +20,10 @@ class SeriesRepository:
         lock_name = f'media_server:series_summary:{db_type}'
         lock_acquired = False
         try:
-            cursor.execute("SELECT GET_LOCK(%s, 30) AS acquired", (lock_name,))
+            # 대형 라이브러리(수십만 권)에서는 재구성 자체가 30초를 넘길 수 있어,
+            # 스캔 완료와 카테고리 삭제 등 다른 트리거가 겹치면 정상적인 경합인데도
+            # 락 타임아웃으로 오인되곤 했다 - 대기 시간을 넉넉히 늘린다.
+            cursor.execute("SELECT GET_LOCK(%s, 90) AS acquired", (lock_name,))
             lock_row = cursor.fetchone()
             lock_acquired = bool(lock_row and int(lock_row['acquired'] or 0))
             if not lock_acquired:

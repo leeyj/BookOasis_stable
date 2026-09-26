@@ -4040,6 +4040,30 @@ body {
     box-shadow: 0 4px 12px rgba(3, 105, 161, 0.5);
 }
 
+/* 음성으로 듣기 (TXT/EPUB) — 다운로드 버튼과 같은 모양 */
+.btn-listen {
+    background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+    border: none;
+    color: #fff;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    border-radius: 6px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(109, 40, 217, 0.35);
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-shrink: 0;
+}
+
+.btn-listen:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(109, 40, 217, 0.5);
+}
+
 /* 하위 호환 레이아웃 */
 .detail-layout { display: flex; gap: 2rem; }
 .detail-left { width: 30%; min-width: 200px; }

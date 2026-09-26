@@ -77,6 +77,8 @@ import { getTxtPageAdvanceWidth, snapTxtPageScrollLeft, isTxtScrollLeftAtMaxPage
 import { chunkText, formatTxtToHtml, stripHtml } from './viewer/txt_text_utils.js';
 import { renderTxtChunkView, applyTxtParagraphStyles } from './viewer/txt_render.js';
 import { getTxtAnchorInfoByMode, restoreTxtAnchorInfoByMode } from './viewer/txt_anchor_utils.js';
+import { findAnchorOffset, chunkStarts } from './viewer/text_position_utils.js';
+import { setReadPositionProvider, fetchSyncState, listenTargetForTxt, listenTargetForEpub } from './viewer/tts_sync.js';
 import { applyTxtSettingsCore, applyFontFamilyToElement as applyTxtFontFamily } from './viewer/txt_settings_apply.js';
 import {
   prevTxtPageAction,
@@ -395,6 +397,9 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
   showViewerLoading(i18n.t("viewer.loading_txt_title"), i18n.t("viewer.loading_txt_sub"));
   
   const isEpub = (state.currentViewerFormat === 'epub');
+  // 듣기(TTS) 위치가 더 최근이면 그 문장부터 연다 — 본문 요청과 병렬로 조회 (느리면 1.5초 후 포기)
+  const ttsSyncPromise = fetchSyncState(state.currentLibraryType, bookId);
+  setReadPositionProvider(currentReadPosition);
   
   if (isEpub) {
     // ─── EPUB 초고속 렌더링: 1단계 /api/media/epub/meta 요청 (50ms) ───
@@ -439,6 +444,9 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
           }
         }
 
+        const ttsTarget = listenTargetForEpub(await ttsSyncPromise, totalChapters);
+        if (ttsTarget) startIdx = ttsTarget.chunkIdx;
+
         startIdx = Math.max(0, Math.min(totalChapters - 1, parseInt(startIdx, 10) || 0));
         currentChunkIdx = startIdx;
 
@@ -458,6 +466,7 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
             // 최초 렌더링임을 명시해 동기적으로 바로 적용되게 한다.
             applyTxtSettings({ previousMode: getViewerSettings().scrollMode });
             setupTxtViewerRuntimeListeners();
+            if (ttsTarget) applyListenTarget(ttsTarget);
 
             // ─── 3단계: 이전/다음 챕터 백그라운드 프리패치 (전후 10개 챕터 확장) ───
             // hydrateEpubChapterWindow는 이제 반경 내 미로드 챕터를 배치 API 1회 호출로
@@ -549,6 +558,9 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
         startIdx = Math.max(0, Math.min(txtChunks.length - 1, parseInt(startIdx, 10) || 0));
       }
 
+      const ttsTarget = isEpub ? null : listenTargetForTxt(await ttsSyncPromise, fullText, txtChunks);
+      if (ttsTarget) startIdx = ttsTarget.chunkIdx;
+
       currentChunkIdx = startIdx;
 
       initReadingDirection();
@@ -557,6 +569,7 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
       applyTxtSettings({ previousMode: getViewerSettings().scrollMode });
 
       setupTxtViewerRuntimeListeners();
+      if (ttsTarget) applyListenTarget(ttsTarget);
     })
     .catch((err) => {
       console.error('[Viewer-Txt] 로딩 에러 발생:', err);
@@ -762,6 +775,31 @@ export function logActiveViewportText() {
   } catch (e) {
     console.error(`[Viewer-Active-Text] 감지 중 예외 발생:`, e);
   }
+}
+
+// 듣기 위치로 연 경우: 첫 렌더(로컬 픽셀 위치 복원 포함)가 끝난 뒤 문장 앵커로 맞추고 알린다
+function applyListenTarget(target) {
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (target.anchorText) restoreTxtAnchorInfo({ chunkIdx: target.chunkIdx, anchorText: target.anchorText });
+    showToast(i18n.t('viewer.tts_moved_to_listen'), 'info');
+  }));
+}
+
+// TTS 동기화용 현재 읽기 위치: 화면의 앵커 문구 + 텍스트 기준 글자 오프셋 (viewer/tts_sync.js가 호출)
+function currentReadPosition() {
+  if (!Array.isArray(txtChunks) || txtChunks.length === 0) return null;
+  const info = getTxtAnchorInfo();
+  if (!info || !info.anchorText) return null;
+  const idx = Number.isInteger(info.chunkIdx) ? info.chunkIdx : currentChunkIdx;
+  if (state.currentViewerFormat === 'epub') {
+    const chapterText = stripHtml(txtChunks[idx] || '');
+    if (!chapterText) return null;
+    const inChapter = findAnchorOffset(chapterText, info.anchorText, 0);
+    return { chapter_idx: idx, char_offset: inChapter ?? 0, text_len: chapterText.length, anchor: info.anchorText };
+  }
+  const inChunk = findAnchorOffset(txtChunks[idx] || '', info.anchorText, 0);
+  const start = chunkStarts(txtChunks)[idx] || 0;
+  return { chapter_idx: 0, char_offset: start + (inChunk ?? 0), text_len: (fullText || '').length, anchor: info.anchorText };
 }
 
 export function getTxtAnchorInfo(forcedMode = null) {

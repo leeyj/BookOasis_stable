@@ -407,6 +407,26 @@ render(pluginId, container, context);
 번들 로드는 `GET /api/media/plugins/<plugin_id>/detail-ui`로 이루어지며, `detail_view`를
 선언하지 않은 플러그인이나 비활성화된 플러그인에는 404를 반환합니다.
 
+### 음성으로 듣기 열기 (`window.openListen`)
+
+`detail_view`처럼 볼륨 목록을 직접 그리는 플러그인도 코어와 같은 "듣기" 버튼을 붙일 수 있습니다.
+`window.openReader`와 같은 방식의 전역 함수입니다(서버 API를 따로 부를 필요 없음).
+
+```javascript
+// TXT/EPUB만 들을 수 있다 (음성 합성은 브라우저에서 텍스트로 한다)
+if (window.canListen && window.canListen(book.file_format)) {
+    btn.addEventListener('click', function (e) {
+        e.stopPropagation();                 // 카드 클릭(뷰어 열기)과 겹치지 않게
+        window.openListen(book.id);          // 두 번째 인자 dbType 생략 시 현재 세션
+    });
+}
+```
+
+- 새 탭으로 열고, 준비되면 바로 재생을 시도합니다(브라우저가 자동재생을 막으면 화면에 "탭해서 듣기"가 뜸).
+- 읽기↔듣기 위치 동기화, 진행도 반영, 닫을 때 원래 창 갱신은 코어가 처리합니다.
+- iframe/외부 링크처럼 전역 함수를 쓸 수 없는 곳에서는 URL로 열어도 됩니다:
+  `/listen?book_id=<id>&db_type=<general|adult>&autoplay=1` (컨텍스트 메뉴 액션의 `open_url`에도 사용 가능).
+
 ### 플러그인 내부 업데이트 계약 (`update_manifest`)
 
 업데이트 버튼 노출/실행 규칙은 코어 하드코딩이 아니라, **각 플러그인 클래스 내부의 `update_manifest` 선언**으로 동작합니다.

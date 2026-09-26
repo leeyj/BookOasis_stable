@@ -420,7 +420,12 @@ class CategoryService:
                 except Exception:
                     pass
 
-            _refresh_series_summaries(db_type)
+            try:
+                _refresh_series_summaries(db_type)
+            except Exception as e:
+                # 카테고리/도서 삭제는 이미 커밋된 상태이므로, 이후 요약 재구성 실패를
+                # "삭제 실패"로 오인시키지 않는다. 다음 스캔이나 재구성 시점에 자연 복구된다.
+                print(f"[CategoryService ERROR] Series summary refresh after delete failed: {e}")
 
         import threading
         t = threading.Thread(target=database.optimize_database, args=(db_type,))

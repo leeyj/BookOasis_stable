@@ -160,7 +160,8 @@ class TextEpubContentService:
         # v2: nav.xhtml 목차 파싱이 중첩 <ol> depth를 반영해 level을 제대로 매기도록 고쳐지면서
         # (레벨이 전부 1로 고정되어 하위 목차 클릭 시 앵커 이동 없이 챕터 시작으로만 가던 버그 수정)
         # 예전 버전으로 캐시된 toc(level 전부 1)를 그대로 재사용하지 않도록 키 버전을 올렸다.
-        redis_cache_key = f"cache:epub:meta:book:v2:{db_type}:{book_id}" if book_id else None
+        # v3: 접두사(opf:) 네임스페이스 OPF를 챕터 0개로 잘못 파싱하던 결과가 24시간 캐시되어 있으므로 버전을 올림
+        redis_cache_key = f"cache:epub:meta:book:v3:{db_type}:{book_id}" if book_id else None
         if redis_cache_key:
             try:
                 from utils.redis_helper import redis_get
@@ -186,8 +187,13 @@ class TextEpubContentService:
                 opf_dir = os.path.dirname(opf_path)
                 opf_data = zf.read(opf_path)
                 opf_str = opf_data.decode('utf-8', errors='ignore')
-                opf_str_cleaned = re.sub(r'\sxmlns="[^"]+"', '', opf_str, count=1)
-                opf_root = ET.fromstring(opf_str_cleaned.encode('utf-8'))
+                opf_root = ET.fromstring(opf_str.encode('utf-8'))
+                # 아래 탐색은 접두사 없는 태그명(manifest/item/spine)을 가정한다. 예전엔 기본 xmlns만
+                # 정규식으로 지웠는데, <opf:package xmlns:opf=...>처럼 접두사를 쓰는 EPUB 2 OPF(표준상 유효)는
+                # 그대로 남아 manifest/spine을 못 찾고 챕터 0개로 열리지 않았다. 태그의 네임스페이스를 전부 뗀다.
+                for elem in opf_root.iter():
+                    if isinstance(elem.tag, str) and '}' in elem.tag:
+                        elem.tag = elem.tag.split('}', 1)[1]
 
                 title_elem = opf_root.find('.//title')
                 title = title_elem.text if title_elem is not None else 'Untitled'
@@ -354,7 +360,8 @@ class TextEpubContentService:
 
     @staticmethod
     def _spine_cache_key(db_type, book_id):
-        return f"cache:epub:spine:book:{db_type}:{book_id}" if book_id else None
+        # v2: meta v3와 같은 이유(빈 spine 캐시 무효화)
+        return f"cache:epub:spine:book:v2:{db_type}:{book_id}" if book_id else None
 
     @staticmethod
     def _set_cached_spine(db_type, book_id, spine_itemrefs):

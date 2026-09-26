@@ -182,3 +182,26 @@ Changing the mount option requires **restarting the rclone mount process** (this
 
 > [!NOTE]
 > The Google Drive API does not support multi-range requests (`Range: bytes=A-B,C-D` in a single request) — it explicitly rejects them with `501 Not Implemented` (verified empirically). So raising the chunk size is the only way to reduce the number of chunk requests per book.
+
+---
+
+## 10. Listen (in-browser TTS)
+
+Reads TXT/EPUB books aloud. Open it with **Listen** in the book menu or **Listen** in the reader menu (Navigate tab). Speech is **synthesized in each user's browser**, so it uses no server CPU.
+
+### ① Requirements
+* **HTTPS is required.** Over plain HTTP, WebGPU, multithreading and the model cache are all disabled and speech is slower than real time (the page shows a warning).
+* The voice model (Supertonic 3, about 400MB) is downloaded **once per device** and kept in the browser.
+* Fastest in browsers with WebGPU (recent Chrome/Edge, Samsung Internet, ...). Otherwise it falls back to WASM.
+
+### ② Server side (usually nothing to do)
+* By default the browser downloads the model straight from Hugging Face.
+* If the Hugging Face CDN blocks the browser request (CORS), the server downloads the model once into `cache/tts_models/<revision>/` and serves it instead. This needs about 400MB of disk and outbound internet access. In Docker it lives in the `./cache` volume, so it survives container rebuilds.
+* This download is **not affected by the admin external-domain whitelist** (the URL is fixed in code, so there is nothing to register).
+* However, if a **firewall or proxy blocks outbound traffic from the server**, loading the model fails. Allow HTTPS (443) to: `huggingface.co`, `*.hf.co` (e.g. `us.aws.cdn.hf.co`), `*.xethub.hf.co`. Downloads start at `huggingface.co` and are redirected to the CDN.
+
+### ③ Behaviour notes
+* The voice engine tends to drop characters when given a very short sentence on its own, so short sentences are read together with their neighbours.
+* EPUB items that contain only images (covers, illustrations) or a single title line are skipped.
+* Standalone hanja are read with Korean readings (e.g. 運命 → 운명, 女人 → 여인). The table comes from Unicode Unihan data (`static/lib/hanja/`, Unicode License V3); characters with several readings and personal names may occasionally be read differently.
+* Listening also updates reading progress (same units as the reader: 4,000-character pages for TXT, chapters for EPUB). Listening to the end marks the book as completed.

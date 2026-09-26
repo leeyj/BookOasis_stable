@@ -1,4 +1,17 @@
 # CHANGELOG
+## v2.7.8
+- (feature) TXT/EPUB 음성으로 듣기 정식 도입 - 브라우저에서 직접 음성 합성(서버 CPU 미사용), 읽는 문장 강조 + 자동 스크롤, 뷰어/도서 메뉴에서 열기, 읽던 위치와 듣던 위치 동기화 | Listen (TXT/EPUB read-aloud) is now a regular feature: speech is synthesized in the browser (no server CPU), the current sentence is highlighted and followed, opens from the reader or the book menu, reading and listening positions stay in sync
+- (improvement) 플러그인이 "음성으로 듣기"를 열 수 있는 전역 함수 추가 (`window.openListen`, `window.canListen` — guide_plugins 참고) | plugins can open Listen via `window.openListen` / `window.canListen` (see guide_plugins)
+- (improvement) 음성으로 듣기에서 한자만 쓴 단어(運命, 天下第一 등)를 한국식 음으로 읽음 (두음법칙 적용, 화면에는 원문 한자 그대로) | Listen reads standalone hanja (e.g. 運命) with Korean readings, applying initial-sound rules (the screen still shows the original hanja)
+- (improvement) 음성으로 듣기로 들은 위치가 읽기 진행도(목록 진행 막대·완독·최근 읽은 도서)에도 반영됨 | listening now also updates reading progress (list progress bar, completion, recently read)
+- (improvement) 음성 모델을 Hugging Face에서 받지 못하는 브라우저는 서버가 한 번 받아 둔 모델을 대신 받음 (외부 도메인 허용 목록과 무관, 서버 방화벽이 외부 접속을 막으면 `huggingface.co`·`*.hf.co` 허용 필요) | browsers that cannot download the voice model from Hugging Face fall back to a copy the server downloads once (independent of the domain whitelist; if a server firewall blocks outbound traffic, allow `huggingface.co` and `*.hf.co`)
+- (fix) 음성으로 듣기에서 "아....그건" 같은 아주 짧은 문장이 튀거나 빠지던 이슈 수정 (짧은 문장은 앞뒤 문장과 함께 합성, 제목만 있는 속표지는 건너뜀) | fix very short sentences (e.g. "Ah.... that") being garbled or skipped in Listen (short sentences are synthesized together with their neighbours; title-only pages are skipped)
+- (fix) CBZ/ZIP 안에 표지 이미지(`cover`/`folder`/`표지` 이름, ComicInfo.xml `FrontCover` 지정)가 있어도 페이지가 숫자로 시작하면 첫 페이지를 표지로 뽑던 이슈 수정 | fix CBZ/ZIP cover extraction picking the first page even when the archive contains a cover image (`cover`/`folder`/`표지` name or ComicInfo.xml `FrontCover`) and pages start with digits
+- (fix) OPF가 `opf:` 접두사 네임스페이스를 쓰는 EPUB(웹 서점 뷰어 저장본 등)이 챕터 0개로 인식되어 열리지 않던 이슈 수정 | fix EPUBs whose OPF uses an `opf:`-prefixed namespace (e.g. saved from web store readers) being parsed as 0 chapters and failing to open
+- (fix) 목록에서 메타정보 검색 결과를 적용하면 카테고리 맨 위로 이동하던 이슈 수정 (스크롤 위치 유지) | fix applying a metadata search result from the list jumping back to the top of the category (scroll position kept)
+- (improvement) 샘플 플러그인 `naver_webtoon` → `webtoon_search`로 이름 변경, 카카오페이지/카카오웹툰 표지 검색 추가 (선택 설치) | sample plugin `naver_webtoon` renamed to `webtoon_search`, adds KakaoPage/Kakao Webtoon cover search (optional)
+
+
 ## v2.7.7
 - (fix) 오디오북/영상 강좌 목록에서, 같은 제목으로 여러 권이 한 시리즈로 묶이는 경우 무한 스크롤이 실제로는 수천 개가 남았어도 중간에 영구히 멈추던 이슈 수정 | fix audiobook/video list infinite scroll permanently stopping partway through even with thousands of series remaining, when multiple rows collapse into one grouped series
 

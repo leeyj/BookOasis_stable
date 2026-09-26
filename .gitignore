@@ -9,6 +9,7 @@ __pycache__/
 venv/
 ENV/
 deploy.py
+test_deploy.py
 test/
 client_secret_*.json
 gdrive_*.json
@@ -52,6 +53,7 @@ logs/*
 
 # Private operator docs (local only, not published)
 docs/operator_deployment_private.md
+docs/private_doc/
 
 # Thesis research data (personal, never published)
 thesis_data/
@@ -66,4 +68,9 @@ thesis_data/
 sample_plugins/metadata/reading_review/reading_reviews.sqlite3*
 plugins/metadata/reading_review/reading_reviews.sqlite3*
 
+# 음성으로 듣기 재현 도구 산출물/가상환경
+tools/tts_repro/out/
+tools/tts_repro/.venv/
 
+# Playwright MCP 스냅샷·스크린샷·콘솔 로그 (개발 중 자동 생성)
+.playwright-mcp/

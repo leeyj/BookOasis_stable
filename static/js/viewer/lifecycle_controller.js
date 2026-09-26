@@ -131,6 +131,8 @@ export function openReader(bookId, format, title, pagesRead, totalPages) {
 
   state.currentViewerFormat = fmt;
   setAnnotationUiEnabled(fmt === 'txt' || fmt === 'epub');
+  const listenBtn = document.getElementById('btn-viewer-listen');
+  if (listenBtn) listenBtn.style.display = (fmt === 'txt' || fmt === 'epub') ? '' : 'none';
 
   if (activeViewerInstance && typeof activeViewerInstance.destroy === 'function') {
     try {

@@ -328,6 +328,26 @@ CREATE TABLE IF NOT EXISTS user_progress (
     UNIQUE KEY uq_user_book_progress (book_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
+CREATE TABLE IF NOT EXISTS tts_progress (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    book_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    listen_chapter INT,
+    listen_offset INT,
+    listen_text_len INT,
+    listen_anchor TEXT,
+    listen_updated_ms BIGINT,
+    read_chapter INT,
+    read_offset INT,
+    read_text_len INT,
+    read_anchor TEXT,
+    read_updated_ms BIGINT,
+    voice VARCHAR(8),
+    steps INT,
+    speed DOUBLE,
+    UNIQUE KEY uq_tts_progress_book_user (book_id, user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
 CREATE TABLE IF NOT EXISTS user_reading_log (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     book_id BIGINT NOT NULL,

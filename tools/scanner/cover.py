@@ -6,6 +6,7 @@ import zipfile
 import urllib.parse
 import base64
 import io
+import unicodedata
 import xml.etree.ElementTree as ET
 from PIL import Image
 from tools.scanner.folder_image import find_common_cover, find_individual_cover, find_common_banner
@@ -28,6 +29,39 @@ COVER_THUMB_MAX_H = 660
 # 실제 표시 폭(상세 페이지 본문 너비, 대략 900~1100px)의 레티나(x2) 기준.
 BANNER_THUMB_MAX_W = 1600
 BANNER_THUMB_MAX_H = 700
+
+# 압축 파일 안에서 표지로 인정하는 이미지 이름(확장자 제외). 페이지가 "001.jpg"처럼 숫자로
+# 시작하면 이름순 정렬에서 "cover.jpg"가 맨 뒤로 가서 첫 페이지가 표지로 뽑히던 문제를 막는다.
+ARCHIVE_COVER_STEMS = ('cover', 'folder', '표지')
+
+
+def pick_archive_cover_image(zf, img_infos):
+    """페이지 순서로 정렬된 img_infos 중 표지로 쓸 항목을 고른다.
+
+    우선순위: ComicInfo.xml의 <Page Type="FrontCover"> → 이름이 cover/folder/표지인 이미지 →
+    첫 페이지. ComicInfo의 Image 속성은 페이지 순서 기준 0부터 시작하는 번호다.
+    """
+    names_lower = {n.lower(): n for n in zf.namelist()}
+    comicinfo_key = names_lower.get('comicinfo.xml')
+    if comicinfo_key:
+        try:
+            root = ET.fromstring(zf.read(comicinfo_key))
+            for page in root.iter('Page'):
+                if (page.get('Type') or '').strip().lower() == 'frontcover':
+                    index = int(page.get('Image', ''))
+                    if 0 <= index < len(img_infos):
+                        return img_infos[index]
+                    break
+        except Exception as e:
+            print(f"[Scanner-Cover] ComicInfo.xml FrontCover 해석 실패, 이름 기준으로 계속: {e}")
+
+    for info in img_infos:
+        stem = os.path.splitext(os.path.basename(info.filename))[0]
+        # macOS에서 만든 압축은 한글 파일명이 NFD로 들어 있어 '표지'와 그냥 비교하면 안 맞는다.
+        if unicodedata.normalize('NFC', stem).lower() in ARCHIVE_COVER_STEMS:
+            return info
+
+    return img_infos[0]
 
 
 def save_as_thumbnail_webp(img, dest_path, quality=80, max_w=COVER_THUMB_MAX_W, max_h=COVER_THUMB_MAX_H):
@@ -443,7 +477,7 @@ def get_series_cover_fallback(series_name, folder_path, force=False, is_remote=F
                         )
                         
                         if img_infos:
-                            first_img_name = img_infos[0].filename
+                            first_img_name = pick_archive_cover_image(zf, img_infos).filename
                             img_data = zf.read(first_img_name)
                             
                             # Save via Pillow WebP encoding

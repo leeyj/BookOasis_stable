@@ -332,9 +332,7 @@ async function selectMetadataBook(book, source) {
 
             bulkSearchQueue = null;
             closeMetadataSearchModal();
-            if (typeof window.selectCategory === 'function') {
-              window.selectCategory(state.currentLibraryId);
-            }
+            refreshListKeepingScroll();
             return;
           }
 
@@ -353,9 +351,8 @@ async function selectMetadataBook(book, source) {
           
           if (isDetailActive && activeSeries && typeof window.openBookDetail === 'function') {
             window.openBookDetail(null, activeSeries, activeLibId);
-          } else if (typeof window.selectCategory === 'function') {
-            // 그리드 목록 뷰인 경우에만 카테고리 전체 목록 갱신
-            window.selectCategory(state.currentLibraryId);
+          } else {
+            refreshListKeepingScroll();
           }
         }
       } else {
@@ -367,6 +364,18 @@ async function selectMetadataBook(book, source) {
       vm.showToast('서버 통신 중 오류가 발생했습니다.', 'error');
     }
   });
+}
+
+// 그리드에서 적용한 뒤 selectCategory()로 카테고리를 통째로 다시 불러오면 맨 위로 튄다.
+// 스캔 완료 때와 같은 경로로, 불러와 둔 페이지 범위만 다시 받고 스크롤 위치를 복원한다.
+function refreshListKeepingScroll() {
+  if (typeof window.invalidateBookListAfterScan === 'function' && window.invalidateBookListAfterScan()) return;
+  // 목록을 불러오는 중이면 invalidate가 끝난 뒤 갱신을 예약해 두었으므로 따로 할 일이 없다.
+  if (state.isLoading || state.isLoadingPrevious) return;
+  // 홈 대시보드 등 도서 목록이 아닌 화면은 기존처럼 다시 그린다.
+  if (typeof window.selectCategory === 'function') {
+    window.selectCategory(state.currentLibraryId);
+  }
 }
 
 // 글로벌 윈도우 스코프 바인딩 (인라인 HTML 핸들러 대응)

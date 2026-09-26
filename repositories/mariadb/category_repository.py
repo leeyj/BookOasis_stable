@@ -328,6 +328,7 @@ class CategoryRepository:
             cursor.execute("DELETE FROM user_progress WHERE book_id IN (SELECT id FROM books WHERE library_id = %s)", (library_id,))
             cursor.execute("DELETE FROM user_reading_log WHERE book_id IN (SELECT id FROM books WHERE library_id = %s)", (library_id,))
             cursor.execute("DELETE FROM user_favorites WHERE book_id IN (SELECT id FROM books WHERE library_id = %s)", (library_id,))
+            cursor.execute("DELETE FROM tts_progress WHERE book_id IN (SELECT id FROM books WHERE library_id = %s)", (library_id,))
             cursor.execute("DELETE FROM books WHERE library_id = %s", (library_id,))
             
             cursor.execute("SELECT physical_path FROM libraries WHERE id = %s", (library_id,))
@@ -434,6 +435,11 @@ class CategoryRepository:
                 for row in cursor_src.fetchall():
                     _dynamic_insert(cursor_dst, 'user_favorites', dict(row), overrides={'book_id': new_book_id})
 
+                # 5-2. 듣기/읽기 동기화 위치(tts_progress) 복제
+                cursor_src.execute("SELECT * FROM tts_progress WHERE book_id = %s", (old_book_id,))
+                for row in cursor_src.fetchall():
+                    _dynamic_insert(cursor_dst, 'tts_progress', dict(row), overrides={'book_id': new_book_id})
+
             cursor_src.execute("SELECT * FROM user_category_permissions WHERE library_id = %s", (library_id,))
             for row in cursor_src.fetchall():
                 _dynamic_insert(cursor_dst, 'user_category_permissions', dict(row), overrides={'library_id': new_lib_id})
@@ -443,6 +449,7 @@ class CategoryRepository:
                 cursor_src.execute("DELETE FROM user_progress WHERE book_id = %s", (old_book_id,))
                 cursor_src.execute("DELETE FROM user_reading_log WHERE book_id = %s", (old_book_id,))
                 cursor_src.execute("DELETE FROM user_favorites WHERE book_id = %s", (old_book_id,))
+                cursor_src.execute("DELETE FROM tts_progress WHERE book_id = %s", (old_book_id,))
                 
             cursor_src.execute("DELETE FROM books WHERE library_id = %s", (library_id,))
             cursor_src.execute("DELETE FROM user_category_permissions WHERE library_id = %s", (library_id,))

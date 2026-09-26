@@ -1,5 +1,6 @@
 // book_context_menu.js – 도서 우클릭 단독 스캔 컨텍스트 메뉴 제어 모듈
 import { state } from './state.js';
+import { canListen, openListen } from './tts_launcher.js';
 import * as api from './api.js';
 import { openBookDetail } from './modal.js';
 import { loadBooksList, loadReadingHistory } from './book_list.js';
@@ -273,6 +274,13 @@ export function showBookContextMenu(x, y, bookId, bookTitle, isVolumeDetail = fa
     pageTurnItem.style.display = (!isMultiSelection && (fmt === 'zip' || fmt === 'cbz')) ? '' : 'none';
   }
 
+  // "음성으로 듣기"는 브라우저에서 텍스트를 합성하므로 TXT/EPUB에서만 노출
+  const ttsItem = document.getElementById('ctx-tts-book');
+  if (ttsItem) {
+    const fmt = String(context.fileFormat || '').toLowerCase();
+    ttsItem.style.display = (!isMultiSelection && canListen(fmt)) ? '' : 'none';
+  }
+
   const addSeriesItem = document.getElementById('ctx-add-series-to-collection');
   if (addSeriesItem) {
     const allSelectedHaveSeries = isMultiSelection && selectedBooks.every(book => String(book.seriesName || '').trim());
@@ -441,6 +449,13 @@ export function triggerPageTurnAction() {
   closeBookContextMenu();
 }
 window.triggerPageTurnAction = triggerPageTurnAction;
+
+export function triggerTtsAction() {
+  if (!currentTargetBook || !currentTargetBook.id) return;
+  openListen(currentTargetBook.id, state.currentLibraryType || 'general');
+  closeBookContextMenu();
+}
+window.triggerTtsAction = triggerTtsAction;
 
 export async function triggerScanSingleBookAction() {
   if (!currentTargetBook || !currentTargetBook.id) return;
@@ -1004,6 +1019,7 @@ if (!window.__bookContextActionBound) {
     if (action === 'add-to-collection') return window.triggerAddToCollectionAction?.();
     if (action === 'add-series-to-collection') return window.triggerAddSeriesToCollectionAction?.();
     if (action === 'page-turn') return window.triggerPageTurnAction?.();
+    if (action === 'tts') return window.triggerTtsAction?.();
     if (action === 'mark-unread') return window.triggerMarkAsUnreadAction?.();
     if (action === 'mark-read') return window.triggerMarkAsReadAction?.();
     if (action === 'cover-align') {

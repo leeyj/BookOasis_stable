@@ -283,6 +283,26 @@ render(pluginId, container, context);
 The bundle is served from `GET /api/media/plugins/<plugin_id>/detail-ui`, which returns 404 for
 plugins that don't declare `detail_view` or are disabled.
 
+### Opening Listen (`window.openListen`)
+
+Plugins that render their own volume list (e.g. `detail_view`) can add the same "Listen" button as the core.
+It is a global function in the same style as `window.openReader` (no server API call needed).
+
+```javascript
+// Only TXT/EPUB can be read aloud (speech is synthesized in the browser from text)
+if (window.canListen && window.canListen(book.file_format)) {
+    btn.addEventListener('click', function (e) {
+        e.stopPropagation();                 // don't also trigger the card click (open reader)
+        window.openListen(book.id);          // optional 2nd arg dbType; defaults to the current session
+    });
+}
+```
+
+- Opens in a new tab and tries to start playback right away (if the browser blocks autoplay, a "Tap to listen" overlay appears).
+- Reading/listening position sync, progress updates and refreshing the original tab on close are handled by the core.
+- Where the global function is not available (iframes, external links), open the URL instead:
+  `/listen?book_id=<id>&db_type=<general|adult>&autoplay=1` (also usable as `open_url` from a context-menu action).
+
 ### Plugin-Owned Update Contract (`update_manifest`)
 
 Update button visibility and execution rules are not core hardcoding anymore. They are driven by each plugin's own `update_manifest` declaration.

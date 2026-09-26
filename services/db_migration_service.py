@@ -457,6 +457,26 @@ _SCHEMA_SQL = """
         last_epub_updated_at DATETIME
     );
 
+    CREATE TABLE IF NOT EXISTS tts_progress (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id INTEGER REFERENCES books(id),
+        user_id INTEGER NOT NULL,
+        listen_chapter INTEGER,
+        listen_offset INTEGER,
+        listen_text_len INTEGER,
+        listen_anchor TEXT,
+        listen_updated_ms INTEGER,
+        read_chapter INTEGER,
+        read_offset INTEGER,
+        read_text_len INTEGER,
+        read_anchor TEXT,
+        read_updated_ms INTEGER,
+        voice TEXT,
+        steps INTEGER,
+        speed REAL,
+        UNIQUE(book_id, user_id)
+    );
+
     CREATE TABLE IF NOT EXISTS book_annotations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         book_id INTEGER REFERENCES books(id),
