@@ -27,6 +27,7 @@ bo_relay_ss/.venv/
 cache/*
 !cache/.gitkeep
 covers/*
+tts_audio/
 !covers/.gitkeep
 
 # IDEs

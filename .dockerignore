@@ -19,6 +19,7 @@ venv/
 db/
 covers/
 cache/
+tts_audio/
 logs/
 bo_relay_ss/
 docs/archive

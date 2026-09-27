@@ -162,6 +162,9 @@ export function applySettingsToUI(settings) {
   if (settings.AUDIO_MINI_PLAYER_MODE !== undefined) {
     state.audioMiniPlayerMode = (settings.AUDIO_MINI_PLAYER_MODE === 'right_dock') ? 'right_dock' : 'mini';
   }
+  if (settings.TTS_PREGEN_ENABLED !== undefined) {
+    state.ttsPregenEnabled = (settings.TTS_PREGEN_ENABLED === '1');
+  }
   if (settings.AUDIO_RIGHT_DOCK_DIM_ENABLED !== undefined) {
     state.audioRightDockDimEnabled = (settings.AUDIO_RIGHT_DOCK_DIM_ENABLED === '1');
   }
@@ -196,6 +199,21 @@ export function applySettingsToUI(settings) {
     if (typeof window.applyAudioMiniPlayerMode === 'function') {
       window.applyAudioMiniPlayerMode(window.__audioMiniPlayerMode);
     }
+  }
+}
+
+// 듣기 서버 미리 만들기: 서버에 필요한 패키지(numpy, onnxruntime)와 ffmpeg가 있는지 표시
+async function loadTtsPregenAvailability() {
+  const el = document.getElementById('setting-tts-pregen-availability');
+  if (!el) return;
+  try {
+    const res = await fetch('/api/media/tts/pregen/admin-status');
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || res.status);
+    el.textContent = data.available ? `사용 가능 · 저장 경로 ${data.audio_root} · 대기 ${data.queued}건 · 진행 ${data.running}건 · 사용량 ${data.cache_mb}MB` : `사용 불가: ${data.reason}`;
+    el.style.color = data.available ? '' : '#f87171';
+  } catch (e) {
+    el.textContent = `상태 확인 실패: ${e.message}`;
   }
 }
 
@@ -348,6 +366,17 @@ export async function loadGeneralSettings() {
       const mcpWriteEnabledEl = document.getElementById('setting-mcp-write-enabled');
       if (mcpWriteEnabledEl) mcpWriteEnabledEl.value = s.MCP_WRITE_ENABLED || '0';
 
+      // 듣기(TTS) 서버 미리 만들기
+      const ttsPregenEl = document.getElementById('setting-tts-pregen-enabled');
+      if (ttsPregenEl) ttsPregenEl.value = s.TTS_PREGEN_ENABLED || '0';
+      const ttsPregenThreadsEl = document.getElementById('setting-tts-pregen-threads');
+      if (ttsPregenThreadsEl) ttsPregenThreadsEl.value = s.TTS_PREGEN_THREADS || '2';
+      const ttsAudioRootEl = document.getElementById('setting-tts-audio-root');
+      if (ttsAudioRootEl) ttsAudioRootEl.value = s.TTS_AUDIO_ROOT || '';
+      const ttsPregenDiskEl = document.getElementById('setting-tts-pregen-disk-gb');
+      if (ttsPregenDiskEl) ttsPregenDiskEl.value = s.TTS_PREGEN_DISK_GB || '10';
+      loadTtsPregenAvailability();
+
       // 만화 뷰어 로딩 지연 시간 (LocalStorage)
       const comicDelayEl = document.getElementById('setting-comic-loading-delay');
       if (comicDelayEl) {
@@ -414,6 +443,10 @@ export async function submitGeneralSettings(event) {
   const hddAggressiveWarmup = document.getElementById('setting-hdd-aggressive-warmup')?.checked ? '1' : '0';
   const proxyAuth = document.getElementById('setting-proxy-header-auth')?.value || '0';
   const mcpWriteEnabled = document.getElementById('setting-mcp-write-enabled')?.value || '0';
+  const ttsPregenEnabled = document.getElementById('setting-tts-pregen-enabled')?.value || '0';
+  const ttsPregenThreads = document.getElementById('setting-tts-pregen-threads')?.value || '2';
+  const ttsPregenDiskGb = document.getElementById('setting-tts-pregen-disk-gb')?.value || '10';
+  const ttsAudioRoot = document.getElementById('setting-tts-audio-root')?.value?.trim() || '';
   const rcloneRcUrl = document.getElementById('setting-rclone-rc-url')?.value || 'http://localhost:5572';
   const coverStorageRoot = document.getElementById('setting-cover-storage-root')?.value?.trim() || '';
   const timezone = document.getElementById('setting-timezone')?.value || 'UTC';
@@ -455,6 +488,10 @@ export async function submitGeneralSettings(event) {
       api.updateSystemSetting('HDD_AGGRESSIVE_WARMUP', hddAggressiveWarmup),
       api.updateSystemSetting('PROXY_HEADER_AUTH', proxyAuth),
       api.updateSystemSetting('MCP_WRITE_ENABLED', mcpWriteEnabled),
+      api.updateSystemSetting('TTS_PREGEN_THREADS', ttsPregenThreads),
+      api.updateSystemSetting('TTS_PREGEN_DISK_GB', ttsPregenDiskGb),
+      api.updateSystemSetting('TTS_AUDIO_ROOT', ttsAudioRoot),
+      api.updateSystemSetting('TTS_PREGEN_ENABLED', ttsPregenEnabled),
       api.updateSystemSetting('RCLONE_RC_URL', rcloneRcUrl),
       api.updateSystemSetting('FFMPEG_TRANSCODE_ARGS', ffmpegTranscodeArgs),
       api.updateSystemSetting('FFMPEG_VAAPI_ARGS', ffmpegVaapiArgs),

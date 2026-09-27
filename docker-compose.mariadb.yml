@@ -14,6 +14,8 @@ services:
       - ./db:/app/db
       - ./covers:/app/covers
       - ./cache:/app/cache
+      # 듣기 서버 미리 만들기 음성 (관리자 설정 TTS_AUDIO_ROOT 기본값 /app/tts_audio — 볼륨이 아니면 기능이 꺼진다)
+      - ./tts_audio:/app/tts_audio
       - ./plugins:/app/plugins
     env_file:
       - .env

@@ -477,6 +477,31 @@ _SCHEMA_SQL = """
         UNIQUE(book_id, user_id)
     );
 
+    -- 듣기(TTS) 서버 미리 만들기: 작업 큐와 조각 음성 캐시 (services/tts_pregen_service.py)
+    CREATE TABLE IF NOT EXISTS tts_pregen_jobs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        voice TEXT NOT NULL,
+        steps INTEGER NOT NULL,
+        speed REAL NOT NULL,
+        status TEXT NOT NULL DEFAULT 'queued',
+        total_pieces INTEGER NOT NULL DEFAULT 0,
+        done_pieces INTEGER NOT NULL DEFAULT 0,
+        error TEXT,
+        heartbeat_ms INTEGER,
+        created_ms INTEGER NOT NULL,
+        finished_ms INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS tts_audio_cache (
+        piece_key TEXT PRIMARY KEY,
+        duration_sec REAL NOT NULL,
+        bytes INTEGER NOT NULL,
+        created_ms INTEGER NOT NULL,
+        last_used_ms INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS book_annotations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         book_id INTEGER REFERENCES books(id),
@@ -672,6 +697,9 @@ _SCHEMA_SQL = """
     """
 
 _INDEXES_SQL = """
+    CREATE INDEX IF NOT EXISTS idx_tts_pregen_jobs_status ON tts_pregen_jobs(status, id);
+    CREATE INDEX IF NOT EXISTS idx_tts_pregen_jobs_book ON tts_pregen_jobs(book_id);
+    CREATE INDEX IF NOT EXISTS idx_tts_audio_cache_last_used ON tts_audio_cache(last_used_ms);
     CREATE INDEX IF NOT EXISTS idx_mcp_pending_changes_status ON mcp_pending_changes(status);
     CREATE INDEX IF NOT EXISTS idx_audiobook_tracks_audiobook_id ON audiobook_tracks(audiobook_id);
     CREATE INDEX IF NOT EXISTS idx_audiobook_track_progress_lookup ON audiobook_track_progress(audiobook_id, user_id, track_id);

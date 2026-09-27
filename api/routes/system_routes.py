@@ -168,10 +168,20 @@ def get_system_status():
         for recent_task in status.get('recent_book_scans', []):
             _add_library_name(recent_task)
 
+        # 듣기 서버 미리 만들기 (스캔과 별개라 is_active에는 넣지 않는다 — 카테고리 스피너·목록 새로고침과 무관)
+        tts_pregen = []
+        try:
+            from services.tts_pregen_service import activity_for
+            from api.auth import check_adult_permission
+            tts_pregen = activity_for(session.get('user_id'), session.get('role') == 'admin', check_adult_permission('adult'))
+        except Exception as e:
+            print(f"[System Status] tts pregen activity skipped: {e}")
+
         response = jsonify({
             'success': True,
             'is_active': is_active,
             'tasks': running_tasks,
+            'tts_pregen': tts_pregen,
             'raw_status': status,
             'has_running': has_running,
             'has_pending': has_pending,

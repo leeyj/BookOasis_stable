@@ -73,6 +73,52 @@ function formatScanActivityElapsed(task) {
   return `${Math.floor(minutes / 60)}시간 ${minutes % 60}분`;
 }
 
+// 듣기 서버 미리 만들기 작업 (/api/system/status의 tts_pregen). 스캔과 같은 목록에 섞어 보여 준다.
+let seenPregenStatus = null;
+function pregenItemHtml(item) {
+  const running = item.status === 'running';
+  const queued = item.status === 'queued';
+  const failed = item.status === 'failed' || item.status === 'cancelled';
+  const stateClass = queued ? ' is-pending' : running ? '' : failed ? ' is-failed' : ' is-completed';
+  const icon = queued ? 'fa-clock' : running ? 'fa-circle-notch fa-spin' : failed ? 'fa-circle-exclamation' : 'fa-circle-check';
+  // 큰 책(조각 1만 개 이상)은 정수 %가 한참 0에 머무므로 소수 한 자리와 조각 수를 같이 보여 준다
+  const pct = item.total ? Math.floor((item.done * 1000) / item.total) / 10 : item.percent;
+  const count = item.total ? ` (${Number(item.done).toLocaleString()} / ${Number(item.total).toLocaleString()})` : '';
+  const detail = queued ? `음성 생성 대기 중${item.total ? ` · ${Number(item.total).toLocaleString()}조각` : ''}`
+    : running ? `음성 생성 중 ${pct}%${count}`
+      : item.status === 'cancelled' ? '음성 생성 취소' : failed ? '음성 생성 실패' : '음성 생성 완료 · 들을 준비됨';
+  const time = running ? `${pct}%` : queued ? '' : failed ? (item.status === 'cancelled' ? '취소' : '실패') : '완료';
+  const title = `${item.title || ''}${item.db_type === 'adult' ? ' (성인)' : ''}`;
+  return `
+      <div class="scan-activity-item${stateClass}">
+        <span class="scan-activity-item-icon">
+          <i class="fa-solid ${icon}" aria-hidden="true"></i>
+        </span>
+        <div class="scan-activity-item-copy">
+          <div class="scan-activity-item-title" title="${escapeActivityAttribute(title)}"><i class="fa-solid fa-headphones" aria-hidden="true" style="margin-right: 0.3rem; opacity: 0.7;"></i>${escapeActivityText(title)}</div>
+          <div class="scan-activity-item-detail">${escapeActivityText(detail)}</div>
+        </div>
+        <span class="scan-activity-item-time">${escapeActivityText(time)}</span>
+      </div>`;
+}
+
+// 페이지를 보고 있는 동안 끝난 작업만 알린다 (처음 불러온 목록의 완료 항목은 알리지 않는다)
+function notifyPregenTransitions(items) {
+  const current = new Map(items.map(i => [`${i.db_type}:${i.id}`, i]));
+  if (seenPregenStatus) {
+    current.forEach((item, key) => {
+      const before = seenPregenStatus.get(key);
+      if (before && before !== item.status && (item.status === 'done' || item.status === 'failed')
+          && typeof window.showToast === 'function') {
+        window.showToast(item.status === 'done'
+          ? `음성 미리 만들기 완료: ${item.title}`
+          : `음성 미리 만들기 실패: ${item.title}`, item.status === 'done' ? 'success' : 'error');
+      }
+    });
+  }
+  seenPregenStatus = new Map([...current].map(([k, i]) => [k, i.status]));
+}
+
 function renderScanActivity(data) {
   latestSystemStatus = data;
   const button = document.getElementById('btn-scan-activity');
@@ -86,7 +132,10 @@ function renderScanActivity(data) {
     ? data.raw_status.recent_book_scans
     : [];
   const isActive = Boolean(data?.success && data?.is_active);
-  button.classList.toggle('is-active', isActive);
+  const pregenItems = Array.isArray(data?.tts_pregen) ? data.tts_pregen : [];
+  notifyPregenTransitions(pregenItems);
+  const pregenActive = pregenItems.some(i => i.status === 'running' || i.status === 'queued');
+  button.classList.toggle('is-active', isActive || pregenActive);
 
   const tasks = [];
   if (running) tasks.push({ task: running, pending: false });
@@ -98,13 +147,15 @@ function renderScanActivity(data) {
       pending: false,
     }));
   }
-  button.title = tasks.length > 0 ? `스캔 활동 ${tasks.length}건` : '스캔 활동';
+  const total = tasks.length + pregenItems.length;
+  button.title = total > 0 ? `스캔 활동 ${total}건` : '스캔 활동';
   summary.textContent = running
     ? `실행 중 · 대기 ${pending.length}건`
     : pending.length ? `대기 ${pending.length}건`
       : recentBookScans.length ? `최근 도서 스캔 ${recentBookScans.length}건`
-        : tasks.length ? '실행 중' : '대기 중';
-  if (tasks.length === 0) {
+        : tasks.length ? '실행 중'
+          : pregenActive ? '음성 생성 중' : pregenItems.length ? '최근 음성 생성' : '대기 중';
+  if (tasks.length === 0 && pregenItems.length === 0) {
     list.innerHTML = `
       <div class="scan-activity-empty">
         <i class="fa-regular fa-circle-check" aria-hidden="true"></i>
@@ -138,7 +189,7 @@ function renderScanActivity(data) {
         </div>
         <span class="scan-activity-item-time">${escapeActivityText(elapsed)}</span>
       </div>`;
-  }).join('');
+  }).join('') + pregenItems.map(pregenItemHtml).join('');
 }
 
 function setScanActivityPopoverOpen(open) {

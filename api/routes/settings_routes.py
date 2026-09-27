@@ -42,6 +42,7 @@ PUBLIC_UI_SETTING_KEYS = (
     'AUDIO_RIGHT_DOCK_DIM_ENABLED',
     'TTS_ENABLED',
     'TTS_WAKE_LOCK',
+    'TTS_PREGEN_ENABLED',
     'DETAIL_VOLUME_GRID_VIEW',
     'COLLAPSE_DETAIL_GENRE_TAGS',
     'SHOW_CONTENT_RATING_BADGE',
@@ -148,6 +149,9 @@ def update_system_setting():
         except ValueError:
             return jsonify({'success': False, 'error': _t('api.err_db_pool_size_range')}), 400
 
+    if key == 'TTS_AUDIO_ROOT' and value and not os.path.isabs(value):
+        return jsonify({'success': False, 'error': '음성 저장 경로는 비워두거나 절대경로여야 합니다.'}), 400
+
     if key == 'COVER_STORAGE_ROOT' and value and not os.path.isabs(value):
         return jsonify({'success': False, 'error': '커버 저장 경로는 비워두거나 절대경로여야 합니다.'}), 400
 
@@ -165,6 +169,10 @@ def update_system_setting():
         if key == 'COVER_STORAGE_ROOT':
             from services.cover_storage_service import invalidate_cache
             invalidate_cache()
+        if key in ('TTS_PREGEN_ENABLED', 'TTS_AUDIO_ROOT'):
+            from services.tts_pregen_service import invalidate_root_cache, wake_worker
+            invalidate_root_cache()
+            wake_worker()
         return jsonify({'success': True, 'message': _t('api.msg_setting_saved', key=key)})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

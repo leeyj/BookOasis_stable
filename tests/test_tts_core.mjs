@@ -6,7 +6,7 @@ const source = await readFile(new URL('../static/js/tts/tts_core.js', import.met
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`;
 const {
   MODEL_BASE, modelUrl, htmlToText, splitForTts, resumableFetch, speakableText, segmentForTts, paragraphRuns, MIN_ALONE_CHARS, isNearSilent, hanjaToHangul,
-  positionKey, lastChapterKey, loadPosition, loadResume, savePosition, AheadPlanner,
+  positionKey, lastChapterKey, loadPosition, loadResume, savePosition, AheadPlanner, pieceKey,
 } = await import(moduleUrl);
 
 const noSpace = (s) => s.replace(/\s+/g, '');
@@ -447,4 +447,12 @@ test('hanja conversion keeps particles and only runs on hanja', () => {
 test('speakableText drops glosses first, then converts the remaining hanja', () => {
   assert.equal(speakableText('서막(序幕) 그 塔이 運命이었다', HANJA), '서막 그 탑이 운명이었다');
   assert.equal(speakableText('서막(序幕) 그 塔이', null), '서막 그 塔이');
+});
+
+// ---- pieceKey (서버 미리 만들기) — tests/test_tts_pregen.py에 같은 벡터가 있다 ----
+
+test('pieceKey matches the server-side piece_key for the same input', async () => {
+  assert.equal(await pieceKey('안녕하세요.', { voice: 'F1', steps: 4, speed: 1.05 }), 'abd1f0295b1523c4a5e0d0dbc82b4b8a2ac8f6ab394e1b2f759886a674845258');
+  // 숫자는 JS 표기(1 → "1")로 들어가고, 한자·따옴표도 그대로 해시된다
+  assert.equal(await pieceKey('運命 → 운명 "따옴표"', { voice: 'M3', steps: 8, speed: 1 }), '0b24e05b350dde0bb801597c7a91e0f7f7079eb54fb156479fe70d22d657d189');
 });

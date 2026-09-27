@@ -1012,6 +1012,34 @@ GET /api/media/plugins/add-plugin-check?plugin_id=123412341234123412341234
 - 완독 판정은 `progress` 또는 `book.finish` 이벤트를 우선 사용
 - `totalPages`는 보조 정보로만 사용
 
+#### `tts.ready` — 듣기 서버 미리 만들기 완료
+
+관리자가 "듣기 서버 미리 만들기"를 켠 서버에서, 사용자가 요청한 책의 음성이 다 만들어지면 한 번 발행됩니다.
+`Account`는 요청한 사용자이고, `Metadata`는 책 정보와 만들 때 쓴 듣기 설정입니다(진행률 관련 키는 없음).
+
+```json
+{
+    "event": "tts.ready",
+    "user": true,
+    "Account": { "id": 7, "title": "사용자이름" },
+    "Metadata": {
+        "type": "book",
+        "format": "epub",
+        "title": "책 제목",
+        "author": "저자 이름",
+        "bookId": 1234,
+        "session": "general",
+        "voice": "F1",
+        "steps": 4,
+        "speed": 1.05,
+        "pieces": 2130
+    }
+}
+```
+
+- `session`은 `general` 또는 `adult`입니다. 성인 도서 알림을 외부로 보낼지는 수신 쪽에서 판단하십시오.
+- 같은 내용이 사람용 알림 채널(`WEBHOOK_DISCORD_URL`, `WEBHOOK_TELEGRAM_*`, `WEBHOOK_NOTIFY_URLS`)에도 `[BookOasis] tts.ready`로 전송됩니다.
+
 ### 표준 이벤트 전송 환경변수
 
 코어 표준 이벤트 웹훅은 아래 환경변수로 제어합니다.

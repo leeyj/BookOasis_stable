@@ -439,6 +439,13 @@ if not IS_WORKER:
     from services.metadata_factory import MetadataFactory
     MetadataFactory.start_all_plugin_background_services()
 
+    # 듣기(TTS) 서버 미리 만들기 작업 스레드 (관리자 설정 TTS_PREGEN_ENABLED가 꺼져 있으면 대기만 한다)
+    try:
+        from services.tts_pregen_service import start_worker as start_tts_pregen_worker
+        start_tts_pregen_worker()
+    except Exception as e:
+        print(f"[TTS-Pregen] worker start failed: {e}")
+
     # ── 선택적 내장 스캐너 워커 기동 ──
     # 우선순위:
     # 1) BOOKOASIS_ENABLE_EMBEDDED_WORKER 명시값(true/false)

@@ -1,4 +1,13 @@
 # CHANGELOG
+## v2.7.9
+- (feature) 듣기 서버 미리 만들기 - 관리자가 켜면 도서 메뉴에서 지정한 도서를 서버가 미리 음성으로 만들어 둠. 진행·완료는 스캔 활동에 표시하고 웹훅(`tts.ready`)으로도 알림, 미리 만든 챕터는 기기에서 모델을 불러오지 않음 (기본 꺼짐) | Listen server pre-generation - when enabled by the admin, the server pre-generates audio for books users pick from the book menu; progress and completion show in Scan activity and via webhook (`tts.ready`), and pre-generated chapters play without loading the model on the device (off by default)
+- (improvement) 듣기 기본 음질을 "보통"으로 변경 ("좋음"과 차이가 작고 생성은 두 배 빠름, 직접 고른 설정은 유지) | Listen now defaults to Normal quality (barely distinguishable from Best, twice as fast to generate; a chosen setting is kept)
+- (fix) iPhone/iPad에서 음성으로 듣기가 화면을 끄면 멈추거나 한동안 뒤 "음성 만드는 중"에서 멈추던 이슈 수정 (iOS는 WebGPU 대신 WASM으로 합성, 화면을 꺼도 계속 재생) | fix Listen on iPhone/iPad stopping when the screen turns off or hanging on "generating" after a while (iOS now synthesizes with WASM and keeps playing with the screen off)
+- (fix) WASM으로 음성을 만드는 동안 화면이 굳어 버튼이 눌리지 않던 이슈 수정 | fix the Listen screen freezing (buttons unresponsive) while synthesizing with WASM
+- (improvement) 음질 "빠름" 제거 (소리가 뭉개져 사용 불가), iPhone은 15 Pro 이상 권장 안내 추가 | removed the "Fast" quality (too garbled to use); docs now recommend iPhone 15 Pro or newer
+- (improvement) WASM으로 합성할 때 기본 음질을 "보통"으로 낮춰 끊김 없이 재생 (직접 고르면 그대로) | WASM synthesis defaults to normal quality for gap-free playback (a manual choice is kept)
+
+
 ## v2.7.8
 - (feature) TXT/EPUB 음성으로 듣기 정식 도입 - 브라우저에서 직접 음성 합성(서버 CPU 미사용), 읽는 문장 강조 + 자동 스크롤, 뷰어/도서 메뉴에서 열기, 읽던 위치와 듣던 위치 동기화 | Listen (TXT/EPUB read-aloud) is now a regular feature: speech is synthesized in the browser (no server CPU), the current sentence is highlighted and followed, opens from the reader or the book menu, reading and listening positions stay in sync
 - (improvement) 플러그인이 "음성으로 듣기"를 열 수 있는 전역 함수 추가 (`window.openListen`, `window.canListen` — guide_plugins 참고) | plugins can open Listen via `window.openListen` / `window.canListen` (see guide_plugins)

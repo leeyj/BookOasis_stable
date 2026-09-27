@@ -8,7 +8,9 @@ import { ort, loadCfgs, loadTextProcessor, loadVoiceStyle, TextToSpeech, writeWa
 import {
   MODEL_BASE, MODEL_FALLBACK_BASE, MODEL_REVISION, ONNX_MODELS, VOICES, modelUrl, htmlToText, segmentForTts, pieceAtOffset,
   resumableFetch, speakableText, paragraphRuns, isNearSilent, MIN_ALONE_CHARS, listenProgress, positionKey, lastChapterKey, loadResume, savePosition, AheadPlanner,
+  pieceKey, MAX_PIECE_CHARS,
 } from '/static/js/tts/tts_core.js';
+import { loadHanjaReadings as loadSharedHanja, fetchEpubChapterText, isFillerSegments, submitPregen } from '/static/js/tts/tts_pregen_client.js';
 import { makeAnchor, resolveOffset, chunkStarts } from '/static/js/viewer/text_position_utils.js';
 import { chunkText } from '/static/js/viewer/txt_text_utils.js';
 
@@ -26,9 +28,10 @@ if (autoplayWanted) {
 const dbType = params.get('db_type') || 'general';
 const CACHE_NAME = `bo-tts-supertonic3-${MODEL_REVISION.slice(0, 8)}`;
 const TOTAL_MODEL_BYTES = 398_000_000;
-const MAX_PIECE_CHARS = 120;
 const SPEEDS = [0.9, 1.05, 1.2, 1.4];
-const STEPS = [[2, 'quality_fast'], [4, 'quality_normal'], [8, 'quality_best']];
+// 2(빠름)는 뭉개져서 들을 수 없는 수준이라 뺐다(2026-09-27)
+const STEPS = [[4, 'quality_normal'], [8, 'quality_best']];
+const WASM_MAX_STEPS = 4;
 const FONT_SIZES = [16, 18, 19, 21, 24];
 const THEMES = [['dark', 'theme_dark'], ['light', 'theme_light'], ['sepia', 'theme_sepia']];
 const UI_KEY = 'bo-tts-player-ui';
@@ -80,10 +83,17 @@ const S = {
   token: 0, active: false, waiting: false, stallStart: null, stalls: 0, playedInRun: false, userPaused: false, resumeTries: 0, pendingOffset: 0,
   text: '', segments: [], sync: null, syncApplied: false,
   genSec: 0, audioSec: 0, loading: false,
+  // 서버 미리 만들기: 현재 챕터·설정에서 서버에 있는 조각 {index → {url, sec}}
+  server: new Map(), serverReady: Promise.resolve(), genNeedsModel: false,
 };
-const settings = { voice: 'F1', steps: 8, speed: 1.05 };
+const PREGEN_ENABLED = document.body.dataset.pregen === '1';
+// 기본 음질은 보통(4): 좋음(8)과 차이를 거의 못 느끼는데 생성은 두 배 빠르다(2026-09-27). tts_pregen_client.js 기본값과 같아야 한다
+const settings = { voice: 'F1', steps: 4, speed: 1.05 };
 let wake = null;
 const wakeGenerator = () => { if (wake) { const w = wake; wake = null; w(); } };
+// iOS는 WebGPU로 생성하면 화면이 꺼지는 즉시 멈추고, 켜 둬도 한동안 뒤 생성이 응답 없이 멈춘다.
+// WASM은 화면이 꺼져도 계속 생성되고 품질도 문제없었다(2026-09-27 iPad mini 실측) — 자동일 때 iOS는 WASM.
+const IS_IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
 // 같은 ORT 세션에 추론이 겹치지 않도록 한 번에 하나씩만 돌린다 (위치 이동 직후 이전 루프가 아직 끝나지 않았을 때)
 let inferChain = Promise.resolve();
@@ -145,9 +155,8 @@ async function loadBookInfo() {
   }
 }
 
-async function fetchChapterText(idx) {
-  const ch = await getJson(`/api/media/epub/chapter?db_type=${encodeURIComponent(dbType)}&book_id=${encodeURIComponent(bookId)}&chapter_idx=${idx}`);
-  return htmlToText(ch.content);
+function fetchChapterText(idx) {
+  return fetchEpubChapterText(dbType, bookId, idx);
 }
 
 async function loadText() {
@@ -157,7 +166,7 @@ async function loadText() {
     // 표지·삽화처럼 그림만 있는 항목(앞쪽에 여러 장 이어지는 경우가 많다)은 읽을 글자가 없으므로
     // 글자가 있는 다음 항목까지 건너뛴다. 뒤로는 가지 않는다. 제목 한 줄뿐인 속표지("화산파 천재검귀 6권")도 같이 건너뛴다 —
     // 앞뒤로 묶을 문장이 없어 엔진이 단독으로 받게 되는데, 짧은 단독 텍스트는 잘 빠지거나 튄다.
-    const isFiller = (segs) => !segs.length || (segs.length === 1 && segs[0].text.length < MIN_ALONE_CHARS);
+    const isFiller = isFillerSegments;
     const from = book.chapter;
     text = await fetchChapterText(book.chapter);
     segments = segmentForTts(text, MAX_PIECE_CHARS);
@@ -197,10 +206,16 @@ async function loadText() {
   renderText();
   renderNow({ instant: true });
   updateControls();
+  refreshServerAudio();
+}
+
+// 모델이 준비됐거나, 모델 없이도 서버에 미리 만든 음성이 있으면 재생할 수 있다
+function canPlay() {
+  return S.pieces.length > 0 && (!!S.tts || S.server.size > 0);
 }
 
 function updateControls() {
-  for (const id of ['playBtn', 'prevBtn', 'nextBtn', 'seek']) $(id).disabled = !S.tts || !S.pieces.length;
+  for (const id of ['playBtn', 'prevBtn', 'nextBtn', 'seek']) $(id).disabled = !canPlay();
 }
 
 // ---- 읽기↔듣기 위치 동기화 (/api/media/tts/position) ----
@@ -241,7 +256,7 @@ async function fetchSync() {
   if (saved) {
     // 다른 기기에서 쓰던 음성 설정을 이어받는다
     if (saved.voice && VOICES.includes(saved.voice)) settings.voice = saved.voice;
-    if (saved.steps) settings.steps = Number(saved.steps);
+    if (STEPS.some(([v]) => v === Number(saved.steps))) settings.steps = Number(saved.steps);
     if (saved.speed) settings.speed = Number(saved.speed);
   }
 }
@@ -307,15 +322,21 @@ async function modelCached() {
 
 // 한자→한국식 음 변환표 (약 100KB, /static/lib는 오래 캐시된다). 못 받으면 한자를 그대로 넘긴다.
 let hanjaReadings = null;
-async function loadHanjaReadings() {
-  try {
-    const res = await fetch('/static/lib/hanja/readings-v1.json');
-    if (res.ok) hanjaReadings = await res.json();
-  } catch (e) { log('한자 변환표를 받지 못함 — 한자는 그대로 읽습니다'); }
+let hanjaPromise = null;
+// 한 번만 받고, 쓰는 쪽은 끝날 때까지 기다린다 — 조각 키(서버 미리 만들기)에 변환 결과가 들어가므로
+// 받기 전후로 같은 조각의 텍스트가 달라지면 안 된다. 표는 도서 메뉴와 같은 로더(tts_pregen_client.js)로 받는다.
+function loadHanjaReadings() {
+  if (!hanjaPromise) {
+    hanjaPromise = loadSharedHanja().then((readings) => {
+      hanjaReadings = readings;
+      if (!readings) log('한자 변환표를 받지 못함 — 한자는 그대로 읽습니다');
+    });
+  }
+  return hanjaPromise;
 }
 
 async function loadModel(hasWebGpu, cached) {
-  if (!hanjaReadings) loadHanjaReadings();
+  loadHanjaReadings();
   if (S.loading || S.tts) return;
   S.loading = true;
   $('modelCard').hidden = false;
@@ -351,7 +372,10 @@ async function loadModel(hasWebGpu, cached) {
     const dlSec = (performance.now() - td) / 1000;
     $('mcSub').textContent = t('model_preparing');
     const want = $('backend').value;
-    const eps = want === 'auto' ? (hasWebGpu ? ['webgpu', 'wasm'] : ['wasm']) : [want];
+    const eps = want === 'auto' ? (hasWebGpu && !IS_IOS ? ['webgpu', 'wasm'] : ['wasm']) : [want];
+    // WASM 추론은 메인 스레드를 붙잡아 생성하는 동안 화면이 굳는다(iPad에서 "탭해서 듣기"가 안 눌림) →
+    // ORT 프록시 워커로 돌린다. 프록시는 WebGPU와 같이 못 쓰고 첫 세션 전에 정해야 해서 WASM만 쓸 때만 켠다.
+    if (eps[0] === 'wasm') ort.env.wasm.proxy = true;
     let sessions = null, used = null;
     const ts = performance.now();
     for (const ep of eps) {
@@ -365,6 +389,7 @@ async function loadModel(hasWebGpu, cached) {
     }
     if (!used) throw new Error('모든 백엔드에서 세션 생성 실패');
     const onnxDir = `${MODEL_BASE}/onnx`;
+    if (ort.env.wasm.proxy) sessions = sessions.map(copyingInputs);
     S.tts = new TextToSpeech(await loadCfgs(onnxDir), await loadTextProcessor(onnxDir), ...sessions);
     kv($('loadInfo'), {
       '백엔드': used.toUpperCase(),
@@ -372,9 +397,16 @@ async function loadModel(hasWebGpu, cached) {
       '세션 준비': `${((performance.now() - ts) / 1000).toFixed(1)}초`,
     });
     log(`모델 준비 완료 (${used})`);
+    // WASM은 음질 8이면 실시간보다 느리다(iPad 0.9배 → 조각마다 끊김, 4면 1.6배 — 2026-09-27 실측).
+    // 다른 기기(WebGPU)에서 이어받은 8도 여기서 4로 내린다. 이 기기에서 직접 8을 고르는 건 막지 않는다.
+    if (used === 'wasm' && settings.steps > WASM_MAX_STEPS) {
+      settings.steps = WASM_MAX_STEPS;
+      log(`WASM이라 음질을 ${WASM_MAX_STEPS}로 맞춤`);
+    }
     $('modelCard').hidden = true;
     updateControls();
     if (autoplayWanted) setTimeout(startAutoplay, 0);
+    if (S.genNeedsModel && S.active) { S.genNeedsModel = false; generatorLoop(S.token); }
   } catch (e) {
     log('모델 로드 실패: ' + e.message);
     $('mcTitle').textContent = t('model_failed');
@@ -386,6 +418,202 @@ async function loadModel(hasWebGpu, cached) {
     renderStatus();
     renderPlayBtn();
   }
+}
+
+// ORT 프록시는 입력 텐서의 버퍼를 워커로 옮겨(transfer) 원본을 비운다. st_helper는 음성 스타일·문장
+// 텐서를 여러 번 넘기므로 두 번째부터 "The object can not be cloned"로 실패한다(iPad 실측) → 넘길 때마다 복사본을 준다.
+function copyingInputs(session) {
+  return {
+    run: (feeds, ...rest) => session.run(Object.fromEntries(Object.entries(feeds).map(
+      ([k, v]) => [k, new ort.Tensor(v.type, v.data.slice(), v.dims)])), ...rest),
+  };
+}
+
+// ---- 서버 미리 만들기 (services/tts_pregen_service.py) ----
+// 조각 키는 합성 입력 전체의 해시라 서버와 같은 텍스트·같은 설정일 때만 맞는다. 안 맞으면 기기에서 만든다.
+let serverToken = 0;
+let serverKeys = [];   // 현재 챕터·설정의 조각 키 (인덱스 = 조각 번호)
+let serverWaitGaveUp = false; // 서버 조각을 한 번 기다리다 포기했으면 이번 재생에서는 더 기다리지 않는다
+const LOOKUP_BATCH = 2000; // 서버 한 번 조회 한도(5000)보다 작게 나눠 묻는다 — 큰 TXT는 한 챕터에 1만 조각이 넘는다
+
+async function lookupKeys(indices, token) {
+  const found = new Map();
+  for (let at = 0; at < indices.length; at += LOOKUP_BATCH) {
+    const chunk = indices.slice(at, at + LOOKUP_BATCH);
+    const res = await fetch('/api/media/tts/audio/lookup', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ db_type: dbType, keys: chunk.map((i) => serverKeys[i]) }),
+    });
+    const data = res.ok ? await res.json() : null;
+    if (token !== serverToken || !data?.success) return null;
+    for (const i of chunk) {
+      const k = serverKeys[i];
+      const sec = data.audio[k];
+      if (sec) found.set(i, { url: `/api/media/tts/audio/${encodeURIComponent(dbType)}/${k}.m4a`, sec });
+    }
+  }
+  return found;
+}
+
+function refreshServerAudio() {
+  const token = ++serverToken;
+  S.server = new Map();
+  serverKeys = [];
+  serverWaitGaveUp = false;
+  if (!self.crypto?.subtle || !S.pieces.length) { S.serverReady = Promise.resolve(); return S.serverReady; }
+  const pieces = S.pieces;
+  const conf = { voice: settings.voice, steps: settings.steps, speed: settings.speed };
+  S.serverReady = (async () => {
+    try {
+      await loadHanjaReadings();
+      const keys = await Promise.all(pieces.map((p) => pieceKey(speakableText(p, hanjaReadings), conf)));
+      if (token !== serverToken) return;
+      serverKeys = keys;
+      const found = await lookupKeys(keys.map((_, i) => i), token);
+      if (!found) return;
+      S.server = found;
+      if (found.size) log(`서버 음성 사용: ${found.size}/${pieces.length}조각`);
+      updateControls();
+    } catch (e) {
+      log(`서버 음성 조회 실패: ${e.message}`);
+    }
+  })();
+  return S.serverReady;
+}
+
+// 서버가 이 책을 지금 설정으로 만드는 중인지 — 그렇다면 없는 조각은 곧 생기므로 잠깐 기다려 볼 만하다
+function serverIsMaking() {
+  const job = pregen.job;
+  return !!job && PREGEN_ACTIVE.has(job.status) && job.voice === settings.voice
+    && Number(job.steps) === Number(settings.steps) && Math.abs(job.speed - settings.speed) < 0.001;
+}
+
+// 만드는 중에는 앞으로 들을 구간에서 새로 생긴 조각을 주기적으로 찾아 넣는다 (전체를 다시 묻지 않는다)
+async function refreshServerWindow(ahead = 200) {
+  if (!serverKeys.length) return;
+  const token = serverToken;
+  const want = [];
+  for (let i = S.cur; i < Math.min(serverKeys.length, S.cur + ahead); i++) if (!S.server.has(i)) want.push(i);
+  if (!want.length) return;
+  try {
+    const found = await lookupKeys(want, token);
+    if (!found || token !== serverToken) return;
+    for (const [i, v] of found) S.server.set(i, v);
+    if (found.size) { updateControls(); wakeGenerator(); }
+  } catch (e) { /* 다음 확인 때 다시 */ }
+}
+
+// 서버가 곧 만들 조각이면 기기에서 만들기 전에 잠깐 기다린다. 한 번 기다려도 안 오면(서버가 다른 구간을
+// 만드는 중) 이번 재생에서는 더 기다리지 않고 기기에서 만든다.
+async function waitForServerPiece(i, token, maxSec = 40) {
+  if (serverWaitGaveUp || !serverIsMaking() || !serverKeys[i]) return false;
+  const until = performance.now() + maxSec * 1000;
+  log(`${i + 1}번째 조각을 서버가 만드는 중 — 기다립니다`);
+  while (performance.now() < until) {
+    await new Promise((r) => setTimeout(r, 4000));
+    if (token !== S.token) return false;
+    const found = await lookupKeys([i], serverToken).catch(() => null);
+    if (found?.has(i)) { S.server.set(i, found.get(i)); return true; }
+    if (!serverIsMaking()) break;
+  }
+  serverWaitGaveUp = true;
+  log('서버 조각을 기다리다 포기 — 이번에는 기기에서 만듭니다');
+  return false;
+}
+
+// 서버에 없는 조각을 만나면 그때 모델을 불러온다. 저장된 모델이 없으면 받기 카드를 띄우고 멈춘다(받으면 이어서).
+async function ensureModelForGeneration() {
+  if (S.tts) return true;
+  if (await modelCached()) {
+    log('서버에 없는 조각 — 모델을 불러옵니다');
+    await loadModel(env.hasWebGpu, true);
+  } else {
+    log('서버에 없는 조각 — 모델 받기가 필요합니다');
+    $('modelCard').hidden = false;
+  }
+  return !!S.tts;
+}
+
+const pregen = { job: null, timer: null, busy: false, busyText: '' };
+const PREGEN_ACTIVE = new Set(['queued', 'running']);
+
+function qualityName(steps) {
+  const q = STEPS.find(([v]) => v === Number(steps));
+  return q ? t(q[1]) : String(steps);
+}
+
+function renderPregen() {
+  if (!PREGEN_ENABLED) return;
+  $('pregenField').hidden = false;
+  const job = pregen.job;
+  const conf = job ? `${job.voice} · ${qualityName(job.steps)} · ${job.speed}×` : '';
+  let text = t('pregen_none');
+  if (pregen.busy) text = pregen.busyText || t('pregen_preparing');
+  else if (job && PREGEN_ACTIVE.has(job.status)) text = t('pregen_running', { pct: job.percent, conf });
+  else if (job && job.status === 'done') {
+    const same = job.voice === settings.voice && Number(job.steps) === Number(settings.steps) && Math.abs(job.speed - settings.speed) < 0.001;
+    text = same ? t('pregen_done', { conf }) : t('pregen_done_other', { conf });
+  } else if (job && job.status === 'failed') text = t('pregen_failed', { error: job.error || '' });
+  else if (job && job.status === 'cancelled') text = t('pregen_cancelled');
+  $('pregenStatus').textContent = text;
+  const active = !!job && PREGEN_ACTIVE.has(job.status);
+  $('pregenBtn').hidden = active;
+  $('pregenBtn').disabled = pregen.busy || !S.pieces.length;
+  $('pregenCancel').hidden = !active;
+}
+
+async function fetchPregenStatus() {
+  if (!PREGEN_ENABLED || !bookId) return;
+  try {
+    const data = await getJson(`/api/media/tts/pregen/status?db_type=${encodeURIComponent(dbType)}&book_id=${encodeURIComponent(bookId)}&_ts=${Date.now()}`);
+    const was = pregen.job;
+    pregen.job = data.job;
+    if (was && PREGEN_ACTIVE.has(was.status) && data.job?.status === 'done') {
+      toast(t('pregen_ready_toast'));
+      refreshServerAudio();
+    } else if (data.job && PREGEN_ACTIVE.has(data.job.status)) {
+      refreshServerWindow();
+    }
+  } catch (e) { /* 다음 확인 때 다시 */ }
+  renderPregen();
+  clearTimeout(pregen.timer);
+  if (pregen.job && PREGEN_ACTIVE.has(pregen.job.status)) pregen.timer = setTimeout(fetchPregenStatus, 15000);
+}
+
+async function requestPregen() {
+  if (pregen.busy || !PREGEN_ENABLED) return;
+  if (!self.crypto?.subtle) { toast(t('pregen_https')); return; }
+  pregen.busy = true;
+  renderPregen();
+  try {
+    const data = await submitPregen({
+      dbType, bookId, settings,
+      format: book.format, chapterCount: book.format === 'epub' ? book.chapters.length : null,
+      txtText: book.format === 'epub' ? null : S.text,
+      startAt: { chapter: book.format === 'epub' ? book.chapter : 0, piece: S.cur },
+      onProgress: (n, total) => { pregen.busyText = t('pregen_collecting', { n, total }); renderPregen(); },
+    });
+    pregen.job = data.job;
+    serverWaitGaveUp = false;
+    log(`서버 미리 만들기 요청: ${data.pieceCount}조각 (${data.created ? '새 작업' : '진행 중인 작업'})`);
+    toast(t('pregen_requested'));
+  } catch (e) {
+    log(`서버 미리 만들기 요청 실패: ${e.message}`);
+    toast(t('pregen_request_failed', { error: e.message }));
+  } finally {
+    pregen.busy = false;
+    pregen.busyText = '';
+    fetchPregenStatus();
+  }
+}
+
+async function cancelPregen() {
+  const job = pregen.job;
+  if (!job) return;
+  try {
+    await fetch(`/api/media/tts/pregen/${job.id}?db_type=${encodeURIComponent(dbType)}`, { method: 'DELETE' });
+  } catch (e) { /* 상태 확인으로 결과를 본다 */ }
+  fetchPregenStatus();
 }
 
 async function ensureStyle() {
@@ -402,7 +630,7 @@ const player = $('player');
 
 function releaseClip(i) {
   const clip = S.clips.get(i);
-  if (clip) { URL.revokeObjectURL(clip.url); S.clips.delete(i); }
+  if (clip) { if (!clip.server) URL.revokeObjectURL(clip.url); S.clips.delete(i); }
   planner.onPlayed(i);
 }
 
@@ -415,7 +643,27 @@ async function generatorLoop(token) {
   while (S.active && token === S.token) {
     if (S.genNext >= S.pieces.length) return;
     if (!planner.shouldGenerate()) { await new Promise((r) => { wake = r; }); continue; }
+    await S.serverReady;
+    if (token !== S.token) return;
     const i = S.genNext;
+    if (!S.server.has(i) && (await waitForServerPiece(i, token))) continue;
+    if (token !== S.token) return;
+    const srv = S.server.get(i);
+    if (srv) {
+      // 서버에 미리 만든 조각 — 추론 없이 받아서 튼다
+      S.clips.set(i, { url: srv.url, audioSec: srv.sec, server: true });
+      planner.onGenerated(i, srv.sec);
+      S.genNext = i + 1;
+      renderStats();
+      if (S.waiting && S.cur === i) playCurrent();
+      continue;
+    }
+    if (!S.tts) {
+      // 서버에 없는 조각을 처음 만났다 — 이제야 모델이 필요하다
+      if (!(await ensureModelForGeneration())) { S.genNeedsModel = true; return; }
+      if (token !== S.token) return;
+    }
+    await loadHanjaReadings();
     const style = await ensureStyle();
     const { steps, speed } = settings;
     const ts = performance.now();
@@ -509,7 +757,7 @@ function primeAudio() {
 // 홈 화면에 추가(PWA)했거나 미디어 재생 이력이 많으면 브라우저가 허용하기도 한다.
 async function startAutoplay() {
   autoplayWanted = false;
-  if (!S.tts || S.active || !S.pieces.length) return;
+  if (!canPlay() || S.active) return;
   togglePlay();
   try {
     await S.primePromise;
@@ -527,7 +775,7 @@ $('tapStart').onclick = () => {
 };
 
 function togglePlay() {
-  if (!S.tts) return;
+  if (!canPlay()) return;
   if (!S.active) {
     S.active = true;
     S.userPaused = false;
@@ -769,6 +1017,7 @@ function renderPlayBtn() {
   $('playBtn').setAttribute('aria-label', t(playing ? 'pause' : waiting ? 'waiting_stop' : 'play'));
 }
 
+
 function renderStatus() {
   let msg = '';
   if (S.loading) msg = t('status_model');
@@ -845,6 +1094,8 @@ function changeVoice(patch) {
   $('speedBtn').textContent = `${settings.speed}×`;
   S.genSec = 0; S.audioSec = 0;
   renderStats();
+  refreshServerAudio();
+  renderPregen();
   if (S.active) restartAt(S.cur);
 }
 
@@ -964,6 +1215,19 @@ function translatePage() {
   } catch (e) {
     log('도서 불러오기 실패: ' + e.message);
     placeholder(e.message);
+    return;
+  }
+  if (PREGEN_ENABLED) {
+    $('pregenBtn').onclick = requestPregen;
+    $('pregenCancel').onclick = cancelPregen;
+    await fetchPregenStatus();
+  }
+  await S.serverReady;
+  if (S.pieces.length && S.server.size === S.pieces.length) {
+    // 이 챕터는 전부 서버에 있다 — 모델을 불러오지 않는다(배터리·메모리 절약, 느린 기기도 재생 가능)
+    log('이 챕터는 서버에 미리 만든 음성으로 재생 — 모델을 불러오지 않음');
+    updateControls(); renderStatus(); renderPlayBtn();
+    if (autoplayWanted) setTimeout(startAutoplay, 0);
     return;
   }
   const cached = await modelCached();

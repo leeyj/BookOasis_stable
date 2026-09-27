@@ -348,6 +348,33 @@ CREATE TABLE IF NOT EXISTS tts_progress (
     UNIQUE KEY uq_tts_progress_book_user (book_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
+CREATE TABLE IF NOT EXISTS tts_pregen_jobs (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    book_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    voice VARCHAR(8) NOT NULL,
+    steps INT NOT NULL,
+    speed DOUBLE NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'queued',
+    total_pieces INT NOT NULL DEFAULT 0,
+    done_pieces INT NOT NULL DEFAULT 0,
+    error TEXT,
+    heartbeat_ms BIGINT,
+    created_ms BIGINT NOT NULL,
+    finished_ms BIGINT,
+    KEY idx_tts_pregen_jobs_status (status, id),
+    KEY idx_tts_pregen_jobs_book (book_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS tts_audio_cache (
+    piece_key CHAR(64) PRIMARY KEY,
+    duration_sec DOUBLE NOT NULL,
+    bytes BIGINT NOT NULL,
+    created_ms BIGINT NOT NULL,
+    last_used_ms BIGINT NOT NULL,
+    KEY idx_tts_audio_cache_last_used (last_used_ms)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
 CREATE TABLE IF NOT EXISTS user_reading_log (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     book_id BIGINT NOT NULL,

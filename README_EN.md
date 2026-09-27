@@ -39,6 +39,12 @@ The server provides a light and fast runtime environment by minimizing third-par
 * **Flexible Scan Ignore Filtering (`.bookoasisignore`)**
   * Configure ignore rules globally or per-folder via `.bookoasisignore` files to exclude Synology NAS thumbnail directories (`@eaDir/`), recycle bins (`#recycle/`), or temporary files (`*.tmp`, `*.sample.cbz`) from disk scanning.
 
+* **Listen (Supplementary)**
+  * EPUB and TXT books can be read aloud right in the browser. No server resources are used, and your reading and listening positions carry over to each other.
+  * Fastest in WebGPU-capable browsers; the voice model is downloaded once on first use.
+  * On iPhone/iPad, iPhone 15 Pro / iPad mini 7 (A17 Pro) or newer is recommended. iPhone 14 and older stutter often and are not recommended.
+  * Optionally, the admin can let the server pre-generate books: listen to today's book as usual, and pre-generate tomorrow's the day before. Pre-generated books play on slower devices with almost no battery use.
+
 ### 🎨 Behind the Scenes: BookOasis Scan Engines
 
 Here is the secret of how BookOasis handles massive libraries (100k+ books) instantly without UI freezing!

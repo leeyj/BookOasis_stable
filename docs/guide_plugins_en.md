@@ -872,6 +872,34 @@ Recommended consumer policy:
 - Determine completion primarily by `book.finish` event or `progress`
 - Treat `totalPages` as auxiliary metadata
 
+#### `tts.ready` — Listen server pre-generation finished
+
+On servers where the admin enabled "Listen server pre-generation", this is emitted once when a book a user requested has been fully generated.
+`Account` is the requesting user; `Metadata` holds the book and the listening settings used (no progress keys).
+
+```json
+{
+    "event": "tts.ready",
+    "user": true,
+    "Account": { "id": 7, "title": "username" },
+    "Metadata": {
+        "type": "book",
+        "format": "epub",
+        "title": "Book title",
+        "author": "Author name",
+        "bookId": 1234,
+        "session": "general",
+        "voice": "F1",
+        "steps": 4,
+        "speed": 1.05,
+        "pieces": 2130
+    }
+}
+```
+
+- `session` is `general` or `adult`. Receivers decide whether adult-session notifications should leave the server.
+- The same event is also sent to the human notification channels (`WEBHOOK_DISCORD_URL`, `WEBHOOK_TELEGRAM_*`, `WEBHOOK_NOTIFY_URLS`) as `[BookOasis] tts.ready`.
+
 ### Standard Event Delivery Environment Variables
 
 Core standardized event webhook delivery is controlled by:

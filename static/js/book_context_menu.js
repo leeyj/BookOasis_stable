@@ -280,6 +280,12 @@ export function showBookContextMenu(x, y, bookId, bookTitle, isVolumeDetail = fa
     const fmt = String(context.fileFormat || '').toLowerCase();
     ttsItem.style.display = (!isMultiSelection && canListen(fmt)) ? '' : 'none';
   }
+  // "음성 미리 만들기"는 관리자가 서버 미리 만들기를 켰을 때만
+  const ttsPregenItem = document.getElementById('ctx-tts-pregen-book');
+  if (ttsPregenItem) {
+    const fmt = String(context.fileFormat || '').toLowerCase();
+    ttsPregenItem.style.display = (!isMultiSelection && state.ttsPregenEnabled && canListen(fmt)) ? '' : 'none';
+  }
 
   const addSeriesItem = document.getElementById('ctx-add-series-to-collection');
   if (addSeriesItem) {
@@ -456,6 +462,32 @@ export function triggerTtsAction() {
   closeBookContextMenu();
 }
 window.triggerTtsAction = triggerTtsAction;
+
+// 듣기 화면을 열지 않고 여기서 바로 요청한다 (본문을 받아 조각내는 데 몇 초 걸릴 수 있다).
+// 설정은 이 책을 마지막으로 들은 설정, 없으면 듣기 기본값. 진행 상황은 스캔 활동(알림 영역)에 보인다.
+export async function triggerTtsPregenAction() {
+  if (!currentTargetBook || !currentTargetBook.id) return;
+  const bookId = currentTargetBook.id;
+  const dbType = state.currentLibraryType || 'general';
+  const title = currentTargetBook.title || '';
+  closeBookContextMenu();
+  const tr = (key, vars) => window.i18n?.t?.(`tts.${key}`, vars) || key;
+  const notify = (msg, type) => (typeof window.showToast === 'function' ? window.showToast(msg, type) : alert(msg));
+  try {
+    const { savedListenState, submitPregen } = await import('./tts/tts_pregen_client.js');
+    const { settings, position } = await savedListenState(dbType, bookId);
+    const quality = tr(Number(settings.steps) === 4 ? 'quality_normal' : 'quality_best');
+    if (!window.confirm(tr('pregen_confirm_menu', { title, conf: `${settings.voice} · ${quality} · ${settings.speed}×` }))) return;
+    notify(tr('pregen_preparing'), 'info');
+    // 마지막으로 읽거나 들은 곳부터 먼저 만든다
+    const data = await submitPregen({ dbType, bookId, settings, startAt: position });
+    notify(tr(data.created ? 'pregen_requested' : 'pregen_already'), 'success');
+    refreshSystemStatus();
+  } catch (e) {
+    notify(tr('pregen_request_failed', { error: e.message === 'https required' ? tr('pregen_https') : e.message }), 'error');
+  }
+}
+window.triggerTtsPregenAction = triggerTtsPregenAction;
 
 export async function triggerScanSingleBookAction() {
   if (!currentTargetBook || !currentTargetBook.id) return;
@@ -1020,6 +1052,7 @@ if (!window.__bookContextActionBound) {
     if (action === 'add-series-to-collection') return window.triggerAddSeriesToCollectionAction?.();
     if (action === 'page-turn') return window.triggerPageTurnAction?.();
     if (action === 'tts') return window.triggerTtsAction?.();
+    if (action === 'tts-pregen') return window.triggerTtsPregenAction?.();
     if (action === 'mark-unread') return window.triggerMarkAsUnreadAction?.();
     if (action === 'mark-read') return window.triggerMarkAsReadAction?.();
     if (action === 'cover-align') {

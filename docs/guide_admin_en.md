@@ -193,6 +193,8 @@ Reads TXT/EPUB books aloud. Open it with **Listen** in the book menu or **Listen
 * **HTTPS is required.** Over plain HTTP, WebGPU, multithreading and the model cache are all disabled and speech is slower than real time (the page shows a warning).
 * The voice model (Supertonic 3, about 400MB) is downloaded **once per device** and kept in the browser.
 * Fastest in browsers with WebGPU (recent Chrome/Edge, Samsung Internet, ...). Otherwise it falls back to WASM.
+* **iPhone/iPad** always synthesize with WASM so playback continues with the screen off, starting at "Normal" quality.
+  * **A17 Pro or newer** is recommended (iPhone 15 Pro and later, iPad mini 7, ...). **iPhone 14 and older** cannot keep up with playback and stutter often, so they are not recommended.
 
 ### ② Server side (usually nothing to do)
 * By default the browser downloads the model straight from Hugging Face.
@@ -205,3 +207,17 @@ Reads TXT/EPUB books aloud. Open it with **Listen** in the book menu or **Listen
 * EPUB items that contain only images (covers, illustrations) or a single title line are skipped.
 * Standalone hanja are read with Korean readings (e.g. 運命 → 운명, 女人 → 여인). The table comes from Unicode Unihan data (`static/lib/hanja/`, Unicode License V3); characters with several readings and personal names may occasionally be read differently.
 * Listening also updates reading progress (same units as the reader: 4,000-character pages for TXT, chapters for EPUB). Listening to the end marks the book as completed.
+
+### ④ Server pre-generation (optional, off by default)
+Synthesizing on the device drains the battery, and slower devices (iPhone 14 and older, ...) cannot keep up with playback. With server pre-generation, **the server prepares books users pick in advance** and the device only downloads and plays them.
+
+> **How it is meant to be used**: listen to a book you want right now with "Listen" as usual, and **pre-generate the books you will listen to tomorrow the day before.** Large books can take hours (e.g. about 11 hours for an 18-volume set). Generation starts from where you left off, so the part you will continue from is ready soon, even before the whole book is done.
+
+* **Enable**: Settings → General → **Listen server pre-generation** → "Enabled". The same card shows whether the server is ready (availability, queued/running jobs, cache size).
+* **Server requirements**: the Python packages `numpy` and `onnxruntime` (included in the Docker image) and `ffmpeg`. For native installs run `pip install numpy onnxruntime` and restart. The server downloads the same voice model files as the browser once, into `cache/tts_models/`.
+* **Use**: **Pre-generate audio** in the book menu, or **Pre-generate** in the Listen settings sheet. It uses the requester's listening settings (voice, speed, quality) and generates **from the last read or listened position first** (then the rest from the start). While it runs, the Listen screen picks up newly generated sentences and plays them from the server. When listening with the same settings the pre-generated audio is used; sentences that differ or are missing are synthesized on the device as before.
+* **Notification**: when finished, the Listen screen shows it as pre-generated (with a toast if it is open), and the webhook event `tts.ready` is sent (human notification channels such as Telegram/Discord and the standard event webhook — see [guide_plugins_en.md](guide_plugins_en.md)).
+* **Server load**: one book at a time, using the configured number of CPU threads (default 2). Reference (i7-1195G7, 4-core laptop CPU): about 8.5x real time with 2 threads at Normal quality, roughly one hour for a 200,000-character book. Synthesis runs at the **lowest OS priority (nice 19)**, so it yields the CPU to web requests and scans and only runs at full speed when the server is otherwise idle. High CPU usage readings therefore barely affect service responsiveness.
+* **Storage**: audio is stored per sentence as AAC under `general/` and `adult/` in the **audio storage path** on the same card (absolute path; empty means `<install folder>/tts_audio`). A 200,000-character book takes about 150-200MB; above the configured cap (default 10GB, per session) the least recently played audio is removed first. Changing the path does not move existing audio; it is generated again.
+* **Docker note**: files outside a volume are lost when the container is recreated, so the feature **only works when the storage path is on a mounted volume**. Current compose files include the `./tts_audio:/app/tts_audio` volume, so leave the path empty. With an older compose file, add that volume or set the path to another mounted location (otherwise the admin card shows "unavailable" with the reason).
+* If a restart or deploy interrupts a job, it resumes on the next start and skips sentences that were already generated.

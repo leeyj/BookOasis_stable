@@ -11,6 +11,14 @@ export const MODEL_FALLBACK_BASE = '/tts/model';
 export const ONNX_MODELS = ['duration_predictor', 'text_encoder', 'vector_estimator', 'vocoder'];
 export const VOICES = ['F1', 'F2', 'F3', 'F4', 'F5', 'M1', 'M2', 'M3', 'M4', 'M5'];
 
+// 서버 미리 만들기 조각 키 — 합성 입력 전체의 sha256. services/tts_engine.py piece_key()와 같은 입력·같은 결과여야 한다
+// (숫자는 JS 기본 표기: 1.0 → "1"). text는 speakableText()까지 거친 실제 합성 입력.
+export async function pieceKey(text, { voice, steps, speed }) {
+  const raw = `${MODEL_REVISION}|${voice}|${steps}|${speed}|${text}`;
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+  return Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 export function modelUrl(path) {
   return `${MODEL_BASE}/${String(path).replace(/^\/+/, '')}`;
 }
@@ -100,6 +108,8 @@ function splitSentences(para, base) {
 // 같은 구절을 긴 문장과 함께 넣으면 0% (공식 Python 레퍼런스도 동일, docs/bug/20260926_bugfix_tts_short_sentence_repro.md).
 // 그래서 이보다 짧은 조각은 혼자 보내지 않는다.
 export const MIN_ALONE_CHARS = 15;
+// 듣기 화면의 조각 최대 길이. 서버 미리 만들기도 같은 값으로 조각내야 키가 맞는다
+export const MAX_PIECE_CHARS = 120;
 
 export function segmentForTts(text, maxLen = 120, minAlone = MIN_ALONE_CHARS) {
   const source = String(text || '');

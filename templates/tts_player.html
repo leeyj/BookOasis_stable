@@ -163,6 +163,12 @@
   .seg-group button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
   .field > label.toggle { display: flex; margin: 0; color: var(--text); align-items: center; justify-content: space-between; font-size: 14px; }
   .toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
+  .pregen-status { margin: 0 0 6px; font-size: 14px; color: var(--strong); }
+  .pregen-note { margin: 0 0 10px; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+  .pregen-actions { display: flex; gap: 8px; }
+  .pregen-actions button { flex: 1; padding: 10px 8px; border-radius: 10px; background: var(--surface-2); font-size: 14px; font-weight: 600; }
+  .pregen-actions #pregenBtn { background: var(--accent); color: var(--accent-ink); }
+  .pregen-actions button:disabled { opacity: .5; }
   .chapter-list { list-style: none; margin: 0; padding: 0; }
   .chapter-list button { width: 100%; text-align: left; padding: 12px 4px; border-bottom: 1px solid var(--line); font-size: 14.5px; display: flex; gap: 10px; }
   .chapter-list button .n { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 2.2em; }
@@ -200,7 +206,7 @@
   @media (prefers-reduced-motion: reduce) { .s, .bar > div, .toast { transition: none; } }
 </style>
 </head>
-<body>
+<body data-pregen="{{ '1' if tts_pregen_enabled else '0' }}">
 <header class="top">
   <span class="icon-btn" aria-hidden="true"></span><!-- 제목을 가운데에 두기 위한 자리 (오른쪽 닫기 버튼과 같은 너비) -->
   <div class="titles">
@@ -262,6 +268,15 @@
     <div class="field"><div class="label" data-i18n="tts.speed">속도</div><div class="seg-group" id="speedGroup"></div></div>
     <div class="field"><div class="label" data-i18n="tts.quality">음질 (높을수록 자연스럽지만 느림)</div><div class="seg-group" id="stepsGroup"></div></div>
     <div class="field" id="autoNextField" hidden><label class="toggle"><span data-i18n="tts.auto_next">챕터가 끝나면 다음 챕터 이어서</span> <input type="checkbox" id="autoNext" checked></label></div>
+    <div class="field pregen" id="pregenField" hidden>
+      <div class="label" data-i18n="tts.pregen_title">서버에 미리 만들기</div>
+      <p class="pregen-status" id="pregenStatus"></p>
+      <p class="pregen-note" data-i18n="tts.pregen_note">서버가 책 전체를 지금 설정(음성·속도·음질)으로 만들어 둡니다. 다 되면 알려 드리고, 이후에는 기기 배터리를 거의 쓰지 않고 들을 수 있습니다.</p>
+      <div class="pregen-actions">
+        <button type="button" id="pregenBtn" data-i18n="tts.pregen_start">미리 만들기</button>
+        <button type="button" id="pregenCancel" hidden data-i18n="tts.pregen_cancel">취소</button>
+      </div>
+    </div>
     <h3 style="margin-top:8px" data-i18n="tts.display">화면</h3>
     <div class="field"><div class="label" data-i18n="tts.font_size">글자 크기</div><div class="seg-group" id="fontGroup"></div></div>
     <div class="field"><div class="label" data-i18n="tts.theme">테마</div><div class="seg-group" id="themeGroup"></div></div>
