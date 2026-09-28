@@ -24,9 +24,13 @@ def test_tables_are_defined_for_both_engines():
     jobs = dict(tables['tts_pregen_jobs'])
     for col in ('book_id', 'user_id', 'voice', 'steps', 'speed', 'status', 'total_pieces', 'done_pieces', 'heartbeat_ms'):
         assert col in jobs
-    assert 'piece_key' in dict(tables['tts_audio_cache'])
-    assert 'CREATE TABLE IF NOT EXISTS tts_pregen_jobs' in MARIADB_CENTRAL_SCHEMA
-    assert 'CREATE TABLE IF NOT EXISTS tts_audio_cache' in MARIADB_CENTRAL_SCHEMA
+    assert 'quality' in jobs
+    for col in ('book_id', 'voice', 'steps', 'speed', 'quality', 'rel_dir', 'bytes', 'created_by', 'last_used_ms'):
+        assert col in dict(tables['tts_audio_books'])
+    for col in ('audio_book_id', 'piece_key', 'chapter', 'part', 'byte_offset', 'byte_length', 'duration_sec'):
+        assert col in dict(tables['tts_audio_pieces'])
+    for table in ('tts_pregen_jobs', 'tts_audio_books', 'tts_audio_pieces'):
+        assert f'CREATE TABLE IF NOT EXISTS {table}' in MARIADB_CENTRAL_SCHEMA
 
 
 # ---- piece key (tests/test_tts_core.mjs에 같은 벡터가 있다) ----
@@ -102,15 +106,25 @@ def test_active_job_lookup_and_counts(sqlite_db):
     assert Repo.count_by_status('general') == {'queued': 1}
 
 
-def test_audio_cache_roundtrip(sqlite_db):
-    Repo.put_audio('general', 'a' * 64, 3.5, 1000, 1)
-    Repo.put_audio('general', 'b' * 64, 2.0, 500, 2)
-    assert Repo.get_audio('general', ['a' * 64, 'c' * 64]) == {'a' * 64: 3.5}
-    assert Repo.total_audio_bytes('general') == 1500
-    Repo.touch_audio('general', ['a' * 64], 10)
-    assert Repo.oldest_audio('general', 1) == [('b' * 64, 500)]
-    Repo.delete_audio('general', ['b' * 64])
-    assert Repo.total_audio_bytes('general') == 1000
+def test_audio_book_index_roundtrip(sqlite_db):
+    book = Repo.get_or_create_audio_book('general', 5, 'F1', 4, 1.05, 'standard', 'books/5/F1_4_1.05_standard', 7, 100)
+    assert Repo.get_or_create_audio_book('general', 5, 'F1', 4, 1.05, 'standard', 'x', 8, 200)['id'] == book['id']
+    other = Repo.get_or_create_audio_book('general', 6, 'F1', 4, 1.05, 'standard', 'books/6/F1_4_1.05_standard', 7, 300)
+    Repo.add_piece('general', book['id'], 'a' * 64, 0, 0, 0, 100, 3.5)
+    Repo.add_piece('general', book['id'], 'b' * 64, 1, 0, 0, 50, 2.0)
+    Repo.add_piece('general', other['id'], 'a' * 64, 0, 0, 0, 80, 3.5)
+    row = Repo.get_audio_book('general', book['id'])
+    assert (row['pieces'], row['bytes'], row['duration_sec']) == (2, 150, 5.5)
+    assert Repo.total_audio_bytes('general') == 230
+    # 같은 키가 두 책에 있으면 최근에 들은 책 것
+    Repo.touch_audio_books('general', [other['id']], 999)
+    assert Repo.find_pieces('general', ['a' * 64])['a' * 64]['audio_book_id'] == other['id']
+    assert [b['id'] for b in Repo.oldest_audio_books('general', 5)] == [book['id'], other['id']]
+    Repo.remove_pieces('general', book['id'], ['b' * 64])
+    assert Repo.get_audio_book('general', book['id'])['bytes'] == 100
+    Repo.delete_audio_book('general', other['id'])
+    assert Repo.find_pieces('general', ['a' * 64])['a' * 64]['audio_book_id'] == book['id']
+    assert [b['id'] for b in Repo.list_audio_books('general')] == [book['id']]
 
 
 # ---- service ----
@@ -162,26 +176,113 @@ def test_create_job_limits_active_jobs_per_user(sqlite_db, audio_root):
             pregen.create_job('general', 99, 7, _payload([_piece('문장.')]))
 
 
-def test_lookup_returns_only_existing_files(sqlite_db, audio_root):
-    present, missing = 'a' * 64, 'b' * 64
-    Repo.put_audio('general', present, 3.0, 10, 1)
-    Repo.put_audio('general', missing, 3.0, 10, 1)
-    path = pregen.audio_path('general', present)
-    os.makedirs(os.path.dirname(path))
-    open(path, 'wb').close()
-    assert pregen.lookup('general', [present, missing, 'not-a-key']) == {present: 3.0}
+def _stored_book(book_id, pieces, chapter=0, quality='standard', user_id=7):
+    """pack 파일에 조각(내용 = 키 앞 8자)을 실제로 써 둔 책 하나"""
+    rel = pregen.book_rel_dir(book_id, 'F1', 4, 1.05, quality)
+    book = Repo.get_or_create_audio_book('general', book_id, 'F1', 4, 1.05, quality, rel, user_id, 1)
+    packs = pregen._BookPacks('general', book)
+    for key in pieces:
+        packs.append(key, chapter, key[:8].encode(), 2.0)
+    return Repo.get_audio_book('general', book['id'])
 
 
-def test_disk_cap_removes_least_recently_used(sqlite_db, audio_root, monkeypatch):
-    monkeypatch.setattr(pregen, 'disk_cap_bytes', lambda: 1500)
-    for i, key in enumerate(('a' * 64, 'b' * 64, 'c' * 64)):
-        Repo.put_audio('general', key, 1.0, 1000, i)
-        path = pregen.audio_path('general', key)
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        open(path, 'wb').close()
+def test_lookup_and_read_come_from_the_book_pack(sqlite_db, audio_root):
+    present, other = 'a' * 64, 'b' * 64
+    _stored_book(1, [present, other])
+    assert pregen.lookup('general', [present, 'c' * 64, 'not-a-key']) == {present: 2.0}
+    assert pregen.read_piece('general', other) == b'bbbbbbbb'
+    # 조각들은 챕터 pack 하나에 이어 붙어 있다 (조각마다 파일이 생기지 않는다)
+    folder = audio_root / 'general' / 'books' / '1' / 'F1_4_1.05_standard'
+    assert [f.name for f in folder.iterdir()] == ['ch0000_00.pack']
+    assert (folder / 'ch0000_00.pack').read_bytes() == b'aaaaaaaabbbbbbbb'
+    # pack이 잘려 나갔으면 없는 조각이다
+    (folder / 'ch0000_00.pack').write_bytes(b'aaaaaaaa')
+    assert pregen.lookup('general', [present, other]) == {present: 2.0}
+    assert pregen.read_piece('general', other) is None
+
+
+def test_truncated_pieces_are_dropped_when_the_book_is_reopened(sqlite_db, audio_root):
+    book = _stored_book(1, ['a' * 64, 'b' * 64])
+    pack = audio_root / 'general' / 'books' / '1' / 'F1_4_1.05_standard' / 'ch0000_00.pack'
+    pack.write_bytes(b'aaaaaaaab')  # 둘째 조각을 쓰다 죽음
+    packs = pregen._BookPacks('general', book)
+    assert packs.keys == {'a' * 64}
+    assert Repo.get_audio_book('general', book['id'])['pieces'] == 1
+    packs.append('c' * 64, 0, b'cccc', 1.0)  # 쓰레기 바이트 뒤에 이어 쓴다
+    assert pregen.read_piece('general', 'c' * 64) == b'cccc'
+
+
+def test_pack_rotates_to_next_part_when_full(sqlite_db, audio_root, monkeypatch):
+    monkeypatch.setattr(pregen, 'PACK_MAX_BYTES', 16)
+    _stored_book(1, ['a' * 64, 'b' * 64, 'c' * 64])
+    folder = audio_root / 'general' / 'books' / '1' / 'F1_4_1.05_standard'
+    assert sorted(f.name for f in folder.iterdir()) == ['ch0000_00.pack', 'ch0000_01.pack']
+    assert pregen.read_piece('general', 'c' * 64) == b'cccccccc'
+
+
+def test_disk_cap_removes_whole_books_least_recently_used(sqlite_db, audio_root, monkeypatch):
+    monkeypatch.setattr(pregen, 'disk_cap_bytes', lambda: 20)
+    old = _stored_book(1, ['a' * 64])
+    mid = _stored_book(2, ['b' * 64])
+    new = _stored_book(3, ['c' * 64])
+    Repo.touch_audio_books('general', [mid['id']], 50)
+    Repo.touch_audio_books('general', [new['id']], 60)
     pregen.enforce_disk_cap('general')
-    assert set(Repo.get_audio('general', ['a' * 64, 'b' * 64, 'c' * 64])) == {'c' * 64}
-    assert not os.path.exists(pregen.audio_path('general', 'a' * 64))
+    assert {b['id'] for b in Repo.list_audio_books('general')} == {mid['id'], new['id']}
+    assert not (audio_root / 'general' / 'books' / '1').exists()
+    # 지금 만드는 책은 가장 오래됐어도 지우지 않는다
+    monkeypatch.setattr(pregen, 'disk_cap_bytes', lambda: 1)
+    pregen.enforce_disk_cap('general', keep_id=mid['id'])
+    assert [b['id'] for b in Repo.list_audio_books('general')] == [mid['id']]
+
+
+def test_delete_audio_book_permissions(sqlite_db, audio_root):
+    book = _stored_book(1, ['a' * 64], user_id=7)
+    with pytest.raises(PermissionError):
+        pregen.delete_audio_book('general', book['id'], 8, False)
+    with pytest.raises(LookupError):
+        pregen.delete_audio_book('general', 999, 7, False)
+    # 만드는 중이면 거절
+    job_id = Repo.create_job('general', 1, 7, 'F1', 4, 1.05, 1, 1)
+    with pytest.raises(RuntimeError):
+        pregen.delete_audio_book('general', book['id'], 7, False)
+    Repo.cancel('general', job_id, 2)
+    assert pregen.delete_audio_book('general', book['id'], 8, True)
+    assert not (audio_root / 'general' / 'books' / '1').exists()
+    assert pregen.lookup('general', ['a' * 64]) == {}
+
+
+def test_list_ready_books_joins_book_info(sqlite_db, audio_root):
+    sqlite_db.execute("INSERT INTO books (id, library_id, title, file_path, file_format, total_pages) VALUES (1, 3, '책 하나', '/b/1.epub', 'epub', 10)")
+    sqlite_db.execute("INSERT INTO books (id, library_id, title, file_path, file_format, total_pages, is_deleted) VALUES (2, 3, '지운 책', '/b/2.epub', 'epub', 10, 1)")
+    _stored_book(1, ['a' * 64], user_id=7)
+    _stored_book(2, ['b' * 64], user_id=7)
+    books = pregen.list_ready_books('general', 8, False)
+    assert [b['title'] for b in books] == ['책 하나']
+    assert books[0]['tts']['bytes'] == 8 and books[0]['tts']['can_delete'] is False
+    assert pregen.list_ready_books('general', 7, False)[0]['tts']['can_delete'] is True
+
+
+def test_legacy_piece_files_are_purged_but_other_files_are_kept(sqlite_db, audio_root):
+    legacy = audio_root / 'general' / 'ab'
+    legacy.mkdir(parents=True)
+    (legacy / f"{'ab' * 32}.m4a").write_bytes(b'x')
+    keep_dir = audio_root / 'general' / 'cd'
+    keep_dir.mkdir()
+    (keep_dir / 'notes.txt').write_text('mine')
+    (audio_root / 'general' / 'music').mkdir()
+    jobs = audio_root / 'general' / 'jobs'
+    jobs.mkdir()
+    done_id = Repo.create_job('general', 1, 7, 'F1', 4, 1.05, 1, 1)
+    Repo.claim_next('general', 2, 0)
+    Repo.finish('general', done_id, 'done', 3)
+    active_id = Repo.create_job('general', 2, 7, 'F1', 4, 1.05, 1, 1)
+    (jobs / f'{done_id}.json').write_text('{}')
+    (jobs / f'{active_id}.json').write_text('{}')
+    assert pregen.purge_legacy_cache() == 1
+    assert not legacy.exists()
+    assert (keep_dir / 'notes.txt').exists() and (audio_root / 'general' / 'music').exists()
+    assert not (jobs / f'{done_id}.json').exists() and (jobs / f'{active_id}.json').exists()
 
 
 def test_near_silent_detection():
@@ -206,26 +307,26 @@ class FakeEngine:
         return [0.0] * 25
 
 
-def _fake_encode(wav, sample_rate, out_path):
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    with open(out_path, 'wb') as f:
-        f.write(b'm4a')
-    return 3
+def _fake_encode(wav, sample_rate, quality='standard', tmp_dir=None):
+    return f'm4a-{quality}'.encode()
 
 
 def test_worker_makes_missing_pieces_and_skips_cached(sqlite_db, audio_root, monkeypatch):
     monkeypatch.setattr(pregen, 'is_enabled', lambda: True)
     monkeypatch.setattr(pregen.tts_engine, 'availability', lambda: (True, ''))
     monkeypatch.setattr(pregen.tts_engine, 'Engine', FakeEngine)
-    monkeypatch.setattr(pregen.tts_engine, 'encode_m4a', _fake_encode)
+    monkeypatch.setattr(pregen.tts_engine, 'encode_m4a_bytes', _fake_encode)
+    monkeypatch.setattr(pregen, 'quality_setting', lambda: 'compact')
     notified = []
     monkeypatch.setattr(pregen, '_notify_ready', lambda db_type, job: notified.append(job['id']))
-    pieces = [_piece('하나.'), _piece('둘.'), _piece('셋.')]
-    # 첫 조각은 이미 캐시에 있다
-    _fake_encode(None, 10, pregen.audio_path('general', pieces[0]['key']))
-    Repo.put_audio('general', pieces[0]['key'], 2.5, 3, 1)
+    pieces = [_piece('하나.'), _piece('둘.', 1), _piece('셋.', 1)]
+    # 첫 조각은 이 책 폴더에 이미 있다 (중단됐다 다시 시작한 경우)
+    rel = pregen.book_rel_dir(1, 'F1', 4, 1.05, 'compact')
+    book = Repo.get_or_create_audio_book('general', 1, 'F1', 4, 1.05, 'compact', rel, 7, 1)
+    pregen._BookPacks('general', book).append(pieces[0]['key'], 0, b'old', 2.5)
     with patch.object(pregen, 'wake_worker'):
         job, _ = pregen.create_job('general', 1, 7, _payload(pieces))
+    assert Repo.get_job('general', job['id'])['quality'] == 'compact'
 
     worker = pregen._Worker()
     assert worker._tick()
@@ -234,6 +335,11 @@ def test_worker_makes_missing_pieces_and_skips_cached(sqlite_db, audio_root, mon
     assert done['status'] == 'done' and done['done_pieces'] == 3
     assert notified == [job['id']]
     assert set(pregen.lookup('general', [p['key'] for p in pieces])) == {p['key'] for p in pieces}
+    assert pregen.read_piece('general', pieces[1]['key']) == b'm4a-compact'
+    folder = audio_root / 'general' / 'books' / '1' / 'F1_4_1.05_compact'
+    assert sorted(f.name for f in folder.iterdir()) == ['ch0000_00.pack', 'ch0001_00.pack']
+    # 끝난 작업의 조각 목록 파일은 지운다
+    assert not (audio_root / 'general' / 'jobs' / f"{job['id']}.json").exists()
     assert not worker._tick()  # 더 할 일 없음
 
 
@@ -294,20 +400,35 @@ def test_create_passes_session_user(allow_rating):
     assert create.call_args.args[:3] == ('general', 3, 7)
 
 
-def test_audio_route_rejects_bad_keys_and_adult_without_access(tmp_path, monkeypatch):
-    monkeypatch.setattr(pregen, 'AUDIO_ROOT', str(tmp_path))
+def test_audio_route_serves_pack_slices_with_ranges(sqlite_db, audio_root):
     client = _client(adult=0)
     assert client.get('/api/media/tts/audio/general/not-a-key.m4a').status_code == 404
     assert client.get(f"/api/media/tts/audio/video/{'a' * 64}.m4a").status_code == 404
     assert client.get(f"/api/media/tts/audio/adult/{'a' * 64}.m4a").status_code == 403
     assert client.get(f"/api/media/tts/audio/general/{'a' * 64}.m4a").status_code == 404
-    path = pregen.audio_path('general', 'a' * 64)
-    os.makedirs(os.path.dirname(path))
-    with open(path, 'wb') as f:
-        f.write(b'audio')
-    response = client.get(f"/api/media/tts/audio/general/{'a' * 64}.m4a")
-    assert response.status_code == 200 and response.data == b'audio'
-    assert 'immutable' in response.headers['Cache-Control']
+    _stored_book(1, ['b' * 64, 'a' * 64])
+    url = f"/api/media/tts/audio/general/{'a' * 64}.m4a"
+    response = client.get(url)
+    assert response.status_code == 200 and response.data == b'aaaaaaaa'
+    assert response.mimetype == 'audio/mp4' and 'immutable' in response.headers['Cache-Control']
+    assert response.headers['Accept-Ranges'] == 'bytes'
+    ranged = client.get(url, headers={'Range': 'bytes=2-4'})
+    assert ranged.status_code == 206 and ranged.data == b'aaa'
+    assert ranged.headers['Content-Range'] == 'bytes 2-4/8'
+    assert client.get(url, headers={'Range': 'bytes=-3'}).data == b'aaa'
+    assert client.get(url, headers={'Range': 'bytes=20-'}).status_code == 416
+    assert client.get(url, headers={'If-None-Match': f'"{"a" * 64}"'}).status_code == 304
+
+
+def test_audio_books_routes(sqlite_db, audio_root, allow_rating):
+    sqlite_db.execute("INSERT INTO books (id, library_id, title, file_path, file_format, total_pages) VALUES (1, 3, '책 하나', '/b/1.epub', 'epub', 10)")
+    book = _stored_book(1, ['a' * 64], user_id=7)
+    listed = _client().get('/api/media/tts/audio/books?type=general').get_json()
+    assert [b['id'] for b in listed['books']] == [1]
+    assert _client().get('/api/media/tts/audio/books?type=audiobook').get_json()['books'] == []
+    assert _client(adult=0).get('/api/media/tts/audio/books?type=adult').status_code == 403
+    assert _client().delete(f"/api/media/tts/audio/books/{book['id']}?db_type=general").status_code == 200
+    assert _client().delete(f"/api/media/tts/audio/books/{book['id']}?db_type=general").status_code == 404
 
 
 def test_admin_status_requires_admin():

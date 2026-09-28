@@ -362,8 +362,39 @@ CREATE TABLE IF NOT EXISTS tts_pregen_jobs (
     heartbeat_ms BIGINT,
     created_ms BIGINT NOT NULL,
     finished_ms BIGINT,
+    quality VARCHAR(16) NOT NULL DEFAULT 'standard',
     KEY idx_tts_pregen_jobs_status (status, id),
     KEY idx_tts_pregen_jobs_book (book_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS tts_audio_books (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    book_id BIGINT NOT NULL,
+    voice VARCHAR(8) NOT NULL,
+    steps INT NOT NULL,
+    speed DOUBLE NOT NULL,
+    quality VARCHAR(16) NOT NULL,
+    rel_dir VARCHAR(255) NOT NULL,
+    pieces INT NOT NULL DEFAULT 0,
+    bytes BIGINT NOT NULL DEFAULT 0,
+    duration_sec DOUBLE NOT NULL DEFAULT 0,
+    created_by BIGINT NOT NULL,
+    created_ms BIGINT NOT NULL,
+    last_used_ms BIGINT NOT NULL,
+    UNIQUE KEY uq_tts_audio_books_conf (book_id, voice, steps, speed, quality),
+    KEY idx_tts_audio_books_last_used (last_used_ms)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS tts_audio_pieces (
+    audio_book_id BIGINT NOT NULL,
+    piece_key CHAR(64) NOT NULL,
+    chapter INT NOT NULL,
+    part INT NOT NULL,
+    byte_offset BIGINT NOT NULL,
+    byte_length INT NOT NULL,
+    duration_sec DOUBLE NOT NULL,
+    PRIMARY KEY (audio_book_id, piece_key),
+    KEY idx_tts_audio_pieces_key (piece_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE IF NOT EXISTS tts_audio_cache (

@@ -79,14 +79,14 @@ export function switchActiveView(viewName) {
     case 'grid':
       if (gridView) gridView.style.display = 'block';
       if (btnSort) {
-        // 'history'(최근 읽은 도서), 'collection'(컬렉션), 'smart_rec'(스마트 추천) 카테고리에서는 정렬 버튼을 노출하지 않고 그 외 보관함에서는 노출
-        btnSort.style.display = (['history', 'collection', 'smart_rec'].includes(state.currentLibraryId)) ? 'none' : 'inline-flex';
+        // 'history'(최근 읽은 도서), 'collection'(컬렉션), 'smart_rec'(스마트 추천), 'tts_ready'(음성 준비됨) 카테고리에서는 정렬 버튼을 노출하지 않고 그 외 보관함에서는 노출
+        btnSort.style.display = (['history', 'collection', 'smart_rec', 'tts_ready'].includes(state.currentLibraryId)) ? 'none' : 'inline-flex';
       }
-      if (state.currentLibraryId === 'collection' || state.currentLibraryId === 'smart_rec') {
+      if (['collection', 'smart_rec', 'tts_ready'].includes(state.currentLibraryId)) {
         const scrollSpinner = document.getElementById('infinite-scroll-spinner');
         if (scrollSpinner) scrollSpinner.style.display = 'none';
       }
-      if (!['history', 'collection', 'smart_rec'].includes(state.currentLibraryId)) {
+      if (!['history', 'collection', 'smart_rec', 'tts_ready'].includes(state.currentLibraryId)) {
         mountIndexScrollbar();
       }
       break;

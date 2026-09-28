@@ -327,7 +327,15 @@
     "view_all": "All Books",
     "settings": "Settings",
     "logout_title": "Log Out",
-    "smart_recommend": "Smart Picks"
+    "smart_recommend": "Smart Picks",
+    "open_menu": "Menu",
+    "menu_search_placeholder": "Search menu / libraries",
+    "section_explore": "Browse",
+    "section_libraries": "Libraries",
+    "admin_tools": "Admin tools",
+    "add_group": "Add group",
+    "scan_activity": "Activity",
+    "account": "Account"
   },
   "smart_recommend": {
     "title": "Smart Picks",
@@ -342,6 +350,7 @@
     "no_history_desc": "Read a few series and we'll tailor recommendations for you."
   },
   "header": {
+    "mobile_toggle": "Search & switch library",
     "general_books": "General Books",
     "adult_books": "Adult Books",
     "audiobooks": "Audiobooks",
@@ -685,6 +694,7 @@
     "err_next_book_not_exist": "Next book file path does not exist."
   },
   "category": {
+    "tts_ready": "Ready to Listen",
     "pin_pinned": "Order pinned (Click to unpin)",
     "pin_unpinned": "Order changeable (Click to pin)",
     "add_new_tooltip": "Add New Category",
@@ -943,5 +953,21 @@
     "viewer_listen": "Listen",
     "tap_to_listen": "Tap to listen",
     "viewer_listen_title": "Listen from where you are reading"
+  },
+  "tts_ready": {
+    "loading": "Loading...",
+    "empty": "No pre-generated audio yet. Use \"Pre-generate audio\" from the book menu.",
+    "load_failed": "Could not load the list: {error}",
+    "listen": "Listen",
+    "delete": "Delete audio",
+    "delete_confirm": "Delete the pre-generated audio for \"{title}\" ({size})?",
+    "delete_busy": "This audio is still being generated. Cancel the pre-generation first.",
+    "deleted": "Pre-generated audio deleted.",
+    "steps_normal": "Normal",
+    "steps_best": "Best",
+    "quality_standard": "Standard",
+    "quality_compact": "Compact",
+    "hours": "{n} h",
+    "minutes": "{n} min"
   }
 }

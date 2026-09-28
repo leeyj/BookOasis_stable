@@ -5,6 +5,7 @@ tts_routes.py - 브라우저 TTS("음성으로 듣기"): 플레이어 화면, �
 둘 수 있다(서버 미리 만들기 — services/tts_pregen_service.py).
 """
 import os
+import re
 
 from flask import Blueprint, request, jsonify, session, render_template, make_response, send_from_directory, Response
 
@@ -190,6 +191,36 @@ def lookup_tts_audio():
     return jsonify({'success': True, 'audio': found})
 
 
+def _range_response(data, etag):
+    """메모리의 바이트를 Range(206)까지 지원해 보낸다 — Safari는 오디오를 Range 요청으로만 받는다.
+    조각 하나는 수십~수백 KB라 통째로 읽어 두고 자른다."""
+    total = len(data)
+    status = 200
+    start, end = 0, total - 1
+    range_header = request.headers.get('Range', '')
+    match = re.match(r'^bytes=(\d*)-(\d*)$', range_header.strip()) if range_header else None
+    if match and total > 0:
+        first, last = match.group(1), match.group(2)
+        if first:
+            start = int(first)
+            end = min(int(last), total - 1) if last else total - 1
+        elif last:  # 끝에서 N바이트
+            start = max(0, total - int(last))
+        if start > end or start >= total:
+            response = Response(status=416)
+            response.headers['Content-Range'] = f'bytes */{total}'
+            return response
+        status = 206
+    response = Response(data[start:end + 1], status=status, mimetype='audio/mp4')
+    response.headers['Accept-Ranges'] = 'bytes'
+    if status == 206:
+        response.headers['Content-Range'] = f'bytes {start}-{end}/{total}'
+    # 키가 내용의 해시라 바뀌지 않는다 → 오래 캐시
+    response.headers['ETag'] = f'"{etag}"'
+    response.headers['Cache-Control'] = 'private, max-age=31536000, immutable'
+    return response
+
+
 @tts_bp.route('/api/media/tts/audio/<db_type>/<key>.m4a', methods=['GET'])
 @login_required
 def get_tts_audio(db_type, key):
@@ -197,11 +228,42 @@ def get_tts_audio(db_type, key):
         return Response(status=404)
     if not check_adult_permission(db_type):
         return Response(status=403)
-    path = pregen.audio_path(db_type, key)
-    if not os.path.isfile(path):
+    if request.headers.get('If-None-Match', '').strip('"') == key:
+        return Response(status=304)
+    data = pregen.read_piece(db_type, key)
+    if data is None:
         return Response(status=404)
-    # 키가 내용의 해시라 파일이 바뀌지 않는다 → 오래 캐시
-    response = send_from_directory(os.path.dirname(path), os.path.basename(path), mimetype='audio/mp4',
-                                   max_age=86400 * 365, conditional=True)
-    response.headers['Cache-Control'] = 'private, max-age=31536000, immutable'
-    return response
+    return _range_response(data, key)
+
+
+@tts_bp.route('/api/media/tts/audio/books', methods=['GET'])
+@login_required
+def list_tts_audio_books():
+    """"음성 준비됨" 목록: 서버에 음성이 저장된 책 (연령 제한에 걸리는 책은 뺀다)"""
+    db_type = request.args.get('type', 'general')
+    if db_type not in _BOOK_DB_TYPES:
+        return jsonify({'success': True, 'books': []})
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+    books = pregen.list_ready_books(db_type, session.get('user_id'), session.get('role') == 'admin')
+    books = [b for b in books if check_book_rating_permission(db_type, b['id'])]
+    return jsonify({'success': True, 'books': books})
+
+
+@tts_bp.route('/api/media/tts/audio/books/<int:audio_book_id>', methods=['DELETE'])
+@login_required
+def delete_tts_audio_book(audio_book_id):
+    db_type = request.args.get('db_type', 'general')
+    if db_type not in _BOOK_DB_TYPES:
+        return jsonify({'success': False, 'error': 'invalid db_type'}), 400
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+    try:
+        pregen.delete_audio_book(db_type, audio_book_id, session.get('user_id'), session.get('role') == 'admin')
+    except LookupError as e:
+        return jsonify({'success': False, 'error': str(e)}), 404
+    except PermissionError as e:
+        return jsonify({'success': False, 'error': str(e)}), 403
+    except RuntimeError as e:
+        return jsonify({'success': False, 'error': str(e)}), 409
+    return jsonify({'success': True})

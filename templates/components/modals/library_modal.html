@@ -31,7 +31,7 @@
             </div>
             <div class="library-form-group">
                 <label for="library-form-path" id="library-form-path-label">서버 물리 경로{% if develop_mode %} / 구글 드라이브 공유 링크{% endif %} (엔터로 여러 개 입력 가능{% if develop_mode %}, 혼합 가능{% endif %})</label>
-                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+                <div class="library-path-input-row" style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
                     <textarea id="library-form-path" name="physical_path" required rows="3" maxlength="8192" placeholder="예: C:\library\fantasy&#10;/home/user/manga{% if develop_mode %}&#10;https://drive.google.com/drive/folders/1A2B3C4D5E6F7G8H9I{% endif %}" style="flex: 1;"></textarea>
                     <button type="button" id="btn-browse-paths" class="btn-browse-paths ui-hover-library-browse" data-role="library-open-path-browser" style="padding: 0.5rem 1rem; background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.5); color: #a855f7; border-radius: 4px; cursor: pointer; font-weight: 600; white-space: nowrap; align-self: flex-start; transition: all 0.2s;" title="찾아보기">
                         <i class="fa-solid fa-folder-open"></i> 찾아보기

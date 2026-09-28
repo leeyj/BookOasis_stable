@@ -23,7 +23,7 @@ export function syncSidebarResponsiveControls() {
   const mobile = isMobileLayout();
 
   if (btn) {
-    btn.style.setProperty('display', mobile ? 'block' : 'none', 'important');
+    btn.style.setProperty('display', mobile ? 'flex' : 'none', 'important');
   }
   if (desktopBtn) {
     desktopBtn.style.setProperty('display', mobile ? 'none' : 'flex', 'important');
@@ -56,11 +56,14 @@ function setSidebarMenuOpen(isOpen, options = {}) {
     content.classList.add('show');
     content.hidden = false;
     if (resetScrollTop) {
+      const scroller = content.querySelector('.sidebar-drawer-scroll');
       content.scrollTop = 0;
+      if (scroller) scroller.scrollTop = 0;
     }
     if (btnIcon) btnIcon.className = 'fa-solid fa-xmark';
     if (btn) btn.setAttribute('aria-expanded', 'true');
     content.dataset.open = '1';
+    syncDrawerChromeState(true);
     return true;
   }
 
@@ -69,7 +72,18 @@ function setSidebarMenuOpen(isOpen, options = {}) {
   if (btnIcon) btnIcon.className = 'fa-solid fa-bars';
   if (btn) btn.setAttribute('aria-expanded', 'false');
   content.dataset.open = '0';
+  syncDrawerChromeState(false);
+  clearSidebarMenuSearch();
   return true;
+}
+
+// 모바일 드로어의 부가 상태: 백드롭 표시용 body 클래스 + 닫힌 드로어는 inert로 포커스/스크린리더 차단.
+// 데스크톱에선 #sidebar-collapsible-content가 그냥 사이드바 본문이라 inert를 걸면 안 된다.
+function syncDrawerChromeState(isOpen) {
+  const { content } = getSidebarElements();
+  const mobile = isMobileLayout();
+  if (document.body) document.body.classList.toggle('sidebar-drawer-open', Boolean(isOpen && mobile));
+  if (content) content.inert = mobile && !isOpen;
 }
 
 export function toggleSidebarMenu() {
@@ -123,6 +137,7 @@ export function syncSidebarMenuState() {
   if (btnIcon) btnIcon.className = isOpen ? 'fa-solid fa-xmark' : 'fa-solid fa-bars';
   content.dataset.open = isOpen ? '1' : '0';
   content.hidden = !isOpen;
+  syncDrawerChromeState(isOpen);
 }
 
 // category/index.js가 그리는 항목들은 라벨이 <span>으로 감싸여 있지 않고 아이콘 뒤에 맨
@@ -224,7 +239,10 @@ function initSidebarCategorySync() {
 // 버그 자체는 fixed 여부와 무관하게 발생할 수 있어 유지한다.)
 function forceIosHeaderRepaint() {
   const header = document.querySelector('.sidebar-header-wrapper');
-  const sidebar = document.querySelector('.library-sidebar');
+  // 모바일에선 .library-sidebar 안에 position:fixed 드로어가 있어, 사이드바에 transform/opacity를 거는
+  // 순간 드로어가 사이드바 기준으로 배치되거나 본문보다 아래 층에 깔린다. 모바일 앱바는 header 자체라
+  // header만 다시 그려도 충분하므로 사이드바는 데스크톱에서만 건드린다.
+  const sidebar = isMobileLayout() ? null : document.querySelector('.library-sidebar');
   [header, sidebar].forEach((el) => {
     if (!el) return;
     // 어떤 종류의 WebKit 리페인트 누락인지 확신할 수 없어(컴포지팅 레이어 문제인지,
@@ -279,6 +297,13 @@ function initSidebarViewportRecovery() {
     forceIosHeaderRepaint();
     resetScrollIfHeaderHidden();
   };
+  // 모바일↔데스크톱 전환 시 열려 있던 드로어 상태(body 클래스/inert)를 새 레이아웃 기준으로 다시 맞춘다
+  const onLayoutChange = () => {
+    syncMobilePopoverHost();
+    if (!isMobileLayout()) setSidebarMenuOpen(false);
+    else syncSidebarMenuState();
+    recover();
+  };
 
   window.addEventListener('pageshow', recover);
   window.addEventListener('focus', recover);
@@ -288,12 +313,179 @@ function initSidebarViewportRecovery() {
     if (document.visibilityState === 'visible') recover();
   });
   if (typeof mediaQuery.addEventListener === 'function') {
-    mediaQuery.addEventListener('change', recover);
+    mediaQuery.addEventListener('change', onLayoutChange);
   } else if (typeof mediaQuery.addListener === 'function') {
-    mediaQuery.addListener(recover);
+    mediaQuery.addListener(onLayoutChange);
   }
 
   window.__sidebarViewportRecoveryBound = true;
+}
+
+// 모바일 드로어의 백드롭/닫기 버튼/Esc, 하단 푸터(스캔 활동·환경설정·계정) 버튼 바인딩.
+// 푸터 버튼은 원래 헤더 버튼을 대신 눌러주는 프록시라 각 기능의 기존 로직을 그대로 쓴다.
+function initSidebarDrawerChrome() {
+  if (window.__sidebarDrawerChromeBound) return;
+  window.__sidebarDrawerChromeBound = true;
+
+  const backdrop = document.querySelector('[data-role="sidebar-drawer-backdrop"]');
+  if (backdrop) backdrop.addEventListener('click', () => closeSidebarMenuForMobile());
+
+  const closeBtn = document.querySelector('[data-role="sidebar-drawer-close"]');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      closeSidebarMenuForMobile();
+    });
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !document.body.classList.contains('sidebar-drawer-open')) return;
+    closeSidebarMenuForMobile();
+  });
+
+  document.querySelectorAll('[data-role="drawer-proxy"]').forEach((proxy) => {
+    proxy.addEventListener('click', (e) => {
+      e.preventDefault();
+      // 이 클릭이 document까지 버블링되면 account_menu.js/scan_activity_status.js의 "바깥 클릭 시 닫기"
+      // 리스너가 방금 연 팝오버를 바로 닫아버린다
+      e.stopPropagation();
+      const target = document.getElementById(proxy.dataset.target || '');
+      if (!target) return;
+      runAfterMobileSidebarClose(() => target.click());
+    });
+  });
+
+  initSidebarMenuSearch();
+}
+
+function normalizeSearchText(value) {
+  return String(value || '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+// 드로어 상단 "메뉴 / 보관함 검색": 라벨 부분일치로 항목을 거른다. 그룹 안의 카테고리가 매치되면
+// 그 그룹은 접혀 있어도 임시로 펼쳐 보여주고, 그룹 이름이 매치되면 하위 항목을 모두 보여준다.
+function applySidebarMenuSearch() {
+  const input = document.querySelector('[data-role="sidebar-menu-search"]');
+  const list = document.getElementById('sidebar-categories');
+  const { content } = getSidebarElements();
+  if (!input || !list) return;
+
+  const query = normalizeSearchText(input.value);
+  const matches = (el) => !query || normalizeSearchText(extractMenuItemLabel(el)).includes(query);
+  if (content) content.classList.toggle('is-menu-searching', Boolean(query));
+
+  Array.from(list.children).forEach((li) => {
+    if (li.matches('.sidebar-library-group')) {
+      const header = li.querySelector('.sidebar-group-header');
+      const groupHit = Boolean(query) && Boolean(header) && matches(header);
+      let childHit = false;
+      li.querySelectorAll('.sidebar-library-group-items > li').forEach((child) => {
+        const hit = !query || groupHit || matches(child);
+        child.classList.toggle('search-hidden', !hit);
+        if (query && hit) childHit = true;
+      });
+      li.classList.toggle('search-hidden', Boolean(query) && !groupHit && !childHit);
+      li.classList.toggle('search-expanded', Boolean(query) && (groupHit || childHit));
+      return;
+    }
+    if (li.matches('.sidebar-section-label, .sidebar-more-btn')) return; // CSS가 검색 중 숨김
+    li.classList.toggle('search-hidden', !matches(li));
+  });
+}
+
+function clearSidebarMenuSearch() {
+  const input = document.querySelector('[data-role="sidebar-menu-search"]');
+  if (!input || !input.value) return;
+  input.value = '';
+  applySidebarMenuSearch();
+}
+
+function initSidebarMenuSearch() {
+  const input = document.querySelector('[data-role="sidebar-menu-search"]');
+  if (!input) return;
+  input.addEventListener('input', applySidebarMenuSearch);
+  input.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    input.blur(); // 모바일 키보드만 내리고 결과는 그대로 둔다
+  });
+  // 세션 전환 등으로 목록이 다시 그려지면 현재 검색어를 다시 적용
+  window.addEventListener('library:categories-rendered', applySidebarMenuSearch);
+}
+
+// 스캔 활동/계정 팝오버는 원래 .library-header 안의 버튼 옆에 있는데, 모바일은 그 헤더를 기본으로 숨기므로
+// (display:none) 드로어 푸터에서 열어도 팝오버째 안 보였다. 모바일에선 두 팝오버를 body 바로 아래로 옮겨
+// 하단 시트(mobile.css, position:fixed)로 띄우고, 데스크톱으로 돌아가면 원래 자리(버튼 옆 드롭다운)로 되돌린다.
+// 스타일은 전부 클래스 기준이고 JS는 id로 찾으므로 위치만 바뀌어도 동작은 같다.
+const RELOCATED_POPOVER_IDS = ['scan-activity-popover', 'account-menu-popover'];
+const popoverHomes = new Map();
+
+function syncMobilePopoverHost() {
+  if (!document.body) return;
+  const mobile = isMobileLayout();
+  RELOCATED_POPOVER_IDS.forEach((id) => {
+    const popover = document.getElementById(id);
+    if (!popover) return;
+    if (!popoverHomes.has(id)) popoverHomes.set(id, popover.parentElement);
+    const home = popoverHomes.get(id);
+    const host = mobile ? document.body : home;
+    if (host && popover.parentElement !== host) host.appendChild(popover);
+  });
+}
+
+function setMobileHeaderOpen(isOpen) {
+  const btn = document.getElementById('btn-mobile-header-toggle');
+  if (document.body) document.body.classList.toggle('mobile-header-open', Boolean(isOpen));
+  if (btn) btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  if (isOpen) {
+    // 스크롤 중 자동 숨김(header_scroll_behavior.js)으로 밀려 올라가 있던 상태면 펼쳐도 안 보이므로 해제
+    const header = document.querySelector('.library-header');
+    if (header) header.classList.remove('library-header--hidden');
+  }
+}
+
+// 모바일 앱바 🔍: 검색/세션탭/그룹모드/필터 헤더를 펼치고 접는다(기본 접힘, 화면을 넓게 쓰기 위함).
+// 세션탭·그룹모드는 한 번 고르면 할 일이 끝나므로 고른 뒤 자동으로 다시 접는다. 검색은 결과를 보며
+// 고쳐 쓸 수 있게 펼친 채로 둔다.
+function initMobileHeaderToggle() {
+  const btn = document.getElementById('btn-mobile-header-toggle');
+  if (!btn || btn.dataset.toggleBound === '1') return;
+  btn.dataset.toggleBound = '1';
+
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    const header = document.querySelector('.library-header');
+    const isOpen = document.body.classList.contains('mobile-header-open');
+    const scrolledAway = Boolean(header && header.classList.contains('library-header--hidden'));
+    setMobileHeaderOpen(!isOpen || scrolledAway);
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!isMobileLayout() || !document.body.classList.contains('mobile-header-open')) return;
+    const target = e.target && typeof e.target.closest === 'function' ? e.target : null;
+    if (target && target.closest('[data-role="library-type-toggle"], [data-role="grouping-mode-toggle"]')) {
+      window.requestAnimationFrame(() => setMobileHeaderOpen(false));
+    }
+  }, true); // 세션탭 핸들러가 전파를 끊어도 받도록 캡처 단계에서
+}
+
+// 앱바의 현재 세션 표시: 활성 세션 탭(.btn-toggle.active) 라벨을 그대로 복사해 i18n을 따로 두지 않는다.
+// 세션 전환·언어 적용·권한에 따른 탭 노출 변경을 모두 잡으려고 탭 그룹 자체를 관찰한다.
+function initMobileSessionChip() {
+  const chip = document.getElementById('mobile-session-chip');
+  const group = document.getElementById('library-type-toggle-group');
+  if (!chip || !group || chip.dataset.bound === '1') return;
+  chip.dataset.bound = '1';
+
+  const sync = () => {
+    const active = group.querySelector('.btn-toggle.active');
+    const label = active ? active.textContent.replace(/\s+/g, ' ').trim() : '';
+    if (chip.textContent !== label) chip.textContent = label;
+  };
+  sync();
+  new MutationObserver(sync).observe(group, {
+    subtree: true, attributes: true, attributeFilter: ['class'], characterData: true, childList: true,
+  });
 }
 
 export function initSidebarInteractions() {
@@ -301,6 +493,10 @@ export function initSidebarInteractions() {
   initSidebarAutoClose();
   initSidebarCategorySync();
   initSidebarViewportRecovery();
+  initSidebarDrawerChrome();
+  initMobileHeaderToggle();
+  initMobileSessionChip();
+  syncMobilePopoverHost();
   // 최초 로드 시에도(백그라운드 복귀 경로와 무관하게) 계산된 display 값과 실제 화면에
   // 그려지는 것이 어긋나는 iOS WebKit 리페인트 버그가 재현됐다(로그상 display는 전부
   // 정상인데 화면엔 안 보임). 1회 보정으로 안 될 수 있어(실측: 300ms 1회 시도로도

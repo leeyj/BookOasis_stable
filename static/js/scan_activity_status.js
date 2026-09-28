@@ -136,6 +136,10 @@ function renderScanActivity(data) {
   notifyPregenTransitions(pregenItems);
   const pregenActive = pregenItems.some(i => i.status === 'running' || i.status === 'queued');
   button.classList.toggle('is-active', isActive || pregenActive);
+  // 모바일에선 이 버튼이 드로어 푸터로 옮겨가 있어 ☰/푸터에 진행 중 점을 대신 띄운다 (mobile.css .drawer-scan-dot)
+  document.querySelectorAll('[data-role="scan-activity-mirror"]').forEach(el => {
+    el.classList.toggle('is-active', isActive || pregenActive);
+  });
 
   const tasks = [];
   if (running) tasks.push({ task: running, pending: false });

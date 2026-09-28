@@ -781,6 +781,14 @@ body {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* 모바일 드로어 전용 요소(백드롭/드로어 헤더/메뉴 검색/섹션 제목/관리 도구/하단 푸터)는
+   데스크톱에서 숨긴다 - 모바일 노출은 mobile.css가 담당 */
+.mobile-drawer-only,
+.sidebar-menu .sidebar-section-label,
+.drawer-scan-dot {
+    display: none;
+}
+
 /* 데스크톱 사이드바 접힌 상태 - 완전히 숨기지 않고 아이콘만 남는 좁은 레일로 전환
    (텍스트 라벨은 title 속성 툴팁으로 대체, sidebar_manager.js의 syncCollapsedSidebarTooltips 참고) */
 .library-sidebar.collapsed {

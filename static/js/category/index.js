@@ -371,7 +371,7 @@ function initDynamicSidebarDelegation() {
       event.stopPropagation();
       if (typeof triggerAddLibrary === 'function') {
         console.log('[Category-Delegation] triggerAddLibrary() 모듈 함수 직접 호출');
-        triggerAddLibrary();
+        runAfterMobileSidebarClose(() => triggerAddLibrary());
       } else if (typeof window.triggerAddLibrary === 'function') {
         console.log('[Category-Delegation] window.triggerAddLibrary() 전역 함수 호출');
         window.triggerAddLibrary();
@@ -386,7 +386,7 @@ function initDynamicSidebarDelegation() {
       event.preventDefault();
       event.stopPropagation();
       if (typeof window.triggerAddGdriveCopy === 'function') {
-        window.triggerAddGdriveCopy();
+        runAfterMobileSidebarClose(() => window.triggerAddGdriveCopy());
       }
       return;
     }
@@ -395,7 +395,7 @@ function initDynamicSidebarDelegation() {
     if (addGroupBtn) {
       event.preventDefault();
       event.stopPropagation();
-      triggerAddLibraryGroup();
+      runAfterMobileSidebarClose(() => triggerAddLibraryGroup());
       return;
     }
 
@@ -456,6 +456,50 @@ function initDynamicSidebarDelegation() {
   }, true);
 
   window.__dynamicSidebarDelegationBound = true;
+}
+
+const ADMIN_TOOLS_OPEN_STORAGE_KEY = 'sidebar_admin_tools_open';
+
+// 모바일 드로어 하단 "관리 도구"(접이식). 데스크톱은 Home 줄의 아이콘 버튼을 그대로 쓰고 이 블록은
+// CSS(.mobile-drawer-only)로 숨긴다. 버튼 data-role이 Home 줄과 같아 클릭은 기존 전역 delegation이 처리.
+function renderSidebarAdminTools({ isAdmin, isPinned, pinTitle }) {
+  const container = document.getElementById('sidebar-admin-tools');
+  if (!container) return;
+  if (!isAdmin) {
+    container.hidden = true;
+    container.innerHTML = '';
+    return;
+  }
+
+  let isOpen = false;
+  try {
+    isOpen = localStorage.getItem(ADMIN_TOOLS_OPEN_STORAGE_KEY) === 'true';
+  } catch (_) {
+    isOpen = false;
+  }
+  const t = (key, fallback) => ((window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t(key, fallback) : fallback);
+  const pinIconStyle = isPinned ? '' : ' style="transform: rotate(45deg);"';
+  const gdriveBtn = window.DEVELOP_MODE
+    ? `<button type="button" data-role="sidebar-add-gdrive-copy"><i class="fa-brands fa-google-drive"></i><span>Drive에서 복사해오기 (실험적)</span></button>`
+    : '';
+
+  container.innerHTML = `<details${isOpen ? ' open' : ''}>
+      <summary><i class="fa-solid fa-chevron-right" aria-hidden="true"></i><span>${escapeHtml(t('sidebar.admin_tools', '관리 도구'))}</span></summary>
+      <div class="sidebar-admin-tool-list">
+        <button type="button" data-role="sidebar-pin-categories"><i class="fa-solid fa-thumbtack"${pinIconStyle}></i><span>${escapeHtml(pinTitle)}</span></button>
+        <button type="button" data-role="sidebar-add-library-group"><i class="fa-solid fa-folder-plus"></i><span>${escapeHtml(t('sidebar.add_group', '그룹 추가'))}</span></button>
+        <button type="button" data-role="sidebar-add-library"><i class="fa-solid fa-plus"></i><span>${escapeHtml(t('category.add_new_tooltip', '새 카테고리 추가'))}</span></button>
+        ${gdriveBtn}
+      </div>
+    </details>`;
+  container.hidden = false;
+
+  const details = container.querySelector('details');
+  details.addEventListener('toggle', () => {
+    try {
+      localStorage.setItem(ADMIN_TOOLS_OPEN_STORAGE_KEY, details.open ? 'true' : 'false');
+    } catch (_) { /* 저장 실패해도 동작엔 지장 없음 */ }
+  });
 }
 
 export async function loadLibraries() {
@@ -530,6 +574,11 @@ export async function loadLibraries() {
       if (state.smartRecommendEnabled !== false) {
         html += `<li class="menu-item ${state.currentLibraryId === 'smart_rec' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-smart-rec" data-id="smart_rec" data-category-id="smart_rec"><i class="fa-solid fa-wand-magic-sparkles" style="color: #34d399;"></i> ${tSmartRec}</li>`;
       }
+      // 음성 준비됨(서버에 미리 만든 듣기 음성이 있는 책) — 서버 미리 만들기가 켜진 도서 세션에서만
+      if (state.ttsPregenEnabled && ['general', 'adult'].includes(state.currentLibraryType)) {
+        const tTtsReady = (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('category.tts_ready', '음성 준비됨') : '음성 준비됨';
+        html += `<li class="menu-item ${state.currentLibraryId === 'tts_ready' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-tts-ready" data-id="tts_ready" data-category-id="tts_ready"><i class="fa-solid fa-headphones" style="color: #a78bfa;"></i> ${tTtsReady}</li>`;
+      }
       html += `<li class="menu-item ${state.currentLibraryId === 'plugins' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-plugins" data-id="plugins" data-category-id="plugins"><i class="fa-solid fa-puzzle-piece" style="color: #38bdf8;"></i> ${tPlugins}</li>`;
       if (state.showSidebarCategoryAll !== false) {
         html += `<li class="menu-item ${state.currentLibraryId === 'all' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-all" data-id="all" data-category-id="all"><i class="fa-solid fa-layer-group"></i> ${tAll}</li>`;
@@ -552,6 +601,13 @@ export async function loadLibraries() {
             console.error('Error parsing library order:', e);
           }
         }
+      }
+
+      // 모바일 드로어의 "보관함" 섹션 제목. data-type="system"이라 Sortable 드래그 대상이 아니고,
+      // applySavedMixedOrder()가 "마지막 system 항목 뒤"에 카테고리를 끼워 넣을 때도 제목 아래로 들어간다.
+      if ((data.libraries || []).length > 0 || state.libraryGroups.length > 0) {
+        const tLibrariesSection = (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('sidebar.section_libraries', '보관함') : '보관함';
+        html += `<li class="sidebar-section-label" data-type="system" aria-hidden="true">${escapeHtml(tLibrariesSection)}</li>`;
       }
 
       const librariesByGroup = new Map();
@@ -617,6 +673,7 @@ export async function loadLibraries() {
       if (requestToken !== sidebarLoadToken) return;
 
       sidebar.innerHTML = html;
+      renderSidebarAdminTools({ isAdmin, isPinned, pinTitle });
       normalizeSidebarBareLabels(sidebar);
       applySavedMixedOrder(sidebar);
       const activeItem = document.getElementById(`category-${state.currentLibraryId}`) || sidebar.querySelector(`[data-id="${state.currentLibraryId}"]`);

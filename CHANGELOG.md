@@ -1,4 +1,13 @@
 # CHANGELOG
+## v2.8.0
+- (feature) 사이드바 "음성 준비됨" - 서버에 미리 만든 음성이 있는 책을 용량·길이와 함께 모아 보고, 바로 듣거나 책 단위로 지우기 | "Ready to Listen" in the sidebar lists books with pre-generated audio (size and length), to listen right away or delete per book
+- (improvement) 미리 만든 음성을 책·챕터 단위 파일로 모아 저장(문장마다 파일 하나 → 챕터마다 하나), 용량 초과 시 오래 안 들은 책부터 통째로 정리, 관리자 설정에 음질 추가(표준 64kbps / 절약 32kbps, 용량 절반). 이전 버전에서 만든 음성은 자동으로 지워지므로 다시 만들어야 함 | pre-generated audio is now stored per book and chapter (one file per chapter instead of per sentence), the disk cap removes least recently played books as a whole, and admins can pick the audio quality (Standard 64kbps / Compact 32kbps, half the size). Audio made by earlier versions is removed automatically and must be generated again
+- (improvement) 모바일 메뉴를 좌측 슬라이드 드로어로 개편 (메뉴/보관함 검색, 탐색·보관함 구분, 관리 도구 접기, 하단 스캔 활동·환경설정·계정) + 검색·세션 탭·작가별은 상단 🔍를 누를 때만 표시해 화면을 넓게 사용 (드럼쟁이 님 포크 UI 기반) | mobile menu is now a left slide-out drawer (menu/library search, Browse/Libraries sections, collapsible admin tools, Scan activity/Settings/Account at the bottom); search, session tabs and grouping now appear only when tapping 🔍 at the top for more screen space (based on 드럼쟁이's fork UI)
+- (fix) 모바일에서 카테고리 추가 등 창의 닫기(X)가 주소창에 가려지던 이슈, 환경설정을 끝까지 스크롤하면 상단 메뉴가 밀려 사라지던 이슈 수정 | fix the close (X) button of dialogs such as Add category being hidden under the mobile address bar, and the top menu scrolling away at the end of Settings on mobile
+- (improvement) 모바일 카테고리 경로 입력에서 찾아보기·링크 연결 테스트 버튼을 입력칸 아래 줄로 배치 | on mobile, the Browse / Test link buttons for category paths now sit below the input
+- (fix) iPhone에서 모바일 상단 일반/성인/오디오북/영상 강좌 탭 글자가 왼쪽으로 쏠리던 이슈 수정 | fix mobile library tabs (General/Adult/Audiobooks/Videos) text leaning left on iPhone
+
+
 ## v2.7.9
 - (feature) 듣기 서버 미리 만들기 - 관리자가 켜면 도서 메뉴에서 지정한 도서를 서버가 미리 음성으로 만들어 둠. 진행·완료는 스캔 활동에 표시하고 웹훅(`tts.ready`)으로도 알림, 미리 만든 챕터는 기기에서 모델을 불러오지 않음 (기본 꺼짐) | Listen server pre-generation - when enabled by the admin, the server pre-generates audio for books users pick from the book menu; progress and completion show in Scan activity and via webhook (`tts.ready`), and pre-generated chapters play without loading the model on the device (off by default)
 - (improvement) 듣기 기본 음질을 "보통"으로 변경 ("좋음"과 차이가 작고 생성은 두 배 빠름, 직접 고른 설정은 유지) | Listen now defaults to Normal quality (barely distinguishable from Best, twice as fast to generate; a chosen setting is kept)

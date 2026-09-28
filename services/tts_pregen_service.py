@@ -4,8 +4,16 @@ tts_pregen_service.py - 듣기(TTS) 서버 미리 만들기: 작업 큐, 조각 
 
 흐름: 듣기 화면이 책 전체를 조각으로 나눠(문장 나누기·한자 변환은 브라우저 몫) 조각 텍스트와 키를
 보낸다 → 작업(tts_pregen_jobs)으로 쌓고 조각 목록은 파일로 둔다 → 이 모듈의 작업 스레드가 조각마다
-합성해 <저장 경로>/<db_type>/<k[:2]>/<k>.m4a로 저장한다 → 끝나면 웹훅(tts.ready)을 보낸다.
+합성해 책 폴더에 모아 저장한다 → 끝나면 웹훅(tts.ready)을 보낸다.
 재생할 때 듣기 화면은 같은 키로 조회해 있으면 받아서 틀고, 없으면 기기에서 만든다.
+
+저장 형식(2026-09-28, v2.8.0): <저장 경로>/<db_type>/books/<book_id>/<목소리>_<품질단계>_<속도>_<음질>/chNNNN_PP.pack
+- pack = 그 챕터 조각의 완결된 m4a 파일들을 바이트로 그대로 이어 붙인 것(64MB 넘으면 _01, _02 …).
+  tts_audio_pieces(목차)의 byte_offset/byte_length로 잘라내면 원래 m4a가 그대로 나오므로, 조각 URL
+  (/api/media/tts/audio/<db>/<key>.m4a)과 듣기 화면의 재생 코드는 예전과 같다.
+- 예전(v2.7.9)엔 조각마다 <k[:2]>/<k>.m4a로 흩어 저장해 한 권에 파일이 2만 개씩 생기고, 어떤 책 것인지·
+  책별 용량을 알 수 없었다. 예전 조각은 옮기지 않고 기동 시 지운다(purge_legacy_cache) — 다시 만들면 된다.
+- 디스크 상한 정리와 삭제는 책(폴더) 단위다.
 
 - 기본 꺼짐. 관리자 설정 TTS_PREGEN_ENABLED=1일 때만 작업을 받고 처리한다.
 - 저장 경로는 관리자 설정 TTS_AUDIO_ROOT(절대 경로), 비우면 <설치 폴더>/tts_audio. Docker는 컨테이너를
@@ -16,6 +24,7 @@ tts_pregen_service.py - 듣기(TTS) 서버 미리 만들기: 작업 큐, 조각 
 import json
 import os
 import re
+import shutil
 import threading
 import time
 import traceback
@@ -42,6 +51,10 @@ WORKER_NICE = 19           # 가장 낮은 우선순위 — 웹·스캔이 CPU�
 
 DEFAULT_THREADS = 2
 DEFAULT_DISK_GB = 10
+PACK_MAX_BYTES = 64 * 1024 * 1024   # 챕터 pack 파일 하나의 최대 크기 (넘으면 다음 part로)
+DISK_CAP_EVERY = 500                # 긴 책을 만드는 동안에도 조각 N개마다 상한을 확인한다
+LEGACY_DIR_RE = re.compile(r'^[0-9a-f]{2}$')
+LEGACY_FILE_RE = re.compile(r'^[0-9a-f]{64}\.m4a$')
 
 
 def _now_ms():
@@ -69,8 +82,14 @@ def disk_cap_bytes():
     return _int_setting('TTS_PREGEN_DISK_GB', DEFAULT_DISK_GB, 1, 10000) * (1024 ** 3)
 
 
+def quality_setting():
+    """관리자 설정 TTS_PREGEN_QUALITY — 'standard'(64k, 기본) 또는 'compact'(32k·24kHz, 절반 크기)"""
+    value = str(SettingsService.get('TTS_PREGEN_QUALITY', tts_engine.DEFAULT_QUALITY) or '').strip()
+    return value if value in tts_engine.QUALITIES else tts_engine.DEFAULT_QUALITY
+
+
 # ---- 저장 경로 ----
-# audio_path()는 조회 한 번에 수천 번 불리므로 설정값을 프로세스 안에 캐시한다. 설정을 저장하면 invalidate_root_cache().
+# audio_root()는 조회 한 번에 수천 번 불리므로 설정값을 프로세스 안에 캐시한다. 설정을 저장하면 invalidate_root_cache().
 _root_cache = None
 
 
@@ -113,8 +132,17 @@ def _on_mounted_volume(path):
         current = parent
 
 
-def audio_path(db_type, key):
-    return os.path.join(audio_root()[0], db_type, key[:2], f'{key}.m4a')
+def book_rel_dir(book_id, voice, steps, speed, quality):
+    """책·설정별 음성 폴더 (db_type 폴더 기준 상대 경로, '/' 구분)"""
+    return f'books/{int(book_id)}/{voice}_{int(steps)}_{tts_engine._js_number(speed)}_{quality}'
+
+
+def book_dir(db_type, rel_dir):
+    return os.path.join(audio_root()[0], db_type, *rel_dir.split('/'))
+
+
+def pack_path(db_type, rel_dir, chapter, part):
+    return os.path.join(book_dir(db_type, rel_dir), f'ch{int(chapter):04d}_{int(part):02d}.pack')
 
 
 def _manifest_path(db_type, job_id):
@@ -179,7 +207,8 @@ def create_job(db_type, book_id, user_id, payload):
     pieces = _validate_pieces(payload.get('pieces'), voice, steps, speed)
     if TTSPregenRepository.count_active_by_user(db_type, user_id) >= MAX_ACTIVE_PER_USER:
         raise PermissionError(f'too many active jobs (max {MAX_ACTIVE_PER_USER})')
-    job_id = TTSPregenRepository.create_job(db_type, book_id, user_id, voice, steps, speed, len(pieces), _now_ms())
+    job_id = TTSPregenRepository.create_job(db_type, book_id, user_id, voice, steps, speed, len(pieces), _now_ms(),
+                                            quality=quality_setting())
     path = _manifest_path(db_type, job_id)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     tmp = f'{path}.part'
@@ -203,6 +232,7 @@ def job_view(job):
         'voice': job['voice'],
         'steps': int(job['steps']),
         'speed': float(job['speed']),
+        'quality': job.get('quality') or tts_engine.DEFAULT_QUALITY,
         'total_pieces': total,
         'done_pieces': done,
         'percent': int(done * 100 / total) if total else 0,
@@ -247,48 +277,166 @@ def admin_status():
     }
 
 
+def _existing_pieces(db_type, keys):
+    """{key: 목차 행} — pack 파일이 실제로 있고 그 구간까지 쓰여 있는 것만"""
+    found = TTSPregenRepository.find_pieces(db_type, keys)
+    sizes = {}
+    out = {}
+    for key, row in found.items():
+        path = pack_path(db_type, row['rel_dir'], row['chapter'], row['part'])
+        if path not in sizes:
+            try:
+                sizes[path] = os.path.getsize(path)
+            except OSError:
+                sizes[path] = -1
+        if sizes[path] >= int(row['byte_offset']) + int(row['byte_length']):
+            out[key] = row
+    return out
+
+
 def lookup(db_type, keys):
-    """{key: duration_sec} — 파일까지 실제로 있는 것만. 찾은 조각은 최근 사용 시각을 갱신한다(디스크 정리 기준)."""
+    """{key: duration_sec} — 파일까지 실제로 있는 것만. 찾은 조각의 책은 최근 사용 시각을 갱신한다(디스크 정리 기준)."""
     if not isinstance(keys, list):
         raise ValueError('keys must be a list')
     keys = [k for k in dict.fromkeys(keys) if isinstance(k, str) and KEY_RE.match(k)][:MAX_LOOKUP_KEYS]
     if not keys:
         return {}
-    found = TTSPregenRepository.get_audio(db_type, keys)
-    found = {k: sec for k, sec in found.items() if os.path.isfile(audio_path(db_type, k))}
+    found = _existing_pieces(db_type, keys)
     if found:
         try:
-            TTSPregenRepository.touch_audio(db_type, found.keys(), _now_ms())
+            TTSPregenRepository.touch_audio_books(db_type, {row['audio_book_id'] for row in found.values()}, _now_ms())
         except Exception as e:
             print(f"[TTS-Pregen] touch failed (ignored): {e}")
-    return found
+    return {k: float(row['duration_sec']) for k, row in found.items()}
+
+
+def read_piece(db_type, key):
+    """조각 하나의 m4a 바이트 (없으면 None). pack 파일에서 목차의 구간만 읽는다."""
+    row = _existing_pieces(db_type, [key]).get(key)
+    if not row:
+        return None
+    with open(pack_path(db_type, row['rel_dir'], row['chapter'], row['part']), 'rb') as f:
+        f.seek(int(row['byte_offset']))
+        data = f.read(int(row['byte_length']))
+    return data if len(data) == int(row['byte_length']) else None
+
+
+def _remove_book_dir(db_type, rel_dir):
+    path = book_dir(db_type, rel_dir)
+    shutil.rmtree(path, ignore_errors=True)
+    # 책 폴더(books/<book_id>)가 비면 같이 지운다
+    parent = os.path.dirname(path)
+    try:
+        if os.path.isdir(parent) and not os.listdir(parent):
+            os.rmdir(parent)
+    except OSError:
+        pass
 
 
 # ---- 디스크 상한 ----
-def enforce_disk_cap(db_type):
-    """캐시 합계가 상한을 넘으면 오래 안 쓴 조각부터 지운다 (성인/일반은 각자 상한)."""
+def enforce_disk_cap(db_type, keep_id=None):
+    """캐시 합계가 상한을 넘으면 오래 안 들은 책부터 폴더째 지운다 (성인/일반은 각자 상한).
+    keep_id(지금 만드는 책)는 지우지 않는다 — 한 권이 상한보다 커도 그 책은 끝까지 만든다."""
     cap = disk_cap_bytes()
     total = TTSPregenRepository.total_audio_bytes(db_type)
     while total > cap:
-        batch = TTSPregenRepository.oldest_audio(db_type, 500)
-        if not batch:
+        victims = [b for b in TTSPregenRepository.oldest_audio_books(db_type, 50) if b['id'] != keep_id]
+        if not victims:
             break
-        removed = []
-        for key, size in batch:
-            try:
-                os.remove(audio_path(db_type, key))
-            except FileNotFoundError:
-                pass
-            except OSError as e:
-                print(f"[TTS-Pregen] remove failed: {key}: {e}")
-                continue
-            removed.append(key)
-            total -= size
+        for book in victims:
+            _remove_book_dir(db_type, book['rel_dir'])
+            TTSPregenRepository.delete_audio_book(db_type, book['id'])
+            total -= int(book['bytes'])
+            print(f"[TTS-Pregen] disk cap: removed {db_type}/{book['rel_dir']} ({int(book['bytes']) // (1024 * 1024)}MB)")
             if total <= cap:
                 break
-        TTSPregenRepository.delete_audio(db_type, removed)
-        if not removed:
-            break
+
+
+# ---- "음성 준비됨" 목록 ----
+def list_ready_books(db_type, user_id, is_admin):
+    """음성이 저장된 책 목록 (서버의 모든 책 — 음성은 공용이라 같은 설정이면 누구나 이어 쓴다).
+    카드용 도서 정보 + 음성 설정/음질/용량/길이 + 이 사용자가 지울 수 있는지."""
+    rows = TTSPregenRepository.list_audio_books(db_type)
+    books = TTSPregenRepository.books_brief(db_type, {r['book_id'] for r in rows}, int(user_id or 0))
+    out = []
+    for r in rows:
+        book = books.get(int(r['book_id']))
+        if not book:
+            continue
+        out.append({
+            **book,
+            'tts': {
+                'id': int(r['id']), 'voice': r['voice'], 'steps': int(r['steps']), 'speed': float(r['speed']),
+                'quality': r['quality'], 'pieces': int(r['pieces']), 'bytes': int(r['bytes']),
+                'duration_sec': float(r['duration_sec'] or 0), 'last_used_ms': r['last_used_ms'],
+                'can_delete': bool(is_admin) or int(r['created_by']) == int(user_id or 0),
+            },
+        })
+    return out
+
+
+def delete_audio_book(db_type, audio_book_id, user_id, is_admin):
+    """책 음성 폴더 삭제. 처음 만든 사람이나 관리자만. 지금 만드는 중이면 거절(먼저 취소)."""
+    book = TTSPregenRepository.get_audio_book(db_type, audio_book_id)
+    if not book:
+        raise LookupError('not found')
+    if not is_admin and int(book['created_by']) != int(user_id or 0):
+        raise PermissionError('not yours')
+    active = TTSPregenRepository.find_active_job(db_type, book['book_id'], book['voice'], int(book['steps']), float(book['speed']))
+    if active and (active.get('quality') or tts_engine.DEFAULT_QUALITY) == book['quality']:
+        raise RuntimeError('being generated')
+    _remove_book_dir(db_type, book['rel_dir'])
+    TTSPregenRepository.delete_audio_book(db_type, audio_book_id)
+    return True
+
+
+# ---- 예전(v2.7.9) 조각 단위 캐시 정리 ----
+def purge_legacy_cache():
+    """<저장 경로>/<db>/<2자리 hex>/<64자리 hex>.m4a와 끝난 작업의 목록 파일을 지운다. 사용자가 저장 경로를 다른
+    파일과 같이 쓰는 폴더로 지정했을 수도 있어 이 이름 규칙에 맞는 것만 지운다. 몇 번 불려도 안전하다."""
+    root, reason = audio_root()
+    if reason or not os.path.isdir(root):
+        return 0
+    removed = 0
+    for db_type in DB_TYPES:
+        base = os.path.join(root, db_type)
+        if not os.path.isdir(base):
+            continue
+        for name in os.listdir(base):
+            sub = os.path.join(base, name)
+            if not LEGACY_DIR_RE.match(name) or not os.path.isdir(sub):
+                continue
+            for fname in os.listdir(sub):
+                if LEGACY_FILE_RE.match(fname):
+                    try:
+                        os.remove(os.path.join(sub, fname))
+                        removed += 1
+                    except OSError as e:
+                        print(f"[TTS-Pregen] legacy remove failed: {fname}: {e}")
+            try:
+                if not os.listdir(sub):
+                    os.rmdir(sub)
+            except OSError:
+                pass
+        jobs_dir = os.path.join(base, 'jobs')
+        if os.path.isdir(jobs_dir):
+            for fname in os.listdir(jobs_dir):
+                m = re.match(r'^(\d+)\.json$', fname)
+                if not m:
+                    continue
+                try:
+                    job = TTSPregenRepository.get_job(db_type, int(m.group(1)))
+                    if not job or job['status'] not in ('queued', 'running'):
+                        os.remove(os.path.join(jobs_dir, fname))
+                except Exception as e:
+                    print(f"[TTS-Pregen] legacy manifest cleanup failed: {fname}: {e}")
+        try:
+            TTSPregenRepository.clear_legacy_cache(db_type)
+        except Exception as e:
+            print(f"[TTS-Pregen] legacy index cleanup failed ({db_type}): {e}")
+    if removed:
+        print(f"[TTS-Pregen] removed {removed} legacy piece files (pre-v2.8.0 layout)")
+    return removed
 
 
 # ---- 알림 ----
@@ -448,6 +596,10 @@ class _Worker:
 
     def _run(self):
         _lower_thread_priority()
+        try:
+            purge_legacy_cache()
+        except Exception as e:
+            print(f"[TTS-Pregen] legacy cleanup failed: {e}")
         while True:
             try:
                 worked = self._tick()
@@ -498,10 +650,16 @@ class _Worker:
             self._process_pieces(db_type, job, pieces)
         finally:
             _record_finished(db_type, job_id)
+            _drop_manifest_if_finished(db_type, job_id)
 
     def _process_pieces(self, db_type, job, pieces):
         job_id = job['id']
         voice, steps, speed = job['voice'], int(job['steps']), float(job['speed'])
+        quality = job.get('quality') or tts_engine.DEFAULT_QUALITY
+        audio_book = TTSPregenRepository.get_or_create_audio_book(
+            db_type, job['book_id'], voice, steps, speed, quality,
+            book_rel_dir(job['book_id'], voice, steps, speed, quality), job['user_id'], _now_ms())
+        packs = _BookPacks(db_type, audio_book)
         started = time.time()
         made = 0
         done = 0
@@ -514,14 +672,16 @@ class _Worker:
                 print(f"[TTS-Pregen] job {db_type}#{job_id} paused (disabled)")
                 return
             key = piece['k']
-            if not (os.path.isfile(audio_path(db_type, key)) and TTSPregenRepository.get_audio(db_type, [key])):
+            if key not in packs.keys:
                 try:
                     engine = self._engine_for(thread_count())
                     wav = engine.synthesize(piece['t'], voice, steps, speed)
-                    size = tts_engine.encode_m4a(wav, engine.sample_rate, audio_path(db_type, key))
-                    TTSPregenRepository.put_audio(db_type, key, len(wav) / engine.sample_rate, size, _now_ms())
+                    data = tts_engine.encode_m4a_bytes(wav, engine.sample_rate, quality, tmp_dir=packs.tmp_dir)
+                    packs.append(key, int(piece.get('c', 0)), data, len(wav) / engine.sample_rate)
                     made += 1
                     failures = 0
+                    if made % DISK_CAP_EVERY == 0:
+                        enforce_disk_cap(db_type, keep_id=audio_book['id'])
                 except Exception as e:
                     # 조각 하나가 실패하면 건너뛰고(그 조각은 재생 때 기기가 만든다), 연달아 실패하면 작업을 멈춘다 —
                     # 그러지 않으면 heartbeat가 끊겼다가 다시 가져가기를 끝없이 되풀이한다
@@ -549,11 +709,68 @@ class _Worker:
         # 일부만 실패하면 완료로 두고 몇 개가 빠졌는지 남긴다 (빠진 조각은 재생 때 기기가 만든다)
         TTSPregenRepository.finish(db_type, job_id, 'done', _now_ms(), error=(f'{failed} pieces failed' if failed else None), done_pieces=done)
         print(f"[TTS-Pregen] job {db_type}#{job_id} done: {summary}")
+        # 방금 만든 책이 "오래 안 들은 책"으로 먼저 지워지지 않게 사용 시각을 지금으로
+        TTSPregenRepository.touch_audio_books(db_type, [audio_book['id']], _now_ms())
         try:
-            enforce_disk_cap(db_type)
+            enforce_disk_cap(db_type, keep_id=audio_book['id'])
         except Exception as e:
             print(f"[TTS-Pregen] disk cap failed: {e}")
         _notify_ready(db_type, TTSPregenRepository.get_job(db_type, job_id) or job)
+
+
+class _BookPacks:
+    """한 책 폴더의 pack 파일 쓰기. 조각 m4a를 챕터별 pack 끝에 이어 붙이고 목차 행을 넣는다.
+    쓰기 → 목차 순서라 중간에 죽으면 pack 끝에 쓰레기 바이트만 남는다(무해). 시작할 때 목차가 가리키는 구간이
+    파일보다 길면(반쯤 쓰인 조각) 그 목차 행은 버리고 다시 만든다."""
+
+    def __init__(self, db_type, audio_book):
+        self.db_type = db_type
+        self.book = audio_book
+        self.dir = book_dir(db_type, audio_book['rel_dir'])
+        self.tmp_dir = os.path.join(audio_root()[0], db_type, '.tmp')  # 인코딩 임시 파일 (책 폴더를 깨끗하게)
+        os.makedirs(self.dir, exist_ok=True)
+        self.keys = set()
+        self.parts = {}   # chapter -> 지금 쓰는 part 번호
+        broken = []
+        sizes = {}
+        for row in TTSPregenRepository.book_pieces(db_type, audio_book['id']):
+            path = pack_path(db_type, audio_book['rel_dir'], row['chapter'], row['part'])
+            if path not in sizes:
+                sizes[path] = os.path.getsize(path) if os.path.isfile(path) else -1
+            if sizes[path] < int(row['byte_offset']) + int(row['byte_length']):
+                broken.append(row['piece_key'])
+                continue
+            self.keys.add(row['piece_key'])
+            self.parts[row['chapter']] = max(self.parts.get(row['chapter'], 0), int(row['part']))
+        if broken:
+            print(f"[TTS-Pregen] {db_type}/{audio_book['rel_dir']}: dropping {len(broken)} truncated pieces")
+            TTSPregenRepository.remove_pieces(db_type, audio_book['id'], broken)
+
+    def append(self, key, chapter, data, duration_sec):
+        part = self.parts.get(chapter, 0)
+        path = pack_path(self.db_type, self.book['rel_dir'], chapter, part)
+        if os.path.isfile(path) and os.path.getsize(path) + len(data) > PACK_MAX_BYTES:
+            part += 1
+            path = pack_path(self.db_type, self.book['rel_dir'], chapter, part)
+        with open(path, 'ab') as f:
+            f.seek(0, os.SEEK_END)
+            offset = f.tell()
+            f.write(data)
+        self.parts[chapter] = part
+        TTSPregenRepository.add_piece(self.db_type, self.book['id'], key, chapter, part, offset, len(data), duration_sec)
+        self.keys.add(key)
+
+
+def _drop_manifest_if_finished(db_type, job_id):
+    """끝난(완료·실패·취소) 작업의 조각 목록 파일은 더 필요 없다"""
+    try:
+        job = TTSPregenRepository.get_job(db_type, job_id)
+        if job and job['status'] in ('done', 'failed', 'cancelled'):
+            os.remove(_manifest_path(db_type, job_id))
+    except OSError:
+        pass
+    except Exception as e:
+        print(f"[TTS-Pregen] manifest cleanup failed: {e}")
 
 
 def _lower_thread_priority():

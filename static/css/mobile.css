@@ -11,12 +11,18 @@
 
 .media-library-container {
     flex-direction: column;
-    gap: 0.9rem;
-    padding: calc(1rem + env(safe-area-inset-top, 0px)) 0.75rem calc(4.5rem + env(safe-area-inset-bottom, 0px)) 0.75rem;
+    gap: 0.5rem;
+    padding: calc(0.5rem + env(safe-area-inset-top, 0px)) 0.75rem calc(4.5rem + env(safe-area-inset-bottom, 0px)) 0.75rem;
 }
 
-/* 2. 좌측 사이드바 -> 상단 네비게이션 형태로 전환 및 햄버거 토글 */
-/* (HTML 인라인 style 오버라이드를 위해 일부 속성 !important 필수 유지) */
+/* 2. 좌측 사이드바 -> 얇은 상단 앱바(☰ 로고 ⋯) + 좌측 슬라이드 드로어 */
+/* (HTML 인라인 style 오버라이드를 위해 일부 속성 !important 필수 유지)
+   예전엔 ☰를 누르면 메뉴가 헤더 안에서 아코디언으로 펼쳐지며 본문을 밀어냈다. 포크 버전의
+   좌측 드로어 UI가 커뮤니티에서 훨씬 편하다는 평을 받아 반영(2026-09-28). DOM은 옮기지 않고
+   #sidebar-collapsible-content 자체를 position:fixed 드로어로 띄운다 - 기존 id/data-role 기반
+   이벤트 위임(category/index.js, view_manager.js 등)을 그대로 살리기 위함.
+   주의: 드로어의 조상(.library-sidebar/.media-library-container/.main-wrapper)에 transform/filter/
+   backdrop-filter를 걸면 fixed 기준이 뷰포트가 아니게 되어 드로어가 깨진다. */
 .library-sidebar {
     display: flex !important;
     flex-direction: column !important;
@@ -28,13 +34,18 @@
     height: auto !important;
     position: relative !important;
     top: 0 !important;
-    border-right: none;
-    border-bottom: 1px solid var(--app-border-light);
-    padding: 0.8rem 0.75rem !important;
-    gap: 0.35rem;
-    overflow: hidden;
-    background: var(--app-bg-sidebar);
-    border-radius: 8px;
+    /* 드로어(#sidebar-collapsible-content)가 이 안에 있으므로 사이드바 자체를 본문(스티키 헤더 z-index:40,
+       설정 표 등)보다 위 층에 둔다 - 사이드바가 어떤 이유로든 쌓임 맥락을 만들면(opacity<1 등) 드로어의
+       z-index가 그 안에 갇혀 본문 헤더/표가 드로어 위로 비쳐 보였다(2026-09-28 실기기). 뷰어(1200)보다는 아래. */
+    z-index: 1100;
+    /* 데스크톱의 transition:all 이 남아있으면 opacity/transform 변경이 0.3초간 보간되며 그동안 쌓임 맥락이 생긴다 */
+    transition: none !important;
+    border: none;
+    padding: 0.15rem 0.1rem !important;
+    gap: 0;
+    overflow: visible;
+    background: transparent;
+    border-radius: 0;
     box-sizing: border-box;
 }
 
@@ -42,18 +53,20 @@
 .library-sidebar.collapsed {
     width: 100% !important;
     min-width: 100% !important;
-    padding: 0.8rem 0.75rem !important;
+    padding: 0.15rem 0.1rem !important;
     opacity: 1 !important;
     pointer-events: auto !important;
     overflow: visible !important;
-    border-right: none;
-    border-bottom: 1px solid var(--app-border-light);
+    border: none;
 }
 
 .sidebar-header-wrapper {
     min-height: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
+    /* 로고 왼쪽에 ☰, 오른쪽 끝에 ⋯ */
+    justify-content: flex-start !important;
+    gap: 0.55rem;
     /* iOS Safari가 백그라운드(화면 잠금, 탭 전환 등) 복귀 시 정적인 헤더 영역의
        리페인트를 누락하는 버그가 있다(JS로 토글하는 강제 리페인트 넛지를 여러 번
        시도했으나 실기기에서 재현이 계속됨, 2026-08-17). 토글 방식 대신 헤더를 처음
@@ -64,30 +77,94 @@
     will-change: transform;
 }
 
-.sidebar-header-wrapper {
-    /* 로고는 왼쪽, ⋯·☰는 오른쪽에 붙여서 (인라인 space-between이면 ☰가 가운데로 떠 있었다) */
-    justify-content: flex-start !important;
-    gap: 0.35rem;
+#btn-sidebar-toggle {
+    order: -1; /* 햄버거는 맨 왼쪽 */
+}
+
+/* 앱바 로고 옆 현재 세션 표시 - 세션 탭이 🔍 안으로 접혀 들어가 "지금 어느 세션인지" 알려줄 곳이 필요
+   (sidebar_manager.js initMobileSessionChip이 활성 세션 탭 라벨을 복사, 색은 :root[data-library-type]) */
+.mobile-session-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.12rem 0.45rem;
+    border: 1px solid var(--app-border);
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--app-text-muted);
+    white-space: nowrap;
+}
+
+.mobile-session-chip:empty {
+    display: none;
+}
+
+:root[data-library-type="adult"] .mobile-session-chip {
+    color: #f87171;
+    border-color: rgba(248, 113, 113, 0.45);
+}
+
+:root[data-library-type="audiobook"] .mobile-session-chip {
+    color: #38bdf8;
+    border-color: rgba(56, 189, 248, 0.45);
+}
+
+:root[data-library-type="video"] .mobile-session-chip {
+    color: #a78bfa;
+    border-color: rgba(167, 139, 250, 0.45);
+}
+
+.btn-mobile-header-toggle {
+    order: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.3rem;
+    height: 2.3rem;
+    padding: 0;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--app-text-muted);
+    font-size: 1.05rem;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.btn-mobile-header-toggle[aria-expanded="true"] {
+    background: var(--app-bg-card);
+    color: var(--app-accent);
+}
+
+/* 모바일은 기능보다 화면 넓이가 우선 - 검색/세션탭/그룹모드/필터 헤더는 앱바 🔍로 펼칠 때만 보인다.
+   (recoverTopCategoryUiAfterBack 등이 인라인 display:grid를 넣으므로 !important 필요) */
+body:not(.mobile-header-open) .library-header {
+    display: none !important;
 }
 
 #btn-category-info-mobile {
-    order: 1;
+    order: 2;
     width: 2.3rem;
     height: 2.3rem;
     padding: 0;
 }
 
-#btn-sidebar-toggle {
-    order: 2; /* 햄버거는 맨 오른쪽 끝 */
-}
-
 .sidebar-title {
     margin: 0 !important;
     margin-right: auto !important;
+    padding: 0 !important;
+    font-size: 1.2rem !important;
+    gap: 0.45rem !important;
     line-height: 1.2;
     cursor: pointer;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
+}
+
+.sidebar-title img {
+    width: 30px !important;
+    height: 30px !important;
 }
 
 /* 햄버거 토글 버튼 노출 및 데스크톱 버튼 숨김 */
@@ -101,93 +178,433 @@
    (뷰어 모달은 z-index:1200 + 불투명에 가까운 배경이라 뷰어가 열리면 자연히 가려짐) */
 .btn-sidebar-toggle {
     display: flex !important; /* HTML 인라인 display: none 오버라이드 */
+    position: relative;
     align-items: center;
     justify-content: center;
     width: 2.3rem;
     height: 2.3rem;
-    background: var(--app-bg-card) !important;
-    border: 1px solid var(--app-border) !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
     border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
     flex-shrink: 0;
+    font-size: 1.3rem !important;
 }
 .btn-sidebar-toggle-desktop {
     display: none !important; /* HTML 인라인 display: flex 오버라이드 */
 }
 
-/* 기본 접힌 상태 */
+/* 스캔 진행 중 표시 점: 원래 상단 스캔활동 아이콘의 주황 점을 ☰와 드로어 푸터에 대신 띄운다
+   (scan_activity_status.js가 [data-role="scan-activity-mirror"]에 .is-active 토글) */
+.drawer-scan-dot {
+    display: block;
+    position: absolute;
+    top: 0.25rem;
+    right: 0.2rem;
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 50%;
+    background: #f59e0b;
+    box-shadow: 0 0 0 2px var(--app-bg-main, #0f172a);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+.drawer-scan-dot.is-active {
+    opacity: 1;
+}
+
+/* 드로어 패널 (닫힘 상태가 기본) */
 .sidebar-collapsible-content {
-    display: none !important;
-    height: auto !important;
+    position: fixed !important;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1110;
+    width: min(84vw, 360px) !important;
+    height: 100% !important;
     min-height: 0 !important;
-    flex: 0 0 auto !important;
-    overflow: hidden !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    width: 100%;
-    justify-content: flex-start !important; /* 인라인 justify-content:space-between 무력화 */
-}
-
-/* 펼침 상태 */
-.sidebar-collapsible-content.show {
-    display: flex !important;
+    display: flex !important; /* hidden 속성(UA display:none)보다 우선 - 개폐는 transform/visibility로 */
     flex-direction: column !important;
-    height: auto !important;
-    min-height: 0 !important;
-    flex: 0 0 auto !important;
-    max-height: min(72dvh, 560px) !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
+    justify-content: flex-start !important; /* 인라인 justify-content:space-between 무력화 */
+    flex: none !important;
     margin: 0 !important;
-    padding: 0.45rem 0 0 0 !important;
-    justify-content: flex-start !important;
-    border-top: 1px solid var(--app-border-light);
+    padding: calc(0.75rem + env(safe-area-inset-top, 0px)) 0.85rem calc(0.5rem + env(safe-area-inset-bottom, 0px)) calc(0.85rem + env(safe-area-inset-left, 0px)) !important;
+    box-sizing: border-box;
+    overflow: hidden !important;
+    /* 테마의 사이드바 색이 반투명이어도 뒤 그리드가 비치지 않게 본문 배경을 깔아둔다 */
+    background: linear-gradient(var(--app-bg-sidebar), var(--app-bg-sidebar)), var(--app-bg-main, #0f172a);
+    border-right: 1px solid var(--app-border);
+    box-shadow: 16px 0 40px rgba(0, 0, 0, 0.45);
+    transform: translate3d(-105%, 0, 0);
+    visibility: hidden;
+    transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0.26s;
 }
 
-.sidebar-collapsible-content.show > div:first-child {
-    margin-top: 0.35rem !important;
+.sidebar-collapsible-content.show {
+    transform: translate3d(0, 0, 0);
+    visibility: visible;
+    transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s;
 }
 
-/* 모바일 사이드바 메뉴 얇은 스크롤바 디자인 */
-.sidebar-collapsible-content::-webkit-scrollbar {
+.sidebar-drawer-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1105;
+    background: rgba(3, 6, 12, 0.55);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease;
+}
+
+body.sidebar-drawer-open .sidebar-drawer-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sidebar-collapsible-content,
+    .sidebar-collapsible-content.show,
+    .sidebar-drawer-backdrop {
+        transition: none;
+    }
+}
+
+.sidebar-drawer-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0 0 0.7rem 0.15rem;
+    flex-shrink: 0;
+}
+
+.sidebar-drawer-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--app-text-primary);
+    min-width: 0;
+}
+
+.sidebar-drawer-brand img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+}
+
+.sidebar-drawer-close {
+    width: 2.4rem;
+    height: 2.4rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--app-text-muted);
+    font-size: 1.25rem;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.sidebar-drawer-close:active {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.sidebar-menu-search {
+    position: relative;
+    flex-shrink: 0;
+    display: block;
+}
+
+.sidebar-menu-search i {
+    position: absolute;
+    left: 0.8rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--app-text-muted);
+    font-size: 0.85rem;
+    pointer-events: none;
+}
+
+.sidebar-menu-search input {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 2.6rem;
+    padding: 0.5rem 0.75rem 0.5rem 2.2rem;
+    border: 1px solid var(--app-border);
+    border-radius: 10px;
+    background: var(--app-input-bg, var(--app-bg-card));
+    color: var(--app-text-primary);
+    font-size: 16px; /* iOS Safari 입력 시 자동 확대 방지 */
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.sidebar-menu-search input:focus {
+    border-color: var(--app-accent);
+}
+
+.sidebar-drawer-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: 0.5rem 0 0 0 !important; /* 인라인 margin-top 무력화 */
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* 드로어 스크롤 얇은 스크롤바 */
+.sidebar-drawer-scroll::-webkit-scrollbar {
     width: 4px;
 }
-.sidebar-collapsible-content::-webkit-scrollbar-track {
+.sidebar-drawer-scroll::-webkit-scrollbar-track {
     background: transparent;
 }
-.sidebar-collapsible-content::-webkit-scrollbar-thumb {
+.sidebar-drawer-scroll::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.1);
     border-radius: 10px;
+}
+
+.library-sidebar .sidebar-section-label {
+    display: block;
+    padding: 0.95rem 0.6rem 0.35rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--app-text-muted);
+    letter-spacing: 0.02em;
+    list-style: none;
+    cursor: default;
+}
+
+.sidebar-drawer-scroll > .sidebar-section-label:first-child {
+    padding-top: 0.35rem;
+}
+
+/* 메뉴 검색 중에는 섹션 제목/더 보기 버튼을 숨기고, 매치되지 않는 항목도 숨긴다
+   (sidebar_manager.js applySidebarMenuSearch) */
+.sidebar-collapsible-content.is-menu-searching .sidebar-section-label,
+.sidebar-collapsible-content.is-menu-searching .sidebar-more-btn,
+.sidebar-menu .search-hidden {
+    display: none !important;
+}
+
+/* "더 보기"로 숨겨졌던 항목도 검색 매치면 보여준다 (applySidebarShowMore의 인라인 display:none 무력화) */
+.sidebar-collapsible-content.is-menu-searching .sidebar-menu > li.menu-item:not(.search-hidden) {
+    display: flex !important;
+}
+
+.sidebar-library-group.search-expanded .sidebar-library-group-items {
+    display: block !important;
 }
 
 /* 사이드바 메뉴는 세로 나열 유지하여 가독성 개선 */
 .sidebar-menu {
     flex-direction: column;
-    gap: 0.4rem;
+    gap: 0.15rem;
 }
 
 .sidebar-menu .menu-item {
-    padding: 0.6rem 0.8rem;
-    font-size: 0.9rem;
+    min-height: 2.75rem; /* 터치 타깃 44px */
+    box-sizing: border-box;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.95rem;
     justify-content: flex-start;
-    border: 1px solid var(--app-border);
-    background: var(--app-bg-card);
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--app-text-primary);
+}
+
+/* 그룹 헤더도 .menu-item이라 위 flex-start를 받는데, 건수는 오른쪽 끝에 붙어야 한다 */
+.sidebar-menu .sidebar-group-header {
+    justify-content: space-between;
 }
 
 .sidebar-menu .menu-item:hover {
-    border-color: var(--app-accent);
     background: var(--app-bg-card-hover);
 }
 
 .sidebar-menu .menu-item.active {
-    border-color: rgba(216, 180, 254, 0.82);
+    background: var(--app-bg-card);
+    border-color: var(--app-accent);
 }
 
-/* 프로필 및 로그아웃 영역 재배치 */
-.sidebar-settings-wrap {
-    margin-top: 1rem !important; /* HTML 인라인 margin-top 오버라이드 */
+/* Home 줄의 관리자 버튼(핀/그룹 추가/카테고리 추가)은 모바일에선 하단 "관리 도구"로 옮겨 보여준다 */
+#sidebar-categories #category-home > div {
+    display: none !important;
+}
+
+.sidebar-admin-tools:not([hidden]) {
+    display: block;
+    margin-top: 0.6rem;
+    padding-top: 0.4rem;
     border-top: 1px solid var(--app-border-light);
-    padding-top: 1rem;
+}
+
+.sidebar-admin-tools details > summary {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0 0.6rem;
+    color: var(--app-text-muted);
+    font-size: 0.9rem;
+    cursor: pointer;
+    list-style: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.sidebar-admin-tools details > summary::-webkit-details-marker {
+    display: none;
+}
+
+.sidebar-admin-tools details > summary i {
+    width: 1rem;
+    font-size: 0.75rem;
+    transition: transform 0.2s ease;
+}
+
+.sidebar-admin-tools details[open] > summary i {
+    transform: rotate(90deg);
+}
+
+.sidebar-admin-tool-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0 0 0.3rem 0.4rem;
+}
+
+.sidebar-admin-tool-list button {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-height: 2.6rem;
+    padding: 0 0.6rem;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--app-text-primary);
+    font: inherit;
+    font-size: 0.9rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.sidebar-admin-tool-list button i {
+    width: 1.25em;
+    text-align: center;
+    color: var(--app-accent);
+}
+
+.sidebar-admin-tool-list button:active {
+    background: var(--app-bg-card-hover);
+}
+
+/* 드로어 하단 고정 푸터: 스캔 활동 / 환경설정 / 계정 */
+.sidebar-drawer-footer {
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 0.25rem;
+    flex-shrink: 0;
+    margin-top: 0.4rem;
+    padding-top: 0.45rem;
+    border-top: 1px solid var(--app-border-light);
+}
+
+.sidebar-drawer-footer button {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0 0.3rem;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--app-text-muted);
+    font: inherit;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.sidebar-drawer-footer button > span:last-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sidebar-drawer-footer button:active {
+    background: var(--app-bg-card-hover);
+    color: var(--app-text-primary);
+}
+
+.drawer-footer-icon {
+    position: relative;
+    display: inline-flex;
+}
+
+.drawer-footer-icon .drawer-scan-dot {
+    top: -0.2rem;
+    right: -0.35rem;
+}
+
+/* 원래 상단 헤더의 스캔활동/환경설정/계정 아이콘은 모바일에서 드로어 푸터로 대체.
+   래퍼(.scan-activity-wrap/.account-menu-wrap)는 남겨둬야 팝오버가 보인다. */
+#btn-scan-activity,
+#category-settings,
+#btn-account-menu {
+    display: none !important;
+}
+
+/* 모달(카테고리 추가/수정 등): 90vh는 안드로이드에서 주소창 높이까지 포함돼 실제 화면보다 커지고, 위쪽이
+   주소창 밑으로 잘려 닫기(X)를 누르기 힘들었다(2026-09-28). 보이는 화면(dvh) 안에 맞추고, 내용을 스크롤해도
+   제목/X 헤더는 위에 붙어 있게 한다. */
+.library-modal .library-modal-content,
+#library-form-modal .library-modal-content {
+    max-height: calc(100vh - 1.5rem);
+    max-height: calc(100dvh - 1.5rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    box-sizing: border-box;
+}
+
+.library-modal-content > .library-modal-header {
+    position: sticky;
+    top: -1.5rem; /* 콘텐츠 padding-top만큼 올려 스크롤 영역 맨 위에 붙임 */
+    z-index: 2;
+    margin: -1.5rem -1.5rem 1.2rem;
+    padding: 1.1rem 1.5rem 0.8rem;
+    background: rgb(var(--app-panel-rgb));
+    border-radius: 12px 12px 0 0;
+}
+
+[data-app-theme="light"] .library-modal-content > .library-modal-header {
+    background: #ffffff;
+}
+
+[data-app-theme="sepia"] .library-modal-content > .library-modal-header {
+    background: #f4e4c1;
+}
+
+.library-modal-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    margin-right: -0.6rem;
+    font-size: 1.7rem;
 }
 
 /* 3. 우측 메인 콘텐츠 영역 조정 */
@@ -222,18 +639,19 @@
     display: inline;
 }
 
-/* 4. 도서 보관함 헤더 영역 - 데스크톱은 한 줄, 모바일은 검색/그룹모드/탭/컨트롤을 세로로 스택 */
-/* (페이지 타이틀/건수는 데스크톱과 마찬가지로 모바일에서도 인라인 display:none으로 숨김 - 별도 grid-area 불필요) */
+/* 4. 도서 보관함 헤더 영역 - 데스크톱은 한 줄, 모바일은 검색 / 세션탭 / (기본·작가별 + 필터·정렬) 3줄
+   (페이지 타이틀/건수는 데스크톱과 마찬가지로 모바일에서도 인라인 display:none으로 숨김 - 별도 grid-area 불필요)
+   스캔활동/환경설정/계정 아이콘은 드로어 하단 푸터로 옮겨 한 줄을 줄였다 (2026-09-28) */
 .library-header {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
-        "search"
-        "group"
-        "tabs"
-        "controls";
-    align-items: stretch;
-    gap: 0.6rem;
+        "search search"
+        "tabs tabs"
+        "group controls";
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.65rem;
 }
 
 #group-mode-toggle-group {
@@ -262,20 +680,36 @@
     white-space: normal;  /* 영어처럼 긴 이름은 버튼 안에서 두 줄로 */
     word-break: keep-all;
     text-align: center;
+    /* iOS Safari는 폭을 줄인 버튼에서 text-align만으로는 글자가 왼쪽에 붙어서 flex로 가운데 고정 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.library-controls {
+.library-header-actions {
     grid-area: controls;
-    width: 100%;
+    justify-self: end;
+    margin-left: 0;
+    gap: 0.35rem;
 }
 
 .library-controls {
-    flex-wrap: wrap;
-    gap: 0.5rem;
+    flex-wrap: nowrap;
+    gap: 0.35rem;
 }
 
 .scan-activity-wrap {
     margin-right: 0;
+}
+
+/* 계정 팝오버도 스캔 활동 팝오버처럼 하단 시트로 (원래 아이콘은 숨겨져 있어 기준 위치가 없음) */
+.account-menu-popover {
+    position: fixed;
+    top: auto;
+    right: 0.75rem;
+    bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+    left: 0.75rem;
+    width: auto;
 }
 
 .scan-activity-popover {
@@ -365,8 +799,19 @@
 }
 
 /* 5. 카드 그리드 및 기타 패딩 미세 조정 */
+/* 앱쉘 높이를 실제 보이는 화면에 정확히 맞춘다. 예전엔 height:100vh + padding이라 문서 자체가
+   화면보다 길었고(안드로이드는 100vh에 주소창·하단 툴바 높이까지 포함), 환경설정처럼 끝이 있는
+   화면을 끝까지 스크롤하면 스크롤이 문서로 이어져 상단 앱바(☰)가 화면 밖으로 밀려나 메뉴로
+   돌아갈 수 없었다(2026-09-28 실기기). dvh 미지원 브라우저는 100vh로 폴백. */
+html {
+    overscroll-behavior: none;
+}
+
 body {
     padding: 10px;
+    box-sizing: border-box;
+    height: 100vh;
+    height: 100dvh;
 }
 
 /* 팝업 모달 크기 조정 */
@@ -650,6 +1095,28 @@ body {
 
 /* 10. 모바일 삼성 브라우저 및 Safari 상단 주소창 노치 영역 여백(Safe Area) 대응 패치 */
 @media screen and (max-width: 768px) {
+    /* 카테고리 추가/수정 모달의 경로 입력: 폰 폭에선 입력칸이 몇 글자밖에 안 보여서, 입력칸은 한 줄 전체,
+       찾아보기/링크 연결 테스트 버튼은 그 아래 줄에 나란히 (인라인 style 오버라이드) */
+    .library-path-input-row {
+        flex-wrap: wrap;
+    }
+
+    .library-path-input-row > textarea {
+        flex: 1 1 100% !important;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .library-path-input-row > button {
+        flex: 1 1 0;
+        min-height: 2.6rem;
+        align-self: stretch !important;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+    }
+
     /* 뷰어 최상단 헤더에 기기 노치 여백(env(safe-area-inset-top))을 더하여 콘텐츠 겹침 방지 */
     .viewer-modal {
         padding-top: env(safe-area-inset-top, 0px);

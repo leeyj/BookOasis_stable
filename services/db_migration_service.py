@@ -491,9 +491,41 @@ _SCHEMA_SQL = """
         error TEXT,
         heartbeat_ms INTEGER,
         created_ms INTEGER NOT NULL,
-        finished_ms INTEGER
+        finished_ms INTEGER,
+        quality TEXT NOT NULL DEFAULT 'standard'
     );
 
+    -- 미리 만든 음성은 책 단위로 저장한다: <저장 경로>/<db>/books/<book_id>/<설정>/chNNNN_PP.pack (조각 m4a를 이어 붙인 파일)
+    -- tts_audio_books = 책·설정별 폴더 하나, tts_audio_pieces = 조각 키 → pack 파일 안의 위치(목차)
+    CREATE TABLE IF NOT EXISTS tts_audio_books (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id INTEGER NOT NULL,
+        voice TEXT NOT NULL,
+        steps INTEGER NOT NULL,
+        speed REAL NOT NULL,
+        quality TEXT NOT NULL,
+        rel_dir TEXT NOT NULL,
+        pieces INTEGER NOT NULL DEFAULT 0,
+        bytes INTEGER NOT NULL DEFAULT 0,
+        duration_sec REAL NOT NULL DEFAULT 0,
+        created_by INTEGER NOT NULL,
+        created_ms INTEGER NOT NULL,
+        last_used_ms INTEGER NOT NULL,
+        UNIQUE(book_id, voice, steps, speed, quality)
+    );
+
+    CREATE TABLE IF NOT EXISTS tts_audio_pieces (
+        audio_book_id INTEGER NOT NULL,
+        piece_key TEXT NOT NULL,
+        chapter INTEGER NOT NULL,
+        part INTEGER NOT NULL,
+        byte_offset INTEGER NOT NULL,
+        byte_length INTEGER NOT NULL,
+        duration_sec REAL NOT NULL,
+        PRIMARY KEY (audio_book_id, piece_key)
+    );
+
+    -- 예전(v2.7.9) 조각 단위 캐시. 더 쓰지 않으며 작업 스레드가 기동 시 비운다 (services/tts_pregen_service.py purge_legacy_cache)
     CREATE TABLE IF NOT EXISTS tts_audio_cache (
         piece_key TEXT PRIMARY KEY,
         duration_sec REAL NOT NULL,
@@ -700,6 +732,8 @@ _INDEXES_SQL = """
     CREATE INDEX IF NOT EXISTS idx_tts_pregen_jobs_status ON tts_pregen_jobs(status, id);
     CREATE INDEX IF NOT EXISTS idx_tts_pregen_jobs_book ON tts_pregen_jobs(book_id);
     CREATE INDEX IF NOT EXISTS idx_tts_audio_cache_last_used ON tts_audio_cache(last_used_ms);
+    CREATE INDEX IF NOT EXISTS idx_tts_audio_books_last_used ON tts_audio_books(last_used_ms);
+    CREATE INDEX IF NOT EXISTS idx_tts_audio_pieces_key ON tts_audio_pieces(piece_key);
     CREATE INDEX IF NOT EXISTS idx_mcp_pending_changes_status ON mcp_pending_changes(status);
     CREATE INDEX IF NOT EXISTS idx_audiobook_tracks_audiobook_id ON audiobook_tracks(audiobook_id);
     CREATE INDEX IF NOT EXISTS idx_audiobook_track_progress_lookup ON audiobook_track_progress(audiobook_id, user_id, track_id);

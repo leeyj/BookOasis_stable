@@ -182,6 +182,9 @@ function recoverTopCategoryUiAfterBack() {
   const rectsOutOfView = [libraryHeader, sidebarHeader].some((el) => {
     if (!el) return false;
     const rect = el.getBoundingClientRect();
+    // 모바일에서 접어둔 .library-header(display:none)는 rect가 전부 0이라 "화면 밖"으로 오판해
+    // 뒤로가기 스크롤 복원을 매번 0으로 날려버리므로 제외
+    if (!rect.width && !rect.height) return false;
     return rect.bottom <= 0 || rect.top < -4;
   });
   if (rectsOutOfView) {
@@ -696,6 +699,10 @@ export async function selectCategory(id, skipHistory = false, options = {}) {
   if (id === 'smart_rec' && state.smartRecommendEnabled === false) {
     id = 'home';
   }
+  // 음성 준비됨: 서버 미리 만들기가 꺼졌거나 TXT/EPUB가 없는 세션(오디오북·영상)이면 홈으로
+  if (id === 'tts_ready' && (!state.ttsPregenEnabled || !['general', 'adult'].includes(state.currentLibraryType))) {
+    id = 'home';
+  }
 
   const preserveSearch = options && options.preserveSearch === true;
   if (preserveSearch) {
@@ -829,6 +836,11 @@ export async function selectCategory(id, skipHistory = false, options = {}) {
     switchActiveView('grid');
     import('./tab_collections.js').then((colls) => {
       colls.renderCollectionsView();
+    });
+  } else if (id === 'tts_ready') {
+    switchActiveView('grid');
+    import('./tts/tts_ready_view.js').then((mod) => {
+      mod.renderTtsReadyView();
     });
   } else if (id === 'smart_rec') {
     switchActiveView('grid');

@@ -16,7 +16,7 @@ let refreshAfterCurrentLoad = false;
 function isBookListViewActive() {
   const currentId = String(state.currentLibraryId || '');
   return !(
-    ['home', 'history', 'collection', 'smart_rec', 'settings', 'plugins'].includes(currentId)
+    ['home', 'history', 'collection', 'smart_rec', 'tts_ready', 'settings', 'plugins'].includes(currentId)
     || currentId.startsWith('plugin_')
   );
 }

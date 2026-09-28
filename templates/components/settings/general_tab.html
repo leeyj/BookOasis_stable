@@ -372,6 +372,16 @@
                                         </p>
                                     </div>
                                     <div class="library-form-group">
+                                        <label for="setting-tts-pregen-quality" style="font-weight: 600; color: var(--app-text-secondary); font-size: 0.85rem; margin-bottom: 0.4rem; display: block;">음질</label>
+                                        <select id="setting-tts-pregen-quality" name="TTS_PREGEN_QUALITY" style="width: 100%; max-width: 480px; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none; cursor: pointer;">
+                                            <option value="standard">표준 (64kbps, 기본값)</option>
+                                            <option value="compact">절약 (32kbps · 24kHz, 용량 절반)</option>
+                                        </select>
+                                        <p style="font-size: 0.78rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0; line-height: 1.45;">
+                                            절약은 용량이 절반이지만 ㅅ·ㅆ 같은 치찰음이 조금 뭉개집니다. 바꾸면 이후 새로 만드는 책부터 적용되며, 이미 만든 책은 그대로 둡니다.
+                                        </p>
+                                    </div>
+                                    <div class="library-form-group">
                                         <label for="setting-tts-pregen-threads" style="font-weight: 600; color: var(--app-text-secondary); font-size: 0.85rem; margin-bottom: 0.4rem; display: block;">합성에 쓸 CPU 스레드 수</label>
                                         <input type="number" id="setting-tts-pregen-threads" name="TTS_PREGEN_THREADS" min="1" max="16" value="2" style="width: 100%; max-width: 480px; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
                                         <p style="font-size: 0.78rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0;">많을수록 빠르지만 그동안 다른 서비스(스캔, 뷰어)가 느려질 수 있습니다. 기본값 2.</p>
@@ -379,7 +389,7 @@
                                     <div class="library-form-group">
                                         <label for="setting-tts-pregen-disk-gb" style="font-weight: 600; color: var(--app-text-secondary); font-size: 0.85rem; margin-bottom: 0.4rem; display: block;">음성 캐시 최대 용량 (GB, 일반·성인 각각)</label>
                                         <input type="number" id="setting-tts-pregen-disk-gb" name="TTS_PREGEN_DISK_GB" min="1" max="10000" value="10" style="width: 100%; max-width: 480px; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
-                                        <p style="font-size: 0.78rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0;">넘으면 오래 안 들은 음성부터 지웁니다. 책 한 권(20만 자)은 약 150~200MB입니다.</p>
+                                        <p style="font-size: 0.78rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0;">넘으면 오래 안 들은 책부터 통째로 지웁니다. 표준 음질 기준 1시간 분량이 약 29MB입니다(20만 자 책 약 150~200MB, 긴 장편은 수 GB).</p>
                                     </div>
                                 </div>
                             </div>

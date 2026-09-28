@@ -177,6 +177,9 @@ export function applySettingsToUI(settings) {
   if (settings.SHOW_CONTENT_RATING_BADGE !== undefined) {
     state.showContentRatingBadge = (settings.SHOW_CONTENT_RATING_BADGE === '1');
   }
+  if (settings.TTS_PREGEN_ENABLED !== undefined) {
+    state.ttsPregenEnabled = (settings.TTS_PREGEN_ENABLED === '1');
+  }
   if (settings.SMART_RECOMMEND_ENABLED !== undefined) {
     state.smartRecommendEnabled = (settings.SMART_RECOMMEND_ENABLED !== '0');
   }
@@ -373,6 +376,8 @@ export async function loadGeneralSettings() {
       if (ttsPregenThreadsEl) ttsPregenThreadsEl.value = s.TTS_PREGEN_THREADS || '2';
       const ttsAudioRootEl = document.getElementById('setting-tts-audio-root');
       if (ttsAudioRootEl) ttsAudioRootEl.value = s.TTS_AUDIO_ROOT || '';
+      const ttsPregenQualityEl = document.getElementById('setting-tts-pregen-quality');
+      if (ttsPregenQualityEl) ttsPregenQualityEl.value = s.TTS_PREGEN_QUALITY === 'compact' ? 'compact' : 'standard';
       const ttsPregenDiskEl = document.getElementById('setting-tts-pregen-disk-gb');
       if (ttsPregenDiskEl) ttsPregenDiskEl.value = s.TTS_PREGEN_DISK_GB || '10';
       loadTtsPregenAvailability();
@@ -445,6 +450,7 @@ export async function submitGeneralSettings(event) {
   const mcpWriteEnabled = document.getElementById('setting-mcp-write-enabled')?.value || '0';
   const ttsPregenEnabled = document.getElementById('setting-tts-pregen-enabled')?.value || '0';
   const ttsPregenThreads = document.getElementById('setting-tts-pregen-threads')?.value || '2';
+  const ttsPregenQuality = document.getElementById('setting-tts-pregen-quality')?.value || 'standard';
   const ttsPregenDiskGb = document.getElementById('setting-tts-pregen-disk-gb')?.value || '10';
   const ttsAudioRoot = document.getElementById('setting-tts-audio-root')?.value?.trim() || '';
   const rcloneRcUrl = document.getElementById('setting-rclone-rc-url')?.value || 'http://localhost:5572';
@@ -489,6 +495,7 @@ export async function submitGeneralSettings(event) {
       api.updateSystemSetting('PROXY_HEADER_AUTH', proxyAuth),
       api.updateSystemSetting('MCP_WRITE_ENABLED', mcpWriteEnabled),
       api.updateSystemSetting('TTS_PREGEN_THREADS', ttsPregenThreads),
+      api.updateSystemSetting('TTS_PREGEN_QUALITY', ttsPregenQuality),
       api.updateSystemSetting('TTS_PREGEN_DISK_GB', ttsPregenDiskGb),
       api.updateSystemSetting('TTS_AUDIO_ROOT', ttsAudioRoot),
       api.updateSystemSetting('TTS_PREGEN_ENABLED', ttsPregenEnabled),

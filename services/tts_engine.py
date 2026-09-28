@@ -11,7 +11,7 @@ import hashlib
 import os
 import shutil
 import subprocess
-import threading
+import tempfile
 
 from services import tts_asset_service as assets
 
@@ -19,7 +19,13 @@ VOICES = ('F1', 'F2', 'F3', 'F4', 'F5', 'M1', 'M2', 'M3', 'M4', 'M5')
 STEPS = (4, 8)
 SPEEDS = (0.9, 1.05, 1.2, 1.4)
 PAD_SEC = 0.25  # 브라우저와 같이 조각 끝에 붙이는 무음
-AAC_BITRATE = '64k'
+# 관리자 설정 TTS_PREGEN_QUALITY: 음질 이름 → (AAC 비트레이트, 출력 샘플레이트 또는 None=모델 그대로 44.1kHz).
+# 절약(32k·24kHz)은 크기가 정확히 절반이지만 치찰음 차이가 귀에 들려(2026-09-28 A/B) 표준을 기본으로 둔다.
+QUALITIES = {
+    'standard': ('64k', None),
+    'compact': ('32k', 24000),
+}
+DEFAULT_QUALITY = 'standard'
 
 
 def _js_number(value):
@@ -105,21 +111,27 @@ class Engine:
         return np.concatenate([wav.astype(np.float32), pad])
 
 
-def encode_m4a(wav, sample_rate, out_path):
-    """float32 파형을 AAC(.m4a)로 저장하고 파일 크기를 돌려준다. 임시 파일에 쓴 뒤 교체해서 반쯤 쓴 파일이 보이지 않는다."""
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    tmp = f'{out_path}.{os.getpid()}.{threading.get_ident()}.part.m4a'
+def encode_m4a_bytes(wav, sample_rate, quality=DEFAULT_QUALITY, tmp_dir=None):
+    """float32 파형을 완결된 AAC(.m4a) 파일 하나로 인코딩해 bytes로 돌려준다 (책 pack 파일에 그대로 이어 붙인다).
+    faststart(moov를 앞으로)는 출력이 탐색 가능해야 해서 파이프 대신 임시 파일을 거친다."""
+    bitrate, out_rate = QUALITIES.get(quality, QUALITIES[DEFAULT_QUALITY])
+    if tmp_dir:
+        os.makedirs(tmp_dir, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(suffix='.m4a', dir=tmp_dir)
+    os.close(fd)
     cmd = [
         'ffmpeg', '-hide_banner', '-loglevel', 'error', '-y',
         '-f', 'f32le', '-ar', str(sample_rate), '-ac', '1', '-i', 'pipe:0',
-        '-c:a', 'aac', '-b:a', AAC_BITRATE, '-movflags', '+faststart', tmp,
     ]
+    if out_rate:
+        cmd += ['-ar', str(out_rate)]
+    cmd += ['-c:a', 'aac', '-b:a', bitrate, '-movflags', '+faststart', tmp]
     try:
         proc = subprocess.run(cmd, input=wav.tobytes(), capture_output=True, timeout=120)
         if proc.returncode != 0:
             raise RuntimeError(f"ffmpeg failed: {proc.stderr.decode('utf-8', 'replace').strip()[:300]}")
-        os.replace(tmp, out_path)
+        with open(tmp, 'rb') as f:
+            return f.read()
     finally:
         if os.path.exists(tmp):
             os.remove(tmp)
-    return os.path.getsize(out_path)

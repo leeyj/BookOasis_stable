@@ -22,7 +22,7 @@ export function initInfiniteScrollObserver() {
         if (detailView && detailView.style.display !== 'none') return;
 
         const currentId = state.currentLibraryId || '';
-        if (['history', 'home', 'settings', 'collection', 'plugins'].includes(currentId) || currentId.startsWith('plugin_')) return;
+        if (['history', 'home', 'settings', 'collection', 'tts_ready', 'plugins'].includes(currentId) || currentId.startsWith('plugin_')) return;
         if (state.isLoading || !state.hasMore) return;
 
         console.log('[InfiniteScroll-Observer] Spinner intersected -> Loading next page...');
@@ -50,7 +50,7 @@ export function initInfiniteScrollObserver() {
         if (detailView && detailView.style.display !== 'none') return;
 
         const currentId = state.currentLibraryId || '';
-        if (['history', 'home', 'settings', 'collection', 'plugins'].includes(currentId) || currentId.startsWith('plugin_')) return;
+        if (['history', 'home', 'settings', 'collection', 'tts_ready', 'plugins'].includes(currentId) || currentId.startsWith('plugin_')) return;
         if (state.isLoading || state.isLoadingPrevious || !state.hasPrevious) return;
 
         console.log('[InfiniteScroll-Observer] Top spinner intersected -> Loading previous page...');

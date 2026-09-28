@@ -3,7 +3,7 @@
 tts_pregen_repository.py – MariaDB 전용 듣기(TTS) 서버 미리 만들기 데이터 액세스 레이어
 
 tts_pregen_jobs: 책 단위 작업 큐 (queued → running → done/failed/cancelled).
-tts_audio_cache: 조각 음성 캐시 색인. 키는 합성 입력 전체의 sha256이라 책·작업과 무관하게 공유된다.
+tts_audio_books / tts_audio_pieces: 책·설정별 음성 폴더와 그 안 조각의 위치(목차). 조각 키는 합성 입력 전체의 sha256.
 시각은 DB 시간대 차이가 없는 epoch ms.
 """
 import database
@@ -14,14 +14,14 @@ ACTIVE_STATUSES = ('queued', 'running')
 class TTSPregenRepository:
     # ---- 작업 ----
     @staticmethod
-    def create_job(db_type, book_id, user_id, voice, steps, speed, total_pieces, now_ms):
+    def create_job(db_type, book_id, user_id, voice, steps, speed, total_pieces, now_ms, quality='standard'):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
             cursor.execute(
-                "INSERT INTO tts_pregen_jobs (book_id, user_id, voice, steps, speed, status, total_pieces, done_pieces, created_ms) "
-                "VALUES (%s, %s, %s, %s, %s, 'queued', %s, 0, %s)",
-                (book_id, user_id, voice, steps, speed, total_pieces, now_ms),
+                "INSERT INTO tts_pregen_jobs (book_id, user_id, voice, steps, speed, status, total_pieces, done_pieces, created_ms, quality) "
+                "VALUES (%s, %s, %s, %s, %s, 'queued', %s, 0, %s, %s)",
+                (book_id, user_id, voice, steps, speed, total_pieces, now_ms, quality),
             )
             conn.commit()
             return cursor.lastrowid
@@ -179,34 +179,76 @@ class TTSPregenRepository:
             rows = cursor.fetchall()
         return {row['status']: int(row['cnt']) for row in rows}
 
-    # ---- 조각 음성 캐시 ----
+    # ---- 책 단위 음성 저장 (tts_audio_books + tts_audio_pieces) ----
     @staticmethod
-    def get_audio(db_type, keys):
-        """{key: duration_sec} (있는 것만)"""
-        keys = list(keys)
-        found = {}
-        with database.connection(db_type) as conn:
-            cursor = conn.cursor()
-            for start in range(0, len(keys), 500):
-                chunk = keys[start:start + 500]
-                placeholders = ', '.join(['%s'] * len(chunk))
-                cursor.execute(
-                    f"SELECT piece_key, duration_sec FROM tts_audio_cache WHERE piece_key IN ({placeholders})",
-                    tuple(chunk),
-                )
-                for row in cursor.fetchall():
-                    found[row['piece_key']] = float(row['duration_sec'])
-        return found
-
-    @staticmethod
-    def put_audio(db_type, key, duration_sec, size_bytes, now_ms):
+    def get_or_create_audio_book(db_type, book_id, voice, steps, speed, quality, rel_dir, user_id, now_ms):
+        """이 책·설정·음질의 음성 폴더 행. 없으면 만든다(처음 요청한 사용자가 created_by)."""
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
             cursor.execute(
-                "INSERT INTO tts_audio_cache (piece_key, duration_sec, bytes, created_ms, last_used_ms) VALUES (%s, %s, %s, %s, %s) "
-                "ON DUPLICATE KEY UPDATE duration_sec = VALUES(duration_sec), bytes = VALUES(bytes), last_used_ms = VALUES(last_used_ms)",
-                (key, duration_sec, size_bytes, now_ms, now_ms),
+                "SELECT * FROM tts_audio_books WHERE book_id = %s AND voice = %s AND steps = %s AND ABS(speed - %s) < 0.001 AND quality = %s",
+                (book_id, voice, steps, speed, quality),
+            )
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+            cursor.execute(
+                "INSERT INTO tts_audio_books (book_id, voice, steps, speed, quality, rel_dir, pieces, bytes, duration_sec, created_by, created_ms, last_used_ms) "
+                "VALUES (%s, %s, %s, %s, %s, %s, 0, 0, 0, %s, %s, %s)",
+                (book_id, voice, steps, speed, quality, rel_dir, user_id, now_ms, now_ms),
+            )
+            conn.commit()
+            cursor.execute("SELECT * FROM tts_audio_books WHERE id = %s", (cursor.lastrowid,))
+            return dict(cursor.fetchone())
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    @staticmethod
+    def get_audio_book(db_type, audio_book_id):
+        with database.connection(db_type) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM tts_audio_books WHERE id = %s", (audio_book_id,))
+            row = cursor.fetchone()
+        return dict(row) if row else None
+
+    @staticmethod
+    def list_audio_books(db_type):
+        with database.connection(db_type) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM tts_audio_books WHERE pieces > 0 ORDER BY last_used_ms DESC")
+            rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+
+    @staticmethod
+    def book_pieces(db_type, audio_book_id):
+        """[{piece_key, chapter, part, byte_offset, byte_length, duration_sec}] — 이 책 폴더의 목차 전체"""
+        with database.connection(db_type) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT piece_key, chapter, part, byte_offset, byte_length, duration_sec FROM tts_audio_pieces WHERE audio_book_id = %s",
+                (audio_book_id,),
+            )
+            rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+
+    @staticmethod
+    def add_piece(db_type, audio_book_id, key, chapter, part, byte_offset, byte_length, duration_sec):
+        """목차 한 줄 추가 + 책 합계 갱신 (pack 파일에 쓴 다음에 부른다)"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "INSERT INTO tts_audio_pieces (audio_book_id, piece_key, chapter, part, byte_offset, byte_length, duration_sec) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                (audio_book_id, key, chapter, part, byte_offset, byte_length, duration_sec),
+            )
+            cursor.execute(
+                "UPDATE tts_audio_books SET pieces = pieces + 1, bytes = bytes + %s, duration_sec = duration_sec + %s WHERE id = %s",
+                (byte_length, duration_sec, audio_book_id),
             )
             conn.commit()
         except Exception:
@@ -216,10 +258,9 @@ class TTSPregenRepository:
             conn.close()
 
     @staticmethod
-    def touch_audio(db_type, keys, now_ms):
+    def remove_pieces(db_type, audio_book_id, keys):
+        """목차에서 지우고 책 합계를 다시 계산한다 (pack 파일이 잘린 경우의 정리용)"""
         keys = list(keys)
-        if not keys:
-            return
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
@@ -227,9 +268,59 @@ class TTSPregenRepository:
                 chunk = keys[start:start + 500]
                 placeholders = ', '.join(['%s'] * len(chunk))
                 cursor.execute(
-                    f"UPDATE tts_audio_cache SET last_used_ms = %s WHERE piece_key IN ({placeholders})",
-                    tuple([now_ms] + chunk),
+                    f"DELETE FROM tts_audio_pieces WHERE audio_book_id = %s AND piece_key IN ({placeholders})",
+                    tuple([audio_book_id] + chunk),
                 )
+            cursor.execute(
+                "SELECT COUNT(*) AS cnt, COALESCE(SUM(byte_length), 0) AS total, COALESCE(SUM(duration_sec), 0) AS sec "
+                "FROM tts_audio_pieces WHERE audio_book_id = %s",
+                (audio_book_id,),
+            )
+            row = cursor.fetchone()
+            cursor.execute(
+                "UPDATE tts_audio_books SET pieces = %s, bytes = %s, duration_sec = %s WHERE id = %s",
+                (int(row['cnt']), int(row['total']), float(row['sec']), audio_book_id),
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    @staticmethod
+    def find_pieces(db_type, keys):
+        """{key: row} — 여러 책에 같은 키가 있으면 최근에 들은 책 것. row에 rel_dir, audio_book_id, 위치가 들어 있다."""
+        keys = list(keys)
+        found = {}
+        with database.connection(db_type) as conn:
+            cursor = conn.cursor()
+            for start in range(0, len(keys), 500):
+                chunk = keys[start:start + 500]
+                placeholders = ', '.join(['%s'] * len(chunk))
+                cursor.execute(
+                    "SELECT p.piece_key, p.audio_book_id, p.chapter, p.part, p.byte_offset, p.byte_length, p.duration_sec, "
+                    "b.rel_dir, b.last_used_ms FROM tts_audio_pieces p JOIN tts_audio_books b ON b.id = p.audio_book_id "
+                    f"WHERE p.piece_key IN ({placeholders})",
+                    tuple(chunk),
+                )
+                for row in cursor.fetchall():
+                    row = dict(row)
+                    prev = found.get(row['piece_key'])
+                    if prev is None or row['last_used_ms'] > prev['last_used_ms']:
+                        found[row['piece_key']] = row
+        return found
+
+    @staticmethod
+    def touch_audio_books(db_type, audio_book_ids, now_ms):
+        ids = [int(i) for i in audio_book_ids]
+        if not ids:
+            return
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            placeholders = ', '.join(['%s'] * len(ids))
+            cursor.execute(f"UPDATE tts_audio_books SET last_used_ms = %s WHERE id IN ({placeholders})", tuple([now_ms] + ids))
             conn.commit()
         except Exception:
             conn.rollback()
@@ -241,37 +332,66 @@ class TTSPregenRepository:
     def total_audio_bytes(db_type):
         with database.connection(db_type) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT COALESCE(SUM(bytes), 0) AS total FROM tts_audio_cache")
+            cursor.execute("SELECT COALESCE(SUM(bytes), 0) AS total FROM tts_audio_books")
             row = cursor.fetchone()
         return int(row['total'] if row else 0)
 
     @staticmethod
-    def oldest_audio(db_type, limit):
-        """[(key, bytes)] — 오래 안 쓴 순"""
+    def oldest_audio_books(db_type, limit):
+        """오래 안 들은 순 [{id, rel_dir, bytes}]"""
         with database.connection(db_type) as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT piece_key, bytes FROM tts_audio_cache ORDER BY last_used_ms LIMIT %s",
-                (int(limit),),
-            )
+            cursor.execute("SELECT id, rel_dir, bytes FROM tts_audio_books ORDER BY last_used_ms LIMIT %s", (int(limit),))
             rows = cursor.fetchall()
-        return [(row['piece_key'], int(row['bytes'])) for row in rows]
+        return [dict(row) for row in rows]
 
     @staticmethod
-    def delete_audio(db_type, keys):
-        keys = list(keys)
-        if not keys:
-            return
+    def delete_audio_book(db_type, audio_book_id):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
-            for start in range(0, len(keys), 500):
-                chunk = keys[start:start + 500]
-                placeholders = ', '.join(['%s'] * len(chunk))
-                cursor.execute(f"DELETE FROM tts_audio_cache WHERE piece_key IN ({placeholders})", tuple(chunk))
+            cursor.execute("DELETE FROM tts_audio_pieces WHERE audio_book_id = %s", (audio_book_id,))
+            cursor.execute("DELETE FROM tts_audio_books WHERE id = %s", (audio_book_id,))
             conn.commit()
         except Exception:
             conn.rollback()
             raise
         finally:
             conn.close()
+
+    @staticmethod
+    def clear_legacy_cache(db_type):
+        """예전(v2.7.9) 조각 단위 캐시 색인을 비운다"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("DELETE FROM tts_audio_cache")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    @staticmethod
+    def books_brief(db_type, book_ids, user_id):
+        """"음성 준비됨" 목록 카드용 도서 정보 {book_id: row} (삭제된 책은 빠진다)"""
+        ids = [int(i) for i in book_ids]
+        if not ids:
+            return {}
+        out = {}
+        with database.connection(db_type) as conn:
+            cursor = conn.cursor()
+            for start in range(0, len(ids), 500):
+                chunk = ids[start:start + 500]
+                placeholders = ', '.join(['%s'] * len(chunk))
+                cursor.execute(
+                    "SELECT b.id, b.library_id, b.title, b.series_name, b.series_alias, b.author, b.file_format, b.total_pages, "
+                    "b.cover_image, b.cover_updated_at, b.cover_align, p.pages_read, p.is_completed "
+                    "FROM books b LEFT JOIN user_progress p ON p.book_id = b.id AND p.user_id = %s "
+                    f"WHERE b.id IN ({placeholders}) AND COALESCE(b.is_deleted, 0) = 0",
+                    tuple([user_id] + chunk),
+                )
+                for row in cursor.fetchall():
+                    out[int(row['id'])] = dict(row)
+        return out
