@@ -15,6 +15,7 @@ from utils.encoding_helper import force_utf8_stdio
 force_utf8_stdio()
 
 from utils.engine_signature import ENGINE_NAME, ENGINE_SIGNATURE, ENGINE_LICENSE
+from utils.process_helper import should_enable_embedded_scanner_worker
 
 # 자식 워커 프로세스 여부 감지
 IS_WORKER = os.environ.get('BOOKOASIS_IS_WORKER') == 'true'
@@ -70,6 +71,8 @@ def is_scanner_worker_running_os():
 
 def ensure_scanner_worker_running():
     """독립 스캐너 워커 프로세스가 실행 중인지 확인하고 필요 시 출발시킵니다."""
+    if not should_enable_embedded_scanner_worker():
+        return
     global _worker_process
     if _worker_process is not None and _worker_process.poll() is None:
         return
@@ -450,16 +453,8 @@ if not IS_WORKER:
     # 우선순위:
     # 1) BOOKOASIS_ENABLE_EMBEDDED_WORKER 명시값(true/false)
     # 2) 미지정 시: 도커 컨테이너 내부는 OFF, 그 외(리눅스 직접 실행 포함)는 ON
-    embedded_worker_raw = os.environ.get('BOOKOASIS_ENABLE_EMBEDDED_WORKER', '').strip().lower()
-    if embedded_worker_raw in ('1', 'true', 'yes', 'on'):
-        embedded_worker_enabled = True
-    elif embedded_worker_raw in ('0', 'false', 'no', 'off'):
-        embedded_worker_enabled = False
-    else:
-        in_docker = os.path.exists('/.dockerenv')
-        embedded_worker_enabled = not in_docker
     is_reloader_parent = os.environ.get('FLASK_DEBUG') in ('1', 'true', 'yes', 'on') and os.environ.get('WERKZEUG_RUN_MAIN') != 'true'
-    if embedded_worker_enabled and not is_reloader_parent:
+    if should_enable_embedded_scanner_worker() and not is_reloader_parent:
         start_scanner_worker_process()
 
     # ── Graceful Shutdown 핸들러 등록 ──

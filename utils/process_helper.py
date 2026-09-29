@@ -12,6 +12,16 @@ import os
 _APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+def should_enable_embedded_scanner_worker():
+    """설정과 실행 환경에 따라 웹 프로세스의 내장 스캐너 워커 사용 여부를 반환합니다."""
+    raw = os.environ.get('BOOKOASIS_ENABLE_EMBEDDED_WORKER', '').strip().lower()
+    if raw in ('1', 'true', 'yes', 'on'):
+        return True
+    if raw in ('0', 'false', 'no', 'off'):
+        return False
+    return not os.path.exists('/.dockerenv')
+
+
 def is_scanner_worker_pid_alive(pid):
     """
     주어진 PID가 실제로 살아있는, 그리고 '이 설치본'의 scanner_worker.py 프로세스인지 확인합니다.
