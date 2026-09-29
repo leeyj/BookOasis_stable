@@ -38,7 +38,11 @@ class BookScanRepository:
                     link         = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(%s, ''), link) ELSE link END,
                     score        = CASE WHEN COALESCE(metadata_locked, 0) = 0 AND %s != 0 THEN %s ELSE score END,
                     summary      = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(%s, ''), summary) ELSE summary END,
-                    release_date = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(%s, ''), release_date) ELSE release_date END
+                    release_date = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(%s, ''), release_date) ELSE release_date END,
+                    genre        = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(%s, ''), genre) ELSE genre END,
+                    tags         = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(%s, ''), tags) ELSE tags END,
+                    books_lv     = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(%s, ''), books_lv) ELSE books_lv END,
+                    publication_status = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(%s, ''), publication_status) ELSE publication_status END
                 WHERE id = %s
                 """,
                 (
@@ -52,6 +56,10 @@ class BookScanRepository:
                     meta['score'], meta['score'],
                     meta['summary'],
                     meta['release_date'],
+                    meta.get('genre', '') or '',
+                    meta.get('tags', '') or '',
+                    meta.get('books_lv', '') or '',
+                    meta.get('publication_status', '') or '',
                     book_id
                 )
             )

@@ -195,10 +195,15 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
     db_folder_mtimes = {canonical_path(row['folder_path']): (row['dir_mtime'], row['meta_mtime']) for row in cursor.fetchall()}
 
     # 0. Load completely scanned folders from previous checkpoint
-    cursor.execute("SELECT folder_path FROM scanner_progress WHERE library_id = ?", (str(library_id),))
-    scanned_folders = set(canonical_path(row['folder_path']) for row in cursor.fetchall())
-    if scanned_folders:
-        print(f"[Scanner-Progress] 🔄 Previous scan progress detected ({len(scanned_folders)}folders completed). Resuming scan.")
+    # 이어하기(resume)는 전체 라이브러리 스캔 전용이다. scan-path(path_scope)는 사용자가 "이 폴더를
+    # 다시 봐라"라고 명시한 요청이라, 이전 체크포인트에 남은 폴더라는 이유로 task에서 빠지면
+    # force=True여도 아무것도 처리되지 않는다(나중에 추가된 kavita.yaml/새 회차가 무시되던 원인).
+    scanned_folders = set()
+    if not path_scope:
+        cursor.execute("SELECT folder_path FROM scanner_progress WHERE library_id = ?", (str(library_id),))
+        scanned_folders = set(canonical_path(row['folder_path']) for row in cursor.fetchall())
+        if scanned_folders:
+            print(f"[Scanner-Progress] 🔄 Previous scan progress detected ({len(scanned_folders)}folders completed). Resuming scan.")
 
     # 1. Traverse physical folder tree and pre-collect file list
     tasks = []
@@ -479,7 +484,10 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
 
                 # 2. Scanner Progress Update
                 for pf in pending_folders:
-                    cursor.execute("INSERT OR IGNORE INTO scanner_progress (library_id, folder_path) VALUES (?, ?)", (str(library_id), pf['root']))
+                    # 부분 스캔은 끝나도 scanner_progress를 비우지 않으므로(scan-end-cleanup 생략),
+                    # 여기서 기록하면 다음 전체 스캔이 그 폴더들을 "이미 완료"로 보고 건너뛴다.
+                    if not path_scope:
+                        cursor.execute("INSERT OR IGNORE INTO scanner_progress (library_id, folder_path) VALUES (?, ?)", (str(library_id), pf['root']))
                     if pf.get('dir_mtime') is not None:
                         cursor.execute("INSERT OR REPLACE INTO folder_mtimes (folder_path, dir_mtime, meta_mtime) VALUES (?, ?, ?)", (pf['root'], pf['dir_mtime'], pf['meta_mtime']))
 

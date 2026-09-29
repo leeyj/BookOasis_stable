@@ -1,6 +1,11 @@
 # CHANGELOG
+## v2.8.1
+- (fix) 이전 스캔 진행 기록 때문에 경로 지정 스캔(scan-path)이 지정한 폴더를 건너뛰던 이슈 수정(force 여부 무관, 새 회차 추가도 무시되던 문제 포함), 부분 스캔이 진행 기록을 남겨 다음 전체 스캔이 해당 폴더를 건너뛰던 이슈 수정 | fix path scans (scan-path) skipping the requested folder because of leftover scan-progress records (with or without force, including newly added episodes), and partial scans leaving progress records that made the next full scan skip those folders
+- (fix) 이미 스캔된 폴더에 나중에 kavita.yaml/info.xml을 추가하거나 수정하면 일반 스캔에서도 새 메타데이터가 반영되도록 수정(로컬 경로) | metadata from a kavita.yaml/info.xml added or edited after a folder was scanned is now applied by a normal scan too (local paths)
+- (fix) 도서 상세의 재스캔/시리즈 재스캔이 태그·장르·연령등급·연재상태를 저장하지 않던 이슈 수정 | fix Rescan / Rescan series on the book detail page not saving tags, genre, age rating and publication status
+
 ## v2.8.0
-- (feature) 사이드바 "음성 준비됨" - 서버에 미리 만든 음성이 있는 책을 용량·길이와 함께 모아 보고, 바로 듣거나 책 단위로 지우기 | "Ready to Listen" in the sidebar lists books with pre-generated audio (size and length), to listen right away or delete per book
+- (feature) 사이드바 "음성 준비됨" - 서버에 미리 만든 음성이 있는 책을 용량·길이와 함께 모아 보고, 바로 듣거나 책 단위로 지우기(beta, 버그 많음) | "Ready to Listen" in the sidebar lists books with pre-generated audio (size and length), to listen right away or delete per book
 - (improvement) 미리 만든 음성을 책·챕터 단위 파일로 모아 저장(문장마다 파일 하나 → 챕터마다 하나), 용량 초과 시 오래 안 들은 책부터 통째로 정리, 관리자 설정에 음질 추가(표준 64kbps / 절약 32kbps, 용량 절반). 이전 버전에서 만든 음성은 자동으로 지워지므로 다시 만들어야 함 | pre-generated audio is now stored per book and chapter (one file per chapter instead of per sentence), the disk cap removes least recently played books as a whole, and admins can pick the audio quality (Standard 64kbps / Compact 32kbps, half the size). Audio made by earlier versions is removed automatically and must be generated again
 - (improvement) 모바일 메뉴를 좌측 슬라이드 드로어로 개편 (메뉴/보관함 검색, 탐색·보관함 구분, 관리 도구 접기, 하단 스캔 활동·환경설정·계정) + 검색·세션 탭·작가별은 상단 🔍를 누를 때만 표시해 화면을 넓게 사용 (드럼쟁이 님 포크 UI 기반) | mobile menu is now a left slide-out drawer (menu/library search, Browse/Libraries sections, collapsible admin tools, Scan activity/Settings/Account at the bottom); search, session tabs and grouping now appear only when tapping 🔍 at the top for more screen space (based on 드럼쟁이's fork UI)
 - (fix) 모바일에서 카테고리 추가 등 창의 닫기(X)가 주소창에 가려지던 이슈, 환경설정을 끝까지 스크롤하면 상단 메뉴가 밀려 사라지던 이슈 수정 | fix the close (X) button of dialogs such as Add category being hidden under the mobile address bar, and the top menu scrolling away at the end of Settings on mobile

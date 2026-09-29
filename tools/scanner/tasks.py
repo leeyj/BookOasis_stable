@@ -161,11 +161,23 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
             print(f"[Scanner-DEBUG-Task] ⚠️ Failed to get mtime for folder '{root}': {e}")
             dir_mtime = None
 
+    # 폴더 메타 파일(kavita.yaml/info.xml)이 마지막 기록 이후 새로 생기거나 바뀌었는지.
+    # 책 파일 자체는 그대로라도 메타가 바뀌었으면 파일 단위 스킵을 풀어 새 메타를 DB에 반영한다
+    # (예: 이미 스캔된 작품 폴더에 나중에 kavita.yaml을 추가한 경우 — 예전엔 폴더 mtime 불일치로
+    # Ultra-fast skip만 풀리고 파일은 전부 "변경 없음"으로 스킵돼 태그 등이 영원히 안 들어갔다).
+    # 원격은 meta_mtime을 항상 0.0으로 두므로 이 감지는 로컬 경로에서만 동작한다.
+    meta_changed = False
+    if (has_yaml or has_xml) and not is_remote and dir_mtime is not None and meta_mtime:
+        cached_mtimes = db_folder_mtimes.get(root) if db_folder_mtimes else None
+        if not cached_mtimes or int(cached_mtimes[1] or 0) != int(meta_mtime):
+            meta_changed = True
+            print(f"[Scanner-DEBUG-Task] 📝 Folder metadata file new/changed - per-file skip disabled - folder: '{root}'")
+
     # 2. Early skip if files are unchanged (mtime & size match DB cache)
     skipped_files = set()
     imgdir_skip = False
     imgdir_virtual_path = join_canonical(root, IMGDIR_VIRTUAL_FILENAME)
-    if not force and db_files_cache:
+    if not force and not meta_changed and db_files_cache:
         for filename in media_files:
             full_path = _full_path_for(root, filename, gdrive_file_ids)
             if full_path in db_files_cache:
@@ -271,7 +283,7 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
         file_format = ext.replace('.', '').lower()
 
         skip = False
-        if not force and not meta_has_data and full_path in db_meta_full and full_path in db_offsets_cached:
+        if not force and not meta_changed and not meta_has_data and full_path in db_meta_full and full_path in db_offsets_cached:
             skip = True
         elif filename in skipped_files:
             skip = True
@@ -285,6 +297,7 @@ def process_folder_task(root, files, force, db_meta_full, db_offsets_cached, db_
 
         elif (
             not force and
+            not meta_changed and
             not meta_has_data and
             full_path in db_meta_full and
             full_path not in db_offsets_cached and
