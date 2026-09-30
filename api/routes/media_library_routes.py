@@ -107,6 +107,7 @@ def get_media_list():
         )
         if has_more:
             series_list = series_list[:limit]
+        series_list = SeriesService.annotate_recent_additions(db_type, series_list)
         t_end = time.perf_counter()
         print(f"[API-PROFILE] GET /api/media/list (type={db_type}, lib={library_id}, page={page}) -> TOTAL HTTP RESPONSE: {(t_end - t_start)*1000:.1f}ms")
         return jsonify({'success': True, 'series': series_list, 'has_more': has_more})

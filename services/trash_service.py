@@ -28,7 +28,9 @@ class TrashService:
             restored = TrashRepository.restore_books(db_type, book_ids)
             if restored and db_type not in ('audiobook', 'video'):
                 from repositories.series_repository import SeriesRepository
-                SeriesRepository.rebuild_summary(db_type)
+                from services.system_health_service import SystemHealthService, series_summary_health_key
+                with SystemHealthService.track(*series_summary_health_key(db_type)):
+                    SeriesRepository.rebuild_summary(db_type)
                 from services.series_service import SeriesService
                 SeriesService.invalidate_all_books_cache()
             return restored

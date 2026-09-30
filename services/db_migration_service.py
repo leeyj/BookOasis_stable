@@ -1099,6 +1099,31 @@ def _backfill_library_group_default_color(conn, cursor):
         print(f"[DB-Migration ERROR] library_groups default color backfill failed: {color_backfill_err}")
 
 
+def _backfill_books_created_at(conn, cursor, db_type):
+    """books.created_at(추가일)이 비어 있는 행을 커버 저장 시각(없으면 현재 시각)으로 채운다.
+
+    추가일이 NULL인 행이 단 하나만 있어도 series_summary 재생성이 NOT NULL 위반으로 통째로
+    롤백돼, 요약 테이블이 멈춘 채 이후 스캔분이 카테고리 목록에 안 보였다(2026-09 홈 서버
+    실사례: 1권 때문에 12일간 일반 도서 목록 갱신 중단). 재생성 쿼리 쪽에도 COALESCE 방어가
+    있지만, 이 행은 최신/과거 추가순 정렬에서도 엉뚱한 위치에 가므로 데이터 자체를 보정한다.
+    WHERE created_at IS NULL은 idx_books_created_at을 타서 반복 실행 비용이 거의 없다."""
+    if db_type not in ('general', 'adult'):
+        return
+    try:
+        is_mariadb = hasattr(conn, '_conn') or type(conn).__name__.startswith(('Mariadb', 'PooledMariaDB'))
+        zero_date_clause = " OR created_at = '0000-00-00 00:00:00'" if is_mariadb else ""
+        cursor.execute(f"""
+            UPDATE books
+            SET created_at = COALESCE(cover_updated_at, CURRENT_TIMESTAMP)
+            WHERE created_at IS NULL{zero_date_clause}
+        """)
+        conn.commit()
+        if (cursor.rowcount or 0) > 0:
+            print(f"[DB-Migration] {db_type} DB - backfilled books.created_at rows: {cursor.rowcount}")
+    except Exception as created_backfill_err:
+        print(f"[DB-Migration ERROR] {db_type} books.created_at backfill failed: {created_backfill_err}")
+
+
 def _rebuild_series_summary_if_needed(conn, db_type):
     """시리즈 요약 테이블(series_summary)이 아직 준비 안 됐으면 최초 1회 생성한다.
 
@@ -1114,7 +1139,10 @@ def _rebuild_series_summary_if_needed(conn, db_type):
             from repositories.mariadb.series_repository import SeriesRepository
         else:
             from repositories.sqlite.series_repository import SeriesRepository
-        if SeriesRepository.rebuild_summary(db_type, only_if_unready=True):
+        from services.system_health_service import SystemHealthService, series_summary_health_key
+        with SystemHealthService.track(*series_summary_health_key(db_type)):
+            created = SeriesRepository.rebuild_summary(db_type, only_if_unready=True)
+        if created:
             print(f"[DB-Migration] {db_type} DB - initial series summary created")
     except Exception as summary_err:
         print(f"[DB-Migration ERROR] {db_type} series summary initialization failed: {summary_err}")
@@ -1440,6 +1468,7 @@ def run_full_migration():
         _backfill_library_group_default_color(conn, cursor)
         if db_type == 'video' and not database.is_mariadb_mode():
             _backfill_html_entities_video_titles_sqlite(conn)
+        _backfill_books_created_at(conn, cursor, db_type)
         _rebuild_series_summary_if_needed(conn, db_type)
 
         conn.close()

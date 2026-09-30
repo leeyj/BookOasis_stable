@@ -757,7 +757,11 @@
     "sort_date_asc": "Oldest Added",
     "resume_fail_list": "Failed to load the book list.",
     "resume_fail_error": "An error occurred while resuming.",
-    "sort_required": "Alphabetical quick jump is only available when sorted A-Z/Z-A."
+    "sort_required": "Alphabetical quick jump is only available when sorted A-Z/Z-A.",
+    "badge_new": "NEW",
+    "badge_new_title": "Newly added in the last {days} days",
+    "badge_added": "+{count}",
+    "badge_added_title": "{count} added in the last {days} days"
   },
   "scheduler": {
     "save_success": "\"{name}\" settings saved successfully.",

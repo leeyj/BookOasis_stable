@@ -177,11 +177,18 @@ def get_system_status():
         except Exception as e:
             print(f"[System Status] tts pregen activity skipped: {e}")
 
+        # 계속 실패 중인 백그라운드 작업(예: 시리즈 목록 갱신) - 관리자에게만 조용히 노출
+        system_warnings = []
+        if session.get('role') == 'admin':
+            from services.system_health_service import SystemHealthService
+            system_warnings = SystemHealthService.get_active_warnings()
+
         response = jsonify({
             'success': True,
             'is_active': is_active,
             'tasks': running_tasks,
             'tts_pregen': tts_pregen,
+            'system_warnings': system_warnings,
             'raw_status': status,
             'has_running': has_running,
             'has_pending': has_pending,

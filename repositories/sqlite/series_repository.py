@@ -46,7 +46,9 @@ class SeriesRepository:
                                MIN(b2.id)
                            ) AS rep_id,
                            COUNT(*) AS series_book_count,
-                           MAX(b2.created_at) AS latest_added
+                           -- created_at이 NULL인 행이 하나라도 있으면 NOT NULL 컬럼 위반으로 재생성 전체가
+                           -- 롤백돼 요약 테이블이 통째로 멈춘다(2026-09 홈 서버 실사례) - 빈 문자열로 대체.
+                           COALESCE(MAX(b2.created_at), '') AS latest_added
                     FROM books b2
                     WHERE (b2.is_deleted = 0 OR b2.is_deleted IS NULL)
                     GROUP BY b2.library_id, COALESCE(NULLIF(b2.series_name, ''), b2.title)
@@ -456,6 +458,31 @@ class SeriesRepository:
                     time.sleep(wait_sec)
                     continue
                 raise e
+
+    @staticmethod
+    def fetch_recent_additions(db_type, days):
+        """최근 N일 안에 추가된 권을 (library_id, series_name)별로 센다 - 목록 카드의
+        "NEW / +N권" 배지용. created_at 기본값(CURRENT_TIMESTAMP)과 같은 시계로 기준 시각을
+        DB에서 직접 계산해야 서버/DB 타임존 차이로 배지가 어긋나지 않는다.
+        반환: (cutoff 문자열, [{library_id, series_name, cnt}, ...])"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT datetime('now', '-' || ? || ' days') AS cutoff", (int(days),))
+            cutoff_row = cursor.fetchone()
+            cutoff = cutoff_row['cutoff'] if cutoff_row else None
+            if not cutoff:
+                return None, []
+            cursor.execute("""
+                SELECT library_id, COALESCE(series_name, '') AS series_name, COUNT(*) AS cnt
+                FROM books
+                WHERE created_at >= ?
+                  AND (is_deleted = 0 OR is_deleted IS NULL)
+                GROUP BY library_id, COALESCE(series_name, '')
+            """, (cutoff,))
+            return str(cutoff), [dict(r) for r in cursor.fetchall()]
+        finally:
+            conn.close()
 
     @staticmethod
     def fetch_library_totals_bulk(db_type):

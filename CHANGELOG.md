@@ -1,4 +1,9 @@
 # CHANGELOG
+## v2.8.2
+- (fix) 추가일이 비어 있는 도서가 하나라도 있으면 일반 도서 카테고리 목록이 갱신되지 않아 새로 스캔한 책·카테고리가 "등록된 도서가 없습니다"로 보이던 이슈 수정 (비어 있는 추가일은 서버 시작 시 자동 보정) | fix general-library category lists no longer updating when any book had an empty added date, which made newly scanned books/categories show as "no books" (empty added dates are now filled in automatically on startup)
+- (improvement) 시리즈 카드에 최근 7일 추가 배지 표시 - 새 작품은 `NEW`, 기존 시리즈에 권이 추가되면 `+N권` (처음 스캔한 카테고리는 제외) | series cards show a badge for additions in the last 7 days - `NEW` for new titles, `+N` when volumes were added to an existing series (skipped for freshly scanned categories)
+- (improvement) 관리자 전용: 시리즈 목록 갱신이 계속 실패하면 상단 스캔 활동 아이콘에 빨간 점과 경고 표시 (다음 성공 시 자동 해제) | admin-only: a red dot and warning on the Scan activity icon while series list refresh keeps failing (clears automatically on the next success)
+
 ## v2.8.1
 - (fix) 이전 스캔 진행 기록 때문에 경로 지정 스캔(scan-path)이 지정한 폴더를 건너뛰던 이슈 수정(force 여부 무관, 새 회차 추가도 무시되던 문제 포함), 부분 스캔이 진행 기록을 남겨 다음 전체 스캔이 해당 폴더를 건너뛰던 이슈 수정 | fix path scans (scan-path) skipping the requested folder because of leftover scan-progress records (with or without force, including newly added episodes), and partial scans leaving progress records that made the next full scan skip those folders
 - (fix) 이미 스캔된 폴더에 나중에 kavita.yaml/info.xml을 추가하거나 수정하면 일반 스캔에서도 새 메타데이터가 반영되도록 수정(로컬 경로) | metadata from a kavita.yaml/info.xml added or edited after a folder was scanned is now applied by a normal scan too (local paths)

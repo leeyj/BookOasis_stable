@@ -212,6 +212,10 @@ body:not(.mobile-header-open) .library-header {
 .drawer-scan-dot.is-active {
     opacity: 1;
 }
+.drawer-scan-dot.has-warning {
+    opacity: 1;
+    background: #ef4444;
+}
 
 /* 드로어 패널 (닫힘 상태가 기본) */
 .sidebar-collapsible-content {

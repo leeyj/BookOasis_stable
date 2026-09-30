@@ -1,6 +1,6 @@
 // scan_activity_status.js – 백그라운드 스캔 상태 폴링 및 카테고리 스피너 제어 루틴 (ui.js에서 분리)
 import { state } from './state.js';
-import { parseServerDateTime } from './utils/time.js';
+import { parseServerDateTime, formatRelativeTime } from './utils/time.js';
 
 let statusIntervalId = null;
 let wasScanningPrevious = false;
@@ -119,6 +119,27 @@ function notifyPregenTransitions(items) {
   seenPregenStatus = new Map([...current].map(([k, i]) => [k, i.status]));
 }
 
+// 계속 실패 중인 백그라운드 작업(/api/system/status의 system_warnings, 관리자에게만 내려옴).
+// 다음 성공 때 서버가 자동으로 지우므로 여기서는 보여 주기만 한다.
+function systemWarningItemHtml(warning) {
+  const count = Number(warning?.fail_count || 0);
+  const since = warning?.last_ok_at
+    ? `마지막 성공 ${formatRelativeTime(warning.last_ok_at)}`
+    : `첫 실패 ${formatRelativeTime(warning?.first_failed_at)}`;
+  const detail = `${since} · 연속 ${count}회 실패 · ${warning?.message || ''}`;
+  return `
+      <div class="scan-activity-item is-failed is-system-warning" data-role="system-warning">
+        <span class="scan-activity-item-icon">
+          <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+        </span>
+        <div class="scan-activity-item-copy">
+          <div class="scan-activity-item-title" title="${escapeActivityAttribute(warning?.label)}">${escapeActivityText(warning?.label)} 실패 중</div>
+          <div class="scan-activity-item-detail" title="${escapeActivityAttribute(detail)}">${escapeActivityText(detail)}</div>
+        </div>
+        <span class="scan-activity-item-time">경고</span>
+      </div>`;
+}
+
 function renderScanActivity(data) {
   latestSystemStatus = data;
   const button = document.getElementById('btn-scan-activity');
@@ -135,10 +156,14 @@ function renderScanActivity(data) {
   const pregenItems = Array.isArray(data?.tts_pregen) ? data.tts_pregen : [];
   notifyPregenTransitions(pregenItems);
   const pregenActive = pregenItems.some(i => i.status === 'running' || i.status === 'queued');
+  const systemWarnings = Array.isArray(data?.system_warnings) ? data.system_warnings : [];
+  const hasWarning = systemWarnings.length > 0;
   button.classList.toggle('is-active', isActive || pregenActive);
+  button.classList.toggle('has-warning', hasWarning);
   // 모바일에선 이 버튼이 드로어 푸터로 옮겨가 있어 ☰/푸터에 진행 중 점을 대신 띄운다 (mobile.css .drawer-scan-dot)
   document.querySelectorAll('[data-role="scan-activity-mirror"]').forEach(el => {
     el.classList.toggle('is-active', isActive || pregenActive);
+    el.classList.toggle('has-warning', hasWarning);
   });
 
   const tasks = [];
@@ -152,15 +177,18 @@ function renderScanActivity(data) {
     }));
   }
   const total = tasks.length + pregenItems.length;
-  button.title = total > 0 ? `스캔 활동 ${total}건` : '스캔 활동';
-  summary.textContent = running
+  button.title = hasWarning
+    ? `스캔 활동 · 경고 ${systemWarnings.length}건`
+    : (total > 0 ? `스캔 활동 ${total}건` : '스캔 활동');
+  summary.textContent = (hasWarning && !running && !pending.length) ? `경고 ${systemWarnings.length}건` : running
     ? `실행 중 · 대기 ${pending.length}건`
     : pending.length ? `대기 ${pending.length}건`
       : recentBookScans.length ? `최근 도서 스캔 ${recentBookScans.length}건`
         : tasks.length ? '실행 중'
           : pregenActive ? '음성 생성 중' : pregenItems.length ? '최근 음성 생성' : '대기 중';
+  const warningsHtml = systemWarnings.map(systemWarningItemHtml).join('');
   if (tasks.length === 0 && pregenItems.length === 0) {
-    list.innerHTML = `
+    list.innerHTML = warningsHtml || `
       <div class="scan-activity-empty">
         <i class="fa-regular fa-circle-check" aria-hidden="true"></i>
         <span>진행 중인 스캔이 없습니다.</span>
@@ -168,7 +196,7 @@ function renderScanActivity(data) {
     return;
   }
 
-  list.innerHTML = tasks.map(({ task, pending: isPending, recent: isRecent }) => {
+  list.innerHTML = warningsHtml + tasks.map(({ task, pending: isPending, recent: isRecent }) => {
     const info = getScanActivityTaskInfo(task, isPending, isRecent);
     const recentStatus = task?.status || 'completed';
     const itemStateClass = isPending ? ' is-pending'

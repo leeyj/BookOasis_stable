@@ -278,6 +278,13 @@ _LIST_QUERY_CACHE_TTL = 120.0
 _TOTALS_CACHE = {}
 _TOTALS_CACHE_TTL = 30.0
 _TOTALS_REDIS_TTL = 300
+# 목록 카드 "NEW / +N권" 배지: 최근 N일 안에 추가된 권 집계를 짧게 캐시한다.
+_RECENT_ADDED_WINDOW_DAYS = 7
+_RECENT_ADDED_CACHE = {}
+_RECENT_ADDED_CACHE_TTL = 60.0
+# 카테고리 전체 권수 중 이 비율 이상이 "최근 추가"면 첫 스캔(초기 등록)으로 보고 배지를 끈다 -
+# 안 그러면 새로 만든 카테고리는 일주일 동안 모든 카드에 NEW가 붙어 배지가 의미를 잃는다.
+_RECENT_ADDED_INITIAL_IMPORT_RATIO = 0.5
 
 # ── [크로스 프로세스 캐시 무효화 신호] ──
 # 스캐너는 core.py의 start_scanner_worker_process()가 subprocess.Popen으로 띄우는
@@ -347,6 +354,7 @@ def _sync_local_books_cache_with_shared_epoch(db_type):
         _ALL_BOOKS_CACHE.clear()
         _LIST_QUERY_CACHE.clear()
         _TOTALS_CACHE.clear()
+        _RECENT_ADDED_CACHE.clear()
     _local_epoch_seen[db_type] = current_epoch
 
 
@@ -359,6 +367,7 @@ class SeriesService:
         _ALL_BOOKS_CACHE.clear()
         _LIST_QUERY_CACHE.clear()
         _TOTALS_CACHE.clear()
+        _RECENT_ADDED_CACHE.clear()
         try:
             from utils.redis_helper import redis_delete_pattern
             redis_delete_pattern('cache:series_totals:*')
@@ -530,6 +539,72 @@ class SeriesService:
         if return_has_more:
             return paged, raw_has_more
         return paged
+
+    @staticmethod
+    def _get_recent_additions(db_type):
+        """{'cutoff': str, 'series': {(library_id, series_name): 권수}, 'muted_libraries': set}"""
+        now = time.time()
+        cached = _RECENT_ADDED_CACHE.get(db_type)
+        if cached and now - cached[0] < _RECENT_ADDED_CACHE_TTL:
+            return cached[1]
+
+        cutoff, rows = SeriesRepository.fetch_recent_additions(db_type, _RECENT_ADDED_WINDOW_DAYS)
+        series_counts = {}
+        library_recent = {}
+        for row in rows:
+            lib_id = int(row['library_id'])
+            cnt = int(row['cnt'] or 0)
+            series_counts[(lib_id, row['series_name'] or '')] = cnt
+            library_recent[lib_id] = library_recent.get(lib_id, 0) + cnt
+
+        muted_libraries = set()
+        if library_recent:
+            totals = SeriesService.get_library_totals_bulk(db_type) or {}
+            for lib_id, recent in library_recent.items():
+                total = int((totals.get(lib_id) or {}).get('book_count') or 0)
+                if total > 0 and recent / total >= _RECENT_ADDED_INITIAL_IMPORT_RATIO:
+                    muted_libraries.add(lib_id)
+
+        data = {'cutoff': cutoff, 'series': series_counts, 'muted_libraries': muted_libraries}
+        _RECENT_ADDED_CACHE[db_type] = (now, data)
+        return data
+
+    @staticmethod
+    def annotate_recent_additions(db_type, entries):
+        """목록 응답 카드에 recent_added_count / is_new_series를 붙인다(캐시된 entry dict는
+        공유 객체라 복사본에 붙인다). 도서(general/adult) 시리즈 카드만 대상."""
+        if db_type not in ('general', 'adult') or not entries:
+            return entries
+        try:
+            recent = SeriesService._get_recent_additions(db_type)
+        except Exception as e:
+            print(f"[SeriesService] recent-additions lookup failed (badges skipped): {e}")
+            return entries
+        cutoff = recent['cutoff']
+        if not cutoff:
+            return entries
+
+        result = []
+        for entry in entries:
+            latest_added = str(entry.get('latest_added') or '')
+            lib_id = entry.get('library_id')
+            if (entry.get('is_author_group') or not latest_added or latest_added < cutoff
+                    or lib_id is None or int(lib_id) in recent['muted_libraries']):
+                result.append(entry)
+                continue
+            book_count = int(entry.get('book_count') or 1)
+            series_name = entry.get('series_name') or ''
+            if series_name == '기타 단행본':  # _build_series_entries가 빈 시리즈명에 붙이는 표시명
+                series_name = ''
+            count = recent['series'].get((int(lib_id), series_name), 0) if book_count > 1 else 1
+            count = min(max(count, 1), book_count)
+            result.append({
+                **entry,
+                'recent_added_count': count,
+                'is_new_series': count >= book_count,
+                'recent_window_days': _RECENT_ADDED_WINDOW_DAYS,
+            })
+        return result
 
     @staticmethod
     def find_jump_position(db_type, library_id, search_query, sort, target_char, limit,

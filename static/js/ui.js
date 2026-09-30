@@ -379,6 +379,22 @@ export function createBookCard(item, options = {}) {
     ? `<span class="book-card-audiobook-completed" title="${i18n.t('detail.audiobook_completed')}" aria-label="${i18n.t('detail.audiobook_completed')}"></span>`
     : '';
 
+  // 최근 추가 배지(커버 우측 하단): 새 작품이면 NEW, 기존 연재 시리즈에 권이 더해졌으면 +N권.
+  // 서버(SeriesService.annotate_recent_additions)가 목록 응답에만 recent_added_count를 붙인다.
+  const recentAddedCount = Number(item.recent_added_count || 0);
+  let recentBadgeHtml = '';
+  if (isBookCard && recentAddedCount > 0) {
+    const days = Number(item.recent_window_days || 7);
+    const isNewSeries = item.is_new_series === true;
+    const label = isNewSeries
+      ? i18n.t('book_list.badge_new')
+      : i18n.t('book_list.badge_added', { count: recentAddedCount });
+    const tip = isNewSeries
+      ? i18n.t('book_list.badge_new_title', { days })
+      : i18n.t('book_list.badge_added_title', { count: recentAddedCount, days });
+    recentBadgeHtml = `<span class="book-card-recent-badge${isNewSeries ? ' is-new' : ''}" data-role="card-recent-badge" title="${tip}">${label}</span>`;
+  }
+
   const isSelectableCard = options.allowSelection && !item.is_author_group;
   if (isSelectableCard) card.classList.add('book-card--selectable');
   const selectionToggleHtml = isSelectableCard
@@ -396,6 +412,7 @@ export function createBookCard(item, options = {}) {
       ${badgeHtml}
       ${favBtnHtml}
       ${lockedBadgeHtml}
+      ${recentBadgeHtml}
       ${infoBtnHtml}
       ${audiobookCompletedDotHtml}
       ${resumeButtonHtml}
