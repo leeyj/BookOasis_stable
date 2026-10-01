@@ -350,7 +350,6 @@
     "no_history_desc": "Read a few series and we'll tailor recommendations for you."
   },
   "header": {
-    "mobile_toggle": "Search & switch library",
     "general_books": "General Books",
     "adult_books": "Adult Books",
     "audiobooks": "Audiobooks",
@@ -695,6 +694,7 @@
   },
   "category": {
     "tts_ready": "Ready to Listen",
+    "home_sub_toggle": "Expand/collapse sub-menu",
     "pin_pinned": "Order pinned (Click to unpin)",
     "pin_unpinned": "Order changeable (Click to pin)",
     "add_new_tooltip": "Add New Category",

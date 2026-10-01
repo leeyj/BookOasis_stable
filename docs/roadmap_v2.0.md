@@ -38,6 +38,7 @@
 | B | 2 | `scheduler.js` → 크론 헬퍼 UI를 `cron_helper.js`로 분리 | ✅ 완료 | 2026-08-12 |
 | B | 3 | `audio_player.js` → `audio_player_modules/` 컨벤션 확장 (챕터 드로어를 `chapter_drawer.js`로 분리) | ✅ 완료 | 2026-08-12 |
 | B | 7 | `book_context_menu.js`(690줄) — 응집도 높아 분리 지점 없음 | ⏭️ 스킵 | 2026-08-12 |
+| B | 7' | 재평가: 1,068줄로 증가(증가분은 메뉴 항목 표시 규칙/액션) → `book_menu/`(menu_rules 순수 함수+node 테스트, actions, plugin_items)로 분리, 본체 458줄. 전역/export/HTML 호환 유지 | ✅ 완료 | 2026-10-01 |
 | B | 5 | `viewer/renderer.js`(825줄) — 성능 핫패스, 무리한 분리는 리스크만 키움 | ⏭️ 스킵 | 2026-08-12 |
 | B | 4 | `audio_player_modules/mini_player_ui.js`(827줄) 클로저 분리 | ⏭️ 스킵 | 2026-08-12 |
 | B | 6 | `viewer_txt.js`(1011줄) — TXT/EPUB이 공용 이벤트 핸들러 안에서 얽혀있어 리스크 질적으로 다름 | ⏸️ 보류 | - |

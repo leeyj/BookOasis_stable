@@ -11,15 +11,13 @@ function getSidebarElements() {
   const content = document.getElementById('sidebar-collapsible-content');
   const btn = document.getElementById('btn-sidebar-toggle');
   const desktopBtn = document.getElementById('btn-sidebar-toggle-desktop');
-  const infoBtnMobile = document.getElementById('btn-category-info-mobile');
-  const infoBtnDesktop = document.getElementById('btn-category-info');
   const brandHome = document.querySelector('[data-role="mobile-brand-home"]');
   const btnIcon = btn ? btn.querySelector('i') : null;
-  return { content, btn, desktopBtn, infoBtnMobile, infoBtnDesktop, brandHome, btnIcon };
+  return { content, btn, desktopBtn, brandHome, btnIcon };
 }
 
 export function syncSidebarResponsiveControls() {
-  const { btn, desktopBtn, infoBtnMobile, infoBtnDesktop, brandHome } = getSidebarElements();
+  const { btn, desktopBtn, brandHome } = getSidebarElements();
   const mobile = isMobileLayout();
 
   if (btn) {
@@ -27,12 +25,6 @@ export function syncSidebarResponsiveControls() {
   }
   if (desktopBtn) {
     desktopBtn.style.setProperty('display', mobile ? 'none' : 'flex', 'important');
-  }
-  if (infoBtnMobile) {
-    infoBtnMobile.style.setProperty('display', mobile ? 'inline-flex' : 'none', 'important');
-  }
-  if (infoBtnDesktop) {
-    infoBtnDesktop.style.setProperty('display', mobile ? 'none' : 'inline-flex', 'important');
   }
   if (brandHome) {
     brandHome.setAttribute('role', 'button');
@@ -237,8 +229,14 @@ function initSidebarCategorySync() {
 // 잠금 해제 시 상단 헤더(로고+햄버거)가 안 나타남). transform을 살짝 건드렸다 되돌리는
 // 것만으로 강제 리페인트를 유도할 수 있다. (버튼이 더 이상 fixed가 아니어도 이 리페인트
 // 버그 자체는 fixed 여부와 무관하게 발생할 수 있어 유지한다.)
+// 화면 맨 위에 실제로 보이는 헤더: 모바일은 로고 앱바(.sidebar-header-wrapper)를 숨기고 검색 헤더 카드(.library-header)가
+// 앱바 역할을 하므로(2026-10-01) 레이아웃별로 대상을 고른다.
+function getVisibleTopHeader() {
+  return document.querySelector(isMobileLayout() ? '.library-header' : '.sidebar-header-wrapper');
+}
+
 function forceIosHeaderRepaint() {
-  const header = document.querySelector('.sidebar-header-wrapper');
+  const header = getVisibleTopHeader();
   // 모바일에선 .library-sidebar 안에 position:fixed 드로어가 있어, 사이드바에 transform/opacity를 거는
   // 순간 드로어가 사이드바 기준으로 배치되거나 본문보다 아래 층에 깔린다. 모바일 앱바는 header 자체라
   // header만 다시 그려도 충분하므로 사이드바는 데스크톱에서만 건드린다.
@@ -267,7 +265,7 @@ function forceIosHeaderRepaint() {
 // 다른 트리거 경로에도 적용한다.
 function resetScrollIfHeaderHidden() {
   if (!isMobileLayout()) return;
-  const header = document.querySelector('.sidebar-header-wrapper');
+  const header = getVisibleTopHeader();
   const mainContent = document.querySelector('.library-main-content');
   // .sidebar-header-wrapper(로고/햄버거)는 .library-sidebar 안에 있어 실제 스크롤
   // 컨테이너인 .library-main-content 내부 스크롤과는 무관하다 - 그래서 이 rect
@@ -280,6 +278,7 @@ function resetScrollIfHeaderHidden() {
   }
   if (!header) return;
   const rect = header.getBoundingClientRect();
+  if (!rect.width && !rect.height) return; // display:none이면 rect가 전부 0이라 "화면 밖"으로 오판
   if (rect.bottom <= 0 || rect.top < -4) {
     // y=0 대신 y=1로 스크롤: iOS Safari는 스크롤 위치가 정확히 0일 때 주소창을
     // 완전히 펼치며 페이지 콘텐츠 위에 겹쳐 그리는 버그가 있다. 1px만 남겨두면
@@ -433,58 +432,86 @@ function syncMobilePopoverHost() {
   });
 }
 
-function setMobileHeaderOpen(isOpen) {
-  const btn = document.getElementById('btn-mobile-header-toggle');
-  if (document.body) document.body.classList.toggle('mobile-header-open', Boolean(isOpen));
-  if (btn) btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-  if (isOpen) {
-    // 스크롤 중 자동 숨김(header_scroll_behavior.js)으로 밀려 올라가 있던 상태면 펼쳐도 안 보이므로 해제
-    const header = document.querySelector('.library-header');
-    if (header) header.classList.remove('library-header--hidden');
-  }
-}
-
-// 모바일 앱바 🔍: 검색/세션탭/그룹모드/필터 헤더를 펼치고 접는다(기본 접힘, 화면을 넓게 쓰기 위함).
-// 세션탭·그룹모드는 한 번 고르면 할 일이 끝나므로 고른 뒤 자동으로 다시 접는다. 검색은 결과를 보며
-// 고쳐 쓸 수 있게 펼친 채로 둔다.
-function initMobileHeaderToggle() {
-  const btn = document.getElementById('btn-mobile-header-toggle');
-  if (!btn || btn.dataset.toggleBound === '1') return;
-  btn.dataset.toggleBound = '1';
-
-  btn.addEventListener('click', (e) => {
-    e.preventDefault();
-    const header = document.querySelector('.library-header');
-    const isOpen = document.body.classList.contains('mobile-header-open');
-    const scrolledAway = Boolean(header && header.classList.contains('library-header--hidden'));
-    setMobileHeaderOpen(!isOpen || scrolledAway);
-  });
-
-  document.addEventListener('click', (e) => {
-    if (!isMobileLayout() || !document.body.classList.contains('mobile-header-open')) return;
-    const target = e.target && typeof e.target.closest === 'function' ? e.target : null;
-    if (target && target.closest('[data-role="library-type-toggle"], [data-role="grouping-mode-toggle"]')) {
-      window.requestAnimationFrame(() => setMobileHeaderOpen(false));
-    }
-  }, true); // 세션탭 핸들러가 전파를 끊어도 받도록 캡처 단계에서
-}
-
-// 앱바의 현재 세션 표시: 활성 세션 탭(.btn-toggle.active) 라벨을 그대로 복사해 i18n을 따로 두지 않는다.
-// 세션 전환·언어 적용·권한에 따른 탭 노출 변경을 모두 잡으려고 탭 그룹 자체를 관찰한다.
-function initMobileSessionChip() {
-  const chip = document.getElementById('mobile-session-chip');
+// 모바일 헤더의 세션 선택 버튼 → 세션 전환 팝업(2열 그리드). 헤더 세션탭(#library-type-toggle-group)은 모바일에서
+// 숨겨 두고 원본으로만 쓰며, 라벨/노출/활성 상태를 버튼과 팝업에 복제한다(i18n·권한별 노출을 따로 두지 않기 위함).
+// 팝업 항목은 같은 data-role="library-type-toggle"이라 tab_media_library.js의 기존 위임 핸들러가 세션을 바꾼다.
+function initMobileSessionMenu() {
+  const trigger = document.getElementById('btn-mobile-session-select');
+  const menu = document.getElementById('mobile-session-menu');
   const group = document.getElementById('library-type-toggle-group');
-  if (!chip || !group || chip.dataset.bound === '1') return;
-  chip.dataset.bound = '1';
+  if (!trigger || !menu || !group || menu.dataset.bound === '1') return;
+  menu.dataset.bound = '1';
+  const triggerLabel = trigger.querySelector('.mobile-session-select-label');
+
+  const close = () => {
+    if (menu.hidden) return;
+    menu.hidden = true;
+    trigger.setAttribute('aria-expanded', 'false');
+  };
+  const open = () => {
+    // 팝업은 헤더 카드 폭에 맞춰 세션 버튼 바로 아래에 띄운다
+    const header = trigger.closest('.library-header');
+    const anchor = (header || trigger).getBoundingClientRect();
+    const rect = trigger.getBoundingClientRect();
+    menu.style.top = `${Math.round(rect.bottom + 6)}px`;
+    menu.style.left = `${Math.round(anchor.left)}px`;
+    menu.style.width = `${Math.round(anchor.width)}px`;
+    menu.hidden = false;
+    trigger.setAttribute('aria-expanded', 'true');
+  };
 
   const sync = () => {
-    const active = group.querySelector('.btn-toggle.active');
-    const label = active ? active.textContent.replace(/\s+/g, ' ').trim() : '';
-    if (chip.textContent !== label) chip.textContent = label;
+    const sources = Array.from(group.querySelectorAll('[data-role="library-type-toggle"]'));
+    if (menu.children.length !== sources.length) {
+      menu.replaceChildren(...sources.map((src) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'mobile-session-menu-item';
+        btn.setAttribute('data-role', 'library-type-toggle');
+        btn.setAttribute('data-library-type', src.getAttribute('data-library-type') || 'general');
+        return btn;
+      }));
+    }
+    let visibleCount = 0;
+    let activeLabel = '';
+    sources.forEach((src, i) => {
+      const btn = menu.children[i];
+      const label = src.textContent.replace(/\s+/g, ' ').trim();
+      if (btn.textContent !== label) btn.textContent = label;
+      const visible = src.style.display !== 'none';
+      btn.hidden = !visible;
+      if (visible) visibleCount += 1;
+      const active = src.classList.contains('active');
+      if (active) activeLabel = label;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    if (triggerLabel && triggerLabel.textContent !== activeLabel) triggerLabel.textContent = activeLabel;
+    // 세션이 하나뿐이면 고를 게 없으므로 버튼째 숨긴다
+    trigger.hidden = group.style.display === 'none' || visibleCount < 2;
+    if (trigger.hidden) close();
   };
+
+  trigger.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (menu.hidden) open(); else close();
+  });
+  // 항목 선택(기존 위임 핸들러가 세션 전환)이나 바깥 탭이면 팝업만 닫는다
+  document.addEventListener('click', (e) => {
+    if (menu.hidden) return;
+    const target = e.target && typeof e.target.closest === 'function' ? e.target : null;
+    if (target && target.closest('#btn-mobile-session-select')) return;
+    window.requestAnimationFrame(close);
+  }, true);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') close();
+  });
+  window.addEventListener('resize', close);
+  window.addEventListener('scroll', close, true);
+
   sync();
   new MutationObserver(sync).observe(group, {
-    subtree: true, attributes: true, attributeFilter: ['class'], characterData: true, childList: true,
+    subtree: true, attributes: true, attributeFilter: ['class', 'style'], characterData: true, childList: true,
   });
 }
 
@@ -494,8 +521,7 @@ export function initSidebarInteractions() {
   initSidebarCategorySync();
   initSidebarViewportRecovery();
   initSidebarDrawerChrome();
-  initMobileHeaderToggle();
-  initMobileSessionChip();
+  initMobileSessionMenu();
   syncMobilePopoverHost();
   // 최초 로드 시에도(백그라운드 복귀 경로와 무관하게) 계산된 display 값과 실제 화면에
   // 그려지는 것이 어긋나는 iOS WebKit 리페인트 버그가 재현됐다(로그상 display는 전부

@@ -15,23 +15,13 @@
     <div class="library-sidebar"
         style="display: flex; flex-direction: column; justify-content: space-between; min-height: auto;">
         <div class="sidebar-header-wrapper" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-            <h3 class="sidebar-title" data-role="mobile-brand-home" style="margin: 0; display: flex; align-items: center; gap: 0.6rem; font-size: 1.4rem;"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="" aria-hidden="true" style="width: 40px; height: 40px; object-fit: contain;"> <span>BookOasis</span><span id="mobile-session-chip" class="mobile-session-chip mobile-drawer-only" aria-live="polite"></span></h3>
-            <button id="btn-sidebar-toggle" class="btn-sidebar-toggle" aria-expanded="false" aria-controls="sidebar-collapsible-content" data-i18n-title="sidebar.open_menu" title="메뉴" style="display: none; background: transparent; border: none; color: var(--app-text-primary); font-size: 1.25rem; cursor: pointer; padding: 0.2rem 0.5rem; outline: none;">
-                <i class="fa-solid fa-bars"></i>
-                <!-- 모바일에선 상단 스캔활동 아이콘이 드로어 하단으로 옮겨가므로, 진행 중 표시 점을 햄버거에 대신 띄운다 -->
-                <span class="drawer-scan-dot" data-role="scan-activity-mirror" aria-hidden="true"></span>
-            </button>
-            <!-- 모바일 전용: 검색/세션탭/그룹모드/필터(.library-header)는 화면을 넓게 쓰도록 기본 숨김, 이 버튼으로 펼침
-                 (sidebar_manager.js initMobileHeaderToggle) -->
-            <button id="btn-mobile-header-toggle" class="btn-mobile-header-toggle mobile-drawer-only" type="button"
-                aria-expanded="false" data-i18n-title="header.mobile_toggle" title="검색 · 보관함 전환">
-                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-            </button>
-            <!-- 모바일용 카테고리 정보 팝오버 트리거 (데스크톱 버전은 global_header.html 참고) -->
-            <button id="btn-category-info-mobile" class="btn-category-info" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="category-info-popover" title="현재 카테고리 정보" style="display: none;">
-                <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
-            </button>
+            <h3 class="sidebar-title" data-role="mobile-brand-home" style="margin: 0; display: flex; align-items: center; gap: 0.6rem; font-size: 1.4rem;"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="" aria-hidden="true" style="width: 40px; height: 40px; object-fit: contain;"> <span>BookOasis</span></h3>
         </div>
+
+        <!-- 모바일 전용 세션 전환 팝업: 헤더의 세션 선택 버튼(#btn-mobile-session-select)을 누르면 뜬다 (2026-10-01).
+             버튼은 sidebar_manager.js initMobileSessionMenu가 #library-type-toggle-group을 그대로 복제해 채운다.
+             .library-header는 스크롤 숨김용 transform이 걸려 그 안에 두면 position:fixed 기준이 틀어지므로 여기 둔다 -->
+        <nav id="mobile-session-menu" class="mobile-session-menu mobile-drawer-only" aria-label="세션 전환" hidden></nav>
 
         <!-- 모바일(≤1200px) 좌측 드로어: 백드롭/드로어 헤더/메뉴 검색/관리 도구/하단 푸터는 .mobile-drawer-only로
              데스크톱에선 숨긴다 (sidebar_manager.js, mobile.css 참고) -->

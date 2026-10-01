@@ -147,6 +147,27 @@ function renderPluginItem(cp) {
   return `<li class="menu-item ${isActive}" data-type="plugin" data-role="sidebar-category-dynamic" id="category-${catId}" data-id="${catId}" data-category-id="${catId}" data-plugin-id="${cp.id}"><i class="${safeIcon}" style="color: #38bdf8;"></i> ${safeTitle}</li>`;
 }
 
+// Home 아래 고정 메뉴(최근 읽은 도서~전체보기)는 Home의 하위 메뉴로 들여 쓰고 접을 수 있다 - 고정 메뉴가 늘 자리를
+// 차지해 보관함 목록이 밀려나던 문제(2026-10-01). 저장값이 없으면 접힌 상태로 시작한다. 단 지금 보고 있는 화면이
+// 하위 메뉴 중 하나면 활성 표시가 가려지지 않도록 저장값과 무관하게 펼쳐 보여준다(저장값은 건드리지 않음).
+const HOME_SUB_COLLAPSED_STORAGE_KEY = 'sidebar_home_sub_collapsed';
+
+function isHomeSubCollapsedPreferred() {
+  try {
+    return localStorage.getItem(HOME_SUB_COLLAPSED_STORAGE_KEY) !== 'false';
+  } catch (_) {
+    return true;
+  }
+}
+
+function applyHomeSubCollapsed(sidebar, collapsed = isHomeSubCollapsedPreferred()) {
+  if (!sidebar) return;
+  const activeIsSub = Boolean(sidebar.querySelector('.sidebar-home-sub.active'));
+  const effective = collapsed && !activeIsSub;
+  sidebar.classList.toggle('home-sub-collapsed', effective);
+  sidebar.querySelector('[data-role="sidebar-home-sub-toggle"]')?.setAttribute('aria-expanded', effective ? 'false' : 'true');
+}
+
 function getGroupCollapsedStorageKey(groupId) {
   return `library_group_collapsed_${state.currentLibraryType}_${groupId}`;
 }
@@ -161,6 +182,10 @@ export function expandGroupContainingCategory(categoryId) {
   if (!categoryId) return;
   const activeItem = document.querySelector(`#sidebar-categories [data-category-id="${categoryId}"]`);
   if (!activeItem) return;
+  if (activeItem.classList.contains('sidebar-home-sub')) {
+    applyHomeSubCollapsed(activeItem.closest('#sidebar-categories'));
+    return;
+  }
   const groupContainer = activeItem.closest('.sidebar-library-group');
   if (!groupContainer || !groupContainer.classList.contains('collapsed')) return;
   groupContainer.classList.remove('collapsed');
@@ -189,7 +214,10 @@ export function applySidebarShowMore(sidebar, currentLibraryId) {
     return;
   }
 
-  const items = Array.from(sidebar.querySelectorAll('li[data-role="sidebar-category-dynamic"]'));
+  // Home 하위 고정 메뉴는 자체 접기(applyHomeSubCollapsed)가 있어 "더 보기" 개수에서 뺀다 - 세면 접어서 안 보이는
+  // 하위 메뉴가 노출 한도(14개)를 차지해 실제 보관함은 몇 개만 보이고 바로 "더 보기"가 붙었다
+  const items = Array.from(sidebar.querySelectorAll('li[data-role="sidebar-category-dynamic"]:not(.sidebar-home-sub)'));
+  sidebar.querySelectorAll('li.sidebar-home-sub').forEach(item => item.style.removeProperty('display'));
   const total = items.length;
 
   if (total < SIDEBAR_MORE_THRESHOLD) {
@@ -419,6 +447,21 @@ function initDynamicSidebarDelegation() {
       return;
     }
 
+    const homeSubToggle = rawTarget.closest('[data-role="sidebar-home-sub-toggle"]');
+    if (homeSubToggle) {
+      event.preventDefault();
+      event.stopPropagation();
+      const sidebarEl = document.getElementById('sidebar-categories');
+      const collapsed = !(sidebarEl && sidebarEl.classList.contains('home-sub-collapsed'));
+      try { localStorage.setItem(HOME_SUB_COLLAPSED_STORAGE_KEY, collapsed ? 'true' : 'false'); } catch (_) {}
+      if (sidebarEl) {
+        // 활성 하위 메뉴 때문에 강제로 펼쳐진 상태에서도 사용자가 접으면 접는다
+        sidebarEl.classList.toggle('home-sub-collapsed', collapsed);
+        homeSubToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      }
+      return;
+    }
+
     const pinBtn = rawTarget.closest('[data-role="sidebar-pin-categories"]');
     if (pinBtn) {
       console.log('[Category-Delegation] 핀 고정 버튼 감지됨:', pinBtn);
@@ -555,10 +598,12 @@ export async function loadLibraries() {
       const tSmartRec = (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('category.smart_recommend', '스마트 추천') : '스마트 추천';
       const tPlugins = (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('category.plugins', '플러그인') : '플러그인';
       const tAll = (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('category.all', '전체보기') : '전체보기';
+      const tHomeSubToggle = (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('category.home_sub_toggle', '하위 메뉴 펼치기/접기') : '하위 메뉴 펼치기/접기';
 
       let html = `<li class="menu-item ${state.currentLibraryId === 'home' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-home" data-id="home" data-category-id="home" style="display: flex; justify-content: space-between; align-items: center; box-sizing: border-box;">
         <span style="display: inline-flex; align-items: center; gap: 0.6rem;"><i class="fa-solid fa-house"></i> ${tHome}</span>
-        <div style="display: inline-flex; align-items: center; gap: 0.4rem;">
+        <div class="sidebar-home-right" style="display: inline-flex; align-items: center; gap: 0.4rem;">
+        <div class="sidebar-home-admin" style="display: inline-flex; align-items: center; gap: 0.4rem;">
           <button id="btn-pin-categories" data-role="sidebar-pin-categories" style="background: none; border: none; cursor: pointer; padding: 0.2rem 0.4rem; font-size: 0.9rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; ${pinBtnStyle}" title="${pinTitle}">
             <i class="fa-solid fa-thumbtack"></i>
           </button>
@@ -566,22 +611,26 @@ export async function loadLibraries() {
           ${addBtnHtml}
           ${addGdriveCopyBtnHtml}
         </div>
+          <button type="button" class="sidebar-home-sub-toggle" data-role="sidebar-home-sub-toggle" aria-expanded="true" title="${escapeHtml(tHomeSubToggle)}" aria-label="${escapeHtml(tHomeSubToggle)}">
+            <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+          </button>
+        </div>
       </li>`;
 
-      html += `<li class="menu-item ${state.currentLibraryId === 'history' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-history" data-id="history" data-category-id="history"><i class="fa-solid fa-clock-rotate-left"></i> ${tHistory}</li>`;
-      html += `<li class="menu-item ${state.currentLibraryId === 'favorite' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-favorite" data-id="favorite" data-category-id="favorite"><i class="fa-solid fa-star" style="color: #eab308;"></i> ${tFavorite}</li>`;
-      html += `<li class="menu-item ${state.currentLibraryId === 'collection' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-collection" data-id="collection" data-category-id="collection"><i class="fa-solid fa-bookmark" style="color: var(--app-accent);"></i> ${tCollection}</li>`;
+      html += `<li class="menu-item sidebar-home-sub ${state.currentLibraryId === 'history' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-history" data-id="history" data-category-id="history"><i class="fa-solid fa-clock-rotate-left"></i> ${tHistory}</li>`;
+      html += `<li class="menu-item sidebar-home-sub ${state.currentLibraryId === 'favorite' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-favorite" data-id="favorite" data-category-id="favorite"><i class="fa-solid fa-star" style="color: #eab308;"></i> ${tFavorite}</li>`;
+      html += `<li class="menu-item sidebar-home-sub ${state.currentLibraryId === 'collection' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-collection" data-id="collection" data-category-id="collection"><i class="fa-solid fa-bookmark" style="color: var(--app-accent);"></i> ${tCollection}</li>`;
       if (state.smartRecommendEnabled !== false) {
-        html += `<li class="menu-item ${state.currentLibraryId === 'smart_rec' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-smart-rec" data-id="smart_rec" data-category-id="smart_rec"><i class="fa-solid fa-wand-magic-sparkles" style="color: #34d399;"></i> ${tSmartRec}</li>`;
+        html += `<li class="menu-item sidebar-home-sub ${state.currentLibraryId === 'smart_rec' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-smart-rec" data-id="smart_rec" data-category-id="smart_rec"><i class="fa-solid fa-wand-magic-sparkles" style="color: #34d399;"></i> ${tSmartRec}</li>`;
       }
       // 음성 준비됨(서버에 미리 만든 듣기 음성이 있는 책) — 서버 미리 만들기가 켜진 도서 세션에서만
       if (state.ttsPregenEnabled && ['general', 'adult'].includes(state.currentLibraryType)) {
         const tTtsReady = (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('category.tts_ready', '음성 준비됨') : '음성 준비됨';
-        html += `<li class="menu-item ${state.currentLibraryId === 'tts_ready' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-tts-ready" data-id="tts_ready" data-category-id="tts_ready"><i class="fa-solid fa-headphones" style="color: #a78bfa;"></i> ${tTtsReady}</li>`;
+        html += `<li class="menu-item sidebar-home-sub ${state.currentLibraryId === 'tts_ready' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-tts-ready" data-id="tts_ready" data-category-id="tts_ready"><i class="fa-solid fa-headphones" style="color: #a78bfa;"></i> ${tTtsReady}</li>`;
       }
-      html += `<li class="menu-item ${state.currentLibraryId === 'plugins' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-plugins" data-id="plugins" data-category-id="plugins"><i class="fa-solid fa-puzzle-piece" style="color: #38bdf8;"></i> ${tPlugins}</li>`;
+      html += `<li class="menu-item sidebar-home-sub ${state.currentLibraryId === 'plugins' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-plugins" data-id="plugins" data-category-id="plugins"><i class="fa-solid fa-puzzle-piece" style="color: #38bdf8;"></i> ${tPlugins}</li>`;
       if (state.showSidebarCategoryAll !== false) {
-        html += `<li class="menu-item ${state.currentLibraryId === 'all' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-all" data-id="all" data-category-id="all"><i class="fa-solid fa-layer-group"></i> ${tAll}</li>`;
+        html += `<li class="menu-item sidebar-home-sub ${state.currentLibraryId === 'all' ? 'active' : ''}" data-type="system" data-role="sidebar-category-dynamic" id="category-all" data-id="all" data-category-id="all"><i class="fa-solid fa-layer-group"></i> ${tAll}</li>`;
       }
       
       if (data.libraries && data.libraries.length > 0) {
@@ -673,6 +722,7 @@ export async function loadLibraries() {
       if (requestToken !== sidebarLoadToken) return;
 
       sidebar.innerHTML = html;
+      applyHomeSubCollapsed(sidebar);
       renderSidebarAdminTools({ isAdmin, isPinned, pinTitle });
       normalizeSidebarBareLabels(sidebar);
       applySavedMixedOrder(sidebar);

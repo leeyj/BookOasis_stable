@@ -1,4 +1,11 @@
 # CHANGELOG
+## v2.8.3
+- (fix) 경로 지정 스캔(scan-path) 등에서 처리·커버 생성·스캔 성공까지 끝났는데 도서가 DB에 등록되지 않던 이슈 수정 (MariaDB, 스캔 도중 다른 작업이 해당 도서 기록을 지운 경우 자동 재등록, 끝내 등록 실패 시 scan-path는 오류 반환) | fix books processed successfully (cover generated, scan reported success) but never registered in the DB, e.g. via scan-path (MariaDB; a record removed by another task mid-scan is now re-registered, and scan-path returns an error if it still can't be saved)
+- (fix) 7일 지난 휴지통 자동 비우기가 파일이 다시 존재하는 도서까지 영구 삭제하던 이슈 수정 (삭제 대신 복구) | fix the 7-day trash auto-cleanup permanently deleting books whose files exist again (they are now restored instead)
+- (fix) 서버가 주기적으로 작업 프로세스를 교체할 때 Google Drive에서 읽던 요청이 걸려 있으면 최대 5분간 응답하지 않던 이슈 수정 (교체 시 읽기 진행도 저장 등 정리 후 바로 종료) | fix the server becoming unresponsive for up to 5 minutes when its worker was periodically recycled while a Google Drive read was in progress (the worker now saves reading progress and cleans up, then exits right away)
+- (improvement) 모바일 상단을 카드 한 장으로 개편 - ☰·검색·계정 줄은 항상 보이고, 기본/작가별과 세션 선택·필터·스캔 활동 줄은 아래로 스크롤하면 접힘. 세션은 "일반 도서 ⌄"를 눌러 바로 전환 (상단 로고 줄과 🔍 버튼 제거) | mobile top bar is now a single card - the ☰/search/account row always stays, while the Default/By author row and the session picker/filter/scan activity row collapse when scrolling down; switch sessions directly from "General Books ⌄" (the logo row and 🔍 button are gone)
+- (improvement) 사이드바 Home 아래 고정 메뉴(최근 읽은 도서~전체보기)를 하위 메뉴로 들여 쓰고 Home 줄의 화살표로 접기 (기본 접힘, 상태 기억) | the fixed sidebar items under Home (Recently read to View all) are now an indented sub-menu that collapses via the arrow on the Home row (collapsed by default, state remembered)
+
 ## v2.8.2
 - (fix) 추가일이 비어 있는 도서가 하나라도 있으면 일반 도서 카테고리 목록이 갱신되지 않아 새로 스캔한 책·카테고리가 "등록된 도서가 없습니다"로 보이던 이슈 수정 (비어 있는 추가일은 서버 시작 시 자동 보정) | fix general-library category lists no longer updating when any book had an empty added date, which made newly scanned books/categories show as "no books" (empty added dates are now filled in automatically on startup)
 - (improvement) 시리즈 카드에 최근 7일 추가 배지 표시 - 새 작품은 `NEW`, 기존 시리즈에 권이 추가되면 `+N권` (처음 스캔한 카테고리는 제외) | series cards show a badge for additions in the last 7 days - `NEW` for new titles, `+N` when volumes were added to an existing series (skipped for freshly scanned categories)

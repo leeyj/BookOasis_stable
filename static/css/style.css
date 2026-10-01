@@ -1031,6 +1031,54 @@ body {
     transform: rotate(-90deg);
 }
 
+/* Home 하위 고정 메뉴(최근 읽은 도서~전체보기): 그룹 폴더처럼 한 칸 들이고 Home 줄의 화살표로 접는다
+   (category/index.js applyHomeSubCollapsed). 메뉴 검색 중엔 mobile.css의 !important 규칙이 매치 항목을 다시 보여준다 */
+.sidebar-menu .menu-item.sidebar-home-sub {
+    margin-left: 1.15rem;
+}
+
+#sidebar-categories.home-sub-collapsed .sidebar-home-sub {
+    display: none;
+}
+
+.sidebar-home-sub-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.2rem 0.4rem;
+    border: none;
+    border-radius: 4px;
+    background: none;
+    color: var(--app-text-muted);
+    font-size: 0.7rem;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.sidebar-home-sub-toggle:hover {
+    color: var(--app-text-primary);
+}
+
+.sidebar-home-sub-toggle i {
+    transition: transform 0.18s ease;
+}
+
+#sidebar-categories.home-sub-collapsed .sidebar-home-sub-toggle i {
+    transform: rotate(-90deg);
+}
+
+/* 데스크톱 아이콘 레일(접힌 사이드바)은 Home 자체가 숨겨져 화살표가 없으므로, 하위 메뉴를 접어 둔 상태여도
+   아이콘은 모두 보여주고 들여쓰기도 없앤다 */
+@media (min-width: 1201px) {
+    .library-sidebar.collapsed #sidebar-categories.home-sub-collapsed .sidebar-home-sub {
+        display: flex;
+    }
+
+    .library-sidebar.collapsed .sidebar-menu .menu-item.sidebar-home-sub {
+        margin-left: 0;
+    }
+}
+
 .sidebar-library-group-items {
     list-style: none;
     margin: 0;

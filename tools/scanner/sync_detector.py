@@ -103,11 +103,28 @@ def handle_deleted_books(cursor, db_books, deleted_paths, target_paths, found_fi
     try:
         cutoff = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')
         cursor.execute(f"""
-            SELECT id, cover_image FROM books
+            SELECT id, cover_image, file_path FROM books
             WHERE COALESCE(is_deleted, 0) = 1
               AND deleted_at <= {ph}
         """, (cutoff,))
         old_deleted_rows = cursor.fetchall()
+
+        # 이 비우기는 스캔 범위/라이브러리와 무관하게 DB 전체에 적용된다. 그 사이 파일이 다시
+        # 나타났는데(다른 부분 스캔이 막 처리 중일 수도 있음) 여기서 row를 지워버리면, 그 스캔의
+        # UPDATE가 0 rows로 끝나 도서가 DB에서 통째로 사라진다. 실제 파일이 있으면 지우지 않고 복구한다.
+        reappeared_ids = [
+            r['id'] for r in old_deleted_rows
+            if r['file_path'] and not r['file_path'].startswith(('gdrive:', 'gdrive://'))
+            and os.path.exists(r['file_path'])
+        ]
+        if reappeared_ids:
+            placeholders = ','.join([ph] * len(reappeared_ids))
+            cursor.execute(f"""
+                UPDATE books SET is_deleted = 0, deleted_at = NULL WHERE id IN ({placeholders})
+            """, tuple(reappeared_ids) if _is_mariadb_mode() else reappeared_ids)
+            print(f"[Scanner-Cleanup] Skipped purge of {len(reappeared_ids)} trashed books whose files exist again (restored).")
+            old_deleted_rows = [r for r in old_deleted_rows if r['id'] not in set(reappeared_ids)]
+
         if old_deleted_rows:
             old_ids = [r['id'] for r in old_deleted_rows]
             placeholders = ','.join([ph] * len(old_ids))

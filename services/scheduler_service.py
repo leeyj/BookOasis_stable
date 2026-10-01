@@ -75,6 +75,13 @@ scheduler = BackgroundScheduler()
 
 class SchedulerService:
     @staticmethod
+    def stop_scheduler():
+        """서버 종료 시 스케줄러 정지 (core.py _graceful_shutdown이 호출).
+        실행 중인 작업은 기다리지 않는다 - 종료 중엔 스레드 풀이 이미 닫혀 새 작업 제출도 실패한다."""
+        if scheduler.running:
+            scheduler.shutdown(wait=False)
+
+    @staticmethod
     def start_scheduler():
         """서버 기동 시 스케줄러를 시작하고 DB에서 기존 스케줄 로드"""
         if not scheduler.running:

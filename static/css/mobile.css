@@ -11,7 +11,7 @@
 
 .media-library-container {
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0; /* 사이드바는 모바일에서 높이 0(로고 앱바 숨김, 드로어/팝업은 fixed)이라 간격이 빈 줄로만 남는다 */
     padding: calc(0.5rem + env(safe-area-inset-top, 0px)) 0.75rem calc(4.5rem + env(safe-area-inset-bottom, 0px)) 0.75rem;
 }
 
@@ -41,7 +41,7 @@
     /* 데스크톱의 transition:all 이 남아있으면 opacity/transform 변경이 0.3초간 보간되며 그동안 쌓임 맥락이 생긴다 */
     transition: none !important;
     border: none;
-    padding: 0.15rem 0.1rem !important;
+    padding: 0 !important;
     gap: 0;
     overflow: visible;
     background: transparent;
@@ -53,101 +53,120 @@
 .library-sidebar.collapsed {
     width: 100% !important;
     min-width: 100% !important;
-    padding: 0.15rem 0.1rem !important;
+    padding: 0 !important;
     opacity: 1 !important;
     pointer-events: auto !important;
     overflow: visible !important;
     border: none;
 }
 
+/* 로고 앱바는 모바일에서 쓰지 않는다 - 검색 헤더 카드(.library-header)가 ☰/검색/계정을 품은 앱바 역할(2026-10-01).
+   예전 앱바에 걸던 iOS 리페인트 대응(translate3d 상시 레이어)은 sidebar_manager.js getVisibleTopHeader 쪽으로 대상만 옮김 */
 .sidebar-header-wrapper {
-    min-height: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    /* 로고 왼쪽에 ☰, 오른쪽 끝에 ⋯ */
-    justify-content: flex-start !important;
-    gap: 0.55rem;
-    /* iOS Safari가 백그라운드(화면 잠금, 탭 전환 등) 복귀 시 정적인 헤더 영역의
-       리페인트를 누락하는 버그가 있다(JS로 토글하는 강제 리페인트 넛지를 여러 번
-       시도했으나 실기기에서 재현이 계속됨, 2026-08-17). 토글 방식 대신 헤더를 처음
-       부터 계속 자체 컴포지팅 레이어로 승격시켜두면, 복귀 시 전체 래스터화 대신
-       레이어 재합성만 하면 되어 이 버그를 원천적으로 피할 가능성이 높다. */
-    transform: translate3d(0, 0, 0);
-    -webkit-transform: translate3d(0, 0, 0);
-    will-change: transform;
-}
-
-#btn-sidebar-toggle {
-    order: -1; /* 햄버거는 맨 왼쪽 */
-}
-
-/* 앱바 로고 옆 현재 세션 표시 - 세션 탭이 🔍 안으로 접혀 들어가 "지금 어느 세션인지" 알려줄 곳이 필요
-   (sidebar_manager.js initMobileSessionChip이 활성 세션 탭 라벨을 복사, 색은 :root[data-library-type]) */
-.mobile-session-chip {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.12rem 0.45rem;
-    border: 1px solid var(--app-border);
-    border-radius: 999px;
-    font-size: 0.7rem;
-    font-weight: 600;
-    line-height: 1.3;
-    color: var(--app-text-muted);
-    white-space: nowrap;
-}
-
-.mobile-session-chip:empty {
-    display: none;
-}
-
-:root[data-library-type="adult"] .mobile-session-chip {
-    color: #f87171;
-    border-color: rgba(248, 113, 113, 0.45);
-}
-
-:root[data-library-type="audiobook"] .mobile-session-chip {
-    color: #38bdf8;
-    border-color: rgba(56, 189, 248, 0.45);
-}
-
-:root[data-library-type="video"] .mobile-session-chip {
-    color: #a78bfa;
-    border-color: rgba(167, 139, 250, 0.45);
-}
-
-.btn-mobile-header-toggle {
-    order: 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 2.3rem;
-    height: 2.3rem;
-    padding: 0;
-    border: none;
-    border-radius: 8px;
-    background: transparent;
-    color: var(--app-text-muted);
-    font-size: 1.05rem;
-    cursor: pointer;
-    flex-shrink: 0;
-}
-
-.btn-mobile-header-toggle[aria-expanded="true"] {
-    background: var(--app-bg-card);
-    color: var(--app-accent);
-}
-
-/* 모바일은 기능보다 화면 넓이가 우선 - 검색/세션탭/그룹모드/필터 헤더는 앱바 🔍로 펼칠 때만 보인다.
-   (recoverTopCategoryUiAfterBack 등이 인라인 display:grid를 넣으므로 !important 필요) */
-body:not(.mobile-header-open) .library-header {
     display: none !important;
 }
 
-#btn-category-info-mobile {
-    order: 2;
-    width: 2.3rem;
-    height: 2.3rem;
-    padding: 0;
+/* 세션 선택 버튼 → 세션 전환 팝업 (sidebar_manager.js initMobileSessionMenu) - 세션 이동이 불편하다는 이슈(2026-10-01).
+   팝업 위치(top/left/width)는 JS가 버튼 아래, 헤더 카드 폭으로 잡는다. */
+.mobile-session-select {
+    grid-area: session;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 0;
+    padding: 0 0.75rem;
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--app-text-primary);
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-session-select[hidden] {
+    display: none;
+}
+
+.mobile-session-select i {
+    font-size: 0.7rem;
+    color: var(--app-text-muted);
+    transition: transform 0.2s ease;
+}
+
+.mobile-session-select[aria-expanded="true"] {
+    border-color: color-mix(in srgb, var(--app-accent) 60%, transparent);
+}
+
+.mobile-session-select[aria-expanded="true"] i {
+    transform: rotate(180deg);
+}
+
+.mobile-session-menu {
+    position: fixed;
+    z-index: 5;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.3rem;
+    padding: 0.4rem;
+    box-sizing: border-box;
+    border: 1px solid var(--app-border);
+    border-radius: 12px;
+    background: var(--app-bg-card);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+}
+
+.mobile-session-menu[hidden],
+.mobile-session-menu-item[hidden] {
+    display: none;
+}
+
+.mobile-session-menu-item {
+    min-height: 2.6rem;
+    padding: 0 0.5rem;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--app-text-secondary, var(--app-text-primary));
+    font: inherit;
+    font-size: 0.88rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-session-menu-item:active {
+    background: var(--app-bg-card-hover);
+}
+
+.mobile-session-menu-item.active {
+    border-color: color-mix(in srgb, var(--app-accent) 45%, transparent);
+    background: color-mix(in srgb, var(--app-accent) 12%, transparent);
+    color: var(--app-accent);
+    font-weight: 700;
+}
+
+:root[data-library-type="adult"] .mobile-session-menu-item.active {
+    border-color: rgba(248, 113, 113, 0.45);
+    background: rgba(248, 113, 113, 0.12);
+    color: #f87171;
+}
+
+:root[data-library-type="audiobook"] .mobile-session-menu-item.active {
+    border-color: rgba(56, 189, 248, 0.45);
+    background: rgba(56, 189, 248, 0.12);
+    color: #38bdf8;
+}
+
+:root[data-library-type="video"] .mobile-session-menu-item.active {
+    border-color: rgba(167, 139, 250, 0.45);
+    background: rgba(167, 139, 250, 0.12);
+    color: #a78bfa;
 }
 
 .sidebar-title {
@@ -440,8 +459,16 @@ body.sidebar-drawer-open .sidebar-drawer-backdrop {
 }
 
 /* Home 줄의 관리자 버튼(핀/그룹 추가/카테고리 추가)은 모바일에선 하단 "관리 도구"로 옮겨 보여준다 */
-#sidebar-categories #category-home > div {
+#sidebar-categories #category-home .sidebar-home-admin {
     display: none !important;
+}
+
+/* 하위 메뉴 접기 버튼은 손가락으로 누르기 쉽게 키운다 */
+.sidebar-home-sub-toggle {
+    width: 2.4rem;
+    height: 2.4rem;
+    margin-right: -0.4rem;
+    font-size: 0.85rem;
 }
 
 .sidebar-admin-tools:not([hidden]) {
@@ -563,11 +590,8 @@ body.sidebar-drawer-open .sidebar-drawer-backdrop {
     right: -0.35rem;
 }
 
-/* 원래 상단 헤더의 스캔활동/환경설정/계정 아이콘은 모바일에서 드로어 푸터로 대체.
-   래퍼(.scan-activity-wrap/.account-menu-wrap)는 남겨둬야 팝오버가 보인다. */
-#btn-scan-activity,
-#category-settings,
-#btn-account-menu {
+/* 환경설정 아이콘은 모바일에서 드로어 푸터로 대체 (스캔활동/계정은 헤더 카드에 그대로 보인다 - 2026-10-01) */
+#category-settings {
     display: none !important;
 }
 
@@ -643,63 +667,109 @@ body.sidebar-drawer-open .sidebar-drawer-backdrop {
     display: inline;
 }
 
-/* 4. 도서 보관함 헤더 영역 - 데스크톱은 한 줄, 모바일은 검색 / 세션탭 / (기본·작가별 + 필터·정렬) 3줄
-   (페이지 타이틀/건수는 데스크톱과 마찬가지로 모바일에서도 인라인 display:none으로 숨김 - 별도 grid-area 불필요)
-   스캔활동/환경설정/계정 아이콘은 드로어 하단 푸터로 옮겨 한 줄을 줄였다 (2026-09-28) */
+/* 4. 도서 보관함 헤더 영역 - 모바일은 이 카드 한 장이 앱바(로고 앱바는 숨김, 2026-10-01):
+     1줄: ☰ | 검색창 | 계정        ← 항상 보임
+     2줄: 기본 | 작가별              ← 아래로 스크롤하면 접히고 위로 올리면 다시 펼쳐짐
+     3줄: 세션 선택 ⋯ | 필터·스캔·정렬
+   세션탭(#library-type-toggle-group)은 숨겨 두고 세션 선택 팝업이 복제해 쓴다(sidebar_manager.js initMobileSessionMenu).
+   .library-header-actions/.library-controls-persistent는 display:contents로 풀어 안쪽 요소를 바로 그리드에 배치한다.
+   (페이지 타이틀/건수는 데스크톱과 마찬가지로 모바일에서도 인라인 display:none으로 숨김 - 별도 grid-area 불필요) */
 .library-header {
+    --mobile-header-row: 2.3rem;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: var(--mobile-header-row) auto auto minmax(0, 1fr) auto var(--mobile-header-row);
+    /* 2·3줄 = 요소 높이 + 위 간격(margin-top). 접을 때 0으로 보간한다(fr은 빈 줄도 다른 fr 줄 높이로 맞춰져 못 씀) */
+    --mobile-header-row2: calc(var(--mobile-header-row) + 0.5rem);
+    --mobile-header-row3: calc(var(--mobile-header-row) + 0.5rem);
+    grid-template-rows: auto var(--mobile-header-row2) var(--mobile-header-row3);
     grid-template-areas:
-        "search search"
-        "tabs tabs"
-        "group controls";
+        "menu search search search search account"
+        "group group group group group group"
+        "session session info . controls controls";
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.55rem 0.65rem;
+    column-gap: 0.4rem;
+    row-gap: 0; /* 줄 간격은 2·3줄 요소의 margin-top으로 - 뷰에 따라 줄이 통째로 비면 간격도 같이 사라지게 */
+    padding: 0.5rem 0.55rem;
+    transition: grid-template-rows 0.22s ease, box-shadow 0.2s ease;
+}
+
+#btn-sidebar-toggle {
+    grid-area: menu;
+}
+
+#btn-category-info {
+    grid-area: info;
+    width: 2.1rem;
+    padding: 0;
+}
+
+#library-type-toggle-group {
+    display: none !important;
 }
 
 #group-mode-toggle-group {
     grid-area: group;
     justify-self: stretch;
     width: 100%;
+    box-sizing: border-box;
 }
 
 #group-mode-toggle-group .btn-toggle {
     flex: 1;
 }
 
-#library-type-toggle-group {
-    grid-area: tabs;
-    justify-self: stretch;
-    width: 100%;
-    flex-wrap: nowrap; /* 탭 4개는 항상 한 줄 — 줄바꿈되면 마지막 탭만 아래로 떨어져 보기 불편했다 */
-}
-
-#library-type-toggle-group .btn-toggle {
-    flex: 1 1 0;
-    min-width: 0;
-    padding: 0.45rem 0.2rem;
-    font-size: 0.82rem;
-    line-height: 1.2;
-    white-space: normal;  /* 영어처럼 긴 이름은 버튼 안에서 두 줄로 */
-    word-break: keep-all;
-    text-align: center;
-    /* iOS Safari는 폭을 줄인 버튼에서 text-align만으로는 글자가 왼쪽에 붙어서 flex로 가운데 고정 */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.library-header-actions {
-    grid-area: controls;
-    justify-self: end;
-    margin-left: 0;
-    gap: 0.35rem;
+.library-header-actions,
+.library-controls-persistent {
+    display: contents;
 }
 
 .library-controls {
+    grid-area: controls;
+    justify-self: end;
     flex-wrap: nowrap;
     gap: 0.35rem;
+}
+
+.account-menu-wrap {
+    grid-area: account;
+    justify-self: end;
+}
+
+/* 아래로 스크롤 중(header_scroll_behavior.js가 --hidden 부여): 데스크톱처럼 카드째 밀어 올리지 않고
+   2·3줄만 접어 ☰/검색/계정 줄은 남긴다. 스크롤 컨테이너의 scroll anchoring이 접힌 높이만큼 scrollTop을
+   되돌리면 "위로 스크롤"로 오판해 접힘/펼침이 반복되므로 anchoring은 끈다. */
+.library-main-content {
+    overflow-anchor: none;
+}
+
+/* 환경설정/플러그인 화면은 view_manager.js가 그룹모드를 인라인 display:none으로 숨긴다 - 빈 줄 높이도 0으로 */
+.library-header:has(#group-mode-toggle-group[style*="display: none"]) {
+    --mobile-header-row2: 0rem;
+}
+
+.library-header.library-header--hidden {
+    grid-template-rows: auto 0rem 0rem;
+    transform: none;
+    opacity: 1;
+    pointer-events: auto;
+}
+
+#group-mode-toggle-group,
+.mobile-session-select,
+#btn-category-info,
+.library-controls {
+    height: var(--mobile-header-row);
+    margin-top: 0.5rem;
+    align-self: start;
+    transition: opacity 0.18s ease, visibility 0.18s ease;
+}
+
+.library-header--hidden #group-mode-toggle-group,
+.library-header--hidden .mobile-session-select,
+.library-header--hidden #btn-category-info,
+.library-header--hidden .library-controls {
+    opacity: 0;
+    visibility: hidden;
 }
 
 .scan-activity-wrap {
@@ -759,7 +829,7 @@ body.sidebar-drawer-open .sidebar-drawer-backdrop {
 }
 
 .library-header .library-search-center {
-    margin: 0.25rem 0 0;
+    margin: 0;
 }
 
 .library-search-center .form-control::placeholder {

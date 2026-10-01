@@ -356,7 +356,68 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
         os.remove(scan_temp_file)
     file_lock = threading.Lock()
 
+    def _existing_book_ids(cur, paths):
+        path_to_id = {}
+        paths = list(dict.fromkeys(paths))
+        for i in range(0, len(paths), 900):
+            chunk = paths[i:i+900]
+            placeholders = ','.join(['?']*len(chunk))
+            cur.execute(f"SELECT id, file_path FROM books WHERE file_path IN ({placeholders})", chunk)
+            for row in cur.fetchall():
+                path_to_id[canonical_path(row['file_path'])] = row['id']
+        return path_to_id
+
+    def _build_insert_row(d):
+        meta = d['merged_meta']
+        title = d.get('title')
+        if not title:
+            title, _ = os.path.splitext(d['filename'])
+        file_format = d.get('file_format') or os.path.splitext(d['filename'])[1].replace('.', '').lower()
+        lib_id_int = int(d['library_id']) if d.get('library_id') is not None else None
+        return (
+            lib_id_int,
+            _clamp_text(title, _METADATA_FIELD_MAX_LEN['title']),
+            _clamp_text(d['series_name'], _METADATA_FIELD_MAX_LEN['series_name']),
+            _clamp_text(meta.get('author', ''), _METADATA_FIELD_MAX_LEN['author']),
+            _clamp_text(meta.get('isbn', ''), _METADATA_FIELD_MAX_LEN['isbn']),
+            canonical_path(d['full_path']), file_format, 100 if file_format == 'epub' else 0,
+            d['cover_image'],
+            d.get('banner_image'),
+            _clamp_text(meta.get('publisher', ''), _METADATA_FIELD_MAX_LEN['publisher']),
+            meta.get('link',''),
+            meta.get('score',0), meta.get('summary',''),
+            _clamp_text(meta.get('release_date', ''), _METADATA_FIELD_MAX_LEN['release_date']),
+            _clamp_text(meta.get('genre', ''), _METADATA_FIELD_MAX_LEN['genre']),
+            meta.get('tags',''),
+            _clamp_text(meta.get('books_lv', ''), _METADATA_FIELD_MAX_LEN['books_lv']),
+            _clamp_text(meta.get('publication_status', ''), _METADATA_FIELD_MAX_LEN['publication_status']),
+            _clamp_text(meta.get('cover_artist', ''), _METADATA_FIELD_MAX_LEN['cover_artist']),
+            _clamp_text(meta.get('teams', ''), _METADATA_FIELD_MAX_LEN['teams']),
+            _clamp_text(meta.get('locations', ''), _METADATA_FIELD_MAX_LEN['locations']),
+            _clamp_text(meta.get('characters', ''), _METADATA_FIELD_MAX_LEN['characters']),
+            d.get('file_mtime', 0.0), d.get('file_size', 0)
+        )
+
     def process_batch(cur, ins_list, upd_list):
+        # db_books 스냅샷은 스캔 시작 시점 기준이라, 그 사이 다른 스캔(예: 7일 지난 휴지통
+        # 자동 비우기)이 row를 지웠으면 UPDATE가 0 rows로 조용히 끝나 도서가 DB에서 사라진다.
+        # write 직전에 실제 존재 여부를 다시 확인해 없어진 대상은 insert(upsert)로 돌린다.
+        recovered = []
+        if upd_list:
+            existing = _existing_book_ids(cur, [canonical_path(d['full_path']) for d in upd_list])
+            still_existing = []
+            for d in upd_list:
+                if canonical_path(d['full_path']) in existing:
+                    still_existing.append(d)
+                else:
+                    recovered.append(d)
+                    print(
+                        f"[Scanner-DB] Stale update target missing; reclassifying as insert "
+                        f"db={db_type} library_id={d.get('library_id')} file_path={d['full_path']}"
+                    )
+            upd_list = still_existing
+        ins_list = list(ins_list) + recovered
+
         if upd_list:
             update_data = []
             for d in upd_list:
@@ -392,48 +453,11 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                 bulk_update_books(cur, update_data, force=force)
             
         if ins_list:
-            insert_data = []
-            for d in ins_list:
-                meta = d['merged_meta']
-                title = d.get('title')
-                if not title:
-                    title, _ = os.path.splitext(d['filename'])
-                lib_id_int = int(d['library_id']) if d.get('library_id') is not None else None
-                insert_data.append((
-                    lib_id_int,
-                    _clamp_text(title, _METADATA_FIELD_MAX_LEN['title']),
-                    _clamp_text(d['series_name'], _METADATA_FIELD_MAX_LEN['series_name']),
-                    _clamp_text(meta.get('author', ''), _METADATA_FIELD_MAX_LEN['author']),
-                    _clamp_text(meta.get('isbn', ''), _METADATA_FIELD_MAX_LEN['isbn']),
-                    canonical_path(d['full_path']), d['file_format'], 100 if d['file_format'] == 'epub' else 0,
-                    d['cover_image'],
-                    d.get('banner_image'),
-                    _clamp_text(meta.get('publisher', ''), _METADATA_FIELD_MAX_LEN['publisher']),
-                    meta.get('link',''),
-                    meta.get('score',0), meta.get('summary',''),
-                    _clamp_text(meta.get('release_date', ''), _METADATA_FIELD_MAX_LEN['release_date']),
-                    _clamp_text(meta.get('genre', ''), _METADATA_FIELD_MAX_LEN['genre']),
-                    meta.get('tags',''),
-                    _clamp_text(meta.get('books_lv', ''), _METADATA_FIELD_MAX_LEN['books_lv']),
-                    _clamp_text(meta.get('publication_status', ''), _METADATA_FIELD_MAX_LEN['publication_status']),
-                    _clamp_text(meta.get('cover_artist', ''), _METADATA_FIELD_MAX_LEN['cover_artist']),
-                    _clamp_text(meta.get('teams', ''), _METADATA_FIELD_MAX_LEN['teams']),
-                    _clamp_text(meta.get('locations', ''), _METADATA_FIELD_MAX_LEN['locations']),
-                    _clamp_text(meta.get('characters', ''), _METADATA_FIELD_MAX_LEN['characters']),
-                    d.get('file_mtime', 0.0), d.get('file_size', 0)
-                ))
-            bulk_insert_books(cur, insert_data)
+            bulk_insert_books(cur, [_build_insert_row(d) for d in ins_list])
 
-        all_paths = [canonical_path(d['full_path']) for d in ins_list] + [canonical_path(d['full_path']) for d in upd_list if d.get('offsets_data')]
+        all_paths = [canonical_path(d['full_path']) for d in ins_list + upd_list if d.get('offsets_data')]
         if all_paths:
-            path_to_id = {}
-            for i in range(0, len(all_paths), 900):
-                chunk = all_paths[i:i+900]
-                placeholders = ','.join(['?']*len(chunk))
-                cur.execute(f"SELECT id, file_path FROM books WHERE file_path IN ({placeholders})", chunk)
-                for row in cur.fetchall():
-                    path_to_id[canonical_path(row['file_path'])] = row['id']
-            
+            path_to_id = _existing_book_ids(cur, all_paths)
             offsets_to_save = []
             for d in upd_list + ins_list:
                 if d.get('offsets_data'):
@@ -445,11 +469,16 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
             if offsets_to_save:
                 bulk_save_book_offsets(cur, offsets_to_save)
 
+    def _unpersisted_items(cur, items):
+        existing = _existing_book_ids(cur, [canonical_path(d['full_path']) for d in items])
+        return [d for d in items if canonical_path(d['full_path']) not in existing]
+
     pending_inserts = []
     pending_updates = []
     pending_folders = []
     detected_new_books = []
     folder_processing_errors = []
+    db_write_missing = []
 
     def flush_pending_data(is_final=False):
         if not pending_inserts and not pending_updates and not pending_folders:
@@ -478,6 +507,11 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     f"[Scanner-DB] Flush start (attempt {attempt}/{max_attempts}, is_final={is_final}) "
                     f"ins={len(pending_inserts)} upd={len(pending_updates)} folders={len(pending_folders)}"
                 )
+                # 0. 스냅샷 갱신: MariaDB(REPEATABLE READ, autocommit=False)에서는 이 장기 conn의
+                # SELECT가 트랜잭션 시작 시점 스냅샷을 계속 보므로, 그 사이 다른 세션이 지운 row도
+                # "있음"으로 보인다(UPDATE만 최신 상태에 적용돼 0 rows). commit으로 새 트랜잭션을 연다.
+                conn.commit()
+
                 # 1. DB Bulk Update
                 if pending_inserts or pending_updates:
                     process_batch(cursor, pending_inserts, pending_updates)
@@ -493,6 +527,24 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
 
                 # 3. Commit ALL at once (Atomic Transaction)
                 _commit_with_retry(conn, 'flush-pending')
+
+                # 3-1. write 후 invariant: commit 뒤(새 스냅샷) 이번 배치 대상이 모두 books에 있어야 한다.
+                # 없으면 insert(upsert)로 1회 재기록하고, 그래도 없으면 스캔 끝에서 처리한다
+                # (여기서 예외를 올리면 non-final flush의 except 분기가 배치를 통째로 버린다).
+                if pending_inserts or pending_updates:
+                    retry_items = _unpersisted_items(cursor, pending_inserts + pending_updates)
+                    if retry_items:
+                        process_batch(cursor, retry_items, [])
+                        _commit_with_retry(conn, 'flush-pending-recover')
+                        still_missing = _unpersisted_items(cursor, retry_items)
+                        for d in retry_items:
+                            if d not in still_missing:
+                                print(f"[Scanner-DB] Recovered missing book row via upsert file_path={d['full_path']}")
+                        if still_missing:
+                            batch_missing = [canonical_path(d['full_path']) for d in still_missing]
+                            db_write_missing.extend(batch_missing)
+                            print(f"[Scanner ERROR] DB write invariant failed missing_paths={batch_missing}")
+                        conn.commit()
                 time.sleep(0.05)
 
                 # 4. Append to JSONL log
@@ -646,7 +698,9 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                         pending_updates.append({
                             "action": "update", "library_id": library_id, "is_offset_only": is_offset_only, "full_path": full_path,
                             "cover_image": cover_image, "banner_image": banner_image, "merged_meta": merged_meta, "offsets_data": offsets_data,
-                            "filename": filename, "series_name": series_name, "file_mtime": item.get('file_mtime', 0.0), "file_size": item.get('file_size', 0)
+                            "filename": filename, "series_name": series_name, "file_mtime": item.get('file_mtime', 0.0), "file_size": item.get('file_size', 0),
+                            # write 직전 row가 사라진 경우 insert로 재분류할 때 필요 (process_batch 참조)
+                            "file_format": file_format, "title": title
                         })
                     else:
                         pending_inserts.append({
@@ -793,6 +847,17 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
         print(f"[Scanner-DB] Final flush done db={db_type} library_id={library_id}")
         log_pool_stats('scan-final-flush')
         cleanup_jsonl_file()
+
+    if db_write_missing:
+        if path_scope:
+            # 부분 경로 스캔은 "파일 처리 성공 + DB row 없음"을 성공 응답으로 숨기지 않는다.
+            raise RuntimeError(f"부분 경로 스캔 DB 등록 실패 (books row 누락): {db_write_missing}")
+        for missing_path in db_write_missing:
+            library_errors.append({
+                'file_path': missing_path,
+                'error_type': 'DBWriteInvariantError',
+                'message': 'Book row missing after scanner write (update/insert both failed to persist)'
+            })
 
 
     # 3. Real-time deletion monitoring: Remove book info disappeared from file system

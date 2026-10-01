@@ -1,13 +1,19 @@
-// book_context_menu.js – 도서 우클릭 단독 스캔 컨텍스트 메뉴 제어 모듈
+// book_context_menu.js – 도서 우클릭/롱프레스 컨텍스트 메뉴: 열기/닫기, 위치, 터치·iOS 가드, 항목 클릭 분기.
+// 항목 표시 규칙은 book_menu/menu_rules.js, 실행 동작은 book_menu/actions.js,
+// 플러그인 항목은 book_menu/plugin_items.js에 있다.
 import { state } from './state.js';
-import { canListen, openListen } from './tts_launcher.js';
+import { canListen } from './tts_launcher.js';
 import * as api from './api.js';
-import { openBookDetail } from './modal.js';
-import { loadBooksList, loadReadingHistory } from './book_list.js';
-import { loadDashboardData } from './dashboard.js?v=20260917-home-widget-plugin-ui-v1';
 import { hideFloatingMenu, isFloatingMenuOpen, positionMenuAtPoint } from './context_menu_manager.js';
 import { clearBookSelection, getSelectedBookTargets, isBookCardSelected } from './book_selection.js';
-import { refreshSystemStatus } from './scan_activity_status.js';
+import { computeBookMenuState } from './book_menu/menu_rules.js';
+import { BOOK_MENU_ACTIONS, canRunLazyScanFromCurrentBookMenu } from './book_menu/actions.js';
+import {
+  cancelPluginContextMenuLoad,
+  clearPluginContextMenuItems,
+  loadPluginContextMenuItems,
+  runBookContextPluginAction,
+} from './book_menu/plugin_items.js';
 
 let currentTargetBook = null;
 let contextMenuSuppressUntil = 0;
@@ -16,7 +22,6 @@ let longPressTimer = null;
 let touchStartX = 0;
 let touchStartY = 0;
 const touchMoveThreshold = 10;
-let contextMenuLoadSeq = 0;
 let menuOpenedByTouchUntil = 0;
 let lastEventX = 0;
 let lastEventY = 0;
@@ -33,31 +38,6 @@ function isIOSDevice() {
 
 const isIOS = isIOSDevice();
 
-function canRunLazyScanFromCurrentBookMenu() {
-  const user = state.currentUser || window.currentUser || {};
-  const dbType = String(state.currentLibraryType || '').toLowerCase();
-  return String(user.role || '').trim().toLowerCase() === 'admin'
-    && ['general', 'adult', 'audiobook'].includes(dbType);
-}
-
-function getLazyScanSeriesTarget(book) {
-  if (!book || book.isVolumeDetail || book.markUnreadScope !== 'series') return null;
-  const libraryId = Number(book.libraryId);
-  const seriesName = String(book.seriesName || '').trim();
-  if (!Number.isInteger(libraryId) || libraryId <= 0 || !seriesName) return null;
-  return { libraryId, seriesName };
-}
-
-// 스캔 범위: 시리즈 카드(대표 권 ID만 넘어옴)일 때만 'series'로 서버가 모든 권으로 확장한다.
-// 상세 화면의 개별 권 메뉴는 seriesName이 채워져 있어도 그 권 하나만 대상이다.
-function getBookScanScope(book) {
-  const selectedBooks = Array.isArray(book?.selectedBooks) ? book.selectedBooks : [];
-  if (selectedBooks.length > 1) {
-    return selectedBooks.every(item => item.markUnreadScope === 'series') ? 'series' : 'book';
-  }
-  return !book?.isVolumeDetail && book?.markUnreadScope === 'series' ? 'series' : 'book';
-}
-
 export function invalidateMetadataPluginsCache() {
   cachedSearchPlugins = null;
   // metadata_search.js 등 외부 모듈 캐시 무효화가 필요한 경우 트리거
@@ -67,132 +47,10 @@ export function invalidateMetadataPluginsCache() {
 }
 window.invalidateMetadataPluginsCache = invalidateMetadataPluginsCache;
 
-function getPluginAccentColor(pluginId) {
-  const text = String(pluginId || 'plugin');
-  let hash = 0;
-  for (let i = 0; i < text.length; i += 1) {
-    hash = ((hash << 5) - hash) + text.charCodeAt(i);
-    hash |= 0;
-  }
-  const hue = Math.abs(hash) % 360;
-  return `hsl(${hue} 72% 60%)`;
-}
-
-function buildCurrentContextPayload() {
-  if (!currentTargetBook) return {};
-  return {
-    book_id: currentTargetBook.id,
-    book_title: currentTargetBook.title,
-    is_volume_detail: !!currentTargetBook.isVolumeDetail,
-    library_id: state.currentLibraryId,
-  };
-}
-
-function clearPluginContextMenuItems() {
-  const bookMenu = document.getElementById('book-context-menu');
-  const listEl = bookMenu ? bookMenu.querySelector('.context-menu-list') : null;
-  if (!listEl) return;
-  listEl.querySelectorAll('.plugin-context-menu-item, .plugin-context-menu-group-title, .plugin-context-menu-separator').forEach((el) => el.remove());
-}
-
-function renderPluginContextMenuItems(items) {
-  const bookMenu = document.getElementById('book-context-menu');
-  const listEl = bookMenu ? bookMenu.querySelector('.context-menu-list') : null;
-  if (!listEl) return;
-
-  clearPluginContextMenuItems();
-
-  if (!Array.isArray(items) || items.length === 0) return;
-
-  const closeItem = listEl.querySelector('.context-menu-close-item');
-  const groups = new Map();
-  items.forEach((item) => {
-    const pluginId = String(item.plugin_id || '').trim();
-    if (!pluginId) return;
-    const pluginName = String(item.plugin_name || pluginId).trim();
-    if (!groups.has(pluginId)) {
-      groups.set(pluginId, { pluginId, pluginName, items: [] });
-    }
-    groups.get(pluginId).items.push(item);
-  });
-
-  const groupList = Array.from(groups.values());
-  groupList.forEach((group, groupIdx) => {
-    const accentColor = getPluginAccentColor(group.pluginId);
-
-    if (groupIdx > 0) {
-      const sep = document.createElement('li');
-      sep.className = 'plugin-context-menu-separator';
-      if (closeItem) listEl.insertBefore(sep, closeItem);
-      else listEl.appendChild(sep);
-    }
-
-    const titleEl = document.createElement('li');
-    titleEl.className = 'plugin-context-menu-group-title';
-    titleEl.style.setProperty('--plugin-accent', accentColor);
-    titleEl.textContent = group.pluginName;
-    if (closeItem) listEl.insertBefore(titleEl, closeItem);
-    else listEl.appendChild(titleEl);
-
-    group.items.forEach((item) => {
-      const pluginId = String(item.plugin_id || '').trim();
-      const actionId = String(item.id || '').trim();
-      const label = String(item.label || '').trim();
-      const iconClass = String(item.icon || 'fa-solid fa-puzzle-piece').trim();
-      if (!pluginId || !actionId || !label) return;
-
-      const li = document.createElement('li');
-      li.className = 'context-menu-item plugin-context-menu-item';
-      li.dataset.pluginId = pluginId;
-      li.dataset.actionId = actionId;
-      li.style.setProperty('--plugin-accent', accentColor);
-      li.innerHTML = `<i class="${iconClass} plugin-context-menu-icon"></i> <span class="plugin-context-menu-label">${label}</span>`;
-      li.addEventListener('click', () => {
-        triggerBookContextPluginAction(pluginId, actionId);
-      });
-
-      if (closeItem) {
-        listEl.insertBefore(li, closeItem);
-      } else {
-        listEl.appendChild(li);
-      }
-    });
-  });
-
-  // 플러그인 항목 렌더링 후 동적으로 확장된 메뉴 높이를 기반으로 위치 재보정
-  adjustMenuPosition(lastEventX, lastEventY);
-}
-
 function adjustMenuPosition(x, y) {
   const bookMenu = document.getElementById('book-context-menu');
   if (!bookMenu || bookMenu.style.display === 'none') return;
   positionMenuAtPoint(bookMenu, x, y, { zIndex: 20060 });
-}
-
-async function loadPluginContextMenuItems() {
-  if (!currentTargetBook || !currentTargetBook.id || currentTargetBook.selectedBooks?.length > 1) {
-    clearPluginContextMenuItems();
-    return;
-  }
-
-  const seq = ++contextMenuLoadSeq;
-  try {
-    const payload = buildCurrentContextPayload();
-    const res = await api.fetchBookContextMenuPluginItems(state.currentLibraryType, payload);
-    if (seq !== contextMenuLoadSeq) return;
-
-    if (res && res.success) {
-      renderPluginContextMenuItems(res.items || []);
-      return;
-    }
-
-    clearPluginContextMenuItems();
-  } catch (err) {
-    console.error('컨텍스트 메뉴 플러그인 항목 조회 실패:', err);
-    if (seq === contextMenuLoadSeq) {
-      clearPluginContextMenuItems();
-    }
-  }
 }
 
 function clearLongPressTimer() {
@@ -210,7 +68,7 @@ function hideBookContextMenu({ suppressMs = 0, clearTarget = true } = {}) {
   hideFloatingMenu('book-context-menu');
   if (clearTarget) currentTargetBook = null;
   menuOpenedByTouchUntil = 0;
-  contextMenuLoadSeq += 1;
+  cancelPluginContextMenuLoad();
   clearPluginContextMenuItems();
   clearLongPressTimer();
   if (suppressMs > 0) {
@@ -226,533 +84,128 @@ function closeBookContextMenu() {
   hideBookContextMenu({ suppressMs: 0, clearTarget: true });
 }
 
+function hasActiveSearchPlugin() {
+  return cachedSearchPlugins === null ? null : cachedSearchPlugins.some(p => p.enabled);
+}
+
+// menu_rules.js가 계산한 항목 상태를 DOM에 반영한다.
+function applyBookMenuState(bookMenu, menuState) {
+  const menuTitle = bookMenu.querySelector('.context-menu-title');
+  if (menuTitle) menuTitle.textContent = menuState.title;
+
+  Object.entries(menuState.items).forEach(([elementId, item]) => {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    // Keep the stylesheet's grid layout when showing an item. Setting `block` here
+    // overrides `.context-menu-item { display: grid; }` and shifts the row's label.
+    if (item.visible !== undefined) el.style.display = item.visible ? '' : 'none';
+    if (item.action) el.setAttribute('data-action', item.action);
+    if (item.iconClass) {
+      const icon = el.querySelector('i');
+      if (icon) {
+        icon.className = item.iconClass;
+        icon.style.color = item.iconColor || '';
+      }
+    }
+    const label = el.querySelector(item.setI18n ? 'span[data-i18n]' : 'span');
+    if (!label) return;
+    if (item.labelKey) {
+      if (item.setI18n) label.dataset.i18n = item.labelKey;
+      label.textContent = window.i18n?.t(item.labelKey) || item.labelFallback || label.textContent;
+    } else if (item.labelText != null) {
+      label.textContent = item.labelText;
+    }
+  });
+}
+
 export function showBookContextMenu(x, y, bookId, bookTitle, isVolumeDetail = false, context = {}) {
   const bookMenu = document.getElementById('book-context-menu');
   if (!bookMenu) return;
 
   if (Date.now() < contextMenuSuppressUntil) return;
   menuLastShownAt = Date.now();
-  
+
   lastEventX = x;
   lastEventY = y;
   const selectedBooks = Array.isArray(context.selectedBooks) ? context.selectedBooks : [];
-  const isMultiSelection = selectedBooks.length > 1;
   const seriesName = String(context.seriesName || (isVolumeDetail ? state.detailSeriesName : '') || '').trim();
   currentTargetBook = { id: bookId, title: bookTitle, isVolumeDetail, ...context, selectedBooks, seriesName };
 
-  const scanLabel = bookMenu.querySelector('#ctx-scan-book span[data-i18n]');
-  if (scanLabel) {
-    const scanScope = getBookScanScope(currentTargetBook);
-    const scanLabelKey = isMultiSelection
-      ? (scanScope === 'series' ? 'context_menu.scan_selected_series_now' : 'context_menu.scan_selected_now')
-      : (scanScope === 'series' ? 'context_menu.scan_series_now' : 'context_menu.scan_book_now');
-    scanLabel.dataset.i18n = scanLabelKey;
-    scanLabel.textContent = window.i18n?.t(scanLabelKey) || scanLabel.textContent;
-  }
+  applyBookMenuState(bookMenu, computeBookMenuState(currentTargetBook, {
+    lazyScanAllowed: canRunLazyScanFromCurrentBookMenu(),
+    listenable: canListen(String(context.fileFormat || '').toLowerCase()),
+    ttsPregenEnabled: !!state.ttsPregenEnabled,
+    isVideoLibrary: state.currentLibraryType === 'video',
+    metaSearchAvailable: hasActiveSearchPlugin(),
+  }));
 
-  const menuTitle = bookMenu.querySelector('.context-menu-title');
-  if (menuTitle) menuTitle.textContent = isMultiSelection ? `도서 메뉴 (${selectedBooks.length}개 선택)` : '도서 메뉴';
-
-  const lazyScanItem = document.getElementById('ctx-lazy-scan-book');
-  if (lazyScanItem) lazyScanItem.style.display = canRunLazyScanFromCurrentBookMenu() ? '' : 'none';
-  if (lazyScanItem) {
-    const seriesTarget = !isMultiSelection ? getLazyScanSeriesTarget(currentTargetBook) : null;
-    const label = lazyScanItem.querySelector('span[data-i18n]');
-    const key = seriesTarget ? 'context_menu.lazy_scan_series' : 'context_menu.lazy_scan_book';
-    if (label) {
-      label.dataset.i18n = key;
-      label.textContent = window.i18n?.t(key) || (
-        seriesTarget ? 'Lazy-Scanner 실행 (시리즈 전체)' : 'Lazy-Scanner 실행 (선택/클릭한 작품)'
-      );
-    }
-  }
-
-  // "페이지 넘김으로 보기(실험적)"는 이미지 기반 만화(zip/cbz)에서만 의미가 있음
-  const pageTurnItem = document.getElementById('ctx-page-turn-book');
-  if (pageTurnItem) {
-    const fmt = String(context.fileFormat || '').toLowerCase();
-    pageTurnItem.style.display = (!isMultiSelection && (fmt === 'zip' || fmt === 'cbz')) ? '' : 'none';
-  }
-
-  // "음성으로 듣기"는 브라우저에서 텍스트를 합성하므로 TXT/EPUB에서만 노출
-  const ttsItem = document.getElementById('ctx-tts-book');
-  if (ttsItem) {
-    const fmt = String(context.fileFormat || '').toLowerCase();
-    ttsItem.style.display = (!isMultiSelection && canListen(fmt)) ? '' : 'none';
-  }
-  // "음성 미리 만들기"는 관리자가 서버 미리 만들기를 켰을 때만
-  const ttsPregenItem = document.getElementById('ctx-tts-pregen-book');
-  if (ttsPregenItem) {
-    const fmt = String(context.fileFormat || '').toLowerCase();
-    ttsPregenItem.style.display = (!isMultiSelection && state.ttsPregenEnabled && canListen(fmt)) ? '' : 'none';
-  }
-
-  const addSeriesItem = document.getElementById('ctx-add-series-to-collection');
-  if (addSeriesItem) {
-    const allSelectedHaveSeries = isMultiSelection && selectedBooks.every(book => String(book.seriesName || '').trim());
-    addSeriesItem.style.display = (isMultiSelection ? allSelectedHaveSeries : !!seriesName) ? '' : 'none';
-  }
-
-  // "커버 정렬"은 개별 권(볼륨) 카드에서만 의미가 있음 (시리즈 집계 카드는 어느 권을 정렬할지
-  // 모호함) - 메인 그리드에서도 book_count===1(집계가 아닌 개별 권 카드)이면 허용하고,
-  // 다중 선택은 선택된 전부가 개별 권일 때만 허용해 한 번에 일괄 정렬할 수 있게 한다.
-  const coverAlignItem = document.getElementById('ctx-cover-align-book');
-  if (coverAlignItem) {
-    const targetBookCount = Number(context.bookCount) > 0 ? Number(context.bookCount) : 1;
-    const multiAllSingleBooks = isMultiSelection
-      && selectedBooks.every(book => (Number(book.bookCount) || 1) <= 1);
-    const showCoverAlign = isVolumeDetail
-      || (!isMultiSelection && targetBookCount <= 1)
-      || multiAllSingleBooks;
-    coverAlignItem.style.display = showCoverAlign ? '' : 'none';
-    const coverAlignLabel = coverAlignItem.querySelector('span');
-    if (coverAlignLabel) {
-      coverAlignLabel.textContent = multiAllSingleBooks
-        ? `선택한 ${selectedBooks.length}개 커버 정렬 (이중 스캔본용)`
-        : '커버 정렬 (이중 스캔본용)';
-    }
-  }
-
-  const readToggleItem = document.getElementById('ctx-unread-book');
-  const readToggleLabel = readToggleItem?.querySelector('span');
-  const readToggleIcon = readToggleItem?.querySelector('i');
-  if (readToggleItem && readToggleLabel) {
-    // 다중 선택이거나 영상 강좌(완독 처리 인프라 없음)일 때는 기존처럼 항상 "읽지 않음" 액션만 노출.
-    // 그 외 단일 대상은 현재 읽음 진행 여부(card.dataset.hasProgress)를 보고 "읽음/읽지 않음"을 토글.
-    const isVideoLibrary = state.currentLibraryType === 'video';
-    const showMarkAsRead = !isMultiSelection && !isVideoLibrary && context.hasProgress === false;
-
-    if (showMarkAsRead) {
-      readToggleItem.setAttribute('data-action', 'mark-read');
-      if (readToggleIcon) {
-        readToggleIcon.className = 'fa-solid fa-eye';
-        readToggleIcon.style.color = '#22c55e';
-      }
-      readToggleLabel.textContent = context.markUnreadScope === 'series'
-        ? (window.i18n?.t('context_menu.mark_series_as_read') || '이 시리즈 전체를 읽은 상태로 변경 (완독)')
-        : (window.i18n?.t('context_menu.mark_as_read') || '읽은 상태로 변경 (완독)');
-    } else {
-      readToggleItem.setAttribute('data-action', 'mark-unread');
-      if (readToggleIcon) {
-        readToggleIcon.className = 'fa-solid fa-eye-slash';
-        readToggleIcon.style.color = '#ef4444';
-      }
-      readToggleLabel.textContent = isMultiSelection
-        ? `선택한 ${selectedBooks.length}개 작품을 읽지 않은 상태로 변경 (0%)`
-        : context.markUnreadScope === 'series'
-        ? (window.i18n?.t('context_menu.mark_series_as_unread') || '이 시리즈 전체를 읽지 않은 상태로 변경 (0%)')
-        : (window.i18n?.t('context_menu.mark_as_unread') || '읽지 않은 상태로 변경 (0%)');
-    }
-  }
-  
-  // 메타정보 검색 메뉴의 플러그인 활성 상태 동적 검사
+  // 메타정보 검색 메뉴: 검색 플러그인 목록을 아직 모르면 비동기로 받아 표시 여부를 정한다
   const metaSearchEl = document.getElementById('ctx-search-meta-book');
-  if (metaSearchEl) {
-    if (cachedSearchPlugins === null) {
-      // 1. 아직 로드되지 않은 경우 비동기 로드 시도
-      api.fetchMetadataPlugins().then(data => {
-        if (data.success && Array.isArray(data.plugins)) {
-          cachedSearchPlugins = data.plugins;
-          const hasActive = cachedSearchPlugins.some(p => p.enabled);
-          // Keep the stylesheet's grid layout when showing the item. Setting `block` here
-          // overrides `.context-menu-item { display: grid; }` and shifts this row's label.
-          metaSearchEl.style.display = hasActive ? '' : 'none';
-          // 메뉴의 높이가 변경될 수 있으므로 재조정 호출
-          adjustMenuPosition(lastEventX, lastEventY);
-        }
-      }).catch(err => {
-        console.error('[BookContextMenu] Failed to check search plugins:', err);
-      });
-    } else {
-      // 2. 캐시된 목록 기준 판단
-      const hasActive = cachedSearchPlugins.some(p => p.enabled);
-      metaSearchEl.style.display = hasActive ? '' : 'none';
-    }
+  if (metaSearchEl && cachedSearchPlugins === null) {
+    api.fetchMetadataPlugins().then(data => {
+      if (data.success && Array.isArray(data.plugins)) {
+        cachedSearchPlugins = data.plugins;
+        metaSearchEl.style.display = hasActiveSearchPlugin() ? '' : 'none';
+        // 메뉴의 높이가 변경될 수 있으므로 재조정 호출
+        adjustMenuPosition(lastEventX, lastEventY);
+      }
+    }).catch(err => {
+      console.error('[BookContextMenu] Failed to check search plugins:', err);
+    });
   }
 
   // 임시 표시하여 실제 메뉴 크기 측정
   positionMenuAtPoint(bookMenu, x, y, { zIndex: 20060 });
-  
-  loadPluginContextMenuItems();
-}
 
-export async function triggerBookContextPluginAction(pluginId, actionId) {
-  if (!pluginId || !actionId) return;
-  if (!currentTargetBook || !currentTargetBook.id) return;
-
-  let pendingPopup = null;
-  try {
-    // 팝업 차단을 피하려면 비동기 응답을 기다리기 전, 사용자 클릭 시점에 미리 창을 열어둬야
-    // 한다(open_url이 있는 플러그인 액션 전용 placeholder — 없는 액션이면 아래에서 바로 닫음).
-    pendingPopup = window.open('', '_blank');
-    if (pendingPopup) {
-      pendingPopup.document.write('<!doctype html><title>작업 처리 중...</title><p>플러그인 작업을 처리하는 중입니다.</p>');
-      pendingPopup.document.close();
-    }
-
-    const payload = buildCurrentContextPayload();
-    console.log('[BookContextMenu] run plugin action', {
-      pluginId,
-      actionId,
-      payload,
-    });
-    const res = await api.runBookContextMenuPluginAction(
-      state.currentLibraryType,
-      pluginId,
-      actionId,
-      payload
-    );
-
-    console.log('[BookContextMenu] action response', res);
-
-    const vm = await import('./view_manager.js');
-    if (!res || !res.success) {
-      if (pendingPopup) {
-        pendingPopup.close();
-      }
-      vm.showToast(res && res.error ? res.error : '플러그인 작업 실행에 실패했습니다.', 'error');
-      return;
-    }
-
-    if (res.open_category) {
-      // 외부 새 탭이 아니라 앱 내부의 카테고리 플러그인 풀페이지로 바로 이동하는 경우
-      // (예: 'plugin_<plugin_id>'). 미리 열어둔 placeholder 팝업은 필요 없으므로 닫는다.
-      if (pendingPopup) {
-        pendingPopup.close();
-      }
-      const tml = await import('./tab_media_library.js');
-      tml.selectCategory(res.open_category);
-    } else if (res.open_url) {
-      if (pendingPopup) {
-        pendingPopup.location.href = res.open_url;
-      } else {
-        window.open(res.open_url, '_blank');
-      }
-    } else if (pendingPopup) {
-      // 액션이 성공했지만 이동할 URL이 없는 경우(YAML 저장 등) 미리 열어둔
-      // 플레이스홀더 팝업을 그대로 두면 about:blank(정확히는 "검색 중..." 문구)로 남는다.
-      pendingPopup.close();
-    }
-
-    if (res.message) {
-      vm.showToast(res.message, 'success');
-    }
-  } catch (err) {
-    if (pendingPopup) {
-      pendingPopup.close();
-    }
-    console.error('플러그인 컨텍스트 메뉴 액션 실행 실패:', err);
-    const vm = await import('./view_manager.js');
-    vm.showToast('플러그인 작업 실행 중 오류가 발생했습니다.', 'error');
-  }
-}
-
-export function triggerPageTurnAction() {
-  if (!currentTargetBook || !currentTargetBook.id) return;
-  const url = '/experimental/page-turn?book_id=' + encodeURIComponent(currentTargetBook.id) +
-    '&db_type=' + encodeURIComponent(state.currentLibraryType || 'general') + '&format=comic';
-  window.open(url, '_blank');
-  closeBookContextMenu();
-}
-window.triggerPageTurnAction = triggerPageTurnAction;
-
-export function triggerTtsAction() {
-  if (!currentTargetBook || !currentTargetBook.id) return;
-  openListen(currentTargetBook.id, state.currentLibraryType || 'general');
-  closeBookContextMenu();
-}
-window.triggerTtsAction = triggerTtsAction;
-
-// 듣기 화면을 열지 않고 여기서 바로 요청한다 (본문을 받아 조각내는 데 몇 초 걸릴 수 있다).
-// 설정은 이 책을 마지막으로 들은 설정, 없으면 듣기 기본값. 진행 상황은 스캔 활동(알림 영역)에 보인다.
-export async function triggerTtsPregenAction() {
-  if (!currentTargetBook || !currentTargetBook.id) return;
-  const bookId = currentTargetBook.id;
-  const dbType = state.currentLibraryType || 'general';
-  const title = currentTargetBook.title || '';
-  closeBookContextMenu();
-  const tr = (key, vars) => window.i18n?.t?.(`tts.${key}`, vars) || key;
-  const notify = (msg, type) => (typeof window.showToast === 'function' ? window.showToast(msg, type) : alert(msg));
-  try {
-    const { savedListenState, submitPregen } = await import('./tts/tts_pregen_client.js');
-    const { settings, position } = await savedListenState(dbType, bookId);
-    const quality = tr(Number(settings.steps) === 4 ? 'quality_normal' : 'quality_best');
-    if (!window.confirm(tr('pregen_confirm_menu', { title, conf: `${settings.voice} · ${quality} · ${settings.speed}×` }))) return;
-    notify(tr('pregen_preparing'), 'info');
-    // 마지막으로 읽거나 들은 곳부터 먼저 만든다
-    const data = await submitPregen({ dbType, bookId, settings, startAt: position });
-    notify(tr(data.created ? 'pregen_requested' : 'pregen_already'), 'success');
-    refreshSystemStatus();
-  } catch (e) {
-    notify(tr('pregen_request_failed', { error: e.message === 'https required' ? tr('pregen_https') : e.message }), 'error');
-  }
-}
-window.triggerTtsPregenAction = triggerTtsPregenAction;
-
-export async function triggerScanSingleBookAction() {
-  if (!currentTargetBook || !currentTargetBook.id) return;
-  const { id, title } = currentTargetBook;
-
-  const selectedBooks = Array.isArray(currentTargetBook.selectedBooks) ? currentTargetBook.selectedBooks : [];
-  const scanScope = getBookScanScope(currentTargetBook);
-  if (selectedBooks.length > 1) {
-    const vm = await import('./view_manager.js');
-    try {
-      const result = await api.enqueueBatchBookScan(
-        state.currentLibraryType,
-        selectedBooks.map(book => book.id),
-        { scope: scanScope }
-      );
-      if (!result?.success) {
-        vm.showToast(result?.error || '다중 도서 스캔 요청에 실패했습니다.', 'error');
-        return;
-      }
-      closeBookContextMenu();
-      clearBookSelection();
-      refreshSystemStatus();
-      vm.showToast(result.message || `선택한 ${selectedBooks.length}개 작품의 스캔을 대기열에 추가했습니다.`, 'success');
-    } catch (error) {
-      console.error('[BookContextMenu] 다중 스캔 요청 실패:', error);
-      vm.showToast('다중 도서 스캔 요청 중 서버 통신 오류가 발생했습니다.', 'error');
-    }
-    return;
-  }
-  
-  import('./view_manager.js').then(async (vm) => {
-    try {
-      const result = await api.enqueueBatchBookScan(state.currentLibraryType, [id], { scope: scanScope });
-      if (!result?.success) {
-        vm.showToast(result?.error || `"${title}" 스캔 요청에 실패했습니다.`, 'error');
-        return;
-      }
-
-      closeBookContextMenu();
-      clearBookSelection();
-      refreshSystemStatus();
-      vm.showToast(result.message || `"${title}" 스캔이 대기열에 추가되었습니다.`, 'success');
-    } catch (err) {
-      console.error('단일 도서 스캔 대기열 등록 오류:', err);
-      vm.showToast('도서 스캔 요청 중 서버 통신 오류가 발생했습니다.', 'error');
-    }
+  loadPluginContextMenuItems(currentTargetBook, {
+    onItemClick: (pluginId, actionId) => triggerBookContextPluginAction(pluginId, actionId),
+    onRendered: () => adjustMenuPosition(lastEventX, lastEventY),
   });
 }
 
-window.triggerScanSingleBookAction = triggerScanSingleBookAction;
-
-export async function triggerLazyScanBookAction() {
-  if (!currentTargetBook || !canRunLazyScanFromCurrentBookMenu()) return;
-
-  const selectedBooks = Array.isArray(currentTargetBook.selectedBooks) ? currentTargetBook.selectedBooks : [];
-  const seriesTarget = selectedBooks.length > 1 ? null : getLazyScanSeriesTarget(currentTargetBook);
-  const bookIds = selectedBooks.length > 1
-    ? selectedBooks.map(book => Number(book.id)).filter(id => Number.isInteger(id) && id > 0)
-    : [Number(currentTargetBook.id)];
-  if (!seriesTarget && (!currentTargetBook.id || !bookIds.length)) return;
-
-  closeBookContextMenu();
-  const vm = await import('./view_manager.js');
-  try {
-    const result = seriesTarget
-      ? await api.triggerSeriesLazyScan(state.currentLibraryType, seriesTarget.libraryId, seriesTarget.seriesName)
-      : await api.triggerBooksLazyScan(state.currentLibraryType, bookIds);
-    vm.showToast(result?.success ? result.message : (result?.error || 'Lazy-Scanner 요청에 실패했습니다.'), result?.success ? 'success' : 'error');
-    if (result?.success) clearBookSelection();
-  } catch (error) {
-    console.error('[BookContextMenu] Lazy-Scanner 요청 실패:', error);
-    vm.showToast('Lazy-Scanner 요청 중 서버 통신 오류가 발생했습니다.', 'error');
-  }
-}
-window.triggerLazyScanBookAction = triggerLazyScanBookAction;
-
-export function triggerSearchMetadataAction() {
-  if (!currentTargetBook || !currentTargetBook.id) return;
-  const { id, title } = currentTargetBook;
-
-  const selectedBooks = Array.isArray(currentTargetBook.selectedBooks) ? currentTargetBook.selectedBooks : [];
-  if (selectedBooks.length > 1) {
-    if (typeof window.openMetadataSearchQueue === 'function') {
-      window.openMetadataSearchQueue(selectedBooks.map(book => ({ id: book.id, title: book.title })));
-    } else {
-      import('./view_manager.js').then(vm => vm.showToast('다중 메타정보 검색 기능을 불러오지 못했습니다.', 'error'));
-    }
-    return;
-  }
-  
-  if (typeof window.openMetadataSearchModal === 'function') {
-    window.openMetadataSearchModal(id, title);
-  } else if (typeof window.openAladinSearchModal === 'function') {
-    window.openAladinSearchModal(id, title);
-  } else {
-    console.error('[Global Trigger ERROR] window.openMetadataSearchModal 함수가 바인딩되지 않았습니다.');
-  }
-}
-window.triggerSearchMetadataAction = triggerSearchMetadataAction;
-window.triggerSearchAladinMetadataAction = triggerSearchMetadataAction;
-
-function removeUnreadTargetCards({ id, isSeriesScope, seriesName, libraryId }) {
-  if (state.currentLibraryId !== 'home' && state.currentLibraryId !== 'history') return;
-
-  const historyContainer = state.currentLibraryId === 'home'
-    ? document.getElementById('dashboard-history-row')
-    : document.getElementById('books-list-container');
-  if (!historyContainer) return;
-
-  historyContainer.querySelectorAll('.book-card').forEach((card) => {
-    const sameBook = String(card.dataset.bookId || '') === String(id);
-    const sameSeries = isSeriesScope
-      && String(card.dataset.seriesName || '') === String(seriesName || '')
-      && String(card.dataset.libraryId || '') === String(libraryId ?? '');
-    if (sameBook || sameSeries) card.remove();
-  });
+export function triggerBookContextPluginAction(pluginId, actionId) {
+  return runBookContextPluginAction(currentTargetBook, pluginId, actionId);
 }
 
-export async function triggerMarkAsUnreadAction() {
-  if (!currentTargetBook || !currentTargetBook.id) return;
-  const { id, title, markUnreadScope, seriesName, libraryId } = currentTargetBook;
-  const isSeriesScope = markUnreadScope === 'series';
-  const selectedBooks = Array.isArray(currentTargetBook.selectedBooks) ? currentTargetBook.selectedBooks : [];
+const menuUi = {
+  close: closeBookContextMenu,
+  get point() { return { x: lastEventX, y: lastEventY }; },
+};
 
-  import('./view_manager.js').then(async (vm) => {
-    try {
-      if (selectedBooks.length > 1) {
-        const uniqueTargets = new Map();
-        selectedBooks.forEach((book) => {
-          const scope = book.markUnreadScope === 'series'
-            && String(book.seriesName || '').trim()
-            && book.libraryId !== null
-            ? 'series'
-            : 'book';
-          const key = scope === 'series'
-            ? `${scope}:${book.libraryId ?? ''}:${String(book.seriesName || '').trim()}`
-            : `${scope}:${book.libraryId ?? ''}:${book.id}`;
-          if (!uniqueTargets.has(key)) uniqueTargets.set(key, { ...book, scope });
-        });
-
-        let succeeded = 0;
-        const failures = [];
-        for (const book of uniqueTargets.values()) {
-          try {
-            const result = await api.markBookAsUnread(state.currentLibraryType, book.id, {
-              scope: book.scope,
-              seriesName: book.seriesName,
-              libraryId: book.libraryId,
-            });
-            if (result?.success) succeeded += 1;
-            else failures.push({ title: book.title, error: result?.error || '변경 실패' });
-          } catch (error) {
-            failures.push({ title: book.title, error: error.message || '서버 통신 오류' });
-          }
-        }
-
-        vm.showToast(
-          `선택 항목 읽지 않음 처리: ${succeeded}/${uniqueTargets.size}개${failures.length ? ` (실패 ${failures.length}개)` : ''}`,
-          failures.length ? 'warning' : 'success'
-        );
-        if (failures.length) console.warn('[BookContextMenu] 다중 읽지 않음 처리 실패:', failures);
-        closeBookContextMenu();
-        clearBookSelection();
-        if (state.currentLibraryId === 'home') await loadDashboardData();
-        else if (state.currentLibraryId === 'history') await loadReadingHistory();
-        else await loadBooksList();
-        return;
-      }
-
-      const res = await api.markBookAsUnread(state.currentLibraryType, id, {
-        scope: isSeriesScope ? 'series' : 'book',
-        seriesName,
-        libraryId,
-      });
-      if (res.success) {
-        const targetLabel = isSeriesScope ? '시리즈 전체가' : '도서가';
-        vm.showToast(`"${title}" ${targetLabel} 읽지 않은 상태(0%)로 변경되었습니다.`, 'success');
-        removeUnreadTargetCards({ id, isSeriesScope, seriesName, libraryId });
-        closeBookContextMenu();
-        
-        // 화면 리프레시: 현재 위치한 탭/뷰에 맞추어 라이브 리로드 실행
-        if (state.currentLibraryId === 'home') {
-          await loadDashboardData();
-        } else if (state.currentLibraryId === 'history') {
-          await loadReadingHistory();
-        } else {
-          // 상세 뷰 혹은 일반 도서 목록 새로고침
-          // (구 모달 구조 시절의 #book-detail-modal / .detail-title-text 참조는 지금의
-          // #book-detail-view / state.detailSeriesName 구조로 바뀐 뒤 갱신되지 않아 죽은
-          // 참조로 남아있었음 — 상세 화면에서 읽지 않음 처리해도 진행률 표시가 새로고침
-          // 안 되던 원인)
-          const detailView = document.getElementById('book-detail-view');
-          const isDetailViewOpen = !!detailView && detailView.style.display !== 'none';
-          if (isDetailViewOpen) {
-            const currentSeriesName = String(state.detailSeriesName || '').trim();
-            if (currentSeriesName) {
-              openBookDetail(null, currentSeriesName, libraryId || state.currentLibraryId);
-            }
-          } else {
-            await loadBooksList();
-          }
-        }
-      } else {
-        vm.showToast(`변경 실패: ${res.error}`, 'error');
-      }
-    } catch (err) {
-      console.error('도서 읽지않음 처리 API 에러:', err);
-      vm.showToast('서버 통신 중 오류가 발생했습니다.', 'error');
-    }
-  });
+function runBookMenuAction(action) {
+  const run = BOOK_MENU_ACTIONS[action];
+  return run ? run(currentTargetBook, menuUi) : undefined;
 }
 
-window.triggerMarkAsUnreadAction = triggerMarkAsUnreadAction;
-
-// "읽지 않은 상태로 변경"의 대칭 액션. 다중 선택 시에는 상태가 혼재될 수 있어(일부만 완독 등)
-// 토글 자체를 노출하지 않으므로(showBookContextMenu 참고) 단일 대상만 처리한다.
-export async function triggerMarkAsReadAction() {
-  if (!currentTargetBook || !currentTargetBook.id) return;
-  const { id, title, markUnreadScope, seriesName, libraryId } = currentTargetBook;
-  const isSeriesScope = markUnreadScope === 'series';
-
-  import('./view_manager.js').then(async (vm) => {
-    try {
-      const res = await api.markBookAsRead(state.currentLibraryType, id, {
-        scope: isSeriesScope ? 'series' : 'book',
-        seriesName,
-        libraryId,
-      });
-      if (res.success) {
-        const targetLabel = isSeriesScope ? '시리즈 전체가' : '도서가';
-        vm.showToast(`"${title}" ${targetLabel} 읽은 상태(완독)로 변경되었습니다.`, 'success');
-        closeBookContextMenu();
-
-        if (state.currentLibraryId === 'home') {
-          await loadDashboardData();
-        } else if (state.currentLibraryId === 'history') {
-          await loadReadingHistory();
-        } else {
-          const detailView = document.getElementById('book-detail-view');
-          const isDetailViewOpen = !!detailView && detailView.style.display !== 'none';
-          if (isDetailViewOpen) {
-            const currentSeriesName = String(state.detailSeriesName || '').trim();
-            if (currentSeriesName) {
-              openBookDetail(null, currentSeriesName, libraryId || state.currentLibraryId);
-            }
-          } else {
-            await loadBooksList();
-          }
-        }
-      } else {
-        vm.showToast(`변경 실패: ${res.error}`, 'error');
-      }
-    } catch (err) {
-      console.error('도서 읽음 처리 API 에러:', err);
-      vm.showToast('서버 통신 중 오류가 발생했습니다.', 'error');
-    }
-  });
-}
-window.triggerMarkAsReadAction = triggerMarkAsReadAction;
-
-window.triggerBookContextPluginAction = triggerBookContextPluginAction;
+// 기존 전역/named export 호환 (ui.js, tab_media_library.js, 외부 플러그인 등이 부른다)
+export const triggerScanSingleBookAction = () => runBookMenuAction('scan');
+export const triggerLazyScanBookAction = () => runBookMenuAction('lazy-scan');
+export const triggerSearchMetadataAction = () => runBookMenuAction('search-meta');
+export const triggerAddToCollectionAction = () => runBookMenuAction('add-to-collection');
+export const triggerAddSeriesToCollectionAction = () => runBookMenuAction('add-series-to-collection');
+export const triggerPageTurnAction = () => runBookMenuAction('page-turn');
+export const triggerTtsAction = () => runBookMenuAction('tts');
+export const triggerTtsPregenAction = () => runBookMenuAction('tts-pregen');
+export const triggerMarkAsUnreadAction = () => runBookMenuAction('mark-unread');
+export const triggerMarkAsReadAction = () => runBookMenuAction('mark-read');
 export { triggerSearchMetadataAction as triggerSearchAladinMetadataAction };
 
-window.showBookContextMenu = showBookContextMenu;
-window.closeBookContextMenu = closeBookContextMenu;
+Object.assign(window, {
+  triggerScanSingleBookAction,
+  triggerLazyScanBookAction,
+  triggerSearchMetadataAction,
+  triggerSearchAladinMetadataAction: triggerSearchMetadataAction,
+  triggerAddToCollectionAction,
+  triggerAddSeriesToCollectionAction,
+  triggerPageTurnAction,
+  triggerTtsAction,
+  triggerTtsPregenAction,
+  triggerMarkAsUnreadAction,
+  triggerMarkAsReadAction,
+  triggerBookContextPluginAction,
+  showBookContextMenu,
+  closeBookContextMenu,
+});
 
 function resolveBookContextTarget(event) {
   if (!event || !event.target || typeof event.target.closest !== 'function') return null;
@@ -985,51 +438,6 @@ if (bookMenuEl) {
   }, true);
 }
 
-export function triggerAddToCollectionAction() {
-  if (!currentTargetBook || !currentTargetBook.id) return;
-  const { id, title } = currentTargetBook;
-  const selectedBooks = Array.isArray(currentTargetBook.selectedBooks) ? currentTargetBook.selectedBooks : [];
-  import('./tab_collections.js').then((colls) => {
-    if (selectedBooks.length > 1) {
-      colls.openAddToCollectionModal({
-        title: `선택한 ${selectedBooks.length}개 작품`,
-        items: selectedBooks.map(book => ({ book_id: book.id, title: book.title })),
-      });
-    } else {
-      colls.openAddToCollectionModal({ book_id: id, title: title });
-    }
-  });
-}
-window.triggerAddToCollectionAction = triggerAddToCollectionAction;
-
-export function triggerAddSeriesToCollectionAction() {
-  if (!currentTargetBook) return;
-  const selectedBooks = Array.isArray(currentTargetBook.selectedBooks) ? currentTargetBook.selectedBooks : [];
-  if (selectedBooks.length > 1) {
-    const seriesItems = Array.from(new Map(
-      selectedBooks
-        .map(book => String(book.seriesName || '').trim())
-        .filter(Boolean)
-        .map(name => [name, { series_name: name, title: name }])
-    ).values());
-    if (!seriesItems.length) return;
-    import('./tab_collections.js').then((colls) => {
-      colls.openAddToCollectionModal({
-        title: `선택한 ${seriesItems.length}개 시리즈`,
-        items: seriesItems,
-      });
-    });
-    return;
-  }
-
-  const seriesName = String(currentTargetBook.seriesName || '').trim();
-  if (!seriesName) return;
-  import('./tab_collections.js').then((colls) => {
-    colls.openAddToCollectionModal({ series_name: seriesName, title: seriesName });
-  });
-}
-window.triggerAddSeriesToCollectionAction = triggerAddSeriesToCollectionAction;
-
 if (!window.__bookContextActionBound) {
   document.addEventListener('click', (event) => {
     const target = event && event.target && typeof event.target.closest === 'function'
@@ -1044,25 +452,7 @@ if (!window.__bookContextActionBound) {
       return;
     }
 
-    const action = target.getAttribute('data-action');
-    if (action === 'scan') return window.triggerScanSingleBookAction?.();
-    if (action === 'lazy-scan') return window.triggerLazyScanBookAction?.();
-    if (action === 'search-meta') return window.triggerSearchMetadataAction?.();
-    if (action === 'add-to-collection') return window.triggerAddToCollectionAction?.();
-    if (action === 'add-series-to-collection') return window.triggerAddSeriesToCollectionAction?.();
-    if (action === 'page-turn') return window.triggerPageTurnAction?.();
-    if (action === 'tts') return window.triggerTtsAction?.();
-    if (action === 'tts-pregen') return window.triggerTtsPregenAction?.();
-    if (action === 'mark-unread') return window.triggerMarkAsUnreadAction?.();
-    if (action === 'mark-read') return window.triggerMarkAsReadAction?.();
-    if (action === 'cover-align') {
-      const bookId = currentTargetBook?.id;
-      const coverAlign = currentTargetBook?.coverAlign;
-      const selectedBooks = Array.isArray(currentTargetBook?.selectedBooks) ? currentTargetBook.selectedBooks : [];
-      const bulkBookIds = selectedBooks.length > 1 ? selectedBooks.map(book => book.id) : null;
-      closeBookContextMenu();
-      return window.showVolumeCoverAlignContextMenu?.(lastEventX, lastEventY, bookId, coverAlign, bulkBookIds);
-    }
+    return runBookMenuAction(target.getAttribute('data-action'));
   }, true);
   window.__bookContextActionBound = true;
 }

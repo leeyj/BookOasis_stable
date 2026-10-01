@@ -8,6 +8,21 @@
         <i class="fa-solid fa-bars"></i>
     </button>
 
+    <!-- 모바일 전용 햄버거(좌측 드로어 열기): 모바일은 로고 앱바 없이 이 헤더 카드 한 장이 앱바 역할을 한다(2026-10-01).
+         데스크톱에선 sidebar_manager.js syncSidebarResponsiveControls가 숨긴다 -->
+    <button id="btn-sidebar-toggle" class="btn-sidebar-toggle" aria-expanded="false" aria-controls="sidebar-collapsible-content" data-i18n-title="sidebar.open_menu" title="메뉴" style="display: none; background: transparent; border: none; color: var(--app-text-primary); font-size: 1.25rem; cursor: pointer; padding: 0.2rem 0.5rem; outline: none;">
+        <i class="fa-solid fa-bars"></i>
+        <!-- 스크롤하면 스캔활동 아이콘 줄이 접히므로, 진행 중 표시 점을 햄버거에도 띄운다 -->
+        <span class="drawer-scan-dot" data-role="scan-activity-mirror" aria-hidden="true"></span>
+    </button>
+
+    <!-- 모바일 전용 세션 선택: 누르면 세션 전환 팝업(#mobile-session-menu) - 라벨은 sidebar_manager.js initMobileSessionMenu가 채운다 -->
+    <button id="btn-mobile-session-select" class="mobile-session-select mobile-drawer-only" type="button"
+        aria-haspopup="true" aria-expanded="false" aria-controls="mobile-session-menu" hidden>
+        <span class="mobile-session-select-label"></span>
+        <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+    </button>
+
     <!-- 현재 선택된 카테고리 정보(ID/경로/시리즈·도서 수) 팝오버 트리거: 마우스 오버 또는 클릭 -->
     <button id="btn-category-info" class="btn-category-info" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="category-info-popover" title="현재 카테고리 정보">
         <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
@@ -41,7 +56,8 @@
     </div>
 
     <!-- 라이브러리 타입(세션) 탭: 페이지의 1차 내비게이션이자 "지금 어느 세션인지" 보여주는 유일한 지표라
-         플러그인 화면을 포함해 어떤 뷰에서도 숨기지 않는다 (view_manager.js 참고) -->
+         플러그인 화면을 포함해 어떤 뷰에서도 숨기지 않는다 (view_manager.js 참고).
+         모바일은 CSS로 숨기고 #btn-mobile-session-select + 팝업이 이 탭을 원본 삼아 복제해 보여준다 -->
     <div id="library-type-toggle-group" class="library-toggle-group">
         <button class="btn-toggle active" id="btn-lib-general" data-role="library-type-toggle" data-library-type="general" data-i18n="header.general_books">일반 도서</button>
         <button class="btn-toggle" id="btn-lib-adult" data-role="library-type-toggle" data-library-type="adult" data-i18n="header.adult_books">성인 도서</button>
