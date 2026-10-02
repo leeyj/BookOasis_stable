@@ -1,4 +1,5 @@
 // chapter_drawer.js - 오디오 챕터(트랙) 드로어 리스트 렌더링/전환 전담
+import { escapeHtml } from '../category/kind_options.js';
 
 export function createChapterDrawer(deps) {
   const {
@@ -24,7 +25,7 @@ export function createChapterDrawer(deps) {
         <div data-role="audio-chapter-track" data-track-id="${t.id}" style="display: flex; align-items: center; justify-content: space-between; padding: 0.8rem 1rem; border-radius: 12px; cursor: pointer; transition: all 0.2s; ${activeStyle}">
           <div style="display: flex; align-items: center; gap: 0.9rem; overflow: hidden;">
             ${playIcon}
-            <span style="font-size: 0.9rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${t.title}</span>
+            <span style="font-size: 0.9rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(t.title)}</span>
           </div>
           <span style="font-size: 0.8rem; color: var(--app-text-muted); font-family: monospace;">${t.time_str || ''}</span>
         </div>

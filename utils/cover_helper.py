@@ -47,11 +47,26 @@ def get_or_cache_remote_poster_webp(poster_source, category, library_id=None, ti
     else:
         if not os.path.exists(poster_source):
             return None
-        try:
-            with open(poster_source, 'rb') as f:
-                img_data = f.read()
-        except Exception:
-            return None
+        from services.audiobook_scanner import AUDIO_EXTENSIONS, read_embedded_cover
+        if str(poster_source).lower().endswith(AUDIO_EXTENSIONS):
+            # 음악 앨범의 포스터 소스가 곡 파일이면 내장 아트만 꺼낸다(파일 전체를 읽지 않음).
+            # 아트가 없으면 .none 표시를 남겨, 그리드를 열 때마다 원격 곡 파일을 다시 여는 일을 막는다.
+            none_marker = os.path.join(cache_dir, f"{source_hash}.none")
+            if os.path.exists(none_marker):
+                return None
+            img_data = read_embedded_cover(poster_source)
+            if not img_data:
+                try:
+                    open(none_marker, 'wb').close()
+                except Exception:
+                    pass
+                return None
+        else:
+            try:
+                with open(poster_source, 'rb') as f:
+                    img_data = f.read()
+            except Exception:
+                return None
 
     if not img_data:
         return None

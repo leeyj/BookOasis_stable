@@ -6,7 +6,7 @@ import sqlite3
 import threading
 from flask import Blueprint, request, jsonify
 from apscheduler.triggers.cron import CronTrigger
-from services.category_service import CategoryService, apply_running_scan_status
+from services.category_service import COVER_ASPECT_RATIOS, CategoryService, apply_running_scan_status
 from services.scheduler_service import run_scan_job, SchedulerService
 from api.auth import admin_required
 from utils.i18n import _t
@@ -199,7 +199,7 @@ def add_media_library():
     hide_cover = 1 if request.form.get('hide_cover', '0') in ('1', 'true', 'True', 'on') else 0
     hide_title = 1 if request.form.get('hide_title', '0') in ('1', 'true', 'True', 'on') else 0
     cover_aspect_ratio = request.form.get('cover_aspect_ratio', '4:3').strip()
-    if cover_aspect_ratio not in ('4:3', '16:9'):
+    if cover_aspect_ratio not in COVER_ASPECT_RATIOS:
         cover_aspect_ratio = '4:3'
     rclone_rc_url = normalize_rclone_url(request.form.get('rclone_rc_url'))
     icon = request.form.get('icon', 'fa-book').strip() or 'fa-book'
@@ -274,7 +274,7 @@ def edit_media_library():
     hide_cover = 1 if request.form.get('hide_cover', '0') in ('1', 'true', 'True', 'on') else 0
     hide_title = 1 if request.form.get('hide_title', '0') in ('1', 'true', 'True', 'on') else 0
     cover_aspect_ratio = request.form.get('cover_aspect_ratio', '4:3').strip()
-    if cover_aspect_ratio not in ('4:3', '16:9'):
+    if cover_aspect_ratio not in COVER_ASPECT_RATIOS:
         cover_aspect_ratio = '4:3'
     rclone_rc_url = normalize_rclone_url(request.form.get('rclone_rc_url'))
     icon = request.form.get('icon', 'fa-book').strip() or 'fa-book'

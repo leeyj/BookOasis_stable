@@ -1,6 +1,7 @@
 import { buildFallbackCoverUrl, getBookCoverSrc } from '../cover_fallback.js';
 import { state } from '../state.js';
 import { stripLeadingBracketTags } from '../series_display.js';
+import { formatClockDuration } from '../utils/time.js';
 
 function normalizeMetadataToken(token) {
   if (!token) return '';
@@ -384,8 +385,11 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
   const summaryToggleLabelMore = i18n.t('detail.summary_more') || '더보기';
   const summaryToggleLabelLess = i18n.t('detail.summary_less') || '접기';
   const isAudiobookContext = state.currentLibraryType === 'audiobook';
+  // 음악 카테고리(오디오북 세션 '음악' 속성): 책 전용 정보(ISBN/출판사/권/별점/청취 완료/메타 검색)를 숨기고
+  // 아티스트 · 곡 수 · 총 길이 · 연도 · 장르 한 줄과 [재생] [셔플 재생] [재스캔]만 둔다.
+  const isMusicContext = isAudiobookContext && !!(meta && meta.is_music);
   const isAudiobookCompleted = isAudiobookContext && Number(meta.is_completed) === 1;
-  const audiobookCompletedBadgeHtml = isAudiobookContext ? `
+  const audiobookCompletedBadgeHtml = (isAudiobookContext && !isMusicContext) ? `
     <span class="audiobook-completed-badge${isAudiobookCompleted ? ' is-visible' : ''}" data-audiobook-completed="${meta.id || ''}">
       <i class="fa-solid fa-headphones"></i> ${i18n.t('detail.audiobook_completed')}
     </span>
@@ -396,7 +400,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
   const markSeriesCompletedLabel = isAudiobookContext
     ? i18n.t('detail.btn_mark_audiobook_completed')
     : i18n.t('detail.btn_mark_series_completed');
-  const markSeriesCompletedBtnHtml = isVideoContext ? '' : `
+  const markSeriesCompletedBtnHtml = (isVideoContext || isMusicContext) ? '' : `
     <button class="ridi-link-btn" data-role="detail-mark-series-complete" data-series-name="${safeSeriesName.replace(/"/g, '&quot;')}" data-library-id="${actualLibraryId}" style="margin: 0; background: #16a34a; border-color: #22c55e; display: inline-flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-circle-check"></i> ${markSeriesCompletedLabel}</button>
   `;
   const identifierLabel = 'ISBN(WEB_ID)';
@@ -414,7 +418,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
   ` : '';
   // 그리드 카드에서 이 표시를 없애고(카드가 많을 때 잡음이 심했음) 상세화면에서만
   // 보여주기로 함 - has_metadata는 book_detail_service.py가 계산해서 내려준다.
-  const metadataMissingBadgeHtml = Number(meta && meta.has_metadata) === 0 ? `
+  const metadataMissingBadgeHtml = (!isMusicContext && Number(meta && meta.has_metadata) === 0) ? `
     <span class="detail-metadata-missing-badge" title="메타데이터 정보 없음" aria-label="메타데이터 정보 없음">
       <i class="fa-solid fa-link-slash" aria-hidden="true"></i> ${i18n.t('detail.metadata_missing') || '메타데이터 없음'}
     </span>
@@ -437,18 +441,42 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
         </div>
         <input type="file" id="cover-upload-file-input" data-role="detail-cover-file-input" accept="image/*" style="display: none;">
   `;
-  const pluginMetaSearchBtnHtml = isVideoContext ? '' : `
+  const pluginMetaSearchBtnHtml = (isVideoContext || isMusicContext) ? '' : `
           <button id="btn-plugin-meta-search" class="ridi-link-btn" data-role="detail-plugin-meta-search" data-book-id="${firstBookId || ''}" data-series-name="${safeSeriesName.replace(/"/g, '&quot;')}" style="margin: 0; background: #2563eb; border-color: #3b82f6;"><i class="fa-solid fa-magnifying-glass"></i> ${i18n.t('detail.btn_search_meta')}</button>
   `;
   const rescanSeriesBtnHtml = isVideoContext ? '' : `
-          <button class="ridi-link-btn" data-role="detail-rescan-series" data-series-name="${safeSeriesName.replace(/"/g, '&quot;')}" data-library-id="${actualLibraryId}" style="margin: 0; background: #ea580c; border-color: #f97316; display: inline-flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-arrows-rotate"></i> ${i18n.t('detail.btn_rescan_series')}</button>
+          <button class="ridi-link-btn" data-role="detail-rescan-series" data-series-name="${safeSeriesName.replace(/"/g, '&quot;')}" data-library-id="${actualLibraryId}" style="margin: 0; background: #ea580c; border-color: #f97316; display: inline-flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-arrows-rotate"></i> ${isMusicContext ? '재스캔' : i18n.t('detail.btn_rescan_series')}</button>
   `;
   const volumeCountLabel = isVideoContext ? `${books.length}편` : `${books.length}권`;
+  // 원격 음악은 재생 전엔 곡 길이를 모르므로(0) 모든 곡 길이를 알 때만 총 재생시간을 보인다
+  const musicTotalSeconds = books.length > 0 && books.every((book) => Number(book.duration) > 0)
+    ? books.reduce((sum, book) => sum + Number(book.duration), 0)
+    : 0;
+  const musicMetaHtml = isMusicContext ? [
+    meta.author && meta.author !== '-' ? `<span class="meta-item"><i class="fa-solid fa-user"></i> ${escapeHtml(meta.author)}</span>` : '',
+    `<span class="meta-item"><i class="fa-solid fa-music"></i> ${books.length}곡</span>`,
+    musicTotalSeconds > 0 ? `<span class="meta-item"><i class="fa-regular fa-clock"></i> ${formatClockDuration(musicTotalSeconds)}</span>` : '',
+    meta.music_year ? `<span class="meta-item"><i class="fa-regular fa-calendar"></i> ${escapeHtml(meta.music_year)}</span>` : '',
+    meta.music_genres ? `<span class="meta-item"><i class="fa-solid fa-tag"></i> ${escapeHtml(meta.music_genres)}</span>` : '',
+  ].join('') : '';
+  const musicShuffleBtnHtml = isMusicContext ? `
+          <button class="ridi-link-btn" data-role="detail-music-shuffle" data-audiobook-id="${meta.id || ''}" style="margin: 0; background: #0f766e; border-color: #14b8a6; display: inline-flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-shuffle"></i> 셔플 재생</button>
+  ` : '';
+  if (isMusicContext && continueTarget) {
+    // 음악은 이어듣기가 없다: 항상 1번 곡부터 [재생]
+    continueBtnHtml = `
+      <button class="ridi-link-btn" style="margin: 0; background: #10b981; border-color: #34d399; font-weight: bold; color: var(--app-text-primary); display: inline-flex; align-items: center; gap: 0.3rem;"
+              data-role="detail-continue" data-continue-action="audio" data-audiobook-id="${meta.id || ''}"
+              data-track-id="${books[0] ? books[0].id : ''}" data-start-time="0">
+        <i class="fa-solid fa-play"></i> 재생
+      </button>
+    `;
+  }
 
   return `
     <!-- 상단 헤더: 커버(작게) + 메타정보 -->
     <div class="detail-header-panel">
-      <div class="detail-cover-container" data-role="detail-cover-dropzone" style="position: relative;">
+      <div class="detail-cover-container${isMusicContext ? ' is-square' : ''}" data-role="detail-cover-dropzone" style="position: relative;">
            <img class="detail-cover-sm" id="detail-cover-img-preview" src="${coverSrc}" alt="Cover" data-title="${(visibleTitle || '').replace(/"/g, '&quot;')}" data-format="${headerFormat}"
               onerror="window.handleCoverError(this)">
         ${detailLockedBadgeHtml}
@@ -467,23 +495,24 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
           ${unlockBtnHtml}
         </h3>
         <div class="detail-meta">
+          ${isMusicContext ? musicMetaHtml : `
           <span class="meta-item"><i class="fa-solid fa-pen-nib"></i> ${escapeHtml(meta.author || '-')}</span>
           <span class="meta-item"><i class="fa-solid fa-barcode"></i> ${identifierLabel}: ${identifierValue}</span>
           <span class="meta-item"><i class="fa-solid fa-building"></i> ${escapeHtml(meta.publisher || '-')}</span>
-          <span class="meta-item"><i class="fa-solid fa-book-open"></i> ${volumeCountLabel}</span>
+          <span class="meta-item"><i class="fa-solid fa-book-open"></i> ${volumeCountLabel}</span>`}
         </div>
         <div class="detail-meta-tags" style="display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.5rem; margin-bottom: 0.8rem;">
-          ${ratingBadgeHtml || publicationStatusBadgeHtml ? `<div class="detail-rating-row" style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">${ratingBadgeHtml}${publicationStatusBadgeHtml}</div>` : ''}
+          ${!isMusicContext && (ratingBadgeHtml || publicationStatusBadgeHtml) ? `<div class="detail-rating-row" style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">${ratingBadgeHtml}${publicationStatusBadgeHtml}</div>` : ''}
           ${genreRowHtml}
           ${tagRowHtml}
         </div>
         ${missingPageBannerHtml}
-        <div class="detail-score" id="detail-score-root" data-static-stars="${stars}">${stars}</div>
+        ${isMusicContext ? '' : `<div class="detail-score" id="detail-score-root" data-static-stars="${stars}">${stars}</div>`}
       </div>
 
       <!-- 요약/설명 + 액션 버튼: 커버 폭에 갇히지 않도록 전체 너비 별도 줄로 배치(커버 아래 빈 공간 재활용) -->
       <div id="detail-header-full-row" class="detail-header-full-row">
-        <div class="book-summary-wrap${shouldShowSummaryToggle ? ' has-toggle' : ''}">
+        <div class="book-summary-wrap${shouldShowSummaryToggle ? ' has-toggle' : ''}"${isMusicContext && (!meta.summary || meta.summary === '등록된 설명이 없습니다.' || meta.summary === i18n.t('detail.no_description')) ? ' hidden' : ''}>
           <p class="book-summary-text${shouldShowSummaryToggle ? ' is-collapsed' : ''}">${summaryText}</p>
           ${shouldShowSummaryToggle ? `
           <button class="book-summary-toggle" type="button"
@@ -496,7 +525,8 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
         <!-- 버튼: 이어서 읽기 및 메타정보 찾기 -->
         <div style="display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; align-items: center;">
           ${continueBtnHtml}
-          ${isVideoContext ? '' : `<button id="btn-manual-meta-search" class="ridi-link-btn" style="display:none; margin: 0; background: color-mix(in srgb, var(--app-accent) 70%, black); border-color: var(--app-accent);"><i class="fa-solid fa-wand-magic-sparkles"></i> ${i18n.t('detail.btn_recommend_match')}</button>`}
+          ${musicShuffleBtnHtml}
+          ${(isVideoContext || isMusicContext) ? '' : `<button id="btn-manual-meta-search" class="ridi-link-btn" style="display:none; margin: 0; background: color-mix(in srgb, var(--app-accent) 70%, black); border-color: var(--app-accent);"><i class="fa-solid fa-wand-magic-sparkles"></i> ${i18n.t('detail.btn_recommend_match')}</button>`}
           ${pluginMetaSearchBtnHtml}
           ${rescanSeriesBtnHtml}
           ${markSeriesCompletedBtnHtml}
@@ -560,13 +590,13 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
         </div>
       </div>
       
-      <!-- 유사 메타데이터 추천 영역 -->
-      <div id="meta-recommend-section" style="display:none; margin-top: 1rem; padding: 1rem; background: rgba(var(--app-panel-rgb), 0.5); border: 1px dashed rgba(168, 85, 247, 0.4); border-radius: 8px; width: 100%;">
+      <!-- 유사 메타데이터 추천 영역 (음악 카테고리는 도서 메타 추천 대상이 아님) -->
+      ${isMusicContext ? '' : `<div id="meta-recommend-section" style="display:none; margin-top: 1rem; padding: 1rem; background: rgba(var(--app-panel-rgb), 0.5); border: 1px dashed rgba(168, 85, 247, 0.4); border-radius: 8px; width: 100%;">
         <h5 style="margin: 0 0 0.8rem 0; color: var(--app-accent-hover); font-size: 0.85rem;"><i class="fa-solid fa-wand-magic-sparkles"></i> ${i18n.t('detail.title_recommend')}</h5>
         <div id="recommend-candidates-list" style="display: flex; flex-direction: column; gap: 0.6rem;">
           <div style="font-size:0.75rem; color: var(--app-text-muted);"><i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('detail.loading_recommend')}</div>
         </div>
-      </div>
+      </div>`}
     </div>
   `;
 }

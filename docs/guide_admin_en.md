@@ -244,7 +244,7 @@ The same cause is grouped into one card per **problem kind x category**; expand 
 
 | Card | Meaning | Action |
 | :--- | :--- | :--- |
-| Remote drive disconnected | The category folder/mount is unreachable. The scanner removes no books meanwhile | Check the mount, then rescan |
+| Remote drive disconnected | The category folder/mount is unreachable. The scanner removes no books meanwhile. Brief blips are ignored; shown only after 10+ minutes | Check the mount, then rescan |
 | Possible mass move/delete | 20%+ (and 20+) of the category newly vanished in one scan - moving to the trash is held | Check renamed folders etc. -> rescan or [Move to trash] |
 | Missing file · moved to trash | Missing files were moved to the trash (deleted after 7 days) | Rescan if they are back |
 | Corrupt file / cover extraction failed | File errors during the scan | Check the original, then rescan |

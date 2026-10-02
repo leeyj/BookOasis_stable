@@ -6,6 +6,7 @@ import { currentTargetLibrary } from './context_menu.js';
 import { updateRemoteWarning, enableVFSCheckForRemote, loadGdriveCopyRemotes, detectGdriveMountRoot } from './path_browser.js';
 import { loadVideoLibraryView } from '../video_library.js';
 import { buildKindOptionsHtml } from './kind_options.js';
+import { coverRatioAttr, normalizeCoverAspectRatio } from '../utils/cover_ratio.js';
 
 async function reloadLibrarySidebar() {
   if (state.currentLibraryType === 'video') {
@@ -312,8 +313,8 @@ export async function triggerEditLibrary() {
   const hideCoverEl = document.getElementById('library-form-hide-cover');
   if (hideCoverEl) hideCoverEl.checked = (hideCoverVal === '1');
 
-  const coverRatioVal = libraryItem?.dataset?.coverAspectRatio === '16:9' ? '16:9' : '4:3';
-  const coverRatioEl = document.getElementById(coverRatioVal === '16:9' ? 'library-form-cover-ratio-16-9' : 'library-form-cover-ratio-4-3');
+  const coverRatioVal = normalizeCoverAspectRatio(libraryItem?.dataset?.coverAspectRatio);
+  const coverRatioEl = document.getElementById(`library-form-cover-ratio-${coverRatioAttr(coverRatioVal)}`);
   if (coverRatioEl) coverRatioEl.checked = true;
   updateCoverRatioRowVisibility();
 

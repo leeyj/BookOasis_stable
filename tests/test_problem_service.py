@@ -239,3 +239,43 @@ def test_unknown_code_uses_fallback_catalog():
     entry = problem_service.catalog_entry('something_new')
     assert entry['title_key'] == 'problems.code.unknown.title'
     assert entry['severity'] == 'notice'
+
+
+# ---- 순단 유예 (remote_unavailable) ----
+
+def _remote(library_id=80, db_type='general'):
+    return ProblemService.report('remote_unavailable', 'library', library_id, db_type=db_type, library_id=library_id,
+                                 target_path='/mnt/gdrive/books', message='/mnt/gdrive/books (not found)')
+
+
+def _codes():
+    return [c['code'] for c in ProblemService.list_cards()]
+
+
+def test_remote_unavailable_card_waits_out_the_grace_period(problem_db):
+    _, clock = problem_db
+    grace_ms = problem_service.CATALOG['remote_unavailable']['grace_sec'] * 1000
+    _remote()
+    assert 'remote_unavailable' not in _codes()            # 막 끊김: 아직 순단일 수 있다
+    clock['ms'] += grace_ms - 1
+    _remote()                                               # 그 사이 스캔이 또 실패해도 최초 시각 기준
+    assert 'remote_unavailable' not in _codes()
+    clock['ms'] += 1
+    assert 'remote_unavailable' in _codes()                 # 유예가 지나도록 해제되지 않음 → 카드
+
+
+def test_a_blip_that_recovers_within_the_grace_period_never_shows_a_card(problem_db):
+    _, clock = problem_db
+    grace_ms = problem_service.CATALOG['remote_unavailable']['grace_sec'] * 1000
+    _remote()
+    clock['ms'] += 30_000
+    ProblemService.resolve('remote_unavailable', 'library', 80, db_type='general')
+    clock['ms'] += grace_ms * 2
+    assert 'remote_unavailable' not in _codes()
+    _remote()                                               # 다시 끊기면 유예를 새로 센다
+    assert 'remote_unavailable' not in _codes()
+
+
+def test_other_codes_show_immediately(problem_db):
+    _missing(1)
+    assert 'file_missing' in _codes()

@@ -495,6 +495,122 @@ class AudiobookRepository:
         finally:
             conn.close()
 
+    # ---- 재생할 때 채우기 (원격 음악: 스캔은 곡 파일을 열지 않는다 - music_enrich_service) ----
+    @staticmethod
+    def update_track_probe(track_id, duration, title=None, artist=None):
+        """곡 길이와 (태그가 있으면) 제목/아티스트를 채운다. 제목/아티스트가 None이면 기존 값을 둔다."""
+        with database.connection('audiobook') as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    "UPDATE audiobook_tracks SET duration = ?, title = COALESCE(?, title), artist = COALESCE(?, artist) "
+                    "WHERE id = ?",
+                    (float(duration or 0.0), title, artist, int(track_id))
+                )
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+
+    @staticmethod
+    def refresh_enriched_album(audiobook_id, author=None, poster=None):
+        """총 재생시간을 곡 길이 합으로 다시 계산하고, 비어 있을 때만 앨범 아티스트/포스터를 채운다."""
+        with database.connection('audiobook') as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    "UPDATE audiobooks SET total_duration = "
+                    "(SELECT COALESCE(SUM(duration), 0) FROM audiobook_tracks WHERE audiobook_id = ?) WHERE id = ?",
+                    (int(audiobook_id), int(audiobook_id))
+                )
+                if author:
+                    cursor.execute(
+                        "UPDATE audiobooks SET author = ? WHERE id = ? AND COALESCE(author, '') = ''",
+                        (author, int(audiobook_id))
+                    )
+                if poster:
+                    cursor.execute(
+                        "UPDATE audiobooks SET poster = ? WHERE id = ? AND COALESCE(poster, '') = ''",
+                        (poster, int(audiobook_id))
+                    )
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+
+    # ---- 음악 앨범 외부 정보 조회 (lookup_music_album 플러그인 폴백) ----
+    _MUSIC_LOOKUP_FIELDS = ('status', 'source', 'artist', 'year', 'genres', 'summary', 'cover_url', 'source_url')
+
+    @staticmethod
+    def get_music_lookup(audiobook_id):
+        with database.connection('audiobook') as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM audiobook_music_lookups WHERE audiobook_id = ?", (int(audiobook_id),))
+            row = cursor.fetchone()
+        return dict(row) if row else None
+
+    @staticmethod
+    def save_music_lookup(audiobook_id, values):
+        """조회 결과를 기록한다(같은 앨범이면 덮어쓴다). values: status(필수), source, artist, year, genres, summary, cover_url, source_url"""
+        fields = AudiobookRepository._MUSIC_LOOKUP_FIELDS
+        params = [int(audiobook_id)] + [values.get(f) for f in fields]
+        with database.connection('audiobook') as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    "INSERT INTO audiobook_music_lookups (audiobook_id, " + ', '.join(fields) + ", looked_up_at) "
+                    "VALUES (?, " + ', '.join(['?'] * len(fields)) + ", CURRENT_TIMESTAMP) ON CONFLICT(audiobook_id) DO UPDATE SET status = excluded.status, source = excluded.source, artist = excluded.artist, year = excluded.year, genres = excluded.genres, summary = excluded.summary, cover_url = excluded.cover_url, source_url = excluded.source_url, looked_up_at = excluded.looked_up_at",
+                    tuple(params)
+                )
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+
+    @staticmethod
+    def list_music_lookup_candidates(limit=20):
+        """아직 조회하지 않은 음악 카테고리 앨범 중 album.yaml 정보가 없는 것(발매일·소개가 비어 있음)."""
+        with database.connection('audiobook') as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT a.id, a.library_id, a.title, a.folder_name, a.folder_path, a.author, a.poster
+                FROM audiobooks a
+                JOIN libraries l ON l.id = a.library_id AND l.content_kind = 'music'
+                LEFT JOIN audiobook_music_lookups m ON m.audiobook_id = a.id
+                WHERE m.audiobook_id IS NULL
+                  AND COALESCE(a.is_deleted, 0) = 0
+                  AND COALESCE(a.premiered, '') = ''
+                  AND COALESCE(a.description, '') = ''
+                ORDER BY a.id ASC
+                LIMIT ?
+                """,
+                (int(limit),)
+            )
+            rows = cursor.fetchall()
+        return [dict(r) for r in rows]
+
+    @staticmethod
+    def update_track_tags(audiobook_id, tracks):
+        """음악 카테고리 트랙의 표시용 제목/아티스트(title, artist)를 바뀐 것만 갱신한다. 반환: 갱신 행 수."""
+        updated = 0
+        with database.connection('audiobook') as conn:
+            cursor = conn.cursor()
+            try:
+                for t in tracks:
+                    cursor.execute(
+                        "UPDATE audiobook_tracks SET title = ?, artist = ? "
+                        "WHERE audiobook_id = ? AND file_path = ? AND (title IS NOT ? OR artist IS NOT ?)",
+                        (t.get('title'), t.get('artist'), int(audiobook_id), os.path.normpath(str(t['file_path'])),
+                         t.get('title'), t.get('artist'))
+                    )
+                    updated += cursor.rowcount or 0
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+        return updated
+
     @staticmethod
     def get_by_folder_path(folder_path):
         """폴더 경로 기반 오디오북 상세 메타 조회"""

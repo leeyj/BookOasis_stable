@@ -44,6 +44,7 @@ BookOasis는 **SQLite(기본값)** 와 **MariaDB/MySQL(엔터프라이즈 권장
 9. `audiobook_tracks`
 10. `audiobook_progress`
 11. `audiobook_track_progress`
+    - `audiobook_music_lookups` (음악 앨범 외부 정보 조회 결과)
 
 **사용자/진행률**
 12. `users`
@@ -87,7 +88,7 @@ BookOasis는 **SQLite(기본값)** 와 **MariaDB/MySQL(엔터프라이즈 권장
 
 - PK: `code` (소문자 slug, `^[a-z][a-z0-9_-]{0,23}$`, 만든 뒤 변경 불가)
 - 컬럼: `name`(표시 이름, UNIQUE, 25자 이내), `is_builtin`, `sort_order`
-- 기본 종류 4개(`manga`/`novel`/`book`/`magazine`)는 일반·성인 DB에만 시딩되며(`is_builtin=1`) 이름만 변경할 수 있고 삭제할 수 없다. 오디오북·영상 DB는 빈 목록으로 시작한다.
+- 기본 종류 4개(`manga`/`novel`/`book`/`magazine`)는 일반·성인 DB에만 시딩되며(`is_builtin=1`) 이름만 변경할 수 있고 삭제할 수 없다. 오디오북 DB에는 기본 종류 `music`(음악)이 시딩되며, 이 속성의 카테고리는 음악 모드(폴더=앨범, 곡 태그 표시)로 스캔된다. 영상 DB는 빈 목록으로 시작한다.
 
 ### libraries
 
@@ -150,7 +151,8 @@ BookOasis는 **SQLite(기본값)** 와 **MariaDB/MySQL(엔터프라이즈 권장
 
 - PK: `id`
 - 주요 FK: `audiobook_id -> audiobooks.id` (ON DELETE CASCADE)
-- 컬럼: `track_number`, `track_code`, `filename`, `file_path`(UNIQUE), `file_mtime`, `file_size`, `duration`, `format`
+- 컬럼: `track_number`, `track_code`, `filename`, `file_path`(UNIQUE), `file_mtime`, `file_size`, `duration`, `format`, `title`, `artist`
+- `title`/`artist`: 음악 카테고리(속성 `music`) 곡의 표시용 제목/아티스트(태그, 없으면 파일명). 오디오북 트랙은 NULL
 
 ### audiobook_progress / audiobook_track_progress
 
@@ -162,6 +164,9 @@ BookOasis는 **SQLite(기본값)** 와 **MariaDB/MySQL(엔터프라이즈 권장
 - `audiobook_track_progress` 주요 FK: `audiobook_id -> audiobooks.id`, `track_id -> audiobook_tracks.id`
   - 컬럼: `user_id`, `current_time`, `progress_pct`, `is_completed`, `updated_at`
   - 제약: `UNIQUE(audiobook_id, track_id, user_id)`
+- `audiobook_music_lookups`: 음악 카테고리 앨범의 외부 정보 조회 결과 (`lookup_music_album` 플러그인 폴백). PK `audiobook_id`
+  - 컬럼: `status`(found/not_found/skipped), `source`(플러그인 id), `artist`, `year`, `genres`, `summary`, `cover_url`, `source_url`, `looked_up_at`
+  - 스캔이 덮어쓰지 않도록 audiobooks와 따로 두고, 화면에는 빈 칸에만 겹쳐 보인다. 앨범마다 한 번만 조회한다
 
 ### users
 

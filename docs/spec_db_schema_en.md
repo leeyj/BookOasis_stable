@@ -44,6 +44,7 @@ Tables common to both engines and all 3 DBs (24 total):
 9. `audiobook_tracks`
 10. `audiobook_progress`
 11. `audiobook_track_progress`
+    - `audiobook_music_lookups` (music album lookup results)
 
 **User / Progress**
 12. `users`
@@ -87,7 +88,7 @@ List of category type values (manga / book / magazine, ...). One table per sessi
 
 - PK: `code` (lowercase slug, `^[a-z][a-z0-9_-]{0,23}$`, immutable once created)
 - Columns: `name` (display name, UNIQUE, max 25 chars), `is_builtin`, `sort_order`
-- The four built-in kinds (`manga`/`novel`/`book`/`magazine`) are seeded only in the general/adult DBs (`is_builtin=1`); they can be renamed but not deleted. The audiobook/video DBs start with an empty list.
+- The four built-in kinds (`manga`/`novel`/`book`/`magazine`) are seeded only in the general/adult DBs (`is_builtin=1`); they can be renamed but not deleted. The audiobook DB is seeded with the built-in kind `music`; categories with this kind are scanned in music mode (folder = album, song tags shown). The video DB starts with an empty list.
 
 ### libraries
 
@@ -150,7 +151,8 @@ Individual audiobook track (file) info.
 
 - PK: `id`
 - Main FK: `audiobook_id -> audiobooks.id` (ON DELETE CASCADE)
-- Columns: `track_number`, `track_code`, `filename`, `file_path`(UNIQUE), `file_mtime`, `file_size`, `duration`, `format`
+- Columns: `track_number`, `track_code`, `filename`, `file_path`(UNIQUE), `file_mtime`, `file_size`, `duration`, `format`, `title`, `artist`
+- `title`/`artist`: display title/artist of songs in music categories (kind `music`), from tags or the filename. NULL for audiobook tracks
 
 ### audiobook_progress / audiobook_track_progress
 
@@ -162,6 +164,9 @@ Per-user audiobook playback progress (work-level / track-level).
 - `audiobook_track_progress` main FK: `audiobook_id -> audiobooks.id`, `track_id -> audiobook_tracks.id`
   - Columns: `user_id`, `current_time`, `progress_pct`, `is_completed`, `updated_at`
   - Constraint: `UNIQUE(audiobook_id, track_id, user_id)`
+- `audiobook_music_lookups`: external album-info lookup results for music-category albums (`lookup_music_album` plugin fallback). PK `audiobook_id`
+  - Columns: `status` (found/not_found/skipped), `source` (plugin id), `artist`, `year`, `genres`, `summary`, `cover_url`, `source_url`, `looked_up_at`
+  - Kept apart from audiobooks so scans never overwrite it; shown only in empty fields. Each album is looked up once
 
 ### users
 

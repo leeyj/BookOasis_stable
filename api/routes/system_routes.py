@@ -492,6 +492,9 @@ def trigger_scan_via_webhook():
             db_path = get_db_path_for_scan(db_type)
             from tools.scanner.core import scan_library_path
             scan_library_path(db_path, lib_id_int, target_path, force=force_requeue)
+            # 큐를 거치지 않는 즉시 스캔이라 목록(시리즈 요약 테이블/캐시) 반영을 직접 한다
+            from services.scan_refresh_service import refresh_after_direct_scan
+            refresh_after_direct_scan(db_type)
 
             return jsonify({
                 'success': True,

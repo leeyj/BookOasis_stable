@@ -80,3 +80,33 @@ Here are the configuration methods for popular external viewer apps that support
   * In a home server environment behind a router, you must configure **Port Forwarding for port 5930** on your router page, or set up a Reverse Proxy (such as Nginx) and DDNS to access the server outside via mobile data network (LTE/5G).
 * **Password Security**:
   * Since external OPDS connections use Basic Auth, it is highly recommended to configure an **SSL certificate (HTTPS)** on your Nginx reverse proxy to encrypt the authentication traffic for security.
+
+## 5. KOReader (e-readers: Kobo, Kindle, PocketBook, Android, ...)
+
+### Reading (OPDS)
+In KOReader, open **Search (magnifier) → OPDS catalog → `+`** and enter:
+* **URL**: `http://<server>:5930/opds` (adult catalog: `/opds-adult`, admin accounts only)
+* **Username / password**: your BookOasis account
+
+Browse category → series → book, or search. EPUB, PDF, CBZ and TXT are downloaded and opened directly.
+
+### Comic page streaming (OPDS-PSE)
+For comics (ZIP/CBZ/image folders) you can choose **Stream** (view page by page without downloading).
+* Streaming links are only added for **books whose page count is known**. In remote-drive (GDS, etc.) categories the
+  page count is filled once a book has been opened in the web viewer or analyzed by the Lazy-Scanner; other books are downloaded.
+* Pages viewed by streaming are also recorded as your BookOasis reading position.
+
+### Reading-position sync (KOReader progress sync)
+1. In the BookOasis web app, open the **account icon (top right) → KOReader sync** and set a **sync password**.
+   KOReader only sends the MD5 of the password, which cannot be checked against your BookOasis login password, so it is separate.
+2. In KOReader, go to **Settings (gear) → Progress sync → Custom sync server**, enter the address shown in the panel
+   (`http://<server>:5930/kosync`), then **Log in** with your BookOasis username and the sync password.
+   Do not use "Register" (your BookOasis account is used).
+3. Keep the document matching method at the **default (binary)**. BookOasis identifies books the same way when they are downloaded over OPDS.
+
+| Format | What syncs |
+| :--- | :--- |
+| Comics (ZIP/CBZ/image folders), PDF | Between KOReader devices + **both ways with the BookOasis web viewer** (page number) |
+| EPUB, TXT | Between KOReader devices only (the web viewer uses a different position format, so it is never overwritten) |
+
+* Only **books downloaded over OPDS** are synced (the server cannot recognize files copied to the device some other way).

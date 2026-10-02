@@ -241,6 +241,43 @@ CREATE TABLE IF NOT EXISTS audiobook_track_progress (
     INDEX idx_audiobook_track_progress_lookup (audiobook_id, user_id, track_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
+CREATE TABLE IF NOT EXISTS kosync_credentials (
+    user_id BIGINT PRIMARY KEY,
+    key_hash VARCHAR(255) NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS kosync_documents (
+    document VARCHAR(64) PRIMARY KEY,
+    db_type VARCHAR(20) NOT NULL,
+    book_id BIGINT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS kosync_progress (
+    user_id BIGINT NOT NULL,
+    document VARCHAR(64) NOT NULL,
+    progress TEXT,
+    percentage DOUBLE,
+    device VARCHAR(255),
+    device_id VARCHAR(255),
+    timestamp BIGINT NOT NULL,
+    PRIMARY KEY (user_id, document)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS audiobook_music_lookups (
+    audiobook_id BIGINT PRIMARY KEY,
+    status VARCHAR(20) NOT NULL,
+    source VARCHAR(100),
+    artist VARCHAR(500),
+    year VARCHAR(20),
+    genres VARCHAR(500),
+    summary TEXT,
+    cover_url TEXT,
+    source_url TEXT,
+    looked_up_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
 CREATE TABLE IF NOT EXISTS videos (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     library_id BIGINT,

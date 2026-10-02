@@ -11,6 +11,7 @@ import './header_scroll_behavior.js';
 // category.js CRUD 임포트
 import { loadLibraries, triggerAddLibrary, triggerEditLibrary, triggerDeleteLibrary, closeLibraryModal, submitLibraryForm, triggerScanLibrary, triggerScanLibraryCovers, triggerCancelScanLibrary } from './category.js';
 import { applySidebarShowMore, expandGroupContainingCategory } from './category/index.js';
+import { resolveCoverAspectRatio } from './utils/cover_ratio.js';
 
 // scheduler.js 임포트
 import { loadLibrarySchedules, saveLibrarySchedule, runLibraryScanNow } from './scheduler.js';
@@ -814,7 +815,7 @@ export async function selectCategory(id, skipHistory = false, options = {}) {
     if (sidebarEl) applySidebarShowMore(sidebarEl, id);
   }
   state.currentLibraryHideCovers = !!(activeItem && activeItem.dataset && activeItem.dataset.type === 'custom' && activeItem.dataset.hideCover === '1');
-  state.currentLibraryAspectRatio = (activeItem && activeItem.dataset && activeItem.dataset.coverAspectRatio === '16:9') ? '16:9' : '4:3';
+  state.currentLibraryAspectRatio = resolveCoverAspectRatio(activeItem?.dataset, state.currentLibraryType);
   state.currentLibraryHideTitles = !!(activeItem && activeItem.dataset && activeItem.dataset.type === 'custom' && activeItem.dataset.hideTitle === '1');
   updateCurrentCategoryIndicator(id, activeItem);
 

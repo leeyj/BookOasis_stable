@@ -5,6 +5,8 @@ import { createMiniPlayerUiController } from './audio_player_modules/mini_player
 import { createAudioPlaybackEngine } from './audio_player_modules/playback_engine.js';
 import { registerAudioPlayerPublicApi } from './audio_player_modules/public_api.js';
 import { createChapterDrawer } from './audio_player_modules/chapter_drawer.js';
+import { getTrackCoverImage } from './audio_player_modules/track_cover.js';
+import { createLyricsPanel } from './audio_player_modules/lyrics_panel.js';
 import { remoteLog } from './remote_log.js';
 import { formatClockDuration } from './utils/time.js';
 
@@ -27,6 +29,137 @@ const audioSpeeds = [1.0, 1.25, 1.5, 1.75, 2.0, 0.75];
 const sleepOptions = [0, 15, 30, 45, 60];
 let currentSleepIndex = 0;
 const playbackEngine = createAudioPlaybackEngine();
+
+// ── 음악 모드 (오디오북 세션 '음악' 속성 카테고리: meta.is_music) ──────────────
+// 진행 저장/이어듣기/배속/완료 배지 없이 곡 단위로 재생하고, 셔플·반복을 기기별로 기억한다.
+const MUSIC_SHUFFLE_KEY = 'bookoasis.music.shuffle';
+const MUSIC_REPEAT_KEY = 'bookoasis.music.repeat';
+const MUSIC_REPEAT_MODES = ['off', 'all', 'one'];
+const MUSIC_PREV_RESTART_SEC = 3;
+
+function readMusicPref(key, fallback) {
+  try {
+    return window.localStorage.getItem(key) ?? fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+
+function writeMusicPref(key, value) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch (e) {}
+}
+
+let musicShuffle = readMusicPref(MUSIC_SHUFFLE_KEY, '0') === '1';
+let musicRepeat = readMusicPref(MUSIC_REPEAT_KEY, 'off');
+if (!MUSIC_REPEAT_MODES.includes(musicRepeat)) musicRepeat = 'off';
+let musicPlayOrder = []; // 현재 앨범의 재생 순서(트랙 인덱스). 셔플이면 섞인 순서
+let musicPlayOrderAlbumId = null;
+
+function isMusicMode() {
+  return !!(currentAudiobookData && currentAudiobookData.meta && currentAudiobookData.meta.is_music);
+}
+
+function buildMusicPlayOrder(startIndex) {
+  const count = currentAudiobookData?.tracks?.length || 0;
+  const order = Array.from({ length: count }, (_, i) => i);
+  if (musicShuffle) {
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    // 지금 곡을 맨 앞에 두어 셔플을 켜도 재생 중인 곡이 끊기지 않게 한다
+    const pos = order.indexOf(startIndex);
+    if (pos > 0) order.unshift(order.splice(pos, 1)[0]);
+  }
+  musicPlayOrder = order;
+  musicPlayOrderAlbumId = currentAudiobookData?.meta?.id ?? null;
+}
+
+function ensureMusicPlayOrder() {
+  const count = currentAudiobookData?.tracks?.length || 0;
+  if (musicPlayOrderAlbumId !== (currentAudiobookData?.meta?.id ?? null) || musicPlayOrder.length !== count) {
+    buildMusicPlayOrder(currentTrackIndex);
+  }
+}
+
+// 재생 순서상 다음/이전 트랙 인덱스. 끝에 닿으면 반복 '전체'일 때만 처음으로 돌아가고, 아니면 -1
+function getMusicNeighborIndex(step) {
+  ensureMusicPlayOrder();
+  const pos = musicPlayOrder.indexOf(currentTrackIndex);
+  const nextPos = pos + step;
+  if (nextPos >= 0 && nextPos < musicPlayOrder.length) return musicPlayOrder[nextPos];
+  if (musicRepeat !== 'all' || musicPlayOrder.length === 0) return -1;
+  if (step > 0 && musicShuffle) {
+    buildMusicPlayOrder(-1);
+    return musicPlayOrder[0];
+  }
+  return musicPlayOrder[step > 0 ? 0 : musicPlayOrder.length - 1];
+}
+
+function playMusicTrackAt(index) {
+  const track = currentAudiobookData?.tracks?.[index];
+  if (!track) return;
+  currentTrackIndex = index;
+  openAudioPlayerModal(currentAudiobookData, track.id, 0, { viewMode: currentAudioPlayerViewMode || 'mini' });
+}
+
+function updateMusicControls() {
+  const shuffleBtn = document.getElementById('btn-audio-shuffle');
+  if (shuffleBtn) shuffleBtn.setAttribute('aria-pressed', musicShuffle ? 'true' : 'false');
+  const repeatBtn = document.getElementById('btn-audio-repeat');
+  if (repeatBtn) repeatBtn.dataset.repeat = musicRepeat;
+  const repeatLabel = document.getElementById('audio-player-repeat-label');
+  if (repeatLabel) repeatLabel.textContent = musicRepeat === 'one' ? 'Repeat 1' : (musicRepeat === 'all' ? 'Repeat All' : 'Repeat');
+}
+
+export function toggleMusicShuffle() {
+  musicShuffle = !musicShuffle;
+  writeMusicPref(MUSIC_SHUFFLE_KEY, musicShuffle ? '1' : '0');
+  buildMusicPlayOrder(currentTrackIndex);
+  updateMusicControls();
+}
+
+export function openAudioPlayerShuffled(audiobookId) {
+  musicShuffle = true;
+  writeMusicPref(MUSIC_SHUFFLE_KEY, '1');
+  musicPlayOrderAlbumId = null; // 새로 섞는다
+  return openAudioPlayer(audiobookId);
+}
+
+export function cycleMusicRepeat() {
+  musicRepeat = MUSIC_REPEAT_MODES[(MUSIC_REPEAT_MODES.indexOf(musicRepeat) + 1) % MUSIC_REPEAT_MODES.length];
+  writeMusicPref(MUSIC_REPEAT_KEY, musicRepeat);
+  updateMusicControls();
+}
+
+function handleMusicTrackEnded() {
+  if (musicRepeat === 'one' && audioInstance) {
+    audioInstance.currentTime = 0;
+    toggleAudioPlay(true);
+    return;
+  }
+  const nextIndex = getMusicNeighborIndex(1);
+  if (nextIndex >= 0) {
+    playMusicTrackAt(nextIndex);
+  } else {
+    updatePlaybackToggleButtons(false);
+  }
+}
+
+const lyricsPanel = createLyricsPanel({
+  onSeek: (time) => {
+    if (!audioInstance || !Number.isFinite(time)) return;
+    audioInstance.currentTime = time;
+    if (audioInstance.paused) toggleAudioPlay(true);
+  }
+});
+
+function cleanArtist(value) {
+  const text = String(value || '').trim();
+  return text && text !== '-' ? text : '';
+}
 
 const progressSync = createAudioProgressSync({
   getAudioInstance: () => audioInstance,
@@ -158,6 +291,9 @@ function initAudioPlayerDelegation() {
     if (action === 'toggle-chapters') return toggleAudioChapterDrawer();
     if (action === 'set-volume') return setAudioVolume(rawValue);
     if (action === 'cycle-sleep') return cycleSleepTimer();
+    if (action === 'toggle-shuffle') return toggleMusicShuffle();
+    if (action === 'cycle-repeat') return cycleMusicRepeat();
+    if (action === 'toggle-lyrics') return lyricsPanel.toggle();
   }, true);
 
   document.addEventListener('input', (event) => {
@@ -188,6 +324,12 @@ export async function openAudioPlayer(audiobookId, trackIdOrTitle = null, startT
       meta: data.meta,
       tracks: data.books || []
     };
+
+    // 음악: 곡을 고르지 않고 앨범을 열었는데 셔플이 켜져 있으면 무작위 곡부터
+    if (isMusicMode() && !trackIdOrTitle && musicShuffle && currentAudiobookData.tracks.length > 0) {
+      const randomIndex = Math.floor(Math.random() * currentAudiobookData.tracks.length);
+      trackIdOrTitle = currentAudiobookData.tracks[randomIndex].id;
+    }
 
     openAudioPlayerModal(currentAudiobookData, trackIdOrTitle, startTime, {
       viewMode: getInitialAudioPlayerViewMode()
@@ -278,6 +420,8 @@ export function openAudioPlayerModal(audioData, targetTrackId = null, startTime 
   const meta = audioData.meta || {};
   const tracks = audioData.tracks || [];
   if (tracks.length === 0) return;
+  const isMusic = !!meta.is_music;
+  modal.dataset.playerMode = isMusic ? 'music' : 'audiobook';
 
   let selectedIdx = 0;
   if (targetTrackId) {
@@ -303,12 +447,24 @@ export function openAudioPlayerModal(audioData, targetTrackId = null, startTime 
   if (titleEl) titleEl.textContent = meta.series_name || '오디오북';
   if (authorEl) authorEl.textContent = `${meta.author || '저자 미상'}${meta.publisher ? ' · ' + meta.publisher : ''}`;
   if (chapterBadgeEl) chapterBadgeEl.textContent = currentTrack ? (currentTrack.title || `CHAPTER ${currentTrack.track_number}`) : 'CHAPTER 1';
+  if (isMusic) {
+    // 음악: 크게 곡 제목, 아래에 아티스트 · 앨범, 배지는 곡 순번
+    const artist = cleanArtist(currentTrack.artist) || cleanArtist(meta.author);
+    const album = meta.series_name || '';
+    if (headerAuthorEl) headerAuthorEl.textContent = cleanArtist(meta.author);
+    if (titleEl) titleEl.textContent = currentTrack.title || album;
+    if (authorEl) authorEl.textContent = [artist, album].filter(Boolean).join(' · ');
+    if (chapterBadgeEl) chapterBadgeEl.textContent = `${currentTrackIndex + 1} / ${tracks.length}`;
+    ensureMusicPlayOrder();
+    updateMusicControls();
+  }
 
-  // 앰비언트 배경 및 커버 렌더링
-  if (meta.cover_image) {
-    if (backdrop) backdrop.style.backgroundImage = `url('${meta.cover_image}')`;
+  // 앰비언트 배경 및 커버 렌더링 (음악: 곡별 커버 - 차트 모음은 곡마다 원래 앨범 아트가 다르다)
+  const coverImage = getTrackCoverImage(meta, currentTrack);
+  if (coverImage) {
+    if (backdrop) backdrop.style.backgroundImage = `url('${coverImage}')`;
     if (coverImg) {
-      coverImg.src = meta.cover_image;
+      coverImg.src = coverImage;
       coverImg.style.display = 'block';
       if (coverPlaceholder) coverPlaceholder.style.display = 'none';
       coverImg.onerror = () => {
@@ -348,17 +504,23 @@ export function openAudioPlayerModal(audioData, targetTrackId = null, startTime 
 
   const streamUrl = `/api/media/audiobooks/${meta.id}/tracks/${currentTrack.id}/stream`;
   audioInstance.src = streamUrl;
-  audioInstance.playbackRate = audioSpeeds[currentAudioSpeedIndex];
+  audioInstance.playbackRate = isMusic ? 1.0 : audioSpeeds[currentAudioSpeedIndex];
   updateTranscodeWarning(meta.id, currentTrack.id);
 
   if (startTime > 0) {
     audioInstance.currentTime = startTime;
-  } else if (meta.current_track_id === currentTrack.id && meta.current_time > 0) {
+  } else if (!isMusic && meta.current_track_id === currentTrack.id && meta.current_time > 0) {
     audioInstance.currentTime = meta.current_time;
   }
 
   toggleAudioPlay(true);
-  initMediaSession(meta, currentTrack);
+  lyricsPanel.onTrackChange(meta, currentTrack);
+  // 음악: 잠금화면에 곡 아티스트를 보여준다(앨범 아티스트가 비어 있는 모음집 대비)
+  initMediaSession(isMusic ? {
+    ...meta,
+    author: cleanArtist(currentTrack.artist) || cleanArtist(meta.author),
+    cover_image: coverImage
+  } : meta, currentTrack);
   renderChapterList();
   updateMiniPlayerUi();
 }
@@ -414,6 +576,7 @@ function initAudioEvents() {
 
     scheduleProgressSnapshot();
     maybeAutoSaveProgress();
+    lyricsPanel.sync(cur);
     updateMiniPlayerUi();
   };
 
@@ -455,6 +618,11 @@ function initAudioEvents() {
   };
 
   audioInstance.onended = () => {
+    if (isMusicMode()) {
+      handleMusicTrackEnded();
+      updateMiniPlayerUi();
+      return;
+    }
     if (currentAudiobookData && currentAudiobookData.tracks && currentTrackIndex < currentAudiobookData.tracks.length - 1) {
       playNextTrack();
     } else {
@@ -582,6 +750,17 @@ export function toggleAudioPlay(forcePlay = null) {
 
 export function playPrevTrack() {
   if (!currentAudiobookData || !currentAudiobookData.tracks) return;
+  if (isMusicMode()) {
+    // 곡 초반이 지났으면 지금 곡을 처음부터, 아니면 재생 순서상 이전 곡
+    const prevIndex = audioInstance && audioInstance.currentTime > MUSIC_PREV_RESTART_SEC ? -1 : getMusicNeighborIndex(-1);
+    if (prevIndex >= 0) {
+      playMusicTrackAt(prevIndex);
+    } else if (audioInstance) {
+      audioInstance.currentTime = 0;
+      updateMiniPlayerUi();
+    }
+    return;
+  }
   if (currentTrackIndex > 0) {
     saveProgress(false, { useBeacon: false, force: true });
     currentTrackIndex--;
@@ -594,6 +773,11 @@ export function playPrevTrack() {
 
 export function playNextTrack() {
   if (!currentAudiobookData || !currentAudiobookData.tracks) return;
+  if (isMusicMode()) {
+    const nextIndex = getMusicNeighborIndex(1);
+    if (nextIndex >= 0) playMusicTrackAt(nextIndex);
+    return;
+  }
   if (currentTrackIndex < currentAudiobookData.tracks.length - 1) {
     saveProgress(false, { useBeacon: false, force: true });
     currentTrackIndex++;
@@ -676,19 +860,24 @@ export function cycleSleepTimer() {
   }
 }
 
+// 음악 모드는 진행(이어듣기/완료)을 저장하지 않는다
 function saveProgress(isCompleted = false, options = {}) {
+  if (isMusicMode()) return Promise.resolve(null);
   return progressSync.saveProgress(isCompleted, options);
 }
 
 function scheduleProgressSnapshot() {
+  if (isMusicMode()) return;
   progressSync.scheduleProgressSnapshot();
 }
 
 function maybeAutoSaveProgress() {
+  if (isMusicMode()) return;
   progressSync.maybeAutoSaveProgress();
 }
 
 function saveProgressInternal(isCompleted = false, options = {}) {
+  if (isMusicMode()) return Promise.resolve(null);
   return progressSync.saveProgressInternal(isCompleted, options);
 }
 
@@ -729,10 +918,14 @@ registerAudioPlayerPublicApi({
   toggleAudioChapterDrawer,
   selectChapterTrack,
   setAudioVolume,
-  cycleSleepTimer
+  cycleSleepTimer,
+  toggleMusicShuffle,
+  cycleMusicRepeat,
+  openAudioPlayerShuffled
 });
 
 function flushAudioProgressForLifecycle(useBeacon = false) {
+  if (isMusicMode()) return;
   progressSync.flushAudioProgressForLifecycle(useBeacon);
 }
 

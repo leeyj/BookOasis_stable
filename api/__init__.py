@@ -13,6 +13,7 @@ from api.stream  import stream_bp
 from api.library import library_bp
 from api.opds     import opds_bp
 from api.app_opds import app_opds_bp
+from api.routes.kosync_routes import kosync_bp
 from api.admin    import admin_bp
 from api.auth     import auth_bp
 from api.dashboard_insights import dashboard_insights_bp
@@ -34,6 +35,7 @@ api_bp.register_blueprint(stream_bp)
 api_bp.register_blueprint(library_bp)
 api_bp.register_blueprint(opds_bp)
 api_bp.register_blueprint(app_opds_bp)  # 타치요미/미혼 전용 엔드포인트
+api_bp.register_blueprint(kosync_bp)    # KOReader 진행 동기화 (kosync 호환)
 api_bp.register_blueprint(admin_bp)
 api_bp.register_blueprint(auth_bp)
 api_bp.register_blueprint(dashboard_insights_bp)

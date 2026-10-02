@@ -93,6 +93,36 @@ def get_series_entries(db_type: str, lib_id: int, prefix: str, urn_prefix: str):
     ]
 
 
+# ── OPDS-PSE (페이지 스트리밍) ─────────────────────────────────────────
+# KOReader 등은 이 링크가 있으면 만화를 내려받지 않고 페이지 단위로 볼 수 있다(OPDS-PSE 1.1).
+# {pageNumber}는 0부터. 페이지 이미지는 웹 뷰어와 같은 추출 경로(StreamPageService)를 쓰며,
+# 압축/이미지 폴더 형식만 지원한다. 페이지 수(pse:count)를 아는 책에만 링크를 단다.
+PSE_STREAM_EXTENSIONS = ('.zip', '.cbz', '.imgdir')
+
+
+def pse_stream_href(db_type: str, book_id: int) -> str:
+    return f"/opds/pse/{db_type}/{int(book_id)}/{{pageNumber}}"
+
+
+def _attach_pse_links(db_type: str, entries: list, is_app_opds: bool) -> None:
+    if is_app_opds:
+        return
+    candidates = [e for e in entries if e.get('type') == 'acquisition' and e.get('book_id')
+                  and str(e.get('file_path') or '').lower().endswith(PSE_STREAM_EXTENSIONS)]
+    if not candidates:
+        return
+    try:
+        pages = OpdsRepository.get_total_pages(db_type, [e['book_id'] for e in candidates])
+    except Exception as e:
+        print(f"[OPDS-PSE] page count lookup failed ({db_type}): {e}")
+        return
+    for entry in candidates:
+        count = pages.get(int(entry['book_id']), 0)
+        if count > 0:
+            entry['pse_href'] = pse_stream_href(db_type, entry['book_id'])
+            entry['pse_count'] = count
+
+
 def _build_stream_href(file_path: str, db_type: str, book_id: int, is_app_opds: bool = False) -> str:
     if not is_app_opds:
         return None
@@ -124,11 +154,14 @@ def get_book_entries(db_type: str, lib_id: int, series_name: str, download_prefi
             'type': 'acquisition',
             'href': f"{download_prefix}/{b['id']}",
             'stream_href': stream_href,
+            'book_id': b['id'],
+            'file_path': b['file_path'],
             'mime': mime,
             'cover': b['cover_image'],
             'cover_url': None if b['cover_image'] else _build_fallback_cover_href(b['title'], ext),
             'cover_mime': 'image/svg+xml' if not b['cover_image'] else None,
         })
+    _attach_pse_links(db_type, entries, is_app_opds)
     return entries, total
 
 
@@ -146,11 +179,14 @@ def get_recently_added_entries(db_type: str, download_prefix: str, urn_prefix: s
             'type': 'acquisition',
             'href': f"{download_prefix}/{b['id']}",
             'stream_href': stream_href,
+            'book_id': b['id'],
+            'file_path': b['file_path'],
             'mime': _guess_mime_type(b['file_path']),
             'cover': b['cover_image'],
             'cover_url': None if b['cover_image'] else _build_fallback_cover_href(b['title'], ext),
             'cover_mime': 'image/svg+xml' if not b['cover_image'] else None,
         })
+    _attach_pse_links(db_type, entries, is_app_opds)
     return entries
 
 
@@ -188,11 +224,14 @@ def get_favorite_entries(db_type: str, download_prefix: str, urn_prefix: str, us
                 'type': 'acquisition',
                 'href': f"{download_prefix}/{b['id']}",
                 'stream_href': stream_href,
+                'book_id': b['id'],
+                'file_path': b['file_path'],
                 'mime': _guess_mime_type(b['file_path']),
                 'cover': b['cover_image'],
                 'cover_url': None if b['cover_image'] else _build_fallback_cover_href(b['title'], ext),
                 'cover_mime': 'image/svg+xml' if not b['cover_image'] else None,
             })
+    _attach_pse_links(db_type, entries, is_app_opds)
     return entries
 
 
@@ -224,11 +263,14 @@ def get_recently_read_entries(db_type: str, download_prefix: str, urn_prefix: st
             'type': 'acquisition',
             'href': f"{download_prefix}/{b['id']}",
             'stream_href': stream_href,
+            'book_id': b['id'],
+            'file_path': b['file_path'],
             'mime': _guess_mime_type(b['file_path']),
             'cover': b['cover_image'],
             'cover_url': None if b['cover_image'] else _build_fallback_cover_href(title, ext),
             'cover_mime': 'image/svg+xml' if not b['cover_image'] else None,
         })
+    _attach_pse_links(db_type, entries, is_app_opds)
     return entries
 
 
@@ -263,9 +305,12 @@ def search_books_entries(db_type: str, query: str, download_prefix: str, urn_pre
             'type': 'acquisition',
             'href': f"{download_prefix}/{b['id']}",
             'stream_href': stream_href,
+            'book_id': b['id'],
+            'file_path': b['file_path'],
             'mime': _guess_mime_type(b['file_path']),
             'cover': b['cover_image'],
             'cover_url': None if b['cover_image'] else _build_fallback_cover_href(b['title'], ext),
             'cover_mime': 'image/svg+xml' if not b['cover_image'] else None,
         })
+    _attach_pse_links(db_type, entries, is_app_opds)
     return entries, total

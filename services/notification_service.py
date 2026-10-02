@@ -104,7 +104,11 @@ def is_manual_trigger(task_type, kwargs):
 def is_notable_history(row):
     """최근 완료로 보여 줄 이력인가: 새 도서/에러/실패/취소가 있거나, 사용자가 직접 누른 작업.
 
-    lazy_scan·예약 스캔처럼 자동으로 돌아 아무 변화 없이 끝난 작업은 숨긴다(이력 테이블에는 남는다)."""
+    lazy_scan·예약 스캔처럼 자동으로 돌아 아무 변화 없이 끝난 작업은 숨긴다(이력 테이블에는 남는다).
+    루트 접근 실패로 끝난 작업도 숨긴다: '원격 드라이브 연결 끊김' 카드가 (순단 유예를 거쳐) 대신 알린다."""
+    from services.scan_problem_service import ROOT_UNREACHABLE_MARKER
+    if row.get('status') == 'failed' and ROOT_UNREACHABLE_MARKER in str(row.get('error_message') or ''):
+        return False
     if row.get('status') in ('failed', 'cancelled'):
         return True
     summary = row.get('result_summary') or {}

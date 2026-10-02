@@ -25,7 +25,7 @@
                     <i class="fa-solid fa-stop"></i>
                     <span style="font-size: 0.78rem; font-weight: 700; color: #fecaca;">중지</span>
                 </button>
-                <button data-role="audio-player-action" data-action="bookmark" title="북마크" style="background: none; border: none; color: #94a3b8; font-size: 1.1rem; cursor: pointer;">
+                <button data-role="audio-player-action" data-action="bookmark" data-audio-only="audiobook" title="북마크" style="background: none; border: none; color: #94a3b8; font-size: 1.1rem; cursor: pointer;">
                     <i class="fa-regular fa-bookmark"></i>
                 </button>
                 <button data-role="audio-player-action" data-action="fullscreen" title="전체화면" style="background: none; border: none; color: #94a3b8; font-size: 1.1rem; cursor: pointer;">
@@ -44,6 +44,9 @@
                     <span style="font-size: 0.85rem; color: #94a3b8; font-weight: 600;">BookOasis Audio</span>
                 </div>
             </div>
+
+            <!-- 음악 모드 가사 (열면 커버 자리를 대신한다) - audio_player_modules/lyrics_panel.js -->
+            <div id="audio-player-lyrics" class="audio-lyrics-panel" data-audio-only="music" aria-live="off"></div>
 
             <!-- 작품 타이틀 & 정보 -->
             <h2 id="audio-player-title" style="font-size: 1.45rem; font-weight: 800; color: #ffffff; margin: 0 0 0.4rem 0; text-align: center; line-height: 1.3; max-width: 100%; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">작품 제목</h2>
@@ -81,7 +84,7 @@
                 </button>
 
                 <!-- 15초 뒤로 -->
-                <button data-role="audio-player-action" data-action="skip" data-value="-15" class="ui-hover-audio-scale" title="15초 뒤로" style="background: none; border: none; color: #f1f5f9; font-size: 1.5rem; cursor: pointer; position: relative; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; transition: transform 0.15s;">
+                <button data-role="audio-player-action" data-action="skip" data-value="-15" data-audio-only="audiobook" class="ui-hover-audio-scale" title="15초 뒤로" style="background: none; border: none; color: #f1f5f9; font-size: 1.5rem; cursor: pointer; position: relative; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; transition: transform 0.15s;">
                     <i class="fa-solid fa-rotate-left" style="font-size: 1.5rem; opacity: 0.85;"></i>
                     <span style="position: absolute; top: 53%; left: 49%; transform: translate(-50%, -50%); font-size: 0.55rem; font-weight: 900; color: #ffffff; pointer-events: none; font-family: monospace;">15</span>
                 </button>
@@ -92,7 +95,7 @@
                 </button>
 
                 <!-- 15초 앞으로 -->
-                <button data-role="audio-player-action" data-action="skip" data-value="15" class="ui-hover-audio-scale" title="15초 앞으로" style="background: none; border: none; color: #f1f5f9; font-size: 1.5rem; cursor: pointer; position: relative; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; transition: transform 0.15s;">
+                <button data-role="audio-player-action" data-action="skip" data-value="15" data-audio-only="audiobook" class="ui-hover-audio-scale" title="15초 앞으로" style="background: none; border: none; color: #f1f5f9; font-size: 1.5rem; cursor: pointer; position: relative; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; transition: transform 0.15s;">
                     <i class="fa-solid fa-rotate-right" style="font-size: 1.5rem; opacity: 0.85;"></i>
                     <span style="position: absolute; top: 53%; left: 51%; transform: translate(-50%, -50%); font-size: 0.55rem; font-weight: 900; color: #ffffff; pointer-events: none; font-family: monospace;">15</span>
                 </button>
@@ -106,15 +109,32 @@
             <!-- 하단 프리미엄 유틸리티 툴바 (Speed, Chapters, Volume, Sleep) -->
             <div class="audio-player-utility-row" style="display: flex; align-items: center; justify-content: space-around; width: 100%; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.08);">
                 <!-- 배속 -->
-                <button data-role="audio-player-action" data-action="cycle-speed" style="background: none; border: none; color: #94a3b8; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 0.3rem;">
+                <button data-role="audio-player-action" data-action="cycle-speed" data-audio-only="audiobook" style="background: none; border: none; color: #94a3b8; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 0.3rem;">
                     <span id="audio-player-speed-label" style="font-size: 0.95rem; font-weight: 800; color: #f1f5f9;">1x</span>
                     <span style="font-size: 0.72rem; color: #94a3b8;">Speed</span>
                 </button>
 
-                <!-- 챕터/목차 -->
+                <!-- 음악 모드: 셔플 / 반복(끔·전체·한 곡) -->
+                <button id="btn-audio-shuffle" data-role="audio-player-action" data-action="toggle-shuffle" data-audio-only="music" aria-pressed="false" style="background: none; border: none; color: #94a3b8; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 0.3rem;">
+                    <i class="fa-solid fa-shuffle" style="font-size: 1.1rem;"></i>
+                    <span style="font-size: 0.72rem; color: #94a3b8;">Shuffle</span>
+                </button>
+                <button id="btn-audio-repeat" data-role="audio-player-action" data-action="cycle-repeat" data-audio-only="music" data-repeat="off" style="background: none; border: none; color: #94a3b8; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 0.3rem;">
+                    <i class="fa-solid fa-repeat" style="font-size: 1.1rem;"></i>
+                    <span id="audio-player-repeat-label" style="font-size: 0.72rem; color: #94a3b8;">Repeat</span>
+                </button>
+
+                <button id="btn-audio-lyrics" data-role="audio-player-action" data-action="toggle-lyrics" data-audio-only="music" aria-pressed="false" style="background: none; border: none; color: #94a3b8; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 0.3rem;">
+                    <i class="fa-solid fa-microphone-lines" style="font-size: 1.1rem;"></i>
+                    <span style="font-size: 0.72rem; color: #94a3b8;">Lyrics</span>
+                </button>
+
+                <!-- 챕터/목차 (음악 모드: 트랙 목록) -->
                 <button data-role="audio-player-action" data-action="toggle-chapters" style="background: none; border: none; color: #94a3b8; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 0.3rem;">
-                    <i class="fa-solid fa-book-open" style="font-size: 1.1rem; color: #f1f5f9;"></i>
-                    <span style="font-size: 0.72rem; color: #94a3b8;">Chapters</span>
+                    <i class="fa-solid fa-book-open" data-audio-only="audiobook" style="font-size: 1.1rem; color: #f1f5f9;"></i>
+                    <i class="fa-solid fa-list-ul" data-audio-only="music" style="font-size: 1.1rem; color: #f1f5f9;"></i>
+                    <span data-audio-only="audiobook" style="font-size: 0.72rem; color: #94a3b8;">Chapters</span>
+                    <span data-audio-only="music" style="font-size: 0.72rem; color: #94a3b8;">Tracks</span>
                 </button>
 
                 <!-- 음량 컨트롤 (항상 표시) -->

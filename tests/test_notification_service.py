@@ -343,3 +343,13 @@ def test_general_user_clear_never_mutes_shared_cards(clear_env):
     assert _FakeSettings.store[(2, ns.CLEARED_SETTING_KEY)] == str(result['cleared_ms'])
     ns.undo_clear(2, False, 0, ['file_corrupt|general|80'])  # 일반 사용자는 되돌리기로도 카드 상태를 못 바꾼다
     assert clear_env['unmute'] == [] and ns.get_cleared_ms(2) == 0
+
+
+def test_scans_that_failed_because_the_root_was_unreachable_are_not_shown_as_scan_failures():
+    # 원격 드라이브 연결 끊김 카드(순단 유예 포함)가 대신 알리므로, 순단마다 '스캔 실패'가 쌓이지 않는다
+    blip = _history(1, trigger='cron', status='failed')
+    blip['error_message'] = "[root_unreachable] 스캔 대상 경로 접근 실패 (HDD/NAS Wake-up 실패): '/mnt/x' (사유: ...)"
+    other = _history(2, trigger='cron', status='failed')
+    other['error_message'] = 'KeyError: boom'
+    assert ns.is_notable_history(blip) is False
+    assert ns.is_notable_history(other) is True

@@ -427,6 +427,19 @@
   * 키워드(`q`)가 비어 있을 경우: OpenSearch Description XML 문서 (`application/opensearchdescription+xml`)
   * 키워드(`q`)가 존재할 경우: 검색 결과 매칭 도서 목록 Atom XML 피드 (`application/atom+xml`)
 
+### `[GET]` `/opds/pse/<db_type>/<book_id>/<page>`
+* **설명**: OPDS-PSE 페이지 스트리밍. 만화 한 페이지 이미지(`page`는 0부터). 피드의 `http://vaemendis.net/opds-pse/stream` 링크(`pse:count` = 페이지 수)가 가리킨다. 페이지 수를 아는 ZIP/CBZ/이미지 폴더 도서에만 링크가 붙는다.
+* **인증**: Basic Auth, 또는 피드가 링크에 붙여 준 서명 토큰(`?token=`, 1시간). 본 페이지는 그 사용자의 읽은 위치로 기록된다.
+
+### KOReader 진행 동기화 (kosync 호환)
+KOReader "진행 상황 동기화"의 사용자 지정 서버 주소는 `/kosync`. 인증은 헤더 `x-auth-user`(BookOasis 사용자명), `x-auth-key`(계정 메뉴에서 정한 **동기화 비밀번호**의 MD5).
+* `[GET]` `/kosync/users/auth` → `{"authorized": "OK"}` / 401
+* `[PUT]` `/kosync/syncs/progress` — 본문 `{document, progress, percentage, device, device_id}` → `{document, timestamp}`. 문서가 OPDS로 내려받은 페이지 기반 도서(만화/PDF)면 BookOasis 읽은 위치에도 반영
+* `[GET]` `/kosync/syncs/progress/<document>` → 마지막 위치(없으면 `{}`). 페이지 기반 도서는 웹에서 더 나중에 읽었으면 웹 위치(device `BookOasis`)
+* `[POST]` `/kosync/users/create` → 402 (가입 대신 BookOasis 계정 사용)
+* `document`: KOReader 기본(바이너리) 방식의 partial MD5. `/opds/download`가 내려줄 때 서버가 같은 값을 계산해 도서와 이어 둔다.
+* 웹(로그인 세션): `[GET|POST|DELETE]` `/api/kosync/settings` — 동기화 비밀번호 상태/설정(`{"password"}`, 4자 이상)/해제
+
 ---
 
 ### `[GET]` `/app-opds` / `/app-opds-adult`

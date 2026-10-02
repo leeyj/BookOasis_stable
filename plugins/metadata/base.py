@@ -176,6 +176,28 @@ class BaseMetadataProvider(ABC):
 
         return resolve(self.id, code, db_type=db_type, target_type=target_type, target_id=target_id)
 
+    def lookup_music_album(self, db_type, context):
+        """음악 앨범 정보 조회 계약 (선택 구현, BookOasis 2.8.4+).
+
+        오디오북 세션의 '음악' 속성 카테고리에서 album.yaml이 없는 앨범을 코어가 스캔 뒤 백그라운드로
+        천천히(앨범 사이 5초) 물어본다. 앨범마다 한 번만 묻고, 결과(못 찾음 포함)를 기억해 다시 묻지 않는다.
+        돌려준 값은 앨범의 빈 칸(아티스트/발매 연도/소개/커버)에만 보이고, 스캔 결과를 덮어쓰지 않는다.
+
+        Args:
+            db_type (str): 'audiobook'
+            context (dict): {
+                'folder_name': 앨범 폴더 이름 (예: '[2008.01.17 정규앨범] Andy The First New Dream'),
+                'artist': 곡 태그로 정한 앨범 아티스트 (없으면 ''),
+                'track_titles': 앞쪽 곡 제목 몇 개 (list[str]),
+                'track_count': 곡 수,
+            }
+
+        Returns:
+            dict | None: 찾으면 {'artist', 'year', 'genres'(list[str]), 'summary', 'cover_url', 'source_url'} 중
+            아는 것만. 못 찾으면 None. 예외를 내면 이번엔 건너뛰고 다음 주기에 다시 묻는다.
+        """
+        return None
+
     def get_context_menu_items(self, db_type, context):
         """도서 컨텍스트 메뉴 확장 항목 계약 (선택 구현)."""
         return []

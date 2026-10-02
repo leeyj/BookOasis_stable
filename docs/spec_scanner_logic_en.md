@@ -212,6 +212,9 @@ Cover images are resolved through the following fallback chain, designed to mini
   - **Category root/mount unreachable** (missing, empty or erroring) -> deletion sync is skipped entirely for this scan (including
     restore and the 7-day purge). A "remote drive disconnected" card (action required) appears and clears itself on the next scan
     after the connection is back. This check cannot be turned off.
+    To keep network blips from flashing the card on and off, it only shows once the root has stayed unreachable for 10 minutes
+    (`CATALOG['remote_unavailable']['grace_sec']`); the deletion hold still applies immediately. Scan jobs that failed because the root
+    was unreachable are not shown as separate scan failures. Audiobook/video categories use the same card, cleared by the next scan that reaches the root.
   - **Root is fine but many books vanish in one scan** (20%+ of the category AND 20+ books, `get_mass_missing_thresholds`) ->
     moving the newly missing books to the trash is held and a "possible mass move/delete" card appears. When the admin presses
     [Move to trash], only books whose files are still missing are moved.

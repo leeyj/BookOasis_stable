@@ -10,6 +10,21 @@ def _escape_like(term):
 
 class OpdsRepository:
     @staticmethod
+    def get_total_pages(db_type, book_ids):
+        """book_id -> total_pages (OPDS-PSE 페이지 스트리밍 링크의 pse:count 용, 한 번의 쿼리)."""
+        ids = [int(i) for i in book_ids or [] if i is not None]
+        if not ids:
+            return {}
+        with database.connection(db_type) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"SELECT id, total_pages FROM books WHERE id IN ({','.join(['?'] * len(ids))})",
+                tuple(ids)
+            )
+            rows = cursor.fetchall()
+        return {int(r['id']): int(r['total_pages'] or 0) for r in rows}
+
+    @staticmethod
     def get_library_list(db_type):
         """카테고리(도서관) 목록 조회"""
         with database.connection(db_type) as conn:

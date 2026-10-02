@@ -18,7 +18,8 @@ def build_opds_standard_xml(request, title: str, entries: list, start_path: str,
 
     lines = [
         '<?xml version="1.0" encoding="utf-8"?>',
-        '<feed xmlns="http://www.w3.org/2005/Atom" xmlns:opds="http://opds-spec.org/2010/catalog">',
+        '<feed xmlns="http://www.w3.org/2005/Atom" xmlns:opds="http://opds-spec.org/2010/catalog" '
+        'xmlns:pse="http://vaemendis.net/opds-pse/ns">',
         f'  <id>{escape_xml(current_url)}</id>',
         f'  <title>{escape_xml(title)}</title>',
         f'  <updated>{now}</updated>',
@@ -75,6 +76,12 @@ def build_opds_standard_xml(request, title: str, entries: list, start_path: str,
                 f'    <link rel="http://opds-spec.org/acquisition" '
                 f'href="{escape_xml(href)}" type="{escape_xml(entry["mime"])}"/>'
             )
+            # OPDS-PSE 페이지 스트리밍 (KOReader 등: 내려받지 않고 페이지 단위로 보기)
+            if entry.get('pse_href') and entry.get('pse_count'):
+                lines.append(
+                    f'    <link rel="http://vaemendis.net/opds-pse/stream" type="image/jpeg" '
+                    f'href="{escape_xml(base_url + entry["pse_href"])}" pse:count="{int(entry["pse_count"])}"/>'
+                )
             cover_url = None
             cover_mime = entry.get('cover_mime')
             if entry.get('cover_url'):

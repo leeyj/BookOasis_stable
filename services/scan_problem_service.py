@@ -46,6 +46,10 @@ SCANNER_CODES = (CODE_FILE_MISSING, CODE_MASS_MISSING, CODE_REMOTE_UNAVAILABLE) 
 _SOURCE = 'scanner'
 _CHUNK = 500
 
+# 루트 접근 실패로 스캔 작업이 실패할 때 오류 문구 앞에 붙는 표시. 알림센터는 이 실패를 '스캔 실패'로
+# 따로 띄우지 않고 remote_unavailable 카드(순단 유예 포함) 하나로만 알린다.
+ROOT_UNREACHABLE_MARKER = '[root_unreachable]'
+
 
 def _norm(path):
     from tools.scanner.path_utils import canonical_path
@@ -339,6 +343,6 @@ def card_library(group_key):
 
 
 __all__ = [
-    'SCANNER_CODES', 'ERROR_TYPE_CODES', 'check_roots', 'is_mass_missing', 'gate_deletions', 'record_trashed',
+    'SCANNER_CODES', 'ERROR_TYPE_CODES', 'ROOT_UNREACHABLE_MARKER', 'check_roots', 'is_mass_missing', 'gate_deletions', 'record_trashed',
     'record_scan_errors', 'reconcile', 'report_root_unreachable', 'confirm_trash', 'card_library', 'make_group_key',
 ]

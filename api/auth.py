@@ -206,6 +206,7 @@ def check_authentication():
             or request.path == '/health'
             or request.path.startswith('/opds')
             or request.path.startswith('/app-opds')   # 타치요미 전용 엔드포인트 (자체 인증 처리)
+            or request.path.startswith('/kosync/')    # KOReader 진행 동기화 (x-auth-user/x-auth-key 자체 인증)
             or request.path.startswith('/covers')
             or request.path.startswith('/api/webhook/')):
         return

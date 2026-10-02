@@ -5,6 +5,7 @@ import { openReader } from './viewer.js';
 import { showToast } from './view_manager.js';
 import { buildFallbackCoverUrl, getBookCoverSrc, buildTextCoverDataUri, coverAlignToObjectPosition } from './cover_fallback.js';
 import { stripLeadingBracketTags, middleTruncateTitle } from './series_display.js';
+import { coverRatioAttr } from './utils/cover_ratio.js';
 import { initGridPruning, resetGridPruning, notifyCardsAppended, notifyCardsPrepended } from './grid_pruning.js';
 import { clearBookSelection, syncBookSelectionCard } from './book_selection.js';
 import {
@@ -225,7 +226,7 @@ export function createBookCard(item, options = {}) {
   card.className = 'book-card';
   if (isVideo) card.dataset.role = 'video-course-card';
   // 영상강좌는 항상 16:9 강제, 그 외(일반/성인/오디오북)는 카테고리별 커버 비율 설정을 따른다
-  card.dataset.coverRatio = isVideo ? '16-9' : (state.currentLibraryAspectRatio === '16:9' ? '16-9' : '4-3');
+  card.dataset.coverRatio = isVideo ? '16-9' : coverRatioAttr(state.currentLibraryAspectRatio);
   card.dataset.bookId = item.id || item.representative_book_id || '';
   card.dataset.coverAlign = item.cover_align || 'center';
   if (item.is_author_group) card.dataset.isAuthorGroup = '1';

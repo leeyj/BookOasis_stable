@@ -127,6 +127,24 @@ class SchedulerService:
             )
             print("[Scheduler] Gdrive view-copy TTL cleanup job registered successfully (interval: 1h)")
 
+        # ── [음악 앨범 외부 정보 조회 (album.yaml이 없을 때 플러그인 폴백)] ──
+        if not scheduler.get_job('music_lookup_job'):
+            def _run_music_lookup():
+                from services.music_lookup_service import run_pending
+                try:
+                    run_pending()
+                except Exception as lookup_err:
+                    print(f"[Scheduler ERROR] music lookup failed: {lookup_err}")
+
+            scheduler.add_job(
+                _run_music_lookup,
+                'interval',
+                minutes=10,
+                id='music_lookup_job',
+                max_instances=1
+            )
+            print("[Scheduler] Music album lookup job registered successfully (interval: 10m)")
+
         try:
             SchedulerService.auto_resume_interrupted_jobs()
         except Exception as e:

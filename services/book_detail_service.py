@@ -10,6 +10,26 @@ from utils.redis_helper import redis_delete_pattern
 from utils.permission_clause import build_library_permission_clause
 from services.cover_storage_service import get_covers_dir
 
+# album.yaml genres의 분류 머리말처럼 정보가 없는 값
+_MUSIC_GENRE_NOISE = {'전체', 'all'}
+
+
+def _music_year_and_genres(audiobook_row, lookup):
+    """음악 앨범 상세 머리 정보 줄용 (발매 연도, 장르 문자열). album.yaml(발매일·장르) → 외부 조회 결과 순."""
+    year = str(audiobook_row.get('premiered') or '')[:4]
+    genres = []
+    folder = audiobook_row.get('folder_path')
+    if folder:
+        from services.music_lyrics_service import load_album_yaml
+        raw = (load_album_yaml(folder) or {}).get('genres')
+        if isinstance(raw, list):
+            genres = [str(g).strip() for g in raw if str(g).strip() and str(g).strip().lower() not in _MUSIC_GENRE_NOISE]
+    if lookup:
+        year = year or str(lookup.get('year') or '')[:4]
+        if not genres and lookup.get('genres'):
+            genres = [g.strip() for g in str(lookup['genres']).split(',') if g.strip()]
+    return (year if year.isdigit() else ''), ', '.join(genres)
+
 class BookDetailService:
     @staticmethod
     def get_media_detail(db_type, series_name, library_id='all', user_id=1, role=None, restrict_same_directory=True, representative_book_id=None):
@@ -31,7 +51,9 @@ class BookDetailService:
                 return {'series_name': series_name, 'author': '-', 'publisher': '-', 'summary': '등록된 오디오북이 없습니다.', 'cover_image': ''}, []
 
             aid = audiobook_row['id']
-            
+            from services.category_service import CategoryService
+            is_music = CategoryService.is_music_library(audiobook_row.get('library_id'))
+
             # 사용자 진행도
             prog_row = AudiobookRepository.get_audiobook_progress(aid, user_id)
             current_track_id = prog_row['current_track_id'] if prog_row else None
@@ -68,15 +90,29 @@ class BookDetailService:
                 'current_time': current_time,
                 'total_progress_pct': total_progress_pct,
                 'is_completed': is_completed,
+                'is_music': is_music,
                 'metadata_locked': 0
             }
+            if is_music:
+                # album.yaml이 없던 앨범: 외부 조회 결과(플러그인 폴백)를 빈 칸에만 채운다
+                from services.music_lookup_service import get_found_lookup
+                lookup = get_found_lookup(aid)
+                if lookup:
+                    if meta['author'] in ('', '-') and lookup.get('artist'):
+                        meta['author'] = lookup['artist']
+                    if not (audiobook_row['description'] or audiobook_row['author_intro']) and lookup.get('summary'):
+                        meta['summary'] = lookup['summary']
+                    meta['music_lookup'] = {k: lookup.get(k) for k in ('source', 'year', 'genres', 'source_url')}
+                # 상세 머리 정보 줄용: 발매 연도·장르 (album.yaml → 외부 조회 결과)
+                meta['music_year'], meta['music_genres'] = _music_year_and_genres(audiobook_row, lookup)
 
             books_list = []
             for t in track_rows:
                 dur_sec = t['duration'] or 0.0
                 mins = int(dur_sec // 60)
                 secs = int(dur_sec % 60)
-                time_str = f"{mins:02d}:{secs:02d}"
+                # 원격 음악은 재생하기 전엔 길이를 모른다(스캔이 곡 파일을 열지 않음) - 00:00 대신 '-'
+                time_str = '-' if (is_music and dur_sec <= 0) else f"{mins:02d}:{secs:02d}"
                 saved_track_progress = track_progress.get(int(t['id']))
                 if is_completed:
                     track_progress_pct = 100.0
@@ -99,7 +135,9 @@ class BookDetailService:
                     'audiobook_id': aid,
                     'track_number': t['track_number'],
                     'track_code': t['track_code'] or str(t['track_number']),
-                    'title': t['filename'],
+                    # 음악 카테고리는 태그(없으면 파일명에서 만든) 곡 제목/아티스트를 보여준다
+                    'title': (t.get('title') if is_music else None) or t['filename'],
+                    'artist': t.get('artist') if is_music else None,
                     'file_format': t['format'] or 'mp3',
                     'duration': dur_sec,
                     'time_str': time_str,
@@ -108,7 +146,8 @@ class BookDetailService:
                     'file_size': t['file_size'] or 0,
                     'file_path': t['file_path'],
                     'total_pages': mins if mins > 0 else 1,
-                    'cover_image': meta['cover_image'],
+                    # 음악: 곡마다 원래 앨범이 다를 수 있어(차트 모음) 곡 파일의 내장 아트를 쓴다
+                    'cover_image': f"/api/media/audiobooks/{aid}/tracks/{t['id']}/cover" if is_music else meta['cover_image'],
                     'is_completed': 1 if prog_row and prog_row['is_completed'] else 0,
                     'is_favorite': meta['is_favorite'],
                 })

@@ -45,6 +45,122 @@ def natural_sort_key(s):
     return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', str(s))]
 
 
+# ── 음악 모드(오디오북 세션의 '음악' 속성 카테고리) ─────────────────────────────
+# 폴더 = 앨범, 폴더 이름 = 제목은 오디오북과 같다. 태그는 앨범을 묶는 데 쓰지 않고 곡 표시(제목/아티스트)에만 쓴다.
+_DISC_DIR_RE = re.compile(r'^(?:cd|disc|disk)\s*[-_.]?\s*\d{1,2}$', re.IGNORECASE)
+# '001 ', '01. ', '1-03 ', '[001] ' 같은 트랙 번호 접두어 (태그가 없을 때 파일명에서 떼어낸다)
+_MUSIC_TRACK_PREFIX_RE = re.compile(
+    r'^\s*(?:\[\s*\d+\s*\]\s*|\d{1,2}-\d{1,3}(?:\s*[.\-_)]\s*|\s+)|\d{1,3}\s*[.\-_)]\s*|\d{2,3}\s+)'
+)
+
+
+def is_disc_dir(name):
+    """'CD1', 'Disc 2', 'disk-03' 처럼 한 앨범의 디스크를 나눈 하위 폴더인지."""
+    return bool(_DISC_DIR_RE.match(str(name or '').strip()))
+
+
+def _first_tag(tags, *keys):
+    if not tags:
+        return None
+    for key in keys:
+        try:
+            value = tags.get(key)
+        except Exception:
+            value = None
+        if isinstance(value, (list, tuple)):
+            value = value[0] if value else None
+        # 일부 태그 도구가 남기는 NUL(값 끝 종결자, ID3v2.4 다중 값 구분자)은 첫 값만 남기고 정리
+        text = str(value).split('\x00')[0].strip() if value is not None else ''
+        if text:
+            return text
+    return None
+
+
+def _tags_title_artist(tags):
+    return _first_tag(tags, 'title', 'Title', 'TITLE'), _first_tag(tags, 'artist', 'Author', 'ARTIST')
+
+
+def read_music_tags(file_path):
+    """곡 태그에서 (제목, 아티스트)를 읽는다. 태그 영역만 읽어 원격(rclone)에서도 가볍게 유지한다."""
+    try:
+        if file_path.lower().endswith('.mp3'):
+            from mutagen.easyid3 import EasyID3
+            return _tags_title_artist(EasyID3(file_path))
+        import mutagen
+        audio = mutagen.File(file_path, easy=True)
+        return _tags_title_artist(audio.tags if audio is not None else None)
+    except Exception:
+        return None, None
+
+
+def _probe_music_duration_and_tags(file_path):
+    """mp3가 아닌 곡은 mutagen으로 한 번만 열어 재생시간과 태그를 함께 얻는다. 실패하면 (0.0, None)."""
+    try:
+        import mutagen
+        audio = mutagen.File(file_path, easy=True)
+        if audio is None or not getattr(audio, 'info', None):
+            return 0.0, None
+        return float(audio.info.length or 0.0), _tags_title_artist(audio.tags)
+    except Exception:
+        return 0.0, None
+
+
+def _plain_text(value):
+    """album.yaml 소개 등 HTML 조각이 섞인 문자열 → 일반 텍스트(&nbsp;·<br> 정리)."""
+    import html
+    text = re.sub(r'<br\s*/?>', '\n', str(value or ''), flags=re.IGNORECASE)
+    text = html.unescape(re.sub(r'<[^>]+>', '', text)).replace('\xa0', ' ')
+    return text.strip()
+
+
+def music_title_from_filename(filename):
+    """태그가 없을 때 파일명에서 (제목, 아티스트)를 만든다. 예: '001 아이유 - 밤편지.flac' -> ('밤편지', '아이유')."""
+    stem = os.path.splitext(os.path.basename(str(filename)))[0]
+    stripped = _MUSIC_TRACK_PREFIX_RE.sub('', stem, count=1).strip() or stem.strip()
+    if ' - ' in stripped:
+        artist, title = stripped.split(' - ', 1)
+        if artist.strip() and title.strip():
+            return title.strip(), artist.strip()
+    return stripped, None
+
+
+def read_embedded_cover(file_path):
+    """곡 파일의 내장 앨범 아트(bytes)를 꺼낸다. 앞표지(type 3)를 우선하고, 없으면 None."""
+    try:
+        lower = file_path.lower()
+        if lower.endswith('.mp3'):
+            from mutagen.id3 import ID3
+            pictures = ID3(file_path).getall('APIC')
+            front = [p for p in pictures if getattr(p, 'type', None) == 3]
+            return (front or pictures)[0].data if pictures else None
+        import mutagen
+        audio = mutagen.File(file_path)
+        if audio is None:
+            return None
+        pictures = list(getattr(audio, 'pictures', None) or [])  # FLAC
+        if pictures:
+            front = [p for p in pictures if getattr(p, 'type', None) == 3]
+            return (front or pictures)[0].data
+        tags = audio.tags
+        if tags is None:
+            return None
+        if hasattr(tags, 'getall'):  # ID3 계열 (예: AIFF/WAV 내장 ID3)
+            apics = tags.getall('APIC')
+            if apics:
+                return apics[0].data
+        covr = tags.get('covr') if hasattr(tags, 'get') else None  # MP4/M4A
+        if covr:
+            return bytes(covr[0])
+        block = tags.get('metadata_block_picture') if hasattr(tags, 'get') else None  # Ogg Vorbis/Opus
+        if block:
+            import base64
+            from mutagen.flac import Picture
+            return Picture(base64.b64decode(block[0])).data
+    except Exception:
+        return None
+    return None
+
+
 def get_audio_duration_and_size(file_path, file_size=None, remote_fast_path=False):
     """
     오디오 파일의 duration(초 단위 float) 및 file_size(byte)를 구합니다.
@@ -276,10 +392,18 @@ def _extract_xing_frames(buf):
     return None
 
 
-def parse_audiobook_folder(folder_path, existing_track_cache=None, remote_fast_path=False):
+def parse_audiobook_folder(folder_path, existing_track_cache=None, remote_fast_path=False, music=False):
     """
     단일 오디오북 디렉터리를 분석하여 메타데이터 및 트랙 목록을 파싱합니다.
+    music=True(음악 카테고리)면 디스크 하위 폴더 순서를 지키고, 곡 태그로 트랙 제목/아티스트를 채우며,
+    폴더 이미지가 없을 때 첫 곡의 내장 아트를 커버로 쓴다(커버 캐시가 첫 요청 때 꺼낸다).
+
+    음악 + 원격 마운트(remote_fast_path)면 곡 파일을 아예 열지 않는다. rclone VFS(cache-mode full, 큰
+    read-chunk)는 태그만 읽어도 곡 파일 전체를 내려받아(25MB FLAC 측정: 25MB 전부) 공유 드라이브(GDS)에
+    부담이 크기 때문이다. 이때 제목은 album.yaml → 파일명, 길이는 0(재생할 때 music_enrich_service가 채움),
+    커버는 폴더 이미지 → album.yaml 포스터 URL 순이며 내장 아트는 쓰지 않는다.
     """
+    skip_audio_reads = bool(music and remote_fast_path)
     if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
         return None
 
@@ -296,8 +420,15 @@ def parse_audiobook_folder(folder_path, existing_track_cache=None, remote_fast_p
     if not audio_files:
         return None
 
-    # 트랙 파일 자연어 순서 정렬
-    audio_files.sort(key=lambda p: natural_sort_key(os.path.basename(p)))
+    # 트랙 파일 자연어 순서 정렬 (음악: CD1/01, CD2/01 이 섞이지 않게 하위 폴더 순서가 먼저)
+    if music:
+        album_root = os.path.normpath(folder_path)
+        audio_files.sort(key=lambda p: (
+            natural_sort_key(os.path.relpath(os.path.dirname(p), album_root)),
+            natural_sort_key(os.path.basename(p)),
+        ))
+    else:
+        audio_files.sort(key=lambda p: natural_sort_key(os.path.basename(p)))
 
     # 메타데이터 준비 (`metadata.json` 또는 `audio.json` 우선 읽기)
     meta = {
@@ -375,6 +506,25 @@ def parse_audiobook_folder(folder_path, existing_track_cache=None, remote_fast_p
         except Exception as err:
             print(f"[AudiobookScanner Warning] audio.json read error in {folder_path}: {err}")
 
+    # 음악: album.yaml(앨범 정보·곡 제목·가사)이 있으면 쓴다. 제목은 폴더 이름 원칙 그대로 두고
+    # 아티스트/발매일/레이블/소개만 채운다. 가사는 재생 시점에 music_lyrics_service가 읽는다.
+    album_yaml_entries = []
+    if music and not meta['author']:
+        from services.music_lyrics_service import album_yaml_tracks, load_album_yaml
+        album_yaml = load_album_yaml(folder_path)
+        if album_yaml:
+            meta['author'] = str(album_yaml.get('artist') or '').strip()
+            meta['premiered'] = meta['premiered'] or str(album_yaml.get('originally_available_at') or '').strip()
+            meta['publisher'] = meta['publisher'] or str(album_yaml.get('studio') or '').strip()
+            meta['code'] = meta['code'] or str(album_yaml.get('code') or '').strip()
+            meta['description'] = meta['description'] or _plain_text(album_yaml.get('summary'))
+            album_yaml_entries = album_yaml_tracks(album_yaml)
+            if not meta['poster']:
+                posters = album_yaml.get('posters')
+                poster_url = posters[0] if isinstance(posters, list) and posters else posters
+                if isinstance(poster_url, str) and poster_url.startswith(('http://', 'https://')):
+                    meta['poster'] = poster_url.strip()
+
     # 커버 포스터 이미지 자동 탐지 (poster.jpg, cover.jpg, folder.jpg 등 ➔ 없으면 *.jpg, *.jpeg, *.png, *.webp 탐지)
     if not meta['poster'] or not meta['poster'].startswith(('http://', 'https://')):
         poster_candidates = ['poster.jpg', 'cover.jpg', 'folder.jpg', 'poster.png', 'cover.png', 'folder.png', 'poster.jpeg', 'cover.jpeg', 'folder.jpeg']
@@ -397,9 +547,16 @@ def parse_audiobook_folder(folder_path, existing_track_cache=None, remote_fast_p
 
         if found_poster:
             meta['poster'] = found_poster
+        elif music and not meta['poster'] and not skip_audio_reads:
+            # 폴더 이미지가 없는 음악 앨범: 첫 곡 경로를 포스터 소스로 두면 커버 캐시가 내장 아트를 꺼낸다
+            # (원격은 곡 파일 전체를 받게 되므로 하지 않는다 - album.yaml 포스터 URL 또는 재생 후 채움)
+            meta['poster'] = os.path.normpath(audio_files[0])
 
     # audio.json / metadata.json에 title/author가 누락되었거나 없으면 폴더명 fallback ("저자 - 제목")
-    if not meta['title'] or not meta['author']:
+    # (음악은 앨범 이름에 ' - '가 흔해 쪼개지 않는다 — 폴더 이름 = 제목, 아티스트는 곡 태그 다수결)
+    if music and not meta['title']:
+        meta['title'] = folder_name
+    if not meta['title'] or (not meta['author'] and not music):
         if ' - ' in folder_name:
             parts = folder_name.split(' - ', 1)
             if not meta['author']:
@@ -434,27 +591,41 @@ def parse_audiobook_folder(folder_path, existing_track_cache=None, remote_fast_p
         cache_row = track_cache.get(normalized_path)
         duration_source = 'file_probe'
         track_started_at = time.perf_counter()
-        if (
+        music_tags = None
+        cache_hit = bool(
             cache_row and
             int(cache_row.get('file_size', -1)) == int(file_size) and
             int(float(cache_row.get('file_mtime', -1.0) or -1.0)) == int(file_mtime)
-        ):
+        )
+        if cache_hit:
             duration = float(cache_row.get('duration', 0.0) or 0.0)
             duration_cache_hits += 1
             duration_source = 'cache'
+            if music and cache_row.get('title'):
+                music_tags = _tags_title_artist({'title': cache_row.get('title'), 'artist': cache_row.get('artist')})
         else:
             if use_metadata_track_durations:
                 duration = float(metadata_track_durations[idx - 1] or 0.0)
                 metadata_duration_hits += 1
                 duration_source = 'metadata'
+            elif skip_audio_reads:
+                # 원격 음악: 곡 파일을 열지 않는다 (길이는 재생할 때 채운다)
+                duration = 0.0
+                duration_source = 'deferred'
             else:
-                duration, file_size = get_audio_duration_and_size(
-                    fpath,
-                    file_size=file_size,
-                    remote_fast_path=remote_fast_path
-                )
+                duration = 0.0
+                if music and not fpath.lower().endswith('.mp3'):
+                    duration, music_tags = _probe_music_duration_and_tags(fpath)
+                if duration <= 0.0:
+                    duration, file_size = get_audio_duration_and_size(
+                        fpath,
+                        file_size=file_size,
+                        remote_fast_path=remote_fast_path
+                    )
                 metadata_duration_fallbacks += 1
                 file_probe_hits += 1
+        if music and music_tags is None and not skip_audio_reads:
+            music_tags = read_music_tags(fpath)
 
         if verbose_track_log:
             track_elapsed_ms = int((time.perf_counter() - track_started_at) * 1000)
@@ -481,7 +652,7 @@ def parse_audiobook_folder(folder_path, existing_track_cache=None, remote_fast_p
 
         ext = os.path.splitext(fname)[1].lstrip('.').lower()
 
-        tracks.append({
+        track = {
             'track_number': idx,
             'track_code': track_code,
             'filename': display_fname,
@@ -490,7 +661,23 @@ def parse_audiobook_folder(folder_path, existing_track_cache=None, remote_fast_p
             'file_size': file_size,
             'duration': duration,
             'format': ext
-        })
+        }
+        if music:
+            tag_title, tag_artist = music_tags or (None, None)
+            name_title, name_artist = music_title_from_filename(fname)
+            if not tag_title and len(album_yaml_entries) == len(audio_files):
+                # 태그가 없으면 album.yaml의 같은 순서 곡 제목 (곡 수가 같을 때만)
+                tag_title = str(album_yaml_entries[idx - 1].get('title') or '').strip() or None
+            track['title'] = tag_title or name_title
+            track['artist'] = tag_artist or (None if tag_title else name_artist)
+        tracks.append(track)
+
+    if music and not meta['author']:
+        # 폴더명에 '아티스트 - 앨범'이 없으면 곡 아티스트가 절반 이상 같을 때만 앨범 아티스트로 쓴다(모음집은 비워 둠)
+        from collections import Counter
+        top = Counter(t['artist'] for t in tracks if t.get('artist')).most_common(1)
+        if top and top[0][1] * 2 >= len(tracks):
+            meta['author'] = top[0][0]
 
     meta['total_duration'] = total_duration
     meta['total_tracks'] = len(tracks)
@@ -506,9 +693,10 @@ def parse_audiobook_folder(folder_path, existing_track_cache=None, remote_fast_p
     }
 
 
-def scan_and_save_audiobook_folder(folder_path, library_id=None):
+def scan_and_save_audiobook_folder(folder_path, library_id=None, music=None):
     """
     단일 오디오북 폴더를 스캔하여 오디오북 DB에 저장/업데이트합니다.
+    music=None이면 카테고리 속성으로 음악 모드 여부를 판단한다(라이브러리 스캔은 한 번 판단해 넘겨준다).
     """
     from repositories.audiobook_repository import AudiobookRepository
 
@@ -524,6 +712,9 @@ def scan_and_save_audiobook_folder(folder_path, library_id=None):
             from repositories.category_repository import CategoryRepository
             if not CategoryRepository.get_library_by_id('audiobook', library_id):
                 library_id = None
+        if music is None:
+            from services.category_service import CategoryService
+            music = CategoryService.is_music_library(library_id)
 
         # 기존 오디오북/트랙 정보로 파싱 시 duration 캐시 재사용을 위해 조회
         existing = AudiobookRepository.get_by_folder_path(normalized_folder_path)
@@ -536,14 +727,17 @@ def scan_and_save_audiobook_folder(folder_path, library_id=None):
                 existing_track_cache[key] = {
                     'file_mtime': float(r.get('file_mtime') or 0.0),
                     'file_size': int(r.get('file_size') or 0),
-                    'duration': float(r.get('duration') or 0.0)
+                    'duration': float(r.get('duration') or 0.0),
+                    'title': r.get('title'),
+                    'artist': r.get('artist')
                 }
 
         parse_started_at = time.perf_counter()
         result = parse_audiobook_folder(
             folder_path,
             existing_track_cache=existing_track_cache,
-            remote_fast_path=remote_fast_path
+            remote_fast_path=remote_fast_path,
+            music=music
         )
         parse_elapsed_sec = time.perf_counter() - parse_started_at
         if not result:
@@ -551,6 +745,10 @@ def scan_and_save_audiobook_folder(folder_path, library_id=None):
 
         meta = result['meta']
         tracks = result['tracks']
+        if music and remote_fast_path and not meta.get('poster') and existing:
+            kept = os.path.normpath(str(existing.get('poster') or ''))
+            if existing.get('poster') and kept.startswith(normalized_folder_path + os.sep):
+                meta['poster'] = kept
         duration_cache_hits = int(result.get('duration_cache_hits', 0) or 0)
         metadata_duration_hits = int(result.get('metadata_duration_hits', 0) or 0)
         metadata_duration_fallbacks = int(result.get('metadata_duration_fallbacks', 0) or 0)
@@ -563,6 +761,8 @@ def scan_and_save_audiobook_folder(folder_path, library_id=None):
         track_inserts = scan_result['track_inserts']
         track_updates = scan_result['track_updates']
         track_deletes = scan_result['track_deletes']
+        if music:
+            track_updates += AudiobookRepository.update_track_tags(audiobook_id, tracks)
 
         elapsed_sec = time.perf_counter() - started_at
         elapsed_ms = int(elapsed_sec * 1000)
@@ -685,12 +885,15 @@ def scan_audiobook_library(library_path, library_id=None, force=False):
     new_items = []
 
     from repositories.audiobook_repository import AudiobookRepository
+    from services.category_service import CategoryService
     raw_paths = AudiobookRepository.get_folder_paths(library_id)
     existing_folder_paths = {os.path.normpath(str(p)) for p in raw_paths if p}
+    music = CategoryService.is_music_library(library_id)
 
     print(
         "[AudiobookScanner][LIBRARY_SCAN_START] "
         f"library_id={library_id} "
+        f"music={music} "
         f"force={force} "
         f"existing_records={len(existing_folder_paths)} "
         f"skip_policy={'default_skip_existing' if skip_existing else 'force_rescan_existing'} "
@@ -702,8 +905,10 @@ def scan_audiobook_library(library_path, library_id=None, force=False):
         # audio.json 파일이 존재하거나 오디오 파일이 있는 최하위 디렉토리 감지
         has_audio_json = 'audio.json' in files
         has_audio_files = any(f.lower().endswith(AUDIO_EXTENSIONS) for f in files)
+        # 음악: 곡 없이 CD1/Disc 2 같은 디스크 폴더만 있는 폴더가 앨범 하나 (디스크마다 따로 앨범이 되지 않게)
+        is_multi_disc_album = music and not has_audio_files and any(is_disc_dir(d) for d in dirs)
 
-        if has_audio_json or has_audio_files:
+        if has_audio_json or has_audio_files or is_multi_disc_album:
             if skip_existing and os.path.normpath(root) in existing_folder_paths:
                 skipped += 1
                 print(
@@ -715,7 +920,7 @@ def scan_audiobook_library(library_path, library_id=None, force=False):
                 dirs.clear()
                 continue
             was_new_folder = os.path.normpath(root) not in existing_folder_paths
-            aid = scan_and_save_audiobook_folder(root, library_id=library_id)
+            aid = scan_and_save_audiobook_folder(root, library_id=library_id, music=music)
             if aid:
                 count += 1
                 if was_new_folder:

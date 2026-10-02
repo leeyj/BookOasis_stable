@@ -45,12 +45,25 @@ def apply_running_scan_status(libraries, db_type, queue_status):
 UNSPECIFIED_LIBRARY_KIND = 'unspecified'
 LIBRARY_KIND_CODE_PATTERN = re.compile(r'^[a-z][a-z0-9_-]{0,23}$')
 MAX_LIBRARY_KIND_NAME_LENGTH = 25
+MUSIC_LIBRARY_KIND = 'music'
+COVER_ASPECT_RATIOS = ('4:3', '16:9', '1:1')
 
 
 class CategoryService:
     @staticmethod
     def get_library_kinds(db_type):
         return CategoryRepository.get_library_kinds(db_type)
+
+    @staticmethod
+    def is_music_library(library_id):
+        """오디오북 세션 카테고리 중 속성이 '음악'인지. 음악 모드(폴더=앨범, 곡 태그 표시, 진행 저장 없음)의 단일 판단식."""
+        if not library_id:
+            return False
+        try:
+            lib = CategoryRepository.get_library_by_id('audiobook', int(library_id))
+        except Exception:
+            return False
+        return bool(lib) and str(lib.get('content_kind') or '').strip().lower() == MUSIC_LIBRARY_KIND
 
     @staticmethod
     def _clean_library_kind_name(name):
@@ -296,9 +309,9 @@ class CategoryService:
 
     @staticmethod
     def _normalize_cover_aspect_ratio(cover_aspect_ratio):
-        """카테고리 그리드 커버 비율. 임의 커스텀 비율은 지원하지 않고 정해진 두 값만 허용한다."""
+        """카테고리 그리드 커버 비율. 임의 커스텀 비율은 지원하지 않고 정해진 값(기본/와이드/정사각)만 허용한다."""
         value = str(cover_aspect_ratio or '4:3').strip()
-        return value if value in ('4:3', '16:9') else '4:3'
+        return value if value in COVER_ASPECT_RATIOS else '4:3'
 
     @staticmethod
     def _validate_gdrive_requirements(physical_path, gdrive_copy_remote, gdrive_view_local_mirror_path):

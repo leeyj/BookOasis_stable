@@ -162,6 +162,80 @@ def _stream_transcoded_audio(file_path, start_time=0.0):
     return rv
 
 
+# FLAC 메타데이터 블록 중 재생에 필요한 것: STREAMINFO(0), SEEKTABLE(3)
+_FLAC_KEEP_BLOCK_TYPES = (0, 3)
+_FLAC_HEADER_SCAN_LIMIT = 16 * 1024 * 1024  # 이보다 큰 메타데이터 영역은 비정상으로 보고 원본 그대로 보낸다
+_FLAC_LAYOUT_CACHE = {}
+
+
+def _flac_clean_layout(file_path):
+    """FLAC을 '재생용 최소 헤더 + 원본 오디오 프레임'으로 보낼 때의 (헤더 bytes, 프레임 시작 오프셋).
+
+    태그(VORBIS_COMMENT)/앨범 아트(PICTURE)/PADDING 같은 블록을 빼고 STREAMINFO·SEEKTABLE만 남긴다.
+    실제 사례: 멜론 차트 FLAC의 PICTURE 블록이 깨져 있어(ffprobe: 'Could not read mimetype from an
+    attached picture') Chrome이 DEMUXER_ERROR_COULD_NOT_OPEN으로 파일 자체를 열지 못했다. 브라우저는
+    태그/아트가 필요 없고(DB에 이미 있음) 오디오 프레임은 그대로라 재생·탐색에 영향이 없다.
+    파싱할 수 없으면 None(호출부가 원본을 그대로 보낸다)."""
+    try:
+        stat = os.stat(file_path)
+    except OSError:
+        return None
+    cached = _FLAC_LAYOUT_CACHE.get(file_path)
+    if cached and cached[0] == stat.st_mtime_ns and cached[1] == stat.st_size:
+        return cached[2]
+
+    layout = None
+    try:
+        with open(file_path, 'rb') as f:
+            if f.read(4) == b'fLaC':
+                kept = []
+                while f.tell() < _FLAC_HEADER_SCAN_LIMIT:
+                    head = f.read(4)
+                    if len(head) < 4:
+                        kept = []
+                        break
+                    is_last = bool(head[0] & 0x80)
+                    block_type = head[0] & 0x7F
+                    block_len = int.from_bytes(head[1:4], 'big')
+                    if block_type in _FLAC_KEEP_BLOCK_TYPES:
+                        body = f.read(block_len)
+                        if len(body) < block_len:
+                            kept = []
+                            break
+                        kept.append((block_type, body))
+                    else:
+                        f.seek(block_len, 1)
+                    if is_last:
+                        break
+                else:
+                    kept = []
+                if kept and kept[0][0] == 0:
+                    frames_offset = f.tell()
+                    header = bytearray(b'fLaC')
+                    for idx, (block_type, body) in enumerate(kept):
+                        last_flag = 0x80 if idx == len(kept) - 1 else 0
+                        header += bytes([last_flag | block_type]) + len(body).to_bytes(3, 'big') + body
+                    if frames_offset <= stat.st_size:
+                        layout = (bytes(header), frames_offset)
+    except OSError:
+        layout = None
+
+    _FLAC_LAYOUT_CACHE[file_path] = (stat.st_mtime_ns, stat.st_size, layout)
+    return layout
+
+
+def _iter_prefixed_file_chunks(file_path, prefix, body_offset, start, length):
+    """가상 스트림(prefix + 파일[body_offset:])의 [start, start+length) 구간을 내보낸다."""
+    remaining = length
+    if start < len(prefix):
+        head = prefix[start:start + remaining]
+        remaining -= len(head)
+        yield head
+        start = len(prefix)
+    if remaining > 0:
+        yield from _iter_file_chunks(file_path, start=body_offset + (start - len(prefix)), length=remaining)
+
+
 def _iter_file_chunks(file_path, start=0, length=None, chunk_size=1024 * 256):
     """Yield file content in chunks to avoid loading large audio files into memory."""
     remaining = length
@@ -242,7 +316,13 @@ def _send_audio_range_response(file_path):
             print(f"[Audio-Transcode] On-the-fly MP3 transcoding served for {ext} (start={start_time:.1f}s): {file_path}")
             return transcoded
 
-    file_size = os.path.getsize(file_path)
+    # FLAC은 재생용 최소 헤더 + 원본 프레임의 가상 스트림으로 보낸다(_flac_clean_layout 참고)
+    prefix, body_offset = b'', 0
+    if ext == 'flac':
+        layout = _flac_clean_layout(file_path)
+        if layout:
+            prefix, body_offset = layout
+    file_size = len(prefix) + os.path.getsize(file_path) - body_offset
     range_header = request.headers.get('Range', None)
 
     mimetype_map = {
@@ -280,7 +360,7 @@ def _send_audio_range_response(file_path):
         length = byte2 - byte1 + 1
 
         rv = Response(
-            _iter_file_chunks(file_path, start=byte1, length=length),
+            _iter_prefixed_file_chunks(file_path, prefix, body_offset, byte1, length),
             206,
             mimetype=mimetype,
             content_type=mimetype,
@@ -294,7 +374,7 @@ def _send_audio_range_response(file_path):
 
     else:
         rv = Response(
-            _iter_file_chunks(file_path),
+            _iter_prefixed_file_chunks(file_path, prefix, body_offset, 0, file_size),
             200,
             mimetype=mimetype,
             content_type=mimetype,
@@ -323,6 +403,46 @@ def _has_audiobook_library_access(aid, row=None):
         return False
     return CategoryRepository.check_user_category_access('audiobook', user_id, ab['library_id'])
 
+@audiobook_bp.route('/api/media/audiobooks/<int:aid>/tracks/<int:tid>/cover', methods=['GET'])
+def get_audiobook_track_cover(aid, tid):
+    """곡별 커버(음악 카테고리): 그 곡 파일의 내장 앨범 아트. 없으면 앨범 커버로 대신한다.
+    차트 모음처럼 곡마다 원래 앨범이 다른 폴더에서 재생 중인 곡에 맞는 아트를 보여 주기 위함."""
+    from repositories.audiobook_repository import AudiobookRepository
+    row = AudiobookRepository.get_audiobook_by_id(aid)
+    if not _has_audiobook_library_access(aid, row=row):
+        return jsonify({'success': False, 'error': '오디오북 접근 권한이 없습니다.'}), 403
+
+    track = AudiobookRepository.get_track_by_id_and_audiobook_id(tid, aid)
+    if track and track.get('file_path'):
+        from utils.cover_helper import get_or_cache_remote_poster_webp
+        # 곡 경로를 포스터 소스로 넘기면 내장 아트만 꺼내 WebP로 캐시한다(없으면 .none 표시로 재시도 안 함)
+        cache_path = get_or_cache_remote_poster_webp(track['file_path'], 'audio', library_id=(row or {}).get('library_id'))
+        if cache_path:
+            from api.stream import send_cached_cover_file
+            return send_cached_cover_file(cache_path)
+    return get_audiobook_cover(aid)
+
+
+@audiobook_bp.route('/api/media/audiobooks/<int:aid>/tracks/<int:tid>/lyrics', methods=['GET'])
+@login_required
+def get_audiobook_track_lyrics(aid, tid):
+    """곡 가사 (album.yaml → 곡 파일 태그). {success, source, synced, lines:[{t, text}]}"""
+    from repositories.audiobook_repository import AudiobookRepository
+    from services.music_lyrics_service import get_track_lyrics
+    row = AudiobookRepository.get_audiobook_by_id(aid)
+    if not row or not _has_audiobook_library_access(aid, row=row):
+        return jsonify({'success': False, 'error': '오디오북 접근 권한이 없습니다.'}), 403
+
+    tracks = AudiobookRepository.get_audiobook_tracks(aid)
+    index = next((i for i, t in enumerate(tracks) if int(t['id']) == int(tid)), -1)
+    if index < 0:
+        return jsonify({'success': False, 'error': 'Track not found'}), 404
+    track = tracks[index]
+    lyrics = get_track_lyrics(row.get('folder_path'), track.get('file_path'),
+                              track.get('title') or track.get('filename'), index, len(tracks))
+    return jsonify({'success': True, **lyrics})
+
+
 @audiobook_bp.route('/api/media/audiobooks/<int:aid>/cover', methods=['GET'])
 def get_audiobook_cover(aid):
     """오디오북 대표 앨범 포스터 이미지 서빙"""
@@ -338,6 +458,17 @@ def get_audiobook_cover(aid):
         if cache_path:
             from api.stream import send_cached_cover_file
             return send_cached_cover_file(cache_path)
+
+    if row:
+        # 음악 앨범에 폴더 이미지도 내장 아트도 없으면 외부 조회 결과(플러그인 폴백)의 커버
+        from services.music_lookup_service import get_found_lookup
+        lookup = get_found_lookup(aid)
+        if lookup and lookup.get('cover_url'):
+            from utils.cover_helper import get_or_cache_remote_poster_webp
+            cache_path = get_or_cache_remote_poster_webp(lookup['cover_url'], 'audio', library_id=row.get('library_id'))
+            if cache_path:
+                from api.stream import send_cached_cover_file
+                return send_cached_cover_file(cache_path)
 
     # Fallback SVG 생성 (만화/영상 커버와 동일하게 캐시 헤더 부여 - 그리드에 표지 없는
     # 항목이 몰려 있으면 매 리로드마다 재생성/재요청이 팬아웃되어 gunicorn 스레드를
@@ -362,6 +493,15 @@ def stream_audiobook_track(aid, tid):
 
     if not row or not row.get('file_path'):
         return jsonify({'success': False, 'error': 'Track not found'}), 404
+
+    from services.music_enrich_service import needs_enrich, schedule_track_enrich
+    if needs_enrich(row):
+        # 원격 음악은 스캔 때 곡 파일을 열지 않아 길이/태그가 비어 있다. 지금 재생되며 캐시되는 이 파일에서
+        # 잠시 뒤 채운다(공유 드라이브 추가 요청 없음). 음악 카테고리만.
+        album = AudiobookRepository.get_audiobook_by_id(aid)
+        from services.category_service import CategoryService
+        if album and CategoryService.is_music_library(album.get('library_id')):
+            schedule_track_enrich(aid, row)
 
     return _send_audio_range_response(row['file_path'])
 

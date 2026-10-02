@@ -95,15 +95,18 @@ def test_schema_definitions_cover_both_engines():
         assert f"('{database_name}', 'libraries', 'content_kind'" in safety_net
 
 
-def test_book_sessions_get_the_four_builtin_kinds_and_other_sessions_start_empty():
+def test_book_sessions_get_the_four_builtin_kinds_audiobook_gets_music_and_video_starts_empty():
     general = _new_database('general')
     audiobook = _new_database('audiobook')
+    video = _new_database('video')
 
     rows = general.execute('SELECT code, name, is_builtin FROM library_kinds ORDER BY sort_order').fetchall()
     assert [(r['code'], r['name'], r['is_builtin']) for r in rows] == [
         ('manga', '만화', 1), ('novel', '소설', 1), ('book', '도서', 1), ('magazine', '잡지', 1),
     ]
-    assert audiobook.execute('SELECT COUNT(*) FROM library_kinds').fetchone()[0] == 0
+    rows = audiobook.execute('SELECT code, name, is_builtin FROM library_kinds ORDER BY sort_order').fetchall()
+    assert [(r['code'], r['name'], r['is_builtin']) for r in rows] == [('music', '음악', 1)]
+    assert video.execute('SELECT COUNT(*) FROM library_kinds').fetchone()[0] == 0
 
 
 def test_seeding_is_idempotent_and_keeps_names_the_admin_changed():

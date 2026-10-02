@@ -347,7 +347,9 @@ _SCHEMA_SQL = """
         file_mtime REAL DEFAULT 0.0,
         file_size INTEGER DEFAULT 0,
         duration REAL DEFAULT 0.0,
-        format TEXT DEFAULT 'mp3'
+        format TEXT DEFAULT 'mp3',
+        title TEXT,
+        artist TEXT
     );
 
     CREATE TABLE IF NOT EXISTS audiobook_progress (
@@ -373,6 +375,49 @@ _SCHEMA_SQL = """
         is_completed INTEGER DEFAULT 0,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(audiobook_id, track_id, user_id)
+    );
+
+    -- 음악 카테고리 앨범의 외부 정보 조회 결과 (lookup_music_album 플러그인 폴백). 스캔이 덮어쓰지 않도록 따로 두고,
+    -- 화면에는 audiobooks의 빈 칸에만 겹쳐 보여 준다. status: found | not_found | skipped
+    CREATE TABLE IF NOT EXISTS audiobook_music_lookups (
+        audiobook_id INTEGER PRIMARY KEY,
+        status TEXT NOT NULL,
+        source TEXT,
+        artist TEXT,
+        year TEXT,
+        genres TEXT,
+        summary TEXT,
+        cover_url TEXT,
+        source_url TEXT,
+        looked_up_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- KOReader 진행 동기화(kosync 호환 API, general DB에서만 사용). KOReader는 비밀번호의 MD5만 보내므로
+    -- BookOasis 로그인 비밀번호와 따로 '동기화 비밀번호'를 둔다(key_hash = 그 MD5의 해시).
+    CREATE TABLE IF NOT EXISTS kosync_credentials (
+        user_id INTEGER PRIMARY KEY,
+        key_hash TEXT NOT NULL,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- KOReader 문서 id(파일 일부로 만든 partial MD5) -> 도서. OPDS로 내려받을 때 같은 방식으로 계산해 둔다.
+    CREATE TABLE IF NOT EXISTS kosync_documents (
+        document TEXT PRIMARY KEY,
+        db_type TEXT NOT NULL,
+        book_id INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- KOReader가 올린 마지막 위치 (사용자 x 문서). KOReader 기기끼리는 이 값을 그대로 주고받는다.
+    CREATE TABLE IF NOT EXISTS kosync_progress (
+        user_id INTEGER NOT NULL,
+        document TEXT NOT NULL,
+        progress TEXT,
+        percentage REAL,
+        device TEXT,
+        device_id TEXT,
+        timestamp INTEGER NOT NULL,
+        PRIMARY KEY (user_id, document)
     );
 
     CREATE TABLE IF NOT EXISTS videos (
@@ -1097,13 +1142,22 @@ BUILTIN_LIBRARY_KINDS = (
 )
 
 
+# 오디오북 세션의 'music' 속성은 그 카테고리를 음악 모드(폴더=앨범, 곡 태그 표시)로 스캔/재생하게 한다.
+BUILTIN_LIBRARY_KINDS_BY_SESSION = {
+    'general': BUILTIN_LIBRARY_KINDS,
+    'adult': BUILTIN_LIBRARY_KINDS,
+    'audiobook': (('music', '음악'),),
+}
+
+
 def _seed_library_kinds(conn, cursor, db_type):
-    """도서 세션(general/adult)에 기본 속성 종류를 심는다. 코드 기준으로 멱등이며, 관리자가 바꾼 이름은 덮어쓰지
-    않는다. 오디오북/영상 세션은 빈 목록으로 시작한다."""
-    if db_type not in ('general', 'adult'):
+    """세션별 기본 속성 종류를 심는다(도서: 만화/소설/도서/잡지, 오디오북: 음악). 코드 기준으로 멱등이며,
+    관리자가 바꾼 이름은 덮어쓰지 않는다. 영상 세션은 빈 목록으로 시작한다."""
+    builtin_kinds = BUILTIN_LIBRARY_KINDS_BY_SESSION.get(db_type)
+    if not builtin_kinds:
         return
     try:
-        for sort_order, (code, name) in enumerate(BUILTIN_LIBRARY_KINDS, start=1):
+        for sort_order, (code, name) in enumerate(builtin_kinds, start=1):
             cursor.execute("SELECT code FROM library_kinds WHERE code = ?", (code,))
             if cursor.fetchone():
                 continue

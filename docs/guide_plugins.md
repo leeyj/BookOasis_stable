@@ -32,7 +32,8 @@
 | 1.0.9 | `search`, `apply` | `home_widget` | 사용자가 "홈 화면 플러그인 배치 모드"를 켰을 때만 노출되는 실제 홈 대시보드 위젯 계약 추가 (§5-1) |
 | 1.1.0 | `search`, `apply` | `detail_view` | 도서 상세 페이지 본문 전체를 대체하는 커스텀 화면 계약 추가 (세션별 단일 슬롯) |
 | 1.1.1 | `search`, `apply` | `dashboard.html`/`dashboard.css`/`dashboard.js` | `home_widget`에 커스텀 CSS/이미지 허용 - 위젯별 Shadow DOM 격리 렌더링 (§5-1) |
-| 1.1.2+ (현재, BookOasis 2.8.4+) | `search`, `apply` | `report_problem`, `resolve_problem` | 관리자 알림에 문제 카드 올리기/해결 - 베이스 클래스 헬퍼, 추가만 하는 계약 (아래 "관리자 알림 문제 카드") |
+| 1.1.2 (BookOasis 2.8.4+) | `search`, `apply` | `report_problem`, `resolve_problem` | 관리자 알림에 문제 카드 올리기/해결 - 베이스 클래스 헬퍼, 추가만 하는 계약 (아래 "관리자 알림 문제 카드") |
+| 1.1.3+ (현재, BookOasis 2.8.4+) | `search`, `apply` | `lookup_music_album` | 음악 카테고리에서 album.yaml이 없는 앨범의 정보 조회 - 코어가 백그라운드로 부르는 추가 계약 (아래 "음악 앨범 정보 조회") |
 
 호환성 원칙:
 
@@ -1311,6 +1312,37 @@ if hasattr(self, "resolve_problem"):
 실제 사용 예: `sample_plugins/metadata/spotify_mood/spotify_mood.py` — 사용자 토큰 갱신이 거절되면
 `token_expired` 카드(조치 필요, [다시 연결])를 올리고, 갱신 성공·재연결·연결 해제 시 해결합니다.
 설계 배경: `docs/plan_unified_notification_queue.md` 3장 "결정: 플러그인 문제 카드 계약".
+
+### 음악 앨범 정보 조회 (`lookup_music_album`, 선택)
+
+오디오북 세션의 **'음악' 속성 카테고리**에서 앨범 폴더에 `album.yaml`이 없으면, 코어가 스캔 뒤 백그라운드로
+이 계약을 구현한 플러그인에게 앨범 정보를 물어봅니다. 플러그인은 외부 서비스에서 찾아 돌려주기만 하고,
+저장과 화면 표시는 코어가 합니다.
+
+```python
+def lookup_music_album(self, db_type, context):
+    # context = {'folder_name': '[2019] [정규] Momentary Sixth Sense [MQA]',
+    #            'artist': 'あいみょん',          # 곡 태그로 정한 앨범 아티스트 (없으면 '')
+    #            'track_titles': ['...', ...],    # 앞쪽 곡 제목 몇 개
+    #            'track_count': 12}
+    return {'artist': 'Aimyon', 'year': '2019', 'genres': ['J-Pop'],
+            'cover_url': 'https://.../600x600bb.jpg', 'source_url': 'https://music.apple.com/...',
+            'summary': None}                      # 아는 것만. 못 찾으면 None
+```
+
+| 항목 | 규칙 |
+| :--- | :--- |
+| 감지 | 베이스 클래스의 기본 구현(`None` 반환)을 **오버라이드한** 활성 플러그인만 부름 |
+| 대상 | 음악 카테고리 앨범 중 발매일·소개가 비어 있는 것(= album.yaml 정보 없음). 모음집(앨범 아티스트 없음 + 곡 아티스트 여러 명)은 묻지 않고 건너뜀 |
+| 주기 | 10분마다 최대 20개 앨범, **앨범 사이 5초** 쉼 (무료 API의 분당 제한 고려) |
+| 한 번만 | 결과(찾음/못 찾음/건너뜀)를 `audiobook_music_lookups`에 기록하고 다시 묻지 않음. 예외를 내면 기록하지 않고 다음 주기에 다시 물음. 플러그인이 하나도 없으면 아무것도 기록하지 않음 |
+| 표시 | 앨범의 **빈 칸에만** 보임: 아티스트, 소개, 커버(폴더 이미지와 곡 내장 아트가 모두 없을 때). 스캔 결과를 덮어쓰지 않음 |
+| 여러 플러그인 | 결과를 먼저 준 플러그인을 씀 (`source`에 플러그인 id 기록) |
+| 실패 처리 | 작업 전체가 실패하면 관리자 알림에 "백그라운드 작업 실패"(음악 앨범 정보 조회)로 보임 |
+
+실제 사용 예: `sample_plugins/metadata/music_itunes/music_itunes.py` — iTunes Search API(키 불필요)로 앨범을 찾고,
+한글/일본어 아티스트 이름은 스토어 표기 후보(앤디 → ANDY, あいみょん → Aimyon)로 맞춥니다. 같은 제목이라도 다른
+가수의 앨범은 받지 않습니다. 기본 스토어는 US입니다(KR 스토어는 앨범 검색 결과가 없음).
 
 ---
 

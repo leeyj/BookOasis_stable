@@ -3165,6 +3165,12 @@ body {
     aspect-ratio: 16 / 9;
 }
 
+/* 정사각(1:1) - 앨범 아트. 음악 카테고리는 설정과 무관하게 항상 이 비율 (utils/cover_ratio.js) */
+.book-card[data-cover-ratio="1-1"] .book-card-cover {
+    height: auto;
+    aspect-ratio: 1 / 1;
+}
+
 .book-card:hover .book-card-cover img {
     transform: none;
 }
@@ -5606,4 +5612,213 @@ body.book-selection-active .btn-card-info-toggle {
 .card-info-menu dd {
     margin: 0;
     word-break: break-all;
+}
+
+/* 오디오 플레이어 음악 모드(오디오북 세션 '음악' 속성 카테고리) - audio_player.js가 모달에 data-player-mode를 굽는다 */
+#audio-player-modal[data-player-mode="music"] [data-audio-only="audiobook"],
+#audio-player-modal:not([data-player-mode="music"]) [data-audio-only="music"] {
+    display: none !important;
+}
+
+#btn-audio-shuffle i,
+#btn-audio-repeat i {
+    color: #f1f5f9;
+}
+
+#btn-audio-shuffle[aria-pressed="true"] i,
+#btn-audio-repeat:not([data-repeat="off"]) i {
+    color: #38bdf8;
+}
+
+/* 음악 모드 가사 패널: 열면 커버 자리를 대신한다 (audio_player_modules/lyrics_panel.js) */
+#btn-audio-lyrics i {
+    color: #f1f5f9;
+}
+
+#btn-audio-lyrics[aria-pressed="true"] i {
+    color: #38bdf8;
+}
+
+#audio-player-modal .audio-lyrics-panel {
+    display: none;
+    position: relative;
+    width: 100%;
+    max-width: 480px;
+    height: min(340px, 42vh);
+    margin-bottom: 1.4rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    text-align: center;
+    padding: 30% 0.5rem;
+    box-sizing: border-box;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 18%, #000 82%, transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 18%, #000 82%, transparent 100%);
+}
+
+#audio-player-modal .audio-lyrics-panel::-webkit-scrollbar {
+    display: none;
+}
+
+#audio-player-modal[data-player-mode="music"].is-lyrics-open .audio-lyrics-panel {
+    display: block;
+}
+
+#audio-player-modal[data-player-mode="music"].is-lyrics-open .audio-cover-stage {
+    display: none !important;
+}
+
+#audio-player-modal .audio-lyrics-line {
+    margin: 0;
+    padding: 0.35rem 0;
+    font-size: 1.02rem;
+    line-height: 1.5;
+    color: rgba(241, 245, 249, 0.42);
+    transition: color 0.25s ease, transform 0.25s ease;
+    white-space: pre-wrap;
+    word-break: keep-all;
+}
+
+#audio-player-modal .audio-lyrics-panel.is-synced .audio-lyrics-line {
+    cursor: pointer;
+}
+
+#audio-player-modal .audio-lyrics-line.is-active {
+    color: #ffffff;
+    font-weight: 700;
+    transform: scale(1.04);
+}
+
+#audio-player-modal .audio-lyrics-panel:not(.is-synced) .audio-lyrics-line {
+    color: rgba(241, 245, 249, 0.8);
+}
+
+#audio-player-modal .audio-lyrics-empty {
+    margin: 0;
+    color: #94a3b8;
+    font-size: 0.9rem;
+}
+
+/* 음악 앨범 상세: 앨범 아트는 정사각 (header_view.js isMusicContext) */
+.detail-cover-container.is-square {
+    width: 180px;
+    height: 180px;
+}
+
+/* 계정 메뉴: KOReader 동기화 (kosync_settings.js) */
+.account-menu-popover:has(#kosync-settings-panel:not([hidden])) {
+    width: min(300px, calc(100vw - 2rem));
+}
+
+.account-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 0.4rem;
+    border: none;
+    border-radius: 5px;
+    background: none;
+    color: var(--app-text-primary);
+    font-size: 0.85rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.account-menu-item:hover {
+    background: var(--app-border-light);
+}
+
+.account-menu-item i {
+    color: var(--app-text-muted);
+    width: 1.1rem;
+}
+
+.kosync-status-badge {
+    margin-left: auto;
+    padding: 0.05rem 0.4rem;
+    border-radius: 999px;
+    background: rgba(34, 197, 94, 0.18);
+    color: #4ade80;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.kosync-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.4rem 0.4rem 0.6rem;
+    border-bottom: 1px solid var(--app-border-light);
+    margin-bottom: 0.3rem;
+    font-size: 0.78rem;
+    color: var(--app-text-muted);
+}
+
+.kosync-settings[hidden] {
+    display: none;
+}
+
+.kosync-row {
+    display: flex;
+    gap: 0.4rem;
+    align-items: baseline;
+}
+
+.kosync-row span {
+    flex-shrink: 0;
+    width: 3.6rem;
+}
+
+.kosync-row code {
+    color: var(--app-text-primary);
+    word-break: break-all;
+    user-select: all;
+}
+
+.kosync-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--app-border);
+    border-radius: 5px;
+    background: var(--app-bg-sidebar);
+    color: var(--app-text-primary);
+    font-size: 0.8rem;
+}
+
+.kosync-actions {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.kosync-btn {
+    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--app-border);
+    border-radius: 5px;
+    background: none;
+    color: var(--app-text-primary);
+    font-size: 0.78rem;
+    cursor: pointer;
+}
+
+.kosync-btn-primary {
+    border-color: var(--app-accent);
+    background: var(--app-accent);
+    color: #fff;
+}
+
+.kosync-message {
+    margin: 0;
+    min-height: 1em;
+    color: var(--app-text-primary);
+}
+
+.kosync-message.is-error {
+    color: #f87171;
+}
+
+.kosync-hint {
+    margin: 0;
+    line-height: 1.45;
 }

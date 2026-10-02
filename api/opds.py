@@ -110,7 +110,9 @@ def _unauthorized():
 # Moon+ Reader가 다운로드 확인 후 재요청 시 인증 없이 요청하는 문제 해결
 # HMAC 서명 토큰을 URL에 포함하여 Basic Auth 없이도 파일 접근 허용
 
-_SIGN_SECRET = os.getenv('SIGN_SECRET', 'bookoasis-opds-sign-2026')
+# 서명 키: SIGN_SECRET → 앱 SECRET_KEY → 프로세스별 임의 값. 예전에는 공개 저장소에 적힌 고정 기본값을 써서
+# SIGN_SECRET을 따로 두지 않은 서버(문서화된 적 없음 = 사실상 전부)에서 누구나 다운로드 토큰을 만들 수 있었다.
+_SIGN_SECRET = os.getenv('SIGN_SECRET') or os.getenv('SECRET_KEY') or secrets.token_hex(32)
 _SIGN_TTL = 3600  # 1시간
 
 
@@ -208,7 +210,7 @@ def opds_root():
         {'id': 'urn:favorite', 'title': '즐겨찾기',
          'type': 'navigation', 'href': '/opds/favorite'},
     ])
-    xml = _opds_xml('general', "My Supporter OPDS Catalog", entries)
+    xml = _opds_xml('general', "BookOasis OPDS Catalog", entries)
     _set_cached_opds_response(cache_key, xml)
     return _atom_response(xml)
 
@@ -239,7 +241,7 @@ def opds_adult_root():
         {'id': 'urn:adult:favorite', 'title': '즐겨찾기',
          'type': 'navigation', 'href': '/opds-adult/favorite'},
     ])
-    xml = _opds_xml('adult', "My Supporter Adult OPDS Catalog", entries, is_adult=True)
+    xml = _opds_xml('adult', "BookOasis Adult OPDS Catalog", entries, is_adult=True)
     _set_cached_opds_response(cache_key, xml)
     return _atom_response(xml)
 
@@ -308,6 +310,9 @@ def opds_series_books(series_name: str, lib_id: str = 'all'):
             old = f'/opds/download/general/{book_id}"'
             new = f'/opds/download/general/{book_id}?token={token}"'
             xml = xml.replace(old, new)
+            # 페이지 스트리밍(OPDS-PSE) 링크도 같은 토큰 (앱이 페이지 요청에 인증을 싣지 않을 때 대비)
+            pse_old = f'/opds/pse/general/{book_id}/{{pageNumber}}"'
+            xml = xml.replace(pse_old, f'/opds/pse/general/{book_id}/{{pageNumber}}?token={token}"')
 
     return _atom_response(xml)
 
@@ -442,6 +447,42 @@ def opds_adult_favorite():
     return _atom_response(xml)
 
 
+def _download_token_user_id(db_type: str, book_id: int, token: str):
+    """검증된 다운로드 토큰에 든 사용자 id (실패하면 None)."""
+    if not token or not _verify_download_token(db_type, book_id, token):
+        return None
+    try:
+        return int(token.rsplit(':', 1)[-1])
+    except (TypeError, ValueError):
+        return None
+
+
+@opds_bp.route('/opds/pse/<string:db_type>/<int:book_id>/<int:page>', methods=['GET'])
+def opds_pse_page(db_type: str, book_id: int, page: int):
+    """OPDS-PSE 페이지 스트리밍: 만화 한 페이지 이미지 (page는 0부터). KOReader 등이 내려받지 않고 볼 때 쓴다.
+    웹 뷰어와 같은 추출 경로를 쓰며, 페이지를 보면 그 사용자의 읽은 위치도 기록된다."""
+    if db_type not in ('general', 'adult'):
+        return jsonify({'error': _t('api.err_book_not_found')}), 404
+    auth_user = _get_authenticated_user(is_adult=(db_type == 'adult'))
+    if auth_user:
+        user_id, role = auth_user.get('id', 0), auth_user.get('role')
+    else:
+        user_id = _download_token_user_id(db_type, book_id, request.args.get('token', ''))
+        if user_id is None:
+            return _unauthorized()
+        role = 'admin'  # 다운로드 토큰과 같은 규칙: 피드를 볼 수 있던 사용자에게만 발급된다
+
+    from services.app_opds_viewer_service import get_stream_page
+    result = get_stream_page(db_type, book_id, max(0, int(page)), user_id=user_id, role=role)
+    if result['status'] == 'book_not_found':
+        return jsonify({'error': _t('api.err_book_not_found')}), 404
+    if result['status'] != 'ok':
+        return jsonify({'error': _t('api.err_extract_page')}), 400
+    res = Response(result['img_data'], mimetype=result['mime_type'])
+    res.headers['Cache-Control'] = 'private, max-age=86400'
+    return res
+
+
 @opds_bp.route('/opds/download/<string:db_type>/<int:book_id>', methods=['GET'])
 def opds_download_book(db_type: str, book_id: int):
     """외부 뷰어 앱이 직접 파일을 다운로드하는 엔드포인트 (상세 디버그 로깅 포함)"""
@@ -514,6 +555,14 @@ def opds_download_book(db_type: str, book_id: int):
         etag_value = hashlib.md5(etag_raw.encode()).hexdigest()
     except Exception:
         etag_value = None
+
+    # KOReader 진행 동기화(kosync)용 문서 id(partial MD5)를 백그라운드로 계산해 이 도서와 이어 둔다.
+    # 앱이 지금 파일 전체를 내려받으므로 원격 드라이브 추가 부담이 없다.
+    try:
+        from services.kosync_service import remember_document_async
+        remember_document_async(db_type, book_id, file_path)
+    except Exception as kosync_err:
+        print(f"[OPDS-Debug] kosync document digest skipped: {kosync_err}")
 
     print(f"[OPDS-Debug] 🚀 파일 전송 준비 - mime_type={mime_type}, raw_filename='{filename}', ascii_filename='{ascii_filename}'")
     try:

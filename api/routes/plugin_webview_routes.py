@@ -456,6 +456,9 @@ def download_to_library():
         from database import get_db_path
         from tools.scanner.core import scan_library_path
         scan_library_path(get_db_path(db_type), library_id, dest_path, force=True)
+        # 큐를 거치지 않는 즉시 스캔이라 목록(시리즈 요약 테이블/캐시) 반영을 직접 한다
+        from services.scan_refresh_service import refresh_after_direct_scan
+        refresh_after_direct_scan(db_type)
     except Exception as e:
         result['scan_error'] = str(e)
 

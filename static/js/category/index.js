@@ -6,6 +6,7 @@ import { updateCurrentCategoryIndicator } from '../category_indicator.js';
 import { bindSidebarContextMenu } from './context_menu.js';
 import { triggerAddLibrary, triggerAddLibraryGroup } from './crud_controller.js';
 import { runAfterMobileSidebarClose } from '../sidebar_manager.js';
+import { normalizeCoverAspectRatio, resolveCoverAspectRatio } from '../utils/cover_ratio.js';
 
 // 고정 포함 전체 15개 이상부터 "더 보기" 버튼 노출
 const SIDEBAR_MORE_THRESHOLD = 15;
@@ -128,7 +129,7 @@ function renderLibraryItem(lib, isPinned) {
   const hideCover = Number(lib.hide_cover || 0) ? 1 : 0;
   const contentKind = escapeHtml(lib.content_kind || 'unspecified');
   const hideTitle = Number(lib.hide_title || 0) ? 1 : 0;
-  const coverAspectRatio = lib.cover_aspect_ratio === '16:9' ? '16:9' : '4:3';
+  const coverAspectRatio = normalizeCoverAspectRatio(lib.cover_aspect_ratio);
   const groupId = lib.group_id == null ? '' : String(lib.group_id);
   const safeGdriveCopyRemote = escapeHtml(lib.gdrive_copy_remote || '');
   const safeGdriveViewMirrorPath = escapeHtml(lib.gdrive_view_local_mirror_path || '');
@@ -728,7 +729,7 @@ export async function loadLibraries() {
       applySavedMixedOrder(sidebar);
       const activeItem = document.getElementById(`category-${state.currentLibraryId}`) || sidebar.querySelector(`[data-id="${state.currentLibraryId}"]`);
       state.currentLibraryHideCovers = !!(activeItem && activeItem.dataset && activeItem.dataset.type === 'custom' && activeItem.dataset.hideCover === '1');
-      state.currentLibraryAspectRatio = (activeItem && activeItem.dataset && activeItem.dataset.coverAspectRatio === '16:9') ? '16:9' : '4:3';
+      state.currentLibraryAspectRatio = resolveCoverAspectRatio(activeItem?.dataset, state.currentLibraryType);
       state.currentLibraryHideTitles = !!(activeItem && activeItem.dataset && activeItem.dataset.type === 'custom' && activeItem.dataset.hideTitle === '1');
       updateCurrentCategoryIndicator(state.currentLibraryId, activeItem);
       bindSidebarContextMenu();

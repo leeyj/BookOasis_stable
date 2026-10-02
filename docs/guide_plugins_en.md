@@ -29,7 +29,8 @@ This document describes the current plugin standard for BookOasis metadata/dashb
 | 1.0.9 | `search`, `apply` | `home_widget` | Added the actual home-dashboard widget contract, shown only when a user turns on "home dashboard plugin layout mode" (§5-1) |
 | 1.1.0 | `search`, `apply` | `detail_view` | Added a contract for replacing the entire book detail page body with a custom screen (single slot per session) |
 | 1.1.1 | `search`, `apply` | `dashboard.html`/`dashboard.css`/`dashboard.js` | `home_widget` can now use full custom CSS/images - rendered in a per-widget Shadow DOM for isolation (§5-1) |
-| 1.1.2+ (current, BookOasis 2.8.4+) | `search`, `apply` | `report_problem`, `resolve_problem` | Raise/resolve problem cards in the admin notifications - base-class helpers, additive contract (see "Admin Notification Problem Cards") |
+| 1.1.2 (BookOasis 2.8.4+) | `search`, `apply` | `report_problem`, `resolve_problem` | Raise/resolve problem cards in the admin notifications - base-class helpers, additive contract (see "Admin Notification Problem Cards") |
+| 1.1.3+ (current, BookOasis 2.8.4+) | `search`, `apply` | `lookup_music_album` | Look up album info for music-category albums without album.yaml - additive contract the core calls in the background (see "Music Album Lookup") |
 
 Compatibility rules:
 
@@ -1175,6 +1176,37 @@ raises a `token_expired` card (action required, [Reconnect]) and resolves it on 
 Background: `docs/plan_unified_notification_queue.md` section 3, "Decision: plugin problem card contract".
 
 ---
+
+### Music Album Lookup (`lookup_music_album`, optional)
+
+In audiobook-session categories with the **'music' kind**, when an album folder has no `album.yaml`, the core asks
+plugins that implement this contract for album info, in the background after scans. The plugin only looks it up;
+the core stores and displays it.
+
+```python
+def lookup_music_album(self, db_type, context):
+    # context = {'folder_name': '[2019] [정규] Momentary Sixth Sense [MQA]',
+    #            'artist': 'あいみょん',          # album artist from song tags ('' if unknown)
+    #            'track_titles': ['...', ...],    # the first few song titles
+    #            'track_count': 12}
+    return {'artist': 'Aimyon', 'year': '2019', 'genres': ['J-Pop'],
+            'cover_url': 'https://.../600x600bb.jpg', 'source_url': 'https://music.apple.com/...',
+            'summary': None}                      # only what you know; None if not found
+```
+
+| Item | Rule |
+| :--- | :--- |
+| Detection | Only enabled plugins that **override** the base-class default (which returns `None`) are called |
+| Targets | Music-category albums with no release date and no summary (= no album.yaml info). Compilations (no album artist + several song artists) are skipped without asking |
+| Pace | Every 10 minutes, up to 20 albums, **5 seconds between albums** (free APIs limit calls per minute) |
+| Once | The outcome (found / not found / skipped) is stored in `audiobook_music_lookups` and never asked again. If the plugin raises, nothing is stored and it is retried next round. With no plugin installed nothing is stored |
+| Display | Fills **only empty fields**: artist, summary, and cover (when there is neither a folder image nor embedded art). Never overwrites scan results |
+| Several plugins | The first plugin that returns a result wins (`source` stores its id) |
+| Failures | If the whole job fails, the admin notifications show it as a failed background task (music album lookup) |
+
+Example: `sample_plugins/metadata/music_itunes/music_itunes.py` — finds albums with the iTunes Search API (no key);
+Korean/Japanese artist names are matched against store spellings (앤디 → ANDY, あいみょん → Aimyon). Albums with the
+same title by another artist are rejected. The default store is US (the KR store returns no album results).
 
 ## 8. Activation Flow
 

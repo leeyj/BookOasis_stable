@@ -1,4 +1,5 @@
 // mini_player_ui.js - 미니 플레이어 UI/드래그/뷰 모드 전담
+import { getTrackCoverImage } from './track_cover.js';
 import { formatClockDuration } from '../utils/time.js';
 
 export function createMiniPlayerUiController(deps) {
@@ -745,8 +746,9 @@ export function createMiniPlayerUiController(deps) {
     }
 
     if (coverEl && coverPlaceholder) {
-      if (meta.cover_image) {
-        coverEl.src = meta.cover_image;
+      const coverImage = getTrackCoverImage(meta, track);
+      if (coverImage) {
+        if (coverEl.getAttribute('src') !== coverImage) coverEl.src = coverImage;
         coverEl.style.display = 'block';
         coverPlaceholder.style.display = 'none';
         coverEl.onerror = () => {

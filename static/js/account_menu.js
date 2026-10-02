@@ -1,5 +1,6 @@
-// account_menu.js – 상단 헤더의 계정 아이콘 팝오버(사용자명/로그아웃) 개폐 제어
+// account_menu.js – 상단 헤더의 계정 아이콘 팝오버(사용자명/KOReader 동기화/로그아웃) 개폐 제어
 // scan_activity_status.js의 팝오버 패턴을 그대로 재사용한다.
+import { initKosyncSettings } from './kosync_settings.js';
 
 function setAccountMenuOpen(open) {
   const button = document.getElementById('btn-account-menu');
@@ -27,7 +28,11 @@ function initAccountMenuPopover() {
 }
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initAccountMenuPopover);
+  document.addEventListener('DOMContentLoaded', () => {
+    initAccountMenuPopover();
+    initKosyncSettings();
+  });
 } else {
   initAccountMenuPopover();
+  initKosyncSettings();
 }

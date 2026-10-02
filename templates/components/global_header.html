@@ -129,6 +129,23 @@
                     <i class="fa-solid fa-circle-user" aria-hidden="true"></i>
                     <span id="session-username-display">-</span>
                 </div>
+                <!-- KOReader 진행 동기화(kosync): 동기화 비밀번호 설정 - static/js/kosync_settings.js -->
+                <button type="button" id="btn-kosync-settings" class="account-menu-item" aria-expanded="false" aria-controls="kosync-settings-panel">
+                    <i class="fa-solid fa-book-open-reader" aria-hidden="true"></i>
+                    <span>KOReader 동기화</span>
+                    <span id="kosync-status-badge" class="kosync-status-badge" hidden>켜짐</span>
+                </button>
+                <div id="kosync-settings-panel" class="kosync-settings" hidden>
+                    <div class="kosync-row"><span>서버</span><code id="kosync-server-url">-</code></div>
+                    <div class="kosync-row"><span>사용자명</span><code id="kosync-username">-</code></div>
+                    <input type="password" id="kosync-password" class="kosync-input" placeholder="동기화 비밀번호 (4자 이상)" autocomplete="new-password">
+                    <div class="kosync-actions">
+                        <button type="button" id="btn-kosync-save" class="kosync-btn kosync-btn-primary">저장</button>
+                        <button type="button" id="btn-kosync-clear" class="kosync-btn" hidden>해제</button>
+                    </div>
+                    <p id="kosync-message" class="kosync-message" aria-live="polite"></p>
+                    <p class="kosync-hint">KOReader → 진행 상황 동기화 → 사용자 지정 동기화 서버에 위 서버 주소, 로그인에 사용자명과 이 비밀번호를 넣으세요. BookOasis 로그인 비밀번호와 따로 정합니다. OPDS로 내려받은 책이 동기화됩니다.</p>
+                </div>
                 <a href="/logout" data-i18n-title="sidebar.logout_title" title="로그아웃" class="account-menu-logout">
                     <i class="fa-solid fa-power-off" aria-hidden="true"></i>
                     <span data-i18n="sidebar.logout_title">로그아웃</span>

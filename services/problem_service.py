@@ -46,7 +46,9 @@ CATALOG = {
     # 한 스캔에서 대량으로 사라졌는데 루트는 살아 있음 → 휴지통 이동을 보류하고 확인을 받는다.
     'mass_missing': {'severity': SEVERITY_ACTION_REQUIRED, 'actions': ['rescan', 'confirm_trash']},
     # 카테고리 루트/마운트 접근 불가 → 삭제 처리 전부 보류. 파괴적 조치는 제공하지 않는다.
-    'remote_unavailable': {'severity': SEVERITY_ACTION_REQUIRED, 'actions': ['rescan']},
+    # 네트워크 순단(수 초~수 분)마다 카드가 떴다 사라지는 일이 잦아, 끊긴 지 grace_sec가 지나도록
+    # 해제되지 않았을 때만 카드로 보여 준다. 기록과 삭제 보류는 즉시 그대로 일어난다.
+    'remote_unavailable': {'severity': SEVERITY_ACTION_REQUIRED, 'actions': ['rescan'], 'grace_sec': 600},
     'file_corrupt': {'severity': SEVERITY_NOTICE, 'actions': ['rescan']},
     'cover_missing': {'severity': SEVERITY_NOTICE, 'actions': ['rescan']},
     'metadata_invalid': {'severity': SEVERITY_AUTO_FIXED, 'actions': ['auto_fix']},
@@ -93,6 +95,7 @@ def catalog_entry(code):
     return {
         'severity': entry['severity'],
         'actions': list(entry['actions']),
+        'grace_sec': int(entry.get('grace_sec') or 0),
         'title_key': f'problems.code.{i18n_code}.title',
         'detail_key': f'problems.code.{i18n_code}.detail',
     }
@@ -229,19 +232,24 @@ class ProblemService:
     # ---- 카드 ----
     @staticmethod
     def list_cards(include_muted=False):
-        """열린 문제 카드 목록. 음소거된 카드는 그 뒤로 대상이 늘었을 때만 다시 보인다."""
+        """열린 문제 카드 목록. 음소거된 카드는 그 뒤로 대상이 늘었을 때만 다시 보인다.
+        유예 시간(grace_sec)이 있는 코드는 열린 지 그만큼 지나기 전엔 보이지 않는다(순단 무시)."""
         try:
             groups = ProblemRepository.list_groups()
         except Exception as e:
             print(f"[ProblemService] list_cards failed: {e}")
             return []
         cards = []
+        current_ms = now_ms()
         for g in groups:
             open_count = int(g.get('open_count') or 0)
             muted = bool(g.get('muted_ms')) and open_count <= int(g.get('muted_count') or 0)
             if muted and not include_muted:
                 continue
             entry = catalog_entry(g.get('code'))
+            first_seen_ms = int(g.get('first_seen_ms') or 0)
+            if entry['grace_sec'] and current_ms - first_seen_ms < entry['grace_sec'] * 1000:
+                continue
             plugin = _plugin_card_info(g) if str(g.get('source') or '').startswith('plugin:') else None
             if plugin:
                 # 플러그인 카드: 문구는 플러그인이 준 것, 조치는 플러그인 액션 RPC (6단계 계약)

@@ -19,6 +19,7 @@ if DBMS in ("mariadb", "mysql"):
         collection_repository,
         db_tuning_repository,
         gdrive_book_copy_repository,
+        kosync_repository,
         mcp_pending_changes_repository,
         metadata_repository,
         opds_repository,
@@ -47,6 +48,7 @@ else:
         collection_repository,
         db_tuning_repository,
         gdrive_book_copy_repository,
+        kosync_repository,
         mcp_pending_changes_repository,
         metadata_repository,
         opds_repository,
@@ -75,6 +77,7 @@ sys.modules['repositories.category_repository'] = category_repository
 sys.modules['repositories.collection_repository'] = collection_repository
 sys.modules['repositories.db_tuning_repository'] = db_tuning_repository
 sys.modules['repositories.gdrive_book_copy_repository'] = gdrive_book_copy_repository
+sys.modules['repositories.kosync_repository'] = kosync_repository
 sys.modules['repositories.mcp_pending_changes_repository'] = mcp_pending_changes_repository
 sys.modules['repositories.metadata_repository'] = metadata_repository
 sys.modules['repositories.opds_repository'] = opds_repository
