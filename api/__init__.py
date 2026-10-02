@@ -24,6 +24,7 @@ from api.routes.bookmark_routes import bookmark_bp
 from api.routes.plugin_webview_routes import plugin_webview_bp
 from api.routes.experimental_routes import experimental_bp
 from api.routes.tts_routes import tts_bp
+from api.routes.problem_routes import problem_bp
 
 # 통합 Blueprint (URL prefix 없음 – 각 모듈이 전체 경로를 직접 정의)
 api_bp = Blueprint('media_api', __name__)
@@ -47,3 +48,4 @@ api_bp.register_blueprint(plugin_webview_bp)
 api_bp.register_blueprint(experimental_bp)
 # 브라우저 TTS 듣기 위치 / 읽기↔듣기 위치 동기화
 api_bp.register_blueprint(tts_bp)
+api_bp.register_blueprint(problem_bp)

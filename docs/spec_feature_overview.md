@@ -108,3 +108,20 @@ tags: [spec, feature, technical]
   - 모듈 스코프 유실과 렌더링 지연을 예방하기 위해, 이벤트 리스너 내에서 keydown 감지 찰나에 로컬스토리지를 다이렉트 디코딩 매칭하는 아키텍처를 도입하여 새로고침 없이 즉석에서 바뀐 단축키가 동작하도록 설계했습니다.
 * **VIEW_LOG 환경변수 연동 프론트엔드 전역 몽키 패치**:
   - `.env`에 등록된 `VIEW_LOG` 변수를 Flask가 파싱하여 웹 렌더링 주소로 노출하며, 그 값이 `true`가 아닐 때 index.html 로딩 시점에 `console.log` 및 `console.warn` 객체를 빈 함수(Null-Function)로 덮어씌워 브라우저 로깅 과부하 및 콘솔 가독성을 대폭 최적화했습니다. (안전상의 이유로 console.error는 살려둠)
+
+---
+
+## 7. [NEW] 종합 알림센터와 문제 카드
+
+### 💡 개요
+스캔 진행/완료, 음성 미리 만들기, 시스템 경고, 파일 문제를 상단 🔔 하나에 모으고, 에러 문장 대신 **"무엇이 / 왜 / 뭘 누르면 되는지"**를 보여 주는 구조입니다.
+2026-09 사건(요약 테이블 재생성이 12일간 로그에만 실패를 남김)을 계기로 설계했습니다. 상세: [plan_unified_notification_queue.md](plan_unified_notification_queue.md).
+
+### 🛠️ 구현 메커니즘
+* **공통 항목 어댑터** (`services/notification_service.py`): 스캔 큐, `scan_history`(결과 요약 JSON), 음성 미리 만들기, 문제 카드를 한 형식으로 바꾸고 로그인 사용자 기준(audience)으로 걸러 `/api/system/status`의 `notifications[]`로 내려줍니다. 화면(`notification_render.js`)은 권한을 모릅니다.
+* **기록은 세밀하게, 알림은 묶어서** (`problem_occurrences`): 대상 1개 x 코드 1개 = 1행 UPSERT라 마운트 끊김으로 수만 건이 터져도 행 수는 대상 수로 고정됩니다. 카드는 문제 종류 x 카테고리로 묶고 안에서는 시리즈별로 접습니다.
+* **파괴적 조치 전 원인 점검** (`scan_problem_service.gate_deletions`): 루트/마운트 접근 불가면 삭제 동기화를 건너뛰고, 한 스캔에서 20% AND 20건 이상 사라지면 휴지통 이동을 보류해 관리자 확인을 받습니다.
+* **자동 해제와 음소거**: 다음 스캔에서 정상이면 행이 해결되고 개수가 0이 된 카드는 사라집니다. "알고 있음"은 그때 개수까지만 숨깁니다.
+* **[진단]과 사용자 신고**: 도서 1권 체크리스트(`book_diagnosis_service`, 파일 시스템 점검은 시간 제한), 뷰어 오류 자리의 [관리자에게 알리기](`user_report`).
+* **창구 둘**: 같은 서비스를 웹 화면과 MCP 도구(`list_problems`, `get_problem_card`, `diagnose_book`)가 함께 씁니다.
+* **플러그인 계약**: 플러그인은 `self.report_problem()` / `self.resolve_problem()`으로 자기 문제 카드를 올립니다(코드 네임스페이스·1,000건 상한·비활성화 시 정리, [guide_plugins.md](guide_plugins.md)).

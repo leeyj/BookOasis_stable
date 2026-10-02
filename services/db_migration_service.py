@@ -623,6 +623,36 @@ _SCHEMA_SQL = """
         decision_note TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS problem_occurrences (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        code TEXT NOT NULL,
+        severity TEXT NOT NULL DEFAULT 'notice',
+        source TEXT NOT NULL DEFAULT 'system',
+        db_type TEXT NOT NULL DEFAULT 'general',
+        library_id INTEGER DEFAULT NULL,
+        target_type TEXT NOT NULL,
+        target_id TEXT NOT NULL,
+        target_path TEXT,
+        series_key TEXT,
+        group_key TEXT NOT NULL,
+        title TEXT,
+        detail TEXT,
+        message TEXT,
+        context TEXT,
+        occurrence_count INTEGER NOT NULL DEFAULT 1,
+        first_seen_ms INTEGER NOT NULL,
+        last_seen_ms INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'open',
+        resolved_ms INTEGER DEFAULT NULL,
+        UNIQUE(code, db_type, target_type, target_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS problem_groups (
+        group_key TEXT PRIMARY KEY,
+        muted_ms INTEGER DEFAULT NULL,
+        muted_count INTEGER NOT NULL DEFAULT 0
+    );
+
     CREATE TABLE IF NOT EXISTS scanner_progress (
         library_id TEXT,
         folder_path TEXT PRIMARY KEY
@@ -644,6 +674,7 @@ _SCHEMA_SQL = """
         started_at TEXT,
         finished_at TEXT,
         error_message TEXT,
+        result_summary TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -735,6 +766,10 @@ _INDEXES_SQL = """
     CREATE INDEX IF NOT EXISTS idx_tts_audio_books_last_used ON tts_audio_books(last_used_ms);
     CREATE INDEX IF NOT EXISTS idx_tts_audio_pieces_key ON tts_audio_pieces(piece_key);
     CREATE INDEX IF NOT EXISTS idx_mcp_pending_changes_status ON mcp_pending_changes(status);
+    CREATE INDEX IF NOT EXISTS idx_problem_occurrences_status_group ON problem_occurrences(status, group_key);
+    CREATE INDEX IF NOT EXISTS idx_problem_occurrences_last_seen ON problem_occurrences(last_seen_ms);
+    CREATE INDEX IF NOT EXISTS idx_problem_occurrences_target ON problem_occurrences(db_type, target_type, target_id);
+    CREATE INDEX IF NOT EXISTS idx_problem_occurrences_library ON problem_occurrences(db_type, library_id);
     CREATE INDEX IF NOT EXISTS idx_audiobook_tracks_audiobook_id ON audiobook_tracks(audiobook_id);
     CREATE INDEX IF NOT EXISTS idx_audiobook_track_progress_lookup ON audiobook_track_progress(audiobook_id, user_id, track_id);
     CREATE INDEX IF NOT EXISTS idx_audiobooks_library_id ON audiobooks(library_id);
@@ -1124,6 +1159,70 @@ def _backfill_books_created_at(conn, cursor, db_type):
         print(f"[DB-Migration ERROR] {db_type} books.created_at backfill failed: {created_backfill_err}")
 
 
+def _migrate_system_health_settings(conn, cursor, db_type):
+    """settings의 SYSTEM_HEALTH_<key> 행(예전 SystemHealthService 저장소)을 problem_occurrences로 옮기고 지운다.
+
+    실패 중이던 항목만 옮긴다 - 정상(ok) 기록은 새 저장소에선 '열린 행 없음'과 같다."""
+    if db_type != 'general':
+        return
+    try:
+        import json
+        from services.system_health_service import LEGACY_SETTINGS_PREFIX, SystemHealthService
+        cursor.execute("SELECT `key`, `value` FROM settings WHERE `key` LIKE 'SYSTEM%'")
+        rows = [(r[0], r[1]) if not hasattr(r, 'keys') else (r['key'], r['value']) for r in cursor.fetchall()]
+        rows = [(k, v) for k, v in rows if str(k).startswith(LEGACY_SETTINGS_PREFIX)]
+        if not rows:
+            return
+        moved = 0
+        for full_key, raw in rows:
+            try:
+                record = json.loads(raw) if raw else {}
+            except (TypeError, ValueError):
+                record = {}
+            if record.get('status') == 'failed':
+                key = full_key[len(LEGACY_SETTINGS_PREFIX):]
+                if not SystemHealthService.record_failure(key, record.get('label') or key, record.get('message') or ''):
+                    # 새 테이블에 못 옮겼으면 원본을 지우지 않는다 (다음 시작 때 다시 시도).
+                    print("[DB-Migration] system health settings migration deferred: problem table not writable")
+                    return
+                moved += 1
+        for full_key, _raw in rows:
+            cursor.execute("DELETE FROM settings WHERE `key` = ?", (full_key,))
+        conn.commit()
+        print(f"[DB-Migration] system health settings -> problem_occurrences: {moved} moved, {len(rows)} settings rows removed")
+    except Exception as e:
+        print(f"[DB-Migration ERROR] system health settings migration failed: {e}")
+
+
+def _purge_resolved_problems(db_type):
+    """해결된 지 30일 지난 문제 기록을 정리한다 (서버 시작 시 1회 - 스캔 경로를 무겁게 하지 않는다)."""
+    if db_type != 'general':
+        return
+    try:
+        from services.problem_service import ProblemService
+        deleted = ProblemService.purge_resolved()
+        if deleted:
+            print(f"[DB-Migration] purged resolved problem rows: {deleted}")
+    except Exception as e:
+        print(f"[DB-Migration ERROR] resolved problem purge failed: {e}")
+
+
+def _purge_old_scan_history(db_type):
+    """90일 지난 scan_history 행을 정리한다 (예전엔 정리 로직이 없어 계속 쌓였다). 서버 시작 시 1회."""
+    if db_type != 'general':
+        return
+    try:
+        from repositories.scanner_queue_repository import ScannerQueueRepository
+        deleted = ScannerQueueRepository.purge_scan_history(SCAN_HISTORY_RETENTION_DAYS)
+        if deleted:
+            print(f"[DB-Migration] purged old scan_history rows: {deleted}")
+    except Exception as e:
+        print(f"[DB-Migration ERROR] scan_history purge failed: {e}")
+
+
+SCAN_HISTORY_RETENTION_DAYS = 90
+
+
 def _rebuild_series_summary_if_needed(conn, db_type):
     """시리즈 요약 테이블(series_summary)이 아직 준비 안 됐으면 최초 1회 생성한다.
 
@@ -1469,6 +1568,9 @@ def run_full_migration():
         if db_type == 'video' and not database.is_mariadb_mode():
             _backfill_html_entities_video_titles_sqlite(conn)
         _backfill_books_created_at(conn, cursor, db_type)
+        _migrate_system_health_settings(conn, cursor, db_type)
+        _purge_resolved_problems(db_type)
+        _purge_old_scan_history(db_type)
         _rebuild_series_summary_if_needed(conn, db_type)
 
         conn.close()

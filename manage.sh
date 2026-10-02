@@ -11,6 +11,8 @@ PID_FILE="$APP_DIR/media_server.pid"
 WORKER_PID_FILE="$APP_DIR/media_server_worker.pid"
 LOG_FILE="$APP_DIR/logs/media_server_startup.log"
 WORKER_LOG_FILE="$APP_DIR/logs/media_server_worker_startup.log"
+# 워커 재시작 루프(tools/scanner_worker_supervisor.sh)를 멈추라는 표시 - stop이 만들고 start가 지운다
+WORKER_STOP_FLAG="$APP_DIR/.scanner_worker.stop"
 
 FORCE_RESTART="false"
 for arg in "$@"; do
@@ -176,15 +178,22 @@ start() {
         fi
     fi
 
-    echo "[*] 스캐너 워커 구동을 시작합니다..."
+    # 재시작 루프가 이미 돌고 있으면(워커가 막 죽어 다시 뜨는 중) 루프를 하나 더 만들지 않는다
+    if [ -n "$(find_pids_by_pattern "tools/scanner_worker_supervisor.sh")" ]; then
+        echo "[*] 스캐너 워커 재시작 루프가 이미 실행 중입니다."
+        return 0
+    fi
+
+    echo "[*] 스캐너 워커 구동을 시작합니다... (죽으면 3초 뒤 자동 재시작)"
+    rm -f "$WORKER_STOP_FLAG" "$WORKER_PID_FILE"
     # setsid로 새 세션/프로세스 그룹을 만들어 gunicorn과 분리한다.
     # (같은 그룹에 있으면 gunicorn의 --max-requests 워커 재활용 시 신호가
     #  이 그룹의 자식인 lazy_scanner.py까지 새어 들어가 중간에 죽는 문제가 있었다)
-    nohup setsid env PYTHONUNBUFFERED=1 python3 tools/scanner_worker.py > "$WORKER_LOG_FILE" 2>&1 &
-    W_NEW_PID=$!
-    echo "$W_NEW_PID" > "$WORKER_PID_FILE"
-    
+    # 재시작 루프는 tools/scanner_worker_supervisor.sh - PID 파일에는 루프가 아니라 실제 워커 PID가 적힌다.
+    nohup setsid env PYTHONUNBUFFERED=1 WORKER_PID_FILE="$WORKER_PID_FILE" WORKER_STOP_FLAG="$WORKER_STOP_FLAG"         bash tools/scanner_worker_supervisor.sh > "$WORKER_LOG_FILE" 2>&1 &
+
     sleep 2
+    W_NEW_PID=$(cat "$WORKER_PID_FILE" 2>/dev/null)
     if check_pid_alive "$W_NEW_PID"; then
         echo "[+] 스캐너 워커 구동 성공! (PID: $W_NEW_PID)"
     else
@@ -231,6 +240,9 @@ stop() {
     # ───────────────────────────────────────────────────────────────────
     echo "[*] 미디어 서버 프로세스를 모두 검출하여 안전한 순서(스캐너 워커 -> 레이지 스캐너 -> 웹서버)로 정리합니다..."
     
+    # 0. 워커 재시작 루프가 워커를 다시 띄우지 않도록 먼저 표시한다 (루프는 워커가 끝나면 스스로 종료)
+    touch "$WORKER_STOP_FLAG"
+
     # 1. 스캐너 워커 프로세스 정리 (DB 커넥션 안전 마감 1순위)
     if [ -f "$WORKER_PID_FILE" ]; then
         W_PID=$(cat "$WORKER_PID_FILE")

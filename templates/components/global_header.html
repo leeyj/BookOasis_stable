@@ -77,25 +77,27 @@
         </button>
         <div class="scan-activity-wrap">
             <button id="btn-scan-activity" class="btn-scan-activity" type="button"
-                aria-label="스캔 활동" aria-expanded="false" aria-controls="scan-activity-popover"
-                title="스캔 활동">
-                <i class="fa-solid fa-wave-square" aria-hidden="true"></i>
+                aria-label="알림" aria-expanded="false" aria-controls="scan-activity-popover"
+                title="알림">
+                <i class="fa-solid fa-bell" aria-hidden="true"></i>
                 <span id="scan-activity-indicator" class="scan-activity-indicator" aria-hidden="true"></span>
             </button>
             <section id="scan-activity-popover" class="scan-activity-popover" hidden aria-live="polite">
                 <header class="scan-activity-header">
                     <div>
-                        <strong>스캔 활동</strong>
+                        <strong data-i18n="notify.title">알림</strong>
                         <span id="scan-activity-summary">대기 중</span>
                     </div>
+                    <button id="btn-clear-notifications" class="scan-activity-clear" type="button" hidden
+                        data-i18n="notify.clear" data-i18n-title="notify.clear_hint" title="완료 기록을 지우고 참고 알림을 '알고 있음'으로 둡니다">지우기</button>
                     <button id="btn-close-scan-activity" type="button" aria-label="닫기" title="닫기">
                         <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                     </button>
                 </header>
                 <div id="scan-activity-list" class="scan-activity-list">
                     <div class="scan-activity-empty">
-                        <i class="fa-regular fa-circle-check" aria-hidden="true"></i>
-                        <span>진행 중인 스캔이 없습니다.</span>
+                        <i class="fa-regular fa-bell" aria-hidden="true"></i>
+                        <span data-i18n="notify.empty">새 알림이 없습니다.</span>
                     </div>
                 </div>
             </section>

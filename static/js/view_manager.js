@@ -1,6 +1,7 @@
 // view_manager.js – 화면(뷰) 상태 제어 및 렌더링 영역 전환 매니저
 import { state } from './state.js';
 import { mountIndexScrollbar, unmountIndexScrollbar } from './index_scrollbar.js';
+import { clearViewerReportAction, showViewerReportAction } from './viewer/report_problem.js';
 
 /**
  * ────────────────────────────────────────────────────────
@@ -133,6 +134,7 @@ export function showViewerLoading(message = i18n.t("viewer.loading_title_default
     }
     if (closeBtn) closeBtn.style.display = 'none'; // 로딩 중에는 닫기 버튼 가림
   }
+  clearViewerReportAction();
 }
 
 export function hideViewerLoading() {
@@ -140,6 +142,7 @@ export function hideViewerLoading() {
   if (overlay) {
     overlay.style.display = 'none';
   }
+  clearViewerReportAction();
 }
 
 export function showViewerError(message = i18n.t("viewer.error_title_default"), subMessage = i18n.t("viewer.error_sub_default")) {
@@ -159,6 +162,8 @@ export function showViewerError(message = i18n.t("viewer.error_title_default"), 
     }
     if (closeBtn) closeBtn.style.display = 'block'; // 에러 시 닫기 버튼 활성화
   }
+  // 오류 자리에 한 줄 조치: 일반 사용자 [관리자에게 알리기] / 관리자 [진단]
+  showViewerReportAction(message, subMessage);
 }
 
 /**
@@ -167,8 +172,10 @@ export function showViewerError(message = i18n.t("viewer.error_title_default"), 
  * ────────────────────────────────────────────────────────
  * @param {string} message - 토스트 노출 메시지
  * @param {string} type - 'success' | 'error' | 'info'
+ * @param {{actionLabel?: string, onAction?: Function, duration?: number}} [options]
+ *        actionLabel+onAction를 주면 토스트 오른쪽에 버튼 하나(예: 되돌리기)를 붙인다.
  */
-export function showToast(message, type = 'success') {
+export function showToast(message, type = 'success', options = {}) {
   let container = document.getElementById('toast-container');
   if (!container) {
     container = document.createElement('div');
@@ -212,6 +219,25 @@ export function showToast(message, type = 'success') {
   }
 
   container.innerHTML = `${iconHtml} <span>${message}</span>`;
+  const hasAction = Boolean(options && options.actionLabel && typeof options.onAction === 'function');
+  // 평소엔 클릭이 토스트를 통과하지만, 버튼이 있을 때만 눌릴 수 있게 한다.
+  container.style.pointerEvents = hasAction ? 'auto' : 'none';
+  if (hasAction) {
+    const actionBtn = document.createElement('button');
+    actionBtn.type = 'button';
+    actionBtn.textContent = options.actionLabel;
+    actionBtn.style.cssText = 'margin-left:0.4rem; padding:0.2rem 0.7rem; border-radius:999px; border:1px solid rgba(168, 85, 247, 0.6); background:transparent; color:inherit; font:inherit; font-size:0.82rem; cursor:pointer;';
+    actionBtn.addEventListener('click', event => {
+      event.stopPropagation();
+      if (window.toastTimer) clearTimeout(window.toastTimer);
+      window.toastTimer = null;
+      container.style.opacity = '0';
+      container.style.transform = 'translateX(-50%) translateY(20px)';
+      container.style.pointerEvents = 'none';
+      options.onAction();
+    });
+    container.appendChild(actionBtn);
+  }
   container.style.opacity = '0';
   container.style.transform = 'translateX(-50%) translateY(20px)';
   
@@ -223,11 +249,13 @@ export function showToast(message, type = 'success') {
     });
   });
 
-  // 3초 뒤 비활성화
+  // 3초 뒤 비활성화 (버튼이 있으면 누를 시간을 더 준다)
+  const duration = Number(options && options.duration) || (hasAction ? 6000 : 3000);
   window.toastTimer = setTimeout(() => {
     container.style.opacity = '0';
     container.style.transform = 'translateX(-50%) translateY(20px)';
-  }, 3000);
+    container.style.pointerEvents = 'none';
+  }, duration);
 }
 
 // 글로벌 노출

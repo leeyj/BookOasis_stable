@@ -500,6 +500,40 @@ CREATE TABLE IF NOT EXISTS mcp_pending_changes (
     INDEX idx_mcp_pending_changes_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
+CREATE TABLE IF NOT EXISTS problem_occurrences (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(150) NOT NULL,
+    severity VARCHAR(30) NOT NULL DEFAULT 'notice',
+    source VARCHAR(150) NOT NULL DEFAULT 'system',
+    db_type VARCHAR(20) NOT NULL DEFAULT 'general',
+    library_id BIGINT DEFAULT NULL,
+    target_type VARCHAR(20) NOT NULL,
+    target_id VARCHAR(255) NOT NULL,
+    target_path TEXT,
+    series_key TEXT,
+    group_key VARCHAR(255) NOT NULL,
+    title TEXT,
+    detail TEXT,
+    message TEXT,
+    context TEXT,
+    occurrence_count INT NOT NULL DEFAULT 1,
+    first_seen_ms BIGINT NOT NULL,
+    last_seen_ms BIGINT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'open',
+    resolved_ms BIGINT DEFAULT NULL,
+    UNIQUE KEY uq_problem_occurrences_target (code, db_type, target_type, target_id),
+    INDEX idx_problem_occurrences_status_group (status, group_key),
+    INDEX idx_problem_occurrences_last_seen (last_seen_ms),
+    INDEX idx_problem_occurrences_target (db_type, target_type, target_id),
+    INDEX idx_problem_occurrences_library (db_type, library_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS problem_groups (
+    group_key VARCHAR(255) PRIMARY KEY,
+    muted_ms BIGINT DEFAULT NULL,
+    muted_count INT NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
 CREATE TABLE IF NOT EXISTS scan_history (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     task_type VARCHAR(100) NOT NULL,
@@ -510,6 +544,7 @@ CREATE TABLE IF NOT EXISTS scan_history (
     started_at VARCHAR(50),
     finished_at VARCHAR(50),
     error_message TEXT,
+    result_summary TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 

@@ -6,6 +6,25 @@ import datetime
 import json
 import database
 
+def _summary_json(result_summary):
+    """작업 결과 요약(dict) → scan_history.result_summary JSON 문자열. 없으면 NULL."""
+    if not result_summary:
+        return None
+    try:
+        return json.dumps(result_summary, ensure_ascii=False)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_summary(raw):
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except (TypeError, ValueError):
+        return None
+
+
 class ScannerQueueRepository:
     @staticmethod
     def startup_cleanup_ghost_tasks():
@@ -525,7 +544,7 @@ class ScannerQueueRepository:
             conn.close()
 
     @staticmethod
-    def record_scan_history(task_type, task_key, status, kwargs_str, enqueue_at, started_at, finished_at, error_message=None):
+    def record_scan_history(task_type, task_key, status, kwargs_str, enqueue_at, started_at, finished_at, error_message=None, result_summary=None):
         """독립된 scan_history 영구 이력 테이블에 스캔 결과 기록"""
         conn = database.get_connection('general')
         cursor = conn.cursor()
@@ -533,10 +552,10 @@ class ScannerQueueRepository:
             cursor.execute("PRAGMA busy_timeout = 10000;")
             cursor.execute(
                 """
-                INSERT INTO scan_history (task_type, task_key, status, kwargs, enqueue_at, started_at, finished_at, error_message)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO scan_history (task_type, task_key, status, kwargs, enqueue_at, started_at, finished_at, error_message, result_summary)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (task_type, task_key, status, kwargs_str, enqueue_at, started_at, finished_at, error_message)
+                (task_type, task_key, status, kwargs_str, enqueue_at, started_at, finished_at, error_message, _summary_json(result_summary))
             )
             conn.commit()
         except Exception as e:
@@ -548,10 +567,10 @@ class ScannerQueueRepository:
                     conn.commit()
                     cursor.execute(
                         """
-                        INSERT INTO scan_history (task_type, task_key, status, kwargs, enqueue_at, started_at, finished_at, error_message)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO scan_history (task_type, task_key, status, kwargs, enqueue_at, started_at, finished_at, error_message, result_summary)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
-                        (task_type, task_key, status, kwargs_str, enqueue_at, started_at, finished_at, error_message)
+                        (task_type, task_key, status, kwargs_str, enqueue_at, started_at, finished_at, error_message, _summary_json(result_summary))
                     )
                     conn.commit()
                     return
@@ -563,7 +582,7 @@ class ScannerQueueRepository:
             conn.close()
 
     @staticmethod
-    def update_task_result(task_id, finished_str, error_message=None):
+    def update_task_result(task_id, finished_str, error_message=None, result_summary=None):
         """스캔 성공(completed) 또는 실패(failed) 상태 기록 및 영구 scan_history 이력 저장"""
         conn = database.get_connection('general')
         cursor = conn.cursor()
@@ -588,7 +607,8 @@ class ScannerQueueRepository:
             if row:
                 ScannerQueueRepository.record_scan_history(
                     row['task_type'], row['task_key'], status, row['kwargs'],
-                    row['enqueue_at'], row['started_at'], finished_str, error_message
+                    row['enqueue_at'], row['started_at'], finished_str, error_message,
+                    result_summary=result_summary
                 )
 
             # 스캔 완료/실패 후 영구 이력 저장이 끝났으므로 대기열 테이블에서 해당 태스크 완전 삭제 (100% 큐 Clean)
@@ -599,6 +619,45 @@ class ScannerQueueRepository:
         except Exception as e:
             conn.rollback()
             raise e
+        finally:
+            conn.close()
+
+    @staticmethod
+    def fetch_recent_history(limit=200):
+        """알림센터 "최근 완료"용: 최근 종료된 작업 이력 (요약 포함, 최신순)."""
+        conn = database.get_connection('general')
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                """
+                SELECT id, task_type, task_key, status, kwargs, started_at, finished_at, error_message, result_summary
+                FROM scan_history
+                WHERE finished_at IS NOT NULL
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (max(1, int(limit)),),
+            )
+            rows = [dict(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()
+        for row in rows:
+            row['result_summary'] = _parse_summary(row.get('result_summary'))
+        return rows
+
+    @staticmethod
+    def purge_scan_history(days=90):
+        """오래된 scan_history 행을 지운다 (알림센터는 7일만 보지만 이력은 90일 보관). 지운 행 수를 돌려준다."""
+        conn = database.get_connection('general')
+        cursor = conn.cursor()
+        try:
+            cursor.execute("DELETE FROM scan_history WHERE created_at < datetime('now', ?)", (f'-{int(days)} days',))
+            deleted = cursor.rowcount or 0
+            conn.commit()
+            return deleted
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             conn.close()
 
@@ -634,7 +693,7 @@ class ScannerQueueRepository:
         try:
             cursor_gen.execute(
                 """
-                SELECT id, task_type, task_key, status, kwargs, enqueue_at, started_at, finished_at, error_message
+                SELECT id, task_type, task_key, status, kwargs, enqueue_at, started_at, finished_at, error_message, result_summary
                 FROM scan_history
                 WHERE task_type != 'lazy_scan'
                 ORDER BY id DESC
@@ -683,6 +742,7 @@ class ScannerQueueRepository:
                 item['library_id'] = library_id
                 item['library_name'] = library_name
                 item['trigger_type'] = trigger_type
+                item['result_summary'] = _parse_summary(item.get('result_summary'))
                 history.append(item)
 
             return history

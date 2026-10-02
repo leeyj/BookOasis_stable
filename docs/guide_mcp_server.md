@@ -99,6 +99,9 @@ mcp dev tools/mcp_server.py
 | `find_missing_genre_and_tags` | 장르·태그가 모두 비어있는 도서 목록 |
 | `find_missing_offsets` | 페이지 오프셋 캐시가 없어 재스캔이 필요한 zip/cbz 도서 목록 (rclone/GDrive 등 원격 마운트 파일은 자동 제외) |
 | `find_duplicate_series` | 동일한 시리즈명이 서로 다른 카테고리 2곳 이상에 흩어진 케이스 |
+| `list_problems` | 알림센터의 열린 문제 카드 목록 (파일 없음·대량 사라짐 보류·원격 드라이브 끊김·파일 손상·백그라운드 작업 실패·사용자 신고·플러그인 문제 등, 플러그인 카드는 `plugin`에 이름/제목/설명) |
+| `get_problem_card` | 문제 카드 하나의 시리즈별 내역, `series_key`를 주면 그 시리즈의 도서 목록 |
+| `diagnose_book` | 도서 1권 진단: DB 기록 / 원격 연결 / 파일 존재 / 파일 형식 체크리스트와 원인·권장 조치 (읽기 전용) |
 | `get_version` | 실행 중인 BookOasis 버전(VERSION 파일 기준) 조회 |
 | `run_readonly_query` | 서재 DB에 읽기 전용(SELECT/WITH/EXPLAIN/PRAGMA/SHOW/DESCRIBE) SQL을 직접 실행 |
 | `read_logs` | `logs/` 폴더의 서버 로그를 끝에서부터 최근 N줄 조회 (검색어 필터 지원) |

@@ -11,40 +11,32 @@ system_health_service.py – 백그라운드 작업의 "계속 실패 중" 상�
     with SystemHealthService.track('series_summary:general', '시리즈 목록 갱신 (일반 도서)'):
         do_work()          # 예외는 그대로 다시 올라간다 - 호출측 동작은 바뀌지 않음
 
-저장소는 settings 테이블(SYSTEM_HEALTH_<key>)이다 - 스캐너 워커는 웹과 별개 OS 프로세스라
-메모리/Redis(미설정 배포 존재)로는 공유가 보장되지 않는다.
+저장소는 문제 기록 테이블(problem_occurrences, target_type='system')이다 - 스캐너 워커는 웹과
+별개 OS 프로세스라 메모리/Redis(미설정 배포 존재)로는 공유가 보장되지 않는다.
+(2026-10 이전에는 settings의 SYSTEM_HEALTH_<key> 행이었다 - 마이그레이션 때 옮기고 지운다.)
 """
-import json
 import time
 from contextlib import contextmanager
-from datetime import datetime
 
-from repositories.settings_repository import SettingsRepository
+from services.problem_service import (
+    CODE_SYSTEM_TASK_FAILED,
+    SEVERITY_ACTION_REQUIRED,
+    ProblemService,
+    make_group_key,
+    to_iso,
+)
 
-_KEY_PREFIX = 'SYSTEM_HEALTH_'
-_MESSAGE_MAX_LEN = 300
-# /api/system/status는 2초마다 폴링되므로 settings 조회를 짧게 캐시한다.
+LEGACY_SETTINGS_PREFIX = 'SYSTEM_HEALTH_'
+_TARGET_TYPE = 'system'
+_GROUP_KEY = make_group_key(CODE_SYSTEM_TASK_FAILED, 'general')
+# /api/system/status는 2초마다 폴링되므로 조회를 짧게 캐시한다.
 _ACTIVE_CACHE_TTL = 15.0
 _active_cache = {'at': 0.0, 'items': []}
 
 
-def _now_str():
-    # 타임존 오프셋을 붙여 저장한다(예: 2026-09-29T13:17:34+00:00). 서버가 UTC로 도는 환경에서
-    # 오프셋 없는 문자열을 내려주면 브라우저가 로컬(KST) 시각으로 읽어 "N시간 전"이 9시간 어긋났다.
-    return datetime.now().astimezone().isoformat(timespec='seconds')
-
-
-def _load(key):
-    try:
-        raw = SettingsRepository.get_value(_KEY_PREFIX + key)
-        return json.loads(raw) if raw else {}
-    except Exception:
-        return {}
-
-
-def _save(key, record):
-    SettingsRepository.set_value(_KEY_PREFIX + key, json.dumps(record, ensure_ascii=False))
-    _active_cache['at'] = 0.0
+# 전용 스캐너 워커 운영에서 워커가 없을 때 (core.ensure_scanner_worker_running이 기록, 워커가 시작하면 해제)
+DEDICATED_WORKER_HEALTH_KEY = 'scanner_worker:dedicated'
+DEDICATED_WORKER_HEALTH_LABEL = '스캐너 워커 (전용 프로세스)'
 
 
 def series_summary_health_key(db_type):
@@ -68,39 +60,20 @@ class SystemHealthService:
 
     @staticmethod
     def record_failure(key, label, error):
-        """작업 실패를 기록한다. 연속 실패 횟수와 최초 실패 시각을 유지한다."""
-        try:
-            record = _load(key)
-            now = _now_str()
-            if record.get('status') != 'failed':
-                record['first_failed_at'] = now
-                record['fail_count'] = 0
-            record.update({
-                'status': 'failed',
-                'label': str(label),
-                'last_failed_at': now,
-                'fail_count': int(record.get('fail_count') or 0) + 1,
-                'message': str(error)[:_MESSAGE_MAX_LEN],
-            })
-            _save(key, record)
-        except Exception as e:
-            print(f"[SystemHealth] record_failure '{key}' failed: {e}")
+        """작업 실패를 기록한다. 연속 실패 횟수(해결 후 재발 시 1부터)와 최초 실패 시각을 유지한다."""
+        ok = ProblemService.report(
+            CODE_SYSTEM_TASK_FAILED, _TARGET_TYPE, key,
+            db_type='general', severity=SEVERITY_ACTION_REQUIRED, source='system',
+            title=str(label), message=str(error), group_key=_GROUP_KEY,
+        )
+        _active_cache['at'] = 0.0
+        return ok
 
     @staticmethod
     def record_success(key):
-        """작업 성공을 기록한다. 실패 상태였다면 경고가 자동으로 사라진다."""
-        try:
-            record = _load(key)
-            if not record:
-                # 한 번도 실패한 적 없는 작업은 성공할 때마다 settings에 쓸 필요가 없다.
-                return
-            _save(key, {
-                'status': 'ok',
-                'label': record.get('label', ''),
-                'last_ok_at': _now_str(),
-            })
-        except Exception as e:
-            print(f"[SystemHealth] record_success '{key}' failed: {e}")
+        """작업 성공을 기록한다. 실패 상태였다면 경고가 자동으로 사라진다(열린 행이 없으면 쓰기 없음)."""
+        if ProblemService.resolve(CODE_SYSTEM_TASK_FAILED, _TARGET_TYPE, key, db_type='general'):
+            _active_cache['at'] = 0.0
 
     @staticmethod
     def get_active_warnings():
@@ -109,26 +82,16 @@ class SystemHealthService:
         if now - _active_cache['at'] < _ACTIVE_CACHE_TTL:
             return _active_cache['items']
         items = []
-        try:
-            rows = SettingsRepository.get_settings_by_prefix(_KEY_PREFIX)
-            for full_key, raw in sorted(rows.items()):
-                try:
-                    record = json.loads(raw) if raw else {}
-                except (TypeError, ValueError):
-                    continue
-                if record.get('status') != 'failed':
-                    continue
-                items.append({
-                    'key': full_key[len(_KEY_PREFIX):],
-                    'label': record.get('label') or full_key[len(_KEY_PREFIX):],
-                    'message': record.get('message', ''),
-                    'first_failed_at': record.get('first_failed_at', ''),
-                    'last_failed_at': record.get('last_failed_at', ''),
-                    'fail_count': int(record.get('fail_count') or 0),
-                    'last_ok_at': record.get('last_ok_at', ''),
-                })
-        except Exception as e:
-            print(f"[SystemHealth] get_active_warnings failed: {e}")
+        for row in ProblemService.list_open(target_type=_TARGET_TYPE, code=CODE_SYSTEM_TASK_FAILED):
+            items.append({
+                'key': row['target_id'],
+                'label': row.get('title') or row['target_id'],
+                'message': row.get('message') or '',
+                'first_failed_at': to_iso(row.get('first_seen_ms')),
+                'last_failed_at': to_iso(row.get('last_seen_ms')),
+                'fail_count': int(row.get('occurrence_count') or 0),
+                'last_ok_at': to_iso(row.get('resolved_ms')),
+            })
         _active_cache['at'] = now
         _active_cache['items'] = items
         return items

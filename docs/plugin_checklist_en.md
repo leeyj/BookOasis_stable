@@ -105,6 +105,7 @@ Checklist:
 - Check for import errors.
 - Make sure class names and file names match discovery rules.
 - Avoid duplicate `id` values.
+- For failures the admin needs to know about (expired token, API quota, ...), don't just log: raise a notification problem card with `self.report_problem()` and close it with `self.resolve_problem()` on success (feature-detect with `hasattr`; see "Admin Notification Problem Cards" in [guide_plugins_en.md](guide_plugins_en.md)).
 - Do not commit `__pycache__` in plugin folders.
 
 Common failure cases:

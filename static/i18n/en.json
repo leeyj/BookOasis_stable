@@ -334,7 +334,7 @@
     "section_libraries": "Libraries",
     "admin_tools": "Admin tools",
     "add_group": "Add group",
-    "scan_activity": "Activity",
+    "scan_activity": "Notifications",
     "account": "Account"
   },
   "smart_recommend": {
@@ -433,6 +433,7 @@
     "ticker_default_msg": "Background task is currently running."
   },
   "context_menu": {
+    "diagnose": "Diagnose (file & connection check)",
     "tts_listen": "Listen",
     "tts_pregen": "Pre-generate audio",
     "scan_now": "Scan Now",
@@ -459,6 +460,8 @@
     "mark_series_as_read": "Mark Entire Series as Read (Completed)"
   },
   "viewer": {
+    "report_sent": "The admin has been notified.",
+    "report_failed": "Could not notify the admin. Please try again shortly.",
     "tab_nav": "Nav",
     "tab_layout": "Layout",
     "tab_style": "Style",
@@ -932,7 +935,7 @@
     "pregen_https": "Only available over HTTPS",
     "pregen_confirm": "Pre-generate this book on the server with your current listening settings?",
     "pregen_menu": "Pre-generate audio",
-    "pregen_confirm_menu": "Pre-generate \"{title}\" on the server?\nSettings: {conf}\n(Progress is shown in Scan activity)",
+    "pregen_confirm_menu": "Pre-generate \"{title}\" on the server?\nSettings: {conf}\n(Progress is shown in Notifications)",
     "pregen_already": "Already being pre-generated",
     "auto_next": "Continue to the next chapter",
     "display": "Display",
@@ -973,5 +976,190 @@
     "quality_compact": "Compact",
     "hours": "{n} h",
     "minutes": "{n} min"
+    },
+
+  "diagnose": {
+    "title": "Diagnose",
+    "running": "Diagnosing... (remote drives can take a few seconds)",
+    "rerun": "Run again",
+    "open_problems": "Open problem records",
+    "action": {
+      "rescan_folder": "Rescan folder",
+      "rescan_book": "Rescan this book"
+    },
+    "check": {
+      "db": {
+        "ok": "DB record OK",
+        "trashed": "In the trash · auto-deleted on {purge}",
+        "missing": "No DB record for this book (ID {id})"
+      },
+      "library": {
+        "missing": "Category not found (ID {id})"
+      },
+      "remote": {
+        "ok": "Remote drive / category folder reachable",
+        "unreachable": "Category folder unreachable — {path}",
+        "timeout": "Category folder not responding ({seconds}s)",
+        "remote_url": "Remote URL book, connection check skipped"
+      },
+      "file": {
+        "ok": "File exists ({size})",
+        "missing": "File missing — {path}",
+        "empty": "File is 0 bytes — {path}",
+        "timeout": "File check not responding ({seconds}s)",
+        "remote_url": "Remote URL book, file check skipped"
+      },
+      "format": {
+        "ok": "File format OK",
+        "bad": "Not a valid {format} file or corrupt",
+        "skip": "No format check for this type",
+        "timeout": "Format check not responding ({seconds}s)"
+      }
+    },
+    "result": {
+      "healthy": "No problems found.",
+      "healthy_with_problems": "Healthy now. Rescan or clear the {count} open problem records below from the card.",
+      "no_record": "This book is not in the DB (it may have been permanently deleted).",
+      "no_library": "The book's category no longer exists.",
+      "remote_url": "Files of remote URL books are not checked on the server.",
+      "remote_unavailable": "The remote drive (mount) seems disconnected. The scanner will not remove books until it is back.",
+      "remote_slow": "The remote drive is responding slowly. Try diagnosing again shortly.",
+      "file_moved": "The file seems to have been moved or deleted. Rescanning the folder finds the new location or moves it to the trash.",
+      "trashed_missing": "The file is missing, so the book is in the trash. It will be deleted automatically after 7 days.",
+      "trashed_but_present": "The file is back. Rescanning the folder restores it from the trash.",
+      "file_corrupt": "The file seems corrupt. Check the original file, then rescan."
+    }
+  },
+  "problems": {
+    "code": {
+      "file_missing": {"title": "File missing · moved to trash", "detail": "The file is no longer at its original location, so the book was moved to the trash (deleted automatically after 7 days)."},
+      "mass_missing": {"title": "Possible mass move/delete", "detail": "Many files disappeared in a single scan. Check for renamed folders before acting. Nothing is moved to the trash until you confirm."},
+      "cover_missing": {"title": "Cover extraction failed", "detail": "A cover could not be created."},
+      "remote_unavailable": {"title": "Remote drive disconnected", "detail": "The category folder cannot be reached. Check the mount. No books are deleted until it comes back."},
+      "file_corrupt": {"title": "File corrupted", "detail": "The file is damaged and cannot be opened."},
+      "metadata_invalid": {"title": "Invalid book info", "detail": "Some of the book information is invalid."},
+      "system_task_failed": {"title": "Background task failing", "detail": "An automatic background task keeps failing."},
+      "user_report": {"title": "User report", "detail": "A user hit an error opening a book and reported it. Check it with Diagnose, then close it with Resolved."},
+      "unknown": {"title": "Unknown error", "detail": "An unclassified error occurred. Please let the administrator know."}
+    },
+    "action": {
+      "plugin_action": "Run",
+      "resolve": "Resolved",
+      "diagnose": "Diagnose",
+      "rescan": "Rescan",
+      "move_to_trash": "Move to trash",
+      "check_mount": "Check mount",
+      "hide": "Hide",
+      "auto_fix": "Auto-fix",
+      "report": "Notify administrator",
+      "rescan_all": "Rescan all",
+      "rescan_series": "Rescan series",
+      "confirm_trash": "Move to trash",
+      "confirm_trash_prompt": "Move the {count} books whose files are still missing to the trash? (deleted automatically after 7 days)",
+      "mute": "Got it",
+      "unmute": "Notify again",
+      "more": "Show more",
+      "queued": "Rescan queued.",
+      "done": "Done.",
+      "failed": "Could not complete: {error}"
+    },
+    "line": {
+      "system": "General (not tied to a book)",
+      "series_all": "{name} — all {count} books",
+      "series_some": "{name} — {count} of {total} books",
+      "series_count": "{name} — {count} books",
+      "library": "Whole category",
+      "no_series": "(no series)"
+    }
+  },
+
+  "notify": {
+    "clear": "Clear",
+    "clear_hint": "Hide finished items and mark notice cards as acknowledged (running and action-required items stay)",
+    "cleared": "Cleared {count} notifications.",
+    "clear_undo": "Undo",
+    "clear_undone": "Restored the cleared notifications.",
+    "clear_failed": "Could not clear notifications.",
+    "title": "Notifications",
+    "empty": "No new notifications.",
+    "unread": "New",
+    "summary": {
+      "idle": "Idle",
+      "running": "{count} in progress",
+      "action": "{count} need attention",
+      "unread": "{count} new",
+      "recent": "{count} recent"
+    },
+    "label": {
+      "error": "Error",
+      "running": "Running",
+      "pending": "Queued",
+      "new": "New",
+      "done": "Done",
+      "muted": "Cancelled",
+      "notice": "Notice"
+    },
+    "scan": {
+      "selected_books": "{count} selected books",
+      "whole_system": "Whole system",
+      "library_fallback": "Category #{id} ({db_type})",
+      "background": "Background task",
+      "task": {
+        "library_scan": "Category scan",
+        "cover_scan": "Cover scan",
+        "lazy_scan": "Media discovery",
+        "batch_book_scan": "Selected-book scan",
+        "gdrive_copy": "Drive copy",
+        "default": "Background task"
+      },
+      "running": {
+        "library_scan": "Scanning category",
+        "cover_scan": "Scanning covers",
+        "lazy_scan": "Discovering media",
+        "batch_book_scan": "Scanning selected books",
+        "gdrive_copy": "Copying from Drive",
+        "default": "Background task running"
+      },
+      "pending": {
+        "library_scan": "Category scan queued",
+        "cover_scan": "Cover scan queued",
+        "lazy_scan": "Media discovery queued",
+        "batch_book_scan": "Selected-book scan queued",
+        "gdrive_copy": "Drive copy queued",
+        "default": "Task queued"
+      },
+      "status": {
+        "completed": "{task} finished",
+        "failed": "{task} failed",
+        "cancelled": "{task} cancelled"
+      },
+      "new_books": "{count} new books",
+      "failed_books": "{count} failed",
+      "batch_result": "{succeeded}/{total} succeeded",
+      "no_change": "No changes"
+    },
+    "tts": {
+      "queued": "Voice generation queued · {total} pieces",
+      "running": "Generating voice {percent}% ({done} / {total})",
+      "done": "Voice ready",
+      "failed": "Voice generation failed",
+      "cancelled": "Voice generation cancelled",
+      "adult_suffix": " (adult)"
+    },
+    "system": {
+      "maintenance": "System maintenance",
+      "db_tuning": "Optimizing database",
+      "failing": "Keeps failing",
+      "last_ok": "last success {when}",
+      "first_failed": "first failure {when}",
+      "fail_count": "{count} failures in a row"
+    },
+    "elapsed": {"seconds": "{n}s", "minutes": "{n} min", "hours": "{h} h {m} min"},
+    "problem": {
+      "scope": "{library} · {count}",
+      "library": "{library}",
+      "plugin_scope": "{count} items",
+      "remote_multi": "{count} categories"
+    }
   }
 }

@@ -1,9 +1,55 @@
 # Plan: 에러 문제 카드 + 종합 알림센터 (스캔 알림 개편 포함)
 
-**상태: 설계 확정, 구현 대기.** 2026-09-29 세션에서 정리·결정. 구현은 **8장 "구현 순서"**를 따른다.
+**상태: 설계 확정, 구현 진행 중 (4단계까지 완료).** 2026-09-29 세션에서 정리·결정. 구현은 **8장 "구현 순서"**를 따른다.
 
 > **새 세션에서 이어받을 때**: ① 이 문서의 "결정:" 소절들이 확정 사항이다(바꾸려면 사용자와 상의).
 > ② 8장에서 `✅ 완료`가 안 붙은 가장 앞 단계부터 진행한다. ③ 남은 미정 사항은 맨 아래 목록 참고.
+
+## 진행 현황 (2026-10-02 세션 종료 시점)
+
+| 단계 | 상태 | 검증 |
+|---|---|---|
+| 0 선행 정리 | ✅ 커밋 `4a91006` | 홈 서버 배포 |
+| 1 데이터 기반 (problem 테이블/서비스, SystemHealthService 흡수) | ✅ | 테스트 서버 MariaDB |
+| 2 스캔 완료 기록 (`scan_history.result_summary`, `trigger_type`, 90일 정리) | ✅ | 테스트 서버 실제 스캔 |
+| 3 알림센터 개편 ("스캔 활동" → "알림", 공통 항목/렌더러, 읽음, NEW 배지 색) | ✅ | 하네스 화면 + 테스트 서버 실데이터 어댑터 |
+| 3+ 알림 일괄 지우기 ([지우기] + 토스트 되돌리기) | ✅ 2026-10-02 | 테스트 서버 MariaDB: 일반/관리자 세션 API 흐름 |
+| 4 스캐너 문제 기록 + 문제 카드 (삭제 직전 안전장치, 카드 펼침/조치, MCP 조회 도구) | ✅ | 테스트 서버: NAS 마운트 내림/복구, 임시 카테고리 대량 사라짐 |
+| 5 진단 버튼 + "관리자에게 알리기" | ✅ 2026-10-02 | 테스트 서버: GDrive 도서 진단, 일반 세션 뷰어 신고 → 카드 → 해결됨 (실제 로그인 화면) |
+| 6 플러그인 계약 (`report_problem`/`resolve_problem`) | ✅ 2026-10-02 (사용자 진행 지시) | 테스트 서버: 플러그인 카드 표시·조치 RPC·비활성화 정리 |
+| 7 필요해질 때만 | 대기 | |
+
+**작업 트리 상태**
+- **전부 미커밋.** 사용자 지시: 구현이 모두 끝날 때까지 커밋하지 않는다.
+- 같은 트리에 별개 작업이 섞여 있다 — 워커 교체 멈춤 수정(`gunicorn.conf.py`, `services/scheduler_service.py`, CHANGELOG 해당 줄),
+  `docs/plan_tts_audiobook.md`(이 작업과 무관한 수정). 커밋할 때 나눠서 올린다.
+- 테스트 서버(192.168.0.21)에는 6단계까지 배포됨. 홈 서버에는 1단계 이후 아무것도 배포 안 함.
+- 로컬 테스트: Python 411 통과 / JS 106 통과 (실패 1건 `test_plugin_permissions::test_plugin_permission_accepts_string_library_id`는 작업 전부터 있던 것).
+
+**새로 생긴 주요 파일**
+- 서버: `services/problem_service.py`, `services/scan_problem_service.py`, `services/problem_card_service.py`,
+  `services/notification_service.py`, `repositories/{sqlite,mariadb}/problem_repository.py`, `api/routes/problem_routes.py`
+  5~6단계: `services/book_diagnosis_service.py`, `services/user_problem_report_service.py`, `services/plugin_problem_service.py`
+- 화면: `static/js/notification_render.js`(순수 함수), `static/js/notification_cards.js`(카드 펼침/조치), `static/js/scan_activity_status.js`(폴링·DOM)
+  5단계: `static/js/book_diagnosis.js` + `diagnosis_render.js`(진단 모달), `static/js/viewer/report_problem.js`(뷰어 오류 자리 버튼)
+- 테스트: `tests/test_problem_service.py`, `test_system_health_service.py`, `test_scan_result_summary.py`, `test_notification_service.py`,
+  `test_notification_render.mjs`, `test_scan_problem_gate.py`, `test_problem_card_service.py`
+  5~6단계: `test_book_diagnosis.py`, `test_plugin_problem_service.py`, `test_book_menu_rules.mjs`(진단 메뉴)
+
+**휴지통 7일 자동 비우기 ✅ 수정 (2026-10-02, 사용자 결정: "동작해야 한다")**: `tools/scanner/sync_detector.handle_deleted_books`가
+이미 휴지통에 있는 도서의 `deleted_at`을 유지하도록 변경(비어 있던 예전 행만 지금 시각). 기존 휴지통은 그동안 매 스캔마다
+시각이 갱신돼 있었으므로 배포 후 **마지막 스캔 시점 + 7일**에 한꺼번에 비워진다(대량 사라짐 판정은 휴지통 이동 단계라 이 비우기와 무관).
+MariaDB SET 평가 순서(왼쪽부터) 때문에 `deleted_at`을 `is_deleted`보다 먼저 둔다 - 테스트 서버 MariaDB 임시 테이블로 확인.
+
+**알림 일괄 지우기 ✅ 완료 (2026-10-02)** — 7장 "결정: 알림 일괄 지우기" 구현 메모 참고.
+**5단계 ✅ 완료 (2026-10-02)** — 8장 5단계 구현 메모 참고.
+**6단계 ✅ 완료 (2026-10-02)** — 8장 6단계 구현 메모 참고. 1~6단계 구현 끝. 7단계는 필요해질 때만. 남은 일 = 커밋(작업 단위로 나눠서) + 홈 서버 배포.
+
+**남은 자잘한 것 (단계와 별개)**
+- 음성 미리 만들기 "최근 완료"가 아직 웹 프로세스 메모리 30분 기준 — 7일 보관하려면 작업 테이블에서 읽도록 변경 필요.
+- MCP `propose_rescan`(Tier B 재스캔 제안) 미구현.
+- [시리즈 재스캔]이 쓰는 기존 `scan-path` API는 웹 요청 안에서 동기 실행 → GDrive 폴더면 응답이 오래 걸릴 수 있음.
+- ~~실제 앱에서 알림 팝오버 확인~~ → 2026-10-02 테스트 서버 로그인 화면(Playwright)에서 팝오버·카드 펼침·[지우기]/되돌리기·진단 모달·뷰어 신고 확인.
 
 ## 배경 / 동기
 - 2026-09-17 ~ 09-29, 시리즈 요약 테이블(`series_summary`) 재생성이 `created_at`이 NULL인
@@ -324,6 +370,30 @@ self.resolve_problem(code="token_expired", target_type="book", target_id=123)
    - `scan_history`는 현재 정리 로직이 전혀 없다(홈 서버 약 870행/2개월). 90일 지난 행 정리를 추가한다.
    - 정리 시점(서버 시작 마이그레이션 vs 스캔 완료 후)은 구현 시 결정.
 
+### 결정: 알림 일괄 지우기 (2026-10-02) ✅ 완료 (2026-10-02, 테스트 서버 MariaDB 실측, 미커밋)
+> 구현 메모: `notification_service.clear_notifications` / `undo_clear`, API `POST /api/notifications/clear`, `POST /api/notifications/clear/undo`
+> (`{previous_cleared_ms, muted_group_keys}`; 카드 해제는 관리자 세션일 때만). 버튼 표시 판단은 `notification_render.clearableCount`(서버 규칙과 같음).
+> 되돌리기 토스트를 위해 공용 `showToast(message, type, options)`에 선택 인자(`actionLabel`/`onAction`/`duration`)를 추가 — 기존 호출은 그대로.
+> 참고 카드 음소거는 '그 시점 개수까지' 숨김이라, 이후 대상이 늘면 다시 보인다(기존 규칙). 실제 로그인 화면 확인은 아직(하네스/API만).
+팝오버 머리말에 **[지우기] 버튼 하나**. 3단계 보완으로 보고 **5단계 착수 전에 먼저 구현**한다.
+
+| 종류 | [지우기] 동작 |
+|---|---|
+| 진행 중 (스캔·음성 생성) | 건드리지 않음 (끝나면 알아서 최근 완료로 이동) |
+| 최근 완료 (스캔 결과·음성 준비됨·실패·취소) | **목록에서 숨김** |
+| 참고(notice) 문제 카드 (파일 없음·손상·표지 실패 등) | **일괄 "알고 있음"(음소거)** — 새 대상이 생기면 다시 보이는 기존 규칙 그대로 |
+| 조치 필요(action_required) 카드 (연결 끊김·대량 사라짐·시스템 작업 실패) | **건드리지 않음** — 원인 해결 시 자동 소멸, 개별 "알고 있음"만 허용 ("빨간 점은 조치 필요에만" 원칙) |
+
+구현 메모:
+- 기록은 지우지 않는다. 사용자별 설정 `NOTIFICATIONS_CLEARED_MS`(읽음 처리 `NOTIFICATIONS_LAST_SEEN_MS`와 같은 방식, user_settings) 하나를
+  저장하고, `build_notifications`에서 `updated_at <= cleared`인 **최근 완료** 항목만 뺀다.
+  `scan_history`(관리자 이력, MCP `get_scan_history` 데이터)는 그대로 둔다. 관리자가 여럿이면 각자 따로 지워진다.
+- 참고 카드 음소거는 카드 단위 공용 상태(`problem_groups`)라 **모든 관리자에게 적용**된다 — 버튼을 누른 관리자만의 숨김이 아님. (이 차이를 의식할 것)
+- API: `POST /api/notifications/clear` (login_required; 참고 카드 음소거는 관리자일 때만 수행).
+  응답에 직전 `cleared_ms`와 음소거한 group_key 목록을 돌려줘 토스트 [되돌리기]로 복원 (`cleared_ms` 되돌림 + 해당 카드 unmute).
+- 버튼은 지울 것(최근 완료 또는 참고 카드)이 있을 때만 보인다. 일반 사용자는 본인 음성 완료 기록만 지워진다.
+- 테스트: 어댑터 필터(시각 경계, 진행/조치 필요 유지), API(일반 사용자는 음소거 안 함), 되돌리기.
+
 ## 8. 구현 순서 (확정, 2026-09-29)
 각 단계는 **따로 배포해도 동작하는 단위**로 나눴다. 앞 단계의 결과물 위에 다음 단계가 올라간다.
 단계마다 끝나면 이 문서의 해당 항목에 `✅ 완료 (날짜)`를 붙인다.
@@ -334,7 +404,12 @@ self.resolve_problem(code="token_expired", target_type="book", target_id=123)
   추가일 자동 보정(`_backfill_books_created_at`), `SystemHealthService` + 관리자 빨간 점, 이 문서.
 - 같은 작업 트리에 TTS 등 다른 미커밋 작업이 섞여 있으니 **커밋 단위를 나눠서** 올린다.
 
-### 1단계 — 데이터 기반 (화면 변화 없음)
+### 1단계 — 데이터 기반 (화면 변화 없음) ✅ 완료 (2026-10-02, 테스트 서버 MariaDB 실측, 미커밋)
+> 구현 메모: 시각 컬럼은 `*_ms`(epoch ms, `tts_pregen`과 같은 방식)로 저장하고 서비스에서 타임존 포함 ISO로 변환.
+> 플러그인 계약(6단계)을 위해 `title`/`detail` 컬럼을 미리 둠. 행 `status`는 open/resolved만 — 음소거는 `problem_groups`.
+> 시스템 경고는 `code='system_task_failed'`, `group_key='system_task_failed|general|-'` 카드 1장.
+> 예전 `SYSTEM_HEALTH_*` settings 행은 서버 시작 마이그레이션(`_migrate_system_health_settings`)이 옮기고 지움.
+> 해결 행 30일 정리는 서버 시작 시(`_purge_resolved_problems`). 테스트: `tests/test_problem_service.py`, `tests/test_system_health_service.py`.
 1. `problem_occurrences` / `problem_groups` 테이블 생성 (3장 스키마 초안).
    - `docs/change_db_guide.md` 3번: `_SCHEMA_SQL`(SQLite) **와** `MARIADB_CENTRAL_SCHEMA`(MariaDB) 둘 다.
 2. 리포지토리 `repositories/{sqlite,mariadb}/problem_repository.py`:
@@ -351,7 +426,15 @@ self.resolve_problem(code="token_expired", target_type="book", target_id=123)
    내부 저장만 `problem_service`(`target_type='system'`)로 교체. 기존 `SYSTEM_HEALTH_*` settings 행은 정리.
 - **완료 기준**: 단위 테스트 통과, 테스트 서버에서 기존 빨간 점 경고가 새 저장소로 그대로 동작.
 
-### 2단계 — 스캔 완료 기록 (7장 "결정: 최근 완료 기록")
+### 2단계 — 스캔 완료 기록 (7장 "결정: 최근 완료 기록") ✅ 완료 (2026-10-02, 테스트 서버 MariaDB 실측, 미커밋)
+> 구현 메모: `scan_history.result_summary`(JSON). 카테고리 스캔 = `{"new_books", "errors", "report_file"}`
+> (엔진 `_scan_library_internal(result_summary=)` → `scan_library` 반환 → `run_scan_job` 반환 → 워커),
+> 선택 도서 스캔 = `{"books", "succeeded", "errors"}`(일부 실패 시 예외의 `.result_summary`로 전달).
+> lazy_scan / cover_scan / gdrive_copy / 오디오북·영상 스캔은 요약 없음(NULL) — 필요해지면 같은 경로로 추가.
+> 트리거는 kwargs `trigger_type`: `manual`(사용자), `cron`(예약 — 기존 값 유지, 계획의 'schedule' 대신),
+> `lazy`(예약 lazy_scan), `webhook`(`/api/webhook/scan`, gd-poller 등). 없으면 = 예전 행 → 자동 취급 권장.
+> 덤으로 `scan_library`가 엔진과 같은 오류 리포트를 한 번 더 저장하던 중복을 없앰(`_save_report_unless_saved`).
+> 90일 정리 = 서버 시작 시 `_purge_old_scan_history`. 테스트: `tests/test_scan_result_summary.py`.
 1. `scan_history`에 결과 요약 JSON 컬럼 추가 (`_SCHEMA_SQL`).
 2. `tools/scanner/engine.py`의 `detected_new_books` 수 / `library_errors` 수 / 리포트 파일명을
    `services/scanner_queue.py` 작업 결과 기록(`update_task_result` → `record_scan_history`)까지 전달.
@@ -360,7 +443,15 @@ self.resolve_problem(code="token_expired", target_type="book", target_id=123)
 4. `scan_history` 90일 정리 추가 (시점: 서버 시작 마이그레이션 쪽 권장 — 스캔 완료 경로를 무겁게 하지 않음).
 - **완료 기준**: 카테고리 스캔 후 `scan_history`에 새 도서 수/에러 수가 남음.
 
-### 3단계 — 알림센터 개편 (기존 출처만, 문제 카드 전)
+### 3단계 — 알림센터 개편 (기존 출처만, 문제 카드 전) ✅ 완료 (2026-10-02, 하네스 화면 확인 + 테스트 서버 실데이터 어댑터 확인, 미커밋)
+> 구현 메모: 서버 어댑터 `services/notification_service.py` (`build_notifications`), 렌더 순수 함수 `static/js/notification_render.js`
+> (node 테스트 `tests/test_notification_render.mjs`), 폴링·DOM은 기존 `scan_activity_status.js`. 문구는 서버가 i18n 키+변수(`detail: [{key, vars}]`)로
+> 내려주고 화면이 번역한다(스캐너 진행 단계/오류 원문은 `raw_detail`로 그대로). 시스템 경고는 작업별 한 줄(문제 카드 `system_task_failed`는 제외),
+> 그 밖의 열린 문제 카드는 일반 카드 줄로 이미 표시된다(4단계에서 상세/조치 연결).
+> 읽음 = 사용자별 `NOTIFICATIONS_LAST_SEEN_MS`(user_settings), 팝오버를 **닫을 때** `POST /api/notifications/seen`.
+> 토스트 = 직전 폴링에서 진행 중이던 `track_key`가 최근 완료로 넘어온 항목만. 아이콘은 종(fa-bell)으로 교체.
+> 덤: 머리말이 두 줄이라 목록 맨 아래가 잘리던 기존 문제를 flex 레이아웃으로 수정.
+> 남은 것: 음성 미리 만들기 "최근 완료"는 아직 웹 프로세스 메모리(30분) 기준 - 7일 보관하려면 작업 테이블에서 읽도록 바꿔야 함.
 1. 서버 어댑터: `/api/system/status`에 공통 스키마 `notifications[]` 추가
    (진행 중 스캔, 최근 완료 기록, TTS 미리 만들기, 시스템 경고). **audience로 걸러서** 내려준다.
    전환 기간에는 기존 필드(`raw_status`, `tts_pregen`, `system_warnings`)도 유지.
@@ -372,7 +463,24 @@ self.resolve_problem(code="token_expired", target_type="book", target_id=123)
 4. 도서 카드 `NEW` 배지 색을 파랑 계열로 조정 (빨강 = 에러와 충돌 방지).
 - **완료 기준**: 지금 팝오버에 나오던 내용이 전부 새 목록에 나오고, 카테고리 스캔 결과가 "최근 완료"로 보임.
 
-### 4단계 — 스캐너 문제 기록 + 문제 카드
+### 4단계 — 스캐너 문제 기록 + 문제 카드 ✅ 완료 (2026-10-02, 테스트 서버 MariaDB 실측: NAS 마운트 내림/복구 + 임시 카테고리 대량 사라짐, 미커밋)
+> 구현 메모:
+> - **기존 방어 확인 결과**: ① 스캔 시작 시 루트 접근 실패 → 스캔 실패(카드 없음) ② 폴더 순회 오류 → 삭제 동기화 생략
+>   ③ 파일 0개 → 삭제 중단(단 early return이라 scanner_progress가 남음). 부분 마운트 장애(일부 폴더만 빈 목록)는 못 막았다.
+> - 판정 위치: 엔진 삭제 동기화 **직전** `services/scan_problem_service.gate_deletions` → (진행/'root'/'mass').
+>   'root'면 삭제 동기화 자체를 건너뛰고(복구/7일 비우기 포함), 'mass'면 새로 사라진 도서의 휴지통 이동만 보류.
+>   이미 휴지통에 있는 도서는 판정·기록에서 뺀다(스캐너의 '사라진 도서' 목록엔 휴지통 도서도 들어 있음 - 실측에서 발견).
+> - 코드: `file_missing`(이미 휴지통, 참고), `mass_missing`(보류, 조치 필요, [확인 후 휴지통으로]), `remote_unavailable`(카테고리 행),
+>   `file_corrupt`(BadZipFile/Offset*), `cover_missing`(NoCover), `unknown`(그 밖). 4단계 계획의 file_missing=조치 필요 → 실제론 스캐너가
+>   이미 휴지통으로 옮기므로 '참고'로 정함.
+> - 문제 기록 쓰기는 스캔 트랜잭션 커밋 **후**(`engine._record_scan_problems`) - SQLite general은 도서와 같은 파일이라 잠금 충돌 방지.
+> - 해제: `reconcile` (파일 다시 보임 / 도서 행 없어짐 / 다시 처리됐는데 오류 없음 / 루트 정상).
+> - 여러 카테고리 동시 연결 끊김 → 알림 어댑터에서 한 줄로 접음. 원인 카드가 열린 카테고리의 '스캔 실패' 줄은 숨김.
+> - API(관리자): `GET /api/problems/card`, `GET /api/problems/card/items`, `POST /api/problems/card/mute`, `POST /api/problems/card/confirm-trash`.
+>   재스캔은 기존 `/scan`, `/scan-path`(동기), `/books/scan-batch` 재사용. UI = `static/js/notification_cards.js`.
+> - MCP: `list_problems`, `get_problem_card` (읽기 전용). `propose_rescan`(Tier B)은 아직.
+> - **발견, 손대지 않음**: 전체 스캔마다 휴지통 도서의 `deleted_at`이 다시 현재 시각으로 바뀌어(`handle_deleted_books`), 자주 스캔하는
+>   카테고리는 '7일 뒤 자동 비우기'가 사실상 일어나지 않는다. 고치면 쌓인 휴지통이 한꺼번에 영구 삭제되므로 사용자 결정 필요.
 - **범위: 일반/성인 도서 스캐너 먼저.** 오디오북/영상 스캐너는 구조가 달라 이 단계에서 제외하고,
   도서 쪽이 안정된 뒤 같은 코드 체계로 확장한다 (`db_type` 컬럼은 처음부터 있으므로 스키마 변경 불필요).
 1. **먼저 확인**: 스캐너가 마운트 끊김 시 도서 삭제 처리를 이미 막는지. 있으면 그 판정을 재사용.
@@ -390,7 +498,17 @@ self.resolve_problem(code="token_expired", target_type="book", target_id=123)
   이 단계에서는 **그대로 유지**한다 (문제 기록과 병행). 문제 카드가 안정되면 리포트 탭을
   문제 기록 조회 화면으로 바꾸고 JSON 리포트를 걷어낼지 그때 결정한다.
 
-### 5단계 — 진단 버튼 + "관리자에게 알리기"
+### 5단계 — 진단 버튼 + "관리자에게 알리기" ✅ 완료 (2026-10-02, 테스트 서버 MariaDB + 로그인 화면 실측, 미커밋)
+> 구현 메모:
+> - 진단: `services/book_diagnosis_service.diagnose_book` (일반/성인 도서). 점검 db → library → remote(`scan_problem_service.check_roots`, 스캐너와 같은 판정)
+>   → file → format(zip 계열 중앙 디렉터리 / PDF 머리말만). 파일 시스템 점검은 15초 시간 제한(멈춘 rclone이 웹 스레드를 붙잡지 않게),
+>   시간 초과는 '끊김'이 아니라 '느림' 결론. 실측: GDrive 도서 첫 진단 약 8초, 로컬 0.7초. `library_diagnostics_service`는 서재 단위 쿼리라 재사용 안 함.
+>   조치는 재스캔만(파일 없음 → 폴더 재스캔 = 스캐너가 정상 경로로 휴지통 처리, 손상 → 그 권 재스캔). 수동 휴지통 이동 API는 만들지 않음.
+>   API `GET /api/problems/diagnose`(관리자), MCP `diagnose_book`. 화면: 도서 메뉴 [진단](관리자, 낱권), 문제 카드 도서 줄 [진단], `static/js/book_diagnosis.js` + `diagnosis_render.js`.
+> - 관리자에게 알리기: 잠정안대로 `code='user_report'`, `source='viewer'`, 참고 등급, `group_key=user_report|db|library`. 받는 쪽 `services/user_problem_report_service.py`
+>   (카테고리 권한 확인, 사용자당 1시간 30건). `POST /api/problems/user-report`(login_required). 뷰어 쪽은 `view_manager.showViewerError` 한 곳에서
+>   `static/js/viewer/report_problem.js`가 버튼을 붙인다(관리자에겐 [진단]). 스캐너가 판단할 근거가 없어 자동 해제 없음 → 카드 [해결됨]
+>   (`POST /api/problems/card/resolve`, `ADMIN_RESOLVABLE_CODES`에 든 코드만). 테스트: `tests/test_book_diagnosis.py`.
 1. 도서 상세 [진단]: DB 기록 / 파일 존재 / 원격 연결 체크리스트 + 결과별 조치 버튼
    (`services/library_diagnostics_service.py` 재사용).
 2. 뷰어 등에서 일반 사용자에게 에러가 났을 때 그 자리에 한 줄 + [관리자에게 알리기].
@@ -398,7 +516,19 @@ self.resolve_problem(code="token_expired", target_type="book", target_id=123)
      기록 → 관리자 알림센터의 일반 문제 카드로 표시. 같은 도서 재신고는 횟수만 증가.
 - **완료 기준**: 일반 계정에서 없는 파일을 열면 알림 버튼이 보이고, 관리자 알림센터에 카드가 생김.
 
-### 6단계 — 플러그인 계약 (3장 "결정: 플러그인 문제 카드 계약")
+### 6단계 — 플러그인 계약 (3장 "결정: 플러그인 문제 카드 계약") ✅ 완료 (2026-10-02, 미커밋)
+> 구현 메모:
+> - 베이스 클래스 `plugins/metadata/base.py`에 `report_problem()`/`resolve_problem()` (추가만, 기존 플러그인 무영향) → `services/plugin_problem_service.py`.
+>   코드 `<plugin id>:<code>`(영문/숫자/_ . - 64자), 출처 `plugin:<id>`, 카드 키 `plugin:<id>|<code>|-`(라우트의 `|` 2개 검증과 맞춤 - 계획의 'plugin:<id>|code'에 꼬리 `-`).
+>   심각도는 notice/action_required만. 대상 기본 `system`(target_id `-`), `book`이면 코어가 시리즈/카테고리/경로를 채움.
+> - 문구: 행의 `title`/`detail` 컬럼 + `context`(플러그인 id/이름/action_id/action_label). `list_cards`가 플러그인 카드에 `plugin` 정보를 붙이고(최근 행 1개 조회),
+>   알림 항목 제목은 항상 `<플러그인 이름> · <제목>`. 조치는 카드 줄·도서 줄의 버튼 → 기존 액션 RPC, `context.source='problem_card'`, `open_url`이면 새 탭.
+> - 남용 방지: 열린 문제 1,000건 상한(`PLUGIN_OPEN_LIMIT`, 넘으면 마지막 발생이 오래된 것부터 해결), 끄면 `on_plugin_disabled`(PluginService.toggle),
+>   부팅 시 `cleanup_inactive_plugins`(start_all_plugin_background_services). 리포지토리에 출처 단위 쿼리 4개 추가(source 인덱스는 없음 - 플러그인 보고는 드물어 생략).
+> - [해결됨]은 플러그인 카드에 없음(플러그인이 resolve, 관리자는 [알고 있음]). 대량 판정 미적용.
+> - 샘플: `spotify_mood` 1.1.0 - 사용자 토큰 갱신 거절 시 `token_expired`(조치 필요, [다시 연결]=spotify_oauth_start), 갱신 성공·재연결·연결 해제 시 해결.
+> - 문서: guide_plugins(ko/en) 매트릭스 1.1.2 행 + "관리자 알림 문제 카드" 절, plugin_checklist(ko/en), api_endpoints 10.5절, spec_db_schema·spec_scanner_logic·spec_feature_overview·guide_admin(ko/en), MCP 가이드, README.
+>   테스트: `tests/test_plugin_problem_service.py`.
 1. 베이스 클래스에 `report_problem()` / `resolve_problem()` 추가 (내부는 `problem_service`).
 2. 코드 네임스페이스 자동 부여, 플러그인별 열린 문제 1,000건 상한, 비활성/삭제 시 정리.
 3. 문서: `docs/guide_plugins.md` + `guide_plugins_en.md` (호환성 매트릭스 새 행), 샘플 플러그인 1개에 사용 예.
@@ -460,7 +590,7 @@ self.resolve_problem(code="token_expired", target_type="book", target_id=123)
 - ~~"최근 완료 기록"의 저장 위치와 보관 기간~~ → **결정됨 (2026-09-29), 7장 "결정: 최근 완료 기록" 참고.**
 - ~~읽음 처리를 사용자별로 할지~~ → **결정됨 (2026-09-29): audience별. 2장 참고.**
 - ~~일반 사용자에게 알림센터를 보여 줄지~~ → **결정됨 (2026-09-29): 하나의 센터 + audience 필터, 항목 없으면 아이콘 흐리게. 2장 참고.**
-- "관리자에게 알리기"를 받는 쪽 → 잠정안 있음 (8장 5단계: `source=viewer`, `code=user_report`). 5단계 착수 시 확정.
+- ~~"관리자에게 알리기"를 받는 쪽~~ → **결정됨 (2026-10-02): 잠정안 그대로 (`source=viewer`, `code=user_report`), 관리자 [해결됨]으로 닫음. 8장 5단계 참고.**
 - 폴링 유지 vs SSE 등 푸시 방식 → 잠정: 폴링 유지 (8장 7단계, 필요해질 때 재검토).
 
 ## 관련

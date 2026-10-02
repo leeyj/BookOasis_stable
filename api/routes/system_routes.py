@@ -55,6 +55,50 @@ def get_library_name(db_type, lib_id):
     return None
 
 
+@system_bp.route('/api/notifications/seen', methods=['POST'])
+@login_required
+def mark_notifications_seen():
+    """알림센터를 연 시각을 기록한다 (이 시각 이후에 바뀐 항목만 '새 알림'으로 표시)."""
+    try:
+        from services.notification_service import mark_seen
+        seen_ms = mark_seen(session.get('user_id'))
+        return jsonify({'success': True, 'seen_ms': seen_ms})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@system_bp.route('/api/notifications/clear', methods=['POST'])
+@login_required
+def clear_notifications():
+    """[지우기]: 최근 완료는 이 사용자에게서 숨기고, 관리자면 참고 문제 카드를 일괄 '알고 있음' 처리한다."""
+    try:
+        from services.notification_service import clear_notifications as clear
+        result = clear(session.get('user_id'), session.get('role') == 'admin')
+        return jsonify({'success': True, **result})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@system_bp.route('/api/notifications/clear/undo', methods=['POST'])
+@login_required
+def undo_clear_notifications():
+    """[지우기] 되돌리기 (토스트 버튼): 직전 cleared_ms 복원 + 그때 음소거한 카드 해제(관리자만)."""
+    data = request.get_json(silent=True) or {}
+    try:
+        previous = int(data.get('previous_cleared_ms') or 0)
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'invalid previous_cleared_ms'}), 400
+    keys = data.get('muted_group_keys') or []
+    if not isinstance(keys, list):
+        return jsonify({'success': False, 'error': 'invalid muted_group_keys'}), 400
+    try:
+        from services.notification_service import undo_clear
+        result = undo_clear(session.get('user_id'), session.get('role') == 'admin', previous, keys)
+        return jsonify({'success': True, **result})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @system_bp.route('/health', methods=['GET'])
 def health():
     return jsonify({
@@ -183,12 +227,31 @@ def get_system_status():
             from services.system_health_service import SystemHealthService
             system_warnings = SystemHealthService.get_active_warnings()
 
+        # 알림센터 공통 항목 (스캔·문제·시스템은 관리자만, 음성 미리 만들기는 요청자 본인 + 관리자).
+        # 위 개별 필드(tasks/tts_pregen/system_warnings/raw_status)는 전환 기간 동안 그대로 유지한다.
+        notifications = []
+        try:
+            from services.notification_service import build_notifications
+            notifications = build_notifications(
+                user_id=session.get('user_id'),
+                is_admin=session.get('role') == 'admin',
+                status=status,
+                pregen=tts_pregen,
+                system_warnings=system_warnings,
+                tuning_db_type=db_type if tuning_active else None,
+                library_name=get_library_name,
+                elapsed_seconds=_elapsed_seconds_from_server_timestamp,
+            )
+        except Exception as e:
+            print(f"[System Status] notifications skipped: {e}")
+
         response = jsonify({
             'success': True,
             'is_active': is_active,
             'tasks': running_tasks,
             'tts_pregen': tts_pregen,
             'system_warnings': system_warnings,
+            'notifications': notifications,
             'raw_status': status,
             'has_running': has_running,
             'has_pending': has_pending,
@@ -450,7 +513,8 @@ def trigger_scan_via_webhook():
             library_id=lib_id_int,
             physical_path=physical_path,
             force=force_requeue,
-            force_requeue=force_requeue
+            force_requeue=force_requeue,
+            trigger_type='webhook'
         )
         
         if not enqueued:

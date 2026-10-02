@@ -88,16 +88,23 @@ def handle_deleted_books(cursor, db_books, deleted_paths, target_paths, found_fi
         return False
 
     # 1. 소프트 딜리트 처리
+    # deleted_paths에는 이미 휴지통에 있는 도서도 들어 있다. 그 도서의 deleted_at을 매 스캔마다 다시 찍으면
+    # 자주 스캔하는 카테고리는 7일이 영영 지나지 않아 아래 자동 비우기가 일어나지 않는다 →
+    # 처음 휴지통에 들어간 시각을 유지한다 (예전 데이터로 deleted_at이 비어 있으면 지금 시각으로 채움).
+    # deleted_at을 is_deleted보다 먼저 둔다 - MariaDB는 SET을 왼쪽부터 평가해 뒤 식이 바뀐 값을 본다.
     for dp in deleted_paths:
         norm_dp = _normalize_path(dp)
         if norm_dp in norm_db_books:
             book_id = norm_db_books[norm_dp]
             cursor.execute(f"""
-                UPDATE books 
-                SET is_deleted = 1, deleted_at = CURRENT_TIMESTAMP 
+                UPDATE books
+                SET deleted_at = CASE WHEN COALESCE(is_deleted, 0) = 1 AND deleted_at IS NOT NULL
+                                      THEN deleted_at ELSE CURRENT_TIMESTAMP END,
+                    is_deleted = 1
                 WHERE id = {ph}
             """, (book_id,))
-            print(f"[Scanner] File disappearance detected, set to trash: {dp}")
+            if cursor.rowcount:
+                print(f"[Scanner] File disappearance detected, set to trash: {dp}")
             
     # 2. [대안 2 적용] 7일 이상 경과한 소프트 딜리트 도서들을 영구 하드 딜리트 (자동 비우기)
     try:

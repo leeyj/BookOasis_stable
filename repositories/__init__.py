@@ -23,6 +23,7 @@ if DBMS in ("mariadb", "mysql"):
         metadata_repository,
         opds_repository,
         plugin_repository,
+        problem_repository,
         reading_progress_repository,
         scanner_queue_repository,
         scheduler_repository,
@@ -50,6 +51,7 @@ else:
         metadata_repository,
         opds_repository,
         plugin_repository,
+        problem_repository,
         reading_progress_repository,
         scanner_queue_repository,
         scheduler_repository,
@@ -77,6 +79,7 @@ sys.modules['repositories.mcp_pending_changes_repository'] = mcp_pending_changes
 sys.modules['repositories.metadata_repository'] = metadata_repository
 sys.modules['repositories.opds_repository'] = opds_repository
 sys.modules['repositories.plugin_repository'] = plugin_repository
+sys.modules['repositories.problem_repository'] = problem_repository
 sys.modules['repositories.reading_progress_repository'] = reading_progress_repository
 sys.modules['repositories.scanner_queue_repository'] = scanner_queue_repository
 sys.modules['repositories.scheduler_repository'] = scheduler_repository

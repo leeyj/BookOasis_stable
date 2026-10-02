@@ -7,7 +7,7 @@ import * as api from './api.js';
 import { hideFloatingMenu, isFloatingMenuOpen, positionMenuAtPoint } from './context_menu_manager.js';
 import { clearBookSelection, getSelectedBookTargets, isBookCardSelected } from './book_selection.js';
 import { computeBookMenuState } from './book_menu/menu_rules.js';
-import { BOOK_MENU_ACTIONS, canRunLazyScanFromCurrentBookMenu } from './book_menu/actions.js';
+import { BOOK_MENU_ACTIONS, canDiagnoseFromCurrentBookMenu, canRunLazyScanFromCurrentBookMenu } from './book_menu/actions.js';
 import {
   cancelPluginContextMenuLoad,
   clearPluginContextMenuItems,
@@ -133,6 +133,7 @@ export function showBookContextMenu(x, y, bookId, bookTitle, isVolumeDetail = fa
 
   applyBookMenuState(bookMenu, computeBookMenuState(currentTargetBook, {
     lazyScanAllowed: canRunLazyScanFromCurrentBookMenu(),
+    diagnoseAllowed: canDiagnoseFromCurrentBookMenu(),
     listenable: canListen(String(context.fileFormat || '').toLowerCase()),
     ttsPregenEnabled: !!state.ttsPregenEnabled,
     isVideoLibrary: state.currentLibraryType === 'video',

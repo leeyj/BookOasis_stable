@@ -84,6 +84,22 @@ def _run_db_self_recovery(db_type):
     except Exception as rec_err:
         print(f"[Scanner-SelfHealing ERROR] Auto recovery failed: {rec_err}")
 
+def _save_report_unless_saved(library_id, library_errors, result_summary):
+    """엔진이 끝까지 돌면 리포트를 이미 저장하고 result_summary에 남긴다 - 같은 오류로 두 번 저장하지 않는다.
+
+    엔진이 중간에 return한 경우(취소, 삭제 동기화 안전 차단 등)에만 여기서 저장한다."""
+    if not library_errors:
+        return
+    if 'errors' in result_summary:
+        return
+    try:
+        from utils.report_helper import save_scan_report
+        result_summary['report_file'] = save_scan_report(library_id, library_errors)
+        result_summary['errors'] = len(library_errors)
+    except Exception as report_err:
+        print(f"[Scanner ERROR] Scan report save failed: {report_err}")
+
+
 @scanner_print_control_decorator
 def scan_library(db_path, library_id, physical_path, force=False, skip_vfs_refresh=False, progress_callback=None):
     """Scan library path and sync DB with file system (force full reindex if force=True).
@@ -145,6 +161,11 @@ def scan_library(db_path, library_id, physical_path, force=False, skip_vfs_refre
         err_details = [f"'{p}' (사유: {msg})" for p, msg in failed_paths]
         err_msg = f"스캔 대상 경로 접근 실패 (HDD/NAS Wake-up 실패): " + ", ".join(err_details)
         print(f"[Scanner-WakeUp ERROR] {err_msg}")
+        if db_type in ('general', 'adult'):
+            # 루트 접근 불가는 그 자체로 확정 - 알림센터에 "원격 드라이브 연결 끊김" 카드로 남는다.
+            # 다음에 스캔이 삭제 판정 단계까지 정상 진행되면 자동으로 해제된다.
+            from services.scan_problem_service import report_root_unreachable
+            report_root_unreachable(db_type, library_id, failed_paths)
         raise FileNotFoundError(err_msg)
 
     if not skip_vfs_refresh:
@@ -195,9 +216,10 @@ def scan_library(db_path, library_id, physical_path, force=False, skip_vfs_refre
     except Exception as check_err:
         print(f"[Scanner-SelfHealing] 사전 무결성 점검 경고 (무시하고 계속): {check_err}")
 
+    result_summary = {}
     conn = database.get_connection(db_type)
     try:
-        _scan_library_internal(conn, db_path, library_id, physical_path, force, db_type, target_paths, is_remote, threads_to_use, library_errors, progress_callback=progress_callback)
+        _scan_library_internal(conn, db_path, library_id, physical_path, force, db_type, target_paths, is_remote, threads_to_use, library_errors, progress_callback=progress_callback, result_summary=result_summary)
     finally:
         try:
             conn.close()
@@ -205,13 +227,8 @@ def scan_library(db_path, library_id, physical_path, force=False, skip_vfs_refre
             pass
         gc.collect()
 
-    # Save scan result error reports
-    if library_errors:
-        try:
-            from utils.report_helper import save_scan_report
-            save_scan_report(library_id, library_errors)
-        except Exception as report_err:
-            print(f"[Scanner ERROR] Scan report save failed: {report_err}")
+    _save_report_unless_saved(library_id, library_errors, result_summary)
+    return result_summary
 
 @scanner_print_control_decorator
 def scan_library_path(db_path, library_id, target_path, force=False, skip_vfs_refresh=False):
@@ -257,13 +274,14 @@ def scan_library_path(db_path, library_id, target_path, force=False, skip_vfs_re
 
     threads_to_use = 1 if is_remote else MAX_SCANNER_THREADS
 
+    result_summary = {}
     conn = database.get_connection(db_type)
     try:
         from tools.scanner.path_utils import canonical_path
         _scan_library_internal(
             conn, db_path, library_id, target_path, force, db_type,
             [target_path], is_remote, threads_to_use, library_errors,
-            path_scope=canonical_path(target_path)
+            path_scope=canonical_path(target_path), result_summary=result_summary
         )
     finally:
         try:
@@ -272,12 +290,8 @@ def scan_library_path(db_path, library_id, target_path, force=False, skip_vfs_re
             pass
         gc.collect()
 
-    if library_errors:
-        try:
-            from utils.report_helper import save_scan_report
-            save_scan_report(library_id, library_errors)
-        except Exception as report_err:
-            print(f"[Scanner ERROR] Scan report save failed: {report_err}")
+    _save_report_unless_saved(library_id, library_errors, result_summary)
+    return result_summary
 
 
 @scanner_print_control_decorator

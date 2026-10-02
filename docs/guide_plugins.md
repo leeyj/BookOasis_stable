@@ -31,7 +31,8 @@
 | 1.0.8 | `search`, `apply` | `detail_sidebar_widget`, `get_detail_sidebar_data` | 도서 상세 페이지 사이드바("이 작가의 다른 도서" 등) 위젯 계약 추가 |
 | 1.0.9 | `search`, `apply` | `home_widget` | 사용자가 "홈 화면 플러그인 배치 모드"를 켰을 때만 노출되는 실제 홈 대시보드 위젯 계약 추가 (§5-1) |
 | 1.1.0 | `search`, `apply` | `detail_view` | 도서 상세 페이지 본문 전체를 대체하는 커스텀 화면 계약 추가 (세션별 단일 슬롯) |
-| 1.1.1+ (현재) | `search`, `apply` | `dashboard.html`/`dashboard.css`/`dashboard.js` | `home_widget`에 커스텀 CSS/이미지 허용 - 위젯별 Shadow DOM 격리 렌더링 (§5-1) |
+| 1.1.1 | `search`, `apply` | `dashboard.html`/`dashboard.css`/`dashboard.js` | `home_widget`에 커스텀 CSS/이미지 허용 - 위젯별 Shadow DOM 격리 렌더링 (§5-1) |
+| 1.1.2+ (현재, BookOasis 2.8.4+) | `search`, `apply` | `report_problem`, `resolve_problem` | 관리자 알림에 문제 카드 올리기/해결 - 베이스 클래스 헬퍼, 추가만 하는 계약 (아래 "관리자 알림 문제 카드") |
 
 호환성 원칙:
 
@@ -1268,6 +1269,48 @@ def get_dashboard_data(self, db_type, limit=10):
 
 `sample_plugins/metadata/pixiv_ranking/pixiv_ranking.py`의 `get_dashboard_data()`에
 실제 적용 예시가 있습니다(위젯이 열릴 때마다 Pixiv 랭킹을 다시 긁던 것을 5분 캐시로 개선).
+
+### 관리자 알림 문제 카드 (`report_problem` / `resolve_problem`, 선택)
+
+플러그인이 "관리자가 알아야 하는 문제"(토큰 만료, 외부 API 한도 초과, 특정 도서 처리 실패 등)를 상단 🔔 알림의
+**문제 카드**로 올릴 수 있습니다. 로그에만 남기면 관리자는 모릅니다 — 이 헬퍼를 쓰면 코어 문제 카드와 같은
+자리·같은 모양으로 보이고, 다음에 성공하면 자동으로 사라집니다.
+
+```python
+# 실패했을 때 (같은 code·대상으로 다시 부르면 새 줄 없이 횟수만 늘어남)
+if hasattr(self, "report_problem"):            # 구버전 코어 대비 기능 감지
+    self.report_problem(
+        "token_expired",                        # 플러그인 안에서만 유일하면 됨 (영문/숫자/_ . -, 64자)
+        severity="action_required",             # notice(기본, 참고) / action_required(빨간 점)
+        title="Spotify 계정 연결 만료",          # 문구는 플러그인이 직접 제공
+        detail="[다시 연결]을 눌러 계정을 다시 연결하세요.",
+        db_type=db_type,
+        target_type="system", target_id=None,   # 선택: book / series / library / system(기본)
+        action_id="spotify_oauth_start",        # 선택: 버튼 → run_context_menu_action(db_type, action_id, context)
+        action_label="다시 연결",
+        message=str(error),                     # 선택: 원문 오류 (보관용)
+    )
+
+# 다음에 성공했을 때 (열린 문제가 없으면 아무것도 안 함 - 매번 불러도 됨)
+if hasattr(self, "resolve_problem"):
+    self.resolve_problem("token_expired", db_type=db_type)
+```
+
+| 항목 | 규칙 |
+| :--- | :--- |
+| 저장 코드 | 코어가 `<plugin id>:<code>`로 저장, 출처는 `plugin:<plugin id>` → 다른 플러그인·코어 코드와 겹치지 않음 |
+| 카드 묶음 | 플러그인 x 코드 1장 (`group_key = plugin:<id>\|<code>\|-`). 카드 제목 앞에는 **플러그인 이름이 항상** 붙음 |
+| 대상 | `target_type="book"` + `target_id=book_id`면 코어가 시리즈/카테고리/경로를 채워 카드 안에서 시리즈별로 묶고 도서 줄에 [진단]을 붙임 |
+| 조치 버튼 | 새 API 없음. 기존 액션 RPC(`/api/media/context-menu/book/plugins/action`)로 `run_context_menu_action`이 불림. `context = {source: "problem_card", group_key, problem_code, target_type?, target_id?, book_id?}`. 결과에 `open_url`이 있으면 새 탭으로 엶 |
+| 노출 | **관리자만** (개인 알림 통로로 쓰지 않음). 관리자는 [알고 있음]으로 숨길 수 있고, 새 대상이 생기면 다시 보임 |
+| 상한 | 플러그인별 열린 문제 **1,000건**. 넘으면 마지막 발생이 오래된 것부터 해결 처리 |
+| 정리 | 플러그인을 **끄면** 열린 문제는 해결 처리. 서버 시작 시 꺼졌거나 폴더가 지워진 플러그인의 문제도 정리 |
+| 대량 판정 | 스캐너 전용 규칙(한 스캔 20% AND 20건)은 플러그인 문제에 적용하지 않음 |
+| 실패 처리 | 잘못된 인자·저장 실패여도 예외 없이 `False`만 반환 (플러그인 동작을 깨뜨리지 않음) |
+
+실제 사용 예: `sample_plugins/metadata/spotify_mood/spotify_mood.py` — 사용자 토큰 갱신이 거절되면
+`token_expired` 카드(조치 필요, [다시 연결])를 올리고, 갱신 성공·재연결·연결 해제 시 해결합니다.
+설계 배경: `docs/plan_unified_notification_queue.md` 3장 "결정: 플러그인 문제 카드 계약".
 
 ---
 

@@ -105,6 +105,7 @@
 - import 에러가 없나 확인합니다.
 - 클래스명과 파일명 매칭이 맞는지 확인합니다.
 - `id` 중복이 없는지 확인합니다.
+- 관리자가 알아야 하는 실패(토큰 만료·API 한도 등)는 로그만 남기지 말고 `self.report_problem()`으로 알림 문제 카드를 올리고, 성공하면 `self.resolve_problem()`으로 닫습니다 (`hasattr`로 기능 감지, [guide_plugins.md](guide_plugins.md) "관리자 알림 문제 카드").
 - 플러그인 폴더 안에 `__pycache__`를 직접 커밋하지 않습니다.
 
 자주 발생하는 실패 사례:

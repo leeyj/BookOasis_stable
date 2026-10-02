@@ -53,6 +53,26 @@ class _ScanFixture(unittest.TestCase):
             p = patch(target, return_value=value)
             p.start()
             self.addCleanup(p.stop)
+        # 스캔 끝 문제 기록(services/scan_problem_service.py)이 쓰는 general DB 연결도 이 임시 DB로 돌린다
+        # (안 그러면 개발 PC의 실제 DB에 기록이 남는다).
+        from contextlib import contextmanager
+        import database as database_module
+
+        @contextmanager
+        def _temp_connection(*_args, **_kwargs):
+            c = self._connect()
+            try:
+                yield c
+            finally:
+                c.close()
+
+        for name, value in (
+            ('get_connection', lambda *_a, **_k: self._connect()),
+            ('connection', _temp_connection),
+        ):
+            p = patch.object(database_module, name, value)
+            p.start()
+            self.addCleanup(p.stop)
         for name, value in (
             ('DB_DIR', base),
             ('check_memory_exceeded', lambda **_kw: False),
@@ -226,6 +246,35 @@ class TrashPurgeSkipsReappearedFilesTests(_ScanFixture):
         conn.close()
         self.assertEqual(rows, {self.book: 0})
 
+
+    def test_rescan_keeps_original_trash_time_so_auto_purge_happens(self):
+        """이미 휴지통에 있는 도서가 다시 '사라짐'으로 잡혀도 deleted_at이 갱신되지 않아야 7일 비우기가 동작한다."""
+        old = (datetime.datetime.now() - datetime.timedelta(days=3)).strftime('%Y-%m-%d %H:%M:%S')
+        gone = join_canonical(self.series_dir, 'gone.zip')
+        fresh = join_canonical(self.series_dir, 'fresh.zip')
+        legacy = join_canonical(self.series_dir, 'legacy.zip')
+        conn = self._connect()
+        for title, path, deleted, at in (('g', gone, 1, old), ('f', fresh, 0, None), ('l', legacy, 1, None)):
+            conn.execute(
+                "INSERT INTO books (library_id, title, file_path, file_format, total_pages, is_deleted, deleted_at) VALUES (1, ?, ?, 'zip', 0, ?, ?)",
+                (title, path, deleted, at),
+            )
+        conn.commit()
+        db_books = {r['file_path']: r['id'] for r in conn.execute("SELECT id, file_path FROM books")}
+
+        with patch('services.cover_storage_service.get_covers_dir', return_value=self.temp_dir.name):
+            ok = sync_detector.handle_deleted_books(
+                conn.cursor(), db_books, {gone, fresh, legacy}, [self.lib_root], {self.book}
+            )
+        conn.commit()
+
+        self.assertTrue(ok)
+        rows = {r['file_path']: (r['is_deleted'], r['deleted_at']) for r in conn.execute("SELECT file_path, is_deleted, deleted_at FROM books")}
+        conn.close()
+        self.assertEqual(rows[gone], (1, old))                  # 처음 휴지통에 들어간 시각 유지
+        self.assertEqual(rows[fresh][0], 1)
+        self.assertIsNotNone(rows[fresh][1])                    # 새로 사라진 도서는 지금 시각
+        self.assertIsNotNone(rows[legacy][1])                   # 시각이 비어 있던 예전 행은 채움
 
 if __name__ == '__main__':
     unittest.main()

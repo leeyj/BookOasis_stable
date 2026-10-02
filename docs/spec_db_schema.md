@@ -66,6 +66,10 @@ BookOasis는 **SQLite(기본값)** 와 **MariaDB/MySQL(엔터프라이즈 권장
 23. `settings`
 24. `plugin_load_events`
 
+**알림/문제 기록** (general DB 하나에 모음, 대상 DB는 `db_type` 컬럼)
+25. `problem_occurrences`
+26. `problem_groups`
+
 ---
 
 ## 3. 테이블 상세
@@ -223,10 +227,39 @@ BookOasis는 **SQLite(기본값)** 와 **MariaDB/MySQL(엔터프라이즈 권장
 
 ### scan_history
 
-완료된 스캔 작업 이력(스캐너 로그/통계용).
+완료된 스캔 작업 이력(스캐너 로그/통계, 알림센터 "최근 완료" 출처).
 
 - PK: `id`
-- 컬럼: `task_type`, `task_key`, `status`, `kwargs`, `enqueue_at`, `started_at`, `finished_at`, `error_message`, `created_at`
+- 컬럼: `task_type`, `task_key`, `status`, `kwargs`, `enqueue_at`, `started_at`, `finished_at`, `error_message`, `result_summary`, `created_at`
+- `kwargs.trigger_type`: 스캔 출처 `manual` / `cron` / `lazy` / `webhook` (없으면 예전 행)
+- `result_summary`(JSON): 카테고리 스캔 `{"new_books", "errors", "report_file"}`, 선택 도서 스캔 `{"books", "succeeded", "errors"}`. 그 밖의 작업은 NULL
+- 보관: 90일 지난 행은 서버 시작 시 정리
+
+### problem_occurrences
+
+알림센터 문제 카드의 발생 기록. **대상 1개 x 코드 1개 = 1행**이며 재발하면 횟수/마지막 시각만 늘어난다(UPSERT).
+설계: [plan_unified_notification_queue.md](plan_unified_notification_queue.md).
+
+- PK: `id`, UNIQUE `(code, db_type, target_type, target_id)`
+- `code`: 문제 종류 — 스캐너 `file_missing`/`mass_missing`/`remote_unavailable`/`file_corrupt`/`cover_missing`/`unknown`,
+  시스템 `system_task_failed`, 사용자 신고 `user_report`, 플러그인 `<plugin id>:<code>`
+- `severity`: `action_required`(빨간 점) / `notice` / `auto_fixed`
+- `source`: `scanner` / `system` / `viewer` / `plugin:<plugin id>`
+- `target_type` + `target_id`: `book`(book_id) / `series`(`"library_id|series_name"`) / `library`(library_id) / `system`(작업 키, 플러그인은 `-`)
+- `series_key`: `"library_id|series_name"` (도서가 지워져도 시리즈별로 묶기 위함, 화면 비노출)
+- `group_key`: 카드 키 = `code|db_type|library_id` (플러그인은 `plugin:<id>|<code>|-`)
+- `title`/`detail`: 플러그인이 준 문구 (코어 코드는 i18n 키로 표시하므로 비어 있음)
+- `message`(원문 오류, 500자), `context`(JSON: 신고자, 플러그인 id/이름/조치 등)
+- 시각: `first_seen_ms`, `last_seen_ms`, `resolved_ms` (epoch ms — DB 시간대와 무관)
+- `status`: `open` / `resolved`. 해결된 행은 30일 뒤 서버 시작 시 정리. 카테고리 삭제 시 그 카테고리 행 삭제
+
+### problem_groups
+
+카드(group_key) 단위 상태 — "알고 있음"(음소거).
+
+- PK: `group_key`
+- 컬럼: `muted_ms`, `muted_count` (음소거할 때의 열린 개수 - 그보다 늘어나면 다시 보인다)
+- 열린 행이 없어진 카드의 행은 자동 삭제
 
 ### scanner_progress
 
@@ -536,8 +569,44 @@ CREATE TABLE IF NOT EXISTS scan_history (
     started_at TEXT,
     finished_at TEXT,
     error_message TEXT,
+    result_summary TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS problem_occurrences (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL,
+    severity TEXT NOT NULL DEFAULT 'notice',
+    source TEXT NOT NULL DEFAULT 'system',
+    db_type TEXT NOT NULL DEFAULT 'general',
+    library_id INTEGER DEFAULT NULL,
+    target_type TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    target_path TEXT,
+    series_key TEXT,
+    group_key TEXT NOT NULL,
+    title TEXT,
+    detail TEXT,
+    message TEXT,
+    context TEXT,
+    occurrence_count INTEGER NOT NULL DEFAULT 1,
+    first_seen_ms INTEGER NOT NULL,
+    last_seen_ms INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open',
+    resolved_ms INTEGER DEFAULT NULL,
+    UNIQUE(code, db_type, target_type, target_id)
+);
+
+CREATE TABLE IF NOT EXISTS problem_groups (
+    group_key TEXT PRIMARY KEY,
+    muted_ms INTEGER DEFAULT NULL,
+    muted_count INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_problem_occurrences_status_group ON problem_occurrences(status, group_key);
+CREATE INDEX IF NOT EXISTS idx_problem_occurrences_last_seen ON problem_occurrences(last_seen_ms);
+CREATE INDEX IF NOT EXISTS idx_problem_occurrences_target ON problem_occurrences(db_type, target_type, target_id);
+CREATE INDEX IF NOT EXISTS idx_problem_occurrences_library ON problem_occurrences(db_type, library_id);
 
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -867,7 +936,42 @@ CREATE TABLE IF NOT EXISTS scan_history (
     started_at VARCHAR(50),
     finished_at VARCHAR(50),
     error_message TEXT,
+    result_summary TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS problem_occurrences (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(150) NOT NULL,
+    severity VARCHAR(30) NOT NULL DEFAULT 'notice',
+    source VARCHAR(150) NOT NULL DEFAULT 'system',
+    db_type VARCHAR(20) NOT NULL DEFAULT 'general',
+    library_id BIGINT DEFAULT NULL,
+    target_type VARCHAR(20) NOT NULL,
+    target_id VARCHAR(255) NOT NULL,
+    target_path TEXT,
+    series_key TEXT,
+    group_key VARCHAR(255) NOT NULL,
+    title TEXT,
+    detail TEXT,
+    message TEXT,
+    context TEXT,
+    occurrence_count INT NOT NULL DEFAULT 1,
+    first_seen_ms BIGINT NOT NULL,
+    last_seen_ms BIGINT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'open',
+    resolved_ms BIGINT DEFAULT NULL,
+    UNIQUE KEY uq_problem_occurrences_target (code, db_type, target_type, target_id),
+    INDEX idx_problem_occurrences_status_group (status, group_key),
+    INDEX idx_problem_occurrences_last_seen (last_seen_ms),
+    INDEX idx_problem_occurrences_target (db_type, target_type, target_id),
+    INDEX idx_problem_occurrences_library (db_type, library_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS problem_groups (
+    group_key VARCHAR(255) PRIMARY KEY,
+    muted_ms BIGINT DEFAULT NULL,
+    muted_count INT NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE IF NOT EXISTS scanner_progress (

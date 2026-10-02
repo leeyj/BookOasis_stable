@@ -66,6 +66,10 @@ Tables common to both engines and all 3 DBs (24 total):
 23. `settings`
 24. `plugin_load_events`
 
+**Notifications / problem records** (kept in the general DB; the target DB is the `db_type` column)
+25. `problem_occurrences`
+26. `problem_groups`
+
 ---
 
 ## 3. Table Details
@@ -223,10 +227,39 @@ Background scanner job queue (pending/running/completed state).
 
 ### scan_history
 
-History of completed scan jobs (used for scanner logs/stats).
+History of completed scan jobs (scanner logs/stats and the source of "recent" items in the notification center).
 
 - PK: `id`
-- Columns: `task_type`, `task_key`, `status`, `kwargs`, `enqueue_at`, `started_at`, `finished_at`, `error_message`, `created_at`
+- Columns: `task_type`, `task_key`, `status`, `kwargs`, `enqueue_at`, `started_at`, `finished_at`, `error_message`, `result_summary`, `created_at`
+- `kwargs.trigger_type`: scan origin `manual` / `cron` / `lazy` / `webhook` (absent on older rows)
+- `result_summary` (JSON): category scans `{"new_books", "errors", "report_file"}`, selected-book scans `{"books", "succeeded", "errors"}`. NULL for other jobs
+- Retention: rows older than 90 days are pruned at server start
+
+### problem_occurrences
+
+Occurrence records behind the notification center's problem cards. **One row per target x code**; a recurrence only
+bumps the count and last-seen time (UPSERT). Design: [plan_unified_notification_queue.md](plan_unified_notification_queue.md).
+
+- PK: `id`, UNIQUE `(code, db_type, target_type, target_id)`
+- `code`: problem kind — scanner `file_missing`/`mass_missing`/`remote_unavailable`/`file_corrupt`/`cover_missing`/`unknown`,
+  system `system_task_failed`, user report `user_report`, plugins `<plugin id>:<code>`
+- `severity`: `action_required` (red dot) / `notice` / `auto_fixed`
+- `source`: `scanner` / `system` / `viewer` / `plugin:<plugin id>`
+- `target_type` + `target_id`: `book` (book_id) / `series` (`"library_id|series_name"`) / `library` (library_id) / `system` (task key, `-` for plugins)
+- `series_key`: `"library_id|series_name"` (groups by series even after the book is deleted; not shown on screen)
+- `group_key`: card key = `code|db_type|library_id` (plugins: `plugin:<id>|<code>|-`)
+- `title`/`detail`: wording supplied by plugins (empty for core codes, which are shown through i18n keys)
+- `message` (raw error, 500 chars), `context` (JSON: reporter, plugin id/name/action, ...)
+- Times: `first_seen_ms`, `last_seen_ms`, `resolved_ms` (epoch ms — independent of DB time zones)
+- `status`: `open` / `resolved`. Resolved rows are purged at server start after 30 days; deleting a category deletes its rows
+
+### problem_groups
+
+Per-card (group_key) state — "Got it" (mute).
+
+- PK: `group_key`
+- Columns: `muted_ms`, `muted_count` (open count when muted - the card shows again once it grows past that)
+- Rows of cards that no longer have open rows are removed automatically
 
 ### scanner_progress
 
@@ -537,8 +570,44 @@ CREATE TABLE IF NOT EXISTS scan_history (
     started_at TEXT,
     finished_at TEXT,
     error_message TEXT,
+    result_summary TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS problem_occurrences (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL,
+    severity TEXT NOT NULL DEFAULT 'notice',
+    source TEXT NOT NULL DEFAULT 'system',
+    db_type TEXT NOT NULL DEFAULT 'general',
+    library_id INTEGER DEFAULT NULL,
+    target_type TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    target_path TEXT,
+    series_key TEXT,
+    group_key TEXT NOT NULL,
+    title TEXT,
+    detail TEXT,
+    message TEXT,
+    context TEXT,
+    occurrence_count INTEGER NOT NULL DEFAULT 1,
+    first_seen_ms INTEGER NOT NULL,
+    last_seen_ms INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open',
+    resolved_ms INTEGER DEFAULT NULL,
+    UNIQUE(code, db_type, target_type, target_id)
+);
+
+CREATE TABLE IF NOT EXISTS problem_groups (
+    group_key TEXT PRIMARY KEY,
+    muted_ms INTEGER DEFAULT NULL,
+    muted_count INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_problem_occurrences_status_group ON problem_occurrences(status, group_key);
+CREATE INDEX IF NOT EXISTS idx_problem_occurrences_last_seen ON problem_occurrences(last_seen_ms);
+CREATE INDEX IF NOT EXISTS idx_problem_occurrences_target ON problem_occurrences(db_type, target_type, target_id);
+CREATE INDEX IF NOT EXISTS idx_problem_occurrences_library ON problem_occurrences(db_type, library_id);
 
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -868,7 +937,42 @@ CREATE TABLE IF NOT EXISTS scan_history (
     started_at VARCHAR(50),
     finished_at VARCHAR(50),
     error_message TEXT,
+    result_summary TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS problem_occurrences (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(150) NOT NULL,
+    severity VARCHAR(30) NOT NULL DEFAULT 'notice',
+    source VARCHAR(150) NOT NULL DEFAULT 'system',
+    db_type VARCHAR(20) NOT NULL DEFAULT 'general',
+    library_id BIGINT DEFAULT NULL,
+    target_type VARCHAR(20) NOT NULL,
+    target_id VARCHAR(255) NOT NULL,
+    target_path TEXT,
+    series_key TEXT,
+    group_key VARCHAR(255) NOT NULL,
+    title TEXT,
+    detail TEXT,
+    message TEXT,
+    context TEXT,
+    occurrence_count INT NOT NULL DEFAULT 1,
+    first_seen_ms BIGINT NOT NULL,
+    last_seen_ms BIGINT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'open',
+    resolved_ms BIGINT DEFAULT NULL,
+    UNIQUE KEY uq_problem_occurrences_target (code, db_type, target_type, target_id),
+    INDEX idx_problem_occurrences_status_group (status, group_key),
+    INDEX idx_problem_occurrences_last_seen (last_seen_ms),
+    INDEX idx_problem_occurrences_target (db_type, target_type, target_id),
+    INDEX idx_problem_occurrences_library (db_type, library_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS problem_groups (
+    group_key VARCHAR(255) PRIMARY KEY,
+    muted_ms BIGINT DEFAULT NULL,
+    muted_count INT NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE IF NOT EXISTS scanner_progress (

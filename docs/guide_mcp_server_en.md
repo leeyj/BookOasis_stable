@@ -91,6 +91,9 @@ mcp dev tools/mcp_server.py
 | `find_missing_genre_and_tags` | Books with both genre and tags empty |
 | `find_missing_offsets` | zip/cbz books missing their page-offset cache and needing a rescan (remote-mounted files such as rclone/GDrive are automatically excluded) |
 | `find_duplicate_series` | Cases where the exact same series name is scattered across 2+ categories |
+| `list_problems` | Open problem cards from the notification center (missing files, held mass disappearance, remote drive disconnected, corrupt files, failing background tasks, user reports, plugin problems, ...; plugin cards carry name/title/detail in `plugin`) |
+| `get_problem_card` | Per-series breakdown of one problem card; with `series_key`, the books in that series |
+| `diagnose_book` | Diagnose one book: DB record / remote connection / file exists / file format checklist with the cause and suggested action (read-only) |
 | `run_readonly_query` | Run raw read-only (SELECT/WITH/EXPLAIN/PRAGMA) SQL against the library DB |
 | `read_logs` | Tail the last N lines of a server log under `logs/` (with an optional search filter) |
 | `call_api` | Call an existing GET REST API endpoint (`docs/api_endpoints.md`) directly |

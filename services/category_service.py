@@ -409,6 +409,8 @@ class CategoryService:
                 print(f"[CategoryService ERROR] Bulk report file removal failed: {e}")
 
             CategoryRepository.delete_library(db_type, library_id)
+            from services.problem_service import ProblemService
+            ProblemService.on_library_deleted(db_type, library_id)
             try:
                 from utils.redis_helper import redis_del
                 redis_del(f"status:scan:stage:library_scan_{db_type}_{library_id}")
@@ -502,6 +504,9 @@ class CategoryService:
         # 4. 트랜잭션 수행
         CategoryRepository.move_library_transaction(from_type, to_type, library_id, lib["name"], lib, books)
         _refresh_series_summaries(from_type, to_type)
+        # 구 DB 기준으로 남은 문제 기록은 더 이상 가리키는 대상이 없다 (다음 스캔이 새 DB 기준으로 다시 기록).
+        from services.problem_service import ProblemService
+        ProblemService.on_library_deleted(from_type, library_id)
         
         # 5. 이관 후 구 DB의 디스크 공간 회수를 위해 백그라운드로 튜닝 구동
         import threading

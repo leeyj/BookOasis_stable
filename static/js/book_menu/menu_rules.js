@@ -21,6 +21,12 @@ export function getLazyScanSeriesTarget(book) {
   return { libraryId, seriesName };
 }
 
+// [진단]은 관리자 + 일반/성인 도서(스캐너 문제 기록 범위)에서만.
+export function isDiagnoseAllowed(user, libraryType) {
+  return String(user?.role || '').trim().toLowerCase() === 'admin'
+    && ['general', 'adult'].includes(String(libraryType || '').toLowerCase());
+}
+
 export function isLazyScanAllowed(user, libraryType) {
   const dbType = String(libraryType || '').toLowerCase();
   return String(user?.role || '').trim().toLowerCase() === 'admin'
@@ -30,7 +36,7 @@ export function isLazyScanAllowed(user, libraryType) {
 /**
  * 메뉴 대상(target)과 환경(env)으로 항목별 표시 상태를 계산한다.
  * target: { isVolumeDetail, selectedBooks, seriesName, markUnreadScope, libraryId, fileFormat, bookCount, hasProgress }
- * env: { lazyScanAllowed, listenable, ttsPregenEnabled, isVideoLibrary, metaSearchAvailable(true|false|null) }
+ * env: { lazyScanAllowed, diagnoseAllowed, listenable, ttsPregenEnabled, isVideoLibrary, metaSearchAvailable(true|false|null) }
  * 반환: { title, items: { [elementId]: { visible?, action?, iconClass?, iconColor?, labelKey?, labelFallback?, labelText?, setI18n? } } }
  *   visible이 undefined면 표시 상태를 건드리지 않는다. labelKey가 있으면 i18n(labelKey) || labelFallback || 현재 문구.
  */
@@ -57,6 +63,10 @@ export function computeBookMenuState(target, env = {}) {
     labelKey: lazySeriesTarget ? 'context_menu.lazy_scan_series' : 'context_menu.lazy_scan_book',
     labelFallback: lazySeriesTarget ? 'Lazy-Scanner 실행 (시리즈 전체)' : 'Lazy-Scanner 실행 (선택/클릭한 작품)',
   };
+
+  // [진단]: 도서 1권 단위라 시리즈 집계 카드(여러 권)와 다중 선택에서는 숨긴다
+  const singleBook = !!target?.isVolumeDetail || (Number(target?.bookCount) || 1) <= 1;
+  items['ctx-diagnose-book'] = { visible: !isMulti && !!env.diagnoseAllowed && singleBook };
 
   // "페이지 넘김으로 보기(실험적)"는 이미지 기반 만화(zip/cbz)에서만 의미가 있음
   items['ctx-page-turn-book'] = { visible: !isMulti && (fmt === 'zip' || fmt === 'cbz') };

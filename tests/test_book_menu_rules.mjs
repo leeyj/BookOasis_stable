@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const source = await readFile(new URL('../static/js/book_menu/menu_rules.js', import.meta.url), 'utf8');
-const { computeBookMenuState, getBookScanScope, getLazyScanSeriesTarget, isLazyScanAllowed } = await import(
+const { computeBookMenuState, getBookScanScope, getLazyScanSeriesTarget, isDiagnoseAllowed, isLazyScanAllowed } = await import(
   `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`
 );
 
@@ -97,4 +97,17 @@ test('metadata search visibility is left alone until the plugin list is known', 
   assert.equal(computeBookMenuState(seriesCard, { metaSearchAvailable: null }).items['ctx-search-meta-book'].visible, undefined);
   assert.equal(computeBookMenuState(seriesCard, { metaSearchAvailable: true }).items['ctx-search-meta-book'].visible, true);
   assert.equal(computeBookMenuState(seriesCard, { metaSearchAvailable: false }).items['ctx-search-meta-book'].visible, false);
+});
+
+test('diagnose: admin + general/adult only, single book (volume or 1-book card), never multi', () => {
+  assert.equal(isDiagnoseAllowed({ role: 'admin' }, 'general'), true);
+  assert.equal(isDiagnoseAllowed({ role: 'admin' }, 'adult'), true);
+  assert.equal(isDiagnoseAllowed({ role: 'admin' }, 'audiobook'), false);
+  assert.equal(isDiagnoseAllowed({ role: 'user' }, 'general'), false);
+  const env = { diagnoseAllowed: true };
+  assert.equal(computeBookMenuState(volumeCard, env).items['ctx-diagnose-book'].visible, true);
+  assert.equal(computeBookMenuState({ ...seriesCard, bookCount: 1 }, env).items['ctx-diagnose-book'].visible, true);
+  assert.equal(computeBookMenuState(seriesCard, env).items['ctx-diagnose-book'].visible, false);
+  assert.equal(computeBookMenuState(multi([volumeCard, volumeCard]), env).items['ctx-diagnose-book'].visible, false);
+  assert.equal(computeBookMenuState(volumeCard, {}).items['ctx-diagnose-book'].visible, false);
 });

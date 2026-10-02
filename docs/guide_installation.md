@@ -188,6 +188,9 @@ BOOKOASIS_ENABLE_EMBEDDED_WORKER=true gunicorn --workers 1 --bind 0.0.0.0:5930 -
 ./manage.sh start
 ```
 * `manage.sh` 경로는 웹과 스캐너 워커를 별도 프로세스로 관리하며, 웹 프로세스의 내장 워커는 자동으로 비활성화됩니다.
+* 스캐너 워커가 비정상 종료되면 3초 뒤 자동으로 다시 시작됩니다(`tools/scanner_worker_supervisor.sh`). `./manage.sh stop`은 다시 띄우지 않고 정상 종료합니다.
+* 전용 워커로 운영할 때(`manage.sh`, Docker, systemd 등 `BOOKOASIS_ENABLE_EMBEDDED_WORKER=false`) 웹은 워커를 대신 띄우지 않습니다. 작업이 등록됐는데 워커가 없으면 상단 🔔 알림에 "스캐너 워커 (전용 프로세스)" 경고가 뜨고, 워커가 다시 시작되면 사라집니다.
+* Docker 판별은 `/.dockerenv` 파일 기준입니다. Podman 등 다른 컨테이너에서 워커를 따로 띄운다면 `BOOKOASIS_ENABLE_EMBEDDED_WORKER=false`를 명시하세요 (명시하지 않으면 웹과 전용 워커가 함께 떠 워커가 둘이 될 수 있습니다).
 
 ### 3) Docker 기반 실행 가이드 (Docker Compose)
 

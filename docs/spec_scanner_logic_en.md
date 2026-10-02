@@ -204,6 +204,21 @@ Cover images are resolved through the following fallback chain, designed to mini
 ### ⑯ Real-Time Deletion Watch, Restoration, and Auto-Empty Trash Policy
 * **Deletion detection and soft delete** (`tools/scanner/sync_detector.py::handle_deleted_books`):
   - A book that no longer appears anywhere in the physical file tree is soft-deleted: `books.is_deleted = 1`, `deleted_at = CURRENT_TIMESTAMP`.
+  - **`deleted_at` keeps the time the book first went to the trash.** The scanner's "missing" list also contains books already in the
+    trash; previously every scan re-stamped their time, so the 7-day auto-empty never happened for frequently scanned categories
+    (fixed 2026-10-02). Only older rows with an empty time get the current time. MariaDB evaluates `SET` left to right, so
+    `deleted_at` is assigned before `is_deleted`.
+* **Pre-deletion safety gate** (`services/scan_problem_service.py::gate_deletions`, decided right before moving books to the trash):
+  - **Category root/mount unreachable** (missing, empty or erroring) -> deletion sync is skipped entirely for this scan (including
+    restore and the 7-day purge). A "remote drive disconnected" card (action required) appears and clears itself on the next scan
+    after the connection is back. This check cannot be turned off.
+  - **Root is fine but many books vanish in one scan** (20%+ of the category AND 20+ books, `get_mass_missing_thresholds`) ->
+    moving the newly missing books to the trash is held and a "possible mass move/delete" card appears. When the admin presses
+    [Move to trash], only books whose files are still missing are moved.
+  - Otherwise books go to the trash as before and are recorded as `file_missing` (notice).
+  - File errors (corrupt files, cover failures, ...) are also recorded in `problem_occurrences` and resolved automatically when the
+    next scan finds them healthy. Problem records are written after the scan transaction commits (avoids SQLite lock conflicts).
+    Admins can check one book at a time with book [Diagnose].
 * **Restoration**: if a path that was previously soft-deleted reappears during a scan, it's automatically restored — `is_deleted = 0`, `deleted_at = NULL` — simply by putting the file back.
 * **Auto hard-delete after 7 days**: books soft-deleted more than 7 days ago are permanently purged on every subsequent scan — `user_progress`, `user_reading_log`, `book_offsets`, and the `books` record are all removed within one transaction, and the associated physical cover image file is deleted from disk too. This policy works in concert with the manual trash-management feature in [services/trash_service.py](../services/trash_service.py).
 * **Emergency-brake safeguard**: if a scan finds **`0`** physical files, it's far more likely that a mounted network drive got unmounted or a path is misconfigured than that the user actually deleted everything. In this case all delete/restore processing is **force-cancelled**, a warning is logged, and the session exits immediately, to prevent the DB from being mass-wiped.

@@ -96,6 +96,8 @@ class TrashService:
                         except Exception:
                             pass
             print(f"[TrashService] Successfully hard deleted {len(target_ids)} books from DB and storage.")
+            from services.problem_service import ProblemService
+            ProblemService.on_books_deleted(db_type, target_ids)
             return True
         except Exception as e:
             print(f"[TrashService ERROR] Failed to empty trash: {e}")

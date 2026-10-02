@@ -158,6 +158,51 @@ def find_duplicate_series(db_type: str = "general") -> dict:
 
 
 @mcp.tool()
+def list_problems(include_muted: bool = False) -> dict:
+    """알림센터의 열린 문제 카드 목록 (웹 알림센터와 같은 데이터).
+    카드 = 문제 종류(code) x 카테고리. 예: file_missing(휴지통으로 옮긴 사라진 파일, 참고),
+    mass_missing(한 스캔에서 대량으로 사라져 휴지통 이동 보류 - 관리자 확인 필요),
+    remote_unavailable(카테고리 루트/마운트 접근 불가 - 삭제 처리 전부 보류), file_corrupt, cover_missing,
+    system_task_failed(계속 실패 중인 백그라운드 작업), user_report(사용자가 뷰어에서 보낸 신고),
+    '<plugin id>:<code>'(플러그인이 올린 문제 - card.plugin에 플러그인 이름/제목/설명). 자세한 내역은 get_problem_card(group_key)로,
+    도서 1권 원인은 diagnose_book으로 보세요."""
+    def _run():
+        from services.problem_service import ProblemService
+        cards = ProblemService.list_cards(include_muted=bool(include_muted))
+        return {'count': len(cards), 'cards': cards}
+    return _quiet(_run)
+
+
+@mcp.tool()
+def get_problem_card(group_key: str, series_key: str = "", offset: int = 0, limit: int = 50) -> dict:
+    """문제 카드 하나의 내역. series_key 없이 부르면 시리즈별 줄 목록(시리즈명, 열린 권수, 시리즈 전체 권수,
+    재스캔용 scan_path), series_key("library_id|시리즈명")를 주면 그 시리즈의 도서 목록(페이지 단위)을 돌려줍니다.
+    조치(재스캔/휴지통 이동)는 이 도구로 하지 않습니다 - 웹 알림센터에서 관리자가 실행하세요."""
+    def _run():
+        from services.problem_card_service import get_card, get_card_items
+        if series_key:
+            data = get_card_items(group_key, series_key=series_key, offset=offset, limit=limit)
+        else:
+            data = get_card(group_key, offset=offset, limit=limit)
+        if data is None:
+            return {'resolved': True, 'message': '열린 카드가 없습니다 (이미 해결됐거나 잘못된 group_key).'}
+        return data
+    return _quiet(_run)
+
+
+@mcp.tool()
+def diagnose_book(db_type: str = "general", book_id: int = 0) -> dict:
+    """도서 1권 진단 체크리스트 (웹 도서 메뉴 [진단]과 같은 결과). db_type: general / adult.
+    checks: db(DB 기록·휴지통 여부) → library → remote(카테고리 루트/마운트) → file(파일 존재) → format(압축/PDF 머리말),
+    각 항목 status = ok/fail/warn/skip. conclusion.key가 원인(diagnose.result.*), actions는 권장 조치(재스캔)입니다.
+    읽기만 하며 아무것도 고치지 않습니다 - 재스캔은 웹에서 실행하세요."""
+    def _run():
+        from services.book_diagnosis_service import diagnose_book as run
+        return run(db_type, int(book_id))
+    return _quiet(_run)
+
+
+@mcp.tool()
 def get_version() -> dict:
     """실행 중인 BookOasis의 버전을 반환합니다 (VERSION 파일 기준: dashboard 본체 버전,
     state, 그리고 migrator/extensions/API/DBMS 등 컴포넌트별 버전)."""

@@ -334,7 +334,7 @@
     "section_libraries": "보관함",
     "admin_tools": "관리 도구",
     "add_group": "그룹 추가",
-    "scan_activity": "스캔 활동",
+    "scan_activity": "알림",
     "account": "계정"
   },
   "smart_recommend": {
@@ -433,6 +433,7 @@
     "ticker_default_msg": "현재 백그라운드 작업이 구동 중입니다."
   },
   "context_menu": {
+    "diagnose": "진단 (파일·연결 점검)",
     "tts_listen": "음성으로 듣기",
     "tts_pregen": "음성 미리 만들기",
     "scan_now": "지금 스캔",
@@ -459,6 +460,8 @@
     "mark_series_as_read": "이 시리즈 전체를 읽은 상태로 변경 (완독)"
   },
   "viewer": {
+    "report_sent": "관리자에게 알렸습니다.",
+    "report_failed": "알리지 못했습니다. 잠시 후 다시 시도해 주세요.",
     "tab_nav": "이동",
     "tab_layout": "보기",
     "tab_style": "스타일",
@@ -932,7 +935,7 @@
     "pregen_https": "HTTPS 주소에서만 요청할 수 있습니다",
     "pregen_confirm": "이 책을 서버에서 지금 듣기 설정으로 미리 만들까요?",
     "pregen_menu": "음성 미리 만들기",
-    "pregen_confirm_menu": "\"{title}\"을(를) 서버에서 음성으로 미리 만들까요?\n설정: {conf}\n(진행 상황은 스캔 활동에 표시됩니다)",
+    "pregen_confirm_menu": "\"{title}\"을(를) 서버에서 음성으로 미리 만들까요?\n설정: {conf}\n(진행 상황은 알림에 표시됩니다)",
     "pregen_already": "이미 미리 만드는 중입니다",
     "auto_next": "챕터가 끝나면 다음 챕터 이어서",
     "display": "화면",
@@ -973,5 +976,190 @@
     "quality_compact": "절약",
     "hours": "{n}시간",
     "minutes": "{n}분"
+    },
+
+  "diagnose": {
+    "title": "진단",
+    "running": "진단 중... (원격 드라이브는 몇 초 걸릴 수 있습니다)",
+    "rerun": "다시 진단",
+    "open_problems": "열린 문제 기록",
+    "action": {
+      "rescan_folder": "폴더 재스캔",
+      "rescan_book": "이 책 재스캔"
+    },
+    "check": {
+      "db": {
+        "ok": "DB 기록 정상",
+        "trashed": "휴지통에 있음 · {purge} 자동 삭제 예정",
+        "missing": "DB에 도서 기록이 없습니다 (ID {id})"
+      },
+      "library": {
+        "missing": "카테고리를 찾을 수 없습니다 (ID {id})"
+      },
+      "remote": {
+        "ok": "원격 드라이브·카테고리 폴더 연결 정상",
+        "unreachable": "카테고리 폴더에 접근할 수 없음 — {path}",
+        "timeout": "카테고리 폴더가 응답하지 않음 ({seconds}초)",
+        "remote_url": "원격 URL 도서라 연결 점검 생략"
+      },
+      "file": {
+        "ok": "파일 있음 ({size})",
+        "missing": "파일 없음 — {path}",
+        "empty": "파일 크기가 0입니다 — {path}",
+        "timeout": "파일 확인이 응답하지 않음 ({seconds}초)",
+        "remote_url": "원격 URL 도서라 파일 점검 생략"
+      },
+      "format": {
+        "ok": "파일 형식 정상",
+        "bad": "{format} 파일이 아니거나 손상됨",
+        "skip": "형식 점검 대상 아님",
+        "timeout": "형식 확인이 응답하지 않음 ({seconds}초)"
+      }
+    },
+    "result": {
+      "healthy": "이상이 없습니다.",
+      "healthy_with_problems": "지금은 정상입니다. 아래 열린 문제 기록 {count}건은 재스캔하거나 카드에서 정리하세요.",
+      "no_record": "DB에 이 도서가 없습니다 (이미 영구 삭제되었을 수 있습니다).",
+      "no_library": "도서가 속한 카테고리가 없습니다.",
+      "remote_url": "원격 URL 도서는 서버에서 파일을 직접 확인하지 않습니다.",
+      "remote_unavailable": "원격 드라이브(마운트) 연결이 끊긴 것 같습니다. 연결이 돌아올 때까지 스캐너는 도서를 지우지 않습니다.",
+      "remote_slow": "원격 드라이브가 느리게 응답합니다. 잠시 후 다시 진단해 보세요.",
+      "file_moved": "파일이 이동되거나 삭제된 것 같습니다. 폴더를 재스캔하면 새 위치를 찾거나 휴지통으로 옮깁니다.",
+      "trashed_missing": "파일이 없어 휴지통에 있습니다. 7일 뒤 자동으로 삭제됩니다.",
+      "trashed_but_present": "파일이 다시 있습니다. 폴더를 재스캔하면 휴지통에서 복구됩니다.",
+      "file_corrupt": "파일이 손상된 것 같습니다. 원본 파일을 확인한 뒤 재스캔하세요."
+    }
+  },
+  "problems": {
+    "code": {
+      "file_missing": {"title": "파일 없음 · 휴지통으로 이동됨", "detail": "파일이 원래 위치에 없어 휴지통으로 옮겼습니다 (7일 뒤 자동 삭제)."},
+      "mass_missing": {"title": "대량 이동/삭제 의심", "detail": "한 번의 스캔에서 많은 파일이 사라졌습니다. 폴더 이름 변경 등을 확인한 뒤 처리하세요. 확인 전까지 휴지통으로 옮기지 않습니다."},
+      "cover_missing": {"title": "표지 추출 실패", "detail": "표지를 만들지 못했습니다."},
+      "remote_unavailable": {"title": "원격 드라이브 연결 끊김", "detail": "카테고리 폴더에 접근할 수 없습니다. 마운트 상태를 확인하세요. 연결이 돌아올 때까지 도서를 지우지 않습니다."},
+      "file_corrupt": {"title": "파일 손상", "detail": "파일이 손상되어 열 수 없습니다."},
+      "metadata_invalid": {"title": "도서 정보 이상", "detail": "도서 정보 일부가 비정상입니다."},
+      "system_task_failed": {"title": "백그라운드 작업 실패", "detail": "자동으로 도는 작업이 계속 실패하고 있습니다."},
+      "user_report": {"title": "사용자 신고", "detail": "사용자가 도서를 열다 오류를 만나 알려 왔습니다. 진단으로 확인한 뒤 [해결됨]으로 닫으세요."},
+      "unknown": {"title": "알 수 없는 오류", "detail": "분류되지 않은 오류입니다. 관리자에게 알려 주세요."}
+    },
+    "action": {
+      "plugin_action": "실행",
+      "resolve": "해결됨",
+      "diagnose": "진단",
+      "rescan": "재스캔",
+      "move_to_trash": "휴지통으로 이동",
+      "check_mount": "마운트 상태 확인",
+      "hide": "숨기기",
+      "auto_fix": "자동 복구",
+      "report": "관리자에게 알리기",
+      "rescan_all": "모두 재스캔",
+      "rescan_series": "시리즈 재스캔",
+      "confirm_trash": "확인 후 휴지통으로",
+      "confirm_trash_prompt": "아직 파일이 없는 {count}권을 휴지통으로 옮길까요? (7일 뒤 자동 삭제)",
+      "mute": "알고 있음",
+      "unmute": "다시 알림",
+      "more": "더 보기",
+      "queued": "재스캔을 등록했습니다.",
+      "done": "처리했습니다.",
+      "failed": "처리하지 못했습니다: {error}"
+    },
+    "line": {
+      "system": "공통 (특정 도서와 무관)",
+      "series_all": "{name} — {count}권 전체",
+      "series_some": "{name} — {total}권 중 {count}권",
+      "series_count": "{name} — {count}권",
+      "library": "카테고리 전체",
+      "no_series": "(시리즈 없음)"
+    }
+  },
+
+  "notify": {
+    "clear": "지우기",
+    "clear_hint": "완료 기록을 지우고 참고 알림을 '알고 있음'으로 둡니다 (진행 중·조치 필요 항목은 남습니다)",
+    "cleared": "알림 {count}건을 지웠습니다.",
+    "clear_undo": "되돌리기",
+    "clear_undone": "지운 알림을 되돌렸습니다.",
+    "clear_failed": "알림을 지우지 못했습니다.",
+    "title": "알림",
+    "empty": "새 알림이 없습니다.",
+    "unread": "새 알림",
+    "summary": {
+      "idle": "대기 중",
+      "running": "진행 중 {count}건",
+      "action": "조치 필요 {count}건",
+      "unread": "새 알림 {count}건",
+      "recent": "최근 {count}건"
+    },
+    "label": {
+      "error": "에러",
+      "running": "진행",
+      "pending": "대기",
+      "new": "신규",
+      "done": "완료",
+      "muted": "취소",
+      "notice": "참고"
+    },
+    "scan": {
+      "selected_books": "선택 도서 {count}권",
+      "whole_system": "전체 시스템",
+      "library_fallback": "카테고리 #{id} ({db_type})",
+      "background": "백그라운드 작업",
+      "task": {
+        "library_scan": "카테고리 스캔",
+        "cover_scan": "표지 스캔",
+        "lazy_scan": "미디어 검색",
+        "batch_book_scan": "선택 도서 스캔",
+        "gdrive_copy": "Drive 복사",
+        "default": "백그라운드 작업"
+      },
+      "running": {
+        "library_scan": "카테고리 스캔 진행 중",
+        "cover_scan": "표지 스캔 진행 중",
+        "lazy_scan": "미디어 검색 진행 중",
+        "batch_book_scan": "선택 도서 스캔 진행 중",
+        "gdrive_copy": "Drive 복사 진행 중",
+        "default": "백그라운드 작업 진행 중"
+      },
+      "pending": {
+        "library_scan": "카테고리 스캔 대기 중",
+        "cover_scan": "표지 스캔 대기 중",
+        "lazy_scan": "미디어 검색 대기 중",
+        "batch_book_scan": "선택 도서 스캔 대기 중",
+        "gdrive_copy": "Drive 복사 대기 중",
+        "default": "작업 대기 중"
+      },
+      "status": {
+        "completed": "{task} 완료",
+        "failed": "{task} 실패",
+        "cancelled": "{task} 취소"
+      },
+      "new_books": "새 도서 {count}권",
+      "failed_books": "실패 {count}권",
+      "batch_result": "성공 {succeeded}/{total}",
+      "no_change": "변화 없음"
+    },
+    "tts": {
+      "queued": "음성 생성 대기 중 · {total}조각",
+      "running": "음성 생성 중 {percent}% ({done} / {total})",
+      "done": "음성 준비됨",
+      "failed": "음성 생성 실패",
+      "cancelled": "음성 생성 취소",
+      "adult_suffix": " (성인)"
+    },
+    "system": {
+      "maintenance": "시스템 유지보수",
+      "db_tuning": "DB 최적화(튜닝) 진행 중",
+      "failing": "계속 실패 중",
+      "last_ok": "마지막 성공 {when}",
+      "first_failed": "첫 실패 {when}",
+      "fail_count": "연속 {count}회 실패"
+    },
+    "elapsed": {"seconds": "{n}초", "minutes": "{n}분", "hours": "{h}시간 {m}분"},
+    "problem": {
+      "scope": "{library} · {count}건",
+      "library": "{library}",
+      "plugin_scope": "{count}건",
+      "remote_multi": "카테고리 {count}개"
+    }
   }
 }

@@ -98,3 +98,21 @@ Provides dynamic shortcut recording to avoid system-level key collisions (especi
    - To bypass module closure constraints and delay, the global event listener dynamically parses LocalStorage on keydown events to compare keycodes in real-time, providing instant shortcut updates without requiring a page refresh.
 * **VIEW_LOG Env-based Global Monkey Patch**:
    - Flask reads `VIEW_LOG` from `.env` and passes it to the frontend via index.html templates. If not set to `true`, a global monkey patch replaces `console.log` and `console.warn` with empty functions, reducing rendering overhead. `console.error` remains intact for diagnostic tracking.
+
+---
+
+## 7. [NEW] Unified Notification Center and Problem Cards
+
+### 💡 Overview
+Scan progress/results, voice pre-generation, system warnings and file problems are gathered under the single top 🔔, showing
+**"what / why / what to press"** instead of raw error text. It was designed after a September 2026 incident in which a summary-table
+rebuild failed for 12 days with the failure only in the logs. Details: [plan_unified_notification_queue.md](plan_unified_notification_queue.md).
+
+### 🛠️ Implementation
+* **Common item adapter** (`services/notification_service.py`): converts the scan queue, `scan_history` (result-summary JSON), voice pre-generation and problem cards into one shape, filters them per logged-in user (audience) and returns them as `notifications[]` in `/api/system/status`. The renderer (`notification_render.js`) knows nothing about permissions.
+* **Record finely, notify in groups** (`problem_occurrences`): one row per target x code (UPSERT), so even tens of thousands of failures from a dropped mount stay bounded by the number of targets. Cards group by problem kind x category and fold by series inside.
+* **Cause check before destructive actions** (`scan_problem_service.gate_deletions`): an unreachable root/mount skips deletion sync, and 20% AND 20+ books vanishing in one scan holds the move to the trash until an admin confirms.
+* **Auto-resolve and mute**: rows resolve when the next scan finds them healthy, and a card whose count reaches 0 disappears. "Got it" hides a card only up to its current count.
+* **[Diagnose] and user reports**: a one-book checklist (`book_diagnosis_service`, file-system checks are time-limited) and [Notify administrator] at viewer errors (`user_report`).
+* **Two front doors**: the web UI and MCP tools (`list_problems`, `get_problem_card`, `diagnose_book`) call the same services.
+* **Plugin contract**: plugins raise their own cards with `self.report_problem()` / `self.resolve_problem()` (namespaced codes, 1,000 open cap, cleanup on disable; see [guide_plugins_en.md](guide_plugins_en.md)).

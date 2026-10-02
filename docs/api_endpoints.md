@@ -1108,7 +1108,7 @@ MCP 서버(`tools/mcp_server.py`)의 Tier B 쓰기 도구(`propose_bulk_book_met
 ## ⚡ 10. 스캐너 & 비동기 작업 큐 API (`scan` / `system`)
 
 ### `[GET]` `/api/system/status`
-* **설명**: 상단 스캔 활동 패널과 카테고리 스피너가 사용하는 경량 실시간 상태 API입니다. 실행 중 작업 1건, 대기 작업 목록, DB 튜닝 여부를 반환합니다.
+* **설명**: 상단 🔔 알림 패널과 카테고리 스피너가 사용하는 경량 실시간 상태 API입니다. 실행 중 작업 1건, 대기 작업 목록, DB 튜닝 여부와 알림 목록(`notifications[]`)을 반환합니다.
 * **권한**: 로그인 사용자 (`@login_required`)
 * **캐시 정책**: `no-store`, `no-cache`
 * **쿼리 파라미터**:
@@ -1162,6 +1162,12 @@ MCP 서버(`tools/mcp_server.py`)의 Tier B 쓰기 도구(`propose_bulk_book_met
   * `raw_status.pending`: 대기 작업 배열
   * `stage`: 워커가 세부 단계를 기록한 경우에만 값이 있으며 일반 스캔에서는 `null`일 수 있음
   * 파일 단위 진행률이나 현재 파일 경로는 현재 응답 계약에 포함되지 않음
+  * `notifications`: 알림센터 공통 항목 배열 (`services/notification_service.py`). 로그인 사용자 기준으로 이미 걸러져 있다
+    (스캔·문제 카드·시스템 경고는 관리자만, 음성 미리 만들기는 요청자 본인 + 관리자). 항목 필드:
+    `id`, `track_key`, `kind`(`problem`/`running`/`recent`), `tone`(`error`/`running`/`new`/`done`/`muted`/`notice`),
+    `source`(`scan`/`tts`/`system`/`problem`/`plugin`), `severity`, `title` 또는 `title_key`+`title_vars`,
+    `detail`(`[{key, vars}]` i18n 조각), `raw_detail`, `target`, `actions`, `progress`, `created_at`/`updated_at`(타임존 포함 ISO),
+    `read`, 문제 카드는 `card`(`group_key`, `code`, `library`, `open_count`, `plugin` 등). 순서: 문제 → 진행 중 → 최근 완료(7일, 최대 50건)
 
 ---
 
@@ -1295,6 +1301,73 @@ MCP 서버(`tools/mcp_server.py`)의 Tier B 쓰기 도구(`propose_bulk_book_met
   * `200`: 취소 성공
   * `400`: `task_id` 누락
   * `404`: 해당 대기 작업을 찾지 못함
+
+---
+
+## 🔔 10.5 알림센터 & 문제 카드 API (`notifications` / `problems`)
+
+설계: [plan_unified_notification_queue.md](plan_unified_notification_queue.md). 알림 목록 자체는 `/api/system/status`의 `notifications[]`로 내려간다.
+재스캔은 별도 API 없이 기존 `/api/media/libraries/<id>/scan`, `/scan-path`, `/api/media/books/scan-batch`를 쓴다.
+플러그인 문제 카드의 조치 버튼은 기존 `/api/media/context-menu/book/plugins/action`(`context.source = "problem_card"`)을 쓴다.
+
+### `[POST]` `/api/notifications/seen`
+* **설명**: 알림을 닫은 시각을 사용자별로 기록한다(`NOTIFICATIONS_LAST_SEEN_MS`). 이 시각 이후에 바뀐 항목만 `read: false`.
+* **권한**: 로그인 사용자 · **응답**: `{"success": true, "seen_ms": 1790900000000}`
+
+### `[POST]` `/api/notifications/clear`
+* **설명**: [지우기]. 최근 완료 항목을 이 사용자에게서 숨기고(`NOTIFICATIONS_CLEARED_MS`, 기록은 유지), 관리자면 참고(notice) 문제 카드를 일괄 음소거한다. 진행 중·조치 필요 항목은 건드리지 않는다.
+* **권한**: 로그인 사용자 (카드 음소거는 관리자일 때만, 공용 상태라 모든 관리자에게 적용)
+* **응답**: `{"success": true, "previous_cleared_ms": 0, "cleared_ms": 1790901054882, "muted_group_keys": ["cover_missing|general|80"]}`
+
+### `[POST]` `/api/notifications/clear/undo`
+* **설명**: [지우기] 되돌리기. 직전 `cleared_ms`로 돌리고 그때 음소거한 카드를 해제한다(해제는 관리자만).
+* **권한**: 로그인 사용자
+* **요청 본문(JSON)**: `{"previous_cleared_ms": 0, "muted_group_keys": ["cover_missing|general|80"]}` · 잘못된 값이면 400
+
+### `[GET]` `/api/problems/card`
+* **설명**: 카드 하나와 시리즈별 줄 목록 (`N권 전체 / M권 중 N권`, 재스캔용 `scan_path`).
+* **권한**: `@admin_required` · **쿼리**: `group_key`(필수, `code|db_type|library_id`), `offset`, `limit`(최대 200) · 해결된 카드면 404 `{"resolved": true}`
+
+### `[GET]` `/api/problems/card/items`
+* **설명**: 카드(또는 그 안 시리즈 한 줄)의 도서 목록 페이지. 플러그인 카드면 행별 `detail`, `plugin_action`이 붙는다.
+* **권한**: `@admin_required` · **쿼리**: `group_key`, `series_key`(선택, `library_id|series_name`), `offset`, `limit`
+
+### `[POST]` `/api/problems/card/mute`
+* **설명**: [알고 있음]. 지금 개수까지 숨기고 대상이 늘어나면 다시 보인다. `{"unmute": true}`면 해제.
+* **권한**: `@admin_required` · **요청 본문**: `{"group_key": "..."}`
+
+### `[POST]` `/api/problems/card/confirm-trash`
+* **설명**: `mass_missing` 카드에서 지금도 파일이 없는 도서만 휴지통으로 옮긴다. 카테고리 루트에 접근할 수 없으면 409로 거절한다.
+* **권한**: `@admin_required` · **요청 본문**: `{"group_key": "mass_missing|general|80"}`
+
+### `[POST]` `/api/problems/card/resolve`
+* **설명**: [해결됨]. 사용자 신고(`user_report`)처럼 스캐너가 자동 해제할 근거가 없는 카드의 열린 행을 모두 해결 처리한다. 그 밖의 카드(스캐너·플러그인)는 400.
+* **권한**: `@admin_required` · **요청 본문**: `{"group_key": "user_report|general|80"}` · **응답**: `{"success": true, "resolved": 1}`
+
+### `[GET]` `/api/problems/diagnose`
+* **설명**: 도서 1권 [진단] — DB 기록 → 카테고리/마운트 → 파일 존재 → 파일 형식(zip 계열·PDF 머리말) 체크리스트와 결론·권장 조치. 읽기만 한다. 파일 시스템 점검은 15초 제한(넘으면 `remote_slow`). MCP `diagnose_book`과 같은 결과.
+* **권한**: `@admin_required` · **쿼리**: `type`(`general`/`adult`), `book_id` · 그 밖의 type이나 잘못된 id는 400
+* **응답 예시**:
+  ```json
+  {
+    "success": true,
+    "book": {"id": 3, "title": "...", "file_path": "...", "library": "만화", "is_deleted": false, "deleted_at": ""},
+    "checks": [
+      {"id": "db", "status": "ok", "key": "diagnose.check.db.ok", "vars": {}},
+      {"id": "remote", "status": "ok", "key": "diagnose.check.remote.ok", "vars": {}},
+      {"id": "file", "status": "fail", "key": "diagnose.check.file.missing", "vars": {"path": "..."}}
+    ],
+    "conclusion": {"key": "diagnose.result.file_moved", "vars": {}},
+    "actions": [{"id": "rescan_path", "library_id": 80, "scan_path": "원피스"}],
+    "problems": []
+  }
+  ```
+
+### `[POST]` `/api/problems/user-report`
+* **설명**: [관리자에게 알리기]. 뷰어 오류 자리에서 보낸 신고를 `user_report` 문제(참고)로 기록한다. 같은 도서 재신고는 횟수만 증가.
+* **권한**: 로그인 사용자 — 본인이 볼 수 있는 도서만(카테고리 권한·성인 권한), 사용자당 1시간 30건(초과 429)
+* **요청 본문(JSON)**: `{"type": "general", "book_id": 2, "where": "viewer", "message": "Failed to load image", "format": "zip"}`
+* **응답**: `{"success": true, "book_id": 2, "title": "..."}` · 볼 수 없는 도서 404
 
 ---
 

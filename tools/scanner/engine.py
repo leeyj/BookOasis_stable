@@ -137,7 +137,26 @@ def _dispatch_new_books_to_plugin_hooks(db_type, event_payload):
         except Exception as hook_err:
             print(f"[Scanner-PluginHook] provider={meta.get('id')} failed: {hook_err}")
 
-def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_type, target_paths, is_remote, threads_to_use, library_errors, path_scope=None, progress_callback=None):
+def _record_scan_problems(db_type, library_id, *, library_errors, trashed_paths, db_books, found_file_paths,
+                          processed_paths, scope_paths, held):
+    """스캔 끝(스캔 트랜잭션 커밋 후): 휴지통 이동/파일 오류를 문제로 남기고, 다시 정상이 된 대상을 해제한다."""
+    if db_type not in ('general', 'adult'):
+        return
+    try:
+        from services import scan_problem_service
+        with database.connection(db_type) as problem_conn:
+            problem_cursor = problem_conn.cursor()
+            scan_problem_service.record_trashed(problem_cursor, db_type, library_id, trashed_paths, db_books)
+            error_paths = scan_problem_service.record_scan_errors(problem_cursor, db_type, library_id, library_errors)
+            scan_problem_service.reconcile(
+                problem_cursor, db_type, library_id, found_file_paths=found_file_paths,
+                processed_paths=processed_paths, error_paths=error_paths, scope_paths=scope_paths, held=held,
+            )
+    except Exception as problem_err:
+        print(f"[Scanner] problem record skipped: {problem_err}")
+
+
+def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_type, target_paths, is_remote, threads_to_use, library_errors, path_scope=None, progress_callback=None, result_summary=None):
     cursor = conn.cursor()
     # 스캔 활동창용 진행 알림(폴더 탐색 수, 처리 완료 도서 파일 수). 콜백이 없으면 아무 일도 하지 않는다.
     progress = LibraryScanProgress(progress_callback)
@@ -477,6 +496,8 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
     pending_updates = []
     pending_folders = []
     detected_new_books = []
+    # 이번 스캔에서 실제로 다시 처리한 파일/폴더 (문제 기록 해제 판단용 - services/scan_problem_service.reconcile)
+    processed_file_paths = set()
     folder_processing_errors = []
     db_write_missing = []
 
@@ -669,6 +690,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     processed_folders_count += 1
                     continue
 
+                processed_file_paths.add(root_folder)
                 dir_mtime = res.get('dir_mtime')
                 meta_mtime = res.get('meta_mtime')
                 merged_meta = res['merged_meta']
@@ -684,6 +706,7 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                     banner_only_update = bool(item.get('banner_image')) and full_path in db_banner_missing
                     if item['skip'] and not banner_only_update:
                         continue
+                    processed_file_paths.add(full_path)
 
                     filename = item['filename']
                     file_format = item['file_format']
@@ -845,6 +868,9 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
         if not flush_pending_data(is_final=True):
             raise RuntimeError('Scanner final flush failed due to persistent DB contention.')
         print(f"[Scanner-DB] Final flush done db={db_type} library_id={library_id}")
+        # 삭제 동기화가 안전 차단으로 중단돼도(아래 return) 이미 등록된 새 도서 수는 남긴다.
+        if result_summary is not None:
+            result_summary['new_books'] = len(detected_new_books)
         log_pool_stats('scan-final-flush')
         cleanup_jsonl_file()
 
@@ -861,8 +887,19 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
 
 
     # 3. Real-time deletion monitoring: Remove book info disappeared from file system
-    print(f"[Scanner-DB] Deletion sync begin db={db_type} library_id={library_id}")
-    if not handle_deleted_books(cursor, db_books, deleted_paths, target_paths, found_file_paths):
+    # 대량 사라짐/루트 접근 불가면 이번 스캔은 휴지통 이동을 보류한다 (services/scan_problem_service.py).
+    # 문제 기록은 general DB에 쓰므로(SQLite면 같은 파일일 수 있음) 열린 쓰기 트랜잭션 없이 판단한다.
+    _commit_with_retry(conn, 'pre-deletion-gate')
+    from services import scan_problem_service
+    deletion_ok, deletion_held, newly_missing_paths = scan_problem_service.gate_deletions(
+        cursor, db_type, library_id, deleted_paths, db_books, target_paths, len(found_file_paths)
+    )
+    # 휴지통 이동 자체는 기존과 같은 목록(deleted_paths)으로 한다 - 문제 기록만 새로 사라진 도서로 남긴다.
+    trashed_paths = set(newly_missing_paths) if deletion_ok else set()
+    print(f"[Scanner-DB] Deletion sync begin db={db_type} library_id={library_id} held={deletion_held}")
+    if deletion_held == 'root':
+        print(f"[Scanner-DB] Deletion sync skipped (library root unreachable) db={db_type} library_id={library_id}")
+    elif not handle_deleted_books(cursor, db_books, set(deleted_paths) if deletion_ok else set(), target_paths, found_file_paths):
         print(f"[Scanner-DB] Deletion sync aborted db={db_type} library_id={library_id}")
         conn.close()
         return
@@ -905,12 +942,24 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
     # Save scan result error reports
     if folder_processing_errors:
         library_errors.extend(folder_processing_errors)
+    _record_scan_problems(
+        db_type, library_id, library_errors=library_errors, trashed_paths=trashed_paths, db_books=db_books,
+        found_file_paths=found_file_paths, processed_paths=processed_file_paths,
+        scope_paths=[path_scope] if path_scope else target_paths, held=deletion_held,
+    )
+    report_file = None
     if library_errors:
         try:
             from utils.report_helper import save_scan_report
-            save_scan_report(library_id, library_errors)
+            report_file = save_scan_report(library_id, library_errors)
         except Exception as report_err:
             print(f"[Scanner ERROR] Scan report save failed: {report_err}")
+    if result_summary is not None:
+        result_summary.update({
+            'new_books': len(detected_new_books),
+            'errors': len(library_errors),
+            'report_file': report_file,
+        })
 
     if detected_new_books:
         def _async_event_worker(books, target_db, lib_id, lib_name):

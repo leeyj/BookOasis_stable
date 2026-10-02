@@ -28,7 +28,8 @@ This document describes the current plugin standard for BookOasis metadata/dashb
 | 1.0.8 | `search`, `apply` | `detail_sidebar_widget`, `get_detail_sidebar_data` | Added book detail page sidebar widget contract ("More by this author", etc.) |
 | 1.0.9 | `search`, `apply` | `home_widget` | Added the actual home-dashboard widget contract, shown only when a user turns on "home dashboard plugin layout mode" (§5-1) |
 | 1.1.0 | `search`, `apply` | `detail_view` | Added a contract for replacing the entire book detail page body with a custom screen (single slot per session) |
-| 1.1.1+ (current) | `search`, `apply` | `dashboard.html`/`dashboard.css`/`dashboard.js` | `home_widget` can now use full custom CSS/images - rendered in a per-widget Shadow DOM for isolation (§5-1) |
+| 1.1.1 | `search`, `apply` | `dashboard.html`/`dashboard.css`/`dashboard.js` | `home_widget` can now use full custom CSS/images - rendered in a per-widget Shadow DOM for isolation (§5-1) |
+| 1.1.2+ (current, BookOasis 2.8.4+) | `search`, `apply` | `report_problem`, `resolve_problem` | Raise/resolve problem cards in the admin notifications - base-class helpers, additive contract (see "Admin Notification Problem Cards") |
 
 Compatibility rules:
 
@@ -1129,6 +1130,49 @@ def get_dashboard_data(self, db_type, limit=10):
 
 See `sample_plugins/metadata/pixiv_ranking/pixiv_ranking.py`'s `get_dashboard_data()` for a
 real example (it used to re-scrape the Pixiv ranking on every widget refresh; now cached 5 min).
+
+
+### Admin Notification Problem Cards (`report_problem` / `resolve_problem`, optional)
+
+A plugin can raise "something the admin should know" (expired token, external API quota exceeded, a book it failed
+to process, ...) as a **problem card** in the top 🔔 notifications. Logging alone means the admin never sees it —
+with these helpers it shows up in the same place and shape as core problem cards and disappears once you succeed again.
+
+```python
+# On failure (calling again with the same code/target only bumps the count, no new row)
+if hasattr(self, "report_problem"):            # feature detection for older cores
+    self.report_problem(
+        "token_expired",                        # unique within your plugin (letters/digits/_ . -, max 64)
+        severity="action_required",             # notice (default) / action_required (red dot)
+        title="Spotify connection expired",     # wording is provided by the plugin
+        detail="Press [Reconnect] to connect the account again.",
+        db_type=db_type,
+        target_type="system", target_id=None,   # optional: book / series / library / system (default)
+        action_id="spotify_oauth_start",        # optional: button -> run_context_menu_action(db_type, action_id, context)
+        action_label="Reconnect",
+        message=str(error),                     # optional: raw error (kept for reference)
+    )
+
+# On the next success (no-op when nothing is open - safe to call every time)
+if hasattr(self, "resolve_problem"):
+    self.resolve_problem("token_expired", db_type=db_type)
+```
+
+| Topic | Rule |
+| :--- | :--- |
+| Stored code | Core stores `<plugin id>:<code>` with source `plugin:<plugin id>` -> never collides with other plugins or core codes |
+| Grouping | One card per plugin x code (`group_key = plugin:<id>\|<code>\|-`). The **plugin name is always** prefixed to the card title |
+| Targets | With `target_type="book"` + `target_id=book_id`, core fills series/category/path, groups the card by series and adds [Diagnose] to the book row |
+| Action button | No new API. The existing action RPC (`/api/media/context-menu/book/plugins/action`) calls `run_context_menu_action` with `context = {source: "problem_card", group_key, problem_code, target_type?, target_id?, book_id?}`. An `open_url` in the result opens in a new tab |
+| Audience | **Admins only** (not a channel for personal notifications). Admins can hide a card with [Got it]; it reappears when new targets are added |
+| Cap | **1,000** open problems per plugin. Beyond that, the ones last seen longest ago are resolved |
+| Cleanup | **Disabling** a plugin resolves its open problems. At server start, problems of plugins that are disabled or whose folder was removed are resolved too |
+| Mass rule | The scanner-only rule (20% AND 20 in one scan) does not apply to plugin problems |
+| Failures | Invalid arguments or storage errors never raise - the helper just returns `False` |
+
+Working example: `sample_plugins/metadata/spotify_mood/spotify_mood.py` — when the user-token refresh is rejected it
+raises a `token_expired` card (action required, [Reconnect]) and resolves it on a successful refresh, reconnect or disconnect.
+Background: `docs/plan_unified_notification_queue.md` section 3, "Decision: plugin problem card contract".
 
 ---
 

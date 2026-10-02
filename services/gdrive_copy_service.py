@@ -48,6 +48,7 @@ class GdriveCopyService:
 
         enqueued = scanner_queue.enqueue(
             'gdrive_copy',
+            trigger_type='manual',
             db_type=db_type,
             remote=remote,
             dest_local_path=dest_local_path,

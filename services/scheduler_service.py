@@ -611,7 +611,7 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
             try:
                 # 재시도는 스캔을 처음부터 다시 시작하므로 이전 시도의 진행 표시 상태를 비운다.
                 scan_progress_reporter.reset()
-                scan_library(
+                result_summary = scan_library(
                     db_path, library_id, physical_path, force=force,
                     skip_vfs_refresh=vfs_refreshed_in_wrapper,
                     progress_callback=scan_progress_reporter,
@@ -647,6 +647,8 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
         msg = f"스캔 성공 완료 - DB={db_type}, LibraryID={library_id}, 소요시간={duration:.2f}초"
         print(f"[Scanner-Trigger] ✅ {msg}")
         write_scan_log(msg)
+        # 알림센터 "최근 완료"용 결과 요약 (새 도서 수/에러 수) - 큐 워커가 scan_history에 남긴다.
+        return result_summary
     except Exception as e:
         # 3. 실패 시 'failed' 기록
         duration, _ = scan_elapsed(start_time)
@@ -680,7 +682,7 @@ def run_lazy_scanner_job():
     """백그라운드 스캐너 작업을 큐에 적재"""
     from services.scanner_queue import scanner_queue
     print("[Scheduler] Lazy cover scanner job scheduled -> Enqueuing if no Lazy-Scanner is active...")
-    scanner_queue.enqueue('lazy_scan')
+    scanner_queue.enqueue('lazy_scan', trigger_type='lazy')
 
 
 

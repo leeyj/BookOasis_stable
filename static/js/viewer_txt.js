@@ -17,6 +17,15 @@ let txtPageSnapTimeout = null;
 let txtPageSnapInProgress = false;
 let txtPendingRestoreTimer = null;
 let txtRestoreToastAt = 0;
+// 페이지 모드 위치 앵커 (화면 크기가 바뀌어도 보던 글자를 따라간다, txt_anchor_utils.js 참고)
+let txtStableAnchor = null;        // 마지막으로 페이지가 자리 잡았을 때 보이던 글자
+let txtHeldAnchor = null;          // 앱을 내릴 때 잡아 둔 글자 - 돌아온 직후 잠시 이것을 기준으로 삼는다
+let txtHeldAnchorUntil = 0;
+let txtHeldLayoutKey = '';
+let txtResizePendingWhileHidden = false;
+let txtRelayoutForResize = null;   // setupTxtViewerRuntimeListeners의 handleResize
+const TXT_HELD_ANCHOR_MS = 3000;
+let txtAnchorFreezeUntil = 0;      // 자동 재조판 직후의 스크롤로는 기준 글자를 바꾸지 않는다
 const epubChapterFetchInFlight = new Set();
 const epubChapterRetryState = new Map();
 
@@ -76,7 +85,12 @@ import { initPageStep, initReadingDirection, getComicReadingDirection } from './
 import { getTxtPageAdvanceWidth, snapTxtPageScrollLeft, isTxtScrollLeftAtMaxPage, getTxtPageMaxScroll, applyTxtTwoPageTrailingSpacer, applyTxtImageMaxHeight } from './viewer/txt_page_utils.js';
 import { chunkText, formatTxtToHtml, stripHtml } from './viewer/txt_text_utils.js';
 import { renderTxtChunkView, applyTxtParagraphStyles } from './viewer/txt_render.js';
-import { getTxtAnchorInfoByMode, restoreTxtAnchorInfoByMode } from './viewer/txt_anchor_utils.js';
+import {
+  getTxtAnchorInfoByMode,
+  restoreTxtAnchorInfoByMode,
+  captureTxtPageAnchor,
+  locateTxtPageAnchor,
+} from './viewer/txt_anchor_utils.js';
 import { findAnchorOffset, chunkStarts } from './viewer/text_position_utils.js';
 import { setReadPositionProvider, fetchSyncState, listenTargetForTxt, listenTargetForEpub } from './viewer/tts_sync.js';
 import { applyTxtSettingsCore, applyFontFamilyToElement as applyTxtFontFamily } from './viewer/txt_settings_apply.js';
@@ -129,6 +143,96 @@ function hydrateEpubChapterWindow(centerIdx, radius = 10) {
 function retryVisibleEpubPlaceholders(maxCount = 8) {
   retryVisibleEpubPlaceholdersExt(txtChunks, maxCount);
 }
+
+// ---- 페이지 모드 위치 앵커: 앱을 내렸다 올려도 보던 페이지 유지 (2026-10-02, iPad 2~3페이지 밀림 신고) ----
+function isTxtPageViewerActive() {
+  if (!['txt', 'epub'].includes(state.currentViewerFormat)) return false;
+  if ((localStorage.getItem('viewer_scroll_mode') || 'page') !== 'page') return false;
+  const modal = document.getElementById('media-viewer-modal');
+  const pane = document.getElementById('txt-viewer-container');
+  return !!(modal && modal.style.display !== 'none' && pane && pane.style.display !== 'none'
+    && document.getElementById('txt-scroll-wrapper'));
+}
+
+function txtLayoutKey() {
+  return `${window.innerWidth}x${window.innerHeight}`;
+}
+
+function captureCurrentTxtPageAnchor() {
+  return captureTxtPageAnchor({
+    scrollWrapper: document.getElementById('txt-scroll-wrapper'),
+    contentArea: document.getElementById('txt-content-area'),
+    chunkIdx: currentChunkIdx,
+  });
+}
+
+function locateCurrentTxtPageAnchor(anchor) {
+  const scrollWrapper = document.getElementById('txt-scroll-wrapper');
+  return locateTxtPageAnchor({
+    scrollWrapper,
+    contentArea: document.getElementById('txt-content-area'),
+    anchor,
+    chunkIdx: currentChunkIdx,
+    advanceWidth: getTxtPageAdvanceWidth(scrollWrapper),
+  });
+}
+
+function heldTxtPageAnchor() {
+  return txtHeldAnchor && Date.now() < txtHeldAnchorUntil ? txtHeldAnchor : null;
+}
+
+// 사용자가 넘겨서 페이지가 자리 잡을 때마다 보이는 글자를 기억한다. 숨겨져 있거나, 복귀 직후이거나,
+// 재조판 때문에 생긴 스크롤이면 갱신하지 않는다 - 그때마다 '지금 페이지 첫 글자'로 바꾸면
+// 화면을 돌릴 때마다 한 페이지씩 앞으로 밀린다.
+function rememberStableTxtPageAnchor() {
+  if (document.hidden || heldTxtPageAnchor() || Date.now() < txtAnchorFreezeUntil) return;
+  const anchor = captureCurrentTxtPageAnchor();
+  if (anchor) txtStableAnchor = anchor;
+}
+
+// 재조판 전 기준 글자: 복귀 직후면 잡아 둔 글자, 아니면 사용자가 마지막으로 넘겨 자리 잡은 글자(같은 챕터일 때),
+// 그것도 없으면 지금 페이지 첫 글자. 지금 화면에서 다시 잡지 않는 이유: 화면을 돌리면 브라우저가 이 처리(100ms 디바운스)
+// 보다 먼저 다단 레이아웃을 다시 배치해, 그 시점의 '지금 페이지'는 이미 다른 본문이다.
+function txtAnchorBeforeRelayout() {
+  const held = heldTxtPageAnchor();
+  if (held) return held;
+  if (txtStableAnchor && txtStableAnchor.chunkIdx === currentChunkIdx) return txtStableAnchor;
+  return captureCurrentTxtPageAnchor();
+}
+
+function onTxtViewerVisibilityChange() {
+  if (!isTxtPageViewerActive()) return;
+  if (document.hidden) {
+    // 숨기기 직전 화면은 아직 정상 배치 - 지금 보이는 글자를 잡고, 실패하면 마지막으로 자리 잡았던 글자를 쓴다.
+    txtHeldAnchor = captureCurrentTxtPageAnchor() || txtStableAnchor;
+    txtHeldAnchorUntil = Number.MAX_SAFE_INTEGER;
+    txtHeldLayoutKey = txtLayoutKey();
+    return;
+  }
+  if (!txtHeldAnchor) return;
+  // 돌아온 뒤 잠시(크기 변화 이벤트가 늦게 오는 동안)는 잡아 둔 글자를 기준으로 삼는다.
+  txtHeldAnchorUntil = Date.now() + TXT_HELD_ANCHOR_MS;
+  setTimeout(() => requestAnimationFrame(() => {
+    if (document.hidden || !isTxtPageViewerActive() || !heldTxtPageAnchor()) return;
+    const sizeChanged = txtLayoutKey() !== txtHeldLayoutKey;
+    if ((txtResizePendingWhileHidden || sizeChanged) && typeof txtRelayoutForResize === 'function') {
+      txtResizePendingWhileHidden = false;
+      txtRelayoutForResize();
+      return;
+    }
+    // 크기는 그대로여도 숨겨진 사이 브라우저가 한 번 다시 배치했을 수 있다 - 글자가 있는 페이지로 되돌린다.
+    const wrapper = document.getElementById('txt-scroll-wrapper');
+    const target = locateCurrentTxtPageAnchor(txtHeldAnchor);
+    if (wrapper && target !== null && Math.abs(target - wrapper.scrollLeft) > 2) {
+      console.log(`[Viewer-Txt] 복귀 후 위치 보정: ${Math.round(wrapper.scrollLeft)} -> ${Math.round(target)}`);
+      txtAnchorFreezeUntil = Date.now() + 800;
+      wrapper.scrollLeft = target;
+      snapTxtPageScrollLeft(wrapper);
+    }
+  }), 250);
+}
+
+document.addEventListener('visibilitychange', onTxtViewerVisibilityChange);
 
 // 스크롤/터치/리사이즈 런타임 리스너를 등록한다. EPUB과 일반 TXT 두 로딩 경로
 // 모두에서 호출되어야 한다 — 예전에는 TXT 경로에만 있어서 EPUB 책은 브라우저
@@ -312,6 +416,11 @@ function setupTxtViewerRuntimeListeners() {
     const wrapper = document.getElementById('txt-scroll-wrapper');
     if (!wrapper) return;
     const mode = localStorage.getItem('viewer_scroll_mode') || 'page';
+    // 앱이 숨겨진 동안(iPad 앱 전환기 스냅샷 등)의 크기 변화로는 다시 조판하지 않는다 - 돌아오면 한 번만 한다.
+    if (document.hidden) {
+      txtResizePendingWhileHidden = true;
+      return;
+    }
 
     const currentWidth = window.innerWidth;
     const widthChanged = Math.abs(currentWidth - lastWindowWidth) > 5;
@@ -324,14 +433,24 @@ function setupTxtViewerRuntimeListeners() {
       // 인덱스 재구성 대신 "마지막 페이지였다"는 사실 자체를 보존한다.
       const wasAtLastPage = isTxtScrollLeftAtMaxPage(wrapper);
       const currentColumnIdx = Math.round(wrapper.scrollLeft / prevStepWidth);
+      // 보던 글자를 기억한다. 열 번호는 폭/높이가 바뀌면 다른 본문을 가리키므로 앵커를 못 찾을 때만 쓴다.
+      const anchor = txtAnchorBeforeRelayout();
       // Resize relayout should preserve current visual page, not stale saved localStorage position.
       applyTxtSettings({ previousMode: mode, skipSavedPositionRestore: true });
       const contentArea = document.getElementById('txt-content-area');
       applyTxtImageMaxHeight(wrapper, contentArea);
       applyTxtTwoPageTrailingSpacer(wrapper, contentArea);
       const newStepWidth = getTxtPageAdvanceWidth(wrapper);
-      wrapper.scrollLeft = wasAtLastPage ? getTxtPageMaxScroll(wrapper) : currentColumnIdx * newStepWidth;
+      const anchored = anchor ? locateCurrentTxtPageAnchor(anchor) : null;
+      txtAnchorFreezeUntil = Date.now() + 800;
+      console.log(`[Viewer-Txt] 리사이즈 위치 유지: anchor=${anchor ? `${anchor.chunkIdx}/${anchor.blockIndex}/${anchor.charOffset}` : 'none'} -> ${anchored === null ? 'fallback(열 번호)' : Math.round(anchored)}`);
+      if (anchored !== null) {
+        wrapper.scrollLeft = anchored;
+      } else {
+        wrapper.scrollLeft = wasAtLastPage ? getTxtPageMaxScroll(wrapper) : currentColumnIdx * newStepWidth;
+      }
       snapTxtPageScrollLeft(wrapper);
+      txtHeldLayoutKey = txtLayoutKey();
       logActiveViewportText();
     } else {
       // In scroll mode, mobile address bar toggles change height only. Skip DOM re-render if width hasn't changed.
@@ -349,10 +468,16 @@ function setupTxtViewerRuntimeListeners() {
     }
   };
 
+  txtRelayoutForResize = handleResize;
+  txtHeldLayoutKey = txtLayoutKey();
+
   if (activeResizeHandler) {
     window.removeEventListener('resize', activeResizeHandler);
   }
   activeResizeHandler = () => {
+    // 크기가 바뀌는 순간 브라우저가 먼저 다시 배치하며 스크롤 이벤트를 낸다. 그 스크롤로 기준 글자를 갱신하면
+    // (페이지 자리 잡기 90ms가 이 처리 100ms보다 빠르다) 이미 어긋난 페이지가 기준이 되므로 바로 막는다.
+    txtAnchorFreezeUntil = Date.now() + 1000;
     clearTimeout(resizeTimeout);
     resizeTimeout = setTimeout(handleResize, 100);
   };
@@ -850,6 +975,8 @@ export function restoreTxtAnchorInfo(anchorInfo) {
 
 export function saveDetailPosition() {
   const scrollWrapper = document.getElementById('txt-scroll-wrapper');
+  // 페이지 넘김(탭·키·슬라이더·목차)과 스크롤 자리 잡기가 모두 여기서 끝난다 - 그때 보이는 글자를 기준으로 기억한다.
+  if ((localStorage.getItem('viewer_scroll_mode') || 'page') === 'page') rememberStableTxtPageAnchor();
   if (scrollWrapper && state.activeBookId) {
     const pos = {
       chunkIdx: currentChunkIdx,
@@ -1063,6 +1190,12 @@ export const TxtViewer = {
   },
   destroy() {
     txtRuntimeState.reset();
+    txtStableAnchor = null;
+    txtHeldAnchor = null;
+    txtHeldAnchorUntil = 0;
+    txtResizePendingWhileHidden = false;
+    txtRelayoutForResize = null;
+    txtAnchorFreezeUntil = 0;
     clearTimeout(txtPageSnapTimeout);
     txtPageSnapInProgress = false;
     cancelPendingTxtRestore();

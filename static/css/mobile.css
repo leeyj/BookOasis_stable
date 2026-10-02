@@ -6,13 +6,32 @@
 .main-wrapper {
     flex: 1 1 0% !important;
     min-height: 0 !important;
-    margin: 10px !important; /* 모바일: 여백 축소 */
+    margin: 10px !important; /* 태블릿: 여백 축소 */
+}
+
+/* 폰: 바깥 프레임(여백·테두리·둥근 모서리·그림자) 없이 화면 끝까지 쓴다 (2026-10-02).
+   폭 390~430px에서 20px 넘게 장식에 쓰였고, 프레임 안에 드로어가 갇혀 겹쳐 보인다는 신고도 있었다.
+   안쪽 카드(상단 헤더 카드 등)가 구조를 맡는다. 노치/홈 인디케이터 여백은 .media-library-container가 env()로 처리. */
+@media screen and (max-width: 768px) {
+    html > body {
+        /* 아래 "5. 카드 그리드" 절의 body { padding: 10px }(태블릿용)을 폰에서 없앤다.
+           그 규칙이 파일 뒤쪽이라 선택자 우선순위를 한 단계 높였다. */
+        padding: 0;
+    }
+
+    .main-wrapper {
+        margin: 0 !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+    }
 }
 
 .media-library-container {
     flex-direction: column;
     gap: 0; /* 사이드바는 모바일에서 높이 0(로고 앱바 숨김, 드로어/팝업은 fixed)이라 간격이 빈 줄로만 남는다 */
-    padding: calc(0.5rem + env(safe-area-inset-top, 0px)) 0.75rem calc(4.5rem + env(safe-area-inset-bottom, 0px)) 0.75rem;
+    /* 좌우도 노치 여백을 더한다 - 가로 모드에서 콘텐츠가 노치/둥근 모서리 아래로 들어가지 않게 */
+    padding: calc(0.5rem + env(safe-area-inset-top, 0px)) calc(0.75rem + env(safe-area-inset-right, 0px)) calc(4.5rem + env(safe-area-inset-bottom, 0px)) calc(0.75rem + env(safe-area-inset-left, 0px));
 }
 
 /* 2. 좌측 사이드바 -> 얇은 상단 앱바(☰ 로고 ⋯) + 좌측 슬라이드 드로어 */
@@ -223,7 +242,7 @@
     width: 0.45rem;
     height: 0.45rem;
     border-radius: 50%;
-    background: #f59e0b;
+    background: var(--notify-running, #f59e0b);
     box-shadow: 0 0 0 2px var(--app-bg-main, #0f172a);
     opacity: 0;
     transition: opacity 0.2s ease;
@@ -233,7 +252,7 @@
 }
 .drawer-scan-dot.has-warning {
     opacity: 1;
-    background: #ef4444;
+    background: var(--notify-error, #ef4444);
 }
 
 /* 드로어 패널 (닫힘 상태가 기본) */

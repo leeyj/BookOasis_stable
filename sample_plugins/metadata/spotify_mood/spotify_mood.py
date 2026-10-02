@@ -15,6 +15,9 @@ spotify_mood.py -- 지금 이 무드에 어울리는 Spotify 플레이리스트/
   공유하는 구조 - 코어의 범용 콜백 브릿지(GET /callback, api/routes/plugin_routes.py)가
   state에 담긴 plugin_id를 보고 이 플러그인의 handle_oauth_callback()에 위임해준다.
   발급받은 refresh_token은 이 플러그인의 config(REFRESH_TOKEN 필드)에 영속 저장한다.
+- 문제 카드 (선택 계약 report_problem/resolve_problem, BookOasis 2.8.4+): 저장된 계정 연결이 만료/취소돼
+  토큰 갱신이 거절되면 관리자 알림에 "Spotify 계정 연결 만료" 카드를 올리고 [다시 연결] 버튼을 붙인다
+  (버튼 = 아래 run_context_menu_action의 spotify_oauth_start). 다음 갱신이 성공하거나 다시 연결하면 카드가 사라진다.
 """
 import json
 import logging
@@ -30,6 +33,8 @@ SPOTIFY_AUTHORIZE_URL = "https://accounts.spotify.com/authorize"
 SPOTIFY_API_BASE = "https://api.spotify.com/v1"
 SPOTIFY_OAUTH_SCOPES = "playlist-read-private playlist-read-collaborative"
 REQUEST_TIMEOUT = 8
+# 알림센터 문제 카드 코드 (플러그인 안에서만 유일하면 된다 - 코어가 'spotify_mood:token_expired'로 저장)
+PROBLEM_TOKEN_EXPIRED = "token_expired"
 
 # 시간대별 기본 무드 정의. hours는 datetime.now().hour 기준 범위(끝값 미포함).
 MOOD_DEFS = [
@@ -324,8 +329,30 @@ class SpotifyMoodMetadataProvider(BaseMetadataProvider):
                 ttl=max(60, expires_in - 60),
             )
 
+        self._resolve_token_expired(db_type)
         logger.warning("[spotify_mood] OAuth 연결 성공 (client_id=%s...)", client_id[:6])
         return {"success": True, "message": "Spotify 계정이 연결되었습니다! 이제 '내 플레이리스트'를 볼 수 있어요."}
+
+    # ------------------------------------------------------------------
+    # 알림센터 문제 카드 (선택 계약) - 구버전 코어에는 report_problem이 없으므로 hasattr로 확인한다
+    # ------------------------------------------------------------------
+    def _report_token_expired(self, db_type, message):
+        if not hasattr(self, "report_problem"):
+            return
+        self.report_problem(
+            PROBLEM_TOKEN_EXPIRED,
+            severity="action_required",
+            title="Spotify 계정 연결 만료",
+            detail="'내 플레이리스트'를 불러올 수 없습니다. [다시 연결]을 눌러 Spotify 계정을 다시 연결하세요.",
+            db_type=db_type,
+            action_id="spotify_oauth_start",
+            action_label="다시 연결",
+            message=message,
+        )
+
+    def _resolve_token_expired(self, db_type):
+        if hasattr(self, "resolve_problem"):
+            self.resolve_problem(PROBLEM_TOKEN_EXPIRED, db_type=db_type)
 
     def _disconnect_oauth(self, db_type):
         cfg = self.get_plugin_config(db_type, default={}) or {}
@@ -343,6 +370,7 @@ class SpotifyMoodMetadataProvider(BaseMetadataProvider):
 
         if client_id:
             self.cache_delete(self._user_token_cache_key(db_type, client_id))
+        self._resolve_token_expired(db_type)  # 관리자가 일부러 끊었으면 '만료' 카드도 필요 없다
         return {"success": True, "message": "Spotify 계정 연결을 해제했습니다."}
 
     def _user_token_cache_key(self, db_type, client_id):
@@ -370,12 +398,19 @@ class SpotifyMoodMetadataProvider(BaseMetadataProvider):
         )
         if not resp.ok:
             detail = ""
+            error_code = ""
             try:
-                detail = resp.json().get("error_description") or ""
+                body = resp.json()
+                detail = body.get("error_description") or ""
+                error_code = body.get("error") or ""
             except Exception:
                 pass
+            if resp.status_code in (400, 401) and error_code in ("invalid_grant", "invalid_client", ""):
+                # 저장된 연결이 만료/취소됨 - 관리자가 다시 연결해야만 풀린다 → 문제 카드
+                self._report_token_expired(db_type, f"status {resp.status_code}: {error_code} {detail}".strip())
             raise RuntimeError(f"Spotify 사용자 토큰 갱신 실패 (status {resp.status_code}): {detail}")
 
+        self._resolve_token_expired(db_type)
         payload = resp.json()
         access_token = payload.get("access_token")
         expires_in = int(payload.get("expires_in") or 3600)

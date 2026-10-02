@@ -51,10 +51,13 @@ def start_scanner_worker_process():
     print(f"[Scanner-Process] Started daemon worker process (PID: {_worker_process.pid})")
 
 
-def is_scanner_worker_running_os():
-    """OS 수준에서 scanner_worker.py 프로세스가 실제로 동작 중인지 검사합니다."""
+def _scanner_worker_presence():
+    """OS 수준에서 다른 scanner_worker.py 프로세스가 있는가: True / False / None(확인 불가 - psutil 없음 등)."""
     try:
         import psutil
+    except Exception:
+        return None
+    try:
         current_pid = os.getpid()
         for proc in psutil.process_iter(['pid', 'cmdline']):
             try:
@@ -64,13 +67,95 @@ def is_scanner_worker_running_os():
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                 pass
     except Exception:
-        pass
+        return None
     return False
 
 
+def is_scanner_worker_running_os():
+    """OS 수준에서 scanner_worker.py 프로세스가 실제로 동작 중인지 검사합니다."""
+    return _scanner_worker_presence() is True
+
+
+_EMBEDDED_WORKER_ON = ('1', 'true', 'yes', 'on')
+_EMBEDDED_WORKER_OFF = ('0', 'false', 'no', 'off')
+
+
+def should_enable_embedded_scanner_worker(environ=None, in_docker=None):
+    """웹 프로세스가 스캐너 워커를 직접 띄워도 되는가 (앱 시작과 작업 등록이 같은 정책을 쓴다).
+
+    1) BOOKOASIS_ENABLE_EMBEDDED_WORKER 명시값(true/false)이 우선
+    2) 미지정: Docker 컨테이너 안은 OFF(entrypoint.sh가 전용 워커를 띄운다), 그 밖(리눅스 직접 실행 등)은 ON
+    전용 워커를 따로 띄우는 운영(Docker entrypoint, manage.sh, systemd)에서 웹까지 워커를 띄우면 워커가
+    둘이 되어 같은 작업을 두 번 처리했다(2026-10 신고: 같은 task-id lazy_scanner 2개, rclone I/O 증가).
+    Docker 외 컨테이너(Podman 등)는 /.dockerenv가 없을 수 있으니 false를 명시한다."""
+    env = os.environ if environ is None else environ
+    raw = str(env.get('BOOKOASIS_ENABLE_EMBEDDED_WORKER', '')).strip().lower()
+    if raw in _EMBEDDED_WORKER_ON:
+        return True
+    if raw in _EMBEDDED_WORKER_OFF:
+        return False
+    if in_docker is None:
+        in_docker = os.path.exists('/.dockerenv')
+    return not in_docker
+
+
+# 전용 워커 운영에서 작업이 등록됐는데 워커가 없으면: 띄우지 않고 관리자에게 알린다 (알림센터 시스템 경고).
+# 워커 재시작(Docker 2초, systemd 5초 등) 중에 등록된 경우를 오경보로 보지 않도록 잠시 뒤 한 번만 확인한다.
+_DEDICATED_WORKER_CHECK_DELAY = 20.0
+_dedicated_check_state = {'pending': False, 'last_at': 0.0}
+
+
+def _check_dedicated_worker_alive():
+    _dedicated_check_state['pending'] = False
+    _dedicated_check_state['last_at'] = time.time()
+    present = _scanner_worker_presence()
+    if present is None:
+        return  # 확인할 수 없으면 경고하지 않는다
+    try:
+        from services.system_health_service import (
+            DEDICATED_WORKER_HEALTH_KEY,
+            DEDICATED_WORKER_HEALTH_LABEL,
+            SystemHealthService,
+        )
+        if present:
+            SystemHealthService.record_success(DEDICATED_WORKER_HEALTH_KEY)
+        else:
+            SystemHealthService.record_failure(
+                DEDICATED_WORKER_HEALTH_KEY, DEDICATED_WORKER_HEALTH_LABEL,
+                RuntimeError('전용 스캐너 워커(tools/scanner_worker.py)가 실행 중이 아니어서 등록된 스캔이 처리되지 않습니다. '
+                             '운영 방식에 맞게 워커를 다시 시작하세요 (Docker: 컨테이너 재시작, manage.sh: ./manage.sh restart, '
+                             'systemd: 워커 서비스 재시작).'),
+            )
+    except Exception as e:
+        print(f"[Scanner-Process] dedicated worker health record failed: {e}")
+
+
+def schedule_dedicated_worker_check():
+    """작업 등록 후 잠시 뒤 전용 워커가 있는지 한 번 확인한다. 이미 예약된 확인이 있으면 그것으로 충분하다
+    (작업이 몰려 등록돼도 20초마다 최대 한 번). '마지막 확인 후 N초' 같은 제한은 두지 않는다 - 워커가 막 죽은 직후의
+    등록을 놓치게 된다(테스트 서버에서 확인)."""
+    import threading
+    if _dedicated_check_state['pending']:
+        return
+    _dedicated_check_state['pending'] = True
+    timer = threading.Timer(_DEDICATED_WORKER_CHECK_DELAY, _check_dedicated_worker_alive)
+    timer.daemon = True
+    timer.start()
+
+
+def _is_scanner_worker_process():
+    return IS_WORKER or 'scanner_worker.py' in os.path.basename(sys.argv[0] if sys.argv else '')
+
+
 def ensure_scanner_worker_running():
-    """독립 스캐너 워커 프로세스가 실행 중인지 확인하고 필요 시 출발시킵니다."""
+    """작업 등록 시 호출: 내장 워커 정책이 켜져 있으면 워커가 없을 때 띄우고(기존 자동 복구),
+    꺼져 있으면(전용 워커 운영) 절대 띄우지 않고 잠시 뒤 전용 워커 생존만 확인해 알린다."""
     global _worker_process
+    if _is_scanner_worker_process():
+        return  # 워커 프로세스 안에서 등록한 작업 - 워커는 바로 여기 있다
+    if not should_enable_embedded_scanner_worker():
+        schedule_dedicated_worker_check()
+        return
     if _worker_process is not None and _worker_process.poll() is None:
         return
     if is_scanner_worker_running_os():
@@ -446,18 +531,8 @@ if not IS_WORKER:
     except Exception as e:
         print(f"[TTS-Pregen] worker start failed: {e}")
 
-    # ── 선택적 내장 스캐너 워커 기동 ──
-    # 우선순위:
-    # 1) BOOKOASIS_ENABLE_EMBEDDED_WORKER 명시값(true/false)
-    # 2) 미지정 시: 도커 컨테이너 내부는 OFF, 그 외(리눅스 직접 실행 포함)는 ON
-    embedded_worker_raw = os.environ.get('BOOKOASIS_ENABLE_EMBEDDED_WORKER', '').strip().lower()
-    if embedded_worker_raw in ('1', 'true', 'yes', 'on'):
-        embedded_worker_enabled = True
-    elif embedded_worker_raw in ('0', 'false', 'no', 'off'):
-        embedded_worker_enabled = False
-    else:
-        in_docker = os.path.exists('/.dockerenv')
-        embedded_worker_enabled = not in_docker
+    # ── 선택적 내장 스캐너 워커 기동 (정책: should_enable_embedded_scanner_worker - 작업 등록 경로와 공용) ──
+    embedded_worker_enabled = should_enable_embedded_scanner_worker()
     is_reloader_parent = os.environ.get('FLASK_DEBUG') in ('1', 'true', 'yes', 'on') and os.environ.get('WERKZEUG_RUN_MAIN') != 'true'
     if embedded_worker_enabled and not is_reloader_parent:
         start_scanner_worker_process()

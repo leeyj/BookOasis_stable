@@ -77,7 +77,7 @@ BookOasis는 현재 두 가지 역할을 함께 맡고 있다.
 - 필터 `#btn-open-filter` (`:47-51`), 정렬 `#btn-lib-sort` (`:75-79`)
 - 그룹 토글 `#group-mode-toggle-group` (`:41-45`)
 - 라이브러리 타입 토글 `#library-type-toggle-group` (`:51-57`)
-- 스캔 활동 버튼 `.scan-activity-wrap` (`:56-72`), 카테고리 정보 `#btn-category-info`, 총계 `#library-total-count`
+- 알림(🔔, 예전 "스캔 활동") 버튼 `.scan-activity-wrap` (`:56-72`), 카테고리 정보 `#btn-category-info`, 총계 `#library-total-count`
 - 유지: 설정 톱니, 계정 메뉴 (`.library-controls-persistent`)
 - 관련 템플릿: `#active-filter-bar`, `#floating-filter-modal` (`tab_media_library.html`), `library_modal.html`, `library_kinds_modal.html`
 

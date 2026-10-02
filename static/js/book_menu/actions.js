@@ -10,10 +10,21 @@ import { loadBooksList, loadReadingHistory } from '../book_list.js';
 import { loadDashboardData } from '../dashboard.js?v=20260917-home-widget-plugin-ui-v1';
 import { clearBookSelection } from '../book_selection.js';
 import { refreshSystemStatus } from '../scan_activity_status.js';
-import { getBookScanScope, getLazyScanSeriesTarget, isLazyScanAllowed } from './menu_rules.js';
+import { getBookScanScope, getLazyScanSeriesTarget, isDiagnoseAllowed, isLazyScanAllowed } from './menu_rules.js';
+import { openBookDiagnosis } from '../book_diagnosis.js';
 
 function selectedOf(target) {
   return Array.isArray(target?.selectedBooks) ? target.selectedBooks : [];
+}
+
+export function canDiagnoseFromCurrentBookMenu() {
+  return isDiagnoseAllowed(state.currentUser || window.currentUser || {}, state.currentLibraryType);
+}
+
+function diagnose(target, ui) {
+  if (!target || !target.id) return;
+  ui.close();
+  openBookDiagnosis(state.currentLibraryType || 'general', target.id, target.title || '');
 }
 
 export function canRunLazyScanFromCurrentBookMenu() {
@@ -364,4 +375,5 @@ export const BOOK_MENU_ACTIONS = {
   'mark-unread': markUnread,
   'mark-read': markRead,
   'cover-align': coverAlign,
+  'diagnose': diagnose,
 };

@@ -180,6 +180,9 @@ BOOKOASIS_ENABLE_EMBEDDED_WORKER=true gunicorn --workers 1 --bind 0.0.0.0:5930 -
 ./manage.sh start
 ```
 * In `manage.sh` mode, the web process embedded worker is disabled and the scanner worker is managed as a separate process.
+* If the scanner worker crashes it is restarted after 3 seconds (`tools/scanner_worker_supervisor.sh`). `./manage.sh stop` shuts it down without restarting.
+* With a dedicated worker (`manage.sh`, Docker, systemd, ... i.e. `BOOKOASIS_ENABLE_EMBEDDED_WORKER=false`) the web process never starts a worker itself. If a job is queued while no worker is running, a "Scanner worker (dedicated process)" warning appears in the top 🔔 notifications and clears once the worker is back.
+* Docker is detected via the `/.dockerenv` file. In other containers (Podman, ...) that run the worker separately, set `BOOKOASIS_ENABLE_EMBEDDED_WORKER=false` explicitly (otherwise the web and the dedicated worker may both start one, giving two workers).
 
 ### 3) Docker Installation Guide (Docker Compose)
 

@@ -371,14 +371,16 @@ def run_scanner_worker_loop():
             # 3. 작업 유형별 실행 분기
             error_message = None
             cancelled = False
+            # 작업 결과 요약(새 도서 수/에러 수 등) - scan_history.result_summary로 남아 알림센터 "최근 완료"에 쓰인다.
+            result_summary = None
             try:
                 try:
                     if task_type == 'lazy_scan':
                         _process_lazy_scan(sq, task_id, **kwargs)
                     elif task_type == 'batch_book_scan':
-                        _process_batch_book_scan(sq, task_id, **kwargs)
+                        result_summary = _process_batch_book_scan(sq, task_id, **kwargs)
                     elif task_type == 'library_scan':
-                        _process_library_scan(sq, **kwargs)
+                        result_summary = _process_library_scan(sq, **kwargs)
                     elif task_type == 'cover_scan':
                         _process_cover_scan(sq, **kwargs)
                     elif task_type == 'gdrive_copy':
@@ -391,6 +393,8 @@ def run_scanner_worker_loop():
                     sq.log(f"🛑 Task cancelled by user request: key={task_key}, type={task_type}, id={task_id} ({cancel_err})")
                 except Exception as work_err:
                     import traceback
+                    # 일부만 실패한 작업(예: 선택 도서 스캔)은 예외에 요약을 실어 보낸다.
+                    result_summary = getattr(work_err, 'result_summary', None) or result_summary
                     tb_str = traceback.format_exc()
                     error_message = f"{work_err}\n{tb_str}"
                     sq.log(f"❌ Task processing crashed:\n{tb_str}")
@@ -410,7 +414,7 @@ def run_scanner_worker_loop():
                     if cancelled:
                         ScannerQueueRepository.mark_task_cancelled(task_id, finished_str)
                     else:
-                        ScannerQueueRepository.update_task_result(task_id, finished_str, error_message)
+                        ScannerQueueRepository.update_task_result(task_id, finished_str, error_message, result_summary=result_summary)
                 except Exception as update_err:
                     sq.log(f"❌ ScannerQueueRepository result update failed: {update_err}")
                 finally:
@@ -656,7 +660,7 @@ def _process_lazy_scan(sq, task_id, **kwargs):
 def _process_library_scan(sq, **kwargs):
     from services.scheduler_service import run_scan_job
     # 가변 인자 딕셔너리를 그대로 포워딩하여 호출
-    run_scan_job(**kwargs)
+    return run_scan_job(**kwargs)
 
 
 def _update_batch_book_scan_stage(sq, task_id, stage):
@@ -758,18 +762,24 @@ def _process_batch_book_scan(sq, task_id, db_type='general', book_ids=None, **_k
     summary = f'선택 도서 스캔 완료{single_title} · 성공 {succeeded}/{total}, 실패 {len(failures)}'
     _update_batch_book_scan_stage(sq, task_id, summary)
     sq.log(summary)
+    result_summary = {'books': total, 'succeeded': succeeded, 'errors': len(failures)}
     if failures:
         failure_details = '; '.join(failures[:5])
         if len(failures) > 5:
             failure_details += f'; 외 {len(failures) - 5}건'
-        raise RuntimeError(f'{summary}: {failure_details}')
+        failure_error = RuntimeError(f'{summary}: {failure_details}')
+        failure_error.result_summary = result_summary
+        raise failure_error
+    return result_summary
     
 def _process_cover_scan(sq, **kwargs):
     from services.cover_scan_service import CoverScanService
+    kwargs.pop('trigger_type', None)  # 큐 기록용(누가 등록했나) - 작업 함수 인자가 아니다
     CoverScanService.run_cover_scan_job(**kwargs)
 
 def _process_gdrive_copy(sq, task_id, **kwargs):
     from services.gdrive_copy_service import GdriveCopyService
+    kwargs.pop('trigger_type', None)
     GdriveCopyService.run_gdrive_copy_job(sq, task_id, **kwargs)
 
 

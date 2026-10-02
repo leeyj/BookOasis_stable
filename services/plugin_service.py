@@ -316,6 +316,10 @@ class PluginService:
         from repositories.plugin_repository import PluginRepository
         key = f"PLUGIN_ENABLED_{plugin_id}"
         PluginRepository.save_plugin_setting(db_type, key, enabled_val)
+        if str(enabled_val).strip() == '0':
+            # 끈 플러그인의 문제 카드는 정리한다 (다시 켜고 다시 보고하면 보인다)
+            from services.plugin_problem_service import on_plugin_disabled
+            on_plugin_disabled(plugin_id)
 
         return True, None
 

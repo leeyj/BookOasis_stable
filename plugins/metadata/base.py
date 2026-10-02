@@ -132,6 +132,50 @@ class BaseMetadataProvider(ABC):
         body.setdefault('plugin_id', self.id)
         return dispatch_webhook_event(event_name, body, channels=channels)
 
+    def report_problem(self, code, *, title, detail='', severity='notice', db_type='general',
+                       target_type='system', target_id=None, action_id=None, action_label=None,
+                       message=None, library_id=None, series_name=None, target_path=None):
+        """관리자 알림센터에 문제 카드를 올린다 (선택 계약, BookOasis 2.8.4+).
+
+        같은 (code, target)으로 다시 부르면 새 줄이 생기지 않고 횟수/마지막 시각만 늘어난다.
+        다음에 성공하면 resolve_problem()으로 해결 처리한다 - 열린 행이 0이 되면 카드가 사라진다.
+
+        Args:
+            code (str): 플러그인 안에서만 유일하면 된다 (영문/숫자/_ . -, 64자 이내).
+                        코어가 '<plugin id>:<code>'로 저장해 다른 플러그인과 겹치지 않는다.
+            title (str): 카드 제목 (플러그인이 직접 제공하는 문구, 300자 이내). 카드에는 플러그인 이름이 앞에 붙는다.
+            detail (str): 설명/해결 방법 한 줄 (선택).
+            severity (str): 'notice'(참고, 기본) 또는 'action_required'(조치 필요 - 관리자 아이콘에 빨간 점).
+            db_type (str): 'general'/'adult'/'audiobook'/'video'.
+            target_type (str): 'system'(기본, 도서와 무관) / 'book' / 'series' / 'library'.
+            target_id: book_id, library_id 등. 'system'이면 생략.
+                       'book'이면 코어가 시리즈/카테고리/경로를 채워 카드 안에서 시리즈별로 묶고 [진단]을 붙인다.
+            action_id (str): 카드/줄의 조치 버튼. 누르면 이 플러그인의
+                             run_context_menu_action(db_type, action_id, context)가 불린다 (기존 액션 RPC).
+                             context = {source: 'problem_card', group_key, problem_code, target_type?, target_id?, book_id?}
+            action_label (str): 버튼 문구 (없으면 '실행').
+            message (str): 원문 오류(선택, 접어서 보관).
+
+        Returns:
+            bool: 기록 성공 여부. 잘못된 인자나 저장 실패여도 예외를 내지 않는다.
+
+        플러그인별 열린 문제는 최대 1,000건이며 넘으면 오래된 것부터 해결 처리된다. 플러그인을 끄면 열린 문제는
+        해결 처리된다. 관리자에게만 보인다. 구버전 코어와 함께 쓰려면 hasattr(self, 'report_problem')로 확인한다.
+        """
+        from services.plugin_problem_service import report
+
+        return report(self.id, code, title=title, detail=detail, severity=severity, db_type=db_type,
+                      target_type=target_type, target_id=target_id, action_id=action_id,
+                      action_label=action_label, message=message, library_id=library_id,
+                      series_name=series_name, target_path=target_path, plugin_name=getattr(self, 'name', None))
+
+    def resolve_problem(self, code, *, db_type='general', target_type='system', target_id=None):
+        """report_problem()으로 올린 문제를 해결 처리한다 (선택 계약, BookOasis 2.8.4+).
+        열린 문제가 없으면 아무것도 하지 않고 False를 돌려준다 - 성공할 때마다 불러도 된다."""
+        from services.plugin_problem_service import resolve
+
+        return resolve(self.id, code, db_type=db_type, target_type=target_type, target_id=target_id)
+
     def get_context_menu_items(self, db_type, context):
         """도서 컨텍스트 메뉴 확장 항목 계약 (선택 구현)."""
         return []

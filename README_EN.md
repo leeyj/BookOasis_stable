@@ -39,6 +39,11 @@ The server provides a light and fast runtime environment by minimizing third-par
 * **Flexible Scan Ignore Filtering (`.bookoasisignore`)**
   * Configure ignore rules globally or per-folder via `.bookoasisignore` files to exclude Synology NAS thumbnail directories (`@eaDir/`), recycle bins (`#recycle/`), or temporary files (`*.tmp`, `*.sample.cbz`) from disk scanning.
 
+* **Notifications and Safe Scanning**
+  * One 🔔 at the top shows scan results, running jobs and file problems (missing, corrupt, ...) as cards grouped by cause, with rescan and [Diagnose] right there.
+  * If a remote drive (rclone, etc.) disconnects or many files vanish at once, books are not moved to the trash until an admin confirms.
+  * The same information is available through MCP tools, and plugins can raise their own problems in the same notifications.
+
 * **Listen (Supplementary)**
   * EPUB and TXT books can be read aloud right in the browser. No server resources are used, and your reading and listening positions carry over to each other.
   * Fastest in WebGPU-capable browsers; the voice model is downloaded once on first use.

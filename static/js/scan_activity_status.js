@@ -1,6 +1,17 @@
 // scan_activity_status.js – 백그라운드 스캔 상태 폴링 및 카테고리 스피너 제어 루틴 (ui.js에서 분리)
 import { state } from './state.js';
-import { parseServerDateTime, formatRelativeTime } from './utils/time.js';
+import { parseServerDateTime } from './utils/time.js';
+import {
+  clearableCount,
+  escapeActivityText,
+  finishedWhileWatching,
+  notificationDetail,
+  notificationItemHtml,
+  notificationTitle,
+  summarizeNotifications,
+  tr,
+} from './notification_render.js';
+import { initNotificationCards, restoreCardExpansions } from './notification_cards.js';
 
 let statusIntervalId = null;
 let wasScanningPrevious = false;
@@ -15,129 +26,19 @@ export function refreshSystemStatus() {
   return refreshStatusPoll ? refreshStatusPoll() : Promise.resolve();
 }
 
-function escapeActivityText(value) {
-  const node = document.createElement('div');
-  node.textContent = String(value ?? '');
-  return node.innerHTML;
-}
-
-function escapeActivityAttribute(value) {
-  return escapeActivityText(value).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
-function getScanActivityTaskInfo(task, isPending = false, isRecent = false) {
-  const taskType = task?.type || task?.task_type || 'background';
-  const kwargs = task?.kwargs || {};
-  const libraryId = kwargs.library_id;
-  const dbType = kwargs.db_type || state.currentLibraryType || 'general';
-  const stage = String(task?.stage || '').trim();
-  const names = {
-    library_scan: '카테고리 스캔',
-    cover_scan: '표지 스캔',
-    lazy_scan: '미디어 검색',
-    batch_book_scan: '선택 도서 스캔',
-    gdrive_copy: 'Drive 복사',
-  };
-  const batchCount = Array.isArray(kwargs.book_ids) ? kwargs.book_ids.length : 0;
-  const isSingleBookScan = taskType === 'batch_book_scan' && batchCount === 1;
-  const singleBookLabel = isRecent && isSingleBookScan && kwargs.book_title
-    ? String(kwargs.book_title)
-    : '도서 1권';
-  const title = taskType === 'batch_book_scan'
-    ? `${task?.library_name ? `${task.library_name} · ` : ''}${isSingleBookScan ? singleBookLabel : `선택 도서 ${batchCount}권`}`
-    : task?.library_name
-      || (taskType === 'lazy_scan' ? '전체 시스템' : libraryId != null ? `Library ${libraryId} (${dbType})` : '백그라운드 작업');
-  const taskName = isSingleBookScan ? '도서 스캔' : (names[taskType] || '백그라운드 작업');
-  const statusLabel = task?.status === 'failed' ? '실패' : task?.status === 'cancelled' ? '취소' : '완료';
-  const detail = isRecent
-    ? (stage || (statusLabel === '완료' ? '스캔 완료' : `스캔 ${statusLabel}`))
-    : isPending ? `${taskName} 대기 중` : stage || `${taskName} 진행 중`;
-  return { title, detail };
-}
-
-function formatScanActivityElapsed(task) {
-  let elapsedSeconds = null;
-  if (task?.elapsed_seconds !== null && task?.elapsed_seconds !== undefined
-      && Number.isFinite(Number(task.elapsed_seconds))) {
-    elapsedSeconds = Math.max(0, Math.floor(Number(task.elapsed_seconds)));
-  } else {
-    const startedAt = task?.started_at || task?.enqueued_at;
-    if (!startedAt) return '';
-    const started = parseServerDateTime(startedAt);
-    if (!started) return '';
-    elapsedSeconds = Math.max(0, Math.floor((Date.now() - started.getTime()) / 1000));
-  }
-  if (elapsedSeconds < 60) return `${elapsedSeconds}초`;
-  const minutes = Math.floor(elapsedSeconds / 60);
-  if (minutes < 60) return `${minutes}분`;
-  return `${Math.floor(minutes / 60)}시간 ${minutes % 60}분`;
-}
-
-// 듣기 서버 미리 만들기 작업 (/api/system/status의 tts_pregen). 스캔과 같은 목록에 섞어 보여 준다.
-let seenPregenStatus = null;
-function pregenItemHtml(item) {
-  const running = item.status === 'running';
-  const queued = item.status === 'queued';
-  const failed = item.status === 'failed' || item.status === 'cancelled';
-  const stateClass = queued ? ' is-pending' : running ? '' : failed ? ' is-failed' : ' is-completed';
-  const icon = queued ? 'fa-clock' : running ? 'fa-circle-notch fa-spin' : failed ? 'fa-circle-exclamation' : 'fa-circle-check';
-  // 큰 책(조각 1만 개 이상)은 정수 %가 한참 0에 머무므로 소수 한 자리와 조각 수를 같이 보여 준다
-  const pct = item.total ? Math.floor((item.done * 1000) / item.total) / 10 : item.percent;
-  const count = item.total ? ` (${Number(item.done).toLocaleString()} / ${Number(item.total).toLocaleString()})` : '';
-  const detail = queued ? `음성 생성 대기 중${item.total ? ` · ${Number(item.total).toLocaleString()}조각` : ''}`
-    : running ? `음성 생성 중 ${pct}%${count}`
-      : item.status === 'cancelled' ? '음성 생성 취소' : failed ? '음성 생성 실패' : '음성 생성 완료 · 들을 준비됨';
-  const time = running ? `${pct}%` : queued ? '' : failed ? (item.status === 'cancelled' ? '취소' : '실패') : '완료';
-  const title = `${item.title || ''}${item.db_type === 'adult' ? ' (성인)' : ''}`;
-  return `
-      <div class="scan-activity-item${stateClass}">
-        <span class="scan-activity-item-icon">
-          <i class="fa-solid ${icon}" aria-hidden="true"></i>
-        </span>
-        <div class="scan-activity-item-copy">
-          <div class="scan-activity-item-title" title="${escapeActivityAttribute(title)}"><i class="fa-solid fa-headphones" aria-hidden="true" style="margin-right: 0.3rem; opacity: 0.7;"></i>${escapeActivityText(title)}</div>
-          <div class="scan-activity-item-detail">${escapeActivityText(detail)}</div>
-        </div>
-        <span class="scan-activity-item-time">${escapeActivityText(time)}</span>
-      </div>`;
-}
-
-// 페이지를 보고 있는 동안 끝난 작업만 알린다 (처음 불러온 목록의 완료 항목은 알리지 않는다)
-function notifyPregenTransitions(items) {
-  const current = new Map(items.map(i => [`${i.db_type}:${i.id}`, i]));
-  if (seenPregenStatus) {
-    current.forEach((item, key) => {
-      const before = seenPregenStatus.get(key);
-      if (before && before !== item.status && (item.status === 'done' || item.status === 'failed')
-          && typeof window.showToast === 'function') {
-        window.showToast(item.status === 'done'
-          ? `음성 미리 만들기 완료: ${item.title}`
-          : `음성 미리 만들기 실패: ${item.title}`, item.status === 'done' ? 'success' : 'error');
-      }
-    });
-  }
-  seenPregenStatus = new Map([...current].map(([k, i]) => [k, i.status]));
-}
-
-// 계속 실패 중인 백그라운드 작업(/api/system/status의 system_warnings, 관리자에게만 내려옴).
-// 다음 성공 때 서버가 자동으로 지우므로 여기서는 보여 주기만 한다.
-function systemWarningItemHtml(warning) {
-  const count = Number(warning?.fail_count || 0);
-  const since = warning?.last_ok_at
-    ? `마지막 성공 ${formatRelativeTime(warning.last_ok_at)}`
-    : `첫 실패 ${formatRelativeTime(warning?.first_failed_at)}`;
-  const detail = `${since} · 연속 ${count}회 실패 · ${warning?.message || ''}`;
-  return `
-      <div class="scan-activity-item is-failed is-system-warning" data-role="system-warning">
-        <span class="scan-activity-item-icon">
-          <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-        </span>
-        <div class="scan-activity-item-copy">
-          <div class="scan-activity-item-title" title="${escapeActivityAttribute(warning?.label)}">${escapeActivityText(warning?.label)} 실패 중</div>
-          <div class="scan-activity-item-detail" title="${escapeActivityAttribute(detail)}">${escapeActivityText(detail)}</div>
-        </div>
-        <span class="scan-activity-item-time">경고</span>
-      </div>`;
+// 보고 있는 동안 끝난 작업만 토스트로 알린다 (진행 중으로 본 track_key가 최근 완료로 넘어왔을 때).
+let previousRunningTrackKeys = null;
+const toastedFinishedIds = new Set();
+function notifyFinishedWhileWatching(items) {
+  const { runningKeys, finished } = finishedWhileWatching(items, previousRunningTrackKeys);
+  previousRunningTrackKeys = runningKeys;
+  if (typeof window.showToast !== 'function') return;
+  finished.forEach(item => {
+    if (toastedFinishedIds.has(item.id)) return;
+    toastedFinishedIds.add(item.id);
+    const toastType = item.tone === 'error' ? 'error' : item.tone === 'muted' ? 'info' : 'success';
+    window.showToast(`${notificationTitle(item)} · ${notificationDetail(item)}`, toastType);
+  });
 }
 
 function renderScanActivity(data) {
@@ -147,90 +48,101 @@ function renderScanActivity(data) {
   const list = document.getElementById('scan-activity-list');
   if (!button || !summary || !list) return;
 
-  const running = data?.raw_status?.running || null;
-  const pending = Array.isArray(data?.raw_status?.pending) ? data.raw_status.pending : [];
-  const recentBookScans = Array.isArray(data?.raw_status?.recent_book_scans)
-    ? data.raw_status.recent_book_scans
-    : [];
-  const isActive = Boolean(data?.success && data?.is_active);
-  const pregenItems = Array.isArray(data?.tts_pregen) ? data.tts_pregen : [];
-  notifyPregenTransitions(pregenItems);
-  const pregenActive = pregenItems.some(i => i.status === 'running' || i.status === 'queued');
-  const systemWarnings = Array.isArray(data?.system_warnings) ? data.system_warnings : [];
-  const hasWarning = systemWarnings.length > 0;
-  button.classList.toggle('is-active', isActive || pregenActive);
-  button.classList.toggle('has-warning', hasWarning);
-  // 모바일에선 이 버튼이 드로어 푸터로 옮겨가 있어 ☰/푸터에 진행 중 점을 대신 띄운다 (mobile.css .drawer-scan-dot)
+  const items = Array.isArray(data?.notifications) ? data.notifications : [];
+  notifyFinishedWhileWatching(items);
+  const summaryInfo = summarizeNotifications(items);
+
+  // 진행 중 = 주황 점(깜빡임), 조치 필요 = 빨간 점(고정), 항목이 없으면 아이콘을 흐리게 (숨기지 않는다).
+  button.classList.toggle('is-active', summaryInfo.isRunning);
+  button.classList.toggle('has-warning', summaryInfo.hasWarning);
+  button.classList.toggle('is-idle', summaryInfo.isEmpty);
+  // 모바일에선 이 버튼이 드로어 푸터로 옮겨가 있어 ☰/푸터에 점을 대신 띄운다 (mobile.css .drawer-scan-dot)
   document.querySelectorAll('[data-role="scan-activity-mirror"]').forEach(el => {
-    el.classList.toggle('is-active', isActive || pregenActive);
-    el.classList.toggle('has-warning', hasWarning);
+    el.classList.toggle('is-active', summaryInfo.isRunning);
+    el.classList.toggle('has-warning', summaryInfo.hasWarning);
   });
 
-  const tasks = [];
-  if (running) tasks.push({ task: running, pending: false });
-  pending.forEach(task => tasks.push({ task, pending: true }));
-  recentBookScans.forEach(task => tasks.push({ task, pending: false, recent: true }));
-  if (tasks.length === 0 && isActive && Array.isArray(data?.tasks)) {
-    data.tasks.forEach(detail => tasks.push({
-      task: { type: 'background', library_name: '시스템 유지보수', stage: detail },
-      pending: false,
-    }));
-  }
-  const total = tasks.length + pregenItems.length;
-  button.title = hasWarning
-    ? `스캔 활동 · 경고 ${systemWarnings.length}건`
-    : (total > 0 ? `스캔 활동 ${total}건` : '스캔 활동');
-  summary.textContent = (hasWarning && !running && !pending.length) ? `경고 ${systemWarnings.length}건` : running
-    ? `실행 중 · 대기 ${pending.length}건`
-    : pending.length ? `대기 ${pending.length}건`
-      : recentBookScans.length ? `최근 도서 스캔 ${recentBookScans.length}건`
-        : tasks.length ? '실행 중'
-          : pregenActive ? '음성 생성 중' : pregenItems.length ? '최근 음성 생성' : '대기 중';
-  const warningsHtml = systemWarnings.map(systemWarningItemHtml).join('');
-  if (tasks.length === 0 && pregenItems.length === 0) {
-    list.innerHTML = warningsHtml || `
+  summary.textContent = summaryInfo.text;
+  const titleText = tr('notify.title', {}, '알림');
+  const buttonTitle = summaryInfo.isEmpty ? titleText : `${titleText} · ${summaryInfo.text}`;
+  button.title = buttonTitle;
+  button.setAttribute('aria-label', buttonTitle);
+  const clearButton = document.getElementById('btn-clear-notifications');
+  if (clearButton) clearButton.hidden = clearableCount(items) === 0;
+
+  if (items.length === 0) {
+    list.innerHTML = `
       <div class="scan-activity-empty">
-        <i class="fa-regular fa-circle-check" aria-hidden="true"></i>
-        <span>진행 중인 스캔이 없습니다.</span>
+        <i class="fa-regular fa-bell" aria-hidden="true"></i>
+        <span>${escapeActivityText(tr('notify.empty', {}, '새 알림이 없습니다.'))}</span>
       </div>`;
     return;
   }
+  initNotificationCards(list, { refresh: () => refreshSystemStatus() });
+  list.innerHTML = items.map(notificationItemHtml).join('');
+  restoreCardExpansions(list);
+}
 
-  list.innerHTML = warningsHtml + tasks.map(({ task, pending: isPending, recent: isRecent }) => {
-    const info = getScanActivityTaskInfo(task, isPending, isRecent);
-    const recentStatus = task?.status || 'completed';
-    const itemStateClass = isPending ? ' is-pending'
-      : isRecent ? ` is-${recentStatus}`
-        : '';
-    const iconClass = isPending
-      ? 'fa-clock'
-      : isRecent
-        ? (recentStatus === 'completed' ? 'fa-circle-check' : 'fa-circle-exclamation')
-        : 'fa-circle-notch fa-spin';
-    const elapsed = isRecent
-      ? (recentStatus === 'failed' ? '실패' : recentStatus === 'cancelled' ? '취소' : '완료')
-      : isPending ? '' : formatScanActivityElapsed(task);
-    return `
-      <div class="scan-activity-item${itemStateClass}">
-        <span class="scan-activity-item-icon">
-          <i class="fa-solid ${iconClass}" aria-hidden="true"></i>
-        </span>
-        <div class="scan-activity-item-copy">
-          <div class="scan-activity-item-title" title="${escapeActivityAttribute(info.title)}">${escapeActivityText(info.title)}</div>
-          <div class="scan-activity-item-detail" title="${escapeActivityAttribute(info.detail)}">${escapeActivityText(info.detail)}</div>
-        </div>
-        <span class="scan-activity-item-time">${escapeActivityText(elapsed)}</span>
-      </div>`;
-  }).join('') + pregenItems.map(pregenItemHtml).join('');
+// 알림을 닫을 때 그 시각을 서버에 남긴다 - 이후 폴링부터 지금 본 항목은 '읽음'이 된다.
+function markNotificationsSeen() {
+  const items = Array.isArray(latestSystemStatus?.notifications) ? latestSystemStatus.notifications : [];
+  if (!items.some(i => i.read === false)) return;
+  fetch('/api/notifications/seen', { method: 'POST' })
+    .then(() => refreshSystemStatus())
+    .catch(err => console.warn('[Notifications] mark seen failed:', err));
+}
+
+// [지우기]: 최근 완료는 숨기고 참고 카드는 '알고 있음'으로 (서버 규칙: notification_service.clear_notifications).
+// 진행 중·조치 필요 항목은 남는다. 토스트 [되돌리기]로 직전 상태를 복원한다.
+async function clearNotifications() {
+  const items = Array.isArray(latestSystemStatus?.notifications) ? latestSystemStatus.notifications : [];
+  const count = clearableCount(items);
+  if (!count) return;
+  const toast = (msg, type, options) => (typeof window.showToast === 'function' ? window.showToast(msg, type, options) : null);
+  try {
+    const res = await fetch('/api/notifications/clear', { method: 'POST' });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'clear failed');
+    await refreshSystemStatus();
+    toast(escapeActivityText(tr('notify.cleared', { count: count.toLocaleString() }, `알림 ${count}건을 지웠습니다.`)), 'success', {
+      actionLabel: tr('notify.clear_undo', {}, '되돌리기'),
+      onAction: () => undoClearNotifications(data),
+    });
+  } catch (err) {
+    console.warn('[Notifications] clear failed:', err);
+    toast(escapeActivityText(tr('notify.clear_failed', {}, '알림을 지우지 못했습니다.')), 'error');
+  }
+}
+
+async function undoClearNotifications(cleared) {
+  try {
+    const res = await fetch('/api/notifications/clear/undo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        previous_cleared_ms: cleared.previous_cleared_ms || 0,
+        muted_group_keys: cleared.muted_group_keys || [],
+      }),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'undo failed');
+    await refreshSystemStatus();
+    if (typeof window.showToast === 'function') window.showToast(escapeActivityText(tr('notify.clear_undone', {}, '지운 알림을 되돌렸습니다.')), 'info');
+  } catch (err) {
+    console.warn('[Notifications] undo clear failed:', err);
+  }
 }
 
 function setScanActivityPopoverOpen(open) {
   const button = document.getElementById('btn-scan-activity');
   const popover = document.getElementById('scan-activity-popover');
   if (!button || !popover) return;
+  const wasOpen = !popover.hidden;
   popover.hidden = !open;
   button.setAttribute('aria-expanded', open ? 'true' : 'false');
   if (open && latestSystemStatus) renderScanActivity(latestSystemStatus);
+  // 닫을 때 읽음 처리한다 - 열자마자 지우면 '새 알림' 표시를 볼 틈이 없다.
+  if (wasOpen && !open) markNotificationsSeen();
 }
 
 function initScanActivityPopover() {
@@ -244,6 +156,7 @@ function initScanActivityPopover() {
     setScanActivityPopoverOpen(popover.hidden);
   });
   closeButton.addEventListener('click', () => setScanActivityPopoverOpen(false));
+  document.getElementById('btn-clear-notifications')?.addEventListener('click', () => clearNotifications());
   popover.addEventListener('click', event => event.stopPropagation());
   document.addEventListener('click', () => setScanActivityPopoverOpen(false));
   document.addEventListener('keydown', event => {

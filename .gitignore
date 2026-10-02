@@ -75,3 +75,6 @@ tools/tts_repro/.venv/
 
 # Playwright MCP 스냅샷·스크린샷·콘솔 로그 (개발 중 자동 생성)
 .playwright-mcp/
+
+# manage.sh 스캐너 워커 재시작 루프 정지 표시 (tools/scanner_worker_supervisor.sh)
+.scanner_worker.stop

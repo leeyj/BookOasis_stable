@@ -723,6 +723,13 @@ class MetadataFactory:
             print(f"[MetadataFactory] start_all_plugin_background_services: provider list load failed: {e}")
             return
 
+        # 꺼졌거나 폴더가 지워진 플러그인이 남긴 문제 카드 정리 (플러그인 문제 카드 계약)
+        try:
+            from services.plugin_problem_service import cleanup_inactive_plugins
+            cleanup_inactive_plugins([p.get('id') for p in providers if p.get('enabled')])
+        except Exception as e:
+            print(f"[MetadataFactory] plugin problem cleanup failed: {e}")
+
         for provider_item in providers:
             if not provider_item.get('enabled'):
                 continue

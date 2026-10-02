@@ -100,6 +100,7 @@ You can exclude specific files or directories from being scanned, such as Synolo
 During a scan, damaged compressed files (Bad Zip File), corrupted images, or unreadable file info due to permission issues are not deleted or omitted but are archived in the **[Scan Error Report]**.
 
 * Administrators can view the error reports to pinpoint exactly which files are broken on the physical drive. After resolving the issues, they can initialize the list by 'Deleting All' reports.
+* The same errors also appear as **problem cards** in the top 🔔 notifications (section 11); a card clears itself when the next scan finds the file healthy. Reports are kept alongside for now.
 
 ---
 
@@ -224,3 +225,40 @@ Synthesizing on the device drains the battery, and slower devices (iPhone 14 and
 * **Upgrading to v2.8.0**: audio made by earlier versions (one file per sentence) uses the old layout and is removed automatically on first start. Generate the books you need again.
 * **Docker note**: files outside a volume are lost when the container is recreated, so the feature **only works when the storage path is on a mounted volume**. Current compose files include the `./tts_audio:/app/tts_audio` volume, so leave the path empty. With an older compose file, add that volume or set the path to another mounted location (otherwise the admin card shows "unavailable" with the reason).
 * If a restart or deploy interrupts a job, it resumes on the next start and skips sentences that were already generated.
+
+---
+
+## 11. Notifications (🔔) and Problem Cards
+
+The top 🔔 **Notifications** shows scans, voice pre-generation, system warnings and problem cards in one list (formerly "Scan activity").
+Design background: [plan_unified_notification_queue.md](plan_unified_notification_queue.md).
+
+### ① List and icon
+* **Colors and labels**: errors/action required (red) -> running (amber) -> recent (new blue · done green · cancelled gray).
+* **Icon dot**: amber while something runs, red when something needs action (admins only). Regular accounts only see their own voice pre-generation, and the icon dims when there is nothing.
+* **Recent items**: category scan results (new/failed books) stay for 7 days (up to 50). Automatic scans that changed nothing are hidden; scans you started yourself show "no change" too.
+* **[Clear]**: hides recent items from your list and marks notice cards as "Got it". Running and action-required items stay, and [Undo] in the toast restores them. Muting notice cards is shared state, so it applies to other admins too.
+
+### ② Problem cards
+The same cause is grouped into one card per **problem kind x category**; expand it to see series, then books. Cards clear themselves when the next scan finds things healthy.
+
+| Card | Meaning | Action |
+| :--- | :--- | :--- |
+| Remote drive disconnected | The category folder/mount is unreachable. The scanner removes no books meanwhile | Check the mount, then rescan |
+| Possible mass move/delete | 20%+ (and 20+) of the category newly vanished in one scan - moving to the trash is held | Check renamed folders etc. -> rescan or [Move to trash] |
+| Missing file · moved to trash | Missing files were moved to the trash (deleted after 7 days) | Rescan if they are back |
+| Corrupt file / cover extraction failed | File errors during the scan | Check the original, then rescan |
+| Background task failing | An automatic task keeps failing | Clears on the next success |
+| User report | A regular user pressed [Notify administrator] at a viewer error | Check with [Diagnose], then [Resolved] |
+| `<plugin name> · …` | Raised by a plugin (the plugin name is always shown first) | The button the plugin provides |
+
+* **[Got it]**: hides the card up to its current count; it shows again when more targets are added.
+* **7-day trash auto-empty**: 7 days after a book went to the trash it is deleted permanently on the next scan (books whose files are back are restored instead).
+
+### ③ Book [Diagnose]
+From the book menu (single volume, general/adult books) or a book row in a problem card, **[Diagnose]** checks DB record -> remote connection -> file exists -> file format and shows the cause with an action (rescan folder / rescan this book).
+It only reads, and reports "slow" if the remote drive does not answer within 15 seconds. The MCP tool `diagnose_book` returns the same result.
+
+### ④ User reports
+When a book fails to open in the viewer, regular users see **[Notify administrator]** in place (admins see [Diagnose] instead).
+Reports gather in a "User report" card; reporting the same book again only increases the count. Users can only report books they can see, up to 30 per hour.

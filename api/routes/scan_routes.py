@@ -20,7 +20,7 @@ def get_db_path_for_scan(db_type):
 
 def _enqueue_targeted_lazy_scan(db_type, **target):
     from services.scanner_queue import scanner_queue
-    return scanner_queue.enqueue('lazy_scan', db_type=db_type, **target)
+    return scanner_queue.enqueue('lazy_scan', db_type=db_type, trigger_type='manual', **target)
 
 
 @scan_bp.route('/api/media/books/lazy-scan', methods=['POST'])
@@ -192,7 +192,7 @@ def enqueue_batch_book_scan():
         book_ids = [int(row['id']) for row in rows]
 
         library_ids = {row['library_id'] for row in rows if row['library_id'] is not None}
-        task_kwargs = {'db_type': db_type, 'book_ids': book_ids, 'scope': scan_scope}
+        task_kwargs = {'db_type': db_type, 'book_ids': book_ids, 'scope': scan_scope, 'trigger_type': 'manual'}
         if len(rows) == len(book_ids) and len(library_ids) == 1:
             task_kwargs['library_id'] = next(iter(library_ids))
         if len(book_ids) == 1:
@@ -355,7 +355,7 @@ def trigger_library_cover_scan(library_id):
         
         from services.scanner_queue import scanner_queue
         enqueued = scanner_queue.enqueue('cover_scan', db_type=db_type, db_path=db_path, 
-                             library_id=library_id, physical_path=physical_path, force_requeue=True)
+                             library_id=library_id, physical_path=physical_path, force_requeue=True, trigger_type='manual')
         if not enqueued:
             return jsonify({
                 'success': False,

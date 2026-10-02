@@ -596,16 +596,17 @@ html[data-library-type="video"] #sidebar-categories [data-id="plugins"] {
     transition: none !important;
 }
 
-/* e-paper 테마: 썸네일(이미지) 제외 모든 요소를 흑백으로 표시 */
-[data-app-theme="epaper"] body,
-[data-app-theme="epaper"] .main-wrapper,
-[data-app-theme="epaper"] .media-library-container,
-[data-app-theme="epaper"] .library-sidebar,
-[data-app-theme="epaper"] .library-main-content {
+/* e-paper 테마: 화면 전체를 흑백으로 표시.
+   필터는 루트(html)에만 건다 - 루트가 아닌 요소에 filter를 걸면 그 요소가 position:fixed의 기준이 되어,
+   모바일 드로어(#sidebar-collapsible-content)가 화면이 아니라 .main-wrapper 안에 갇혀 프레임에 겹쳐 보였다
+   (2026-10-02, mobile.css 주석 참고). 예전엔 body/.main-wrapper/.media-library-container/.library-sidebar/
+   .library-main-content에 겹겹이 걸려 있었고, body 필터가 이미 전체를 덮었으므로 보이는 결과는 같다. */
+[data-app-theme="epaper"] {
     filter: grayscale(1);
 }
 
-/* 썸네일 이미지는 컬러 유지 (grayscale 예외) */
+/* 썸네일 이미지는 컬러 유지 의도 (grayscale 예외).
+   참고: 조상에 걸린 필터는 자식의 filter:none으로 되돌릴 수 없어, 예전(body 필터)부터 실제로는 썸네일도 흑백이다. */
 [data-app-theme="epaper"] .book-card-cover img,
 [data-app-theme="epaper"] .dashboard-book-card img,
 [data-app-theme="epaper"] .dashboard-row-container img {
@@ -1535,6 +1536,22 @@ body {
     justify-content: center;
 }
 
+/* 알림센터 색 토큰 - 테마별로 바꾸려면 각 테마 블록에서 덮어쓴다 */
+:root {
+    --notify-error: #ef4444;
+    --notify-error-soft: rgba(239, 68, 68, 0.16);
+    --notify-running: #f59e0b;
+    --notify-running-soft: rgba(245, 158, 11, 0.16);
+    --notify-new: #3b82f6;
+    --notify-new-soft: rgba(59, 130, 246, 0.18);
+    --notify-done: #22c55e;
+    --notify-done-soft: rgba(34, 197, 94, 0.15);
+    --notify-muted: #7f8a93;
+    --notify-muted-soft: rgba(127, 138, 147, 0.16);
+    --notify-notice: #94a3b8;
+    --notify-notice-soft: rgba(148, 163, 184, 0.14);
+}
+
 .scan-activity-wrap {
     position: relative;
     flex-shrink: 0;
@@ -1565,7 +1582,7 @@ body {
 }
 
 .btn-scan-activity.is-active > i {
-    color: #f59e0b;
+    color: var(--notify-running);
     animation: scanActivityPulse 1.4s ease-in-out infinite;
 }
 
@@ -1576,19 +1593,24 @@ body {
     width: 0.42rem;
     height: 0.42rem;
     border-radius: 50%;
-    background: #f59e0b;
+    background: var(--notify-running);
     box-shadow: 0 0 0 2px #172033;
     opacity: 0;
+}
+
+/* 볼 알림이 없을 때: 숨기지 않고 흐리게 (아이콘이 사라지면 고장으로 오해할 수 있다) */
+.btn-scan-activity.is-idle > i {
+    opacity: 0.45;
 }
 
 .btn-scan-activity.is-active .scan-activity-indicator {
     opacity: 1;
 }
 
-/* 계속 실패 중인 백그라운드 작업이 있을 때(관리자 전용): 깜빡임 없이 빨간 점만 고정 */
+/* 조치 필요 항목이 있을 때(관리자 전용): 깜빡임 없이 빨간 점만 고정 */
 .btn-scan-activity.has-warning .scan-activity-indicator {
     opacity: 1;
-    background: #ef4444;
+    background: var(--notify-error);
 }
 
 .scan-activity-popover {
@@ -1599,11 +1621,18 @@ body {
     width: min(360px, calc(100vw - 2rem));
     max-height: min(62vh, 520px);
     overflow: hidden;
+    /* 머리말(제목+요약 두 줄) 높이가 고정이 아니라, 목록이 남은 높이를 채우게 한다 */
+    display: flex;
+    flex-direction: column;
     border: 1px solid rgba(148, 163, 184, 0.22);
     border-radius: 6px;
     background: #20272b;
     color: #d5d9dc;
     box-shadow: 0 16px 36px rgba(0, 0, 0, 0.48);
+}
+
+.scan-activity-popover[hidden] {
+    display: none;
 }
 
 .scan-activity-header {
@@ -1640,8 +1669,32 @@ body {
     cursor: pointer;
 }
 
+.scan-activity-header .scan-activity-clear {
+    width: auto;
+    height: 1.7rem;
+    margin-left: auto;
+    margin-right: 0.25rem;
+    padding: 0 0.6rem;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 6px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.scan-activity-header .scan-activity-clear:hover,
+.scan-activity-header .scan-activity-clear:focus-visible {
+    color: var(--app-text-primary);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.scan-activity-header .scan-activity-clear[hidden] {
+    display: none;
+}
+
 .scan-activity-list {
-    max-height: calc(min(62vh, 520px) - 3.25rem);
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
 }
 
@@ -1663,20 +1716,379 @@ body {
     padding-top: 0.1rem;
 }
 
-.scan-activity-item.is-pending .scan-activity-item-icon {
+/* 알림센터 항목 종류별 색 (services/notification_service.py tone). 색만으로 구분하지 않도록
+   아이콘 + 짧은 라벨(에러/진행/신규/완료/취소/참고)을 항상 함께 둔다. */
+.scan-activity-item.notify-tone-error { --notify-tone: var(--notify-error); --notify-tone-soft: var(--notify-error-soft); }
+.scan-activity-item.notify-tone-running { --notify-tone: var(--notify-running); --notify-tone-soft: var(--notify-running-soft); }
+.scan-activity-item.notify-tone-pending { --notify-tone: var(--notify-muted); --notify-tone-soft: var(--notify-muted-soft); }
+.scan-activity-item.notify-tone-new { --notify-tone: var(--notify-new); --notify-tone-soft: var(--notify-new-soft); }
+.scan-activity-item.notify-tone-done { --notify-tone: var(--notify-done); --notify-tone-soft: var(--notify-done-soft); }
+.scan-activity-item.notify-tone-muted { --notify-tone: var(--notify-muted); --notify-tone-soft: var(--notify-muted-soft); }
+.scan-activity-item.notify-tone-notice { --notify-tone: var(--notify-notice); --notify-tone-soft: var(--notify-notice-soft); }
+
+.scan-activity-item .scan-activity-item-icon {
+    color: var(--notify-tone, var(--notify-running));
+}
+
+.scan-activity-item.notify-tone-error {
+    box-shadow: inset 3px 0 0 var(--notify-error);
+}
+
+.scan-activity-item-side {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.3rem;
+}
+
+.notify-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 999px;
+    background: var(--notify-tone-soft, transparent);
+    color: var(--notify-tone, #8f9aa3);
+    font-size: 0.66rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.notify-unread-dot {
+    width: 0.38rem;
+    height: 0.38rem;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.scan-activity-item.is-unread .scan-activity-item-title {
+    color: var(--app-text-primary);
+}
+
+.notify-source-icon {
+    margin-right: 0.3rem;
+    opacity: 0.7;
+}
+
+/* 문제 카드 펼침 (static/js/notification_cards.js): 카드 → 시리즈 줄 → 도서 */
+.notify-card-toggle {
+    width: 1.5rem;
+    height: 1.4rem;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: #8f9aa3;
+    cursor: pointer;
+}
+
+.notify-card-toggle:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--app-text-primary);
+}
+
+.scan-activity-item.is-expanded .notify-card-toggle i {
+    transform: rotate(180deg);
+}
+
+.notify-card-body {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.55rem 0 0 2.15rem;
+}
+
+.notify-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.notify-card-btn {
+    flex-shrink: 0;
+    padding: 0.2rem 0.55rem;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.04);
+    color: #d5d9dc;
+    font-size: 0.7rem;
+    cursor: pointer;
+}
+
+.notify-card-btn:hover:not(:disabled) {
+    border-color: var(--notify-tone, var(--app-accent));
+    color: var(--app-text-primary);
+}
+
+.notify-card-btn:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
+
+.notify-card-btn[data-notify-action="confirm_trash"] {
+    border-color: var(--notify-error-soft);
+    color: var(--notify-error);
+}
+
+.notify-card-book-note {
+    display: block;
+    color: #8f9aa3;
+    font-size: 0.68rem;
+    white-space: normal;
+}
+
+/* 도서 [진단] 모달 (static/js/book_diagnosis.js) - 뷰어 오류 오버레이(10006)보다 위 */
+.diagnose-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10050;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.55);
+}
+
+.diagnose-modal[hidden] {
+    display: none;
+}
+
+.diagnose-dialog {
+    width: min(32rem, 100%);
+    max-height: calc(100vh - 32px);
+    display: flex;
+    flex-direction: column;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    background: rgb(var(--app-panel-rgb));
+    color: var(--app-text-primary);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.48);
+}
+
+.diagnose-header,
+.diagnose-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.75rem 0.9rem;
+}
+
+.diagnose-header {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.diagnose-header strong {
+    font-size: 0.92rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.diagnose-footer {
+    justify-content: flex-end;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.diagnose-close {
+    border: 0;
+    background: transparent;
+    color: #8f9aa3;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.diagnose-body {
+    padding: 0.8rem 0.9rem;
+    overflow-y: auto;
+    font-size: 0.82rem;
+}
+
+.diagnose-book-title {
+    font-weight: 700;
+}
+
+.diagnose-book-path {
+    margin-top: 0.15rem;
+    color: #8f9aa3;
+    font-size: 0.72rem;
+    word-break: break-all;
+}
+
+.diagnose-checks {
+    list-style: none;
+    margin: 0.8rem 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.diagnose-check {
+    display: grid;
+    grid-template-columns: 1.1rem minmax(0, 1fr);
+    gap: 0.45rem;
+    align-items: start;
+    word-break: break-all;
+}
+
+.diagnose-check.is-ok i { color: var(--notify-done); }
+.diagnose-check.is-fail i { color: var(--notify-error); }
+.diagnose-check.is-warn i { color: var(--notify-running); }
+.diagnose-check.is-skip i { color: var(--notify-muted); }
+.diagnose-check.is-skip { color: #8f9aa3; }
+
+.diagnose-conclusion {
+    padding: 0.6rem 0.7rem;
+    border-radius: 6px;
+    background: var(--notify-tone-soft, rgba(255, 255, 255, 0.05));
+    border-left: 3px solid var(--notify-tone, var(--notify-notice));
+    line-height: 1.45;
+}
+
+.diagnose-conclusion.notify-tone-error { --notify-tone: var(--notify-error); --notify-tone-soft: var(--notify-error-soft); }
+.diagnose-conclusion.notify-tone-notice { --notify-tone: var(--notify-notice); --notify-tone-soft: var(--notify-notice-soft); }
+.diagnose-conclusion.notify-tone-done { --notify-tone: var(--notify-done); --notify-tone-soft: var(--notify-done-soft); }
+
+.diagnose-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.7rem;
+}
+
+.diagnose-problems {
+    margin-top: 0.9rem;
+    font-size: 0.76rem;
+}
+
+.diagnose-problems ul {
+    margin: 0.3rem 0 0;
+    padding-left: 1.1rem;
+}
+
+.diagnose-subtitle {
+    color: #8f9aa3;
+    font-weight: 600;
+}
+
+.diagnose-problem-msg {
+    color: #8f9aa3;
+    word-break: break-all;
+}
+
+/* 뷰어 오류 자리의 한 줄 조치 (static/js/viewer/report_problem.js) */
+.viewer-report-row {
+    margin-top: 0.8rem;
+}
+
+.viewer-report-row[hidden] {
+    display: none;
+}
+
+.viewer-report-btn {
+    padding: 0.45rem 0.9rem;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #f1f5f9;
+    font: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.viewer-report-btn:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
+.viewer-report-done {
+    color: #cbd5e1;
+    font-size: 0.85rem;
+}
+
+.notify-card-btn.is-link {
+    align-self: flex-start;
+    border: 0;
+    background: transparent;
+    color: var(--app-accent);
+    padding-left: 0;
+}
+
+.notify-card-lines,
+.notify-card-books {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.notify-card-line + .notify-card-line {
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.notify-card-line-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-height: 1.9rem;
+}
+
+.notify-card-line-toggle,
+.notify-card-line-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #b8c0c6;
+    font-size: 0.75rem;
+}
+
+.notify-card-line-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+    text-align: left;
+}
+
+.notify-card-line-toggle i {
+    width: 0.7rem;
+    font-size: 0.6rem;
     color: #7f8a93;
 }
 
-.scan-activity-item.is-completed .scan-activity-item-icon {
-    color: #22c55e;
+.notify-card-books {
+    padding: 0 0 0.4rem 1.05rem;
 }
 
-.scan-activity-item.is-failed .scan-activity-item-icon {
-    color: #ef4444;
+.notify-card-book {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-height: 1.7rem;
 }
 
-.scan-activity-item.is-cancelled .scan-activity-item-icon {
-    color: #7f8a93;
+.notify-card-book-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #8f9aa3;
+    font-size: 0.72rem;
+}
+
+.notify-card-note {
+    color: #8f9aa3;
+    font-size: 0.72rem;
+}
+
+.notify-card-note.is-error {
+    color: var(--notify-error);
 }
 
 .scan-activity-item-copy {
@@ -3696,8 +4108,10 @@ body {
     z-index: 5;
     padding: 2px 7px;
     border-radius: 999px;
-    background: var(--app-accent);
-    color: var(--app-accent-contrast, #ffffff);
+    /* +N권(기존 작품에 권 추가)은 중립색 - '신규'(파랑) NEW 배지와 테마 강조색이 겹쳐도 구분되게 */
+    background: rgba(15, 23, 42, 0.82);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.28);
     font-size: 0.68rem;
     font-weight: 700;
     line-height: 1.4;
@@ -3708,7 +4122,9 @@ body {
 }
 
 .book-card-recent-badge.is-new {
-    background: #ef4444;
+    /* 빨강은 알림센터에서 '에러'라 신규 작품 배지는 '신규' 색(파랑)을 쓴다 */
+    background: var(--notify-new);
+    border-color: transparent;
     color: #ffffff;
 }
 
