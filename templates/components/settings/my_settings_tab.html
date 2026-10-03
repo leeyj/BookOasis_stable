@@ -72,6 +72,15 @@
                                         </div>
                                     </div>
 
+                                    <!-- 완독·재생 완료 기준 (%) - 도서/오디오북 트랙/영상 에피소드 공용. 마지막 페이지는 항상 완독 -->
+                                    <div class="library-form-group">
+                                        <label for="my-setting-book-complete-percent" style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                            <i class="fa-solid fa-circle-check" style="color: var(--app-accent); margin-right: 0.3rem;"></i> <span data-i18n="settings.book_complete_percent_label">완독·재생 완료 기준 (%)</span>
+                                        </label>
+                                        <input type="number" id="my-setting-book-complete-percent" name="BOOK_COMPLETE_PERCENT" min="50" max="100" step="1" value="95" style="width: 100%; max-width: 160px; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;">
+                                        <p style="font-size: 0.78rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0;" data-i18n="settings.book_complete_percent_desc">도서·오디오북 트랙·영상 에피소드를 이 비율 이상 보거나 들으면 완료로 처리합니다 (50~100, 기본 95). 100이면 끝까지 봐야 완료입니다. 이미 완독 처리된 도서는 바뀌지 않습니다.</p>
+                                    </div>
+
                                     <!-- 오디오 미니 플레이어 형태 -->
                                     <div class="library-form-group">
                                         <label for="my-setting-audio-mini-player-mode" style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">

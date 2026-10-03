@@ -14,6 +14,9 @@ load_dotenv()
 from utils.encoding_helper import force_utf8_stdio
 force_utf8_stdio()
 
+# 어떤 플러그인보다 먼저 - plugins.metadata.base를 이미지의 계약 코드로 고정(바인드 마운트의 옛 base.py 무시)
+import plugin_framework  # noqa: F401
+
 from utils.engine_signature import ENGINE_NAME, ENGINE_SIGNATURE, ENGINE_LICENSE
 
 # 자식 워커 프로세스 여부 감지

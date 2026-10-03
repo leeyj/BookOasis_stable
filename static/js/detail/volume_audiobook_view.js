@@ -40,7 +40,7 @@ export function renderAudiobookVolumes(orderedBooks, detailMeta = null) {
     totalBytes += fileSize;
     const codec = String(book.file_format || '-').toLowerCase();
     const kbps = durationSec > 0 ? Math.round((fileSize * 8 / 1000) / durationSec) : 0;
-    const isTrackCompleted = Number(book.is_track_completed) === 1 || Number(book.track_progress_pct || 0) >= 95;
+    const isTrackCompleted = Number(book.is_track_completed) === 1;  // 완료 기준(%)은 서버가 사용자 설정으로 판정
     const trackCompletedDotHtml = isMusic ? '' : `<span class="ab-track-completed-dot${isTrackCompleted ? ' is-visible' : ''}"
       data-audiobook-track-completed="${book.id}"
       title="${i18n.t('detail.audiobook_completed')}"

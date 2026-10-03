@@ -6,7 +6,7 @@ from contextlib import contextmanager
 import pytest
 
 import database
-from plugins.metadata.base import BaseMetadataProvider
+from plugin_framework.metadata_base import BaseMetadataProvider
 from repositories.sqlite import problem_repository as sqlite_repository
 from services import notification_service as ns
 from services import plugin_problem_service as pps

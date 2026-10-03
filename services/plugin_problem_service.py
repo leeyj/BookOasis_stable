@@ -3,7 +3,7 @@
 plugin_problem_service.py – 플러그인 문제 카드 계약 (알림센터 6단계)
 
 설계: docs/plan_unified_notification_queue.md 3장 "결정: 플러그인 문제 카드 계약" / 8장 6단계.
-플러그인은 베이스 클래스 헬퍼 self.report_problem() / self.resolve_problem()으로 부르고(plugins/metadata/base.py),
+플러그인은 베이스 클래스 헬퍼 self.report_problem() / self.resolve_problem()으로 부르고(plugin_framework/metadata_base.py),
 실제 저장은 여기서 문제 기록 테이블(services/problem_service.py)에 한다.
 
 - 코어는 저장·표시만 한다. 제목/설명 문구는 플러그인이 준다(코어가 플러그인 코드의 의미를 해석하지 않는다).

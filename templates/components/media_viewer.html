@@ -44,6 +44,11 @@
         <!-- Kavita 스타일 플로팅 조작 오버레이 메뉴 (탭 형식 개편 & 푸른색 테마) -->
         <div id="comic-overlay-menu" class="comic-overlay-menu" style="display: none; z-index: 10003;">
             <div class="overlay-header">
+                <!-- 전체화면 전환: F11이 없는 태블릿(Windows 포함)·모바일을 위해 메뉴 상단에 항상 둔다.
+                     브라우저가 Fullscreen API를 지원할 때만 보임(fullscreen_controller.js가 표시 제어). -->
+                <button id="btn-overlay-fullscreen" class="overlay-fullscreen-btn" data-role="viewer-action" data-action="toggle-fullscreen" data-i18n-title="viewer.fullscreen" title="전체화면" style="display: none;">
+                    <i class="fa-solid fa-expand" id="overlay-fullscreen-icon"></i>
+                </button>
                 <!-- 탭 네비게이션: 항상 상단에 노출되는 메뉴 버튼들 (예전엔 화면 중앙 카드 안에 있었음) -->
                 <div class="overlay-tab-nav">
                     <button class="overlay-tab-btn active" id="tab-btn-nav" data-role="viewer-action" data-action="overlay-tab" data-value="nav">
@@ -127,10 +132,6 @@
                             <i class="fa-solid fa-arrows-up-down"></i> <span id="tap-zone-direction-label" data-i18n="viewer.tap_zone_horizontal">좌/우</span>
                         </button>
 
-                        <!-- 모바일 전용 전체화면 전환 버튼 (안드로이드, iOS) -->
-                        <button id="btn-overlay-fullscreen-mobile" class="btn-overlay-fit" data-role="viewer-action" data-action="toggle-fullscreen" style="display: none;" title="전체화면 전환">
-                            <i class="fa-solid fa-expand" id="overlay-mobile-fullscreen-icon"></i> <span id="overlay-mobile-fullscreen-label" data-i18n="viewer.fullscreen">전체화면</span>
-                        </button>
                     </div>
 
                     <!-- 이미지/PDF 너비 조절 슬라이더 (스크롤 모드일 때만 표시) -->

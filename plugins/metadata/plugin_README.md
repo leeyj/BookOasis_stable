@@ -4,7 +4,7 @@
 
 > 💡 **참고**: 스캐너 로컬 파서 개발은 [스캐너 파서 개발 가이드](../../docs/guide_scanner_parser.md)를 참조하십시오.
 
-> ⚠️ **이 `plugins/metadata/` 폴더는 `docker-compose.yml`에서 호스트에 바인드 마운트되는 사용자 데이터 폴더입니다.** 여기에는 프레임워크 필수 파일(`base.py`, `__init__.py`, 템플릿)만 두고, 저장소가 기본 제공하는 예시 플러그인은 `sample_plugins/metadata/`(마운트되지 않는 별도 위치)에 보관합니다. 업데이트(`git pull`, `git clean` 등) 과정에서 사용자가 직접 설치한 플러그인이 유실되지 않도록 하기 위함입니다. 저장소 기본 샘플을 쓰고 싶다면 [설정] > [플러그인] 탭의 **"샘플에서 설치"** 버튼을 이용하세요.
+> ⚠️ **이 `plugins/metadata/` 폴더는 `docker-compose.yml`에서 호스트에 바인드 마운트되는 사용자 데이터 폴더입니다.** 여기에는 프레임워크 필수 파일(`base.py` 안내 파일, `__init__.py`, 템플릿)만 두고(계약 코드 자체는 이미지와 함께 갱신되는 `plugin_framework/metadata_base.py`에 있습니다), 저장소가 기본 제공하는 예시 플러그인은 `sample_plugins/metadata/`(마운트되지 않는 별도 위치)에 보관합니다. 업데이트(`git pull`, `git clean` 등) 과정에서 사용자가 직접 설치한 플러그인이 유실되지 않도록 하기 위함입니다. 저장소 기본 샘플을 쓰고 싶다면 [설정] > [플러그인] 탭의 **"샘플에서 설치"** 버튼을 이용하세요.
 
 ---
 
@@ -72,7 +72,7 @@ BookOasis 플러그인은 화면 목적에 따라 2가지 독립된 UI 번들을
 
 ## 3. 플러그인 클래스 기본 계약 (Class Contract)
 
-모든 플러그인 클래스는 `plugins/metadata/base.py`에 정의된 `BaseMetadataProvider`를 상속받아야 합니다.
+모든 플러그인 클래스는 `BaseMetadataProvider`(`from plugins.metadata.base import BaseMetadataProvider`, 실제 코드는 `plugin_framework/metadata_base.py`)를 상속받아야 합니다.
 클래스 이름은 `{파일명의CamelCase}MetadataProvider` 형태를 권장합니다. (예: `GoogleMetadataProvider`)
 
 ```python

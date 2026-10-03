@@ -1,4 +1,9 @@
 # CHANGELOG
+## v2.8.6
+- (feature) 완독·재생 완료 기준(%)을 내 설정에서 조절 - 도서, 오디오북 트랙, 영상 에피소드 공용 (50~100, 기본 95) | the finished threshold (%) is now adjustable in My Settings for books, audiobook tracks and video episodes (50-100, default 95)
+- (improvement) 뷰어 메뉴 상단에 전체화면 전환 버튼 추가 - F11을 누르기 어려운 태블릿(Windows 포함)에서도 전환 가능. 기존 '보기' 탭의 모바일 전용 버튼을 대체 | add a fullscreen toggle to the top of the viewer menu so tablets (including Windows) can switch without F11; replaces the mobile-only button in the Layout tab
+- (fix) Docker에서 플러그인 계약 파일(plugins/metadata/base.py)이 업데이트되지 않아 새 계약(음악 앨범 정보 조회 등)이 "has no attribute" 오류로 실패하던 이슈 수정 - 계약 코드를 이미지 쪽(plugin_framework/)으로 옮기고 플러그인 import 경로는 그대로 유지 | fix new plugin contracts (music album lookup, etc.) failing with "has no attribute" on Docker because the bind-mounted plugins/metadata/base.py never got updated - the contract code now lives in the image (plugin_framework/) with the plugin import path unchanged
+
 ## v2.8.5
 - (feature) KOReader 연동 - OPDS 만화 페이지 스트리밍(OPDS-PSE, 페이지 수를 아는 ZIP/CBZ/이미지 폴더)과 KOReader 진행 상황 동기화(kosync 호환, 서버 주소 /kosync, 계정 메뉴에서 동기화 비밀번호 설정). 만화·PDF는 웹 뷰어와 양방향, EPUB·TXT는 KOReader 기기끼리 | KOReader support - OPDS comic page streaming (OPDS-PSE, for ZIP/CBZ/image folders with a known page count) and KOReader progress sync (kosync-compatible, server address /kosync, sync password set in the account menu); comics/PDF sync both ways with the web viewer, EPUB/TXT between KOReader devices
 - (security) OPDS 다운로드 링크 서명 키가 공개 저장소의 고정값이던 문제 수정 - 앱 SECRET_KEY를 사용 | OPDS download link tokens were signed with a fixed key published in the repository; they now use the app SECRET_KEY

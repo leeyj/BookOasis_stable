@@ -219,7 +219,9 @@ done
 # 완전히 빈 호스트 폴더로 마운트되면 base.py 등 필수 프레임워크 파일이 컨테이너
 # 안에서도 안 보여서 부팅 자체가 실패한다. 이미지 빌드 시 마운트에 가려지지 않는
 # /app/_plugin_framework_defaults 에 보관해 둔 원본에서, "없는 파일만" 채워 넣는다
-# (기존 파일은 절대 덮어쓰지 않음 — 사용자가 수정한 base.py 등을 보존).
+# (기존 파일은 덮어쓰지 않음). 단 base.py는 예외 - 계약 코드는 plugin_framework/로 옮겨졌고
+# 코어가 import를 그쪽으로 고정하므로 호스트의 base.py는 쓰이지 않는다. 옛 전체 사본이 남아
+# 헷갈리지 않게 이미지의 안내 파일로 맞춘다.
 # ─────────────────────────────────────────────────────────
 if [ -d "/app/_plugin_framework_defaults" ]; then
     mkdir -p /app/plugins/metadata 2>/dev/null || true
@@ -232,6 +234,10 @@ if [ -d "/app/_plugin_framework_defaults" ]; then
                 echo "[Entrypoint] ⚠️  플러그인 프레임워크 파일 시드 실패: $name"
         fi
     done
+    if [ -f /app/_plugin_framework_defaults/base.py ] && ! cmp -s /app/_plugin_framework_defaults/base.py /app/plugins/metadata/base.py; then
+        cp /app/_plugin_framework_defaults/base.py /app/plugins/metadata/base.py 2>/dev/null && \
+            echo "[Entrypoint] plugins/metadata/base.py 를 안내 파일로 교체 (계약 코드는 plugin_framework/)" || true
+    fi
 fi
 
 DB_ENGINE_LOWER=$(echo "${DB_ENGINE:-sqlite}" | tr '[:upper:]' '[:lower:]')

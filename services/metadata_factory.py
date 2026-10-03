@@ -10,7 +10,7 @@ import time
 import traceback
 from datetime import datetime
 from flask import json
-from plugins.metadata.base import BaseMetadataProvider
+from plugin_framework.metadata_base import BaseMetadataProvider
 
 class SecurityError(PermissionError):
     pass

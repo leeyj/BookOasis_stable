@@ -103,7 +103,7 @@ BookOasis plugins support dual UI bundles tailored to specific views:
 
 ## 3. Provider Contract
 
-All providers must inherit [plugins/metadata/base.py](../plugins/metadata/base.py).
+All providers must inherit `BaseMetadataProvider`. Keep importing it as `from plugins.metadata.base import BaseMetadataProvider`; the code itself lives in [plugin_framework/metadata_base.py](../plugin_framework/metadata_base.py) and updates with the image regardless of the bind-mounted `plugins/` folder.
 
 Recommended class attributes:
 

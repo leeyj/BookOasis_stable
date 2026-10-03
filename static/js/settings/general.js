@@ -563,6 +563,9 @@ export async function loadMySettings() {
     const fontFamilyEl = document.getElementById('my-setting-viewer-font-family');
     if (fontFamilyEl) fontFamilyEl.value = s.VIEWER_FONT_FAMILY || 'sans-serif';
 
+    const completePercentEl = document.getElementById('my-setting-book-complete-percent');
+    if (completePercentEl) completePercentEl.value = s.BOOK_COMPLETE_PERCENT || '95';
+
     const audioMiniPlayerModeEl = document.getElementById('my-setting-audio-mini-player-mode');
     if (audioMiniPlayerModeEl) {
       audioMiniPlayerModeEl.value = (s.AUDIO_MINI_PLAYER_MODE === 'right_dock') ? 'right_dock' : 'mini';
@@ -617,6 +620,8 @@ export async function submitMySettings(event) {
   const showInsights = document.getElementById('my-setting-show-dashboard-insights')?.checked ? '1' : '0';
   const fontSize = document.getElementById('my-setting-viewer-font-size')?.value || '18';
   const fontFamily = document.getElementById('my-setting-viewer-font-family')?.value || 'sans-serif';
+  const completePercentRaw = parseInt(document.getElementById('my-setting-book-complete-percent')?.value, 10);
+  const bookCompletePercent = String(Number.isFinite(completePercentRaw) ? Math.min(100, Math.max(50, completePercentRaw)) : 95);
   const audioMiniPlayerModeRaw = document.getElementById('my-setting-audio-mini-player-mode')?.value || 'mini';
   const audioMiniPlayerMode = (audioMiniPlayerModeRaw === 'right_dock') ? 'right_dock' : 'mini';
   const audioRightDockDimEnabled = document.getElementById('my-setting-audio-right-dock-dim')?.checked ? '1' : '0';
@@ -643,6 +648,7 @@ export async function submitMySettings(event) {
       api.updateUserSetting('SHOW_DASHBOARD_INSIGHTS', showInsights),
       api.updateUserSetting('VIEWER_FONT_SIZE', fontSize),
       api.updateUserSetting('VIEWER_FONT_FAMILY', fontFamily),
+      api.updateUserSetting('BOOK_COMPLETE_PERCENT', bookCompletePercent),
       api.updateUserSetting('AUDIO_MINI_PLAYER_MODE', audioMiniPlayerMode),
       api.updateUserSetting('AUDIO_RIGHT_DOCK_DIM_ENABLED', audioRightDockDimEnabled),
       api.updateUserSetting('DETAIL_VOLUME_GRID_VIEW', detailVolumeGridView),

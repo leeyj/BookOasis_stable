@@ -21,7 +21,7 @@ export function renderVideoVolumes(orderedBooks, detailMeta = null) {
     const durationText = ep.time_str && durationSec > 0 ? ep.time_str : toClock(durationSec);
     totalDurationSec += durationSec;
 
-    const isEpCompleted = Number(ep.is_episode_completed) === 1 || Number(ep.episode_progress_pct || 0) >= 95;
+    const isEpCompleted = Number(ep.is_episode_completed) === 1;  // 완료 기준(%)은 서버가 사용자 설정으로 판정
     const completedDotHtml = `<span class="ab-track-completed-dot${isEpCompleted ? ' is-visible' : ''}"
       title="시청 완료" aria-label="시청 완료"></span>`;
 

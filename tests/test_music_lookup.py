@@ -7,7 +7,7 @@ from contextlib import contextmanager
 
 import pytest
 
-from plugins.metadata.base import BaseMetadataProvider
+from plugin_framework.metadata_base import BaseMetadataProvider
 from repositories.sqlite import audiobook_repository as sqlite_repo
 from sample_plugins.metadata.music_itunes.music_itunes import (
     MusicItunesMetadataProvider,

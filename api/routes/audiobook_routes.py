@@ -11,6 +11,7 @@ import json
 from flask import Blueprint, request, Response, jsonify, session
 from api.auth import login_required, check_adult_permission
 import database
+from services.reading_progress_service import get_book_complete_percent
 
 audiobook_bp = Blueprint('audiobook_api', __name__)
 
@@ -582,7 +583,7 @@ def audiobook_progress_api(aid):
                 track_duration = float(track_row.get('duration') or 0.0)
                 if track_duration > 0:
                     track_progress_pct = min(100.0, max(0.0, (current_time / track_duration) * 100.0))
-                    track_is_completed = 1 if track_progress_pct >= 95.0 else 0
+                    track_is_completed = 1 if track_progress_pct >= get_book_complete_percent(user_id) else 0
                 AudiobookRepository.save_audiobook_track_progress(
                     aid,
                     user_id,

@@ -557,6 +557,29 @@
     transform: translateY(-50%) scale(1.05);
 }
 
+/* 전체화면 전환 (닫기 버튼과 대칭으로 왼쪽 여백에 배치) */
+.overlay-fullscreen-btn {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--app-text-muted);
+    padding: 0.3rem 0.6rem;
+    font-size: 0.95rem;
+    border-radius: 6px;
+    cursor: pointer;
+    line-height: 1;
+    transition: all 0.2s ease;
+}
+
+.overlay-fullscreen-btn:hover {
+    background: color-mix(in srgb, var(--app-accent) 20%, transparent);
+    border-color: var(--app-accent);
+    color: var(--app-text-primary);
+}
+
 .overlay-controls-panel {
     /* 헤더 바로 아래 틈 없이 붙여서, 별개로 뜬 컨텍스트 메뉴가 아니라 헤더 자체가
        아래로 늘어나 펼쳐진 것처럼 보이게 한다 - 위쪽은 헤더와 맞닿는 면이라 각지게

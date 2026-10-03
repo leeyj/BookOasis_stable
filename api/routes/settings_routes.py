@@ -76,6 +76,7 @@ USER_OVERRIDABLE_SETTING_KEYS = (
     'BOOK_RECOMMEND_ENABLED',
     'HOME_DASHBOARD_PLUGIN_MODE',
     'HOME_WIDGET_LAYOUT',
+    'BOOK_COMPLETE_PERCENT',
 )
 
 @settings_bp.route('/api/media/settings', methods=['GET'])
@@ -207,8 +208,14 @@ def update_user_setting():
     max_value_len = SETTING_VALUE_LIMITS.get(key, MAX_SETTING_VALUE_DEFAULT_LENGTH)
     if len(value) > max_value_len:
         return jsonify({'success': False, 'error': f'설정 값 길이는 최대 {max_value_len}자까지 허용됩니다. ({key})'}), 400
+    if key == 'BOOK_COMPLETE_PERCENT':
+        from services.reading_progress_service import parse_book_complete_percent, invalidate_book_complete_percent
+        if parse_book_complete_percent(value) is None:
+            return jsonify({'success': False, 'error': _t('api.err_book_complete_percent_range')}), 400
     try:
         SettingsService.set_user_value(user_id, key, value)
+        if key == 'BOOK_COMPLETE_PERCENT':
+            invalidate_book_complete_percent(user_id)
         return jsonify({'success': True, 'message': _t('api.msg_setting_saved', key=key)})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

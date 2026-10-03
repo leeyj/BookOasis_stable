@@ -13,7 +13,7 @@ music_lookup_service.py – 음악 앨범 외부 정보 조회 (album.yaml이 �
 """
 import time
 
-from plugins.metadata.base import BaseMetadataProvider
+from plugin_framework.metadata_base import BaseMetadataProvider
 
 LOOKUP_INTERVAL_SEC = 5.0  # iTunes 등 무료 API의 분당 제한(약 20회)을 넘지 않게. 플러그인이 앨범당 1~3회 부를 수 있다
 BATCH_SIZE = 20

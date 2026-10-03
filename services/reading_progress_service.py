@@ -17,6 +17,42 @@ from utils.redis_helper import get_redis_client, make_key, redis_del, redis_acqu
 logger = logging.getLogger("bookoasis")
 
 
+BOOK_COMPLETE_PERCENT_KEY = 'BOOK_COMPLETE_PERCENT'
+BOOK_COMPLETE_PERCENT_DEFAULT = 95
+BOOK_COMPLETE_PERCENT_MIN = 50
+_COMPLETE_PERCENT_CACHE_TTL = 60.0
+_complete_percent_cache = {}  # user_id -> (percent, cached_at)
+
+
+def parse_book_complete_percent(value):
+    """설정값을 50~100 정수로. 잘못된 값이면 None."""
+    try:
+        percent = int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    return percent if BOOK_COMPLETE_PERCENT_MIN <= percent <= 100 else None
+
+
+def get_book_complete_percent(user_id):
+    """완독/재생 완료 기준(%) - 도서·오디오북 트랙·영상 에피소드 공용. 내 설정 BOOK_COMPLETE_PERCENT, 없으면 95.
+    진행률 저장마다 불리므로 잠깐 캐시한다."""
+    cached = _complete_percent_cache.get(user_id)
+    if cached and time.time() - cached[1] < _COMPLETE_PERCENT_CACHE_TTL:
+        return cached[0]
+    from services.settings_service import SettingsService
+    percent = parse_book_complete_percent(SettingsService.get_effective(BOOK_COMPLETE_PERCENT_KEY, user_id, ''))
+    percent = percent or BOOK_COMPLETE_PERCENT_DEFAULT
+    _complete_percent_cache[user_id] = (percent, time.time())
+    return percent
+
+
+def invalidate_book_complete_percent(user_id=None):
+    if user_id is None:
+        _complete_percent_cache.clear()
+    else:
+        _complete_percent_cache.pop(user_id, None)
+
+
 def get_progress_flush_interval_seconds():
     try:
         return max(1, int(os.environ.get('PROGRESS_FLUSH_INTERVAL_SEC', '2') or '2'))
@@ -134,7 +170,7 @@ class ReadingProgressService:
         pages_read = page_idx + 1
         is_completed = 0
         if total_pages > 0:
-            if (pages_read / total_pages) >= 0.95 or pages_read >= total_pages:
+            if (pages_read / total_pages) * 100 >= get_book_complete_percent(user_id) or pages_read >= total_pages:
                 is_completed = 1
 
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')

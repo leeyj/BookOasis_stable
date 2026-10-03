@@ -1,5 +1,5 @@
 // fullscreen_controller.js - viewer fullscreen and mobile auto-fullscreen helpers
-import { getViewerPlatformProfile, shouldShowMobileFullscreenButton } from './platform_profile.js';
+import { getViewerPlatformProfile, shouldShowFullscreenButton } from './platform_profile.js';
 
 let _fullscreenSyncBound = false;
 
@@ -67,26 +67,25 @@ export function isMobileDevice() {
 export function syncViewerFullscreenState() {
   const modal = getViewerModal();
   const icon = getFullscreenIcon();
-  const mobileIcon = document.getElementById('overlay-mobile-fullscreen-icon');
-  const mobileLabel = document.getElementById('overlay-mobile-fullscreen-label');
-  const mobileBtn = document.getElementById('btn-overlay-fullscreen-mobile');
+  const overlayIcon = document.getElementById('overlay-fullscreen-icon');
+  const overlayBtn = document.getElementById('btn-overlay-fullscreen');
   if (!modal) return;
 
-  if (mobileBtn) {
-    mobileBtn.style.display = shouldShowMobileFullscreenButton() ? 'inline-flex' : 'none';
+  if (overlayBtn) {
+    overlayBtn.style.display = shouldShowFullscreenButton() ? 'inline-flex' : 'none';
   }
 
   const inFullscreen = isViewerInFullscreen();
   if (inFullscreen) {
     modal.classList.add('fullscreen-mode');
     if (icon) icon.className = 'fa-solid fa-compress';
-    if (mobileIcon) mobileIcon.className = 'fa-solid fa-compress';
-    if (mobileLabel) mobileLabel.setAttribute('data-i18n', 'viewer.exit_fullscreen');
+    if (overlayIcon) overlayIcon.className = 'fa-solid fa-compress';
+    if (overlayBtn) overlayBtn.setAttribute('data-i18n-title', 'viewer.exit_fullscreen');
   } else {
     modal.classList.remove('fullscreen-mode');
     if (icon) icon.className = 'fa-solid fa-expand';
-    if (mobileIcon) mobileIcon.className = 'fa-solid fa-expand';
-    if (mobileLabel) mobileLabel.setAttribute('data-i18n', 'viewer.fullscreen');
+    if (overlayIcon) overlayIcon.className = 'fa-solid fa-expand';
+    if (overlayBtn) overlayBtn.setAttribute('data-i18n-title', 'viewer.fullscreen');
   }
 
   if (window.i18n && typeof window.i18n.translateDOM === 'function') {

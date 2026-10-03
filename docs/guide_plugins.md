@@ -228,7 +228,7 @@ window.addEventListener('message', (event) => {
 
 ## 3. 플러그인 클래스 기본 계약
 
-모든 플러그인 클래스는 [plugins/metadata/base.py](../plugins/metadata/base.py)를 상속해야 합니다.
+모든 플러그인 클래스는 `BaseMetadataProvider`를 상속해야 합니다. import 경로는 `from plugins.metadata.base import BaseMetadataProvider` 그대로이고, 실제 코드는 [plugin_framework/metadata_base.py](../plugin_framework/metadata_base.py)에 있습니다(Docker 바인드 마운트의 `plugins/` 폴더와 무관하게 이미지와 함께 갱신).
 
 필수/권장 필드:
 

@@ -36,8 +36,10 @@ export function shouldUseAndroidHotspotTouchFallback(profile = getViewerPlatform
   return !!(profile.isAndroid && profile.hasTouch);
 }
 
-export function shouldShowMobileFullscreenButton(profile = getViewerPlatformProfile()) {
-  return !!profile.isMobileDevice;
+// 기기 판별 대신 기능 지원으로 판단 - Windows 태블릿은 데스크톱 UA라 모바일로 안 잡히는데 F11도 누르기 어렵다.
+// (iPhone Safari처럼 요소 전체화면을 지원하지 않으면 숨김)
+export function shouldShowFullscreenButton() {
+  return !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
 }
 
 export function shouldAutoFullscreenForFormat(format, profile = getViewerPlatformProfile()) {

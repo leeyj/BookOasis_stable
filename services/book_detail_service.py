@@ -9,6 +9,7 @@ from utils.cover_helper import get_cover_image_with_t, resolve_series_cover, inv
 from utils.redis_helper import redis_delete_pattern
 from utils.permission_clause import build_library_permission_clause
 from services.cover_storage_service import get_covers_dir
+from services.reading_progress_service import get_book_complete_percent
 
 # album.yaml genres의 분류 머리말처럼 정보가 없는 값
 _MUSIC_GENRE_NOISE = {'전체', 'all'}
@@ -106,6 +107,7 @@ class BookDetailService:
                 # 상세 머리 정보 줄용: 발매 연도·장르 (album.yaml → 외부 조회 결과)
                 meta['music_year'], meta['music_genres'] = _music_year_and_genres(audiobook_row, lookup)
 
+            complete_pct = get_book_complete_percent(user_id)
             books_list = []
             for t in track_rows:
                 dur_sec = t['duration'] or 0.0
@@ -119,13 +121,13 @@ class BookDetailService:
                     is_track_completed = 1
                 elif saved_track_progress:
                     track_progress_pct = float(saved_track_progress.get('progress_pct') or 0.0)
-                    is_track_completed = 1 if track_progress_pct >= 95.0 else 0
+                    is_track_completed = 1 if track_progress_pct >= complete_pct else 0
                 elif current_track_number is not None and int(t.get('track_number') or 0) < current_track_number:
                     track_progress_pct = 100.0
                     is_track_completed = 1
                 elif current_track_id is not None and int(t['id']) == int(current_track_id) and float(dur_sec or 0.0) > 0:
                     track_progress_pct = min(100.0, (float(current_time or 0.0) / float(dur_sec)) * 100.0)
-                    is_track_completed = 1 if track_progress_pct >= 95.0 else 0
+                    is_track_completed = 1 if track_progress_pct >= complete_pct else 0
                 else:
                     track_progress_pct = 0.0
                     is_track_completed = 0
@@ -205,6 +207,7 @@ class BookDetailService:
                 'metadata_locked': 0
             }
 
+            complete_pct = get_book_complete_percent(user_id)
             books_list = []
             for ep in episode_rows:
                 dur_sec = ep['duration'] or 0.0
@@ -217,10 +220,10 @@ class BookDetailService:
                     is_ep_completed = 1
                 elif saved_ep_progress:
                     ep_progress_pct = float(saved_ep_progress.get('progress_pct') or 0.0)
-                    is_ep_completed = 1 if ep_progress_pct >= 95.0 else 0
+                    is_ep_completed = 1 if ep_progress_pct >= complete_pct else 0
                 elif current_episode_id is not None and int(ep['id']) == int(current_episode_id) and float(dur_sec or 0.0) > 0:
                     ep_progress_pct = min(100.0, (float(current_time or 0.0) / float(dur_sec)) * 100.0)
-                    is_ep_completed = 1 if ep_progress_pct >= 95.0 else 0
+                    is_ep_completed = 1 if ep_progress_pct >= complete_pct else 0
                 else:
                     ep_progress_pct = 0.0
                     is_ep_completed = 0

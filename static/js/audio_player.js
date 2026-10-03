@@ -181,10 +181,7 @@ const progressSync = createAudioProgressSync({
     track.is_track_completed = Number(result?.track_is_completed) === 1 ? 1 : 0;
 
     const allTracksCompleted = currentAudiobookData.tracks.length > 0
-      && currentAudiobookData.tracks.every((row) => {
-        const pct = Number(row?.track_progress_pct || 0);
-        return Number(row?.is_track_completed) === 1 || pct >= 95;
-      });
+      && currentAudiobookData.tracks.every((row) => Number(row?.is_track_completed) === 1);  // 완료 기준(%)은 서버가 사용자 설정으로 판정
 
     if (allTracksCompleted) {
       document.querySelectorAll(`[data-audiobook-completed="${currentAudiobookData.meta?.id || ''}"]`).forEach((badge) => {

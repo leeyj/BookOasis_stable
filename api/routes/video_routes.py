@@ -11,6 +11,7 @@ from flask import Blueprint, request, Response, jsonify, session
 from api.auth import login_required, admin_required
 import database
 
+from services.reading_progress_service import get_book_complete_percent
 video_bp = Blueprint('video_api', __name__)
 
 
@@ -507,7 +508,7 @@ def video_progress_api(vid):
                 episode_duration = float(episode_row.get('duration') or 0.0)
                 if episode_duration > 0:
                     episode_progress_pct = min(100.0, max(0.0, (current_time / episode_duration) * 100.0))
-                    episode_is_completed = 1 if episode_progress_pct >= 95.0 else 0
+                    episode_is_completed = 1 if episode_progress_pct >= get_book_complete_percent(user_id) else 0
                 if is_completed:
                     episode_progress_pct = 100.0
                     episode_is_completed = 1
