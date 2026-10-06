@@ -1,4 +1,7 @@
 # CHANGELOG
+## v2.8.7
+- (feature) 장르/태그 필터를 2개 이상 선택했을 때 '필터 적용 중(AND)'을 눌러 AND(모두 포함)/OR(하나라도 포함)로 전환 | when 2+ genre/tag filters are selected, click "Active Filters (AND)" to switch between AND (match all) and OR (match any)
+
 ## v2.8.6
 - (feature) 완독·재생 완료 기준(%)을 내 설정에서 조절 - 도서, 오디오북 트랙, 영상 에피소드 공용 (50~100, 기본 95) | the finished threshold (%) is now adjustable in My Settings for books, audiobook tracks and video episodes (50-100, default 95)
 - (improvement) 뷰어 메뉴 상단에 전체화면 전환 버튼 추가 - F11을 누르기 어려운 태블릿(Windows 포함)에서도 전환 가능. 기존 '보기' 탭의 모바일 전용 버튼을 대체 | add a fullscreen toggle to the top of the viewer menu so tablets (including Windows) can switch without F11; replaces the mobile-only button in the Layout tab

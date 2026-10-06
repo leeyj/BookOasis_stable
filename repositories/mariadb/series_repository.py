@@ -102,7 +102,7 @@ class SeriesRepository:
             conn.close()
 
     @staticmethod
-    def _fetch_summary_rows(db_type, library_id, user_id, role, limit, offset, favorite_user_id, sort='asc', include_has_metadata=False):
+    def _fetch_summary_rows(db_type, library_id, user_id, role, limit, offset, favorite_user_id, sort='asc', include_has_metadata=False, filter_mode='and'):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
@@ -230,7 +230,7 @@ class SeriesRepository:
             conn.close()
 
     @staticmethod
-    def fetch_books_for_grouping(db_type, library_id, search_query='', favorite_only=False, genre_filters=None, tag_filters=None, user_id=None, role=None, limit=None, offset=None, sort='asc', include_has_metadata=False):
+    def fetch_books_for_grouping(db_type, library_id, search_query='', favorite_only=False, genre_filters=None, tag_filters=None, user_id=None, role=None, limit=None, offset=None, sort='asc', include_has_metadata=False, filter_mode='and'):
         """시리즈 그룹핑 렌더링에 필요한 기본 도서 레코드 목록 조회 (MariaDB Native)"""
         safe_user_id = int(user_id) if user_id is not None and int(user_id) > 0 else 1
         genre_filters = [str(v).strip() for v in (genre_filters or []) if str(v).strip()]
@@ -398,15 +398,22 @@ class SeriesRepository:
                     )
                     sub_params.extend([like, like, like, like])
 
+            # 장르/태그 필터: 기본 AND(모두 포함), filter_mode='or'이면 하나라도 포함되면 매칭
+            topic_clauses, topic_params = [], []
             for genre in genre_filters:
                 compact = genre.replace(' ', '')
-                sub_where.append("CONCAT(',', REPLACE(COALESCE(b2.genre, ''), ' ', ''), ',') LIKE %s")
-                sub_params.append(f"%,{compact},%")
-
+                topic_clauses.append("CONCAT(',', REPLACE(COALESCE(b2.genre, ''), ' ', ''), ',') LIKE %s")
+                topic_params.append(f"%,{compact},%")
             for tag in tag_filters:
                 compact = tag.replace(' ', '')
-                sub_where.append("CONCAT(',', REPLACE(COALESCE(b2.tags, ''), ' ', ''), ',') LIKE %s")
-                sub_params.append(f"%,{compact},%")
+                topic_clauses.append("CONCAT(',', REPLACE(COALESCE(b2.tags, ''), ' ', ''), ',') LIKE %s")
+                topic_params.append(f"%,{compact},%")
+            if topic_clauses:
+                if filter_mode == 'or':
+                    sub_where.append('(' + ' OR '.join(topic_clauses) + ')')
+                else:
+                    sub_where.extend(topic_clauses)
+                sub_params.extend(topic_params)
 
             sub_join = ""
             if role != 'admin' and user_id:
@@ -574,7 +581,7 @@ class SeriesRepository:
             conn.close()
 
     @staticmethod
-    def fetch_grouping_totals(db_type, library_id, search_query='', favorite_only=False, genre_filters=None, tag_filters=None, user_id=None, role=None):
+    def fetch_grouping_totals(db_type, library_id, search_query='', favorite_only=False, genre_filters=None, tag_filters=None, user_id=None, role=None, filter_mode='and'):
         safe_user_id = int(user_id) if user_id is not None and int(user_id) > 0 else 1
         genre_filters = [str(value).strip() for value in (genre_filters or []) if str(value).strip()]
         tag_filters = [str(value).strip() for value in (tag_filters or []) if str(value).strip()]
@@ -685,14 +692,22 @@ class SeriesRepository:
                         "OR LOWER(COALESCE(b2.series_name, '')) LIKE %s OR LOWER(COALESCE(b2.series_alias, '')) LIKE %s)"
                     )
                     sub_params.extend([like, like, like, like])
+            # 장르/태그 필터: 기본 AND(모두 포함), filter_mode='or'이면 하나라도 포함되면 매칭
+            topic_clauses, topic_params = [], []
             for genre in genre_filters:
                 compact = genre.replace(' ', '')
-                sub_where.append("CONCAT(',', REPLACE(COALESCE(b2.genre, ''), ' ', ''), ',') LIKE %s")
-                sub_params.append(f"%,{compact},%")
+                topic_clauses.append("CONCAT(',', REPLACE(COALESCE(b2.genre, ''), ' ', ''), ',') LIKE %s")
+                topic_params.append(f"%,{compact},%")
             for tag in tag_filters:
                 compact = tag.replace(' ', '')
-                sub_where.append("CONCAT(',', REPLACE(COALESCE(b2.tags, ''), ' ', ''), ',') LIKE %s")
-                sub_params.append(f"%,{compact},%")
+                topic_clauses.append("CONCAT(',', REPLACE(COALESCE(b2.tags, ''), ' ', ''), ',') LIKE %s")
+                topic_params.append(f"%,{compact},%")
+            if topic_clauses:
+                if filter_mode == 'or':
+                    sub_where.append('(' + ' OR '.join(topic_clauses) + ')')
+                else:
+                    sub_where.extend(topic_clauses)
+                sub_params.extend(topic_params)
 
             sub_join = ""
             if role != 'admin' and user_id:

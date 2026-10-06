@@ -1,0 +1,48 @@
+<div class="ren-settings-panel">
+  <p class="ren-desc">
+    매일 아침 읽을 "내 뉴스 브리핑"을 한 권의 EPUB으로 만들어 서재에 꽂아 줍니다.
+    관심 있는 RSS 피드를 등록하면 하루 한 번 수집해 선택한 라이브러리에 저장하고 스캔을 요청합니다.
+    피드가 전문(content:encoded)을 주면 본문까지, 요약만 주면 요약과 원문 링크를 수록합니다.
+    제목·링크만 주는 피드는 헤드라인 브리핑 형태가 되며, 기사 원문 수집은 지원하지 않습니다.
+    생성된 EPUB은 개인 열람용으로만 사용하세요.
+  </p>
+
+  <div class="ren-field">
+    <label for="ren-feeds">RSS 피드 목록</label>
+    <input id="ren-feeds" type="text" name="FEEDS" placeholder="내 피드|https://example.com/feed.xml ; https://example.org/rss.xml">
+    <small>여러 개는 <code>;</code>로 구분합니다. 형식: <code>이름|URL</code> 또는 URL만.</small>
+  </div>
+
+  <div class="ren-field">
+    <label for="ren-library">저장할 라이브러리 ID</label>
+    <input id="ren-library" type="number" name="LIBRARY_ID" min="1" placeholder="예: 29">
+    <small>일반 도서 라이브러리 중 로컬 경로를 가진 것 (GDrive 전용은 불가).</small>
+  </div>
+
+  <label class="ren-check"><input type="checkbox" name="MERGE_FEEDS"> 모든 피드를 한 권으로 합치기 (하루 한 권 "브리핑", 목차에서 [피드이름]으로 구분)</label>
+  <div class="ren-field">
+    <label for="ren-digest">합친 책 이름</label>
+    <input id="ren-digest" type="text" name="DIGEST_NAME" placeholder="오늘의 브리핑">
+    <small>위 옵션을 켰을 때만 사용됩니다. 끄면 피드마다 한 권(시리즈)씩 만듭니다.</small>
+  </div>
+
+  <div class="ren-row">
+    <div class="ren-field">
+      <label for="ren-hour">수집 시각(시, 0~23)</label>
+      <input id="ren-hour" type="number" name="RUN_HOUR" min="0" max="23" placeholder="6">
+    </div>
+    <div class="ren-field">
+      <label for="ren-max">피드당 최대 기사 수</label>
+      <input id="ren-max" type="number" name="MAX_ITEMS" min="1" max="200" placeholder="30">
+    </div>
+  </div>
+
+  <label class="ren-check"><input type="checkbox" name="ENABLED"> 매일 자동 수집 (끄면 "지금 수집"만 동작)</label>
+  <label class="ren-check"><input type="checkbox" name="INCLUDE_IMAGES" checked> 이미지 포함 (끄면 텍스트만, 용량 절약)</label>
+
+  <div class="ren-actions">
+    <button type="button" class="ren-run-btn" data-role="ren-run-now">지금 수집</button>
+    <span class="ren-status" data-role="ren-status"></span>
+  </div>
+  <small class="ren-hint">"지금 수집"은 먼저 아래 "설정 저장"을 눌러 저장한 값으로 실행됩니다.</small>
+</div>

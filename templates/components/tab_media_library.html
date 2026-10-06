@@ -94,7 +94,8 @@
         <!-- 필터 활성 알림 바 (초기 숨김) -->
         <div id="active-filter-bar" class="active-filter-bar" style="display: none;">
             <div class="active-filter-info">
-                <i class="fa-solid fa-filter" style="color: #ffffff;"></i> <span data-i18n="filter.active_filters" style="font-size: 0.85rem; color: #ffffff; font-weight: 700;">필터 적용 중:</span>
+                <i class="fa-solid fa-filter" style="color: #ffffff;"></i> <span data-i18n="filter.active_filters" style="font-size: 0.85rem; color: #ffffff; font-weight: 700;">필터 적용 중</span>
+                <button type="button" id="btn-active-filter-mode" class="btn-filter-mode" data-role="active-filter-mode" data-i18n-title="filter.mode_toggle_title" title="클릭하여 AND/OR 전환" style="display: none;">(AND)</button><span style="font-size: 0.85rem; color: #ffffff; font-weight: 700;">:</span>
             </div>
             <div id="active-filter-badges" class="active-filter-badges">
                 <!-- JS에서 동적으로 뱃지 렌더링 -->

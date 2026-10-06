@@ -421,6 +421,12 @@ function setTranslate(xPos, yPos, el) {
 if (!document.body.dataset.activeFilterRemoveDelegated) {
     document.body.dataset.activeFilterRemoveDelegated = '1';
     document.addEventListener('click', (event) => {
+        if (event.target.closest('[data-role="active-filter-mode"]')) {
+            event.preventDefault();
+            event.stopPropagation();
+            toggleFilterMode();
+            return;
+        }
         const removeButton = event.target.closest('[data-role="active-filter-remove"]');
         if (!removeButton) return;
 
@@ -452,15 +458,23 @@ export function updateActiveFilterBar() {
         return;
     }
 
+    // AND/OR 전환 버튼은 필터가 2개 이상일 때만 의미가 있다
+    const modeButton = document.getElementById('btn-active-filter-mode');
+    if (modeButton) {
+        modeButton.style.display = totalFilters > 1 ? 'inline-flex' : 'none';
+        modeButton.textContent = state.filterMode === 'or' ? '(OR)' : '(AND)';
+        modeButton.classList.toggle('is-or', state.filterMode === 'or');
+    }
+
     let html = '';
     selectedGenres.forEach(genre => {
-        html += `<span class="active-filter-item">
+        html += `<span class="active-filter-item is-genre">
             <i class="fa-solid fa-list-ul"></i> ${escapeHtml(genre)}
             <span class="filter-remove-btn" data-role="active-filter-remove" data-filter-type="genre" data-filter-value="${escapeHtml(genre)}"><i class="fa-solid fa-xmark"></i></span>
         </span>`;
     });
     selectedTags.forEach(tag => {
-        html += `<span class="active-filter-item">
+        html += `<span class="active-filter-item is-tag">
             <i class="fa-solid fa-tag"></i> ${escapeHtml(tag)}
             <span class="filter-remove-btn" data-role="active-filter-remove" data-filter-type="tag" data-filter-value="${escapeHtml(tag)}"><i class="fa-solid fa-xmark"></i></span>
         </span>`;
@@ -469,6 +483,19 @@ export function updateActiveFilterBar() {
     badgeContainer.innerHTML = html;
     bar.style.display = 'flex';
 }
+
+// 장르/태그 필터 결합 방식 전환 (AND: 모두 포함 <-> OR: 하나라도 포함)
+export function toggleFilterMode() {
+    state.filterMode = state.filterMode === 'or' ? 'and' : 'or';
+    try {
+        localStorage.setItem('library_filter_mode', state.filterMode);
+    } catch (e) {}
+    updateActiveFilterBar();
+    if (typeof window.filterBooks === 'function') {
+        window.filterBooks();
+    }
+}
+window.toggleFilterMode = toggleFilterMode;
 
 export function removeActiveFilterItem(type, value) {
     if (type === 'genre') {

@@ -11,6 +11,11 @@ async function safeFetch(url, options = {}) {
   return res;
 }
 
+// 장르/태그 필터 결합 방식: 기본 AND, 'or'일 때만 서버에 전달 (필터가 2개 이상일 때만 의미가 있다)
+function filterModeQuery(genres, tags) {
+  return state.filterMode === 'or' && (genres.length + tags.length) > 1 ? '&filter_mode=or' : '';
+}
+
 export async function fetchLibraries(type) {
   const res = await safeFetch(`/api/media/libraries?type=${type}&_=${Date.now()}`, {cache: 'no-store'});
   return res.json();
@@ -21,9 +26,10 @@ export async function fetchBooksList({type, libraryId, page, limit, append, sear
   const sortQuery = sort ? `&sort=${sort}` : '';
   const genresQuery = genres.length > 0 ? `&genres=${encodeURIComponent(genres.join(','))}` : '';
   const tagsQuery = tags.length > 0 ? `&tags=${encodeURIComponent(tags.join(','))}` : '';
+  const modeQuery = filterModeQuery(genres, tags);
   const groupByQuery = groupBy ? `&group_by=${encodeURIComponent(groupBy)}` : '';
   const authorKeyQuery = authorKey ? `&author_key=${encodeURIComponent(authorKey)}` : '';
-  const url = `/api/media/list?type=${type}&library_id=${libraryId}&page=${page}&limit=${limit}${searchQuery}${sortQuery}${genresQuery}${tagsQuery}${groupByQuery}${authorKeyQuery}&_=${Date.now()}`;
+  const url = `/api/media/list?type=${type}&library_id=${libraryId}&page=${page}&limit=${limit}${searchQuery}${sortQuery}${genresQuery}${tagsQuery}${modeQuery}${groupByQuery}${authorKeyQuery}&_=${Date.now()}`;
   const res = await safeFetch(url, {cache: 'no-store'});
   return res.json();
 }
@@ -48,7 +54,8 @@ export async function fetchJumpPosition({type, libraryId, search, sort, genres =
   const sortQuery = sort ? `&sort=${sort}` : '';
   const genresQuery = genres.length > 0 ? `&genres=${encodeURIComponent(genres.join(','))}` : '';
   const tagsQuery = tags.length > 0 ? `&tags=${encodeURIComponent(tags.join(','))}` : '';
-  const url = `/api/media/list/jump?type=${type}&library_id=${libraryId}&limit=${limit}${searchQuery}${sortQuery}${genresQuery}${tagsQuery}&char=${encodeURIComponent(char)}&_=${Date.now()}`;
+  const modeQuery = filterModeQuery(genres, tags);
+  const url = `/api/media/list/jump?type=${type}&library_id=${libraryId}&limit=${limit}${searchQuery}${sortQuery}${genresQuery}${tagsQuery}${modeQuery}&char=${encodeURIComponent(char)}&_=${Date.now()}`;
   const res = await safeFetch(url, {cache: 'no-store'});
   return res.json();
 }
@@ -57,7 +64,8 @@ export async function fetchBooksTotals({type, libraryId, search, genres = [], ta
   const searchQuery = search ? `&search=${encodeURIComponent(search)}` : '';
   const genresQuery = genres.length > 0 ? `&genres=${encodeURIComponent(genres.join(','))}` : '';
   const tagsQuery = tags.length > 0 ? `&tags=${encodeURIComponent(tags.join(','))}` : '';
-  const url = `/api/media/list-totals?type=${type}&library_id=${libraryId}${searchQuery}${genresQuery}${tagsQuery}&_=${Date.now()}`;
+  const modeQuery = filterModeQuery(genres, tags);
+  const url = `/api/media/list-totals?type=${type}&library_id=${libraryId}${searchQuery}${genresQuery}${tagsQuery}${modeQuery}&_=${Date.now()}`;
   const res = await safeFetch(url, {cache: 'no-store'});
   return res.json();
 }

@@ -76,6 +76,7 @@ def get_media_list():
     sort = request.args.get('sort', 'asc').strip().lower()
     genre_filters = _parse_csv_filter_values(request.args.get('genres', ''))
     tag_filters = _parse_csv_filter_values(request.args.get('tags', ''))
+    filter_mode = 'or' if request.args.get('filter_mode', '').strip().lower() == 'or' else 'and'
     group_by = request.args.get('group_by', '').strip()
     author_key = request.args.get('author_key', '').strip()
     # 목록에선 has_metadata를 기본 미계산(null) - 대형 카테고리에서 수 초가 걸리는 비용이라 플러그인 등이 명시적으로 요청할 때만 계산한다.
@@ -98,6 +99,7 @@ def get_media_list():
             sort,
             genre_filters=genre_filters,
             tag_filters=tag_filters,
+            filter_mode=filter_mode,
             user_id=user_id,
             role=role,
             group_by=group_by,
@@ -148,6 +150,7 @@ def get_media_list_jump_position():
     target_char = request.args.get('char', '').strip()
     genre_filters = _parse_csv_filter_values(request.args.get('genres', ''))
     tag_filters = _parse_csv_filter_values(request.args.get('tags', ''))
+    filter_mode = 'or' if request.args.get('filter_mode', '').strip().lower() == 'or' else 'and'
     user_id = session.get('user_id')
     role = session.get('role')
     try:
@@ -168,6 +171,7 @@ def get_media_list_jump_position():
             limit,
             genre_filters=genre_filters,
             tag_filters=tag_filters,
+            filter_mode=filter_mode,
             user_id=user_id,
             role=role
         )
@@ -186,6 +190,7 @@ def get_media_list_totals():
     search_query = request.args.get('search', '').strip()
     genre_filters = _parse_csv_filter_values(request.args.get('genres', ''))
     tag_filters = _parse_csv_filter_values(request.args.get('tags', ''))
+    filter_mode = 'or' if request.args.get('filter_mode', '').strip().lower() == 'or' else 'and'
     try:
         totals = SeriesService.get_books_totals(
             db_type,
@@ -193,6 +198,7 @@ def get_media_list_totals():
             search_query=search_query,
             genre_filters=genre_filters,
             tag_filters=tag_filters,
+            filter_mode=filter_mode,
             user_id=session.get('user_id'),
             role=session.get('role'),
         )

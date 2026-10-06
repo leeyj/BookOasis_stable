@@ -4741,6 +4741,28 @@ body {
     flex-shrink: 0;
 }
 
+.btn-filter-mode {
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    color: #ffffff;
+    font-size: 0.8rem;
+    font-weight: 800;
+    padding: 0.1rem 0.45rem;
+    border-radius: 6px;
+    cursor: pointer;
+    align-items: center;
+    transition: background 0.2s ease;
+}
+
+.btn-filter-mode:hover {
+    background: rgba(0, 0, 0, 0.55);
+}
+
+.btn-filter-mode.is-or {
+    background: #ffffff;
+    color: #b45309;
+}
+
 .active-filter-badges {
     display: flex;
     align-items: center;
@@ -4761,6 +4783,16 @@ body {
     font-weight: 700;
     gap: 0.4rem;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.active-filter-item.is-genre {
+    background: rgba(30, 58, 138, 0.6);
+    border-color: #93c5fd;
+}
+
+.active-filter-item.is-tag {
+    background: rgba(6, 78, 59, 0.6);
+    border-color: #6ee7b7;
 }
 
 .active-filter-item .filter-remove-btn {

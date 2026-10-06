@@ -404,7 +404,7 @@ class SeriesService:
         return result
 
     @staticmethod
-    def get_books_list(db_type, library_id, page, limit, search_query, sort='asc', genre_filters=None, tag_filters=None, user_id=None, role=None, group_by=None, author_key=None, include_has_metadata=False, return_has_more=False):
+    def get_books_list(db_type, library_id, page, limit, search_query, sort='asc', genre_filters=None, tag_filters=None, user_id=None, role=None, group_by=None, author_key=None, include_has_metadata=False, return_has_more=False, filter_mode='and'):
         import time
         t0 = time.perf_counter()
         _sync_local_books_cache_with_shared_epoch(db_type)
@@ -412,6 +412,7 @@ class SeriesService:
         favorite_only = library_id == 'favorite'
         normalized_genres = [str(v).strip() for v in (genre_filters or []) if str(v).strip()]
         normalized_tags = [str(v).strip() for v in (tag_filters or []) if str(v).strip()]
+        filter_mode = 'or' if str(filter_mode or '').lower() == 'or' else 'and'
         group_by = (group_by or '').strip().lower()
         author_key = (author_key or '').strip()
 
@@ -432,6 +433,7 @@ class SeriesService:
             str(sort or 'asc'),
             tuple(normalized_genres),
             tuple(normalized_tags),
+            filter_mode,
             int(user_id) if user_id else 0,
             str(role or ''),
             group_by,
@@ -472,6 +474,7 @@ class SeriesService:
                 favorite_only=favorite_only,
                 genre_filters=normalized_genres,
                 tag_filters=normalized_tags,
+                filter_mode=filter_mode,
                 user_id=user_id,
                 role=role,
                 limit=None,
@@ -511,6 +514,7 @@ class SeriesService:
             favorite_only=favorite_only,
             genre_filters=normalized_genres,
             tag_filters=normalized_tags,
+            filter_mode=filter_mode,
             user_id=user_id,
             role=role,
             limit=sql_limit,
@@ -608,7 +612,7 @@ class SeriesService:
 
     @staticmethod
     def find_jump_position(db_type, library_id, search_query, sort, target_char, limit,
-                            genre_filters=None, tag_filters=None, user_id=None, role=None):
+                            genre_filters=None, tag_filters=None, user_id=None, role=None, filter_mode='and'):
         """
         가나다(초성) 바로가기: 전체 목록을 동일한 정렬 기준으로 구성한 뒤 target_char로
         시작하는 첫 항목의 절대 인덱스를 찾아 페이지/오프셋으로 환산합니다.
@@ -621,6 +625,7 @@ class SeriesService:
         favorite_only = library_id == 'favorite'
         normalized_genres = [str(v).strip() for v in (genre_filters or []) if str(v).strip()]
         normalized_tags = [str(v).strip() for v in (tag_filters or []) if str(v).strip()]
+        filter_mode = 'or' if str(filter_mode or '').lower() == 'or' else 'and'
         sort_key = (sort or 'asc').lower()
         if sort_key not in ('asc', 'desc'):
             sort_key = 'asc'
@@ -633,6 +638,7 @@ class SeriesService:
             sort_key,
             tuple(normalized_genres),
             tuple(normalized_tags),
+            filter_mode,
             int(user_id) if user_id else 0,
             str(role or ''),
         )
@@ -648,6 +654,7 @@ class SeriesService:
                 favorite_only=favorite_only,
                 genre_filters=normalized_genres,
                 tag_filters=normalized_tags,
+                filter_mode=filter_mode,
                 user_id=user_id,
                 role=role,
                 limit=None,
@@ -688,19 +695,21 @@ class SeriesService:
         }
 
     @staticmethod
-    def get_books_totals(db_type, library_id, search_query='', genre_filters=None, tag_filters=None, user_id=None, role=None):
+    def get_books_totals(db_type, library_id, search_query='', genre_filters=None, tag_filters=None, user_id=None, role=None, filter_mode='and'):
         import time
         _sync_local_books_cache_with_shared_epoch(db_type)
         library_id = _normalize_library_id(library_id)
         favorite_only = library_id == 'favorite'
         normalized_genres = [str(value).strip() for value in (genre_filters or []) if str(value).strip()]
         normalized_tags = [str(value).strip() for value in (tag_filters or []) if str(value).strip()]
+        filter_mode = 'or' if str(filter_mode or '').lower() == 'or' else 'and'
         cache_payload = json.dumps({
             'db_type': db_type,
             'library_id': library_id,
             'search': str(search_query or ''),
             'genres': normalized_genres,
             'tags': normalized_tags,
+            'filter_mode': filter_mode,
             'user_id': int(user_id) if user_id else 0,
             'role': str(role or ''),
         }, ensure_ascii=False, sort_keys=True, separators=(',', ':'))
@@ -735,6 +744,7 @@ class SeriesService:
             favorite_only=favorite_only,
             genre_filters=normalized_genres,
             tag_filters=normalized_tags,
+            filter_mode=filter_mode,
             user_id=user_id,
             role=role,
         )

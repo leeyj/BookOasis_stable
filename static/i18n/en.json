@@ -864,7 +864,8 @@
     "unknown_error": "Unknown error"
   },
   "filter": {
-    "active_filters": "Active Filters:",
+    "active_filters": "Active Filters",
+    "mode_toggle_title": "Click to switch AND/OR (AND: match all selected, OR: match any)",
     "reset_all": "Reset All",
     "modal_title": "Genre / Tag Filter",
     "search_placeholder": "Enter search keyword...",

@@ -1,0 +1,88 @@
+.ren-settings-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+}
+
+.ren-desc {
+    margin: 0;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    color: var(--app-text-muted);
+}
+
+.ren-row {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.ren-field label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--app-text-primary);
+}
+
+.ren-field input {
+    width: 100%;
+    max-width: 640px;
+    background: var(--app-input-bg, rgba(0,0,0,0.2));
+    border: 1px solid var(--app-border, rgba(255,255,255,0.1));
+    color: var(--app-text-primary);
+    padding: 0.6rem 0.8rem;
+    border-radius: 6px;
+    outline: none;
+    font-size: 0.85rem;
+}
+
+.ren-row .ren-field input {
+    width: 180px;
+}
+
+.ren-field small,
+.ren-hint {
+    display: block;
+    margin-top: 0.35rem;
+    font-size: 0.78rem;
+    color: var(--app-text-muted);
+}
+
+.ren-check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.88rem;
+    color: var(--app-text-primary);
+    cursor: pointer;
+}
+
+.ren-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    flex-wrap: wrap;
+}
+
+.ren-run-btn {
+    background: var(--app-accent);
+    color: var(--app-accent-contrast, #fff);
+    border: none;
+    padding: 0.55rem 1rem;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.ren-run-btn:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.ren-status {
+    font-size: 0.82rem;
+    color: var(--app-text-muted);
+    line-height: 1.6;
+}

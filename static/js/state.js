@@ -30,6 +30,7 @@ export const state = {
   searchQuery: '',
   currentSortDirection: localStorage.getItem('library_sort_direction') || 'asc', // 로컬 캐시 연동 (기본값: 오름차순)
   groupMode: localStorage.getItem('library_group_mode') || 'default', // 'default'(시리즈) | 'author'(작가별 모음)
+  filterMode: localStorage.getItem('library_filter_mode') === 'or' ? 'or' : 'and', // 장르/태그 필터 결합 방식: 'and'(모두 포함) | 'or'(하나라도 포함)
   authorKeyFilter: '', // 작가별 카드 클릭 드릴다운용 정규화 작가 키(기본 그리드로 전환 시에만 사용)
   
   // 시스템 전역 설정
