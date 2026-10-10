@@ -490,6 +490,16 @@ export const PdfViewer = {
   nextPage() {
     nextPdfPage();
   },
+  // 마지막 페이지가 화면에 나와 있는지 (슬라이드가 권 끝을 판단할 때 사용)
+  isAtLastPage() {
+    if (!pdfDoc || !pdfTotalPages) return false;
+    if ((localStorage.getItem('viewer_scroll_mode') || 'page') === 'scroll') {
+      const renderArea = document.getElementById('pdf-render-area');
+      return !!renderArea && renderArea.scrollTop + renderArea.clientHeight >= renderArea.scrollHeight - 2;
+    }
+    const step = (typeof getComicPageStep === 'function') ? getComicPageStep() : 1;
+    return pdfCurrentPage + (step === 2 ? 1 : 0) >= pdfTotalPages;
+  },
   jumpTo(target) {
     if (target === 'first') {
       pdfJumpToFirstPage();

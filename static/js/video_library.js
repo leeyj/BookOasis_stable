@@ -247,8 +247,17 @@ export function sortVideoCourses() {
   const sortDir = state.currentSortDirection || 'asc';
   const sorted = [...lastLoadedVideos];
 
+  const folderName = (v) => String(v.folder_path || v.title || '').split(/[\\/]/).filter(Boolean).pop() || '';
+  const episodeCount = (v) => Number(v.total_episodes || 0);
   if (sortDir === 'desc') {
     sorted.sort((a, b) => String(b.title || '').localeCompare(String(a.title || ''), 'ko'));
+  } else if (sortDir === 'folder_asc' || sortDir === 'folder_desc') {
+    const dir = sortDir === 'folder_desc' ? -1 : 1;
+    sorted.sort((a, b) => dir * folderName(a).localeCompare(folderName(b), 'ko'));
+  } else if (sortDir === 'count_desc' || sortDir === 'count_asc') {
+    const dir = sortDir === 'count_desc' ? -1 : 1;
+    sorted.sort((a, b) => dir * (episodeCount(a) - episodeCount(b))
+      || String(a.title || '').localeCompare(String(b.title || ''), 'ko'));
   } else if (sortDir === 'date_desc') {
     sorted.sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0));
   } else if (sortDir === 'date_asc') {

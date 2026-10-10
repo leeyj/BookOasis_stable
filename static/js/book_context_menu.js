@@ -16,6 +16,7 @@ import {
 } from './book_menu/plugin_items.js';
 
 let currentTargetBook = null;
+let menuRevealSeq = 0;
 let contextMenuSuppressUntil = 0;
 let dismissPointerGuardUntil = 0;
 let longPressTimer = null;
@@ -65,6 +66,7 @@ function isBookContextMenuOpen() {
 }
 
 function hideBookContextMenu({ suppressMs = 0, clearTarget = true } = {}) {
+  menuRevealSeq += 1; // 아직 표시 대기 중인 메뉴가 있으면 띄우지 않는다
   hideFloatingMenu('book-context-menu');
   if (clearTarget) currentTargetBook = null;
   menuOpenedByTouchUntil = 0;
@@ -124,6 +126,8 @@ export function showBookContextMenu(x, y, bookId, bookTitle, isVolumeDetail = fa
 
   if (Date.now() < contextMenuSuppressUntil) return;
   menuLastShownAt = Date.now();
+  // 이미 열린 메뉴를 다른 도서로 다시 여는 경우, 새 항목이 준비될 때까지 예전 위치에 남지 않게 숨긴다
+  if (isBookContextMenuOpen()) hideFloatingMenu('book-context-menu');
 
   lastEventX = x;
   lastEventY = y;
@@ -142,8 +146,9 @@ export function showBookContextMenu(x, y, bookId, bookTitle, isVolumeDetail = fa
 
   // 메타정보 검색 메뉴: 검색 플러그인 목록을 아직 모르면 비동기로 받아 표시 여부를 정한다
   const metaSearchEl = document.getElementById('ctx-search-meta-book');
+  let searchPluginsReady = Promise.resolve();
   if (metaSearchEl && cachedSearchPlugins === null) {
-    api.fetchMetadataPlugins().then(data => {
+    searchPluginsReady = api.fetchMetadataPlugins().then(data => {
       if (data.success && Array.isArray(data.plugins)) {
         cachedSearchPlugins = data.plugins;
         metaSearchEl.style.display = hasActiveSearchPlugin() ? '' : 'none';
@@ -155,13 +160,23 @@ export function showBookContextMenu(x, y, bookId, bookTitle, isVolumeDetail = fa
     });
   }
 
-  // 임시 표시하여 실제 메뉴 크기 측정
-  positionMenuAtPoint(bookMenu, x, y, { zIndex: 20060 });
-
-  loadPluginContextMenuItems(currentTargetBook, {
+  const { ready: pluginItemsReady } = loadPluginContextMenuItems(currentTargetBook, {
     onItemClick: (pluginId, actionId) => triggerBookContextPluginAction(pluginId, actionId),
     onRendered: () => adjustMenuPosition(lastEventX, lastEventY),
   });
+
+  // 플러그인 항목까지 준비된 뒤 한 번에 표시한다 (항목이 뒤늦게 하나씩 붙는 깜빡임 방지).
+  // 준비가 늦으면(첫 조회 등) 짧게만 기다리고 띄운 뒤, 늦게 온 항목은 위치를 재보정해 덧붙인다.
+  const revealSeq = ++menuRevealSeq;
+  const reveal = () => {
+    if (revealSeq !== menuRevealSeq) return;
+    menuLastShownAt = Date.now();
+    positionMenuAtPoint(bookMenu, x, y, { zIndex: 20060 });
+  };
+  Promise.race([
+    Promise.all([pluginItemsReady, searchPluginsReady]),
+    new Promise((resolve) => setTimeout(resolve, 250)),
+  ]).then(reveal, reveal);
 }
 
 export function triggerBookContextPluginAction(pluginId, actionId) {

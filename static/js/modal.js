@@ -3,7 +3,7 @@
 import { openBookDetail, goBackToList } from './detail/index.js';
 import { detailVolumeViewState, applyDetailVolumeView, toggleDetailUnreadFilter, setDetailVolumeSort } from './detail/volume_controller.js';
 import { toggleMetaEditMode, triggerCoverUpload, handleCoverUploadSelect, handleCoverDrop, saveManualMetadata, handleUnlockMetadataEvent } from './detail/metadata_editor.js';
-import { showGlobalLoadingSpinner, hideGlobalLoadingSpinner, toggleBookFavorite, toggleSeriesFavorite, rescanBook, rescanMissingBooks, rescanSeries, markSeriesCompleted } from './detail/book_actions.js';
+import { showGlobalLoadingSpinner, hideGlobalLoadingSpinner, toggleBookFavorite, toggleSeriesFavorite, rescanBook, rescanMissingBooks, rescanSeries, markSeriesCompleted, markSeriesUnread } from './detail/book_actions.js';
 
 // ── Re-export Modules ──
 export {
@@ -26,7 +26,8 @@ export {
   rescanBook,
   rescanMissingBooks,
   rescanSeries,
-  markSeriesCompleted
+  markSeriesCompleted,
+  markSeriesUnread
 };
 
 // ── Global Window Bindings (HTML 및 인라인 이벤트 100% 하위 호환성 보장) ──
@@ -49,6 +50,7 @@ window.rescanBook = rescanBook;
 window.rescanMissingBooks = rescanMissingBooks;
 window.rescanSeries = rescanSeries;
 window.markSeriesCompleted = markSeriesCompleted;
+window.markSeriesUnread = markSeriesUnread;
 
 window.showGlobalLoadingSpinner = showGlobalLoadingSpinner;
 window.hideGlobalLoadingSpinner = hideGlobalLoadingSpinner;

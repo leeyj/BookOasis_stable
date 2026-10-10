@@ -1,6 +1,6 @@
-"dashboard": "2.8.8"
+"dashboard": "2.8.9"
 "migrator": "1.1.1"
 "extensions": "1.0.3"
 "API": "1.0.5"
-"DBMS": "2.8.4","SQLITE","MARIADB"
+"DBMS": "2.8.9","SQLITE","MARIADB"
 "state": "release-production"

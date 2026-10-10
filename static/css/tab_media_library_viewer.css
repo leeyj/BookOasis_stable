@@ -1487,6 +1487,44 @@
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+/* 고정 필터: 읽음 상태 (genre_tag_filter.js setReadFilter) */
+.filter-read-state {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+.filter-read-state-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--app-text-muted);
+}
+.filter-read-state-options {
+    display: inline-flex;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.filter-read-option {
+    background: transparent;
+    border: none;
+    color: var(--app-text-muted);
+    padding: 0.35rem 0.7rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+.filter-read-option + .filter-read-option {
+    border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+.filter-read-option:hover {
+    color: var(--app-text-primary);
+}
+.filter-read-option.active {
+    background: var(--app-accent);
+    color: #ffffff;
+    font-weight: 700;
+}
+
 .filter-tab {
     flex: 1;
     background: transparent;
@@ -1676,4 +1714,87 @@ input:checked + .toggle-switch-slider::before {
     transform: translateX(20px);
     background-color: #ffffff;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+
+/* ── 슬라이드(자동 진행): 실행 중 컨트롤 + 다음 권 카운트다운 (slideshow_controller.js) ── */
+.viewer-slideshow-pill {
+    position: absolute;
+    right: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    z-index: 10004;
+    display: none;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.45rem;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.72);
+    color: #f1f5f9;
+    font-size: 0.8rem;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+    transition: opacity 0.4s ease;
+    user-select: none;
+}
+.viewer-slideshow-pill.dimmed {
+    opacity: 0.25;
+}
+.viewer-slideshow-pill-label {
+    padding: 0 0.2rem;
+    white-space: nowrap;
+}
+.viewer-slideshow-pill-btn {
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+    color: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.viewer-slideshow-pill-btn:hover {
+    background: rgba(255, 255, 255, 0.24);
+}
+.viewer-slideshow-countdown {
+    position: absolute;
+    inset: 0;
+    z-index: 10006;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.45);
+    padding: 16px;
+}
+.viewer-slideshow-countdown-card {
+    max-width: 360px;
+    width: 100%;
+    padding: 1.1rem 1.2rem;
+    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.92);
+    color: #f1f5f9;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+.viewer-slideshow-countdown-title {
+    font-weight: 700;
+    margin-bottom: 0.35rem;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+}
+.viewer-slideshow-countdown-sub {
+    font-size: 0.85rem;
+    color: #cbd5e1;
+    margin-bottom: 0.9rem;
+}
+.viewer-slideshow-countdown-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+}
+.overlay-slideshow-row {
+    margin-top: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
 }

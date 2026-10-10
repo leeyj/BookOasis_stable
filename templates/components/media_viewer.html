@@ -77,6 +77,12 @@
                         <button class="btn-overlay-action btn-overlay-action-icon-only" id="btn-add-bookmark" data-role="viewer-action" data-action="add-bookmark" data-i18n-title="viewer.add_bookmark" title="북마크 추가"><i class="fa-solid fa-bookmark"></i></button>
                         <button class="btn-overlay-action" id="btn-viewer-listen" data-role="viewer-action" data-action="listen" data-i18n-title="tts.viewer_listen_title" title="읽던 위치부터 음성으로 듣기" style="display: none;"><i class="fa-solid fa-headphones"></i> <span data-i18n="tts.viewer_listen">듣기</span></button>
                     </div>
+                    <!-- 슬라이드(자동 진행): 만화/PDF 전용 (slideshow_controller.js가 표시/옵션 채움) -->
+                    <div class="overlay-controls-row overlay-slideshow-row" id="overlay-slideshow-row" style="display: none;">
+                        <button class="btn-overlay-action" id="btn-slideshow-toggle" data-role="viewer-action" data-action="slideshow-toggle" data-i18n-title="viewer.slideshow_title" title="자동으로 넘기기/스크롤 (P)"><i class="fa-solid fa-play"></i> <span id="slideshow-toggle-label">슬라이드</span></button>
+                        <select id="viewer-slideshow-interval-select" data-role="viewer-action-change" data-action="slideshow-interval" class="overlay-select" data-i18n-title="viewer.slideshow_interval_title" title="페이지 모드: 넘김 간격"></select>
+                        <select id="viewer-slideshow-speed-select" data-role="viewer-action-change" data-action="slideshow-speed" class="overlay-select" data-i18n-title="viewer.slideshow_speed_title" title="스크롤 모드: 자동 스크롤 속도"></select>
+                    </div>
                 </div>
 
                 <!-- 탭 2: 레이아웃 / 보기 방식 -->

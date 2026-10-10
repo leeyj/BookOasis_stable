@@ -79,6 +79,7 @@ def get_media_list():
     filter_mode = 'or' if request.args.get('filter_mode', '').strip().lower() == 'or' else 'and'
     group_by = request.args.get('group_by', '').strip()
     author_key = request.args.get('author_key', '').strip()
+    read_filter = request.args.get('read_filter', '').strip().lower()
     # 목록에선 has_metadata를 기본 미계산(null) - 대형 카테고리에서 수 초가 걸리는 비용이라 플러그인 등이 명시적으로 요청할 때만 계산한다.
     include_has_metadata = request.args.get('include_has_metadata', '').strip().lower() in ('1', 'true', 'yes')
     user_id = session.get('user_id')
@@ -105,7 +106,8 @@ def get_media_list():
             group_by=group_by,
             author_key=author_key,
             include_has_metadata=include_has_metadata,
-            return_has_more=True
+            return_has_more=True,
+            read_filter=read_filter,
         )
         if has_more:
             series_list = series_list[:limit]
@@ -173,7 +175,8 @@ def get_media_list_jump_position():
             tag_filters=tag_filters,
             filter_mode=filter_mode,
             user_id=user_id,
-            role=role
+            role=role,
+            read_filter=request.args.get('read_filter', '').strip().lower(),
         )
         return jsonify({'success': True, **result})
     except Exception as e:
@@ -201,6 +204,7 @@ def get_media_list_totals():
             filter_mode=filter_mode,
             user_id=session.get('user_id'),
             role=session.get('role'),
+            read_filter=request.args.get('read_filter', '').strip().lower(),
         )
         return jsonify({'success': True, **totals})
     except Exception as error:

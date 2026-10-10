@@ -377,3 +377,61 @@ export async function markSeriesCompleted(event, seriesName, libraryId) {
     }
   }
 }
+
+// "모두 완독처리"의 반대 동작 - 시리즈 전체(오디오북은 해당 작품)의 진행 기록을 지운다.
+// 백엔드는 도서 메뉴의 "이 시리즈 전체를 읽지 않은 상태로 변경"과 같은 /api/media/unread를 쓴다.
+export async function markSeriesUnread(event, seriesName, libraryId) {
+  if (event) event.stopPropagation();
+
+  const btn = (event && event.target && typeof event.target.closest === 'function' && event.target.closest('button')) || null;
+  const originalHtml = btn ? btn.innerHTML : '';
+  const restoreBtn = () => {
+    if (!btn) return;
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+  };
+
+  const isAudiobook = state.currentLibraryType === 'audiobook';
+  // 오디오북은 시리즈명(제목) 매칭 대신 상세에 떠 있는 작품 ID로 정확히 지운다
+  const audioContext = isAudiobook ? collectDetailAudiobookContext() : { audiobookId: null };
+  const representativeId = parseInt(state.detailRepresentativeBookId, 10);
+  const targetBookId = isAudiobook
+    ? audioContext.audiobookId
+    : (collectDetailBookIds()[0] || (Number.isFinite(representativeId) && representativeId > 0 ? representativeId : null));
+
+  if (!targetBookId || (!isAudiobook && (!seriesName || libraryId === ''))) {
+    window.showToast?.(i18n.t('detail.no_books_to_mark_unread'), 'info');
+    return;
+  }
+
+  if (!window.confirm(i18n.t(isAudiobook ? 'detail.confirm_mark_audiobook_unread' : 'detail.confirm_mark_series_unread'))) {
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${i18n.t('detail.marking_unread')}`;
+  }
+
+  try {
+    const res = await api.markBookAsUnread(state.currentLibraryType, targetBookId, isAudiobook
+      ? { scope: 'book' }
+      : { scope: 'series', seriesName, libraryId });
+    if (res && res.success) {
+      const message = isAudiobook
+        ? i18n.t('detail.mark_audiobook_unread_done')
+        : i18n.t('detail.mark_series_unread_done', { count: res.affected_count || 0 });
+      window.showToast?.(message, 'success');
+      setTimeout(() => {
+        window.openBookDetail?.(null, seriesName, libraryId, state.detailRepresentativeBookId, state.detailDisplayTitle);
+      }, 600);
+    } else {
+      restoreBtn();
+      window.showToast?.((res && res.error) ? res.error : i18n.t('detail.mark_series_unread_fail'), 'error');
+    }
+  } catch (err) {
+    console.error('[markSeriesUnread] 오류:', err);
+    restoreBtn();
+    window.showToast?.(i18n.t('detail.mark_series_unread_fail'), 'error');
+  }
+}

@@ -3,6 +3,7 @@ import { state } from './state.js';
 import * as api from './api.js';
 import { openBookDetail, goBackToList } from './modal.js';
 import { updateCurrentCategoryIndicator } from './category_indicator.js';
+import { readOpenViewerSession } from './viewer/lifecycle_controller.js';
 import { openReader, closeMediaViewer, toggleFullscreenViewer, setComicFitMode, changeFontSize, toggleReaderTheme, initKeyboardListener, nextComicPage, prevComicPage, nextPdfPage, prevPdfPage, epubPrevPage, epubNextPage, prevTxtPage, nextTxtPage } from './viewer.js';
 import { switchActiveView } from './view_manager.js';
 import { flushProgress } from './viewer_progress.js';
@@ -339,6 +340,10 @@ function normalizeMediaType(val) {
 
 // 메인 초기화 함수
 async function initTabMediaLibrary() {
+  // 부팅은 한 번만 - 진입 모듈이 다른 URL로 두 번 평가되면 리스너·초기 조회가 전부 두 번 돌았다(2.8.9).
+  if (window.__tabMediaLibraryInited) return;
+  window.__tabMediaLibraryInited = true;
+
   const kioskParams = parseKioskParamsFromUrl();
   if (kioskParams) {
     // 킷오스크 모드: 사이드바/설정 등 라이브러리 UI를 전혀 부팅하지 않고 지정된 책의 리더 또는 플러그인 화면만 즉시 연다.
@@ -542,7 +547,12 @@ async function initTabMediaLibrary() {
 
   const initialHash = window.location.hash || '';
   const isDetailDeepLink = initialHash.startsWith('#detail');
-  const targetMediaType = parseMediaTypeFromUrl();
+  // 뷰어를 연 채로 탭이 정리됐다가 되살아난 경우(모바일 백그라운드) - 열려 있던 책으로 바로 돌아간다
+  const resumeViewer = initialHash === '#viewer' ? readOpenViewerSession() : null;
+  if (resumeViewer && resumeViewer.type && canAccessLibraryType(resumeViewer.type)) {
+    state.currentLibraryType = resumeViewer.type;
+  }
+  const targetMediaType = resumeViewer ? null : parseMediaTypeFromUrl();
 
   if (targetMediaType) {
     if (!canAccessLibraryType(targetMediaType)) {
@@ -560,6 +570,13 @@ async function initTabMediaLibrary() {
     if (typeof window.loadVideoLibraryView === 'function') await window.loadVideoLibraryView();
   } else {
     await loadLibraries();
+  }
+
+  if (resumeViewer) {
+    console.log(`[Viewer-Resume] 새로 로드된 탭에서 열려 있던 책 복원: book=${resumeViewer.bookId} (${resumeViewer.format})`);
+    selectCategory(resumeViewer.libraryId || 'home', true);
+    openReader(resumeViewer.bookId, resumeViewer.format, resumeViewer.title, 0, 0);
+    return;
   }
 
   if (isDetailDeepLink) {
@@ -714,6 +731,8 @@ export async function selectCategory(id, skipHistory = false, options = {}) {
   } else {
     clearLibrarySearchQuery();
   }
+  // 고정 필터(읽음 상태)는 카테고리를 옮겨도 유지되므로 배지 표시를 현재 세션 기준으로 맞춘다
+  window.updateActiveFilterBar?.();
 
   if (options && options.searchNavigationFrom) {
     const returnLibraryId = String(options.searchNavigationFrom);

@@ -7,6 +7,7 @@ import re
 import database
 from repositories.series_metadata_utils import book_metadata_select_expr
 from repositories.series_search_query import parse_series_search_query
+from repositories.series_list_options import is_score_sort, build_order_by, build_read_series_filter, build_completed_exists, group_fully_read_series
 
 class SeriesRepository:
     @staticmethod
@@ -102,7 +103,7 @@ class SeriesRepository:
             conn.close()
 
     @staticmethod
-    def _fetch_summary_rows(db_type, library_id, user_id, role, limit, offset, favorite_user_id, sort='asc', include_has_metadata=False, filter_mode='and'):
+    def _fetch_summary_rows(db_type, library_id, user_id, role, limit, offset, favorite_user_id, sort='asc', include_has_metadata=False, filter_mode='and', read_filter='', read_keys=None):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
@@ -111,11 +112,16 @@ class SeriesRepository:
             if not state or not int(state['is_ready'] or 0):
                 return None
 
+            # 별점순은 books를 (score, id) 인덱스 순서로 읽어 대표 도서만 골라 61개에서 멈춘다. MariaDB 옵티마이저는
+            # 인덱스가 있어도 요약 표 6.4만 행부터 읽어 페이지마다 ~100ms를 썼다(2026-10-10 홈 서버 ANALYZE:
+            # 강제 시 208행·1.5ms) - 그래서 읽는 순서를 STRAIGHT_JOIN으로 고정하고, 카테고리 조건도 b 쪽에 건다.
+            score_sort = is_score_sort(sort)
+            lib_alias = 'b' if score_sort else 's'
             where = []
             params = [favorite_user_id]
             if library_id and str(library_id) not in ('all', 'favorite', 'history', 'home'):
                 try:
-                    where.append("s.library_id = %s")
+                    where.append(f"{lib_alias}.library_id = %s")
                     params.append(int(library_id))
                 except (ValueError, TypeError):
                     pass
@@ -136,7 +142,7 @@ class SeriesRepository:
                 if not allowed_library_ids:
                     return []
                 placeholders = ','.join(['%s'] * len(allowed_library_ids))
-                where.append(f"s.library_id IN ({placeholders})")
+                where.append(f"{lib_alias}.library_id IN ({placeholders})")
                 params.extend(allowed_library_ids)
 
             sql = f"""
@@ -150,27 +156,27 @@ class SeriesRepository:
                        b.created_at, b.genre, b.tags, b.books_lv, b.publication_status, b.library_id,
                        COALESCE(b.metadata_locked, 0) AS metadata_locked,
                        {book_metadata_select_expr('b', include_has_metadata)} AS has_metadata,
+                       b.score,
                        s.series_book_count, s.latest_added AS series_latest_added
-                FROM series_summary s
-                INNER JOIN books b ON b.id = s.representative_book_id
+                {"FROM books b STRAIGHT_JOIN series_summary s ON s.representative_book_id = b.id" if score_sort else "FROM series_summary s INNER JOIN books b ON b.id = s.representative_book_id"}
             """
+            # 읽음 필터: 다 읽은 시리즈 키 목록으로 거른다 (조건 파라미터는 WHERE 순서 그대로 뒤에 붙음)
+            read_clause, read_params = build_read_series_filter(
+                read_filter, read_keys, lib_col='s.library_id', key_col='s.series_key', placeholder='%s'
+            )
+            if read_clause:
+                where.append(read_clause)
+                params.extend(read_params)
             if where:
                 sql += " WHERE " + " AND ".join(where)
-            # sort='desc'일 때 SQL 자체를 내림차순으로 뒤집는다 - 예전에는 항상 오름차순으로
-            # LIMIT/OFFSET을 적용한 뒤 호출부에서 그 결과만 파이썬으로 재정렬해서, 페이지 1을
-            # 넘어가면 SQL이 애초에 오름차순 기준 행 구간을 가져와버려 결과가 뒤죽박죽이었다.
-            # date_asc/date_desc(최신/과거 추가순)도 마찬가지로 SQL에서 바로 정렬+LIMIT을
-            # 걸어야 한다 - 예전엔 이 정렬만 SQL ORDER BY를 못 태우고 호출부(series_service)가
-            # 라이브러리 전체를 무제한으로 읽어와 파이썬에서 정렬했는데, 이게 무거운 요청 하나가
-            # gunicorn 1-worker/4-thread의 GIL을 오래 잡아서 같은 워커의 다른 요청들까지
-            # pending 상태로 줄줄이 밀리는 원인이었다.
-            sort_norm = str(sort or 'asc').lower()
-            if sort_norm in ('date_asc', 'date_desc'):
-                date_dir = 'DESC' if sort_norm == 'date_desc' else 'ASC'
-                sql += f" ORDER BY s.latest_added {date_dir}, s.representative_book_id ASC"
-            else:
-                title_dir = 'DESC' if sort_norm == 'desc' else 'ASC'
-                sql += f" ORDER BY s.library_id ASC, s.sort_series_name {title_dir}, s.representative_book_id ASC"
+            # sort를 SQL ORDER BY에 그대로 반영해야 LIMIT/OFFSET 페이지가 정렬 순서와 맞는다 -
+            # 예전엔 오름차순으로 자른 뒤 파이썬에서 재정렬해 2페이지부터 뒤죽박죽이었고, 날짜순은
+            # 전체를 읽어 파이썬 정렬하느라 워커 GIL을 오래 잡았다(series_list_options.build_order_by).
+            sql += " ORDER BY " + build_order_by(
+                sort, lib_col='s.library_id', name_col='s.sort_series_name',
+                date_col='s.latest_added', count_col='s.series_book_count', id_col='s.representative_book_id',
+                score_col='b.score', score_id_col='b.id'
+            )
             if limit is not None:
                 sql += " LIMIT %s"
                 params.append(int(limit))
@@ -183,7 +189,7 @@ class SeriesRepository:
             conn.close()
 
     @staticmethod
-    def _fetch_summary_totals(db_type, library_id, user_id, role):
+    def _fetch_summary_totals(db_type, library_id, user_id, role, read_filter='', read_keys=None):
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
@@ -213,6 +219,12 @@ class SeriesRepository:
                 where.append(f"s.library_id IN ({placeholders})")
                 params.extend(allowed_library_ids)
 
+            read_clause, read_params = build_read_series_filter(
+                read_filter, read_keys, lib_col='s.library_id', key_col='s.series_key', placeholder='%s'
+            )
+            if read_clause:
+                where.append(read_clause)
+                params.extend(read_params)
             sql = """
                 SELECT COUNT(*) AS total_series_count,
                        COALESCE(SUM(s.series_book_count), 0) AS total_book_count
@@ -230,22 +242,18 @@ class SeriesRepository:
             conn.close()
 
     @staticmethod
-    def fetch_books_for_grouping(db_type, library_id, search_query='', favorite_only=False, genre_filters=None, tag_filters=None, user_id=None, role=None, limit=None, offset=None, sort='asc', include_has_metadata=False, filter_mode='and'):
+    def fetch_books_for_grouping(db_type, library_id, search_query='', favorite_only=False, genre_filters=None, tag_filters=None, user_id=None, role=None, limit=None, offset=None, sort='asc', include_has_metadata=False, filter_mode='and', read_filter='', read_keys=None):
         """시리즈 그룹핑 렌더링에 필요한 기본 도서 레코드 목록 조회 (MariaDB Native)"""
         safe_user_id = int(user_id) if user_id is not None and int(user_id) > 0 else 1
         genre_filters = [str(v).strip() for v in (genre_filters or []) if str(v).strip()]
         tag_filters = [str(v).strip() for v in (tag_filters or []) if str(v).strip()]
         search_mode, search_term = parse_series_search_query(search_query)
-        sort_norm = str(sort or 'asc').lower()
-        is_date_sort = sort_norm in ('date_asc', 'date_desc')
-        title_dir = 'DESC' if sort_norm == 'desc' else 'ASC'
-        date_dir = 'DESC' if sort_norm == 'date_desc' else 'ASC'
 
         if db_type not in ('audiobook', 'video') and not search_query and not favorite_only and not genre_filters and not tag_filters:
             try:
                 summary_rows = SeriesRepository._fetch_summary_rows(
                     db_type, library_id, user_id, role, limit, offset, safe_user_id, sort=sort,
-                    include_has_metadata=include_has_metadata
+                    include_has_metadata=include_has_metadata, read_filter=read_filter, read_keys=read_keys
                 )
                 if summary_rows is not None:
                     return summary_rows
@@ -284,6 +292,13 @@ class SeriesRepository:
                 )
                 params.append(user_id)
 
+            completed_clause = build_completed_exists(
+                read_filter, progress_table='audiobook_progress', id_col='audiobook_id', row_id_col='a.id', placeholder='%s'
+            )
+            if completed_clause:
+                where.append(completed_clause)
+                params.append(safe_user_id)
+
             sql = f"""
                 SELECT a.id, a.title AS series_name, '' AS series_alias, a.title, '' AS title_alias,
                        a.author, a.folder_path AS file_path, 'audiobook' AS file_format,
@@ -292,6 +307,7 @@ class SeriesRepository:
                        COALESCE(a.is_favorite, 0) AS is_favorite,
                        a.created_at, '' AS genre, '' AS tags, a.library_id, 0 AS metadata_locked,
                        COALESCE(a.total_tracks, 0) AS total_tracks,
+                       CAST(a.ratings AS DECIMAL(10,2)) AS score,
                        COALESCE((
                            SELECT MAX(ap.is_completed) FROM audiobook_progress ap
                            WHERE ap.audiobook_id = a.id AND ap.user_id = %s
@@ -299,7 +315,7 @@ class SeriesRepository:
                        1 AS series_book_count
                 FROM audiobooks a
                 WHERE {' AND '.join(where)}
-                ORDER BY {"a.created_at " + date_dir if is_date_sort else "a.library_id ASC, a.title " + title_dir}, a.id ASC
+                ORDER BY {build_order_by(sort, lib_col='a.library_id', name_col='a.title', date_col='a.created_at', count_col='COALESCE(a.total_tracks, 0)', id_col='a.id', score_col='CAST(a.ratings AS DECIMAL(10,2))')}
             """
             if limit is not None:
                 sql += " LIMIT %s"
@@ -336,6 +352,13 @@ class SeriesRepository:
                 )
                 params.append(user_id)
 
+            completed_clause = build_completed_exists(
+                read_filter, progress_table='video_progress', id_col='video_id', row_id_col='v.id', placeholder='%s'
+            )
+            if completed_clause:
+                where.append(completed_clause)
+                params.append(safe_user_id)
+
             sql = f"""
                 SELECT v.id, v.title AS series_name, '' AS series_alias, v.title, '' AS title_alias,
                        '' AS author, v.folder_path AS file_path, 'video' AS file_format,
@@ -351,7 +374,7 @@ class SeriesRepository:
                        1 AS series_book_count
                 FROM videos v
                 WHERE {' AND '.join(where)}
-                ORDER BY {"v.created_at " + date_dir if is_date_sort else "v.library_id ASC, v.title " + title_dir}, v.id ASC
+                ORDER BY {build_order_by(sort, lib_col='v.library_id', name_col='v.title', date_col='v.created_at', count_col='COALESCE(v.total_episodes, 0)', id_col='v.id')}
             """
             if limit is not None:
                 sql += " LIMIT %s"
@@ -434,6 +457,13 @@ class SeriesRepository:
             if favorite_only:
                 outer_where.append("EXISTS (SELECT 1 FROM user_favorites uf WHERE uf.book_id = b.id AND uf.user_id = %s)")
                 params.append(safe_user_id)
+            read_clause, read_params = build_read_series_filter(
+                read_filter, read_keys, lib_col='b.library_id',
+                key_col="COALESCE(NULLIF(b.series_name, ''), b.title)", placeholder='%s'
+            )
+            if read_clause:
+                outer_where.append(read_clause)
+                params.extend(read_params)
 
             sql = f"""
                 SELECT b.id, b.series_name, b.series_alias, b.title, b.title_alias, b.author, b.file_path, b.file_format,
@@ -443,7 +473,7 @@ class SeriesRepository:
                        b.genre, b.tags, b.books_lv, b.publication_status, b.library_id, COALESCE(b.metadata_locked, 0) AS metadata_locked,
                        {book_metadata_select_expr('b', include_has_metadata)} AS has_metadata,
                        rep.series_book_count AS series_book_count, rep.series_latest_added AS series_latest_added,
-                       rep.matched_title AS matched_title
+                       rep.matched_title AS matched_title, b.score
                 FROM books b
                 INNER JOIN (
                     SELECT COALESCE(
@@ -459,7 +489,7 @@ class SeriesRepository:
                     GROUP BY b2.library_id, COALESCE(NULLIF(b2.series_name, ''), b2.title)
                 ) rep ON b.id = rep.rep_id
                 WHERE {' AND '.join(outer_where)}
-                ORDER BY {"rep.series_latest_added " + date_dir if is_date_sort else "b.library_id ASC, b.series_name " + title_dir}, b.id ASC
+                ORDER BY {build_order_by(sort, lib_col='b.library_id', name_col='b.series_name', date_col='rep.series_latest_added', count_col='rep.series_book_count', id_col='b.id', score_col='b.score')}
             """
 
             if limit is not None:
@@ -484,6 +514,53 @@ class SeriesRepository:
                     item['is_favorite'] = 1 if item['id'] in fav_set else 0
                 result.append(item)
             return result
+        finally:
+            conn.close()
+
+    @staticmethod
+    def fetch_fully_read_series_keys(db_type, user_id):
+        """사용자가 모든 권을 완독한 시리즈 {library_id: {series_key, ...}} - 목록 읽음 필터용.
+        완독 기록이 있는 시리즈만 골라 그 시리즈들의 전체 권수와 비교하므로 사용자 진행 기록
+        크기에만 비례한다 (라이브러리 전체를 훑지 않음)."""
+        if db_type in ('audiobook', 'video') or not user_id:
+            return {}
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                SELECT bx.library_id AS library_id,
+                       COALESCE(NULLIF(bx.series_name, ''), bx.title) AS series_key,
+                       COUNT(DISTINCT up.book_id) AS done
+                FROM user_progress up
+                INNER JOIN books bx ON bx.id = up.book_id
+                WHERE up.user_id = %s AND up.is_completed = 1
+                  AND (bx.is_deleted = 0 OR bx.is_deleted IS NULL)
+                GROUP BY bx.library_id, COALESCE(NULLIF(bx.series_name, ''), bx.title)
+            """, (int(user_id),))
+            done_rows = [(row['library_id'], row['series_key'], row['done']) for row in cursor.fetchall()]
+            if not done_rows:
+                return {}
+
+            keys_by_library = {}
+            for library_id, series_key, _done in done_rows:
+                keys_by_library.setdefault(int(library_id), []).append(str(series_key))
+
+            total_rows = []
+            for library_id, keys in keys_by_library.items():
+                for start in range(0, len(keys), 400):
+                    chunk = keys[start:start + 400]
+                    marks = ','.join(['%s'] * len(chunk))
+                    cursor.execute(f"""
+                        SELECT COALESCE(NULLIF(series_name, ''), title) AS series_key, COUNT(*) AS total
+                        FROM books
+                        WHERE library_id = %s
+                          AND (is_deleted = 0 OR is_deleted IS NULL)
+                          AND (series_name IN ({marks})
+                               OR ((series_name IS NULL OR series_name = '') AND title IN ({marks})))
+                        GROUP BY COALESCE(NULLIF(series_name, ''), title)
+                    """, (library_id, *chunk, *chunk))
+                    total_rows.extend((library_id, row['series_key'], row['total']) for row in cursor.fetchall())
+            return group_fully_read_series(done_rows, total_rows)
         finally:
             conn.close()
 

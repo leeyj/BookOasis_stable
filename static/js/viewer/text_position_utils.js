@@ -76,3 +76,20 @@ export function offsetToChunk(chunks, offset) {
   }
   return { chunkIdx: lo, inChunk: target - starts[lo] };
 }
+
+// 다른 기기·브라우저에서 더 최근에 읽은 위치를 따를지 정한다. 따를 서버 읽기 위치(read) 또는 null.
+// syncState: /api/media/tts/position 응답 상태 + clockOffsetMs(서버 시계 - 이 기기 시계)
+// localPos: 이 기기 viewer_last_pos_{id} ({anchorText, savedAt}) - 없으면 새 기기이거나 저장소가 지워진 경우
+// 이 기기가 닫을 때 보낸 자기 보고는 savedAt과 거의 같은 시각이라 marginMs 안쪽으로 보고 무시한다.
+export function pickOtherDeviceReadTarget(syncState, localPos, { marginMs = 5000 } = {}) {
+  const read = syncState && syncState.latest === 'read' ? syncState.read : null;
+  if (!read || !read.anchor) return null;
+  const compact = (value) => String(value || '').replace(/\s+/g, '');
+  if (localPos && localPos.anchorText && compact(localPos.anchorText) === compact(read.anchor)) return null;
+  const savedAt = Number(localPos && localPos.savedAt) || 0;
+  if (savedAt > 0) {
+    const localOnServerClock = savedAt + (Number(syncState.clockOffsetMs) || 0);
+    if (!(Number(read.updated_ms) > localOnServerClock + marginMs)) return null;
+  }
+  return read;
+}

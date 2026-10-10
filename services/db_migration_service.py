@@ -839,6 +839,11 @@ _INDEXES_SQL = """
     CREATE INDEX IF NOT EXISTS idx_books_library_active_series ON books(library_id, COALESCE(is_deleted, 0), COALESCE(series_name, ''));
     CREATE INDEX IF NOT EXISTS idx_series_summary_order ON series_summary(library_id, sort_series_name, representative_book_id);
     CREATE INDEX IF NOT EXISTS idx_series_summary_latest_added ON series_summary(latest_added, representative_book_id);
+    CREATE INDEX IF NOT EXISTS idx_series_summary_count ON series_summary(series_book_count, representative_book_id);
+    CREATE INDEX IF NOT EXISTS idx_series_summary_lib_count ON series_summary(library_id, series_book_count, representative_book_id);
+    CREATE INDEX IF NOT EXISTS idx_series_summary_rep ON series_summary(representative_book_id);
+    CREATE INDEX IF NOT EXISTS idx_books_score ON books(score, id);
+    CREATE INDEX IF NOT EXISTS idx_books_library_score ON books(library_id, score, id);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_user_progress_book_user ON user_progress(book_id, user_id);
     CREATE INDEX IF NOT EXISTS idx_user_progress_last_read ON user_progress(user_id, last_read_at DESC);
     CREATE INDEX IF NOT EXISTS idx_user_progress_last_read_book ON user_progress(last_read_at DESC, book_id);

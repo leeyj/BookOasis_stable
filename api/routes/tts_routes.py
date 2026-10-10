@@ -6,6 +6,7 @@ tts_routes.py - 브라우저 TTS("음성으로 듣기"): 플레이어 화면, �
 """
 import os
 import re
+import time
 
 from flask import Blueprint, request, jsonify, session, render_template, make_response, send_from_directory, Response
 
@@ -50,7 +51,8 @@ def get_tts_position():
     if denied:
         return denied
     state = TTSProgressService.get_sync_state(db_type, book_id, session.get('user_id'))
-    return jsonify({'success': True, 'state': state})
+    # 클라이언트가 자기 시계와 서버 시계 차이를 구해 '다른 기기에서 더 최근에 읽었는지' 비교한다
+    return jsonify({'success': True, 'state': state, 'server_now_ms': int(time.time() * 1000)})
 
 
 @tts_bp.route('/api/media/tts/position', methods=['POST'])

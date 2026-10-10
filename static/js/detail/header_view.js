@@ -400,8 +400,12 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
   const markSeriesCompletedLabel = isAudiobookContext
     ? i18n.t('detail.btn_mark_audiobook_completed')
     : i18n.t('detail.btn_mark_series_completed');
+  const markSeriesUnreadLabel = isAudiobookContext
+    ? i18n.t('detail.btn_mark_audiobook_unread')
+    : i18n.t('detail.btn_mark_series_unread');
   const markSeriesCompletedBtnHtml = (isVideoContext || isMusicContext) ? '' : `
     <button class="ridi-link-btn" data-role="detail-mark-series-complete" data-series-name="${safeSeriesName.replace(/"/g, '&quot;')}" data-library-id="${actualLibraryId}" style="margin: 0; background: #16a34a; border-color: #22c55e; display: inline-flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-circle-check"></i> ${markSeriesCompletedLabel}</button>
+    <button class="ridi-link-btn" data-role="detail-mark-series-unread" data-series-name="${safeSeriesName.replace(/"/g, '&quot;')}" data-library-id="${actualLibraryId}" style="margin: 0; background: #475569; border-color: #64748b; display: inline-flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-eye-slash"></i> ${markSeriesUnreadLabel}</button>
   `;
   const identifierLabel = 'ISBN(WEB_ID)';
   const identifierValue = escapeHtml((isAudiobookContext || isVideoContext) ? (meta.web_id || '-') : (meta.isbn || '-'));

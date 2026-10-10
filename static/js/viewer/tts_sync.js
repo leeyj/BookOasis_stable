@@ -3,7 +3,7 @@
 // 보고하고, 뷰어를 열 때 듣기 위치가 더 최근이면 그 문장으로 이동한다 (더 최근 쪽을 따르고 알림 — 2026-09-24 결정).
 // viewer_txt.js ↔ viewer_progress.js 순환 import를 피하려고, 현재 읽기 위치는 뷰어가 등록한 provider로 받는다.
 import { state } from '../state.js';
-import { makeAnchor, resolveOffset, offsetToChunk } from './text_position_utils.js';
+import { makeAnchor, resolveOffset, offsetToChunk, pickOtherDeviceReadTarget } from './text_position_utils.js';
 
 const REPORT_MIN_GAP_MS = 30_000;
 const REPORT_DEBOUNCE_MS = 3_000;
@@ -95,8 +95,12 @@ export async function fetchSyncState(dbType, bookId) {
       cache: 'no-store', signal: controller?.signal,
     });
     if (!res.ok) return null;
+    const receivedAt = Date.now();
     const data = await res.json();
-    return data && data.success ? data.state : null;
+    if (!data || !data.success || !data.state) return null;
+    // 다른 기기 읽기 위치와 이 기기 저장 시각을 비교하려고 서버 시계와의 차이를 같이 넘긴다
+    const clockOffsetMs = Number(data.server_now_ms) > 0 ? Number(data.server_now_ms) - receivedAt : 0;
+    return { ...data.state, clockOffsetMs };
   } catch (e) {
     return null; // 느리거나 실패하면 동기화 없이 기존대로 연다
   } finally {
@@ -110,12 +114,28 @@ export function listenTargetForTxt(syncState, fullText, chunks) {
   const listen = syncState && syncState.latest === 'listen' ? syncState.listen : null;
   if (!listen || !fullText || !chunks || !chunks.length) return null;
   const offset = resolveOffset(fullText, listen);
-  return { chunkIdx: offsetToChunk(chunks, offset).chunkIdx, anchorText: makeAnchor(fullText, offset) };
+  return { kind: 'listen', chunkIdx: offsetToChunk(chunks, offset).chunkIdx, anchorText: makeAnchor(fullText, offset) };
 }
 
 export function listenTargetForEpub(syncState, totalChapters) {
   const listen = syncState && syncState.latest === 'listen' ? syncState.listen : null;
   if (!listen || !totalChapters) return null;
   const chunkIdx = Math.max(0, Math.min(totalChapters - 1, Number(listen.chapter_idx) || 0));
-  return { chunkIdx, anchorText: listen.anchor || '' };
+  return { kind: 'listen', chunkIdx, anchorText: listen.anchor || '' };
+}
+
+// 다른 기기·브라우저에서 더 최근에 읽었으면 그 문장으로 연다 (판단은 pickOtherDeviceReadTarget).
+// 서버에는 TTS 동기화용 읽기 위치(챕터·글자 오프셋·앵커)가 이미 30초마다/떠날 때 보고되고 있다.
+export function readTargetForEpub(syncState, totalChapters, localPos) {
+  const read = pickOtherDeviceReadTarget(syncState, localPos);
+  if (!read || !totalChapters) return null;
+  const chunkIdx = Math.max(0, Math.min(totalChapters - 1, Number(read.chapter_idx) || 0));
+  return { kind: 'read', chunkIdx, anchorText: read.anchor };
+}
+
+export function readTargetForTxt(syncState, fullText, chunks, localPos) {
+  const read = pickOtherDeviceReadTarget(syncState, localPos);
+  if (!read || !fullText || !chunks || !chunks.length) return null;
+  const offset = resolveOffset(fullText, read);
+  return { kind: 'read', chunkIdx: offsetToChunk(chunks, offset).chunkIdx, anchorText: makeAnchor(fullText, offset) };
 }

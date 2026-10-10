@@ -460,6 +460,8 @@ class ReadingProgressRepository:
         try:
             if db_type == 'audiobook':
                 cursor.execute("DELETE FROM audiobook_progress WHERE audiobook_id = %s AND user_id = %s", (book_id, user_id))
+                # 트랙별 완료 표시도 함께 지워야 미독 처리 후 상세의 트랙 체크가 남지 않는다
+                cursor.execute("DELETE FROM audiobook_track_progress WHERE audiobook_id = %s AND user_id = %s", (book_id, user_id))
             elif db_type == 'video':
                 cursor.execute("DELETE FROM video_progress WHERE video_id = %s AND user_id = %s", (book_id, user_id))
                 cursor.execute("DELETE FROM video_episode_progress WHERE video_id = %s AND user_id = %s", (book_id, user_id))
@@ -490,6 +492,10 @@ class ReadingProgressRepository:
                     placeholders = ','.join('%s' for _ in book_ids)
                     cursor.execute(
                         f"DELETE FROM audiobook_progress WHERE user_id = %s AND audiobook_id IN ({placeholders})",
+                        (user_id, *book_ids)
+                    )
+                    cursor.execute(
+                        f"DELETE FROM audiobook_track_progress WHERE user_id = %s AND audiobook_id IN ({placeholders})",
                         (user_id, *book_ids)
                     )
             elif db_type == 'video':

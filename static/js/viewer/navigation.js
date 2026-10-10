@@ -274,6 +274,26 @@ export function markAsCompleted() {
 }
 
 
+// 두쪽 보기(step === 2)일 때 화면에 노출 중인 마지막 페이지 인덱스 ("한 장 밀기" 보정 반영)
+function getComicDisplayEndPage() {
+  const step = Settings.getComicPageStep ? Settings.getComicPageStep() : 1;
+  const totalPages = Renderer.getComicTotalPages();
+  const currentPage = Renderer.getComicCurrentPage();
+  const shiftOffset = (step === 2 && Settings.getSpreadShiftOffset) ? Settings.getSpreadShiftOffset() : 0;
+  return (step === 2) ? Math.min(currentPage + shiftOffset + 1, totalPages - 1) : currentPage;
+}
+
+// 마지막 페이지가 화면에 나와 있는지 (슬라이드가 권 끝을 판단할 때 사용)
+export function isComicAtLastPage() {
+  const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
+  if (scrollMode === 'scroll') {
+    const wrapper = document.querySelector('.comic-image-wrapper');
+    return !!wrapper && wrapper.scrollTop + wrapper.clientHeight >= wrapper.scrollHeight - 2;
+  }
+  const totalPages = Renderer.getComicTotalPages();
+  return totalPages > 0 && getComicDisplayEndPage() >= totalPages - 1;
+}
+
 export function nextComicPage() {
   const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
   if (scrollMode === 'scroll') {
@@ -289,10 +309,7 @@ export function nextComicPage() {
     const step = Settings.getComicPageStep ? Settings.getComicPageStep() : 1;
     const totalPages = Renderer.getComicTotalPages();
     const currentPage = Renderer.getComicCurrentPage();
-    const shiftOffset = (step === 2 && Settings.getSpreadShiftOffset) ? Settings.getSpreadShiftOffset() : 0;
-
-    // 두쪽 보기(step === 2)일 때 화면에 노출 중인 마지막 페이지 인덱스 ("한 장 밀기" 보정 반영)
-    const displayEndPage = (step === 2) ? Math.min(currentPage + shiftOffset + 1, totalPages - 1) : currentPage;
+    const displayEndPage = getComicDisplayEndPage();
 
     // 이미 마지막 페이지까지 노출 중인 경우 다음 권 불러오기 발동
     if (displayEndPage >= totalPages - 1) {

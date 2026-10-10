@@ -1,4 +1,5 @@
 import { VIEWER_FONTS } from '../viewer_settings.js';
+import { scheduleAnchorRechecks } from './txt_anchor_utils.js';
 
 // 내장 폰트 로드 실패 시(파일 누락/네트워크 오류) 되돌아갈 시스템 폰트 체인
 const BUILTIN_FONT_FALLBACKS = {
@@ -47,6 +48,7 @@ export function applyTxtSettingsCore(ctx) {
     renderCurrentChunk,
     snapTxtPageScrollLeft,
     saveDetailPosition,
+    holdRestoreAnchor,
     showRestoreLoadingToast,
     setPendingRestoreTimer,
     applyFontFamily,
@@ -213,8 +215,18 @@ export function applyTxtSettingsCore(ctx) {
         const pos = JSON.parse(savedPosStr);
         if (pos && pos.chunkIdx === getCurrentChunkIdx()) {
           showRestoreLoadingToast('위치 복원 중...');
+          const anchorInfo = pos.anchorText ? { chunkIdx: pos.chunkIdx, anchorText: pos.anchorText } : null;
           const timerId = setTimeout(() => {
-            if (scrollMode === 'scroll') {
+            // 보던 글자로 먼저 찾는다 - 화면 크기가 저장할 때와 달라도 같은 문장이 있는 쪽이 열린다.
+            if (anchorInfo && typeof holdRestoreAnchor === 'function') holdRestoreAnchor(anchorInfo);
+            const anchorRestored = !!anchorInfo && restoreTxtAnchorInfo(anchorInfo);
+            if (anchorRestored) {
+              if (scrollMode === 'scroll') {
+                if (window.dispatchEvent) scrollWrapper.dispatchEvent(new Event('scroll'));
+              } else {
+                snapTxtPageScrollLeft(scrollWrapper);
+              }
+            } else if (scrollMode === 'scroll') {
               scrollWrapper.scrollTop = pos.scrollTop;
               // 스크롤 오프셋 복원 후 눈에 보이는 챕터 주변(null) 동적 fetch
               if (window.dispatchEvent) {
@@ -226,7 +238,14 @@ export function applyTxtSettingsCore(ctx) {
             }
             setPendingRestoreTimer(null);
             if (container) container.style.pointerEvents = '';
-            console.log(`[Viewer-Txt] 로컬 세부 위치 복원 성공 (left=${pos.scrollLeft}, top=${pos.scrollTop})`);
+            console.log(`[Viewer-Txt] 로컬 세부 위치 복원 성공 (${anchorRestored ? '글자 기준' : `left=${pos.scrollLeft}, top=${pos.scrollTop}`})`);
+            // 이미지·글꼴이 늦게 로드되면(원격 EPUB은 수 초) 쪽 나눔이 다시 바뀌어 같은 글자가 다음 쪽으로
+            // 밀려난다. 사용자가 그사이 넘기지 않았을 때만 몇 번 더 같은 글자로 맞춘다.
+            if (anchorRestored) {
+              scheduleAnchorRechecks(() => {
+                if (restoreTxtAnchorInfo(anchorInfo) && scrollMode !== 'scroll') snapTxtPageScrollLeft(scrollWrapper);
+              });
+            }
           }, 150);
           setPendingRestoreTimer(timerId);
           restored = true;

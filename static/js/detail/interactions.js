@@ -7,7 +7,7 @@ export function bindDetailInteractions() {
 
   document.addEventListener('click', (event) => {
     const target = event && event.target && typeof event.target.closest === 'function'
-      ? event.target.closest('[data-role="detail-listen"], [data-role="detail-genre-filter"], [data-role="detail-tag-filter"], [data-role="detail-collapse-toggle"], [data-role="detail-rescan-missing"], [data-role="detail-unlock-metadata"], [data-role="detail-cover-upload"], [data-role="detail-series-favorite"], [data-role="detail-edit-toggle"], [data-role="detail-plugin-meta-search"], [data-role="detail-rescan-series"], [data-role="detail-mark-series-complete"], [data-role="detail-save-meta"], [data-role="detail-cancel-meta"], [data-role="detail-volume-filter"], [data-role="detail-volume-sort"], [data-role="detail-summary-toggle"], [data-role="detail-continue"], [data-role="detail-music-shuffle"], [data-role="detail-book-favorite"], [data-role="detail-rescan-book"], [data-role="detail-audio-open"], [data-role="detail-audio-play"], [data-role="detail-audio-tab"], [data-role="detail-video-open"], [data-role="detail-video-play"], [data-role="detail-volume-open-reader"], [data-role="detail-download-link"]')
+      ? event.target.closest('[data-role="detail-listen"], [data-role="detail-genre-filter"], [data-role="detail-tag-filter"], [data-role="detail-collapse-toggle"], [data-role="detail-rescan-missing"], [data-role="detail-unlock-metadata"], [data-role="detail-cover-upload"], [data-role="detail-series-favorite"], [data-role="detail-edit-toggle"], [data-role="detail-plugin-meta-search"], [data-role="detail-rescan-series"], [data-role="detail-mark-series-complete"], [data-role="detail-mark-series-unread"], [data-role="detail-save-meta"], [data-role="detail-cancel-meta"], [data-role="detail-volume-filter"], [data-role="detail-volume-sort"], [data-role="detail-summary-toggle"], [data-role="detail-continue"], [data-role="detail-music-shuffle"], [data-role="detail-book-favorite"], [data-role="detail-rescan-book"], [data-role="detail-audio-open"], [data-role="detail-audio-play"], [data-role="detail-audio-tab"], [data-role="detail-video-open"], [data-role="detail-video-play"], [data-role="detail-volume-open-reader"], [data-role="detail-download-link"]')
       : null;
     if (!target) return;
 
@@ -72,6 +72,9 @@ export function bindDetailInteractions() {
     }
     if (role === 'detail-mark-series-complete') {
       return window.markSeriesCompleted?.(event, target.getAttribute('data-series-name') || '', target.getAttribute('data-library-id') || '');
+    }
+    if (role === 'detail-mark-series-unread') {
+      return window.markSeriesUnread?.(event, target.getAttribute('data-series-name') || '', target.getAttribute('data-library-id') || '');
     }
     if (role === 'detail-save-meta') {
       return window.saveManualMetadata?.(target.getAttribute('data-series-name') || '', target.getAttribute('data-library-id') || '');

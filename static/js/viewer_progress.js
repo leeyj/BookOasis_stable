@@ -144,15 +144,24 @@ export function flushProgress(useBeacon = false, flushImmediately = false) {
   });
 }
 
+// lifecycle_controller.js가 현재 뷰어 인스턴스를 돌려주는 함수를 등록한다 (순환 import 회피).
+let activeViewerGetter = null;
+export function registerActiveViewerGetter(getter) {
+  activeViewerGetter = typeof getter === 'function' ? getter : null;
+}
+
+// 이탈/숨김 직전 위치 스냅샷을 동기로 남긴다 - 예전엔 동적 import(.then)로 비동기 실행돼
+// 바로 뒤의 flushProgress(true)가 먼저 나가고, 스냅샷(EPUB 챕터 index·지문 포함)은 3초 디바운스
+// 타이머에 걸린 채 남았다. 모바일은 백그라운드에서 타이머가 멈추거나 탭이 정리돼 끝내 전송되지 않았다.
 function prepareActiveViewerSnapshot() {
   try {
-    import('./viewer/lifecycle_controller.js').then(m => {
-      const instance = m.getActiveViewerInstance ? m.getActiveViewerInstance() : null;
-      if (instance && typeof instance.prepareForClose === 'function') {
-        instance.prepareForClose();
-      }
-    }).catch(() => {});
-  } catch (e) {}
+    const instance = activeViewerGetter ? activeViewerGetter() : null;
+    if (instance && typeof instance.prepareForClose === 'function') {
+      instance.prepareForClose();
+    }
+  } catch (e) {
+    console.warn('[Viewer-Progress] snapshot before flush failed:', e);
+  }
 }
 
 // ── 페이지 이탈 / 뒤로가기(popstate) / 탭 전환 / 화면 잠금 시 진행률 즉시 전송 ──

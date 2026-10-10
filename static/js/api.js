@@ -21,7 +21,11 @@ export async function fetchLibraries(type) {
   return res.json();
 }
 
-export async function fetchBooksList({type, libraryId, page, limit, append, search, sort, genres = [], tags = [], groupBy, authorKey}) {
+function readFilterQuery(readFilter) {
+  return readFilter ? `&read_filter=${encodeURIComponent(readFilter)}` : '';
+}
+
+export async function fetchBooksList({type, libraryId, page, limit, append, search, sort, genres = [], tags = [], groupBy, authorKey, readFilter = ''}) {
   const searchQuery = search ? `&search=${encodeURIComponent(search)}` : '';
   const sortQuery = sort ? `&sort=${sort}` : '';
   const genresQuery = genres.length > 0 ? `&genres=${encodeURIComponent(genres.join(','))}` : '';
@@ -29,7 +33,7 @@ export async function fetchBooksList({type, libraryId, page, limit, append, sear
   const modeQuery = filterModeQuery(genres, tags);
   const groupByQuery = groupBy ? `&group_by=${encodeURIComponent(groupBy)}` : '';
   const authorKeyQuery = authorKey ? `&author_key=${encodeURIComponent(authorKey)}` : '';
-  const url = `/api/media/list?type=${type}&library_id=${libraryId}&page=${page}&limit=${limit}${searchQuery}${sortQuery}${genresQuery}${tagsQuery}${modeQuery}${groupByQuery}${authorKeyQuery}&_=${Date.now()}`;
+  const url = `/api/media/list?type=${type}&library_id=${libraryId}&page=${page}&limit=${limit}${searchQuery}${sortQuery}${genresQuery}${tagsQuery}${modeQuery}${groupByQuery}${authorKeyQuery}${readFilterQuery(readFilter)}&_=${Date.now()}`;
   const res = await safeFetch(url, {cache: 'no-store'});
   return res.json();
 }
@@ -49,23 +53,23 @@ export async function fetchSearchOverlay({type, libraryId, query}) {
   return res.json();
 }
 
-export async function fetchJumpPosition({type, libraryId, search, sort, genres = [], tags = [], char, limit}) {
+export async function fetchJumpPosition({type, libraryId, search, sort, genres = [], tags = [], char, limit, readFilter = ''}) {
   const searchQuery = search ? `&search=${encodeURIComponent(search)}` : '';
   const sortQuery = sort ? `&sort=${sort}` : '';
   const genresQuery = genres.length > 0 ? `&genres=${encodeURIComponent(genres.join(','))}` : '';
   const tagsQuery = tags.length > 0 ? `&tags=${encodeURIComponent(tags.join(','))}` : '';
   const modeQuery = filterModeQuery(genres, tags);
-  const url = `/api/media/list/jump?type=${type}&library_id=${libraryId}&limit=${limit}${searchQuery}${sortQuery}${genresQuery}${tagsQuery}${modeQuery}&char=${encodeURIComponent(char)}&_=${Date.now()}`;
+  const url = `/api/media/list/jump?type=${type}&library_id=${libraryId}&limit=${limit}${searchQuery}${sortQuery}${genresQuery}${tagsQuery}${modeQuery}${readFilterQuery(readFilter)}&char=${encodeURIComponent(char)}&_=${Date.now()}`;
   const res = await safeFetch(url, {cache: 'no-store'});
   return res.json();
 }
 
-export async function fetchBooksTotals({type, libraryId, search, genres = [], tags = []}) {
+export async function fetchBooksTotals({type, libraryId, search, genres = [], tags = [], readFilter = ''}) {
   const searchQuery = search ? `&search=${encodeURIComponent(search)}` : '';
   const genresQuery = genres.length > 0 ? `&genres=${encodeURIComponent(genres.join(','))}` : '';
   const tagsQuery = tags.length > 0 ? `&tags=${encodeURIComponent(tags.join(','))}` : '';
   const modeQuery = filterModeQuery(genres, tags);
-  const url = `/api/media/list-totals?type=${type}&library_id=${libraryId}${searchQuery}${genresQuery}${tagsQuery}${modeQuery}&_=${Date.now()}`;
+  const url = `/api/media/list-totals?type=${type}&library_id=${libraryId}${searchQuery}${genresQuery}${tagsQuery}${modeQuery}${readFilterQuery(readFilter)}&_=${Date.now()}`;
   const res = await safeFetch(url, {cache: 'no-store'});
   return res.json();
 }

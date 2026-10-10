@@ -1,7 +1,24 @@
 # CHANGELOG
+## v2.8.9
+- (improvement) 도서 메뉴가 플러그인 항목까지 준비된 뒤 한 번에 뜨도록 개선 (항목이 순차적으로 붙던 깜빡임 제거, 같은 도서는 즉시 표시) | the book menu now opens in one go with plugin items included instead of items popping in one after another; reopening the same book shows it instantly
+- (feature) 상세 페이지에 "모두 미독처리" 추가 - 시리즈 전체를 읽지 않은 상태로 되돌림 (오디오북은 "청취 기록 초기화") | add "Mark All Unread" to the detail page - resets the whole series to unread ("Reset Listening" for audiobooks)
+- (feature) 만화/PDF 뷰어 슬라이드 - 페이지 모드는 정해진 간격(3~30초)으로 자동 넘김, 스크롤 모드는 자동 스크롤(느림/보통/빠름). 권 끝에서 5초 뒤 다음 권으로 이어서 진행, 메뉴를 열면 잠시 멈춤, 실행 중 화면 꺼짐 방지. 메뉴 이동 탭 또는 P 키 | comic/PDF viewer slideshow - auto page turn at a set interval (3-30s) in page mode or auto scroll (slow/normal/fast) in scroll mode; continues to the next volume after a 5s countdown, pauses while the menu is open and keeps the screen awake; from the menu Navigate tab or the P key
+- (fix) 오디오북을 읽지 않음으로 바꿔도 트랙별 완료 표시가 남던 이슈 수정 | fix per-track completion marks remaining after marking an audiobook unread
+- (feature) 정렬 추가: 폴더 이름순([태그] 포함 원본 폴더명)과 도서 수 순. 정렬 버튼은 기준을 고르는 드롭다운으로 변경 | new sorts: folder name (raw folder name including [tags]) and book count; the sort button now opens a dropdown
+- (feature) 필터에 고정 필터 "읽음 상태" 추가 - 읽은 도서 제외/읽은 도서만 (시리즈 모든 권 완독 기준, 바로 적용되고 브라우저에 기억됨) | add a fixed "Read status" filter - hide read / read only (a series counts as read when every volume is finished; applies immediately and is remembered in the browser)
+- (improvement) 도서 수 순 정렬과 읽음 필터 전체 수량을 인덱스/집계 쿼리로 처리 (6.4만 시리즈 기준 페이지당 약 290ms → 인덱스 조회). 같은 권수는 추가 순으로 정렬 | book-count sort and read-filter totals now use an index and an aggregate query (about 290ms per page at 64k series before); series with the same count are ordered by when they were added
+- (feature) 정렬에 "별점 높은 순" 추가 (메타 별점 기준, 점수 없는 시리즈는 뒤로) | add a "Highest Rated" sort (metadata star score; series without a score go last)
+- (fix) 앱 시작 처리가 두 번 실행되던 이슈 수정 (카테고리 목록 2회 조회, 필터 버튼 1번에 2번 동작, 뒤로가기 처리 중복 등) | fix the app startup running twice (category list fetched twice, filter buttons firing twice, duplicate back-navigation handling, etc.)
+- (improvement) 다른 기기·브라우저에서 TXT/EPUB을 열면 마지막으로 읽던 문장으로 이동 (기존엔 챕터 첫 쪽) - 이동했으면 알림 표시 | opening a TXT/EPUB on another device or browser now goes to the sentence you last read there (previously the start of the chapter), with a notice
+- (fix) TXT/EPUB 읽기 위치가 서버에 챕터 단위로만 저장되고, 쪽을 넘기고 바로 닫으면 마지막 위치가 빠지던 이슈 수정 (듣기↔읽기 위치 동기화에도 영향) | fix the TXT/EPUB reading position reaching the server only per chapter and the last position being dropped when closing right after turning a page (also affected read/listen sync)
+- (fix) 모바일에서 책을 보다 앱을 내렸다 돌아왔을 때 브라우저가 탭을 새로 불러오면 뷰어가 닫히고 목록이 뜨던 이슈 수정 - 읽던 책을 자동으로 다시 엶 | fix the viewer closing and the list showing when a mobile browser reloads the tab after returning from the background - the book reopens automatically
+- (fix) TXT/EPUB을 다시 열거나 글자 크기·글꼴·행간·문단 간격을 바꿨을 때 화면 크기 차이로 몇 쪽 앞뒤가 열리던 이슈 수정 - 보던 문장 기준으로 위치를 찾음 | fix TXT/EPUB reopening (or changing font size/font/line height/paragraph spacing) landing a few pages off when the screen size differs - the position now follows the sentence you were reading
+- (fix) 앱을 내리거나 화면을 끌 때 EPUB 읽기 위치(챕터)가 서버에 저장되지 않을 수 있던 이슈 수정 | fix the EPUB reading position (chapter) sometimes not reaching the server when the app is backgrounded or the screen turns off
+
 ## v2.8.8
 - (fix) 만화 다음 권 이어보기 때 전체화면 버튼으로 켠 전체화면이 풀리던 이슈 수정 | fix fullscreen (entered via the fullscreen button) exiting when continuing to the next comic volume
 - (fix) 만화 다음 권 이어보기 때 보기 모드(높이/너비 맞춤)가 표지 비율에 따라 바뀌던 이슈 수정 - 직접 고른 맞춤 모드를 기억 | fix the comic fit mode (height/width) switching by cover ratio when continuing to the next volume - the fit mode you pick is now remembered
+
 
 ## v2.8.7
 - (feature) 장르/태그 필터를 2개 이상 선택했을 때 '필터 적용 중(AND)'을 눌러 AND(모두 포함)/OR(하나라도 포함)로 전환 | when 2+ genre/tag filters are selected, click "Active Filters (AND)" to switch between AND (match all) and OR (match any)

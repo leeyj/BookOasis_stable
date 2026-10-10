@@ -59,6 +59,12 @@ export async function initFloatingFilter() {
     tabTags.addEventListener('click', () => switchFilterTab('tags'));
     searchInput.addEventListener('input', onFilterSearchChange);
 
+    document.querySelectorAll('.filter-read-option').forEach((btn) => {
+        btn.addEventListener('click', () => setReadFilter(btn.dataset.readFilter || ''));
+    });
+    syncReadFilterUI();
+    updateActiveFilterBar();
+
     // 전역 함수 바인딩 (HTML onclick 바인딩 호환용)
     window.toggleFilterModal = toggleFilterModal;
     window.selectGenreFilter = selectGenreFilter;
@@ -179,6 +185,7 @@ export function toggleFilterModal() {
     
     if (modal.style.display === 'none') {
         modal.style.display = 'flex';
+        syncReadFilterUI();
         // 카테고리/스코프 변경 시 stale 데이터가 남지 않도록 모달 오픈마다 재조회
         loadGenresAndTagsData();
     } else {
@@ -367,6 +374,8 @@ export function resetAllFilters() {
     selectedTags.clear();
     state.filterGenres = [];
     state.filterTags = [];
+    storeReadFilter('');
+    syncReadFilterUI();
     
     document.getElementById('filter-search-input').value = '';
     renderChips();
@@ -451,7 +460,9 @@ export function updateActiveFilterBar() {
     const badgeContainer = document.getElementById('active-filter-badges');
     if (!bar || !badgeContainer) return;
 
-    const totalFilters = selectedGenres.size + selectedTags.size;
+    const readFilter = getActiveReadFilter();
+    const topicFilters = selectedGenres.size + selectedTags.size;
+    const totalFilters = topicFilters + (readFilter ? 1 : 0);
     if (totalFilters === 0) {
         bar.style.display = 'none';
         badgeContainer.innerHTML = '';
@@ -461,12 +472,19 @@ export function updateActiveFilterBar() {
     // AND/OR 전환 버튼은 필터가 2개 이상일 때만 의미가 있다
     const modeButton = document.getElementById('btn-active-filter-mode');
     if (modeButton) {
-        modeButton.style.display = totalFilters > 1 ? 'inline-flex' : 'none';
+        modeButton.style.display = topicFilters > 1 ? 'inline-flex' : 'none';
         modeButton.textContent = state.filterMode === 'or' ? '(OR)' : '(AND)';
         modeButton.classList.toggle('is-or', state.filterMode === 'or');
     }
 
     let html = '';
+    if (readFilter) {
+        const readLabel = i18n.t(readFilter === 'only_read' ? 'filter.read_only' : 'filter.read_exclude');
+        html += `<span class="active-filter-item is-read">
+            <i class="fa-solid fa-book-open-reader"></i> ${escapeHtml(readLabel)}
+            <span class="filter-remove-btn" data-role="active-filter-remove" data-filter-type="read" data-filter-value=""><i class="fa-solid fa-xmark"></i></span>
+        </span>`;
+    }
     selectedGenres.forEach(genre => {
         html += `<span class="active-filter-item is-genre">
             <i class="fa-solid fa-list-ul"></i> ${escapeHtml(genre)}
@@ -498,6 +516,10 @@ export function toggleFilterMode() {
 window.toggleFilterMode = toggleFilterMode;
 
 export function removeActiveFilterItem(type, value) {
+    if (type === 'read') {
+        setReadFilter('');
+        return;
+    }
     if (type === 'genre') {
         selectedGenres.delete(value);
     } else if (type === 'tag') {
@@ -508,3 +530,37 @@ export function removeActiveFilterItem(type, value) {
     applyFilters();
 }
 window.removeActiveFilterItem = removeActiveFilterItem;
+
+// ── 고정 필터: 읽음 상태 ──
+// 장르/태그와 달리 '필터 적용'을 누르지 않아도 바로 적용되고, 브라우저에 기억돼 카테고리를 옮겨도 유지된다.
+function getActiveReadFilter() {
+    return state.currentLibraryType === 'video' ? '' : (state.readFilter || '');
+}
+
+function storeReadFilter(value) {
+    state.readFilter = ['exclude_read', 'only_read'].includes(value) ? value : '';
+    try {
+        if (state.readFilter) localStorage.setItem('library_read_filter', state.readFilter);
+        else localStorage.removeItem('library_read_filter');
+    } catch (e) {}
+}
+
+function syncReadFilterUI() {
+    const section = document.getElementById('filter-read-state');
+    // 영상 강좌 목록은 전용 그리드라 읽음 필터를 지원하지 않는다
+    if (section) section.style.display = state.currentLibraryType === 'video' ? 'none' : '';
+    document.querySelectorAll('.filter-read-option').forEach((btn) => {
+        btn.classList.toggle('active', (btn.dataset.readFilter || '') === (state.readFilter || ''));
+    });
+}
+
+export function setReadFilter(value) {
+    storeReadFilter(value);
+    syncReadFilterUI();
+    updateActiveFilterBar();
+    if (typeof window.filterBooks === 'function') {
+        window.filterBooks();
+    }
+}
+window.setReadFilter = setReadFilter;
+window.updateActiveFilterBar = updateActiveFilterBar;

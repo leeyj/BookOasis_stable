@@ -92,7 +92,8 @@ import {
   locateTxtPageAnchor,
 } from './viewer/txt_anchor_utils.js';
 import { findAnchorOffset, chunkStarts } from './viewer/text_position_utils.js';
-import { setReadPositionProvider, fetchSyncState, listenTargetForTxt, listenTargetForEpub } from './viewer/tts_sync.js';
+import { scheduleAnchorRechecks } from './viewer/txt_anchor_utils.js';
+import { setReadPositionProvider, fetchSyncState, listenTargetForTxt, listenTargetForEpub, readTargetForTxt, readTargetForEpub, noteReadActivity } from './viewer/tts_sync.js';
 import { applyTxtSettingsCore, applyFontFamilyToElement as applyTxtFontFamily } from './viewer/txt_settings_apply.js';
 import {
   prevTxtPageAction,
@@ -569,7 +570,11 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
           }
         }
 
-        const ttsTarget = listenTargetForEpub(await ttsSyncPromise, totalChapters);
+        // 듣기 위치가 더 최근이면 그 문장, 아니면 다른 기기·브라우저에서 더 최근에 읽은 문장으로 연다
+        const syncState = await ttsSyncPromise;
+        const ttsTarget = listenTargetForEpub(syncState, totalChapters)
+          || readTargetForEpub(syncState, totalChapters, readLocalTxtPosition(bookId));
+        console.log(`[Viewer-Txt] 위치 동기화: latest=${syncState ? syncState.latest : 'none'} → ${ttsTarget ? `${ttsTarget.kind} 챕터 ${ttsTarget.chunkIdx}` : '이 기기 위치'}`);
         if (ttsTarget) startIdx = ttsTarget.chunkIdx;
 
         startIdx = Math.max(0, Math.min(totalChapters - 1, parseInt(startIdx, 10) || 0));
@@ -589,9 +594,10 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
             // "scroll → page 모드 전환"으로 오판해 더블 rAF로 지연 적용된다. 그 사이
             // 컬럼 미설정 상태로 첫 페인트가 되어 1페이지 폭처럼 보이는 원인이 되므로,
             // 최초 렌더링임을 명시해 동기적으로 바로 적용되게 한다.
-            applyTxtSettings({ previousMode: getViewerSettings().scrollMode });
+            // 동기화 대상이 있으면 이 기기 저장 위치 복원(150ms 뒤)이 그 위치를 덮어쓰지 않게 한다
+            applyTxtSettings({ previousMode: getViewerSettings().scrollMode, skipSavedPositionRestore: !!ttsTarget });
             setupTxtViewerRuntimeListeners();
-            if (ttsTarget) applyListenTarget(ttsTarget);
+            if (ttsTarget) applySyncTarget(ttsTarget);
 
             // ─── 3단계: 이전/다음 챕터 백그라운드 프리패치 (전후 10개 챕터 확장) ───
             // hydrateEpubChapterWindow는 이제 반경 내 미로드 챕터를 배치 API 1회 호출로
@@ -683,7 +689,9 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
         startIdx = Math.max(0, Math.min(txtChunks.length - 1, parseInt(startIdx, 10) || 0));
       }
 
-      const ttsTarget = isEpub ? null : listenTargetForTxt(await ttsSyncPromise, fullText, txtChunks);
+      const syncState = await ttsSyncPromise;
+      const ttsTarget = isEpub ? null : (listenTargetForTxt(syncState, fullText, txtChunks)
+        || readTargetForTxt(syncState, fullText, txtChunks, readLocalTxtPosition(bookId)));
       if (ttsTarget) startIdx = ttsTarget.chunkIdx;
 
       currentChunkIdx = startIdx;
@@ -691,10 +699,10 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
       initReadingDirection();
       renderCurrentChunk(true);
       // 최초 오픈 시 previousMode 오판 방지 (위 스트리밍 경로와 동일한 이유)
-      applyTxtSettings({ previousMode: getViewerSettings().scrollMode });
+      applyTxtSettings({ previousMode: getViewerSettings().scrollMode, skipSavedPositionRestore: !!ttsTarget });
 
       setupTxtViewerRuntimeListeners();
-      if (ttsTarget) applyListenTarget(ttsTarget);
+      if (ttsTarget) applySyncTarget(ttsTarget);
     })
     .catch((err) => {
       console.error('[Viewer-Txt] 로딩 에러 발생:', err);
@@ -903,17 +911,63 @@ export function logActiveViewportText() {
 }
 
 // 듣기 위치로 연 경우: 첫 렌더(로컬 픽셀 위치 복원 포함)가 끝난 뒤 문장 앵커로 맞추고 알린다
-function applyListenTarget(target) {
+// ── 복원 기준 문장 붙잡기 ──
+// 위치를 문장으로 되찾은 뒤에는 사용자가 조작(터치·클릭·키·휠)할 때까지 그 문장을 기준으로 유지한다.
+// - 이미지·글꼴·여백 적용으로 재조판(applyTxtSettings)이 몇 번 더 일어날 때 '지금 맨 위 줄'로 기준을 바꾸면
+//   한 쪽씩 밀려났다.
+// - 열어 보기만 하고 닫았는데 맨 위 줄이 '새로 읽은 위치'로 서버에 보고돼, 다른 기기가 엉뚱하게 따라 움직였다.
+// (2.8.9 크롬·엣지 두 브라우저 실측)
+let txtRestoreHold = null; // { chunkIdx, anchorText }
+
+function holdRestoreAnchor(anchorInfo) {
+  if (!anchorInfo || !anchorInfo.anchorText) return;
+  txtRestoreHold = { chunkIdx: anchorInfo.chunkIdx, anchorText: anchorInfo.anchorText };
+}
+
+function activeRestoreHold() {
+  if (!txtRestoreHold || txtRestoreHold.chunkIdx !== currentChunkIdx) return null;
+  return txtRestoreHold;
+}
+
+['pointerdown', 'touchstart', 'keydown', 'wheel'].forEach((type) => {
+  document.addEventListener(type, () => { txtRestoreHold = null; }, { capture: true, passive: true });
+});
+
+// 이 기기에 저장된 세부 위치 ({chunkIdx, scrollLeft, scrollTop, anchorText, savedAt}) - 없으면 null
+function readLocalTxtPosition(bookId) {
+  try {
+    return JSON.parse(localStorage.getItem(`viewer_last_pos_${bookId}`) || 'null');
+  } catch (e) {
+    return null;
+  }
+}
+
+// 듣기 위치(listen) 또는 다른 기기 읽기 위치(read)의 문장으로 이동하고 알린다.
+// 원격 EPUB은 이미지·글꼴이 늦게 로드돼 쪽 나눔이 다시 바뀌므로, 사용자가 넘기지 않았으면 몇 번 더 같은 문장으로 맞춘다.
+function applySyncTarget(target) {
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    if (target.anchorText) restoreTxtAnchorInfo({ chunkIdx: target.chunkIdx, anchorText: target.anchorText });
-    showToast(i18n.t('viewer.tts_moved_to_listen'), 'info');
+    const anchorInfo = target.anchorText ? { chunkIdx: target.chunkIdx, anchorText: target.anchorText } : null;
+    holdRestoreAnchor(anchorInfo);
+    if (anchorInfo && restoreTxtAnchorInfo(anchorInfo)) {
+      const wrapper = document.getElementById('txt-scroll-wrapper');
+      const isPageMode = (localStorage.getItem('viewer_scroll_mode') || 'page') === 'page';
+      if (wrapper && isPageMode) snapTxtPageScrollLeft(wrapper);
+      saveDetailPosition();
+      scheduleAnchorRechecks(() => {
+        if (restoreTxtAnchorInfo(anchorInfo)) {
+          if (wrapper && isPageMode) snapTxtPageScrollLeft(wrapper);
+          saveDetailPosition();
+        }
+      });
+    }
+    showToast(i18n.t(target.kind === 'read' ? 'viewer.moved_to_other_device_read' : 'viewer.tts_moved_to_listen'), 'info');
   }));
 }
 
 // TTS 동기화용 현재 읽기 위치: 화면의 앵커 문구 + 텍스트 기준 글자 오프셋 (viewer/tts_sync.js가 호출)
 function currentReadPosition() {
   if (!Array.isArray(txtChunks) || txtChunks.length === 0) return null;
-  const info = getTxtAnchorInfo();
+  const info = activeRestoreHold() || getTxtAnchorInfo();
   if (!info || !info.anchorText) return null;
   const idx = Number.isInteger(info.chunkIdx) ? info.chunkIdx : currentChunkIdx;
   if (state.currentViewerFormat === 'epub') {
@@ -983,7 +1037,30 @@ export function saveDetailPosition() {
       scrollLeft: scrollWrapper.scrollLeft,
       scrollTop: scrollWrapper.scrollTop
     };
+    // 다시 열 때 화면 크기(주소창·툴바·회전)가 달라도 같은 곳을 찾도록 보던 글자를 함께 남긴다.
+    // 좌표(scrollLeft)만으로 되돌리면 쪽 나눔이 바뀌어 몇 쪽 앞뒤가 열렸다.
+    const hold = activeRestoreHold();
+    if (hold) {
+      pos.anchorText = hold.anchorText;
+    } else {
+      try {
+        const anchor = getTxtAnchorInfo();
+        if (anchor && anchor.anchorText && anchor.chunkIdx === currentChunkIdx) pos.anchorText = anchor.anchorText;
+      } catch (e) {}
+    }
+    // 다른 기기에서 더 최근에 읽었는지 비교하는 기준 (tts_sync.readTargetFor*). 붙잡은 문장(아직 읽어 나가지 않음)이면
+    // 시각을 갱신하지 않는다 - 열어 두기만 한 기기가 그사이 다른 기기에서 더 읽은 위치보다 '최신'으로 보이면 안 된다.
+    let previousSavedAt = 0;
+    if (hold) {
+      try { previousSavedAt = Number(JSON.parse(localStorage.getItem(`viewer_last_pos_${state.activeBookId}`) || '{}').savedAt) || 0; } catch (e) {}
+    }
+    pos.savedAt = previousSavedAt || Date.now();
     localStorage.setItem(`viewer_last_pos_${state.activeBookId}`, JSON.stringify(pos));
+    // 챕터 안 쪽 넘김도 서버 읽기 위치(TTS 동기화·다른 기기 복원용)에 반영한다 - 예전엔 saveProgress(챕터가
+    // 바뀔 때)에서만 보고돼 긴 챕터 안에서 읽은 위치는 서버에 챕터 단위로만 남았다. 30초에 한 번으로 묶이고,
+    // 닫기·화면 이탈 때는 마지막 위치가 바로 전송된다(viewer_progress.flushProgress → flushReadReport).
+    // 복원한 문장을 붙잡고 있는 동안(아직 사용자가 읽어 나가지 않음)은 새로 읽은 위치가 아니므로 보고하지 않는다.
+    if (!hold) noteReadActivity();
   }
 }
 
@@ -997,8 +1074,9 @@ export function applyTxtSettings(options = {}) {
   txtPageSnapInProgress = false;
   cancelPendingTxtRestore();
 
+  const hold = activeRestoreHold();
   applyTxtSettingsCore({
-    options,
+    options: hold ? { ...options, skipSavedPositionRestore: true } : options,
     container,
     scrollWrapper,
     contentArea,
@@ -1015,6 +1093,7 @@ export function applyTxtSettings(options = {}) {
     renderCurrentChunk,
     snapTxtPageScrollLeft,
     saveDetailPosition,
+    holdRestoreAnchor,
     showRestoreLoadingToast: showTxtRestoreLoadingToast,
     setPendingRestoreTimer: value => {
       txtPendingRestoreTimer = value;
@@ -1032,6 +1111,14 @@ export function applyTxtSettings(options = {}) {
       );
     }
   });
+  if (hold) {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (activeRestoreHold() && restoreTxtAnchorInfo(hold)
+        && (localStorage.getItem('viewer_scroll_mode') || 'page') === 'page') {
+        snapTxtPageScrollLeft(scrollWrapper);
+      }
+    }));
+  }
 }
 
 export function prevTxtPage() {
@@ -1190,6 +1277,7 @@ export const TxtViewer = {
   },
   destroy() {
     txtRuntimeState.reset();
+    txtRestoreHold = null;
     txtStableAnchor = null;
     txtHeldAnchor = null;
     txtHeldAnchorUntil = 0;

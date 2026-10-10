@@ -109,30 +109,81 @@ function renderPluginContextMenuItems(items, { onItemClick, onRendered }) {
   onRendered?.();
 }
 
-export async function loadPluginContextMenuItems(target, { onItemClick, onRendered }) {
-  if (!target || !target.id || target.selectedBooks?.length > 1) {
+// 도서별 최근 조회 결과. 같은 도서 메뉴를 다시 열 때 서버 응답을 기다리지 않고 바로 그린다.
+// (항목이 도서마다 다를 수 있어(예: 독후감 유무) 도서 단위로만 재사용하고, 열 때마다 뒤에서 다시 확인한다.)
+const ITEMS_CACHE_LIMIT = 100;
+const itemsCache = new Map();
+
+function getCacheKey(target) {
+  return `${state.currentLibraryType}:${target.id}:${target.isVolumeDetail ? 1 : 0}`;
+}
+
+function rememberItems(key, items) {
+  itemsCache.delete(key);
+  itemsCache.set(key, items);
+  if (itemsCache.size > ITEMS_CACHE_LIMIT) {
+    itemsCache.delete(itemsCache.keys().next().value);
+  }
+}
+
+function isPluginTarget(target) {
+  return !!(target && target.id && !(target.selectedBooks?.length > 1));
+}
+
+// 메뉴를 띄우기 전에 플러그인 항목을 그린다. 이미 그렸거나(캐시) 더 기다릴 필요가 없으면
+// 반환된 ready가 resolve된다 — 호출부는 ready 이후에 메뉴를 보여 주면 항목이 한 번에 뜬다.
+// ready는 최대 waitMs까지만 기다리며, 그 뒤에 도착한 응답은 기존처럼 열린 메뉴에 덧붙인다.
+export function loadPluginContextMenuItems(target, { onItemClick, onRendered, waitMs = 250 }) {
+  if (!isPluginTarget(target)) {
     clearPluginContextMenuItems();
-    return;
+    return { ready: Promise.resolve() };
   }
 
   const seq = ++loadSeq;
-  try {
-    const payload = buildContextPayload(target);
-    const res = await api.fetchBookContextMenuPluginItems(state.currentLibraryType, payload);
-    if (seq !== loadSeq) return;
+  const key = getCacheKey(target);
+  const cached = itemsCache.get(key);
+  let renderedSignature = null;
 
-    if (res && res.success) {
-      renderPluginContextMenuItems(res.items || [], { onItemClick, onRendered });
-      return;
-    }
-
+  if (cached) {
+    renderPluginContextMenuItems(cached, { onItemClick });
+    renderedSignature = JSON.stringify(cached);
+  } else {
     clearPluginContextMenuItems();
-  } catch (err) {
-    console.error('컨텍스트 메뉴 플러그인 항목 조회 실패:', err);
-    if (seq === loadSeq) {
-      clearPluginContextMenuItems();
-    }
   }
+
+  const fetchPromise = (async () => {
+    try {
+      const payload = buildContextPayload(target);
+      const res = await api.fetchBookContextMenuPluginItems(state.currentLibraryType, payload);
+      if (seq !== loadSeq) return;
+
+      if (res && res.success) {
+        const items = res.items || [];
+        rememberItems(key, items);
+        if (JSON.stringify(items) !== renderedSignature) {
+          renderPluginContextMenuItems(items, { onItemClick, onRendered });
+        }
+        return;
+      }
+
+      clearPluginContextMenuItems();
+      onRendered?.();
+    } catch (err) {
+      console.error('컨텍스트 메뉴 플러그인 항목 조회 실패:', err);
+      if (seq === loadSeq) {
+        clearPluginContextMenuItems();
+        onRendered?.();
+      }
+    }
+  })();
+
+  if (cached) return { ready: Promise.resolve() };
+  return {
+    ready: Promise.race([
+      fetchPromise,
+      new Promise((resolve) => setTimeout(resolve, waitMs)),
+    ]),
+  };
 }
 
 export async function runBookContextPluginAction(target, pluginId, actionId) {

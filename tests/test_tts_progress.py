@@ -276,7 +276,10 @@ def test_get_returns_sync_state(allow_rating):
     with patch('services.tts_progress_service.TTSProgressService.get_sync_state', return_value=state) as get:
         response = _client().get('/api/media/tts/position?db_type=general&book_id=4')
     assert response.status_code == 200
-    assert response.get_json() == {'success': True, 'state': state}
+    body = response.get_json()
+    assert body['success'] is True and body['state'] == state
+    # 클라이언트가 서버 시계와의 차이를 구하는 데 쓴다 (다른 기기 읽기 위치 비교)
+    assert isinstance(body['server_now_ms'], int) and body['server_now_ms'] > 1_600_000_000_000
     assert get.call_args.args == ('general', 4, 7)
 
 

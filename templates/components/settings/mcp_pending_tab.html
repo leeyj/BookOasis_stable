@@ -37,4 +37,4 @@
     </div>
 </div>
 
-<script type="module" src="{{ static_asset_url('js/settings/mcp_pending.js') }}"></script>
+{# mcp_pending.js는 settings_tab.js가 import한다 - 여기서 따로 로드하면 모듈이 두 번 평가된다(2.8.9). #}

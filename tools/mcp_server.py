@@ -42,7 +42,7 @@ def _quiet(fn, *args, **kwargs):
 
 
 _BOOK_DB_TYPES = ('general', 'adult', 'audiobook')
-_SEARCH_SORT_VALUES = ('asc', 'desc', 'date_asc', 'date_desc')
+_SEARCH_SORT_VALUES = ('asc', 'desc', 'date_asc', 'date_desc', 'folder_asc', 'folder_desc', 'count_desc', 'count_asc', 'score_desc')
 
 
 def _check_book_args(db_type, sort='asc'):
@@ -93,7 +93,9 @@ def search_books(query: str = "", db_type: str = "general", library_id: str = "a
     db_type: general(일반 도서) / adult(성인 서재) / audiobook(오디오북) - video(영상 강좌)는
     이 도구가 다루지 않으므로 video는 run_readonly_query나 call_api를 쓰세요.
     genre/tags는 콤마로 구분된 필터 문자열입니다(선택).
-    sort: asc(기본, 가나다순) / desc(가나다 역순) / date_desc(최근 추가순) / date_asc(오래된 추가순).
+    sort: asc(기본, 가나다순) / desc(가나다 역순) / date_desc(최근 추가순) / date_asc(오래된 추가순) /
+    folder_asc·folder_desc(폴더 이름 그대로, [태그] 포함) / count_desc·count_asc(권수 많은/적은 순) /
+    score_desc(메타 별점 높은 순, 점수 없는 시리즈는 뒤).
     "최근 추가된 책 N개"처럼 정렬이 필요한 질문엔 query를 비우고 sort="date_desc", limit=N을 주세요.
     "아무 책이나/무작위" 요청엔 이 도구 대신 get_random_book을 쓰세요(이 도구는 항상 같은 순서로 반환)."""
     return _quiet(_search_books_impl, query, db_type, library_id, genre, tags, limit, sort)

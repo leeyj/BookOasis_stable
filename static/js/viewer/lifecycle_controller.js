@@ -5,8 +5,9 @@ import { TxtViewer } from '../viewer_txt.js';
 import { PdfViewer, clearPdfViewer } from '../viewer_pdf.js';
 import { tryAutoFullscreenOnOpen, exitFullscreenIfNeeded, isViewerInFullscreen } from './fullscreen_controller.js';
 import { shouldAutoFullscreenForFormat } from './platform_profile.js';
-import { flushProgress, resetPreloadState } from '../viewer_progress.js';
+import { flushProgress, resetPreloadState, registerActiveViewerGetter } from '../viewer_progress.js';
 import { setAnnotationUiEnabled } from './annotation_ui.js';
+import { onSlideshowViewerClosing, onSlideshowViewerOpened } from './slideshow_controller.js';
 
 let deps = {
   initViewerSeekBar: () => {},
@@ -22,6 +23,30 @@ export function configureLifecycleController(nextDeps = {}) {
 
 export function getActiveViewerInstance() {
   return activeViewerInstance;
+}
+registerActiveViewerGetter(getActiveViewerInstance);
+
+// ── 열린 책 기억 (탭 정리 후 복귀용) ──
+// 모바일 OS가 백그라운드 탭을 정리하면 돌아올 때 /#viewer 로 새로 로드되는데, 그동안은 뷰어를
+// 복원하지 못하고 목록이 떠서 "읽던 곳으로 못 돌아간다"로 보였다. sessionStorage는 같은 탭이
+// 되살아날 때 유지되므로 여기에 열린 책을 남기고, 정상적으로 닫으면 지운다.
+const OPEN_VIEWER_SESSION_KEY = 'bookoasis_open_viewer';
+
+function rememberOpenViewer(entry) {
+  try { sessionStorage.setItem(OPEN_VIEWER_SESSION_KEY, JSON.stringify(entry)); } catch (e) {}
+}
+
+function forgetOpenViewer() {
+  try { sessionStorage.removeItem(OPEN_VIEWER_SESSION_KEY); } catch (e) {}
+}
+
+export function readOpenViewerSession() {
+  try {
+    const entry = JSON.parse(sessionStorage.getItem(OPEN_VIEWER_SESSION_KEY) || 'null');
+    return entry && entry.bookId ? entry : null;
+  } catch (e) {
+    return null;
+  }
 }
 
 export function openReader(bookId, format, title, pagesRead, totalPages) {
@@ -56,6 +81,14 @@ export function openReader(bookId, format, title, pagesRead, totalPages) {
   state.activeBookId = bookId;
   const viewerModal = document.getElementById('media-viewer-modal');
   if (!viewerModal) return;
+
+  rememberOpenViewer({
+    bookId,
+    format: fmt,
+    title: title || '',
+    type: state.currentLibraryType,
+    libraryId: state.currentLibraryId || 'all',
+  });
 
   if (viewerModal.parentNode !== document.body) {
     document.body.appendChild(viewerModal);
@@ -144,10 +177,11 @@ export function openReader(bookId, format, title, pagesRead, totalPages) {
   }
   activeViewerInstance = null;
 
+  let initPromise = null;
   if (fmt === 'zip' || fmt === 'cbz' || fmt === 'imgdir') {
     if (overlayComicFit) overlayComicFit.style.display = 'flex';
     activeViewerInstance = ComicViewer;
-    activeViewerInstance.init(bookId, pagesRead, totalPages).then(() => {
+    initPromise = activeViewerInstance.init(bookId, pagesRead, totalPages).then(() => {
       deps.initViewerSeekBar();
     });
   } else if (fmt === 'txt') {
@@ -158,7 +192,7 @@ export function openReader(bookId, format, title, pagesRead, totalPages) {
     deps.initViewerSeekBar();
   } else if (fmt === 'pdf') {
     activeViewerInstance = PdfViewer;
-    activeViewerInstance.init(bookId, pagesRead, totalPages);
+    initPromise = activeViewerInstance.init(bookId, pagesRead, totalPages);
     deps.initViewerSeekBar();
   } else if (fmt === 'epub') {
     if (overlayTxtControls) overlayTxtControls.style.display = 'flex';
@@ -171,12 +205,19 @@ export function openReader(bookId, format, title, pagesRead, totalPages) {
     closeMediaViewer();
   }
 
+  // 슬라이드 컨트롤 표시 + 다음 권 자동 이어 재생 중이면 새 책에서 다시 시작
+  onSlideshowViewerOpened(fmt, initPromise);
+
   deps.syncHotspotPointerEvents();
 }
 
 export function closeMediaViewer(triggerBack = true, isTransitioning = false, options = {}) {
   const viewerModal = document.getElementById('media-viewer-modal');
   if (!viewerModal) return Promise.resolve();
+
+  onSlideshowViewerClosing();
+  // 다음 권으로 넘어가는 중이면 곧 새 책이 기록을 덮어쓴다 - 정상 닫기일 때만 지운다
+  if (!(options && options.keepFullscreen)) forgetOpenViewer();
 
   if (activeViewerInstance && typeof activeViewerInstance.prepareForClose === 'function') {
     try {
@@ -185,6 +226,11 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false, op
       console.warn('[Viewer-Core] Error preparing viewer for close:', e);
     }
   }
+
+  // 진도·읽기 위치 전송은 뷰어를 정리(destroy)하기 전에 시작한다 - TXT/EPUB 읽기 위치 보고(tts_sync)는
+  // 화면의 본문에서 위치를 읽는데, 정리 뒤에 보내면 본문이 비어 마지막 위치가 조용히 빠졌다
+  // (쪽을 넘기고 3초 안에 닫으면 서버 읽기 위치가 갱신되지 않던 원인, 2.8.9).
+  const flushPromise = flushProgress(false, true);
 
   // 다음 권 이어보기처럼 곧바로 새 책을 여는 경우에는 Fullscreen API 전체화면을
   // 유지한다. exitFullscreen 후 다시 requestFullscreen을 하면 데스크톱은 자동
@@ -274,7 +320,6 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false, op
     clearPdfViewer();
   }
 
-  const flushPromise = flushProgress(false, true);
   resetPreloadState();
 
   const reloadData = () => {

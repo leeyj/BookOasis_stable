@@ -7,6 +7,7 @@ import { reportReadNow } from './viewer/tts_sync.js';
 import { openListen } from './tts_launcher.js';
 import { nextPdfPage, prevPdfPage, pdfJumpToFirstPage, pdfJumpToLastPage, renderPdfPage } from './viewer_pdf.js';
 import { initFullscreenStateSync, isViewerInFullscreen, toggleFullscreenViewer } from './viewer/fullscreen_controller.js';
+import { toggleSlideshow, setSlideshowInterval, setSlideshowSpeed } from './viewer/slideshow_controller.js';
 import { initViewerSeekBar } from './viewer/seekbar_controller.js';
 import {
   configureLifecycleController,
@@ -580,6 +581,7 @@ function initMediaViewerDelegation() {
     if (action === 'toggle-split-spread') return window.toggleComicSplitSpread?.();
     if (action === 'toggle-theme-cycle') return window.toggleTheme?.();
     if (action === 'toggle-padding-panel') return window.toggleViewerPaddingPanel?.();
+    if (action === 'slideshow-toggle') return toggleSlideshow();
   }, true);
 
   document.addEventListener('input', (event) => {
@@ -603,6 +605,8 @@ function initMediaViewerDelegation() {
     if (action === 'theme') return window.onViewerThemeChange?.(target.value);
     if (action === 'line-height') return window.onViewerLineHeightChange?.(target.value);
     if (action === 'paragraph-spacing') return window.onViewerParagraphSpacingChange?.(target.value);
+    if (action === 'slideshow-interval') return setSlideshowInterval(target.value);
+    if (action === 'slideshow-speed') return setSlideshowSpeed(target.value);
   }, true);
 
   window.__mediaViewerDelegationBound = true;

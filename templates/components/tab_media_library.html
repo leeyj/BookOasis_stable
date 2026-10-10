@@ -136,6 +136,16 @@
             </div>
         </div>
         <div class="filter-modal-body">
+            <!-- 고정 필터: 읽음 상태 (시리즈 모든 권 완독 = 읽음, 바로 적용·브라우저에 기억) -->
+            <div class="filter-read-state" id="filter-read-state">
+                <span class="filter-read-state-label" data-i18n="filter.read_state">읽음 상태</span>
+                <div class="filter-read-state-options" role="group">
+                    <button type="button" class="filter-read-option" data-read-filter="" data-i18n="filter.read_all">전체</button>
+                    <button type="button" class="filter-read-option" data-read-filter="exclude_read" data-i18n="filter.read_exclude">읽은 도서 제외</button>
+                    <button type="button" class="filter-read-option" data-read-filter="only_read" data-i18n="filter.read_only">읽은 도서만</button>
+                </div>
+            </div>
+
             <!-- 선택된 태그 목록 (Chips) -->
             <div class="selected-chips-container" id="selected-chips-container" style="display: none;">
                 <!-- 동적 칩 렌더링 -->
@@ -206,4 +216,7 @@
     </div>
 </div>
 
-<script type="module" src="{{ static_asset_url('js/tab_media_library.js') }}"></script>
+{# 진입 모듈은 쿼리(?v=) 없이 로드한다 - category/*.js 등이 '../tab_media_library.js'로 import하므로 URL이 다르면
+   브라우저가 모듈을 두 번 평가해 부팅이 두 번 돌았다(2.8.9). 캐시 갱신은 core.py가 /static/js/**에 주는
+   Cache-Control: no-cache(매 로드 재검증)로 보장된다. tests/test_module_entry_single_instance.mjs 참고. #}
+<script type="module" src="{{ url_for('static', filename='js/tab_media_library.js') }}"></script>

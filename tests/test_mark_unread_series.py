@@ -83,3 +83,70 @@ def test_mark_unread_invalidates_all_user_history_cache_variants():
     assert affected_count == 2
     delete_pattern.assert_called_once_with('cache:history*:general:7:*')
     assert fnmatchcase('cache:history:v8:general:7:30:0', delete_pattern.call_args.args[0])
+
+
+def _audiobook_progress_db(tmp_path, monkeypatch):
+    db_path = tmp_path / "audiobook.db"
+    conn = sqlite3.connect(db_path)
+    conn.executescript(
+        """
+        CREATE TABLE audiobooks (
+            id INTEGER PRIMARY KEY,
+            title TEXT,
+            library_id INTEGER,
+            is_deleted INTEGER DEFAULT 0
+        );
+        CREATE TABLE audiobook_progress (audiobook_id INTEGER, user_id INTEGER);
+        CREATE TABLE audiobook_track_progress (audiobook_id INTEGER, track_id INTEGER, user_id INTEGER);
+
+        INSERT INTO audiobooks (id, title, library_id) VALUES (1, 'Target', 10), (2, 'Other', 10);
+        INSERT INTO audiobook_progress (audiobook_id, user_id) VALUES (1, 7), (2, 7), (1, 8);
+        INSERT INTO audiobook_track_progress (audiobook_id, track_id, user_id) VALUES
+            (1, 100, 7), (1, 101, 7), (2, 200, 7), (1, 100, 8);
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    def get_connection(_db_type):
+        connection = sqlite3.connect(db_path)
+        connection.row_factory = sqlite3.Row
+        return connection
+
+    monkeypatch.setattr(
+        "repositories.sqlite.reading_progress_repository.database.get_connection",
+        get_connection,
+    )
+    return get_connection
+
+
+def _track_rows(get_connection):
+    conn = get_connection("audiobook")
+    rows = conn.execute(
+        "SELECT audiobook_id, track_id, user_id FROM audiobook_track_progress ORDER BY user_id, audiobook_id, track_id"
+    ).fetchall()
+    conn.close()
+    return [tuple(row) for row in rows]
+
+
+def test_audiobook_unread_by_series_clears_track_progress(tmp_path, monkeypatch):
+    get_connection = _audiobook_progress_db(tmp_path, monkeypatch)
+
+    deleted_ids = ReadingProgressRepository.delete_user_progress_by_series("audiobook", "Target", 10, 7)
+
+    assert deleted_ids == [1]
+    assert _track_rows(get_connection) == [(2, 200, 7), (1, 100, 8)]
+
+
+def test_audiobook_unread_by_book_clears_track_progress(tmp_path, monkeypatch):
+    get_connection = _audiobook_progress_db(tmp_path, monkeypatch)
+
+    ReadingProgressRepository.delete_user_progress_by_book("audiobook", 1, 7)
+
+    conn = get_connection("audiobook")
+    progress_rows = conn.execute(
+        "SELECT audiobook_id, user_id FROM audiobook_progress ORDER BY user_id, audiobook_id"
+    ).fetchall()
+    conn.close()
+    assert [tuple(row) for row in progress_rows] == [(2, 7), (1, 8)]
+    assert _track_rows(get_connection) == [(2, 200, 7), (1, 100, 8)]

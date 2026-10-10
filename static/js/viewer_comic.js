@@ -96,6 +96,9 @@ export const ComicViewer = {
   nextPage() {
     nextComicPage();
   },
+  isAtLastPage() {
+    return Nav.isComicAtLastPage();
+  },
   jumpTo(target) {
     if (target === 'first') {
       comicJumpToFirstPage();

@@ -4795,6 +4795,27 @@ body {
     border-color: #6ee7b7;
 }
 
+.active-filter-item.is-read {
+    background: rgba(88, 28, 135, 0.6);
+    border-color: #d8b4fe;
+}
+
+/* 정렬 드롭다운 (library_sort_menu.js): 현재 정렬에 체크 표시 */
+.library-sort-menu .library-sort-item {
+    grid-template-columns: 1.25rem minmax(0, 1fr) 1rem;
+}
+.library-sort-menu .library-sort-check {
+    visibility: hidden;
+    color: var(--app-accent);
+}
+.library-sort-menu .library-sort-item.active {
+    color: var(--app-text-primary);
+    font-weight: 700;
+}
+.library-sort-menu .library-sort-item.active .library-sort-check {
+    visibility: visible;
+}
+
 .active-filter-item .filter-remove-btn {
     cursor: pointer;
     color: var(--app-text-muted);

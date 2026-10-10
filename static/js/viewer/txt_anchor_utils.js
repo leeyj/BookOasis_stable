@@ -347,3 +347,24 @@ function _queryRectInElement(el, query) {
   }
   return match ? _charRect(_textNodes(el), match.index) : null;
 }
+
+// 위치를 글자(앵커)로 되찾은 뒤, 이미지·글꼴이 늦게 로드돼 쪽 나눔이 다시 바뀌는 경우(원격 EPUB은 수 초)를 위해
+// 잠시 동안 몇 번 더 같은 글자로 맞춘다. 사용자가 조작(터치·클릭·키·휠)하면 그 즉시 멈춘다.
+// scrollLeft 변화로 '사용자가 넘겼는지' 판단하면 뷰어 자체의 쪽 맞춤(snap)도 이동으로 오인해 너무 일찍 멈췄다(2.8.9).
+export function scheduleAnchorRechecks(reapply, delays = [700, 1800, 3500]) {
+  const events = ['pointerdown', 'touchstart', 'keydown', 'wheel'];
+  let stopped = false;
+  const stop = () => {
+    stopped = true;
+    events.forEach((type) => document.removeEventListener(type, stop, true));
+  };
+  events.forEach((type) => document.addEventListener(type, stop, { capture: true, passive: true }));
+  delays.forEach((delay, i) => {
+    setTimeout(() => {
+      if (stopped) return;
+      try { reapply(); } catch (e) {}
+      if (i === delays.length - 1) stop();
+    }, delay);
+  });
+  return stop;
+}

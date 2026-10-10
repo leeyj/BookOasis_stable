@@ -248,6 +248,24 @@ function triggerOpenNextBook(nextBook) {
     });
 }
 
+// 슬라이드(자동 진행)용: 확인 모달 없이 다음 권을 조회한다. 없으면 null.
+export async function fetchNextBook(currentBookId) {
+  const url = `/api/media/next-book?type=${state.currentLibraryType}&book_id=${currentBookId}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  if (!data.success || !data.next_book) return null;
+  if (String(data.next_book.id) === String(currentBookId)) return null;
+  return data.next_book;
+}
+
+// 슬라이드(자동 진행)용: 조회해 둔 다음 권을 바로 연다 (전체화면 유지 포함, 일반 이어보기와 같은 경로).
+export function openNextBook(nextBook) {
+  if (nextEpisodeBusy || nextEpisodeModalOpen) return null;
+  nextEpisodeBusy = true;
+  return triggerOpenNextBook(nextBook);
+}
+
 function showNextEpisodeModal(nextBook) {
   const modal = document.getElementById('viewer-next-episode-modal');
   const titleEl = document.getElementById('viewer-next-episode-title');

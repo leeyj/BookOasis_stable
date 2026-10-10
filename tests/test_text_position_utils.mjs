@@ -7,7 +7,7 @@ async function load(path) {
   return import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 }
 
-const { makeAnchor, findAnchorOffset, resolveOffset, chunkStarts, offsetToChunk } = await load('../static/js/viewer/text_position_utils.js');
+const { makeAnchor, findAnchorOffset, resolveOffset, chunkStarts, offsetToChunk, pickOtherDeviceReadTarget } = await load('../static/js/viewer/text_position_utils.js');
 const { chunkText } = await load('../static/js/viewer/txt_text_utils.js');
 const { segmentForTts, splitForTts, pieceAtOffset, htmlToText, listenProgress } = await load('../static/js/tts/tts_core.js');
 
@@ -158,4 +158,29 @@ test('EPUB listen progress is the chapter index, like the viewer', () => {
   assert.equal(listenProgress('epub', { chapter: 20, chapterCount: 14 }).page_idx, 13);
   assert.equal(listenProgress('epub', { chapter: 0, chapterCount: 0 }), null);
   assert.equal(listenProgress('txt', { offset: 10, txtChunkStarts: [] }), null);
+});
+
+test('pickOtherDeviceReadTarget: 다른 기기에서 더 최근에 읽었을 때만 그 위치를 따른다', () => {
+  const read = { chapter_idx: 2, char_offset: 900, text_len: 5000, anchor: '빈선예도 그녀의 아우라를 느꼈는지', updated_ms: 1_000_000 };
+  const state = (extra = {}) => ({ latest: 'read', read, clockOffsetMs: 0, ...extra });
+  const local = (extra = {}) => ({ chunkIdx: 2, anchorText: '그녀를 누구라고 설명해야 하나?', savedAt: 900_000, ...extra });
+
+  // 다른 기기가 더 최근 (서버 시각 1,000,000 > 이 기기 900,000 + 5초)
+  assert.equal(pickOtherDeviceReadTarget(state(), local()), read);
+  // 이 기기가 닫을 때 보낸 자기 보고: 저장 시각과 거의 같음 → 무시
+  assert.equal(pickOtherDeviceReadTarget(state(), local({ savedAt: 998_000 })), null);
+  // 이 기기가 더 최근
+  assert.equal(pickOtherDeviceReadTarget(state(), local({ savedAt: 1_200_000 })), null);
+  // 같은 문장(공백 차이 무시) → 이동/알림 없음
+  assert.equal(pickOtherDeviceReadTarget(state(), local({ anchorText: '빈선예도 그녀의  아우라를 느꼈는지', savedAt: 1 })), null);
+  // 이 기기 시계가 서버보다 2분 늦음: 이 기기 저장(900,000)은 서버 시계로 1,020,000 → 서버 읽기(1,000,000)가 더 오래됨
+  assert.equal(pickOtherDeviceReadTarget(state({ clockOffsetMs: 120_000 }), local()), null);
+  // 새 기기/저장소 삭제(로컬 없음), 구버전 로컬(savedAt 없음) → 문장이 다르면 따른다
+  assert.equal(pickOtherDeviceReadTarget(state(), null), read);
+  assert.equal(pickOtherDeviceReadTarget(state(), local({ savedAt: undefined })), read);
+  // 듣기 위치가 더 최근이거나(listen) 세밀한 위치가 없으면(legacy/null) 관여하지 않는다
+  assert.equal(pickOtherDeviceReadTarget(state({ latest: 'listen' }), null), null);
+  assert.equal(pickOtherDeviceReadTarget(state({ latest: 'legacy' }), null), null);
+  assert.equal(pickOtherDeviceReadTarget(null, null), null);
+  assert.equal(pickOtherDeviceReadTarget(state({ read: { ...read, anchor: '' } }), null), null);
 });

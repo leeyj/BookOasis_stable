@@ -6,6 +6,7 @@ import json
 import time
 from utils.cover_helper import get_cover_image_with_t, resolve_series_cover
 from repositories.series_repository import SeriesRepository
+from repositories.series_list_options import normalize_read_filter, normalize_sort
 
 _CHOSEONG = [
     'ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ',
@@ -161,6 +162,7 @@ def _build_series_entries(db_type, rows, search_query=''):
             'author': author,
             'book_count': book_count,
             'total_tracks': total_tracks,
+            'score': representative.get('score'),
             'is_completed': is_completed,
             'cover_image': get_cover_image_with_t(final_cover, updated_at),
             'cover_align': cover_align,
@@ -252,6 +254,30 @@ def _build_author_entries(db_type, rows):
 
 def _sort_entries(entries, sort='asc'):
     sort_key = (sort or 'asc').lower()
+    if sort_key in ('folder_asc', 'folder_desc'):
+        # 폴더 이름 그대로([태그] 포함) 정렬 - 같은 [작가]/[그룹] 태그끼리 모인다
+        entries.sort(
+            key=lambda x: (str(x.get('series_name') or ''), str(x.get('representative_title') or '')),
+            reverse=(sort_key == 'folder_desc'),
+        )
+        return
+
+    if sort_key == 'score_desc':
+        # SQL과 같은 기준: 대표 도서 점수 높은 순, 동률은 대표 도서 ID 내림차순 (점수 없음 = 뒤)
+        entries.sort(
+            key=lambda x: (float(x.get('score') or 0), int(x.get('representative_book_id') or 0)),
+            reverse=True,
+        )
+        return
+
+    if sort_key in ('count_desc', 'count_asc'):
+        # SQL(series_list_options.build_order_by)과 같은 기준: 권수, 동률은 대표 도서 ID (같은 방향)
+        def _key(x):
+            count = int(x.get('total_tracks') or 0) or int(x.get('book_count') or 0)
+            return (count, int(x.get('representative_book_id') or 0))
+        entries.sort(key=_key, reverse=(sort_key == 'count_desc'))
+        return
+
     if sort_key in ('asc', 'desc'):
         reverse = (sort_key == 'desc')
         entries.sort(
@@ -404,7 +430,20 @@ class SeriesService:
         return result
 
     @staticmethod
-    def get_books_list(db_type, library_id, page, limit, search_query, sort='asc', genre_filters=None, tag_filters=None, user_id=None, role=None, group_by=None, author_key=None, include_has_metadata=False, return_has_more=False, filter_mode='and'):
+    def _resolve_read_keys(db_type, user_id, read_filter):
+        """읽음 필터에 쓸 '다 읽은 시리즈' 목록과, 캐시 키에 넣을 그 목록의 지문.
+        오디오북/영상은 작품 단위 완료 여부를 SQL에서 바로 보므로 목록이 필요 없다."""
+        if not read_filter or db_type in ('audiobook', 'video'):
+            return None, ''
+        read_keys = SeriesRepository.fetch_fully_read_series_keys(db_type, user_id)
+        payload = json.dumps(
+            {str(lib): sorted(keys) for lib, keys in sorted(read_keys.items())},
+            ensure_ascii=False, separators=(',', ':'),
+        )
+        return read_keys, hashlib.sha1(payload.encode('utf-8')).hexdigest()[:16]
+
+    @staticmethod
+    def get_books_list(db_type, library_id, page, limit, search_query, sort='asc', genre_filters=None, tag_filters=None, user_id=None, role=None, group_by=None, author_key=None, include_has_metadata=False, return_has_more=False, filter_mode='and', read_filter=''):
         import time
         t0 = time.perf_counter()
         _sync_local_books_cache_with_shared_epoch(db_type)
@@ -415,6 +454,9 @@ class SeriesService:
         filter_mode = 'or' if str(filter_mode or '').lower() == 'or' else 'and'
         group_by = (group_by or '').strip().lower()
         author_key = (author_key or '').strip()
+        sort = normalize_sort(sort)
+        read_filter = normalize_read_filter(read_filter)
+        read_keys, read_digest = SeriesService._resolve_read_keys(db_type, user_id, read_filter)
 
         offset = max(0, (page - 1) * limit)
         # 작가별 그룹핑/작가 드릴다운은 인덱스 없는 파이썬 그룹핑이라 항상 전체스캔 경로를 탄다.
@@ -423,7 +465,8 @@ class SeriesService:
         # 경로를 탄다 - 예전엔 이 정렬만 전체 라이브러리를 무제한으로 읽어와 파이썬에서
         # 정렬했는데, 그 무거운 동기 작업이 gunicorn 1-worker/4-thread의 GIL을 오래 붙잡아
         # 같은 워커에서 처리 중인 다른 요청들까지 pending 상태로 줄줄이 밀리는 원인이었다.
-        requires_full_scan = bool(search_query) or (sort not in ('asc', 'desc', 'date_asc', 'date_desc')) or bool(group_by) or bool(author_key)
+        # 폴더 이름순/도서 수순도 SQL ORDER BY + LIMIT으로 처리되므로(series_list_options) 전체스캔이 필요 없다.
+        requires_full_scan = bool(search_query) or bool(group_by) or bool(author_key)
 
         now = time.time()
         cache_key = (
@@ -439,6 +482,8 @@ class SeriesService:
             group_by,
             author_key,
             bool(include_has_metadata),
+            read_filter,
+            read_digest,
         )
 
         if not requires_full_scan:
@@ -479,7 +524,9 @@ class SeriesService:
                 role=role,
                 limit=None,
                 offset=None,
-                include_has_metadata=include_has_metadata
+                include_has_metadata=include_has_metadata,
+                read_filter=read_filter,
+                read_keys=read_keys,
             )
             t2 = time.perf_counter()
 
@@ -520,14 +567,19 @@ class SeriesService:
             limit=sql_limit,
             offset=sql_offset,
             sort=sort,
-            include_has_metadata=include_has_metadata
+            include_has_metadata=include_has_metadata,
+            read_filter=read_filter,
+            read_keys=read_keys,
         )
         t2 = time.perf_counter()
 
         entries = _build_series_entries(db_type, rows, search_query)
         t3 = time.perf_counter()
 
-        _sort_entries(entries, sort=sort)
+        # 폴더 이름순/도서 수순은 SQL 순서를 그대로 쓴다 - 파이썬 재정렬은 DB 콜레이션과
+        # 문자 비교 순서가 달라 페이지 안 순서만 어긋나게 만든다.
+        if sort not in ('folder_asc', 'folder_desc', 'count_desc', 'count_asc', 'score_desc'):
+            _sort_entries(entries, sort=sort)
         t4 = time.perf_counter()
 
         paged = entries if sql_limit is not None else entries[offset:offset + limit + 1]
@@ -612,7 +664,8 @@ class SeriesService:
 
     @staticmethod
     def find_jump_position(db_type, library_id, search_query, sort, target_char, limit,
-                            genre_filters=None, tag_filters=None, user_id=None, role=None, filter_mode='and'):
+                            genre_filters=None, tag_filters=None, user_id=None, role=None, filter_mode='and',
+                            read_filter=''):
         """
         가나다(초성) 바로가기: 전체 목록을 동일한 정렬 기준으로 구성한 뒤 target_char로
         시작하는 첫 항목의 절대 인덱스를 찾아 페이지/오프셋으로 환산합니다.
@@ -629,6 +682,8 @@ class SeriesService:
         sort_key = (sort or 'asc').lower()
         if sort_key not in ('asc', 'desc'):
             sort_key = 'asc'
+        read_filter = normalize_read_filter(read_filter)
+        read_keys, read_digest = SeriesService._resolve_read_keys(db_type, user_id, read_filter)
 
         now = time.time()
         cache_key = (
@@ -641,6 +696,8 @@ class SeriesService:
             filter_mode,
             int(user_id) if user_id else 0,
             str(role or ''),
+            read_filter,
+            read_digest,
         )
         cached = _LIST_QUERY_CACHE.get(cache_key)
         if cached and (now - cached[0] < _LIST_QUERY_CACHE_TTL):
@@ -658,7 +715,9 @@ class SeriesService:
                 user_id=user_id,
                 role=role,
                 limit=None,
-                offset=None
+                offset=None,
+                read_filter=read_filter,
+                read_keys=read_keys,
             )
             t_build = time.perf_counter()
             entries = _build_series_entries(db_type, rows)
@@ -695,7 +754,7 @@ class SeriesService:
         }
 
     @staticmethod
-    def get_books_totals(db_type, library_id, search_query='', genre_filters=None, tag_filters=None, user_id=None, role=None, filter_mode='and'):
+    def get_books_totals(db_type, library_id, search_query='', genre_filters=None, tag_filters=None, user_id=None, role=None, filter_mode='and', read_filter=''):
         import time
         _sync_local_books_cache_with_shared_epoch(db_type)
         library_id = _normalize_library_id(library_id)
@@ -703,7 +762,11 @@ class SeriesService:
         normalized_genres = [str(value).strip() for value in (genre_filters or []) if str(value).strip()]
         normalized_tags = [str(value).strip() for value in (tag_filters or []) if str(value).strip()]
         filter_mode = 'or' if str(filter_mode or '').lower() == 'or' else 'and'
+        read_filter = normalize_read_filter(read_filter)
+        read_keys, read_digest = SeriesService._resolve_read_keys(db_type, user_id, read_filter)
         cache_payload = json.dumps({
+            'read_filter': read_filter,
+            'read_digest': read_digest,
             'db_type': db_type,
             'library_id': library_id,
             'search': str(search_query or ''),
@@ -737,17 +800,53 @@ class SeriesService:
             if cached and now - cached[0] < _TOTALS_CACHE_TTL:
                 return cached[1]
 
-        totals = SeriesRepository.fetch_grouping_totals(
-            db_type,
-            library_id,
-            search_query=search_query or '',
-            favorite_only=favorite_only,
-            genre_filters=normalized_genres,
-            tag_filters=normalized_tags,
-            filter_mode=filter_mode,
-            user_id=user_id,
-            role=role,
-        )
+        totals = None
+        if read_filter and db_type not in ('audiobook', 'video') and not search_query and not favorite_only                 and not normalized_genres and not normalized_tags:
+            # 필터 없는 큰 목록은 요약 테이블에서 바로 COUNT/SUM - 예전처럼 대표 행을 전부 받아 세면
+            # 6.4만 시리즈에서 DB만 약 460ms(정렬+조인 6.4만 번, 2026-10-10 홈 서버 ANALYZE 실측)였다.
+            try:
+                totals = SeriesRepository._fetch_summary_totals(
+                    db_type, library_id, user_id, role, read_filter=read_filter, read_keys=read_keys
+                )
+            except Exception:
+                totals = None
+        if totals is not None:
+            pass
+        elif read_filter:
+            # 검색/장르·태그/즐겨찾기가 걸린 좁은 목록은 결과가 작아 목록 조회 결과를 그대로 센다.
+            rows = SeriesRepository.fetch_books_for_grouping(
+                db_type,
+                library_id,
+                search_query=search_query or '',
+                favorite_only=favorite_only,
+                genre_filters=normalized_genres,
+                tag_filters=normalized_tags,
+                filter_mode=filter_mode,
+                user_id=user_id,
+                role=role,
+                limit=None,
+                offset=None,
+                read_filter=read_filter,
+                read_keys=read_keys,
+            )
+            totals = {
+                'total_series_count': len(rows),
+                'total_book_count': sum(
+                    int(r.get('total_tracks') or 0) or int(r.get('series_book_count') or 1) for r in rows
+                ),
+            }
+        else:
+            totals = SeriesRepository.fetch_grouping_totals(
+                db_type,
+                library_id,
+                search_query=search_query or '',
+                favorite_only=favorite_only,
+                genre_filters=normalized_genres,
+                tag_filters=normalized_tags,
+                filter_mode=filter_mode,
+                user_id=user_id,
+                role=role,
+            )
 
         if redis_available:
             try:

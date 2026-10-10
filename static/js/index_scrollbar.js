@@ -111,6 +111,7 @@ async function handleIndexClick(char) {
       tags: (state.filterTags || []).map(normalizeMetadataToken).filter(Boolean),
       char,
       limit,
+      readFilter: state.currentLibraryType === 'video' ? '' : (state.readFilter || ''),
     });
 
     if (!result || !result.success || !result.found) {

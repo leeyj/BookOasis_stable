@@ -122,6 +122,17 @@ function handleViewerKeydown(e) {
     return;
   }
 
+  // 슬라이드(자동 진행) 켜기/끄기 - 만화/PDF 전용. 사용자 지정 키와 겹치면 그쪽을 우선한다.
+  const fmtForSlideshow = (state.currentViewerFormat || '').toLowerCase();
+  const isSlideshowKey = (rawKey === 'p' || codeKey === 'keyp') && !e.ctrlKey && !e.altKey && !e.metaKey;
+  const isCustomMappedKey = [customNextKeys, customPrevKeys, customCloseKeys, customDashboardKeys]
+    .some(keys => keys.includes(rawKey) || keys.includes(codeKey));
+  if (isSlideshowKey && !isCustomMappedKey && ['zip', 'cbz', 'imgdir', 'pdf'].includes(fmtForSlideshow)) {
+    e.preventDefault();
+    window.toggleViewerSlideshow?.();
+    return;
+  }
+
   // 형광펜 모드 토글 (EPUB/TXT 전용). 브라우저가 예약해 쓰는 조합(Ctrl/Alt+H 등)과 겹치지
   // 않도록 아무 보조키 없는 단순 'H'만 쓰고, Ctrl/Alt/Meta가 눌려있으면 무시한다.
   const fmt = (state.currentViewerFormat || '').toLowerCase();
