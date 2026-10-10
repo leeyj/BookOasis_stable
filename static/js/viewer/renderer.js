@@ -299,6 +299,7 @@ export async function initRenderer(bookId, pagesRead, totalPages) {
   const initialScrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
   syncSplitSpreadModeForScrollMode(initialScrollMode === 'scroll');
   Settings.initScrollWidth(); // 저장된 스크롤 너비 복원
+  Settings.initFitMode(); // 저장된 높이/너비 맞춤 복원
   applyComicFitMode();
   loadComicPage();
 
@@ -315,8 +316,8 @@ export function setComicTotalPages(v) { comicTotalPages = v; }
 export function setIsScrollingToTarget(v) { isScrollingToTarget = v; }
 export function getIsScrollingToTarget() { return isScrollingToTarget; }
 
-export function setComicFitMode(mode) {
-  Settings.setFitMode(mode);
+export function setComicFitMode(mode, { persist = true } = {}) {
+  Settings.setFitMode(mode, { persist });
   applyComicFitMode();
 }
 
@@ -775,13 +776,11 @@ export function loadComicPage() {
           loadTrace.log('page-mode loading overlay hidden');
 
 
-          if (comicCurrentPage === 0 && expectedLoads === 1) {
+          // 사용자가 맞춤 모드를 직접 고른 적이 없을 때만 표지 비율로 자동 판정한다.
+          // (다음 권 이어보기 등으로 0페이지에서 열릴 때 사용자 설정을 덮어쓰지 않도록)
+          if (comicCurrentPage === 0 && expectedLoads === 1 && !Settings.hasStoredFitMode()) {
             const aspectRatio = imageElements[0].naturalWidth / imageElements[0].naturalHeight;
-            if (aspectRatio < 0.7) {
-              setComicFitMode('width');
-            } else {
-              setComicFitMode('height');
-            }
+            setComicFitMode(aspectRatio < 0.7 ? 'width' : 'height', { persist: false });
           }
         }
       };

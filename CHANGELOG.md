@@ -1,4 +1,8 @@
 # CHANGELOG
+## v2.8.8
+- (fix) 만화 다음 권 이어보기 때 전체화면 버튼으로 켠 전체화면이 풀리던 이슈 수정 | fix fullscreen (entered via the fullscreen button) exiting when continuing to the next comic volume
+- (fix) 만화 다음 권 이어보기 때 보기 모드(높이/너비 맞춤)가 표지 비율에 따라 바뀌던 이슈 수정 - 직접 고른 맞춤 모드를 기억 | fix the comic fit mode (height/width) switching by cover ratio when continuing to the next volume - the fit mode you pick is now remembered
+
 ## v2.8.7
 - (feature) 장르/태그 필터를 2개 이상 선택했을 때 '필터 적용 중(AND)'을 눌러 AND(모두 포함)/OR(하나라도 포함)로 전환 | when 2+ genre/tag filters are selected, click "Active Filters (AND)" to switch between AND (match all) and OR (match any)
 

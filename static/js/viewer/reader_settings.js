@@ -231,8 +231,33 @@ export function initPageStep() {
   setComicPageStep(getStoredComicPageStep());
 }
 
-export function setFitMode(mode) {
-  comicFitMode = mode;
+const FIT_MODE_STORAGE_KEY = 'comic_fit_mode';
+
+function getStoredFitMode() {
+  try {
+    const saved = localStorage.getItem(FIT_MODE_STORAGE_KEY);
+    return (saved === 'width' || saved === 'height') ? saved : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// 사용자가 직접 높이/너비 맞춤을 고른 적이 있는지 (있으면 표지 비율 자동 판정을 건너뛴다)
+export function hasStoredFitMode() {
+  return getStoredFitMode() !== null;
+}
+
+export function setFitMode(mode, { persist = false } = {}) {
+  comicFitMode = mode === 'width' ? 'width' : 'height';
+  if (persist) {
+    try { localStorage.setItem(FIT_MODE_STORAGE_KEY, comicFitMode); } catch (e) {}
+  }
+  syncFitUI();
+}
+
+export function initFitMode() {
+  const saved = getStoredFitMode();
+  if (saved) comicFitMode = saved;
   syncFitUI();
 }
 

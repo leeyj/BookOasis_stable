@@ -3,7 +3,7 @@ import { state } from '../state.js';
 import { ComicViewer, clearComicViewer } from '../viewer_comic.js';
 import { TxtViewer } from '../viewer_txt.js';
 import { PdfViewer, clearPdfViewer } from '../viewer_pdf.js';
-import { tryAutoFullscreenOnOpen, exitFullscreenIfNeeded } from './fullscreen_controller.js';
+import { tryAutoFullscreenOnOpen, exitFullscreenIfNeeded, isViewerInFullscreen } from './fullscreen_controller.js';
 import { shouldAutoFullscreenForFormat } from './platform_profile.js';
 import { flushProgress, resetPreloadState } from '../viewer_progress.js';
 import { setAnnotationUiEnabled } from './annotation_ui.js';
@@ -174,7 +174,7 @@ export function openReader(bookId, format, title, pagesRead, totalPages) {
   deps.syncHotspotPointerEvents();
 }
 
-export function closeMediaViewer(triggerBack = true, isTransitioning = false) {
+export function closeMediaViewer(triggerBack = true, isTransitioning = false, options = {}) {
   const viewerModal = document.getElementById('media-viewer-modal');
   if (!viewerModal) return Promise.resolve();
 
@@ -186,7 +186,11 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false) {
     }
   }
 
-  const fullscreenExitPromise = exitFullscreenIfNeeded();
+  // 다음 권 이어보기처럼 곧바로 새 책을 여는 경우에는 Fullscreen API 전체화면을
+  // 유지한다. exitFullscreen 후 다시 requestFullscreen을 하면 데스크톱은 자동
+  // 재진입 경로가 없고, 모바일도 사용자 제스처 만료로 요청이 거부될 수 있다.
+  const keepFullscreen = !!(options && options.keepFullscreen) && isViewerInFullscreen();
+  const fullscreenExitPromise = keepFullscreen ? Promise.resolve() : exitFullscreenIfNeeded();
 
   const padPanel = document.getElementById('viewer-padding-overlay-panel');
   if (padPanel) {
@@ -203,10 +207,12 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false) {
       delete menu.dataset.iosBodyLock;
     }
 
-    viewerModal.classList.remove('fullscreen-mode');
-    viewerModal.style.display = 'none';
-    const fullscreenIcon = document.getElementById('fullscreen-icon');
-    if (fullscreenIcon) fullscreenIcon.className = 'fa-solid fa-expand';
+    if (!keepFullscreen) {
+      viewerModal.classList.remove('fullscreen-mode');
+      viewerModal.style.display = 'none';
+      const fullscreenIcon = document.getElementById('fullscreen-icon');
+      if (fullscreenIcon) fullscreenIcon.className = 'fa-solid fa-expand';
+    }
 
     // body 및 documentElement 인라인 스크롤 락 스타일만 안전 소거 (CSS 변수 유실 방지)
     document.body.style.removeProperty('overflow');
