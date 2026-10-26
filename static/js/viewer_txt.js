@@ -5,6 +5,14 @@ import { viewerStorage } from './viewer/storage.js';
 // Route all storage access through a wrapper for safer future refactors.
 const localStorage = viewerStorage;
 
+// Restoring a saved EPUB viewport is not a new reading action.
+let epubAwaitingUserInput = false;
+
+function saveProgress(...args) {
+  if (state.currentViewerFormat === 'epub' && epubAwaitingUserInput) return;
+  persistProgress(...args);
+}
+
 let txtChunks = [];
 let currentChunkIdx = 0;
 let loadedChunks = { min: 0, max: 0 };
@@ -68,6 +76,7 @@ export const txtRuntimeState = {
     txtScrollNextEpisodeTriggered = value;
   },
   reset() {
+    epubAwaitingUserInput = false;
     txtChunks = [];
     currentChunkIdx = 0;
     loadedChunks = { min: 0, max: 0 };
@@ -80,7 +89,7 @@ export const txtRuntimeState = {
 };
 
 import { showViewerLoading, hideViewerLoading, showViewerError, showToast } from './view_manager.js';
-import { saveProgress } from './viewer_progress.js';
+import { saveProgress as persistProgress } from './viewer_progress.js';
 import { initPageStep, initReadingDirection, getComicReadingDirection } from './viewer/reader_settings.js';
 import { getTxtPageAdvanceWidth, snapTxtPageScrollLeft, isTxtScrollLeftAtMaxPage, getTxtPageMaxScroll, applyTxtTwoPageTrailingSpacer, applyTxtImageMaxHeight } from './viewer/txt_page_utils.js';
 import { chunkText, formatTxtToHtml, stripHtml } from './viewer/txt_text_utils.js';
@@ -534,6 +543,7 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
   showViewerLoading(i18n.t("viewer.loading_txt_title"), i18n.t("viewer.loading_txt_sub"));
   
   const isEpub = (state.currentViewerFormat === 'epub');
+  epubAwaitingUserInput = isEpub;
   // 듣기(TTS) 위치가 더 최근이면 그 문장부터 연다 — 본문 요청과 병렬로 조회 (느리면 1.5초 후 포기)
   const ttsSyncPromise = fetchSyncState(state.currentLibraryType, bookId);
   setReadPositionProvider(currentReadPosition);
@@ -588,6 +598,9 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
         console.log(`[Viewer-Txt] 위치 동기화: latest=${syncState ? syncState.latest : 'none'} → ${ttsTarget ? `${ttsTarget.kind} 챕터 ${ttsTarget.chunkIdx}` : '이 기기 위치'}`);
         if (ttsTarget) startIdx = ttsTarget.chunkIdx;
 
+        // Keep first-ever opens in reading history; only a saved-position restore is quiet.
+        epubAwaitingUserInput = !!(ttsTarget || readLocalTxtPosition(bookId)
+          || serverEpubSession?.updatedAt || Number(initialPageIdx) > 0);
         startIdx = Math.max(0, Math.min(totalChapters - 1, parseInt(startIdx, 10) || 0));
         currentChunkIdx = startIdx;
 
@@ -941,7 +954,12 @@ function activeRestoreHold() {
 }
 
 ['pointerdown', 'touchstart', 'keydown', 'wheel'].forEach((type) => {
-  document.addEventListener(type, () => { txtRestoreHold = null; }, { capture: true, passive: true });
+  document.addEventListener(type, (event) => {
+    txtRestoreHold = null;
+    const closing = event.key === 'Escape'
+      || event.target?.closest?.('[data-role="viewer-action"][data-action="close"]');
+    if (event.isTrusted && !closing) epubAwaitingUserInput = false;
+  }, { capture: true, passive: true });
 });
 
 // 이 기기에 저장된 세부 위치 ({chunkIdx, scrollLeft, scrollTop, anchorText, savedAt}) - 없으면 null
@@ -1074,16 +1092,16 @@ export function saveDetailPosition() {
     // 다른 기기에서 더 최근에 읽었는지 비교하는 기준 (tts_sync.readTargetFor*). 붙잡은 문장(아직 읽어 나가지 않음)이면
     // 시각을 갱신하지 않는다 - 열어 두기만 한 기기가 그사이 다른 기기에서 더 읽은 위치보다 '최신'으로 보이면 안 된다.
     let previousSavedAt = 0;
-    if (hold) {
+    if (hold || epubAwaitingUserInput) {
       try { previousSavedAt = Number(JSON.parse(localStorage.getItem(`viewer_last_pos_${state.activeBookId}`) || '{}').savedAt) || 0; } catch (e) {}
     }
-    pos.savedAt = previousSavedAt || Date.now();
+    pos.savedAt = epubAwaitingUserInput ? previousSavedAt : (previousSavedAt || Date.now());
     localStorage.setItem(`viewer_last_pos_${state.activeBookId}`, JSON.stringify(pos));
     // 챕터 안 쪽 넘김도 서버 읽기 위치(TTS 동기화·다른 기기 복원용)에 반영한다 - 예전엔 saveProgress(챕터가
     // 바뀔 때)에서만 보고돼 긴 챕터 안에서 읽은 위치는 서버에 챕터 단위로만 남았다. 30초에 한 번으로 묶이고,
     // 닫기·화면 이탈 때는 마지막 위치가 바로 전송된다(viewer_progress.flushProgress → flushReadReport).
     // 복원한 문장을 붙잡고 있는 동안(아직 사용자가 읽어 나가지 않음)은 새로 읽은 위치가 아니므로 보고하지 않는다.
-    if (!hold) noteReadActivity();
+    if (!hold && !epubAwaitingUserInput) noteReadActivity();
   }
 }
 
