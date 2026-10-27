@@ -68,6 +68,33 @@ claude mcp add bookoasis -- docker exec -i bookoasis python3 tools/mcp_server.py
   }
   ```
 
+### Connecting from another PC over SSH (Claude Desktop etc.)
+
+The MCP server is stdio-only and never listens on the network, but you can still use it from Claude Desktop on a laptop or desktop by having the client **run `mcp_server.py` on the server through `ssh`**. No new port is opened; your existing SSH access is the access control.
+
+```json
+{
+  "mcpServers": {
+    "bookoasis": {
+      "command": "ssh",
+      "args": [
+        "-T", "-o", "BatchMode=yes",
+        "user@192.168.0.10",
+        "cd /path/to/media_server && python3 tools/mcp_server.py"
+      ]
+    }
+  }
+}
+```
+
+- **Key authentication is required.** MCP clients have no screen to type a password or passphrase into. First check that `ssh user@server` in a terminal connects **without asking anything**. If your key has a passphrase, load it into ssh-agent beforehand (macOS: Keychain; Windows: the "OpenSSH Authentication Agent" service + `ssh-add`).
+- **`BatchMode=yes`**: if ssh would need to ask something (unknown host key, no key), it fails right away instead of hanging. If the connection fails, run the same command in a terminal to see why. For a server you have never connected to, connect once from a terminal to accept its host key.
+- **`-T`**: no TTY (same reason as never using `-t` with Docker — control characters break the stdio protocol).
+- **Windows**: the OpenSSH client built into Windows 10/11 (`ssh.exe`) works as is. If `ssh` is not found, put the full path in `"command"`, e.g. `C:\\Windows\\System32\\OpenSSH\\ssh.exe`.
+- **If you installed into a virtualenv**, use that venv's python instead of `python3` (e.g. `.venv/bin/python tools/mcp_server.py`). Non-interactive SSH sessions may not read the PATH set in `.bashrc`.
+- **If the server runs Docker**, change the remote command to `docker exec -i bookoasis python3 tools/mcp_server.py` (no `cd` needed). The SSH user must be allowed to run `docker`.
+- The MCP server runs with the SSH account's permissions, so connect as the account that installed BookOasis (the one that can read its data).
+
 ### Gemini CLI / OpenAI Codex CLI / Cursor / other MCP clients
 
 Most of these also use the same `mcpServers` JSON shape, but the exact config file name/location and any CLI registration command (if one exists) varies by tool and can change over time. Check that tool's current official docs for "register an MCP server" and paste in the common JSON block above — as long as `command`/`args` are correct, it works identically regardless of which client you use.

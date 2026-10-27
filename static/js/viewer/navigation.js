@@ -77,6 +77,9 @@ export function toggleComicOverlay() {
     if (typeof window.syncComicCenterGapButton === 'function') {
       window.syncComicCenterGapButton();
     }
+    if (typeof window.syncViewerFontSizeLabel === 'function') {
+      window.syncViewerFontSizeLabel();
+    }
 
     const fmt = (state.currentViewerFormat || '').toLowerCase();
     const styleTabBtn = document.getElementById('tab-btn-style');

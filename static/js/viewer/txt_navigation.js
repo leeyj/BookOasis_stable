@@ -99,6 +99,17 @@ export function prevTxtPageAction(ctx) {
   }
 }
 
+// 마지막 장의 마지막 화면인지 (자동 넘김이 권 끝을 판단할 때 사용). nextTxtPageAction의 끝 판정과 같은 식이다.
+export function isTxtAtLastPage({ scrollMode, chunkIdx, chunkCount, scrollLeft, scrollWidth, clientWidth, pageStepWidth, scrollTop, scrollHeight, clientHeight }) {
+  if (chunkCount <= 0 || chunkIdx < chunkCount - 1) return false;
+  if (scrollMode === 'page') {
+    const maxScrollLeft = Math.max(0, scrollWidth - clientWidth);
+    const snapTolerance = Math.max(30, pageStepWidth * 0.4);
+    return scrollLeft + snapTolerance >= maxScrollLeft;
+  }
+  return scrollTop + 10 >= scrollHeight - clientHeight;
+}
+
 export function nextTxtPageAction(ctx) {
   const scrollWrapper = ctx.getScrollWrapper();
   if (!scrollWrapper) return;

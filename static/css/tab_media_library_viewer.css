@@ -885,6 +885,283 @@
     color: var(--app-accent-hover);
 }
 
+/* ── 설정 행 목록 (3.0.5): 한 줄에 설정 하나 — 이름(왼쪽) ... 조작(오른쪽), 줄 사이 옅은 구분선.
+   조작은 네 가지만 쓴다: 둘 중 고르기(.vm-seg), 켜기/끄기(.vm-switch), 숫자(.vm-stepper), 연속 값(슬라이더).
+   버튼 id·data-action은 예전과 같아서 동작 코드는 .active만 바꾸면 된다. ── */
+/* 폭은 내용에 맞춘다 - 고정 폭이면 짧은 이름과 스위치 사이가 휑하게 벌어진다 */
+.overlay-controls-panel:has(.overlay-tab-content.active .vm-list) {
+    width: fit-content;
+    min-width: min(320px, 100vw);
+    max-width: min(440px, 100vw);
+    /* 높이는 위 헤더와 아래 시크바 사이에 남는 만큼 (메뉴가 세로 flex라 min-height: 0이면 줄어들며 안에서 스크롤).
+       고정 calc(100dvh - N)은 휴대폰 가로 화면에서 남는 공간이 있어도 4줄만 보였다. */
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.vm-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.vm-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--app-space-6, 1.5rem);
+    min-height: 46px;
+    padding: var(--app-space-1) 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--app-text-primary) 8%, transparent);
+}
+
+.vm-row:last-child {
+    border-bottom: 0;
+}
+
+/* 이동 탭 위 버튼 줄: 아이콘 위·글자 아래의 같은 크기 타일 (가로로 늘어선 버튼이 패널 폭을 넓히지 않게) */
+#overlay-tab-nav > .overlay-controls-row {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: var(--app-space-1-5);
+}
+
+#overlay-tab-nav > .overlay-controls-row .btn-overlay-action {
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--app-space-1);
+    min-width: 0;
+    padding: var(--app-space-2) 2px;
+    font-size: var(--app-fs-2xs);
+    /* 긴 이름은 단어 단위로 두 줄까지 */
+    white-space: normal;
+    text-align: center;
+    line-height: 1.2;
+    overflow-wrap: normal;
+}
+
+#overlay-tab-nav > .overlay-controls-row .btn-overlay-action i {
+    font-size: 1.05rem;
+}
+
+/* 이동 탭: 위 버튼 줄과 자동 넘김 목록 사이 */
+.overlay-controls-row + .vm-list {
+    margin-top: var(--app-space-2);
+    border-top: 1px solid color-mix(in srgb, var(--app-text-primary) 8%, transparent);
+}
+
+.vm-row-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--app-text-secondary);
+    font-size: var(--app-fs-sm);
+    font-weight: var(--app-fw-medium);
+    line-height: 1.35;
+}
+
+.vm-kbd {
+    margin-left: var(--app-space-1);
+    padding: 0 0.35em;
+    border: 1px solid color-mix(in srgb, var(--app-text-primary) 20%, transparent);
+    border-radius: 4px;
+    color: var(--app-text-muted);
+    font-family: inherit;
+    font-size: var(--app-fs-2xs);
+}
+
+/* 둘 중 고르기: 상자 없이 글자만, 고른 쪽만 강조색 */
+.vm-seg {
+    display: flex;
+    flex-shrink: 0;
+    gap: var(--app-space-1);
+}
+
+.vm-seg .btn-overlay-fit {
+    background: none;
+    padding: var(--app-space-1-5) var(--app-space-2);
+    color: var(--app-text-muted);
+    font-size: var(--app-fs-sm);
+}
+
+.vm-seg .btn-overlay-fit:hover {
+    color: var(--app-text-primary);
+}
+
+.vm-seg .btn-overlay-fit.active {
+    background: none;
+    color: var(--app-accent-hover);
+    font-weight: var(--app-fw-semibold);
+}
+
+/* 켜기/끄기: 버튼 자체를 스위치로 그린다. 예전 버튼 안 글자(분할 끔/1장 등)는 상태 동기화 코드가 계속
+   쓰므로 DOM에는 두고 화면에서만 숨긴다. */
+.vm-switch {
+    position: relative;
+    flex-shrink: 0;
+    width: 44px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: 13px;
+    background: color-mix(in srgb, var(--app-text-primary) 22%, transparent);
+    cursor: pointer;
+    transition: background-color 0.18s ease;
+}
+
+.vm-switch > * {
+    display: none;
+}
+
+.vm-switch::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    transition: transform 0.18s ease;
+}
+
+.vm-switch.active {
+    background: var(--app-accent);
+}
+
+.vm-switch.active::after {
+    transform: translateX(18px);
+}
+
+/* 숫자: [− 값 +] */
+.vm-stepper {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    border: 1px solid color-mix(in srgb, var(--app-text-primary) 18%, transparent);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.vm-stepper button {
+    width: 36px;
+    height: 30px;
+    border: 0;
+    background: none;
+    color: var(--app-text-primary);
+    font-size: 1.05rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.vm-stepper button:hover {
+    background: color-mix(in srgb, var(--app-text-primary) 10%, transparent);
+}
+
+.vm-stepper-value {
+    min-width: 3.4em;
+    padding: 0 var(--app-space-1);
+    border-left: 1px solid color-mix(in srgb, var(--app-text-primary) 12%, transparent);
+    border-right: 1px solid color-mix(in srgb, var(--app-text-primary) 12%, transparent);
+    color: var(--app-text-secondary);
+    font-size: var(--app-fs-xs);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    line-height: 30px;
+}
+
+/* 목록 안의 select: 오른쪽 값처럼 보이게 테두리를 빼고 옅은 바탕만 */
+.vm-row .overlay-select {
+    flex-shrink: 0;
+    max-width: 58%;
+    border: 0;
+    background: color-mix(in srgb, var(--app-text-primary) 8%, transparent);
+    padding: var(--app-space-1-5) var(--app-space-2);
+    border-radius: 6px;
+    font-size: var(--app-fs-xs);
+}
+
+.vm-row .overlay-select:hover,
+.vm-row .overlay-select:focus {
+    background: color-mix(in srgb, var(--app-text-primary) 14%, transparent);
+}
+
+/* 이미지 너비 행: 스크롤 모드에서만 (.visible) */
+.vm-row.overlay-width-row {
+    border-top: 0;
+    padding-top: var(--app-space-1);
+}
+
+.vm-row.overlay-width-row:not(.visible) {
+    display: none;
+}
+
+.vm-slider {
+    display: flex;
+    flex: 0 1 60%;
+    align-items: center;
+    gap: var(--app-space-2);
+}
+
+.vm-slider .comic-scroll-width-slider {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+}
+
+/* 여백 탭도 같은 폭·글자 크기로 (이름 ... 값 한 줄 + 슬라이더, 줄 사이 구분선) */
+.overlay-controls-panel:has(#overlay-tab-margin.active) {
+    width: min(340px, 100vw);
+    min-height: 0;
+    overflow-y: auto;
+}
+
+/* EPUB/TXT는 메뉴가 열리면 시크바 바로 위 오른쪽에 목차 버튼(txt_toc.js, 44px, bottom 112px)이 뜬다.
+   패널이 아래까지 늘어나는 낮은 화면(휴대폰 가로)에서 버튼이 행을 가리지 않게 그 높이만큼 비워 둔다.
+   (스타일 탭 버튼은 navigation.js가 TXT/EPUB일 때만 inline display:flex로 켠다) */
+.comic-overlay-menu:has(#tab-btn-style[style*="flex"]) .overlay-controls-panel {
+    margin-bottom: 88px;
+}
+
+/* 패널이 줄어들 때 헤더·시크바는 그대로 */
+.comic-overlay-menu > .overlay-header,
+.comic-overlay-menu > .overlay-footer {
+    flex-shrink: 0;
+}
+
+#overlay-tab-margin .overlay-margin-container {
+    gap: 0;
+    padding: 0;
+}
+
+#overlay-tab-margin .quick-padding-row {
+    padding: var(--app-space-2) 0 var(--app-space-3);
+    border-bottom: 1px solid color-mix(in srgb, var(--app-text-primary) 8%, transparent);
+}
+
+#overlay-tab-margin .quick-padding-row:last-child {
+    border-bottom: 0;
+}
+
+#overlay-tab-margin .quick-padding-row label {
+    margin-bottom: var(--app-space-2);
+    color: var(--app-text-secondary);
+    font-size: var(--app-fs-sm);
+    font-weight: var(--app-fw-medium);
+}
+
+/* 휴대폰 세로: 패널을 화면 폭 그대로 (태블릿 세로 768px까지 넓히면 이름과 스위치 사이가 다시 휑해진다) */
+@media (max-width: 560px) {
+    .overlay-controls-panel:has(#overlay-tab-margin.active),
+    .overlay-controls-panel:has(.overlay-tab-content.active .vm-list) {
+        width: 100%;
+        max-width: 100%;
+        border-radius: 0 0 12px 12px;
+        padding: var(--app-space-2) var(--app-space-4);
+    }
+}
+
 .overlay-footer {
     background: rgba(var(--app-panel-rgb), 0.85);
     backdrop-filter: blur(10px);
@@ -1839,8 +2116,7 @@ input:checked + .toggle-switch-slider::before {
     gap: 0.5rem;
     justify-content: center;
 }
+/* 자동 넘김 목록(.vm-list) - 행이 패널 폭을 다 쓰게 한다 */
 .overlay-slideshow-row {
-    margin-top: 0.5rem;
-    flex-wrap: wrap;
-    align-items: center;
+    align-self: stretch;
 }

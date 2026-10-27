@@ -68,6 +68,33 @@ claude mcp add bookoasis -- docker exec -i bookoasis python3 tools/mcp_server.py
   }
   ```
 
+### 다른 PC에서 SSH로 연결하기 (Claude Desktop 등)
+
+MCP 서버는 네트워크로 열리지 않는 stdio 전용이지만, AI 도구가 **`ssh`로 서버에 접속해 `mcp_server.py`를 실행**하게 하면 노트북·데스크톱의 Claude Desktop에서도 그대로 쓸 수 있습니다. 포트를 새로 열 필요가 없고, 기존 SSH 접속 권한이 곧 접근 권한입니다.
+
+```json
+{
+  "mcpServers": {
+    "bookoasis": {
+      "command": "ssh",
+      "args": [
+        "-T", "-o", "BatchMode=yes",
+        "user@192.168.0.10",
+        "cd /path/to/media_server && python3 tools/mcp_server.py"
+      ]
+    }
+  }
+}
+```
+
+- **키 인증이 필수입니다.** MCP 클라이언트는 비밀번호·passphrase를 입력받을 화면이 없습니다. 먼저 터미널에서 `ssh user@서버`가 **아무것도 묻지 않고** 접속되는지 확인하세요. passphrase가 걸린 키라면 ssh-agent에 미리 올려 두세요(macOS: 키체인, Windows: "OpenSSH Authentication Agent" 서비스 + `ssh-add`).
+- **`BatchMode=yes`**: 무언가를 물어야 하는 상황(처음 보는 호스트 키, 키 없음)이면 멈춰 있지 않고 바로 실패합니다. 연결이 안 되면 같은 명령을 터미널에서 직접 실행해 보면 원인이 보입니다. 처음 접속하는 서버라면 터미널에서 한 번 접속해 호스트 키를 등록해 두세요.
+- **`-T`**: TTY를 붙이지 않습니다(Docker의 `-t` 금지와 같은 이유 — 제어 문자가 섞이면 stdio 프로토콜이 깨집니다).
+- **Windows**: Windows 10/11에 기본 포함된 OpenSSH(`ssh.exe`)를 그대로 씁니다. `ssh`를 못 찾으면 `"command"`에 `C:\\Windows\\System32\\OpenSSH\\ssh.exe`처럼 전체 경로를 쓰세요.
+- **가상환경(venv)으로 설치했다면** `python3` 대신 그 venv의 파이썬 경로를 쓰세요(예: `.venv/bin/python tools/mcp_server.py`). SSH 비대화형 접속은 `.bashrc`의 PATH 설정을 읽지 않을 수 있습니다.
+- **서버가 Docker라면** 원격 명령을 `docker exec -i bookoasis python3 tools/mcp_server.py`로 바꾸면 됩니다(`cd`는 필요 없음). SSH 계정이 `docker`를 실행할 수 있어야 합니다.
+- 이렇게 실행된 MCP 서버는 SSH 계정의 권한으로 돕니다. BookOasis 데이터에 접근할 수 있는 계정(설치한 계정)으로 접속하세요.
+
 ### 버전 확인과 업데이트 — MCP는 업데이트를 "안내"만 합니다
 
 `get_version`으로 실행 중인 버전을 확인하고, `call_api`로 `/api/media/about`을 호출하면 GitHub 최신 버전과 비교한 업데이트 가능 여부를 볼 수 있습니다. **MCP 서버는 BookOasis 자신을 업데이트하거나 덮어쓰지 않습니다** — 이는 "코어/플러그인 소스 파일은 건드리지 않고 DB만 쓴다"는 설계 원칙 때문이며, Docker 컨테이너 안에서 실행되는 MCP가 자기 이미지를 교체할 수도 없습니다. 업데이트는 항상 호스트에서 직접 실행하세요. (AI에게 "업데이트가 있는지 확인하고 방법을 알려줘"라고 요청하면 안내까지만 해줍니다.)

@@ -184,8 +184,18 @@ configureLifecycleController({
 });
 
 // 공통 환경 설정 트리거 함수
+// 메뉴 '스타일' 탭의 글자 크기 값 (기본 1.15em을 100%로)
+export function syncFontSizeLabel() {
+  const el = document.getElementById('vm-font-size-value');
+  if (!el) return;
+  const size = parseFloat(localStorage.getItem('viewer_font_size') || '1.15') || 1.15;
+  el.textContent = `${Math.round((size / 1.15) * 100)}%`;
+}
+window.syncViewerFontSizeLabel = syncFontSizeLabel;
+
 export function changeFontSize(dir) {
   updateFontSize(dir);
+  syncFontSizeLabel();
   const activeViewerInstance = getActiveViewerInstance();
   if (activeViewerInstance && typeof activeViewerInstance.applySettings === 'function') {
     activeViewerInstance.applySettings();

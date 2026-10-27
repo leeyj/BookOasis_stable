@@ -1,16 +1,19 @@
-// slideshow_controller.js - 만화/PDF 뷰어 슬라이드(자동 진행)
+// slideshow_controller.js - 만화/PDF/EPUB/TXT 뷰어 자동 넘김(내부 이름: 슬라이드)
 // 페이지 모드는 일정 간격으로 다음 페이지, 스크롤 모드는 일정 속도로 자동 스크롤한다.
 // 권 끝에 닿으면 카운트다운 후 다음 권을 열고(전체화면 유지) 같은 방식으로 이어서 진행한다.
 import { state } from '../state.js';
 import { getActiveViewerInstance } from './lifecycle_controller.js';
+import {
+  INTERVAL_PRESETS,
+  SCROLL_PX_PRESETS,
+  getIntervalSec,
+  getScrollPxPerSec,
+  saveIntervalSec,
+  saveScrollPxPerSec,
+} from './slideshow_settings.js';
 
-const SUPPORTED_FORMATS = ['zip', 'cbz', 'imgdir', 'pdf'];
-const INTERVAL_KEY = 'viewer_slideshow_interval';
-const SPEED_KEY = 'viewer_slideshow_scroll_speed';
-const INTERVAL_OPTIONS = [3, 5, 8, 10, 15, 30];
-const DEFAULT_INTERVAL = 5;
-const SPEED_PX_PER_SEC = { slow: 40, normal: 80, fast: 160 };
-const DEFAULT_SPEED = 'normal';
+const SUPPORTED_FORMATS = ['zip', 'cbz', 'imgdir', 'pdf', 'epub', 'txt'];
+const TEXT_FORMATS = ['epub', 'txt'];
 // 스크롤 모드에서 바닥에 닿은 뒤 이만큼 머물러야 권 끝으로 본다 (늦게 로드되는 이미지로 길이가 늘어날 수 있음)
 const SCROLL_END_HOLD_MS = 1500;
 // 사용자가 직접 스크롤/터치하면 자동 스크롤을 잠깐 멈춘다
@@ -54,31 +57,15 @@ function readStorage(key) {
   try { return localStorage.getItem(key); } catch (e) { return null; }
 }
 
-function writeStorage(key, value) {
-  try { localStorage.setItem(key, value); } catch (e) {}
-}
-
-function getIntervalSec() {
-  const saved = parseInt(readStorage(INTERVAL_KEY), 10);
-  return INTERVAL_OPTIONS.includes(saved) ? saved : DEFAULT_INTERVAL;
-}
-
-function getSpeedKey() {
-  const saved = readStorage(SPEED_KEY);
-  return Object.prototype.hasOwnProperty.call(SPEED_PX_PER_SEC, saved) ? saved : DEFAULT_SPEED;
-}
-
 export function setSlideshowInterval(value) {
-  const sec = parseInt(value, 10);
-  if (!INTERVAL_OPTIONS.includes(sec)) return;
-  writeStorage(INTERVAL_KEY, String(sec));
+  const sec = saveIntervalSec(value);
+  if (sec === null) return;
   if (running) pageDeadline = performance.now() + sec * 1000;
   updatePill();
 }
 
 export function setSlideshowSpeed(value) {
-  if (!Object.prototype.hasOwnProperty.call(SPEED_PX_PER_SEC, value)) return;
-  writeStorage(SPEED_KEY, value);
+  if (saveScrollPxPerSec(value) === null) return;
   updatePill();
 }
 
@@ -89,6 +76,7 @@ function isScrollMode() {
 function getScrollContainer() {
   const fmt = String(state.currentViewerFormat || '').toLowerCase();
   if (fmt === 'pdf') return document.getElementById('pdf-render-area');
+  if (TEXT_FORMATS.includes(fmt)) return document.getElementById('txt-scroll-wrapper');
   return document.querySelector('#comic-viewer-container .comic-image-wrapper') || document.querySelector('.comic-image-wrapper');
 }
 
@@ -139,7 +127,7 @@ function tick(now) {
     }
     bottomSince = 0;
     // 일부 브라우저는 scrollTop의 소수점을 버리므로 1px 단위로 모아서 움직인다
-    scrollCarry += SPEED_PX_PER_SEC[getSpeedKey()] * dt / 1000;
+    scrollCarry += getScrollPxPerSec() * dt / 1000;
     if (scrollCarry >= 1) {
       const px = Math.floor(scrollCarry);
       scrollCarry -= px;
@@ -268,9 +256,11 @@ function updatePill() {
     if (icon) icon.className = paused ? 'lc lc-play' : 'lc lc-pause';
     const label = pill.querySelector('.viewer-slideshow-pill-label');
     if (label) {
+      const px = getScrollPxPerSec();
+      const sec = getIntervalSec();
       label.textContent = isScrollMode()
-        ? `${t('viewer.slideshow_scroll', null, '자동 스크롤')} · ${t(`viewer.slideshow_speed_${getSpeedKey()}`, null, getSpeedKey())}`
-        : `${t('viewer.slideshow', null, '슬라이드')} · ${t('viewer.slideshow_seconds', { n: getIntervalSec() }, `${getIntervalSec()}초`)}`;
+        ? `${t('viewer.slideshow_scroll', null, '자동 스크롤')} · ${t('viewer.slideshow_px_per_sec', { n: px }, `${px}px/초`)}`
+        : `${t('viewer.slideshow', null, '자동 넘김')} · ${t('viewer.slideshow_seconds', { n: sec }, `${sec}초`)}`;
     }
   }
   syncSlideshowControls();
@@ -296,36 +286,43 @@ export function syncSlideshowControls() {
   const row = document.getElementById('overlay-slideshow-row');
   if (row) row.style.display = isSlideshowSupportedFormat() ? 'flex' : 'none';
 
+  const toggleBtn = document.getElementById('btn-slideshow-toggle');
+  if (toggleBtn) toggleBtn.classList.toggle('active', running);
   const icon = document.querySelector('#btn-slideshow-toggle i');
   const label = document.getElementById('slideshow-toggle-label');
   if (icon) icon.className = running ? 'lc lc-square' : 'lc lc-play';
-  if (label) label.textContent = running ? t('viewer.slideshow_stop', null, '슬라이드 끄기') : t('viewer.slideshow_start', null, '슬라이드');
+  if (label) label.textContent = running ? t('viewer.slideshow_stop', null, '자동 넘김 끄기') : t('viewer.slideshow_start', null, '자동 넘김');
 
-  const intervalSelect = document.getElementById('viewer-slideshow-interval-select');
-  if (intervalSelect) {
-    if (!intervalSelect.options.length) {
-      INTERVAL_OPTIONS.forEach((sec) => {
-        const opt = document.createElement('option');
-        opt.value = String(sec);
-        opt.textContent = t('viewer.slideshow_interval_option', { n: sec }, `넘김 ${sec}초`);
-        intervalSelect.appendChild(opt);
-      });
-    }
-    intervalSelect.value = String(getIntervalSec());
-  }
+  fillPresetSelect(
+    document.getElementById('viewer-slideshow-interval-select'),
+    INTERVAL_PRESETS,
+    getIntervalSec(),
+    (sec) => t('viewer.slideshow_seconds', { n: sec }, `${sec}초`),
+  );
+  fillPresetSelect(
+    document.getElementById('viewer-slideshow-speed-select'),
+    SCROLL_PX_PRESETS,
+    getScrollPxPerSec(),
+    (px) => t('viewer.slideshow_px_per_sec', { n: px }, `${px}px/초`),
+  );
+}
 
-  const speedSelect = document.getElementById('viewer-slideshow-speed-select');
-  if (speedSelect) {
-    if (!speedSelect.options.length) {
-      Object.keys(SPEED_PX_PER_SEC).forEach((key) => {
-        const opt = document.createElement('option');
-        opt.value = key;
-        opt.textContent = `${t('viewer.slideshow_scroll', null, '자동 스크롤')} ${t(`viewer.slideshow_speed_${key}`, null, key)}`;
-        speedSelect.appendChild(opt);
-      });
-    }
-    speedSelect.value = getSpeedKey();
+// 프리셋에 없는 값(설정 화면에서 직접 입력한 값)도 선택돼 보이도록 그 값을 옵션으로 끼워 넣는다
+function fillPresetSelect(select, presets, current, labelOf) {
+  if (!select) return;
+  const values = presets.includes(current) ? presets : [...presets, current].sort((a, b) => a - b);
+  const key = values.join(',');
+  if (select.dataset.presetKey !== key) {
+    select.innerHTML = '';
+    values.forEach((value) => {
+      const opt = document.createElement('option');
+      opt.value = String(value);
+      opt.textContent = labelOf(value);
+      select.appendChild(opt);
+    });
+    select.dataset.presetKey = key;
   }
+  select.value = String(current);
 }
 
 // ── 다음 권 이어 재생 ──
@@ -401,7 +398,7 @@ async function goToNextVolume() {
       return;
     }
     if (!nextBook) {
-      toast(t('viewer.slideshow_last_volume', null, '마지막 권입니다. 슬라이드를 마칩니다.'), 'info');
+      toast(t('viewer.slideshow_last_volume', null, '마지막 권입니다. 자동 넘김을 마칩니다.'), 'info');
       stopSlideshow();
       return;
     }
@@ -425,7 +422,7 @@ async function goToNextVolume() {
 // ── 시작/정지 ──
 export function startSlideshow() {
   if (!isSlideshowSupportedFormat()) {
-    toast(t('viewer.slideshow_unsupported', null, '슬라이드는 만화와 PDF에서만 쓸 수 있습니다.'), 'info');
+    toast(t('viewer.slideshow_unsupported', null, '이 형식에서는 자동 넘김을 쓸 수 없습니다.'), 'info');
     return;
   }
   bindInteractionTracking();
@@ -496,3 +493,5 @@ export function onSlideshowViewerOpened(fmt, initPromise) {
 }
 
 window.toggleViewerSlideshow = toggleSlideshow;
+// viewer_txt.js가 스크롤 끝에서 자체 다음 권 확인창을 띄울지 판단할 때 쓴다 (순환 import 방지)
+window.isViewerSlideshowRunning = isSlideshowRunning;

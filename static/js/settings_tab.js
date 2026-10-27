@@ -7,6 +7,16 @@ import { loadPermissionsMatrix } from './settings/permissions.js';
 import { loadQueueStatus } from './settings/queue.js';
 import { loadMcpPendingChanges } from './settings/mcp_pending.js';
 import { loadExternalDomainsSettings } from './settings/external_domains.js';
+import {
+  INTERVAL_PRESETS,
+  SCROLL_PX_PRESETS,
+  getIntervalSec,
+  getScrollPxPerSec,
+  normalizeInterval,
+  normalizeScrollPx,
+  saveIntervalSec,
+  saveScrollPxPerSec,
+} from './viewer/slideshow_settings.js';
 
 export {
   applySettingsToUI,
@@ -290,6 +300,48 @@ function loadViewerSettings() {
     rightInput.value = padRight;
     document.getElementById('setting-viewer-padding-right-val').innerText = padRight;
   }
+
+  setSlideshowFieldValue('interval', getIntervalSec());
+  setSlideshowFieldValue('speed', getScrollPxPerSec());
+}
+
+// ── 자동 페이지 넘김: 슬라이더·숫자 입력·프리셋 칩이 같은 값을 가리키게 맞춘다 ──
+const SLIDESHOW_FIELDS = {
+  interval: { presets: INTERVAL_PRESETS, normalize: normalizeInterval, save: saveIntervalSec, chipKey: 'viewer.slideshow_seconds', chipFallback: (n) => `${n}초` },
+  speed: { presets: SCROLL_PX_PRESETS, normalize: normalizeScrollPx, save: saveScrollPxPerSec, chipKey: 'viewer.slideshow_px_per_sec', chipFallback: (n) => `${n}px/초` },
+};
+
+function renderSlideshowChips(field) {
+  const box = document.querySelector(`.viewer-slideshow-chips[data-slideshow-field="${field}"]`);
+  if (!box || box.childElementCount) return;
+  const conf = SLIDESHOW_FIELDS[field];
+  conf.presets.forEach((value) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'viewer-slideshow-chip';
+    chip.dataset.role = 'slideshow-setting-chip';
+    chip.dataset.slideshowField = field;
+    chip.dataset.value = String(value);
+    const translated = window.i18n?.t?.(conf.chipKey, { n: value });
+    chip.textContent = (translated && translated !== conf.chipKey) ? translated : conf.chipFallback(value);
+    box.appendChild(chip);
+  });
+}
+
+function setSlideshowFieldValue(field, value) {
+  const conf = SLIDESHOW_FIELDS[field];
+  const normalized = conf && conf.normalize(value);
+  if (normalized === null || normalized === undefined) return;
+  renderSlideshowChips(field);
+  document.querySelectorAll(`[data-slideshow-field="${field}"]`).forEach((el) => {
+    if (el.matches('input')) el.value = String(normalized);
+    else if (el.matches('.viewer-slideshow-chip')) el.classList.toggle('active', Number(el.dataset.value) === normalized);
+  });
+}
+
+function readSlideshowFieldValue(field) {
+  const input = document.querySelector(`input[data-role="slideshow-setting-number"][data-slideshow-field="${field}"]`);
+  return input ? SLIDESHOW_FIELDS[field].normalize(input.value) : null;
 }
 
 // 뷰어 여백 설정 저장
@@ -314,6 +366,11 @@ function submitViewerSettings(event) {
     localStorage.setItem('viewer_padding_left', padLeft);
     localStorage.setItem('viewer_padding_right', padRight);
     console.log('[Settings-Viewer] Saved Novel padding values to localStorage');
+
+    Object.keys(SLIDESHOW_FIELDS).forEach((field) => {
+      const value = readSlideshowFieldValue(field);
+      if (value !== null) setSlideshowFieldValue(field, SLIDESHOW_FIELDS[field].save(value));
+    });
 
     // 실시간 뷰어 여백 즉시 반영을 위해 통합 함수 대리 호출
     if (typeof window.applyViewerPaddingRealtime === 'function') {
@@ -347,6 +404,30 @@ if (!window.__viewerSettingsDelegationBound) {
     if (labelEl) {
       labelEl.innerText = target.value;
     }
+  }, true);
+
+  document.addEventListener('input', (event) => {
+    const target = event && event.target;
+    if (!target || !(target.matches instanceof Function)) return;
+    if (!target.matches('[data-role="slideshow-setting-range"]')) return;
+    setSlideshowFieldValue(target.dataset.slideshowField, target.value);
+  }, true);
+
+  // 숫자 입력은 다 친 뒤(change)에 범위를 맞춘다 - 입력 중에 "1"이 2로 바뀌지 않게
+  document.addEventListener('change', (event) => {
+    const target = event && event.target;
+    if (!target || !(target.matches instanceof Function)) return;
+    if (!target.matches('[data-role="slideshow-setting-number"]')) return;
+    setSlideshowFieldValue(target.dataset.slideshowField, target.value);
+  }, true);
+
+  document.addEventListener('click', (event) => {
+    const chip = event && event.target && event.target.closest instanceof Function
+      ? event.target.closest('[data-role="slideshow-setting-chip"]')
+      : null;
+    if (!chip) return;
+    event.preventDefault();
+    setSlideshowFieldValue(chip.dataset.slideshowField, chip.dataset.value);
   }, true);
 
   window.__viewerSettingsDelegationBound = true;

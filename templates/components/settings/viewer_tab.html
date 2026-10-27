@@ -120,6 +120,39 @@
                             </div>
                         </div>
 
+                        <!-- 1-1. 자동 페이지 넘김 (slideshow_settings.js와 같은 저장 키/범위) -->
+                        <div class="library-form-group" id="setting-slideshow-group"
+                            style="background: rgba(var(--app-panel-rgb), 0.5); border: 1px solid rgba(var(--app-panel-border-rgb), 0.08); padding: 1.1rem; border-radius: 8px; display: flex; flex-direction: column; gap: 0.9rem;">
+                            <div>
+                                <div style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.4rem;">
+                                    <i class="lc lc-play" style="color: #38bdf8;"></i> <span data-i18n="settings.viewer_slideshow_label">자동 페이지 넘김</span>
+                                </div>
+                                <p style="font-size: 0.78rem; color: var(--app-text-muted); margin: 0; line-height: 1.45;" data-i18n="settings.viewer_slideshow_desc">
+                                    뷰어에서 P 키를 누르거나 메뉴 '이동' 탭의 ▶ 자동 넘김 버튼을 누르면 켜집니다. 페이지 모드에서는 정한 간격마다 다음 페이지로, 스크롤 모드에서는 아래로 천천히 스크롤합니다. 만화·PDF·EPUB·TXT에서 쓸 수 있고, 권 끝에서는 다음 권으로 이어집니다.
+                                </p>
+                            </div>
+
+                            <div class="viewer-slideshow-setting" data-slideshow-setting="interval">
+                                <label for="setting-slideshow-interval-number" class="viewer-slideshow-setting-title" data-i18n="settings.viewer_slideshow_interval_label">페이지 모드: 넘김 간격</label>
+                                <div class="viewer-slideshow-setting-row">
+                                    <input type="range" id="setting-slideshow-interval-range" data-role="slideshow-setting-range" data-slideshow-field="interval" min="2" max="120" step="1" value="5">
+                                    <input type="number" id="setting-slideshow-interval-number" data-role="slideshow-setting-number" data-slideshow-field="interval" min="2" max="120" step="1" value="5" inputmode="numeric">
+                                    <span class="viewer-slideshow-setting-unit" data-i18n="settings.viewer_slideshow_unit_sec">초</span>
+                                </div>
+                                <div class="viewer-slideshow-chips" data-slideshow-field="interval"></div>
+                            </div>
+
+                            <div class="viewer-slideshow-setting" data-slideshow-setting="speed">
+                                <label for="setting-slideshow-speed-number" class="viewer-slideshow-setting-title" data-i18n="settings.viewer_slideshow_speed_label">스크롤 모드: 스크롤 속도</label>
+                                <div class="viewer-slideshow-setting-row">
+                                    <input type="range" id="setting-slideshow-speed-range" data-role="slideshow-setting-range" data-slideshow-field="speed" min="10" max="400" step="5" value="60">
+                                    <input type="number" id="setting-slideshow-speed-number" data-role="slideshow-setting-number" data-slideshow-field="speed" min="10" max="400" step="1" value="60" inputmode="numeric">
+                                    <span class="viewer-slideshow-setting-unit" data-i18n="settings.viewer_slideshow_unit_px">px/초</span>
+                                </div>
+                                <div class="viewer-slideshow-chips" data-slideshow-field="speed"></div>
+                            </div>
+                        </div>
+
 
                         <!-- 2. 모바일/PC 여백 적용 가이드 카드 (우측 빈공간 조화용 디자인 카드) -->
                         <div

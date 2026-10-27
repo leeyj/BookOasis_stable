@@ -6740,3 +6740,81 @@ body.book-selection-active .btn-card-info-toggle {
     margin: 0;
     line-height: 1.45;
 }
+
+/* 설정 > 뷰어: 자동 페이지 넘김 (슬라이더 + 숫자 + 프리셋 칩) */
+.viewer-slideshow-setting {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.viewer-slideshow-setting-title {
+    font-weight: 600;
+    color: var(--app-text-primary);
+    font-size: 0.85rem;
+}
+
+.viewer-slideshow-setting-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.viewer-slideshow-setting-row input[type="range"] {
+    flex: 1;
+    min-width: 0;
+    cursor: pointer;
+    accent-color: var(--app-accent);
+}
+
+.viewer-slideshow-setting-row input[type="number"] {
+    width: 5.5rem;
+    flex-shrink: 0;
+    text-align: right;
+    font-weight: 700;
+    background: rgba(var(--app-panel-rgb), 0.6);
+    border: 1px solid rgba(var(--app-panel-border-rgb), 0.1);
+    color: var(--app-text-primary);
+    padding: 0.45rem 0.6rem;
+    border-radius: 6px;
+    outline: none;
+}
+
+.viewer-slideshow-setting-row input[type="number"]:focus-visible {
+    border-color: var(--app-accent);
+}
+
+.viewer-slideshow-setting-unit {
+    flex-shrink: 0;
+    min-width: 2.2rem;
+    font-size: 0.8rem;
+    color: var(--app-text-muted);
+}
+
+.viewer-slideshow-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.viewer-slideshow-chip {
+    border: 1px solid rgba(var(--app-panel-border-rgb), 0.18);
+    background: transparent;
+    color: var(--app-text-secondary);
+    border-radius: 999px;
+    padding: 0.3rem 0.85rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.viewer-slideshow-chip:hover {
+    border-color: var(--app-accent);
+    color: var(--app-text-primary);
+}
+
+.viewer-slideshow-chip.active {
+    background: var(--app-accent);
+    border-color: var(--app-accent);
+    color: var(--app-accent-contrast);
+    font-weight: 600;
+}

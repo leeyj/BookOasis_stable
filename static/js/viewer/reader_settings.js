@@ -138,9 +138,10 @@ function syncComicPageStepUI() {
     label.textContent = scrollMode === 'scroll' ? '1장' : `${comicPageStep}장`;
   }
 
-  // 2쪽보기가 아니면 "한 장 밀기" 정렬 보정은 의미가 없다 - 버튼을 숨기고 상태도 리셋한다.
+  // 2쪽보기가 아니면 "한 장 밀기" 정렬 보정은 의미가 없다 - 행째로 숨기고 상태도 리셋한다.
   const shiftBtn = document.getElementById('btn-spread-shift');
-  if (shiftBtn) shiftBtn.style.display = isTwoPageActive ? '' : 'none';
+  const shiftRow = shiftBtn && (shiftBtn.closest('.vm-row') || shiftBtn);
+  if (shiftRow) shiftRow.style.display = isTwoPageActive ? '' : 'none';
   if (!isTwoPageActive && spreadShiftOffset !== 0) {
     resetSpreadShiftOffset();
   }

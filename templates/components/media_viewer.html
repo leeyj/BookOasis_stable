@@ -81,98 +81,112 @@
                         <button class="btn-overlay-action" data-role="viewer-action" data-action="jump-first"><i class="lc lc-skip-back"></i> <span data-i18n="viewer.from_beginning">처음부터</span></button>
                         <button class="btn-overlay-action" data-role="viewer-action" data-action="mark-completed"><i class="lc lc-circle-check"></i> <span data-i18n="viewer.mark_completed">읽음 완료</span></button>
                         <button class="btn-overlay-action" data-role="viewer-action" data-action="jump-last"><i class="lc lc-skip-forward"></i> <span data-i18n="viewer.to_last_page">마지막으로</span></button>
-                        <button class="btn-overlay-action btn-overlay-action-icon-only" id="btn-add-bookmark" data-role="viewer-action" data-action="add-bookmark" data-i18n-title="viewer.add_bookmark" title="북마크 추가"><i class="fa-solid fa-bookmark"></i></button>
+                        <button class="btn-overlay-action btn-overlay-action-icon-only" id="btn-add-bookmark" data-role="viewer-action" data-action="add-bookmark" data-i18n-title="viewer.add_bookmark" title="북마크 추가"><i class="fa-solid fa-bookmark"></i> <span data-i18n="viewer.menu_bookmark">북마크</span></button>
                         <button class="btn-overlay-action" id="btn-viewer-listen" data-role="viewer-action" data-action="listen" data-i18n-title="tts.viewer_listen_title" title="읽던 위치부터 음성으로 듣기" style="display: none;"><i class="lc lc-headphones"></i> <span data-i18n="tts.viewer_listen">듣기</span></button>
                     </div>
-                    <!-- 슬라이드(자동 진행): 만화/PDF 전용 (slideshow_controller.js가 표시/옵션 채움) -->
-                    <div class="overlay-controls-row overlay-slideshow-row" id="overlay-slideshow-row" style="display: none;">
-                        <button class="btn-overlay-action" id="btn-slideshow-toggle" data-role="viewer-action" data-action="slideshow-toggle" data-i18n-title="viewer.slideshow_title" title="자동으로 넘기기/스크롤 (P)"><i class="lc lc-play"></i> <span id="slideshow-toggle-label">슬라이드</span></button>
-                        <select id="viewer-slideshow-interval-select" data-role="viewer-action-change" data-action="slideshow-interval" class="overlay-select" data-i18n-title="viewer.slideshow_interval_title" title="페이지 모드: 넘김 간격"></select>
-                        <select id="viewer-slideshow-speed-select" data-role="viewer-action-change" data-action="slideshow-speed" class="overlay-select" data-i18n-title="viewer.slideshow_speed_title" title="스크롤 모드: 자동 스크롤 속도"></select>
+                    <!-- 자동 넘김(슬라이드): 만화/PDF/EPUB/TXT (slideshow_controller.js가 표시/옵션 채움) -->
+                    <div class="vm-list overlay-slideshow-row" id="overlay-slideshow-row" style="display: none;">
+                        <div class="vm-row">
+                            <span class="vm-row-label"><span id="vm-label-autoturn" data-i18n="viewer.menu_autoturn">자동 넘김</span> <kbd class="vm-kbd">P</kbd></span>
+                            <button class="vm-switch" id="btn-slideshow-toggle" role="switch" aria-labelledby="vm-label-autoturn" data-role="viewer-action" data-action="slideshow-toggle" data-i18n-title="viewer.slideshow_title" title="자동으로 넘기기/스크롤 (P)"><i class="lc lc-play"></i> <span id="slideshow-toggle-label">자동 넘김</span></button>
+                        </div>
+                        <div class="vm-row">
+                            <label class="vm-row-label" for="viewer-slideshow-interval-select" data-i18n="viewer.menu_autoturn_interval">넘김 간격 (페이지 모드)</label>
+                            <select id="viewer-slideshow-interval-select" data-role="viewer-action-change" data-action="slideshow-interval" class="overlay-select"></select>
+                        </div>
+                        <div class="vm-row">
+                            <label class="vm-row-label" for="viewer-slideshow-speed-select" data-i18n="viewer.menu_autoturn_speed">스크롤 속도 (스크롤 모드)</label>
+                            <select id="viewer-slideshow-speed-select" data-role="viewer-action-change" data-action="slideshow-speed" class="overlay-select"></select>
+                        </div>
                     </div>
                 </div>
 
-                <!-- 탭 2: 레이아웃 / 보기 방식 -->
+                <!-- 탭 2: 레이아웃 / 보기 방식 — 한 줄에 설정 하나(이름 ... 조작). 버튼 id/data-action은 예전 그대로라
+                     reader_settings.js 등이 켜짐(.active)만 바꾸면 스위치/선택지 모양이 따라 바뀐다. -->
                 <div class="overlay-tab-content" id="overlay-tab-layout">
-                    <div class="overlay-controls-row">
-                        <!-- 공용 스크롤 방식 선택 -->
-                        <div class="overlay-scroll-group" id="overlay-scroll-mode-group">
-                            <button id="btn-scroll-page" class="btn-overlay-fit active" data-role="viewer-action" data-action="scroll-mode" data-value="page" data-i18n-title="viewer.scroll_page" title="책장처럼 넘기기">
-                                <i class="lc lc-book-open"></i> <span data-i18n="viewer.page">페이지</span>
-                            </button>
-                            <button id="btn-scroll-continuous" class="btn-overlay-fit" data-role="viewer-action" data-action="scroll-mode" data-value="scroll" data-i18n-title="viewer.scroll_continuous" title="아래로 스크롤">
-                                <i class="lc lc-move-vertical"></i> <span data-i18n="viewer.scroll">스크롤</span>
-                            </button>
+                    <div class="vm-list">
+                        <div class="vm-row">
+                            <span class="vm-row-label" data-i18n="viewer.menu_flow">넘김 방식</span>
+                            <div class="vm-seg" id="overlay-scroll-mode-group">
+                                <button id="btn-scroll-page" class="btn-overlay-fit active" data-role="viewer-action" data-action="scroll-mode" data-value="page" data-i18n-title="viewer.scroll_page" title="책장처럼 넘기기"><span data-i18n="viewer.page">페이지</span></button>
+                                <button id="btn-scroll-continuous" class="btn-overlay-fit" data-role="viewer-action" data-action="scroll-mode" data-value="scroll" data-i18n-title="viewer.scroll_continuous" title="아래로 스크롤"><span data-i18n="viewer.scroll">스크롤</span></button>
+                            </div>
                         </div>
 
-                        <!-- 만화 맞춤 모드 -->
-                        <div class="overlay-fit-group" id="overlay-comic-fit-group">
-                            <button id="btn-overlay-fit-height" class="btn-overlay-fit active" data-role="viewer-action" data-action="comic-fit" data-value="height" data-i18n="viewer.fit_height_label">높이맞춤</button>
-                            <button id="btn-overlay-fit-width" class="btn-overlay-fit" data-role="viewer-action" data-action="comic-fit" data-value="width" data-i18n="viewer.fit_width_label">너비맞춤</button>
+                        <!-- 만화 전용 (lifecycle_controller.js가 표시 제어) -->
+                        <div class="vm-row" id="overlay-comic-fit-group">
+                            <span class="vm-row-label" data-i18n="viewer.menu_fit">화면 맞춤</span>
+                            <div class="vm-seg">
+                                <button id="btn-overlay-fit-height" class="btn-overlay-fit active" data-role="viewer-action" data-action="comic-fit" data-value="height" data-i18n="viewer.fit_height_label">높이맞춤</button>
+                                <button id="btn-overlay-fit-width" class="btn-overlay-fit" data-role="viewer-action" data-action="comic-fit" data-value="width" data-i18n="viewer.fit_width_label">너비맞춤</button>
+                            </div>
                         </div>
 
-                        <!-- 1장/2장 보기 -->
-                        <button id="btn-comic-page-step" class="btn-overlay-fit" data-role="viewer-action" data-action="toggle-page-step" title="1장/2장 보기 전환">
-                            <i class="lc lc-file-text"></i> <span id="comic-page-step-label">1장</span>
-                        </button>
+                        <div class="vm-row">
+                            <span class="vm-row-label" id="vm-label-two-page" data-i18n="viewer.menu_two_page">두 쪽 보기</span>
+                            <button id="btn-comic-page-step" class="vm-switch" role="switch" aria-labelledby="vm-label-two-page" data-role="viewer-action" data-action="toggle-page-step" title="1장/2장 보기 전환"><span id="comic-page-step-label">1장</span></button>
+                        </div>
 
                         <!-- 2쪽보기 정렬 한 장 밀기: 예) (9,10)(11,12)로 짝지어지던 스프레드를 (10,11)로 보정.
-                             2쪽보기일 때만 노출(reader_settings.js의 syncComicPageStepUI가 표시 제어). -->
-                        <button id="btn-spread-shift" class="btn-overlay-fit" data-role="viewer-action" data-action="shift-spread" data-i18n-title="viewer.shift_spread_title" title="두 페이지 짝을 한 장 밀어서 보기" style="display: none;">
-                            <i class="lc lc-move-horizontal"></i> <span data-i18n="viewer.shift_spread">한 장 밀기</span>
-                        </button>
+                             2쪽보기일 때만 노출(reader_settings.js의 syncComicPageStepUI가 이 행을 표시 제어). -->
+                        <div class="vm-row" id="vm-row-spread-shift" style="display: none;">
+                            <span class="vm-row-label" id="vm-label-spread-shift" data-i18n="viewer.menu_spread_shift">두 쪽 짝을 한 장 밀기</span>
+                            <button id="btn-spread-shift" class="vm-switch" role="switch" aria-labelledby="vm-label-spread-shift" data-role="viewer-action" data-action="shift-spread" data-i18n-title="viewer.shift_spread_title" title="두 페이지 짝을 한 장 밀어서 보기"></button>
+                        </div>
 
-                        <!-- 다음 버튼부터 줄바꿈 (컨트롤이 많아 한 줄에 다 안 들어감) -->
-                        <div class="overlay-row-break"></div>
+                        <div class="vm-row">
+                            <span class="vm-row-label" id="vm-label-split" data-i18n="viewer.menu_split">펼침 이미지 반씩 나눠 보기</span>
+                            <button id="btn-comic-split-spread" class="vm-switch" role="switch" aria-labelledby="vm-label-split" data-role="viewer-action" data-action="toggle-split-spread" data-i18n-title="viewer.split_spread_title" title="페이지 분할 보기 전환"><span id="comic-split-spread-label" data-i18n="viewer.split_spread_off">분할 끔</span></button>
+                        </div>
 
-                        <!-- 스프레드 이미지 좌/우 분할 보기 -->
-                        <button id="btn-comic-split-spread" class="btn-overlay-fit" data-role="viewer-action" data-action="toggle-split-spread" data-i18n-title="viewer.split_spread_title" title="페이지 분할 보기 전환">
-                            <i class="lc lc-columns-2"></i> <span id="comic-split-spread-label" data-i18n="viewer.split_spread_off">분할 끔</span>
-                        </button>
+                        <div class="vm-row">
+                            <span class="vm-row-label" id="vm-label-center-gap" data-i18n="viewer.menu_no_center_gap">두 쪽 보기 가운데 여백 없애기</span>
+                            <button id="btn-comic-center-gap" class="vm-switch" role="switch" aria-labelledby="vm-label-center-gap" data-role="viewer-action" data-action="toggle-center-gap" title="2장 보기 중앙 여백 토글"><span id="comic-center-gap-label" data-i18n="viewer.center_gap_show">중앙 여백</span></button>
+                        </div>
 
-                        <!-- 2장 보기 중앙 여백 토글 -->
-                        <button id="btn-comic-center-gap" class="btn-overlay-fit" data-role="viewer-action" data-action="toggle-center-gap" title="2장 보기 중앙 여백 토글">
-                            <i class="lc lc-grip-vertical"></i> <span id="comic-center-gap-label" data-i18n="viewer.center_gap_show">중앙 여백</span>
-                        </button>
+                        <div class="vm-row">
+                            <span class="vm-row-label" id="vm-label-rtl" data-i18n="viewer.menu_rtl">오른쪽에서 왼쪽으로 읽기</span>
+                            <button id="btn-comic-reading-direction" class="vm-switch" role="switch" aria-labelledby="vm-label-rtl" data-role="viewer-action" data-action="toggle-reading-direction" title="읽기 방향 전환"><span id="comic-reading-direction-label">왼쪽→오른쪽</span></button>
+                        </div>
 
-                        <!-- 읽기 방향 -->
-                        <button id="btn-comic-reading-direction" class="btn-overlay-fit" data-role="viewer-action" data-action="toggle-reading-direction" title="읽기 방향 전환">
-                            <i class="lc lc-arrow-left-right"></i> <span id="comic-reading-direction-label">왼쪽→오른쪽</span>
-                        </button>
+                        <div class="vm-row">
+                            <span class="vm-row-label" id="vm-label-tap-vertical" data-i18n="viewer.menu_tap_vertical">위/아래 탭으로 넘기기</span>
+                            <button id="btn-tap-zone-direction" class="vm-switch" role="switch" aria-labelledby="vm-label-tap-vertical" data-role="viewer-action" data-action="toggle-tap-zone-direction" data-i18n-title="viewer.tap_zone_direction" title="탭존 방향 전환 (좌/우 ↔ 상/하)"><span id="tap-zone-direction-label" data-i18n="viewer.tap_zone_horizontal">좌/우</span></button>
+                        </div>
 
-                        <!-- 탭존 방향 (좌/우 ↔ 상/하, 한손 파지 대응) -->
-                        <button id="btn-tap-zone-direction" class="btn-overlay-fit" data-role="viewer-action" data-action="toggle-tap-zone-direction" data-i18n-title="viewer.tap_zone_direction" title="탭존 방향 전환 (좌/우 ↔ 상/하)">
-                            <i class="lc lc-move-vertical"></i> <span id="tap-zone-direction-label" data-i18n="viewer.tap_zone_horizontal">좌/우</span>
-                        </button>
-
-                    </div>
-
-                    <!-- 이미지/PDF 너비 조절 슬라이더 (스크롤 모드일 때만 표시) -->
-                    <div class="overlay-width-row" id="overlay-width-row">
-                        <span class="overlay-width-label" data-i18n="viewer.image_width">크기 (너비):</span>
-                        <input
-                            type="range"
-                            id="comic-scroll-width-slider"
-                            class="comic-scroll-width-slider"
-                            min="400"
-                            max="1400"
-                            step="50"
-                            value="800"
-                            data-role="viewer-action-input" data-action="comic-scroll-width"
-                        >
-                        <span class="overlay-width-value" id="comic-scroll-width-label">800px</span>
+                        <!-- 이미지/PDF 너비 조절 슬라이더 (스크롤 모드일 때만 표시) -->
+                        <div class="vm-row overlay-width-row" id="overlay-width-row">
+                            <label class="vm-row-label overlay-width-label" for="comic-scroll-width-slider" data-i18n="viewer.menu_image_width">이미지 너비</label>
+                            <div class="vm-slider">
+                                <input
+                                    type="range"
+                                    id="comic-scroll-width-slider"
+                                    class="comic-scroll-width-slider"
+                                    min="400"
+                                    max="1400"
+                                    step="50"
+                                    value="800"
+                                    data-role="viewer-action-input" data-action="comic-scroll-width"
+                                >
+                                <span class="overlay-width-value" id="comic-scroll-width-label">800px</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- 탭 3: 텍스트 및 EPUB 뷰어 스타일 옵션 -->
+                <!-- 탭 3: 텍스트 및 EPUB 뷰어 스타일 옵션 (lifecycle_controller.js가 TXT/EPUB일 때만 표시) -->
                 <div class="overlay-tab-content" id="overlay-tab-style">
-                    <div class="overlay-controls-row" id="overlay-txt-controls-row">
-                        <div class="overlay-txt-group" id="overlay-txt-controls-group">
+                    <div class="vm-list" id="overlay-txt-controls-row">
+                        <div class="vm-row">
+                            <label class="vm-row-label" for="viewer-font-select" data-i18n="viewer.menu_font">글꼴</label>
                             <select id="viewer-font-select" data-role="viewer-action-change" data-action="font-family" class="overlay-select">
                                 <option value="gothic">나눔고딕</option>
                                 <option value="pretendard">Pretendard</option>
                             </select>
-                            <select id="viewer-theme-select" data-role="viewer-action-change" data-action="theme" class="overlay-select" title="배경색 선택">
+                        </div>
+                        <div class="vm-row">
+                            <label class="vm-row-label" for="viewer-theme-select" data-i18n="viewer.menu_theme">배경</label>
+                            <select id="viewer-theme-select" data-role="viewer-action-change" data-action="theme" class="overlay-select">
                                 <option value="epaper">E-Paper (순백/순검정)</option>
                                 <option value="white">화이트 (순백)</option>
                                 <option value="sepia">세피아 (미색)</option>
@@ -180,24 +194,35 @@
                                 <option value="dark">다크 (기본)</option>
                                 <option value="black">블랙 (OLED)</option>
                             </select>
-                            <select id="viewer-line-height-select" data-role="viewer-action-change" data-action="line-height" class="overlay-select" title="행간 조절">
-                                <option value="1.2">행간 1.2</option>
-                                <option value="1.4">행간 1.4</option>
-                                <option value="1.6">행간 1.6</option>
-                                <option value="1.8">행간 1.8 (기본)</option>
-                                <option value="2.0">행간 2.0</option>
-                                <option value="2.2">행간 2.2</option>
+                        </div>
+                        <div class="vm-row">
+                            <span class="vm-row-label" data-i18n="viewer.menu_font_size">글자 크기</span>
+                            <div class="vm-stepper">
+                                <button data-role="viewer-action" data-action="font-size" data-value="-1" data-i18n-title="viewer.font_smaller" title="글자 작게">−</button>
+                                <span class="vm-stepper-value" id="vm-font-size-value">100%</span>
+                                <button data-role="viewer-action" data-action="font-size" data-value="1" data-i18n-title="viewer.font_larger" title="글자 크게">+</button>
+                            </div>
+                        </div>
+                        <div class="vm-row">
+                            <label class="vm-row-label" for="viewer-line-height-select" data-i18n="viewer.menu_line_height">줄 간격</label>
+                            <select id="viewer-line-height-select" data-role="viewer-action-change" data-action="line-height" class="overlay-select">
+                                <option value="1.2">1.2</option>
+                                <option value="1.4">1.4</option>
+                                <option value="1.6">1.6</option>
+                                <option value="1.8">1.8</option>
+                                <option value="2.0">2.0</option>
+                                <option value="2.2">2.2</option>
                             </select>
-                            <select id="viewer-paragraph-spacing-select" data-role="viewer-action-change" data-action="paragraph-spacing" class="overlay-select" title="단락 간격 조절">
-                                <option value="0.5">단락 0.5em</option>
-                                <option value="1.0">단락 1.0em (기본)</option>
-                                <option value="1.5">단락 1.5em</option>
-                                <option value="2.0">단락 2.0em</option>
-                                <option value="2.5">단락 2.5em</option>
+                        </div>
+                        <div class="vm-row">
+                            <label class="vm-row-label" for="viewer-paragraph-spacing-select" data-i18n="viewer.menu_paragraph">문단 간격</label>
+                            <select id="viewer-paragraph-spacing-select" data-role="viewer-action-change" data-action="paragraph-spacing" class="overlay-select">
+                                <option value="0.5">0.5</option>
+                                <option value="1.0">1.0</option>
+                                <option value="1.5">1.5</option>
+                                <option value="2.0">2.0</option>
+                                <option value="2.5">2.5</option>
                             </select>
-                            <button data-role="viewer-action" data-action="font-size" data-value="-1" class="btn-overlay-fit" data-i18n-title="viewer.font_smaller" title="글자 작게">A-</button>
-                            <button data-role="viewer-action" data-action="font-size" data-value="1" class="btn-overlay-fit" data-i18n-title="viewer.font_larger" title="글자 크게">A+</button>
-                            <button data-role="viewer-action" data-action="toggle-theme-cycle" class="btn-overlay-fit" data-i18n-title="viewer.toggle_theme" title="배경 테마 순환 전환"><i class="lc lc-contrast"></i> <span id="viewer-theme-label">다크</span></button>
                         </div>
                     </div>
                 </div>

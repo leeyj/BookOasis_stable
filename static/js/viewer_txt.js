@@ -99,6 +99,7 @@ import { applyTxtSettingsCore, applyFontFamilyToElement as applyTxtFontFamily } 
 import {
   prevTxtPageAction,
   nextTxtPageAction,
+  isTxtAtLastPage,
   txtJumpToFirstPageAction,
   txtJumpToLastPageAction,
   txtSliderInputAction,
@@ -272,6 +273,8 @@ function setupTxtViewerRuntimeListeners() {
       const newIdx = Math.min(txtChunks.length - 1, Math.max(0, Math.floor(ratio * txtChunks.length)));
       const isAtAbsoluteEnd = scrollWrapper.scrollTop + scrollWrapper.clientHeight >= scrollWrapper.scrollHeight - 15;
       if (!isAtAbsoluteEnd || isTransitioning || txtScrollNextEpisodeTriggered || newIdx < txtChunks.length - 1) return;
+      // 자동 넘김 중에는 자동 넘김이 카운트다운 후 다음 권을 연다
+      if (window.isViewerSlideshowRunning?.()) return;
 
       isTransitioning = true;
       txtScrollNextEpisodeTriggered = true;
@@ -1342,6 +1345,24 @@ export const TxtViewer = {
   },
   nextPage() {
     nextTxtPage();
+  },
+  // 마지막 장의 마지막 화면인지 (자동 넘김이 권 끝을 판단할 때 사용)
+  isAtLastPage() {
+    const scrollWrapper = document.getElementById('txt-scroll-wrapper');
+    if (!scrollWrapper) return false;
+    const scrollMode = localStorage.getItem('viewer_scroll_mode') || 'page';
+    return isTxtAtLastPage({
+      scrollMode,
+      chunkIdx: currentChunkIdx,
+      chunkCount: txtChunks.length,
+      scrollLeft: scrollWrapper.scrollLeft,
+      scrollWidth: scrollWrapper.scrollWidth,
+      clientWidth: scrollWrapper.clientWidth,
+      pageStepWidth: scrollMode === 'page' ? getTxtPageAdvanceWidth(scrollWrapper) : 0,
+      scrollTop: scrollWrapper.scrollTop,
+      scrollHeight: scrollWrapper.scrollHeight,
+      clientHeight: scrollWrapper.clientHeight,
+    });
   },
   jumpTo(target) {
     if (target === 'first') {

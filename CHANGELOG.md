@@ -1,4 +1,8 @@
 # CHANGELOG
+## v3.0.5
+- (improvement) 뷰어 메뉴를 한 줄에 설정 하나(이름 … 스위치·선택지·[− 값 +])로 정리하고 패널 폭을 내용에 맞춤 | viewer menu reorganized into one setting per row (name … switch / choice / [− value +]) with the panel sized to its content
+- (improvement) 자동 넘김(구 슬라이드)을 EPUB/TXT에서도 쓸 수 있게 함, 넘김 간격(2~120초)·스크롤 속도(10~400px/초)를 자유롭게 조절하는 항목을 설정 > 뷰어에 추가 | auto page turn (formerly Slideshow) now works for EPUB/TXT; Settings > Viewer gets free page-turn interval (2-120s) and scroll speed (10-400px/s) controls
+
 ## v3.0.4
 - (fix) 구글 링크 카테고리의 웹툰 폴더에 새 회차가 올라오면 책은 등록되지만 커버가 비던 문제 수정 — 시리즈 대표 커버(kavita.yaml, 없으면 series.json 이미지)를 붙임 | fix new episodes in a webtoon folder of a Google link category being added without a cover — they now get the series cover (from kavita.yaml, or the series.json image)
 - (improvement) 카테고리 기본 속성에 '웹툰' 추가 — 웹툰 카테고리는 회차가 작품 대표 표지를 같이 쓰고, 표지가 빈 회차는 스캔 끝과 속성을 웹툰으로 바꿀 때 같은 폴더 회차의 표지로 채움(파일 안 받음) | add 'Webtoon' to the built-in category types — episodes in a webtoon category share the series cover, and episodes without a cover get the cover of another episode in the same folder at the end of a scan or when the category is switched to Webtoon (no file downloads)

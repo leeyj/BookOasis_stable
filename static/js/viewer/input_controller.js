@@ -1,6 +1,7 @@
 // input_controller.js - keyboard/wheel/hotspot/click input handlers for viewer
 import { state } from '../state.js';
 import { shouldUseAndroidHotspotTouchFallback } from './platform_profile.js';
+import { isSlideshowSupportedFormat } from './slideshow_controller.js';
 
 let _deps = {
   toggleFullscreenViewer: null,
@@ -122,12 +123,11 @@ function handleViewerKeydown(e) {
     return;
   }
 
-  // 슬라이드(자동 진행) 켜기/끄기 - 만화/PDF 전용. 사용자 지정 키와 겹치면 그쪽을 우선한다.
-  const fmtForSlideshow = (state.currentViewerFormat || '').toLowerCase();
+  // 자동 넘김(슬라이드) 켜기/끄기 - 만화/PDF/EPUB/TXT. 사용자 지정 키와 겹치면 그쪽을 우선한다.
   const isSlideshowKey = (rawKey === 'p' || codeKey === 'keyp') && !e.ctrlKey && !e.altKey && !e.metaKey;
   const isCustomMappedKey = [customNextKeys, customPrevKeys, customCloseKeys, customDashboardKeys]
     .some(keys => keys.includes(rawKey) || keys.includes(codeKey));
-  if (isSlideshowKey && !isCustomMappedKey && ['zip', 'cbz', 'imgdir', 'pdf'].includes(fmtForSlideshow)) {
+  if (isSlideshowKey && !isCustomMappedKey && isSlideshowSupportedFormat()) {
     e.preventDefault();
     window.toggleViewerSlideshow?.();
     return;
