@@ -32,6 +32,22 @@ export function stripHtml(html) {
   return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
 }
 
+// Read anchors must match rendered EPUB text. Decode character references after stripping tags,
+// without changing stripHtml's existing source-coordinate behavior for its other callers.
+export function decodeHtmlEntities(text) {
+  if (!text) return '';
+  if (typeof document === 'undefined') return String(text);
+  const textarea = document.createElement('textarea');
+  // textarea parses character references as text; escaping literal '<' also prevents markup
+  // interpretation, script execution, or resource loads from untrusted EPUB content.
+  textarea.innerHTML = String(text).replace(/</g, '&lt;');
+  return textarea.value;
+}
+
+export function stripHtmlForAnchor(html) {
+  return decodeHtmlEntities(stripHtml(html)).replace(/\s+/g, ' ').trim();
+}
+
 export function formatTxtToHtml(rawText) {
   const lines = rawText.split('\n');
   const htmlParts = [];

@@ -83,7 +83,7 @@ import { showViewerLoading, hideViewerLoading, showViewerError, showToast } from
 import { saveProgress } from './viewer_progress.js';
 import { initPageStep, initReadingDirection, getComicReadingDirection } from './viewer/reader_settings.js';
 import { getTxtPageAdvanceWidth, snapTxtPageScrollLeft, isTxtScrollLeftAtMaxPage, getTxtPageMaxScroll, applyTxtTwoPageTrailingSpacer, applyTxtImageMaxHeight } from './viewer/txt_page_utils.js';
-import { chunkText, formatTxtToHtml, stripHtml } from './viewer/txt_text_utils.js';
+import { chunkText, formatTxtToHtml, stripHtml, stripHtmlForAnchor } from './viewer/txt_text_utils.js';
 import { renderTxtChunkView, applyTxtParagraphStyles } from './viewer/txt_render.js';
 import {
   getTxtAnchorInfoByMode,
@@ -985,7 +985,7 @@ function currentReadPosition() {
   if (!info || !info.anchorText) return null;
   const idx = Number.isInteger(info.chunkIdx) ? info.chunkIdx : currentChunkIdx;
   if (state.currentViewerFormat === 'epub') {
-    const chapterText = stripHtml(txtChunks[idx] || '');
+    const chapterText = stripHtmlForAnchor(txtChunks[idx] || '');
     if (!chapterText) return null;
     const inChapter = findAnchorOffset(chapterText, info.anchorText, 0);
     return { chapter_idx: idx, char_offset: inChapter ?? 0, text_len: chapterText.length, anchor: info.anchorText };
@@ -1008,7 +1008,8 @@ export function getTxtAnchorInfo(forcedMode = null) {
     fullText,
     txtChunks,
     currentChunkIdx,
-    stripHtml
+    stripHtml,
+    stripHtmlForAnchor
   });
 }
 
@@ -1026,7 +1027,8 @@ export function restoreTxtAnchorInfo(anchorInfo) {
     isEpub,
     fullText,
     txtChunks,
-    stripHtml
+    stripHtml,
+    stripHtmlForAnchor
   });
 
   if (restored) {
