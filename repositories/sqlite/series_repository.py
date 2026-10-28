@@ -71,6 +71,91 @@ class SeriesRepository:
             conn.close()
 
     @staticmethod
+    def fetch_series_snapshot(db_type, library_id, path_prefix):
+        """경로 아래 도서의 요약 관련 값 {book_id: (series_key, series_name, has_cover, is_active, created_at)}.
+        즉시 스캔 전후를 비교해 바뀐 시리즈만 갱신할 때 쓴다. LIKE가 형제 폴더까지 잡아도 비교 대상이 늘 뿐이다."""
+        conn = database.get_connection(db_type)
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, COALESCE(NULLIF(series_name, ''), title) AS series_key, series_name,
+                       (cover_image IS NOT NULL AND cover_image != '') AS has_cover,
+                       (is_deleted = 0 OR is_deleted IS NULL) AS is_active, created_at
+                FROM books WHERE library_id = ? AND file_path LIKE ?
+            """, (library_id, path_prefix + '%'))
+            return {
+                row['id']: (row['series_key'], row['series_name'], bool(row['has_cover']),
+                            bool(row['is_active']), str(row['created_at'] or ''))
+                for row in cursor.fetchall()
+            }
+        finally:
+            conn.close()
+
+    @staticmethod
+    def refresh_summary_keys(db_type, keys):
+        """(library_id, series_key) 목록의 요약 줄만 전체 재생성과 같은 집계식으로 다시 계산한다.
+        요약이 아직 준비 안 됐거나 삭제 대기 카테고리면 None - 호출측이 전체 재생성으로 넘어간다."""
+        if db_type in ('audiobook', 'video'):
+            return 0
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT is_ready FROM series_summary_state WHERE id = 1")
+            state = cursor.fetchone()
+            if not (state and int(state['is_ready'] or 0)):
+                return None
+            library_ids = sorted({lib for lib, _key in keys})
+            if library_ids:
+                placeholders = ', '.join(['?'] * len(library_ids))
+                cursor.execute(f"SELECT COUNT(*) AS c FROM libraries WHERE pending_delete = 1 AND id IN ({placeholders})", library_ids)
+                if int(cursor.fetchone()['c'] or 0):
+                    return None
+            for library_id, series_key in keys:
+                cursor.execute("""
+                    SELECT rep.series_key, rep.rep_id, rep.series_book_count,
+                           COALESCE(b.series_name, '') AS sort_series_name, rep.latest_added
+                    FROM (
+                        SELECT COALESCE(NULLIF(b2.series_name, ''), b2.title) AS series_key,
+                               COALESCE(
+                                   MIN(CASE WHEN b2.cover_image IS NOT NULL AND b2.cover_image != '' THEN b2.id END),
+                                   MIN(b2.id)
+                               ) AS rep_id,
+                               COUNT(*) AS series_book_count,
+                               COALESCE(MAX(b2.created_at), '') AS latest_added
+                        FROM books b2
+                        WHERE b2.library_id = ?
+                          AND (b2.is_deleted = 0 OR b2.is_deleted IS NULL)
+                          AND (b2.series_name = ? OR ((b2.series_name IS NULL OR b2.series_name = '') AND b2.title = ?))
+                        GROUP BY COALESCE(NULLIF(b2.series_name, ''), b2.title)
+                    ) rep
+                    INNER JOIN books b ON b.id = rep.rep_id
+                """, (library_id, series_key, series_key))
+                row = cursor.fetchone()
+                if row:
+                    cursor.execute("""
+                        INSERT INTO series_summary (
+                            library_id, series_key, representative_book_id,
+                            series_book_count, sort_series_name, latest_added
+                        ) VALUES (?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(library_id, series_key) DO UPDATE SET
+                            representative_book_id = excluded.representative_book_id,
+                            series_book_count = excluded.series_book_count,
+                            sort_series_name = excluded.sort_series_name,
+                            latest_added = excluded.latest_added
+                    """, (library_id, row['series_key'], row['rep_id'], row['series_book_count'],
+                          row['sort_series_name'], row['latest_added']))
+                else:
+                    cursor.execute("DELETE FROM series_summary WHERE library_id = ? AND series_key = ?",
+                                   (library_id, series_key))
+            conn.commit()
+            return len(keys)
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    @staticmethod
     def _fetch_summary_rows(db_type, library_id, user_id, role, limit, offset, favorite_user_id, sort='asc', include_has_metadata=False, filter_mode='and', read_filter='', read_keys=None):
         """series_summary가 준비돼 있으면 그걸로 목록을 조회, 아니면 None(호출측이 실시간
         GROUP BY 경로로 폴백)."""

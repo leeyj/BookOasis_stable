@@ -331,13 +331,12 @@ def trigger_library_path_scan(library_id):
         )
 
         from tools.scanner.core import scan_library_path
-        scan_library_path(db_path, library_id, target_path, force=force)
-
         # 이 경로는 scanner_queue를 거치지 않는 동기 단건 스캔이라 큐 완료 처리(최근 추가 캐시 소거,
         # 시리즈 요약 테이블 재생성, 목록 캐시 무효화)가 실행되지 않는다 - 요약 테이블이 갱신되지 않으면
         # 새 도서가 검색에는 나와도 그리드에는 다음 큐 스캔 전까지 보이지 않았다.
-        from services.scan_refresh_service import refresh_after_direct_scan
-        refresh_after_direct_scan(db_type)
+        from services.scan_refresh_service import track_direct_scan
+        with track_direct_scan(db_type, library_id, target_path):
+            scan_library_path(db_path, library_id, target_path, force=force)
 
         return jsonify({'success': True, 'message': '지정한 경로의 스캔 및 등록이 완료되었습니다.'})
     except FileNotFoundError as e:

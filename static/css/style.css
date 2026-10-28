@@ -1041,6 +1041,32 @@ button, input, select, textarea {
     color: var(--app-accent-hover);
 }
 
+/* 로고 옆 [new:x.y.z] 업데이트 배지 (관리자에게만, tab_media_library.js checkAppUpdateBadge) */
+.app-update-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 0.15rem;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--app-accent-hover) 55%, transparent);
+    background: color-mix(in srgb, var(--app-accent-hover) 14%, transparent);
+    color: var(--app-accent-hover);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    line-height: 1.3;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.app-update-badge[hidden] {
+    display: none;
+}
+
+.app-update-badge:hover {
+    background: color-mix(in srgb, var(--app-accent-hover) 26%, transparent);
+}
+
 /* PC 사이드바 머리 줄: [☰][야자수 BookOasis] (2026-10-22, Plex처럼 ☰가 여닫는 메뉴 바로 위에 오게).
    ☰ 글리프는 아래 메뉴 아이콘 열(menu-item 왼쪽 여백 1rem)에 맞추고 로고는 그 오른쪽에 붙인다.
    HTML 인라인 justify-content:space-between을 덮어야 해서 !important. 모바일은 이 줄째 숨김(mobile.css) */

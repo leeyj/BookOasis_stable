@@ -85,13 +85,19 @@ function initLibraryShellDelegation() {
 
   document.addEventListener('click', (event) => {
     const target = event && event.target && typeof event.target.closest === 'function'
-      ? event.target.closest('[data-role="mobile-brand-home"], [data-role="sidebar-category-static"], [data-role="desktop-sidebar-toggle"], [data-role="library-search-action"], [data-role="library-open-filter"], [data-role="library-sort-toggle"], [data-role="library-type-toggle"], [data-role="grouping-mode-toggle"], [data-role="library-filter-reset"], [data-role="detail-back-to-list"]')
+      ? event.target.closest('[data-role="app-update-badge"], [data-role="mobile-brand-home"], [data-role="sidebar-category-static"], [data-role="desktop-sidebar-toggle"], [data-role="library-search-action"], [data-role="library-open-filter"], [data-role="library-sort-toggle"], [data-role="library-type-toggle"], [data-role="grouping-mode-toggle"], [data-role="library-filter-reset"], [data-role="detail-back-to-list"]')
       : null;
     if (!target) return;
 
     event.preventDefault();
 
     const role = target.getAttribute('data-role');
+    if (role === 'app-update-badge') {
+      return runAfterMobileSidebarClose(async () => {
+        await selectCategory('settings');
+        (await loadSettingsTab()).switchSettingsTab('about');
+      });
+    }
     if (role === 'mobile-brand-home') {
       return runAfterMobileSidebarClose(() => selectCategory('home'));
     }
@@ -349,6 +355,28 @@ function normalizeMediaType(val) {
   return null;
 }
 
+// 로고 옆 [new:x.y.z] 배지: GitHub(stable)에 더 높은 버전이 있으면 관리자에게만 보여준다.
+// 서버가 결과를 캐시하므로(성공 6시간/실패 30분) 부팅마다 불러도 GitHub을 매번 치지 않는다. 클릭 → 설정 > 정보
+async function checkAppUpdateBadge() {
+  if (!state.currentUser || state.currentUser.role !== 'admin') return;
+  const badge = document.querySelector('[data-role="app-update-badge"]');
+  if (!badge) return;
+  try {
+    const res = await fetch('/api/media/update-check');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.success || !data.can_update || !data.latest) return;
+    badge.textContent = `new:${data.latest}`;
+    badge.title = window.i18n
+      ? window.i18n.t('settings.about_update_badge_title', { current: data.current, latest: data.latest },
+        `업데이트 있음: v${data.current} → v${data.latest}`)
+      : `업데이트 있음: v${data.current} → v${data.latest}`;
+    badge.hidden = false;
+  } catch (e) {
+    // 배지는 부가 표시라 실패해도 조용히 넘어간다 (설정 > 정보에서 상태를 다시 볼 수 있음)
+  }
+}
+
 // 메인 초기화 함수
 async function initTabMediaLibrary() {
   // 부팅은 한 번만 - 진입 모듈이 다른 URL로 두 번 평가되면 리스너·초기 조회가 전부 두 번 돌았다(2.8.9).
@@ -381,6 +409,7 @@ async function initTabMediaLibrary() {
   });
 
   await loadInitialSystemSettings();
+  checkAppUpdateBadge();
 
   restoreDesktopSidebarState();
   initSidebarInteractions();

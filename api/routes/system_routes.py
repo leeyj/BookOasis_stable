@@ -4,6 +4,7 @@ system_routes.py – 시스템 상태, 큐, 정보 조회 라우터
 """
 import os
 import re
+import time
 import datetime
 from flask import Blueprint, request, jsonify, session
 from api.auth import admin_required, login_required, verify_webhook_token, webhook_token_required
@@ -362,16 +363,21 @@ def cancel_system_queue_task():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@system_bp.route('/api/media/about', methods=['GET'])
-def get_about_info():
-    if 'user_id' not in session:
-        return jsonify({'success': False, 'error': 'Login required'}), 401
-    """BookOasis 소프트웨어 정보 및 버전 데이터 리턴"""
+_GITHUB_VERSION_URL = 'https://raw.githubusercontent.com/leeyj/BookOasis_stable/main/VERSION'
+# 헤더 업데이트 배지가 페이지를 열 때마다 GitHub을 부르지 않도록 결과를 메모리에 둔다.
+# 실패도 짧게 캐시해 GitHub이 막힌 환경(오프라인/방화벽)에서 매번 5초씩 기다리지 않게 한다.
+_GITHUB_VERSION_TTL_OK = 6 * 3600
+_GITHUB_VERSION_TTL_FAIL = 30 * 60
+_GITHUB_VERSION_CACHE = {'value': None, 'checked_at': 0.0}
+
+
+def _read_local_version():
+    """로컬 VERSION 파일에서 (dashboard, state) 버전을 읽는다."""
     version_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '..', 'VERSION')
-    
+
     dashboard_ver = '0.2.6'
     state_ver = 'pre-alpha'
-    
+
     if os.path.exists(version_path):
         try:
             with open(version_path, 'r', encoding='utf-8') as f:
@@ -384,20 +390,22 @@ def get_about_info():
                         dashboard_ver = line_clean.split(':', 1)[1].strip()
                     elif line_clean.startswith('state:'):
                         state_ver = line_clean.split(':', 1)[1].strip()
-        except Exception as e:
+        except Exception:
             pass
-    
-    github_dashboard_ver = None
-    update_check = {
-        'can_update': False,
-        'reason': 'github_version_unavailable'
-    }
+    return dashboard_ver, state_ver
 
+
+def _get_github_dashboard_version(force=False):
+    """GitHub(stable) VERSION의 dashboard 버전. 실패 시 None (TTL 캐시)."""
+    now = time.time()
+    cached = _GITHUB_VERSION_CACHE
+    ttl = _GITHUB_VERSION_TTL_OK if cached['value'] else _GITHUB_VERSION_TTL_FAIL
+    if not force and cached['checked_at'] and now - cached['checked_at'] < ttl:
+        return cached['value']
+
+    github_dashboard_ver = None
     try:
-        req = Request(
-            'https://raw.githubusercontent.com/leeyj/BookOasis_stable/main/VERSION',
-            headers={'User-Agent': 'BookOasis/1.0'}
-        )
+        req = Request(_GITHUB_VERSION_URL, headers={'User-Agent': 'BookOasis/1.0'})
         with urlopen(req, timeout=5) as resp:
             text = resp.read().decode('utf-8', errors='replace')
             match = re.search(r'"dashboard"\s*:\s*"([^"]+)"', text)
@@ -405,6 +413,46 @@ def get_about_info():
                 github_dashboard_ver = match.group(1).strip()
     except Exception:
         github_dashboard_ver = None
+
+    cached['value'] = github_dashboard_ver
+    cached['checked_at'] = now
+    return github_dashboard_ver
+
+
+@system_bp.route('/api/media/update-check', methods=['GET'])
+@admin_required
+def get_update_check():
+    """헤더 업데이트 배지용: 현재 버전과 GitHub 최신 버전 비교 (캐시 사용)."""
+    current_ver, _ = _read_local_version()
+    latest_ver = _get_github_dashboard_version()
+    can_update = False
+    if latest_ver:
+        try:
+            can_update, _ = PluginService.can_update_to_github_version(current_ver, latest_ver)
+        except Exception:
+            can_update = False
+    return jsonify({
+        'success': True,
+        'current': current_ver,
+        'latest': latest_ver,
+        'can_update': bool(can_update),
+    })
+
+
+@system_bp.route('/api/media/about', methods=['GET'])
+def get_about_info():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'Login required'}), 401
+    """BookOasis 소프트웨어 정보 및 버전 데이터 리턴"""
+    dashboard_ver, state_ver = _read_local_version()
+
+    update_check = {
+        'can_update': False,
+        'reason': 'github_version_unavailable'
+    }
+
+    # 설정 > 정보 화면은 사용자가 직접 연 것이므로 캐시를 건너뛰고 새로 확인한다(배지 캐시도 같이 갱신)
+    github_dashboard_ver = _get_github_dashboard_version(force=True)
 
     if github_dashboard_ver:
         try:
@@ -493,10 +541,10 @@ def trigger_scan_via_webhook():
 
             db_path = get_db_path_for_scan(db_type)
             from tools.scanner.core import scan_library_path
-            scan_library_path(db_path, lib_id_int, target_path, force=force_requeue)
             # 큐를 거치지 않는 즉시 스캔이라 목록(시리즈 요약 테이블/캐시) 반영을 직접 한다
-            from services.scan_refresh_service import refresh_after_direct_scan
-            refresh_after_direct_scan(db_type)
+            from services.scan_refresh_service import track_direct_scan
+            with track_direct_scan(db_type, lib_id_int, target_path):
+                scan_library_path(db_path, lib_id_int, target_path, force=force_requeue)
 
             return jsonify({
                 'success': True,

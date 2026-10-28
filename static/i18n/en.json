@@ -485,6 +485,7 @@
     "about_load_failed": "Failed to load",
     "about_connection_error": "Connection error",
     "about_update_available": "Update available (current version is lower than GitHub version)",
+    "about_update_badge_title": "Update available: v{current} → v{latest} (click for details)",
     "about_update_not_required": "No update required (current version is latest or higher)",
     "about_update_status_failed": "Failed to check update status",
     "report_title": "Book Scan Error Report Viewer",

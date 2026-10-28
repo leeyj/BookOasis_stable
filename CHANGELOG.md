@@ -1,4 +1,10 @@
 # CHANGELOG
+## v3.0.6
+- (performance) 경로 지정 즉시 스캔(웹훅 path·scan-path·웹뷰 다운로드) 뒤 시리즈 목록 전체를 다시 만들지 않고 바뀐 시리즈만 갱신, 동시에 대기하던 전체 재생성은 이미 끝났으면 건너뜀 — 회차를 연달아 등록할 때 MariaDB가 쉬지 않던 문제 해결 | after a direct path scan (webhook path, scan-path, webview download) only the changed series are updated instead of rebuilding the whole series list, and a queued full rebuild is skipped if one already covered it — fixes MariaDB staying busy while episodes are added one after another
+- (performance) 웹뷰 다운로드가 회차 하나마다 카테고리 루트의 모든 책을 강제로 다시 처리하던 문제 수정(회차당 약 10초 → 0.3초) | fix webview downloads force-reprocessing every book in the category root for each episode (about 10s → 0.3s per episode)
+- (improvement) 새 버전이 나오면 관리자 화면 로고 옆에 [new:버전] 배지 표시(누르면 설정 > 정보) | admins see a [new:version] badge next to the logo when a newer release is out (click opens Settings > About)
+
+
 ## v3.0.5
 - (improvement) 뷰어 메뉴를 한 줄에 설정 하나(이름 … 스위치·선택지·[− 값 +])로 정리하고 패널 폭을 내용에 맞춤 | viewer menu reorganized into one setting per row (name … switch / choice / [− value +]) with the panel sized to its content
 - (improvement) 자동 넘김(구 슬라이드)을 EPUB/TXT에서도 쓸 수 있게 함, 넘김 간격(2~120초)·스크롤 속도(10~400px/초)를 자유롭게 조절하는 항목을 설정 > 뷰어에 추가 | auto page turn (formerly Slideshow) now works for EPUB/TXT; Settings > Viewer gets free page-turn interval (2-120s) and scroll speed (10-400px/s) controls
