@@ -56,6 +56,8 @@ const i18n = {
                 this.dictionary = await response.json();
                 this.currentLang = lang;
                 localStorage.setItem('bookoasis_lang', lang);
+                // 서버 메시지(utils/i18n.py의 _t)는 이 쿠키로 언어를 고른다 - 없으면 늘 한국어였다
+                try { document.cookie = `bookoasis_lang=${encodeURIComponent(lang)}; path=/; max-age=31536000; SameSite=Lax`; } catch (e) { /* 무시 */ }
             } else {
                 throw new Error(`Status ${response.status}`);
             }

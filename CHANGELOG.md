@@ -1,4 +1,15 @@
 # CHANGELOG
+## v3.0.7
+- (improvement) 플러그인 다운로드(`downloadToLibrary`, `/api/webview/download`)에 `folder`(시리즈 하위 폴더) 지정 추가 — 회차가 카테고리 루트에 쌓이지 않고 그 폴더만 스캔, 생략하면 예전처럼 루트에 저장 | plugin downloads (`downloadToLibrary`, `/api/webview/download`) accept a `folder` (series subfolder) — episodes no longer pile up in the category root and only that folder is scanned; without it files go to the root as before
+- (fix) 플러그인 다운로드 주소가 다른 주소로 넘어가면(리다이렉트) 넘어가기 전 주소로 파일 이름을 정해, 예를 들어 `…/11.epub.noimages`로 저장되어 책으로 등록되지 않던 문제 수정 — 마지막 주소의 이름(`pg11.epub`)을 씀 | fix plugin downloads naming the file after the pre-redirect URL (e.g. saved as `…/11.epub.noimages` and not added as a book) — the name now comes from the final URL (`pg11.epub`)
+- (improvement) http 주소(예: 192.168.x.x)로 접속하면 브라우저가 화면 켜짐 유지를 막아 자동 넘김 중 화면이 꺼질 수 있다는 안내를 처음 한 번 표시 | auto page turn shows a one-time notice that the screen may turn off when connected over http (e.g. 192.168.x.x), where browsers don't allow keeping the screen on
+- (fix) 영어로 설정해도 EPUB/TXT를 다시 열 때 '위치 복원 중...' 알림이 한국어로 나오던 문제 수정 | fix the 'Restoring position...' notice showing in Korean in English mode when reopening EPUB/TXT
+- (fix) 영어로 설정해도 한국어로 나오던 화면 문구 번역 — 컬렉션, 도서/오디오북/영상 상세(등급·연재 배지, 탭, 표), 카드 버튼, 우클릭 메뉴 알림, 뷰어(만화 보기 토글·배경/글꼴·목차/북마크·하이라이트), 오디오/영상 플레이어, TV 화면, 로그인/비밀번호 변경, 카테고리 정보·기본 속성 이름, 대시보드 목표·장르 집계, 플러그인 화면/다운로드 알림 | translate text that stayed Korean in English mode: collections, book/audiobook/video details (rating and status badges, tabs, tables), card buttons, context-menu notices, the viewer (comic toggles, background/font, contents/bookmarks, highlights), audio/video players, the TV screen, login/password change, category info and built-in kind names, dashboard goal and genre stats, plugin views and download notices
+- (fix) 서버가 보내는 메시지가 언어 설정과 관계없이 늘 한국어로 오던 문제 수정(언어 쿠키를 저장하지 않았음), 키 이름이 그대로 나오던 오류 메시지 5개 수정 | fix server messages always arriving in Korean regardless of the language setting (the language cookie was never stored), and five error messages that showed a raw key name
+- (fix) 검색창 안내 문구가 번역 사전보다 먼저 정해져 한국어로 남던 문제, 영어 화면에서 단축키 기록 중에도 검색 단축키가 동작하던 문제 수정 | fix the search box hint being set before translations loaded (stayed Korean), and the search shortcut firing while recording a shortcut in English mode
+- (improvement) TTS 플레이어 진단 로그를 영어로 통일 | TTS player diagnostic log in English
+
+
 ## v3.0.6
 - (performance) 경로 지정 즉시 스캔(웹훅 path·scan-path·웹뷰 다운로드) 뒤 시리즈 목록 전체를 다시 만들지 않고 바뀐 시리즈만 갱신, 동시에 대기하던 전체 재생성은 이미 끝났으면 건너뜀 — 회차를 연달아 등록할 때 MariaDB가 쉬지 않던 문제 해결 | after a direct path scan (webhook path, scan-path, webview download) only the changed series are updated instead of rebuilding the whole series list, and a queued full rebuild is skipped if one already covered it — fixes MariaDB staying busy while episodes are added one after another
 - (performance) 웹뷰 다운로드가 회차 하나마다 카테고리 루트의 모든 책을 강제로 다시 처리하던 문제 수정(회차당 약 10초 → 0.3초) | fix webview downloads force-reprocessing every book in the category root for each episode (about 10s → 0.3s per episode)

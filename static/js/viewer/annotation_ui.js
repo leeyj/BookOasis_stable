@@ -44,7 +44,7 @@ function ensureToggleButton() {
   btn = document.createElement('button');
   btn.id = TOGGLE_ID;
   btn.type = 'button';
-  btn.title = '형광펜 모드 켜기/끄기';
+  btn.title = i18n.t('viewer.highlight_toggle_title');
   btn.textContent = '🖍️';
   btn.style.cssText = [
     // 우측 중앙에 크게 떠 있으면 태블릿 해상도에서 본문을 가려 읽기 방해가 크므로 작은
@@ -102,7 +102,7 @@ export function setHighlightMode(active) {
   }
   if (typeof window.showToast === 'function') {
     window.showToast(
-      highlightModeActive ? '형광펜 모드 켜짐 — 텍스트를 드래그해 선택하세요' : '형광펜 모드 꺼짐',
+      highlightModeActive ? i18n.t('viewer.highlight_on') : i18n.t('viewer.highlight_off'),
       'info'
     );
   }
@@ -141,7 +141,7 @@ function ensureButton() {
   btn.id = BUTTON_ID;
   btn.type = 'button';
   btn.className = 'context-menu';
-  btn.textContent = '🖍️ 형광펜 추가';
+  btn.textContent = i18n.t('viewer.highlight_add');
   btn.style.cssText = [
     'display:none', 'padding:8px 14px', 'background:#1e293b', 'color:#fbbf24',
     'border:1px solid rgba(251,191,36,0.5)', 'border-radius:8px', 'font-size:0.85rem',
@@ -248,7 +248,7 @@ async function onAddHighlightClick() {
       addAnnotationLocal(created);
       wrapRangeWithMark(range, { id: created.id, color: created.color });
     } else if (typeof window.showToast === 'function') {
-      window.showToast(data && data.error ? data.error : '형광펜 추가에 실패했습니다.', 'error');
+      window.showToast(data && data.error ? data.error : i18n.t('viewer.highlight_add_failed'), 'error');
     }
   } catch (e) {
     console.error('[Annotation] create failed', e);
@@ -259,8 +259,8 @@ async function deleteAnnotationById(annotationId) {
   if (!annotationId) return;
   const annotation = getAnnotationById(annotationId);
   const confirmMsg = annotation && annotation.note
-    ? `이 하이라이트를 삭제할까요?\n메모: ${annotation.note}`
-    : '이 하이라이트를 삭제할까요?';
+    ? i18n.t('viewer.highlight_delete_confirm_note', { note: annotation.note })
+    : i18n.t('viewer.highlight_delete_confirm');
   if (!window.confirm(confirmMsg)) return;
 
   const dbType = state.currentLibraryType;

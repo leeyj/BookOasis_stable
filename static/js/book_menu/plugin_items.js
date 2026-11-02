@@ -196,7 +196,7 @@ export async function runBookContextPluginAction(target, pluginId, actionId) {
     // 한다(open_url이 있는 플러그인 액션 전용 placeholder — 없는 액션이면 아래에서 바로 닫음).
     pendingPopup = window.open('', '_blank');
     if (pendingPopup) {
-      pendingPopup.document.write('<!doctype html><title>작업 처리 중...</title><p>플러그인 작업을 처리하는 중입니다.</p>');
+      pendingPopup.document.write(`<!doctype html><title>${i18n.t('context_menu.plugin_working_title')}</title><p>${i18n.t('context_menu.plugin_working')}</p>`);
       pendingPopup.document.close();
     }
 
@@ -220,7 +220,7 @@ export async function runBookContextPluginAction(target, pluginId, actionId) {
       if (pendingPopup) {
         pendingPopup.close();
       }
-      vm.showToast(res && res.error ? res.error : '플러그인 작업 실행에 실패했습니다.', 'error');
+      vm.showToast(res && res.error ? res.error : i18n.t('context_menu.plugin_action_failed'), 'error');
       return;
     }
 
@@ -253,6 +253,6 @@ export async function runBookContextPluginAction(target, pluginId, actionId) {
     }
     console.error('플러그인 컨텍스트 메뉴 액션 실행 실패:', err);
     const vm = await import('../view_manager.js');
-    vm.showToast('플러그인 작업 실행 중 오류가 발생했습니다.', 'error');
+    vm.showToast(i18n.t('context_menu.plugin_action_error'), 'error');
   }
 }

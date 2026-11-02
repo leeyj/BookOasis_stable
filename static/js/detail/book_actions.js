@@ -3,7 +3,7 @@ import { state } from '../state.js';
 import * as api from '../api.js';
 
 // 전역 작업 차단 로딩 오버레이 헬퍼 (대량 삭제/긴 비동기 작업용)
-export function showGlobalLoadingSpinner(message = '처리 중입니다. 잠시만 기다려 주세요...') {
+export function showGlobalLoadingSpinner(message = i18n.t('detail.spinner_processing')) {
   let overlay = document.getElementById('global-loading-overlay');
   if (!overlay) {
     overlay = document.createElement('div');
@@ -29,7 +29,7 @@ export function showGlobalLoadingSpinner(message = '처리 중입니다. 잠시�
       <div style="background: rgba(var(--app-panel-rgb), 0.95); padding: 2rem 2.5rem; border-radius: 16px; border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); text-align: center; max-width: 90vw; width: 400px;">
         <i class="lc lc-loader-circle lc-spin" style="font-size: 2.5rem; color: var(--app-accent); margin-bottom: 1.2rem;"></i>
         <div id="global-loading-overlay-msg" style="font-size: 1rem; font-weight: 600; color: var(--app-text-primary); line-height: 1.5; word-break: keep-all;">${message}</div>
-        <div style="font-size: 0.8rem; color: var(--app-text-muted); margin-top: 0.8rem;">작업이 진행되는 동안 잠시만 기다려 주세요</div>
+        <div style="font-size: 0.8rem; color: var(--app-text-muted); margin-top: 0.8rem;">${i18n.t('detail.spinner_wait')}</div>
       </div>
     `;
     document.body.appendChild(overlay);
@@ -170,7 +170,7 @@ export async function rescanBook(event, bookId, seriesName, libraryId) {
     btn.disabled = false;
     btn.innerHTML = originalHtml;
     if (typeof window.showToast === 'function') {
-      window.showToast('서버 통신 중 오류가 발생했습니다.', 'error');
+      window.showToast(i18n.t('detail.server_comm_error'), 'error');
     }
   }
 }
@@ -237,7 +237,7 @@ export async function rescanMissingBooks(event, seriesName, libraryId) {
     btn.disabled = false;
     btn.innerHTML = originalHtml;
     if (typeof window.showToast === 'function') {
-      window.showToast('서버 통신 중 오류가 발생했습니다.', 'error');
+      window.showToast(i18n.t('detail.server_comm_error'), 'error');
     }
   }
 }
@@ -260,7 +260,7 @@ export async function rescanSeries(event, seriesName, libraryId) {
 
     if (bookIds.length === 0) {
       if (typeof window.showToast === 'function') {
-        window.showToast('재스캔할 도서가 없습니다.', 'info');
+        window.showToast(i18n.t('detail.no_books_to_rescan'), 'info');
       }
       btn.disabled = false;
       btn.innerHTML = originalHtml;
@@ -303,7 +303,7 @@ export async function rescanSeries(event, seriesName, libraryId) {
     btn.disabled = false;
     btn.innerHTML = originalHtml;
     if (typeof window.showToast === 'function') {
-      window.showToast('서버 통신 중 오류가 발생했습니다.', 'error');
+      window.showToast(i18n.t('detail.server_comm_error'), 'error');
     }
   }
 }

@@ -45,14 +45,14 @@ function ensureMenu() {
   menu.innerHTML = `
     <div class="context-menu-header">
       <span class="context-menu-header-left">
-        <span class="context-menu-drag-handle" data-role="annotation-context-drag" title="메뉴 위치 이동" aria-hidden="true"><i class="lc lc-grip-horizontal"></i></span>
-        <span class="context-menu-title">하이라이트 메뉴</span>
+        <span class="context-menu-drag-handle" data-role="annotation-context-drag" title="${i18n.t('viewer.menu_move')}" aria-hidden="true"><i class="lc lc-grip-horizontal"></i></span>
+        <span class="context-menu-title">${i18n.t('viewer.highlight_menu')}</span>
       </span>
-      <button type="button" class="context-menu-close-btn" data-role="annotation-context-close" aria-label="닫기"><span class="context-menu-close-icon">&times;</span><span class="context-menu-close-text">닫기</span></button>
+      <button type="button" class="context-menu-close-btn" data-role="annotation-context-close" aria-label="${i18n.t('common.close')}"><span class="context-menu-close-icon">&times;</span><span class="context-menu-close-text">${i18n.t('common.close')}</span></button>
     </div>
     <ul class="context-menu-list">
-      <li class="context-menu-item" data-role="annotation-context-delete"><i class="lc lc-trash" style="color: #f87171;"></i> <span>하이라이트 삭제</span></li>
-      <li class="context-menu-item context-menu-close-item" data-role="annotation-context-close"><i class="lc lc-x" style="color: #f87171;"></i> <span>닫기</span></li>
+      <li class="context-menu-item" data-role="annotation-context-delete"><i class="lc lc-trash" style="color: #f87171;"></i> <span>${i18n.t('viewer.highlight_delete')}</span></li>
+      <li class="context-menu-item context-menu-close-item" data-role="annotation-context-close"><i class="lc lc-x" style="color: #f87171;"></i> <span>${i18n.t('common.close')}</span></li>
     </ul>
   `;
   getModalRoot().appendChild(menu);
@@ -199,7 +199,7 @@ async function executeAnnotationAction(pluginId, actionId, target, extraContext)
 
     const vm = await import('../view_manager.js');
     if (!res || !res.success) {
-      vm.showToast(res && res.error ? res.error : '플러그인 작업 실행에 실패했습니다.', 'error');
+      vm.showToast(res && res.error ? res.error : i18n.t('context_menu.plugin_action_failed'), 'error');
       return;
     }
 
@@ -219,7 +219,7 @@ async function executeAnnotationAction(pluginId, actionId, target, extraContext)
       // 없이 조용히 실패하지 않도록 최소한 에러 토스트로는 알려준다.
       const opened = window.open(res.open_url, '_blank');
       if (!opened) {
-        vm.showToast('팝업이 차단되어 새 탭을 열지 못했습니다. 브라우저의 팝업 차단 설정을 확인해주세요.', 'error');
+        vm.showToast(i18n.t('context_menu.popup_blocked'), 'error');
       }
     }
 

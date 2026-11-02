@@ -599,7 +599,7 @@ export function initTxtViewer(bookId, initialPageIdx = 0) {
           .then(cRes => cRes.json())
           .then(cData => {
             hideViewerLoading();
-            txtChunks[startIdx] = cData.content || '<p>내용이 없습니다.</p>';
+            txtChunks[startIdx] = cData.content || `<p>${i18n.t('viewer.chunk_empty')}</p>`;
             
             initReadingDirection();
             renderCurrentChunk(true);
@@ -737,7 +737,7 @@ function showTxtRestoreLoadingToast(msg = null) {
   if (now - txtRestoreToastAt < 300) return;
   txtRestoreToastAt = now;
   if (typeof showToast === 'function') {
-    showToast(typeof msg === 'string' ? msg : '로딩중입니다', 'info');
+    showToast(typeof msg === 'string' ? msg : i18n.t('tv.loading'), 'info');
   }
 }
 
@@ -767,7 +767,7 @@ function renderCurrentChunk(initMode = false, onSettled) {
             setTimeout(() => awaitChapter(retriesLeft - 1, false), 200);
             return;
           } else {
-            txtChunks[requestedIdx] = '<p>내용이 없습니다.</p>';
+            txtChunks[requestedIdx] = `<p>${i18n.t('viewer.chunk_empty')}</p>`;
           }
           hideViewerLoading();
           if (currentChunkIdx === requestedIdx) {

@@ -28,25 +28,25 @@
 </head>
 <body>
 
-<button type="button" id="tv-drawer-toggle" class="tv-drawer-toggle" title="카테고리">
+<button type="button" id="tv-drawer-toggle" class="tv-drawer-toggle" title="카테고리" data-i18n-title="tv.categories">
     <i class="lc lc-menu"></i>
 </button>
 
-<button type="button" id="tv-account-badge" class="tv-account-badge" title="계정">
+<button type="button" id="tv-account-badge" class="tv-account-badge" title="계정" data-i18n-title="header.account">
     <i class="lc lc-user"></i>
-    <span id="tv-account-name">로그인</span>
+    <span id="tv-account-name" data-i18n="tv.login">로그인</span>
 </button>
 
 <div id="tv-account-popup" class="tv-account-popup" style="display:none;">
     <div id="tv-account-popup-user" style="display:none;">
         <div class="tv-account-popup-row"><span id="tv-account-popup-username"></span></div>
-        <button type="button" id="tv-account-logout-btn" class="tv-popup-btn"><i class="lc lc-log-out"></i> 로그아웃</button>
+        <button type="button" id="tv-account-logout-btn" class="tv-popup-btn"><i class="lc lc-log-out"></i> <span data-i18n="tv.logout">로그아웃</span></button>
     </div>
     <form id="tv-login-form" class="tv-login-form" style="display:none;">
-        <input type="text" id="tv-login-username" class="tv-login-input" placeholder="아이디" autocomplete="username" required>
-        <input type="password" id="tv-login-password" class="tv-login-input" placeholder="비밀번호" autocomplete="current-password" required>
+        <input type="text" id="tv-login-username" class="tv-login-input" placeholder="아이디" data-i18n-placeholder="tv.username" autocomplete="username" required>
+        <input type="password" id="tv-login-password" class="tv-login-input" placeholder="비밀번호" data-i18n-placeholder="tv.password" autocomplete="current-password" required>
         <div id="tv-login-error" class="tv-login-error" style="display:none;"></div>
-        <button type="submit" class="tv-popup-btn tv-popup-btn-primary"><i class="lc lc-log-in"></i> 로그인</button>
+        <button type="submit" class="tv-popup-btn tv-popup-btn-primary"><i class="lc lc-log-in"></i> <span data-i18n="tv.login">로그인</span></button>
     </form>
 </div>
 
@@ -54,14 +54,14 @@
 
 <div id="tv-drawer" class="tv-drawer">
     <div class="tv-drawer-header">
-        <span class="tv-drawer-header-title"><i class="lc lc-book"></i> 카테고리</span>
-        <button type="button" id="tv-drawer-close" class="tv-drawer-close" title="닫기">
+        <span class="tv-drawer-header-title"><i class="lc lc-book"></i> <span data-i18n="tv.categories">카테고리</span></span>
+        <button type="button" id="tv-drawer-close" class="tv-drawer-close" title="닫기" data-i18n-title="common.close">
             <i class="lc lc-x"></i>
         </button>
     </div>
     <div class="tv-drawer-body">
         <button type="button" id="tv-drawer-home" class="tv-drawer-item active">
-            <i class="lc lc-house"></i><span>홈</span>
+            <i class="lc lc-house"></i><span data-i18n="tv.home">홈</span>
         </button>
         <div id="tv-drawer-list" class="tv-drawer-list"></div>
     </div>
@@ -70,12 +70,12 @@
 <main id="tv-main" class="tv-main">
     <div id="tv-home-view" class="tv-view">
         <section class="tv-row">
-            <h2 class="tv-row-title"><i class="fa-solid fa-bookmark"></i> 이어보기</h2>
-            <div id="tv-row-history" class="tv-row-track"><div class="tv-row-loading">불러오는 중...</div></div>
+            <h2 class="tv-row-title"><i class="fa-solid fa-bookmark"></i> <span data-i18n="tv.continue">이어보기</span></h2>
+            <div id="tv-row-history" class="tv-row-track"><div class="tv-row-loading" data-i18n="tv.loading">불러오는 중...</div></div>
         </section>
         <section class="tv-row">
-            <h2 class="tv-row-title"><i class="fa-solid fa-star"></i> 최근 추가</h2>
-            <div id="tv-row-recent" class="tv-row-track"><div class="tv-row-loading">불러오는 중...</div></div>
+            <h2 class="tv-row-title"><i class="fa-solid fa-star"></i> <span data-i18n="tv.recent">최근 추가</span></h2>
+            <div id="tv-row-recent" class="tv-row-track"><div class="tv-row-loading" data-i18n="tv.loading">불러오는 중...</div></div>
         </section>
     </div>
 
@@ -84,14 +84,15 @@
             <h2 id="tv-category-title" class="tv-row-title"></h2>
             <button type="button" id="tv-sort-toggle" class="tv-sort-toggle">
                 <i class="lc lc-arrow-down-a-z"></i>
-                <span id="tv-sort-label">가나다 오름차순</span>
+                <span id="tv-sort-label" data-i18n="tv.sort_asc">가나다 오름차순</span>
             </button>
         </div>
         <div id="tv-category-grid" class="tv-grid"></div>
-        <button type="button" id="tv-category-more" class="tv-load-more" style="display:none;">더 보기</button>
+        <button type="button" id="tv-category-more" class="tv-load-more" style="display:none;" data-i18n="tv.more">더 보기</button>
     </div>
 </main>
 
+<script src="{{ static_asset_url('js/i18n.js') }}"></script>
 <script src="{{ static_asset_url('js/tv.js') }}"></script>
 </body>
 </html>

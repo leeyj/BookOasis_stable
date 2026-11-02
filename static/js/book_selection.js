@@ -27,7 +27,7 @@ function targetFromCard(card) {
   const parsedLibraryId = Number.parseInt(rawLibraryId, 10);
   return {
     id,
-    title: String(card.dataset.title || '도서'),
+    title: String(card.dataset.title || i18n.t('context_menu.book_default')),
     markUnreadScope: card.dataset.markUnreadScope || 'book',
     seriesName: String(card.dataset.seriesName || '').trim(),
     libraryId: Number.isFinite(parsedLibraryId) ? parsedLibraryId : null,
@@ -44,7 +44,7 @@ function setCardSelected(card, selected) {
   const button = card.querySelector('[data-role="book-card-select-toggle"]');
   if (button) {
     button.setAttribute('aria-pressed', selected ? 'true' : 'false');
-    button.setAttribute('aria-label', selected ? '선택 해제' : '작품 선택');
+    button.setAttribute('aria-label', selected ? i18n.t('book_list.deselect') : i18n.t('book_list.select_work'));
   }
 }
 
@@ -63,13 +63,13 @@ function ensureToolbar() {
 
   const hint = document.createElement('span');
   hint.className = 'book-selection-toolbar-hint';
-  hint.textContent = '선택한 작품을 우클릭해 일괄 작업';
+  hint.textContent = i18n.t('book_list.selection_hint');
 
   const clearButton = document.createElement('button');
   clearButton.type = 'button';
   clearButton.className = 'book-selection-clear';
   clearButton.dataset.role = 'book-selection-clear';
-  clearButton.innerHTML = '<i class="lc lc-x" aria-hidden="true"></i><span>선택 해제</span>';
+  clearButton.innerHTML = `<i class="lc lc-x" aria-hidden="true"></i><span>${i18n.t('book_list.deselect')}</span>`;
 
   toolbar.append(summary, hint, clearButton);
   document.body.append(toolbar);
@@ -83,7 +83,7 @@ function updateToolbar() {
   // 다중 선택 중에는 카드 정보 버튼 등 개별 카드 보조 버튼을 숨긴다 (CSS에서 이 클래스를 참조)
   document.body.classList.toggle('book-selection-active', count > 0);
   const summary = element.querySelector('[data-role="book-selection-summary"]');
-  if (summary) summary.textContent = `${count}개 선택`;
+  if (summary) summary.textContent = i18n.t('book_list.selected_count', { n: count });
 }
 
 function setSelected(card, selected) {

@@ -988,8 +988,8 @@ BookOasis는 외부 수신 서버로 도서 이벤트를 `POST` 전송할 수 �
 #### `[POST]` `/api/webview/download`
 * **설명**: URL의 파일을 서버가 대신 다운로드해 지정한 라이브러리의 물리 경로에 저장하고, 지원 확장자(`.zip .cbz .epub .pdf .txt`)면 즉시 스캐너로 임포트합니다.
 * **권한**: `@login_required` (+ 대상 `library_id`에 대한 사용자 접근 권한 필요, 실패 시 403)
-* **요청 파라미터**: `{"url": "https://...", "library_id": 12, "db_type": "general"}` (`db_type` 생략 시 `general`)
-* **응답 예시 (200 OK)**: `{"success": true, "filename": "book.epub", "imported_as_book": true}` — 지원 확장자가 아니면 `imported_as_book: false` + `warning: "unsupported_format"`, 임포트는 됐지만 스캔에 실패하면 `scan_error` 필드가 추가됩니다.
+* **요청 파라미터**: `{"url": "https://...", "library_id": 12, "db_type": "general", "folder": "시리즈명"}` (`db_type` 생략 시 `general`, `folder` 생략 시 라이브러리 루트에 저장. `folder`는 루트 아래 하위 폴더로 4단계까지, `..`·루트 밖 경로는 400)
+* **응답 예시 (200 OK)**: `{"success": true, "filename": "book.epub", "folder": "시리즈명", "imported_as_book": true}` — 지원 확장자가 아니면 `imported_as_book: false` + `warning: "unsupported_format"`, 임포트는 됐지만 스캔에 실패하면 `scan_error` 필드가 추가됩니다.
 * **응답 크기 제한**: 500MB
 
 ---

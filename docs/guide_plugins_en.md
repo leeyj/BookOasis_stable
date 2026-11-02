@@ -1271,21 +1271,23 @@ window.BookOasisPlugin.openWebview('https://example.com/some-page');
 - The server performs SSRF defense (blocks private/loopback IPs, re-validates every redirect hop, caps response size at 15MB), so some requests may still be rejected even for whitelisted domains.
 - If the response is HTML, a `<base href="original-site">` tag is auto-injected so relative image/CSS/JS/link URLs resolve against the original site instead of the proxy. This isn't a full asset rewriter (e.g. inline `style="background:url(...)"` isn't handled), so heavy SPA-style sites may still render incorrectly.
 
-### `window.BookOasisPlugin.downloadToLibrary(url, { libraryId, dbType })`
+### `window.BookOasisPlugin.downloadToLibrary(url, { libraryId, dbType, folder })`
 
 Downloads the file at the URL, saves it into the selected library's physical path, and immediately triggers a scan to import it.
 
 ```js
 window.BookOasisPlugin.downloadToLibrary('https://example.com/book.epub', {
   libraryId: 12,
-  dbType: 'general' // defaults to 'general' if omitted
+  dbType: 'general', // defaults to 'general' if omitted
+  folder: 'Solo Leveling' // optional: subfolder under the library root (up to 4 levels, e.g. 'Author/Series')
 });
 ```
 
 - Goes through the same whitelist check + SSRF defense (500MB response cap).
 - Fails if the calling user doesn't have access to the target library.
 - If the extension isn't one of the supported formats (`.zip .cbz .epub .pdf .txt`), the file is still saved but not imported as a book (`imported_as_book: false`).
-- Returns a Promise resolving to `{ success, filename, imported_as_book, warning?, scan_error? }`.
+- With `folder`, the file is saved in that subfolder (created if missing) and only that folder is scanned. Pass the series name for webtoons and other serials that keep adding episodes — without it files land in the root, and each episode's scan gets slower as the root grows. Characters not allowed in file names become `_`; `..` (`folder_traversal`), more than 4 levels (`folder_too_deep`) and paths that resolve outside the root (`folder_outside_root`) are rejected with 400.
+- Returns a Promise resolving to `{ success, filename, folder, imported_as_book, warning?, scan_error? }` (`folder` is the saved location relative to the root, empty for the root).
 
 ### `window.BookOasisPlugin.getProxyUrl(url)` / `getStreamProxyUrl(url)`
 

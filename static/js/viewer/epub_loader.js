@@ -127,7 +127,7 @@ export function requestEpubChapterContent(txtChunks, chapterIdx, options = {}) {
   return fetch(`/api/media/epub/chapter?db_type=${state.currentLibraryType}&book_id=${state.activeBookId}&chapter_idx=${idx}`)
     .then(r => r.json())
     .then(async d => {
-      const content = (d && d.content) ? d.content : '<p>내용이 없습니다.</p>';
+      const content = (d && d.content) ? d.content : `<p>${i18n.t('viewer.chunk_empty')}</p>`;
       txtChunks[idx] = content;
       epubChapterRetryState.delete(idx);
 
@@ -193,7 +193,7 @@ export function requestEpubChaptersBatch(txtChunks, chapterIndices) {
         if (!Number.isFinite(idx)) continue;
         receivedIdxSet.add(idx);
 
-        const content = ch.content || '<p>내용이 없습니다.</p>';
+        const content = ch.content || `<p>${i18n.t('viewer.chunk_empty')}</p>`;
         txtChunks[idx] = content;
         epubChapterRetryState.delete(idx);
 

@@ -68,11 +68,11 @@ function showVideoContextMenu(x, y, card, libraryId) {
 
   const title = card.getAttribute('data-video-title') || '';
   const titleEl = document.getElementById('video-ctx-title');
-  if (titleEl) titleEl.textContent = title || '강좌 메뉴';
+  if (titleEl) titleEl.textContent = title || i18n.t('book_list.video_course_menu');
 
   const favBtn = card.querySelector('[data-role="video-course-favorite"]');
   const favLabelEl = document.getElementById('video-ctx-favorite-label');
-  if (favLabelEl) favLabelEl.textContent = favBtn?.classList.contains('active') ? '즐겨찾기 해제' : '즐겨찾기 추가';
+  if (favLabelEl) favLabelEl.textContent = favBtn?.classList.contains('active') ? i18n.t('book_list.fav_remove') : i18n.t('book_list.fav_add');
 
   positionMenuAtPoint('video-context-menu', x, y, { zIndex: 20060 });
 }
@@ -101,12 +101,12 @@ function renderVideoCourseCards(videos, libraryId, emptyMessage) {
       <div class="book-card-cover">
         <div class="book-card-overlay"></div>
         <img src="/api/media/videos/${v.id}/cover" alt="${escapeHtml(v.title)}" decoding="async" loading="lazy" onload="this.classList.add('is-loaded')">
-        <div class="book-badge-count">${v.total_episodes || 0}편</div>
-        <button class="btn-card-fav-toggle" data-role="video-course-add-collection" title="컬렉션에 추가"
+        <div class="book-badge-count">${i18n.t('book_list.video_episodes', { n: v.total_episodes || 0 })}</div>
+        <button class="btn-card-fav-toggle" data-role="video-course-add-collection" title="${i18n.t('context_menu.add_to_collection')}"
                 style="position:absolute; top:8px; left:8px; background: rgba(var(--app-panel-rgb), 0.75); border:none; color:var(--app-accent-hover); width:1.9rem; height:1.9rem; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:2;">
           <i class="lc lc-folder-plus"></i>
         </button>
-        <button class="btn-card-fav-toggle ${isFav ? 'active' : ''}" data-role="video-course-favorite" data-next-status="${isFav ? 0 : 1}" title="즐겨찾기 토글"
+        <button class="btn-card-fav-toggle ${isFav ? 'active' : ''}" data-role="video-course-favorite" data-next-status="${isFav ? 0 : 1}" title="${i18n.t('detail.toggle_fav_book')}"
                 style="position:absolute; top:8px; right:8px; background: rgba(var(--app-panel-rgb), 0.75); border:none; color:${isFav ? '#eab308' : '#94a3b8'}; width:1.9rem; height:1.9rem; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:2;">
           <i class="${isFav ? 'fa-solid fa-star' : 'lc lc-star'}"></i>
         </button>
@@ -205,13 +205,13 @@ export async function loadVideoLibraryView() {
 export async function loadVideoCourseGrid(libraryId) {
   const container = document.getElementById('books-list-container');
   if (!container) return;
-  container.innerHTML = '<div class="loading-spinner">강좌 목록을 불러오는 중...</div>';
+  container.innerHTML = `<div class="loading-spinner">${i18n.t('book_list.video_loading')}</div>`;
 
   try {
     const res = await fetch(`/api/media/videos?library_id=${libraryId}&_=${Date.now()}`, { cache: 'no-store' });
     const data = await res.json();
     if (!data.success) {
-      container.innerHTML = `<div class="loading-spinner">강좌 목록을 불러오지 못했습니다: ${escapeHtml(data.error || '')}</div>`;
+      container.innerHTML = `<div class="loading-spinner">${i18n.t('book_list.video_load_failed', { error: escapeHtml(data.error || '') })}</div>`;
       return;
     }
 
@@ -229,10 +229,10 @@ export async function loadVideoCourseGrid(libraryId) {
     renderVideoCourseCards(
       visibleVideos,
       libraryId,
-      query ? '검색 결과가 없습니다.' : '이 라이브러리에는 아직 스캔된 강좌가 없습니다. 사이드바에서 우클릭(또는 메뉴)으로 스캔을 실행해 주세요.'
+      query ? i18n.t('filter.no_results') : i18n.t('book_list.video_empty_hint')
     );
   } catch (e) {
-    container.innerHTML = '<div class="loading-spinner">서버 요청 중 오류가 발생했습니다.</div>';
+    container.innerHTML = `<div class="loading-spinner">${i18n.t('book_list.video_server_error')}</div>`;
     console.error('[VideoLibrary] course list load failed:', e);
   }
 }
@@ -277,7 +277,7 @@ export function sortVideoCourses() {
   renderVideoCourseCards(
     visibleVideos,
     lastLoadedLibraryId,
-    query ? '검색 결과가 없습니다.' : '이 라이브러리에는 아직 스캔된 강좌가 없습니다.'
+    query ? i18n.t('filter.no_results') : i18n.t('book_list.video_empty')
   );
 }
 window.sortVideoCourses = sortVideoCourses;
@@ -295,7 +295,7 @@ export function filterVideoCourses() {
     : lastLoadedVideos;
 
   updateVideoTotalCount(filtered);
-  renderVideoCourseCards(filtered, lastLoadedLibraryId, query ? '검색 결과가 없습니다.' : '이 라이브러리에는 아직 스캔된 강좌가 없습니다.');
+  renderVideoCourseCards(filtered, lastLoadedLibraryId, query ? i18n.t('filter.no_results') : i18n.t('book_list.video_empty'));
 }
 
 window.loadVideoLibraryView = loadVideoLibraryView;

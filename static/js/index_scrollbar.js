@@ -89,9 +89,9 @@ async function handleIndexClick(char) {
   const sortDir = state.currentSortDirection || 'asc';
   if (sortDir !== 'asc' && sortDir !== 'desc') {
     if (window.i18n) {
-      alert(window.i18n.t('book_list.sort_required') || '이름(가나다) 정렬일 때만 사용할 수 있습니다.');
+      alert(window.i18n.t('book_list.sort_required') || i18n.t('book_list.index_name_sort_only'));
     } else {
-      alert('이름(가나다) 정렬일 때만 사용할 수 있습니다.');
+      alert(i18n.t('book_list.index_name_sort_only'));
     }
     return;
   }

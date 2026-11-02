@@ -720,7 +720,7 @@ export function createMiniPlayerUiController(deps) {
     const trackFooterEl = document.getElementById('audio-mini-track-footer');
     const trackListEl = document.getElementById('audio-mini-track-list');
 
-    if (titleEl) titleEl.textContent = meta.series_name || '오디오북';
+    if (titleEl) titleEl.textContent = meta.series_name || i18n.t('audio.default_title');
     if (subtitleEl) subtitleEl.textContent = track ? (track.title || `Track ${track.track_number || getCurrentTrackIndex() + 1}`) : (meta.author || 'BookOasis');
 
     if (trackFooterEl) {
@@ -728,9 +728,9 @@ export function createMiniPlayerUiController(deps) {
         const trackNo = Number(track.track_number) > 0 ? Number(track.track_number) : (getCurrentTrackIndex() + 1);
         const totalTracks = tracks.length > 0 ? tracks.length : trackNo;
         const trackTitle = track.title || `Track ${trackNo}`;
-        trackFooterEl.textContent = `트랙 ${trackNo}/${totalTracks} · ${trackTitle}`;
+        trackFooterEl.textContent = i18n.t('audio.track_footer', { no: trackNo, total: totalTracks, title: trackTitle });
       } else {
-        trackFooterEl.textContent = '트랙 정보 없음';
+        trackFooterEl.textContent = i18n.t('audio.no_track_info');
       }
     }
 

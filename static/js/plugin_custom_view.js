@@ -32,7 +32,7 @@ export async function mountCategoryPluginUI(pluginId) {
   container.innerHTML = `
     <div class="loading-spinner" style="padding: 4rem 1rem; text-align: center; color: var(--app-text-muted); width: 100%;">
       <i class="lc lc-loader-circle lc-spin lc-2x" style="color: var(--app-accent-hover);"></i>
-      <div style="margin-top: 1rem; font-size: 0.95rem;">플러그인 전용 화면을 불러오는 중...</div>
+      <div style="margin-top: 1rem; font-size: 0.95rem;">${i18n.t('plugin_view.loading')}</div>
     </div>
   `;
 
@@ -72,7 +72,7 @@ export async function mountCategoryPluginUI(pluginId) {
     if (requestToken !== pluginViewLoadToken) return;
 
     if (!data.success) {
-      container.innerHTML = `<div style="padding: 3rem; color: #ef4444; text-align: center; width: 100%;">플러그인 데이터를 불러오지 못했습니다: ${escapeHtml(data.error || '오류')}</div>`;
+      container.innerHTML = `<div style="padding: 3rem; color: #ef4444; text-align: center; width: 100%;">${i18n.t('plugin_view.load_failed', { error: escapeHtml(data.error || i18n.t('plugin_view.error')) })}</div>`;
       return;
     }
 
@@ -94,7 +94,7 @@ export async function mountCategoryPluginUI(pluginId) {
           <h2 style="margin: 0; color: var(--app-text-primary); font-size: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 0.6rem;">
             <i class="${icon}" style="color: var(--app-accent-hover);"></i> <span>${title}</span>
           </h2>
-          <span style="color: var(--app-text-muted); font-size: 0.85rem;">제공: ${escapeHtml(pluginInfo.name || 'BookOasis Plugin')}</span>
+          <span style="color: var(--app-text-muted); font-size: 0.85rem;">${i18n.t('plugin_view.provided_by', { name: escapeHtml(pluginInfo.name || 'BookOasis Plugin') })}</span>
         </div>
         <div id="custom-plugin-body-${pluginId}" class="custom-plugin-page-body" style="width: 100%; flex: 1;">
         </div>
@@ -110,7 +110,7 @@ export async function mountCategoryPluginUI(pluginId) {
 
   } catch (e) {
     console.error(`[PluginCustomView] Loading error (${pluginId}):`, e);
-    container.innerHTML = `<div style="padding: 3rem; color: #ef4444; text-align: center; width: 100%;">플러그인 뷰 로딩 중 오류가 발생했습니다. (${escapeHtml(e.message)})</div>`;
+    container.innerHTML = `<div style="padding: 3rem; color: #ef4444; text-align: center; width: 100%;">${i18n.t('plugin_view.load_error', { error: escapeHtml(e.message) })}</div>`;
   }
 }
 window.mountCategoryPluginUI = mountCategoryPluginUI;
@@ -136,8 +136,8 @@ function renderStatsDashboardCustomView(container, stats) {
           <i class="lc lc-book-open"></i>
         </div>
         <div>
-          <div style="color: var(--app-text-muted); font-size: 0.85rem; font-weight: 500;">총 보유 시리즈 / 도서</div>
-          <div style="color: var(--app-text-primary); font-size: 1.4rem; font-weight: 700; margin-top: 0.2rem;">${series} 시리즈 / ${books} 권</div>
+          <div style="color: var(--app-text-muted); font-size: 0.85rem; font-weight: 500;">${i18n.t('plugin_view.stat_owned')}</div>
+          <div style="color: var(--app-text-primary); font-size: 1.4rem; font-weight: 700; margin-top: 0.2rem;">${i18n.t('plugin_view.stat_owned_value', { series, books })}</div>
         </div>
       </div>
 
@@ -146,8 +146,8 @@ function renderStatsDashboardCustomView(container, stats) {
           <i class="lc lc-chart-line"></i>
         </div>
         <div>
-          <div style="color: var(--app-text-muted); font-size: 0.85rem; font-weight: 500;">주간 완독 현황</div>
-          <div style="color: var(--app-text-primary); font-size: 1.4rem; font-weight: 700; margin-top: 0.2rem;">이번주 ${weekCompleted} 권</div>
+          <div style="color: var(--app-text-muted); font-size: 0.85rem; font-weight: 500;">${i18n.t('plugin_view.stat_week')}</div>
+          <div style="color: var(--app-text-primary); font-size: 1.4rem; font-weight: 700; margin-top: 0.2rem;">${i18n.t('plugin_view.stat_week_value', { n: weekCompleted })}</div>
         </div>
       </div>
 
@@ -156,8 +156,8 @@ function renderStatsDashboardCustomView(container, stats) {
           <i class="lc lc-circle-check"></i>
         </div>
         <div>
-          <div style="color: var(--app-text-muted); font-size: 0.85rem; font-weight: 500;">월간 완독 도서</div>
-          <div style="color: var(--app-text-primary); font-size: 1.4rem; font-weight: 700; margin-top: 0.2rem;">이번달 ${monthCompleted} 권</div>
+          <div style="color: var(--app-text-muted); font-size: 0.85rem; font-weight: 500;">${i18n.t('plugin_view.stat_month')}</div>
+          <div style="color: var(--app-text-primary); font-size: 1.4rem; font-weight: 700; margin-top: 0.2rem;">${i18n.t('plugin_view.stat_month_value', { n: monthCompleted })}</div>
         </div>
       </div>
 
@@ -166,7 +166,7 @@ function renderStatsDashboardCustomView(container, stats) {
           <i class="lc lc-file-text"></i>
         </div>
         <div>
-          <div style="color: var(--app-text-muted); font-size: 0.85rem; font-weight: 500;">주간 읽은 페이지 수</div>
+          <div style="color: var(--app-text-muted); font-size: 0.85rem; font-weight: 500;">${i18n.t('plugin_view.stat_pages')}</div>
           <div style="color: var(--app-text-primary); font-size: 1.4rem; font-weight: 700; margin-top: 0.2rem;">${weekPages} Page</div>
         </div>
       </div>
@@ -174,24 +174,24 @@ function renderStatsDashboardCustomView(container, stats) {
 
     <!-- 포맷 분석 영역 -->
     <div style="background: rgba(var(--app-panel-rgb), 0.4); border: 1px solid rgba(var(--app-panel-border-rgb), 0.05); border-radius: 12px; padding: 1.5rem;">
-      <h3 style="margin: 0 0 1rem 0; color: var(--app-text-muted); font-size: 1.1rem;">보유 미디어 파일 포맷 분석</h3>
+      <h3 style="margin: 0 0 1rem 0; color: var(--app-text-muted); font-size: 1.1rem;">${i18n.t('plugin_view.formats_title')}</h3>
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
         <div style="background: rgba(var(--app-panel-rgb), 0.6); border-radius: 8px; padding: 1rem; text-align: center;">
           <div style="color: #38bdf8; font-size: 1.5rem; font-weight: 700;">${zipCnt.toLocaleString()}</div>
-          <div style="color: var(--app-text-muted); font-size: 0.8rem; margin-top: 0.2rem;">압축 파일 (ZIP/CBZ/RAR)</div>
+          <div style="color: var(--app-text-muted); font-size: 0.8rem; margin-top: 0.2rem;">${i18n.t('plugin_view.format_archive')}</div>
         </div>
         <div style="background: rgba(var(--app-panel-rgb), 0.6); border-radius: 8px; padding: 1rem; text-align: center;">
           <div style="color: var(--app-accent); font-size: 1.5rem; font-weight: 700;">${epubCnt.toLocaleString()}</div>
-          <div style="color: var(--app-text-muted); font-size: 0.8rem; margin-top: 0.2rem;">전자책 (EPUB/TXT)</div>
+          <div style="color: var(--app-text-muted); font-size: 0.8rem; margin-top: 0.2rem;">${i18n.t('plugin_view.format_ebook')}</div>
         </div>
         <div style="background: rgba(var(--app-panel-rgb), 0.6); border-radius: 8px; padding: 1rem; text-align: center;">
           <div style="color: #4ade80; font-size: 1.5rem; font-weight: 700;">${pdfCnt.toLocaleString()}</div>
-          <div style="color: var(--app-text-muted); font-size: 0.8rem; margin-top: 0.2rem;">문서 파일 (PDF)</div>
+          <div style="color: var(--app-text-muted); font-size: 0.8rem; margin-top: 0.2rem;">${i18n.t('plugin_view.format_pdf')}</div>
         </div>
         ${(m4bCnt || mp3Cnt) ? `
         <div style="background: rgba(var(--app-panel-rgb), 0.6); border-radius: 8px; padding: 1rem; text-align: center;">
           <div style="color: #fb923c; font-size: 1.5rem; font-weight: 700;">${(m4bCnt + mp3Cnt).toLocaleString()}</div>
-          <div style="color: var(--app-text-muted); font-size: 0.8rem; margin-top: 0.2rem;">오디오북 (M4B/MP3)</div>
+          <div style="color: var(--app-text-muted); font-size: 0.8rem; margin-top: 0.2rem;">${i18n.t('plugin_view.format_audiobook')}</div>
         </div>
         ` : ''}
       </div>
@@ -201,15 +201,15 @@ function renderStatsDashboardCustomView(container, stats) {
 
 function renderCustomPluginGridItems(container, items) {
   if (!items || items.length === 0) {
-    container.innerHTML = '<div style="padding: 3rem; color: var(--app-text-muted); text-align: center;">표시할 항목이 없습니다.</div>';
+    container.innerHTML = `<div style="padding: 3rem; color: var(--app-text-muted); text-align: center;">${i18n.t('tv.empty_row')}</div>`;
     return;
   }
 
   let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1.5rem; width: 100%;">';
   items.forEach(item => {
     const cover = item.cover || item.image || item.image_url || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=100&auto=format&fit=crop&q=60';
-    const title = escapeHtml(item.title || '제목 없음');
-    const author = escapeHtml(item.author || item.artist || '저자 미상');
+    const title = escapeHtml(item.title || i18n.t('tv.untitled'));
+    const author = escapeHtml(item.author || item.artist || i18n.t('plugin_view.unknown_author'));
     const link = item.link || item.url || '#';
     const isExternal = link && link !== '#';
 

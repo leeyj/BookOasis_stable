@@ -3,7 +3,7 @@
 // 생성/재생 엔진(생성 대기열 + AheadPlanner, <audio> 하나로 src 교체, 예상 밖 일시정지 자동 재개,
 // mediaSession, 조각 안 오프셋 이어 듣기, 위치 서버 동기화)은 실폰에서 검증된 실험 페이지
 // (templates/experimental_tts.html)와 같은 동작을 그대로 옮겼다. 진단 정보는 LOG 오버레이로 뺐다.
-// 화면 문구는 i18n(static/i18n/*.json의 tts.*)으로, LOG 오버레이의 진단 로그는 개발용이라 한국어 그대로 둔다.
+// 화면 문구는 i18n(static/i18n/*.json의 tts.*)으로, LOG 오버레이의 진단 로그는 개발용이라 영어로 쓴다(로그 영어 통일).
 import { ort, loadCfgs, loadTextProcessor, loadVoiceStyle, TextToSpeech, writeWavFile } from '/static/lib/supertonic/st_helper.js';
 import {
   MODEL_BASE, MODEL_FALLBACK_BASE, MODEL_REVISION, ONNX_MODELS, VOICES, modelUrl, htmlToText, segmentForTts, pieceAtOffset,
@@ -105,24 +105,24 @@ function inferExclusive(fn) {
 
 // ---- 환경 ----
 async function detectEnv() {
-  let webgpu = '없음';
+  let webgpu = 'none';
   if (navigator.gpu) {
     try {
       const a = await navigator.gpu.requestAdapter();
-      webgpu = a ? `있음${a.info?.vendor ? ` (${a.info.vendor} ${a.info.architecture || ''})` : ''}` : '어댑터 없음';
-    } catch (e) { webgpu = '오류: ' + e.message; }
+      webgpu = a ? `yes${a.info?.vendor ? ` (${a.info.vendor} ${a.info.architecture || ''})` : ''}` : 'no adapter';
+    } catch (e) { webgpu = 'error: ' + e.message; }
   }
   const threads = self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 1) : 1;
   ort.env.wasm.wasmPaths = '/tts/ort/';
   ort.env.wasm.numThreads = threads;
   if (!self.isSecureContext) $('insecure').hidden = false;
   kv($('env'), {
-    'HTTPS': self.isSecureContext ? '예' : '아니오',
-    '교차 출처 격리': self.crossOriginIsolated ? `예 (WASM ${threads}스레드)` : '아니오 (WASM 1스레드)',
+    'HTTPS': self.isSecureContext ? 'yes' : 'no',
+    'Cross-origin isolated': self.crossOriginIsolated ? `yes (WASM ${threads} threads)` : 'no (WASM 1 thread)',
     'WebGPU': webgpu,
-    '모델 캐시': 'caches' in self ? '사용 가능' : '불가',
+    'Model cache': 'caches' in self ? 'available' : 'unavailable',
   });
-  return webgpu.startsWith('있음');
+  return webgpu.startsWith('yes');
 }
 
 // ---- 도서 ----
@@ -176,7 +176,7 @@ async function loadText() {
       segments = segmentForTts(text, MAX_PIECE_CHARS);
     }
     if (book.chapter !== from && !isFiller(segments)) {
-      log(`${from + 1}~${book.chapter}번째 항목은 그림이나 제목만 있어 건너뜀`);
+      log(`Skipped items ${from + 1}-${book.chapter}: images or headings only`);
       toast(t('skipped_images'));
       S.syncApplied = true; // 동기화 위치는 건너뛴 항목 기준이라 새 항목에는 맞지 않는다
       try { storage?.setItem(lastChapterKey(dbType, bookId), String(book.chapter)); } catch (e) { /* 무시 */ }
@@ -201,8 +201,8 @@ async function loadText() {
     if (synced.notice) toast(t(synced.notice));
   }
   $('seek').max = String(Math.max(0, S.pieces.length - 1));
-  const at = S.cur || S.pendingOffset ? `, ${S.cur + 1}번째 조각 ${S.pendingOffset.toFixed(1)}초부터` : '';
-  log(`본문 ${text.length.toLocaleString()}자 → ${S.pieces.length.toLocaleString()}조각${at}${synced ? ` (${synced.source})` : ''}`);
+  const at = S.cur || S.pendingOffset ? `, from piece ${S.cur + 1} at ${S.pendingOffset.toFixed(1)}s` : '';
+  log(`Text ${text.length.toLocaleString()} chars → ${S.pieces.length.toLocaleString()} pieces${at}${synced ? ` (${synced.source})` : ''}`);
   renderText();
   renderNow({ instant: true });
   updateControls();
@@ -233,15 +233,15 @@ function syncStartPiece(text) {
   if (!st || S.syncApplied || !S.segments.length) return null;
   S.syncApplied = true;
   if (st.latest === 'read') {
-    return { piece: pieceAtOffset(S.segments, resolveOffset(text, st.read)), notice: 'started_at_read', source: '읽던 위치' };
+    return { piece: pieceAtOffset(S.segments, resolveOffset(text, st.read)), notice: 'started_at_read', source: 'read position' };
   }
   if (st.latest === 'listen') {
-    return { piece: pieceAtOffset(S.segments, resolveOffset(text, st.listen)), source: '듣던 위치' };
+    return { piece: pieceAtOffset(S.segments, resolveOffset(text, st.listen)), source: 'listen position' };
   }
   if (st.latest === 'legacy' && book.format === 'txt' && st.legacy.pages_read > 0) {
     const starts = chunkStarts(chunkText(text, 4000));
     const offset = starts[Math.min(starts.length - 1, st.legacy.pages_read - 1)] || 0;
-    return { piece: pieceAtOffset(S.segments, offset), notice: 'started_at_read', source: '읽던 페이지' };
+    return { piece: pieceAtOffset(S.segments, offset), notice: 'started_at_read', source: 'read page' };
   }
   return null;
 }
@@ -329,7 +329,7 @@ function loadHanjaReadings() {
   if (!hanjaPromise) {
     hanjaPromise = loadSharedHanja().then((readings) => {
       hanjaReadings = readings;
-      if (!readings) log('한자 변환표를 받지 못함 — 한자는 그대로 읽습니다');
+      if (!readings) log('Hanja reading table not loaded — Hanja is read as is');
     });
   }
   return hanjaPromise;
@@ -352,7 +352,7 @@ async function loadModel(hasWebGpu, cached) {
   try {
     const bufs = [];
     for (const m of ONNX_MODELS) {
-      log(`${m}.onnx 받는 중`);
+      log(`Downloading ${m}.onnx`);
       const { buffer, fromCache, attempts, fromFallback } = await resumableFetch(modelUrl(`onnx/${m}.onnx`), {
         cache,
         fallbackUrl: `${MODEL_FALLBACK_BASE}/onnx/${m}.onnx`,
@@ -365,8 +365,8 @@ async function loadModel(hasWebGpu, cached) {
         },
       });
       fromCacheAll = fromCacheAll && fromCache;
-      if (attempts > 1) log(`${m}.onnx: 끊겨서 ${attempts - 1}번 이어 받음`);
-      if (fromFallback) log(`${m}.onnx: HF 직접 다운로드가 막혀 서버에서 받음`);
+      if (attempts > 1) log(`${m}.onnx: resumed ${attempts - 1} time(s) after interruptions`);
+      if (fromFallback) log(`${m}.onnx: direct HF download blocked, fetched via server`);
       bufs.push(buffer);
     }
     const dlSec = (performance.now() - td) / 1000;
@@ -385,30 +385,30 @@ async function loadModel(hasWebGpu, cached) {
           sessions.push(await ort.InferenceSession.create(new Uint8Array(bufs[i]), { executionProviders: [ep], graphOptimizationLevel: 'all' }));
         }
         used = ep; break;
-      } catch (e) { log(`${ep} 세션 실패: ${e.message}`); }
+      } catch (e) { log(`${ep} session failed: ${e.message}`); }
     }
-    if (!used) throw new Error('모든 백엔드에서 세션 생성 실패');
+    if (!used) throw new Error('Session creation failed on every backend');
     const onnxDir = `${MODEL_BASE}/onnx`;
     if (ort.env.wasm.proxy) sessions = sessions.map(copyingInputs);
     S.tts = new TextToSpeech(await loadCfgs(onnxDir), await loadTextProcessor(onnxDir), ...sessions);
     kv($('loadInfo'), {
-      '백엔드': used.toUpperCase(),
-      '다운로드': fromCacheAll ? `브라우저 캐시에서 ${dlSec.toFixed(1)}초` : `${dlSec.toFixed(1)}초`,
-      '세션 준비': `${((performance.now() - ts) / 1000).toFixed(1)}초`,
+      'Backend': used.toUpperCase(),
+      'Download': fromCacheAll ? `${dlSec.toFixed(1)}s from browser cache` : `${dlSec.toFixed(1)}s`,
+      'Session ready': `${((performance.now() - ts) / 1000).toFixed(1)}s`,
     });
-    log(`모델 준비 완료 (${used})`);
+    log(`Model ready (${used})`);
     // WASM은 음질 8이면 실시간보다 느리다(iPad 0.9배 → 조각마다 끊김, 4면 1.6배 — 2026-09-27 실측).
     // 다른 기기(WebGPU)에서 이어받은 8도 여기서 4로 내린다. 이 기기에서 직접 8을 고르는 건 막지 않는다.
     if (used === 'wasm' && settings.steps > WASM_MAX_STEPS) {
       settings.steps = WASM_MAX_STEPS;
-      log(`WASM이라 음질을 ${WASM_MAX_STEPS}로 맞춤`);
+      log(`WASM: quality capped at ${WASM_MAX_STEPS}`);
     }
     $('modelCard').hidden = true;
     updateControls();
     if (autoplayWanted) setTimeout(startAutoplay, 0);
     if (S.genNeedsModel && S.active) { S.genNeedsModel = false; generatorLoop(S.token); }
   } catch (e) {
-    log('모델 로드 실패: ' + e.message);
+    log('Model load failed: ' + e.message);
     $('mcTitle').textContent = t('model_failed');
     $('mcSub').textContent = e.message;
     $('loadBtn').textContent = t('model_retry');
@@ -472,10 +472,10 @@ function refreshServerAudio() {
       const found = await lookupKeys(keys.map((_, i) => i), token);
       if (!found) return;
       S.server = found;
-      if (found.size) log(`서버 음성 사용: ${found.size}/${pieces.length}조각`);
+      if (found.size) log(`Using server audio: ${found.size}/${pieces.length} pieces`);
       updateControls();
     } catch (e) {
-      log(`서버 음성 조회 실패: ${e.message}`);
+      log(`Server audio lookup failed: ${e.message}`);
     }
   })();
   return S.serverReady;
@@ -508,7 +508,7 @@ async function refreshServerWindow(ahead = 200) {
 async function waitForServerPiece(i, token, maxSec = 40) {
   if (serverWaitGaveUp || !serverIsMaking() || !serverKeys[i]) return false;
   const until = performance.now() + maxSec * 1000;
-  log(`${i + 1}번째 조각을 서버가 만드는 중 — 기다립니다`);
+  log(`Server is generating piece ${i + 1} — waiting`);
   while (performance.now() < until) {
     await new Promise((r) => setTimeout(r, 4000));
     if (token !== S.token) return false;
@@ -517,7 +517,7 @@ async function waitForServerPiece(i, token, maxSec = 40) {
     if (!serverIsMaking()) break;
   }
   serverWaitGaveUp = true;
-  log('서버 조각을 기다리다 포기 — 이번에는 기기에서 만듭니다');
+  log('Gave up waiting for the server piece — generating on this device');
   return false;
 }
 
@@ -525,10 +525,10 @@ async function waitForServerPiece(i, token, maxSec = 40) {
 async function ensureModelForGeneration() {
   if (S.tts) return true;
   if (await modelCached()) {
-    log('서버에 없는 조각 — 모델을 불러옵니다');
+    log('Piece not on server — loading the model');
     await loadModel(env.hasWebGpu, true);
   } else {
-    log('서버에 없는 조각 — 모델 받기가 필요합니다');
+    log('Piece not on server — model download needed');
     $('modelCard').hidden = false;
   }
   return !!S.tts;
@@ -595,10 +595,10 @@ async function requestPregen() {
     });
     pregen.job = data.job;
     serverWaitGaveUp = false;
-    log(`서버 미리 만들기 요청: ${data.pieceCount}조각 (${data.created ? '새 작업' : '진행 중인 작업'})`);
+    log(`Server pre-generation requested: ${data.pieceCount} pieces (${data.created ? 'new job' : 'job in progress'})`);
     toast(t('pregen_requested'));
   } catch (e) {
-    log(`서버 미리 만들기 요청 실패: ${e.message}`);
+    log(`Server pre-generation request failed: ${e.message}`);
     toast(t('pregen_request_failed', { error: e.message }));
   } finally {
     pregen.busy = false;
@@ -673,11 +673,11 @@ async function generatorLoop(token) {
       result = await inferExclusive(() => S.tts._infer([input], ['ko'], style, steps, speed));
       // 엔진이 가끔 거의 무음을 낸다 — 초기 노이즈가 랜덤이라 다시 만들면 대부분 정상 (한 번만)
       if (token === S.token && isNearSilent(result.wav, S.tts.sampleRate, result.duration[0])) {
-        log(`${i + 1}번째 조각이 거의 무음 — 다시 생성`);
+        log(`Piece ${i + 1} is nearly silent — regenerating`);
         result = await inferExclusive(() => S.tts._infer([input], ['ko'], style, steps, speed));
       }
     } catch (e) {
-      log(`${i + 1}번째 조각 생성 실패: ${e.message} — 건너뜀`);
+      log(`Piece ${i + 1} generation failed: ${e.message} — skipped`);
       S.genNext = i + 1; continue;
     }
     if (token !== S.token) return; // 그 사이 위치가 바뀌었으면 버린다
@@ -690,7 +690,7 @@ async function generatorLoop(token) {
     S.genSec += genSec; S.audioSec += audioSec;
     S.genNext = i + 1;
     renderStats();
-    if (document.hidden || i < 3) log(`생성 #${i + 1} ${genSec.toFixed(1)}초${document.hidden ? ' (화면 꺼짐 중)' : ''}`);
+    if (document.hidden || i < 3) log(`Generated #${i + 1} ${genSec.toFixed(1)}s${document.hidden ? ' (screen off)' : ''}`);
     if (S.waiting && S.cur === i) playCurrent();
   }
 }
@@ -710,7 +710,7 @@ function playCurrent() {
   // 재생 시작/위치 이동 직후의 첫 대기는 끊김이 아니라 준비 시간이므로 세지 않는다
   if (S.waiting && S.stallStart !== null && S.playedInRun) {
     S.stalls++;
-    log(`끊김 ${((performance.now() - S.stallStart) / 1000).toFixed(1)}초 후 재개`);
+    log(`Resumed after a ${((performance.now() - S.stallStart) / 1000).toFixed(1)}s stall`);
   }
   S.waiting = false; S.stallStart = null; S.playedInRun = true; S.resumeTries = 0;
   S.listened = true;
@@ -721,9 +721,9 @@ function playCurrent() {
   S.pendingOffset = 0;
   if (offset > 0 && offset < clip.audioSec - 0.5) {
     player.addEventListener('loadedmetadata', () => { player.currentTime = offset; }, { once: true });
-    log(`${S.cur + 1}번째 조각 ${offset.toFixed(1)}초부터 재생`);
+    log(`Playing piece ${S.cur + 1} from ${offset.toFixed(1)}s`);
   }
-  player.play().catch((e) => log(`재생 실패 #${S.cur + 1}: ${e.name} ${e.message}`));
+  player.play().catch((e) => log(`Playback failed #${S.cur + 1}: ${e.name} ${e.message}`));
   renderStatus(); renderPlayBtn();
 }
 
@@ -762,7 +762,7 @@ async function startAutoplay() {
   try {
     await S.primePromise;
   } catch (e) {
-    log(`자동 재생이 막힘 (${e.name}) — 탭해서 듣기 표시`);
+    log(`Autoplay blocked (${e.name}) — showing tap to listen`);
     S.active = false; S.token++; wakeGenerator(); clearClips(); S.waiting = false;
     player.pause();
     renderPlayBtn(); renderStatus();
@@ -786,7 +786,7 @@ function togglePlay() {
   } else if (isPausedByUser() && !S.waiting) {
     S.userPaused = false;
     S.resumeTries = 0;
-    player.play().catch((e) => log('재생 실패: ' + e.message));
+    player.play().catch((e) => log('Playback failed: ' + e.message));
   } else {
     // 생성 대기 중에 누르면 멈춘다 (다시 누르면 그 자리에서 이어서)
     S.userPaused = true;
@@ -808,12 +808,12 @@ function onFinished() {
   reportListen(true, false, true); // 끝까지 들은 위치를 바로 저장 → 진행도 100%, 완독
   savePosition(storage, positionKey(dbType, bookId, book.chapter), 0, { total: S.pieces.length, finished: true });
   if (book.format === 'epub' && $('autoNext').checked && book.chapter + 1 < book.chapters.length) {
-    log('챕터 끝 — 다음 챕터로');
+    log('End of chapter — next chapter');
     changeChapter(book.chapter + 1, true);
   } else {
     // 책 끝: 뒤에 읽을 글자 없는 항목(판권·뒤표지)만 남아 마지막 챕터까지 못 가도 완독으로 기록한다
     if (S.listened && (book.format !== 'epub' || book.chapter + 1 >= book.chapters.length)) reportBookEnd();
-    S.active = false; log('끝까지 읽었습니다'); toast(t('finished'));
+    S.active = false; log('Reached the end'); toast(t('finished'));
     renderPlayBtn(); renderStatus();
   }
 }
@@ -836,12 +836,12 @@ player.addEventListener('pause', () => {
   if (player.dataset.prime === '1' || player.ended || !S.active || S.userPaused || S.waiting) return;
   const clip = S.clips.get(S.cur);
   if (!clip || player.src !== clip.url) return; // 위치 이동 중
-  if (S.resumeTries >= 3) { log(`자동 재개 포기 #${S.cur + 1}`); return; }
+  if (S.resumeTries >= 3) { log(`Gave up auto-resume #${S.cur + 1}`); return; }
   S.resumeTries++;
   setTimeout(() => {
     if (!player.paused || S.userPaused || !S.active) return;
-    log(`예상 밖 일시정지 → 자동 재개 시도 ${S.resumeTries} #${S.cur + 1}${document.hidden ? ' (화면 꺼짐)' : ''}`);
-    player.play().catch((e) => log(`자동 재개 실패: ${e.name} ${e.message}`));
+    log(`Unexpected pause → auto-resume attempt ${S.resumeTries} #${S.cur + 1}${document.hidden ? ' (screen off)' : ''}`);
+    player.play().catch((e) => log(`Auto-resume failed: ${e.name} ${e.message}`));
   }, 300);
 });
 player.addEventListener('playing', () => { S.userPaused = false; });
@@ -861,8 +861,8 @@ player.addEventListener('timeupdate', () => {
 });
 window.addEventListener('pagehide', () => { saveOffset(); reportListen(true, true); });
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { saveOffset(); reportListen(true, true); log('화면 꺼짐/백그라운드'); return; }
-  log('화면 다시 보임');
+  if (document.hidden) { saveOffset(); reportListen(true, true); log('Screen off / background'); return; }
+  log('Screen visible again');
   renderNow({ instant: true }); // 꺼져 있는 동안은 강조/스크롤을 건너뛰었다
 });
 player.addEventListener('pause', () => { if (S.userPaused) reportListen(true); });
@@ -873,14 +873,14 @@ for (const ev of ['ended', 'playing', 'pause', 'waiting', 'stalled', 'error']) {
     if (player.dataset.prime === '1') return;
     if (ev === 'playing' && !document.hidden) return;
     const err = ev === 'error' && player.error ? ` code=${player.error.code}` : '';
-    log(`[audio] ${ev} #${S.cur + 1} @${player.currentTime.toFixed(1)}s${document.hidden ? ' (화면 꺼짐)' : ''}${err}`);
+    log(`[audio] ${ev} #${S.cur + 1} @${player.currentTime.toFixed(1)}s${document.hidden ? ' (screen off)' : ''}${err}`);
   });
 }
 let beat = performance.now();
 setInterval(() => {
   const now = performance.now();
   const lag = now - beat - 1000;
-  if (lag > 1500) log(`메인 스레드 ${(lag / 1000).toFixed(1)}초 지연${document.hidden ? ' (화면 꺼짐)' : ''}`);
+  if (lag > 1500) log(`Main thread lagged ${(lag / 1000).toFixed(1)}s${document.hidden ? ' (screen off)' : ''}`);
   beat = now;
 }, 1000);
 
@@ -904,10 +904,10 @@ function setMediaSession() {
   });
   const h = navigator.mediaSession.setActionHandler.bind(navigator.mediaSession);
   try {
-    h('play', () => { log('[세션] 재생 요청'); S.userPaused = false; player.play(); });
-    h('pause', () => { log('[세션] 일시정지 요청'); S.userPaused = true; player.pause(); });
-    h('previoustrack', () => { log('[세션] 이전 요청'); restartAt(S.cur - 1); });
-    h('nexttrack', () => { log('[세션] 다음 요청'); restartAt(S.cur + 1); });
+    h('play', () => { log('[session] play requested'); S.userPaused = false; player.play(); });
+    h('pause', () => { log('[session] pause requested'); S.userPaused = true; player.pause(); });
+    h('previoustrack', () => { log('[session] previous requested'); restartAt(S.cur - 1); });
+    h('nexttrack', () => { log('[session] next requested'); restartAt(S.cur + 1); });
   } catch (e) { /* 일부 브라우저는 핸들러 일부만 지원 */ }
 }
 
@@ -941,7 +941,7 @@ function renderText() {
   $('text').innerHTML = html.join('');
   hlEls = [];
   void $('text').offsetHeight; // 레이아웃까지 포함해 잰다
-  log(`본문 표시 ${paras.length.toLocaleString()}문단, ${(performance.now() - tr).toFixed(0)}ms`);
+  log(`Rendered text: ${paras.length.toLocaleString()} paragraphs, ${(performance.now() - tr).toFixed(0)}ms`);
 }
 
 // ---- 자동 스크롤 ----
@@ -993,11 +993,11 @@ function renderNow({ instant = false } = {}) {
 
 function renderStats() {
   kv($('stats'), {
-    '위치': `${S.pieces.length ? S.cur + 1 : 0} / ${S.pieces.length}`,
-    '버퍼': `${Math.round(planner.bufferedSec)}초`,
-    '생성 속도': S.genSec > 0 ? `${(S.audioSec / S.genSec).toFixed(1)}배` : '-',
-    '끊김': `${S.stalls}회`,
-    '설정': `${settings.voice} · 음질 ${settings.steps} · ${settings.speed}×`,
+    'Position': `${S.pieces.length ? S.cur + 1 : 0} / ${S.pieces.length}`,
+    'Buffer': `${Math.round(planner.bufferedSec)}s`,
+    'Generation speed': S.genSec > 0 ? `${(S.audioSec / S.genSec).toFixed(1)}x` : '-',
+    'Stalls': `${S.stalls}`,
+    'Settings': `${settings.voice} · quality ${settings.steps} · ${settings.speed}×`,
   });
 }
 
@@ -1213,7 +1213,7 @@ function translatePage() {
     await loadBookInfo();
     await loadText();
   } catch (e) {
-    log('도서 불러오기 실패: ' + e.message);
+    log('Book load failed: ' + e.message);
     placeholder(e.message);
     return;
   }
@@ -1225,14 +1225,14 @@ function translatePage() {
   await S.serverReady;
   if (S.pieces.length && S.server.size === S.pieces.length) {
     // 이 챕터는 전부 서버에 있다 — 모델을 불러오지 않는다(배터리·메모리 절약, 느린 기기도 재생 가능)
-    log('이 챕터는 서버에 미리 만든 음성으로 재생 — 모델을 불러오지 않음');
+    log('This chapter plays server pre-generated audio — model not loaded');
     updateControls(); renderStatus(); renderPlayBtn();
     if (autoplayWanted) setTimeout(startAutoplay, 0);
     return;
   }
   const cached = await modelCached();
   if (cached) {
-    log('브라우저에 저장된 모델이 있어 바로 불러옵니다');
+    log('Model found in browser storage — loading it now');
     await loadModel(env.hasWebGpu, true);
   } else {
     $('modelCard').hidden = false;

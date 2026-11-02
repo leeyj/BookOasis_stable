@@ -35,7 +35,7 @@ export function renderTxtChunkView({
       const wrapped = txtChunks
         .map((ch, idx) => {
           const isPending = (ch === null || ch === 'LOADING_PENDING');
-          return `<div class="txt-scroll-chunk" data-idx="${idx}" style="margin-bottom: 3rem;">${!isPending ? ch : '<div class="epub-ch-loading" style="padding: 2rem; text-align: center; opacity: 0.5;">챕터 불러오는 중...</div>'}</div>`;
+          return `<div class="txt-scroll-chunk" data-idx="${idx}" style="margin-bottom: 3rem;">${!isPending ? ch : `<div class="epub-ch-loading" style="padding: 2rem; text-align: center; opacity: 0.5;">${i18n.t('viewer.chapter_loading')}</div>`}</div>`;
         })
         .join('');
       contentArea.innerHTML = `<div class="txt-full-content epub-full-content">${wrapped}</div>`;

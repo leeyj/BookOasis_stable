@@ -74,7 +74,7 @@ export function applyTxtSettingsCore(ctx) {
     }
     if (container) container.style.pointerEvents = 'none';
     if (typeof showRestoreLoadingToast === 'function') {
-      showRestoreLoadingToast('보기 모드 전환 중...');
+      showRestoreLoadingToast(i18n.t('viewer.switching_mode'));
     }
 
     // 앵커 복원이 실패하더라도 모드 전환 직전의 실제 뷰포트 비율을 기준으로 복원한다.
@@ -214,7 +214,7 @@ export function applyTxtSettingsCore(ctx) {
       try {
         const pos = JSON.parse(savedPosStr);
         if (pos && pos.chunkIdx === getCurrentChunkIdx()) {
-          showRestoreLoadingToast('위치 복원 중...');
+          showRestoreLoadingToast(window.i18n?.t?.('viewer.restoring_position') || '위치 복원 중...');
           const anchorInfo = pos.anchorText ? { chunkIdx: pos.chunkIdx, anchorText: pos.anchorText } : null;
           const timerId = setTimeout(() => {
             // 보던 글자로 먼저 찾는다 - 화면 크기가 저장할 때와 달라도 같은 문장이 있는 쪽이 열린다.
@@ -254,7 +254,7 @@ export function applyTxtSettingsCore(ctx) {
     }
 
     if (!restored && isModeSwitch && preservedAnchor) {
-      showRestoreLoadingToast('보기 모드 전환 중...');
+      showRestoreLoadingToast(i18n.t('viewer.switching_mode'));
       const timerId = setTimeout(() => {
         const ok = restoreTxtAnchorInfo(preservedAnchor);
         if (ok) {

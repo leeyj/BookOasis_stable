@@ -94,7 +94,7 @@ async function openMetadataSearchTarget(bookId, defaultQuery, seriesMode = false
 
 export async function openMetadataSearchQueue(targets) {
   const books = (Array.isArray(targets) ? targets : [])
-    .map(book => ({ id: Number.parseInt(book?.id, 10), title: String(book?.title || '도서').trim() }))
+    .map(book => ({ id: Number.parseInt(book?.id, 10), title: String(book?.title || i18n.t('context_menu.book_default')).trim() }))
     .filter(book => Number.isFinite(book.id) && book.id > 0);
   if (!books.length) return;
 
@@ -109,7 +109,7 @@ function updateMetadataSearchTitle() {
   if (!title) return;
   if (bulkSearchQueue) {
     const current = bulkSearchQueue.books[bulkSearchQueue.index];
-    title.textContent = `메타정보 검색 (${bulkSearchQueue.index + 1}/${bulkSearchQueue.books.length}) · ${current?.title || ''}`;
+    title.textContent = i18n.t('metadata_search.bulk_title', { no: bulkSearchQueue.index + 1, total: bulkSearchQueue.books.length, title: current?.title || '' });
   } else {
     title.textContent = window.i18n?.t('modal.meta_search_title') || '도서 메타데이터 검색';
   }
@@ -335,7 +335,7 @@ async function selectMetadataBook(book, source) {
 
           if (isBulkSearch) {
             if (await advanceMetadataSearchQueue()) {
-              vm.showToast('메타정보를 적용했습니다. 다음 작품을 검색합니다.', 'success');
+              vm.showToast(i18n.t('metadata_search.applied_next'), 'success');
               return;
             }
 
@@ -370,7 +370,7 @@ async function selectMetadataBook(book, source) {
       }
     } catch (err) {
       console.error('[MetadataApply-DEBUG] [예외 발생] 메타데이터 적용 API 에러:', err);
-      vm.showToast('서버 통신 중 오류가 발생했습니다.', 'error');
+      vm.showToast(i18n.t('detail.server_comm_error'), 'error');
     }
   });
 }

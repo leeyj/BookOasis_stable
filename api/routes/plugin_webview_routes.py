@@ -376,6 +376,32 @@ def _first_local_root(physical_path):
     return None
 
 
+DOWNLOAD_FOLDER_MAX_DEPTH = 4
+
+
+def _resolve_download_dir(root, folder):
+    """root 아래 하위 폴더(예: 시리즈명, '작가/시리즈')를 정해 만든다. (경로, 오류 사유) 반환.
+    폴더를 안 주면 root 그대로(기존 동작). '..'·절대경로·root 밖(심볼릭 링크 포함)은 거부한다."""
+    if folder is None or not str(folder).strip():
+        return root, None
+    raw_parts = [p.strip() for p in re.split(r'[\\/]+', str(folder)) if p.strip()]
+    if any(p in ('.', '..') for p in raw_parts):
+        return None, 'folder_traversal'
+    parts = [_FILENAME_UNSAFE_RE.sub('_', p).strip(' .')[:200] for p in raw_parts]
+    parts = [p for p in parts if p]
+    if not parts:
+        return root, None
+    if len(parts) > DOWNLOAD_FOLDER_MAX_DEPTH:
+        return None, 'folder_too_deep'
+    target = os.path.join(root, *parts)
+    # 만들기 전에 검사한다 - 중간에 root 밖을 가리키는 링크가 있으면 밖에 폴더가 생긴다
+    root_real = os.path.realpath(root)
+    if os.path.commonpath([root_real, os.path.realpath(target)]) != root_real:
+        return None, 'folder_outside_root'
+    os.makedirs(target, exist_ok=True)
+    return target, None
+
+
 @plugin_webview_bp.route('/api/webview/download', methods=['POST'])
 @login_required
 def download_to_library():
@@ -410,9 +436,18 @@ def download_to_library():
     if not host:
         return _error_response('invalid_url', 400)
 
-    dest_dir = _first_local_root(lib_info.get('physical_path'))
-    if not dest_dir:
+    dest_root = _first_local_root(lib_info.get('physical_path'))
+    if not dest_root:
         return jsonify({'success': False, 'error': '다운로드를 저장할 로컬 경로가 없는 라이브러리입니다 (원격/GDrive 전용).'}), 400
+
+    # 커뮤니티 분류 규칙(시리즈별 폴더)대로 저장하도록 하위 폴더를 받는다 - 루트에 회차가 쌓이면
+    # 회차마다 루트 전체를 훑게 된다. 생략하면 예전처럼 루트에 저장.
+    try:
+        dest_dir, folder_error = _resolve_download_dir(dest_root, data.get('folder'))
+    except OSError as e:
+        return jsonify({'success': False, 'error': 'folder_create_failed', 'message': str(e)}), 500
+    if folder_error:
+        return jsonify({'success': False, 'error': folder_error, 'message': 'folder 값이 올바르지 않습니다.'}), 400
 
     try:
         upstream = fetch_with_redirect_revalidation(url, patterns, method='GET')
@@ -424,7 +459,9 @@ def download_to_library():
     try:
         from urllib.parse import urlsplit
         cd_name = _filename_from_content_disposition(upstream.headers.get('Content-Disposition'))
-        url_name = os.path.basename(urlsplit(url).path)
+        # 리다이렉트를 따라갔으면 마지막 주소의 이름을 쓴다(예: /ebooks/11.epub.noimages → pg11.epub)
+        final_name = os.path.basename(urlsplit(getattr(upstream, 'url', None) or '').path)
+        url_name = final_name or os.path.basename(urlsplit(url).path)
         raw_name = cd_name or url_name or f"download_{int(time.time())}"
         filename = _sanitize_filename(raw_name)
         if not os.path.splitext(filename)[1] and cd_name is None and url_name and '.' in url_name:
@@ -446,6 +483,7 @@ def download_to_library():
     result = {
         'success': True,
         'filename': os.path.basename(dest_path),
+        'folder': os.path.relpath(dest_dir, dest_root).replace(os.sep, '/') if dest_dir != dest_root else '',
         'imported_as_book': imported_as_book,
     }
     if not imported_as_book:
@@ -457,7 +495,7 @@ def download_to_library():
         from tools.scanner.core import scan_library_path
         # 큐를 거치지 않는 즉시 스캔이라 목록(시리즈 요약 테이블/캐시) 반영을 직접 한다
         from services.scan_refresh_service import track_direct_scan
-        # 파일 경로를 주면 그 폴더(=라이브러리 루트)를 스캔한다. force면 루트 아래 모든 책을 다시 처리해
+        # 파일 경로를 주면 그 폴더(folder 지정 시 그 하위 폴더, 아니면 라이브러리 루트)를 스캔한다. force면 루트 아래 모든 책을 다시 처리해
         # 회차 하나에 수 초씩 걸렸다 - 파일명은 늘 새로 정해지므로(_unique_destination_path) force가 필요 없다.
         with track_direct_scan(db_type, library_id, dest_path):
             scan_library_path(get_db_path(db_type), library_id, dest_path, force=False)

@@ -12,12 +12,12 @@ async function handleLogin(e) {
     errDiv.style.display = 'none';
 
     if (usernameInput.length > MAX_USERNAME_LENGTH) {
-        errText.innerText = `아이디는 최대 ${MAX_USERNAME_LENGTH}자까지 입력할 수 있습니다.`;
+        errText.innerText = i18n.t('login.username_max', { n: MAX_USERNAME_LENGTH });
         errDiv.style.display = 'flex';
         return;
     }
     if (passwordInput.length > MAX_PASSWORD_LENGTH) {
-        errText.innerText = `비밀번호는 최대 ${MAX_PASSWORD_LENGTH}자까지 입력할 수 있습니다.`;
+        errText.innerText = i18n.t('login.password_max', { n: MAX_PASSWORD_LENGTH });
         errDiv.style.display = 'flex';
         return;
     }
@@ -52,11 +52,11 @@ async function handleLogin(e) {
                 window.location.href = '/';
             }
         } else {
-            errText.innerText = data.error || '로그인 실패';
+            errText.innerText = data.error || i18n.t('login.failed');
             errDiv.style.display = 'flex';
         }
     } catch (err) {
-        errText.innerText = '서버 연결 오류가 발생했습니다.';
+        errText.innerText = i18n.t('login.server_error');
         errDiv.style.display = 'flex';
         console.error(err);
     }
@@ -72,19 +72,19 @@ async function handleChangePassword(e) {
     errDiv.style.display = 'none';
 
     if (newPw.length > MAX_PASSWORD_LENGTH || confirmPw.length > MAX_PASSWORD_LENGTH) {
-        errText.innerText = `비밀번호는 최대 ${MAX_PASSWORD_LENGTH}자까지 입력할 수 있습니다.`;
+        errText.innerText = i18n.t('login.password_max', { n: MAX_PASSWORD_LENGTH });
         errDiv.style.display = 'flex';
         return;
     }
 
     if (newPw !== confirmPw) {
-        errText.innerText = '비밀번호가 일치하지 않습니다.';
+        errText.innerText = i18n.t('login.password_mismatch');
         errDiv.style.display = 'flex';
         return;
     }
 
     if (newPw.trim() === 'admin') {
-        errText.innerText = '새 비밀번호는 초기 비밀번호(admin)와 다르게 입력해 주세요.';
+        errText.innerText = i18n.t('login.password_same_as_default');
         errDiv.style.display = 'flex';
         return;
     }
@@ -100,11 +100,11 @@ async function handleChangePassword(e) {
         if (data.success) {
             window.location.href = '/';
         } else {
-            errText.innerText = data.error || '비밀번호 변경 실패';
+            errText.innerText = data.error || i18n.t('login.change_failed');
             errDiv.style.display = 'flex';
         }
     } catch (err) {
-        errText.innerText = '서버 연결 오류가 발생했습니다.';
+        errText.innerText = i18n.t('login.server_error');
         errDiv.style.display = 'flex';
         console.error(err);
     }

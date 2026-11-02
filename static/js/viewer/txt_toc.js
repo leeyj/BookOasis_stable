@@ -335,8 +335,8 @@ export function renderEpubTocPanel({ tocList, txtChunks, onJumpToChapter }) {
     });
     return b;
   };
-  const tocTabBtn = makeTabBtn('toc', 'fas fa-list', '목차');
-  const bookmarkTabBtn = makeTabBtn('bookmarks', 'fas fa-bookmark', '북마크');
+  const tocTabBtn = makeTabBtn('toc', 'fas fa-list', i18n.t('viewer.toc_tab'));
+  const bookmarkTabBtn = makeTabBtn('bookmarks', 'fas fa-bookmark', i18n.t('audio.bookmark'));
   // TXT는 실제 목차가 없다 — chunkText()로 임의 분할한 구간을 "N장"으로 나열하면
   // 사용자에게 진짜 챕터처럼 오인되어 혼란만 준다. TXT에서는 목차 탭 자체를 숨기고
   // 북마크 탭만 노출한다(내부적으로는 여전히 같은 구간 단위를 위치 추적에 사용).
@@ -496,7 +496,7 @@ function _buildBookmarkEmptyState() {
   const empty = document.createElement('p');
   empty.className = 'epub-bookmark-empty';
   empty.style.cssText = 'opacity:0.6; font-size:0.85rem; text-align:center; margin-top:24px;';
-  empty.textContent = '저장된 북마크가 없습니다.';
+  empty.textContent = i18n.t('viewer.bookmarks_empty');
   return empty;
 }
 
@@ -566,7 +566,7 @@ function _renderBookmarkListInto(bookmarkPanelEl, bookId, dbType) {
 
     const delBtn = document.createElement('button');
     delBtn.type = 'button';
-    delBtn.title = '북마크 삭제';
+    delBtn.title = i18n.t('viewer.bookmark_delete');
     delBtn.innerHTML = '<i class="fas fa-trash-can"></i>';
     delBtn.style.cssText = 'background:transparent; border:none; color:inherit; opacity:0.55; cursor:pointer; padding:4px; font-size:0.85rem;';
     delBtn.addEventListener('click', async (e) => {
@@ -578,9 +578,9 @@ function _renderBookmarkListInto(bookmarkPanelEl, bookId, dbType) {
         if (data && data.success) {
           bookmarksCache = bookmarksCache.filter((b) => Number(b.id) !== Number(bookmark.id));
           _renderBookmarkListInto(bookmarkPanelEl, bookId, dbType);
-          if (typeof window.showToast === 'function') window.showToast('북마크가 삭제되었습니다.', 'success');
+          if (typeof window.showToast === 'function') window.showToast(i18n.t('viewer.bookmark_deleted'), 'success');
         } else if (typeof window.showToast === 'function') {
-          window.showToast((data && data.error) || '북마크 삭제에 실패했습니다.', 'error');
+          window.showToast((data && data.error) || i18n.t('viewer.bookmark_delete_failed'), 'error');
         }
       } catch (err) {
         console.error('[Bookmark] 삭제 실패:', err);
@@ -656,11 +656,11 @@ function _waitForChapterImagesSettled(chapterIdx) {
 export async function addBookmarkAtCurrentPosition() {
   const format = (state.currentViewerFormat || '').toLowerCase();
   if (format !== 'epub' && format !== 'txt') {
-    if (typeof window.showToast === 'function') window.showToast('이 뷰어에서는 북마크를 지원하지 않습니다.', 'error');
+    if (typeof window.showToast === 'function') window.showToast(i18n.t('viewer.bookmark_unsupported'), 'error');
     return;
   }
   if (activeTocIdx < 0 || activeTocIdx >= tocEntryRefs.length) {
-    if (typeof window.showToast === 'function') window.showToast('현재 위치를 확인할 수 없습니다.', 'error');
+    if (typeof window.showToast === 'function') window.showToast(i18n.t('viewer.bookmark_no_position'), 'error');
     return;
   }
 
@@ -691,13 +691,13 @@ export async function addBookmarkAtCurrentPosition() {
         const bookmarkPanelEl = document.getElementById('epub-toc-tab-bookmarks');
         if (bookmarkPanelEl) _renderBookmarkListInto(bookmarkPanelEl, bookId, dbType);
       }
-      if (typeof window.showToast === 'function') window.showToast('북마크가 추가되었습니다.', 'success');
+      if (typeof window.showToast === 'function') window.showToast(i18n.t('viewer.bookmark_added'), 'success');
     } else if (typeof window.showToast === 'function') {
-      window.showToast((data && data.error) || '북마크 추가에 실패했습니다.', 'error');
+      window.showToast((data && data.error) || i18n.t('viewer.bookmark_add_failed'), 'error');
     }
   } catch (e) {
     console.error('[Bookmark] 추가 실패:', e);
-    if (typeof window.showToast === 'function') window.showToast('북마크 추가에 실패했습니다.', 'error');
+    if (typeof window.showToast === 'function') window.showToast(i18n.t('viewer.bookmark_add_failed'), 'error');
   }
 }
 
@@ -757,7 +757,7 @@ export function jumpToTxtTocChapter({
     fetch(`/api/media/epub/chapter?db_type=${state.currentLibraryType}&book_id=${activeBookId}&chapter_idx=${chapterIdx}`)
       .then(res => res.json())
       .then(data => {
-        const content = data.content || '<p>내용이 없습니다.</p>';
+        const content = data.content || `<p>${i18n.t('viewer.chunk_empty')}</p>`;
         txtChunks[chapterIdx] = content;
 
         const contentArea = document.getElementById('txt-content-area');

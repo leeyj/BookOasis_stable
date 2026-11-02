@@ -12,7 +12,7 @@ export async function fetchTotalPagesIfNeeded(bookId, currentTotal) {
     const res = await fetch(`/api/media/books/${bookId}/info?type=${libType}`);
     if (res.status === 404) {
       if (typeof window.handleBookDeletedFallback === 'function') {
-        window.handleBookDeletedFallback('해당 도서(카테고리)가 서버에서 삭제되었습니다.');
+        window.handleBookDeletedFallback(i18n.t('viewer.book_deleted'));
       }
       return 0;
     }

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BookOasis - 로그인</title>
+    <title data-i18n="login.page_title">BookOasis - 로그인</title>
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="{{ static_asset_url('images/favicon.png', sig='boe-favicon-palm') }}">
     <!-- FontAwesome -->
@@ -59,8 +59,8 @@
     <div id="change-card" class="auth-card force-change-border hidden">
         <div class="auth-header">
             <span class="auth-logo"><i class="lc lc-shield-half icon-warning"></i></span>
-            <h2 class="auth-title title-warning">보안 변경 강제</h2>
-            <p class="auth-subtitle subtitle-warning">초기 비밀번호(admin)를 사용 중입니다.<br>안전한 새 비밀번호를 설정해 주세요.</p>
+            <h2 class="auth-title title-warning" data-i18n="login.force_change_title">보안 변경 강제</h2>
+            <p class="auth-subtitle subtitle-warning" data-i18n="login.force_change_desc">초기 비밀번호(admin)를 사용 중입니다.<br>안전한 새 비밀번호를 설정해 주세요.</p>
         </div>
 
         <div id="change-error" class="error-message">
@@ -69,15 +69,15 @@
 
         <form id="change-form" onsubmit="handleChangePassword(event)">
             <div class="form-group">
-                <input type="password" id="new-password" class="form-control" placeholder="새 비밀번호 (4자리 이상)" required autocomplete="new-password" maxlength="256">
+                <input type="password" id="new-password" class="form-control" placeholder="새 비밀번호 (4자리 이상)" data-i18n-placeholder="login.new_password_placeholder" required autocomplete="new-password" maxlength="256">
                 <i class="lc lc-lock"></i>
             </div>
             <div class="form-group">
-                <input type="password" id="confirm-password" class="form-control" placeholder="새 비밀번호 확인" required autocomplete="new-password" maxlength="256">
+                <input type="password" id="confirm-password" class="form-control" placeholder="새 비밀번호 확인" data-i18n-placeholder="login.confirm_password_placeholder" required autocomplete="new-password" maxlength="256">
                 <i class="lc lc-lock"></i>
             </div>
             <button type="submit" class="btn-submit btn-warning">
-                비밀번호 변경 및 메인 이동 <i class="lc lc-check"></i>
+                <span data-i18n="login.change_and_continue">비밀번호 변경 및 메인 이동</span> <i class="lc lc-check"></i>
             </button>
         </form>
     </div>

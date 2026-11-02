@@ -88,9 +88,9 @@ export function renderAudiobookVolumes(orderedBooks, detailMeta = null) {
   return `
     <div class="volumes-section ab-volumes-shell">
       <div class="ab-tab-header">
-        <button class="ab-tab-btn active" data-role="detail-audio-tab" data-target="chapters">${isMusic ? '트랙' : '챕터'} <span>${books.length}</span></button>
-        <button class="ab-tab-btn" data-role="detail-audio-tab" data-target="tracks">오디오 트랙 <span>${books.length}</span></button>
-        <button class="ab-tab-btn" data-role="detail-audio-tab" data-target="detail">세부사항</button>
+        <button class="ab-tab-btn active" data-role="detail-audio-tab" data-target="chapters">${isMusic ? i18n.t('detail.ab_tab_tracks') : i18n.t('detail.ab_tab_chapters')} <span>${books.length}</span></button>
+        <button class="ab-tab-btn" data-role="detail-audio-tab" data-target="tracks">${i18n.t('detail.ab_tab_audio_tracks')} <span>${books.length}</span></button>
+        <button class="ab-tab-btn" data-role="detail-audio-tab" data-target="detail">${i18n.t('detail.ab_tab_details')}</button>
         ${completedBadgeHtml}
       </div>
 
@@ -101,9 +101,9 @@ export function renderAudiobookVolumes(orderedBooks, detailMeta = null) {
               <tr>
                 <th class="ab-col-play"></th>
                 <th class="ab-col-id">${isMusic ? '#' : 'Id'}</th>
-                <th>제목</th>
-                ${isMusic ? '<th class="ab-col-artist">아티스트</th>' : '<th class="ab-col-time">시작</th>'}
-                <th class="ab-col-time">기간</th>
+                <th>${i18n.t('detail.ab_col_title')}</th>
+                ${isMusic ? `<th class="ab-col-artist">${i18n.t('detail.ab_col_artist')}</th>` : `<th class="ab-col-time">${i18n.t('detail.ab_col_start')}</th>`}
+                <th class="ab-col-time">${i18n.t('detail.ab_col_duration')}</th>
               </tr>
             </thead>
             <tbody>${chapterRowsHtml}</tbody>
@@ -118,11 +118,11 @@ export function renderAudiobookVolumes(orderedBooks, detailMeta = null) {
               <tr>
                 <th class="ab-col-play"></th>
                 <th class="ab-col-id">#</th>
-                <th>파일 이름</th>
-                <th class="ab-col-codec">코덱</th>
-                <th class="ab-col-time">비트레이트</th>
-                <th class="ab-col-size">크기</th>
-                <th class="ab-col-time">기간</th>
+                <th>${i18n.t('detail.ab_col_filename')}</th>
+                <th class="ab-col-codec">${i18n.t('detail.ab_col_codec')}</th>
+                <th class="ab-col-time">${i18n.t('detail.ab_col_bitrate')}</th>
+                <th class="ab-col-size">${i18n.t('detail.ab_col_size')}</th>
+                <th class="ab-col-time">${i18n.t('detail.ab_col_duration')}</th>
               </tr>
             </thead>
             <tbody>${trackRowsHtml}</tbody>
@@ -132,10 +132,10 @@ export function renderAudiobookVolumes(orderedBooks, detailMeta = null) {
 
       <div class="ab-tab-pane" data-pane="detail">
         <div class="ab-stats-grid">
-          <div class="ab-stat-card"><span class="k">총 트랙</span><strong>${books.length}</strong></div>
-          <div class="ab-stat-card"><span class="k">총 재생시간</span><strong>${totalDurationText}</strong></div>
-          <div class="ab-stat-card"><span class="k">총 크기</span><strong>${toSizeMB(totalBytes)}</strong></div>
-          <div class="ab-stat-card"><span class="k">평균 길이</span><strong>${books.length > 0 ? toClock(Math.round(runningStartSec / books.length)) : '-'}</strong></div>
+          <div class="ab-stat-card"><span class="k">${i18n.t('detail.ab_stat_tracks')}</span><strong>${books.length}</strong></div>
+          <div class="ab-stat-card"><span class="k">${i18n.t('detail.ab_stat_total_time')}</span><strong>${totalDurationText}</strong></div>
+          <div class="ab-stat-card"><span class="k">${i18n.t('detail.ab_stat_size')}</span><strong>${toSizeMB(totalBytes)}</strong></div>
+          <div class="ab-stat-card"><span class="k">${i18n.t('detail.ab_stat_avg')}</span><strong>${books.length > 0 ? toClock(Math.round(runningStartSec / books.length)) : '-'}</strong></div>
         </div>
       </div>
     </div>

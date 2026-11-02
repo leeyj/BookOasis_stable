@@ -334,8 +334,8 @@ function renderSelectedChips() {
 function createSelectedChipElement(type, value) {
     const chip = document.createElement('div');
     chip.className = 'filter-chip-selected';
-    chip.title = `[${type === 'genres' ? '장르' : '태그'}] ${value}`;
-    chip.innerHTML = `<span>[${type === 'genres' ? '장르' : '태그'}] ${escapeHtml(value)}</span> <i class="lc lc-x" style="font-size: 0.7rem;"></i>`;
+    chip.title = `[${type === 'genres' ? i18n.t('detail.chip_genre') : i18n.t('detail.chip_tag')}] ${value}`;
+    chip.innerHTML = `<span>[${type === 'genres' ? i18n.t('detail.chip_genre') : i18n.t('detail.chip_tag')}] ${escapeHtml(value)}</span> <i class="lc lc-x" style="font-size: 0.7rem;"></i>`;
     chip.addEventListener('click', () => {
         if (type === 'genres') {
             selectedGenres.delete(value);

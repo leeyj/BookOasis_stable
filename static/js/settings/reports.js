@@ -152,7 +152,7 @@ export async function loadScanHistory() {
     tbody.innerHTML = `
       <tr>
         <td colspan="6" style="padding: 2rem; text-align: center; color: #ef4444;">
-          스캔 이력을 불러오는 도중 오류가 발생했습니다.
+          ${i18n.t('settings.reports_history_load_error')}
         </td>
       </tr>
     `;

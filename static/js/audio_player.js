@@ -334,9 +334,9 @@ export async function openAudioPlayer(audiobookId, trackIdOrTitle = null, startT
   } catch (err) {
     console.error('[AudioPlayer] Error opening audio player:', err);
     if (typeof window.showToast === 'function') {
-      window.showToast('오디오북 정보를 불러오지 못했습니다.', 'error');
+      window.showToast(i18n.t('audio.load_failed'), 'error');
     } else {
-      alert('오디오북 정보를 불러오지 못했습니다.');
+      alert(i18n.t('audio.load_failed'));
     }
   }
 }
@@ -439,10 +439,10 @@ export function openAudioPlayerModal(audioData, targetTrackId = null, startTime 
   const coverPlaceholder = document.getElementById('audio-player-cover-placeholder');
   const backdrop = document.getElementById('audio-player-backdrop');
 
-  if (headerTitleEl) headerTitleEl.textContent = meta.series_name || '오디오북';
+  if (headerTitleEl) headerTitleEl.textContent = meta.series_name || i18n.t('audio.default_title');
   if (headerAuthorEl) headerAuthorEl.textContent = meta.author || 'BookOasis';
-  if (titleEl) titleEl.textContent = meta.series_name || '오디오북';
-  if (authorEl) authorEl.textContent = `${meta.author || '저자 미상'}${meta.publisher ? ' · ' + meta.publisher : ''}`;
+  if (titleEl) titleEl.textContent = meta.series_name || i18n.t('audio.default_title');
+  if (authorEl) authorEl.textContent = `${meta.author || i18n.t('plugin_view.unknown_author')}${meta.publisher ? ' · ' + meta.publisher : ''}`;
   if (chapterBadgeEl) chapterBadgeEl.textContent = currentTrack ? (currentTrack.title || `CHAPTER ${currentTrack.track_number}`) : 'CHAPTER 1';
   if (isMusic) {
     // 음악: 크게 곡 제목, 아래에 아티스트 · 앨범, 배지는 곡 순번
@@ -698,7 +698,7 @@ export function stopAndHideAudioPlayer() {
 }
 
 export function toggleAudioBookmark() {
-  const msg = '오디오북 북마크 기능은 준비 중입니다.';
+  const msg = i18n.t('audio.bookmark_soon');
   if (typeof window.showToast === 'function') {
     window.showToast(msg, 'info');
   } else {
@@ -849,7 +849,7 @@ export function cycleSleepTimer() {
     sleepTimerId = setTimeout(() => {
       toggleAudioPlay(false);
       if (typeof window.showToast === 'function') {
-        window.showToast('취침 타이머가 만료되어 오디오 재생을 정지했습니다.', 'info');
+        window.showToast(i18n.t('audio.sleep_timer_stopped'), 'info');
       }
     }, sleepMinutes * 60 * 1000);
   } else {

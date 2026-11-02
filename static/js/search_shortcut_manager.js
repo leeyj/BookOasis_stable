@@ -38,7 +38,7 @@ export function applySearchShortcutSetting() {
     }
     searchInput.setAttribute('placeholder', translatedPlaceholder);
     const titleLabel = (window.i18n && typeof window.i18n.t === 'function')
-      ? window.i18n.t('settings.search_shortcut_label', '검색 단축키 설정')
+      ? window.i18n.t('settings.search_shortcut_label')
       : '검색 단축키 설정';
     searchInput.setAttribute('title', `${titleLabel}: ${displayShortcut}`);
   }
@@ -48,13 +48,17 @@ export function initLibrarySearchShortcut() {
   if (window.__librarySearchShortcutBound) return;
 
   applySearchShortcutSetting();
+  // 번역 사전이 아직 안 왔으면 한국어 안내가 굳는다 - 준비되면 다시 넣는다
+  if (!window.i18nReady) document.addEventListener('i18nReady', () => applySearchShortcutSetting(), { once: true });
 
   window.addEventListener('bookoasis_language_changed', () => {
     applySearchShortcutSetting();
   });
 
   document.addEventListener('keydown', (e) => {
-    if (document.getElementById('btn-record-shortcut')?.innerText === '입력 대기...') return;
+    // 단축키 기록 중(버튼 글자가 '입력 대기...' - 번역된 글자일 수 있다)엔 검색으로 가지 않는다
+    const recordLabel = document.getElementById('btn-record-shortcut')?.innerText;
+    if (recordLabel && (recordLabel === '입력 대기...' || recordLabel === window.i18n?.t?.('settings.keys_waiting_input'))) return;
 
     const savedRaw = localStorage.getItem('settings_search_shortcut');
     let currentShortcut = null;

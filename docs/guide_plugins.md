@@ -1421,21 +1421,23 @@ window.BookOasisPlugin.openWebview('https://example.com/some-page');
 - 서버가 SSRF 방어(사설/루프백 IP 차단, 리다이렉트 재검증, 응답 크기 제한 15MB)를 수행하므로 화이트리스트에 있어도 일부 요청은 거부될 수 있습니다.
 - 응답이 HTML이면 `<base href="원본사이트">`를 자동 주입해 상대경로 이미지/CSS/JS/링크가 프록시가 아닌 원본 사이트 기준으로 풀리도록 합니다. 완전한 자산 재작성기는 아니라서(예: 인라인 `style="background:url(...)"`) 무거운 SPA는 여전히 깨질 수 있습니다.
 
-### `window.BookOasisPlugin.downloadToLibrary(url, { libraryId, dbType })`
+### `window.BookOasisPlugin.downloadToLibrary(url, { libraryId, dbType, folder })`
 
 URL의 파일을 다운로드해 선택한 라이브러리 물리 경로에 저장하고, 스캐너로 즉시 임포트합니다.
 
 ```js
 window.BookOasisPlugin.downloadToLibrary('https://example.com/book.epub', {
   libraryId: 12,
-  dbType: 'general' // 생략 시 'general'
+  dbType: 'general', // 생략 시 'general'
+  folder: '나 혼자 레벨업' // 선택: 라이브러리 루트 아래 하위 폴더('작가/시리즈'처럼 4단계까지)
 });
 ```
 
 - 화이트리스트 검증 + SSRF 방어(응답 크기 제한 500MB)를 거칩니다.
 - 호출한 사용자가 대상 라이브러리에 접근 권한이 없으면 실패합니다.
 - 지원 확장자(`.zip .cbz .epub .pdf .txt`)가 아니면 파일은 저장되지만 도서로 임포트되지는 않습니다(`imported_as_book: false`).
-- 반환값(Promise)은 `{ success, filename, imported_as_book, warning?, scan_error? }` 형태입니다.
+- `folder`를 주면 그 하위 폴더에 저장하고(없으면 만듦) 그 폴더만 스캔합니다. 웹툰·연재물처럼 회차가 계속 쌓이는 경우 시리즈 이름을 넘기십시오 — 생략하면 루트에 저장되고, 루트가 커질수록 회차마다 스캔이 느려집니다. 파일명에 못 쓰는 문자는 `_`로 바뀌고, `..`(`folder_traversal`), 5단계 이상(`folder_too_deep`), 루트 밖을 가리키는 경로(`folder_outside_root`)는 400으로 거부됩니다.
+- 반환값(Promise)은 `{ success, filename, folder, imported_as_book, warning?, scan_error? }` 형태입니다(`folder`는 실제 저장된 루트 기준 상대 경로, 루트면 빈 문자열).
 
 ### `window.BookOasisPlugin.getProxyUrl(url)` / `getStreamProxyUrl(url)`
 

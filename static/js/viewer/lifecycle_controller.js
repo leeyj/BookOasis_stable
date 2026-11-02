@@ -409,7 +409,7 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false, op
   return Promise.resolve(fullscreenExitPromise);
 }
 
-export function handleBookDeletedFallback(reason = '해당 도서(카테고리)가 서버에서 삭제되었습니다.') {
+export function handleBookDeletedFallback(reason = i18n.t('viewer.book_deleted')) {
   console.warn(`[Viewer-Fallback] 도서 삭제 감지 404: ${reason}`);
   
   // 1. 진행 중인 뷰어 닫기
@@ -419,9 +419,9 @@ export function handleBookDeletedFallback(reason = '해당 도서(카테고리)�
   
   // 2. 사용자용 알림 표출
   if (typeof window.showToast === 'function') {
-    window.showToast(`⚠️ ${reason} 목록 화면으로 이동합니다.`, 'error');
+    window.showToast(i18n.t('viewer.book_deleted_toast', { reason }), 'error');
   } else {
-    alert(`⚠️ ${reason}\n목록 화면으로 이동합니다.`);
+    alert(i18n.t('viewer.book_deleted_alert', { reason }));
   }
 
   // 3. 해시 정리 및 목록으로 안전 이동

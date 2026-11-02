@@ -74,7 +74,7 @@ function bindVolumeCoverAlignMenuOnce() {
 
     if (failCount > 0) {
       console.error(`[CoverAlign-API] 저장 실패: ${failCount}/${bookIds.length}건`);
-      alert(bookIds.length > 1 ? `${failCount}건의 커버 정렬 변경에 실패했습니다.` : '커버 정렬 변경에 실패했습니다.');
+      alert(bookIds.length > 1 ? i18n.t('detail.cover_align_failed_n', { n: failCount }) : i18n.t('detail.cover_align_failed'));
     }
   });
 
@@ -98,7 +98,7 @@ export function showVolumeCoverAlignContextMenu(x, y, bookId, currentAlign, book
   if (menu) {
     markActiveAlignItem(menu, resolvedAlign);
     const title = menu.querySelector('.context-menu-title');
-    if (title) title.textContent = bulkIds ? `커버 정렬 (${bulkIds.length}개)` : '커버 정렬';
+    if (title) title.textContent = bulkIds ? i18n.t('detail.cover_align_title_n', { n: bulkIds.length }) : i18n.t('detail.cover_align_title');
   }
 
   positionMenuAtPoint('volume-cover-align-context-menu', x, y, { zIndex: 20061 });

@@ -72,10 +72,10 @@ function syncComicReadingDirectionUI() {
   if (btn) {
     btn.classList.toggle('active', comicReadingDirection === 'rtl');
     btn.setAttribute('data-direction', comicReadingDirection);
-    btn.title = comicReadingDirection === 'rtl' ? '오른쪽→왼쪽 읽기' : '왼쪽→오른쪽 읽기';
+    btn.title = i18n.t(comicReadingDirection === 'rtl' ? 'viewer.dir_rtl_title' : 'viewer.dir_ltr_title');
   }
   if (label) {
-    label.textContent = comicReadingDirection === 'rtl' ? '오른쪽→왼쪽' : '왼쪽→오른쪽';
+    label.textContent = i18n.t(comicReadingDirection === 'rtl' ? 'viewer.dir_rtl' : 'viewer.dir_ltr');
   }
 }
 
@@ -113,10 +113,10 @@ function syncTapZoneDirectionUI() {
   const label = document.getElementById('tap-zone-direction-label');
   if (btn) {
     btn.classList.toggle('active', tapZoneDirection === 'vertical');
-    btn.title = tapZoneDirection === 'vertical' ? '상/하 탭으로 넘기기' : '좌/우 탭으로 넘기기';
+    btn.title = i18n.t(tapZoneDirection === 'vertical' ? 'viewer.tap_vertical_title' : 'viewer.tap_horizontal_title');
   }
   if (label) {
-    label.textContent = tapZoneDirection === 'vertical' ? '상/하' : '좌/우';
+    label.textContent = i18n.t(tapZoneDirection === 'vertical' ? 'viewer.tap_vertical' : 'viewer.tap_horizontal');
   }
 }
 
@@ -132,10 +132,10 @@ function syncComicPageStepUI() {
   if (btn) {
     btn.classList.toggle('active', isTwoPageActive);
     btn.setAttribute('data-step', String(comicPageStep));
-    btn.title = scrollMode === 'scroll' ? '스크롤 모드에서는 1장씩만 적용됩니다' : (comicPageStep === 2 ? '2장씩 보기' : '1장씩 보기');
+    btn.title = i18n.t(scrollMode === 'scroll' ? 'viewer.page_step_scroll_title' : (comicPageStep === 2 ? 'viewer.page_step_two_title' : 'viewer.page_step_one_title'));
   }
   if (label) {
-    label.textContent = scrollMode === 'scroll' ? '1장' : `${comicPageStep}장`;
+    label.textContent = i18n.t('viewer.page_step_label', { n: scrollMode === 'scroll' ? 1 : comicPageStep });
   }
 
   // 2쪽보기가 아니면 "한 장 밀기" 정렬 보정은 의미가 없다 - 행째로 숨기고 상태도 리셋한다.
@@ -177,7 +177,7 @@ function syncSpreadShiftOffsetUI() {
   const btn = document.getElementById('btn-spread-shift');
   if (!btn) return;
   btn.classList.toggle('active', spreadShiftOffset === 1);
-  btn.title = spreadShiftOffset === 1 ? '페이지 정렬 원래대로' : '두 페이지 짝을 한 장 밀어서 보기';
+  btn.title = i18n.t(spreadShiftOffset === 1 ? 'viewer.shift_spread_reset_title' : 'viewer.shift_spread_title');
 }
 
 // ──────────────────────────────────────────────────
@@ -213,10 +213,10 @@ function syncComicSplitSpreadUI() {
   const label = document.getElementById('comic-split-spread-label');
   if (btn) {
     btn.classList.toggle('active', comicSplitSpread);
-    btn.title = comicSplitSpread ? '분할 보기 끄기 (원본 이미지로 보기)' : '페이지를 좌/우로 분할해서 보기';
+    btn.title = i18n.t(comicSplitSpread ? 'viewer.split_spread_off_title' : 'viewer.split_spread_on_title');
   }
   if (label) {
-    label.textContent = comicSplitSpread ? '분할 켬' : '분할 끔';
+    label.textContent = i18n.t(comicSplitSpread ? 'viewer.split_spread_on' : 'viewer.split_spread_off');
   }
 }
 

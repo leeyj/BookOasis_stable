@@ -35,7 +35,7 @@ export function renderVolumeList(orderedBooks, safeSeriesName, actualLibraryId, 
     const progressPercent = book.total_pages > 0 ? Math.round((pagesRead / book.total_pages) * 100) : 0;
     const progressText = pagesRead > 0
       ? `${pagesRead}p / ${book.total_pages}p (${progressPercent}%)`
-      : '미독';
+      : i18n.t('detail.unread');
     const readBtnText = pagesRead > 0
       ? `<i class="lc lc-play"></i> ${i18n.t('detail.btn_resume')}`
       : `<i class="lc lc-play"></i> ${i18n.t('detail.btn_start')}`;
@@ -90,7 +90,7 @@ export function renderVolumeList(orderedBooks, safeSeriesName, actualLibraryId, 
     const infoBannerHtml = (noCoverInfo && state.showTxtNoCoverInfoBanner !== false) ? `
       <div class="vol-warn-banner vol-warn-banner--info">
         <i class="lc lc-info"></i>
-        <span>기본 커버 사용 중 (TXT)</span>
+        <span>${i18n.t('detail.default_cover_txt')}</span>
       </div>
     ` : '';
 

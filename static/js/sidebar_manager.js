@@ -29,7 +29,7 @@ export function syncSidebarResponsiveControls() {
   if (brandHome) {
     brandHome.setAttribute('role', 'button');
     brandHome.setAttribute('tabindex', '0');
-    brandHome.setAttribute('aria-label', 'BookOasis 홈으로 이동');
+    brandHome.setAttribute('aria-label', window.i18n?.t?.('sidebar.brand_home') || 'BookOasis 홈으로 이동');
   }
 }
 

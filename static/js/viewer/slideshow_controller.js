@@ -161,9 +161,32 @@ function stopLoop() {
 }
 
 // ── 화면 꺼짐 방지 ──
+// Wake Lock은 보안 컨텍스트(https/localhost)에서만 있다 - LAN http(192.168.x.x)로 열면 navigator.wakeLock이
+// 아예 없어 화면이 그대로 꺼진다(2026-11-02 AVD 실측). 브라우저마다 한 번만 알린다.
+const WAKE_LOCK_NOTICE_KEY = 'viewer_wakelock_notice_shown';
+
+function notifyWakeLockUnavailable() {
+  try {
+    if (localStorage.getItem(WAKE_LOCK_NOTICE_KEY)) return;
+    localStorage.setItem(WAKE_LOCK_NOTICE_KEY, '1');
+  } catch (e) {
+    return;
+  }
+  if (window.isSecureContext === false) {
+    toast(t('viewer.slideshow_wakelock_insecure', null,
+      'http 주소로 접속 중이라 자동 넘김 중에도 화면이 꺼질 수 있습니다. 기기의 화면 꺼짐 시간을 늘리거나 https 주소로 접속하세요.'), 'info');
+  } else {
+    toast(t('viewer.slideshow_wakelock_unsupported', null,
+      '이 브라우저는 화면 켜짐 유지를 지원하지 않아 자동 넘김 중에도 화면이 꺼질 수 있습니다.'), 'info');
+  }
+}
+
 async function acquireWakeLock() {
   if (!running || wakeLock || document.hidden) return;
-  if (!navigator.wakeLock || typeof navigator.wakeLock.request !== 'function') return;
+  if (!navigator.wakeLock || typeof navigator.wakeLock.request !== 'function') {
+    notifyWakeLockUnavailable();
+    return;
+  }
   try {
     wakeLock = await navigator.wakeLock.request('screen');
     wakeLock.addEventListener('release', () => { wakeLock = null; });

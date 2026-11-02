@@ -13,20 +13,20 @@ export async function renderCollectionsView() {
   const scrollSpinner = document.getElementById('infinite-scroll-spinner');
   if (scrollSpinner) scrollSpinner.style.display = 'none';
 
-  if (indicator) indicator.innerText = '컬렉션 (Collections)';
+  if (indicator) indicator.innerText = i18n.t('collections.indicator');
 
   if (!container) return;
   container.innerHTML = `
     <div style="grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
       <h3 style="margin:0; font-size:1.1rem; color: var(--app-text-primary); display:flex; align-items:center; gap:0.5rem;">
-        <i class="fa-solid fa-bookmark" style="color: var(--app-accent);"></i> 나만의 컬렉션 목록
+        <i class="fa-solid fa-bookmark" style="color: var(--app-accent);"></i> ${i18n.t('collections.list_title')}
       </h3>
       <button id="btn-create-collection-main" class="btn-toggle active" style="padding: 0.4rem 0.9rem; font-size: 0.88rem; background: var(--color-accent); color: var(--app-text-primary); border:none; border-radius:6px; cursor:pointer;">
-        <i class="lc lc-plus"></i> 새 컬렉션 만들기
+        <i class="lc lc-plus"></i> ${i18n.t('collections.create_new')}
       </button>
     </div>
     <div id="collections-grid-list" style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.2rem;">
-      <div style="grid-column:1/-1; text-align:center; padding:3rem; color: var(--app-text-muted);"><i class="lc lc-loader-circle lc-spin"></i> 컬렉션을 불러오는 중...</div>
+      <div style="grid-column:1/-1; text-align:center; padding:3rem; color: var(--app-text-muted);"><i class="lc lc-loader-circle lc-spin"></i> ${i18n.t('collections.loading')}</div>
     </div>
   `;
 
@@ -38,21 +38,21 @@ export async function renderCollectionsView() {
     const res = await fetch(`/api/v1/collections?db_type=${state.currentLibraryType || 'general'}`);
     const data = await res.json();
     if (!data.success) {
-      document.getElementById('collections-grid-list').innerHTML = `<div style="grid-column:1/-1; color:#ef4444; padding:2rem;">오류: ${data.error}</div>`;
+      document.getElementById('collections-grid-list').innerHTML = `<div style="grid-column:1/-1; color:#ef4444; padding:2rem;">${i18n.t('collections.error', { error: data.error })}</div>`;
       return;
     }
 
     const collections = data.collections || [];
-    if (countBadge) countBadge.innerText = `(총 ${collections.length}개 컬렉션)`;
+    if (countBadge) countBadge.innerText = i18n.t('collections.count', { n: collections.length });
 
     if (collections.length === 0) {
       document.getElementById('collections-grid-list').innerHTML = `
         <div style="grid-column: 1 / -1; text-align: center; padding: 4rem 1rem; background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.1); border-radius: 12px;">
           <i class="fa-solid fa-bookmark" style="font-size: 3rem; color: #475569; margin-bottom: 1rem;"></i>
-          <h4 style="margin: 0 0 0.5rem 0; color: var(--app-text-muted);">아직 생성된 컬렉션이 없습니다.</h4>
-          <p style="color: var(--app-text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">도서 우클릭 메뉴에서 [컬렉션에 추가]를 눌러 나만의 묶음을 만들어 보세요!</p>
+          <h4 style="margin: 0 0 0.5rem 0; color: var(--app-text-muted);">${i18n.t('collections.empty_title')}</h4>
+          <p style="color: var(--app-text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">${i18n.t('collections.empty_hint')}</p>
           <button onclick="document.getElementById('btn-create-collection-main').click()" class="btn-toggle active" style="padding: 0.5rem 1.2rem; font-size: 0.9rem; background: var(--color-accent); border:none; border-radius:6px; color: var(--app-text-primary); cursor:pointer;">
-            <i class="lc lc-plus"></i> 지금 첫 컬렉션 만들기
+            <i class="lc lc-plus"></i> ${i18n.t('collections.create_first')}
           </button>
         </div>
       `;
@@ -67,17 +67,17 @@ export async function renderCollectionsView() {
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.8rem;">
             <span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: ${color};"></span>
             <div style="display: flex; gap: 0.4rem;">
-              <button class="btn-edit-coll" data-coll-id="${coll.id}" title="컬렉션 수정" style="background:transparent; border:none; color: var(--app-text-muted); cursor:pointer; font-size:0.85rem;"><i class="lc lc-pen"></i></button>
-              <button class="btn-delete-coll" data-coll-id="${coll.id}" title="컬렉션 삭제" style="background:transparent; border:none; color:#ef4444; cursor:pointer; font-size:0.85rem;"><i class="lc lc-trash-2"></i></button>
+              <button class="btn-edit-coll" data-coll-id="${coll.id}" title="${i18n.t('collections.edit_title')}" style="background:transparent; border:none; color: var(--app-text-muted); cursor:pointer; font-size:0.85rem;"><i class="lc lc-pen"></i></button>
+              <button class="btn-delete-coll" data-coll-id="${coll.id}" title="${i18n.t('collections.delete_title')}" style="background:transparent; border:none; color:#ef4444; cursor:pointer; font-size:0.85rem;"><i class="lc lc-trash-2"></i></button>
             </div>
           </div>
           <div>
             <h4 style="margin: 0 0 0.4rem 0; color: var(--app-text-primary); font-size: 1.05rem; word-break: break-word;">${escapeHtml(coll.name)}</h4>
-            <p style="margin: 0; color: var(--app-text-muted); font-size: 0.82rem; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${coll.description ? escapeHtml(coll.description) : '설명 없음'}</p>
+            <p style="margin: 0; color: var(--app-text-muted); font-size: 0.82rem; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${coll.description ? escapeHtml(coll.description) : i18n.t('collections.no_description')}</p>
           </div>
           <div style="margin-top: 1.2rem; padding-top: 0.8rem; border-top: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--app-text-muted);">
-            <span><i class="lc lc-book" style="color:${color}; margin-right:0.3rem;"></i> ${coll.item_count || 0}개 항목</span>
-            <span style="color: var(--color-accent); font-weight: 500;">열기 <i class="lc lc-chevron-right" style="font-size:0.75rem;"></i></span>
+            <span><i class="lc lc-book" style="color:${color}; margin-right:0.3rem;"></i> ${i18n.t('collections.item_count', { n: coll.item_count || 0 })}</span>
+            <span style="color: var(--color-accent); font-weight: 500;">${i18n.t('collections.open')} <i class="lc lc-chevron-right" style="font-size:0.75rem;"></i></span>
           </div>
         </div>
       `;
@@ -107,14 +107,14 @@ export async function renderCollectionsView() {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const collId = btn.getAttribute('data-coll-id');
-        if (confirm('이 컬렉션을 삭제하시겠습니까? (소속 도서 원본은 삭제되지 않습니다)')) {
+        if (confirm(i18n.t('collections.delete_confirm'))) {
           await deleteCollection(collId);
         }
       });
     });
 
   } catch (err) {
-    document.getElementById('collections-grid-list').innerHTML = `<div style="grid-column:1/-1; color:#ef4444; padding:2rem;">통신 오류: ${err.message}</div>`;
+    document.getElementById('collections-grid-list').innerHTML = `<div style="grid-column:1/-1; color:#ef4444; padding:2rem;">${i18n.t('collections.network_error', { error: err.message })}</div>`;
   }
 }
 
@@ -127,21 +127,21 @@ export async function renderCollectionDetail(collectionId) {
   if (scrollSpinner) scrollSpinner.style.display = 'none';
 
   if (!container) return;
-  container.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:3rem; color: var(--app-text-muted);"><i class="lc lc-loader-circle lc-spin"></i> 컬렉션 상세 정보를 불러오는 중...</div>`;
+  container.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:3rem; color: var(--app-text-muted);"><i class="lc lc-loader-circle lc-spin"></i> ${i18n.t('collections.loading_detail')}</div>`;
 
   try {
     const res = await fetch(`/api/v1/collections/${collectionId}?db_type=${state.currentLibraryType || 'general'}`);
     const data = await res.json();
     if (!data.success) {
-      container.innerHTML = `<div style="grid-column:1/-1; color:#ef4444; padding:2rem;">오류: ${data.error}</div>`;
+      container.innerHTML = `<div style="grid-column:1/-1; color:#ef4444; padding:2rem;">${i18n.t('collections.error', { error: data.error })}</div>`;
       return;
     }
 
     const coll = data.collection;
     const items = coll.items || [];
 
-    if (indicator) indicator.innerText = `컬렉션: ${coll.name}`;
-    if (countBadge) countBadge.innerText = `(총 ${items.length}개 항목)`;
+    if (indicator) indicator.innerText = i18n.t('collections.indicator_named', { name: coll.name });
+    if (countBadge) countBadge.innerText = i18n.t('collections.item_total', { n: items.length });
 
     container.innerHTML = '';
 
@@ -150,14 +150,14 @@ export async function renderCollectionDetail(collectionId) {
     headerCard.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
         <button id="btn-back-to-collections" class="btn-toggle" style="padding:0.35rem 0.8rem; font-size:0.85rem; border-radius:6px; cursor:pointer;">
-          <i class="lc lc-arrow-left"></i> 컬렉션 목록으로 돌아가기
+          <i class="lc lc-arrow-left"></i> ${i18n.t('collections.back')}
         </button>
         <span style="font-size:0.8rem; color: var(--app-text-muted); background:rgba(255,255,255,0.05); padding:0.2rem 0.6rem; border-radius:12px;">
           <i class="lc lc-circle" style="color:${coll.color || '#7c3aed'}; font-size:0.6rem; margin-right:0.3rem;"></i> ${escapeHtml(coll.name)}
         </span>
       </div>
       <h2 style="margin:0.5rem 0 0.3rem 0; color: var(--app-text-primary);">${escapeHtml(coll.name)}</h2>
-      <p style="margin:0; color: var(--app-text-muted); font-size:0.9rem;">${coll.description ? escapeHtml(coll.description) : '등록된 설명이 없습니다.'}</p>
+      <p style="margin:0; color: var(--app-text-muted); font-size:0.9rem;">${coll.description ? escapeHtml(coll.description) : i18n.t('collections.no_description_long')}</p>
     `;
 
     const itemsGrid = document.createElement('div');
@@ -168,7 +168,7 @@ export async function renderCollectionDetail(collectionId) {
       itemsGrid.innerHTML = `
         <div style="grid-column: 1 / -1; text-align: center; padding: 3rem 1rem; color: var(--app-text-muted);">
           <i class="lc lc-folder-open" style="font-size: 2.5rem; color: #475569; margin-bottom: 0.8rem;"></i>
-          <p style="margin:0;">컬렉션에 등록된 항목이 없습니다. 도서/시리즈 우클릭 메뉴에서 [컬렉션에 추가]를 눌러보세요.</p>
+          <p style="margin:0;">${i18n.t('collections.detail_empty')}</p>
         </div>
       `;
     } else {
@@ -176,25 +176,25 @@ export async function renderCollectionDetail(collectionId) {
         const isSeries = item.type === 'series';
         const isAudiobook = item.type === 'audiobook';
         const isVideo = item.type === 'video';
-        const itemTitle = item.title || item.series_name || '제목 없음';
+        const itemTitle = item.title || item.series_name || i18n.t('collections.untitled');
 
         const cardOptions = isSeries ? {
           showVolumeCount: true,
-          actionTitle: '이어읽기',
+          actionTitle: i18n.t('collections.action_resume'),
           onPrimaryClick: (e) => openBookDetail(e, itemTitle, 'all', item.book_id, itemTitle),
           onActionClick: (e) => resumeSeries(e, itemTitle, 'all', item.book_id)
         } : (isAudiobook ? {
-          actionTitle: '재생',
+          actionTitle: i18n.t('collections.action_play'),
           onPrimaryClick: () => window.playAudiobook?.(item.audiobook_id),
           onActionClick: () => window.playAudiobook?.(item.audiobook_id)
         } : (isVideo ? {
           isVideo: true,
-          actionTitle: '상세보기',
+          actionTitle: i18n.t('collections.action_detail'),
           onPrimaryClick: (e) => openBookDetail(e, itemTitle, 'all', item.video_id, itemTitle),
           onActionClick: (e) => openBookDetail(e, itemTitle, 'all', item.video_id, itemTitle)
         } : {
           showProgress: true,
-          actionTitle: '바로 읽기',
+          actionTitle: i18n.t('collections.action_read'),
           onPrimaryClick: (e) => openBookDetail(e, item.book_series || item.series_name || '', 'all', item.book_id, itemTitle),
           onActionClick: (e) => {
             if (window.openReader) window.openReader(item.book_id, item.file_format, itemTitle);
@@ -220,13 +220,13 @@ export async function renderCollectionDetail(collectionId) {
         // 컬렉션 제거 [X] 버튼을 카드 커버 우상단에 세련되게 추가
         const removeBtn = document.createElement('button');
         removeBtn.className = 'btn-remove-item-from-coll';
-        removeBtn.title = '컬렉션에서 제거';
+        removeBtn.title = i18n.t('collections.remove_title');
         removeBtn.style.cssText = 'position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,0.7); border: none; color: #ef4444; width: 26px; height: 26px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; z-index: 10; transition: transform 0.15s ease;';
         removeBtn.innerHTML = '<i class="lc lc-x"></i>';
         removeBtn.onclick = async (e) => {
           e.stopPropagation();
           e.preventDefault();
-          if (confirm(`'${itemTitle}' 항목을 이 컬렉션에서 제거하시겠습니까?`)) {
+          if (confirm(i18n.t('collections.remove_confirm', { title: itemTitle }))) {
             await removeItemFromCollection(collectionId, item.id);
             renderCollectionDetail(collectionId);
           }
@@ -248,7 +248,7 @@ export async function renderCollectionDetail(collectionId) {
     });
 
   } catch (err) {
-    container.innerHTML = `<div style="grid-column:1/-1; color:#ef4444; padding:2rem;">통신 오류: ${err.message}</div>`;
+    container.innerHTML = `<div style="grid-column:1/-1; color:#ef4444; padding:2rem;">${i18n.t('collections.network_error', { error: err.message })}</div>`;
   }
 }
 
@@ -260,23 +260,23 @@ export function openCreateCollectionModal(onCreated) {
     <div id="modal-create-collection" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
       <div style="background: rgba(var(--app-panel-rgb), 1); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); border-radius: 12px; width: 90%; max-width: 420px; padding: 1.5rem; color: var(--app-text-primary); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
         <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
-          <i class="fa-solid fa-bookmark" style="color: var(--app-accent);"></i> 새 컬렉션 생성
+          <i class="fa-solid fa-bookmark" style="color: var(--app-accent);"></i> ${i18n.t('collections.create_title')}
         </h3>
         <div style="margin-bottom: 1rem;">
-          <label style="display: block; font-size: 0.85rem; color: var(--app-text-muted); margin-bottom: 0.3rem;">컬렉션 이름</label>
-          <input type="text" id="input-coll-name" placeholder="예: 심리학 도서 모음" style="width: 100%; box-sizing: border-box; padding: 0.6rem; background: rgba(var(--app-panel-rgb), 0.8); border: 1px solid rgba(var(--app-panel-border-rgb), 0.15); border-radius: 6px; color: var(--app-text-primary); outline: none;">
+          <label style="display: block; font-size: 0.85rem; color: var(--app-text-muted); margin-bottom: 0.3rem;">${i18n.t('collections.name_label')}</label>
+          <input type="text" id="input-coll-name" placeholder="${i18n.t('collections.name_placeholder')}" style="width: 100%; box-sizing: border-box; padding: 0.6rem; background: rgba(var(--app-panel-rgb), 0.8); border: 1px solid rgba(var(--app-panel-border-rgb), 0.15); border-radius: 6px; color: var(--app-text-primary); outline: none;">
         </div>
         <div style="margin-bottom: 1rem;">
-          <label style="display: block; font-size: 0.85rem; color: var(--app-text-muted); margin-bottom: 0.3rem;">설명 (선택)</label>
-          <textarea id="input-coll-desc" placeholder="컬렉션에 대한 간단한 설명..." style="width: 100%; box-sizing: border-box; padding: 0.6rem; background: rgba(var(--app-panel-rgb), 0.8); border: 1px solid rgba(var(--app-panel-border-rgb), 0.15); border-radius: 6px; color: var(--app-text-primary); outline: none; resize: vertical; height: 60px;"></textarea>
+          <label style="display: block; font-size: 0.85rem; color: var(--app-text-muted); margin-bottom: 0.3rem;">${i18n.t('collections.desc_optional')}</label>
+          <textarea id="input-coll-desc" placeholder="${i18n.t('collections.desc_placeholder')}" style="width: 100%; box-sizing: border-box; padding: 0.6rem; background: rgba(var(--app-panel-rgb), 0.8); border: 1px solid rgba(var(--app-panel-border-rgb), 0.15); border-radius: 6px; color: var(--app-text-primary); outline: none; resize: vertical; height: 60px;"></textarea>
         </div>
         <div style="margin-bottom: 1.5rem;">
-          <label style="display: block; font-size: 0.85rem; color: var(--app-text-muted); margin-bottom: 0.3rem;">테마 색상</label>
+          <label style="display: block; font-size: 0.85rem; color: var(--app-text-muted); margin-bottom: 0.3rem;">${i18n.t('collections.color_label')}</label>
           <input type="color" id="input-coll-color" value="#7c3aed" style="width: 60px; height: 35px; border: none; background: transparent; cursor: pointer;">
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 0.6rem;">
-          <button id="btn-cancel-coll-modal" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.08); border: none; border-radius: 6px; color: var(--app-text-muted); cursor: pointer;">취소</button>
-          <button id="btn-save-coll-modal" style="padding: 0.5rem 1.2rem; background: var(--color-accent); border: none; border-radius: 6px; color: var(--app-text-primary); font-weight: 600; cursor: pointer;">생성하기</button>
+          <button id="btn-cancel-coll-modal" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.08); border: none; border-radius: 6px; color: var(--app-text-muted); cursor: pointer;">${i18n.t('collections.cancel')}</button>
+          <button id="btn-save-coll-modal" style="padding: 0.5rem 1.2rem; background: var(--color-accent); border: none; border-radius: 6px; color: var(--app-text-primary); font-weight: 600; cursor: pointer;">${i18n.t('collections.create')}</button>
         </div>
       </div>
     </div>
@@ -293,7 +293,7 @@ export function openCreateCollectionModal(onCreated) {
     const color = document.getElementById('input-coll-color').value;
 
     if (!name) {
-      alert('컬렉션 이름을 입력해 주세요.');
+      alert(i18n.t('collections.name_required'));
       return;
     }
 
@@ -309,10 +309,10 @@ export function openCreateCollectionModal(onCreated) {
         if (onCreated) onCreated(data.collection_id);
         else renderCollectionsView();
       } else {
-        alert(`생성 실패: ${data.error}`);
+        alert(i18n.t('collections.create_failed', { error: data.error }));
       }
     } catch (e) {
-      alert(`오류: ${e.message}`);
+      alert(i18n.t('collections.error', { error: e.message }));
     }
   });
 }
@@ -329,7 +329,7 @@ export function openAddToCollectionModal(itemInfo) {
     .then(r => r.json())
     .then(data => {
       if (!data.success) {
-        alert(`컬렉션 목록 조회 실패: ${data.error}`);
+        alert(i18n.t('collections.list_failed', { error: data.error }));
         return;
       }
       const collections = data.collections || [];
@@ -339,7 +339,7 @@ export function openAddToCollectionModal(itemInfo) {
 
       let listHtml = '';
       if (collections.length === 0) {
-        listHtml = `<div style="text-align:center; padding:1.5rem; color: var(--app-text-muted);">생성된 컬렉션이 없습니다. 아래 버튼으로 먼저 생성해 보세요.</div>`;
+        listHtml = `<div style="text-align:center; padding:1.5rem; color: var(--app-text-muted);">${i18n.t('collections.picker_empty')}</div>`;
       } else {
         collections.forEach(c => {
           listHtml += `
@@ -347,7 +347,7 @@ export function openAddToCollectionModal(itemInfo) {
               <span style="display:flex; align-items:center; gap:0.5rem; color: var(--app-text-primary); font-size:0.95rem;">
                 <i class="lc lc-circle" style="color:${c.color || '#7c3aed'}; font-size:0.6rem;"></i> ${escapeHtml(c.name)}
               </span>
-              <span style="font-size:0.8rem; color: var(--app-text-muted);">(${c.item_count || 0}개)</span>
+              <span style="font-size:0.8rem; color: var(--app-text-muted);">${i18n.t('collections.picker_count', { n: c.item_count || 0 })}</span>
             </div>
           `;
         });
@@ -357,14 +357,14 @@ export function openAddToCollectionModal(itemInfo) {
         <div id="modal-add-to-collection" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
           <div style="background: rgba(var(--app-panel-rgb), 1); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); border-radius: 12px; width: 90%; max-width: 400px; padding: 1.5rem; color: var(--app-text-primary); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
             <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
-              <i class="lc lc-circle-plus" style="color: var(--app-accent);"></i> ${escapeHtml(itemInfo?.title || '컬렉션에 추가')}
+              <i class="lc lc-circle-plus" style="color: var(--app-accent);"></i> ${escapeHtml(itemInfo?.title || i18n.t('collections.add_title'))}
             </h3>
             <div style="margin-bottom: 1rem; max-height: 240px; overflow-y: auto;">
               ${listHtml}
             </div>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 0.8rem; border-top: 1px solid rgba(255,255,255,0.08);">
-              <button id="btn-new-coll-inside" style="padding: 0.4rem 0.8rem; background: color-mix(in srgb, var(--app-accent) 20%, transparent); border: 1px solid var(--app-accent); border-radius: 6px; color: var(--app-accent-hover); cursor: pointer; font-size: 0.85rem;"><i class="lc lc-plus"></i> 새 컬렉션</button>
-              <button id="btn-close-add-coll" style="padding: 0.4rem 1rem; background: rgba(255,255,255,0.08); border: none; border-radius: 6px; color: var(--app-text-muted); cursor: pointer; font-size: 0.85rem;">닫기</button>
+              <button id="btn-new-coll-inside" style="padding: 0.4rem 0.8rem; background: color-mix(in srgb, var(--app-accent) 20%, transparent); border: 1px solid var(--app-accent); border-radius: 6px; color: var(--app-accent-hover); cursor: pointer; font-size: 0.85rem;"><i class="lc lc-plus"></i> ${i18n.t('collections.new_short')}</button>
+              <button id="btn-close-add-coll" style="padding: 0.4rem 1rem; background: rgba(255,255,255,0.08); border: none; border-radius: 6px; color: var(--app-text-muted); cursor: pointer; font-size: 0.85rem;">${i18n.t('collections.close')}</button>
             </div>
           </div>
         </div>
@@ -402,17 +402,17 @@ async function addItemToCollection(collectionId, itemInfo, { silent = false } = 
       });
       const data = await res.json();
       if (data.success) {
-        const skippedText = data.skipped_count > 0 ? ` (이미 있던 ${data.skipped_count}개는 건너뜀)` : '';
-        if (!silent) alert(`컬렉션에 ${data.added_count}개 항목이 추가되었습니다.${skippedText}`);
+        const skippedText = data.skipped_count > 0 ? i18n.t('collections.skipped', { n: data.skipped_count }) : '';
+        if (!silent) alert(i18n.t('collections.added', { n: data.added_count, skipped: skippedText }));
       } else {
-        if (!silent) alert(`추가 실패: ${data.error}`);
+        if (!silent) alert(i18n.t('collections.add_failed', { error: data.error }));
       }
       return data;
     } catch (e) {
-      if (!silent) alert(`오류: ${e.message}`);
+      if (!silent) alert(i18n.t('collections.error', { error: e.message }));
       return { success: false, error: e.message };
     }
-    return { success: false, error: '작가 항목을 추가하지 못했습니다.' };
+    return { success: false, error: i18n.t('collections.author_add_failed') };
   }
 
   try {
@@ -429,13 +429,13 @@ async function addItemToCollection(collectionId, itemInfo, { silent = false } = 
     });
     const data = await res.json();
     if (data.success) {
-      if (!silent) alert('컬렉션에 성공적으로 추가되었습니다!');
+      if (!silent) alert(i18n.t('collections.added_one'));
     } else {
-      if (!silent) alert(`추가 실패: ${data.error}`);
+      if (!silent) alert(i18n.t('collections.add_failed', { error: data.error }));
     }
     return data;
   } catch (e) {
-    if (!silent) alert(`오류: ${e.message}`);
+    if (!silent) alert(i18n.t('collections.error', { error: e.message }));
     return { success: false, error: e.message };
   }
 }
@@ -449,9 +449,9 @@ async function addItemsToCollection(collectionId, items) {
   const addedCount = results.filter(result => result?.success).length;
   const failure = results.find(result => !result?.success);
   if (addedCount === results.length) {
-    alert(`선택한 ${addedCount}개 항목을 컬렉션에 추가했습니다.`);
+    alert(i18n.t('collections.added_selected', { n: addedCount }));
   } else {
-    alert(`선택한 ${results.length}개 중 ${addedCount}개를 추가했습니다.${failure?.error ? ` 첫 오류: ${failure.error}` : ''}`);
+    alert(`${i18n.t('collections.added_partial', { total: results.length, added: addedCount })}${failure?.error ? i18n.t('collections.first_error', { error: failure.error }) : ''}`);
   }
 }
 
@@ -475,10 +475,10 @@ async function deleteCollection(collectionId) {
     if (data.success) {
       renderCollectionsView();
     } else {
-      alert(`삭제 실패: ${data.error}`);
+      alert(i18n.t('collections.delete_failed', { error: data.error }));
     }
   } catch (e) {
-    alert(`오류: ${e.message}`);
+    alert(i18n.t('collections.error', { error: e.message }));
   }
 }
 
@@ -490,23 +490,23 @@ function openEditCollectionModal(coll) {
     <div id="modal-create-collection" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
       <div style="background: rgba(var(--app-panel-rgb), 1); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); border-radius: 12px; width: 90%; max-width: 420px; padding: 1.5rem; color: var(--app-text-primary); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
         <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
-          <i class="lc lc-pen" style="color: var(--app-accent);"></i> 컬렉션 수정
+          <i class="lc lc-pen" style="color: var(--app-accent);"></i> ${i18n.t('collections.edit_title')}
         </h3>
         <div style="margin-bottom: 1rem;">
-          <label style="display: block; font-size: 0.85rem; color: var(--app-text-muted); margin-bottom: 0.3rem;">컬렉션 이름</label>
+          <label style="display: block; font-size: 0.85rem; color: var(--app-text-muted); margin-bottom: 0.3rem;">${i18n.t('collections.name_label')}</label>
           <input type="text" id="input-coll-name" value="${escapeHtml(coll.name)}" style="width: 100%; box-sizing: border-box; padding: 0.6rem; background: rgba(var(--app-panel-rgb), 0.8); border: 1px solid rgba(var(--app-panel-border-rgb), 0.15); border-radius: 6px; color: var(--app-text-primary); outline: none;">
         </div>
         <div style="margin-bottom: 1rem;">
-          <label style="display: block; font-size: 0.85rem; color: var(--app-text-muted); margin-bottom: 0.3rem;">설명</label>
+          <label style="display: block; font-size: 0.85rem; color: var(--app-text-muted); margin-bottom: 0.3rem;">${i18n.t('collections.desc_label')}</label>
           <textarea id="input-coll-desc" style="width: 100%; box-sizing: border-box; padding: 0.6rem; background: rgba(var(--app-panel-rgb), 0.8); border: 1px solid rgba(var(--app-panel-border-rgb), 0.15); border-radius: 6px; color: var(--app-text-primary); outline: none; resize: vertical; height: 60px;">${coll.description ? escapeHtml(coll.description) : ''}</textarea>
         </div>
         <div style="margin-bottom: 1.5rem;">
-          <label style="display: block; font-size: 0.85rem; color: var(--app-text-muted); margin-bottom: 0.3rem;">테마 색상</label>
+          <label style="display: block; font-size: 0.85rem; color: var(--app-text-muted); margin-bottom: 0.3rem;">${i18n.t('collections.color_label')}</label>
           <input type="color" id="input-coll-color" value="${coll.color || '#7c3aed'}" style="width: 60px; height: 35px; border: none; background: transparent; cursor: pointer;">
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 0.6rem;">
-          <button id="btn-cancel-coll-modal" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.08); border: none; border-radius: 6px; color: var(--app-text-muted); cursor: pointer;">취소</button>
-          <button id="btn-save-coll-modal" style="padding: 0.5rem 1.2rem; background: var(--color-accent); border: none; border-radius: 6px; color: var(--app-text-primary); font-weight: 600; cursor: pointer;">저장하기</button>
+          <button id="btn-cancel-coll-modal" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.08); border: none; border-radius: 6px; color: var(--app-text-muted); cursor: pointer;">${i18n.t('collections.cancel')}</button>
+          <button id="btn-save-coll-modal" style="padding: 0.5rem 1.2rem; background: var(--color-accent); border: none; border-radius: 6px; color: var(--app-text-primary); font-weight: 600; cursor: pointer;">${i18n.t('collections.save')}</button>
         </div>
       </div>
     </div>
@@ -523,7 +523,7 @@ function openEditCollectionModal(coll) {
     const color = document.getElementById('input-coll-color').value;
 
     if (!name) {
-      alert('컬렉션 이름을 입력해 주세요.');
+      alert(i18n.t('collections.name_required'));
       return;
     }
 
@@ -538,10 +538,10 @@ function openEditCollectionModal(coll) {
         document.getElementById('modal-create-collection')?.remove();
         renderCollectionsView();
       } else {
-        alert(`수정 실패: ${data.error}`);
+        alert(i18n.t('collections.update_failed', { error: data.error }));
       }
     } catch (e) {
-      alert(`오류: ${e.message}`);
+      alert(i18n.t('collections.error', { error: e.message }));
     }
   });
 }

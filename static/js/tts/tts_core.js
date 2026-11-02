@@ -403,7 +403,7 @@ export async function resumableFetch(url, {
         received += value.byteLength;
         onProgress?.({ received, total, fromCache: false });
       }
-      if (total !== null && received < total) throw new Error(`${source}: 응답이 ${received}/${total}바이트에서 끝남`);
+      if (total !== null && received < total) throw new Error(`${source}: response ended at ${received}/${total} bytes`);
       break;
     } catch (e) {
       // 4xx는 다시 받아도 같으므로 바로 실패 (429만 예외)

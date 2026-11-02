@@ -104,9 +104,11 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
       0: '전체이용가', 15: '15세이상', 18: '18세이상(성인)',
       19: '성인망가', 20: '포르노',
     };
-    const ratingLabel = meta.content_rating_label || ratingLabelMap[ratingLevel] || '포르노';
+    const ratingLabelKo = meta.content_rating_label || ratingLabelMap[ratingLevel] || '포르노';
+    const ratingKey = `detail.rating_level_${ratingLevel}`;
+    const ratingLabel = i18n.t(ratingKey) !== ratingKey ? i18n.t(ratingKey) : ratingLabelKo;
     ratingBadgeHtml = `
-      <span class="badge detail-badge" data-role="detail-rating-badge" title="열람 등급" style="--badge-color: ${colors.fg};">
+      <span class="badge detail-badge" data-role="detail-rating-badge" title="${i18n.t('detail.rating_badge_title')}" style="--badge-color: ${colors.fg};">
         <i class="lc lc-shield-half"></i>${ratingLabel}
       </span>
     `;
@@ -123,9 +125,12 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
   };
   const publicationStatusLabel = meta.publication_status_label || '알 수 없음';
   const publicationStatusColors = publicationStatusColorMap[publicationStatusLabel] || { fg: '#94a3b8' };
+  const publicationStatusCode = ['0', '1', '2'].includes(String(meta.publication_status ?? '')) ? String(meta.publication_status) : 'unknown';
+  const publicationStatusKey = `detail.publication_status_${publicationStatusCode}`;
+  const publicationStatusText = i18n.t(publicationStatusKey) !== publicationStatusKey ? i18n.t(publicationStatusKey) : publicationStatusLabel;
   const publicationStatusBadgeHtml = `
-    <span class="badge detail-badge" data-role="detail-publication-status-badge" title="연재 상태" style="--badge-color: ${publicationStatusColors.fg};">
-      <i class="fa-solid fa-bookmark"></i>${escapeHtml(publicationStatusLabel)}
+    <span class="badge detail-badge" data-role="detail-publication-status-badge" title="${i18n.t('detail.publication_status_title')}" style="--badge-color: ${publicationStatusColors.fg};">
+      <i class="fa-solid fa-bookmark"></i>${escapeHtml(publicationStatusText)}
     </span>
   `;
 
@@ -168,12 +173,12 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
   };
 
   const genreRowHtml = buildChipRow(genresArr, {
-    kind: 'genre', label: '장르', icon: 'lc lc-tag', dataAttr: 'data-genre',
-    role: 'detail-genre-filter', toggleTitle: '클릭하여 전체 장르 펼치기',
+    kind: 'genre', label: i18n.t('detail.chip_genre'), icon: 'lc lc-tag', dataAttr: 'data-genre',
+    role: 'detail-genre-filter', toggleTitle: i18n.t('detail.chip_genre_expand'),
   });
   const tagRowHtml = buildChipRow(tagsArr, {
-    kind: 'tag', label: '태그', icon: 'lc lc-hash', dataAttr: 'data-tag',
-    role: 'detail-tag-filter', toggleTitle: '클릭하여 전체 태그 펼치기',
+    kind: 'tag', label: i18n.t('detail.chip_tag'), icon: 'lc lc-hash', dataAttr: 'data-tag',
+    role: 'detail-tag-filter', toggleTitle: i18n.t('detail.chip_tag_expand'),
   });
 
   const missingPageBooks = books.filter((book) => {
@@ -291,7 +296,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
     let tooltipTitle = '';
     if (continueReason === 'in-progress') {
       btnLabel = isVideoBtnContext
-        ? '이어보기'
+        ? i18n.t('detail.continue_watching')
         : isAudioContext
           ? (i18n.t('detail.continue_listening') || '이어서 듣기')
           : (i18n.t('detail.continue_reading') || '이어서 읽기');
@@ -299,7 +304,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
       iconClass = isVideoBtnContext ? 'lc lc-clapperboard' : isAudioContext ? 'lc lc-headphones' : 'lc lc-play';
     } else if (continueReason === 'recent') {
       btnLabel = isVideoBtnContext
-        ? '이어보기'
+        ? i18n.t('detail.continue_watching')
         : isAudioContext
           ? (i18n.t('detail.continue_listening') || '이어서 듣기')
           : (i18n.t('detail.continue_reading') || '이어서 읽기');
@@ -307,7 +312,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
       iconClass = isVideoBtnContext ? 'lc lc-clapperboard' : isAudioContext ? 'lc lc-headphones' : 'lc lc-play';
     } else {
       btnLabel = isVideoBtnContext
-        ? '처음부터 보기'
+        ? i18n.t('detail.start_watching')
         : isAudioContext
           ? (i18n.t('detail.start_listening') || '처음부터 듣기')
           : (i18n.t('detail.start_reading') || '첫 권부터 읽기');
@@ -339,7 +344,8 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
   }
 
   const isLocked = Number(meta && meta.metadata_locked) === 1 || (books && books.some((book) => Number(book.metadata_locked) === 1));
-  const summaryTextRaw = meta.summary || i18n.t('detail.no_description');
+  // 서버는 설명이 없으면 한국어 기본 문구를 넣어 보낸다 - 화면에는 현재 언어로
+  const summaryTextRaw = (!meta.summary || meta.summary === '등록된 설명이 없습니다.') ? i18n.t('detail.no_description') : meta.summary;
   const summaryText = escapeHtml(summaryTextRaw);
   const summaryLineBreaks = (String(summaryTextRaw).match(/\n/g) || []).length;
   const shouldShowSummaryToggle = String(summaryTextRaw).length > 260 || summaryLineBreaks >= 5;
@@ -372,19 +378,19 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
   const identifierValue = escapeHtml((isAudiobookContext || isVideoContext) ? (meta.web_id || '-') : (meta.isbn || '-'));
   const identifierEditValue = escapeHtml((isAudiobookContext || isVideoContext) ? (meta.web_id || '') : (meta.isbn || ''));
   const detailLockedBadgeHtml = isLocked ? `
-    <div class="book-card-locked-badge" title="메타데이터 잠김 (수동 편집됨)">
+    <div class="book-card-locked-badge" title="${i18n.t('book_list.metadata_locked')}">
       <i class="lc lc-lock"></i>
     </div>
   ` : '';
   const unlockBtnHtml = isLocked ? `
     <button type="button" class="detail-more-item btn-unlock-metadata" data-role="detail-unlock-metadata" data-series-name="${safeSeriesName.replace(/"/g, '&quot;')}" data-library-id="${actualLibraryId}" data-book-id="${isAudiobookContext ? (meta.id || '') : (firstBookId || '')}" title="메타데이터 잠금을 해제하고 자동 스캔 갱신을 허용합니다">
-      <i class="lc lc-lock-open"></i> 잠금해제
+      <i class="lc lc-lock-open"></i> ${i18n.t('detail.unlock_metadata')}
     </button>
   ` : '';
   // 그리드 카드에서 이 표시를 없애고(카드가 많을 때 잡음이 심했음) 상세화면에서만
   // 보여주기로 함 - has_metadata는 book_detail_service.py가 계산해서 내려준다.
   const metadataMissingBadgeHtml = (!isMusicContext && Number(meta && meta.has_metadata) === 0) ? `
-    <span class="detail-metadata-missing-badge" title="메타데이터 정보 없음" aria-label="메타데이터 정보 없음">
+    <span class="detail-metadata-missing-badge" title="${i18n.t('detail.metadata_missing_title')}" aria-label="${i18n.t('detail.metadata_missing_title')}">
       <i class="lc lc-unlink" aria-hidden="true"></i> ${i18n.t('detail.metadata_missing') || '메타데이터 없음'}
     </span>
   ` : '';
@@ -410,22 +416,22 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
           <button type="button" id="btn-plugin-meta-search" class="detail-more-item" data-role="detail-plugin-meta-search" data-book-id="${firstBookId || ''}" data-series-name="${safeSeriesName.replace(/"/g, '&quot;')}"><i class="lc lc-search"></i> ${i18n.t('detail.btn_search_meta')}</button>
   `;
   const rescanSeriesBtnHtml = isVideoContext ? '' : `
-          <button type="button" class="detail-more-item" data-role="detail-rescan-series" data-series-name="${safeSeriesName.replace(/"/g, '&quot;')}" data-library-id="${actualLibraryId}"><i class="lc lc-refresh-cw"></i> ${isMusicContext ? '재스캔' : i18n.t('detail.btn_rescan_series')}</button>
+          <button type="button" class="detail-more-item" data-role="detail-rescan-series" data-series-name="${safeSeriesName.replace(/"/g, '&quot;')}" data-library-id="${actualLibraryId}"><i class="lc lc-refresh-cw"></i> ${isMusicContext ? i18n.t('detail.rescan_short') : i18n.t('detail.btn_rescan_series')}</button>
   `;
-  const volumeCountLabel = isVideoContext ? `${books.length}편` : `${books.length}권`;
+  const volumeCountLabel = i18n.t(isVideoContext ? 'book_list.video_episodes' : 'detail.volume_count', { n: books.length });
   // 원격 음악은 재생 전엔 곡 길이를 모르므로(0) 모든 곡 길이를 알 때만 총 재생시간을 보인다
   const musicTotalSeconds = books.length > 0 && books.every((book) => Number(book.duration) > 0)
     ? books.reduce((sum, book) => sum + Number(book.duration), 0)
     : 0;
   const musicMetaHtml = isMusicContext ? [
     meta.author && meta.author !== '-' ? `<span class="meta-item"><i class="lc lc-user"></i> ${escapeHtml(meta.author)}</span>` : '',
-    `<span class="meta-item"><i class="lc lc-music"></i> ${books.length}곡</span>`,
+    `<span class="meta-item"><i class="lc lc-music"></i> ${i18n.t('detail.track_count', { n: books.length })}</span>`,
     musicTotalSeconds > 0 ? `<span class="meta-item"><i class="lc lc-clock"></i> ${formatClockDuration(musicTotalSeconds)}</span>` : '',
     meta.music_year ? `<span class="meta-item"><i class="lc lc-calendar"></i> ${escapeHtml(meta.music_year)}</span>` : '',
     meta.music_genres ? `<span class="meta-item"><i class="lc lc-tag"></i> ${escapeHtml(meta.music_genres)}</span>` : '',
   ].join('') : '';
   const musicShuffleBtnHtml = isMusicContext ? `
-          <button class="ridi-link-btn" data-role="detail-music-shuffle" data-audiobook-id="${meta.id || ''}"><i class="lc lc-shuffle"></i> 셔플 재생</button>
+          <button class="ridi-link-btn" data-role="detail-music-shuffle" data-audiobook-id="${meta.id || ''}"><i class="lc lc-shuffle"></i> ${i18n.t('detail.shuffle_play')}</button>
   ` : '';
   if (isMusicContext && continueTarget) {
     // 음악은 이어듣기가 없다: 항상 1번 곡부터 [재생]
@@ -433,7 +439,7 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
       <button class="ridi-link-btn ridi-link-btn--primary"
               data-role="detail-continue" data-continue-action="audio" data-audiobook-id="${meta.id || ''}"
               data-track-id="${books[0] ? books[0].id : ''}" data-start-time="0">
-        <i class="lc lc-play"></i> 재생
+        <i class="lc lc-play"></i> ${i18n.t('collections.action_play')}
       </button>
     `;
   }
@@ -523,8 +529,8 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
         <h3 class="book-detail-title" style="margin-bottom: 0.5rem; font-size: 1.3rem;">${i18n.t('detail.edit_title')} <span style="font-size: 0.8rem; color: var(--app-text-muted); font-weight: normal; margin-left: 0.5rem;">${i18n.t('detail.edit_subtitle')}</span></h3>
         <div class="edit-meta-form-group">
           <div class="edit-meta-row-item">
-            <label>시리즈 별칭 (Alias)</label>
-            <input type="text" id="edit-series-alias-input" class="edit-meta-input" value="${escapeHtml(meta.series_alias || '')}" placeholder="기본 폴더명 대신 표시할 제목">
+            <label>${i18n.t('detail.series_alias_label')}</label>
+            <input type="text" id="edit-series-alias-input" class="edit-meta-input" value="${escapeHtml(meta.series_alias || '')}" placeholder="${i18n.t('detail.series_alias_placeholder')}">
           </div>
           <div class="edit-meta-row-item">
             <label>${i18n.t('detail.label_author')}</label>
@@ -559,8 +565,8 @@ export function renderDetailHeader(meta, books, safeSeriesName, actualLibraryId,
               <option value="ma15+" ${booksLvValue === 'ma15+' ? 'selected' : ''}>ma15+</option>
               <option value="m" ${booksLvValue === 'm' ? 'selected' : ''}>m</option>
               <option value="15세" ${booksLvValue === '15세' ? 'selected' : ''}>15세</option>
-              <option value="r18" ${isAdultMangaRating ? 'selected' : ''}>R18 (성인망가)</option>
-              <option value="adult only 18+" ${isPornRating ? 'selected' : ''}>Adult Only 18+ (포르노)</option>
+              <option value="r18" ${isAdultMangaRating ? 'selected' : ''}>${i18n.t('detail.lv_r18')}</option>
+              <option value="adult only 18+" ${isPornRating ? 'selected' : ''}>${i18n.t('detail.lv_adult_only')}</option>
               <option value="18세" ${['18세', '18세이상', '18세이상(성인)', '성인'].includes(booksLvValue) ? 'selected' : ''}>18세</option>
             </select>
           </div>

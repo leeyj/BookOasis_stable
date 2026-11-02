@@ -81,13 +81,13 @@ function renderPlayerModal(startTime = 0) {
       <video id="video-player-el" controls autoplay playsinline webkit-playsinline style="width:100%; max-height:70vh; background:#000; border-radius:8px;"
              src="/api/media/videos/${currentMeta.id}/episodes/${episode.id}/stream">${episode.has_subtitle ? `<track kind="subtitles" src="/api/media/videos/${currentMeta.id}/episodes/${episode.id}/subtitle" srclang="ko" label="자막" default>` : ''}</video>
       <div style="display:flex; justify-content:center; align-items:center; gap:0.8rem;">
-        <button data-role="video-player-prev" ${hasPrev ? '' : 'disabled'} title="이전 회차" style="${transportBtnStyle(hasPrev)} width:3rem; height:3rem;">
+        <button data-role="video-player-prev" ${hasPrev ? '' : 'disabled'} title="${i18n.t('audio.prev_episode')}" style="${transportBtnStyle(hasPrev)} width:3rem; height:3rem;">
           <i class="lc lc-skip-back"></i>
         </button>
-        <button data-role="video-player-toggle" title="재생/일시정지" style="${transportBtnStyle(true)} width:3.6rem; height:3.6rem; background:rgba(168,85,247,0.25); border-color:rgba(168,85,247,0.5); font-size:1.2rem;">
+        <button data-role="video-player-toggle" title="${i18n.t('audio.play_pause')}" style="${transportBtnStyle(true)} width:3.6rem; height:3.6rem; background:rgba(168,85,247,0.25); border-color:rgba(168,85,247,0.5); font-size:1.2rem;">
           <i class="lc lc-pause" data-role="video-player-toggle-icon"></i>
         </button>
-        <button data-role="video-player-next" ${hasNext ? '' : 'disabled'} title="다음 회차" style="${transportBtnStyle(hasNext)} width:3rem; height:3rem;">
+        <button data-role="video-player-next" ${hasNext ? '' : 'disabled'} title="${i18n.t('audio.next_episode')}" style="${transportBtnStyle(hasNext)} width:3rem; height:3rem;">
           <i class="lc lc-skip-forward"></i>
         </button>
       </div>
@@ -236,9 +236,9 @@ export async function openVideoPlayer(videoId, episodeId = null, startTime = 0) 
   } catch (err) {
     console.error('[VideoPlayer] Error opening video player:', err);
     if (typeof window.showToast === 'function') {
-      window.showToast('영상 강좌 정보를 불러오지 못했습니다.', 'error');
+      window.showToast(i18n.t('audio.video_load_failed'), 'error');
     } else {
-      alert('영상 강좌 정보를 불러오지 못했습니다.');
+      alert(i18n.t('audio.video_load_failed'));
     }
   }
 }

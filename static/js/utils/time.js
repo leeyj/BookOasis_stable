@@ -62,11 +62,12 @@ export function formatClockDuration(totalSeconds, { emptyLabel = null } = {}) {
 }
 
 // 초 단위 재생시간을 "H시간 M분" 서술형으로 표시한다 (영상 강좌 목록 카드 등 클록 포맷이 아닌 곳에서 사용).
-export function formatDurationLong(totalSeconds, { emptyLabel = '분석전' } = {}) {
+export function formatDurationLong(totalSeconds, { emptyLabel = (globalThis.i18n?.t?.('detail.video_not_analyzed') || '분석전') } = {}) {
   const sec = Math.max(0, Math.floor(Number(totalSeconds) || 0));
   if (sec <= 0) return emptyLabel;
   const hours = Math.floor(sec / 3600);
   const minutes = Math.floor((sec % 3600) / 60);
-  if (hours > 0) return `${hours}시간 ${minutes}분`;
-  return `${minutes}분`;
+  const tt = (key, vars, fb) => { const s = globalThis.i18n?.t?.(key, vars); return s && s !== key ? s : fb; };
+  if (hours > 0) return tt('common.duration_hm', { h: hours, m: minutes }, `${hours}시간 ${minutes}분`);
+  return tt('common.duration_m', { m: minutes }, `${minutes}분`);
 }

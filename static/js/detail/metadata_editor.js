@@ -140,11 +140,11 @@ export async function saveManualMetadata(seriesName, _libraryId = '', audiobookI
 
 export async function handleUnlockMetadataEvent(event, seriesName, libraryId, bookId) {
   if (event) event.stopPropagation();
-  if (!confirm('이 시리즈/도서의 메타데이터 잠금을 해제하시겠습니까?\n해제 후 스캔 시 메타데이터 및 커버가 다시 자동 업데이트됩니다.')) {
+  if (!confirm(i18n.t('detail.unlock_confirm'))) {
     return;
   }
   if (typeof window.showGlobalLoadingSpinner === 'function') {
-    window.showGlobalLoadingSpinner('메타데이터 잠금을 해제하는 중입니다...');
+    window.showGlobalLoadingSpinner(i18n.t('detail.unlocking'));
   }
   try {
     const res = await api.unlockMetadata(state.currentLibraryType, seriesName, libraryId, bookId);
@@ -153,9 +153,9 @@ export async function handleUnlockMetadataEvent(event, seriesName, libraryId, bo
     }
     if (res && res.success) {
       if (typeof window.showToast === 'function') {
-        window.showToast('메타데이터 잠금이 해제되었습니다.');
+        window.showToast(i18n.t('detail.unlocked'));
       } else {
-        alert('메타데이터 잠금이 해제되었습니다.');
+        alert(i18n.t('detail.unlocked'));
       }
       if (typeof window.openBookDetail === 'function') {
         window.openBookDetail(null, seriesName, libraryId, state.detailRepresentativeBookId, state.detailDisplayTitle);
@@ -164,13 +164,13 @@ export async function handleUnlockMetadataEvent(event, seriesName, libraryId, bo
         window.loadBooksList(false);
       }
     } else {
-      alert(`잠금 해제 실패: ${res.error || '오류가 발생했습니다.'}`);
+      alert(i18n.t('detail.unlock_failed', { error: res.error || i18n.t('detail.server_comm_error') }));
     }
   } catch (e) {
     if (typeof window.hideGlobalLoadingSpinner === 'function') {
       window.hideGlobalLoadingSpinner();
     }
     console.error('unlockMetadata 에러:', e);
-    alert('잠금 해제 처리 중 오류가 발생했습니다.');
+    alert(i18n.t('detail.unlock_error'));
   }
 }

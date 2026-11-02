@@ -8,7 +8,7 @@
 function notifyLoadFailure() {
   try {
     if (typeof window.showToast === 'function') {
-      window.showToast('화면 구성 요소를 불러오지 못했습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.', 'error');
+      window.showToast(i18n.t('common.module_load_failed'), 'error');
     }
   } catch (e) {}
 }

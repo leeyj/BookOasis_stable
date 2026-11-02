@@ -205,7 +205,7 @@ export function setAnnotationMarker(doc, annotationId, marker) {
   sup.className = PLUGIN_MARKER_CLASS;
   sup.dataset.annotationId = String(annotationId);
   sup.textContent = marker;
-  sup.title = '플러그인이 추가 정보를 남겼습니다';
+  sup.title = i18n.t('viewer.plugin_note');
   sup.style.cssText = 'margin-left:1px; color:#fbbf24; user-select:none;';
   lastMark.insertAdjacentElement('afterend', sup);
 }

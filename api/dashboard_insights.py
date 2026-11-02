@@ -2,6 +2,7 @@
 from flask import Blueprint, jsonify, request, session
 import datetime
 from collections import Counter
+from utils.i18n import _t
 from services.reading_history_service import ReadingHistoryService
 from repositories.settings_repository import SettingsRepository
 from repositories.reading_progress_repository import ReadingProgressRepository
@@ -115,22 +116,23 @@ def get_dashboard_insights():
                     g_name = str(genre).strip()
                 elif fmt and str(fmt).strip():
                     fmt_str = str(fmt).strip().upper()
+                    # 표시 이름은 요청 언어(bookoasis_lang 쿠키)로
                     if fmt_str in ('CBZ', 'CBR', 'ZIP', 'RAR'):
-                        g_name = '만화책 (' + fmt_str + ')'
+                        g_name = _t('dashboard.genre_comic', fmt=fmt_str)
                     elif fmt_str == 'EPUB':
-                        g_name = '전자책 (EPUB)'
+                        g_name = _t('dashboard.genre_epub')
                     elif fmt_str == 'TXT':
-                        g_name = '텍스트 (TXT)'
+                        g_name = _t('dashboard.genre_txt')
                     elif fmt_str == 'PDF':
-                        g_name = '문서 (PDF)'
+                        g_name = _t('dashboard.genre_pdf')
                     elif fmt_str in ('MP3', 'M4B'):
-                        g_name = '오디오북 (' + fmt_str + ')'
+                        g_name = _t('dashboard.genre_audiobook', fmt=fmt_str)
                     elif fmt_str == 'VIDEO':
-                        g_name = '영상 강좌'
+                        g_name = _t('dashboard.genre_video')
                     else:
-                        g_name = fmt_str + ' 도서'
+                        g_name = _t('dashboard.genre_other_format', fmt=fmt_str)
                 else:
-                    g_name = '기타/단행본'
+                    g_name = _t('dashboard.genre_misc')
                 
                 counts[g_name] += 1
 

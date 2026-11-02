@@ -69,7 +69,7 @@ export function loadCustomFontsList() {
 
           // 기존 기본 옵션만 남기고 초기화
           select.innerHTML = `
-            <option value="gothic">나눔고딕</option>
+            <option value="gothic">${i18n.t('viewer.font_nanum_gothic')}</option>
             <option value="pretendard">Pretendard</option>
           `;
           sortedFontsDesc.forEach(font => {
@@ -216,7 +216,7 @@ export function syncViewerThemeUI() {
 
   const label = document.getElementById('viewer-theme-label');
   if (label) {
-    label.textContent = themeObj.label || '다크';
+    label.textContent = i18n.t(`viewer.theme_short_${themeObj.name || 'dark'}`);
   }
 }
 
@@ -344,7 +344,7 @@ window.setScrollMode = function (mode) {
       gap: 0.5rem;
     ">
       <i class="lc lc-refresh-cw" style="color:var(--app-accent); font-size:1rem;"></i>
-      보기 모드 전환 중...
+      ${i18n.t('viewer.switching_mode')}
     </div>
   `;
   if (viewerBody) viewerBody.appendChild(banner);

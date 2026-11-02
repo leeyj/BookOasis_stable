@@ -38,9 +38,9 @@ function ensurePopoverEl() {
 }
 
 function bookCountLabel() {
-  if (state.currentLibraryType === 'audiobook') return '트랙 수';
-  if (state.currentLibraryType === 'video') return '편수';
-  return '도서 권수';
+  if (state.currentLibraryType === 'audiobook') return i18n.t('book_list.info_track_count');
+  if (state.currentLibraryType === 'video') return i18n.t('book_list.info_episode_count');
+  return i18n.t('book_list.info_book_count');
 }
 
 function escapeHtml(str) {
@@ -59,8 +59,8 @@ function renderPopoverContent(item) {
   if (!isCustomCategory) {
     const label = item ? String(item.textContent || '').replace(/\s+/g, ' ').trim() : '';
     popover.innerHTML = `
-      <div class="category-info-popover-title"><i class="lc lc-info"></i> ${escapeHtml(label || '카테고리 정보')}</div>
-      <div class="category-info-popover-empty">경로/시리즈·도서 수 정보가 없는 항목입니다.</div>
+      <div class="category-info-popover-title"><i class="lc lc-info"></i> ${escapeHtml(label || i18n.t('book_list.category_info_title'))}</div>
+      <div class="category-info-popover-empty">${i18n.t('book_list.info_none')}</div>
     `;
     return;
   }
@@ -72,10 +72,10 @@ function renderPopoverContent(item) {
     <div class="category-info-popover-title"><i class="${window.boIcon(escapeHtml(item.dataset.icon || 'fa-book'))}" style="color: ${escapeHtml(item.dataset.color || 'var(--app-accent)')};"></i> ${escapeHtml(name)}</div>
     <dl style="margin: 0;">
       <div class="category-info-popover-row"><dt>ID</dt><dd>${escapeHtml(id)}</dd></div>
-      <div class="category-info-popover-row"><dt>카테고리 명</dt><dd>${escapeHtml(name)}</dd></div>
-      <div class="category-info-popover-row"><dt>등록 경로</dt><dd>${escapeHtml(path)}</dd></div>
-      <div class="category-info-popover-row"><dt>시리즈 수</dt><dd data-role="category-info-series-count">불러오는 중...</dd></div>
-      <div class="category-info-popover-row"><dt>${escapeHtml(bookCountLabel())}</dt><dd data-role="category-info-book-count">불러오는 중...</dd></div>
+      <div class="category-info-popover-row"><dt>${i18n.t('book_list.info_name')}</dt><dd>${escapeHtml(name)}</dd></div>
+      <div class="category-info-popover-row"><dt>${i18n.t('book_list.info_path')}</dt><dd>${escapeHtml(path)}</dd></div>
+      <div class="category-info-popover-row"><dt>${i18n.t('book_list.info_series_count')}</dt><dd data-role="category-info-series-count">${i18n.t('tv.loading')}</dd></div>
+      <div class="category-info-popover-row"><dt>${escapeHtml(bookCountLabel())}</dt><dd data-role="category-info-book-count">${i18n.t('tv.loading')}</dd></div>
     </dl>
   `;
 

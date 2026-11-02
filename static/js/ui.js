@@ -327,7 +327,7 @@ export function createBookCard(item, options = {}) {
       ? Number(item.total_tracks)
       : ((item.book_count !== undefined && Number(item.book_count) > 0) ? Number(item.book_count) : 0);
     subTextHtml = episodes > 0
-      ? `<p class="book-card-sub-video"><i class="lc lc-clapperboard"></i> ${episodes}편</p>`
+      ? `<p class="book-card-sub-video"><i class="lc lc-clapperboard"></i> ${i18n.t('book_list.video_episodes', { n: episodes })}</p>`
       : '';
   } else if (isAudiobook) {
     const chapters = (item.total_tracks !== undefined && Number(item.total_tracks) > 0)
@@ -358,7 +358,7 @@ export function createBookCard(item, options = {}) {
   const favIconClass = isFav ? 'fa-solid fa-star' : 'lc lc-star';
   const favoriteTargetName = rawSeriesName || displayTitle;
   const favBtnHtml = `
-    <button class="btn-card-fav-toggle ${isFav ? 'active' : ''}" title="즐겨찾기 토글" data-role="card-favorite-toggle" data-favorite-name="${favoriteTargetName.replace(/"/g, '&quot;')}" data-book-id="${item.id || ''}" data-next-status="${isFav ? 0 : 1}">
+    <button class="btn-card-fav-toggle ${isFav ? 'active' : ''}" title="${i18n.t('detail.toggle_fav_book')}" data-role="card-favorite-toggle" data-favorite-name="${favoriteTargetName.replace(/"/g, '&quot;')}" data-book-id="${item.id || ''}" data-next-status="${isFav ? 0 : 1}">
       <i class="${favIconClass}"></i>
     </button>
   `;
@@ -368,7 +368,7 @@ export function createBookCard(item, options = {}) {
   const currentUser = state.currentUser || window.currentUser || {};
   const isAdminUser = String(currentUser.role || '').trim().toLowerCase() === 'admin';
   const infoBtnHtml = (isAdminUser && isBookCard && !item.is_author_group && card.dataset.bookId)
-    ? `<button type="button" class="btn-card-info-toggle" data-role="card-info-toggle" title="정보" aria-label="정보"><i class="lc lc-info" aria-hidden="true"></i></button>`
+    ? `<button type="button" class="btn-card-info-toggle" data-role="card-info-toggle" title="${i18n.t('card_info.title')}" aria-label="${i18n.t('card_info.title')}"><i class="lc lc-info" aria-hidden="true"></i></button>`
     : '';
 
   const lazyPlaceholder = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
@@ -384,7 +384,7 @@ export function createBookCard(item, options = {}) {
   let lockedBadgeHtml = '';
   if (item.metadata_locked === 1 || item.metadata_locked === '1') {
     lockedBadgeHtml = `
-      <div class="book-card-locked-badge" title="메타데이터 잠김 (수동 편집됨)">
+      <div class="book-card-locked-badge" title="${i18n.t('book_list.metadata_locked')}">
         <i class="lc lc-lock"></i>
       </div>
     `;
@@ -415,10 +415,10 @@ export function createBookCard(item, options = {}) {
   const isSelectableCard = options.allowSelection && !item.is_author_group;
   if (isSelectableCard) card.classList.add('book-card--selectable');
   const selectionToggleHtml = isSelectableCard
-    ? `<button type="button" class="book-card-select-toggle" data-role="book-card-select-toggle" aria-pressed="false" aria-label="작품 선택" title="작품 선택"><i class="lc lc-check" aria-hidden="true"></i></button>`
+    ? `<button type="button" class="book-card-select-toggle" data-role="book-card-select-toggle" aria-pressed="false" aria-label="${i18n.t('book_list.select_work')}" title="${i18n.t('book_list.select_work')}"><i class="lc lc-check" aria-hidden="true"></i></button>`
     : '';
   const resumeButtonHtml = showResumeAction
-    ? `<button class="btn-resume-series" title="${options.actionTitle || '읽기'}"><i class="lc lc-book-open"></i></button>`
+    ? `<button class="btn-resume-series" title="${options.actionTitle || i18n.t('book_list.action_read')}"><i class="lc lc-book-open"></i></button>`
     : '';
 
   card.innerHTML = `
@@ -594,7 +594,7 @@ export function renderHistoryGrid(booksList) {
     const card = createBookCard(item, isSeriesHistory ? {
       showVolumeCount: true,
       markUnreadScope: 'series',
-      actionTitle: '이어읽기',
+      actionTitle: i18n.t('collections.action_resume'),
       onPrimaryClick: (e) => openBookDetail(e, item.series_name || normalizedTitle, item.library_id, item.representative_book_id, item.series_alias || item.series_name || normalizedTitle),
       onActionClick: (e) => {
         if (typeof window.resumeSeries === 'function') {
@@ -604,7 +604,7 @@ export function renderHistoryGrid(booksList) {
     } : {
       showProgress: true,
       markUnreadScope: 'series',
-      actionTitle: '이어읽기',
+      actionTitle: i18n.t('collections.action_resume'),
       onPrimaryClick: (e) => openBookDetail(e, item.series_name || normalizedTitle, item.library_id, item.id),
       onActionClick: (e) => {
         if (state.currentLibraryType === 'video') {
@@ -632,7 +632,7 @@ export function buildSeriesGridCard(item, priority) {
     showVolumeCount: true,
     allowSelection: !isSpecialCategory && (state.currentLibraryType === 'general' || state.currentLibraryType === 'adult'),
     markUnreadScope: 'series',
-    actionTitle: '이어읽기',
+    actionTitle: i18n.t('collections.action_resume'),
     imagePriority: priority,
     onPrimaryClick: item.is_author_group
       ? (e) => window.onAuthorGroupCardClick?.(item)
@@ -732,7 +732,7 @@ export function renderDashboardHistory(booksList) {
       hideTitle: true,
       markUnreadScope: 'series',
       lazyLoad: false,
-      actionTitle: '이어읽기',
+      actionTitle: i18n.t('collections.action_resume'),
       onPrimaryClick: (e) => {
         console.log('[Dashboard-ReadingHistory] Card Primary Clicked (Opening Detail):', { targetSeriesName, targetLibraryId, targetBookId });
         if (typeof window.openBookDetail === 'function') {
@@ -763,7 +763,7 @@ export function renderDashboardRecentlyAdded(booksList) {
   if (!container) return;
 
   if (booksList.length === 0) {
-    container.innerHTML = '<div class="loading-spinner loading-spinner--compact">최근에 추가된 도서가 없습니다.</div>';
+    container.innerHTML = `<div class="loading-spinner loading-spinner--compact">${i18n.t('book_list.no_recent_added')}</div>`;
     return;
   }
 
@@ -775,7 +775,7 @@ export function renderDashboardRecentlyAdded(booksList) {
       isNew: true,
       hideTitle: true,
       lazyLoad: false,
-      actionTitle: '바로읽기',
+      actionTitle: i18n.t('collections.action_read'),
       onPrimaryClick: (e) => openBookDetail(e, item.series_name || normalizedTitle, item.library_id, item.id),
       onActionClick: (e) => {
         if (state.currentLibraryType === 'video') {
@@ -836,8 +836,7 @@ window.toggleCardFavoriteEvent = async (event, name, bookId, nextStatus, authorK
   console.log(`[Favorite-Action] 토글 API 응답 결과:`, res);
 
   if (res && res.success) {
-    const statusText = requestedStatus === 1 ? '등록' : '해제';
-    showToast(`"${name}" 즐겨찾기가 ${statusText}되었습니다.`, 'success');
+    showToast(i18n.t(requestedStatus === 1 ? 'book_list.fav_added' : 'book_list.fav_removed', { name }), 'success');
 
     if (state.currentLibraryId === 'home') {
       if (typeof window.loadDashboardData === 'function') window.loadDashboardData();
@@ -849,6 +848,6 @@ window.toggleCardFavoriteEvent = async (event, name, bookId, nextStatus, authorK
   } else {
     // 실패 시 UI 복원
     if (btn && snapshot) restoreFavoriteState(btn, snapshot);
-    showToast('즐겨찾기 업데이트에 실패했습니다.', 'error');
+    showToast(i18n.t('book_list.fav_update_failed'), 'error');
   }
 };

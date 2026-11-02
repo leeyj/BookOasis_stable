@@ -309,7 +309,7 @@ function injectKioskBackButton(returnUrl) {
   btn.id = 'kiosk-back-btn';
   btn.type = 'button';
   btn.className = 'kiosk-back-btn';
-  btn.title = '돌아가기';
+  btn.title = i18n.t('book_list.go_back');
   btn.innerHTML = '<i class="lc lc-arrow-left"></i>';
   btn.addEventListener('click', () => {
     window.location.href = returnUrl;
@@ -929,7 +929,7 @@ export async function selectCategory(id, skipHistory = false, options = {}) {
         window.loadVideoCourseGrid(numericId);
       } else {
         const container = document.getElementById('books-list-container');
-        if (container) container.innerHTML = '<div class="loading-spinner">좌측에서 영상 강좌 라이브러리를 선택하거나, 없다면 + 버튼으로 추가해 주세요.</div>';
+        if (container) container.innerHTML = `<div class="loading-spinner">${i18n.t('book_list.video_pick_library')}</div>`;
       }
     } else if (id === 'history') {
       loadReadingHistory();

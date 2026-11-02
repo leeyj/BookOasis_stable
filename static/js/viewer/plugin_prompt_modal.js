@@ -50,7 +50,7 @@ export function showPluginPromptModal(spec = {}) {
     const submitBtn = modal.querySelector('[data-role="plugin-prompt-submit"]');
     const cancelBtn = modal.querySelector('[data-role="plugin-prompt-cancel"]');
 
-    titleEl.textContent = spec.title || '입력';
+    titleEl.textContent = spec.title || i18n.t('context_menu.prompt_input');
     if (spec.message) {
       msgEl.textContent = spec.message;
       msgEl.style.display = 'block';
@@ -63,7 +63,7 @@ export function showPluginPromptModal(spec = {}) {
     input.value = spec.default_value ?? spec.defaultValue ?? '';
     input.placeholder = spec.placeholder || '';
     input.rows = spec.multiline === false ? 1 : 4;
-    submitBtn.textContent = spec.submit_label ?? spec.submitLabel ?? '확인';
+    submitBtn.textContent = spec.submit_label ?? spec.submitLabel ?? i18n.t('context_menu.prompt_ok');
 
     modal.style.display = 'flex';
     input.focus();

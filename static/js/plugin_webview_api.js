@@ -70,7 +70,7 @@ function showWhitelistPrompt(url) {
   // 정확히 어떤 호스트가 막혔는지 보여준다 — 예: apex(example.com)만 등록해둔 상태에서
   // www.example.com처럼 서브도메인이 요청되면 별개 호스트로 취급되어 거부되는데,
   // 이 사실이 안 보이면 사용자가 뭘 더 등록해야 할지 알 수 없다.
-  const message = `허용 목록에 없는 도메인입니다: ${host}\n설정 > 외부 도메인 탭에서 추가해주세요. (서브도메인까지 포함하려면 *.도메인 형태로 등록)`;
+  const message = i18n.t('plugin_view.domain_not_allowed', { host });
   if (typeof window.showToast === 'function') {
     window.showToast(message, 'error');
   }
@@ -127,7 +127,7 @@ function closeWebviewModal() {
 export async function openWebview(url) {
   const host = extractHost(url);
   if (!host) {
-    if (typeof window.showToast === 'function') window.showToast('URL 형식이 올바르지 않습니다.', 'error');
+    if (typeof window.showToast === 'function') window.showToast(i18n.t('plugin_view.invalid_url'), 'error');
     return;
   }
 
@@ -143,7 +143,7 @@ export async function openWebview(url) {
   try {
     const probe = await fetch(proxyUrl);
     if (!probe.ok) {
-      let message = '외부 페이지를 불러오지 못했습니다.';
+      let message = i18n.t('plugin_view.page_load_failed');
       try {
         const errData = await probe.json();
         message = errData.message || message;
@@ -152,7 +152,7 @@ export async function openWebview(url) {
       return;
     }
   } catch (e) {
-    if (typeof window.showToast === 'function') window.showToast('외부 페이지 요청 중 오류가 발생했습니다.', 'error');
+    if (typeof window.showToast === 'function') window.showToast(i18n.t('plugin_view.page_request_error'), 'error');
     return;
   }
 
@@ -174,7 +174,7 @@ export async function openWebview(url) {
 export async function getProxyUrl(url) {
   const host = extractHost(url);
   if (!host) {
-    if (typeof window.showToast === 'function') window.showToast('URL 형식이 올바르지 않습니다.', 'error');
+    if (typeof window.showToast === 'function') window.showToast(i18n.t('plugin_view.invalid_url'), 'error');
     return null;
   }
   const patterns = await loadWhitelistCache();
@@ -197,7 +197,7 @@ export async function getProxyUrl(url) {
 export async function getStreamProxyUrl(url) {
   const host = extractHost(url);
   if (!host) {
-    if (typeof window.showToast === 'function') window.showToast('URL 형식이 올바르지 않습니다.', 'error');
+    if (typeof window.showToast === 'function') window.showToast(i18n.t('plugin_view.invalid_url'), 'error');
     return null;
   }
   const patterns = await loadWhitelistCache();
@@ -225,16 +225,17 @@ export function getCachedImageUrl(url) {
 /**
  * 플러그인이 외부 URL의 파일을 지정한 라이브러리로 다운로드+임포트한다.
  * @param {string} url
- * @param {{libraryId: number|string, dbType?: string}} options
+ * @param {{libraryId: number|string, dbType?: string, folder?: string}} options
+ *   folder: 라이브러리 루트 아래 저장할 하위 폴더(예: 시리즈명, '작가/시리즈'). 생략하면 루트.
  */
 export async function downloadToLibrary(url, options = {}) {
   const host = extractHost(url);
   if (!host) {
-    if (typeof window.showToast === 'function') window.showToast('URL 형식이 올바르지 않습니다.', 'error');
+    if (typeof window.showToast === 'function') window.showToast(i18n.t('plugin_view.invalid_url'), 'error');
     return { success: false, error: 'invalid_url' };
   }
   if (!options.libraryId) {
-    if (typeof window.showToast === 'function') window.showToast('다운로드 대상 라이브러리가 지정되지 않았습니다.', 'error');
+    if (typeof window.showToast === 'function') window.showToast(i18n.t('plugin_view.download_no_library'), 'error');
     return { success: false, error: 'missing_library_id' };
   }
 
@@ -244,7 +245,7 @@ export async function downloadToLibrary(url, options = {}) {
     return { success: false, error: 'not_whitelisted' };
   }
 
-  if (typeof window.showToast === 'function') window.showToast('다운로드를 시작합니다...', 'info');
+  if (typeof window.showToast === 'function') window.showToast(i18n.t('plugin_view.download_start'), 'info');
 
   try {
     const res = await fetch('/api/webview/download', {
@@ -253,26 +254,27 @@ export async function downloadToLibrary(url, options = {}) {
       body: JSON.stringify({
         url,
         library_id: options.libraryId,
-        db_type: options.dbType || 'general'
+        db_type: options.dbType || 'general',
+        folder: options.folder || undefined
       })
     });
     const data = await res.json();
 
     if (!res.ok || !data.success) {
-      if (typeof window.showToast === 'function') window.showToast(data.message || '다운로드에 실패했습니다.', 'error');
+      if (typeof window.showToast === 'function') window.showToast(data.message || i18n.t('plugin_view.download_failed'), 'error');
       return data;
     }
 
     if (!data.imported_as_book) {
-      if (typeof window.showToast === 'function') window.showToast('파일은 저장되었지만 지원되는 도서 형식이 아니어서 목록에 표시되지 않습니다.', 'error');
+      if (typeof window.showToast === 'function') window.showToast(i18n.t('plugin_view.download_unsupported'), 'error');
     } else if (data.scan_error) {
-      if (typeof window.showToast === 'function') window.showToast('다운로드는 완료됐지만 자동 스캔에 실패했습니다. 수동 스캔을 실행해주세요.', 'error');
+      if (typeof window.showToast === 'function') window.showToast(i18n.t('plugin_view.download_scan_failed'), 'error');
     } else {
-      if (typeof window.showToast === 'function') window.showToast(`"${data.filename}" 다운로드 및 등록이 완료되었습니다.`, 'success');
+      if (typeof window.showToast === 'function') window.showToast(i18n.t('plugin_view.download_done', { name: data.filename }), 'success');
     }
     return data;
   } catch (e) {
-    if (typeof window.showToast === 'function') window.showToast('다운로드 요청 중 오류가 발생했습니다.', 'error');
+    if (typeof window.showToast === 'function') window.showToast(i18n.t('plugin_view.download_error'), 'error');
     return { success: false, error: 'request_failed' };
   }
 }

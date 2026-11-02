@@ -97,11 +97,11 @@ export function applyLibraryTypeButtonState(type) {
 export async function switchLibraryType(type) {
   if (!canAccessLibraryType(type)) {
     if (type === 'adult') {
-      alert('성인 도서관 접근 권한이 없습니다.');
+      alert(i18n.t('sidebar.no_adult_access'));
     } else if (type === 'audiobook') {
-      alert('오디오북 도서관 접근 권한이 없습니다.');
+      alert(i18n.t('sidebar.no_audiobook_access'));
     } else if (type === 'video') {
-      alert('영상 강좌 접근 권한이 없습니다.');
+      alert(i18n.t('sidebar.no_video_access'));
     }
     return;
   }

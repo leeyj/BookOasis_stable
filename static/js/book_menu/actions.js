@@ -46,16 +46,16 @@ async function scan(target, ui) {
         { scope: scanScope }
       );
       if (!result?.success) {
-        vm.showToast(result?.error || '다중 도서 스캔 요청에 실패했습니다.', 'error');
+        vm.showToast(result?.error || i18n.t('context_menu.multi_scan_failed'), 'error');
         return;
       }
       ui.close();
       clearBookSelection();
       refreshSystemStatus();
-      vm.showToast(result.message || `선택한 ${selectedBooks.length}개 작품의 스캔을 대기열에 추가했습니다.`, 'success');
+      vm.showToast(result.message || i18n.t('context_menu.multi_scan_queued', { n: selectedBooks.length }), 'success');
     } catch (error) {
       console.error('[BookContextMenu] 다중 스캔 요청 실패:', error);
-      vm.showToast('다중 도서 스캔 요청 중 서버 통신 오류가 발생했습니다.', 'error');
+      vm.showToast(i18n.t('context_menu.multi_scan_error'), 'error');
     }
     return;
   }
@@ -64,17 +64,17 @@ async function scan(target, ui) {
     try {
       const result = await api.enqueueBatchBookScan(state.currentLibraryType, [id], { scope: scanScope });
       if (!result?.success) {
-        vm.showToast(result?.error || `"${title}" 스캔 요청에 실패했습니다.`, 'error');
+        vm.showToast(result?.error || i18n.t('context_menu.scan_failed', { title }), 'error');
         return;
       }
 
       ui.close();
       clearBookSelection();
       refreshSystemStatus();
-      vm.showToast(result.message || `"${title}" 스캔이 대기열에 추가되었습니다.`, 'success');
+      vm.showToast(result.message || i18n.t('context_menu.scan_queued', { title }), 'success');
     } catch (err) {
       console.error('단일 도서 스캔 대기열 등록 오류:', err);
-      vm.showToast('도서 스캔 요청 중 서버 통신 오류가 발생했습니다.', 'error');
+      vm.showToast(i18n.t('context_menu.scan_error'), 'error');
     }
   });
 }
@@ -95,11 +95,11 @@ async function lazyScan(target, ui) {
     const result = seriesTarget
       ? await api.triggerSeriesLazyScan(state.currentLibraryType, seriesTarget.libraryId, seriesTarget.seriesName)
       : await api.triggerBooksLazyScan(state.currentLibraryType, bookIds);
-    vm.showToast(result?.success ? result.message : (result?.error || 'Lazy-Scanner 요청에 실패했습니다.'), result?.success ? 'success' : 'error');
+    vm.showToast(result?.success ? result.message : (result?.error || i18n.t('context_menu.lazy_failed')), result?.success ? 'success' : 'error');
     if (result?.success) clearBookSelection();
   } catch (error) {
     console.error('[BookContextMenu] Lazy-Scanner 요청 실패:', error);
-    vm.showToast('Lazy-Scanner 요청 중 서버 통신 오류가 발생했습니다.', 'error');
+    vm.showToast(i18n.t('context_menu.lazy_error'), 'error');
   }
 }
 
@@ -112,7 +112,7 @@ function searchMeta(target) {
     if (typeof window.openMetadataSearchQueue === 'function') {
       window.openMetadataSearchQueue(selectedBooks.map(book => ({ id: book.id, title: book.title })));
     } else {
-      import('../view_manager.js').then(vm => vm.showToast('다중 메타정보 검색 기능을 불러오지 못했습니다.', 'error'));
+      import('../view_manager.js').then(vm => vm.showToast(i18n.t('context_menu.multi_meta_load_failed'), 'error'));
     }
     return;
   }
@@ -131,7 +131,7 @@ function addToCollection(target) {
   import('../tab_collections.js').then((colls) => {
     if (selectedBooks.length > 1) {
       colls.openAddToCollectionModal({
-        title: `선택한 ${selectedBooks.length}개 작품`,
+        title: i18n.t('context_menu.selected_works', { n: selectedBooks.length }),
         items: selectedBooks.map(book => ({ book_id: book.id, title: book.title })),
       });
     } else {
@@ -153,7 +153,7 @@ function addSeriesToCollection(target) {
     if (!seriesItems.length) return;
     import('../tab_collections.js').then((colls) => {
       colls.openAddToCollectionModal({
-        title: `선택한 ${seriesItems.length}개 시리즈`,
+        title: i18n.t('context_menu.selected_series', { n: seriesItems.length }),
         items: seriesItems,
       });
     });
@@ -280,14 +280,14 @@ async function markUnread(target, ui) {
               libraryId: book.libraryId,
             });
             if (result?.success) succeeded += 1;
-            else failures.push({ title: book.title, error: result?.error || '변경 실패' });
+            else failures.push({ title: book.title, error: result?.error || i18n.t('context_menu.change_failed_short') });
           } catch (error) {
-            failures.push({ title: book.title, error: error.message || '서버 통신 오류' });
+            failures.push({ title: book.title, error: error.message || i18n.t('context_menu.server_error_short') });
           }
         }
 
         vm.showToast(
-          `선택 항목 읽지 않음 처리: ${succeeded}/${uniqueTargets.size}개${failures.length ? ` (실패 ${failures.length}개)` : ''}`,
+          i18n.t('context_menu.bulk_unread_result', { done: succeeded, total: uniqueTargets.size }) + (failures.length ? i18n.t('context_menu.bulk_failed_suffix', { n: failures.length }) : ''),
           failures.length ? 'warning' : 'success'
         );
         if (failures.length) console.warn('[BookContextMenu] 다중 읽지 않음 처리 실패:', failures);
@@ -305,17 +305,16 @@ async function markUnread(target, ui) {
         libraryId,
       });
       if (res.success) {
-        const targetLabel = isSeriesScope ? '시리즈 전체가' : '도서가';
-        vm.showToast(`"${title}" ${targetLabel} 읽지 않은 상태(0%)로 변경되었습니다.`, 'success');
+        vm.showToast(i18n.t(isSeriesScope ? 'context_menu.series_marked_unread' : 'context_menu.book_marked_unread', { title }), 'success');
         removeUnreadTargetCards({ id, isSeriesScope, seriesName, libraryId });
         ui.close();
         await refreshAfterReadStateChange(libraryId);
       } else {
-        vm.showToast(`변경 실패: ${res.error}`, 'error');
+        vm.showToast(i18n.t('context_menu.change_failed', { error: res.error }), 'error');
       }
     } catch (err) {
       console.error('도서 읽지않음 처리 API 에러:', err);
-      vm.showToast('서버 통신 중 오류가 발생했습니다.', 'error');
+      vm.showToast(i18n.t('detail.server_comm_error'), 'error');
     }
   });
 }
@@ -335,16 +334,15 @@ async function markRead(target, ui) {
         libraryId,
       });
       if (res.success) {
-        const targetLabel = isSeriesScope ? '시리즈 전체가' : '도서가';
-        vm.showToast(`"${title}" ${targetLabel} 읽은 상태(완독)로 변경되었습니다.`, 'success');
+        vm.showToast(i18n.t(isSeriesScope ? 'context_menu.series_marked_read' : 'context_menu.book_marked_read', { title }), 'success');
         ui.close();
         await refreshAfterReadStateChange(libraryId);
       } else {
-        vm.showToast(`변경 실패: ${res.error}`, 'error');
+        vm.showToast(i18n.t('context_menu.change_failed', { error: res.error }), 'error');
       }
     } catch (err) {
       console.error('도서 읽음 처리 API 에러:', err);
-      vm.showToast('서버 통신 중 오류가 발생했습니다.', 'error');
+      vm.showToast(i18n.t('detail.server_comm_error'), 'error');
     }
   });
 }

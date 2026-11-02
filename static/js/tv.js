@@ -9,10 +9,10 @@
 
   var SORT_CYCLE = { asc: 'desc', desc: 'date_desc', date_desc: 'date_asc', date_asc: 'asc' };
   var SORT_LABELS = {
-    asc: { icon: 'fa-sort-alpha-down', label: '가나다 오름차순' },
-    desc: { icon: 'fa-sort-alpha-up', label: '가나다 내림차순' },
-    date_desc: { icon: 'fa-sort-numeric-down-alt', label: '최신 추가순' },
-    date_asc: { icon: 'fa-sort-numeric-up', label: '과거 추가순' }
+    asc: { icon: 'fa-sort-alpha-down', label: '가나다 오름차순', key: 'tv.sort_asc' },
+    desc: { icon: 'fa-sort-alpha-up', label: '가나다 내림차순', key: 'tv.sort_desc' },
+    date_desc: { icon: 'fa-sort-numeric-down-alt', label: '최신 추가순', key: 'tv.sort_date_desc' },
+    date_asc: { icon: 'fa-sort-numeric-up', label: '과거 추가순', key: 'tv.sort_date_asc' }
   };
 
   var state = {
@@ -26,6 +26,11 @@
   var loginPopupOpenedForUnauthorized = false;
 
   function $(id) { return document.getElementById(id); }
+
+  // i18n.js가 없거나 아직 사전이 없으면 한국어 그대로
+  function tt(key, fallback, vars) {
+    return window.i18n ? window.i18n.t(key, vars || {}, fallback) : fallback;
+  }
 
   function escapeHtml(str) {
     return String(str == null ? '' : str)
@@ -81,7 +86,7 @@
     card.className = 'tv-card';
     card.tabIndex = 0;
 
-    var title = item.series_alias || item.series_name || item.title_alias || item.title || '제목 없음';
+    var title = item.series_alias || item.series_name || item.title_alias || item.title || tt('tv.untitled', '제목 없음');
     var cover = resolveCoverSrc(item.cover_image);
     var pagesRead = Number(item.pages_read || 0);
     var totalPages = Number(item.total_pages || 0);
@@ -112,7 +117,7 @@
     if (!track) return;
     track.innerHTML = '';
     if (!items || items.length === 0) {
-      track.innerHTML = '<div class="tv-empty">표시할 항목이 없습니다.</div>';
+      track.innerHTML = '<div class="tv-empty">' + tt('tv.empty_row', '표시할 항목이 없습니다.') + '</div>';
       return;
     }
     var fragment = document.createDocumentFragment();
@@ -160,7 +165,7 @@
     $('tv-home-view').style.display = 'none';
     $('tv-category-view').style.display = '';
     $('tv-category-title').textContent = name;
-    $('tv-category-grid').innerHTML = '<div class="tv-row-loading">불러오는 중...</div>';
+    $('tv-category-grid').innerHTML = '<div class="tv-row-loading">' + tt('tv.loading', '불러오는 중...') + '</div>';
     $('tv-category-more').style.display = 'none';
     setActiveDrawerItem(triggerEl || null);
     loadCategoryPage(false);
@@ -171,7 +176,7 @@
     var toggle = $('tv-sort-toggle');
     if (!toggle) return;
     toggle.querySelector('i').className = window.boIcon(info.icon);
-    $('tv-sort-label').textContent = info.label;
+    $('tv-sort-label').textContent = tt(info.key, info.label);
   }
 
   function cycleSort() {
@@ -184,7 +189,7 @@
 
   function loadCategoryPage(append) {
     if (!state.category) return;
-    if (!append) $('tv-category-grid').innerHTML = '<div class="tv-row-loading">불러오는 중...</div>';
+    if (!append) $('tv-category-grid').innerHTML = '<div class="tv-row-loading">' + tt('tv.loading', '불러오는 중...') + '</div>';
     var url = '/api/media/list?type=' + TV_TYPE +
       '&library_id=' + encodeURIComponent(state.category.id) +
       '&sort=' + encodeURIComponent(state.sort) +
@@ -194,7 +199,7 @@
       var items = (data.success && data.series) ? data.series : [];
       if (!append) grid.innerHTML = '';
       if (!items || items.length === 0) {
-        if (!append) grid.innerHTML = '<div class="tv-empty">이 카테고리에 콘텐츠가 없습니다.</div>';
+        if (!append) grid.innerHTML = '<div class="tv-empty">' + tt('tv.empty_category', '이 카테고리에 콘텐츠가 없습니다.') + '</div>';
         $('tv-category-more').style.display = 'none';
         return;
       }
@@ -205,7 +210,7 @@
       $('tv-category-more').style.display = data.has_more ? '' : 'none';
       if (!append) focusFirstCard(grid);
     }).catch(function () {
-      if (!append) $('tv-category-grid').innerHTML = '<div class="tv-empty">불러오지 못했습니다.</div>';
+      if (!append) $('tv-category-grid').innerHTML = '<div class="tv-empty">' + tt('tv.load_failed', '불러오지 못했습니다.') + '</div>';
     });
   }
 
@@ -242,13 +247,13 @@
     });
 
     if (plugins.length > 0) {
-      html += '<div class="tv-drawer-group-header"><i class="lc lc-puzzle"></i>플러그인</div>';
+      html += '<div class="tv-drawer-group-header"><i class="lc lc-puzzle"></i>' + tt('tv.plugins', '플러그인') + '</div>';
       plugins.forEach(function (plugin) {
         html += '<button type="button" class="tv-drawer-item" data-plugin-id="' + escapeHtml(plugin.id) + '" data-name="' + escapeHtml(plugin.title || plugin.name || '') + '"><i class="' + escapeHtml(window.boIcon(plugin.icon || 'lc lc-puzzle')) + '"></i><span>' + escapeHtml(plugin.title || plugin.name || '') + '</span></button>';
       });
     }
 
-    list.innerHTML = html || '<div class="tv-empty" style="padding:1rem 1.4rem;">카테고리가 없습니다.</div>';
+    list.innerHTML = html || '<div class="tv-empty" style="padding:1rem 1.4rem;">' + tt('tv.no_categories', '카테고리가 없습니다.') + '</div>';
 
     list.querySelectorAll('.tv-drawer-item[data-library-id]').forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -307,7 +312,7 @@
   function updateAccountBadge() {
     var nameEl = $('tv-account-name');
     var user = window.__tvUser;
-    nameEl.textContent = user ? user.username : '로그인';
+    nameEl.textContent = user ? user.username : tt('tv.login', '로그인');
   }
 
   function renderAccountPopupState() {
@@ -317,7 +322,7 @@
     if (user) {
       userBox.style.display = '';
       loginForm.style.display = 'none';
-      $('tv-account-popup-username').textContent = user.username + (user.role === 'admin' ? ' (관리자)' : '');
+      $('tv-account-popup-username').textContent = user.username + (user.role === 'admin' ? tt('tv.admin_suffix', ' (관리자)') : '');
     } else {
       userBox.style.display = 'none';
       loginForm.style.display = '';
@@ -376,11 +381,11 @@
         loadDrawer();
         loadHomeRows();
       } else {
-        errorEl.textContent = (result.data && result.data.error) || '로그인에 실패했습니다.';
+        errorEl.textContent = (result.data && result.data.error) || tt('tv.login_failed', '로그인에 실패했습니다.');
         errorEl.style.display = '';
       }
     }).catch(function () {
-      errorEl.textContent = '서버에 연결할 수 없습니다.';
+      errorEl.textContent = tt('tv.server_unreachable', '서버에 연결할 수 없습니다.');
       errorEl.style.display = '';
     });
   }
@@ -640,5 +645,9 @@
     loadDrawer();
   }
 
-  document.addEventListener('DOMContentLoaded', init);
+  // 번역 사전을 먼저 받고(실패해도 진행) 화면 글자를 바꾼 뒤 시작한다
+  document.addEventListener('DOMContentLoaded', function () {
+    var ready = window.i18n ? window.i18n.init().then(function () { window.i18n.translateDOM(); }) : Promise.resolve();
+    ready.catch(function () {}).then(init);
+  });
 })();

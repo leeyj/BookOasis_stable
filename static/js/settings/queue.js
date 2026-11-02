@@ -162,7 +162,7 @@ function buildQueueRowInnerHtml(task, index, t) {
             <td style="padding: 1rem; color: var(--app-text-primary);">${getQueueTaskTypeName(task.type, t)}</td>
             <td style="padding: 1rem; color: var(--app-text-primary); font-weight: 500;">${task.library_name || t('queue.system')}</td>
             <td style="padding: 1rem; color: var(--app-text-muted); font-size: 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                <span>시작: ${task.started_at || '-'}</span>
+                <span>${t('queue.started_at', { time: task.started_at || '-' })}</span>
                 ${cancelButton}
             </td>
         `;

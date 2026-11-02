@@ -221,7 +221,7 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
         const recList = document.getElementById('recommend-candidates-list');
         if (recSection && recList) {
           recSection.style.display = 'block';
-          recList.innerHTML = `<div style="font-size:0.75rem; color: var(--app-text-muted);"><i class="lc lc-loader-circle lc-spin"></i> 추천 후보를 찾는 중...</div>`;
+          recList.innerHTML = `<div style="font-size:0.75rem; color: var(--app-text-muted);"><i class="lc lc-loader-circle lc-spin"></i> ${i18n.t('detail.rec_searching')}</div>`;
           api.fetchMetaRecommend(state.currentLibraryType, seriesName).then(res => {
             if (res.success && res.recommends && res.recommends.length > 0) {
               recList.innerHTML = renderRecommendList(res.recommends, seriesName);
@@ -250,13 +250,13 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
                     } else {
                       alert(i18n.t('modal.apply_fail', {error: copyRes.error}));
                       e.target.disabled = false;
-                      e.target.innerText = '이 정보로 채우기';
+                      e.target.innerText = i18n.t('detail.rec_fill');
                     }
                   } catch (err) {
                     console.error('메타데이터 복사 오류:', err);
                     alert(i18n.t('modal.server_error'));
                     e.target.disabled = false;
-                    e.target.innerText = '이 정보로 채우기';
+                    e.target.innerText = i18n.t('detail.rec_fill');
                   }
                 });
               });
@@ -379,7 +379,7 @@ function renderInteractiveRatingStars(root, libType, ratingContext, widgetData) 
   const draw = (data, disabled) => {
     const myRating = Math.max(0, Math.min(5, Math.round((Number(data.my_rating) || 0) * 2) / 2));
     const avgText = data.count > 0
-      ? `<span class="detail-score-summary">(${data.count}명 평균 ${Number(data.average || 0).toFixed(1)})</span>`
+      ? `<span class="detail-score-summary">${i18n.t('detail.score_summary', { count: data.count, avg: Number(data.average || 0).toFixed(1) })}</span>`
       : '';
     let starsHtml = '';
     for (let i = 1; i <= 5; i += 1) {
@@ -399,7 +399,7 @@ function renderInteractiveRatingStars(root, libType, ratingContext, widgetData) 
     try {
       const res = await api.submitRating(libType, ratingContext, rating);
       if (!res.success) {
-        alert(res.error || '별점 제출에 실패했습니다.');
+        alert(res.error || i18n.t('detail.score_submit_failed'));
         draw(previous, false);
         return;
       }
@@ -407,7 +407,7 @@ function renderInteractiveRatingStars(root, libType, ratingContext, widgetData) 
       draw(res, false);
     } catch (err) {
       console.error('[Detail] 별점 제출 실패:', err);
-      alert('별점 제출 중 오류가 발생했습니다.');
+      alert(i18n.t('detail.score_submit_error'));
       draw(previous, false);
     }
   };
@@ -483,7 +483,7 @@ function renderDetailSidebarWidgetItem(item, fallbackLibraryId) {
     file_format: item.file_format,
     library_id: libraryId,
   }, {
-    actionTitle: '이어읽기',
+    actionTitle: i18n.t('collections.action_resume'),
     onPrimaryClick: (e) => openBookDetail(e, seriesName || item.title, libraryId, bookId, seriesName || item.title),
     onActionClick: (e) => {
       if (typeof window.resumeSeries === 'function') {

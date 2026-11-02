@@ -161,19 +161,19 @@ export async function submitUserForm(e) {
   const has_adult_access = document.getElementById('user-form-adult-access').checked;
 
   if (!username) {
-    alert(i18n.t('settings.users_add_fail', {error: '사용자 아이디를 입력해 주세요.'}));
+    alert(i18n.t('settings.users_add_fail', {error: i18n.t('settings.users_username_required')}));
     return;
   }
   if (username.length > MAX_USERNAME_LENGTH) {
-    alert(i18n.t('settings.users_add_fail', {error: `사용자 아이디는 최대 ${MAX_USERNAME_LENGTH}자까지 허용됩니다.`}));
+    alert(i18n.t('settings.users_add_fail', {error: i18n.t('settings.users_username_max', { n: MAX_USERNAME_LENGTH })}));
     return;
   }
   if (password.length < MIN_PASSWORD_LENGTH) {
-    alert(i18n.t('settings.users_add_fail', {error: `비밀번호는 최소 ${MIN_PASSWORD_LENGTH}자 이상이어야 합니다.`}));
+    alert(i18n.t('settings.users_add_fail', {error: i18n.t('settings.users_password_min', { n: MIN_PASSWORD_LENGTH })}));
     return;
   }
   if (password.length > MAX_PASSWORD_LENGTH) {
-    alert(i18n.t('settings.users_add_fail', {error: `비밀번호는 최대 ${MAX_PASSWORD_LENGTH}자까지 허용됩니다.`}));
+    alert(i18n.t('settings.users_add_fail', {error: i18n.t('settings.users_password_max', { n: MAX_PASSWORD_LENGTH })}));
     return;
   }
 

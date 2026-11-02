@@ -99,7 +99,7 @@ export async function loadDashboardInsights(libraryType = 'general') {
           `;
         }).join('');
       } else {
-        currentlyContainer.innerHTML = `<div style="text-align: center; color: var(--app-text-muted); font-size: 0.78rem; padding: 0.4rem 0;" data-i18n="dashboard.insights_no_currently">${(window.t && window.t('dashboard.insights_no_currently')) || '현재 진행 중인 도서가 없습니다.'}</div>`;
+        currentlyContainer.innerHTML = `<div style="text-align: center; color: var(--app-text-muted); font-size: 0.78rem; padding: 0.4rem 0;" data-i18n="dashboard.insights_no_currently">${(window.i18n?.t && window.i18n.t('dashboard.insights_no_currently')) || '현재 진행 중인 도서가 없습니다.'}</div>`;
       }
     }
 
@@ -141,7 +141,7 @@ export async function loadDashboardInsights(libraryType = 'general') {
           </div>
         `).join('');
       } else {
-        genreContainer.innerHTML = `<div style="text-align: center; color: var(--app-text-muted); font-size: 0.78rem;" data-i18n="dashboard.insights_no_genre">${(window.t && window.t('dashboard.insights_no_genre')) || '올해 독서 장르 기록이 없습니다.'}</div>`;
+        genreContainer.innerHTML = `<div style="text-align: center; color: var(--app-text-muted); font-size: 0.78rem;" data-i18n="dashboard.insights_no_genre">${(window.i18n?.t && window.i18n.t('dashboard.insights_no_genre')) || '올해 독서 장르 기록이 없습니다.'}</div>`;
       }
     }
 
@@ -167,13 +167,14 @@ window.openBookViewer = function(bookId) {
 
 window.openEditReadingGoalModal = async function() {
   const currentTarget = document.getElementById('goal-target-count')?.textContent || '30';
-  const promptText = (window.t && window.t('dashboard.insights_edit_prompt')) || '2026년 연간 완독 목표 권수를 입력하세요:';
+  const year = document.getElementById('insights-year-label')?.textContent || new Date().getFullYear();
+  const promptText = i18n.t('dashboard.insights_edit_prompt', { year });
   const input = prompt(promptText, currentTarget);
   if (input === null) return;
 
   const val = parseInt(input.trim(), 10);
   if (isNaN(val) || val <= 0) {
-    alert('유효한 숫자를 입력해 주세요.');
+    alert(i18n.t('dashboard.insights_goal_invalid'));
     return;
   }
 
@@ -188,11 +189,11 @@ window.openEditReadingGoalModal = async function() {
     if (data.success) {
       window.loadDashboardInsights(activeType);
     } else {
-      alert(data.error || '목표 권수 저장에 실패했습니다.');
+      alert(data.error || i18n.t('dashboard.insights_goal_save_failed'));
     }
   } catch (e) {
     console.error('[EditGoal] Error:', e);
-    alert('서버 저장 중 오류가 발생했습니다.');
+    alert(i18n.t('dashboard.insights_goal_save_error'));
   }
 };
 
