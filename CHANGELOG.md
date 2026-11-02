@@ -1,5 +1,14 @@
 # CHANGELOG
+## v3.0.8
+- (security) EPUB 안의 그림 주소로 HTML·SVG 같은 문서 파일까지 사이트 주소에서 열리던 문제 수정 — 그림만 내보내고 SVG는 스크립트가 돌지 않게 막음(악성 EPUB 대비) | fix the EPUB image endpoint also serving document files (HTML, SVG, etc.) on the site's origin — only images are served now, and SVG is sandboxed so its scripts cannot run (protects against malicious EPUBs)
+- (security) 구글 링크 카테고리의 메타데이터를 받을 때 공유 폴더 쪽 이름으로 미러 폴더 밖에 파일을 쓸 수 없게 막음 | Google link categories can no longer write metadata files outside the local mirror folder through names chosen by the shared folder
+- (security) 취약점이 알려진 파이썬 패키지 업데이트 — Flask 3.1.3, gunicorn 26.2.0, Werkzeug 3.1.9, tinytag 2.3.2, PyMySQL 1.2.3, python-dotenv 1.2.4, urllib3·Jinja2·idna·certifi 최소 버전 지정, Python 3.11 이상이면 Pillow 13.0.0 | update Python packages with known vulnerabilities — Flask 3.1.3, gunicorn 26.2.0, Werkzeug 3.1.9, tinytag 2.3.2, PyMySQL 1.2.3, python-dotenv 1.2.4, minimum versions for urllib3/Jinja2/idna/certifi, and Pillow 13.0.0 on Python 3.11+
+- (security) 표지·만화 페이지·EPUB 그림을 열 때 내용 기준으로 JPEG·PNG·WEBP·GIF·BMP만 열고, 확장자를 바꾼 TIFF·PSD 같은 다른 형식은 거부(Pillow 12.x에 남는 Python 3.10 환경 보호) | covers, comic pages and EPUB images now open only JPEG/PNG/WEBP/GIF/BMP by content; other formats such as renamed TIFF/PSD are refused (protects Python 3.10 installs that stay on Pillow 12.x)
+- (fix) 새로 설치한 환경에서 setuptools가 최신이면 스케줄러(apscheduler 3.10)가 pkg_resources를 못 찾아 시작하지 못하던 문제 — apscheduler 3.11.3 | fix the scheduler (apscheduler 3.10) failing to start on fresh installs with a recent setuptools (missing pkg_resources) — apscheduler 3.11.3
+
+
 ## v3.0.7
+- (security) PDF 뷰어 엔진 pdf.js를 2.16.105에서 6.4.299(legacy 빌드)로 교체 — 악성 PDF로 사이트 주소에서 스크립트가 실행될 수 있던 취약점(CVE-2024-4367) 해소, 로컬/원격 열기 속도·이어 보기는 전과 같음(실측) | upgrade the PDF viewer engine pdf.js from 2.16.105 to 6.4.299 (legacy build) — fixes CVE-2024-4367, where a malicious PDF could run script on the site's origin; local/remote open speed and resume are unchanged (measured)
 - (improvement) 플러그인 다운로드(`downloadToLibrary`, `/api/webview/download`)에 `folder`(시리즈 하위 폴더) 지정 추가 — 회차가 카테고리 루트에 쌓이지 않고 그 폴더만 스캔, 생략하면 예전처럼 루트에 저장 | plugin downloads (`downloadToLibrary`, `/api/webview/download`) accept a `folder` (series subfolder) — episodes no longer pile up in the category root and only that folder is scanned; without it files go to the root as before
 - (fix) 플러그인 다운로드 주소가 다른 주소로 넘어가면(리다이렉트) 넘어가기 전 주소로 파일 이름을 정해, 예를 들어 `…/11.epub.noimages`로 저장되어 책으로 등록되지 않던 문제 수정 — 마지막 주소의 이름(`pg11.epub`)을 씀 | fix plugin downloads naming the file after the pre-redirect URL (e.g. saved as `…/11.epub.noimages` and not added as a book) — the name now comes from the final URL (`pg11.epub`)
 - (improvement) http 주소(예: 192.168.x.x)로 접속하면 브라우저가 화면 켜짐 유지를 막아 자동 넘김 중 화면이 꺼질 수 있다는 안내를 처음 한 번 표시 | auto page turn shows a one-time notice that the screen may turn off when connected over http (e.g. 192.168.x.x), where browsers don't allow keeping the screen on
@@ -8,6 +17,7 @@
 - (fix) 서버가 보내는 메시지가 언어 설정과 관계없이 늘 한국어로 오던 문제 수정(언어 쿠키를 저장하지 않았음), 키 이름이 그대로 나오던 오류 메시지 5개 수정 | fix server messages always arriving in Korean regardless of the language setting (the language cookie was never stored), and five error messages that showed a raw key name
 - (fix) 검색창 안내 문구가 번역 사전보다 먼저 정해져 한국어로 남던 문제, 영어 화면에서 단축키 기록 중에도 검색 단축키가 동작하던 문제 수정 | fix the search box hint being set before translations loaded (stayed Korean), and the search shortcut firing while recording a shortcut in English mode
 - (improvement) TTS 플레이어 진단 로그를 영어로 통일 | TTS player diagnostic log in English
+- (improvement) 네이티브 실행(manage.sh)의 웹 워커 재시작 주기를 1000건에서 5000건 요청으로 늘림 — PDF를 볼 때 워커가 너무 자주 재시작되던 문제 | native runs (manage.sh) now recycle the web worker every 5000 requests instead of 1000 — the worker was restarting too often while reading PDFs
 
 
 ## v3.0.6

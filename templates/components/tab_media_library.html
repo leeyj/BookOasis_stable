@@ -9,8 +9,9 @@
     {# tojson: '...'로 넣으면 HTML 이스케이프로 &가 &amp;가 되어 asset 지문이 안 읽히고 1년 캐시가 안 걸렸다 #}
     window.__BO_LIB_URLS = {
         jszip: {{ static_asset_url('lib/jszip/jszip.min.js') | tojson }},
-        pdfjs: {{ static_asset_url('lib/pdfjs/pdf.min.js') | tojson }},
-        pdfjsWorker: {{ static_asset_url('lib/pdfjs/pdf.worker.min.js') | tojson }}
+        {# pdf.js는 버전 폴더에 둔다 - /static/lib/는 1년 immutable 캐시라 같은 주소로 바꾸면 옛 파일이 남는다(6.4.299, 2026-11-02) #}
+        pdfjs: {{ static_asset_url('lib/pdfjs-6.4.299/pdf.min.mjs') | tojson }},
+        pdfjsWorker: {{ static_asset_url('lib/pdfjs-6.4.299/pdf.worker.min.mjs') | tojson }}
     };
 </script>
 

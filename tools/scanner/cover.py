@@ -9,6 +9,7 @@ import io
 import unicodedata
 import xml.etree.ElementTree as ET
 from PIL import Image
+from utils.safe_image import open_image
 from utils.archive_entry import is_page_image_name
 from tools.scanner.folder_image import find_common_cover, find_individual_cover, find_common_banner
 from services.cover_storage_service import get_covers_dir
@@ -195,7 +196,7 @@ def extract_epub_cover_direct(epub_path, dest_path):
                     img_data = zf.read(matched_name)
                     # Save via Pillow WebP encoding
                     try:
-                        with Image.open(io.BytesIO(img_data)) as img:
+                        with open_image(io.BytesIO(img_data)) as img:
                             save_as_thumbnail_webp(img, dest_path)
                     except Exception as e:
                         print(f"[Scanner-EPUB-Cover] WebP encoding failed, saving original binary: {e}")
@@ -244,7 +245,7 @@ def download_cover_from_url(file_path, image_url, force=False, library_id=None):
             img_data = resp.read()
         
         try:
-            img = Image.open(io.BytesIO(img_data))
+            img = open_image(io.BytesIO(img_data))
             save_as_thumbnail_webp(img, cover_filepath)
         except Exception as e:
             print(f"[Scanner-Cover] URL image WebP encoding failed: {e}. Trying original save.")
@@ -303,7 +304,7 @@ def extract_cover_from_b64(file_path, cover_b64, force=False, library_id=None):
             
         # Save via Pillow WebP encoding
         try:
-            img = Image.open(io.BytesIO(img_data))
+            img = open_image(io.BytesIO(img_data))
             save_as_thumbnail_webp(img, cover_filepath)
         except Exception as e:
             print(f"[Scanner-Cover] Base64 image identify/WebP render failed (binary corruption suspected): {e}. Fallback to cover extraction in original file.")
@@ -353,7 +354,7 @@ def extract_banner_from_b64(file_path, banner_b64, force=False, library_id=None)
             return db_banner_path
 
         try:
-            img = Image.open(io.BytesIO(img_data))
+            img = open_image(io.BytesIO(img_data))
             save_as_thumbnail_webp(img, banner_filepath, max_w=BANNER_THUMB_MAX_W, max_h=BANNER_THUMB_MAX_H)
         except Exception as e:
             print(f"[Scanner-Banner] Base64 image identify/WebP render failed: {e}")
@@ -397,7 +398,7 @@ def get_folder_banner(file_path, folder_path, banner_b64=None, force=False, libr
 
     try:
         os.makedirs(dest_dir, exist_ok=True)
-        with Image.open(cand_path) as img:
+        with open_image(cand_path) as img:
             save_as_thumbnail_webp(img, local_banner_path, max_w=BANNER_THUMB_MAX_W, max_h=BANNER_THUMB_MAX_H)
         print(f"[Scanner-Banner] Folder banner WebP convert copy complete: {cand_path} -> {local_banner_path}, Force={force}")
         return db_banner_path
@@ -448,7 +449,7 @@ def get_series_cover_fallback(series_name, folder_path, force=False, is_remote=F
     cand_path = find_individual_cover(folder_path, filename) if filename else None
     if cand_path:
         try:
-            with Image.open(cand_path) as img:
+            with open_image(cand_path) as img:
                 save_as_thumbnail_webp(img, local_cover_path)
             print(f"[Scanner-Cover] Individual book 1:1 mapped cover WebP convert copy complete: {cand_path} -> {local_cover_path}, Force={force}")
             return db_cover_path
@@ -464,7 +465,7 @@ def get_series_cover_fallback(series_name, folder_path, force=False, is_remote=F
     cand_path = find_common_cover(folder_path)
     if cand_path:
         try:
-            with Image.open(cand_path) as img:
+            with open_image(cand_path) as img:
                 save_as_thumbnail_webp(img, local_cover_path)
             print(f"[Scanner-Cover] Series representative common cover WebP convert copy complete: {cand_path} -> {local_cover_path}, Force={force}")
             return db_cover_path
@@ -519,7 +520,7 @@ def get_series_cover_fallback(series_name, folder_path, force=False, is_remote=F
                             
                             # Save via Pillow WebP encoding
                             try:
-                                with Image.open(io.BytesIO(img_data)) as img:
+                                with open_image(io.BytesIO(img_data)) as img:
                                     save_as_thumbnail_webp(img, local_cover_path)
                             except Exception as e:
                                 print(f"[Scanner-Cover-Auto] WebP encoding failed, saving original binary: {e}")
@@ -575,7 +576,7 @@ def get_imgdir_cover(folder_path, virtual_file_path, force=False, library_id=Non
         return None
 
     try:
-        with Image.open(candidate) as img:
+        with open_image(candidate) as img:
             save_as_thumbnail_webp(img, local_cover_path)
         print(f"[Scanner-Cover-IMGDIR] Cover generated: '{candidate}' -> '{local_cover_path}'")
         return db_cover_path

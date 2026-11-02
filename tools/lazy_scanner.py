@@ -5,7 +5,6 @@ import gc
 import time
 import argparse
 from PIL import Image
-
 MEDIA_SERVER_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if MEDIA_SERVER_DIR not in sys.path:
     sys.path.append(MEDIA_SERVER_DIR)
@@ -15,6 +14,7 @@ if MEDIA_SERVER_DIR not in sys.path:
 # CP949 콘솔에서 setup_lazy_scanner_logging()의 custom_print가 이모지/한글을 콘솔에
 # 직접 출력할 때 깨지거나 UnicodeEncodeError가 나는 문제 방지).
 from utils.encoding_helper import force_utf8_stdio
+from utils.safe_image import open_image
 force_utf8_stdio()
 
 import builtins
@@ -1328,7 +1328,7 @@ def run_lazy_cover_resize():
                 max_w, max_h = BANNER_THUMB_MAX_W, BANNER_THUMB_MAX_H
             else:
                 max_w, max_h = COVER_THUMB_MAX_W, COVER_THUMB_MAX_H
-            with Image.open(path) as img:
+            with open_image(path) as img:
                 needs_resize = img.width > max_w or img.height > max_h
                 if needs_resize:
                     tmp_path = path + '.resize_tmp'

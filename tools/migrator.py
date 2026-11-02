@@ -215,7 +215,8 @@ def convert_and_copy_cover(source_cover_name, kavita_covers_dir, bookoasis_cover
     try:
         # Pillow를 활용하여 WebP 포맷 변환 저장
         from PIL import Image
-        with Image.open(source_path) as img:
+        from utils.safe_image import open_image
+        with open_image(source_path) as img:
             img.save(target_path, "WEBP", quality=80)
         return db_cover_path
     except Exception as e:

@@ -149,7 +149,8 @@ start() {
     
     # Gunicorn을 통해 5930 포트로 백그라운드 기동 (Docker CMD와 동일하게 스레드 12개 — 스레드 4개일 때
     # 한 요청이 파일 락 대기로 오래 묶이면 다른 사용자 요청 전부가 막히는 사고가 있었다)
-    nohup env PYTHONUNBUFFERED=1 BOOKOASIS_ENABLE_EMBEDDED_WORKER=false python3 -m gunicorn -w 1 --threads 12 --max-requests 1000 --max-requests-jitter 100 --timeout 300 -b 0.0.0.0:5930 core:app > "$LOG_FILE" 2>&1 &
+    # --max-requests 5000: PDF 한 권이 범위 요청을 많게는 180개 보내 1000이면 70분에 33번 재시작했다(2026-11-02 실측)
+    nohup env PYTHONUNBUFFERED=1 BOOKOASIS_ENABLE_EMBEDDED_WORKER=false python3 -m gunicorn -w 1 --threads 12 --max-requests 5000 --max-requests-jitter 500 --timeout 300 -b 0.0.0.0:5930 core:app > "$LOG_FILE" 2>&1 &
 
 
     

@@ -4,7 +4,7 @@ import { showViewerLoading, hideViewerLoading, showViewerError } from './view_ma
 import { saveProgress } from './viewer_progress.js';
 import { getComicPageStep, getComicReadingDirection, getSpreadShiftOffset, resetSpreadShiftOffset } from './viewer_comic.js';
 import { initPageStep } from './viewer/reader_settings.js';
-import { ensurePdfJs } from './utils/script_loader.js';
+import { ensurePdfJs, pdfJsAssetBase } from './utils/script_loader.js';
 
 export let pdfDoc = null;
 export let pdfCurrentPage = 1;
@@ -64,12 +64,17 @@ export async function initPdfViewer(bookId, pagesRead, totalPages) {
   }
 
   const url = `/api/media/pdf?db_type=${state.currentLibraryType}&book_id=${bookId}`;
+  const assetBase = pdfJsAssetBase();
   pdfjsLib.getDocument({
     url: url,
     disableAutoFetch: true,  // 브라우저가 전체 파일을 백그라운드에서 전부 받는 행위 억제
     disableStream: false,    // 스트림 단위로 조각 수신 허용
-    cMapUrl: '/static/lib/pdfjs/cmaps/',
-    cMapPacked: true
+    isEvalSupported: false,  // CVE-2024-4367(2.16 대상). 6.x는 이 옵션이 없어 무시되지만 되돌릴 때를 위해 둔다
+    cMapUrl: `${assetBase}cmaps/`,
+    cMapPacked: true,
+    standardFontDataUrl: `${assetBase}standard_fonts/`, // 글꼴이 안 들어 있는 PDF
+    wasmUrl: `${assetBase}wasm/`,                       // JPX(JPEG2000)·JBIG2 이미지 디코더
+    iccUrl: `${assetBase}iccs/`
   }).promise
     .then(doc => { 
       pdfDoc = doc; 
@@ -351,7 +356,8 @@ function renderSinglePdfCanvas(pageNum, canvas, availWidth, availHeight) {
       }
     }
 
-    const renderCtx = { canvasContext: ctx, viewport };
+    // 6.x는 canvas를 넘기는 방식을 권장한다(canvasContext는 호환용)
+    const renderCtx = { canvas, viewport };
     const renderTask = page.render(renderCtx);
     currentRenderTasks.push(renderTask);
 
@@ -431,7 +437,9 @@ export function clearPdfViewer() {
   if (pdfDoc) {
     try {
       if (typeof pdfDoc.cleanup === 'function') pdfDoc.cleanup();
+      // 6.x는 문서 객체에 destroy()가 없고 loadingTask.destroy()로 해제한다(없으면 닫아도 문서·worker 메모리가 남았다)
       if (typeof pdfDoc.destroy === 'function') pdfDoc.destroy();
+      else if (pdfDoc.loadingTask && typeof pdfDoc.loadingTask.destroy === 'function') pdfDoc.loadingTask.destroy();
     } catch (e) {
       console.warn('[Viewer-Pdf] Failed to destroy pdfDoc:', e);
     }

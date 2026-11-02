@@ -646,7 +646,8 @@ class TextEpubContentService:
             try:
                 import io
                 from PIL import Image
-                with Image.open(io.BytesIO(raw_data)) as img:
+                from utils.safe_image import open_image
+                with open_image(io.BytesIO(raw_data)) as img:
                     img = img.convert('RGBA' if img.mode in ('RGBA', 'LA', 'P') else 'RGB')
                     if max(img.size) > EPUB_IMAGE_MAX_SIDE:
                         ratio = EPUB_IMAGE_MAX_SIDE / max(img.size)

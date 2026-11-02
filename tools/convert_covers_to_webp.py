@@ -6,9 +6,12 @@ SQLite 데이터베이스(books, series 테이블) 내의 cover_image 컬럼을 
 """
 
 import os
+import sys
 import sqlite3
 import hashlib
 from PIL import Image
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.safe_image import open_image  # noqa: E402
 
 MEDIA_SERVER_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_DIR = os.path.join(MEDIA_SERVER_DIR, 'db')
@@ -28,7 +31,7 @@ def get_db_paths():
 def convert_image_to_webp(src_path, dest_path, quality=80):
     """일반 이미지를 WebP로 인코딩하여 저장"""
     try:
-        with Image.open(src_path) as img:
+        with open_image(src_path) as img:
             # WebP 저장을 위해 RGBA 혹은 RGB 모드 유지
             img.save(dest_path, "WEBP", quality=quality)
         return True

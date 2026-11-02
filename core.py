@@ -68,6 +68,12 @@ def _static_js_tree_signature(js_root):
 _LONG_CACHE_EXTS = ('.woff', '.woff2', '.ttf', '.eot', '.png', '.jpg', '.jpeg', '.svg', '.ico')
 
 
+# pdf.js 6.x(.mjs 모듈·.wasm 디코더): 시스템 MIME 표가 없는 이미지(python:3.10-slim)에서도 모듈로 받아지게
+import mimetypes as _mimetypes
+_mimetypes.add_type('text/javascript', '.mjs')
+_mimetypes.add_type('application/wasm', '.wasm')
+
+
 def static_cache_policy(path, has_asset_fingerprint):
     """정적 파일 응답의 캐시 정책. 'immutable'(1년, 재검증 없음) | 'revalidate'(매번 304 확인) | 'long'(1년, Flask no-cache 유지) | None.
 

@@ -350,9 +350,9 @@ def get_epub_image():
     if error:
         return jsonify({'error': error}), 404 if error == 'Resource not found' else 500
 
-    res = Response(data, mimetype=mime or 'image/jpeg')
-    res.headers['Cache-Control'] = 'public, max-age=31536000'
-    return res
+    # EPUB 안의 .html/.svg 등이 사이트 주소에서 문서로 열리지 않게 이미지만 내보낸다(utils/safe_media.py)
+    from utils.safe_media import book_resource_response
+    return book_resource_response(data, mime)
 
 @stream_bp.route('/api/media/pdf', methods=['GET'])
 @login_required

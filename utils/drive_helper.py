@@ -428,12 +428,18 @@ def refresh_gdrive_meta_mirror(remote_name, folder_id, mirror_root, g_files):
     반환: (받은 수, 실패 수, 방식 문자열)."""
     from utils.rclone_gdrive_copy import rclone_download_file_by_id, rclone_sync_metadata_mirror
     wanted = {}
+    root_real = os.path.realpath(mirror_root)
     for item in g_files:
         name = item.get('name') or ''
         if not name.lower().endswith(GDRIVE_META_EXTENSIONS) or not item.get('id'):
             continue
         rel = os.path.join(item.get('rel_folder') or '', name)
-        wanted[os.path.normpath(os.path.join(mirror_root, rel))] = item
+        local = os.path.normpath(os.path.join(mirror_root, rel))
+        # 공유 폴더의 이름은 남이 정한다 - '..'·절대경로로 미러 밖에 쓰지 않게 막는다
+        if os.path.isabs(rel) or os.path.commonpath([root_real, os.path.realpath(local)]) != root_real:
+            print(f"[gdrive_helper ⚠️] Skipped metadata outside mirror: {rel!r}")
+            continue
+        wanted[local] = item
 
     if os.path.isdir(mirror_root):
         for dirpath, _dirs, files in os.walk(mirror_root):

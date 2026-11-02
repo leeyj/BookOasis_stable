@@ -134,7 +134,8 @@ def _write_poster_cache(poster_source, img_data, cache_path, sig_path, none_mark
     try:
         import io
         from PIL import Image
-        with Image.open(io.BytesIO(img_data)) as img:
+        from utils.safe_image import open_image
+        with open_image(io.BytesIO(img_data)) as img:
             save_as_thumbnail_webp(img, cache_path)
         if signature:
             _write_text(sig_path, signature)
@@ -236,7 +237,8 @@ def get_or_cache_external_image_webp(url, category, max_bytes=2 * 1024 * 1024, t
     try:
         import io
         from PIL import Image
-        with Image.open(io.BytesIO(img_data)) as img:
+        from utils.safe_image import open_image
+        with open_image(io.BytesIO(img_data)) as img:
             save_as_thumbnail_webp(img, cache_path)
         return cache_path
     except Exception as e:
