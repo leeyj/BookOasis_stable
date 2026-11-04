@@ -11,7 +11,7 @@ class UserRepository:
         with database.connection(db_type) as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT id, username, password_hash, role, is_default_password, has_adult_access, has_audiobook_access, has_download_access, content_rating_max FROM users WHERE username = ?",
+                "SELECT id, username, password_hash, role, is_default_password, has_adult_access, has_audiobook_access, has_video_access, has_download_access, content_rating_max FROM users WHERE username = ?",
                 (username,)
             )
             row = cursor.fetchone()
@@ -39,7 +39,7 @@ class UserRepository:
         with database.connection(db_type) as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT id, username, password_hash, role, is_default_password, has_adult_access, has_audiobook_access, has_download_access, content_rating_max FROM users WHERE id = ?",
+                "SELECT id, username, password_hash, role, is_default_password, has_adult_access, has_audiobook_access, has_video_access, has_download_access, content_rating_max FROM users WHERE id = ?",
                 (user_id,)
             )
             row = cursor.fetchone()
@@ -51,7 +51,7 @@ class UserRepository:
         with database.connection(db_type) as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT id, username, role, is_default_password, has_adult_access, has_audiobook_access, has_download_access, content_rating_max, created_at FROM users ORDER BY id ASC"
+                "SELECT id, username, role, is_default_password, has_adult_access, has_audiobook_access, has_video_access, has_download_access, content_rating_max, created_at FROM users ORDER BY id ASC"
             )
             rows = cursor.fetchall()
         return [dict(row) for row in rows]
@@ -195,6 +195,21 @@ class UserRepository:
         cursor = conn.cursor()
         try:
             cursor.execute("UPDATE users SET has_audiobook_access = ? WHERE id = ?", (has_audiobook_access, user_id))
+            conn.commit()
+            return True
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    @staticmethod
+    def update_video_access(db_type, user_id, has_video_access):
+        """사용자별 영상 강좌 접근 권한 갱신"""
+        conn = database.get_connection(db_type)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("UPDATE users SET has_video_access = ? WHERE id = ?", (has_video_access, user_id))
             conn.commit()
             return True
         except Exception as e:

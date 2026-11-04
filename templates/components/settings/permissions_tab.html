@@ -54,6 +54,19 @@
         </div>
 
         <div id="permission-session-audiobook" class="permission-session-panel" style="display:none;">
+            <p style="font-size: 0.8rem; color: var(--app-text-muted); margin: 0 0 0.6rem 0;" data-i18n="settings.perm_audiobook_access_desc">끄면 아래 카테고리 권한과 상관없이 오디오북 메뉴가 보이지 않습니다. 켠 뒤 볼 카테고리를 아래에서 고르세요. (사용자가 다시 로그인하면 반영)</p>
+            <div class="settings-table-wrapper" style="background: rgba(var(--app-panel-rgb), 0.25); border: 1px solid rgba(var(--app-panel-border-rgb), 0.05); border-radius: 8px; overflow-x: auto; backdrop-filter: blur(10px); margin-bottom: 1rem;">
+                <table class="settings-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; min-width: 600px;">
+                    <thead>
+                        <tr style="background: rgba(var(--app-panel-rgb), 0.4); border-bottom: 1px solid rgba(var(--app-panel-border-rgb), 0.08); color: var(--app-text-muted);">
+                            <th style="padding:1rem; width:40%;" data-i18n="settings.perm_col_user">사용자</th>
+                            <th style="padding:1rem; width:20%; text-align:center;" data-i18n="settings.perm_col_role">역할</th>
+                            <th style="padding:1rem; width:40%; text-align:center;" data-i18n="settings.perm_col_audiobook_access">오디오북 메뉴 사용 허용</th>
+                        </tr>
+                    </thead>
+                    <tbody id="permissions-audiobook-access-table-body"></tbody>
+                </table>
+            </div>
             <div class="permission-filter-bar" style="display:flex; gap:0.6rem; margin-bottom:0.6rem; flex-wrap:wrap;">
                 <input type="text" class="permission-user-filter" placeholder="사용자 검색" data-i18n-placeholder="settings.perm_user_filter_placeholder" style="flex:1; min-width:160px; padding:0.5rem 0.8rem; border-radius:6px; border:1px solid rgba(255,255,255,0.12); background: rgba(var(--app-panel-rgb), 0.4); color: var(--app-text-primary);">
                 <input type="text" class="permission-category-filter" placeholder="카테고리 검색" data-i18n-placeholder="settings.perm_category_filter_placeholder" style="flex:1; min-width:160px; padding:0.5rem 0.8rem; border-radius:6px; border:1px solid rgba(255,255,255,0.12); background: rgba(var(--app-panel-rgb), 0.4); color: var(--app-text-primary);">
@@ -69,6 +82,19 @@
         </div>
 
         <div id="permission-session-video" class="permission-session-panel" style="display:none;">
+            <p style="font-size: 0.8rem; color: var(--app-text-muted); margin: 0 0 0.6rem 0;" data-i18n="settings.perm_video_access_desc">끄면 아래 카테고리 권한과 상관없이 영상 강좌 메뉴가 보이지 않습니다. 켠 뒤 볼 카테고리를 아래에서 고르세요. (사용자가 다시 로그인하면 반영)</p>
+            <div class="settings-table-wrapper" style="background: rgba(var(--app-panel-rgb), 0.25); border: 1px solid rgba(var(--app-panel-border-rgb), 0.05); border-radius: 8px; overflow-x: auto; backdrop-filter: blur(10px); margin-bottom: 1rem;">
+                <table class="settings-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; min-width: 600px;">
+                    <thead>
+                        <tr style="background: rgba(var(--app-panel-rgb), 0.4); border-bottom: 1px solid rgba(var(--app-panel-border-rgb), 0.08); color: var(--app-text-muted);">
+                            <th style="padding:1rem; width:40%;" data-i18n="settings.perm_col_user">사용자</th>
+                            <th style="padding:1rem; width:20%; text-align:center;" data-i18n="settings.perm_col_role">역할</th>
+                            <th style="padding:1rem; width:40%; text-align:center;" data-i18n="settings.perm_col_video_access">영상 강좌 메뉴 사용 허용</th>
+                        </tr>
+                    </thead>
+                    <tbody id="permissions-video-access-table-body"></tbody>
+                </table>
+            </div>
             <div class="permission-filter-bar" style="display:flex; gap:0.6rem; margin-bottom:0.6rem; flex-wrap:wrap;">
                 <input type="text" class="permission-user-filter" placeholder="사용자 검색" data-i18n-placeholder="settings.perm_user_filter_placeholder" style="flex:1; min-width:160px; padding:0.5rem 0.8rem; border-radius:6px; border:1px solid rgba(255,255,255,0.12); background: rgba(var(--app-panel-rgb), 0.4); color: var(--app-text-primary);">
                 <input type="text" class="permission-category-filter" placeholder="카테고리 검색" data-i18n-placeholder="settings.perm_category_filter_placeholder" style="flex:1; min-width:160px; padding:0.5rem 0.8rem; border-radius:6px; border:1px solid rgba(255,255,255,0.12); background: rgba(var(--app-panel-rgb), 0.4); color: var(--app-text-primary);">

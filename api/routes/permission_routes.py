@@ -59,6 +59,10 @@ def _fetch_library_permissions(db_type, include_plugins=False):
 
     return categories, permissions
 
+# users 테이블은 4개 DB에 모두 있다(사용자 추가·삭제도 4개 모두). 권한 값도 4곳에 같이 쓴다.
+USER_DB_TYPES = ('general', 'adult', 'audiobook', 'video')
+
+
 @permission_bp.route('/api/admin/permissions', methods=['GET'])
 @admin_required
 def get_permissions():
@@ -248,8 +252,7 @@ def update_adult_permission():
         return jsonify({'success': False, 'error': 'user_id는 필수 항목입니다.'}), 400
 
     try:
-        # 양쪽 DB 모두 사용자 권한 동기화 업데이트
-        for db_type in ['general', 'adult', 'audiobook']:
+        for db_type in USER_DB_TYPES:
             UserRepository.update_adult_access(db_type, user_id, has_adult_access)
         return jsonify({'success': True, 'message': '성인 도서 접근 권한이 변경되었습니다.'})
     except Exception as e:
@@ -268,8 +271,7 @@ def update_download_permission():
         return jsonify({'success': False, 'error': 'user_id는 필수 항목입니다.'}), 400
 
     try:
-        # 3개 DB 모두 사용자 다운로드 권한 동기화 업데이트
-        for db_type in ['general', 'adult', 'audiobook']:
+        for db_type in USER_DB_TYPES:
             UserRepository.update_download_access(db_type, user_id, has_download_access)
         return jsonify({'success': True, 'message': '파일 다운로드 접근 권한이 변경되었습니다.'})
     except Exception as e:
@@ -303,8 +305,7 @@ def update_content_rating_permission():
                 'error': '관리자 계정의 최대 허용 등급은 포르노로 고정되어 있습니다.'
             }), 400
 
-        # 3개 DB 모두 사용자 콘텐츠 등급 동기화 업데이트
-        for db_type in ['general', 'adult', 'audiobook']:
+        for db_type in USER_DB_TYPES:
             UserRepository.update_content_rating_max(db_type, user_id, content_rating_max)
         return jsonify({'success': True, 'message': '콘텐츠 등급 권한이 변경되었습니다.'})
     except Exception as e:
@@ -323,9 +324,27 @@ def update_audiobook_permission():
         return jsonify({'success': False, 'error': 'user_id는 필수 항목입니다.'}), 400
 
     try:
-        # 3개 DB 모두 사용자 오디오북 권한 동기화 업데이트
-        for db_type in ['general', 'adult', 'audiobook']:
+        for db_type in USER_DB_TYPES:
             UserRepository.update_audiobook_access(db_type, user_id, has_audiobook_access)
         return jsonify({'success': True, 'message': '오디오북 접근 권한이 변경되었습니다.'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@permission_bp.route('/api/admin/permissions/update-video', methods=['POST'])
+@admin_required
+def update_video_permission():
+    """사용자별 영상 강좌 접근 권한 토글 업데이트"""
+    data = request.get_json() or {}
+    user_id = data.get('user_id')
+    has_video_access = 1 if data.get('has_video_access') else 0
+
+    if not user_id:
+        return jsonify({'success': False, 'error': 'user_id는 필수 항목입니다.'}), 400
+
+    try:
+        for db_type in USER_DB_TYPES:
+            UserRepository.update_video_access(db_type, user_id, has_video_access)
+        return jsonify({'success': True, 'message': '영상 강좌 접근 권한이 변경되었습니다.'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
