@@ -1,75 +1,53 @@
 # 🗄️ Database Schema Specification
 
-BookOasis supports two selectable engines — **SQLite (default)** and **MariaDB/MySQL (enterprise, recommended)** — and keeps a logically identical schema (table/column layout) across both. The active engine is selected via `DB_ENGINE` in `.env` (`sqlite` or `mariadb`).
+BookOasis supports two engines, **SQLite (default)** and **MariaDB/MySQL**, with the same tables and columns in both. Pick one with `DB_ENGINE` in `.env` (`sqlite` or `mariadb`).
 
-- **SQLite mode**: **3 independent DB files** — `general`, `adult`, `audiobook`
-  - General DB: `db/media_general.db`
-  - Adult DB: `db/media_adult.db`
-  - Audiobook DB: `db/media_audiobook.db`
-- **MariaDB mode**: **3 independent databases** — `general`, `adult`, `audiobook` (default prefix `media_`, configurable via `mariadb_database_prefix`)
-  - `media_general`, `media_adult`, `media_audiobook`
-  - See [move_to_mariadb.md](./move_to_mariadb.md) and section 8 of [guide_admin_en.md](./guide_admin_en.md) for migration steps.
+- **SQLite mode**: **4 DB files**
+  - General `db/media_general.db`, adult `db/media_adult.db`, audiobook `db/media_audiobook.db`, video `db/media_video.db`
+- **MariaDB mode**: **4 databases** — `media_general`, `media_adult`, `media_audiobook`, `media_video`
+  - The `media_` prefix can be changed with `MARIADB_DATABASE_PREFIX`.
+  - For switching, see [move_to_mariadb.md](./move_to_mariadb.md) and section 8 of [guide_admin_en.md](./guide_admin_en.md)
 
-All 3 DBs (files or schemas) get the **entire same table set** created in them. For example, the `audiobook` DB also gets book-related tables like `books`/`user_favorites` (unused there), and conversely `general`/`adult` also get the `audiobooks`-family tables (unused there). Which tables are actually meaningful depends on the DB type.
+All 4 DBs get **the same full table set**. For example the `video` DB also has `books`, and the `general` DB also has `videos` (left empty). Which tables actually hold data depends on the DB type; see the "Used in" column in section 2.
 
-This document summarizes the latest code-based schema snapshot (**as of 2026-08-14**; SQLite from `database.py:init_databases`, MariaDB from `tools/db_schema_updater.py:MARIADB_CENTRAL_SCHEMA`) and table responsibilities.
+This document describes what each table is **for and how tables relate**. For column types and defaults, the code is the source of truth (section 6). `tests/test_spec_db_schema_tables.py` compares the table list with the code, so when you add or drop a table you must update section 2 of this document for the test to pass.
 
 ---
 
 ## 1. Schema Overview
 
-- All 3 SQLite DB files (general/adult/audiobook) are initialized from the same `schema` SQL string.
-- All 3 MariaDB databases are likewise initialized from the same `MARIADB_CENTRAL_SCHEMA` string.
-- On startup, `auto_migrate_schema(...)` (SQLite) / `_ensure_mariadb_columns()`, `_ensure_mariadb_indexes()` (MariaDB) automatically backfill columns/indexes missing from the declared schema.
-- However, long-lived production DB files can still contain legacy columns/indexes, so queries should remain compatibility-friendly.
-- MariaDB tables use `ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`; SQLite's `INTEGER`/`TEXT` generally map to `BIGINT`/`VARCHAR(n)` or `TEXT` (see the code snapshot in section 6 for exact per-column types).
+- The schema lives in two places: SQLite `_SCHEMA_SQL` in `services/db_migration_service.py`, MariaDB `MARIADB_CENTRAL_SCHEMA` in `tools/db_schema_updater.py`. Both must define the same tables (a test checks this).
+- At startup `run_full_migration()` applies the same schema to all 4 DBs and adds columns and indexes that are declared but missing in an existing DB (SQLite reads `_SCHEMA_SQL` and fills gaps automatically; MariaDB uses the column/index backfill lists in `tools/db_schema_updater.py`).
+- Production DBs upgraded from old versions may still have leftover columns or indexes, so core and plugin queries should stay tolerant.
+- MariaDB uses `ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`; SQLite `INTEGER`/`TEXT` generally become `BIGINT`/`VARCHAR(n)` or `TEXT`.
+- Global data (settings, the scan queue and history, notifications, MCP pending changes, kosync, per-user settings) is written **only to the general DB**. `users` is copied to all 4 DBs under the same username.
 
 ---
 
 ## 2. Shared Table List
 
-Tables common to both engines and all 3 DBs (24 total):
+The 45 tables shared by all 4 DBs. "Used in" is the DB where the data actually lives.
 
-**Library / Book Core**
-1. `library_groups`
-2. `library_kinds`
-3. `libraries`
-4. `books`
-5. `book_offsets`
-6. `series_summary`
-7. `series_summary_state`
-
-**Audiobook**
-8. `audiobooks`
-9. `audiobook_tracks`
-10. `audiobook_progress`
-11. `audiobook_track_progress`
-    - `audiobook_music_lookups` (music album lookup results)
-
-**User / Progress**
-12. `users`
-13. `user_progress`
-14. `user_reading_log`
-15. `user_favorites`
-16. `user_category_permissions`
-
-**Collections**
-17. `collections`
-18. `collection_items`
-
-**Scanner / Ops**
-19. `scanner_tasks`
-20. `scan_history`
-21. `scanner_progress`
-22. `folder_mtimes`
-
-**Settings / Plugins**
-23. `settings`
-24. `plugin_load_events`
-
-**Notifications / problem records** (kept in the general DB; the target DB is the `db_type` column)
-25. `problem_occurrences`
-26. `problem_groups`
+| Group | Tables | Used in |
+| :--- | :--- | :--- |
+| Categories | `library_groups`, `library_kinds`, `libraries`, `plugin_group_assignments` | All 4 (each DB has its own categories) |
+| Books | `books`, `book_offsets`, `series_summary`, `series_summary_state` | general, adult |
+| Audiobooks/music | `audiobooks`, `audiobook_tracks`, `audiobook_progress`, `audiobook_track_progress`, `audiobook_music_lookups` | audiobook |
+| Video | `videos`, `video_episodes`, `video_progress`, `video_episode_progress` | video |
+| Users/progress | `users`, `user_category_permissions` | All 4 |
+| | `user_progress`, `user_reading_log`, `user_favorites` | general, adult |
+| | `user_settings` | general |
+| Reading extras | `book_annotations`, `epub_bookmarks`, `tts_progress` | general, adult |
+| Collections | `collections`, `collection_items` | All 4 (per the request's `db_type` session) |
+| TTS pre-generation | `tts_audio_books`, `tts_audio_pieces`, `tts_pregen_jobs` | general, adult |
+| | `tts_audio_cache` | Unused (v2.7.9 legacy cache index, only cleared) |
+| Google link | `gdrive_book_copies` | general, adult |
+| External | `kosync_credentials`, `kosync_documents`, `kosync_progress` | general |
+| | `mcp_pending_changes` | general |
+| Scanner | `scanner_tasks`, `scan_history` | general (target DB in `kwargs.db_type`) |
+| | `scanner_progress`, `folder_mtimes` | The category's own DB |
+| Settings/plugins | `settings`, `plugin_load_events` | general |
+| Notifications/problems | `problem_occurrences`, `problem_groups` | general (target DB in the `db_type` column) |
 
 ---
 
@@ -96,7 +74,11 @@ Library roots and scan/runtime options.
 
 - PK: `id`
 - Main FK: `group_id -> library_groups.id`
-- Columns: `name`, `physical_path`, `cron_schedule`, `last_scanned_at`, `scan_status`, `is_remote`, `vfs_refresh_before_scan`, `rclone_rc_url`, `icon`, `color`, `hide_cover`, `hide_title`, `cover_aspect_ratio`, `content_kind`, `group_id`, `sort_order`
+- Columns: `name`, `physical_path`, `cron_schedule`, `schedule_enabled`, `last_scanned_at`, `scan_status`, `is_remote`, `vfs_refresh_before_scan`, `rclone_rc_url`, `icon`, `color`, `hide_cover`, `hide_title`, `cover_aspect_ratio`, `content_kind`, `group_id`, `sort_order`, `gdrive_copy_remote`, `gdrive_view_local_mirror_path`, `pending_delete`, `transfer_target_id`
+- `schedule_enabled`: turns the scheduled scan on/off. `cron_schedule` is kept when off
+- `scan_status`: `ready` / `scanning` / `cancelling` / `failed` / `interrupted` — transitions in [spec_scanner_queue_state_transitions_en.md](./spec_scanner_queue_state_transitions_en.md)
+- `pending_delete`: 0 normal, 1 being deleted, 2 moving out to another session, 3 moving in (the target). `transfer_target_id` is the target category id. Deletes and moves run in chunks as scanner queue tasks (`library_delete`/`library_transfer`); list queries must filter with `COALESCE(pending_delete, 0)`
+- `gdrive_copy_remote`, `gdrive_view_local_mirror_path`: the rclone remote name and the local metadata mirror path of a Google link category (beta)
 - `hide_cover`: stores whether cover rendering should be hidden at library/category level (`INTEGER DEFAULT 0`).
 - `content_kind`: category type code (logical reference to `library_kinds.code`). Defaults to `'unspecified'`. Plugins can read it as a classification criterion (e.g. telling manga from books in related-works search) (`TEXT NOT NULL DEFAULT 'unspecified'`, `VARCHAR(24)` on MariaDB).
 - `hide_title`: per-category toggle to hide the grid card title text and show thumbnail only (Netflix style). UI only exposed for general/adult book sessions (`INTEGER DEFAULT 0`).
@@ -111,7 +93,8 @@ Book metadata and file identity.
 - Main FK: `library_id -> libraries.id`
 - Major columns:
   - Identity/path: `id`, `library_id`, `file_path`, `file_format`
-  - Metadata: `title`, `series_name`, `author`, `isbn`, `publisher`, `summary`, `genre`, `tags`, `link`, `release_date`, `score`
+  - Metadata: `title`, `series_name`, `author`, `isbn`, `publisher`, `summary`, `genre`, `tags`, `link`, `release_date`, `score`, `publication_status`, `cover_artist`, `teams`, `locations`, `characters`
+  - Content rating: `books_lv` (compared with the user's `content_rating_max`)
   - Viewer/cover: `total_pages`, `cover_image`, `cover_updated_at`, `cover_align`, `has_offsets`
   - Banner: `banner_image`, `banner_updated_at` - optional detail-page hero image. Stored at `covers/<library_id>/banner_<hash>.webp` using the same file-path MD5 hash as the cover. The scanner fills it from a loose `banner.<ext>` file in the folder or a `banner` (Base64) field in the metadata YAML - left empty if neither is present (unlike the cover, it never force-extracts from inside a zip/epub)
   - State/protection: `metadata_locked`, `created_at`
@@ -125,7 +108,8 @@ Per-page byte-offset cache for compressed archives (e.g., ZIP). When the viewer 
 
 - PK: `id`
 - Main FK: `book_id -> books.id`
-- Columns: `book_id`, `page_idx`, `filename`, `local_header_offset`, `compress_size`, `file_size`, `compress_type`
+- Columns: `book_id`, `page_idx`, `filename`, `local_header_offset`, `compress_size`, `file_size`, `compress_type`, `data_offset`
+- `data_offset`: where the compressed data actually starts. For remote (FUSE) paths it is left NULL at scan time, because reading every page header would multiply remote requests — the viewer then falls back to reading the local header
 - On MariaDB these offset columns are `BIGINT`, supporting source archives beyond 4GB (ZIP64).
 
 ### series_summary / series_summary_state
@@ -133,7 +117,8 @@ Per-page byte-offset cache for compressed archives (e.g., ZIP). When the viewer 
 Pre-aggregated series grouping / representative-cover cache (speeds up library listing rendering).
 
 - `series_summary` PK: composite (`library_id`, `series_key`)
-  - Columns: `representative_book_id`, `series_book_count`, `sort_series_name`
+  - Columns: `representative_book_id`, `series_book_count`, `sort_series_name`, `latest_added`
+  - After a queued scan the whole table is rebuilt (`SeriesRepository.rebuild_summary`); direct scans that bypass the queue (path scan, webhook, webview download) recompute only the changed series rows (`track_direct_scan` in `services/scan_refresh_service.py`)
 - `series_summary_state` PK: `id`
   - Columns: `is_ready`, `refreshed_at` — flags whether the background re-aggregation has completed
 
@@ -143,7 +128,7 @@ Audiobook (work-level) metadata.
 
 - PK: `id`
 - Main FK: `library_id -> libraries.id`
-- Columns: `title`, `sort_title`, `web_id`, `author`, `publisher`, `code`, `poster`, `premiered`, `ratings`, `author_intro`, `description`, `folder_name`, `folder_path`(UNIQUE), `total_duration`, `total_tracks`, `file_type`, `is_favorite`, `created_at`, `updated_at`, `is_deleted`, `deleted_at`
+- Columns: `title`, `sort_title`, `web_id`, `author`, `publisher`, `code`, `poster`, `premiered`, `ratings`, `author_intro`, `description`, `folder_name`, `folder_path`(UNIQUE), `total_duration`, `total_tracks`, `file_type`, `is_favorite`, `metadata_locked`, `created_at`, `updated_at`, `is_deleted`, `deleted_at`
 
 ### audiobook_tracks
 
@@ -173,7 +158,9 @@ Per-user audiobook playback progress (work-level / track-level).
 User account and privilege data.
 
 - PK: `id`
-- Columns: `username`(UNIQUE), `password_hash`, `role`, `is_default_password`, `has_adult_access`, `has_audiobook_access`, `created_at`
+- Columns: `username`(UNIQUE), `password_hash`, `role`, `is_default_password`, `has_adult_access`, `has_audiobook_access`, `has_video_access`, `has_download_access`, `content_rating_max`, `created_at`
+- Copied to all 4 DBs under the same `username` (ids may differ per DB). Login and permissions use the general DB
+- Audiobook and video access is actually enforced by `user_category_permissions` (per category). `has_audiobook_access`/`has_video_access` have no switch in the UI and are effectively always 1
 
 ### user_progress
 
@@ -219,16 +206,17 @@ User-defined collections that freely group books/series/audiobooks together.
   - Main FK: `user_id -> users.id`
   - Columns: `name`, `description`, `color`, `cover_image`, `created_at`, `updated_at`
 - `collection_items` PK: `id`
-  - Main FK: `collection_id -> collections.id`(CASCADE), `book_id -> books.id`(CASCADE, nullable), `audiobook_id -> audiobooks.id`(CASCADE, nullable)
+  - Main FK: `collection_id -> collections.id`(CASCADE), `book_id -> books.id`(CASCADE, nullable), `audiobook_id -> audiobooks.id`(CASCADE, nullable), `video_id` (nullable, logical reference to `videos.id`)
   - Columns: `series_name`(nullable), `sort_order`, `created_at`
-  - Constraints: `UNIQUE(collection_id, book_id)`, `UNIQUE(collection_id, series_name)`, `UNIQUE(collection_id, audiobook_id)` — exactly one of book/series/audiobook is populated per row
+  - Constraints: `UNIQUE(collection_id, book_id)`, `UNIQUE(collection_id, series_name)`, `UNIQUE(collection_id, audiobook_id)` — exactly one of book/series/audiobook/video is populated per row
 
 ### scanner_tasks
 
-Background scanner job queue (pending/running/completed state).
+Background scanner job queue. Finished tasks move to `scan_history` and their row is deleted here.
 
 - PK: `id`
-- Columns: `task_type`, `task_key`(UNIQUE), `status`, `kwargs`, `stage`, `worker_pid`, `enqueue_at`, `started_at`, `finished_at`, `error_message`
+- Columns: `task_type`, `task_key`(UNIQUE), `status`, `kwargs`, `stage`, `worker_pid`, `cancel_requested`, `enqueue_at`, `started_at`, `finished_at`, `error_message`
+- Task types, state transitions and cancellation: [spec_scanner_queue_state_transitions_en.md](./spec_scanner_queue_state_transitions_en.md)
 
 ### scan_history
 
@@ -246,6 +234,7 @@ Occurrence records behind the notification center's problem cards. **One row per
 bumps the count and last-seen time (UPSERT). Design: [plan_unified_notification_queue.md](plan_unified_notification_queue.md).
 
 - PK: `id`, UNIQUE `(code, db_type, target_type, target_id)`
+- Target: `db_type`, `library_id`, `target_path` (file path), `occurrence_count` (times it recurred)
 - `code`: problem kind — scanner `file_missing`/`mass_missing`/`remote_unavailable`/`file_corrupt`/`cover_missing`/`unknown`,
   system `system_task_failed`, user report `user_report`, plugins `<plugin id>:<code>`
 - `severity`: `action_required` (red dot) / `notice` / `auto_fixed`
@@ -299,6 +288,92 @@ Plugin load/error event log.
 - PK: `id`
 - Columns: `plugin_id`, `status`, `message`, `occurred_at`
 
+### plugin_group_assignments
+
+Places a plugin's category tab in a sidebar group (`library_groups`).
+
+- PK: `plugin_id`
+- Columns: `group_id`, `sort_order`
+
+### videos / video_episodes
+
+Video courses (one folder = one course) and their episode files. Used only in the video DB.
+
+- `videos` PK: `id`, main FK: `library_id -> libraries.id`
+  - Columns: `title`, `sort_title`, `web_id`, `genres`, `poster`, `backdrop`, `premiered`, `description`, `folder_name`, `folder_path`(UNIQUE), `total_duration`, `total_episodes`, `is_favorite`, `created_at`, `updated_at`, `is_deleted`, `deleted_at`
+- `video_episodes` PK: `id`, main FK: `video_id -> videos.id`(CASCADE)
+  - Columns: `episode_number`, `episode_code`, `title`, `filename`, `file_path`(UNIQUE), `file_mtime`, `file_size`, `duration`, `width`, `height`, `premiered`, `format`, `needs_transcode`, `subtitle_path`, `container_verified`
+  - `needs_transcode`: 1 when the browser can't play the codec as is (played through ffmpeg). `duration`/`width`/`height`/`container_verified` are filled later by the lazy scanner with ffprobe
+
+### video_progress / video_episode_progress
+
+Per-user watch progress (per course / per episode). Same shape as audiobook progress.
+
+- `video_progress` main FK: `video_id -> videos.id`(CASCADE), `current_episode_id -> video_episodes.id`
+  - Columns: `user_id`, `current_time`, `total_progress_pct`, `playback_rate`, `is_completed`, `last_watched_at`
+  - Constraint: `UNIQUE(video_id, user_id)`
+- `video_episode_progress` main FK: `video_id`, `episode_id` (both CASCADE)
+  - Columns: `user_id`, `current_time`, `progress_pct`, `is_completed`, `updated_at`
+  - Constraint: `UNIQUE(video_id, episode_id, user_id)`
+
+### user_settings
+
+Per-user settings (key/value, like the global `settings`). Written only to the general DB.
+
+- PK: `id`, constraint `UNIQUE(user_id, key)`
+- Columns: `user_id`, `key`, `value`, `updated_at`
+
+### book_annotations / epub_bookmarks
+
+Highlights/notes and bookmarks made while reading EPUB/TXT.
+
+- `book_annotations` main FK: `book_id -> books.id`
+  - Columns: `user_id`, `format`, `chapter_idx`, `start_offset`, `end_offset`, `quote`, `prefix`, `suffix`, `color`, `note`, `plugin_marker`, `created_at`, `updated_at`
+  - `quote`/`prefix`/`suffix`: surrounding text used to find the spot again if the text shifts a little. `plugin_marker`: marks annotations created by a plugin
+- `epub_bookmarks` main FK: `book_id -> books.id`
+  - Columns: `user_id`, `format`, `chapter_idx`, `percent`, `label`, `created_at`
+
+### tts_progress
+
+TTS (read-aloud) position. The listening position and the reading position are kept separately.
+
+- PK: `id`, main FK: `book_id -> books.id`, constraint `UNIQUE(book_id, user_id)`
+- Columns: `listen_chapter`, `listen_offset`, `listen_text_len`, `listen_anchor`, `listen_updated_ms`, `read_chapter`, `read_offset`, `read_text_len`, `read_anchor`, `read_updated_ms`, `voice`, `steps`, `speed`
+
+### tts_audio_books / tts_audio_pieces / tts_pregen_jobs / tts_audio_cache
+
+Optional server-side TTS pre-generation. Audio is stored in per-book `.pack` files under `tts_audio/`.
+
+- `tts_audio_books`: one row per book × voice setting. Constraint `UNIQUE(book_id, voice, steps, speed, quality)`
+  - Columns: `book_id`, `voice`, `steps`, `speed`, `quality`, `rel_dir`, `pieces`, `bytes`, `duration_sec`, `created_by`, `created_ms`, `last_used_ms`
+- `tts_audio_pieces`: where each piece sits inside the `.pack`. PK `(audio_book_id, piece_key)`
+  - Columns: `chapter`, `part`, `byte_offset`, `byte_length`, `duration_sec`
+- `tts_pregen_jobs`: pre-generation jobs. `status` defaults to `queued`
+  - Columns: `book_id`, `user_id`, `voice`, `steps`, `speed`, `quality`, `status`, `total_pieces`, `done_pieces`, `error`, `heartbeat_ms`, `created_ms`, `finished_ms`
+- `tts_audio_cache`: the per-piece cache index from v2.7.9. No longer used; `clear_legacy_cache()` only empties it. PK `piece_key`
+
+### gdrive_book_copies
+
+State of book copies downloaded for opening in a Google link category (beta). A periodic job removes old copies.
+
+- PK: `id`, main FK: `book_id -> books.id` (UNIQUE)
+- Columns: `library_id`, `source_file_id`, `status` (`copied` / `unsupported`), `local_path`, `error_message`, `updated_at`
+
+### kosync_credentials / kosync_documents / kosync_progress
+
+KOReader progress sync (kosync). Written only to the general DB.
+
+- `kosync_credentials`: PK `user_id`, columns `key_hash`, `updated_at`
+- `kosync_documents`: KOReader document hash → book. PK `document`, columns `db_type`, `book_id`, `created_at`
+- `kosync_progress`: PK `(user_id, document)`, columns `progress`, `percentage`, `device`, `device_id`, `timestamp`
+
+### mcp_pending_changes
+
+Changes from MCP write tools (Tier B) that wait for admin approval instead of applying at once. Written only to the general DB.
+
+- PK: `id`
+- Columns: `tool_name`, `db_type`, `target`, `payload` (JSON), `preview`, `status` (default `pending`), `created_at`, `decided_at`, `decided_by`, `decision_note`
+
 ---
 
 ## 4. Relationship Summary
@@ -324,6 +399,15 @@ Plugin load/error event log.
 - `users (1) -> audiobook_progress (N)`
 - `libraries (1) -> user_category_permissions (N)`
 - `collections (1) -> collection_items (N)`
+- `libraries (1) -> videos (N)`, `videos (1) -> video_episodes (N)`, `videos (1) -> video_progress / video_episode_progress (N)`
+- `books (1) -> book_annotations / epub_bookmarks / tts_progress (N)`
+- `books (1) -> tts_audio_books (N)`, `tts_audio_books (1) -> tts_audio_pieces (N)`
+- `books (1) -> gdrive_book_copies (0..1)`, `books (1) -> kosync_documents (N)`
+
+**When you add a new table that hangs off a book**, also add it to these three cleanup lists. If you miss one, its rows are left behind when a category is deleted or moved, or when the trash is emptied.
+- `purge_book_dependents` in `repositories/category_data_shared.py` (category delete/move)
+- `repositories/trash_repository_shared.py` (permanent delete from trash)
+- the 7-day auto purge in `tools/scanner/sync_detector.py`
 
 ---
 
@@ -338,715 +422,13 @@ Plugin load/error event log.
 
 ---
 
-## 6. Source Snapshot (CREATE TABLE / INDEX)
+## 6. Schema Source (column types, indexes)
 
-### 6.1 SQLite — `database.py:init_databases`
+Column types, defaults and indexes are not copied into this document (the old copy went stale quickly). Read the source directly:
 
-All 3 DB files (general/adult/audiobook) are initialized from this single schema.
-
-```sql
-CREATE TABLE IF NOT EXISTS library_groups (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,
-    icon TEXT DEFAULT 'fa-folder',
-    color TEXT DEFAULT '#a855f7',
-    sort_order INTEGER DEFAULT 0
-);
-
-CREATE TABLE IF NOT EXISTS library_kinds (
-    code TEXT PRIMARY KEY,
-    name TEXT NOT NULL UNIQUE,
-    is_builtin INTEGER NOT NULL DEFAULT 0,
-    sort_order INTEGER DEFAULT 0
-);
-
-CREATE TABLE IF NOT EXISTS libraries (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,
-    physical_path TEXT NOT NULL,
-    cron_schedule TEXT DEFAULT NULL,
-    last_scanned_at DATETIME DEFAULT NULL,
-    scan_status TEXT DEFAULT 'ready',
-    is_remote INTEGER DEFAULT 0,
-    vfs_refresh_before_scan INTEGER DEFAULT 0,
-    rclone_rc_url TEXT DEFAULT NULL,
-    icon TEXT DEFAULT 'fa-book',
-    color TEXT DEFAULT '#94a3b8',
-    hide_cover INTEGER DEFAULT 0,
-    group_id INTEGER DEFAULT NULL,
-    sort_order INTEGER DEFAULT 0,
-    content_kind TEXT NOT NULL DEFAULT 'unspecified'
-);
-
-CREATE TABLE IF NOT EXISTS scanner_tasks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    task_type TEXT NOT NULL,
-    task_key TEXT NOT NULL UNIQUE,
-    status TEXT NOT NULL DEFAULT 'pending',
-    kwargs TEXT,
-    stage TEXT,
-    worker_pid INTEGER DEFAULT NULL,
-    enqueue_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    started_at DATETIME DEFAULT NULL,
-    finished_at DATETIME DEFAULT NULL,
-    error_message TEXT
-);
-
-CREATE TABLE IF NOT EXISTS books (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    library_id INTEGER REFERENCES libraries(id),
-    title TEXT NOT NULL,
-    series_name TEXT,
-    author TEXT,
-    isbn TEXT,
-    file_path TEXT NOT NULL UNIQUE,
-    file_format TEXT NOT NULL,
-    total_pages INTEGER NOT NULL,
-    has_offsets INTEGER DEFAULT 0,
-    cover_image TEXT,
-    publisher TEXT,
-    link TEXT,
-    score INTEGER,
-    release_date TEXT,
-    summary TEXT,
-    genre TEXT,
-    tags TEXT,
-    is_favorite INTEGER DEFAULT 0,
-    cover_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    is_deleted INTEGER DEFAULT 0,
-    deleted_at DATETIME DEFAULT NULL,
-    metadata_locked INTEGER DEFAULT 0,
-    series_alias TEXT,
-    title_alias TEXT,
-    file_mtime REAL DEFAULT 0.0,
-    file_size INTEGER DEFAULT 0,
-    cover_align TEXT DEFAULT 'center',
-    banner_image TEXT,
-    banner_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS series_summary (
-    library_id INTEGER NOT NULL,
-    series_key VARCHAR(500) NOT NULL,
-    representative_book_id INTEGER NOT NULL,
-    series_book_count INTEGER NOT NULL DEFAULT 0,
-    sort_series_name VARCHAR(500) NOT NULL DEFAULT '',
-    PRIMARY KEY (library_id, series_key)
-);
-
-CREATE TABLE IF NOT EXISTS series_summary_state (
-    id INTEGER PRIMARY KEY,
-    is_ready INTEGER NOT NULL DEFAULT 0,
-    refreshed_at DATETIME DEFAULT NULL
-);
-
-CREATE TABLE IF NOT EXISTS audiobooks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    library_id INTEGER REFERENCES libraries(id),
-    title TEXT NOT NULL,
-    sort_title TEXT,
-    web_id TEXT,
-    author TEXT,
-    publisher TEXT,
-    code TEXT,
-    poster TEXT,
-    premiered TEXT,
-    ratings REAL DEFAULT 0.0,
-    author_intro TEXT,
-    description TEXT,
-    folder_name TEXT NOT NULL,
-    folder_path TEXT NOT NULL UNIQUE,
-    total_duration REAL DEFAULT 0.0,
-    total_tracks INTEGER DEFAULT 1,
-    file_type TEXT DEFAULT 'multi',
-    is_favorite INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    is_deleted INTEGER DEFAULT 0,
-    deleted_at DATETIME DEFAULT NULL
-);
-
-CREATE TABLE IF NOT EXISTS audiobook_tracks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    audiobook_id INTEGER REFERENCES audiobooks(id) ON DELETE CASCADE,
-    track_number INTEGER NOT NULL,
-    track_code TEXT,
-    filename TEXT NOT NULL,
-    file_path TEXT NOT NULL UNIQUE,
-    file_mtime REAL DEFAULT 0.0,
-    file_size INTEGER DEFAULT 0,
-    duration REAL DEFAULT 0.0,
-    format TEXT DEFAULT 'mp3'
-);
-
-CREATE TABLE IF NOT EXISTS audiobook_progress (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    audiobook_id INTEGER REFERENCES audiobooks(id) ON DELETE CASCADE,
-    user_id INTEGER NOT NULL DEFAULT 1,
-    current_track_id INTEGER REFERENCES audiobook_tracks(id),
-    current_time REAL DEFAULT 0.0,
-    total_progress_pct REAL DEFAULT 0.0,
-    playback_rate REAL DEFAULT 1.0,
-    is_completed INTEGER DEFAULT 0,
-    last_listened_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(audiobook_id, user_id)
-);
-
-CREATE TABLE IF NOT EXISTS audiobook_track_progress (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    audiobook_id INTEGER REFERENCES audiobooks(id) ON DELETE CASCADE,
-    track_id INTEGER REFERENCES audiobook_tracks(id) ON DELETE CASCADE,
-    user_id INTEGER NOT NULL DEFAULT 1,
-    current_time REAL DEFAULT 0.0,
-    progress_pct REAL DEFAULT 0.0,
-    is_completed INTEGER DEFAULT 0,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(audiobook_id, track_id, user_id)
-);
-
-CREATE TABLE IF NOT EXISTS user_progress (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    book_id INTEGER REFERENCES books(id),
-    user_id INTEGER NOT NULL,
-    pages_read INTEGER DEFAULT 0,
-    is_completed INTEGER DEFAULT 0,
-    last_read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    last_epub_cfi TEXT,
-    last_epub_href TEXT,
-    last_epub_spine_index INTEGER,
-    last_epub_percent INTEGER DEFAULT 0,
-    last_epub_fingerprint TEXT,
-    last_epub_updated_at DATETIME
-);
-
-CREATE TABLE IF NOT EXISTS user_reading_log (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    book_id INTEGER REFERENCES books(id),
-    user_id INTEGER NOT NULL,
-    pages_read_delta INTEGER NOT NULL,
-    duration_seconds INTEGER DEFAULT 0,
-    read_date DATE DEFAULT CURRENT_DATE
-);
-
-CREATE TABLE IF NOT EXISTS user_favorites (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    book_id INTEGER REFERENCES books(id),
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(user_id, book_id)
-);
-
-CREATE TABLE IF NOT EXISTS book_offsets (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    book_id INTEGER REFERENCES books(id),
-    page_idx INTEGER,
-    filename TEXT,
-    local_header_offset INTEGER,
-    compress_size INTEGER,
-    file_size INTEGER,
-    compress_type INTEGER
-);
-
-CREATE TABLE IF NOT EXISTS settings (
-    key TEXT PRIMARY KEY,
-    value TEXT,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS scanner_progress (
-    library_id TEXT,
-    folder_path TEXT PRIMARY KEY
-);
-
-CREATE TABLE IF NOT EXISTS folder_mtimes (
-    folder_path TEXT PRIMARY KEY,
-    dir_mtime REAL,
-    meta_mtime REAL
-);
-
-CREATE TABLE IF NOT EXISTS scan_history (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    task_type TEXT NOT NULL,
-    task_key TEXT,
-    status TEXT NOT NULL,
-    kwargs TEXT,
-    enqueue_at TEXT,
-    started_at TEXT,
-    finished_at TEXT,
-    error_message TEXT,
-    result_summary TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS problem_occurrences (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    code TEXT NOT NULL,
-    severity TEXT NOT NULL DEFAULT 'notice',
-    source TEXT NOT NULL DEFAULT 'system',
-    db_type TEXT NOT NULL DEFAULT 'general',
-    library_id INTEGER DEFAULT NULL,
-    target_type TEXT NOT NULL,
-    target_id TEXT NOT NULL,
-    target_path TEXT,
-    series_key TEXT,
-    group_key TEXT NOT NULL,
-    title TEXT,
-    detail TEXT,
-    message TEXT,
-    context TEXT,
-    occurrence_count INTEGER NOT NULL DEFAULT 1,
-    first_seen_ms INTEGER NOT NULL,
-    last_seen_ms INTEGER NOT NULL,
-    status TEXT NOT NULL DEFAULT 'open',
-    resolved_ms INTEGER DEFAULT NULL,
-    UNIQUE(code, db_type, target_type, target_id)
-);
-
-CREATE TABLE IF NOT EXISTS problem_groups (
-    group_key TEXT PRIMARY KEY,
-    muted_ms INTEGER DEFAULT NULL,
-    muted_count INTEGER NOT NULL DEFAULT 0
-);
-
-CREATE INDEX IF NOT EXISTS idx_problem_occurrences_status_group ON problem_occurrences(status, group_key);
-CREATE INDEX IF NOT EXISTS idx_problem_occurrences_last_seen ON problem_occurrences(last_seen_ms);
-CREATE INDEX IF NOT EXISTS idx_problem_occurrences_target ON problem_occurrences(db_type, target_type, target_id);
-CREATE INDEX IF NOT EXISTS idx_problem_occurrences_library ON problem_occurrences(db_type, library_id);
-
-CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    role TEXT DEFAULT 'user',
-    is_default_password INTEGER DEFAULT 1,
-    has_adult_access INTEGER DEFAULT 1,
-    has_audiobook_access INTEGER DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS user_category_permissions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    library_id INTEGER NOT NULL,
-    has_access INTEGER DEFAULT 1,
-    UNIQUE(user_id, library_id)
-);
-
-CREATE TABLE IF NOT EXISTS collections (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    name TEXT NOT NULL,
-    description TEXT DEFAULT NULL,
-    color TEXT DEFAULT '#7c3aed',
-    cover_image TEXT DEFAULT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS collection_items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
-    book_id INTEGER DEFAULT NULL REFERENCES books(id) ON DELETE CASCADE,
-    series_name TEXT DEFAULT NULL,
-    audiobook_id INTEGER DEFAULT NULL REFERENCES audiobooks(id) ON DELETE CASCADE,
-    sort_order INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(collection_id, book_id),
-    UNIQUE(collection_id, series_name),
-    UNIQUE(collection_id, audiobook_id)
-);
-
-CREATE TABLE IF NOT EXISTS plugin_load_events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    plugin_id TEXT NOT NULL,
-    status TEXT NOT NULL,
-    message TEXT DEFAULT NULL,
-    occurred_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-**SQLite indexes:**
-
-```sql
-CREATE INDEX IF NOT EXISTS idx_audiobook_tracks_audiobook_id ON audiobook_tracks(audiobook_id);
-CREATE INDEX IF NOT EXISTS idx_audiobook_track_progress_lookup ON audiobook_track_progress(audiobook_id, user_id, track_id);
-CREATE INDEX IF NOT EXISTS idx_audiobooks_library_id ON audiobooks(library_id);
-CREATE INDEX IF NOT EXISTS idx_audiobooks_title ON audiobooks(title);
-CREATE INDEX IF NOT EXISTS idx_book_offsets_book_id ON book_offsets(book_id);
-CREATE INDEX IF NOT EXISTS idx_book_offsets_book_page ON book_offsets(book_id, page_idx);
-CREATE INDEX IF NOT EXISTS idx_books_series_name ON books(series_name);
-CREATE INDEX IF NOT EXISTS idx_books_series_alias ON books(series_alias);
-CREATE INDEX IF NOT EXISTS idx_books_library_id ON books(library_id);
-CREATE INDEX IF NOT EXISTS idx_books_isbn ON books(isbn);
-CREATE INDEX IF NOT EXISTS idx_libraries_group_id ON libraries(group_id);
-CREATE INDEX IF NOT EXISTS idx_libraries_group_order ON libraries(group_id, sort_order);
-CREATE INDEX IF NOT EXISTS idx_books_is_favorite ON books(is_favorite);
-CREATE INDEX IF NOT EXISTS idx_books_created_at ON books(created_at);
-CREATE INDEX IF NOT EXISTS idx_books_series_lib_title ON books(series_name, library_id, title);
-CREATE INDEX IF NOT EXISTS idx_books_library_active_series ON books(library_id, COALESCE(is_deleted, 0), COALESCE(series_name, ''));
-CREATE INDEX IF NOT EXISTS idx_series_summary_order ON series_summary(library_id, sort_series_name, representative_book_id);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_user_progress_book_user ON user_progress(book_id, user_id);
-CREATE INDEX IF NOT EXISTS idx_user_progress_last_read ON user_progress(user_id, last_read_at DESC);
-CREATE INDEX IF NOT EXISTS idx_user_progress_last_read_book ON user_progress(last_read_at DESC, book_id);
-CREATE INDEX IF NOT EXISTS idx_user_reading_log_user_date ON user_reading_log(user_id, read_date);
-CREATE INDEX IF NOT EXISTS idx_user_reading_log_book_user_date ON user_reading_log(book_id, user_id, read_date);
-CREATE INDEX IF NOT EXISTS idx_user_favorites_user_book ON user_favorites(user_id, book_id);
-CREATE INDEX IF NOT EXISTS idx_user_favorites_book ON user_favorites(book_id);
-CREATE INDEX IF NOT EXISTS idx_user_category_permissions_lookup ON user_category_permissions(user_id, library_id, has_access);
-CREATE INDEX IF NOT EXISTS idx_collections_user ON collections(user_id);
-CREATE INDEX IF NOT EXISTS idx_collection_items_coll ON collection_items(collection_id);
-CREATE INDEX IF NOT EXISTS idx_plugin_load_events_plugin_time ON plugin_load_events(plugin_id, occurred_at DESC);
-```
-
-### 6.2 MariaDB — `tools/db_schema_updater.py:MARIADB_CENTRAL_SCHEMA`
-
-All 3 MariaDB databases (`media_general`, `media_adult`, `media_audiobook`) are initialized from this single schema. The logical structure matches SQLite; the main differences are `BIGINT`/`VARCHAR(n)` types and indexes declared inline inside `CREATE TABLE`. Missing columns/indexes on existing production DBs are auto-backfilled at startup by `_ensure_mariadb_columns()` / `_ensure_mariadb_indexes()` (`ALTER TABLE ... ADD COLUMN`, `CREATE INDEX`).
-
-```sql
-CREATE TABLE IF NOT EXISTS library_groups (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE,
-    icon VARCHAR(100) DEFAULT 'fa-folder',
-    color VARCHAR(50) DEFAULT '#a855f7',
-    sort_order INT DEFAULT 0
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-
-CREATE TABLE IF NOT EXISTS library_kinds (
-    code VARCHAR(24) PRIMARY KEY,
-    name VARCHAR(100) NOT NULL UNIQUE,
-    is_builtin TINYINT(1) NOT NULL DEFAULT 0,
-    sort_order INT DEFAULT 0
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-
-CREATE TABLE IF NOT EXISTS libraries (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE,
-    physical_path TEXT NOT NULL,
-    cron_schedule VARCHAR(255) DEFAULT NULL,
-    last_scanned_at DATETIME DEFAULT NULL,
-    scan_status VARCHAR(50) DEFAULT 'ready',
-    is_remote INT DEFAULT 0,
-    vfs_refresh_before_scan INT DEFAULT 0,
-    rclone_rc_url TEXT DEFAULT NULL,
-    icon VARCHAR(100) DEFAULT 'fa-book',
-    color VARCHAR(50) DEFAULT '#94a3b8',
-    hide_cover INT DEFAULT 0,
-    group_id BIGINT DEFAULT NULL,
-    sort_order INT DEFAULT 0,
-    content_kind VARCHAR(24) NOT NULL DEFAULT 'unspecified',
-    INDEX idx_libraries_group_id (group_id),
-    INDEX idx_libraries_group_order (group_id, sort_order)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-
-CREATE TABLE IF NOT EXISTS scanner_tasks (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    task_type VARCHAR(100) NOT NULL,
-    task_key VARCHAR(255) NOT NULL UNIQUE,
-    status VARCHAR(50) NOT NULL DEFAULT 'pending',
-    kwargs TEXT,
-    stage TEXT,
-    worker_pid INT DEFAULT NULL,
-    enqueue_at VARCHAR(50),
-    started_at VARCHAR(50),
-    finished_at VARCHAR(50),
-    error_message TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-
-CREATE TABLE IF NOT EXISTS books (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    library_id BIGINT,
-    title VARCHAR(500) NOT NULL,
-    series_name VARCHAR(500),
-    author VARCHAR(500),
-    isbn VARCHAR(100),
-    file_path TEXT NOT NULL,
-    file_format VARCHAR(50) NOT NULL,
-    total_pages INT NOT NULL DEFAULT 0,
-    has_offsets INT DEFAULT 0,
-    cover_image TEXT,
-    publisher VARCHAR(255),
-    link TEXT,
-    score INT,
-    release_date VARCHAR(100),
-    summary TEXT,
-    genre VARCHAR(255),
-    tags TEXT,
-    is_favorite INT DEFAULT 0,
-    cover_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    is_deleted INT DEFAULT 0,
-    deleted_at DATETIME DEFAULT NULL,
-    metadata_locked INT DEFAULT 0,
-    series_alias VARCHAR(500),
-    title_alias VARCHAR(500),
-    file_mtime DOUBLE DEFAULT 0.0,
-    file_size BIGINT DEFAULT 0,
-    cover_align VARCHAR(10) DEFAULT 'center',
-    banner_image TEXT,
-    banner_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_books_file_path (file_path(500)),
-    INDEX idx_books_series_name (series_name(255)),
-    INDEX idx_books_series_alias (series_alias(255)),
-    INDEX idx_books_library_id (library_id),
-    INDEX idx_books_title (title(255)),
-    INDEX idx_books_isbn (isbn)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-
-CREATE TABLE IF NOT EXISTS series_summary (
-    library_id BIGINT NOT NULL,
-    series_key VARCHAR(500) NOT NULL,
-    representative_book_id BIGINT NOT NULL,
-    series_book_count BIGINT NOT NULL DEFAULT 0,
-    sort_series_name VARCHAR(500) NOT NULL DEFAULT '',
-    PRIMARY KEY (library_id, series_key),
-    INDEX idx_series_summary_order (library_id, sort_series_name, representative_book_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-
-CREATE TABLE IF NOT EXISTS series_summary_state (
-    id TINYINT NOT NULL PRIMARY KEY,
-    is_ready TINYINT NOT NULL DEFAULT 0,
-    refreshed_at DATETIME DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-
-CREATE TABLE IF NOT EXISTS audiobooks (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    library_id BIGINT,
-    title VARCHAR(500) NOT NULL,
-    sort_title VARCHAR(500),
-    web_id VARCHAR(100),
-    author VARCHAR(500),
-    publisher VARCHAR(255),
-    code VARCHAR(255),
-    poster TEXT,
-    premiered VARCHAR(100),
-    ratings DOUBLE DEFAULT 0.0,
-    author_intro TEXT,
-    description TEXT,
-    folder_name VARCHAR(500) NOT NULL,
-    folder_path TEXT NOT NULL,
-    total_duration DOUBLE DEFAULT 0.0,
-    total_tracks INT DEFAULT 1,
-    file_type VARCHAR(50) DEFAULT 'multi',
-    is_favorite INT DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    is_deleted INT DEFAULT 0,
-    deleted_at DATETIME DEFAULT NULL,
-    UNIQUE KEY uq_audiobooks_folder_path (folder_path(500))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-
-CREATE TABLE IF NOT EXISTS audiobook_tracks (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    audiobook_id BIGINT NOT NULL,
-    track_number INT NOT NULL,
-    track_code VARCHAR(100),
-    title VARCHAR(500),
-    filename VARCHAR(500) NOT NULL,
-    file_path TEXT NOT NULL,
-    file_mtime DOUBLE DEFAULT 0.0,
-    file_size BIGINT DEFAULT 0,
-    duration DOUBLE DEFAULT 0.0,
-    format VARCHAR(50) DEFAULT 'mp3',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_tracks_file_path (file_path(500)),
-    INDEX idx_tracks_audiobook (audiobook_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-
-CREATE TABLE IF NOT EXISTS audiobook_progress (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    audiobook_id BIGINT NOT NULL,
-    user_id BIGINT NOT NULL DEFAULT 1,
-    current_track_id BIGINT,
-    `current_time` DOUBLE DEFAULT 0.0,
-    total_progress_pct DOUBLE DEFAULT 0.0,
-    playback_rate DOUBLE DEFAULT 1.0,
-    is_completed INT DEFAULT 0,
-    last_listened_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_audiobook_user_progress (audiobook_id, user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-
-CREATE TABLE IF NOT EXISTS audiobook_track_progress (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    audiobook_id BIGINT NOT NULL,
-    track_id BIGINT NOT NULL,
-    user_id BIGINT NOT NULL DEFAULT 1,
-    `current_time` DOUBLE DEFAULT 0.0,
-    progress_pct DOUBLE DEFAULT 0.0,
-    is_completed INT DEFAULT 0,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_audiobook_track_user_progress (audiobook_id, track_id, user_id),
-    INDEX idx_audiobook_track_progress_lookup (audiobook_id, user_id, track_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-
-CREATE TABLE IF NOT EXISTS user_progress (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    book_id BIGINT NOT NULL,
-    user_id BIGINT NOT NULL,
-    pages_read INT DEFAULT 0,
-    is_completed INT DEFAULT 0,
-    last_read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    last_epub_cfi TEXT,
-    last_epub_href TEXT,
-    last_epub_spine_index INT,
-    last_epub_percent INT DEFAULT 0,
-    last_epub_fingerprint VARCHAR(255),
-    last_epub_updated_at DATETIME,
-    UNIQUE KEY uq_user_book_progress (book_id, user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-
-CREATE TABLE IF NOT EXISTS user_reading_log (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    book_id BIGINT NOT NULL,
-    user_id BIGINT NOT NULL,
-    pages_read_delta INT NOT NULL,
-    duration_seconds INT DEFAULT 0,
-    read_date DATE DEFAULT (CURRENT_DATE)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-
-CREATE TABLE IF NOT EXISTS user_favorites (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT NOT NULL,
-    book_id BIGINT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_user_favorite (user_id, book_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-
-CREATE TABLE IF NOT EXISTS book_offsets (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    book_id BIGINT NOT NULL,
-    page_idx INT,
-    filename VARCHAR(500),
-    local_header_offset BIGINT,
-    compress_size BIGINT,
-    file_size BIGINT,
-    compress_type INT,
-    INDEX idx_offsets_book (book_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-
-CREATE TABLE IF NOT EXISTS settings (
-    `key` VARCHAR(255) PRIMARY KEY,
-    `value` TEXT,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-
-CREATE TABLE IF NOT EXISTS scan_history (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    task_type VARCHAR(100) NOT NULL,
-    task_key VARCHAR(255),
-    status VARCHAR(50) NOT NULL,
-    kwargs TEXT,
-    enqueue_at VARCHAR(50),
-    started_at VARCHAR(50),
-    finished_at VARCHAR(50),
-    error_message TEXT,
-    result_summary TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-
-CREATE TABLE IF NOT EXISTS problem_occurrences (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    code VARCHAR(150) NOT NULL,
-    severity VARCHAR(30) NOT NULL DEFAULT 'notice',
-    source VARCHAR(150) NOT NULL DEFAULT 'system',
-    db_type VARCHAR(20) NOT NULL DEFAULT 'general',
-    library_id BIGINT DEFAULT NULL,
-    target_type VARCHAR(20) NOT NULL,
-    target_id VARCHAR(255) NOT NULL,
-    target_path TEXT,
-    series_key TEXT,
-    group_key VARCHAR(255) NOT NULL,
-    title TEXT,
-    detail TEXT,
-    message TEXT,
-    context TEXT,
-    occurrence_count INT NOT NULL DEFAULT 1,
-    first_seen_ms BIGINT NOT NULL,
-    last_seen_ms BIGINT NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'open',
-    resolved_ms BIGINT DEFAULT NULL,
-    UNIQUE KEY uq_problem_occurrences_target (code, db_type, target_type, target_id),
-    INDEX idx_problem_occurrences_status_group (status, group_key),
-    INDEX idx_problem_occurrences_last_seen (last_seen_ms),
-    INDEX idx_problem_occurrences_target (db_type, target_type, target_id),
-    INDEX idx_problem_occurrences_library (db_type, library_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-
-CREATE TABLE IF NOT EXISTS problem_groups (
-    group_key VARCHAR(255) PRIMARY KEY,
-    muted_ms BIGINT DEFAULT NULL,
-    muted_count INT NOT NULL DEFAULT 0
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-
-CREATE TABLE IF NOT EXISTS scanner_progress (
-    library_id VARCHAR(100),
-    folder_path VARCHAR(500) PRIMARY KEY
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-
-CREATE TABLE IF NOT EXISTS folder_mtimes (
-    folder_path VARCHAR(500) PRIMARY KEY,
-    dir_mtime DOUBLE,
-    meta_mtime DOUBLE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-
-CREATE TABLE IF NOT EXISTS users (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(100) NOT NULL UNIQUE,
-    password_hash VARCHAR(255) NOT NULL,
-    role VARCHAR(50) DEFAULT 'user',
-    is_default_password INT DEFAULT 1,
-    has_adult_access INT DEFAULT 1,
-    has_audiobook_access INT DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-
-CREATE TABLE IF NOT EXISTS user_category_permissions (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT NOT NULL,
-    library_id BIGINT NOT NULL,
-    has_access INT DEFAULT 1,
-    UNIQUE KEY uq_user_cat_perm (user_id, library_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-
-CREATE TABLE IF NOT EXISTS collections (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    description TEXT DEFAULT NULL,
-    color VARCHAR(50) DEFAULT '#7c3aed',
-    cover_image TEXT DEFAULT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_collections_user (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-
-CREATE TABLE IF NOT EXISTS collection_items (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    collection_id BIGINT NOT NULL,
-    book_id BIGINT DEFAULT NULL,
-    series_name VARCHAR(500) DEFAULT NULL,
-    audiobook_id BIGINT DEFAULT NULL,
-    sort_order INT DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_coll_book (collection_id, book_id),
-    UNIQUE KEY uq_coll_series (collection_id, series_name(255)),
-    UNIQUE KEY uq_coll_audiobook (collection_id, audiobook_id),
-    INDEX idx_collection_items_coll (collection_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-
-CREATE TABLE IF NOT EXISTS plugin_load_events (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    plugin_id VARCHAR(255) NOT NULL,
-    status VARCHAR(20) NOT NULL,
-    message TEXT DEFAULT NULL,
-    occurred_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_plugin_load_events_plugin_time (plugin_id, occurred_at DESC)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-```
-
-**Note**: beyond the inline indexes above, `_ensure_mariadb_indexes()` separately maintains extra backfill indexes for existing production DBs (e.g., composite `(library_id, is_deleted, ...)` indexes like `idx_books_lib_del_series`, `idx_books_lib_del_title`). New installs may already have these folded into the latest `MARIADB_CENTRAL_SCHEMA`; check `_ensure_mariadb_indexes()` in `tools/db_schema_updater.py` directly for the authoritative current list.
+- SQLite: `services/db_migration_service.py` — `_SCHEMA_SQL` (tables), `_INDEXES_SQL` (indexes)
+- MariaDB: `tools/db_schema_updater.py` — `MARIADB_CENTRAL_SCHEMA` (tables), plus the column/index backfill lists for existing DBs
+- How to add a column (edit both sources, add it to the backfill list): [change_db_guide.md](./change_db_guide.md)
 
 ---
 

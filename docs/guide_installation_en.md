@@ -10,12 +10,17 @@ tags: [install, guide, setup]
 
 This document is a comprehensive guide to installing the BookOasis media server in a local environment or a Linux production server.
 
+> **Installing for the first time? Start with the step-by-step guide for your setup.**
+> - [Synology NAS (Container Manager)](guide_install_synology_en.md) — install from the web UI, no terminal
+> - [Oracle Cloud free server (Ubuntu, ARM/AMD)](guide_install_oracle_en.md) — setup wizard + firewall and security
+> - [Connecting Google Drive (rclone)](guide_rclone_gdrive_en.md) — headless servers, creating your own client_id
+
 ---
 
 ## 1. System Requirements
 
 * **Operating System**: Windows 10/11, Linux (Ubuntu 20.04+ recommended), macOS
-* **Python**: 3.9 or higher recommended
+* **Python**: 3.10 or higher (gunicorn 26 and Pillow 12 need 3.10+). 3.11+ is better: it installs Pillow 13, which carries security fixes
 * **Database**: 
   - **SQLite (Default)**: Built-in Python library, no separate DB server installation required.
   - **MariaDB / MySQL (Enterprise Recommended)**: Eliminates disk lock bottlenecks and corruption risks in high-concurrency / large library environments.
@@ -128,7 +133,22 @@ SECURITY_CSP_LOG_REPORTS=true
 SECURITY_CSP_REPORT_FILE=./logs/csp_reports.jsonl
 SECURITY_CSP_REPORT_RATE_LIMIT_PER_MIN=120
 SECURITY_CSP_REPORT_DEDUP_WINDOW_SEC=30
+
+# (Optional) MariaDB / MySQL mode
+#DB_ENGINE=mariadb
+#MARIADB_HOST=127.0.0.1
+#MARIADB_PORT=3306
+#MARIADB_USER=bookoasis
+#MARIADB_PASSWORD=your_mariadb_password
+#MARIADB_DATABASE_PREFIX=media_
+
+# (Optional) slow-request / server-error diagnostic log (off by default) - logs/request_debug.log
+#DEBUG_REQUEST_LOG=false
+# only requests slower than this (ms) are recorded
+#DEBUG_REQUEST_LOG_MS=500
 ```
+
+**Slow-request diagnostic log:** if screens are sometimes slow, turn on `DEBUG_REQUEST_LOG=true` for a few days, then run `python tools/summarize_request_debug_log.py --hours 72` (or the MCP tool `get_request_debug_summary`) for a per-route summary. Turn it off again once you've found the cause.
 
 **Recommended CSP transition:**
 1. Start with `SECURITY_CSP_REPORT_ONLY=true` and `SECURITY_CSP_ENFORCE=false`
@@ -169,11 +189,13 @@ In Linux server environments, run the web process with Gunicorn. For this projec
 
 ```bash
 # [Recommended] Single-command mode: single web worker + embedded scanner worker
-BOOKOASIS_ENABLE_EMBEDDED_WORKER=true gunicorn --workers 1 --bind 0.0.0.0:5930 --timeout 120 core:app --daemon
+BOOKOASIS_ENABLE_EMBEDDED_WORKER=true gunicorn --workers 1 --threads 12 --max-requests 5000 --max-requests-jitter 500 --bind 0.0.0.0:5930 --timeout 300 core:app --daemon
 
 # If you want to change the port to 8080, modify the bind option:
-# BOOKOASIS_ENABLE_EMBEDDED_WORKER=true gunicorn --workers 1 --bind 0.0.0.0:8080 --timeout 120 core:app --daemon
+# BOOKOASIS_ENABLE_EMBEDDED_WORKER=true gunicorn --workers 1 --threads 12 --max-requests 5000 --max-requests-jitter 500 --bind 0.0.0.0:8080 --timeout 300 core:app --daemon
 ```
+* Without `--threads 12`, Gunicorn serves one request at a time, so other screens freeze while a comic page or PDF loads (same value as Docker and `manage.sh`).
+* `--max-requests 5000` restarts the worker now and then to free memory. A single PDF can send up to 180 range requests, so a small value like 1000 restarts it far too often.
 
 ```bash
 # [Alternative] Two-process manager mode (separate web/worker)
@@ -255,10 +277,10 @@ services:
   bookoasis:
     environment:
       - DB_ENGINE=mariadb
-      - DB_HOST=192.168.0.100  # External MariaDB Server IP
-      - DB_PORT=3306
-      - DB_USER=bookoasis
-      - DB_PASSWORD=your_password
+      - MARIADB_HOST=192.168.0.100  # External MariaDB Server IP
+      - MARIADB_PORT=3306
+      - MARIADB_USER=bookoasis
+      - MARIADB_PASSWORD=your_password
 ```
 * 💡 Specifying credentials in `docker-compose.override.yml` ensures your personal DB settings are preserved across `git pull` updates without conflicts.
 * The container's internal port `5930` is bound to the host's `5930` port. If you wish to change the host port, modify the left-side port number in `docker-compose.ghcr.yml` like `ports: - "8080:5930"`.

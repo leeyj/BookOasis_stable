@@ -1,4 +1,19 @@
 # CHANGELOG
+## v3.1.0
+- (fix) 만화 스크롤 모드에서 끝까지 봐도 진행률이 몇 쪽 앞(예: 95/100)으로 저장되던 문제 수정 — 현재 페이지를 화면 위치로 직접 계산 | fix comic scroll mode saving progress a few pages short (e.g. 95/100) even after reading to the end — the current page is now computed from the screen position
+- (fix) 구글 링크 카테고리의 '확인 후 휴지통으로'가 원격 경로를 로컬 파일처럼 검사하던 부분 정리 — 원격은 마지막 스캔 결과를 따름 | the Google link category 'move to trash after confirming' action no longer checks remote paths as local files — remote paths follow the last scan result
+- (fix) 성인 카테고리 스캔이 중단 버튼을 눌러도 멈추지 않던 문제 수정 — 같은 번호의 일반 카테고리 상태를 보고 있었음 | fix adult category scans not stopping when the cancel button was pressed — the scanner was checking the general category with the same id
+- (fix) rclone 오디오북·영상 카테고리에서 경로 지정·웹훅 스캔 전 VFS 새로고침이 같은 번호의 일반 카테고리 설정을 따르던 문제 수정 | fix path and webhook scans of rclone audiobook/video categories using the VFS refresh settings of the general category with the same id
+- (fix) MariaDB에서 설정의 DB 커넥션 풀 크기가 무시되고 늘 5개로 동작하던 문제 수정 — 설정값을 따르되 MariaDB는 최대 20개 | fix MariaDB ignoring the DB connection pool size setting and always using 5 — the setting now applies, capped at 20 on MariaDB
+- (fix) MariaDB에서 이미 있는 사용자 이름으로 사용자를 추가하면 '이미 존재' 대신 '추가 실패' 오류가 나던 문제 수정 | fix adding a user with an existing name on MariaDB showing 'failed to add' instead of 'already exists'
+- (fix) 영상 카테고리의 예약 스캔이 서버 재시작이나 카테고리·설정 저장 뒤 사라지고, 중단된 영상 스캔이 자동으로 이어지지 않던 문제 수정 | fix scheduled scans of video categories disappearing after a server restart or after saving categories/settings, and interrupted video scans not resuming automatically
+- (docs) 설치·관리자 가이드의 MariaDB 환경 변수 이름(`DB_HOST` 등 → `MARIADB_HOST` 등), Gunicorn 직접 실행 옵션(`--threads 12` 누락으로 요청을 하나씩만 처리), Python 최소 버전(3.10)을 바로잡고, 카테고리 속성·삭제/이동·경고 표시, 진단 기록, MCP 도구 목록을 현재 동작에 맞춤, 아키텍처 가이드를 현재 구조로 새로 쓰고, DB 스키마·스캐너·스캔 대기열 명세 문서를 코드에 맞춤 | fix the install/admin guides' MariaDB variable names (`DB_HOST` etc. → `MARIADB_HOST` etc.), the direct Gunicorn command (missing `--threads 12`, so it served one request at a time) and the minimum Python version (3.10), and bring category properties, delete/move, the warning mark, the diagnostic log and the MCP tool list up to date, rewrite the architecture guide for the current structure, and bring the DB schema, scanner and scan queue spec documents in line with the code
+
+
+## v3.0.9
+- (improvement) 처리가 필요한 알림(대량 사라짐 등)이 열린 카테고리는 제목의 ⓘ 옆에 빨간 경고 표시(관리자만) — 누르면 알림센터에서 해당 카드를 펼쳐 보여줌 | categories with an open alert that needs action (e.g. mass missing files) show a red warning next to the title's ⓘ (admins only) — clicking it opens that card in the notification center
+
+
 ## v3.0.8
 - (security) EPUB 안의 그림 주소로 HTML·SVG 같은 문서 파일까지 사이트 주소에서 열리던 문제 수정 — 그림만 내보내고 SVG는 스크립트가 돌지 않게 막음(악성 EPUB 대비) | fix the EPUB image endpoint also serving document files (HTML, SVG, etc.) on the site's origin — only images are served now, and SVG is sandboxed so its scripts cannot run (protects against malicious EPUBs)
 - (security) 구글 링크 카테고리의 메타데이터를 받을 때 공유 폴더 쪽 이름으로 미러 폴더 밖에 파일을 쓸 수 없게 막음 | Google link categories can no longer write metadata files outside the local mirror folder through names chosen by the shared folder

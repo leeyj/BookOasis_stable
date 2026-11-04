@@ -41,8 +41,51 @@ function notifyFinishedWhileWatching(items) {
   });
 }
 
+// 처리 필요(action_required) 카드가 열린 카테고리 "dbType:libId" → 그 카드의 펼침 키.
+// 문제 카드는 관리자에게만 내려오므로 일반 사용자는 늘 비어 있다. '알고 있음'으로 둔 카드는 빼고 센다.
+let actionCardByLibrary = new Map();
+
+function collectActionCards(items) {
+  const map = new Map();
+  items.forEach(item => {
+    if (item?.kind !== 'problem' || item?.severity !== 'action_required') return;
+    const cards = item.card ? [item.card] : (Array.isArray(item?.target?.cards) ? item.target.cards : []);
+    const expandKey = item.card ? item.card.group_key : item.id;
+    cards.forEach(card => {
+      if (!card || card.muted || card.library_id === null || card.library_id === undefined) return;
+      const key = `${card.db_type || 'general'}:${card.library_id}`;
+      if (!map.has(key)) map.set(key, expandKey);
+    });
+  });
+  return map;
+}
+
+function applyCategoryWarning() {
+  const btn = document.getElementById('btn-category-warning');
+  if (!btn) return;
+  const expandKey = actionCardByLibrary.get(`${state.currentLibraryType}:${state.currentLibraryId}`);
+  btn.hidden = !expandKey;
+  btn.dataset.expandKey = expandKey || '';
+}
+
+// 카테고리 ⚠ → 알림센터를 열고 그 카드를 펼쳐 보이게 한다.
+function openNotificationCard(expandKey) {
+  setScanActivityPopoverOpen(true);
+  const list = document.getElementById('scan-activity-list');
+  const itemEl = expandKey && list
+    ? list.querySelector(`[data-expand-key="${CSS.escape(expandKey)}"]`)
+    : null;
+  if (!itemEl) return;
+  if (!itemEl.classList.contains('is-expanded')) {
+    itemEl.querySelector('[data-notify-action="toggle_card"]')?.click();
+  }
+  itemEl.scrollIntoView({ block: 'nearest' });
+}
+
 function renderScanActivity(data) {
   latestSystemStatus = data;
+  actionCardByLibrary = collectActionCards(Array.isArray(data?.notifications) ? data.notifications : []);
+  applyCategoryWarning();
   const button = document.getElementById('btn-scan-activity');
   const summary = document.getElementById('scan-activity-summary');
   const list = document.getElementById('scan-activity-list');
@@ -157,6 +200,11 @@ function initScanActivityPopover() {
   });
   closeButton.addEventListener('click', () => setScanActivityPopoverOpen(false));
   document.getElementById('btn-clear-notifications')?.addEventListener('click', () => clearNotifications());
+  document.getElementById('btn-category-warning')?.addEventListener('click', event => {
+    event.stopPropagation();
+    openNotificationCard(event.currentTarget.dataset.expandKey);
+  });
+  window.addEventListener('library:category-selected', applyCategoryWarning);
   popover.addEventListener('click', event => event.stopPropagation());
   document.addEventListener('click', () => setScanActivityPopoverOpen(false));
   document.addEventListener('keydown', event => {

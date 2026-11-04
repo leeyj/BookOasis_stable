@@ -279,6 +279,18 @@ def reconcile(cursor, db_type, library_id, *, found_file_paths, processed_paths,
 
 # ---- 관리자 조치 ----
 
+def _path_present_now(path):
+    """휴지통 이동 직전 확인: 지금 파일이 있는가.
+
+    로컬/마운트 경로는 바로 확인한다. gdrive: 같은 원격 가상 경로는 os.path.exists로 확인할 수 없고
+    (항상 '없음'), 그 자리에서 폴더 전체를 다시 훑기엔 비싸므로 마지막 스캔 결과를 따른다 -
+    스캔 끝의 reconcile()이 다시 보인 파일의 기록을 이미 해제했으니, 열린 기록 = 마지막 스캔 때 없던 파일.
+    그 뒤에 다시 생긴 파일은 다음 스캔이 휴지통에서 복구한다(handle_deleted_books)."""
+    if _is_remote_url(path):
+        return False
+    return os.path.exists(path)
+
+
 def confirm_trash(group_key):
     """mass_missing 카드: 지금도 파일이 없는 도서만 휴지통으로 옮기고 해제한다. (옮긴 수, 아직 남은 수)"""
     import database
@@ -296,7 +308,7 @@ def confirm_trash(group_key):
     if not roots_ok:
         raise RuntimeError('카테고리 루트에 접근할 수 없어 휴지통 이동을 하지 않았습니다.')
     still_missing = [r for r in rows if str(r['target_id']).isdigit() and r.get('target_path')
-                     and not os.path.exists(r['target_path'])]
+                     and not _path_present_now(r['target_path'])]
     reappeared = [r for r in rows if r not in still_missing]
     trash_ids = [int(r['target_id']) for r in still_missing]
     if trash_ids:

@@ -12,6 +12,11 @@
                     <button id="btn-category-info" class="btn-category-info" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="category-info-popover" title="현재 카테고리 정보" data-i18n-title="book_list.category_info_title">
                         <i class="lc lc-info" aria-hidden="true"></i>
                     </button>
+                    <!-- 이 카테고리에 처리 필요(action_required) 알림 카드가 열려 있으면 관리자에게만 보인다.
+                         누르면 알림센터를 열고 그 카드를 펼친다 (scan_activity_status.js) -->
+                    <button id="btn-category-warning" class="btn-category-warning" type="button" hidden title="처리가 필요한 알림이 있습니다 - 눌러서 알림센터에서 확인" data-i18n-title="book_list.category_warning_title" aria-label="처리가 필요한 알림이 있습니다 - 눌러서 알림센터에서 확인">
+                        <i class="lc lc-triangle-alert" aria-hidden="true"></i>
+                    </button>
                 </div>
                 <div class="library-list-controls">
                     <button id="btn-lib-sort" data-role="library-sort-toggle" class="library-list-btn" style="display: none;"

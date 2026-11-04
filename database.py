@@ -294,37 +294,74 @@ def shutdown_all_pools():
                     print(f"[DB-Shutdown] Error closing {db_type} MariaDB pool: {e}")
     print("[DB-Shutdown] All DB connection pools closed.")
 
+# MariaDB는 DB 4개 × 프로세스(웹·워커·lazy)마다 풀이 따로 생겨, 설정 상한(50)을 그대로 쓰면 바쁠 때
+# 서버 기본 max_connections(151)에 닿을 수 있다. 웹 스레드 12개 + 스캔 스레드를 받기엔 20이면 충분하다.
+MARIADB_POOL_SIZE_CAP = 20
+_DEFAULT_POOL_SIZE = 5
+
+
+def _is_mariadb_engine():
+    return os.environ.get('DB_ENGINE', os.environ.get('DBMS', 'sqlite')).lower() in ('mariadb', 'mysql')
+
+
+def _read_pool_size_setting_sqlite():
+    """SQLite general DB의 settings.DB_POOL_SIZE (없으면 None)."""
+    if not os.path.exists(DB_GENERAL_PATH):
+        return None
+    conn = sqlite3.connect(DB_GENERAL_PATH, timeout=5.0)
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='settings'")
+        if not cursor.fetchone():
+            return None
+        cursor.execute("SELECT `value` FROM settings WHERE `key` = 'DB_POOL_SIZE'")
+        row = cursor.fetchone()
+        return row[0] if row else None
+    finally:
+        conn.close()
+
+
+def _read_pool_size_setting_mariadb():
+    """MariaDB general DB의 settings.DB_POOL_SIZE (없으면 None).
+    풀 크기를 정하려고 풀에서 연결을 꺼내면 자기 자신을 다시 부르므로 단독 연결로 한 번 읽는다."""
+    conn = MariaDBConnectionPool('general', 1)._create_raw_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT `value` FROM settings WHERE `key` = 'DB_POOL_SIZE'")
+            row = cursor.fetchone()
+            return row['value'] if row else None
+    finally:
+        conn.close()
+
+
 def _get_pool_size_raw():
     global _cached_pool_size
     with _pool_size_cache_lock:
         if _cached_pool_size is not None:
             return _cached_pool_size
 
-    db_path = DB_GENERAL_PATH
-    if not os.path.exists(db_path):
-        return 5
+    mariadb = _is_mariadb_engine()
     try:
-        conn = sqlite3.connect(db_path, timeout=5.0)
-        cursor = conn.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='settings'")
-        if cursor.fetchone():
-            cursor.execute("SELECT `value` FROM settings WHERE `key` = 'DB_POOL_SIZE'")
-            row = cursor.fetchone()
-            if row:
-                conn.close()
-                val = int(row[0])
-                val = max(1, min(50, val))
-                with _pool_size_cache_lock:
-                    _cached_pool_size = val
-                return val
-        conn.close()
+        raw = _read_pool_size_setting_mariadb() if mariadb else _read_pool_size_setting_sqlite()
     except Exception:
-        pass
-    
-    # 캐시 갱신 실패 혹은 기본값 반환 시에도 캐싱 처리하여 다음 연결 시 불필요한 반복 쿼리 방지
+        # MariaDB에 잠시 닿지 못한 경우는 캐시하지 않는다 - 기본값에 고정되지 않고 다음 연결 때 다시 읽는다.
+        if mariadb:
+            return _DEFAULT_POOL_SIZE
+        raw = None
+
+    val = _DEFAULT_POOL_SIZE
+    if raw is not None:
+        try:
+            val = max(1, min(50, int(raw)))
+        except (TypeError, ValueError):
+            val = _DEFAULT_POOL_SIZE
+    if mariadb:
+        val = min(val, MARIADB_POOL_SIZE_CAP)
+
+    # 기본값도 캐시해 다음 연결 때 반복 조회하지 않는다 (설정 저장 시 invalidate_pool_size_cache()).
     with _pool_size_cache_lock:
-        _cached_pool_size = 5
-    return 5
+        _cached_pool_size = val
+    return val
 
 class DictRow(dict):
     """sqlite3.Row 호환 딕셔너리 서브클래스 (row['col'], row.get('col'), row[0] 인덱싱 지원)"""
@@ -651,8 +688,7 @@ def get_mariadb_connection(db_type='general'):
 
 def get_connection(db_type='general', wait_timeout=30.0):
     """데이터베이스 연결 반환 (SQLite 커넥션 풀 또는 MariaDB 커넥션 풀 지원)"""
-    engine = os.environ.get('DB_ENGINE', os.environ.get('DBMS', 'sqlite')).lower()
-    if engine in ('mariadb', 'mysql'):
+    if _is_mariadb_engine():
         return get_mariadb_connection(db_type)
 
     global _pools

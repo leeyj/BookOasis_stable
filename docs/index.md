@@ -13,6 +13,9 @@ This is the central technical documentation and task history archive portal for 
 
 * **사용자 및 어드민 가이드 (Guides)**:
   - [설치 가이드 (guide_installation.md)](./guide_installation.md) / [English (guide_installation_en.md)](./guide_installation_en.md): 설치 요구사항, 빠른 구동법, 리버스 프록시 연동 / Prerequisites, startup bat files, and reverse proxy configs.
+  - [Synology NAS 설치 (guide_install_synology.md)](./guide_install_synology.md) / [English](./guide_install_synology_en.md): Container Manager에 compose 붙여넣기, 경로·권한 / paste-in compose, paths and permissions.
+  - [오라클 무료 서버 설치 (guide_install_oracle.md)](./guide_install_oracle.md) / [English](./guide_install_oracle_en.md): 설치 마법사, 방화벽(Docker는 iptables 건드리지 않기), 보안 / setup wizard, firewall, security.
+  - [구글 드라이브 연결 (guide_rclone_gdrive.md)](./guide_rclone_gdrive.md) / [English](./guide_rclone_gdrive_en.md): 내 client_id, headless 로그인, 마운트·rslave / own client_id, headless sign-in, mount and rslave.
   - [CSP 단계 전환 체크리스트 (checklist_csp_rollout.md)](./checklist_csp_rollout.md) / [English (checklist_csp_rollout_en.md)](./checklist_csp_rollout_en.md): Report-Only 관측에서 Enforce 전환까지 운영 점검/롤백 절차 / Operational gates and rollback path for CSP rollout.
   - [마이그레이션 가이드 (migration_guide.md)](./migration_guide.md) / [English (migration_guide_en.md)](./migration_guide_en.md): Kavita에서 BookOasis로의 완벽 이사 / Seamless migration from Kavita to BookOasis.
   - [관리자 가이드 (guide_admin.md)](./guide_admin.md) / [English (guide_admin_en.md)](./guide_admin_en.md): 사용자 권한 제어, 라이브러리 추가, 백그라운드 스캐너 제어, MariaDB 성능 튜닝 / User privileges, library additions, background task controls, and MariaDB performance tuning.

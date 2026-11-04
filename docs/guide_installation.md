@@ -10,12 +10,17 @@ tags: [install, guide, setup]
 
 이 문서는 북 오아시스 미디어 서버를 로컬 환경 및 Linux 운영 서버에 설치하고 서비스를 구동하기 위한 통합 안내서입니다.
 
+> **처음 설치하시나요? 환경에 맞는 단계별 가이드부터 보세요.**
+> - [Synology NAS (Container Manager)](guide_install_synology.md) — 터미널 없이 화면에서 설치
+> - [오라클 클라우드 무료 서버 (Ubuntu, ARM/AMD)](guide_install_oracle.md) — 설치 마법사 + 방화벽·보안
+> - [구글 드라이브 연결하기 (rclone)](guide_rclone_gdrive.md) — 화면 없는 서버, 내 client_id 만들기
+
 ---
 
 ## 1. 시스템 요구사항
 
 * **운영체제**: Windows 10/11, Linux (Ubuntu 20.04+ 권장), macOS
-* **Python**: 3.9 이상 권장
+* **Python**: 3.10 이상 (gunicorn 26·Pillow 12가 3.10부터 설치됨). 3.11 이상이면 보안 수정이 들어간 Pillow 13이 설치되어 더 좋습니다
 * **데이터베이스**: 
   - **SQLite (기본값)**: Python 내장 라이브러리로 별도 DB 서버 설치 없이 즉시 구동.
   - **MariaDB / MySQL (엔터프라이즈 권장)**: 대용량 도서(수만~수십만 권) 및 다중 동시 접속 환경에서 락 병목과 손상 위험을 100% 제거하고 초고속 성능 보장.
@@ -107,10 +112,11 @@ SECRET_KEY=yoursupersecretfixedkey12345!
 
 # (선택) MariaDB / MySQL 데이터베이스 엔터프라이즈 모드 설정
 DB_ENGINE=mariadb
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=your_mariadb_password
+MARIADB_HOST=127.0.0.1
+MARIADB_PORT=3306
+MARIADB_USER=bookoasis
+MARIADB_PASSWORD=your_mariadb_password
+MARIADB_DATABASE_PREFIX=media_
 
 # (선택) 외부 트리거 스캔 인바운드 웹훅 토큰
 WEBHOOK_TOKEN=your_secure_api_token_here
@@ -136,7 +142,14 @@ SECURITY_CSP_LOG_REPORTS=true
 SECURITY_CSP_REPORT_FILE=./logs/csp_reports.jsonl
 SECURITY_CSP_REPORT_RATE_LIMIT_PER_MIN=120
 SECURITY_CSP_REPORT_DEDUP_WINDOW_SEC=30
+
+# (선택) 느린 요청·서버 오류 진단 기록 (기본 꺼짐) - logs/request_debug.log
+#DEBUG_REQUEST_LOG=false
+# 이 시간(ms) 이상 걸린 요청만 기록
+#DEBUG_REQUEST_LOG_MS=500
 ```
+
+**느린 요청 진단 기록:** 화면이 가끔 느리다면 `DEBUG_REQUEST_LOG=true`로 며칠 켜 두고 `python tools/summarize_request_debug_log.py --hours 72`(또는 MCP `get_request_debug_summary`)로 경로별 요약을 봅니다. 문제를 찾으면 다시 끄세요.
 
 **CSP 권장 전환 순서:**
 1. `SECURITY_CSP_REPORT_ONLY=true`, `SECURITY_CSP_ENFORCE=false` 상태로 먼저 운영
@@ -177,11 +190,13 @@ Linux 서버 환경에서는 Gunicorn으로 웹 프로세스를 안정적으로 
 
 ```bash
 # [권장] 단일 명령 기동: 단일 웹 워커 + 내장 스캐너 워커 자동 기동
-BOOKOASIS_ENABLE_EMBEDDED_WORKER=true gunicorn --workers 1 --bind 0.0.0.0:5930 --timeout 120 core:app --daemon
+BOOKOASIS_ENABLE_EMBEDDED_WORKER=true gunicorn --workers 1 --threads 12 --max-requests 5000 --max-requests-jitter 500 --bind 0.0.0.0:5930 --timeout 300 core:app --daemon
 
 # 만약 포트를 8080으로 변경하고 싶다면 바인딩 옵션을 수정하세요:
-# BOOKOASIS_ENABLE_EMBEDDED_WORKER=true gunicorn --workers 1 --bind 0.0.0.0:8080 --timeout 120 core:app --daemon
+# BOOKOASIS_ENABLE_EMBEDDED_WORKER=true gunicorn --workers 1 --threads 12 --max-requests 5000 --max-requests-jitter 500 --bind 0.0.0.0:8080 --timeout 300 core:app --daemon
 ```
+* `--threads 12`를 빼면 요청을 한 번에 하나만 처리해, 만화 페이지·PDF를 보는 동안 다른 화면이 멈춥니다(Docker·`manage.sh`와 같은 값).
+* `--max-requests 5000`: 워커를 주기적으로 새로 띄워 메모리를 정리합니다. PDF 한 권이 범위 요청을 많게는 180개 보내므로 1000처럼 작게 잡으면 너무 자주 재시작합니다.
 
 ```bash
 # [대안] 2프로세스 관리 스크립트 방식(웹/워커 분리)
@@ -263,10 +278,10 @@ services:
   bookoasis:
     environment:
       - DB_ENGINE=mariadb
-      - DB_HOST=192.168.0.100  # 외부 MariaDB 서버 IP
-      - DB_PORT=3306
-      - DB_USER=bookoasis
-      - DB_PASSWORD=your_password
+      - MARIADB_HOST=192.168.0.100  # 외부 MariaDB 서버 IP
+      - MARIADB_PORT=3306
+      - MARIADB_USER=bookoasis
+      - MARIADB_PASSWORD=your_password
 ```
 * 💡 `docker-compose.override.yml`에 작성해 두면 Git 소스 업데이트(`git pull`) 시에도 개인 DB 접속 정보가 초기화되거나 충돌하지 않는 최고의 장점이 있습니다.
 

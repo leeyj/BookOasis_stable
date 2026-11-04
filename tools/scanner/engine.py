@@ -917,14 +917,23 @@ def _scan_library_internal(conn, db_path, library_id, physical_path, force, db_t
                 is_cancelled = False
                 _cancel_conn = None
                 try:
-                    _cancel_conn = database.get_connection('general')
-                    _cancel_cur = _cancel_conn.cursor()
-                    _cancel_cur.execute("SELECT scan_status FROM libraries WHERE id = ?", (library_id,))
-                    status_row = _cancel_cur.fetchone()
-                    if status_row and status_row['scan_status'] == 'cancelling':
-                        is_cancelled = True
+                    # 중단 표시(libraries.scan_status)는 카테고리가 속한 DB에, 큐(scanner_tasks)는 general에 있다.
+                    _status_conn = database.get_connection(db_type)
+                    try:
+                        _status_cur = _status_conn.cursor()
+                        _status_cur.execute("SELECT scan_status FROM libraries WHERE id = ?", (library_id,))
+                        status_row = _status_cur.fetchone()
+                        if status_row and status_row['scan_status'] == 'cancelling':
+                            is_cancelled = True
+                    finally:
+                        try:
+                            _status_conn.close()
+                        except Exception:
+                            pass
 
                     if not is_cancelled:
+                        _cancel_conn = database.get_connection('general')
+                        _cancel_cur = _cancel_conn.cursor()
                         task_key = f"library_scan_{db_type}_{library_id}"
                         _cancel_cur.execute("SELECT status FROM scanner_tasks WHERE task_key = ? AND status = 'cancelled'", (task_key,))
                         if _cancel_cur.fetchone():

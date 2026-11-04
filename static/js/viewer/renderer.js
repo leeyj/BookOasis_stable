@@ -28,6 +28,13 @@ let isPreloading = false;
 let splitModeActive = false;
 const SCROLL_IMAGE_MAX_RETRIES = 2;
 
+// navigation.js와 같은 스위치: localStorage.DEBUG_VIEWER = '1' 일 때만 출력 (navigation.js가 이 모듈을 import하므로 따로 둔다)
+function viewerDebugLog(...args) {
+  const v = String(localStorage.getItem('DEBUG_VIEWER') || '').toLowerCase();
+  if (v !== '1' && v !== 'true' && v !== 'on') return;
+  console.log(...args);
+}
+
 function createComicLoadTrace(details = {}) {
   const traceId = ++comicLoadTraceSeq;
   const startedAt = (typeof performance !== 'undefined' && typeof performance.now === 'function')
@@ -541,38 +548,65 @@ export function loadComicPage() {
       threshold: 0.1
     };
 
+    // 옵저버는 이미지 지연 로딩 전용이다. 현재 페이지는 아래 trackVisiblePage가 화면 위치로 직접 계산한다 -
+    // 예전엔 "이번 콜백에서 변한 entry 중 비율 최대"를 현재 페이지로 삼았는데, rootMargin 2000px 탓에 그건
+    // 화면 위·아래 2000px 바깥 경계를 막 넘은 이미지였다. 끝부분에선 아래에서 새로 들어오는 이미지가 없어
+    // 위로 빠져나가는 이미지(실제보다 몇 장 앞)만 잡혀, 끝까지 봐도 98/100 같은 값이 저장됐다.
     observer = new IntersectionObserver((entries) => {
-      if (isScrollingToTarget) return;
-
-      let bestEntry = null;
-      let maxRatio = 0;
-
       entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          loadScrollImage(entry.target);
-          if (entry.intersectionRatio > maxRatio) {
-            maxRatio = entry.intersectionRatio;
-            bestEntry = entry;
-          }
-        }
+        if (entry.isIntersecting) loadScrollImage(entry.target);
       });
-
-      if (bestEntry) {
-        const pageIdx = parseInt(bestEntry.target.dataset.index, 10);
-        if (pageIdx !== comicCurrentPage) {
-          comicCurrentPage = pageIdx;
-          updatePageInfo();
-          saveProgress(state.activeBookId, comicCurrentPage, comicTotalPages);
-        }
-        preloadScrollImagesAround(pageIdx, 15);
-      }
     }, observerOptions);
 
     imgElements.forEach(img => {
       observer.observe(img);
     });
 
+    // 화면 위쪽 1/4 지점에 걸친 이미지를 현재 페이지로 본다 (이어보기 때 그 이미지 머리로 돌아가므로
+    // 가운데보다 위쪽 기준이 덜 건너뛴다). 바닥까지 내렸으면 마지막 페이지.
+    const computeVisiblePage = () => {
+      const maxScrollTop = wrapper.scrollHeight - wrapper.clientHeight;
+      if (maxScrollTop > 0 && wrapper.scrollTop >= maxScrollTop - 16) return comicTotalPages - 1;
+
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const probeY = wrapperRect.top + wrapper.clientHeight / 4;
+      let lo = 0;
+      let hi = imgElements.length - 1;
+      let found = 0;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (imgElements[mid].getBoundingClientRect().top <= probeY) {
+          found = mid;
+          lo = mid + 1;
+        } else {
+          hi = mid - 1;
+        }
+      }
+      return found;
+    };
+
+    let trackFrame = 0;
+    const trackVisiblePage = () => {
+      trackFrame = 0;
+      if (isScrollingToTarget || !imgElements.length) return;
+      const pageIdx = computeVisiblePage();
+      if (pageIdx !== comicCurrentPage) {
+        const maxScrollTop = wrapper.scrollHeight - wrapper.clientHeight;
+        viewerDebugLog(`[Viewer-Comic] scroll page ${comicCurrentPage} -> ${pageIdx} / ${comicTotalPages}`, {
+          scrollTop: Math.round(wrapper.scrollTop),
+          maxScrollTop,
+          atBottom: maxScrollTop > 0 && wrapper.scrollTop >= maxScrollTop - 16
+        });
+        comicCurrentPage = pageIdx;
+        updatePageInfo();
+        saveProgress(state.activeBookId, comicCurrentPage, comicTotalPages);
+        preloadScrollImagesAround(pageIdx, 15);
+      }
+    };
+
     const progressHandler = () => {
+      if (!trackFrame) trackFrame = requestAnimationFrame(trackVisiblePage);
+
       if (scrollPreloadTriggered || !state.activeBookId || comicTotalPages <= 1) return;
 
       const maxScrollTop = Math.max(1, wrapper.scrollHeight - wrapper.clientHeight);

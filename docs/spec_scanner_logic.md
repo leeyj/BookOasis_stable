@@ -2,13 +2,13 @@
 
 이 문서는 북 오아시스(BookOasis) 미디어 서버의 스캐너 및 파일 시스템 동기화 시스템의 핵심 동작 메커니즘을 상세히 설명합니다.
 
-일반(만화/전자책) 스캐너와 오디오북 스캐너는 완전히 분리된 별도 파이프라인입니다. 1~2장은 일반 스캐너를, 3장은 오디오북 스캐너를 다룹니다. 로컬 메타데이터 파서(`kavita.yaml`, `komga.yaml` 등)를 직접 추가/수정하려면 [guide_scanner_parser.md](./guide_scanner_parser.md)를, 스캔 완료 웹훅/플러그인 훅을 활용하려면 [guide_plugins.md](./guide_plugins.md)를 함께 참고하세요.
+일반(만화/전자책) 스캐너, 오디오북 스캐너, 영상 스캐너는 서로 분리된 파이프라인입니다. 1~2장은 일반 스캐너, 3장은 오디오북 스캐너, 4장은 영상 스캐너, 5장은 세 스캐너 공통의 스캔 뒤 처리를 다룹니다. 스캔 대기열·상태 전이는 [spec_scanner_queue_state_transitions.md](./spec_scanner_queue_state_transitions.md)를 보세요. 로컬 메타데이터 파서(`kavita.yaml`, `komga.yaml` 등)를 직접 추가/수정하려면 [guide_scanner_parser.md](./guide_scanner_parser.md)를, 스캔 완료 웹훅/플러그인 훅을 활용하려면 [guide_plugins.md](./guide_plugins.md)를 함께 참고하세요.
 
 ---
 
 ## 1. 스캐너 전체 동작 흐름 (일반/성인 라이브러리)
 
-스캐너는 데이터베이스(`media_general.db`, `media_adult.db`)의 라이브러리 설정을 순회하며, 파일 시스템의 실제 상태와 DB 데이터를 일치시키는 동기화 엔진입니다. `db_type`이 `audiobook`인 경우 이 흐름을 전혀 타지 않고 [3장 오디오북 스캐너](#3-오디오북-스캐너-완전히-분리된-파이프라인)로 즉시 위임됩니다.
+스캐너는 데이터베이스(`media_general.db`, `media_adult.db`)의 라이브러리 설정을 순회하며, 파일 시스템의 실제 상태와 DB 데이터를 일치시키는 동기화 엔진입니다. `db_type`이 `audiobook`인 경우 이 흐름을 전혀 타지 않고 [3장 오디오북 스캐너](#3-오디오북-스캐너-완전히-분리된-파이프라인)로 즉시 위임됩니다. `db_type`이 `video`이면 [4장 영상 스캐너](#4-영상-스캐너-분리된-파이프라인)로 위임됩니다.
 
 ```mermaid
 graph TD
@@ -92,6 +92,9 @@ graph TD
   - 응답 본문을 파싱해 `"file does not exist"` 같은 실패 응답은 성공으로 오인하지 않도록 검증(`_is_vfs_refresh_success_response`)하고, RC 서버가 아직 기동 중이라 연결이 거부된 경우(`Connection refused`) 최대 3회까지 2초 간격으로 재시도합니다.
   - 모든 요청에는 엔진 시그니처가 담긴 `User-Agent` 헤더가 첨부되어, 이 로직이 복제/재사용되더라도 네트워크 트래픽에서 출처를 식별할 수 있습니다.
 
+* **어디서 새로고침하나**: 큐를 통한 카테고리 스캔은 `services/scheduler_service.py::run_scan_job`이 카테고리 DB 기준으로 먼저 새로고침하고, 엔진에는 `skip_vfs_refresh`를 넘겨 다시 하지 않습니다. 큐를 거치지 않는 직접 스캔(경로 지정 스캔·웹훅·웹뷰 다운로드)은 `trigger_vfs_refresh`가 DB 파일 이름으로 general/adult/audiobook/video를 판별해 그 DB의 카테고리 설정을 읽습니다.
+* **`is_remote=0`이면 RC 통신을 하지 않습니다**: 경로가 rclone 마운트로 보여도 카테고리에서 원격 드라이브를 끈 경우는 새로고침하지 않습니다.
+
 ### ③ 사전 DB 무결성 자가 점검 (Self-Healing)
 * **동작 방식** (`tools/scanner/core.py::_run_db_self_recovery`):
   - SQLite 모드에서 스캔 직전 `PRAGMA integrity_check;`를 실행합니다.
@@ -115,6 +118,8 @@ graph TD
   - 완료된 폴더 3개마다(매 폴더가 아님) 취소 여부를 확인합니다. 이때 스캔에 사용 중인 커넥션이 아닌 **별도의 독립 커넥션**으로 조회하는데, 이는 장기 커넥션이 WAL 스냅샷 격리로 인해 다른 세션의 COMMIT(취소 요청)을 즉시 읽지 못하는 문제를 회피하기 위함입니다.
   - 취소 신호는 두 소스를 모두 확인합니다: `libraries.scan_status = 'cancelling'` 그리고 `scanner_tasks` 테이블의 `task_key = library_scan_{db_type}_{library_id}` 행이 `status = 'cancelled'`인 경우.
   - 취소가 감지되면 남은 pending 데이터를 최종 flush한 뒤 `libraries.scan_status`를 `'ready'`로 되돌리고 즉시 반환합니다(체크포인트는 남겨두어 다음 스캔에서 이어서 진행).
+  - `libraries.scan_status`는 **그 카테고리가 속한 DB**(general/adult)에서, `scanner_tasks`는 general DB에서 읽습니다. 예전에는 둘 다 general에서 읽어 성인 카테고리 스캔이 중단되지 않았습니다(3.1.0 수정, `tests/test_scan_cancel_db_type.py`).
+  - 엔진이 정상 반환하므로 큐 이력(`scan_history`)에는 `completed`로 남습니다.
   - 오디오북 스캐너에는 체크포인트/취소 로직이 전혀 없습니다 — 재시작 시 `skip_existing` 정책으로만 중복 작업을 줄입니다.
 
 ### ⑥ 스캔 예외 필터링 (IgnoreFilter & .bookoasisignore)
@@ -129,7 +134,8 @@ graph TD
 * **동작 방식** (`tools/scanner/sync_detector.py::detect_and_handle_book_movement`):
   - 사라진 파일 목록(`deleted_paths`)과 신규 발견 파일 목록(`new_paths`)을 교차 추출하기 전에, 윈도우/리눅스 경로 구분자 차이(`\` ↔ `/`)를 통일하는 정규화를 먼저 적용합니다.
   - 파일명(Basename)이 완벽히 일치하는 한 쌍이 존재하면, 이를 '도서 이동'으로 판단하여 `books.file_path` 값만 신규 경로로 `UPDATE` 처리합니다.
-  - IMGDIR 가상 항목(`__folder__.imgdir`, [⑫](#-imgdir-가상-북-단위-이미지-폴더) 참고)은 파일명이 항상 동일하므로 오탐을 막기 위해 이 basename 매칭에서 명시적으로 제외됩니다.
+  - IMGDIR 가상 항목(`__folder__.imgdir`, [⑫](#⑫-imgdir-가상-북단위-이미지-폴더) 참고)은 파일명이 항상 동일하므로 오탐을 막기 위해 이 basename 매칭에서 명시적으로 제외됩니다.
+  - **2단계 — 이름이 바뀐 파일** (`_match_renamed_files`): basename이 달라 1단계에서 짝을 못 찾은 경우, 사라진 도서와 새 파일의 **크기 + 수정 시각(초)**이 서로 하나씩만 맞으면 같은 파일로 보고 경로를 고칩니다. 크기나 시각이 0이거나 후보가 둘 이상이면 옮기지 않습니다(기존처럼 휴지통 + 새 도서). 제목이 예전 파일 이름에서 온 것이고 `metadata_locked`가 아니면 제목도 새 파일 이름으로 바꿉니다. 이름 변경은 로컬·구글 드라이브 모두 수정 시각을 유지하므로 이 비교가 성립합니다.
   - 이로써 고유 ID(`book_id`)와 여기에 바인딩된 독서 진행률(`user_progress`), 독서 기록(`user_reading_log`) 등이 유실 없이 완벽하게 복구 및 유지됩니다.
 
 ### ⑧ 메타데이터 파싱 및 병합: 플러그인 확장형 파서 로더
@@ -150,7 +156,7 @@ graph TD
 4. **파일 내부 첫 페이지 자동 추출 (원격 경로 아님 및 강제 스캔 시)**:
    - **EPUB**: `META-INF/container.xml` 및 Manifest의 cover 항목을 수색하여 원본 이미지를 다이렉트 추출합니다.
    - **ZIP / CBZ**: 압축 파일 내의 이미지 엔트리들을 자연 정렬(`natural_sort_key`)하여 가장 첫 번째 이미지 파일을 표지로 자동 압축 해제해 사용합니다.
-   - **PDF**: 대용량 PDF의 무더기 표지 추출은 OOM/워커 타임아웃 유발 위험 때문에 메인 스캔에서는 의도적으로 비활성화되어 있으며, [Lazy Scanner](#-lazy-scanner-2차-보정-스캐너)로 위임됩니다.
+   - **PDF**: 대용량 PDF의 무더기 표지 추출은 OOM/워커 타임아웃 유발 위험 때문에 메인 스캔에서는 의도적으로 비활성화되어 있으며, [Lazy Scanner](#⑳-lazy-scanner-2차-보정-스캐너)로 위임됩니다.
 * **후처리 안전장치**: 추출 직후 커버 파일 크기가 0바이트이면 즉시 삭제하고 결과를 무효화하여, 다음 스캔에서 재시도되도록 합니다.
 
 ### ⑩ 바이트 오프셋 메타데이터 분석 및 DB 저장
@@ -168,7 +174,7 @@ graph TD
 * **자동 재개 방식**:
   - 현재 완료한 폴더까지는 pending 데이터를 flush하고, `scanner_tasks.status`를 `'exit_pending'`(단계 메시지 `"Paused due to memory limit (Auto-Resuming...)"`)으로 갱신한 뒤, DB 커넥션을 닫고 JSONL 임시 파일을 정리합니다.
   - 이후 별도 데몬이 재기동하는 것이 아니라, **`os.execv()`로 현재 프로세스 자신을 `tools/scanner_worker.py` 재실행으로 즉시 치환(self-respawn)**합니다. 프로세스가 완전히 새로 시작되며 저장된 체크포인트(`scanner_progress`)를 기반으로 이어서 스캔이 진행됩니다.
-  - Lazy Scanner는 별도의 독립적인 메모리 감시 로직을 사용하며, 초과 시 `os.execv` 대신 `sys.exit(10)`으로 종료해 "다시 스케줄해 달라"는 신호를 상위 실행기에 전달합니다([Lazy Scanner](#-lazy-scanner-2차-보정-스캐너) 참고).
+  - Lazy Scanner는 별도의 독립적인 메모리 감시 로직을 사용하며, 초과 시 `os.execv` 대신 `sys.exit(10)`으로 종료해 "다시 스케줄해 달라"는 신호를 상위 실행기에 전달합니다([Lazy Scanner](#⑳-lazy-scanner-2차-보정-스캐너) 참고).
 
 ### ⑫ IMGDIR 가상 북(단위 이미지 폴더)
 * **문제 해결**: 압축되지 않고 이미지 파일들만 낱장으로 들어 있는 폴더(스캔 지원 압축/전자책 포맷이 전혀 없는 경우)를 하나의 가상 "책"으로 취급합니다.
@@ -176,14 +182,17 @@ graph TD
   - 지원 압축/전자책 포맷(`SUPPORTED_FORMATS`)이 하나도 없고 이미지 파일만 있는 폴더는 합성 파일명 **`__folder__.imgdir`**로 대표되는 단일 가상 항목으로 등록됩니다.
   - 일반 도서는 "현재 폴더 = 시리즈"지만, IMGDIR은 반대로 **"현재 폴더 = 책 제목", "부모 폴더 = 시리즈"** 규칙을 사용합니다.
   - 캐시 비교는 개별 파일이 아닌 폴더 mtime과 내부 이미지 총 용량 합계로 이루어지며, 표지는 폴더 내 첫 이미지를 사용합니다.
-  - 도서 이동 감지([⑦](#-도서-이동path-변경-자동-감지-및-히스토리-보존))에서는 파일명이 항상 동일하므로 basename 매칭 대상에서 제외됩니다.
+  - 도서 이동 감지([⑦](#⑦-도서-이동path-변경-자동-감지-및-히스토리-보존))에서는 파일명이 항상 동일하므로 basename 매칭 대상에서 제외됩니다.
 
-### ⑬ 웹공유링크(구글 드라이브) 스캔
-* **문제 해결**: 실제 마운트/동기화 없이 구글 드라이브 폴더 공유 링크만으로 라이브러리를 구성할 수 있게 합니다.
+### ⑬ 웹공유링크(구글 드라이브) 스캔 (베타)
+* **문제 해결**: 실제 마운트/동기화 없이 구글 드라이브 폴더 공유 링크만으로 라이브러리를 구성할 수 있게 합니다. 베타 기능이며 `GDRIVE_LINK_BETA`(또는 `DEVELOP`)가 켜져 있어야 화면에 나옵니다.
 * **동작 방식** (`tools/scanner/engine.py`):
-  - 대상 경로가 `is_gdrive_url()`로 판별되면 `os.walk()`를 전혀 사용하지 않고, `fetch_gdrive_folder_files()`로 원격 폴더/파일 목록을 가져와 `gdrive://{folder_id}/...` 형태의 가상 경로를 구성합니다.
+  - 대상 경로가 `is_gdrive_url()`로 판별되면 `os.walk()`를 쓰지 않고 원격 목록으로 `gdrive://{folder_id}/...` 가상 경로를 만듭니다.
+  - **목록**: 카테고리에 rclone 원격(`libraries.gdrive_copy_remote`)이 있으면 `fetch_gdrive_folder_files_via_rclone()`로 `rclone lsjson`을 한 번 호출합니다. 실패하면 API 키 목록(`fetch_gdrive_folder_files()`)으로 대신하되, 이번 스캔은 삭제 동기화를 건너뜁니다(부분 목록으로 지우면 안 되므로 순회 오류로 취급). 원격이 없는 예전 카테고리만 처음부터 API 키 경로를 씁니다. 대형 공유 폴더에서 API 키 익명 다운로드가 Google 403으로 막힌 일(2026-10-22) 때문에 원격 방식이 기본입니다.
+  - **메타데이터**: `kavita.yaml` 등 메타 파일은 `refresh_gdrive_meta_mirror()`가 로컬 미러(`gdrive_meta_mirror_dir`)로 한 번에 받아 두고, 파서는 그 미러를 읽습니다. 미러를 받지 못해도 책 등록은 진행되고 다음 스캔에서 다시 받습니다.
+  - 원격 방식에서는 책을 열 때 로컬 사본을 읽으므로(`gdrive_book_copies`) zip마다 Range로 오프셋을 미리 계산하지 않습니다. 파일 목록의 수정 시각·크기로 바뀌지 않은 폴더는 건너뜁니다.
   - IgnoreFilter는 이 가상 경로에도 상대 폴더/파일명 기준으로 동일하게 적용됩니다.
-  - 이후의 메타 파싱·표지 추출·오프셋 분석은 원격 마운트 경로와 동일한 `is_remote` 취급을 받습니다.
+  - 목록 조회·메타 받기 실패는 `SystemHealthService`에 기록되어 알림센터에 보입니다. 단계별 기록은 `utils/gdrive_beta_log.py`의 `beta_log`로 남습니다.
 
 ### ⑭ JSONL 로그 기록 및 하이브리드 DB 반영(Flush)
 * **아키텍처 변경**: 과거에는 워커들이 `.jsonl`에 결과를 기록해두면 메인 엔진이 스캔 종료 후 한 번에 읽어 Bulk Insert하는 구조였지만, 현재는 **메모리 내 `pending_inserts`/`pending_updates`/`pending_folders` 리스트에 직접 누적**하고, 주기적으로 DB에 반영하는 구조로 바뀌었습니다.
@@ -220,7 +229,7 @@ graph TD
   - 파일 오류(손상·표지 실패 등)도 문제 기록(`problem_occurrences`)으로 남고, 다음 스캔에서 정상이면 자동 해제됩니다.
     문제 기록 쓰기는 스캔 트랜잭션 커밋 후에 합니다(SQLite 잠금 충돌 방지). 관리자는 도서 [진단]으로 1권씩 원인을 확인할 수 있습니다.
 * **복구**: 이전에 소프트 삭제되었던 경로가 스캔에서 다시 발견되면 `is_deleted = 0`, `deleted_at = NULL`로 자동 복구됩니다(파일을 되돌려 놓기만 하면 휴지통에서 자동 복귀).
-* **7일 경과 자동 하드 삭제**: 소프트 삭제된 지 7일이 지난 도서는 매 스캔마다 자동으로 영구 삭제됩니다 — `user_progress`, `user_reading_log`, `book_offsets`, `books` 레코드를 트랜잭션 내에서 함께 제거하고, 연결된 커버 이미지 물리 파일도 디스크에서 삭제합니다. 이 정책은 [services/trash_service.py](../services/trash_service.py)의 수동 휴지통 관리 기능과 함께 동작합니다.
+* **7일 경과 자동 하드 삭제**: 소프트 삭제된 지 7일이 지난 도서는 매 스캔마다 자동으로 영구 삭제됩니다 — 책에 딸린 행(진행률·읽기 기록·오프셋·주석·책갈피·TTS 등)과 `books` 레코드를 트랜잭션 내에서 함께 제거하고, 연결된 커버 이미지 물리 파일도 디스크에서 삭제합니다. 이 정책은 [services/trash_service.py](../services/trash_service.py)의 수동 휴지통 관리 기능과 함께 동작합니다.
 * **비상 브레이크 안전장치**: 만약 스캔 결과 찾은 물리 파일 개수가 **`0`개**인 경우, 실제로 사용자가 모든 파일을 지웠다기보다는 마운트 네트워크 드라이브가 갑자기 해제되었거나 디스크 경로 오류일 확률이 극도로 높습니다. 이 경우 삭제 로직이 작동하여 DB 전체가 밀리는 대참사를 예방하기 위해, **모든 삭제/복구 프로세스를 강제 취소**하고 경고 로그와 함께 즉시 세션을 빠져나옵니다.
 
 ### ⑰ ZIP/CBZ 압축 파일 처리 및 부분 바이트 스트리밍 상세 전략
@@ -262,7 +271,7 @@ graph TD
 
 ## 3. 오디오북 스캐너 (완전히 분리된 파이프라인)
 
-오디오북 라이브러리(`media_audiobook.db`, `db_type == 'audiobook'`)는 `tools/scanner/core.py::scan_library`/`scan_library_path`에서 감지되는 즉시 `services/audiobook_scanner.py::scan_audiobook_library`로 위임되고 반환됩니다. **1~2장에서 설명한 스레드풀, 체크포인트(`scanner_progress`), 취소 감지, JSONL/Redis 락 기반 flush, `book_offsets` 오프셋 스트리밍 메커니즘은 오디오북 경로에 전혀 적용되지 않습니다.** HDD Wake-up([①](#-hddnas-wake-up-및-사전-경로-검증))과 VFS 캐시 새로고침([②](#-원격-vfs-rclone-연동-및-캐시-새로고침))만 공통으로 거칩니다.
+오디오북 라이브러리(`media_audiobook.db`, `db_type == 'audiobook'`)는 `tools/scanner/core.py::scan_library`/`scan_library_path`에서 감지되는 즉시 `services/audiobook_scanner.py::scan_audiobook_library`로 위임되고 반환됩니다. **1~2장에서 설명한 스레드풀, 체크포인트(`scanner_progress`), 취소 감지, JSONL/Redis 락 기반 flush, `book_offsets` 오프셋 스트리밍 메커니즘은 오디오북 경로에 전혀 적용되지 않습니다.** HDD Wake-up([①](#①-hddnas-wake-up-및-사전-경로-검증))과 VFS 캐시 새로고침([②](#②-원격-vfsrclone-연동-및-캐시-새로고침))만 공통으로 거칩니다.
 
 ```mermaid
 graph TD
@@ -283,17 +292,19 @@ graph TD
 ### ㉑ 폴더 단위 탐색과 스킵 정책
 * **감지 단위**: `os.walk`로 순회하며 폴더 내에 `audio.json` 파일이 있거나 지원 오디오 확장자(`AUDIO_EXTENSIONS = .mp3, .m4b, .m4a, .flac, .aac, .wav, .ogg, .opus, .wma`) 파일이 하나라도 있으면 그 폴더 자체를 "오디오북 한 권"으로 판정합니다.
 * **중첩 방지**: 오디오북으로 판정된 폴더에서는 `dirs.clear()`를 호출해 하위 폴더로의 재귀 탐색을 차단합니다 — 오디오북 폴더 안에 또 다른 오디오북이 중첩될 수 없다는 전제입니다. 트랙은 하위 폴더까지 모으므로, 폴더 자체와 하위 폴더 모두에 음원이 있으면 하위 폴더가 그 책에 합쳐집니다(예: 카테고리 폴더에 음원 1개 → 카테고리 전체가 책 1권). 자동으로 나누지 않고 알림센터 카드 `audiobook_nested_audio`로 알립니다(카테고리 폴더 자체가 책이거나 하위 metadata.json/audio.json이 무시되면 조치 필요, 그 밖엔 알림). 안내: 음원을 옮긴 뒤 카테고리를 삭제·재등록 — 이미 합쳐진 책의 트랙이 파일 경로 UNIQUE를 쥐고 있어 하위 폴더를 따로 저장하면 중복으로 실패하기 때문입니다(이 저장 실패도 `audiobook_save_failed` 카드로 표시).
-* **스킵 정책**: `force=True`가 아닌 한, `AudiobookRepository.get_folder_paths()`로 조회한 **이미 등록된 폴더 경로 전체 목록**과 정확히 일치하면 내부를 열어보지 않고 통째로 스킵합니다. 일반 스캐너의 파일별 mtime/size 비교([⑮](#-mtime-기반의-2단계-초고속-스킵ultra-fast-skip-알고리즘))보다 훨씬 거친(coarse) 단위이며, 트랙이 일부만 추가/변경된 경우 이를 감지하려면 `force=True` 전체 재스캔이 필요합니다.
+* **스킵 정책**: `force=True`가 아니면 이미 등록된 폴더는 열지 않고 건너뜁니다. 다만 등록된 폴더도 **파일 목록 서명**(`_audio_signature`: 오디오 파일의 상대 경로 + 크기)을 DB의 트랙 서명(`AudiobookRepository.get_track_signatures`)과 비교해, 트랙이 추가·삭제되거나 이름이 바뀐 폴더는 다시 처리합니다(`[AudiobookScanner][CHANGED]` 로그). 목록 정보만 쓰므로 원격에서도 파일을 내려받지 않습니다.
+* **폴더 이동·이름 변경**: 새로 발견한 폴더의 트랙 구성이 폴더가 사라진 기존 책의 트랙을 모두 포함하고 그런 책이 하나뿐이면, 그 책을 옮긴 것으로 보고 경로만 고칩니다(`_MovedAudiobookFinder`, id와 재생 기록 유지, 신간 이벤트 없음).
+* **사라진 책 숨김**: 짝이 없는 사라진 책은 스캔 끝에 숨깁니다(소프트 삭제, `_hide_unmatched_missing`). 카테고리 폴더에 접근할 수 없거나 한 번에 많이 사라지면(도서와 같은 대량 사라짐 기준 `is_mass_missing`) 보류하고 로그만 남깁니다.
 
 ### ㉒ 메타데이터 소스: `metadata.json` 우선, `audio.json` 레거시 폴백
-* **`metadata.json`** (우선 사용, 더 풍부한 스키마): `title`, `publisher`, `description`, `publishedDate`/`publishedYear`, `isbn`, `web_id`, `authors[]`(배열), `narrators[]`(배열, 3명 초과 시 "N명 등"으로 축약해 저자 필드에 병기), `chapters[{start, end}]`(챕터별 시작/종료 초 — 오디오 파일 개수와 1:1로 맞으면 트랙 재생시간을 파일 프로빙 없이 이 값으로 대체), `images.cover|poster` + `image_blobs`(내장 표지, [㉓](#-포스터표지-탐색) 참고). 인코딩은 UTF-8(BOM 포함)/UTF-16/UTF-32를 자동 판별하고, 그래도 안 되면 cp949(한글 윈도우 ANSI)로 다시 읽습니다(`load_json_any_encoding`, audio.json도 동일). cp949로 읽은 경우 로그에 남깁니다. 그 밖의 ANSI(cp1252, Shift-JIS 등)는 지원하지 않아 파싱 실패로 처리됩니다. `files`/`title_sort`/`genres`/`tags`/`series` 등 나머지 필드는 읽지 않습니다.
+* **`metadata.json`** (우선 사용, 더 풍부한 스키마): `title`, `publisher`, `description`, `publishedDate`/`publishedYear`, `isbn`, `web_id`, `authors[]`(배열), `narrators[]`(배열, 3명 초과 시 "N명 등"으로 축약해 저자 필드에 병기), `chapters[{start, end}]`(챕터별 시작/종료 초 — 오디오 파일 개수와 1:1로 맞으면 트랙 재생시간을 파일 프로빙 없이 이 값으로 대체), `images.cover|poster` + `image_blobs`(내장 표지, [㉓](#㉓-포스터표지-탐색) 참고). 인코딩은 UTF-8(BOM 포함)/UTF-16/UTF-32를 자동 판별하고, 그래도 안 되면 cp949(한글 윈도우 ANSI)로 다시 읽습니다(`load_json_any_encoding`, audio.json도 동일). cp949로 읽은 경우 로그에 남깁니다. 그 밖의 ANSI(cp1252, Shift-JIS 등)는 지원하지 않아 파싱 실패로 처리됩니다. `files`/`title_sort`/`genres`/`tags`/`series` 등 나머지 필드는 읽지 않습니다.
 * **`audio.json`** (레거시, `metadata.json`이 없거나 문법 오류·최상위가 객체가 아니어서 파싱에 실패했을 때 사용): 평탄한 구조로 `title`, `author`, `publisher`, `code`, `web_id`, `poster`, `premiered`, `author_intro`, `desc`/`description`, `ratings`.
-* 이 두 파서는 [⑧](#-메타데이터-파싱-및-병합-플러그인-확장형-파서-로더)의 `tools/scanner/metadata/` 플러그인 로더와는 **완전히 별개의 독립 파서**이며 `merge_local_metadata()`를 거치지 않습니다.
+* 이 두 파서는 [⑧](#⑧-메타데이터-파싱-및-병합-플러그인-확장형-파서-로더)의 `tools/scanner/metadata/` 플러그인 로더와는 **완전히 별개의 독립 파서**이며 `merge_local_metadata()`를 거치지 않습니다.
 * **제목/저자 폴백**: `metadata.json`/`audio.json` 어느 쪽에도 제목/저자가 없으면 폴더명을 `" - "` 기준으로 분리해 `"저자 - 제목"` 패턴으로 추정합니다.
 
 ### ㉓ 포스터(표지) 탐색
 * 후보 파일명 순서대로 탐색: `poster.jpg` → `cover.jpg` → `folder.jpg` (및 `.png`/`.jpeg` 변형) → 어느 것도 없으면 폴더 내 첫 번째 `.jpg`/`.jpeg`/`.png`/`.webp` 파일 → 그래도 없고 `metadata.json`에 `images.cover`(없으면 `images.poster`, 둘 다 없고 blob이 하나뿐이면 그 blob)가 가리키는 `image_blobs` 항목(base64)이 있으면 **`metadata.json` 경로 자체**를 포스터 소스로 저장합니다(base64는 DB에 넣지 않음). 디코딩은 첫 표지 요청 때 `utils/cover_helper.py`가 하며, 표지가 없으면 `.none` 표시를 남겨 반복 파싱을 막습니다.
-* 일반 스캐너의 [⑨](#-단계별-표지-이미지-추출-및-매핑-전략) 파이프라인과 달리 WebP 변환이나 해시 파일명 재저장을 거치지 않고, 원본 파일 경로를 그대로 DB에 저장합니다.
+* 일반 스캐너의 [⑨](#⑨-단계별-표지-이미지-추출-및-매핑-전략) 파이프라인과 달리 WebP 변환이나 해시 파일명 재저장을 거치지 않고, 원본 파일 경로를 그대로 DB에 저장합니다.
 
 ### ㉔ 트랙 길이(Duration) 분석: 다단계 폴백과 원격 고속 경로
 가장 정교한 서브시스템으로, 오디오 파일 전체를 열지 않고도 재생 시간을 추정하는 것을 목표로 합니다 (`get_audio_duration_and_size`):
@@ -308,7 +319,39 @@ graph TD
 ### ㉕ DB 저장 및 로깅 규약
 * 저장은 `AudiobookRepository.save_audiobook_scan()`을 통해 `media_audiobook.db`의 오디오북 전용 테이블에 이루어지며, 일반 스캐너의 `book_offsets`/`scanner_progress`/`folder_mtimes` 테이블은 전혀 사용하지 않습니다. 오디오북 스트리밍은 ZIP 바이트 오프셋 방식이 아니라 오디오 파일 자체에 대한 HTTP Range 요청 기반입니다.
 * 라이브러리 단위 시작/완료는 `[AudiobookScanner][LIBRARY_SCAN_START]`/`[LIBRARY_SCAN_DONE]`, 폴더 단위 처리 결과는 `[AudiobookScanner][BOOK_PROCESSED]`로 구조화 로깅되며, duration 해석 모드(`cache_only`/`metadata_only`/`file_probe_only`/`mixed` 등)와 캐시 적중률을 함께 남겨 성능 진단에 활용합니다. 이는 일반 스캐너의 `[Scanner-*]` 로그 접두어 체계와는 별도의 명명 규칙입니다.
-* 스캔 완료 후 신규 오디오북에 대해서도 [⑲](#-스캔-완료-이벤트-디스패치-커뮤니티-플러그인-연동)와 동일한 `scan.new_books_detected` 이벤트 및 플러그인 훅 디스패치가 이루어집니다(`_dispatch_audiobook_new_items_events`). 이 디스패치는 오디오북 스캐너가 별도 파이프라인으로 분리되어 있었기 때문에 한동안 누락되어 있었으며, 현재는 일반 스캐너와 동일한 훅 호출 경로(`tools/scanner/engine.py::_dispatch_new_books_to_plugin_hooks`)를 재사용하도록 연결되었습니다.
+* 스캔 완료 후 신규 오디오북에 대해서도 [⑲](#⑲-스캔-완료-이벤트-디스패치-커뮤니티-플러그인-연동)와 동일한 `scan.new_books_detected` 이벤트 및 플러그인 훅 디스패치가 이루어집니다(`_dispatch_audiobook_new_items_events`). 이 디스패치는 오디오북 스캐너가 별도 파이프라인으로 분리되어 있었기 때문에 한동안 누락되어 있었으며, 현재는 일반 스캐너와 동일한 훅 호출 경로(`tools/scanner/engine.py::_dispatch_new_books_to_plugin_hooks`)를 재사용하도록 연결되었습니다.
+
 
 ---
-*Last Updated: 2026-08-15*
+
+## 4. 영상 스캐너 (분리된 파이프라인)
+
+영상 카테고리(`media_video.db`, `db_type == 'video'`)는 `tools/scanner/core.py`에서 `services/video_scanner.py::scan_video_library`로 위임됩니다. 오디오북처럼 **폴더 하나 = 강좌 하나** 규칙을 쓰며, 일반 스캐너의 스레드풀·체크포인트·취소 감지·오프셋 처리는 적용되지 않습니다. HDD Wake-up([①](#①-hddnas-wake-up-및-사전-경로-검증)), VFS 새로고침([②](#②-원격-vfsrclone-연동-및-캐시-새로고침)), 루트 접근 불가 카드("원격 드라이브 연결 끊김")는 공통으로 거칩니다.
+
+### ㉖ 탐색과 회차 등록
+* **감지 단위**: `os.walk`로 돌며 영상 확장자(`VIDEO_EXTENSIONS = .mp4, .mkv, .avi, .webm, .mov, .m4v, .ts`) 파일이 있는 폴더를 강좌로 보고, 그 아래로는 더 내려가지 않습니다(`dirs.clear()`). 회차는 하위 폴더까지 모아 자연 정렬합니다.
+* **스킵 정책**: 오디오북과 같습니다. 등록된 강좌는 건너뛰되, 파일 목록 서명(상대 경로 + 크기)이 DB 회차(`VideoRepository.get_episode_signatures`)와 다르면 다시 처리해 새 회차를 등록합니다(`[VideoScanner][CHANGED]`).
+* **메타데이터**: 강좌 폴더의 `show.yaml`(Plex TV 쇼 스타일)이 있으면 강좌·회차 정보를 읽습니다(시즌은 첫 시즌만). 없으면 폴더 이름을 제목으로 씁니다.
+* **자막**: 같은 이름의 `.srt`/`.smi`/`.vtt` 사이드카를 찾습니다. 언어 태그(`Movie.ko.srt`)를 인식하고, 부분 자막(`forced`)은 빼며, 한국어와 `srt`를 우선합니다(`_find_sidecar_subtitle`).
+* **오디오북과 다른 점**: 폴더 이동 감지와 사라진 강좌 숨김이 **없습니다**. 강좌 폴더를 옮기거나 지우면 기존 행이 남고, 옮긴 폴더는 새 강좌로 등록됩니다. 강좌 안에서 사라진 회차 파일은 저장 때 지워집니다.
+
+### ㉗ 길이·코덱 분석과 재생 방식
+* 스캔은 파일 목록과 크기만 저장하고, 재생 시간·해상도·코덱 분석(ffprobe)은 **lazy 스캐너가 나중에** 합니다(`tools/lazy_scanner.py`의 영상 보정 단계). 이미 분석한 회차는 mtime·크기가 같으면 캐시를 씁니다.
+* 분석 결과 브라우저가 그대로 틀 수 없는 코덱·컨테이너이면 `video_episodes.needs_transcode = 1`로 표시하고, 재생할 때 ffmpeg로 변환해 보냅니다(`is_browser_compatible`). 확장자와 실제 컨테이너가 다른 파일은 `container_verified`로 한 번 더 검사합니다.
+
+---
+
+## 5. 스캔 뒤 처리 (공통)
+
+### ㉘ 목록 반영과 이벤트
+* **큐 스캔이 끝나면** (`services/scanner_queue.py` 워커 루프, 성공 또는 일부 성공 시):
+  - 최근 추가 캐시(`cache:recent_added*`)를 지웁니다.
+  - 도서 DB(general/adult)는 시리즈 요약 테이블을 다시 만듭니다(`SeriesRepository.rebuild_summary`). 실패는 `SystemHealthService`에 기록됩니다.
+* **큐를 거치지 않는 직접 스캔** (경로 지정 스캔 `/api/media/libraries/<id>/scan-path`, 경로를 준 웹훅 스캔 `/api/webhook/scan`, 플러그인 웹뷰 다운로드):
+  - `services/scan_refresh_service.py::track_direct_scan`으로 감싸 스캔 전후 시리즈 스냅샷을 비교하고, **바뀐 시리즈 줄만** 다시 계산합니다(`refresh_summary_keys`). 바뀐 시리즈가 많거나(500개 초과) 스냅샷을 못 뜨면 전체를 다시 만듭니다.
+  - 요청을 짧게 모아(1초) 백그라운드에서 처리하므로 API 응답을 늦추지 않습니다. 같은 DB의 반영은 한 번에 하나만 돕니다.
+* **새 도서 이벤트**: 새로 등록된 항목은 웹훅·플러그인 훅으로 알립니다([⑲](#⑲-스캔-완료-이벤트-디스패치-커뮤니티-플러그인-연동)). 스캔 스레드를 붙잡지 않도록 데몬 스레드로 보냅니다.
+* **스캔 결과 요약**: 새 도서 수·오류 수·보고서 파일 이름이 `scan_history.result_summary`에 남아 알림센터 "최근 완료"에 보입니다.
+
+---
+*Last Updated: 2026-11-04*

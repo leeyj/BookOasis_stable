@@ -49,14 +49,23 @@ Administrators can control system access privileges via the **[Settings Icon ⚙
 
 A Library is a unit that binds books in a physical directory to a specific library category on the Web UI.
 
-### ① Add Library Fields
-* **Library Name**: The name displayed on the Web UI sidebar.
-* **Target Physical Path**: The absolute path on the server where the book files are stored (e.g., `D:\Manga` or `/home/user/books`).
-* **Is Remote**: Check this if it's a remote storage like Google Drive mounted via Rclone VFS.
-  * *When checked: Skips detailed offset analysis inside compressed files and automatic temporary cover extraction to prevent network bottlenecks.*
-  * *When unchecked: the scanner will not attempt remote VFS refreshes (RC / `vfs/refresh`) during scans.*
-* **Is Adult**: When checked, the library is only revealed to accounts with the adult authentication flag assigned.
-* **VFS Refresh before scan**: Specifies whether to call the Rclone API to refresh the cache right before scanning to sync the latest remote drive state.
+### ① Add Category Fields
+Each library (general, adult, audiobook, video) keeps its own categories. To add an adult category, switch to the adult library first (it is only visible to accounts with adult access).
+* **Category name / Parent group**: the name shown in the sidebar, and the virtual group it sits in (or ungrouped).
+* **Property (optional)**: a value that classifies the category. Plugins can use it, and some properties change how scans work.
+  * Built-in properties: manga · novel · book · magazine · **webtoon** (audiobook library: **music**). Built-ins can be renamed but not deleted.
+  * **webtoon**: episodes share the series cover (the folder's kavita.yaml or series.json image, etc.). Episodes without a cover get one from the same folder at the end of each scan and when you switch the property to webtoon (no file downloads).
+  * **music** (audiobooks): scans and plays the category in music mode (folder = album, track tags shown).
+  * Use **[Manage properties]** to add properties for this install only (properties in use can't be deleted).
+* **Server physical path**: absolute path to the book files on the server (e.g. `D:\Manga`, `/home/user/books`). Press Enter to add several paths to one category; [Browse] lets you pick a server folder.
+* **Remote / advanced**
+  * **Remote drive (VFS mount / rclone, etc.)**: check this for Google Drive or other remote storage mounted with rclone. Scans then skip page-offset analysis inside archives and leave it to the Lazy-Scanner, to keep network load down.
+  * **Rclone RC API address**: used to refresh the rclone VFS cache before a scan. Fill it in if any path is remote. Whether to refresh before each scan is set in the **per-category scan settings on the Schedule tab**.
+* **Display**: hide this category's covers, hide titles (covers only, title on hover), cover aspect ratio (default 4:3 · wide 16:9 · square 1:1).
+
+### ② Deleting and moving categories
+* **Delete**: the category leaves the list at once, and a 'category delete' job in the scan queue removes its book records in batches. It resumes after a server restart. EPUB bookmarks, annotations, collection entries, KOReader sync and pre-generated TTS audio are removed too. Files on disk are never deleted.
+* **Move between general and adult**: right-click the category in the sidebar → **Move to adult / Move to general**. A 'category move' job in the scan queue does the work, and the category then appears under **Ungrouped** in the target library. Reading progress, bookmarks, annotations and KOReader sync move with it; it is removed from collections, and pre-generated TTS audio is deleted.
 
 ---
 
@@ -69,7 +78,7 @@ The Scanner is the core engine that synchronizes the file system and database th
 * **Cancel**: If you press the 'Cancel' button while a scan task is running, the scanner safely finishes processing up to the current folder unit and then voluntarily terminates the task.
 * **Checkpoint Mechanism**: Even if an error or forced termination occurs during a scan, the records of already completed folders remain intact in `scanner_progress`, so the next scan will automatically resume from the remaining parts.
 
-### ⑤ Scan Ignore Patterns & .bookoasisignore Setup
+### ① Scan Ignore Patterns & .bookoasisignore Setup
 You can exclude specific files or directories from being scanned, such as Synology NAS thumbnail folders (`@eaDir/`), recycle bins (`#recycle/`), or temporary files (`*.tmp`, `*.sample.cbz`).
 
 * **Global Ignore Patterns (Admin Settings)**:
@@ -127,10 +136,11 @@ BookOasis officially supports **MariaDB / MySQL Enterprise Mode** alongside buil
 ### ② MariaDB Setup (.env)
 ```env
 DB_ENGINE=mariadb
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=your_mariadb_password
+MARIADB_HOST=127.0.0.1
+MARIADB_PORT=3306
+MARIADB_USER=bookoasis
+MARIADB_PASSWORD=your_mariadb_password
+MARIADB_DATABASE_PREFIX=media_   # DB name = prefix + general/adult/audiobook/video
 ```
 
 ### ③ SQLite -> MariaDB One-Click Migration Tool
@@ -233,9 +243,11 @@ Synthesizing on the device drains the battery, and slower devices (iPhone 14 and
 The top 🔔 **Notifications** shows scans, voice pre-generation, system warnings and problem cards in one list (formerly "Scan activity").
 Design background: [plan_unified_notification_queue.md](plan_unified_notification_queue.md).
 
+Even alerts that need action are never shown as toasts or popups. Reading comes first, so the app only uses marks you click into, like the icon dot and the category warning mark.
+
 ### ① List and icon
 * **Colors and labels**: errors/action required (red) -> running (amber) -> recent (new blue · done green · cancelled gray).
-* **Icon dot**: amber while something runs, red when something needs action (admins only). Regular accounts only see their own voice pre-generation, and the icon dims when there is nothing.
+* **Icon dot**: amber while something runs, red when something needs action (admins only). A category with an open action-required card also gets a **red warning mark** next to the ⓘ on its book-list title (admins only); clicking it opens that card in the notification center. Regular accounts only see their own voice pre-generation, and the icon dims when there is nothing.
 * **Recent items**: category scan results (new/failed books) stay for 7 days (up to 50). Automatic scans that changed nothing are hidden; scans you started yourself show "no change" too.
 * **[Clear]**: hides recent items from your list and marks notice cards as "Got it". Running and action-required items stay, and [Undo] in the toast restores them. Muting notice cards is shared state, so it applies to other admins too.
 

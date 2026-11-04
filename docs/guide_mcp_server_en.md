@@ -95,6 +95,14 @@ The MCP server is stdio-only and never listens on the network, but you can still
 - **If the server runs Docker**, change the remote command to `docker exec -i bookoasis python3 tools/mcp_server.py` (no `cd` needed). The SSH user must be allowed to run `docker`.
 - The MCP server runs with the SSH account's permissions, so connect as the account that installed BookOasis (the one that can read its data).
 
+### Checking the version and updating — MCP only "advises" on updates
+
+Use `get_version` to see the running version, and call `/api/media/about` through `call_api` to compare it with the latest GitHub release. **The MCP server never updates or overwrites BookOasis itself.** That follows the design rule "never touch core/plugin source files, only write to the DB", and an MCP running inside a Docker container couldn't replace its own image anyway. Always run updates on the host yourself. (If you ask the AI "check for an update and tell me how", it will only explain the steps.)
+
+- **Docker (GHCR image):** `docker compose -f <your compose file> pull`, then `up -d` — see the [installation guide](guide_installation_en.md) for the exact commands.
+- **Docker (built locally):** `docker compose -f docker-compose.build.yml -f docker-compose.override.yml up -d --build`
+- **Native install:** update the source, then restart the service.
+
 ### Gemini CLI / OpenAI Codex CLI / Cursor / other MCP clients
 
 Most of these also use the same `mcpServers` JSON shape, but the exact config file name/location and any CLI registration command (if one exists) varies by tool and can change over time. Check that tool's current official docs for "register an MCP server" and paste in the common JSON block above — as long as `command`/`args` are correct, it works identically regardless of which client you use.
@@ -122,6 +130,8 @@ mcp dev tools/mcp_server.py
 | `get_problem_card` | Per-series breakdown of one problem card; with `series_key`, the books in that series |
 | `diagnose_book` | Diagnose one book: DB record / remote connection / file exists / file format checklist with the cause and suggested action (read-only) |
 | `get_gdrive_beta_summary` | Google Drive link categories (closed beta) log summary: scan time, skipped folders, new books; book-open download time/size/failure rate; next-episode prefetch; cache usage; open warnings |
+| `get_request_debug_summary` | Per-route summary of slow requests (500 ms+ by default) and server errors (5xx) (`hours` default 24, 0 = everything kept / `top` default 20). Records only exist while the server `.env` has `DEBUG_REQUEST_LOG=true`. A `cpu_share` near 1 means the request itself is heavy; a low share with high contention means it was waiting behind other requests |
+| `get_version` | Running BookOasis version (from the VERSION file: dashboard version, state, and component versions such as migrator/extensions/API/DBMS) |
 | `run_readonly_query` | Run raw read-only (SELECT/WITH/EXPLAIN/PRAGMA) SQL against the library DB |
 | `read_logs` | Tail the last N lines of a server log under `logs/` (with an optional search filter) |
 | `call_api` | Call an existing GET REST API endpoint (`docs/api_endpoints.md`) directly |

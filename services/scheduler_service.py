@@ -158,7 +158,7 @@ class SchedulerService:
         from repositories.scheduler_repository import SchedulerRepository
         
         print("[Scheduler] Checking for interrupted scan jobs to auto-resume...")
-        for db_type in ['general', 'adult', 'audiobook']:
+        for db_type in ['general', 'adult', 'audiobook', 'video']:
             db_path = database.get_db_path(db_type)
             # MariaDB 모드 식별자(mariadb:...)는 파일 경로가 아니므로 파일 존재 검사 스킵
             if not db_path.startswith('mariadb:') and not os.path.exists(db_path):
@@ -222,7 +222,7 @@ class SchedulerService:
         except Exception as e:
             print(f"[Scheduler] Error removing job: {e}")
 
-        for db_type in ['general', 'adult', 'audiobook']:
+        for db_type in ['general', 'adult', 'audiobook', 'video']:
             db_path = database.get_db_path(db_type)
             # MariaDB 모드 식별자(mariadb:...)는 파일 경로가 아니므로 파일 존재 검사 스킵
             if not db_path.startswith('mariadb:') and not os.path.exists(db_path):

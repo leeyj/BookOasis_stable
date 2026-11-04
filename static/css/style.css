@@ -1448,6 +1448,33 @@ button, input, select, textarea {
     color: var(--app-accent);
 }
 
+/* ⓘ 옆 처리 필요 알림 표시(관리자 전용) - ⓘ와 같은 크기·정렬, 알림 종의 빨간 점과 같은 색 */
+.btn-category-warning {
+    background: transparent;
+    border: none;
+    color: var(--notify-error, #ef4444);
+    font-size: var(--app-fs-sm);
+    cursor: pointer;
+    padding: 0.4rem 0.2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.2s ease;
+    flex-shrink: 0;
+}
+
+.btn-category-warning[hidden] {
+    display: none;
+}
+
+.btn-category-warning i {
+    transform: translateY(0.15em);
+}
+
+.btn-category-warning:hover {
+    opacity: 0.75;
+}
+
 .category-info-popover {
     position: fixed;
     z-index: 10020;

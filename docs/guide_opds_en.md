@@ -95,6 +95,7 @@ For comics (ZIP/CBZ/image folders) you can choose **Stream** (view page by page 
 * Streaming links are only added for **books whose page count is known**. In remote-drive (GDS, etc.) categories the
   page count is filled once a book has been opened in the web viewer or analyzed by the Lazy-Scanner; other books are downloaded.
 * Pages viewed by streaming are also recorded as your BookOasis reading position.
+* Streaming links are sent **to KOReader only**. Sending them to other apps such as Moon+ Reader made their read button disappear (2.9.4), so other apps download the book instead.
 
 ### Reading-position sync (KOReader progress sync)
 1. In the BookOasis web app, open the **account icon (top right) → KOReader sync** and set a **sync password**.

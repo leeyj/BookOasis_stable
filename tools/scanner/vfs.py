@@ -82,7 +82,13 @@ def trigger_vfs_refresh(db_path, library_id, physical_path):
     if not remote_paths:
         return
 
-    db_type = 'adult' if 'adult' in os.path.basename(db_path) else 'general'
+    db_name = os.path.basename(db_path)
+    db_type = (
+        'audiobook' if 'audiobook' in db_name else
+        'video' if 'video' in db_name else
+        'adult' if 'adult' in db_name else
+        'general'
+    )
     print(f"[Scanner-VFS] Remote mount path detected: {remote_paths} - Checking cache status...")
 
     try:

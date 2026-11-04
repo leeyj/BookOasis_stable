@@ -2,13 +2,13 @@
 
 This document describes the core mechanics of the BookOasis media server's scanner and filesystem synchronization engine in detail.
 
-The general (comic/ebook) scanner and the audiobook scanner are two entirely separate pipelines. Sections 1–2 cover the general scanner; Section 3 covers the audiobook scanner. To add or modify a local metadata parser (`kavita.yaml`, `komga.yaml`, etc.), see [guide_scanner_parser.md](./guide_scanner_parser.md). For scan-completion webhooks/plugin hooks, see [guide_plugins.md](./guide_plugins.md).
+The general (comic/ebook) scanner, the audiobook scanner and the video scanner are separate pipelines. Sections 1–2 cover the general scanner, Section 3 the audiobook scanner, Section 4 the video scanner, and Section 5 the post-scan work shared by all three. For the scan queue and state transitions see [spec_scanner_queue_state_transitions_en.md](./spec_scanner_queue_state_transitions_en.md). To add or modify a local metadata parser (`kavita.yaml`, `komga.yaml`, etc.), see [guide_scanner_parser.md](./guide_scanner_parser.md). For scan-completion webhooks/plugin hooks, see [guide_plugins.md](./guide_plugins.md).
 
 ---
 
 ## 1. Overall Scanner Flow (General/Adult Libraries)
 
-The scanner iterates library configurations from the database (`media_general.db`, `media_adult.db`) and synchronizes the actual filesystem state with the DB. When `db_type` is `audiobook`, this flow is never entered at all — control is handed off immediately to the [Section 3 audiobook pipeline](#3-audiobook-scanner-a-fully-separate-pipeline).
+The scanner iterates library configurations from the database (`media_general.db`, `media_adult.db`) and synchronizes the actual filesystem state with the DB. When `db_type` is `audiobook`, this flow is never entered at all — control is handed off immediately to the [Section 3 audiobook pipeline](#3-audiobook-scanner-a-fully-separate-pipeline). When `db_type` is `video`, it is handed off to the [Section 4 video pipeline](#4-video-scanner-a-separate-pipeline).
 
 ```mermaid
 graph TD
@@ -92,6 +92,9 @@ graph TD
   - Validates the response body (`_is_vfs_refresh_success_response`) so that a `"file does not exist"` reply is never mistaken for success, and retries up to 3 times with a 2s delay if the RC server isn't ready yet (connection refused).
   - Every request carries a `User-Agent` header with the engine signature, so the origin can be traced in network logs even if this logic is copied/reused elsewhere.
 
+* **Where the refresh happens**: for a category scan through the queue, `services/scheduler_service.py::run_scan_job` refreshes first using the category's DB and passes `skip_vfs_refresh` to the engine so it is not done twice. Direct scans that bypass the queue (path scan, webhook, webview download) go through `trigger_vfs_refresh`, which tells general/adult/audiobook/video apart by the DB file name and reads the category settings from that DB.
+* **No RC calls when `is_remote=0`**: even if the path looks like an rclone mount, nothing is refreshed when remote drive is turned off for the category.
+
 ### ③ Pre-scan DB Integrity Self-Healing
 * **Mechanism** (`tools/scanner/core.py::_run_db_self_recovery`):
   - Runs `PRAGMA integrity_check;` immediately before scanning (SQLite mode only).
@@ -115,6 +118,8 @@ graph TD
   - Checked every 3 completed folders (not every folder). This check uses a **separate independent connection** rather than the scan's long-lived connection, because a long-lived connection's WAL snapshot isolation can prevent it from seeing another session's COMMIT (the cancel request) promptly.
   - Two signals are checked: `libraries.scan_status = 'cancelling'`, and a row in `scanner_tasks` with `task_key = library_scan_{db_type}_{library_id}` and `status = 'cancelled'`.
   - On cancellation, any pending data is flushed, `libraries.scan_status` is reverted to `'ready'`, and the function returns immediately (the checkpoint is preserved so the next scan resumes from this point).
+  - `libraries.scan_status` is read from **the DB the category belongs to** (general/adult), and `scanner_tasks` from the general DB. Both used to be read from general, so adult category scans could not be stopped (fixed in 3.1.0, `tests/test_scan_cancel_db_type.py`).
+  - Because the engine returns normally, the queue history (`scan_history`) records the task as `completed`.
   - The audiobook scanner has no checkpoint/cancel logic at all — on restart it only avoids redundant work via its coarse `skip_existing` folder policy.
 
 ### ⑥ Scan Ignore Filtering (IgnoreFilter & .bookoasisignore)
@@ -129,7 +134,8 @@ graph TD
 * **Mechanism** (`tools/scanner/sync_detector.py::detect_and_handle_book_movement`):
   - Before cross-diffing the disappeared-path set (`deleted_paths`) against the newly-found-path set (`new_paths`), Windows/Linux path separator differences (`\` vs `/`) are normalized first.
   - If a pair with an exactly matching basename (filename) exists, it's treated as a "book move" and only `books.file_path` is `UPDATE`d to the new path.
-  - IMGDIR virtual entries (`__folder__.imgdir`, see [⑫](#-imgdir-virtual-books-image-only-folders)) always share the same filename, so they are explicitly excluded from this basename matching to avoid false positives.
+  - IMGDIR virtual entries (`__folder__.imgdir`, see [⑫](#⑫-imgdir-virtual-books-image-only-folders)) always share the same filename, so they are explicitly excluded from this basename matching to avoid false positives.
+  - **Stage 2 — renamed files** (`_match_renamed_files`): when stage 1 finds no pair because the basename changed, a vanished book and a new file whose **size + modification time (seconds)** match one-to-one are treated as the same file and the path is fixed. If the size or time is 0, or there is more than one candidate, nothing is moved (trash + new book, as before). If the title came from the old file name and the book is not `metadata_locked`, the title is changed to the new file name too. Renames keep the modification time on both local disks and Google Drive, which is what makes this comparison work.
   - This ensures the book's unique ID (`book_id`) and everything bound to it — `user_progress`, `user_reading_log` — survives intact.
 
 ### ⑧ Metadata Parsing and Merging: Plugin-Extensible Parser Loader
@@ -150,7 +156,7 @@ Cover images are resolved through the following fallback chain, designed to mini
 4. **In-archive first-page auto-extraction (non-remote paths and forced scans only)**:
    - **EPUB**: searches `META-INF/container.xml` and the manifest's cover entry to extract the original image directly.
    - **ZIP/CBZ**: naturally sorts (`natural_sort_key`) the archive's image entries and auto-extracts the very first one as the cover.
-   - **PDF**: bulk PDF cover extraction is deliberately disabled in the main scan path (risk of OOM/worker timeout on large PDFs) and deferred to the [Lazy Scanner](#-lazy-scanner-second-pass-repair-scanner).
+   - **PDF**: bulk PDF cover extraction is deliberately disabled in the main scan path (risk of OOM/worker timeout on large PDFs) and deferred to the [Lazy Scanner](#⑳-lazy-scanner-second-pass-repair-scanner).
 * **Post-extraction safeguard**: if the extracted cover file is 0 bytes, it is immediately deleted and the result invalidated so it gets retried on the next scan.
 
 ### ⑩ Byte-Offset Metadata Analysis and DB Storage
@@ -168,7 +174,7 @@ Cover images are resolved through the following fallback chain, designed to mini
 * **Auto-resume mechanism**:
   - All folders completed so far are flushed, `scanner_tasks.status` is set to `'exit_pending'` (stage message `"Paused due to memory limit (Auto-Resuming...)"`), the DB connection is closed, and the temporary JSONL file is cleaned up.
   - Rather than an external daemon noticing an exit and restarting it, the process **replaces itself in-place via `os.execv()`, re-executing `tools/scanner_worker.py`** — a true self-respawn. The freshly started process picks up from the saved checkpoint (`scanner_progress`).
-  - The Lazy Scanner uses its own independent memory-watch logic; on exceeding its threshold it calls `sys.exit(10)` instead of `os.execv`, signaling "please reschedule me" to whatever runs it (see [Lazy Scanner](#-lazy-scanner-second-pass-repair-scanner)).
+  - The Lazy Scanner uses its own independent memory-watch logic; on exceeding its threshold it calls `sys.exit(10)` instead of `os.execv`, signaling "please reschedule me" to whatever runs it (see [Lazy Scanner](#⑳-lazy-scanner-second-pass-repair-scanner)).
 
 ### ⑫ IMGDIR Virtual Books (Image-only Folders)
 * **Problem solved**: treats a folder containing only loose image files (no supported archive/ebook format at all) as a single virtual "book".
@@ -176,14 +182,17 @@ Cover images are resolved through the following fallback chain, designed to mini
   - A folder with zero supported archive/ebook formats (`SUPPORTED_FORMATS`) but at least one image file is registered as a single virtual entry represented by the synthetic filename **`__folder__.imgdir`**.
   - Unlike normal books ("current folder = series"), IMGDIR inverts the rule: **"current folder = book title", "parent folder = series"**.
   - Cache comparison uses folder mtime plus the summed size of all contained images (rather than per-file comparison), and the cover is taken from the first image in the folder.
-  - It's excluded from book-move basename matching ([⑦](#-book-movement-path-change-auto-detection-and-history-preservation)) since the filename is always identical.
+  - It's excluded from book-move basename matching ([⑦](#⑦-book-movement-path-change-auto-detection-and-history-preservation)) since the filename is always identical.
 
-### ⑬ Web-Share-Link (Google Drive) Scanning
-* **Problem solved**: lets a library be built purely from a Google Drive folder share link, with no actual mount/sync required.
+### ⑬ Web-Share-Link (Google Drive) Scanning (beta)
+* **Problem solved**: lets a library be built purely from a Google Drive folder share link, with no actual mount/sync. This is a beta feature; it only shows in the UI when `GDRIVE_LINK_BETA` (or `DEVELOP`) is on.
 * **Mechanism** (`tools/scanner/engine.py`):
-  - When a target path is identified via `is_gdrive_url()`, `os.walk()` is never used at all. Instead `fetch_gdrive_folder_files()` fetches the remote folder/file listing and builds virtual paths shaped like `gdrive://{folder_id}/...`.
+  - When a target path is identified via `is_gdrive_url()`, `os.walk()` is not used; virtual paths `gdrive://{folder_id}/...` are built from the remote listing.
+  - **Listing**: if the category has an rclone remote (`libraries.gdrive_copy_remote`), `fetch_gdrive_folder_files_via_rclone()` calls `rclone lsjson` once. If that fails, the API-key listing (`fetch_gdrive_folder_files()`) is used instead, but this scan skips the deletion sync (a partial listing must not delete anything, so it counts as a traversal error). Only older categories without a remote use the API-key path from the start. The remote is the default because anonymous API-key downloads from a large shared folder were blocked by Google with 403 (2026-10-22).
+  - **Metadata**: `kavita.yaml` and other metadata files are downloaded at once into a local mirror (`gdrive_meta_mirror_dir`) by `refresh_gdrive_meta_mirror()`, and the parsers read the mirror. If the mirror can't be fetched, books are still registered and the next scan tries again.
+  - In remote mode books are read from a local copy when opened (`gdrive_book_copies`), so zip offsets are not precomputed with Range requests. Folders whose files have the same modification time and size in the listing are skipped.
   - IgnoreFilter applies identically to these virtual paths, based on relative folder/file names.
-  - Subsequent metadata parsing, cover extraction, and offset analysis all treat this as `is_remote`, same as a remote mount.
+  - Listing and metadata failures are recorded in `SystemHealthService` and show up in the notification center. Step-by-step records are written with `beta_log` in `utils/gdrive_beta_log.py`.
 
 ### ⑭ JSONL Logging and Hybrid DB Flushing
 * **Architectural change**: previously, worker threads wrote results to a `.jsonl` file that the main engine bulk-inserted in one pass after the scan finished. Today, results are instead **accumulated directly in in-memory `pending_inserts`/`pending_updates`/`pending_folders` lists** and flushed to the DB periodically.
@@ -223,7 +232,7 @@ Cover images are resolved through the following fallback chain, designed to mini
     next scan finds them healthy. Problem records are written after the scan transaction commits (avoids SQLite lock conflicts).
     Admins can check one book at a time with book [Diagnose].
 * **Restoration**: if a path that was previously soft-deleted reappears during a scan, it's automatically restored — `is_deleted = 0`, `deleted_at = NULL` — simply by putting the file back.
-* **Auto hard-delete after 7 days**: books soft-deleted more than 7 days ago are permanently purged on every subsequent scan — `user_progress`, `user_reading_log`, `book_offsets`, and the `books` record are all removed within one transaction, and the associated physical cover image file is deleted from disk too. This policy works in concert with the manual trash-management feature in [services/trash_service.py](../services/trash_service.py).
+* **Auto hard-delete after 7 days**: books soft-deleted more than 7 days ago are permanently purged on every subsequent scan — the rows that hang off the book (progress, reading log, offsets, annotations, bookmarks, TTS, etc.) and the `books` record are all removed within one transaction, and the associated physical cover image file is deleted from disk too. This policy works in concert with the manual trash-management feature in [services/trash_service.py](../services/trash_service.py).
 * **Emergency-brake safeguard**: if a scan finds **`0`** physical files, it's far more likely that a mounted network drive got unmounted or a path is misconfigured than that the user actually deleted everything. In this case all delete/restore processing is **force-cancelled**, a warning is logged, and the session exits immediately, to prevent the DB from being mass-wiped.
 
 ### ⑰ ZIP/CBZ Archive Handling and Partial-Byte Streaming Strategy
@@ -265,7 +274,7 @@ Cover images are resolved through the following fallback chain, designed to mini
 
 ## 3. Audiobook Scanner (A Fully Separate Pipeline)
 
-Audiobook libraries (`media_audiobook.db`, `db_type == 'audiobook'`) are detected in `tools/scanner/core.py::scan_library`/`scan_library_path` and immediately delegated to, then returned from, `services/audiobook_scanner.py::scan_audiobook_library`. **None of Sections 1–2's thread pool, checkpointing (`scanner_progress`), cancellation detection, JSONL/Redis-lock-based flushing, or `book_offsets` byte-offset streaming mechanisms apply to the audiobook path at all.** Only HDD wake-up ([①](#-hddnas-wake-up-and-pre-flight-path-validation)) and VFS cache refresh ([②](#-rclone-vfs-cache-refresh)) are shared.
+Audiobook libraries (`media_audiobook.db`, `db_type == 'audiobook'`) are detected in `tools/scanner/core.py::scan_library`/`scan_library_path` and immediately delegated to, then returned from, `services/audiobook_scanner.py::scan_audiobook_library`. **None of Sections 1–2's thread pool, checkpointing (`scanner_progress`), cancellation detection, JSONL/Redis-lock-based flushing, or `book_offsets` byte-offset streaming mechanisms apply to the audiobook path at all.** Only HDD wake-up ([①](#①-hddnas-wake-up-and-pre-flight-path-validation)) and VFS cache refresh ([②](#②-rclone-vfs-cache-refresh)) are shared.
 
 ```mermaid
 graph TD
@@ -286,17 +295,19 @@ graph TD
 ### ㉑ Folder-Unit Traversal and Skip Policy
 * **Detection unit**: while walking via `os.walk`, any folder containing an `audio.json` file, or at least one file with a supported audio extension (`AUDIO_EXTENSIONS = .mp3, .m4b, .m4a, .flac, .aac, .wav, .ogg, .opus, .wma`), is treated as "one audiobook".
 * **Nesting prevention**: once a folder is identified as an audiobook, `dirs.clear()` blocks recursion into its subfolders — the assumption being that an audiobook folder cannot contain another nested audiobook. Tracks are collected from subfolders too, so when both the folder itself and its subfolders hold audio, the subfolders are merged into that book (e.g. one audio file in the category folder → the whole category becomes one book). This is not split automatically; the notification card `audiobook_nested_audio` reports it ("action required" when the category folder itself is the book or a subfolder's metadata.json/audio.json was ignored, otherwise a notice). Guidance: move the audio files, then delete and re-add the category — the merged book's tracks hold the UNIQUE file paths, so saving the subfolders separately fails as a duplicate (that save failure is shown as an `audiobook_save_failed` card).
-* **Skip policy**: unless `force=True`, a folder path that exactly matches an entry in the **full list of already-registered folder paths** (`AudiobookRepository.get_folder_paths()`) is skipped entirely without being opened. This is a much coarser unit than the general scanner's per-file mtime/size comparison ([⑮](#-two-tier-mtime-based-ultra-fast-skip-algorithm)) — detecting a partial track addition/change requires a full `force=True` rescan.
+* **Skip policy**: unless `force=True`, already-registered folders are skipped without being opened. Registered folders are still compared by **file list signature** (`_audio_signature`: relative path + size of the audio files) against the tracks in the DB (`AudiobookRepository.get_track_signatures`); folders whose tracks were added, removed or renamed are processed again (`[AudiobookScanner][CHANGED]` log). Only listing information is used, so nothing is downloaded from remotes.
+* **Folder moves and renames**: if a newly found folder contains all the tracks of exactly one existing book whose folder has vanished, that book is treated as moved and only its path is fixed (`_MovedAudiobookFinder`; id and playback history kept, no new-item event).
+* **Hiding vanished books**: vanished books with no match are hidden at the end of the scan (soft delete, `_hide_unmatched_missing`). If the category folder is unreachable or many disappear at once (the same mass-missing rule as books, `is_mass_missing`), this is held and only logged.
 
 ### ㉒ Metadata Sources: `metadata.json` Preferred, `audio.json` Legacy Fallback
 * **`metadata.json`** (preferred, richer schema): `title`, `publisher`, `description`, `publishedDate`/`publishedYear`, `isbn`, `web_id`, `authors[]` (array), `narrators[]` (array; abbreviated as "N others" past 3 names, appended to the author field), `chapters[{start, end}]` (per-chapter start/end seconds — when the chapter count matches the audio file count 1:1, track durations are taken from these values instead of probing files), `images.cover|poster` + `image_blobs` (embedded cover, see ㉓). The encoding is auto-detected as UTF-8 (with or without BOM), UTF-16 or UTF-32, with a retry as cp949 (Korean Windows ANSI) when that fails (`load_json_any_encoding`, also used for audio.json); a cp949 read is logged. Other ANSI code pages (cp1252, Shift-JIS, ...) are not supported and count as a parse failure. Other fields such as `files`/`title_sort`/`genres`/`tags`/`series` are not read.
 * **`audio.json`** (legacy, used when `metadata.json` is absent or fails to parse - syntax error or a non-object top level): a flat structure with `title`, `author`, `publisher`, `code`, `web_id`, `poster`, `premiered`, `author_intro`, `desc`/`description`, `ratings`.
-* Both of these parsers are **completely independent** of the [⑧](#-metadata-parsing-and-merging-plugin-extensible-parser-loader) plugin loader under `tools/scanner/metadata/`, and never go through `merge_local_metadata()`.
+* Both of these parsers are **completely independent** of the [⑧](#⑧-metadata-parsing-and-merging-plugin-extensible-parser-loader) plugin loader under `tools/scanner/metadata/`, and never go through `merge_local_metadata()`.
 * **Title/author fallback**: if neither JSON source supplies a title or author, the folder name is split on `" - "` and interpreted as an `"author - title"` pattern.
 
 ### ㉓ Poster (Cover) Discovery
 * Candidate filenames tried in order: `poster.jpg` → `cover.jpg` → `folder.jpg` (plus `.png`/`.jpeg` variants) → failing all of those, the first `.jpg`/`.jpeg`/`.png`/`.webp` file found in the folder → failing that, if `metadata.json` has an `image_blobs` entry (base64) referenced by `images.cover` (else `images.poster`, or the sole blob when neither key exists), **the `metadata.json` path itself** is stored as the poster source (the base64 never goes into the DB). `utils/cover_helper.py` decodes it on the first cover request and leaves a `.none` marker when no cover is found, so the file is not parsed again.
-* Unlike the general scanner's [⑨](#-staged-cover-image-extraction-and-mapping-strategy) pipeline, there is no WebP conversion or hashed-filename re-save — the raw source file path is stored in the DB as-is.
+* Unlike the general scanner's [⑨](#⑨-staged-cover-image-extraction-and-mapping-strategy) pipeline, there is no WebP conversion or hashed-filename re-save — the raw source file path is stored in the DB as-is.
 
 ### ㉔ Track Duration Analysis: Multi-Tier Fallback with a Remote Fast Path
 The most intricate subsystem here, designed to estimate playback duration without opening entire audio files (`get_audio_duration_and_size`):
@@ -311,7 +322,39 @@ The most intricate subsystem here, designed to estimate playback duration withou
 ### ㉕ DB Storage and Logging Conventions
 * Storage goes through `AudiobookRepository.save_audiobook_scan()` into `media_audiobook.db`'s dedicated audiobook tables; the general scanner's `book_offsets`/`scanner_progress`/`folder_mtimes` tables are never touched. Audiobook streaming is based on HTTP Range requests against the whole audio file, not the ZIP byte-offset mechanism.
 * Library-level start/completion is logged as `[AudiobookScanner][LIBRARY_SCAN_START]`/`[LIBRARY_SCAN_DONE]`; per-folder results as `[AudiobookScanner][BOOK_PROCESSED]`, which also records the duration-resolution mode (`cache_only`/`metadata_only`/`file_probe_only`/`mixed`, etc.) and cache-hit ratio for performance diagnostics. This is a distinct naming convention from the general scanner's `[Scanner-*]` log prefixes.
-* After a scan, newly found audiobooks trigger the same `scan.new_books_detected` event and plugin-hook dispatch described in [⑲](#-scan-completion-event-dispatch-community-plugin-integration) (`_dispatch_audiobook_new_items_events`). This dispatch was missing for a long time precisely because the audiobook scanner is a separate pipeline; it now reuses the same hook-calling path as the general scanner (`tools/scanner/engine.py::_dispatch_new_books_to_plugin_hooks`).
+* After a scan, newly found audiobooks trigger the same `scan.new_books_detected` event and plugin-hook dispatch described in [⑲](#⑲-scan-completion-event-dispatch-community-plugin-integration) (`_dispatch_audiobook_new_items_events`). This dispatch was missing for a long time precisely because the audiobook scanner is a separate pipeline; it now reuses the same hook-calling path as the general scanner (`tools/scanner/engine.py::_dispatch_new_books_to_plugin_hooks`).
+
 
 ---
-*Last Updated: 2026-08-15*
+
+## 4. Video Scanner (A Separate Pipeline)
+
+Video categories (`media_video.db`, `db_type == 'video'`) are handed off by `tools/scanner/core.py` to `services/video_scanner.py::scan_video_library`. Like audiobooks it uses the rule **one folder = one course**; the general scanner's thread pool, checkpoints, cancel detection and offset handling do not apply. HDD wake-up ([①](#①-hddnas-wake-up-and-pre-flight-path-validation)), the VFS refresh ([②](#②-rclone-vfs-cache-refresh)) and the root-unreachable card ("remote drive disconnected") are shared.
+
+### ㉖ Traversal and episode registration
+* **Detection unit**: `os.walk` treats a folder containing video files (`VIDEO_EXTENSIONS = .mp4, .mkv, .avi, .webm, .mov, .m4v, .ts`) as a course and does not descend further (`dirs.clear()`). Episodes are collected from subfolders too and sorted naturally.
+* **Skip policy**: same as audiobooks. Registered courses are skipped, but if the file list signature (relative path + size) differs from the episodes in the DB (`VideoRepository.get_episode_signatures`), the course is processed again and new episodes are registered (`[VideoScanner][CHANGED]`).
+* **Metadata**: a `show.yaml` (Plex TV-show style) in the course folder supplies course and episode info (first season only). Without it the folder name is the title.
+* **Subtitles**: sidecar `.srt`/`.smi`/`.vtt` files with the same name are found. Language tags (`Movie.ko.srt`) are recognized, partial subtitles (`forced`) are skipped, and Korean and `srt` are preferred (`_find_sidecar_subtitle`).
+* **Differences from audiobooks**: there is **no** folder move detection and no hiding of vanished courses. If a course folder is moved or deleted, the old row stays and the moved folder is registered as a new course. Episode files that vanish inside a course are removed when the course is saved.
+
+### ㉗ Duration/codec analysis and playback
+* The scan stores only the file list and sizes; duration, resolution and codec analysis (ffprobe) is done **later by the lazy scanner** (the video step in `tools/lazy_scanner.py`). Episodes already analyzed reuse the cache when mtime and size match.
+* If the analysis shows a codec or container the browser can't play as is, `video_episodes.needs_transcode = 1` is set and playback goes through ffmpeg (`is_browser_compatible`). Files whose extension doesn't match the real container are checked once more via `container_verified`.
+
+---
+
+## 5. Post-Scan Work (Shared)
+
+### ㉘ Updating lists and events
+* **When a queued scan finishes** (the worker loop in `services/scanner_queue.py`, on success or partial success):
+  - The recently-added cache (`cache:recent_added*`) is cleared.
+  - For the book DBs (general/adult) the series summary table is rebuilt (`SeriesRepository.rebuild_summary`). Failures are recorded in `SystemHealthService`.
+* **Direct scans that bypass the queue** (path scan `/api/media/libraries/<id>/scan-path`, a webhook scan with a path `/api/webhook/scan`, plugin webview downloads):
+  - Wrapped in `services/scan_refresh_service.py::track_direct_scan`, which compares series snapshots before and after the scan and recomputes **only the changed series rows** (`refresh_summary_keys`). With many changed series (more than 500) or no snapshot, the whole table is rebuilt.
+  - Requests are batched briefly (1 second) and handled in the background, so the API response isn't delayed. Only one update per DB runs at a time.
+* **New-item events**: newly registered items are announced through webhooks and plugin hooks ([⑲](#⑲-scan-completion-event-dispatch-community-plugin-integration)). They are sent from daemon threads so the scan thread isn't held up.
+* **Scan result summary**: the number of new books, the error count and the report file name are stored in `scan_history.result_summary` and shown under "recently finished" in the notification center.
+
+---
+*Last Updated: 2026-11-04*

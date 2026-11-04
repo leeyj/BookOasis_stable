@@ -408,7 +408,9 @@ def add_user():
         for db_type in ['general', 'adult', 'audiobook', 'video']:
             UserRepository.add_user(db_type, username, password_hash, role, has_adult_access, has_audiobook_access, has_video_access, has_download_access)
     except Exception as e:
-        if 'UNIQUE' in str(e):
+        # SQLite: "UNIQUE constraint failed", MariaDB: (1062, "Duplicate entry ...")
+        error_text = str(e)
+        if 'UNIQUE' in error_text or 'Duplicate entry' in error_text or '1062' in error_text:
             return jsonify({'success': False, 'error': _t('api.username_exists')}), 409
         return jsonify({'success': False, 'error': _t('api.add_user_failed', error=str(e))}), 500
         

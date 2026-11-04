@@ -72,6 +72,7 @@ Here is the secret of how BookOasis handles massive libraries (100k+ books) inst
 For detailed environment configuration and installation methods, please refer to the technical documentation.
 
 * Installation Guide: [Setup Guide (docs/guide_installation_en.md)](./docs/guide_installation_en.md)
+  * Step-by-step by setup: [Synology NAS](./docs/guide_install_synology_en.md) · [Oracle free server](./docs/guide_install_oracle_en.md) · [Connecting Google Drive (rclone)](./docs/guide_rclone_gdrive_en.md)
 * Admin and Settings: [Admin Guide (docs/guide_admin_en.md)](./docs/guide_admin_en.md)
 * Mobile Viewer Integration: [OPDS Integration Guide (docs/guide_opds_en.md)](./docs/guide_opds_en.md)
 * Architecture and Source Structure: [Architecture Guide (docs/guide_architecture_en.md)](./docs/guide_architecture_en.md)

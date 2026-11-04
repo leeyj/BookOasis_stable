@@ -78,3 +78,9 @@ tools/tts_repro/.venv/
 
 # manage.sh 스캐너 워커 재시작 루프 정지 표시 (tools/scanner_worker_supervisor.sh)
 .scanner_worker.stop
+
+# 사용자가 찍은 가이드용 원본 스크린샷 (개인 정보가 보일 수 있음 — 가린 사본은 docs/images/에)
+docs/user_guide/
+
+# 스캐너 임시 진행 기록(db/{카테고리}_{시각}.jsonl)·로그·측정 결과 — 어디서 생기든 올리지 않는다
+*.jsonl

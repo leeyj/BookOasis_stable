@@ -130,6 +130,7 @@ mcp dev tools/mcp_server.py
 | `get_problem_card` | 문제 카드 하나의 시리즈별 내역, `series_key`를 주면 그 시리즈의 도서 목록 |
 | `diagnose_book` | 도서 1권 진단: DB 기록 / 원격 연결 / 파일 존재 / 파일 형식 체크리스트와 원인·권장 조치 (읽기 전용) |
 | `get_gdrive_beta_summary` | 구글 드라이브 링크 카테고리(클로즈 베타) 로그 요약: 스캔 시간·건너뛴 폴더·신규, 책 열기 시간/크기/실패율, 다음 화 미리 받기, 캐시 사용량, 열린 경고 |
+| `get_request_debug_summary` | 느린 요청(기본 500ms 이상)·서버 오류(5xx) 기록을 경로별로 요약 (`hours` 기본 24, 0이면 전체 / `top` 기본 20). 서버 `.env`에 `DEBUG_REQUEST_LOG=true`일 때만 기록이 쌓임. `cpu_share`가 1에 가까우면 그 요청 자체가 무겁고, 낮은데 겹침(contention)이 많으면 다른 요청에 밀린 것 |
 | `get_version` | 실행 중인 BookOasis 버전(VERSION 파일 기준) 조회 |
 | `run_readonly_query` | 서재 DB에 읽기 전용(SELECT/WITH/EXPLAIN/PRAGMA/SHOW/DESCRIBE) SQL을 직접 실행 |
 | `read_logs` | `logs/` 폴더의 서버 로그를 끝에서부터 최근 N줄 조회 (검색어 필터 지원) |
