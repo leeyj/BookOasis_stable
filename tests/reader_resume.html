@@ -1,0 +1,55 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Reader resume geometry regression</title>
+<style>body { font: 16px sans-serif; } pre { white-space: pre-wrap; }</style>
+<h1>Reader resume geometry regression</h1>
+<p>Serve the repository root over HTTP, then open this page. No book, account or server API is used.</p>
+<pre id="results">Running…</pre>
+<script type="module">
+import { restoreTxtAnchorInfoByMode } from '../static/js/viewer/txt_anchor_utils.js';
+
+const results = [];
+for (const format of ['epub', 'txt']) {
+  for (const initialScroll of [0, 200]) {
+    const fixture = document.createElement('div');
+    fixture.style.cssText = 'position:relative;width:500px;height:300px;overflow:auto;border:0;padding:0;font:16px/24px monospace';
+    document.body.appendChild(fixture);
+    const content = document.createElement('div');
+    fixture.appendChild(content);
+    const spacer = document.createElement('div');
+    spacer.style.height = '600px';
+    content.appendChild(spacer);
+    const chapter = document.createElement('div');
+    chapter.className = 'txt-scroll-chunk';
+    chapter.dataset.idx = '1';
+    chapter.style.position = 'relative'; // paragraph.offsetTop is chapter-local, not scroll-container-local
+    content.appendChild(chapter);
+    const paragraph = document.createElement('p');
+    paragraph.style.cssText = 'margin:0;padding:0';
+    const query = 'Unique saved sentence inside a long paragraph.';
+    paragraph.textContent = 'prefix '.repeat(300) + query + ' suffix'.repeat(200);
+    chapter.appendChild(paragraph);
+    fixture.scrollTop = initialScroll;
+    const range = document.createRange();
+    const offset = paragraph.firstChild.data.indexOf(query);
+    range.setStart(paragraph.firstChild, offset);
+    range.setEnd(paragraph.firstChild, offset + query.length);
+    const expectedTop = fixture.scrollTop + range.getClientRects()[0].top - fixture.getBoundingClientRect().top - 30;
+    const restored = restoreTxtAnchorInfoByMode({
+      anchorInfo: { chunkIdx: 1, anchorText: query },
+      scrollWrapper: fixture, contentArea: content, storage: { getItem: () => 'scroll' },
+      currentChunkIdx: 1, getPageAdvanceWidth: () => 500, isEpub: format === 'epub',
+      fullText: paragraph.textContent, txtChunks: ['', paragraph.textContent], stripHtml: s => s,
+    });
+    const bounds = fixture.getBoundingClientRect();
+    const actual = range.getClientRects()[0];
+    const error = Math.abs(fixture.scrollTop - expectedTop);
+    results.push({ format, initialScroll, restored, expectedTop, actualTop: fixture.scrollTop, error,
+      pass: restored && error < 2 && actual.bottom > bounds.top && actual.top < bounds.bottom });
+    fixture.remove();
+  }
+}
+window.readerResumeResults = results;
+document.querySelector('#results').textContent = JSON.stringify(results, null, 2);
+document.title = results.every(x => x.pass) ? 'PASS: reader resume geometry' : 'FAIL: reader resume geometry';
+</script>

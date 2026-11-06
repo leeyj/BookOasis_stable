@@ -150,7 +150,9 @@ export function restoreTxtAnchorInfoByMode({
 
   if (matchedElem) {
     if (scrollMode === 'scroll') {
-      scrollWrapper.scrollTop = Math.max(0, matchedElem.offsetTop - 30);
+      const rect = _queryRectInElement(matchedElem, query) || matchedElem.getBoundingClientRect();
+      const wrapperRect = scrollWrapper.getBoundingClientRect();
+      scrollWrapper.scrollTop = Math.max(0, scrollWrapper.scrollTop + rect.top - wrapperRect.top - 30);
       return true;
     }
 
