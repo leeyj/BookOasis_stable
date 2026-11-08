@@ -137,6 +137,14 @@
         padding: 0 0.8rem;
         cursor: pointer;
       }
+      /* 3D(VRM) 모드: 캐릭터가 오른쪽에 서 있고 채팅 패널은 그 왼쪽에 열린다 */
+      #reading-mate-mascot .rm-stage { display: none; width: 180px; height: 260px; cursor: pointer; }
+      #reading-mate-mascot .rm-stage canvas { width: 100%; height: 100%; display: block; }
+      #reading-mate-mascot.rm-3d { flex-direction: row; align-items: flex-end; right: 0.5rem; bottom: 0; }
+      #reading-mate-mascot.rm-3d .rm-stage { display: block; }
+      #reading-mate-mascot.rm-3d .rm-avatar-btn { display: none; }
+      #reading-mate-mascot.rm-3d .rm-chat-panel { margin: 0 0 1.25rem 0; }
+      #reading-mate-mascot.rm-reading { display: none !important; }
     `;
     document.head.appendChild(style);
   }
@@ -164,6 +172,7 @@
           <button type="submit"><i class="fa-solid fa-paper-plane"></i></button>
         </form>
       </div>
+      <div class="rm-stage" id="rm-stage" title="독서메이트에게 물어보기"></div>
       <button type="button" class="rm-avatar-btn" id="rm-avatar-btn" title="독서메이트에게 물어보기">
         <span id="rm-avatar-fallback">📚</span>
       </button>
@@ -176,12 +185,14 @@
     const form = host.querySelector('#rm-chat-form');
     const input = host.querySelector('#rm-chat-input');
 
-    avatarBtn.addEventListener('click', () => {
+    const togglePanel = () => {
       panel.classList.toggle('open');
       if (panel.classList.contains('open') && history.length === 0) {
         fetchReply(''); // 첫 오픈 시 인사말 요청
       }
-    });
+    };
+    avatarBtn.addEventListener('click', togglePanel);
+    host.querySelector('#rm-stage').addEventListener('click', togglePanel);
     closeBtn.addEventListener('click', () => panel.classList.remove('open'));
 
     form.addEventListener('submit', (e) => {
@@ -225,6 +236,7 @@
     let pendingBubble = null;
     if (userText) {
       pendingBubble = appendBubble('assistant', '생각 중...', true);
+      mate3d.think();
     }
 
     fetch(DATA_URL + '?' + params.toString())
@@ -234,6 +246,7 @@
 
         if (!data.success) {
           appendBubble('assistant', data.error || '오류가 발생했어요.');
+          mate3d.speak('', 'sad');
           return;
         }
 
@@ -247,6 +260,7 @@
         }
 
         appendBubble('assistant', data.reply || '...');
+        mate3d.speak(data.reply || '');
         if (userText) {
           history.push({ role: 'user', content: userText });
         }
@@ -276,6 +290,268 @@
       : '마스코트를 준비하는 중...';
   }
 
-  ensureMascot();
+  // ------------------------------------------------------------------
+  // 4) 3D 캐릭터(VRM) - 설정에서 켰을 때만 로드한다.
+  //    이 파일은 new Function으로 실행되는 일반 스크립트라 `import` 문을 못 쓴다.
+  //    대신 동적 import()로 three.js / three-vrm 을 CDN(esm.sh)에서 불러온다.
+  //    ?deps=three@... 로 three 버전을 고정해야 three 인스턴스가 하나로 유지된다.
+  //    실패하거나 좁은 화면이면 기존 2D 아바타가 그대로 남는다.
+  // ------------------------------------------------------------------
+  const THREE_VER = '0.180.0';
+  const VRM_VER = '3.5.5';
+  const NARROW_QUERY = window.matchMedia('(max-width: 640px)');
+
+  const mate3d = {
+    vrm: null, talk: null, thinking: false, exprUntil: 0,
+    think() {
+      if (!this.vrm) return;
+      this.thinking = true;
+      this.setExpr('relaxed', 0.5);
+    },
+    speak(text, expr) {
+      if (!this.vrm) return;
+      this.thinking = false;
+      this.setExpr(expr || 'happy', 1, 2500);
+      this.talk = text ? { text: text.slice(0, 200), i: 0, acc: 0, cur: null } : null;
+    },
+    exprName(name) {
+      const em = this.vrm.expressionManager;
+      // VRM 0.x 의 '놀람'은 표준 프리셋이 없어 커스텀 'Surprised'로 들어오는 모델이 많다
+      const aliases = { surprised: ['surprised', 'Surprised'] }[name] || [name];
+      return aliases.find((k) => em.getExpression(k)) || null;
+    },
+    setExpr(name, weight, holdMs) {
+      const em = this.vrm && this.vrm.expressionManager;
+      if (!em) return;
+      ['happy', 'relaxed', 'surprised', 'sad', 'angry'].forEach((k) => {
+        const n = this.exprName(k);
+        if (n) em.setValue(n, 0);
+      });
+      const n = name && name !== 'neutral' ? this.exprName(name) : null;
+      if (n) em.setValue(n, weight == null ? 1 : weight);
+      this.exprUntil = holdMs ? performance.now() + holdMs : 0;
+    },
+  };
+
+  // 한글 음절의 중성으로 입 모양(aa/ih/ou/ee/oh)을 고른다. TTS를 붙이면 오디오 볼륨으로 바꾸면 된다.
+  function vowelOf(ch) {
+    const c = ch.charCodeAt(0);
+    if (c >= 0xAC00 && c <= 0xD7A3) {
+      const jung = Math.floor((c - 0xAC00) / 28) % 21;
+      if ([0, 1, 2, 3, 9, 10, 11].includes(jung)) return 'aa';
+      if ([4, 5, 6, 7, 14, 15].includes(jung)) return 'ee';
+      if ([8, 12].includes(jung)) return 'oh';
+      if ([13, 16, 17, 18].includes(jung)) return 'ou';
+      return 'ih';
+    }
+    if (/[\s.,!?…~]/.test(ch)) return null;
+    return ['aa', 'ih', 'ou', 'ee', 'oh'][c % 5];
+  }
+
+  function isReading() {
+    const viewer = document.getElementById('media-viewer-modal');
+    return !!viewer && viewer.style.display === 'flex';
+  }
+
+  // 책을 읽는 동안에는 마스코트(2D/3D 모두)를 숨긴다 - 읽기 화면을 가리지 않는다.
+  function watchReading(host) {
+    const sync = () => host.classList.toggle('rm-reading', isReading());
+    const viewer = document.getElementById('media-viewer-modal');
+    if (viewer) new MutationObserver(sync).observe(viewer, { attributes: true, attributeFilter: ['style', 'class'] });
+    sync();
+  }
+
+  async function loadCharacter(host) {
+    let info;
+    try {
+      const res = await fetch(DATA_URL + '?action=character');
+      info = await res.json();
+    } catch (e) {
+      return;
+    }
+    if (!info || !info.success) return;
+    if (info.character_name) {
+      characterName = info.character_name;
+      const title = document.getElementById('rm-chat-title');
+      if (title) title.textContent = characterName;
+    }
+    if (info.character_image_url) setAvatarImage(info.character_image_url);
+    if (!info.character_3d || !info.vrm_url || host.dataset.vrmLoaded) return;
+    if (NARROW_QUERY.matches) {
+      console.info(LOG_PREFIX, '좁은 화면이라 3D 캐릭터 대신 2D 아바타를 씁니다.');
+      return;
+    }
+    host.dataset.vrmLoaded = 'loading';
+    try {
+      await mountVrm(host, info.vrm_url, info.vrma_url);
+      host.dataset.vrmLoaded = 'ok';
+    } catch (e) {
+      host.dataset.vrmLoaded = 'failed';
+      host.classList.remove('rm-3d');
+      console.warn(LOG_PREFIX, '3D 캐릭터 로드 실패 - 2D 아바타로 대체:', e);
+    }
+  }
+
+  async function mountVrm(host, vrmUrl, vrmaUrl) {
+    const dep = '?deps=three@' + THREE_VER;
+    const [THREE, { GLTFLoader }, VRMLib, VRMALib] = await Promise.all([
+      import('https://esm.sh/three@' + THREE_VER),
+      import('https://esm.sh/three@' + THREE_VER + '/examples/jsm/loaders/GLTFLoader.js'),
+      import('https://esm.sh/@pixiv/three-vrm@' + VRM_VER + dep),
+      import('https://esm.sh/@pixiv/three-vrm-animation@' + VRM_VER + dep),
+    ]);
+    const { VRMLoaderPlugin, VRMUtils } = VRMLib;
+    const { VRMAnimationLoaderPlugin, VRMLookAtQuaternionProxy, createVRMAnimationClip } = VRMALib;
+
+    const loader = new GLTFLoader();
+    loader.register((p) => new VRMLoaderPlugin(p));
+    loader.register((p) => new VRMAnimationLoaderPlugin(p));
+    const gltf = await loader.loadAsync(vrmUrl);
+    const vrm = gltf.userData.vrm;
+    if (!vrm) throw new Error('VRM 파일이 아닙니다: ' + vrmUrl);
+    VRMUtils.removeUnnecessaryVertices(gltf.scene);
+    VRMUtils.combineSkeletons(gltf.scene);
+    VRMUtils.rotateVRM0(vrm); // VRM 0.x 는 반대쪽을 보고 있어 돌려준다 (1.0이면 아무것도 안 함)
+    vrm.scene.traverse((o) => { o.frustumCulled = false; });
+
+    const stage = host.querySelector('#rm-stage');
+    const canvas = document.createElement('canvas');
+    stage.appendChild(canvas);
+    host.classList.add('rm-3d');
+
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    const scene = new THREE.Scene();
+    scene.add(vrm.scene);
+    const light = new THREE.DirectionalLight(0xffffff, Math.PI * 0.9);
+    light.position.set(1, 1, 1);
+    scene.add(light, new THREE.AmbientLight(0xffffff, 0.6));
+    const camera = new THREE.PerspectiveCamera(24, 180 / 260, 0.1, 20);
+    const w = stage.clientWidth || 180;
+    const h = stage.clientHeight || 260;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+
+    // 머리 높이 기준으로 카메라를 둔다 (모델마다 키가 달라도 비슷한 구도가 되도록)
+    vrm.scene.updateMatrixWorld(true);
+    const headPos = new THREE.Vector3();
+    vrm.humanoid.getNormalizedBoneNode('head').getWorldPosition(headPos);
+    const hy = headPos.y;
+    camera.position.set(0, hy, hy * 1.9);
+    camera.lookAt(0, hy - 0.36, 0);
+
+    // 시선: 마우스를 따라간다
+    const lookTarget = new THREE.Object3D();
+    camera.add(lookTarget);
+    scene.add(camera);
+    if (vrm.lookAt) {
+      vrm.lookAt.target = lookTarget;
+      const proxy = new VRMLookAtQuaternionProxy(vrm.lookAt);
+      proxy.name = 'VRMLookAtQuaternionProxy';
+      vrm.scene.add(proxy);
+    }
+    window.addEventListener('pointermove', (e) => {
+      const r = canvas.getBoundingClientRect();
+      const nx = (e.clientX - (r.left + r.width / 2)) / window.innerWidth * 2;
+      const ny = -(e.clientY - (r.top + r.height * 0.2)) / window.innerHeight * 2;
+      lookTarget.position.set(nx * 0.8, ny * 0.5, -1);
+    }, { passive: true });
+
+    // 대기 동작: VRMA가 있으면 그걸, 없으면 코드로 만든 숨쉬기/흔들림
+    let mixer = null;
+    if (vrmaUrl) {
+      try {
+        const g = await loader.loadAsync(vrmaUrl);
+        const anim = g.userData.vrmAnimations && g.userData.vrmAnimations[0];
+        if (anim) {
+          mixer = new THREE.AnimationMixer(vrm.scene);
+          mixer.clipAction(createVRMAnimationClip(anim, vrm)).play();
+        }
+      } catch (e) {
+        console.warn(LOG_PREFIX, 'VRMA 로드 실패 - 기본 대기 동작 사용:', e);
+      }
+    }
+    const bone = (n) => vrm.humanoid.getNormalizedBoneNode(n);
+    const setRot = (n, x, y, z) => { const o = bone(n); if (o) o.rotation.set(x, y, z); };
+    const proceduralIdle = (t) => {
+      // T포즈 팔을 내리고, 숨쉬기 + 좌우 흔들림 + 고개 기울임(생각 중이면 더 기울임)
+      const b = Math.sin(t * 1.6);
+      const sway = Math.sin(t * 0.7);
+      setRot('leftUpperArm', 0, 0, -1.2 + b * 0.02);
+      setRot('rightUpperArm', 0, 0, 1.2 - b * 0.02);
+      setRot('leftLowerArm', 0, -0.25, 0);
+      setRot('rightLowerArm', 0, 0.25, 0);
+      setRot('spine', b * 0.015, 0, sway * 0.02);
+      setRot('chest', b * 0.02, 0, 0);
+      setRot('neck', 0, sway * 0.04, 0);
+      setRot('head', 0.02, 0, -sway * 0.03 + (mate3d.thinking ? 0.12 : 0));
+    };
+
+    mate3d.vrm = vrm;
+    const em = vrm.expressionManager;
+    let nextBlink = 2;
+    let blinkT = -1;
+    let running = false;
+    const clock = new THREE.Clock();
+    const shouldRun = () => !document.hidden && !isReading() && !NARROW_QUERY.matches;
+
+    const frame = () => {
+      if (!shouldRun()) { running = false; return; }
+      requestAnimationFrame(frame);
+      const dt = Math.min(clock.getDelta(), 0.1);
+      if (mixer) mixer.update(dt); else proceduralIdle(clock.elapsedTime);
+
+      if (em) {
+        // 깜빡임
+        nextBlink -= dt;
+        if (nextBlink <= 0 && blinkT < 0) { blinkT = 0; nextBlink = 2 + Math.random() * 3; }
+        let blink = 0;
+        if (blinkT >= 0) {
+          blinkT += dt;
+          blink = blinkT < 0.07 ? blinkT / 0.07 : Math.max(0, 1 - (blinkT - 0.07) / 0.1);
+          if (blinkT > 0.17) blinkT = -1;
+        }
+        em.setValue('blink', blink);
+
+        // 립싱크: 답변 글자를 0.07초에 한 자씩 따라가며 입 모양을 바꾼다
+        ['aa', 'ih', 'ou', 'ee', 'oh'].forEach((v) => em.setValue(v, 0));
+        const talk = mate3d.talk;
+        if (talk) {
+          talk.acc += dt;
+          while (talk.acc > 0.07 && talk.i < talk.text.length) {
+            talk.acc -= 0.07;
+            talk.cur = vowelOf(talk.text[talk.i++]);
+          }
+          if (talk.cur) em.setValue(talk.cur, Math.sin(Math.min(1, talk.acc / 0.07) * Math.PI) * 0.8);
+          if (talk.i >= talk.text.length && talk.acc > 0.2) mate3d.talk = null;
+        }
+        if (mate3d.exprUntil && performance.now() > mate3d.exprUntil && !mate3d.talk) mate3d.setExpr('neutral');
+      }
+      vrm.update(dt);
+      renderer.render(scene, camera);
+    };
+    const start = () => {
+      if (running || !shouldRun()) return;
+      running = true;
+      clock.getDelta();
+      requestAnimationFrame(frame);
+    };
+    // 책을 열거나 탭이 숨겨지면 루프가 스스로 멈추고, 돌아오면 다시 시작한다
+    document.addEventListener('visibilitychange', start);
+    NARROW_QUERY.addEventListener('change', () => {
+      host.classList.toggle('rm-3d', !NARROW_QUERY.matches);
+      start();
+    });
+    const viewer = document.getElementById('media-viewer-modal');
+    if (viewer) new MutationObserver(start).observe(viewer, { attributes: true, attributeFilter: ['style'] });
+    start();
+    console.info(LOG_PREFIX, '3D 캐릭터 로드 완료:', vrmUrl);
+  }
+
+  const mascotHost = ensureMascot();
+  watchReading(mascotHost);
   renderTabStatus();
+  loadCharacter(mascotHost);
 })();

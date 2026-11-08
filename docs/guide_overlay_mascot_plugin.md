@@ -219,6 +219,26 @@ function fetchReply(userText) {
 직접 입력하는 구조입니다. 캐릭터 이미지를 샘플에 기본값으로 박아 배포할 경우, 그 이미지의
 재배포 라이선스를 반드시 먼저 확인하세요.
 
+### 6.1 3D 캐릭터(VRM) — 1.1.0
+
+`CHARACTER_3D`를 켜면 아바타 버튼 대신 VRM 캐릭터가 오른쪽 아래에 서 있고, 채팅 패널은 그 왼쪽에 열립니다.
+
+| 설정 | 내용 |
+|---|---|
+| `CHARACTER_3D` | 기본 꺼짐. 켜야 three.js와 모델을 내려받는다. |
+| `VRM_URL` | 기본값은 three-vrm 저장소의 pixiv 공식 샘플 `VRM1_Constraint_Twist_Sample.vrm`(jsDelivr, 버전 고정). 모델 메타에 재배포·수정·상업 이용 허용, 크레딧 불필요로 되어 있어 플러그인 개발자가 바로 확인용으로 쓸 수 있다. 파일은 이 저장소에 넣지 않고 URL로만 참조한다. |
+| `VRMA_URL` | 선택. 비우면 코드로 만든 대기 동작(팔 내리기·숨쉬기·흔들림)을 쓴다. 블렌더 VRM Add-on으로 뽑은 `.vrma`를 지정할 수 있다. |
+
+구현 포인트 ([script.js](../sample_plugins/metadata/reading_mate/script.js) 4번 블록):
+
+1. **라이브러리 로드** — `script.js`는 `new Function`으로 실행되는 일반 스크립트라 `import` 문을 쓸 수 없다. 동적 `import()`로 esm.sh에서 three / three-vrm / three-vrm-animation을 불러오고, `?deps=three@<버전>`으로 three 버전을 고정해 인스턴스가 하나만 생기게 한다. 코어 CSP가 `script-src https:`와 `connect-src https:`를 허용하므로 따로 설정할 것은 없다.
+2. **캐릭터 설정 조회** — 마운트 때 `?action=character`로 캐릭터 설정만 받는다. LLM 키가 없어도 응답하고, 키는 응답에 담지 않는다.
+3. **읽기 방해 금지** — 코어 뷰어(`#media-viewer-modal`)가 `display:flex`인 동안 마스코트 전체(2D·3D)를 숨기고 렌더 루프를 멈춘다(MutationObserver). 탭이 백그라운드로 가도 멈춘다.
+4. **대체 동작** — 640px 이하 화면에서는 3D를 아예 내려받지 않고 2D 아바타를 쓴다. 로드에 실패해도 2D로 돌아간다.
+5. **표정·립싱크** — 답변이 오면 `happy` 표정을 짓고, 답변 글자를 따라 한글 중성으로 입 모양(aa/ih/ou/ee/oh)을 바꾼다. 생각 중에는 고개를 기울인다. VRM 0.x 모델은 '놀람'이 커스텀 `Surprised`로 들어오는 경우가 많아 별칭으로 처리한다.
+
+**개인 모델 쓰기:** 재배포가 금지된 모델(VRoid Hub 모델 등)은 샘플이나 공개 저장소에 넣으면 안 된다. 자기 서버의 `static/` 아래(예: `static/user_assets/`)에 직접 올리고 `VRM_URL`에 `/static/user_assets/모델.vrm`처럼 같은 사이트 경로를 적는다. 다른 호스트의 `http://` 주소는 CSP를 강제 모드로 켜면 막힌다.
+
 ---
 
 ## 7. 검증 체크리스트
@@ -230,6 +250,10 @@ function fetchReply(userText) {
 - [ ] 새로고침 후 탭을 다시 열면 아바타가 재생성되는가 (중복 마운트 없이)?
 - [ ] 네트워크 탭에서 응답에 API 키가 노출되지 않는가?
 - [ ] 브라우저 콘솔에 `[Reading-Mate-Plugin]` 접두사 로그 외 에러가 없는가?
+- [ ] (3D) `CHARACTER_3D`를 켜면 캐릭터가 서 있고, 클릭하면 채팅이 열리는가?
+- [ ] (3D) 책을 열면 마스코트가 사라지고, 닫으면 다시 나타나는가?
+- [ ] (3D) 모바일 폭에서는 2D 아바타가 뜨고 esm.sh 요청이 없는가?
+- [ ] (3D) `VRM_URL`을 틀린 주소로 바꾸면 2D 아바타로 돌아가는가?
 
 ---
 

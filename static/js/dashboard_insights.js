@@ -4,20 +4,12 @@ import { getBookCoverSrc, buildFallbackCoverUrl } from './cover_fallback.js';
 if (!window.__dashboardInsightsDelegationBound) {
   document.addEventListener('click', (event) => {
     const target = event && event.target && typeof event.target.closest === 'function'
-      ? event.target.closest('[data-role="reading-goal-edit"], [data-role="currently-reading-book"]')
+      ? event.target.closest('[data-role="reading-goal-edit"]')
       : null;
     if (!target) return;
 
     event.preventDefault();
-    const role = target.getAttribute('data-role');
-    if (role === 'reading-goal-edit') {
-      window.openEditReadingGoalModal?.();
-      return;
-    }
-    const bookId = Number.parseInt(target.getAttribute('data-book-id') || '', 10);
-    if (role === 'currently-reading-book' && Number.isFinite(bookId) && bookId > 0) {
-      window.openBookViewer?.(bookId);
-    }
+    window.openEditReadingGoalModal?.();
   }, true);
   window.__dashboardInsightsDelegationBound = true;
 }
@@ -159,9 +151,27 @@ function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-window.openBookViewer = function(bookId) {
-  if (typeof window.openMediaViewer === 'function') {
-    window.openMediaViewer(bookId);
+// 책 ID만 알 때 여는 경로: reader-info로 형식/제목/진도를 받아 openReader로 연다.
+window.openBookViewer = async function(bookId) {
+  const id = Number.parseInt(bookId, 10);
+  if (!Number.isFinite(id) || id <= 0) return;
+  const type = window.currentLibraryType || 'general';
+  try {
+    const res = await fetch(`/api/media/books/${encodeURIComponent(id)}/reader-info?type=${encodeURIComponent(type)}`);
+    const data = await res.json();
+    const book = data && data.success ? data.book : null;
+    if (!book) {
+      console.error('[DashboardInsights] reader-info 실패:', data && data.error);
+      return;
+    }
+    const fmt = String(book.file_format || '').toLowerCase();
+    if ((fmt === 'audiobook' || fmt === 'audio') && typeof window.openAudioPlayer === 'function') {
+      window.openAudioPlayer(id);
+    } else if (typeof window.openReader === 'function') {
+      window.openReader(book.id || id, book.file_format, book.title || '', book.pages_read || 0, book.total_pages || 0);
+    }
+  } catch (e) {
+    console.error('[DashboardInsights] openBookViewer error:', e);
   }
 };
 

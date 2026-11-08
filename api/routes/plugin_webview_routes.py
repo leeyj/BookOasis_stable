@@ -422,8 +422,7 @@ def download_to_library():
     if not lib_info:
         return jsonify({'success': False, 'error': '라이브러리를 찾을 수 없습니다.'}), 404
 
-    # 권한 체크 — 기존 헬퍼는 예외 시 fail-open이라, 파일 쓰기가 걸린 이 기능에서는
-    # 명시적으로 fail-closed 처리한다 (예외가 나면 거부).
+    # 권한 체크 — 헬퍼도 DB 오류 시 거부(fail-closed)하지만, 연결 자체가 실패하는 경우까지 여기서 막는다.
     try:
         allowed = CategoryRepository.check_user_category_access(db_type, session['user_id'], library_id)
     except Exception:

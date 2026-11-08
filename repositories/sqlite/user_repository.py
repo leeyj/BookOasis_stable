@@ -66,16 +66,24 @@ class UserRepository:
         return int(row['cnt']) if row else 0
 
     @staticmethod
-    def add_user(db_type, username, password_hash, role, has_adult_access, has_audiobook_access=1, has_video_access=1, has_download_access=1):
-        """신규 사용자 등록 및 카테고리 권한 기본 매핑 시딩"""
+    def add_user(db_type, username, password_hash, role, has_adult_access, has_audiobook_access=1, has_video_access=1, has_download_access=1, user_id=None):
+        """신규 사용자 등록 및 카테고리 권한 기본 매핑 시딩.
+        user_id를 주면 그 id로 넣는다 - users는 4개 DB에 있고 권한 변경·카테고리 권한이 모두 같은 id로 찾으므로,
+        일반 DB가 정한 id를 나머지 DB에 그대로 쓴다(각 DB의 자동 증가 값이 우연히 같기를 기대하지 않는다)."""
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
-            cursor.execute(
-                "INSERT INTO users (username, password_hash, role, is_default_password, has_adult_access, has_audiobook_access, has_video_access, has_download_access) VALUES (?, ?, ?, 1, ?, ?, ?, ?)",
-                (username, password_hash, role, has_adult_access, has_audiobook_access, has_video_access, has_download_access)
-            )
-            user_id = cursor.lastrowid
+            if user_id is None:
+                cursor.execute(
+                    "INSERT INTO users (username, password_hash, role, is_default_password, has_adult_access, has_audiobook_access, has_video_access, has_download_access) VALUES (?, ?, ?, 1, ?, ?, ?, ?)",
+                    (username, password_hash, role, has_adult_access, has_audiobook_access, has_video_access, has_download_access)
+                )
+                user_id = cursor.lastrowid
+            else:
+                cursor.execute(
+                    "INSERT INTO users (id, username, password_hash, role, is_default_password, has_adult_access, has_audiobook_access, has_video_access, has_download_access) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)",
+                    (int(user_id), username, password_hash, role, has_adult_access, has_audiobook_access, has_video_access, has_download_access)
+                )
             
             # 신규 사용자 생성 시 모든 라이브러리 카테고리 권한 기본적으로 1(허용) 처리
             cursor.execute("SELECT id FROM libraries WHERE COALESCE(pending_delete, 0) = 0")

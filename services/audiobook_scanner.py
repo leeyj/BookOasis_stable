@@ -1121,12 +1121,20 @@ def _audio_signature(folder_path, extensions=AUDIO_EXTENSIONS):
     return sig
 
 
+def _audiobook_tracks(item_id):
+    from repositories.audiobook_repository import AudiobookRepository
+    return AudiobookRepository.get_audiobook_tracks(item_id)
+
+
 class _MovedAudiobookFinder:
     """폴더 이름 변경/이동 인식: 새로 발견한 폴더의 트랙 구성(상대 경로+크기)이 '폴더가 사라진 기존 책'과
     같으면(기존 트랙이 모두 있으면) 그 책을 옮긴 것으로 본다. 새 폴더라는 실제 증거가 있을 때만 옮기므로
-    마운트가 끊겨도 잘못 옮기지 않는다. 짝이 없는 사라진 책은 스캔 끝에 숨김(소프트 삭제) 후보가 된다."""
+    마운트가 끊겨도 잘못 옮기지 않는다. 짝이 없는 사라진 책은 스캔 끝에 숨김(소프트 삭제) 후보가 된다.
+    영상 스캐너도 같은 규칙을 쓴다(load_tracks=회차 조회, extensions=영상 확장자)."""
 
-    def __init__(self, library_path, rows):
+    def __init__(self, library_path, rows, load_tracks=None, extensions=AUDIO_EXTENSIONS):
+        self.load_tracks = load_tracks or _audiobook_tracks
+        self.extensions = extensions
         root = os.path.normpath(library_path)
         self.rows = [r for r in rows if not r.get('is_deleted') and
                      (os.path.normpath(r['folder_path']) == root or os.path.normpath(r['folder_path']).startswith(root + os.sep))]
@@ -1139,15 +1147,14 @@ class _MovedAudiobookFinder:
         return self._missing
 
     def find(self, new_folder):
-        from repositories.audiobook_repository import AudiobookRepository
         candidates = [r for r in self.missing() if r['id'] not in self.moved_ids]
         if not candidates:
             return None
-        new_sig = _audio_signature(new_folder)
+        new_sig = _audio_signature(new_folder, self.extensions)
         matches = []
         for r in candidates:
             old_folder = os.path.normpath(r['folder_path'])
-            tracks = AudiobookRepository.get_audiobook_tracks(r['id'])
+            tracks = self.load_tracks(r['id'])
             old_sig = {(os.path.relpath(os.path.normpath(t['file_path']), old_folder), int(t.get('file_size') or 0)): t['id']
                        for t in tracks if t.get('file_path')}
             if old_sig and set(old_sig) <= set(new_sig):
@@ -1160,10 +1167,11 @@ class _MovedAudiobookFinder:
         return [r for r in self.missing() if r['id'] not in self.moved_ids]
 
 
-def _hide_unmatched_missing(finder, library_path, library_id):
-    """폴더가 사라졌고 옮겨진 곳도 없는 책을 숨긴다. 카테고리 폴더에 접근할 수 없거나(마운트 끊김)
+def _hide_unmatched_missing(finder, library_path, library_id, db_type='audiobook', repo=None, log_prefix='AudiobookScanner'):
+    """폴더가 사라졌고 옮겨진 곳도 없는 책(영상은 강좌)을 숨긴다. 카테고리 폴더에 접근할 수 없거나(마운트 끊김)
     한 번에 많이 사라지면(도서와 같은 대량 삭제 기준) 보류하고 로그만 남긴다."""
-    from repositories.audiobook_repository import AudiobookRepository
+    if repo is None:
+        from repositories.audiobook_repository import AudiobookRepository as repo
     missing = finder.unmatched_missing()
     if not missing:
         return 0
@@ -1172,17 +1180,17 @@ def _hide_unmatched_missing(finder, library_path, library_id):
     except OSError:
         reachable = False
     if not reachable:
-        print(f"[AudiobookScanner][MISSING_HELD] library_id={library_id} reason=library_unreachable missing={len(missing)} library_path={library_path}")
+        print(f"[{log_prefix}][MISSING_HELD] library_id={library_id} reason=library_unreachable missing={len(missing)} library_path={library_path}")
         return 0
     from services.scan_problem_service import is_mass_missing
-    if is_mass_missing('audiobook', library_id, len(missing), len(finder.rows)):
-        print(f"[AudiobookScanner][MISSING_HELD] library_id={library_id} reason=mass_missing missing={len(missing)} total={len(finder.rows)} library_path={library_path}")
+    if is_mass_missing(db_type, library_id, len(missing), len(finder.rows)):
+        print(f"[{log_prefix}][MISSING_HELD] library_id={library_id} reason=mass_missing missing={len(missing)} total={len(finder.rows)} library_path={library_path}")
         return 0
     hidden = 0
     for r in missing:
-        if AudiobookRepository.set_deleted(r['id'], True):
+        if repo.set_deleted(r['id'], True):
             hidden += 1
-            print(f"[AudiobookScanner][MISSING_HIDDEN] audiobook_id={r['id']} folder_path={r['folder_path']}")
+            print(f"[{log_prefix}][MISSING_HIDDEN] {db_type}_id={r['id']} folder_path={r['folder_path']}")
     return hidden
 
 

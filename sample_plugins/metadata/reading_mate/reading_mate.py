@@ -29,6 +29,13 @@ MAX_MESSAGE_CHARS = 500
 MAX_HISTORY_TURNS = 8
 LIBRARY_SAMPLE_LIMIT = 30
 
+# three-vrm 저장소의 공식 예제 모델 (pixiv Inc., VRM 메타: 재배포·수정 재배포·상업 이용 허용,
+# 크레딧 불필요). 파일을 이 저장소에 넣지 않고 jsDelivr(CORS 허용) URL로만 참조한다.
+DEFAULT_VRM_URL = (
+    "https://cdn.jsdelivr.net/gh/pixiv/three-vrm@v3.5.5/"
+    "packages/three-vrm/examples/models/VRM1_Constraint_Twist_Sample.vrm"
+)
+
 
 class ReadingMateMetadataProvider(BaseMetadataProvider):
     """우측 하단 오버레이 캐릭터 + LLM 채팅 기반 도서 추천 플러그인."""
@@ -70,6 +77,27 @@ class ReadingMateMetadataProvider(BaseMetadataProvider):
             "type": "text",
             "required": False,
         },
+        {
+            "key": "CHARACTER_3D",
+            "label": "3D 캐릭터(VRM) 사용",
+            "type": "checkbox",
+            "default": False,
+            "description": "켜면 아바타 대신 VRM 캐릭터가 서 있습니다. 첫 로드 때 모델 파일(기본 샘플 약 10MB)을 받습니다. 좁은 화면(모바일)과 책을 읽는 동안에는 표시하지 않습니다.",
+        },
+        {
+            "key": "VRM_URL",
+            "label": "VRM 모델 URL",
+            "type": "text",
+            "default": DEFAULT_VRM_URL,
+            "description": "기본값은 pixiv 공식 샘플(재배포·수정 허용). 직접 가진 모델은 서버 static/ 아래에 올리고 /static/... 경로를 적으세요. 모델 라이선스의 재배포 조건을 확인하세요.",
+        },
+        {
+            "key": "VRMA_URL",
+            "label": "대기 동작 VRMA URL (선택)",
+            "type": "text",
+            "required": False,
+            "description": "비워두면 코드로 만든 기본 대기 동작(숨쉬기·흔들림)을 씁니다.",
+        },
     ]
 
     # 대시보드 카드는 쓰지 않고, 사이드바 전용 탭 하나만 사용한다. 이 탭은
@@ -86,7 +114,7 @@ class ReadingMateMetadataProvider(BaseMetadataProvider):
         "enabled": True,
         "provider": "github-raw",
         "raw_base_url": "https://raw.githubusercontent.com/leeyj/BookOasis_stable/main/sample_plugins/metadata/reading_mate",
-        "files": ["reading_mate.py", "__init__.py", "VERSION"],
+        "files": ["reading_mate.py", "__init__.py", "VERSION", "index.html", "style.css", "script.js"],
         "version_file": "VERSION",
         "version_key": "plugin version",
         "show_sample_update_button": True,
@@ -127,6 +155,31 @@ class ReadingMateMetadataProvider(BaseMetadataProvider):
             return {"message": message, "history": history}
         except Exception:
             return {"message": "", "history": []}
+
+    # ------------------------------------------------------------------
+    # 캐릭터 설정 (2D 이미지 / 3D VRM)
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _request_action():
+        try:
+            from flask import request
+
+            return (request.args.get("action") or "").strip()
+        except Exception:
+            return ""
+
+    @staticmethod
+    def _character_info(cfg):
+        enabled = cfg.get("CHARACTER_3D")
+        if isinstance(enabled, str):
+            enabled = enabled.strip().lower() in ("1", "true", "on", "yes")
+        return {
+            "character_name": str(cfg.get("CHARACTER_NAME") or "책비서").strip(),
+            "character_image_url": str(cfg.get("CHARACTER_IMAGE_URL") or "").strip(),
+            "character_3d": bool(enabled),
+            "vrm_url": str(cfg.get("VRM_URL") or DEFAULT_VRM_URL).strip(),
+            "vrma_url": str(cfg.get("VRMA_URL") or "").strip(),
+        }
 
     # ------------------------------------------------------------------
     # 내 서재 샘플 -> LLM에게 "실제로 이 서재에 있는 책만" 추천하게 근거로 제공
@@ -215,8 +268,12 @@ class ReadingMateMetadataProvider(BaseMetadataProvider):
         api_key = str(cfg.get("LLM_API_KEY") or "").strip()
         base_url = str(cfg.get("LLM_BASE_URL") or "https://api.openai.com/v1").strip().rstrip("/")
         model = str(cfg.get("LLM_MODEL") or "gpt-4o-mini").strip()
-        character_name = str(cfg.get("CHARACTER_NAME") or "책비서").strip()
-        character_image_url = str(cfg.get("CHARACTER_IMAGE_URL") or "").strip()
+        character = self._character_info(cfg)
+        character_name = character["character_name"]
+
+        if self._request_action() == "character":
+            # 마스코트 마운트 시점에 캐릭터 설정만 받아간다 (LLM 키 없이도 캐릭터는 떠야 함).
+            return {"success": True, **character}
 
         if not api_key:
             return {
@@ -231,8 +288,7 @@ class ReadingMateMetadataProvider(BaseMetadataProvider):
             return {
                 "success": True,
                 "reply": f"안녕! 나는 {character_name}야. 요즘 어떤 분위기의 책이 끌려?",
-                "character_name": character_name,
-                "character_image_url": character_image_url,
+                **character,
             }
 
         library_sample = self._sample_library(db_type)
@@ -251,6 +307,5 @@ class ReadingMateMetadataProvider(BaseMetadataProvider):
         return {
             "success": True,
             "reply": reply,
-            "character_name": character_name,
-            "character_image_url": character_image_url,
+            **character,
         }

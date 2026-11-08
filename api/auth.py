@@ -403,18 +403,52 @@ def add_user():
         
     password_hash = generate_password_hash(password)
     
+    values = (username, password_hash, role, has_adult_access, has_audiobook_access, has_video_access, has_download_access)
+    # 일반 DB가 기준: 로그인·중복 검사·id는 여기서 정한다.
     try:
-        # 동기화를 위해 두 데이터베이스에 모두 사용자 추가
-        for db_type in ['general', 'adult', 'audiobook', 'video']:
-            UserRepository.add_user(db_type, username, password_hash, role, has_adult_access, has_audiobook_access, has_video_access, has_download_access)
+        user_id = UserRepository.add_user('general', *values)
     except Exception as e:
         # SQLite: "UNIQUE constraint failed", MariaDB: (1062, "Duplicate entry ...")
         error_text = str(e)
         if 'UNIQUE' in error_text or 'Duplicate entry' in error_text or '1062' in error_text:
             return jsonify({'success': False, 'error': _t('api.username_exists')}), 409
         return jsonify({'success': False, 'error': _t('api.add_user_failed', error=str(e))}), 500
-        
+
+    # 나머지 DB에는 같은 id로 넣는다. 하나라도 실패하면 넣은 곳을 모두 되돌려 DB끼리 어긋나지 않게 한다.
+    added = ['general']
+    try:
+        for db_type in USER_DB_TYPES[1:]:
+            _remove_stale_user_rows(db_type, user_id, username)
+            UserRepository.add_user(db_type, *values, user_id=user_id)
+            added.append(db_type)
+    except Exception as e:
+        print(f"[AddUser] failed on {db_type}, rolling back {added}: username={username} user_id={user_id} error={e}")
+        for done_type in added:
+            try:
+                UserRepository.delete_user(done_type, user_id)
+            except Exception as rollback_err:
+                print(f"[AddUser] rollback failed on {done_type}: user_id={user_id} error={rollback_err}")
+        return jsonify({'success': False, 'error': _t('api.add_user_failed', error=str(e))}), 500
+
     return jsonify({'success': True, 'message': _t('api.user_added_success')})
+
+
+# users 테이블이 있는 DB. 일반(general)이 기준이고 나머지는 같은 id로 맞춘다.
+USER_DB_TYPES = ('general', 'adult', 'audiobook', 'video')
+
+
+def _remove_stale_user_rows(db_type, user_id, username):
+    """보조 DB에 남은 찌꺼기 행을 지운다: 예전 추가·삭제가 중간에 실패해 남은 같은 이름 또는 같은 id의 행.
+    일반 DB에서 이 이름은 방금 새로 들어갔고 이 id도 방금 받은 것이라, 보조 DB의 그런 행은 쓰이지 않는 행이다."""
+    stale_ids = set()
+    same_name = UserRepository.find_by_username(db_type, username)
+    if same_name:
+        stale_ids.add(int(same_name['id']))
+    if UserRepository.find_by_id(db_type, user_id):
+        stale_ids.add(int(user_id))
+    for stale_id in stale_ids:
+        print(f"[AddUser] removing stale user row in {db_type}: id={stale_id} (new user {username} id={user_id})")
+        UserRepository.delete_user(db_type, stale_id)
 
 @auth_bp.route('/api/admin/users/<int:target_user_id>', methods=['DELETE'])
 @login_required
@@ -437,8 +471,7 @@ def delete_user(target_user_id):
                 'error': _t('api.delete_last_admin_error', default='마지막 관리자 계정은 삭제할 수 없습니다.')
             }), 400
         
-    # 두 데이터베이스 모두에서 삭제
-    for db_type in ['general', 'adult', 'audiobook', 'video']:
+    for db_type in USER_DB_TYPES:
         UserRepository.delete_user(db_type, target_user_id)
         
     return jsonify({'success': True, 'message': _t('api.user_deleted_success')})

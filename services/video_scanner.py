@@ -370,6 +370,9 @@ def scan_and_save_video_folder(folder_path, library_id=None):
         meta = result['meta']
         episodes = result['episodes']
 
+        if existing and int(existing.get('is_deleted') or 0):
+            VideoRepository.set_deleted(existing['id'], False)
+            print(f"[VideoScanner][RESTORED] video_id={existing['id']} folder_path={normalized_folder_path}")
         scan_result = VideoRepository.save_video_scan(normalized_folder_path, library_id, meta, episodes)
         video_id = scan_result['video_id']
         from services.audiobook_scanner import _touch_if_poster_replaced
@@ -409,14 +412,19 @@ def scan_video_library(library_path, library_id=None, force=False):
     count = 0
     skipped = 0
     changed = 0
+    moved = 0
     errors = 0
     skip_existing = not force
     library_started_at = time.perf_counter()
 
     from repositories.video_repository import VideoRepository
-    from services.audiobook_scanner import _audio_signature
-    raw_paths = VideoRepository.get_folder_paths(library_id)
-    existing_folder_paths = {os.path.normpath(str(p)) for p in raw_paths if p}
+    from services.audiobook_scanner import _audio_signature, _MovedAudiobookFinder, _hide_unmatched_missing
+    folder_rows = VideoRepository.get_folder_rows(library_id)
+    # 숨겨진(폴더가 사라졌던) 강좌는 '등록됨'으로 보지 않는다 - 폴더가 다시 나타나면 처리되며 복원된다
+    existing_folder_paths = {os.path.normpath(str(r['folder_path'])) for r in folder_rows if not r.get('is_deleted')}
+    # 폴더 이름 변경/이동 인식과 사라진 강좌 숨김은 오디오북과 같은 규칙(회차 상대 경로+크기가 모두 있으면 같은 강좌)
+    moved_finder = _MovedAudiobookFinder(library_path, folder_rows,
+                                         load_tracks=VideoRepository.get_video_episodes, extensions=VIDEO_EXTENSIONS)
     # 등록된 강좌도 파일 목록(상대 경로+크기)을 DB 회차와 비교해 달라진 강좌(회차 추가/삭제·이름 변경)만 다시
     # 처리한다 - 예전엔 등록된 강좌를 통째로 건너뛰어 새 회차가 강제 재스캔 전까지 등록되지 않았다.
     episode_signatures = VideoRepository.get_episode_signatures(library_id) if skip_existing else {}
@@ -443,12 +451,24 @@ def scan_video_library(library_path, library_id=None, force=False):
                 dirs.clear()
                 continue
 
+            if folder not in existing_folder_paths:
+                match = moved_finder.find(root)
+                if match:
+                    row, episode_paths = match
+                    VideoRepository.relocate_video(row['id'], folder, os.path.basename(folder), episode_paths)
+                    moved_finder.moved_ids.add(row['id'])
+                    moved += 1
+                    print(f"[VideoScanner][MOVED] video_id={row['id']} from={row['folder_path']} to={folder}")
+
             vid = scan_and_save_video_folder(root, library_id=library_id)
             if vid:
                 count += 1
                 dirs.clear()
             else:
                 errors += 1
+
+    hidden = _hide_unmatched_missing(moved_finder, library_path, library_id,
+                                     db_type='video', repo=VideoRepository, log_prefix='VideoScanner')
 
     library_elapsed_ms = int((time.perf_counter() - library_started_at) * 1000)
     print(
@@ -457,6 +477,8 @@ def scan_video_library(library_path, library_id=None, force=False):
         f"processed={count} "
         f"skipped={skipped} "
         f"changed={changed} "
+        f"moved={moved} "
+        f"hidden={hidden} "
         f"errors={errors} "
         f"force={force} "
         f"elapsed_ms={library_elapsed_ms} "

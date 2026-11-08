@@ -336,7 +336,7 @@ Video categories (`media_video.db`, `db_type == 'video'`) are handed off by `too
 * **Skip policy**: same as audiobooks. Registered courses are skipped, but if the file list signature (relative path + size) differs from the episodes in the DB (`VideoRepository.get_episode_signatures`), the course is processed again and new episodes are registered (`[VideoScanner][CHANGED]`).
 * **Metadata**: a `show.yaml` (Plex TV-show style) in the course folder supplies course and episode info (first season only). Without it the folder name is the title.
 * **Subtitles**: sidecar `.srt`/`.smi`/`.vtt` files with the same name are found. Language tags (`Movie.ko.srt`) are recognized, partial subtitles (`forced`) are skipped, and Korean and `srt` are preferred (`_find_sidecar_subtitle`).
-* **Differences from audiobooks**: there is **no** folder move detection and no hiding of vanished courses. If a course folder is moved or deleted, the old row stays and the moved folder is registered as a new course. Episode files that vanish inside a course are removed when the course is saved.
+* **Moved and vanished courses**: uses the same code as audiobooks (`_MovedAudiobookFinder`, `_hide_unmatched_missing`). If a newly found folder's episodes (relative path + size) include every episode of exactly one existing course whose folder is gone, only the paths are updated (`VideoRepository.relocate_video`; the id and watch history are kept; `[VideoScanner][MOVED]`). Unmatched vanished courses are hidden at the end of the scan (`is_deleted`); this is held when the category folder is unreachable or too many vanish at once (`[VideoScanner][MISSING_HELD]`). When a hidden course's folder comes back it is processed and restored (`[VideoScanner][RESTORED]`). Episode files that vanish inside a course are removed when the course is saved.
 
 ### ㉗ Duration/codec analysis and playback
 * The scan stores only the file list and sizes; duration, resolution and codec analysis (ffprobe) is done **later by the lazy scanner** (the video step in `tools/lazy_scanner.py`). Episodes already analyzed reuse the cache when mtime and size match.
@@ -357,4 +357,4 @@ Video categories (`media_video.db`, `db_type == 'video'`) are handed off by `too
 * **Scan result summary**: the number of new books, the error count and the report file name are stored in `scan_history.result_summary` and shown under "recently finished" in the notification center.
 
 ---
-*Last Updated: 2026-11-04*
+*Last Updated: 2026-11-08*

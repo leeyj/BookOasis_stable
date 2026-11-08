@@ -188,12 +188,12 @@ class VideoRepository:
 
     @staticmethod
     def get_episode_signatures(library_id):
-        """스캐너용: 카테고리의 강좌마다 회차 {(강좌 폴더 기준 상대 경로, 크기)} - 폴더 안 변경 감지에 쓴다."""
+        """스캐너용: 카테고리의 (숨기지 않은) 강좌마다 회차 {(강좌 폴더 기준 상대 경로, 크기)} - 폴더 안 변경 감지에 쓴다."""
         with database.connection('video') as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT v.folder_path, e.file_path, COALESCE(e.file_size, 0) AS file_size FROM video_episodes e "
-                "JOIN videos v ON v.id = e.video_id WHERE v.library_id = %s",
+                "JOIN videos v ON v.id = e.video_id WHERE v.library_id = %s AND COALESCE(v.is_deleted, 0) = 0",
                 (library_id,))
             rows = cursor.fetchall()
         sigs = {}
@@ -226,7 +226,8 @@ class VideoRepository:
             cursor.execute(
                 """
                 SELECT id, library_id, title, sort_title, web_id, genres, poster, backdrop,
-                       premiered, description, folder_name, total_duration, total_episodes
+                       premiered, description, folder_name, total_duration, total_episodes,
+                       COALESCE(is_deleted, 0) AS is_deleted
                 FROM videos
                 WHERE folder_path = %s
                 """,
@@ -234,6 +235,50 @@ class VideoRepository:
             )
             row = cursor.fetchone()
         return dict(row) if row else None
+
+    @staticmethod
+    def get_folder_rows(library_id):
+        """스캐너용: 카테고리의 강좌 폴더 목록과 삭제(숨김) 여부."""
+        with database.connection('video') as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, folder_path, COALESCE(is_deleted, 0) AS is_deleted FROM videos WHERE library_id = %s", (library_id,))
+            rows = cursor.fetchall()
+        return [dict(r) for r in rows if r and r['folder_path']]
+
+    @staticmethod
+    def relocate_video(video_id, folder_path, folder_name, episode_paths):
+        """강좌 폴더 이름 변경/이동: 강좌와 회차의 경로만 바꿔 id(이어 보기 기록)를 유지한다. episode_paths = [(episode_id, new_path)]"""
+        conn = database.get_connection('video')
+        cursor = conn.cursor()
+        try:
+            cursor.execute("UPDATE videos SET folder_path = %s, folder_name = %s, is_deleted = 0, deleted_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                           (folder_path, folder_name, int(video_id)))
+            for episode_id, new_path in episode_paths:
+                cursor.execute("UPDATE video_episodes SET file_path = %s WHERE id = %s", (new_path, int(episode_id)))
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    @staticmethod
+    def set_deleted(video_id, deleted):
+        """폴더가 사라진 강좌 숨기기(소프트 삭제) / 다시 나타나면 복원."""
+        conn = database.get_connection('video')
+        cursor = conn.cursor()
+        try:
+            if deleted:
+                cursor.execute("UPDATE videos SET is_deleted = 1, deleted_at = CURRENT_TIMESTAMP WHERE id = %s AND COALESCE(is_deleted, 0) = 0", (int(video_id),))
+            else:
+                cursor.execute("UPDATE videos SET is_deleted = 0, deleted_at = NULL WHERE id = %s AND COALESCE(is_deleted, 0) = 1", (int(video_id),))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
 
     @staticmethod
     def save_video_scan(folder_path, library_id, meta, episodes):

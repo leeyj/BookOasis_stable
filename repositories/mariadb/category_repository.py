@@ -669,8 +669,10 @@ class CategoryRepository:
             )
             row = cursor.fetchone()
             return row is not None
-        except Exception:
-            return True
+        except Exception as e:
+            # 확인을 못 하면 막는다(fail-closed). 예전엔 허용이라 DB 오류 때 권한 없는 카테고리가 열렸다.
+            print(f"[CategoryAccess] check failed, denying: db_type={db_type} user_id={user_id} library_id={library_id} error={e}")
+            return False
         finally:
             conn.close()
 

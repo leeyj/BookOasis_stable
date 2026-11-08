@@ -134,7 +134,25 @@ def index():
     return render_template(
         'index.html', active_page='media_library', settings=settings,
         view_log_enabled=view_log_enabled, develop_mode=develop_mode, home_layout=home_layout,
+        menu_has_categories=_menu_has_categories(),
     )
+
+
+def _menu_has_categories():
+    """오디오북·영상 탭을 띄울지: 일반 사용자는 볼 수 있는 카테고리가 하나라도 있어야 한다.
+    메뉴 스위치(has_*_access)가 켜져 있어도 카테고리 권한이 0개면 빈 탭만 보였다.
+    관리자는 항상 보인다. 조회가 실패하면 탭을 숨기지 않는다(목록 API가 권한을 따로 확인한다)."""
+    result = {'audiobook': True, 'video': True}
+    if session.get('role') == 'admin':
+        return result
+    user_id = session.get('user_id')
+    from repositories.category_repository import CategoryRepository
+    for db_type in result:
+        try:
+            result[db_type] = bool(CategoryRepository.get_libraries_by_user_permissions(db_type, user_id))
+        except Exception as e:
+            print(f"[Index] Failed to count {db_type} categories for user {user_id}, keeping the tab: {e}")
+    return result
 
 @system_bp.route('/api/system/status', methods=['GET'])
 @login_required

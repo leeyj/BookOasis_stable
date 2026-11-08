@@ -333,7 +333,7 @@ graph TD
 * **스킵 정책**: 오디오북과 같습니다. 등록된 강좌는 건너뛰되, 파일 목록 서명(상대 경로 + 크기)이 DB 회차(`VideoRepository.get_episode_signatures`)와 다르면 다시 처리해 새 회차를 등록합니다(`[VideoScanner][CHANGED]`).
 * **메타데이터**: 강좌 폴더의 `show.yaml`(Plex TV 쇼 스타일)이 있으면 강좌·회차 정보를 읽습니다(시즌은 첫 시즌만). 없으면 폴더 이름을 제목으로 씁니다.
 * **자막**: 같은 이름의 `.srt`/`.smi`/`.vtt` 사이드카를 찾습니다. 언어 태그(`Movie.ko.srt`)를 인식하고, 부분 자막(`forced`)은 빼며, 한국어와 `srt`를 우선합니다(`_find_sidecar_subtitle`).
-* **오디오북과 다른 점**: 폴더 이동 감지와 사라진 강좌 숨김이 **없습니다**. 강좌 폴더를 옮기거나 지우면 기존 행이 남고, 옮긴 폴더는 새 강좌로 등록됩니다. 강좌 안에서 사라진 회차 파일은 저장 때 지워집니다.
+* **폴더 이동·사라진 강좌**: 오디오북([㉑](#㉑-폴더-단위-탐색과-스킵-정책))과 같은 코드(`_MovedAudiobookFinder`, `_hide_unmatched_missing`)를 씁니다. 새로 발견한 폴더의 회차(상대 경로+크기)가 폴더가 사라진 기존 강좌의 회차를 모두 포함하고 그런 강좌가 하나뿐이면 경로만 고칩니다(`VideoRepository.relocate_video`, id와 이어 보기 기록 유지, `[VideoScanner][MOVED]`). 짝이 없는 사라진 강좌는 스캔 끝에 숨기고(`is_deleted`), 카테고리 폴더에 접근할 수 없거나 대량으로 사라지면 보류합니다(`[VideoScanner][MISSING_HELD]`). 숨긴 강좌의 폴더가 다시 나타나면 처리하면서 복원합니다(`[VideoScanner][RESTORED]`). 강좌 안에서 사라진 회차 파일은 저장 때 지워집니다.
 
 ### ㉗ 길이·코덱 분석과 재생 방식
 * 스캔은 파일 목록과 크기만 저장하고, 재생 시간·해상도·코덱 분석(ffprobe)은 **lazy 스캐너가 나중에** 합니다(`tools/lazy_scanner.py`의 영상 보정 단계). 이미 분석한 회차는 mtime·크기가 같으면 캐시를 씁니다.
@@ -354,4 +354,4 @@ graph TD
 * **스캔 결과 요약**: 새 도서 수·오류 수·보고서 파일 이름이 `scan_history.result_summary`에 남아 알림센터 "최근 완료"에 보입니다.
 
 ---
-*Last Updated: 2026-11-04*
+*Last Updated: 2026-11-08*

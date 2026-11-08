@@ -16,6 +16,7 @@ export function canAccessAudiobookLibrary() {
   const role = String(user.role || '').toLowerCase();
   if (role === 'admin') return true;
 
+  if (user.has_audiobook_categories === false) return false; // 볼 수 있는 카테고리가 없으면 빈 탭을 띄우지 않는다
   const raw = user.has_audiobook_access;
   return raw === true || raw === 1 || String(raw) === '1';
 }
@@ -25,6 +26,7 @@ export function canAccessVideoLibrary() {
   const role = String(user.role || '').toLowerCase();
   if (role === 'admin') return true;
 
+  if (user.has_video_categories === false) return false; // 볼 수 있는 카테고리가 없으면 빈 탭을 띄우지 않는다
   const raw = user.has_video_access;
   return raw === true || raw === 1 || String(raw) === '1';
 }
