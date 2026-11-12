@@ -1416,6 +1416,24 @@ button, input, select, textarea {
     overflow-anchor: none;
 }
 
+/* 시리즈 상세: 표지 대표 색 두 개(detail/cover_tint.js가 --cover-tint-a/b로 넣음)로 본문 배경에 투톤 그라데이션.
+   스크롤 컨테이너의 배경이라 내용이 스크롤돼도 배경은 제자리에 있다. 글자 대비를 지키려고 색은 일부만 섞는다. */
+.library-main-content.has-cover-tint {
+    --cover-tint-strength: 30%;
+    background-image: linear-gradient(135deg,
+        color-mix(in srgb, var(--cover-tint-a) var(--cover-tint-strength), transparent) 0%,
+        color-mix(in srgb, var(--cover-tint-a) calc(var(--cover-tint-strength) * 0.5), transparent) 45%,
+        color-mix(in srgb, var(--cover-tint-b) var(--cover-tint-strength), transparent) 100%);
+}
+
+[data-app-theme="light"] .library-main-content.has-cover-tint {
+    --cover-tint-strength: 16%;
+}
+
+[data-app-theme="epaper"] .library-main-content.has-cover-tint {
+    background-image: none;
+}
+
 .btn-sidebar-toggle-desktop:hover {
     color: var(--app-accent) !important;
 }
@@ -2016,6 +2034,394 @@ button, input, select, textarea {
 .library-list-segment-btn.active {
     background: color-mix(in srgb, var(--app-text-primary) 10%, transparent);
     color: var(--app-text-primary);
+}
+
+.library-list-segment-btn[hidden] {
+    display: none;
+}
+
+/* ── 관리자 테이블 뷰 (table_view/index.js) ──
+   표 모드(#books-grid-view.table-mode)에서는 카드 그리드·무한 스크롤 스피너·정렬 버튼을 감추고 표만 보인다.
+   관리 화면이라 줄·테두리는 남긴다(빼기 원칙은 읽는 화면에만). */
+.series-table-view {
+    display: none;
+}
+
+#books-grid-view.table-mode .series-table-view {
+    display: block;
+}
+
+#books-grid-view.table-mode #books-list-container,
+#books-grid-view.table-mode .scroll-spinner,
+#books-grid-view.table-mode #btn-lib-sort {
+    display: none !important;
+}
+
+.series-table-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--app-space-2) var(--app-space-4);
+    flex-wrap: wrap;
+    margin-bottom: var(--app-space-2);
+}
+
+.series-table-hint {
+    margin: 0 0 var(--app-space-2);
+    color: var(--app-text-secondary);
+    font-size: var(--app-fs-sm);
+    line-height: 1.5;
+}
+
+.series-table-status {
+    display: flex;
+    align-items: center;
+    gap: var(--app-space-2);
+    flex-wrap: wrap;
+    min-height: 32px;
+    color: var(--app-text-secondary);
+    font-size: var(--app-fs-sm);
+}
+
+.series-table-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--app-space-1);
+    height: 24px;
+    padding: 0 var(--app-space-2);
+    border: 1px solid var(--app-border);
+    border-radius: 999px;
+    background: var(--app-accent-soft);
+    color: var(--app-text-primary);
+    font: inherit;
+    font-size: var(--app-fs-xs);
+    cursor: pointer;
+}
+
+.series-table-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--app-space-1);
+}
+
+.series-table-menu-wrap {
+    position: relative;
+}
+
+.series-table-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: 30;
+    min-width: 200px;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: var(--app-space-2);
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    background: var(--app-bg-card);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.series-table-menu-hint {
+    padding: var(--app-space-1) var(--app-space-2) var(--app-space-2);
+    color: var(--app-text-muted);
+    font-size: var(--app-fs-xs);
+}
+
+.series-table-menu-item {
+    display: flex;
+    align-items: center;
+    gap: var(--app-space-2);
+    padding: var(--app-space-1-5) var(--app-space-2);
+    border-radius: 6px;
+    color: var(--app-text-primary);
+    font-size: var(--app-fs-sm);
+    cursor: pointer;
+}
+
+.series-table-menu-item:hover {
+    background: color-mix(in srgb, var(--app-text-primary) 8%, transparent);
+}
+
+.series-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    font-size: var(--app-fs-sm);
+    color: var(--app-text-primary);
+}
+
+.series-table-th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    padding: 0 var(--app-space-2);
+    height: 36px;
+    border-bottom: 1px solid var(--app-border);
+    background: var(--app-bg-main);
+    color: var(--app-text-secondary);
+    font-size: var(--app-fs-xs);
+    font-weight: var(--app-fw-semibold);
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.series-table-sort {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--app-space-1);
+    max-width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.series-table-sort:hover,
+.series-table-sort.active {
+    color: var(--app-text-primary);
+}
+
+.series-table-sort-arrow {
+    font-size: 0.8rem;
+}
+
+.series-table-sort-arrow.is-desc {
+    transform: rotate(180deg);
+}
+
+.series-table-td {
+    height: 48px;
+    padding: 0 var(--app-space-2);
+    border-bottom: 1px solid var(--app-border-light);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.series-table-row:hover .series-table-td {
+    background: color-mix(in srgb, var(--app-text-primary) 4%, transparent);
+}
+
+.series-table-td.is-editable {
+    cursor: text;
+}
+
+.series-table-td.is-editable:hover,
+.series-table-td.is-editable:focus-visible {
+    outline: 1px solid var(--app-border);
+    outline-offset: -1px;
+}
+
+.series-table-td.is-editable:focus-visible {
+    outline-color: var(--app-accent);
+}
+
+.series-table-td.is-editing {
+    padding: 0 var(--app-space-1);
+    overflow: visible;
+}
+
+.series-table-td.is-saving {
+    color: var(--app-text-muted);
+}
+
+.series-table-input {
+    width: 100%;
+    height: 32px;
+    padding: 0 var(--app-space-1-5);
+    border: 1px solid var(--app-accent);
+    border-radius: 4px;
+    background: var(--app-bg-card);
+    color: var(--app-text-primary);
+    font: inherit;
+}
+
+.series-table-cover {
+    display: block;
+    width: 28px;
+    height: 40px;
+    border-radius: 3px;
+    object-fit: cover;
+    background: var(--app-bg-card);
+}
+
+.series-table-link {
+    display: block;
+    max-width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--app-text-primary);
+    font: inherit;
+    font-weight: var(--app-fw-medium);
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.series-table-link:hover {
+    color: var(--app-accent);
+}
+
+.series-table-lock {
+    padding: var(--app-space-1);
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    color: var(--app-text-muted);
+    cursor: pointer;
+}
+
+.series-table-lock:not(.is-locked) {
+    opacity: 0.45;
+}
+
+.series-table-lock.is-locked {
+    color: var(--app-text-primary);
+}
+
+.series-table-lock:hover {
+    opacity: 1;
+    color: var(--app-text-primary);
+    background: color-mix(in srgb, var(--app-text-primary) 8%, transparent);
+}
+
+/* 설명(긴 글) 아이콘: 있으면 밝게, 없으면 잠금 아이콘처럼 흐리게 */
+.series-table-longtext {
+    padding: var(--app-space-1);
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    color: var(--app-text-muted);
+    opacity: 0.45;
+    cursor: pointer;
+}
+
+.series-table-longtext.has-value {
+    color: var(--app-text-primary);
+    opacity: 1;
+}
+
+.series-table-longtext:hover {
+    opacity: 1;
+    color: var(--app-text-primary);
+    background: color-mix(in srgb, var(--app-text-primary) 8%, transparent);
+}
+
+.series-table-popover {
+    position: fixed;
+    z-index: 1000;
+    width: min(420px, calc(100vw - 16px));
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-space-2);
+    padding: var(--app-space-3);
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    background: var(--app-bg-card);
+    color: var(--app-text-primary);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.series-table-popover.is-saving { opacity: 0.7; }
+
+.series-table-popover-head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--app-space-2);
+    min-width: 0;
+}
+
+.series-table-popover-series {
+    overflow: hidden;
+    color: var(--app-text-muted);
+    font-size: 0.85em;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.series-table-popover-input {
+    width: 100%;
+    min-height: 140px;
+    max-height: 50vh;
+    padding: var(--app-space-2);
+    border: 1px solid var(--app-border);
+    border-radius: 6px;
+    background: var(--app-bg-card);
+    color: var(--app-text-primary);
+    font: inherit;
+    line-height: 1.5;
+    resize: vertical;
+}
+
+.series-table-popover-input:focus {
+    outline: none;
+    border-color: var(--app-accent);
+}
+
+.series-table-popover-foot {
+    display: flex;
+    align-items: center;
+    gap: var(--app-space-2);
+}
+
+.series-table-popover-hint {
+    flex: 1;
+    color: var(--app-text-muted);
+    font-size: 0.8em;
+}
+
+.series-table-popover-btn {
+    padding: var(--app-space-1) var(--app-space-3);
+    border: 1px solid var(--app-border);
+    border-radius: 6px;
+    background: none;
+    color: var(--app-text-primary);
+    font: inherit;
+    cursor: pointer;
+}
+
+.series-table-popover-btn.is-primary {
+    border-color: var(--app-accent);
+    background: var(--app-accent);
+    color: #fff;
+}
+
+.series-table-popover-btn:disabled { cursor: default; opacity: 0.6; }
+
+.series-table .col-summary { width: 56px; text-align: center; }
+.series-table .col-cover { width: 44px; }
+.series-table .col-series_name { width: 24%; }
+.series-table .col-isbn { width: 124px; }
+.series-table .col-books_lv { width: 104px; }
+.series-table .col-publication_status { width: 92px; }
+.series-table .col-score { width: 60px; }
+.series-table .col-book_count { width: 60px; }
+.series-table .col-file_format { width: 64px; }
+.series-table .col-latest_added { width: 100px; }
+.series-table .col-metadata_locked { width: 52px; }
+.series-table td.col-score,
+.series-table td.col-book_count,
+.series-table td.col-latest_added {
+    color: var(--app-text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+.series-table-more {
+    display: flex;
+    justify-content: center;
+    padding: var(--app-space-4) 0;
+    min-height: 24px;
+    color: var(--app-text-muted);
+    font-size: var(--app-fs-sm);
 }
 
 /* 알림센터 색 토큰 - 테마별로 바꾸려면 각 테마 블록에서 덮어쓴다 */

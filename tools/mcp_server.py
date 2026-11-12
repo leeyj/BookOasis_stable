@@ -165,6 +165,24 @@ def find_missing_genre_and_tags(db_type: str = "general", library_id: int = None
 
 
 @mcp.tool()
+def list_series_table(db_type: str = "general", library_id: int = None, missing: str = "",
+                      sort: str = "series_name", direction: str = "asc", search: str = "",
+                      page: int = 1, limit: int = 50) -> dict:
+    """시리즈를 한 줄씩 메타데이터와 함께 조회합니다 (화면의 관리자 테이블 뷰와 같은 데이터, 일반/성인 도서만).
+    missing: 비어 있는 시리즈만 고를 필드를 쉼표로 (cover, series_alias, author, publisher, isbn, genre, tags,
+    books_lv, publication_status, score) - 여러 개면 모두 비어 있는 시리즈.
+    sort: series_name, series_alias, author, publisher, isbn, genre, tags, books_lv, publication_status, score,
+    book_count, file_format, latest_added, metadata_locked. direction: asc | desc.
+    total은 page=1일 때만 채워집니다. 고칠 때는 update_book_metadata를 쓰세요."""
+    def _run():
+        from services.library_diagnostics_service import LibraryDiagnosticsService
+        return LibraryDiagnosticsService.list_series_table(
+            db_type, library_id=library_id, missing=missing, sort=sort, direction=direction,
+            search=search, page=page, limit=limit)
+    return _quiet(_run)
+
+
+@mcp.tool()
 def find_missing_offsets(db_type: str = "general", library_id: int = None,
                           limit: int = 50, offset: int = 0) -> dict:
     """zip/cbz 만화책 중 페이지 오프셋 캐시가 없어 재스캔이 필요한 도서 목록을 조회합니다.
@@ -295,7 +313,9 @@ def update_book_metadata(series_name: str, db_type: str = "general", library_id:
     이 도구는 기존 REST API가 쓰는 것과 동일한 검증된 서비스 메서드만 호출하고, 코어나
     플러그인 소스 코드/파일은 절대 건드리지 않습니다. 변경 전/후 값은 응답의
     changed_fields와 logs/mcp_write_audit.log에 함께 기록됩니다. 실행 전 search_books로
-    대상 시리즈명이 정확한지 먼저 확인하세요."""
+    대상 시리즈명이 정확한지 먼저 확인하세요. 수정은 그 카테고리의 시리즈에만 적용됩니다.
+    같은 이름의 시리즈가 여러 카테고리에 있으면 library_id(숫자)를 꼭 지정하세요 - "all"이면
+    어느 쪽인지 알 수 없어 고치지 않고 에러를 돌려줍니다."""
     def _run():
         from services.mcp_admin_tools_service import McpAdminToolsService
         fields = {

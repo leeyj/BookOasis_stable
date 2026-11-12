@@ -8,6 +8,7 @@ from flask import Blueprint
 from api.routes.media_library_routes import media_library_routes_bp
 from api.routes.book_routes import book_routes_bp
 from api.routes.plugin_routes import plugin_routes_bp
+from api.routes.series_table_routes import series_table_bp
 
 # 하위 호환성을 유지하는 통합 Blueprint
 library_bp = Blueprint('media_library', __name__)
@@ -15,3 +16,4 @@ library_bp = Blueprint('media_library', __name__)
 library_bp.register_blueprint(media_library_routes_bp)
 library_bp.register_blueprint(book_routes_bp)
 library_bp.register_blueprint(plugin_routes_bp)
+library_bp.register_blueprint(series_table_bp)

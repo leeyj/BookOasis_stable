@@ -85,7 +85,7 @@ export function handleCoverDrop(event) {
   }
 }
 
-export async function saveManualMetadata(seriesName, _libraryId = '', audiobookId = '') {
+export async function saveManualMetadata(seriesName, libraryId = '', audiobookId = '') {
   const seriesAlias = document.getElementById('edit-series-alias-input') ? document.getElementById('edit-series-alias-input').value.trim() : '';
   const author = document.getElementById('edit-author-input').value.trim();
   const isbn = document.getElementById('edit-isbn-input').value.trim();
@@ -111,6 +111,8 @@ export async function saveManualMetadata(seriesName, _libraryId = '', audiobookI
   formData.append('genre', genre);
   formData.append('tags', tags);
   formData.append('books_lv', booksLv);
+  // 다른 카테고리에 같은 이름의 시리즈가 있어도 이 카테고리의 시리즈만 고친다
+  if (/^\d+$/.test(String(libraryId))) formData.append('library_id', String(libraryId));
   // 오디오북은 제목이 같은 다른 책까지 바뀌지 않게 그 책 하나만 수정한다
   if (audiobookId) formData.append('audiobook_id', audiobookId);
   if (coverFile) {

@@ -8,6 +8,10 @@ import { stripLeadingBracketTags } from './series_display.js';
 import { mountIndexScrollbar, unmountIndexScrollbar } from './index_scrollbar.js';
 import { BookListRefreshState, getLoadedPageRange } from './book_list_refresh_state.js';
 import { resolveSearchNavigation } from './search_navigation.js';
+import { lazyModule } from './utils/lazy_module.js';
+import { syncTableModeUi } from './table_view/mode.js';
+
+const loadTableView = lazyModule(() => import('./table_view/index.js'));
 
 let filterDebounceTimer = null;
 let totalsRequestSerial = 0;
@@ -158,11 +162,27 @@ export async function loadBooksList(isAppend = false, startPage = null, options 
     return;
   }
 
+  // 표 모드(관리자 전용 테이블 뷰): 같은 진입점으로 들어와 표를 다시 그린다 - 카테고리 이동·검색·필터가 그대로 반영된다.
+  // 다음 쪽은 표가 스스로 불러오므로 그리드 무한 스크롤 요청(isAppend)은 받지 않는다.
+  if (syncTableModeUi()) {
+    if (isAppend) return;
+    state.hasMore = false;
+    state.hasPrevious = false;
+    unmountIndexScrollbar();
+    const tableListKey = getBookListKey();
+    const tableRefreshVersion = bookListRefreshState.beginRequest(tableListKey);
+    const loaded = await (await loadTableView()).reloadSeriesTable();
+    if (loaded && tableListKey === getBookListKey()) {
+      bookListRefreshState.markLoaded(tableListKey, tableRefreshVersion);
+    }
+    return;
+  }
+
   if (state.isLoading) {
     console.warn('[Book-List] loadBooksList skipped: already loading');
     return;
   }
-  
+
   const container = document.getElementById('books-list-container');
   if (!container) {
     console.warn('[Book-List] loadBooksList skipped: #books-list-container missing');

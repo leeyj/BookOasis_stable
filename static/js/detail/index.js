@@ -11,6 +11,7 @@ import { createBookCard } from '../ui.js';
 import './volume_context_menu.js';
 import { goBackToList } from './back_to_list.js';
 import { withPluginGlobals } from '../utils/script_loader.js';
+import { applyCoverTint, clearCoverTint } from './cover_tint.js';
 
 bindDetailInteractions();
 
@@ -132,6 +133,10 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
           <aside class="detail-page-sidebar" id="detail-widget-sidebar" style="display:none;"></aside>
         </div>
       `;
+
+      // 표지 대표 색으로 본문 배경에 투톤 그라데이션 (플러그인 상세뷰가 본문을 대체하면 생략)
+      if (pluginDetailBundle) clearCoverTint();
+      else applyCoverTint(document.getElementById('detail-cover-img-preview'));
 
       if (pluginDetailBundle && pluginDetailBundle.js) {
         withPluginGlobals(pluginDetailBundle.js, () => {

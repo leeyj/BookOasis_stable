@@ -30,6 +30,8 @@ export const state = {
   searchQuery: '',
   currentSortDirection: localStorage.getItem('library_sort_direction') || 'asc', // 로컬 캐시 연동 (기본값: 오름차순)
   groupMode: localStorage.getItem('library_group_mode') || 'default', // 'default'(시리즈) | 'author'(작가별 모음)
+  // 목록 보기: 'grid'(카드) | 'table'(관리자 전용 표). 표는 쓸 수 있는 곳에서만 적용된다(table_view/mode.js)
+  listViewMode: localStorage.getItem('library_list_view_mode') === 'table' ? 'table' : 'grid',
   // 고정 필터 - 읽음 상태: ''(전체) | 'exclude_read'(읽은 도서 제외) | 'only_read'(읽은 도서만). 시리즈의 모든 권을 완독해야 '읽음'.
   readFilter: ['exclude_read', 'only_read'].includes(localStorage.getItem('library_read_filter')) ? localStorage.getItem('library_read_filter') : '',
   filterMode: localStorage.getItem('library_filter_mode') === 'or' ? 'or' : 'and', // 장르/태그 필터 결합 방식: 'and'(모두 포함) | 'or'(하나라도 포함)

@@ -274,3 +274,32 @@ It only reads, and reports "slow" if the remote drive does not answer within 15 
 ### ④ User reports
 When a book fails to open in the viewer, regular users see **[Notify administrator]** in place (admins see [Diagnose] instead).
 Reports gather in a "User report" card; reporting the same book again only increases the count. Users can only report books they can see, up to 30 per hour.
+
+## 12. Table View (metadata cleanup)
+
+In the book list title row, **[Default | By Author | Table]** → **Table** shows one series per row. It is meant for finding series with empty metadata and filling them in place.
+
+* **When it appears**: admin account, a category or "All" of general/adult books, and a wide screen (wider than 900px). Audiobooks, video courses and phone layouts have no button.
+* **Sort**: click a header to sort by that column, click again to reverse. Rows with an empty value always go last.
+* **Empty values**: shows only series where every selected field is empty (e.g. author + genre). Values come from the representative volume of the series.
+* **Columns**: choose which columns to show. The choice is stored in this browser only.
+* **Search and genre/tag filters**: the top search box and filter apply to the table too. Table search looks at series name, alias and author only (not volume titles).
+* **CSV**: downloads every row matching the current filters, with the visible columns (UTF-8 with BOM so Excel reads it correctly). It is for review only; uploading a CSV back to bulk-edit is not supported.
+
+### ① Editing cells
+Click (or press Enter on) an alias, author, publisher, ISBN, genre, tags, rating level or status cell to edit it.
+
+* **Enter** or clicking elsewhere saves, **Esc** cancels, **Tab** saves and moves to the next cell.
+* Saving behaves like [Edit info] on the series page: it applies to every volume of the series and **locks** the series so the next scan does not overwrite it.
+* The **Description** column shows an icon (bright when a description exists, dimmed when empty). Click it to edit in a small popup that keeps line breaks. Save with **Ctrl+Enter** or [Save], close with **Esc**. Saving locks the series like any other cell.
+* The padlock in the Locked column is a toggle: click a closed padlock (locked) to unlock, or a dimmed open padlock (unlocked) to lock. A locked series keeps its metadata when the next scan runs.
+* Rows without a series name (loose single volumes) cannot be edited here.
+* An edit applies only to the series in that category. A series with the same name in another category is not changed.
+
+### ② Fixing many series at once: kavita.yaml
+Fix a few series in the cells; for many, **put a `kavita.yaml` in each series folder and scan**. The values live in the file, so they come back after a reinstall or database move. The next scan picks up a yaml added to a folder that was already scanned.
+
+* **A locked series ignores kavita.yaml.** Editing any cell locks the series, so unlock it first if you want the yaml to apply, then scan.
+* For the file format, see `kavita_yaml.py` in [guide_scanner_parser.md](guide_scanner_parser.md).
+
+The MCP tool `list_series_table` returns the same table.

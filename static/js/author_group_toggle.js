@@ -1,6 +1,7 @@
-/* author_group_toggle.js – 작가별 모음 / 기본(시리즈) 그리드 뷰 전환 모듈 */
+/* author_group_toggle.js – 목록 보기 전환: 기본(시리즈) 그리드 / 작가별 모음 / 표(관리자 전용 테이블 뷰) */
 import { state } from './state.js';
 import { loadBooksList } from './book_list.js';
+import { isTableModeActive, setListViewMode, syncTableModeUi } from './table_view/mode.js';
 
 export function applyGroupModeButtonState(mode) {
   const safeMode = mode === 'author' ? 'author' : 'default';
@@ -12,6 +13,8 @@ export function applyGroupModeButtonState(mode) {
   } else {
     document.getElementById('btn-group-default')?.classList.add('active');
   }
+  // 표 모드면 선택 표시를 표 버튼으로 옮긴다 (표 버튼 자체의 표시 여부도 여기서 맞춘다)
+  syncTableModeUi();
 }
 
 // 작가별 카드를 클릭해 특정 작가로 드릴다운한 상태에서도 "작가별" 토글을 계속 활성 표시한다.
@@ -38,9 +41,27 @@ function pushGroupModeHistory(mode, authorKey) {
   );
 }
 
+// 표(테이블 뷰)로 전환. 기본/작가별 선택(state.groupMode)은 그대로 두어 그리드로 돌아오면 이어진다.
+function switchToTableView() {
+  if (isTableModeActive()) return;
+  setListViewMode('table');
+  if (!syncTableModeUi()) {
+    // 쓸 수 없는 곳(일반 사용자·오디오북·좁은 화면 등)에서 눌린 경우 - 그리드 그대로
+    setListViewMode('grid');
+    return;
+  }
+  state.authorKeyFilter = '';
+  state.currentPage = 1;
+  loadBooksList(false);
+}
+
 export function switchGroupMode(mode) {
+  if (mode === 'table') return switchToTableView();
+
   const safeMode = mode === 'author' ? 'author' : 'default';
-  if (state.groupMode === safeMode && !state.authorKeyFilter) return;
+  const leavingTable = state.listViewMode === 'table';
+  if (leavingTable) setListViewMode('grid');
+  if (!leavingTable && state.groupMode === safeMode && !state.authorKeyFilter) return;
 
   pushGroupModeHistory(safeMode, '');
   applyGroupModeState(safeMode, '');

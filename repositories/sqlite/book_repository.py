@@ -417,6 +417,16 @@ class BookRepository:
         return row['series_name'] if row and row['series_name'] else query_series_name
 
     @staticmethod
+    def list_series_library_ids(db_type, series_name, limit=2):
+        """이 시리즈명이 있는 카테고리 id 목록 (같은 이름이 여러 카테고리에 있는지 확인용)"""
+        with database.connection(db_type) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT DISTINCT library_id FROM books WHERE series_name = ? AND COALESCE(is_deleted, 0) = 0 LIMIT ?",
+                (series_name, int(limit)))
+            return [row['library_id'] for row in cursor.fetchall()]
+
+    @staticmethod
     def resolve_series_library_id(db_type, series_name, perm_clause, perm_params):
         with database.connection(db_type) as conn:
             cursor = conn.cursor()
@@ -519,8 +529,12 @@ class BookRepository:
         return row['latest_updated'] if row else None
 
     @staticmethod
-    def update_media_detail(db_type, series_name, author, isbn, publisher, summary, link, genre, tags, series_alias=None, cover_image_url=None, books_lv=None, publication_status=None):
+    def update_media_detail(db_type, series_name, author, isbn, publisher, summary, link, genre, tags, series_alias=None, cover_image_url=None, books_lv=None, publication_status=None, library_id=None):
+        # library_id로 범위를 좁힌다 - 시리즈명만 쓰면 다른 카테고리의 같은 이름 시리즈까지 바뀐다
         conn = database.get_connection(db_type)
+        scope_sql, scope_params = '', ()
+        if library_id is not None and str(library_id).strip() != '':
+            scope_sql, scope_params = " AND CAST(library_id AS TEXT) = ?", (str(library_id),)
         cursor = conn.cursor()
         try:
             if cover_image_url:
@@ -540,7 +554,7 @@ class BookRepository:
                         metadata_locked = 1,
                         cover_updated_at = CURRENT_TIMESTAMP
                     WHERE series_name = ?
-                """, (author, isbn, publisher, summary, link, genre, tags, books_lv, publication_status, series_alias, cover_image_url, series_name))
+                """ + scope_sql, (author, isbn, publisher, summary, link, genre, tags, books_lv, publication_status, series_alias, cover_image_url, series_name, *scope_params))
             else:
                 cursor.execute("""
                     UPDATE books
@@ -557,7 +571,7 @@ class BookRepository:
                         metadata_locked = 1,
                         cover_updated_at = CURRENT_TIMESTAMP
                     WHERE series_name = ?
-                """, (author, isbn, publisher, summary, link, genre, tags, books_lv, publication_status, series_alias, series_name))
+                """ + scope_sql, (author, isbn, publisher, summary, link, genre, tags, books_lv, publication_status, series_alias, series_name, *scope_params))
             conn.commit()
             return cursor.rowcount > 0
         except Exception as e:
@@ -569,6 +583,11 @@ class BookRepository:
     @staticmethod
     def unlock_media_metadata(db_type, series_name=None, library_id=None, book_id=None):
         """도서/시리즈 메타데이터 잠금 해제 (metadata_locked = 0)"""
+        return BookRepository.set_media_metadata_lock(db_type, False, series_name, library_id, book_id)
+
+    @staticmethod
+    def set_media_metadata_lock(db_type, locked, series_name=None, library_id=None, book_id=None):
+        """도서/시리즈 메타데이터 잠금 설정/해제 (metadata_locked = 1/0)"""
         conn = database.get_connection(db_type)
         cursor = conn.cursor()
         try:
@@ -587,7 +606,7 @@ class BookRepository:
             if not where:
                 return False
             
-            sql = f"UPDATE books SET metadata_locked = 0 WHERE {' AND '.join(where)}"
+            sql = f"UPDATE books SET metadata_locked = {1 if locked else 0} WHERE {' AND '.join(where)}"
             cursor.execute(sql, params)
             conn.commit()
             return cursor.rowcount > 0

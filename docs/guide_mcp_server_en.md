@@ -124,6 +124,7 @@ mcp dev tools/mcp_server.py
 | `get_library_stats` | Total and per-category series/book counts |
 | `find_missing_cover` | Books with no cover image |
 | `find_missing_genre_and_tags` | Books with both genre and tags empty |
+| `list_series_table` | One row per series with its metadata (sort, empty-value filter `missing`; same data as the admin table view, general/adult books) |
 | `find_missing_offsets` | zip/cbz books missing their page-offset cache and needing a rescan (remote-mounted files such as rclone/GDrive are automatically excluded) |
 | `find_duplicate_series` | Cases where the exact same series name is scattered across 2+ categories |
 | `list_problems` | Open problem cards from the notification center (missing files, held mass disappearance, remote drive disconnected, corrupt files, failing background tasks, user reports, plugin problems, ...; plugin cards carry name/title/detail in `plugin`) |

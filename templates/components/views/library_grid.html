@@ -30,6 +30,8 @@
                     <div id="group-mode-toggle-group" class="library-list-segment">
                         <button class="library-list-segment-btn active" id="btn-group-default" data-role="grouping-mode-toggle" data-group-mode="default" title="기본" data-i18n-title="header.group_mode_default"><i class="lc lc-layout-grid" aria-hidden="true"></i><span class="btn-toggle-label" data-i18n="header.group_mode_default">기본</span></button>
                         <button class="library-list-segment-btn" id="btn-group-author" data-role="grouping-mode-toggle" data-group-mode="author" title="작가별" data-i18n-title="header.group_mode_author"><i class="lc lc-users" aria-hidden="true"></i><span class="btn-toggle-label" data-i18n="header.group_mode_author">작가별</span></button>
+                        <!-- 표(테이블 뷰): 관리자 + 도서 카테고리 + 넓은 화면에서만 보인다 (table_view/mode.js) -->
+                        <button class="library-list-segment-btn" id="btn-view-table" data-role="grouping-mode-toggle" data-group-mode="table" hidden title="표로 보기 (메타데이터 정리)" data-i18n-title="header.group_mode_table_title"><i class="lc lc-table-properties" aria-hidden="true"></i><span class="btn-toggle-label" data-i18n="header.group_mode_table">표</span></button>
                     </div>
                 </div>
             </div>
@@ -41,6 +43,8 @@
                 <!-- JS에 의해 동적으로 도서 카드들이 주입됨 -->
                 <div class="loading-spinner" data-i18n="common.loading_books">도서 목록을 불러오는 중...</div>
             </div>
+            <!-- 관리자 테이블 뷰: 표 모드일 때만 보이고(#books-grid-view.table-mode), 내용은 table_view/index.js가 그린다 -->
+            <div id="books-table-view" class="series-table-view"></div>
             <!-- 무한 스크롤 로딩 스피너 -->
             <div id="infinite-scroll-spinner" class="scroll-spinner" style="display: none;">
                 <i class="lc lc-loader-circle lc-spin lc-2x"></i>

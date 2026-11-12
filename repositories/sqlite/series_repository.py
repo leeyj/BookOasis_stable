@@ -7,6 +7,7 @@ import database
 from repositories.series_metadata_utils import book_metadata_select_expr
 from repositories.series_search_query import parse_series_search_query
 from repositories.series_list_options import is_score_sort, build_order_by, build_read_series_filter, build_completed_exists, group_fully_read_series
+from repositories.series_table_query import build_table_queries
 
 class SeriesRepository:
     @staticmethod
@@ -293,6 +294,31 @@ class SeriesRepository:
             }
         finally:
             conn.close()
+
+    @staticmethod
+    def fetch_series_table(db_type, library_id=None, sort=None, direction=None, missing=None, search='',
+                           genres=None, tags=None, filter_mode='and', limit=100, offset=0, with_total=True):
+        """관리자 테이블 뷰: 시리즈 한 줄씩(요약 + 대표 권). 요약이 아직 준비 안 됐으면 None.
+        반환: {'rows': [...], 'total': 전체 건수 또는 None}"""
+        if db_type in ('audiobook', 'video'):
+            return None
+        rows_sql, rows_params, count_sql, count_params = build_table_queries(
+            'sqlite', library_id=library_id, sort=sort, direction=direction, missing=missing, search=search,
+            genres=genres, tags=tags, filter_mode=filter_mode, limit=limit, offset=offset,
+        )
+        with database.connection(db_type) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT is_ready FROM series_summary_state WHERE id = 1")
+            state = cursor.fetchone()
+            if not state or not int(state['is_ready'] or 0):
+                return None
+            total = None
+            if with_total:
+                cursor.execute(count_sql, tuple(count_params))
+                total = int(cursor.fetchone()['total'] or 0)
+            cursor.execute(rows_sql, tuple(rows_params))
+            rows = [dict(row) for row in cursor.fetchall()]
+        return {'rows': rows, 'total': total}
 
     @staticmethod
     def fetch_books_for_grouping(db_type, library_id, search_query='', favorite_only=False, genre_filters=None, tag_filters=None, user_id=None, role=None, limit=None, offset=None, sort='asc', include_has_metadata=False, filter_mode='and', read_filter='', read_keys=None):

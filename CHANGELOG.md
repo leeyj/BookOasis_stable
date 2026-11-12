@@ -1,4 +1,12 @@
 # CHANGELOG
+## v3.1.3
+- (feat) 관리자 테이블 뷰 — 책 목록을 표로 보고(정렬·빈 값 필터·컬럼 선택) 셀에서 메타데이터를 바로 수정, CSV 내보내기 (일반/성인 도서, 넓은 화면) | admin table view — see the book list as a table (sort, empty-value filter, column picker), edit metadata in cells, export CSV (general/adult books, wide screens)
+- (feat) MCP 도구 `list_series_table` 추가 | add the MCP tool `list_series_table`
+- (fix) MCP `update_book_metadata`로 한 필드만 고쳐도 비어 있던 작가·출판사·줄거리에 화면용 문구('-' 등)가 저장되던 문제 수정 | fix MCP `update_book_metadata` writing display placeholders ('-' etc.) into empty author, publisher and summary when changing another field
+- (improvement) 시리즈 상세 배경에 표지 대표 색 두 가지로 은은한 그라데이션 — 라이트 테마는 더 옅게, e-paper 테마와 무채색 표지는 적용 안 함 | series detail background gets a subtle two-tone gradient from the cover's main colors — lighter on the light theme, off on the e-paper theme and for colorless covers
+- (fix) 시리즈 메타 수정(상세 화면·테이블 뷰·MCP)이 다른 카테고리의 같은 이름 시리즈까지 바꾸던 문제 수정 — 이제 그 카테고리만 바뀌고, 카테고리를 모르는데 이름이 여러 곳에 있으면 고치지 않음 | fix series metadata edits (series page, table view, MCP) also changing a same-named series in another category — now only that category changes, and an ambiguous name with no category is refused
+- (improvement) 테이블 뷰에 수정 방법 안내 추가 — 셀을 고치면 잠기고 잠긴 시리즈엔 kavita.yaml이 반영되지 않음, 많은 양은 kavita.yaml + 스캔 권장. CSV는 확인용으로 표시 | table view now explains how to edit — editing locks the series and a locked series ignores kavita.yaml; use kavita.yaml + scan for bulk changes. CSV marked as review-only
+
 ## v3.1.2
 - (fix) 볼 수 있는 카테고리가 하나도 없는 사용자에게 오디오북·영상 강좌 탭이 빈 채로 보이던 문제 수정 | fix the audiobook and video course tabs showing empty for users with no accessible category
 - (fix) 카테고리 권한 확인 중 DB 오류가 나면 접근을 허용하던 문제 수정 — 이제 거부 | fix category permission checks allowing access when the DB check failed — now denied

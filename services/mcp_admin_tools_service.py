@@ -21,6 +21,8 @@ import json
 from datetime import datetime
 from collections import deque
 
+from services import series_metadata_patch
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOGS_DIR = os.path.join(BASE_DIR, 'logs')
 MCP_WRITE_AUDIT_LOG = os.path.join(LOGS_DIR, 'mcp_write_audit.log')
@@ -230,56 +232,20 @@ class McpAdminToolsService:
 
         return {'success': bool(success), 'message': message, 'series_name': series_name, 'changed_fields': changed}
 
-    METADATA_ALLOWED_FIELDS = ('author', 'isbn', 'publisher', 'summary', 'link', 'genre', 'tags', 'series_alias', 'books_lv', 'publication_status')
+    # 필드 검증·병합 저장은 관리자 테이블 뷰 셀 편집과 같이 쓰도록 services/series_metadata_patch.py로 옮겼다.
+    METADATA_ALLOWED_FIELDS = series_metadata_patch.ALLOWED_FIELDS
 
     @staticmethod
     def _validate_metadata_fields(fields):
         """update_book_metadata(Tier A)와 Tier B 제안/승인 양쪽이 공유하는 필드 검증.
-
-        방어심층화: 이 필드들은 프론트(예: static/js/detail/header_view.js)가 이스케이프
-        없이 innerHTML로 렌더링하던 저장형 XSS 싱크였다(별도로 수정함). 렌더링 쪽 수정이
-        근본 대책이지만, MCP는 이 필드들에 자유 텍스트를 꽂을 수 있는 원격 쓰기 경로이므로
-        여기서도 최소한 HTML 태그(<, >)는 거부한다 - 렌더링 버그가 나중에 재발해도 MCP가
-        유일한 방어선이 되지 않도록. Tier B는 제안 생성 시점과 승인 시점 양쪽에서 이 검증을
-        다시 돌려, 제안이 오래 대기하는 동안 검증 로직이 바뀌어도 승인 시점 기준으로 재확인한다."""
-        unknown = [k for k in fields if k not in McpAdminToolsService.METADATA_ALLOWED_FIELDS]
-        if unknown:
-            raise ValueError(f"허용되지 않는 필드입니다: {', '.join(unknown)} (허용: {', '.join(McpAdminToolsService.METADATA_ALLOWED_FIELDS)})")
-
-        for key, value in fields.items():
-            if value is not None and ('<' in str(value) or '>' in str(value)):
-                raise ValueError(f"'{key}' 필드에 '<' 또는 '>' 문자를 포함할 수 없습니다 (HTML 태그 삽입 방지).")
-        if fields.get('link') is not None and fields['link'] and not re.match(r'^https?://', fields['link'].strip(), re.IGNORECASE):
-            raise ValueError("link는 http:// 또는 https://로 시작해야 합니다.")
+        Tier B는 제안 생성 시점과 승인 시점 양쪽에서 이 검증을 다시 돌려, 제안이 오래 대기하는 동안
+        검증 로직이 바뀌어도 승인 시점 기준으로 재확인한다."""
+        series_metadata_patch.validate_fields(fields)
 
     @staticmethod
     def _apply_book_metadata(db_type, series_name, library_id, fields):
-        """시리즈 하나에 대해 실제로 값을 병합·적용한다. services/book_detail_service.py의
-        get_media_detail()로 현재 값을 읽어와 병합한 뒤, 기존 REST API가 쓰는 것과 동일한
-        update_media_detail()을 그대로 호출해 캐시 무효화 등 부수 효과까지 동일하게 처리한다.
-        Returns: (changed_fields dict, success bool, message str)"""
-        from services.book_detail_service import BookDetailService
-        current_meta, current_books = BookDetailService.get_media_detail(db_type, series_name, library_id=library_id)
-        if not current_books:
-            # get_media_detail()은 없는 시리즈에도 기본값 채운 meta dict를 반환하므로,
-            # 실제 존재 여부는 books_rows(2번째 반환값)가 비어있는지로 판단해야 한다.
-            raise ValueError(f"시리즈를 찾을 수 없습니다: {series_name}")
-
-        allowed_fields = McpAdminToolsService.METADATA_ALLOWED_FIELDS
-        before = {k: current_meta.get(k, '') for k in allowed_fields}
-        merged = dict(before)
-        merged.update({k: v for k, v in fields.items() if v is not None})
-
-        success, message = BookDetailService.update_media_detail(
-            db_type, series_name,
-            author=merged['author'], isbn=merged['isbn'], publisher=merged['publisher'],
-            summary=merged['summary'], link=merged['link'], genre=merged['genre'], tags=merged['tags'],
-            series_alias=merged['series_alias'], books_lv=merged['books_lv'],
-            publication_status=merged['publication_status'],
-        )
-
-        changed = {k: {'before': before[k], 'after': merged[k]} for k in allowed_fields if before[k] != merged[k]}
-        return changed, success, message
+        """시리즈 하나에 값을 병합·적용한다. Returns: (changed_fields dict, success bool, message str)"""
+        return series_metadata_patch.apply_fields(db_type, series_name, library_id, fields)
 
     @staticmethod
     def bulk_set_favorite(db_type, book_ids, is_favorite, user_id):

@@ -283,6 +283,24 @@
   | `books_lv` | string | 선택 | 도서 등급 (`everyone`/`ma15+`/`m`/`r18`/`adult only`/`adult only 18+`/`일반`/`15세`/`18세`/`성인망가`/`포르노` 중 하나, 미지정 시 전체이용가) |
   | `cover_image` | file | 선택 | 표지 이미지 파일 |
 
+### `[POST]` `/api/media/lock-metadata`
+* **설명**: 시리즈(또는 낱권) 메타데이터를 잠급니다(`metadata_locked = 1`). 잠긴 도서는 다음 스캔이 메타데이터를 덮어쓰지 않습니다. 관리자 테이블 뷰의 자물쇠 토글이 사용합니다. (관리자 전용, 일반/성인 도서만)
+* **권한**: `@admin_required`
+* **Content-Type**: `multipart/form-data` 또는 `application/x-www-form-urlencoded`
+* **요청 파라미터**:
+  | 파라미터명 | 타입 | 필수여부 | 설명 |
+  | :--- | :--- | :--- | :--- |
+  | `type` | string | 선택 | DB 스코프 (`general` 또는 `adult`, 기본값: `general`) |
+  | `series_name` | string | 조건부 | 대상 시리즈명. 있으면 그 시리즈의 모든 권을 잠급니다 |
+  | `library_id` | int | 선택 | `series_name`과 함께 주면 그 카테고리로 범위를 좁힙니다 |
+  | `book_id` | int | 조건부 | `series_name`이 없을 때 대상 도서 ID |
+* **응답**: 성공 시 `{"success": true}`, 대상이 없으면 404.
+
+### `[POST]` `/api/media/unlock-metadata`
+* **설명**: 메타데이터 잠금을 해제합니다(`metadata_locked = 0`). 파라미터는 `lock-metadata`와 같습니다. 오디오북(`type=audiobook`)은 `book_id`로만 해제합니다.
+* **권한**: `@login_required`
+* **응답**: 성공 시 `{"success": true, "message": ...}`, 대상이 없거나 이미 해제되었으면 404.
+
 ### `[POST/PATCH]` `/api/media/series/alias`
 * **설명**: 특정 시리즈 전용 표시 별칭(`series_alias`)을 수정/삭제합니다. (관리자 전용)
 * **권한**: `@admin_required`

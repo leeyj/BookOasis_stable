@@ -29,6 +29,7 @@ def edit_media_detail():
     books_lv    = request.form.get('books_lv', '').strip()
     cover_file  = request.files.get('cover_image')
     audiobook_id = request.form.get('audiobook_id', '').strip()
+    library_id  = request.form.get('library_id', '').strip()
 
     if not series_name:
         return jsonify({'success': False, 'error': _t('api.err_series_name_required')}), 400
@@ -51,7 +52,8 @@ def edit_media_detail():
             cover_file=cover_file,
             series_alias=series_alias,
             books_lv=books_lv or None,
-            audiobook_id=int(audiobook_id) if audiobook_id.isdigit() else None
+            audiobook_id=int(audiobook_id) if audiobook_id.isdigit() else None,
+            library_id=int(library_id) if library_id.isdigit() else None,
         )
         if success:
             try:
@@ -340,6 +342,29 @@ def download_book(book_id):
     except Exception as e:
         import traceback
         print(f"[Download API] Error:\n{traceback.format_exc()}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@book_routes_bp.route('/api/media/lock-metadata', methods=['POST'])
+@admin_required
+def lock_media_metadata():
+    """도서/시리즈 메타데이터 잠금 (metadata_locked = 1) - 테이블 뷰 자물쇠 토글용 (일반·성인 도서)."""
+    db_type = request.form.get('type', 'general')
+    if db_type not in ('general', 'adult'):
+        return jsonify({'success': False, 'error': 'unsupported type'}), 400
+    if not check_adult_permission(db_type):
+        return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
+    try:
+        from repositories.book_repository import BookRepository
+        success = BookRepository.set_media_metadata_lock(
+            db_type, True,
+            series_name=request.form.get('series_name'),
+            library_id=request.form.get('library_id'),
+            book_id=request.form.get('book_id'),
+        )
+        if success:
+            return jsonify({'success': True})
+        return jsonify({'success': False, 'error': '해당 도서/시리즈를 찾을 수 없습니다.'}), 404
+    except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @book_routes_bp.route('/api/media/unlock-metadata', methods=['POST'])

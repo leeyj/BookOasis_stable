@@ -421,7 +421,7 @@ class BookDetailService:
         return meta, books_list
 
     @staticmethod
-    def update_media_detail(db_type, series_name, author, isbn, publisher, summary, link, genre='', tags='', cover_file=None, series_alias=None, books_lv=None, publication_status=None, audiobook_id=None):
+    def update_media_detail(db_type, series_name, author, isbn, publisher, summary, link, genre='', tags='', cover_file=None, series_alias=None, books_lv=None, publication_status=None, audiobook_id=None, library_id=None):
         import hashlib
 
         if db_type == 'audiobook':
@@ -471,9 +471,17 @@ class BookDetailService:
         
         # 1. 해당 시리즈에 속한 도서의 library_id와 대표 book 레코드 1개 조회
         from repositories.book_repository import BookRepository
-        library_id = BookRepository.resolve_series_library_id(db_type, series_name, '', [])
-        if library_id is None:
-            return False, '해당 시리즈에 속한 도서를 찾을 수 없습니다.'
+        # 카테고리가 정해지지 않았으면 이 이름이 있는 카테고리를 찾는다. 같은 이름이 여러 카테고리에 있으면
+        # 어느 쪽인지 알 수 없으므로 고치지 않는다 (예전엔 시리즈명만으로 전부 바꿔 다른 카테고리까지 바뀌었다)
+        if library_id is not None and str(library_id).strip().isdigit():
+            library_id = int(str(library_id).strip())
+        else:
+            found = BookRepository.list_series_library_ids(db_type, series_name, limit=2)
+            if not found:
+                return False, '해당 시리즈에 속한 도서를 찾을 수 없습니다.'
+            if len(found) > 1:
+                return False, f'"{series_name}" 시리즈가 여러 카테고리에 있습니다. 카테고리(library_id)를 지정해 주세요.'
+            library_id = found[0]
         
         try:
             cover_image_url = None
@@ -493,7 +501,7 @@ class BookDetailService:
                 print(f"[BookDetailService] Series cover uploaded manually: {dest_path} -> {cover_image_url}")
             
             # 3. 시리즈 메타 정보 일괄 업데이트
-            BookRepository.update_media_detail(db_type, series_name, author, isbn, publisher, summary, link, genre, tags, series_alias=series_alias, cover_image_url=cover_image_url, books_lv=books_lv, publication_status=publication_status)
+            BookRepository.update_media_detail(db_type, series_name, author, isbn, publisher, summary, link, genre, tags, series_alias=series_alias, cover_image_url=cover_image_url, books_lv=books_lv, publication_status=publication_status, library_id=library_id)
             
             # 4. In-Memory 표지 캐시 및 Redis 캐시 무효화
             invalidate_series_cover_cache(db_type=db_type, lib_id=library_id, series_name=series_name)

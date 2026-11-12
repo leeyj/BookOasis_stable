@@ -2,6 +2,8 @@
 import { state } from './state.js';
 import { mountIndexScrollbar, unmountIndexScrollbar } from './index_scrollbar.js';
 import { clearViewerReportAction, showViewerReportAction } from './viewer/report_problem.js';
+import { syncTableModeUi } from './table_view/mode.js';
+import { clearCoverTint } from './detail/cover_tint.js';
 
 /**
  * ────────────────────────────────────────────────────────
@@ -46,6 +48,8 @@ export function switchActiveView(viewName) {
   if (customPluginView) customPluginView.style.display = 'none';
   
   unmountIndexScrollbar();
+  // 상세의 표지 색 배경은 상세에서만 - 다른 화면으로 가면 걷는다 (상세 진입 시엔 렌더 후 다시 계산)
+  if (viewName !== 'detail') clearCoverTint();
 
   // 상단 검색바/필터 컨트롤 숨김 조율 - 헤더 자체와 세션탭/환경설정·계정은 항상 유지
   if (viewName === 'plugin_custom' || viewName === 'settings' || viewName === 'plugins') {
@@ -87,7 +91,10 @@ export function switchActiveView(viewName) {
         const scrollSpinner = document.getElementById('infinite-scroll-spinner');
         if (scrollSpinner) scrollSpinner.style.display = 'none';
       }
-      if (!['history', 'collection', 'smart_rec', 'tts_ready'].includes(state.currentLibraryId)) {
+      // 표 모드(관리자 테이블 뷰)는 쓸 수 있는 카테고리에서만 켜진다 - 최근 읽은 도서·컬렉션 등에선 그리드로 되돌린다
+      if (syncTableModeUi()) {
+        unmountIndexScrollbar();
+      } else if (!['history', 'collection', 'smart_rec', 'tts_ready'].includes(state.currentLibraryId)) {
         mountIndexScrollbar();
       }
       break;

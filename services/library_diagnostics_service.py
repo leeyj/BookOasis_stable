@@ -42,6 +42,17 @@ class LibraryDiagnosticsService:
         return BookRepository.find_missing_genre_and_tags(db_type, library_id=library_id, limit=limit, offset=offset)
 
     @staticmethod
+    def list_series_table(db_type, library_id=None, missing='', sort=None, direction=None, search='', page=1, limit=50):
+        """관리자 테이블 뷰와 같은 시리즈 표 (정렬·빈 값 필터). 요약이 준비 안 됐으면 ValueError."""
+        from services.series_table_service import SeriesTableService, SummaryNotReady
+        try:
+            return SeriesTableService.list_rows(
+                db_type, library_id=library_id, page=page, limit=limit, sort=sort, direction=direction,
+                missing=missing, search=search)
+        except SummaryNotReady:
+            raise ValueError('시리즈 요약을 만드는 중입니다. 잠시 후 다시 시도해 주세요.')
+
+    @staticmethod
     def find_missing_offsets(db_type, library_id=None, limit=50, offset=0):
         from repositories.book_repository import BookRepository
         db_type = _validate_db_type(db_type)
