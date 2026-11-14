@@ -160,6 +160,8 @@ export function loadAndApplyCustomFont(fontName, fontUrl, element, fallbackFamil
       if (wrapper && wrapper.classList.contains('scroll-mode-page')) {
         const contentArea = document.getElementById('txt-content-area');
         import('./viewer/txt_page_utils.js').then(m => {
+          // 늦게 온 글꼴로 바뀐 뒤 화면 일부가 옛 그림으로 남아 문단이 겹쳐 보이는 문제 방지
+          if (contentArea) m.refreshTxtPageRender(wrapper, contentArea);
           // 폰트 교체로 글자폭이 바뀌면 컬럼(페이지) 수가 달라질 수 있으므로
           // 홀수 마지막 페이지 스페이서를 최신 레이아웃 기준으로 다시 계산한다.
           if (contentArea) m.applyTxtTwoPageTrailingSpacer(wrapper, contentArea);

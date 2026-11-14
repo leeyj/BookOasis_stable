@@ -1,4 +1,7 @@
 # CHANGELOG
+## v3.1.5
+- (fix) TXT/EPUB 페이지 모드에서 글꼴이 적용된 뒤 문단이 겹쳐 보이던 문제 수정 | fix paragraphs appearing on top of each other in TXT/EPUB page mode after the font is applied
+
 ## v3.1.4
 - (fix) 메타데이터 검색 결과에서 표지를 못 불러오면 대체 표지가 나오지 않던 문제 수정 | fix the fallback cover not showing when a metadata search result's cover fails to load
 - (fix) 플러그인 위젯·검색 설명의 링크/강조가 닫히지 않아 뒤 내용까지 링크가 되던 문제 수정 | fix links/emphasis in plugin widgets and search descriptions never closing, turning the rest of the text into a link

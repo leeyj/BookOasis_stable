@@ -1,5 +1,6 @@
 import { VIEWER_FONTS } from '../viewer_settings.js';
 import { scheduleAnchorRechecks } from './txt_anchor_utils.js';
+import { refreshTxtPageRender } from './txt_page_utils.js';
 
 // 내장 폰트 로드 실패 시(파일 누락/네트워크 오류) 되돌아갈 시스템 폰트 체인
 const BUILTIN_FONT_FALLBACKS = {
@@ -198,6 +199,8 @@ export function applyTxtSettingsCore(ctx) {
       document.fonts.ready.then(() => {
         requestAnimationFrame(() => {
           if (scrollWrapper && scrollWrapper.classList.contains('scroll-mode-page')) {
+            // 글꼴이 본문보다 늦게 적용된 경우 옛 그림이 남아 문단이 겹쳐 보이지 않도록 다시 그린다
+            refreshTxtPageRender(scrollWrapper, contentArea);
             snapTxtPageScrollLeft(scrollWrapper);
           }
         });

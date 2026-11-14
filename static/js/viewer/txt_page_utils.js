@@ -53,6 +53,21 @@ export function snapTxtPageScrollLeft(scrollWrapper) {
   scrollWrapper.scrollLeft = isTxtScrollLeftAtMaxPage(scrollWrapper) ? maxScroll : roundedStop;
 }
 
+// 글꼴이 본문보다 늦게 적용되면 Chrome이 레이아웃은 새 글꼴로 다시 잡지만,
+// 페이지 모드 스크롤 영역에 이미 그려둔 그림 일부를 갱신하지 않아 문단이 겹쳐 보일 수 있다
+// (2026-11 제보: 요소 위치는 정상인데 화면만 겹침, 쪽을 넘겼다 돌아와도 그대로).
+// 실기기 콘솔 확인 결과 본문을 잠깐 display:none으로 내렸다 올리면 풀렸다.
+// 그 과정에서 scrollLeft가 0으로 밀리므로 원래 값을 되돌린다.
+export function refreshTxtPageRender(scrollWrapper, contentArea) {
+  if (!scrollWrapper || !contentArea) return;
+  if (!scrollWrapper.classList.contains('scroll-mode-page')) return;
+  const savedScrollLeft = scrollWrapper.scrollLeft;
+  contentArea.style.display = 'none';
+  void contentArea.offsetHeight;
+  contentArea.style.display = '';
+  scrollWrapper.scrollLeft = savedScrollLeft;
+}
+
 // 삽화 이미지의 max-height가 뷰포트(vh) 기준으로 박혀 있으면, 실제 한 페이지(컬럼)
 // 높이는 상하 여백만큼 뷰포트보다 작으므로 이미지가 페이지 하나를 넘겨버려
 // (이미지는 컬럼 중간에서 쪼갤 수 없는 요소라) 다음 페이지가 통째로 빈 페이지가 된다.
