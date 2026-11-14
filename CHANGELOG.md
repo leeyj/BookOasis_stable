@@ -1,6 +1,10 @@
 # CHANGELOG
+## v3.1.6
+- (fix) TXT/EPUB 두 쪽 보기에서 화면 폭에 따라 왼쪽 쪽 글자가 넘길수록 조금씩 잘리던 문제 수정 | fix the left page's text getting cut off a little more with each page turn in TXT/EPUB two-page view on some screen widths
+
 ## v3.1.5
 - (fix) TXT/EPUB 페이지 모드에서 글꼴이 적용된 뒤 문단이 겹쳐 보이던 문제 수정 | fix paragraphs appearing on top of each other in TXT/EPUB page mode after the font is applied
+
 
 ## v3.1.4
 - (fix) 메타데이터 검색 결과에서 표지를 못 불러오면 대체 표지가 나오지 않던 문제 수정 | fix the fallback cover not showing when a metadata search result's cover fails to load

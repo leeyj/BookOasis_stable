@@ -122,7 +122,12 @@ export function applyTxtTwoPageTrailingSpacer(scrollWrapper, contentArea) {
   const columnWidthPx = parseFloat(styles.columnWidth);
   const columnGapPx = parseFloat(styles.columnGap) || 0;
   if (!Number.isFinite(columnWidthPx) || columnWidthPx <= 0) return;
-  const columnUnitWidth = columnWidthPx + columnGapPx;
+  // 단 간격은 지정한 column-width가 아니라 "넘김 폭(펼침 하나)의 절반"으로 잡는다.
+  // 본문 폭이 홀수(예: 1165px)면 지정 단 폭은 floor로 562px이지만 브라우저는 562.5px로 늘려 그린다.
+  // 지정값으로 본문 폭을 계산하면 펼침마다 1px씩 어긋나 왼쪽 쪽 글자가 잘렸다
+  // (2026-11 제보: 갤럭시 탭 S8, dpr 2.125, 4번째 펼침에서 -4.2px).
+  const spreadWidth = getTxtPageAdvanceWidth(scrollWrapper);
+  const columnUnitWidth = spreadWidth / 2;
   if (columnUnitWidth <= 0) return;
 
   const pageCount = Math.max(1, Math.round((contentArea.scrollWidth + columnGapPx) / columnUnitWidth));
@@ -146,7 +151,8 @@ export function applyTxtTwoPageTrailingSpacer(scrollWrapper, contentArea) {
     // 배정하므로(콘텐츠 양과 무관한 순수 기하 계산), 남는 마지막 컬럼은 항상
     // 확실히 비워진 채로 존재한다.
     const evenColumnCount = pageCount + 1;
-    const targetWidth = Math.round(evenColumnCount * columnWidthPx + (evenColumnCount - 1) * columnGapPx);
+    // 펼침 수 × 넘김 폭 − 마지막 간격: 넘김 위치(펼침 폭의 정수배)와 단 시작이 정확히 맞는다.
+    const targetWidth = (evenColumnCount / 2) * spreadWidth - columnGapPx;
     contentArea.style.width = `${targetWidth}px`;
   }
 }
