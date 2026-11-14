@@ -133,7 +133,7 @@
     max-height: 100%;
     width: auto !important;
     height: auto !important;
-    object-fit: contain !important;
+    object-fit: contain;
     display: block;
 }
 
@@ -148,7 +148,7 @@
 }
 
 .comic-page-pair.no-center-gap {
-    gap: 0 !important;
+    gap: 0;
 }
 
 /* 🌟 1장 보기 모드일 때 (화면을 최대한 가득 채움) */
@@ -162,7 +162,7 @@
     max-height: 100% !important;
     width: auto !important;
     height: auto !important;
-    object-fit: contain !important;
+    object-fit: contain;
     margin: 0;
 }
 
@@ -177,7 +177,7 @@
     max-height: 100% !important;
     width: auto !important;
     height: auto !important;
-    object-fit: contain !important;
+    object-fit: contain;
     margin: 0;
 }
 
@@ -301,7 +301,7 @@
     max-height: none;
 
     /* iOS Safari 이미지 드래그 선택 및 스크롤 묵살 현상 해결 패치 */
-    pointer-events: auto !important;
+    pointer-events: auto;
     /* 터치 이벤트 시작점 확보를 위해 복원 */
     -webkit-user-drag: none;
     -webkit-touch-callout: none;
@@ -1087,6 +1087,13 @@
     background: color-mix(in srgb, var(--app-text-primary) 14%, transparent);
 }
 
+/* select 배경이 반투명이라 네이티브 드롭다운 목록이 흰 배경 + 밝은 글자(상속)로
+   그려져 항목이 안 보였다 → option에 불투명 배경을 명시 */
+.overlay-select option {
+    background: var(--app-input-bg);
+    color: var(--app-text-primary);
+}
+
 /* 이미지 너비 행: 스크롤 모드에서만 (.visible) */
 .vm-row.overlay-width-row {
     border-top: 0;
@@ -1181,7 +1188,7 @@
 .fullscreen-mode .overlay-footer,
 :fullscreen .overlay-footer,
 :-webkit-full-screen .overlay-footer {
-    padding-bottom: calc(2.2rem + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(2.2rem + env(safe-area-inset-bottom, 0px));
 }
 
 /* ────────────────────────────────────────────────────────
@@ -1971,33 +1978,6 @@
     #media-viewer-modal #txt-scroll-wrapper::-webkit-scrollbar {
         width: 3px;
         height: 3px;
-    }
-}
-
-/* 뷰어 내 여백 상세 설정 퀵 패널 */
-.viewer-padding-panel {
-    position: absolute;
-    bottom: 120px;
-    right: 30px;
-    width: 320px;
-    background: rgba(var(--app-panel-rgb), 0.85);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    padding: 1.2rem;
-    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    color: var(--app-text-muted);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-@media (max-width: 480px) {
-    .viewer-padding-panel {
-        left: 10px;
-        right: 10px;
-        bottom: 110px;
-        width: auto;
-        padding: 1rem;
     }
 }
 

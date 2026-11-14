@@ -1,5 +1,6 @@
 // category_info_popover.js – 헤더 햄버거 옆 "..." 버튼: 현재 선택된 카테고리의
 // ID/이름/등록 경로/시리즈 수/도서 권수를 보여주는 팝오버 (마우스 오버 또는 클릭으로 개폐)
+import { escapeHtml } from './utils/html.js';
 import { state } from './state.js';
 import { fetchBooksTotals } from './api.js';
 
@@ -41,15 +42,6 @@ function bookCountLabel() {
   if (state.currentLibraryType === 'audiobook') return i18n.t('book_list.info_track_count');
   if (state.currentLibraryType === 'video') return i18n.t('book_list.info_episode_count');
   return i18n.t('book_list.info_book_count');
-}
-
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
 }
 
 function renderPopoverContent(item) {

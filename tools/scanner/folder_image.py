@@ -3,7 +3,8 @@ import os
 import threading
 import time
 
-IMAGE_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif')
+from utils import media_types as _media_types
+IMAGE_EXTENSIONS = _media_types.IMAGE_EXTENSIONS
 COMMON_COVER_NAMES = (
     'cover.jpg', 'cover.png', 'covers.jpg', 'covers.png', 'folder.jpg', 'folder.png',
     'cover.jpeg', 'covers.jpeg', 'folder.jpeg',

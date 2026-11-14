@@ -1,4 +1,5 @@
 // index.js – 사이드바 카테고리 목록 로드 및 순서 드래그 앤 드롭 오케스트레이터
+import { escapeHtml } from '../utils/html.js';
 import { state } from '../state.js';
 import * as api from '../api.js';
 import { selectCategory } from '../tab_media_library.js';
@@ -97,15 +98,6 @@ function applySavedMixedOrder(sidebar) {
 function isCurrentUserAdmin() {
   const user = state.currentUser || window.currentUser || {};
   return String(user.role || '').trim().toLowerCase() === 'admin';
-}
-
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
 }
 
 const _compactCountFormatter = (typeof Intl !== 'undefined' && Intl.NumberFormat)

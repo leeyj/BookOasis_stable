@@ -1,4 +1,5 @@
 // static/js/dashboard_insights.js - 대시보드 독서 동기부여 위젯 컨트롤러 (Compact & Slim)
+import { escapeHtml } from './utils/html.js';
 import { getBookCoverSrc, buildFallbackCoverUrl } from './cover_fallback.js';
 
 if (!window.__dashboardInsightsDelegationBound) {
@@ -144,11 +145,6 @@ export async function loadDashboardInsights(libraryType = 'general') {
   } catch (err) {
     console.error('[DashboardInsights] Load error:', err);
   }
-}
-
-function escapeHtml(str) {
-  if (!str) return '';
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // 책 ID만 알 때 여는 경로: reader-info로 형식/제목/진도를 받아 openReader로 연다.

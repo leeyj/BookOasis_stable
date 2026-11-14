@@ -7,6 +7,7 @@ import json
 import glob
 import re
 from flask import Blueprint, request, jsonify
+from api.helpers.route_helpers import error_response
 from api.auth import admin_required
 from utils.i18n import _t
 
@@ -57,7 +58,7 @@ def get_library_reports(library_id):
             })
         return jsonify({'success': True, 'reports': report_list})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @report_bp.route('/api/media/libraries/reports/view', methods=['GET'])
 @admin_required
@@ -77,7 +78,7 @@ def view_report_detail():
     except ValueError as e:
         return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 def _parse_report_timestamp(filename):
     """리포트 파일명에서 타임스탬프 파싱"""

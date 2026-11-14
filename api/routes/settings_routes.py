@@ -4,6 +4,7 @@ settings_routes.py – 시스템 설정 관리 라우터
 """
 import os
 from flask import Blueprint, request, jsonify, session
+from api.helpers.route_helpers import error_response
 from services.settings_service import SettingsService
 from services.scheduler_service import SchedulerService
 from api.auth import admin_required, login_required
@@ -92,7 +93,7 @@ def get_system_settings():
         settings = SettingsService.get_all()
         return jsonify({'success': True, 'settings': settings})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @settings_bp.route('/api/media/settings/public', methods=['GET'])
 @login_required
@@ -120,7 +121,7 @@ def get_public_ui_settings():
                 public_settings[k] = all_settings[k]
         return jsonify({'success': True, 'settings': public_settings})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @settings_bp.route('/api/media/settings', methods=['POST'])
 @admin_required
@@ -176,7 +177,7 @@ def update_system_setting():
             wake_worker()
         return jsonify({'success': True, 'message': _t('api.msg_setting_saved', key=key)})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @settings_bp.route('/api/media/settings/user', methods=['GET'])
 @login_required
@@ -194,7 +195,7 @@ def get_user_settings():
                 effective[k] = globals_[k]
         return jsonify({'success': True, 'settings': effective, 'overrides': user_overrides})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @settings_bp.route('/api/media/settings/user', methods=['POST'])
 @login_required
@@ -218,7 +219,7 @@ def update_user_setting():
             invalidate_book_complete_percent(user_id)
         return jsonify({'success': True, 'message': _t('api.msg_setting_saved', key=key)})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @settings_bp.route('/api/media/settings/trigger-lazy-scan', methods=['POST'])
 @admin_required
@@ -233,7 +234,7 @@ def trigger_lazy_scan_api():
         ).start()
         return jsonify({'success': True, 'message': _t('api.msg_lazy_scanner_triggered')})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @settings_bp.route('/api/media/settings/custom-themes', methods=['GET'])
 @login_required
@@ -244,7 +245,7 @@ def get_custom_themes():
         themes = [{'id': t['id'], 'label': t['label']} for t in get_themes()]
         return jsonify({'success': True, 'themes': themes})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @settings_bp.route('/api/media/settings/custom-themes.css', methods=['GET'])
 @login_required
@@ -257,7 +258,7 @@ def get_custom_themes_css():
         response.headers['Cache-Control'] = 'no-cache, must-revalidate'
         return response
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @settings_bp.route('/api/media/settings/custom-themes/rescan', methods=['POST'])
 @admin_required
@@ -272,7 +273,7 @@ def rescan_custom_themes():
             'rejected': get_last_rejected(),
         })
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @settings_bp.route('/api/media/settings/cover-storage/migrate', methods=['POST'])
 @admin_required
@@ -285,7 +286,7 @@ def migrate_cover_storage():
             return jsonify({'success': False, 'error': error}), 400
         return jsonify({'success': True, 'message': '커버 파일 이관을 시작했습니다.'})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @settings_bp.route('/api/media/settings/cover-storage/migrate/status', methods=['GET'])
 @admin_required
@@ -295,7 +296,7 @@ def get_cover_storage_migrate_status():
         from services.cover_storage_service import get_migration_status
         return jsonify({'success': True, 'status': get_migration_status()})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @settings_bp.route('/api/admin/mcp-pending-changes', methods=['GET'])
 @admin_required
@@ -307,7 +308,7 @@ def get_mcp_pending_changes():
         status = request.args.get('status') or None
         return jsonify({'success': True, 'changes': McpProposalService.list_pending(status=status)})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @settings_bp.route('/api/admin/mcp-pending-changes/<int:change_id>/approve', methods=['POST'])
 @admin_required
@@ -321,7 +322,7 @@ def approve_mcp_pending_change(change_id):
     except ValueError as ve:
         return jsonify({'success': False, 'error': str(ve)}), 400
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @settings_bp.route('/api/admin/mcp-pending-changes/<int:change_id>/reject', methods=['POST'])
 @admin_required
@@ -335,4 +336,4 @@ def reject_mcp_pending_change(change_id):
     except ValueError as ve:
         return jsonify({'success': False, 'error': str(ve)}), 400
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)

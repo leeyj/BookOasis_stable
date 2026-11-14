@@ -200,8 +200,7 @@ def scan_library(db_path, library_id, physical_path, force=False, skip_vfs_refre
 
     # ── [Self-Healing: 사전 DB 무결성 점검 및 손상 감지 시 자동 복구] ──
     try:
-        engine = os.environ.get('DB_ENGINE', os.environ.get('DBMS', 'sqlite')).lower()
-        if engine not in ('mariadb', 'mysql'):
+        if not database.is_mariadb_mode():
             check_conn = database.get_connection(db_type, wait_timeout=5.0)
             try:
                 check_cur = check_conn.cursor()

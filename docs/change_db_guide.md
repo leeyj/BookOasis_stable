@@ -28,7 +28,8 @@ MariaDB 제로데이트(`0000-00-00 00:00:00`) 처리가 `db_schema_updater.py`�
 |---|---|---|
 | `database.py` | 커넥션 풀링(SQLite/MariaDB)만. `init_databases()`는 `run_full_migration()`을 호출하는 얇은 래퍼 | 풀링 관련 변경일 때만 |
 | `services/db_migration_service.py` | **컬럼/인덱스 diff + 백필의 유일한 소스.** `_SCHEMA_SQL`(SQLite DDL), `_INDEXES_SQL`, `auto_migrate_schema`, MariaDB 전용 안전망(`_ensure_mariadb_columns`/`_ensure_mariadb_indexes`), 모든 백필 함수, 오케스트레이터 `run_full_migration()` | **스키마를 바꿀 때 여기만 고치면 됨** |
-| `tools/db_schema_updater.py` | 얇은 CLI 진입점. MariaDB `MARIADB_CENTRAL_SCHEMA`(초기 테이블 생성 DDL, `_SCHEMA_SQL`과 별개)와 SQLite WAL 체크포인트만 자체 로직으로 갖고, 나머지는 `run_full_migration()` 호출 | MariaDB 초기 생성 DDL을 바꿀 때만 |
+| `services/schema_mariadb.py` | MariaDB `MARIADB_CENTRAL_SCHEMA`(초기 테이블 생성 DDL, `_SCHEMA_SQL`과 별개). import가 없는 상수 전용 모듈 | MariaDB 초기 생성 DDL을 바꿀 때만 |
+| `tools/db_schema_updater.py` | 얇은 CLI 진입점. SQLite WAL 체크포인트만 자체 로직으로 갖고 나머지는 `run_full_migration()` 호출. `MARIADB_CENTRAL_SCHEMA`는 호환용으로 재노출만 함 | 거의 없음 |
 
 `database.init_databases()`와 `tools/db_schema_updater.py`의 `run_schema_update()`
 **둘 다 결국 `services/db_migration_service.py`의 `run_full_migration()` 하나만
@@ -46,7 +47,7 @@ MariaDB 제로데이트(`0000-00-00 00:00:00`) 처리가 `db_schema_updater.py`�
    추가로 `_ensure_mariadb_columns()`/`_ensure_mariadb_indexes()`의 튜플 리스트에도
    넣는다. **이건 "안전망"이지 필수 단계가 아니다** — 대부분의 컬럼 추가는 1번만으로
    충분하다.
-3. 완전히 새 테이블을 만드는 경우에만 `tools/db_schema_updater.py`의
+3. 완전히 새 테이블을 만드는 경우에만 `services/schema_mariadb.py`의
    `MARIADB_CENTRAL_SCHEMA`에도 MariaDB 방언으로 `CREATE TABLE`을 추가해야 한다
    (초기 생성은 통합 안 돼 있으므로 여기는 여전히 손으로 동기화 필요 — 유일하게
    남은 "두 곳 동기화" 지점이니 새 테이블 추가 시에는 반드시 둘 다 확인할 것).
@@ -72,7 +73,7 @@ MariaDB 제로데이트(`0000-00-00 00:00:00`) 처리가 `db_schema_updater.py`�
 
 ## 검증 방법 (스키마 변경 후 반드시 실행)
 
-1. `.venv/Scripts/python -c "import database; import services.db_migration_service; import tools.db_schema_updater"` —
+1. `.venv/Scripts/python -c "import database; import services.db_migration_service; import services.schema_mariadb; import tools.db_schema_updater"` —
    순환 임포트 없이 되는지. **`from services.db_migration_service import run_full_migration`을
    database를 거치지 않고 최초 진입점으로 직접 실행해도** 깨지지 않는지 별도로 확인할 것
    (`.venv/Scripts/python -c "from services.db_migration_service import run_full_migration"`).

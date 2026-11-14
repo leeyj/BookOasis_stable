@@ -9,6 +9,7 @@ import * as api from '../api.js';
 import { positionMenuAtPoint, hideFloatingMenu, isFloatingMenuOpen, enableMenuDrag } from '../context_menu_manager.js';
 import { setAnnotationMarker } from './annotation_anchor.js';
 import { updateAnnotationLocal } from './annotation_state.js';
+import { clearPluginMenuItems, renderPluginMenuGroups } from '../plugin_menu_render.js';
 
 const MENU_ID = 'annotation-context-menu';
 let currentTarget = null; // 현재 메뉴가 열려 있는 annotation 객체
@@ -17,17 +18,6 @@ let deleteHandler = null;
 
 export function configureAnnotationContextMenu({ onDelete }) {
   deleteHandler = onDelete;
-}
-
-function getPluginAccentColor(pluginId) {
-  const text = String(pluginId || 'plugin');
-  let hash = 0;
-  for (let i = 0; i < text.length; i += 1) {
-    hash = ((hash << 5) - hash) + text.charCodeAt(i);
-    hash |= 0;
-  }
-  const hue = Math.abs(hash) % 360;
-  return `hsl(${hue} 72% 60%)`;
 }
 
 function getModalRoot() {
@@ -71,61 +61,17 @@ function ensureMenu() {
   return menu;
 }
 
-function clearPluginItems() {
+function getMenuList() {
   const menu = document.getElementById(MENU_ID);
-  const listEl = menu ? menu.querySelector('.context-menu-list') : null;
-  if (!listEl) return;
-  listEl.querySelectorAll('.plugin-context-menu-item, .plugin-context-menu-group-title, .plugin-context-menu-separator').forEach((el) => el.remove());
+  return menu ? menu.querySelector('.context-menu-list') : null;
+}
+
+function clearPluginItems() {
+  clearPluginMenuItems(getMenuList());
 }
 
 function renderPluginItems(items) {
-  const menu = document.getElementById(MENU_ID);
-  const listEl = menu ? menu.querySelector('.context-menu-list') : null;
-  if (!listEl) return;
-
-  clearPluginItems();
-  if (!Array.isArray(items) || items.length === 0) return;
-
-  const closeItem = listEl.querySelector('.context-menu-close-item');
-  const groups = new Map();
-  items.forEach((item) => {
-    const pluginId = String(item.plugin_id || '').trim();
-    if (!pluginId) return;
-    const pluginName = String(item.plugin_name || pluginId).trim();
-    if (!groups.has(pluginId)) groups.set(pluginId, { pluginId, pluginName, items: [] });
-    groups.get(pluginId).items.push(item);
-  });
-
-  Array.from(groups.values()).forEach((group, groupIdx) => {
-    const accentColor = getPluginAccentColor(group.pluginId);
-
-    if (groupIdx > 0) {
-      const sep = document.createElement('li');
-      sep.className = 'plugin-context-menu-separator';
-      listEl.insertBefore(sep, closeItem);
-    }
-
-    const titleEl = document.createElement('li');
-    titleEl.className = 'plugin-context-menu-group-title';
-    titleEl.style.setProperty('--plugin-accent', accentColor);
-    titleEl.textContent = group.pluginName;
-    listEl.insertBefore(titleEl, closeItem);
-
-    group.items.forEach((item) => {
-      const pluginId = String(item.plugin_id || '').trim();
-      const actionId = String(item.id || '').trim();
-      const label = String(item.label || '').trim();
-      const iconClass = window.boIcon(String(item.icon || 'lc lc-puzzle').trim());
-      if (!pluginId || !actionId || !label) return;
-
-      const li = document.createElement('li');
-      li.className = 'context-menu-item plugin-context-menu-item';
-      li.style.setProperty('--plugin-accent', accentColor);
-      li.innerHTML = `<i class="${iconClass} plugin-context-menu-icon"></i> <span class="plugin-context-menu-label">${label}</span>`;
-      li.addEventListener('click', () => triggerAnnotationPluginAction(pluginId, actionId));
-      listEl.insertBefore(li, closeItem);
-    });
-  });
+  renderPluginMenuGroups(getMenuList(), items, triggerAnnotationPluginAction);
 }
 
 function buildContext(annotation) {

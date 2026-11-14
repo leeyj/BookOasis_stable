@@ -8,6 +8,7 @@ import shlex
 import subprocess
 import threading
 from flask import Blueprint, request, Response, jsonify, session
+from api.helpers.route_helpers import error_response, current_user_id
 from api.auth import login_required, admin_required
 import database
 
@@ -34,6 +35,8 @@ VIDEO_MIMETYPE_MAP = {
     'webm': 'video/webm',
     'avi': 'video/x-msvideo',
     'ts': 'video/mp2t',
+    'wmv': 'video/x-ms-wmv',
+    'flv': 'video/x-flv',
 }
 
 
@@ -468,7 +471,7 @@ def video_progress_api(vid):
     if not _has_video_library_access(vid):
         return jsonify({'success': False, 'error': '영상 강좌 접근 권한이 없습니다.'}), 403
 
-    user_id = session.get('user_id', 1)
+    user_id = current_user_id()
     from repositories.video_repository import VideoRepository
 
     if request.method == 'POST':
@@ -523,7 +526,7 @@ def video_progress_api(vid):
                 'episode_is_completed': episode_is_completed,
             })
         except Exception as e:
-            return jsonify({'success': False, 'error': str(e)}), 500
+            return error_response(e)
     else:
         progress_row = VideoRepository.get_video_progress(vid, user_id)
         return jsonify({'success': True, 'progress': progress_row})

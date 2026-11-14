@@ -9,7 +9,7 @@ tools/db_schema_updater.py(MariaDB 전용 수작업 컬럼/인덱스 리스트)�
 있던 적 있음). 이 모듈이 그 둘을 하나로 합친 결과물이다.
 
 - SQLite용 초기 테이블 생성 DDL(_SCHEMA_SQL/_INDEXES_SQL)과 MariaDB용 초기 생성
-  DDL(tools/db_schema_updater.py의 MARIADB_CENTRAL_SCHEMA)은 의도적으로 지금처럼
+  DDL(services/schema_mariadb.py의 MARIADB_CENTRAL_SCHEMA)은 의도적으로 지금처럼
   별도로 유지한다 (다이얼렉트 변환 계층까지 통합하는 건 범위 밖).
 - 컬럼/인덱스 diff + 백필 같은 "부족한 스키마 생성" 레이어만 여기에 모음.
 - 진입점은 run_full_migration() 하나이며, database.init_databases()와
@@ -146,8 +146,7 @@ def startup_db_sanity_check():
     - 메인 DB 파일 자체의 손상은 경고 로그만 출력하고 서버 기동은 계속합니다.
     """
     import database
-    engine = os.environ.get('DB_ENGINE', os.environ.get('DBMS', 'sqlite')).lower()
-    if engine in ('mariadb', 'mysql'):
+    if database.is_mariadb_mode():
         return
     db_map = {
         'general'  : database.DB_GENERAL_PATH,
@@ -889,7 +888,7 @@ def _connect_and_init_schema(db_type, schema):
             # SQLite용 schema는 TEXT PRIMARY KEY 등으로 MariaDB에서 실패하므로(과거엔 조용히
             # 무시돼 신규 테이블이 누락됨), db_schema_updater를 거치지 않는 시작 경로에서도
             # 중앙 스키마를 먼저 적용한다.
-            from tools.db_schema_updater import MARIADB_CENTRAL_SCHEMA
+            from services.schema_mariadb import MARIADB_CENTRAL_SCHEMA
             for stmt in (s.strip() for s in MARIADB_CENTRAL_SCHEMA.split(';')):
                 if not stmt:
                     continue

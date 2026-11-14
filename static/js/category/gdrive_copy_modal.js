@@ -2,16 +2,8 @@
 // 카테고리와 무관한 독립 동작이다 — 리모트 + 저장할 로컬 폴더만 있으면 실행된다.
 // 복사해온 파일을 카테고리로 등록할지는 완료 후 사용자가 별도로 정한다
 // (2026-08-23, "복사 전용 카테고리를 미리 만들어두게 강제할 이유가 없다"는 판단).
+import { escapeHtml } from '../utils/html.js';
 import { state } from '../state.js';
-
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
 
 function toast(msg, type = 'info') {
   if (typeof window.showToast === 'function') {

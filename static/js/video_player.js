@@ -1,5 +1,6 @@
 // static/js/video_player.js - 영상 강좌 재생 모달 (네이티브 <video controls> 기반, 최소 통합 스코프)
 // audio_player.js::openAudioPlayer()와 동일하게 공용 상세 API(/api/media/detail)를 직접 fetch해서 연다.
+import { escapeHtml } from './utils/html.js';
 import { remoteLog } from './remote_log.js';
 
 let currentMeta = null;
@@ -7,12 +8,6 @@ let currentEpisodes = [];
 let currentEpisodeIndex = -1;
 let lastAutoSaveAtMs = 0;
 const AUTO_SAVE_MS = 10000;
-
-function escapeHtml(str) {
-  return String(str || '').replace(/[&<>"']/g, (ch) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[ch]));
-}
 
 function getOverlay() {
   let overlay = document.getElementById('video-player-modal-overlay');

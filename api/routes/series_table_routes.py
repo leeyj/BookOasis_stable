@@ -3,6 +3,7 @@
 from datetime import datetime
 
 from flask import Blueprint, Response, request, jsonify, stream_with_context
+from api.helpers.route_helpers import error_response
 
 from api.auth import admin_required, check_adult_permission
 from services.series_table_service import SeriesTableService, SummaryNotReady
@@ -49,7 +50,7 @@ def get_series_table():
     except ValueError as e:
         return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 
 @series_table_bp.route('/api/admin/series-table/cell', methods=['POST'])
@@ -68,7 +69,7 @@ def save_series_table_cell():
     except ValueError as e:
         return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 
 @series_table_bp.route('/api/admin/series-table/export', methods=['GET'])
@@ -84,7 +85,7 @@ def export_series_table():
     except ValueError as e:
         return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
     filename = f"bookoasis_series_{db_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
     return Response(

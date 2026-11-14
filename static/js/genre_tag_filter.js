@@ -1,4 +1,5 @@
 // genre_tag_filter.js – 장르 및 태그 플로팅 모달창 관리 모듈
+import { escapeHtml } from './utils/html.js';
 import { state } from './state.js';
 
 let genresData = [];
@@ -20,17 +21,6 @@ function normalizeMetadataToken(token) {
         .replace(/^[\s'"\[\],]+|[\s'"\[\],]+$/g, '')
         .replace(/\s{2,}/g, ' ')
         .trim();
-}
-
-// genre/tags 값은 DB의 books.genre/books.tags(사용자/플러그인/MCP 쓰기 도구가 채울 수 있는
-// 자유 텍스트)에서 온다 - innerHTML로 꽂기 전에 반드시 이스케이프해야 한다.
-function escapeHtml(value) {
-    return String(value ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
 }
 
 export async function initFloatingFilter() {

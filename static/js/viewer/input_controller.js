@@ -2,6 +2,7 @@
 import { state } from '../state.js';
 import { shouldUseAndroidHotspotTouchFallback } from './platform_profile.js';
 import { isSlideshowSupportedFormat } from './slideshow_controller.js';
+import { getViewerKeyList } from './key_defaults.js';
 
 let _deps = {
   toggleFullscreenViewer: null,
@@ -77,10 +78,10 @@ function handleViewerKeydown(e) {
   }
 
   // 커스텀 매핑 키 (기본값 + localStorage 커스텀 지정키)
-  const customNextKeys = (localStorage.getItem('custom_key_next') || 'ArrowRight,Space,PageDown,VolumeDown,ChannelDown,AudioVolumeDown').split(',').map(k => k.trim().toLowerCase());
-  const customPrevKeys = (localStorage.getItem('custom_key_prev') || 'ArrowLeft,PageUp,VolumeUp,ChannelUp,AudioVolumeUp').split(',').map(k => k.trim().toLowerCase());
-  const customCloseKeys = (localStorage.getItem('custom_key_close') || 'Escape').split(',').map(k => k.trim().toLowerCase());
-  const customDashboardKeys = (localStorage.getItem('custom_key_dashboard') || 'Home').split(',').map(k => k.trim().toLowerCase());
+  const customNextKeys = getViewerKeyList('next');
+  const customPrevKeys = getViewerKeyList('prev');
+  const customCloseKeys = getViewerKeyList('close');
+  const customDashboardKeys = getViewerKeyList('dashboard');
 
   const rawKey = (e.key || '').toLowerCase();
   const codeKey = (e.code || '').toLowerCase();

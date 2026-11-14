@@ -50,7 +50,7 @@ DB_MAP = {
     }
 }
 
-from tools.db_schema_updater import MARIADB_CENTRAL_SCHEMA as MARIADB_SCHEMA_DDL
+from services.schema_mariadb import MARIADB_CENTRAL_SCHEMA as MARIADB_SCHEMA_DDL
 
 
 def connect_mariadb(db_name=None):
@@ -182,7 +182,7 @@ def prepare_mariadb_schemas():
     for db_type, config in DB_MAP.items():
         init_schema(db_type, config['mariadb_db'])
 
-    from tools.db_schema_updater import _ensure_mariadb_columns, _ensure_mariadb_indexes
+    from services.db_migration_service import _ensure_mariadb_columns, _ensure_mariadb_indexes
 
     _ensure_mariadb_columns()
     _ensure_mariadb_indexes()

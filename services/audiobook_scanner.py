@@ -7,7 +7,8 @@ import subprocess
 import time
 from utils.drive_helper import is_remote_path
 
-AUDIO_EXTENSIONS = ('.mp3', '.m4b', '.m4a', '.flac', '.aac', '.wav', '.ogg', '.opus', '.wma')
+from utils import media_types as _media_types
+AUDIO_EXTENSIONS = _media_types.AUDIO_EXTENSIONS
 
 _MP3_BITRATE_TABLE = {
     (3, 3): [0, 32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448],   # MPEG1, Layer1
@@ -616,7 +617,7 @@ def parse_audiobook_folder(folder_path, existing_track_cache=None, remote_fast_p
         if not found_poster and os.path.exists(folder_path):
             try:
                 for file_name in os.listdir(folder_path):
-                    if file_name.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
+                    if file_name.lower().endswith(_media_types.IMAGE_EXTENSIONS):
                         found_poster = os.path.join(folder_path, file_name)
                         break
             except Exception:

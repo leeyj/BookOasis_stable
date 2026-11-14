@@ -200,7 +200,7 @@ flowchart LR
     Web["웹 기동 core.py → init_databases()"] --> Full
     Full --> Steps["DB 4곳마다: 스키마 → 빠진 컬럼 ALTER →<br/>인덱스 → 기본 설정·admin 시드 → 백필 →<br/>오래된 기록 정리 → 시리즈 요약"]
 ```
-* SQLite DDL은 `_SCHEMA_SQL`·`_INDEXES_SQL`(`services/db_migration_service.py`), MariaDB DDL은 `MARIADB_CENTRAL_SCHEMA`(`tools/db_schema_updater.py`) **두 곳**에 있습니다. 새 테이블·컬럼은 둘 다 고쳐야 합니다 → [change_db_guide.md](./change_db_guide.md)
+* SQLite DDL은 `_SCHEMA_SQL`·`_INDEXES_SQL`(`services/db_migration_service.py`), MariaDB DDL은 `MARIADB_CENTRAL_SCHEMA`(`services/schema_mariadb.py`) **두 곳**에 있습니다. 새 테이블·컬럼은 둘 다 고쳐야 합니다 → [change_db_guide.md](./change_db_guide.md)
 * 빠진 컬럼은 기동 때 자동으로 `ALTER TABLE ADD COLUMN` 됩니다. 마이그레이션은 매 기동 돌아도 안전해야 합니다(멱등).
 * 테이블 사이 외래 키·연쇄 삭제는 없습니다. 도서에 딸린 데이터 정리는 코드가 목록으로 합니다(§11).
 

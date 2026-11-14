@@ -204,8 +204,8 @@ body {
 }
 
 .force-change-border {
-    border-color: var(--color-warning) !important;
-    box-shadow: 0 0 25px rgba(234, 88, 12, 0.25) !important;
+    border-color: var(--color-warning);
+    box-shadow: 0 0 25px rgba(234, 88, 12, 0.25);
 }
 
 .hidden {

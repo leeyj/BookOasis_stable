@@ -147,13 +147,13 @@ async function clearNotifications() {
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'clear failed');
     await refreshSystemStatus();
-    toast(escapeActivityText(tr('notify.cleared', { count: count.toLocaleString() }, `알림 ${count}건을 지웠습니다.`)), 'success', {
+    toast(tr('notify.cleared', { count: count.toLocaleString() }, `알림 ${count}건을 지웠습니다.`), 'success', {
       actionLabel: tr('notify.clear_undo', {}, '되돌리기'),
       onAction: () => undoClearNotifications(data),
     });
   } catch (err) {
     console.warn('[Notifications] clear failed:', err);
-    toast(escapeActivityText(tr('notify.clear_failed', {}, '알림을 지우지 못했습니다.')), 'error');
+    toast(tr('notify.clear_failed', {}, '알림을 지우지 못했습니다.'), 'error');
   }
 }
 
@@ -170,7 +170,7 @@ async function undoClearNotifications(cleared) {
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'undo failed');
     await refreshSystemStatus();
-    if (typeof window.showToast === 'function') window.showToast(escapeActivityText(tr('notify.clear_undone', {}, '지운 알림을 되돌렸습니다.')), 'info');
+    if (typeof window.showToast === 'function') window.showToast(tr('notify.clear_undone', {}, '지운 알림을 되돌렸습니다.'), 'info');
   } catch (err) {
     console.warn('[Notifications] undo clear failed:', err);
   }

@@ -1,6 +1,7 @@
 // book_actions.js – 도서/시리즈 즐겨찾기 토글 및 재스캔 액션 핸들러
 import { state } from '../state.js';
 import * as api from '../api.js';
+import { escapeHtml } from '../utils/html.js';
 
 // 전역 작업 차단 로딩 오버레이 헬퍼 (대량 삭제/긴 비동기 작업용)
 export function showGlobalLoadingSpinner(message = i18n.t('detail.spinner_processing')) {
@@ -28,7 +29,7 @@ export function showGlobalLoadingSpinner(message = i18n.t('detail.spinner_proces
     overlay.innerHTML = `
       <div style="background: rgba(var(--app-panel-rgb), 0.95); padding: 2rem 2.5rem; border-radius: 16px; border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); text-align: center; max-width: 90vw; width: 400px;">
         <i class="lc lc-loader-circle lc-spin" style="font-size: 2.5rem; color: var(--app-accent); margin-bottom: 1.2rem;"></i>
-        <div id="global-loading-overlay-msg" style="font-size: 1rem; font-weight: 600; color: var(--app-text-primary); line-height: 1.5; word-break: keep-all;">${message}</div>
+        <div id="global-loading-overlay-msg" style="font-size: 1rem; font-weight: 600; color: var(--app-text-primary); line-height: 1.5; word-break: keep-all;">${escapeHtml(message)}</div>
         <div style="font-size: 0.8rem; color: var(--app-text-muted); margin-top: 0.8rem;">${i18n.t('detail.spinner_wait')}</div>
       </div>
     `;

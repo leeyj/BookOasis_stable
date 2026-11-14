@@ -10,7 +10,8 @@ import yaml
 
 from services.audiobook_scanner import natural_sort_key
 
-VIDEO_EXTENSIONS = ('.mp4', '.mkv', '.avi', '.webm', '.mov', '.m4v', '.ts')
+from utils import media_types as _media_types
+VIDEO_EXTENSIONS = _media_types.VIDEO_EXTENSIONS
 
 # 자막 사이드카 탐색 확장자 (같은 파일명, 확장자만 다른 파일을 우선순위 순으로 찾음)
 SUBTITLE_EXTENSIONS = ('.smi', '.srt', '.vtt')

@@ -273,11 +273,6 @@ export function closeMediaViewer(triggerBack = true, isTransitioning = false, op
   const keepFullscreen = !!(options && options.keepFullscreen) && isViewerInFullscreen();
   const fullscreenExitPromise = keepFullscreen ? Promise.resolve() : exitFullscreenIfNeeded();
 
-  const padPanel = document.getElementById('viewer-padding-overlay-panel');
-  if (padPanel) {
-    padPanel.style.display = 'none';
-  }
-
   if (!isTransitioning) {
     const menu = document.getElementById('comic-overlay-menu');
     let savedScrollY = 0;

@@ -4,6 +4,7 @@ scan_routes.py – 스캔 관리 라우터 (도서 스캔, 표지 스캔 등)
 """
 import os
 from flask import Blueprint, request, jsonify
+from api.helpers.route_helpers import error_response
 from services.book_scan_service import BookScanService
 from api.auth import admin_required
 from utils.i18n import _t
@@ -81,7 +82,7 @@ def trigger_books_lazy_scan():
                 'message': f"'{series_name}' 시리즈 {book_count}권의 Lazy-Scanner 작업을 대기열에 추가했습니다."
             })
         except Exception as e:
-            return jsonify({'success': False, 'error': str(e)}), 500
+            return error_response(e)
         finally:
             if conn:
                 conn.close()
@@ -124,7 +125,7 @@ def trigger_books_lazy_scan():
             'message': f'선택한 {len(book_ids)}개 작품의 Lazy-Scanner 작업을 대기열에 추가했습니다.'
         })
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
     finally:
         if conn:
             conn.close()
@@ -141,7 +142,7 @@ def scan_single_book_api(book_id):
         else:
             return jsonify({'success': False, 'error': message}), 400
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 
 @scan_bp.route('/api/media/books/scan-batch', methods=['POST'])
@@ -197,7 +198,7 @@ def enqueue_batch_book_scan():
             return jsonify({'success': False, 'error': '시리즈 스캔은 한 번에 최대 500권까지 가능합니다.'}), 400
         return _enqueue_batch_book_scan(db_type, rows, scan_scope)
     except Exception as error:
-        return jsonify({'success': False, 'error': str(error)}), 500
+        return error_response(error)
     finally:
         if conn:
             conn.close()
@@ -279,7 +280,7 @@ def trigger_library_scan(library_id):
         print(f"[API-ScanTrigger SUCCESS] ✅ Library_id={library_id} scan task enqueued successfully.")
         return jsonify({'success': True, 'message': _t('api.msg_scan_started')})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 def _resolve_library_scoped_path(physical_path, rel_path):
     """라이브러리 physical_path(복수 루트 가능) 기준 상대경로를 절대경로로 해석하고,
@@ -342,7 +343,7 @@ def trigger_library_path_scan(library_id):
     except FileNotFoundError as e:
         return jsonify({'success': False, 'error': str(e)}), 404
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 
 @scan_bp.route('/api/media/libraries/<int:library_id>/cancel-scan', methods=['POST'])
@@ -355,7 +356,7 @@ def cancel_library_scan(library_id):
         CategoryRepository.update_library_scan_status(db_type, library_id, 'cancelling')
         return jsonify({'success': True, 'message': _t('api.msg_scan_cancelling')})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @scan_bp.route('/api/media/libraries/<int:library_id>/scan-covers', methods=['POST'])
 @admin_required
@@ -383,7 +384,7 @@ def trigger_library_cover_scan(library_id):
         
         return jsonify({'success': True, 'message': _t('api.msg_cover_scan_started')})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 
 @scan_bp.route('/api/media/libraries/<int:library_id>/lazy-scan', methods=['POST'])
@@ -408,7 +409,7 @@ def trigger_library_lazy_scan(library_id):
             'message': f'라이브러리 ID {library_id}의 Lazy-Scanner 작업을 대기열에 추가했습니다.'
         })
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @scan_bp.route('/api/media/libraries/scan-all', methods=['POST'])
 @admin_required
@@ -449,7 +450,7 @@ def trigger_all_libraries_scan():
             
         return jsonify({'success': True, 'message': f'{enqueued_count}개의 카테고리가 순차 스캔 대기열에 추가되었습니다. (중복 제외: {skipped_count})'})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 
 @scan_bp.route('/api/media/scan-history', methods=['GET'])
@@ -463,4 +464,4 @@ def get_scan_history_api():
 
         return jsonify({'success': True, 'history': history})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)

@@ -4,12 +4,13 @@ validation.py – 공통 검증 및 유틸리티 헬퍼
 """
 import os
 from utils.i18n import _t
+from utils import media_types as _media_types
 
 MAX_LIBRARY_PATHS = 20
 MAX_LIBRARY_PATH_LINE_LENGTH = 1024
 MAX_LIBRARY_PATH_TEXT_LENGTH = 8192
 
-_AUDIO_EXTENSIONS = ('.mp3', '.m4b', '.m4a', '.flac', '.aac', '.wav', '.ogg', '.opus', '.wma')
+_AUDIO_EXTENSIONS = _media_types.AUDIO_EXTENSIONS
 _BOOKISH_EXTENSIONS = ('.zip', '.cbz', '.rar', '.cbr', '.epub', '.pdf', '.txt')
 
 def validate_library_paths(physical_path, is_remote=0):

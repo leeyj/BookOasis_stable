@@ -1,4 +1,5 @@
 /* tab_collections.js - 사용자별 컬렉션(Collection) UI 렌더러 및 이벤트 매니저 */
+import { escapeHtml } from './utils/html.js';
 import { state } from './state.js';
 import { createBookCard } from './ui.js';
 import { openBookDetail } from './modal.js';
@@ -544,14 +545,4 @@ function openEditCollectionModal(coll) {
       alert(i18n.t('collections.error', { error: e.message }));
     }
   });
-}
-
-function escapeHtml(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
 }

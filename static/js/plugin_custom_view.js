@@ -1,18 +1,9 @@
 // static/js/plugin_custom_view.js – 카테고리 레벨 플러그인 전용 풀페이지 뷰포트 마운트 오케스트레이터
+import { escapeHtml } from './utils/html.js';
 import { state } from './state.js';
 import { switchActiveView } from './view_manager.js';
 import { updateCurrentCategoryIndicator } from './category_indicator.js';
 import { withPluginGlobals } from './utils/script_loader.js';
-
-function escapeHtml(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
 
 // 부문/카테고리를 빠르게 연속 전환하면 먼저 연 플러그인 화면의 비동기 로딩이 나중에
 // 끝나면서, 이미 다른 화면으로 넘어간 컨테이너를 낡은 내용으로 덮어쓸 수 있다.

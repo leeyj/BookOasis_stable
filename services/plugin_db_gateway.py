@@ -7,9 +7,9 @@ class PluginDatabaseGateway:
     """Shared DB gateway for metadata plugins."""
 
     def __init__(self, db_type="general"):
-        import os
+        from database import is_mariadb_mode
         self.db_type = db_type or "general"
-        self._engine = os.environ.get('DB_ENGINE', os.environ.get('DBMS', 'sqlite')).lower()
+        self._engine = 'mariadb' if is_mariadb_mode() else 'sqlite'
 
     def _prepare_query(self, query):
         if not query:

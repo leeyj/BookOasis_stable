@@ -22,6 +22,7 @@ import zipfile
 from datetime import datetime, timedelta
 
 from services.problem_service import ProblemService, catalog_entry
+from utils import media_types as _media_types
 
 DIAGNOSE_DB_TYPES = ('general', 'adult')
 # GDrive(rclone) 첫 접근은 몇 초 걸린다(테스트 서버 실측: 루트+파일+형식 합계 약 8초) - 느림을 끊김으로 오판하지 않게 넉넉히.
@@ -32,7 +33,7 @@ OK, FAIL, WARN, SKIP = 'ok', 'fail', 'warn', 'skip'
 
 _ZIP_FORMATS = ('zip', 'cbz', 'epub')
 _PAGE_ARCHIVE_FORMATS = ('zip', 'cbz')
-_VIDEO_EXT = ('.mp4', '.mkv', '.avi', '.mov', '.wmv', '.webm', '.m4v', '.ts', '.flv')
+_VIDEO_EXT = _media_types.VIDEO_EXTENSIONS
 
 
 def _check(check_id, status, key, **vars_):

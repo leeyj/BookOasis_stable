@@ -21,6 +21,7 @@ import time
 import urllib.parse
 
 from flask import Blueprint, Response, jsonify, redirect, request, send_file, session
+from api.helpers.route_helpers import error_response
 import database
 from api.cache import LRUCache
 from api.opds_common.auth import authenticate_basic_auth_user, unauthorized_response
@@ -198,6 +199,14 @@ def _require_app_opds_auth(db_type: str = None):
     return None
 
 
+def _app_opds_user_id(db_type):
+    """앱 OPDS 요청을 인증한 사용자 ID. 예전엔 진행률 API가 user_id=1(관리자)로 고정 기록했다.
+    _require_app_opds_auth()를 통과한 뒤에 부른다 - 인증 정보가 없으면 None."""
+    is_adult = request.path.startswith('/app-opds-adult/') or str(db_type or '').strip().lower() == 'adult'
+    user = _get_authenticated_user_cached(is_adult=is_adult)
+    return user.get('id') if user else None
+
+
 def _enrich_books_for_app_opds(books_list, db_type: str, is_adult_prefix: bool):
     return enrich_books_for_app_opds(books_list, db_type, is_adult_prefix)
 
@@ -267,7 +276,7 @@ def app_opds_stream_compat():
         page_idx = int(request.args.get('page_idx', 0))
     except (ValueError, TypeError):
         page_idx = 0
-    user_id = current_user.get('id', 1)
+    user_id = current_user.get('id')
     role = current_user.get('role')
 
     if not book_id:
@@ -297,7 +306,7 @@ def app_opds_txt_compat():
     if auth_error:
         return auth_error
     current_user = _get_authenticated_user_cached(is_adult=default_db_type == 'adult' or db_type == 'adult') or {}
-    user_id = current_user.get('id', 1)
+    user_id = current_user.get('id')
     role = current_user.get('role')
 
     book_id = request.args.get('book_id')
@@ -323,7 +332,7 @@ def app_opds_pdf_compat():
     if auth_error:
         return auth_error
     current_user = _get_authenticated_user_cached(is_adult=default_db_type == 'adult' or db_type == 'adult') or {}
-    user_id = current_user.get('id', 1)
+    user_id = current_user.get('id')
     role = current_user.get('role')
 
     book_id = request.args.get('book_id')
@@ -384,13 +393,12 @@ def app_opds_progress_state_compat():
         return jsonify({'success': False, 'error': _t('api.err_book_id_required')}), 400
 
     try:
-        result = viewer_get_progress_state(db_type, book_id, user_id=1)
+        result = viewer_get_progress_state(db_type, book_id, user_id=_app_opds_user_id(db_type))
         if result['status'] != 'ok':
             return jsonify({'success': False, 'error': 'book not found'}), 404
         return jsonify({'success': True, 'state': result['state']})
     except Exception as e:
-        print(f"[App-OPDS Progress State API Error] {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 
 @app_opds_bp.route('/app-opds/api/media/progress', methods=['POST'])
@@ -412,11 +420,10 @@ def app_opds_progress_compat():
         if book_id is None or page_idx is None:
             return jsonify({'success': False, 'error': _t('api.err_book_id_page_idx_required')}), 400
 
-        viewer_save_progress(db_type, book_id, page_idx, total_pages, epub_session=epub_session, user_id=1)
+        viewer_save_progress(db_type, book_id, page_idx, total_pages, epub_session=epub_session, user_id=_app_opds_user_id(db_type))
         return jsonify({'success': True})
     except Exception as e:
-        print(f"[App-OPDS Progress API Error] {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 
 @app_opds_bp.route('/app-opds/api/media/unread', methods=['POST'])
@@ -434,11 +441,10 @@ def app_opds_unread_compat():
         if book_id is None:
             return jsonify({'success': False, 'error': 'book_id가 누락되었습니다.'}), 400
 
-        viewer_mark_unread(db_type, book_id, user_id=1)
+        viewer_mark_unread(db_type, book_id, user_id=_app_opds_user_id(db_type))
         return jsonify({'success': True})
     except Exception as e:
-        print(f"[App-OPDS Unread API Error] {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 
 @app_opds_bp.route('/app-opds/api/media/preload-next-book', methods=['POST'])
@@ -456,15 +462,14 @@ def app_opds_preload_next_book_compat():
         if not book_id:
             return jsonify({'success': False, 'error': _t('api.err_book_id_required')}), 400
 
-        result = viewer_preload_next_book(db_type, book_id, user_id=1)
+        result = viewer_preload_next_book(db_type, book_id, user_id=_app_opds_user_id(db_type))
         if result['status'] == 'no_next':
             return jsonify({'success': True, 'message': _t('api.msg_no_next_book')})
         if result['status'] == 'next_not_exist':
             return jsonify({'success': False, 'error': _t('api.err_next_book_not_exist')}), 404
         return jsonify({'success': True, 'preloaded_book_id': result['preloaded_book_id']})
     except Exception as e:
-        print(f"[App-OPDS Preload API Error] {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 
 @app_opds_bp.route('/app-opds/login', methods=['POST', 'GET'])

@@ -387,10 +387,11 @@ def fetch_gdrive_folder_files(folder_id_or_url, parent_subpath="", depth=0, max_
 
 
 # 이미지 폴더(화보 등)를 책 한 권으로 등록할 때 쓰는 이미지 확장자 (tools/scanner/tasks.py와 동일).
-GDRIVE_IMAGE_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif')
+from utils import media_types as _media_types
+GDRIVE_IMAGE_EXTENSIONS = _media_types.IMAGE_EXTENSIONS
 
 # 메타데이터로 쓰는 파일 확장자 — 공유 폴더에서 이것만 로컬 미러로 받아둔다(tools/scanner/tasks.py와 동일).
-GDRIVE_META_EXTENSIONS = ('.yaml', '.yml', '.json', '.xml')
+GDRIVE_META_EXTENSIONS = _media_types.METADATA_EXTENSIONS
 
 
 def gdrive_meta_mirror_dir(db_type, library_id, folder_id=None):
@@ -531,7 +532,7 @@ def fetch_gdrive_folder_files_via_rclone(remote_name, folder_id_or_url):
 # 바로 다운로드할 수 있다. 파일명(및 그로부터 파생되는 제목/확장자 판별)은 별도의 원본
 # filename 변수를 그대로 쓰는 다른 코드 경로들과 완전히 분리되어 있어, 이 마커가 화면
 # 제목이나 확장자 판별에는 영향을 주지 않는다 (books.title은 file_path가 아니라 그
-# 원본 filename에서만 파생됨 — tools/scanner/db_writer_sqlite.py의 insert_new_book_v2 참조).
+# 원본 filename에서만 파생됨 — tools/scanner/db_writer.py의 insert_new_book_v2 참조).
 GDRIVE_FILE_ID_MARKER = '?gid='
 
 

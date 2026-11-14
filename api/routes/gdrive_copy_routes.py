@@ -7,6 +7,7 @@ gdrive_copy_routes.py – 구글 드라이브 서버사이드 복사(2단계: �
 """
 import os
 from flask import Blueprint, request, jsonify
+from api.helpers.route_helpers import error_response
 from api.auth import admin_required
 from utils.rclone_gdrive_copy import list_writable_drive_remotes, validate_remote_access
 from services.gdrive_copy_service import GdriveCopyService
@@ -28,7 +29,7 @@ def get_gdrive_copy_remotes():
         remotes = list_writable_drive_remotes()
         return jsonify({'success': True, 'remotes': remotes})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 
 @gdrive_copy_bp.route('/api/gdrive-copy/validate', methods=['POST'])
@@ -51,7 +52,7 @@ def validate_gdrive_copy_target():
         status_code = 200 if result.get('success') else 400
         return jsonify(result), status_code
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 
 @gdrive_copy_bp.route('/api/gdrive-copy/detect-mount-root', methods=['POST'])
@@ -92,7 +93,7 @@ def detect_gdrive_copy_mount_root():
             '이 경우 "마운트 루트 직접 입력"에 실제 마운트 경로를 입력해 주세요.'
         )})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 
 @gdrive_copy_bp.route('/api/gdrive-copy/start', methods=['POST'])
@@ -117,4 +118,4 @@ def start_gdrive_copy():
     except ValueError as e:
         return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)

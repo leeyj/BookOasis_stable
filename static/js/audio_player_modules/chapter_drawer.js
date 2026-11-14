@@ -1,5 +1,5 @@
 // chapter_drawer.js - 오디오 챕터(트랙) 드로어 리스트 렌더링/전환 전담
-import { escapeHtml } from '../category/kind_options.js';
+import { escapeHtml } from '../utils/html.js';
 
 export function createChapterDrawer(deps) {
   const {

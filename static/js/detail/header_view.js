@@ -1,3 +1,4 @@
+import { escapeHtml } from '../utils/html.js';
 import { buildFallbackCoverUrl, getBookCoverSrc } from '../cover_fallback.js';
 import { state } from '../state.js';
 import { stripLeadingBracketTags } from '../series_display.js';
@@ -9,18 +10,6 @@ function normalizeMetadataToken(token) {
     .replace(/^[\s'"\[\],]+|[\s'"\[\],]+$/g, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
-}
-
-// author/publisher/summary/genre/tags/link/series_alias 등은 사용자/플러그인/MCP 쓰기 도구가
-// 자유 텍스트로 채울 수 있는 필드라, 텍스트 노드/속성값으로 꽂기 전에 항상 이스케이프해야 한다
-// (과거 이 파일은 이 필드들을 이스케이프 없이 innerHTML에 직접 삽입해 저장형 XSS가 가능했다).
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }
 
 // href로 쓰기 전에 http(s)/상대경로만 허용 - javascript: 등 위험한 프로토콜 차단

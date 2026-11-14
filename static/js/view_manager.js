@@ -1,5 +1,6 @@
 // view_manager.js – 화면(뷰) 상태 제어 및 렌더링 영역 전환 매니저
 import { state } from './state.js';
+import { escapeHtml } from './utils/html.js';
 import { mountIndexScrollbar, unmountIndexScrollbar } from './index_scrollbar.js';
 import { clearViewerReportAction, showViewerReportAction } from './viewer/report_problem.js';
 import { syncTableModeUi } from './table_view/mode.js';
@@ -179,8 +180,10 @@ export function showViewerError(message = i18n.t("viewer.error_title_default"), 
  * ────────────────────────────────────────────────────────
  * @param {string} message - 토스트 노출 메시지
  * @param {string} type - 'success' | 'error' | 'info'
- * @param {{actionLabel?: string, onAction?: Function, duration?: number}} [options]
+ * @param {{actionLabel?: string, onAction?: Function, duration?: number, html?: boolean}} [options]
  *        actionLabel+onAction를 주면 토스트 오른쪽에 버튼 하나(예: 되돌리기)를 붙인다.
+ *        message는 기본적으로 텍스트로 이스케이프된다(서버 오류 문구가 그대로 들어오므로).
+ *        HTML 마크업이 꼭 필요하면 html: true를 준다.
  */
 export function showToast(message, type = 'success', options = {}) {
   let container = document.getElementById('toast-container');
@@ -225,7 +228,8 @@ export function showToast(message, type = 'success', options = {}) {
     window.toastTimer = null;
   }
 
-  container.innerHTML = `${iconHtml} <span>${message}</span>`;
+  const messageHtml = options && options.html ? String(message ?? '') : escapeHtml(message);
+  container.innerHTML = `${iconHtml} <span>${messageHtml}</span>`;
   const hasAction = Boolean(options && options.actionLabel && typeof options.onAction === 'function');
   // 평소엔 클릭이 토스트를 통과하지만, 버튼이 있을 때만 눌릴 수 있게 한다.
   container.style.pointerEvents = hasAction ? 'auto' : 'none';

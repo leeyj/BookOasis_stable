@@ -16,8 +16,8 @@ BookOasis는 **SQLite(기본값)** 와 **MariaDB/MySQL** 두 엔진을 지원하
 
 ## 1. 스키마 개요
 
-- 스키마 원본은 두 곳입니다: SQLite `services/db_migration_service.py`의 `_SCHEMA_SQL`, MariaDB `tools/db_schema_updater.py`의 `MARIADB_CENTRAL_SCHEMA`. 두 곳의 테이블 구성은 같아야 합니다(테스트가 확인).
-- 기동 때 `run_full_migration()`이 4개 DB에 같은 스키마를 적용하고, 선언에 있는데 운영 DB에 없는 컬럼·인덱스를 보강합니다(SQLite는 `_SCHEMA_SQL`을 읽어 자동 보강, MariaDB는 `tools/db_schema_updater.py`의 컬럼·인덱스 보강 목록).
+- 스키마 원본은 두 곳입니다: SQLite `services/db_migration_service.py`의 `_SCHEMA_SQL`, MariaDB `services/schema_mariadb.py`의 `MARIADB_CENTRAL_SCHEMA`. 두 곳의 테이블 구성은 같아야 합니다(테스트가 확인).
+- 기동 때 `run_full_migration()`이 4개 DB에 같은 스키마를 적용하고, 선언에 있는데 운영 DB에 없는 컬럼·인덱스를 보강합니다(SQLite는 `_SCHEMA_SQL`을 읽어 자동 보강, MariaDB는 `services/db_migration_service.py`의 `_ensure_mariadb_columns`/`_ensure_mariadb_indexes` 보강 목록).
 - 과거 버전에서 올라온 운영 DB에는 잔여 컬럼·인덱스가 남아 있을 수 있으므로, 코어/플러그인 쿼리는 호환성을 고려해야 합니다.
 - MariaDB는 `ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`을 쓰며, SQLite의 `INTEGER`/`TEXT`는 대체로 `BIGINT`/`VARCHAR(n)` 또는 `TEXT`로 옮겨집니다.
 - 전역 데이터(설정, 스캔 대기열·이력, 알림, MCP 대기 변경, kosync, 사용자별 설정)는 **general DB 하나에만** 씁니다. `users`는 4개 DB에 같은 사용자 이름으로 복제됩니다.
@@ -426,7 +426,7 @@ MCP 쓰기 도구(Tier B)가 바로 적용하지 않고 관리자 승인을 기�
 컬럼 타입, 기본값, 인덱스는 이 문서에 옮겨 적지 않습니다(예전 사본은 금방 낡았습니다). 아래 원본을 직접 보세요.
 
 - SQLite: `services/db_migration_service.py` — `_SCHEMA_SQL`(테이블), `_INDEXES_SQL`(인덱스)
-- MariaDB: `tools/db_schema_updater.py` — `MARIADB_CENTRAL_SCHEMA`(테이블), 운영 DB 보강용 컬럼·인덱스 목록
+- MariaDB: `services/schema_mariadb.py` — `MARIADB_CENTRAL_SCHEMA`(테이블), 운영 DB 보강용 컬럼·인덱스 목록은 `services/db_migration_service.py`
 - 컬럼을 추가하는 절차(두 원본을 함께 고치기, 보강 목록에 넣기): [change_db_guide.md](./change_db_guide.md)
 
 ---

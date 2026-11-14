@@ -1,0 +1,629 @@
+# -*- coding: utf-8 -*-
+"""
+schema_mariadb.py – MariaDB 중앙 스키마 정의 (Single Source of Truth).
+
+예전엔 tools/db_schema_updater.py에 있었는데, 웹 프로세스(services/db_migration_service.py)가 이 상수 하나 때문에
+import 시점에 .env를 직접 파싱하고 실패하면 sys.exit(1)하는 CLI 모듈을 불러왔다. 상수만 여기로 옮겼다 -
+이 모듈은 아무것도 import하지 않는다(순환 import 방지). SQLite 스키마는 db_migration_service._SCHEMA_SQL.
+"""
+
+MARIADB_CENTRAL_SCHEMA = """
+CREATE TABLE IF NOT EXISTS library_groups (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    icon VARCHAR(100) DEFAULT 'fa-folder',
+    color VARCHAR(50) DEFAULT NULL,
+    sort_order INT DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS library_kinds (
+    code VARCHAR(24) PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    is_builtin TINYINT(1) NOT NULL DEFAULT 0,
+    sort_order INT DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS libraries (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    physical_path TEXT NOT NULL,
+    cron_schedule VARCHAR(255) DEFAULT NULL,
+    schedule_enabled TINYINT(1) NOT NULL DEFAULT 1,
+    last_scanned_at DATETIME DEFAULT NULL,
+    scan_status VARCHAR(50) DEFAULT 'ready',
+    is_remote INT DEFAULT 0,
+    vfs_refresh_before_scan INT DEFAULT 0,
+    rclone_rc_url TEXT DEFAULT NULL,
+    icon VARCHAR(100) DEFAULT 'fa-book',
+    color VARCHAR(50) DEFAULT '#94a3b8',
+    hide_cover INT DEFAULT 0,
+    group_id BIGINT DEFAULT NULL,
+    sort_order INT DEFAULT 0,
+    gdrive_copy_remote VARCHAR(255) DEFAULT NULL,
+    gdrive_view_local_mirror_path TEXT DEFAULT NULL,
+    content_kind VARCHAR(24) NOT NULL DEFAULT 'unspecified',
+    pending_delete INT DEFAULT 0,
+    transfer_target_id BIGINT DEFAULT NULL,
+    INDEX idx_libraries_group_id (group_id),
+    INDEX idx_libraries_group_order (group_id, sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS plugin_group_assignments (
+    plugin_id VARCHAR(255) PRIMARY KEY,
+    group_id BIGINT NOT NULL,
+    sort_order INT DEFAULT 0,
+    INDEX idx_plugin_group_assignments_group_id (group_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS scanner_tasks (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    task_type VARCHAR(100) NOT NULL,
+    task_key VARCHAR(255) NOT NULL UNIQUE,
+    status VARCHAR(50) NOT NULL DEFAULT 'pending',
+    kwargs TEXT,
+    stage TEXT,
+    worker_pid INT DEFAULT NULL,
+    enqueue_at VARCHAR(50),
+    started_at VARCHAR(50),
+    finished_at VARCHAR(50),
+    error_message TEXT,
+    cancel_requested INT DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS books (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    library_id BIGINT,
+    title VARCHAR(500) NOT NULL,
+    series_name VARCHAR(500),
+    author VARCHAR(500),
+    isbn VARCHAR(100),
+    file_path TEXT NOT NULL,
+    file_format VARCHAR(50) NOT NULL,
+    total_pages INT NOT NULL DEFAULT 0,
+    has_offsets INT DEFAULT 0,
+    cover_image TEXT,
+    publisher VARCHAR(255),
+    link TEXT,
+    score INT,
+    release_date VARCHAR(100),
+    summary TEXT,
+    genre VARCHAR(255),
+    tags TEXT,
+    books_lv VARCHAR(20),
+    is_favorite INT DEFAULT 0,
+    cover_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    is_deleted INT DEFAULT 0,
+    deleted_at DATETIME DEFAULT NULL,
+    metadata_locked INT DEFAULT 0,
+    series_alias VARCHAR(500),
+    title_alias VARCHAR(500),
+    file_mtime DOUBLE DEFAULT 0.0,
+    file_size BIGINT DEFAULT 0,
+    cover_align VARCHAR(10) DEFAULT 'center',
+    UNIQUE KEY uq_books_file_path (file_path(500)),
+    INDEX idx_books_series_name (series_name(255)),
+    INDEX idx_books_series_alias (series_alias(255)),
+    INDEX idx_books_library_id (library_id),
+    INDEX idx_books_title (title(255)),
+    INDEX idx_books_isbn (isbn)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS series_summary (
+    library_id BIGINT NOT NULL,
+    series_key VARCHAR(500) NOT NULL,
+    representative_book_id BIGINT NOT NULL,
+    series_book_count BIGINT NOT NULL DEFAULT 0,
+    sort_series_name VARCHAR(500) NOT NULL DEFAULT '',
+    latest_added VARCHAR(50) NOT NULL DEFAULT '',
+    PRIMARY KEY (library_id, series_key),
+    INDEX idx_series_summary_order (library_id, sort_series_name, representative_book_id),
+    INDEX idx_series_summary_latest_added (latest_added, representative_book_id),
+    INDEX idx_series_summary_count (series_book_count, representative_book_id),
+    INDEX idx_series_summary_lib_count (library_id, series_book_count, representative_book_id),
+    INDEX idx_series_summary_rep (representative_book_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS series_summary_state (
+    id TINYINT NOT NULL PRIMARY KEY,
+    is_ready TINYINT NOT NULL DEFAULT 0,
+    refreshed_at DATETIME DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS audiobooks (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    library_id BIGINT,
+    title VARCHAR(500) NOT NULL,
+    sort_title VARCHAR(500),
+    web_id VARCHAR(100),
+    author VARCHAR(500),
+    publisher VARCHAR(255),
+    code VARCHAR(255),
+    poster TEXT,
+    premiered VARCHAR(100),
+    ratings DOUBLE DEFAULT 0.0,
+    author_intro TEXT,
+    description TEXT,
+    folder_name VARCHAR(500) NOT NULL,
+    folder_path TEXT NOT NULL,
+    total_duration DOUBLE DEFAULT 0.0,
+    total_tracks INT DEFAULT 1,
+    file_type VARCHAR(50) DEFAULT 'multi',
+    is_favorite INT DEFAULT 0,
+    metadata_locked INT DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    is_deleted INT DEFAULT 0,
+    deleted_at DATETIME DEFAULT NULL,
+    UNIQUE KEY uq_audiobooks_folder_path (folder_path(500))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS audiobook_tracks (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    audiobook_id BIGINT NOT NULL,
+    track_number INT NOT NULL,
+    track_code VARCHAR(100),
+    title VARCHAR(500),
+    filename VARCHAR(500) NOT NULL,
+    file_path TEXT NOT NULL,
+    file_mtime DOUBLE DEFAULT 0.0,
+    file_size BIGINT DEFAULT 0,
+    duration DOUBLE DEFAULT 0.0,
+    format VARCHAR(50) DEFAULT 'mp3',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_tracks_file_path (file_path(500)),
+    INDEX idx_tracks_audiobook (audiobook_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS audiobook_progress (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    audiobook_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL DEFAULT 1,
+    current_track_id BIGINT,
+    `current_time` DOUBLE DEFAULT 0.0,
+    total_progress_pct DOUBLE DEFAULT 0.0,
+    playback_rate DOUBLE DEFAULT 1.0,
+    is_completed INT DEFAULT 0,
+    last_listened_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_audiobook_user_progress (audiobook_id, user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS audiobook_track_progress (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    audiobook_id BIGINT NOT NULL,
+    track_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL DEFAULT 1,
+    `current_time` DOUBLE DEFAULT 0.0,
+    progress_pct DOUBLE DEFAULT 0.0,
+    is_completed INT DEFAULT 0,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_audiobook_track_user_progress (audiobook_id, track_id, user_id),
+    INDEX idx_audiobook_track_progress_lookup (audiobook_id, user_id, track_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS kosync_credentials (
+    user_id BIGINT PRIMARY KEY,
+    key_hash VARCHAR(255) NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS kosync_documents (
+    document VARCHAR(64) PRIMARY KEY,
+    db_type VARCHAR(20) NOT NULL,
+    book_id BIGINT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS kosync_progress (
+    user_id BIGINT NOT NULL,
+    document VARCHAR(64) NOT NULL,
+    progress TEXT,
+    percentage DOUBLE,
+    device VARCHAR(255),
+    device_id VARCHAR(255),
+    timestamp BIGINT NOT NULL,
+    PRIMARY KEY (user_id, document)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS audiobook_music_lookups (
+    audiobook_id BIGINT PRIMARY KEY,
+    status VARCHAR(20) NOT NULL,
+    source VARCHAR(100),
+    artist VARCHAR(500),
+    year VARCHAR(20),
+    genres VARCHAR(500),
+    summary TEXT,
+    cover_url TEXT,
+    source_url TEXT,
+    looked_up_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS videos (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    library_id BIGINT,
+    title VARCHAR(500) NOT NULL,
+    sort_title VARCHAR(500),
+    web_id VARCHAR(100),
+    genres VARCHAR(500),
+    poster TEXT,
+    backdrop TEXT,
+    premiered VARCHAR(100),
+    description TEXT,
+    folder_name VARCHAR(500) NOT NULL,
+    folder_path TEXT NOT NULL,
+    total_duration DOUBLE DEFAULT 0.0,
+    total_episodes INT DEFAULT 0,
+    is_favorite INT DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    is_deleted INT DEFAULT 0,
+    deleted_at DATETIME DEFAULT NULL,
+    UNIQUE KEY uq_videos_folder_path (folder_path(500))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS video_episodes (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    video_id BIGINT NOT NULL,
+    episode_number INT NOT NULL,
+    episode_code VARCHAR(50),
+    title VARCHAR(500),
+    filename VARCHAR(500) NOT NULL,
+    file_path TEXT NOT NULL,
+    file_mtime DOUBLE DEFAULT 0.0,
+    file_size BIGINT DEFAULT 0,
+    duration DOUBLE DEFAULT 0.0,
+    width INT DEFAULT 0,
+    height INT DEFAULT 0,
+    premiered VARCHAR(100),
+    format VARCHAR(50) DEFAULT 'mp4',
+    needs_transcode INT DEFAULT 0,
+    subtitle_path TEXT,
+    container_verified INT DEFAULT 0,
+    UNIQUE KEY uq_video_episodes_file_path (file_path(500)),
+    INDEX idx_video_episodes_video_id (video_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS video_progress (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    video_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL DEFAULT 1,
+    current_episode_id BIGINT,
+    `current_time` DOUBLE DEFAULT 0.0,
+    total_progress_pct DOUBLE DEFAULT 0.0,
+    playback_rate DOUBLE DEFAULT 1.0,
+    is_completed INT DEFAULT 0,
+    last_watched_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_video_user_progress (video_id, user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS video_episode_progress (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    video_id BIGINT NOT NULL,
+    episode_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL DEFAULT 1,
+    `current_time` DOUBLE DEFAULT 0.0,
+    progress_pct DOUBLE DEFAULT 0.0,
+    is_completed INT DEFAULT 0,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_video_episode_user_progress (video_id, episode_id, user_id),
+    INDEX idx_video_episode_progress_lookup (video_id, user_id, episode_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS user_progress (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    book_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    pages_read INT DEFAULT 0,
+    is_completed INT DEFAULT 0,
+    last_read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_epub_cfi TEXT,
+    last_epub_href TEXT,
+    last_epub_spine_index INT,
+    last_epub_percent INT DEFAULT 0,
+    last_epub_fingerprint VARCHAR(255),
+    last_epub_updated_at DATETIME,
+    UNIQUE KEY uq_user_book_progress (book_id, user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS tts_progress (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    book_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    listen_chapter INT,
+    listen_offset INT,
+    listen_text_len INT,
+    listen_anchor TEXT,
+    listen_updated_ms BIGINT,
+    read_chapter INT,
+    read_offset INT,
+    read_text_len INT,
+    read_anchor TEXT,
+    read_updated_ms BIGINT,
+    voice VARCHAR(8),
+    steps INT,
+    speed DOUBLE,
+    UNIQUE KEY uq_tts_progress_book_user (book_id, user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS tts_pregen_jobs (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    book_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    voice VARCHAR(8) NOT NULL,
+    steps INT NOT NULL,
+    speed DOUBLE NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'queued',
+    total_pieces INT NOT NULL DEFAULT 0,
+    done_pieces INT NOT NULL DEFAULT 0,
+    error TEXT,
+    heartbeat_ms BIGINT,
+    created_ms BIGINT NOT NULL,
+    finished_ms BIGINT,
+    quality VARCHAR(16) NOT NULL DEFAULT 'standard',
+    KEY idx_tts_pregen_jobs_status (status, id),
+    KEY idx_tts_pregen_jobs_book (book_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS tts_audio_books (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    book_id BIGINT NOT NULL,
+    voice VARCHAR(8) NOT NULL,
+    steps INT NOT NULL,
+    speed DOUBLE NOT NULL,
+    quality VARCHAR(16) NOT NULL,
+    rel_dir VARCHAR(255) NOT NULL,
+    pieces INT NOT NULL DEFAULT 0,
+    bytes BIGINT NOT NULL DEFAULT 0,
+    duration_sec DOUBLE NOT NULL DEFAULT 0,
+    created_by BIGINT NOT NULL,
+    created_ms BIGINT NOT NULL,
+    last_used_ms BIGINT NOT NULL,
+    UNIQUE KEY uq_tts_audio_books_conf (book_id, voice, steps, speed, quality),
+    KEY idx_tts_audio_books_last_used (last_used_ms)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS tts_audio_pieces (
+    audio_book_id BIGINT NOT NULL,
+    piece_key CHAR(64) NOT NULL,
+    chapter INT NOT NULL,
+    part INT NOT NULL,
+    byte_offset BIGINT NOT NULL,
+    byte_length INT NOT NULL,
+    duration_sec DOUBLE NOT NULL,
+    PRIMARY KEY (audio_book_id, piece_key),
+    KEY idx_tts_audio_pieces_key (piece_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS tts_audio_cache (
+    piece_key CHAR(64) PRIMARY KEY,
+    duration_sec DOUBLE NOT NULL,
+    bytes BIGINT NOT NULL,
+    created_ms BIGINT NOT NULL,
+    last_used_ms BIGINT NOT NULL,
+    KEY idx_tts_audio_cache_last_used (last_used_ms)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS user_reading_log (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    book_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    pages_read_delta INT NOT NULL,
+    duration_seconds INT DEFAULT 0,
+    read_date DATE DEFAULT (CURRENT_DATE)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS book_annotations (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    book_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    format VARCHAR(20) NOT NULL,
+    chapter_idx INT,
+    start_offset INT NOT NULL,
+    end_offset INT NOT NULL,
+    quote TEXT NOT NULL,
+    prefix TEXT,
+    suffix TEXT,
+    color VARCHAR(20) DEFAULT '#fbbf24',
+    note TEXT,
+    plugin_marker VARCHAR(20),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_book_annotations_book_user (book_id, user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS epub_bookmarks (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    book_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    format VARCHAR(20) NOT NULL,
+    chapter_idx INT NOT NULL,
+    percent INT DEFAULT 0,
+    label VARCHAR(200),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_epub_bookmarks_book_user (book_id, user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS user_favorites (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    book_id BIGINT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_user_favorite (user_id, book_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS book_offsets (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    book_id BIGINT NOT NULL,
+    page_idx INT,
+    filename VARCHAR(500),
+    local_header_offset BIGINT,
+    compress_size BIGINT,
+    file_size BIGINT,
+    compress_type INT,
+    data_offset BIGINT,
+    INDEX idx_offsets_book (book_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS gdrive_book_copies (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    book_id BIGINT NOT NULL UNIQUE,
+    library_id BIGINT NOT NULL,
+    source_file_id VARCHAR(255) NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    local_path TEXT,
+    error_message TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_gdrive_book_copies_library (library_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS settings (
+    `key` VARCHAR(255) PRIMARY KEY,
+    `value` TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS mcp_pending_changes (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    tool_name VARCHAR(100) NOT NULL,
+    db_type VARCHAR(20) NOT NULL DEFAULT 'general',
+    target TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    preview TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    decided_at DATETIME DEFAULT NULL,
+    decided_by BIGINT DEFAULT NULL,
+    decision_note TEXT,
+    INDEX idx_mcp_pending_changes_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS problem_occurrences (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(150) NOT NULL,
+    severity VARCHAR(30) NOT NULL DEFAULT 'notice',
+    source VARCHAR(150) NOT NULL DEFAULT 'system',
+    db_type VARCHAR(20) NOT NULL DEFAULT 'general',
+    library_id BIGINT DEFAULT NULL,
+    target_type VARCHAR(20) NOT NULL,
+    target_id VARCHAR(255) NOT NULL,
+    target_path TEXT,
+    series_key TEXT,
+    group_key VARCHAR(255) NOT NULL,
+    title TEXT,
+    detail TEXT,
+    message TEXT,
+    context TEXT,
+    occurrence_count INT NOT NULL DEFAULT 1,
+    first_seen_ms BIGINT NOT NULL,
+    last_seen_ms BIGINT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'open',
+    resolved_ms BIGINT DEFAULT NULL,
+    UNIQUE KEY uq_problem_occurrences_target (code, db_type, target_type, target_id),
+    INDEX idx_problem_occurrences_status_group (status, group_key),
+    INDEX idx_problem_occurrences_last_seen (last_seen_ms),
+    INDEX idx_problem_occurrences_target (db_type, target_type, target_id),
+    INDEX idx_problem_occurrences_library (db_type, library_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS problem_groups (
+    group_key VARCHAR(255) PRIMARY KEY,
+    muted_ms BIGINT DEFAULT NULL,
+    muted_count INT NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS scan_history (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    task_type VARCHAR(100) NOT NULL,
+    task_key VARCHAR(255),
+    status VARCHAR(50) NOT NULL,
+    kwargs TEXT,
+    enqueue_at VARCHAR(50),
+    started_at VARCHAR(50),
+    finished_at VARCHAR(50),
+    error_message TEXT,
+    result_summary TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS scanner_progress (
+    library_id VARCHAR(100),
+    folder_path VARCHAR(500) PRIMARY KEY
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS folder_mtimes (
+    folder_path VARCHAR(500) PRIMARY KEY,
+    dir_mtime DOUBLE,
+    meta_mtime DOUBLE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS users (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(100) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(50) DEFAULT 'user',
+    is_default_password INT DEFAULT 1,
+    has_adult_access INT DEFAULT 1,
+    has_audiobook_access INT DEFAULT 1,
+    has_video_access INT DEFAULT 1,
+    has_download_access INT DEFAULT 1,
+    content_rating_max INT DEFAULT 18,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS user_category_permissions (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    library_id BIGINT NOT NULL,
+    has_access INT DEFAULT 1,
+    UNIQUE KEY uq_user_cat_perm (user_id, library_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS user_settings (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    `key` VARCHAR(64) NOT NULL,
+    value TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_user_settings (user_id, `key`),
+    INDEX idx_user_settings_user_id (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS collections (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT DEFAULT NULL,
+    color VARCHAR(50) DEFAULT '#7c3aed',
+    cover_image TEXT DEFAULT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_collections_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS collection_items (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    collection_id BIGINT NOT NULL,
+    book_id BIGINT DEFAULT NULL,
+    series_name VARCHAR(500) DEFAULT NULL,
+    audiobook_id BIGINT DEFAULT NULL,
+    video_id BIGINT DEFAULT NULL,
+    sort_order INT DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_coll_book (collection_id, book_id),
+    UNIQUE KEY uq_coll_series (collection_id, series_name(255)),
+    UNIQUE KEY uq_coll_audiobook (collection_id, audiobook_id),
+    UNIQUE KEY uq_coll_video (collection_id, video_id),
+    INDEX idx_collection_items_coll (collection_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS plugin_load_events (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    plugin_id VARCHAR(255) NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    message TEXT DEFAULT NULL,
+    occurred_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_plugin_load_events_plugin_time (plugin_id, occurred_at DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+"""

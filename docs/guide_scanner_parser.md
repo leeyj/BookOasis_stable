@@ -9,18 +9,18 @@
 ## 1. 기본 원칙
 
 ### 1) 파서는 자급형이어야 합니다
-각 파서 파일은 다른 파서 모듈이나 [tools/scanner/parser.py](../tools/scanner/parser.py) 에 의존하지 않고, 필요한 유틸을 해당 파일 안에 직접 포함해야 합니다.
+각 파서 파일은 다른 파서 모듈에 의존하지 않고, 필요한 유틸을 해당 파일 안에 직접 포함해야 합니다.
 
-### 2) 직접 호출은 금지합니다
-새로운 코드에서는 [tools/scanner/parser.py](../tools/scanner/parser.py) 를 공용 헬퍼처럼 직접 import해서 쓰지 마십시오.
+### 2) 진입 경로
+파서는 아래 경로로만 불러 씁니다.
 
 - 허용: [tools/scanner/metadata/__init__.py](../tools/scanner/metadata/__init__.py) 를 통한 공통 진입
 - 허용: [tools/scanner/metadata/info_xml.py](../tools/scanner/metadata/info_xml.py), [tools/scanner/metadata/kavita_yaml.py](../tools/scanner/metadata/kavita_yaml.py), [tools/scanner/metadata/series_json.py](../tools/scanner/metadata/series_json.py), [tools/scanner/metadata/comicinfo_xml.py](../tools/scanner/metadata/comicinfo_xml.py)
 - 허용: `komga_yaml.py` 같은 새 폴더형 파서는 `tools/scanner/metadata/` 에 파일을 추가하면 자동 반영됨
-- 금지: 새 파서 코드에서 [tools/scanner/parser.py](../tools/scanner/parser.py) 의 함수에 의존하는 방식
+- 금지: 새 파서 코드에서 다른 파서 파일의 함수를 import해 의존하는 방식
 
-### 3) 레거시 parser.py 는 호환성 용도입니다
-[tools/scanner/parser.py](../tools/scanner/parser.py) 는 기존 호출부 호환을 위한 레거시 모듈로만 취급합니다. 신규 기능 추가는 우선적으로 `tools/scanner/metadata/` 쪽에서 진행합니다.
+### 3) 레거시 parser.py 는 제거되었습니다 (v3.1.4)
+예전 `tools/scanner/parser.py`는 `tools/scanner/metadata/`로 옮겨진 파서들의 옛 사본이었고 코어에서 쓰는 곳이 없어 삭제했습니다. 외부 코드가 이 모듈을 import했다면 `tools/scanner/metadata/`의 해당 파서를 쓰십시오.
 
 ---
 

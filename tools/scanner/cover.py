@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
 import shutil
-import hashlib
 import zipfile
 import urllib.parse
 import base64
@@ -12,9 +11,10 @@ from PIL import Image
 from utils.safe_image import open_image
 from utils.archive_entry import is_page_image_name
 from tools.scanner.folder_image import find_common_cover, find_individual_cover, find_common_banner
-from services.cover_storage_service import get_covers_dir
+from services.cover_storage_service import get_covers_dir, cover_filename_for
 
-SUPPORTED_IMAGE_FORMATS = ('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif')
+from utils import media_types as _media_types
+SUPPORTED_IMAGE_FORMATS = _media_types.IMAGE_EXTENSIONS
 
 # 실제 화면에 표시되는 커버 크기의 상한(레티나 2배 포함)에 맞춘 값. 그리드 카드 너비는
 # 설정(BOOK_THUMBNAIL_WIDTH, templates/components/settings/general_tab.html)에서 120~240px로
@@ -217,8 +217,7 @@ def download_cover_from_url(file_path, image_url, force=False, library_id=None):
     import ssl
     
     # Create MD5 hash filename based on full file path
-    book_hash = hashlib.md5(file_path.encode('utf-8')).hexdigest()
-    cover_filename = f"book_{book_hash}.webp"
+    cover_filename = cover_filename_for(file_path)
     
     if library_id is not None:
         dest_dir = os.path.join(get_covers_dir(), str(library_id))
@@ -285,8 +284,7 @@ def extract_cover_from_b64(file_path, cover_b64, force=False, library_id=None):
         img_data = base64.b64decode(cover_b64)
         
         # Create MD5 hash filename based on full file path (동일 파일명 충돌 원천 해결, webp 고정)
-        book_hash = hashlib.md5(file_path.encode('utf-8')).hexdigest()
-        cover_filename = f"book_{book_hash}.webp"
+        cover_filename = cover_filename_for(file_path)
         
         if library_id is not None:
             dest_dir = os.path.join(get_covers_dir(), str(library_id))
@@ -337,8 +335,7 @@ def extract_banner_from_b64(file_path, banner_b64, force=False, library_id=None)
 
         img_data = base64.b64decode(banner_b64)
 
-        book_hash = hashlib.md5(file_path.encode('utf-8')).hexdigest()
-        banner_filename = f"banner_{book_hash}.webp"
+        banner_filename = cover_filename_for(file_path, 'banner')
 
         if library_id is not None:
             dest_dir = os.path.join(get_covers_dir(), str(library_id))
@@ -379,8 +376,7 @@ def get_folder_banner(file_path, folder_path, banner_b64=None, force=False, libr
         if result:
             return result
 
-    banner_hash = hashlib.md5(file_path.encode('utf-8')).hexdigest()
-    banner_filename = f"banner_{banner_hash}.webp"
+    banner_filename = cover_filename_for(file_path, 'banner')
     if library_id is not None:
         dest_dir = os.path.join(get_covers_dir(), str(library_id))
         db_banner_path = f"{library_id}/{banner_filename}"
@@ -426,11 +422,9 @@ def get_series_cover_fallback(series_name, folder_path, force=False, is_remote=F
         target_path_seed = os.path.join(folder_path, filename)
         
     if target_path_seed:
-        book_hash = hashlib.md5(target_path_seed.encode('utf-8')).hexdigest()
-        cover_filename = f"book_{book_hash}.webp"
+        cover_filename = cover_filename_for(target_path_seed)
     else:
-        series_hash = hashlib.md5(series_name.encode('utf-8')).hexdigest()
-        cover_filename = f"series_{series_hash}.webp"
+        cover_filename = cover_filename_for(series_name, 'series')
 
     if library_id is not None:
         dest_dir = os.path.join(get_covers_dir(), str(library_id))
@@ -547,8 +541,7 @@ def get_imgdir_cover(folder_path, virtual_file_path, force=False, library_id=Non
     if not folder_path or not virtual_file_path:
         return None
 
-    cover_hash = hashlib.md5(virtual_file_path.encode('utf-8')).hexdigest()
-    cover_filename = f"book_{cover_hash}.webp"
+    cover_filename = cover_filename_for(virtual_file_path)
 
     if library_id is not None:
         dest_dir = os.path.join(get_covers_dir(), str(library_id))

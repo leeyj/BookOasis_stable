@@ -590,7 +590,6 @@ function initMediaViewerDelegation() {
     if (action === 'toggle-tap-zone-direction') return toggleTapZoneDirection();
     if (action === 'toggle-split-spread') return window.toggleComicSplitSpread?.();
     if (action === 'toggle-theme-cycle') return window.toggleTheme?.();
-    if (action === 'toggle-padding-panel') return window.toggleViewerPaddingPanel?.();
     if (action === 'slideshow-toggle') return toggleSlideshow();
   }, true);
 

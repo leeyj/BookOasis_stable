@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template, g
+from api.helpers.route_helpers import error_response
 from functools import wraps
 import ipaddress
 import os
@@ -528,4 +529,4 @@ def get_languages():
         langs = get_available_languages()
         return jsonify({'success': True, 'languages': langs})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)

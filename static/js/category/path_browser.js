@@ -1,4 +1,5 @@
 // path_browser.js – 서버 물리 경로 탐색 모달 및 원격 경로/GDrive 연결 테스트
+import { escapeHtml } from '../utils/html.js';
 import { state } from '../state.js';
 
 const MAX_LIBRARY_PATHS = 20;
@@ -7,15 +8,6 @@ const MAX_LIBRARY_PATH_TEXT_LENGTH = 8192;
 const MAX_PATH_BROWSER_INPUT_LENGTH = 1024;
 
 let pathBrowserCurrentPath = '';
-
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
 
 export function testGDriveLinks() {
   const pathEl = document.getElementById('library-form-path');

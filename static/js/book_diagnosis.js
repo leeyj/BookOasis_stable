@@ -56,7 +56,7 @@ async function load() {
 }
 
 function toast(message, type = 'success') {
-  if (typeof window.showToast === 'function') window.showToast(escapeActivityText(message), type);
+  if (typeof window.showToast === 'function') window.showToast(message, type);
 }
 
 async function runAction(btn) {

@@ -9,7 +9,7 @@ import re
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 EXCLUDE_DIRS = {'.git', '__pycache__', '.venv', 'venv', 'docs', 'scratch', '.gemini'}
-EXCLUDE_FILES = {'audit_mariadb_sql.py', 'db_writer_sqlite.py'}
+EXCLUDE_FILES = {'audit_mariadb_sql.py', 'db_writer.py'}
 
 def audit_file(filepath):
     rel_path = os.path.relpath(filepath, PROJECT_ROOT)

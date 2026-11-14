@@ -20,11 +20,16 @@ force_utf8_stdio()
 import builtins
 import datetime
 import database
+from utils.db_retry import run_write_with_retry
 from tools.scanner.cover import get_series_cover_fallback, COVER_THUMB_MAX_W, COVER_THUMB_MAX_H, save_as_thumbnail_webp
 
 # 우아한 종료 시그널 감지 플래그
 stop_requested = False
 _progress_update_warning_logged = False
+
+
+class _LazyDbWriteError(Exception):
+    """표지/오프셋을 뽑은 뒤 DB 기록만 실패한 경우. 표지 추출 실패와 구분해 NO_COVER로 덮지 않는다."""
 
 
 def _update_lazy_scan_stage(task_id, stage):
@@ -616,8 +621,9 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None,
 
                                 if offsets:
                                     from tools.scanner.db_writer import save_book_offsets
-                                    save_book_offsets(cursor, book_id, filename, offsets)
-                                    conn.commit()
+                                    run_write_with_retry(
+                                        conn, lambda _c: save_book_offsets(cursor, book_id, filename, offsets),
+                                        f'lazy-offsets:{book_id}')
                                     print(f"[Lazy-Scanner] Saved offsets only ({len(offsets)}p): {filename}")
                                     
                                     # ── 성공 시 세션 누적 가산 ──
@@ -660,36 +666,40 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None,
                             if (is_series or is_json_only) and not shared_cover:
                                 shared_cover = cover_image_path
 
-                            # ComicInfo.xml 메타데이터가 있으면 함께 업데이트
-                            if comicinfo_meta and any(comicinfo_meta.get(k) for k in ('author', 'summary', 'publisher', 'release_date', 'books_lv')):
-                                cursor.execute("""
-                                    UPDATE books SET
-                                        cover_image = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN ? ELSE cover_image END,
-                                        cover_updated_at = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
-                                        author = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), author) ELSE author END,
-                                        publisher = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), publisher) ELSE publisher END,
-                                        summary = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), summary) ELSE summary END,
-                                        release_date = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), release_date) ELSE release_date END,
-                                        books_lv = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), books_lv) ELSE books_lv END
-                                    WHERE id = ? AND COALESCE(metadata_locked, 0) = 0
-                                """, (
-                                    cover_image_path,
-                                    comicinfo_meta.get('author', ''),
-                                    comicinfo_meta.get('publisher', ''),
-                                    comicinfo_meta.get('summary', ''),
-                                    comicinfo_meta.get('release_date', ''),
-                                    comicinfo_meta.get('books_lv', ''),
-                                    book_id
-                                ))
-                            else:
-                                cursor.execute("""
-                                    UPDATE books SET
-                                        cover_image = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN ? ELSE cover_image END,
-                                        cover_updated_at = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN CURRENT_TIMESTAMP ELSE cover_updated_at END
-                                    WHERE id = ? AND COALESCE(metadata_locked, 0) = 0
-                                """, (cover_image_path, book_id))
-                            cover_updated = cursor.rowcount > 0
-                            conn.commit()
+                            def _write_cover(_c):
+                                # ComicInfo.xml 메타데이터가 있으면 함께 업데이트
+                                if comicinfo_meta and any(comicinfo_meta.get(k) for k in ('author', 'summary', 'publisher', 'release_date', 'books_lv')):
+                                    cursor.execute("""
+                                        UPDATE books SET
+                                            cover_image = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN ? ELSE cover_image END,
+                                            cover_updated_at = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN CURRENT_TIMESTAMP ELSE cover_updated_at END,
+                                            author = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), author) ELSE author END,
+                                            publisher = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), publisher) ELSE publisher END,
+                                            summary = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), summary) ELSE summary END,
+                                            release_date = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), release_date) ELSE release_date END,
+                                            books_lv = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN COALESCE(NULLIF(?, ''), books_lv) ELSE books_lv END
+                                        WHERE id = ? AND COALESCE(metadata_locked, 0) = 0
+                                    """, (
+                                        cover_image_path,
+                                        comicinfo_meta.get('author', ''),
+                                        comicinfo_meta.get('publisher', ''),
+                                        comicinfo_meta.get('summary', ''),
+                                        comicinfo_meta.get('release_date', ''),
+                                        comicinfo_meta.get('books_lv', ''),
+                                        book_id
+                                    ))
+                                else:
+                                    cursor.execute("""
+                                        UPDATE books SET
+                                            cover_image = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN ? ELSE cover_image END,
+                                            cover_updated_at = CASE WHEN COALESCE(metadata_locked, 0) = 0 THEN CURRENT_TIMESTAMP ELSE cover_updated_at END
+                                        WHERE id = ? AND COALESCE(metadata_locked, 0) = 0
+                                    """, (cover_image_path, book_id))
+                                return cursor.rowcount > 0
+                            try:
+                                cover_updated = run_write_with_retry(conn, _write_cover, f'lazy-cover:{book_id}')
+                            except Exception as write_err:
+                                raise _LazyDbWriteError(f"cover DB update failed: {write_err}") from write_err
                             if cover_updated:
                                 print(f"[Lazy-Scanner] Cover extracted and DB updated: {cover_image_path}")
                             else:
@@ -699,8 +709,9 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None,
                             if offsets_data:
                                 try:
                                     from tools.scanner.db_writer import save_book_offsets
-                                    save_book_offsets(cursor, book_id, filename, offsets_data)
-                                    conn.commit()
+                                    run_write_with_retry(
+                                        conn, lambda _c: save_book_offsets(cursor, book_id, filename, offsets_data),
+                                        f'lazy-offsets:{book_id}')
                                 except Exception as oe:
                                     print(f"[Lazy-Scanner] Ignored exception while saving offsets: {oe}")
 
@@ -708,11 +719,12 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None,
                             # 커버 추출 실패해도 오프셋만 단독 저장 (total_pages 복구 목적)
                             try:
                                 from tools.scanner.db_writer import save_book_offsets
-                                save_book_offsets(cursor, book_id, filename, offsets_data)
-                                conn.commit()
+                                run_write_with_retry(
+                                    conn, lambda _c: save_book_offsets(cursor, book_id, filename, offsets_data),
+                                    f'lazy-offsets:{book_id}')
                                 print(f"[Lazy-Scanner] Saved offsets only, without a cover: {filename}")
                             except Exception as oe:
-                                print("[Lazy-Scanner] Saved offsets only, without a cover: " + filename)
+                                print(f"[Lazy-Scanner] Failed to save offsets (no cover): {filename}: {oe}")
                         else:
                             raise ValueError("표지 이미지를 추출할 수 없거나 파일 포맷이 무효합니다.")
 
@@ -726,7 +738,12 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None,
 
                     except Exception as e:
                         err_msg = str(e)
-                        if offset_only:
+                        if isinstance(e, _LazyDbWriteError):
+                            # 표지는 뽑았는데 DB 기록만 실패(잠금 재시도 소진 등) - 다음 회차에 다시 시도한다.
+                            print(f"[Lazy-Scanner ERROR] DB write failed ({filename}): {err_msg}")
+                            error_type = "DbWriteFailed"
+                            report_message = f"ERR_LAZY_DB_WRITE_FAIL: {err_msg}"
+                        elif offset_only:
                             print(f"[Lazy-Scanner ERROR] Offset-only processing failed ({filename}, {type(e).__name__}): {err_msg}")
                             error_type = "OffsetIndexError"
                             report_message = f"ERR_LAZY_OFFSET_FAIL: {err_msg}"
@@ -755,14 +772,13 @@ def run_lazy_cover_extraction(target_book_id=None, target_db_type=None,
                                 print(f"[Lazy-Scanner] Keeping the existing valid cover (a failed re-extraction is not recorded as NO_COVER): {filename}")
                             else:
                                 try:
-                                    cursor.execute("""
+                                    run_write_with_retry(conn, lambda _c: cursor.execute("""
                                         UPDATE books SET
                                             cover_image = 'NO_COVER',
                                             cover_updated_at = CURRENT_TIMESTAMP,
                                             has_offsets = CASE WHEN (COALESCE(total_pages, 0) = 0 OR COALESCE(has_offsets, 0) = 0) THEN -1 ELSE has_offsets END
                                         WHERE id = ?
-                                    """, (book_id,))
-                                    conn.commit()
+                                    """, (book_id,)), f'lazy-no-cover:{book_id}')
                                 except Exception as db_mark_err:
                                     print(f"[Lazy-Scanner WARNING] Ignored error while marking failure state: {db_mark_err}")
 
@@ -837,14 +853,12 @@ def get_series_cover_fallback_single(series_name, parent_dir, filename, file_pat
     폴더당 YAML/JSON 재파싱 비용을 절약합니다.
     """
     import io
-    import hashlib
     from tools.scanner.cover import extract_cover_from_b64, download_cover_from_url
-    from services.cover_storage_service import get_covers_dir
+    from services.cover_storage_service import get_covers_dir, cover_filename_for
 
     # 커버 캐시 파일명은 DB에 저장된 원본(가상) 경로 기준으로 안정적으로 키잉해야 하므로,
     # 로컬 경로로 치환하기 전에 먼저 해시를 계산한다.
-    book_hash = hashlib.md5(file_path.encode('utf-8')).hexdigest()
-    cover_filename = f"book_{book_hash}.webp"
+    cover_filename = cover_filename_for(file_path)
     local_cover_path = os.path.join(get_covers_dir(), str(library_id), cover_filename)
     db_cover_path = f"{library_id}/{cover_filename}"
 
@@ -1057,23 +1071,29 @@ def run_lazy_video_duration_backfill():
 
                 needs_transcode = 0 if is_browser_compatible(file_path, vcodec, acodec, format_name) else 1
 
-                cursor.execute(
-                    "UPDATE video_episodes SET duration = ?, width = ?, height = ?, needs_transcode = ? WHERE id = ?",
-                    (duration, width, height, needs_transcode, episode_id)
-                )
-                conn.commit()
+                # 행 하나의 기록 실패(잠금 재시도 소진 등)가 루프 전체를 끝내 total_duration 재계산까지
+                # 빠지지 않게 행 단위로 잡는다 - 실패한 행은 duration이 그대로 0이라 다음 실행에서 다시 잡힌다.
+                try:
+                    run_write_with_retry(conn, lambda _c: cursor.execute(
+                        "UPDATE video_episodes SET duration = ?, width = ?, height = ?, needs_transcode = ? WHERE id = ?",
+                        (duration, width, height, needs_transcode, episode_id)
+                    ), f'lazy-video-duration:{episode_id}')
+                except Exception as write_err:
+                    print(f"[Lazy-Scanner] ({done}/{total}) DB write failed (will retry next run) -> {os.path.basename(file_path)}: {write_err}")
+                    continue
                 updated_count += 1
                 touched_video_ids.add(video_id)
 
             if stop_requested:
                 print("[Lazy-Scanner] ⚠️ Stop request (SIGTERM/SIGINT) detected. Finishing the video backfill after the running ffprobe jobs complete.")
 
-        for video_id in touched_video_ids:
-            cursor.execute("SELECT COALESCE(SUM(duration), 0) AS total FROM video_episodes WHERE video_id = ?", (video_id,))
-            total_row = cursor.fetchone()
-            total = total_row['total'] if total_row else 0
-            cursor.execute("UPDATE videos SET total_duration = ? WHERE id = ?", (total, video_id))
-        conn.commit()
+        def _recalc_totals(_c):
+            for video_id in touched_video_ids:
+                cursor.execute("SELECT COALESCE(SUM(duration), 0) AS total FROM video_episodes WHERE video_id = ?", (video_id,))
+                total_row = cursor.fetchone()
+                total = total_row['total'] if total_row else 0
+                cursor.execute("UPDATE videos SET total_duration = ? WHERE id = ?", (total, video_id))
+        run_write_with_retry(conn, _recalc_totals, 'lazy-video-total-duration')
 
         print(f"[Lazy-Scanner] 🎬 Video episode backfill done: {updated_count} updated, total_duration recalculated for {len(touched_video_ids)} courses")
     except Exception as e:
@@ -1154,9 +1174,13 @@ def run_lazy_video_container_revalidation():
             if row['file_path'] and os.path.exists(row['file_path']):
                 valid_rows.append(row)
             else:
-                cursor.execute("UPDATE video_episodes SET container_verified = 1 WHERE id = ?", (row['id'],))
-                conn.commit()
-                verified_count += 1
+                try:
+                    run_write_with_retry(conn, lambda _c, _id=row['id']: cursor.execute(
+                        "UPDATE video_episodes SET container_verified = 1 WHERE id = ?", (_id,)
+                    ), f"lazy-video-verify:{row['id']}")
+                    verified_count += 1
+                except Exception as write_err:
+                    print(f"[Lazy-Scanner] DB write failed while marking a missing file as checked (will retry next run): {write_err}")
 
         total = len(valid_rows)
         print(f"[Lazy-Scanner] 🎬 Found {total} video episodes to recheck. Starting ffprobe container check ({probe_workers} at a time)...")
@@ -1194,17 +1218,21 @@ def run_lazy_video_container_revalidation():
 
                 still_compatible = is_browser_compatible(file_path, vcodec, acodec, format_name)
                 if not still_compatible:
-                    cursor.execute(
-                        "UPDATE video_episodes SET needs_transcode = 1, container_verified = 1 WHERE id = ?",
-                        (episode_id,)
-                    )
+                    sql = "UPDATE video_episodes SET needs_transcode = 1, container_verified = 1 WHERE id = ?"
+                else:
+                    sql = "UPDATE video_episodes SET container_verified = 1 WHERE id = ?"
+                try:
+                    run_write_with_retry(conn, lambda _c: cursor.execute(sql, (episode_id,)),
+                                         f'lazy-video-container:{episode_id}')
+                except Exception as write_err:
+                    # 검증 완료로 표시되지 않았으니 다음 실행에서 다시 검사한다.
+                    print(f"[Lazy-Scanner] ({done}/{total}) DB write failed during container recheck (will retry next run) -> {os.path.basename(file_path)}: {write_err}")
+                    continue
+                if not still_compatible:
                     flipped_count += 1
                     touched_video_ids.add(video_id)
                     print(f"[Lazy-Scanner] ⚠️ Container mismatch found (actual format: {format_name}) -> marked for transcoding: {os.path.basename(file_path)}")
-                else:
-                    cursor.execute("UPDATE video_episodes SET container_verified = 1 WHERE id = ?", (episode_id,))
                 verified_count += 1
-                conn.commit()
 
             if stop_requested:
                 print("[Lazy-Scanner] ⚠️ Stop request (SIGTERM/SIGINT) detected. Finishing the video container recheck after the running ffprobe jobs complete.")

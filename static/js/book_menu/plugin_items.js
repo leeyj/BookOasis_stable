@@ -2,19 +2,9 @@
 // 메뉴의 열림/닫힘과 현재 대상 도서는 book_context_menu.js가 갖고, 여기엔 대상을 인자로 넘긴다.
 import { state } from '../state.js';
 import * as api from '../api.js';
+import { clearPluginMenuItems, renderPluginMenuGroups } from '../plugin_menu_render.js';
 
 let loadSeq = 0;
-
-function getPluginAccentColor(pluginId) {
-  const text = String(pluginId || 'plugin');
-  let hash = 0;
-  for (let i = 0; i < text.length; i += 1) {
-    hash = ((hash << 5) - hash) + text.charCodeAt(i);
-    hash |= 0;
-  }
-  const hue = Math.abs(hash) % 360;
-  return `hsl(${hue} 72% 60%)`;
-}
 
 function buildContextPayload(target) {
   if (!target) return {};
@@ -32,9 +22,7 @@ function getMenuList() {
 }
 
 export function clearPluginContextMenuItems() {
-  const listEl = getMenuList();
-  if (!listEl) return;
-  listEl.querySelectorAll('.plugin-context-menu-item, .plugin-context-menu-group-title, .plugin-context-menu-separator').forEach((el) => el.remove());
+  clearPluginMenuItems(getMenuList());
 }
 
 // 진행 중인 항목 조회 결과를 버린다 (메뉴가 닫히거나 다른 도서로 다시 열린 경우).
@@ -45,68 +33,9 @@ export function cancelPluginContextMenuLoad() {
 function renderPluginContextMenuItems(items, { onItemClick, onRendered }) {
   const listEl = getMenuList();
   if (!listEl) return;
-
-  clearPluginContextMenuItems();
-
-  if (!Array.isArray(items) || items.length === 0) return;
-
-  const closeItem = listEl.querySelector('.context-menu-close-item');
-  const groups = new Map();
-  items.forEach((item) => {
-    const pluginId = String(item.plugin_id || '').trim();
-    if (!pluginId) return;
-    const pluginName = String(item.plugin_name || pluginId).trim();
-    if (!groups.has(pluginId)) {
-      groups.set(pluginId, { pluginId, pluginName, items: [] });
-    }
-    groups.get(pluginId).items.push(item);
-  });
-
-  const groupList = Array.from(groups.values());
-  groupList.forEach((group, groupIdx) => {
-    const accentColor = getPluginAccentColor(group.pluginId);
-
-    if (groupIdx > 0) {
-      const sep = document.createElement('li');
-      sep.className = 'plugin-context-menu-separator';
-      if (closeItem) listEl.insertBefore(sep, closeItem);
-      else listEl.appendChild(sep);
-    }
-
-    const titleEl = document.createElement('li');
-    titleEl.className = 'plugin-context-menu-group-title';
-    titleEl.style.setProperty('--plugin-accent', accentColor);
-    titleEl.textContent = group.pluginName;
-    if (closeItem) listEl.insertBefore(titleEl, closeItem);
-    else listEl.appendChild(titleEl);
-
-    group.items.forEach((item) => {
-      const pluginId = String(item.plugin_id || '').trim();
-      const actionId = String(item.id || '').trim();
-      const label = String(item.label || '').trim();
-      const iconClass = window.boIcon(String(item.icon || 'lc lc-puzzle').trim());
-      if (!pluginId || !actionId || !label) return;
-
-      const li = document.createElement('li');
-      li.className = 'context-menu-item plugin-context-menu-item';
-      li.dataset.pluginId = pluginId;
-      li.dataset.actionId = actionId;
-      li.style.setProperty('--plugin-accent', accentColor);
-      li.innerHTML = `<i class="${iconClass} plugin-context-menu-icon"></i> <span class="plugin-context-menu-label">${label}</span>`;
-      li.addEventListener('click', () => {
-        onItemClick(pluginId, actionId);
-      });
-
-      if (closeItem) {
-        listEl.insertBefore(li, closeItem);
-      } else {
-        listEl.appendChild(li);
-      }
-    });
-  });
-
+  renderPluginMenuGroups(listEl, items, onItemClick);
   // 플러그인 항목 렌더링 후 동적으로 확장된 메뉴 높이를 기반으로 위치 재보정
-  onRendered?.();
+  if (Array.isArray(items) && items.length > 0) onRendered?.();
 }
 
 // 도서별 최근 조회 결과. 같은 도서 메뉴를 다시 열 때 서버 응답을 기다리지 않고 바로 그린다.

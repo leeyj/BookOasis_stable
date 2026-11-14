@@ -2,6 +2,7 @@
 import sqlite3
 import time
 from flask import Blueprint, request, jsonify, session
+from api.helpers.route_helpers import error_response, current_user_id
 
 from services.category_service import CategoryService
 from services.series_service import SeriesService
@@ -61,7 +62,7 @@ def get_media_libraries():
             })
         return jsonify({'success': False, 'error': msg}), 500
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @media_library_routes_bp.route('/api/media/list', methods=['GET'])
 @login_required
@@ -137,7 +138,7 @@ def get_media_search_overlay():
         )
         return jsonify({'success': True, **result})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @media_library_routes_bp.route('/api/media/list/jump', methods=['GET'])
 @login_required
@@ -180,7 +181,7 @@ def get_media_list_jump_position():
         )
         return jsonify({'success': True, **result})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @media_library_routes_bp.route('/api/media/list-totals', methods=['GET'])
 @login_required
@@ -208,7 +209,7 @@ def get_media_list_totals():
         )
         return jsonify({'success': True, **totals})
     except Exception as error:
-        return jsonify({'success': False, 'error': str(error)}), 500
+        return error_response(error)
 
 @media_library_routes_bp.route('/api/media/all-list', methods=['GET'])
 @login_required
@@ -219,7 +220,7 @@ def get_media_all_list():
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
     library_id = request.args.get('library_id')
-    user_id = session.get('user_id', 1)
+    user_id = current_user_id()
     role = session.get('role')
     try:
         series_list = SeriesService.get_all_books_list(
@@ -232,7 +233,7 @@ def get_media_all_list():
         print(f"[API-PROFILE] GET /api/media/all-list (type={db_type}, lib={library_id}) -> TOTAL HTTP RESPONSE: {(t_end - t_start)*1000:.1f}ms")
         return jsonify({'success': True, 'series': series_list})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @media_library_routes_bp.route('/api/media/detail', methods=['GET'])
 @login_required
@@ -244,7 +245,7 @@ def get_media_detail():
     series_name = request.args.get('series', '')
     library_id  = request.args.get('library_id', 'all')
     representative_book_id = request.args.get('representative_book_id')
-    user_id     = session.get('user_id', 1)
+    user_id     = current_user_id()
     role        = session.get('role')
 
     try:
@@ -258,7 +259,7 @@ def get_media_detail():
         )
         return jsonify({'success': True, 'meta': meta, 'books': books_list})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @media_library_routes_bp.route('/api/media/card-info', methods=['GET'])
 @login_required
@@ -289,7 +290,7 @@ def get_media_card_info():
             return jsonify({'success': False, 'error': '정보를 찾을 수 없습니다.'}), 404
         return jsonify({'success': True, **info})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @media_library_routes_bp.route('/api/media/tags', methods=['GET'])
 @login_required
@@ -304,7 +305,7 @@ def get_media_tags():
         tags = LibraryService.get_media_tags(db_type, library_id)
         return jsonify({'success': True, 'tags': tags})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @media_library_routes_bp.route('/api/media/genres', methods=['GET'])
 @login_required
@@ -319,7 +320,7 @@ def get_media_genres():
         genres = LibraryService.get_media_genres(db_type, library_id)
         return jsonify({'success': True, 'genres': genres})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @media_library_routes_bp.route('/api/media/history', methods=['GET'])
 @login_required
@@ -328,12 +329,12 @@ def get_media_history():
     db_type = request.args.get('type', 'general')
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
-    user_id = session.get('user_id', 1)
+    user_id = current_user_id()
     try:
         history = ReadingHistoryService.get_history(db_type, user_id=user_id)
         return jsonify({'success': True, 'books': history})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @media_library_routes_bp.route('/api/media/recommendations', methods=['GET'])
 @login_required
@@ -346,12 +347,12 @@ def get_smart_recommendations():
     library_id = request.args.get('library_id')
     if not series_name:
         return jsonify({'success': False, 'error': 'series_name is required'}), 400
-    user_id = session.get('user_id', 1)
+    user_id = current_user_id()
     try:
         data = RecommendationService.get_similar_series(db_type, series_name, library_id, user_id=user_id)
         return jsonify({'success': True, **data})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @media_library_routes_bp.route('/api/media/recently-added', methods=['GET'])
 @login_required
@@ -366,7 +367,7 @@ def get_media_recently_added():
         books = ReadingHistoryService.get_recently_added(db_type, user_id=user_id, role=role)
         return jsonify({'success': True, 'books': books})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @media_library_routes_bp.route('/api/category/test-gdrive-links', methods=['POST'])
 @login_required

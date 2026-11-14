@@ -12,6 +12,7 @@ cover_storage_service.py – 커버 이미지 저장 루트 경로의 단일 진
 파일 단위로 호출되는 `get_covers_dir()`는 반드시 프로세스 내 캐시를 둔다 - 설정을
 저장한 직후 `invalidate_cache()`를 호출해 재시작 없이 즉시 반영한다.
 """
+import hashlib
 import os
 import shutil
 import threading
@@ -30,6 +31,22 @@ _warned_broken_paths = set()
 
 _migration_lock = threading.Lock()
 _migration_status = {'status': 'idle', 'moved': 0, 'total': 0, 'error': None, 'source': None, 'dest': None}
+
+
+def cover_filename_for(key, prefix='book'):
+    """표지/배너 파일 이름 규칙: '{prefix}_{md5(key)}.webp'.
+
+    key는 DB에 저장된 원본(가상) 경로(file_path)이고, 시리즈 표지는 시리즈 이름이다.
+    스캐너·지연 스캐너·이관 도구·드라이브 복사가 같은 이름을 만들어야 기존 표지를 다시 찾으므로
+    이 규칙을 바꾸면 이미 저장된 표지가 모두 고아가 된다.
+    prefix: 'book' | 'banner' | 'series'
+    """
+    return f"{prefix}_{hashlib.md5(str(key).encode('utf-8')).hexdigest()}.webp"
+
+
+def cover_db_path(library_id, filename):
+    """DB cover_image 컬럼에 저장하는 상대 경로: 라이브러리 폴더가 있으면 '{library_id}/{filename}'."""
+    return f"{library_id}/{filename}" if library_id is not None else filename
 
 
 def _resolve():

@@ -101,10 +101,6 @@
     background: rgba(245, 158, 11, 0.3) !important;
 }
 
-.ui-hover-logout-link:hover {
-    color: #f87171 !important;
-}
-
 /* 앱 UI 글꼴 - 테마와 무관하게 하나 */
 :root {
     --app-font-sans: 'BookOasis Sans', 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui,
@@ -304,21 +300,13 @@ html[data-library-type="video"] #sidebar-categories [data-id="plugins"] {
     border: 1px solid #cbd5e1 !important;
 }
 
-[data-app-theme="light"] .book-card-title {
-    color: #0f172a !important;
-}
-
-[data-app-theme="light"] .book-card-author,
-[data-app-theme="light"] .book-card-meta,
-[data-app-theme="light"] .book-card-subinfo {
-    color: #475569 !important;
-}
+/* .book-card-title(h4)은 위의 h1-h5 강제색이 같은 값으로 칠한다. */
 
 [data-app-theme="light"] .library-modal-content {
-    background: #ffffff !important;
-    color: #0f172a !important;
-    border: 1px solid #cbd5e1 !important;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15) !important;
+    background: #ffffff;
+    color: #0f172a;
+    border: 1px solid #cbd5e1;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
 }
 
 [data-app-theme="light"] .library-modal-header h3,
@@ -432,10 +420,10 @@ html[data-library-type="video"] #sidebar-categories [data-id="plugins"] {
 }
 
 [data-app-theme="sepia"] .library-modal-content {
-    background: #f4e4c1 !important;
-    color: #3b2a1a !important;
-    border: 1px solid #e6d3ad !important;
-    box-shadow: 0 20px 50px rgba(67, 52, 34, 0.2) !important;
+    background: #f4e4c1;
+    color: #3b2a1a;
+    border: 1px solid #e6d3ad;
+    box-shadow: 0 20px 50px rgba(67, 52, 34, 0.2);
 }
 
 [data-app-theme="sepia"] .library-modal-header h3,
@@ -460,16 +448,6 @@ html[data-library-type="video"] #sidebar-categories [data-id="plugins"] {
 
 [data-app-theme="sepia"] .settings-table thead th {
     color: #3b2a1a !important;
-}
-
-[data-app-theme="sepia"] .book-card-title {
-    color: #3b2a1a !important;
-}
-
-[data-app-theme="sepia"] .book-card-author,
-[data-app-theme="sepia"] .book-card-meta,
-[data-app-theme="sepia"] .book-card-subinfo {
-    color: #6b5744 !important;
 }
 
 [data-app-theme="blue"] {
@@ -701,20 +679,10 @@ html[data-library-type="video"] #sidebar-categories [data-id="plugins"] {
     box-shadow: none;
 }
 
-[data-app-theme="epaper"] .book-card-title {
-    color: #000000 !important;
-}
-
-[data-app-theme="epaper"] .book-card-author,
-[data-app-theme="epaper"] .book-card-meta,
-[data-app-theme="epaper"] .book-card-subinfo {
-    color: #222222 !important;
-}
-
 [data-app-theme="epaper"] .library-modal-content {
-    background: #ffffff !important;
-    color: #000000 !important;
-    border: 2px solid #000000 !important;
+    background: #ffffff;
+    color: #000000;
+    border: 2px solid #000000;
 }
 
 [data-app-theme="epaper"] .library-modal-header h3,
@@ -886,7 +854,7 @@ button, input, select, textarea {
 }
 
 .library-sidebar.collapsed .sidebar-admin-tools {
-    display: none !important;
+    display: none;
 }
 
 /* 데스크톱 사이드바 접힌 상태 - 완전히 숨기지 않고 아이콘만 남는 좁은 레일로 전환
@@ -963,13 +931,13 @@ button, input, select, textarea {
 /* 그룹 펼침/접기 화살표, 항목 수 배지는 레일 모드에서 의미가 없어 아이콘 복원 대상에서도 제외 */
 .library-sidebar.collapsed .sidebar-group-chevron,
 .library-sidebar.collapsed .sidebar-group-header small {
-    display: none !important;
+    display: none;
 }
 
 /* 중첩된 사용자 정의 그룹의 하위 항목까지 아이콘 레일에 다 펼치면 좁은 폭에서 뭉개지므로,
    접힘 모드에서는 최상위 아이콘까지만 보여주고 하위 목록은 숨긴다 (펼치면 다시 보임) */
 .library-sidebar.collapsed .sidebar-library-group-items {
-    display: none !important;
+    display: none;
 }
 
 /* 사이드바 전용 얇고 미려한 스크롤바 디자인 */
@@ -1434,10 +1402,6 @@ button, input, select, textarea {
     background-image: none;
 }
 
-.btn-sidebar-toggle-desktop:hover {
-    color: var(--app-accent) !important;
-}
-
 /* 현재 카테고리 정보 팝오버 트리거(ⓘ) - 책 목록 제목 옆.
    바로 앞의 작은 건수 글자와 크기·줄을 맞춘다(제목 줄은 기준선 정렬, .library-list-heading).
    예전엔 큰 제목의 세로 가운데에 맞춰져 작은 건수 글자 옆에서 3px쯤 떠 보였다 */
@@ -1553,7 +1517,7 @@ button, input, select, textarea {
     pointer-events: none;
 }
 .kiosk-mode .library-header {
-    display: none !important;
+    display: none;
 }
 
 .kiosk-back-btn {
@@ -4153,8 +4117,8 @@ button, input, select, textarea {
         /* 카드에 overflow:hidden이 없으므로 표지 모서리(6px)에 맞춰 직접 둥글린다 */
         border-radius: 0 0 6px 6px;
         padding: 1.6rem 2.2rem 0.55rem 0.6rem;
-        background: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.82)) !important;
-        border: 0 !important;
+        background: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.82));
+        border: 0;
         opacity: 0;
         pointer-events: none;
         transition: opacity 0.15s ease;
@@ -4169,10 +4133,6 @@ button, input, select, textarea {
     .book-card.book-card--hide-title .book-card-title {
         color: #fff !important;
         -webkit-line-clamp: 1;
-    }
-
-    .book-card.book-card--hide-title .book-card-subinfo {
-        color: rgba(255, 255, 255, 0.72) !important;
     }
 
     .book-card.book-card--hide-title .book-card-sub-progress {
@@ -5892,10 +5852,10 @@ button, input, select, textarea {
 /* 모바일 숨김 처리 */
 @media (max-width: 768px) {
     .alphabet-scrollbar {
-        display: none !important;
+        display: none;
     }
     .library-main-content.has-index-scrollbar {
-        padding-right: 0 !important;
+        padding-right: 0;
     }
 }
 
@@ -6690,8 +6650,8 @@ button, input, select, textarea {
 /* Drag and Drop Sortable Plugins Style */
 .plugin-card.dragging {
   opacity: 0.45;
-  border: 1px dashed var(--app-accent) !important;
-  background: color-mix(in srgb, var(--app-accent) 5%, transparent) !important;
+  border: 1px dashed var(--app-accent);
+  background: color-mix(in srgb, var(--app-accent) 5%, transparent);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3) !important;
 }
 
@@ -6763,9 +6723,9 @@ button, input, select, textarea {
   backdrop-filter: blur(4px);
 }
 .vol-grid-download-btn:hover {
-  background: #3b82f6 !important;
-  color: #ffffff !important;
-  border-color: #60a5fa !important;
+  background: #3b82f6;
+  color: #ffffff;
+  border-color: #60a5fa;
   transform: scale(1.12);
   box-shadow: 0 6px 14px rgba(59, 130, 246, 0.45);
 }
@@ -7043,7 +7003,7 @@ body.book-selection-active .btn-card-info-toggle {
 }
 
 #audio-player-modal[data-player-mode="music"].is-lyrics-open .audio-cover-stage {
-    display: none !important;
+    display: none;
 }
 
 #audio-player-modal .audio-lyrics-line {

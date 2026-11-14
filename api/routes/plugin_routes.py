@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from flask import Blueprint, request, jsonify, session
+from api.helpers.route_helpers import error_response, session_user_info
 
 from services.metadata_service import MetadataService
 from services.plugin_service import PluginService
@@ -10,17 +11,8 @@ from utils.plugin_session_helper import PLUGIN_SESSION_TYPES, resolve_plugin_ses
 plugin_routes_bp = Blueprint('media_plugin_routes', __name__)
 
 
-def _get_current_user_id_for_annotation():
-    """annotation_routes.py의 _get_current_user_info()와 동일한 세션 조회 규약.
-    plugin_marker는 book_annotations.user_id로 소유권을 확인해야 하므로 필요하다."""
-    user_id = session.get('user_id')
-    role = session.get('role')
-    if not user_id:
-        user_dict = session.get('user')
-        if isinstance(user_dict, dict):
-            user_id = user_dict.get('id')
-            role = user_dict.get('role')
-    return user_id, role
+# plugin_marker는 book_annotations.user_id로 소유권을 확인해야 해서 annotation 라우트와 같은 세션 조회를 쓴다.
+_get_current_user_id_for_annotation = session_user_info
 
 @plugin_routes_bp.route('/api/media/metadata/plugins', methods=['GET'])
 @admin_required
@@ -30,7 +22,7 @@ def get_metadata_plugins_api():
         plugins = MetadataService.get_searchable_plugins()
         return jsonify({'success': True, 'plugins': plugins})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 def _build_plugin_load_status_payload():
     from services.metadata_factory import MetadataFactory
@@ -59,7 +51,7 @@ def get_plugin_load_status_api():
     try:
         return jsonify(_build_plugin_load_status_payload())
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @plugin_routes_bp.route('/api/webhook/plugins/status', methods=['GET'])
 @webhook_token_required
@@ -71,7 +63,7 @@ def get_plugin_load_status_webhook_api():
     try:
         return jsonify(_build_plugin_load_status_payload())
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @plugin_routes_bp.route('/api/media/plugins/add-plugin-check', methods=['GET'])
 def check_add_plugin_api():
@@ -91,7 +83,7 @@ def check_add_plugin_api():
         enabled = is_plugin_in_add_plugin_list(plugin_id)
         return jsonify({'success': True, 'plugin_id': plugin_id, 'enabled': enabled})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @plugin_routes_bp.route('/api/media/metadata/plugins/manage', methods=['GET'])
 @admin_required
@@ -104,7 +96,7 @@ def get_metadata_plugins_manage_api():
         plugins = MetadataFactory.get_available_providers(include_view_ui=False)
         return jsonify({'success': True, 'plugins': plugins})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @plugin_routes_bp.route('/api/media/plugins/update-eligibility', methods=['POST'])
 def plugin_update_eligibility():
@@ -131,7 +123,7 @@ def plugin_update_eligibility():
     except ValueError as e:
         return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @plugin_routes_bp.route('/api/media/books/search-metadata', methods=['GET'])
 @admin_required
@@ -148,7 +140,7 @@ def search_book_metadata_api():
         results = MetadataService.search_metadata(db_type, query, source)
         return jsonify({'success': True, 'results': results})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @plugin_routes_bp.route('/api/media/books/<int:book_id>/apply-metadata', methods=['POST'])
 @admin_required
@@ -178,7 +170,7 @@ def apply_book_metadata_api(book_id):
         else:
             return jsonify({'success': False, 'error': message}), 400
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @plugin_routes_bp.route('/api/media/metadata/plugins/toggle', methods=['POST'])
 @admin_required
@@ -198,7 +190,7 @@ def toggle_metadata_plugin_api():
         status_txt = _t('api.status_enabled') if enabled_val == '1' else _t('api.status_disabled')
         return jsonify({'success': True, 'message': _t('api.msg_plugin_status_updated', plugin_id=plugin_id, status_txt=status_txt)})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @plugin_routes_bp.route('/api/media/metadata/plugins/save-config', methods=['POST'])
 @admin_required
@@ -220,7 +212,7 @@ def save_metadata_plugin_config_api():
             return jsonify({'success': False, 'error': error}), 400
         return jsonify({'success': True, 'message': _t('api.msg_plugin_config_saved', plugin_id=plugin_id)})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @plugin_routes_bp.route('/api/media/metadata/plugins/sample-update', methods=['POST'])
 @admin_required
@@ -238,7 +230,7 @@ def sample_update_metadata_plugin_api():
     except ValueError as e:
         return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @plugin_routes_bp.route('/api/media/metadata/plugins/samples', methods=['GET'])
 @admin_required
@@ -248,7 +240,7 @@ def list_sample_plugins_api():
         samples = PluginService.list_sample_plugins()
         return jsonify({'success': True, 'samples': samples})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @plugin_routes_bp.route('/api/media/metadata/plugins/install-from-sample', methods=['POST'])
 @admin_required
@@ -265,7 +257,7 @@ def install_sample_plugin_api():
             return jsonify({'success': False, **payload}), 400
         return jsonify({'success': True, **payload})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @plugin_routes_bp.route('/api/media/dashboard/widgets', methods=['GET'])
 def get_dashboard_widgets_api():
@@ -302,7 +294,7 @@ def get_dashboard_widgets_api():
 
         return jsonify({'success': True, 'widgets': active_widgets}), 200
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @plugin_routes_bp.route('/api/media/dashboard/widgets/<plugin_id>/data', methods=['GET'])
 def get_dashboard_widget_data_api(plugin_id):
@@ -331,7 +323,7 @@ def get_dashboard_widget_data_api(plugin_id):
     except ValueError as ve:
         return jsonify({'success': False, 'error': str(ve)}), 400
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @plugin_routes_bp.route('/api/media/home-layout', methods=['GET'])
 def get_home_layout_api():
@@ -349,7 +341,7 @@ def get_home_layout_api():
         layout = HomeDashboardService.get_layout(user_id, db_type, role=session.get('role'))
         return jsonify({'success': True, **layout}), 200
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @plugin_routes_bp.route('/api/media/detail-sidebar-widgets', methods=['GET'])
 @login_required
@@ -414,7 +406,7 @@ def get_detail_sidebar_widgets_api():
 
         return jsonify({'success': True, 'widgets': widgets_with_data}), 200
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 def _find_active_rating_provider(db_type):
     """rating_widget을 선언하고 이 세션(db_type)에 노출 가능한 provider 중 order가 가장
@@ -468,7 +460,7 @@ def get_rating_widget_api():
         status_code = 200 if result.get('success') else 400
         return jsonify(result), status_code
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @plugin_routes_bp.route('/api/media/rating-widget/submit', methods=['POST'])
 @login_required
@@ -504,7 +496,7 @@ def submit_rating_widget_api():
         status_code = 200 if result.get('success') else 400
         return jsonify(result), status_code
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @plugin_routes_bp.route('/api/media/smart-recommend-widgets', methods=['GET'])
 @login_required
@@ -562,7 +554,7 @@ def get_smart_recommend_widgets_api():
 
         return jsonify({'success': True, 'widgets': widgets_with_data}), 200
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @plugin_routes_bp.route('/api/media/category-plugins', methods=['GET'])
 def get_category_plugins_api():
@@ -637,7 +629,7 @@ def get_category_plugins_api():
         active_category_plugins.sort(key=lambda x: x['order'])
         return jsonify({'success': True, 'category_plugins': active_category_plugins}), 200
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @plugin_routes_bp.route('/api/media/plugins/<plugin_id>/ui', methods=['GET'])
 def get_plugin_ui_bundle_api(plugin_id):
@@ -649,7 +641,7 @@ def get_plugin_ui_bundle_api(plugin_id):
             return jsonify({'success': False, 'error': 'UI bundle not found'}), 404
         return jsonify({'success': True, 'plugin_id': plugin_id, 'bundle': bundle}), 200
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @plugin_routes_bp.route('/api/media/plugins/<plugin_id>/detail-ui', methods=['GET'])
 @login_required
@@ -667,7 +659,7 @@ def get_plugin_detail_ui_bundle_api(plugin_id):
             return jsonify({'success': False, 'error': 'Detail UI bundle not found'}), 404
         return jsonify({'success': True, 'plugin_id': plugin_id, 'bundle': bundle}), 200
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @plugin_routes_bp.route('/api/media/context-menu/book/plugins', methods=['POST'])
 @login_required
@@ -725,7 +717,7 @@ def get_book_context_menu_plugin_items_api():
 
         return jsonify({'success': True, 'items': merged_items}), 200
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @plugin_routes_bp.route('/api/media/context-menu/book/plugins/action', methods=['POST'])
 @login_required
@@ -759,7 +751,7 @@ def run_book_context_menu_plugin_action_api():
     except ValueError as ve:
         return jsonify({'success': False, 'error': str(ve)}), 400
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 def _resolve_cover_url(cover_image):
     """book_context_menu용과 동일하게, DB의 cover_image 원본값을 실제 접근 가능한 경로로
@@ -858,7 +850,7 @@ def get_annotation_context_menu_plugin_items_api():
 
         return jsonify({'success': True, 'items': merged_items}), 200
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @plugin_routes_bp.route('/api/media/context-menu/annotation/plugins/action', methods=['POST'])
 @login_required
@@ -909,7 +901,7 @@ def run_annotation_context_menu_plugin_action_api():
     except ValueError as ve:
         return jsonify({'success': False, 'error': str(ve)}), 400
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @plugin_routes_bp.route('/callback', methods=['GET'])
 @admin_required

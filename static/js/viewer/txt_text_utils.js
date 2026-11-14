@@ -17,6 +17,7 @@ export function chunkText(text, chunkSize = 4000) {
   return chunks;
 }
 
+// 이 파일은 테스트가 data: URL로 단독 로드하는 순수 모듈이라 import 없이 자체 사본을 둔다(공용판: utils/html.js).
 export function escapeHtml(text) {
   if (!text) return '';
   return text

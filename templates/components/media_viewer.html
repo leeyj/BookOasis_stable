@@ -283,42 +283,6 @@
             </div>
         </div>
 
-        <!-- 뷰어 여백 설정 퀵 조절 패널 -->
-        <div id="viewer-padding-overlay-panel" class="viewer-padding-panel" style="display: none; z-index: 10004;">
-            <div class="padding-panel-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.5rem; margin-bottom: 0.75rem;">
-                <h4 style="margin: 0; color: var(--app-text-primary); font-size: 0.88rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
-                    <i class="lc lc-move" style="color: var(--app-accent);"></i>
-                    <span data-i18n="viewer.spacing_settings">뷰어 여백 상세 설정</span>
-                </h4>
-                <span class="padding-panel-close" data-role="viewer-action" data-action="toggle-padding-panel" style="cursor: pointer; color: var(--app-text-muted); font-size: 1.2rem; font-weight: bold;">&times;</span>
-            </div>
-            <div class="padding-panel-body">
-                <!-- 소설/텍스트 조절 폼 (TXT, EPUB) -->
-                <div id="quick-padding-novel-group" style="display: none; flex-direction: column; gap: 0.6rem;">
-                    <!-- 1. 상단 여백 -->
-                    <div class="quick-padding-row" style="display: flex; flex-direction: column; gap: 0.2rem;">
-                        <label style="font-size: 0.76rem; color: var(--app-text-muted); display: flex; justify-content: space-between;"><span data-i18n="settings.padding_top_label">상단 여백</span> <span><span id="quick-novel-top-val">40</span>px</span></label>
-                        <input type="range" id="quick-novel-top-slider" min="0" max="200" step="5" value="40" style="width: 100%; cursor: pointer; accent-color: var(--app-accent);">
-                    </div>
-                    <!-- 2. 하단 여백 -->
-                    <div class="quick-padding-row" style="display: flex; flex-direction: column; gap: 0.2rem;">
-                        <label style="font-size: 0.76rem; color: var(--app-text-muted); display: flex; justify-content: space-between;"><span data-i18n="settings.padding_bottom_label">하단 여백</span> <span><span id="quick-novel-bottom-val">60</span>px</span></label>
-                        <input type="range" id="quick-novel-bottom-slider" min="0" max="200" step="5" value="60" style="width: 100%; cursor: pointer; accent-color: var(--app-accent);">
-                    </div>
-                    <!-- 3. 좌측 여백 -->
-                    <div class="quick-padding-row" style="display: flex; flex-direction: column; gap: 0.2rem;">
-                        <label style="font-size: 0.76rem; color: var(--app-text-muted); display: flex; justify-content: space-between;"><span data-i18n="settings.padding_left_label">좌측 여백</span> <span><span id="quick-novel-left-val">20</span>px</span></label>
-                        <input type="range" id="quick-novel-left-slider" min="0" max="200" step="5" value="20" style="width: 100%; cursor: pointer; accent-color: var(--app-accent);">
-                    </div>
-                    <!-- 4. 우측 여백 -->
-                    <div class="quick-padding-row" style="display: flex; flex-direction: column; gap: 0.2rem;">
-                        <label style="font-size: 0.76rem; color: var(--app-text-muted); display: flex; justify-content: space-between;"><span data-i18n="settings.padding_right_label">우측 여백</span> <span><span id="quick-novel-right-val">20</span>px</span></label>
-                        <input type="range" id="quick-novel-right-slider" min="0" max="200" step="5" value="20" style="width: 100%; cursor: pointer; accent-color: var(--app-accent);">
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- 이미지(만화) 뷰어 -->
         <div id="comic-viewer-container" class="viewer-pane" style="display:none; position: relative;">
             <div class="comic-image-wrapper">

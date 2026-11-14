@@ -2,6 +2,7 @@
 //
 // 속성 이름은 관리자가 입력한 문자열이라 innerHTML에 넣기 전에 반드시 이스케이프한다.
 
+// 이 파일은 테스트가 data: URL로 단독 로드하는 순수 모듈이라 import 없이 자체 사본을 둔다(공용판: utils/html.js).
 export function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')

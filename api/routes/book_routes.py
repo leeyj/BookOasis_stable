@@ -2,6 +2,7 @@
 import os
 import mimetypes
 from flask import Blueprint, request, jsonify, session, send_file
+from api.helpers.route_helpers import error_response, current_user_id
 
 from services.book_service import BookService
 from services.book_detail_service import BookDetailService
@@ -64,7 +65,7 @@ def edit_media_detail():
                 pass
         return jsonify({'success': success, 'message': message if success else None, 'error': message if not success else None})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @book_routes_bp.route('/api/media/series/alias', methods=['POST', 'PATCH'])
 @admin_required
@@ -89,7 +90,7 @@ def update_series_alias():
             pass
         return jsonify({'success': True, 'message': f'"{series_name}" 시리즈 별칭이 수정되었습니다.', 'series_alias': series_alias})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @book_routes_bp.route('/api/media/books/<int:book_id>/alias', methods=['POST', 'PATCH'])
 @admin_required
@@ -110,7 +111,7 @@ def update_book_alias(book_id):
             pass
         return jsonify({'success': True, 'message': f'도서(ID: {book_id}) 별칭이 수정되었습니다.', 'title_alias': title_alias})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @book_routes_bp.route('/api/media/meta/recommend', methods=['GET'])
 @login_required
@@ -128,7 +129,7 @@ def get_media_meta_recommend():
         recommends = MetadataService.get_meta_recommend(db_type, series_name)
         return jsonify({'success': True, 'recommends': recommends})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @book_routes_bp.route('/api/media/meta/copy', methods=['POST'])
 @admin_required
@@ -149,7 +150,7 @@ def copy_media_metadata():
         else:
             return jsonify({'success': False, 'error': message}), 404
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @book_routes_bp.route('/api/media/next-book', methods=['GET'])
 @login_required
@@ -159,7 +160,7 @@ def get_next_book_api():
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
     book_id = request.args.get('book_id')
-    user_id = session.get('user_id', 1)
+    user_id = current_user_id()
     
     if not book_id:
         return jsonify({'success': False, 'error': _t('api.err_book_id_missing')}), 400
@@ -168,7 +169,7 @@ def get_next_book_api():
         next_book = BookService.get_next_book(db_type, book_id, user_id=user_id)
         return jsonify({'success': True, 'next_book': next_book})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @book_routes_bp.route('/api/media/books/<int:book_id>/info', methods=['GET'])
 @login_required
@@ -188,7 +189,7 @@ def get_book_info(book_id):
             'cover_image': info.get('cover_image')
         })
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @book_routes_bp.route('/api/media/books/<int:book_id>/reader-info', methods=['GET'])
 @login_required
@@ -205,7 +206,7 @@ def get_book_reader_info(book_id):
             return jsonify({'success': False, 'error': 'Book not found'}), 404
         return jsonify({'success': True, 'book': info})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @book_routes_bp.route('/api/media/books/<int:book_id>/favorite', methods=['POST', 'PATCH'])
 @login_required
@@ -214,7 +215,7 @@ def toggle_book_favorite(book_id):
     db_type = request.form.get('type', 'general')
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
-    user_id = session.get('user_id', 1)
+    user_id = current_user_id()
     try:
         is_favorite = int(request.form.get('is_favorite', 0))
     except ValueError:
@@ -226,7 +227,7 @@ def toggle_book_favorite(book_id):
         SeriesService.invalidate_all_books_cache()
         return jsonify({'success': True, 'message': _t('api.msg_favorite_updated')})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @book_routes_bp.route('/api/media/books/<int:book_id>/cover-align', methods=['POST', 'PATCH'])
 @login_required
@@ -245,7 +246,7 @@ def update_book_cover_align(book_id):
         SeriesService.invalidate_all_books_cache()
         return jsonify({'success': True})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @book_routes_bp.route('/api/media/series/favorite', methods=['POST', 'PATCH'])
 @login_required
@@ -254,7 +255,7 @@ def toggle_series_favorite_api():
     db_type = request.form.get('type', 'general')
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
-    user_id = session.get('user_id', 1)
+    user_id = current_user_id()
     series_name = request.form.get('series_name', '').strip()
     try:
         is_favorite = int(request.form.get('is_favorite', 0))
@@ -270,7 +271,7 @@ def toggle_series_favorite_api():
         SeriesService.invalidate_all_books_cache()
         return jsonify({'success': True, 'message': _t('api.msg_series_favorite_updated')})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @book_routes_bp.route('/api/media/author/favorite', methods=['POST', 'PATCH'])
 @login_required
@@ -279,7 +280,7 @@ def toggle_author_favorite_api():
     db_type = request.form.get('type', 'general')
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
-    user_id = session.get('user_id', 1)
+    user_id = current_user_id()
     author_key = request.form.get('author_key', '').strip()
     try:
         is_favorite = int(request.form.get('is_favorite', 0))
@@ -295,7 +296,7 @@ def toggle_author_favorite_api():
         SeriesService.invalidate_all_books_cache()
         return jsonify({'success': True, 'message': _t('api.msg_series_favorite_updated')})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @book_routes_bp.route('/api/media/books/<int:book_id>/download', methods=['GET'])
 @login_required
@@ -342,7 +343,7 @@ def download_book(book_id):
     except Exception as e:
         import traceback
         print(f"[Download API] Error:\n{traceback.format_exc()}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @book_routes_bp.route('/api/media/lock-metadata', methods=['POST'])
 @admin_required
@@ -365,7 +366,7 @@ def lock_media_metadata():
             return jsonify({'success': True})
         return jsonify({'success': False, 'error': '해당 도서/시리즈를 찾을 수 없습니다.'}), 404
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @book_routes_bp.route('/api/media/unlock-metadata', methods=['POST'])
 @login_required
@@ -404,4 +405,4 @@ def unlock_media_metadata():
         else:
             return jsonify({'success': False, 'error': '해당 도서/시리즈를 찾을 수 없거나 이미 해제되었습니다.'}), 404
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)

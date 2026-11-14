@@ -1,5 +1,5 @@
 import { formatClockDuration } from '../utils/time.js';
-import { escapeHtml } from '../category/kind_options.js';
+import { escapeHtml } from '../utils/html.js';
 
 export function renderAudiobookVolumes(orderedBooks, detailMeta = null) {
   const books = Array.isArray(orderedBooks) ? [...orderedBooks] : [];

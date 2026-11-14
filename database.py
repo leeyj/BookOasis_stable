@@ -301,7 +301,7 @@ _DEFAULT_POOL_SIZE = 5
 
 
 def _is_mariadb_engine():
-    return os.environ.get('DB_ENGINE', os.environ.get('DBMS', 'sqlite')).lower() in ('mariadb', 'mysql')
+    return is_mariadb_mode()
 
 
 def _read_pool_size_setting_sqlite():
@@ -405,12 +405,14 @@ class MariadbCursorWrapper:
             converted = converted.replace('INSERT OR REPLACE', 'REPLACE INTO')
 
         # 3. SQLite ON CONFLICT(file_path) DO UPDATE SET EXCLUDED... ➔ MariaDB ON DUPLICATE KEY UPDATE...
-        if 'ON CONFLICT' in converted and 'EXCLUDED' in converted:
+        if 'ON CONFLICT' in converted.upper() and 'EXCLUDED' in converted.upper():
             import re
             m = re.search(r'ON\s+CONFLICT\s*\([^)]*\)\s*DO\s+UPDATE\s+SET\s+(.*)', converted, re.DOTALL | re.IGNORECASE)
             if m:
                 set_clause = m.group(1)
                 set_clause = re.sub(r'EXCLUDED\.([a-zA-Z0-9_]+)', r'VALUES(\1)', set_clause, flags=re.IGNORECASE)
+                # 예전엔 set_clause를 만들기만 하고 SQL에 반영하지 않아 MariaDB에서 문법 오류가 났다.
+                converted = converted[:m.start()] + 'ON DUPLICATE KEY UPDATE ' + set_clause
         # 4. SQLite datetime('now', ...) ➔ MariaDB NOW() / DATE_SUB(NOW(), INTERVAL x DAY) 자동 변환
         if 'datetime(' in converted.lower() and 'now' in converted.lower():
             import re
@@ -721,9 +723,8 @@ def connection(db_type='general', wait_timeout=30.0):
 
 def get_pool_stats(db_type='general'):
     """현재 커넥션 풀 상태 스냅샷을 반환합니다."""
-    engine = os.environ.get('DB_ENGINE', os.environ.get('DBMS', 'sqlite')).lower()
     with _pools_lock:
-        if engine in ('mariadb', 'mysql'):
+        if is_mariadb_mode():
             pool = _mariadb_pools.get(db_type)
         else:
             pool = _pools.get(db_type)

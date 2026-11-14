@@ -7,6 +7,7 @@ import re
 import time
 import datetime
 from flask import Blueprint, request, jsonify, session
+from api.helpers.route_helpers import error_response
 from api.auth import admin_required, login_required, verify_webhook_token, webhook_token_required
 from flask import render_template
 from urllib.request import Request, urlopen
@@ -65,7 +66,7 @@ def mark_notifications_seen():
         seen_ms = mark_seen(session.get('user_id'))
         return jsonify({'success': True, 'seen_ms': seen_ms})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 
 @system_bp.route('/api/notifications/clear', methods=['POST'])
@@ -77,7 +78,7 @@ def clear_notifications():
         result = clear(session.get('user_id'), session.get('role') == 'admin')
         return jsonify({'success': True, **result})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 
 @system_bp.route('/api/notifications/clear/undo', methods=['POST'])
@@ -97,7 +98,7 @@ def undo_clear_notifications():
         result = undo_clear(session.get('user_id'), session.get('role') == 'admin', previous, keys)
         return jsonify({'success': True, **result})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 
 @system_bp.route('/health', methods=['GET'])
@@ -283,7 +284,7 @@ def get_system_status():
         response.headers['Expires'] = '0'
         return response
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @system_bp.route('/api/system/db-pool-status', methods=['GET'])
 @admin_required
@@ -298,7 +299,7 @@ def get_db_pool_status():
             pools[db_type] = database.get_pool_stats(db_type)
         return jsonify({'success': True, 'pools': pools})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @system_bp.route('/api/media/system/queue', methods=['GET'])
 @admin_required
@@ -344,7 +345,7 @@ def get_system_queue_status():
         response.headers['Expires'] = '0'
         return response
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @system_bp.route('/api/media/system/queue/clear', methods=['POST'])
 @admin_required
@@ -355,7 +356,7 @@ def clear_system_queue():
         count = scanner_queue.clear_queue()
         return jsonify({'success': True, 'message': f'대기열 {count}건이 삭제되었습니다.'})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @system_bp.route('/api/media/system/queue/cancel', methods=['POST'])
 @admin_required
@@ -379,7 +380,7 @@ def cancel_system_queue_task():
 
         return jsonify({'success': False, 'error': '대기열에서 작업을 찾지 못했습니다.'}), 404
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 _GITHUB_VERSION_URL = 'https://raw.githubusercontent.com/leeyj/BookOasis_stable/main/VERSION'
 # 헤더 업데이트 배지가 페이지를 열 때마다 GitHub을 부르지 않도록 결과를 메모리에 둔다.
@@ -510,7 +511,7 @@ def client_log():
         print(f"[CLIENT-LOG:{tag}] (user={user_id}) {message}")
         return jsonify({'success': True})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @system_bp.route('/api/webhook/scan', methods=['GET', 'POST'])
 def trigger_scan_via_webhook():
@@ -571,7 +572,7 @@ def trigger_scan_via_webhook():
         except FileNotFoundError as e:
             return jsonify({'success': False, 'error': str(e)}), 404
         except Exception as e:
-            return jsonify({'success': False, 'error': str(e)}), 500
+            return error_response(e)
 
     # 3. 백그라운드 스캔 대기열 주입 (스캐너 워커 필수 인자 포함)
     try:
@@ -601,7 +602,7 @@ def trigger_scan_via_webhook():
             'message': f'"{lib_name} ({db_type})" 스캔 작업이 대기열에 성공적으로 등록되었습니다.'
         })
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @system_bp.route('/api/webhook/system/db-engine', methods=['GET'])
 @webhook_token_required
@@ -619,4 +620,4 @@ def get_db_engine_webhook_api():
             'is_mariadb': is_mariadb
         })
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)

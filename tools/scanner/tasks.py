@@ -13,7 +13,8 @@ from tools.scanner.offset import collect_zip_offsets_data
 from tools.scanner.path_utils import canonical_path, join_canonical
 
 SUPPORTED_FORMATS = ('.zip', '.cbz', '.epub', '.pdf', '.txt')
-SUPPORTED_IMAGE_FORMATS = ('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif')
+from utils import media_types as _media_types
+SUPPORTED_IMAGE_FORMATS = _media_types.IMAGE_EXTENSIONS
 IMGDIR_VIRTUAL_FILENAME = '__folder__.imgdir'
 
 
@@ -58,7 +59,7 @@ def _full_path_for(root, filename, gdrive_file_ids):
     return encode_gdrive_file_id(base, file_id)
 
 
-_META_EXTENSIONS = ('.yaml', '.yml', '.json', '.xml')
+_META_EXTENSIONS = _media_types.METADATA_EXTENSIONS
 
 
 def _stage_gdrive_metadata_folder(root, files, gdrive_file_ids, gdrive_meta_dirs=None):

@@ -1,24 +1,12 @@
 # -*- coding: utf-8 -*-
 from flask import Blueprint, request, jsonify, session
+from api.helpers.route_helpers import session_user_info as _get_current_user_info, db_type_arg
 from services.bookmark_service import BookmarkService
 
 bookmark_bp = Blueprint('bookmarks', __name__)
 
-def _get_current_user_info():
-    user_id = session.get('user_id')
-    role = session.get('role')
-    if not user_id:
-        user_dict = session.get('user')
-        if isinstance(user_dict, dict):
-            user_id = user_dict.get('id')
-            role = user_dict.get('role')
-    return user_id, role
-
 def _get_target_db():
-    raw_type = request.args.get('db_type', 'general')
-    if raw_type not in ('general', 'adult'):
-        return 'general'
-    return raw_type
+    return db_type_arg(('general', 'adult'))
 
 @bookmark_bp.route('/api/v1/books/<int:book_id>/bookmarks', methods=['GET'])
 def get_book_bookmarks(book_id):

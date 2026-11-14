@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+from api.helpers.route_helpers import error_response
 from services.trash_service import TrashService
 
 trash_bp = Blueprint('admin_trash', __name__)
@@ -19,8 +20,7 @@ def get_trash_books():
             'video': video_books
         })
     except Exception as e:
-        print(f"[API ERROR] Failed to fetch trash books: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @trash_bp.route('/api/admin/trash/restore', methods=['POST'])
 def restore_trash_books():
@@ -39,8 +39,7 @@ def restore_trash_books():
         else:
             return jsonify({'success': False, 'error': '도서 복구 처리에 실패했습니다.'}), 500
     except Exception as e:
-        print(f"[API ERROR] Failed to restore books: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @trash_bp.route('/api/admin/trash/empty', methods=['POST'])
 def empty_trash_books():
@@ -58,5 +57,4 @@ def empty_trash_books():
         else:
             return jsonify({'success': False, 'error': '휴지통 비우기 처리에 실패했습니다.'}), 500
     except Exception as e:
-        print(f"[API ERROR] Failed to empty trash: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)

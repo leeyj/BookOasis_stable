@@ -37,27 +37,9 @@ DB_DIR = os.path.join(MEDIA_SERVER_DIR, 'db')
 stop_requested = False
 
 
-def _is_db_locked_error(exc):
-    """SQLite 'database is locked'뿐 아니라 MariaDB의 lock-wait-timeout(1205)/
-    deadlock(1213)도 진짜 '일시적 경합'으로 인식해 재시도 대상으로 잡는다.
-    이 체크가 SQLite만 보던 예전에는, MariaDB에서 진짜 락 경합이 발생해도
-    항상 False로 판정되어 재시도 없이 즉시 실패 처리되는 별개 문제가 있었다."""
-    try:
-        if isinstance(exc, sqlite3.OperationalError) and 'locked' in str(exc).lower():
-            return True
-        msg = str(exc).lower()
-        if 'lock wait timeout' in msg or 'deadlock' in msg or 'try restarting transaction' in msg:
-            return True
-        try:
-            import pymysql
-            if isinstance(exc, pymysql.err.OperationalError):
-                code = exc.args[0] if exc.args else None
-                return code in (1205, 1213) or 'lock' in msg
-        except ImportError:
-            pass
-        return False
-    except Exception:
-        return False
+# 잠금 판별·커밋 재시도는 utils/db_retry.py로 옮겼다(lazy_scanner·스케줄러와 공유).
+# 예전 _commit_with_retry는 잠금 시 rollback() 후 재커밋해 쓰기를 통째로 버렸다 - 공용판은 롤백 없이 COMMIT만 재시도한다.
+from utils.db_retry import is_db_locked_error as _is_db_locked_error, commit_with_retry as _commit_with_retry
 
 
 # MariaDB VARCHAR(N) 컬럼과 실제 길이 제한을 맞춘 스캐너 메타데이터 필드.
@@ -85,29 +67,6 @@ _METADATA_FIELD_MAX_LEN = {
 def _clamp_text(value, max_len):
     s = value if isinstance(value, str) else ('' if value is None else str(value))
     return s[:max_len] if len(s) > max_len else s
-
-
-def _commit_with_retry(conn, context_label, max_attempts=12):
-    last_exc = None
-    for attempt in range(1, max_attempts + 1):
-        try:
-            conn.commit()
-            return True
-        except Exception as e:
-            last_exc = e
-            if not _is_db_locked_error(e):
-                raise
-            try:
-                conn.rollback()
-            except Exception:
-                pass
-            wait_sec = min(3.0, 0.2 * (2 ** (attempt - 1)))
-            print(f"[Scanner-DB] {context_label} commit locked (attempt {attempt}/{max_attempts}). Retrying in {wait_sec:.2f}s...")
-            time.sleep(wait_sec)
-
-    if last_exc:
-        raise last_exc
-    return False
 
 
 def _dispatch_new_books_to_plugin_hooks(db_type, event_payload):

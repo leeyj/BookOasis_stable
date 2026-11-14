@@ -5,6 +5,7 @@ library_routes.py – 라이브러리(카테고리) CRUD 및 스케줄 관리 �
 import sqlite3
 import threading
 from flask import Blueprint, request, jsonify
+from api.helpers.route_helpers import error_response
 from apscheduler.triggers.cron import CronTrigger
 from services.category_service import COVER_ASPECT_RATIOS, CategoryService, apply_running_scan_status
 from services.scheduler_service import run_scan_job, SchedulerService
@@ -100,7 +101,7 @@ def edit_library_kind():
     except ValueError as error:
         return jsonify({'success': False, 'error': str(error)}), 400
     except Exception as error:
-        return jsonify({'success': False, 'error': str(error)}), 500
+        return error_response(error)
 
 
 @library_bp.route('/api/media/library-kinds/delete', methods=['POST'])
@@ -114,7 +115,7 @@ def delete_library_kind():
     except ValueError as error:
         return jsonify({'success': False, 'error': str(error)}), 400
     except Exception as error:
-        return jsonify({'success': False, 'error': str(error)}), 500
+        return error_response(error)
 
 
 @library_bp.route('/api/media/library-groups/move', methods=['POST'])
@@ -128,7 +129,7 @@ def move_library_groups():
     except ValueError as error:
         return jsonify({'success': False, 'error': str(error)}), 400
     except Exception as error:
-        return jsonify({'success': False, 'error': str(error)}), 500
+        return error_response(error)
 
 
 @library_bp.route('/api/media/plugin-groups/assign', methods=['POST'])
@@ -142,7 +143,7 @@ def assign_plugin_groups():
     except ValueError as error:
         return jsonify({'success': False, 'error': str(error)}), 400
     except Exception as error:
-        return jsonify({'success': False, 'error': str(error)}), 500
+        return error_response(error)
 
 
 @library_bp.route('/api/media/libraries/move', methods=['POST'])
@@ -156,7 +157,7 @@ def move_media_libraries():
     except ValueError as error:
         return jsonify({'success': False, 'error': str(error)}), 400
     except Exception as error:
-        return jsonify({'success': False, 'error': str(error)}), 500
+        return error_response(error)
 
 def get_db_path_for_scan(db_type):
     """db_type에 대응하는 스캔 대상 데이터베이스 경로/식별자 반환 (MariaDB 모드 대응)"""
@@ -223,7 +224,7 @@ def add_media_library():
         err_str = str(e)
         if 'Duplicate entry' in err_str or 'UNIQUE constraint' in err_str or '1062' in err_str:
             return jsonify({'success': False, 'error': _t('api.err_library_name_exists')}), 400
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
     
     # 즉시 스캔 비동기 수행
     try:
@@ -304,7 +305,7 @@ def edit_media_library():
         err_str = str(e)
         if 'Duplicate entry' in err_str or 'UNIQUE constraint' in err_str or '1062' in err_str:
             return jsonify({'success': False, 'error': _t('api.err_library_name_exists')}), 400
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
     
     # 즉시 스캔 비동기 수행 (경로가 변경된 경우에만)
     is_path_changed = False
@@ -345,7 +346,7 @@ def delete_media_library():
         # 실제 도서 삭제는 스캐너 큐가 이어서 한다 - 카테고리는 이미 목록에서 빠졌다.
         return jsonify({'success': True, 'queued': True, 'message': _t('api.msg_library_delete_queued')})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @library_bp.route('/api/media/libraries/schedules', methods=['GET'])
 @admin_required
@@ -359,7 +360,7 @@ def get_libraries_schedules():
         libraries = apply_running_scan_status(libraries, db_type, scanner_queue.get_queue_status())
         return jsonify({'success': True, 'libraries': libraries})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @library_bp.route('/api/media/libraries/<int:library_id>/schedule', methods=['POST'])
 @admin_required
@@ -401,7 +402,7 @@ def update_library_schedule(library_id):
         
         return jsonify({'success': True, 'message': _t('api.msg_schedule_updated')})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @library_bp.route('/api/media/libraries/<int:library_id>/schedule-enabled', methods=['POST'])
 @admin_required
@@ -425,7 +426,7 @@ def update_library_schedule_enabled(library_id):
 
         return jsonify({'success': True})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 def _format_library_row(r):
     """DB 행을 JSON 형식으로 변환"""
@@ -467,6 +468,5 @@ def move_media_library():
     except ValueError as e:
         return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
-        print(f"[API ERROR] Category transfer failed: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 

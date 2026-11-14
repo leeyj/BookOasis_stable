@@ -346,7 +346,11 @@ def run_scan_job(db_type, db_path, library_id, physical_path, force=False, initi
             'database table is locked',
             'database schema is locked',
         )
-        return any(marker in text for marker in transient_markers)
+        if any(marker in text for marker in transient_markers):
+            return True
+        # MariaDB lock-wait-timeout(1205)/deadlock(1213)도 일시적 경합으로 보고 스캔을 재시도한다.
+        from utils.db_retry import is_db_locked_error
+        return is_db_locked_error(err)
 
     def is_vfs_refresh_success_response(res_text, rel_path):
         text = str(res_text or '').strip()

@@ -200,7 +200,7 @@ flowchart LR
     Web["Web start core.py → init_databases()"] --> Full
     Full --> Steps["For each of the 4 DBs: schema → ALTER missing columns →<br/>indexes → default settings and admin seed → backfills →<br/>purge old records → series summary"]
 ```
-* The SQLite DDL is in `_SCHEMA_SQL`/`_INDEXES_SQL` (`services/db_migration_service.py`) and the MariaDB DDL is in `MARIADB_CENTRAL_SCHEMA` (`tools/db_schema_updater.py`) — **two places**. New tables and columns must be added to both → [change_db_guide.md](./change_db_guide.md)
+* The SQLite DDL is in `_SCHEMA_SQL`/`_INDEXES_SQL` (`services/db_migration_service.py`) and the MariaDB DDL is in `MARIADB_CENTRAL_SCHEMA` (`services/schema_mariadb.py`) — **two places**. New tables and columns must be added to both → [change_db_guide.md](./change_db_guide.md)
 * Missing columns are added automatically with `ALTER TABLE ADD COLUMN` at startup. Migrations must be safe to run on every start (idempotent).
 * There are no foreign keys or cascading deletes. Cleaning up data attached to books is done in code, from lists (§11).
 

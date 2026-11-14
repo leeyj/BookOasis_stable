@@ -1,47 +1,19 @@
 // viewer_padding.js – 뷰어 내부 실시간 여백 조절 및 동적 패딩 적용 모듈
 import { state } from '../state.js';
 
-// 여백 상세 설정 패널 토글
+// 여백 조절은 오버레이 메뉴의 '여백' 탭이 담당한다. 예전 독립 퀵 패널(#viewer-padding-overlay-panel)은
+// 여는 버튼이 없어 쓰이지 않았고 슬라이더 ID가 여백 탭과 겹쳐 제거했다. 전역 이름은 호환용으로 남긴다.
 export function toggleViewerPaddingPanel() {
-  console.log('[Viewer-Padding] toggleViewerPaddingPanel called. Current Format:', state.currentViewerFormat);
-  const panel = document.getElementById('viewer-padding-overlay-panel');
-  const overlayMenu = document.getElementById('comic-overlay-menu');
-  if (!panel) {
-    console.error('[Viewer-Padding] #viewer-padding-overlay-panel not found in DOM');
-    return;
-  }
-
-  if (panel.style.display === 'none') {
-    panel.style.display = 'block';
-    console.log('[Viewer-Padding] Panel display set to block');
-    // 모바일 겹침 방지: 여백 조절판이 열릴 때 오버레이 제어 메뉴를 일단 숨김
-    if (overlayMenu) {
-      overlayMenu.style.display = 'none';
-    }
-    initViewerPaddingPanel();
-  } else {
-    panel.style.display = 'none';
-    console.log('[Viewer-Padding] Panel display set to none. Re-rendering viewer.');
-    // 여백 조절판을 닫았을 때, 오버레이 메뉴를 복원
-    if (overlayMenu) {
-      overlayMenu.style.display = 'flex';
-    }
-    // 최종 닫히는 시점에 1회 완벽 리렌더링하여 좌표 찢어짐 원천 봉쇄!
-    commitViewerPadding();
-  }
+  window.switchViewerOverlayTab?.('margin');
 }
 
 // 뷰어 포맷에 따라 슬라이더 값 동기화 및 폼 그룹 노출
 export function initViewerPaddingPanel() {
   console.log('[Viewer-Padding] initViewerPaddingPanel executing...');
   const isTxtOrEpub = (state.currentViewerFormat === 'epub' || state.currentViewerFormat === 'txt');
-  
-  const novelGroup = document.getElementById('quick-padding-novel-group');
 
   if (isTxtOrEpub) {
     console.log('[Viewer-Padding] Detected TXT/EPUB novel mode.');
-    if (novelGroup) novelGroup.style.display = 'flex';
-    
     // 4방향 개별 소설 값 복원
     const padTop = localStorage.getItem('viewer_padding_top') || '40';
     const padBottom = localStorage.getItem('viewer_padding_bottom') || '60';
@@ -74,9 +46,6 @@ export function initViewerPaddingPanel() {
       const valEl = document.getElementById('quick-novel-right-val');
       if (valEl) valEl.innerText = padRight;
     }
-  } else {
-    console.log('[Viewer-Padding] Detected Non-novel mode (Comic/PDF). Hiding groups.');
-    if (novelGroup) novelGroup.style.display = 'none';
   }
 
   // 동적 슬라이더 이벤트 프로그램 바인딩

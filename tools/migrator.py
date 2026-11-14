@@ -3,7 +3,6 @@ import sqlite3
 import os
 import shutil
 import sys
-import hashlib
 import re
 from datetime import datetime
 
@@ -16,6 +15,7 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(MEDIA_SERVER_DIR, ".env"))
 
 import database
+from services.cover_storage_service import cover_filename_for
 
 def get_db_connection(db_path):
     conn = sqlite3.connect(db_path)
@@ -199,8 +199,7 @@ def convert_and_copy_cover(source_cover_name, kavita_covers_dir, bookoasis_cover
         return None
         
     # BookOasis 표준 파일 경로 기준 MD5 해시 파일명
-    book_hash = hashlib.md5(file_path.encode('utf-8')).hexdigest()
-    cover_filename = f"book_{book_hash}.webp"
+    cover_filename = cover_filename_for(file_path)
     
     if library_id is not None:
         dest_dir = os.path.join(bookoasis_covers_dir, str(library_id))
@@ -600,13 +599,9 @@ def run_bookoasis_to_bookoasis():
                 new_cover_image = cover_image
                 
                 if cover_image and not cover_image.startswith('series_'):
-                    # 기존 해시 파일명
-                    old_hash = hashlib.md5(file_path.encode('utf-8')).hexdigest()
-                    # 새 해시 파일명
-                    new_hash = hashlib.md5(new_file_path.encode('utf-8')).hexdigest()
-                    
-                    old_cover_filename = f"book_{old_hash}.webp"
-                    new_cover_filename = f"book_{new_hash}.webp"
+                    # 기존/새 경로 기준 해시 파일명
+                    old_cover_filename = cover_filename_for(file_path)
+                    new_cover_filename = cover_filename_for(new_file_path)
                     
                     lib_id = row_value(b, 'library_id')
                     if lib_id:

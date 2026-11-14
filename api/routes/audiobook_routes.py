@@ -9,6 +9,7 @@ import subprocess
 import shutil
 import json
 from flask import Blueprint, request, Response, jsonify, session
+from api.helpers.route_helpers import error_response, current_user_id
 from api.auth import login_required, check_adult_permission
 import database
 from services.reading_progress_service import get_book_complete_percent
@@ -531,7 +532,7 @@ def audiobook_progress_api(aid):
     if not _has_audiobook_library_access(aid):
         return jsonify({'success': False, 'error': '오디오북 접근 권한이 없습니다.'}), 403
 
-    user_id = session.get('user_id', 1)
+    user_id = current_user_id()
     from repositories.audiobook_repository import AudiobookRepository
 
     if request.method == 'POST':
@@ -620,7 +621,7 @@ def audiobook_progress_api(aid):
                 'completed_track_count': completed_track_count,
             })
         except Exception as e:
-            return jsonify({'success': False, 'error': str(e)}), 500
+            return error_response(e)
     else:
         progress_row = AudiobookRepository.get_audiobook_progress(aid, user_id)
         return jsonify({'success': True, 'progress': progress_row})

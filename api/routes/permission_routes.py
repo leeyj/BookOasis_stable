@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from flask import Blueprint, request, jsonify, session
+from api.helpers.route_helpers import error_response
 from api.auth import admin_required
 from repositories.category_repository import CategoryRepository
 from repositories.user_repository import UserRepository
@@ -138,7 +139,7 @@ def get_permissions():
             }
         })
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 def _apply_single_permission_change(change):
     """change 1건({user_id, library_id, has_access, target_db})을 실제로 반영한다.
@@ -187,7 +188,7 @@ def update_permission():
     except ValueError as e:
         return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 
 @permission_bp.route('/api/admin/permissions/bulk-update', methods=['POST'])
@@ -219,7 +220,7 @@ def copy_permissions_from_user():
     try:
         categories, permissions = _fetch_library_permissions(target_db, include_plugins=(target_db == 'general'))
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
     source_perms = permissions.get(str(source_user_id), {})
     changes = []
@@ -256,7 +257,7 @@ def update_adult_permission():
             UserRepository.update_adult_access(db_type, user_id, has_adult_access)
         return jsonify({'success': True, 'message': '성인 도서 접근 권한이 변경되었습니다.'})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 
 @permission_bp.route('/api/admin/permissions/update-download', methods=['POST'])
@@ -275,7 +276,7 @@ def update_download_permission():
             UserRepository.update_download_access(db_type, user_id, has_download_access)
         return jsonify({'success': True, 'message': '파일 다운로드 접근 권한이 변경되었습니다.'})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 
 @permission_bp.route('/api/admin/permissions/update-content-rating', methods=['POST'])
@@ -309,7 +310,7 @@ def update_content_rating_permission():
             UserRepository.update_content_rating_max(db_type, user_id, content_rating_max)
         return jsonify({'success': True, 'message': '콘텐츠 등급 권한이 변경되었습니다.'})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 
 @permission_bp.route('/api/admin/permissions/update-audiobook', methods=['POST'])
@@ -328,7 +329,7 @@ def update_audiobook_permission():
             UserRepository.update_audiobook_access(db_type, user_id, has_audiobook_access)
         return jsonify({'success': True, 'message': '오디오북 접근 권한이 변경되었습니다.'})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 
 @permission_bp.route('/api/admin/permissions/update-video', methods=['POST'])
@@ -347,4 +348,4 @@ def update_video_permission():
             UserRepository.update_video_access(db_type, user_id, has_video_access)
         return jsonify({'success': True, 'message': '영상 강좌 접근 권한이 변경되었습니다.'})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)

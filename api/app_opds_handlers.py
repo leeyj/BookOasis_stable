@@ -2,6 +2,7 @@
 """Shared handlers used by api/app_opds.py routes."""
 
 from flask import Response, jsonify, request
+from api.helpers.route_helpers import error_response
 
 from api.opds_common.xml import build_external_request_url, get_external_base_url
 
@@ -131,7 +132,7 @@ class AppOpdsHandlers:
                 series_list = series_list[:limit]
             return jsonify({'success': True, 'series': series_list, 'has_more': has_more})
         except Exception as e:
-            return jsonify({'success': False, 'error': str(e)}), 500
+            return error_response(e)
 
     def handle_media_libraries_compat(self, is_adult: bool):
         if not self._check_auth_cached(is_adult=is_adult):
@@ -149,7 +150,7 @@ class AppOpdsHandlers:
             libraries = CategoryService.get_libraries(db_type, user_id=user_id, role=role)
             return jsonify({'success': True, 'libraries': libraries})
         except Exception as e:
-            return jsonify({'success': False, 'error': str(e)}), 500
+            return error_response(e)
 
     def handle_media_detail_compat(self, is_adult: bool):
         if not self._check_auth_cached(is_adult=is_adult):
@@ -179,7 +180,7 @@ class AppOpdsHandlers:
             books_list = self._enrich_books(books_list, db_type, is_adult_prefix=is_adult)
             return jsonify({'success': True, 'meta': meta, 'books': books_list})
         except Exception as e:
-            return jsonify({'success': False, 'error': str(e)}), 500
+            return error_response(e)
 
     def handle_book_info_compat(self, is_adult: bool, book_id: int):
         if not self._check_auth_cached(is_adult=is_adult):
@@ -195,7 +196,7 @@ class AppOpdsHandlers:
                 return jsonify({'success': False, 'error': 'Book not found'}), 404
             return jsonify({'success': True, 'total_pages': info.get('total_pages', 0), 'cover_image': info.get('cover_image')})
         except Exception as e:
-            return jsonify({'success': False, 'error': str(e)}), 500
+            return error_response(e)
 
     def handle_login_compat(self, is_adult: bool):
         if not self._check_auth_cached(is_adult=is_adult):

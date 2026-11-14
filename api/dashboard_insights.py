@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from flask import Blueprint, jsonify, request, session
+from api.helpers.route_helpers import error_response, current_user_id
 import datetime
 from collections import Counter
 from utils.i18n import _t
@@ -12,9 +13,7 @@ dashboard_insights_bp = Blueprint('dashboard_insights_api', __name__)
 @dashboard_insights_bp.route('/api/dashboard/insights', methods=['GET'])
 def get_dashboard_insights():
     try:
-        user_id = session.get('user_id')
-        if not user_id:
-            user_id = session.get('user_id', 1)
+        user_id = current_user_id()
 
         db_type = request.args.get('library_type', 'general')
         if db_type not in ('general', 'adult', 'audiobook', 'video'):
@@ -172,8 +171,7 @@ def get_dashboard_insights():
             'genre_breakdown': genre_breakdown
         })
     except Exception as e:
-        print(f"[Insights API Error] {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 
 @dashboard_insights_bp.route('/api/dashboard/goal', methods=['POST'])
@@ -194,5 +192,4 @@ def save_reading_goal():
 
         return jsonify({'success': True, 'target_books': target_val})
     except Exception as e:
-        print(f"[Goal API Error] {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)

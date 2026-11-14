@@ -1,13 +1,5 @@
 // settings/mcp_pending.js - MCP Tier B(대량/파괴적 작업) "제안 → 관리자 승인" 큐 UI
-
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+import { escapeHtml } from '../utils/html.js';
 
 function t(key, variables, fallback) {
   return window.i18n ? window.i18n.t(key, variables || {}, fallback) : (fallback || key);

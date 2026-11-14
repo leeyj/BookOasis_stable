@@ -14,9 +14,9 @@ function _hideTrashOverlay() {
     if (overlay) overlay.style.display = 'none';
 }
 
-// 외부(emptyTrashAll 등)에서 이미 호출하던 전역 함수도 연결
-window.showGlobalLoadingSpinner = _showTrashOverlay;
-window.hideGlobalLoadingSpinner = _hideTrashOverlay;
+// window.showGlobalLoadingSpinner/hideGlobalLoadingSpinner는 detail/book_actions.js가 담당한다(modal.js 지연 바인딩).
+// 예전엔 이 파일이 같은 전역을 휴지통 전용 오버레이로 덮어써, 로드 순서에 따라 카테고리 삭제 등 다른 화면의
+// 스피너가 휴지통 오버레이로 바뀌었다. 휴지통은 아래 _show/_hideTrashOverlay를 직접 쓴다.
 
 function initTrashDelegation() {
     if (window.__trashDelegationBound) return;

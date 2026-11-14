@@ -8,6 +8,7 @@ import json
 import os
 import re
 from flask import Blueprint, render_template, request, jsonify, Response, make_response, redirect, send_from_directory
+from api.helpers.route_helpers import error_response
 from api.auth import login_required, admin_required
 from services.tts_asset_service import cross_origin_isolate
 
@@ -163,7 +164,7 @@ def pagedjs_test_files():
                 })
         return jsonify({'success': True, 'files': entries})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 
 @experimental_bp.route('/experimental/pagedjs-test/api/meta', methods=['GET'])

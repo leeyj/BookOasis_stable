@@ -1,4 +1,5 @@
 // scheduler.js – 라이브러리 스케줄 목록 로딩 및 관리 UI 전용 모듈
+import { escapeHtml } from './utils/html.js';
 import { state } from './state.js';
 import * as api from './api.js';
 import { bindFloatingMenuOutsideClose, hideFloatingMenu, positionMenuAtElement } from './context_menu_manager.js';
@@ -13,15 +14,6 @@ function buildStatusBadge(scanStatus) {
     return `<span class="badge-scan-status failed">${i18n.t('settings.status_failed')}</span>`;
   }
   return `<span class="badge-scan-status ready">${i18n.t('settings.status_ready')}</span>`;
-}
-
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }
 
 function formatLastScan(value) {

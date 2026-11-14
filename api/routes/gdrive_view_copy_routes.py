@@ -12,6 +12,7 @@ gdrive_view_copy_routes.py – 구글 드라이브 "책 단위 사전복사(뷰�
 """
 import os
 from flask import Blueprint, request, jsonify
+from api.helpers.route_helpers import error_response
 from api.auth import admin_required
 
 gdrive_view_copy_bp = Blueprint('gdrive_view_copy', __name__)
@@ -62,7 +63,7 @@ def list_gdrive_view_copy_libraries():
             })
         return jsonify({'success': True, 'type': db_type, 'libraries': items})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 
 @gdrive_view_copy_bp.route('/api/gdrive-view-copy/status', methods=['GET'])
@@ -88,7 +89,7 @@ def get_gdrive_view_copy_status():
             return jsonify({'success': False, 'error': '도서를 찾을 수 없습니다.'}), 404
         return jsonify({'success': True, **result})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 
 @gdrive_view_copy_bp.route('/api/gdrive-view-copy/prefetch', methods=['POST'])
@@ -137,7 +138,7 @@ def prefetch_gdrive_view_copy():
             **status_result,
         })
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 
 def _lookup_gdrive_view_copy_status(db_type, book_id):

@@ -1,13 +1,6 @@
 // plugin_health_panel.js – 관리자 대시보드 상단 플러그인 로드 상태(성공/실패) 알림 패널
+import { escapeHtml } from './utils/html.js';
 const DISMISS_KEY = 'plugin_health_panel_dismissed_signature';
-
-function escapeHtml(value) {
-  return String(value == null ? '' : value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
 
 function t(key, vars, fallback) {
   if (window.i18n && typeof window.i18n.t === 'function') return window.i18n.t(key, vars, fallback);

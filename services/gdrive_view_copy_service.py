@@ -163,11 +163,10 @@ def _fill_cover_from_local_copy(db_type, book_id, file_path, local_path, library
                 beta_log('view.cover_on_open', db=db_type, lib=library_id, book=book_id, kind='imgdir')
             return
         if local_path.lower().endswith('.pdf'):
-            import hashlib
-            from services.cover_storage_service import get_covers_dir
+            from services.cover_storage_service import get_covers_dir, cover_filename_for
             from tools.scanner.cover import render_pdf_cover
             # 표지 파일 이름은 원래 DB 경로(file_path) 기준 — 스캔 때 만들어지는 표지와 같은 규칙.
-            cover_name = f"book_{hashlib.md5(file_path.encode('utf-8')).hexdigest()}.webp"
+            cover_name = cover_filename_for(file_path)
             dest_dir = os.path.join(get_covers_dir(), str(library_id))
             os.makedirs(dest_dir, exist_ok=True)
             if render_pdf_cover(local_path, os.path.join(dest_dir, cover_name)):

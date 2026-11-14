@@ -3,17 +3,12 @@
 // (data-library-type="video" 상태에서 Home/History/즐겨찾기/컬렉션/스마트추천/플러그인 메뉴는 CSS로 숨김),
 // 그리드 콘텐츠(강좌 카드)만 전용 렌더러로 대체한다. 카드 클릭은 오디오북과 동일하게 공용 상세화면
 // 파이프라인(openBookDetail)을 그대로 타서, 상세화면/에피소드 목록/재생시간 저장 UI가 오디오북과 일치한다.
+import { escapeHtml } from './utils/html.js';
 import { openBookDetail } from './modal.js';
 import { updateLibraryTotalCount, updateSearchActionButtonUI } from './book_list.js';
 import { positionMenuAtPoint, hideFloatingMenu, bindFloatingMenuOutsideClose } from './context_menu_manager.js';
 import { state } from './state.js';
 import { formatDurationLong } from './utils/time.js';
-
-function escapeHtml(str) {
-  return String(str || '').replace(/[&<>"']/g, (ch) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[ch]));
-}
 
 function formatDuration(totalSeconds) {
   return formatDurationLong(totalSeconds);

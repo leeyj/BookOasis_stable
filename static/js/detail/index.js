@@ -1,4 +1,5 @@
 // index.js – 상세 뷰 라이프사이클 관리 (오케스트레이터)
+import { escapeHtml } from '../utils/html.js';
 import { state } from '../state.js';
 import * as api from '../api.js';
 import { switchActiveView } from '../view_manager.js';
@@ -353,15 +354,6 @@ export async function openBookDetail(event, seriesName, libraryId, representativ
       <div class="loading-spinner">${i18n.t('modal.load_detail_error')}</div>
     `;
   }
-}
-
-function escapeHtml(str) {
-  return String(str ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
 }
 
 // 헤더의 .detail-score 자리를 클릭 가능한 커뮤니티 별점(0.5 단위)으로 그린다. widgetData는

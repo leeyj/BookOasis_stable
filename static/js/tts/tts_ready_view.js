@@ -1,6 +1,7 @@
 // tts_ready_view.js – 드로어 "음성 준비됨": 서버 미리 만들기로 음성이 저장된 책 목록 (services/tts_pregen_service.py)
 // 음성은 서버 공용이라 누가 만들었든 모든 책을 보여준다. 카드는 일반 목록과 같은 createBookCard를 쓰고,
 // 표지 오른쪽 아래 버튼을 "듣기"로 바꾼 뒤 아래에 음성 설정·용량 한 줄과 (지울 권한이 있으면) 삭제 버튼을 붙인다.
+import { escapeHtml } from '../utils/html.js';
 import { state } from '../state.js';
 import { createBookCard } from '../ui.js';
 import { openBookDetail } from '../modal.js';
@@ -10,10 +11,6 @@ const tr = (key, vars, fallback) => {
   if (window.i18n && typeof window.i18n.t === 'function') return window.i18n.t(`tts_ready.${key}`, vars || {}, fallback);
   return fallback;
 };
-
-function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
 
 function formatBytes(bytes) {
   const mb = Number(bytes || 0) / (1024 * 1024);

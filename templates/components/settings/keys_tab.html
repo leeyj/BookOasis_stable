@@ -209,14 +209,10 @@
 }
 </style>
 
-<script>
+{# 기본값은 viewer/key_defaults.js 한 곳에서 관리한다(뷰어 입력 처리와 공유). module_asset_url로 불러와야 같은 모듈 인스턴스를 쓴다. #}
+<script type="module">
+import { DEFAULT_VIEWER_KEYS as defaultKeyMap } from "{{ module_asset_url('js/viewer/key_defaults.js') }}";
 (function() {
-    const defaultKeyMap = {
-        next: 'ArrowRight, Space, PageDown, VolumeDown',
-        prev: 'ArrowLeft, PageUp, VolumeUp',
-        close: 'Escape',
-        dashboard: 'Home'
-    };
 
     function updateDisplayValues() {
         ['next', 'prev', 'close', 'dashboard'].forEach(target => {

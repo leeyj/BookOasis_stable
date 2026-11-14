@@ -8,6 +8,7 @@ import mimetypes
 import urllib.parse
 from pathlib import Path
 from flask import Blueprint, request, Response, jsonify, send_file, session
+from api.helpers.route_helpers import error_response, current_user_id
 from services.reading_progress_service import ReadingProgressService
 from services.stream_service import StreamService
 from api.auth import login_required, check_adult_permission, check_book_rating_permission, admin_required
@@ -149,7 +150,7 @@ def stream_comic_page():
     db_type  = request.args.get('db_type', 'general')
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
-    user_id  = session.get('user_id', 1)
+    user_id  = current_user_id()
     role     = session.get('role')
     book_id  = request.args.get('book_id')
     page_idx = int(request.args.get('page_idx', 0))
@@ -186,7 +187,7 @@ def get_txt_content():
     db_type = request.args.get('db_type', 'general')
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
-    user_id = session.get('user_id', 1)
+    user_id = current_user_id()
     role = session.get('role')
     book_id = request.args.get('book_id')
     if not book_id:
@@ -212,7 +213,7 @@ def get_epub_content():
     db_type = request.args.get('db_type', 'general')
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
-    user_id = session.get('user_id', 1)
+    user_id = current_user_id()
     role = session.get('role')
     book_id = request.args.get('book_id')
     if not book_id:
@@ -238,7 +239,7 @@ def get_epub_meta_api():
     db_type = request.args.get('db_type', 'general')
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
-    user_id = session.get('user_id', 1)
+    user_id = current_user_id()
     role = session.get('role')
     book_id = request.args.get('book_id')
     if not book_id:
@@ -264,7 +265,7 @@ def get_epub_chapter_api():
     db_type = request.args.get('db_type', 'general')
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
-    user_id = session.get('user_id', 1)
+    user_id = current_user_id()
     role = session.get('role')
     book_id = request.args.get('book_id')
     chapter_idx = request.args.get('chapter_idx', 0)
@@ -293,7 +294,7 @@ def get_epub_chapters_batch_api():
     db_type = request.args.get('db_type', 'general')
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
-    user_id = session.get('user_id', 1)
+    user_id = current_user_id()
     role = session.get('role')
     book_id = request.args.get('book_id')
     if not book_id:
@@ -332,7 +333,7 @@ def get_epub_image():
     db_type = request.args.get('db_type', 'general')
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
-    user_id = session.get('user_id', 1)
+    user_id = current_user_id()
     role = session.get('role')
     book_id = request.args.get('book_id')
     resource_path = request.args.get('path')
@@ -361,7 +362,7 @@ def get_pdf_range():
     db_type = request.args.get('db_type', 'general')
     if not check_adult_permission(db_type):
         return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
-    user_id = session.get('user_id', 1)
+    user_id = current_user_id()
     role = session.get('role')
     book_id = request.args.get('book_id')
     if not book_id:
@@ -548,7 +549,7 @@ def save_viewer_progress():
         total_pages = data.get('total_pages')
         epub_session = data.get('epub_session') or None
         flush_immediately = bool(data.get('flush_immediately', False))
-        user_id = session.get('user_id', 1)
+        user_id = current_user_id()
 
         if book_id is None or page_idx is None:
             return jsonify({'success': False, 'error': _t('api.err_book_id_page_idx_required')}), 400
@@ -570,8 +571,7 @@ def save_viewer_progress():
             return jsonify({'success': False, 'error': 'progress persistence is busy'}), 503
         return jsonify({'success': True})
     except Exception as e:
-        print(f"[Progress API Error] {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @stream_bp.route('/api/media/progress-state', methods=['GET'])
 @login_required
@@ -586,15 +586,14 @@ def get_viewer_progress_state():
         if not book_id:
             return jsonify({'success': False, 'error': _t('api.err_book_id_required')}), 400
 
-        user_id = session.get('user_id', 1)
+        user_id = current_user_id()
         state = StreamService.get_progress_state(db_type, book_id, user_id=user_id)
         if not state:
             return jsonify({'success': False, 'error': 'book not found'}), 404
 
         return jsonify({'success': True, 'state': state})
     except Exception as e:
-        print(f"[Progress State API Error] {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @stream_bp.route('/api/media/unread', methods=['POST'])
 @login_required
@@ -609,7 +608,7 @@ def mark_book_as_unread():
         scope = data.get('scope', 'book')
         series_name = str(data.get('series_name') or '').strip()
         library_id = data.get('library_id')
-        user_id = session.get('user_id', 1)
+        user_id = current_user_id()
 
         if book_id is None:
             return jsonify({'success': False, 'error': 'book_id가 누락되었습니다.'}), 400
@@ -627,8 +626,7 @@ def mark_book_as_unread():
         )
         return jsonify({'success': True, 'affected_count': affected_count, 'scope': scope})
     except Exception as e:
-        print(f"[Unread API Error] {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @stream_bp.route('/api/media/read', methods=['POST'])
 @login_required
@@ -645,7 +643,7 @@ def mark_book_as_read():
         scope = data.get('scope', 'book')
         series_name = str(data.get('series_name') or '').strip()
         library_id = data.get('library_id')
-        user_id = session.get('user_id', 1)
+        user_id = current_user_id()
 
         if book_id is None:
             return jsonify({'success': False, 'error': 'book_id가 누락되었습니다.'}), 400
@@ -663,8 +661,7 @@ def mark_book_as_read():
         )
         return jsonify({'success': True, 'affected_count': affected_count, 'scope': scope})
     except Exception as e:
-        print(f"[Read API Error] {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @stream_bp.route('/api/media/series/complete', methods=['POST'])
 @login_required
@@ -676,7 +673,7 @@ def mark_series_as_completed():
         if not check_adult_permission(db_type):
             return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
 
-        user_id = session.get('user_id', 1)
+        user_id = current_user_id()
 
         if db_type == 'audiobook':
             raw_audiobook_id = data.get('audiobook_id')
@@ -704,8 +701,7 @@ def mark_series_as_completed():
 
         return jsonify({'success': True, 'updated_count': int(updated_count)})
     except Exception as e:
-        print(f"[Series Complete API Error] {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 
 @stream_bp.route('/api/media/preload-next-book', methods=['POST'])
 @login_required
@@ -717,7 +713,7 @@ def preload_next_book_api():
         if not check_adult_permission(db_type):
             return jsonify({'success': False, 'error': _t('api.err_no_adult_access')}), 403
         book_id = data.get('book_id')
-        user_id = session.get('user_id', 1)
+        user_id = current_user_id()
 
         if not book_id:
             return jsonify({'success': False, 'error': _t('api.err_book_id_required')}), 400
@@ -750,6 +746,5 @@ def preload_next_book_api():
             return jsonify({'success': False, 'error': _t('api.err_next_book_not_exist')}), 404
 
     except Exception as e:
-        print(f"[Preload API Error] {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e)
 

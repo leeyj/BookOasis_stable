@@ -1,4 +1,5 @@
 /* tab_smart_recommend.js - 최근 읽은 시리즈 기준 장르/태그 겹침 "스마트 추천" UI 렌더러 */
+import { escapeHtml } from './utils/html.js';
 import { state } from './state.js';
 import * as api from './api.js';
 import { createBookCard } from './ui.js';
@@ -194,14 +195,4 @@ function buildSection(rowId, title, iconClass, items, isFallback) {
 
   section.appendChild(row);
   return section;
-}
-
-function escapeHtml(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
 }

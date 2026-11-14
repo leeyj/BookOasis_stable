@@ -6,7 +6,8 @@ macOS Finder로 만든 ZIP에는 `__MACOSX/` 폴더와 `._원본이름` AppleDou
 자연 정렬상 `__MACOSX/...`가 앞에 와서 0페이지가 깨진 이미지가 된다.
 """
 
-IMG_EXT = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp')
+from utils import media_types as _media_types
+IMG_EXT = _media_types.IMAGE_EXTENSIONS
 
 
 def is_macos_junk_name(name: str) -> bool:

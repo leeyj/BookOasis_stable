@@ -5,6 +5,7 @@ import { renderDashboardHistory, renderDashboardRecentlyAdded } from './ui.js';
 import { updateLibraryTotalCount } from './book_list.js';
 import { loadPluginHealthPanel } from './plugin_health_panel.js';
 import { withPluginGlobals } from './utils/script_loader.js';
+import { escapeHtml, sanitizePluginHtml } from './utils/html.js';
 
 let dashboardLoadToken = 0;
 let pluginsLoadToken = 0;
@@ -849,72 +850,4 @@ function formatDashboardMetricText(value) {
     .replace(/\\r\\n/g, '\n')
     .replace(/\\n/g, '\n')
     .replace(/\r\n/g, '\n');
-}
-
-function escapeHtml(value) {
-  return String(value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-/**
- * sanitizePluginHtml – 플러그인 콘텐츠용 제한적 HTML 허용 함수
- *
- * 허용 태그: b, i, em, strong, br, span, a(href만), ul, ol, li, p, small, mark, code
- * 차단 대상: <script>, <iframe>, <object>, <embed>, on* 이벤트 속성, javascript: href
- *
- * title/author/publisher 같은 고유명사 필드에는 사용하지 말 것 (escapeHtml 유지).
- * metric/value/description/subtitle 같은 플러그인 콘텐츠 필드에만 사용할 것.
- */
-function sanitizePluginHtml(value) {
-  const raw = String(value || '');
-
-  // 1단계: 위험 태그 완전 제거 (script, iframe, object, embed, form, input, style)
-  const DANGEROUS_TAGS = /(<\s*\/?(script|iframe|object|embed|form|input|button|select|textarea|style|link|meta|base|svg|math)[^>]*>)/gi;
-  let sanitized = raw.replace(DANGEROUS_TAGS, '');
-
-  // 2단계: on* 이벤트 속성 제거 (onclick, onerror, onload 등)
-  sanitized = sanitized.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '');
-
-  // 3단계: href/src의 javascript: 프로토콜 제거
-  sanitized = sanitized.replace(/(href|src)\s*=\s*["']?\s*javascript:[^"'>]*/gi, '$1="#"');
-
-  // 4단계: 허용 태그 화이트리스트 외 모든 태그 이스케이프
-  const ALLOWED_TAGS = new Set(['b', 'i', 'em', 'strong', 'br', 'span', 'a', 'ul', 'ol', 'li', 'p', 'small', 'mark', 'code']);
-  sanitized = sanitized.replace(/<(\/?)(\w+)([^>]*)>/g, (match, slash, tag, attrs) => {
-    const lowerTag = tag.toLowerCase();
-    if (!ALLOWED_TAGS.has(lowerTag)) {
-      // 허용 목록에 없는 태그는 텍스트로 이스케이프
-      return match.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    }
-    if (lowerTag === 'a') {
-      // <a> 태그: href, title, target만 허용 (rel="noopener" 강제)
-      const hrefMatch = attrs.match(/href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]*))/i);
-      const titleMatch = attrs.match(/title\s*=\s*(?:"([^"]*)"|'([^']*)')/i);
-      const href = hrefMatch ? (hrefMatch[1] || hrefMatch[2] || hrefMatch[3] || '#') : '#';
-      const title = titleMatch ? ` title="${escapeHtml(titleMatch[1] || titleMatch[2] || '')}"` : '';
-      const safeHref = /^(https?:\/\/|\/)/.test(href) ? href : '#';
-      return `<a href="${escapeHtml(safeHref)}"${title} target="_blank" rel="noopener noreferrer">`;
-    }
-    if (lowerTag === 'span') {
-      // <span>: class, style만 허용 (style은 color/font-weight/font-style만)
-      const styleMatch = attrs.match(/style\s*=\s*(?:"([^"]*)"|'([^']*)')/i);
-      if (styleMatch) {
-        const styleVal = styleMatch[1] || styleMatch[2] || '';
-        // color, font-weight, font-style, font-size, text-decoration만 허용
-        const safeStyle = styleVal.split(';')
-          .filter(rule => /^\s*(color|font-weight|font-style|font-size|text-decoration)\s*:/i.test(rule))
-          .join(';');
-        return safeStyle ? `<span style="${escapeHtml(safeStyle)}">` : '<span>';
-      }
-      return '<span>';
-    }
-    // 그 외 허용 태그: 속성 전체 제거 (태그 이름만 유지)
-    return `<${slash}${lowerTag}>`;
-  });
-
-  return sanitized;
 }

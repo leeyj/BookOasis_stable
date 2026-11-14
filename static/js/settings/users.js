@@ -1,18 +1,10 @@
 // static/js/settings/users.js – 사용자 관리 탭 모듈
+import { escapeHtml } from '../utils/html.js';
 import { state } from '../state.js';
 
 const MAX_USERNAME_LENGTH = 128;
 const MAX_PASSWORD_LENGTH = 256;
 const MIN_PASSWORD_LENGTH = 4;
-
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
 
 function initUsersDelegation() {
   if (window.__usersDelegationBound) return;

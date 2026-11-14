@@ -16,8 +16,8 @@ This document describes what each table is **for and how tables relate**. For co
 
 ## 1. Schema Overview
 
-- The schema lives in two places: SQLite `_SCHEMA_SQL` in `services/db_migration_service.py`, MariaDB `MARIADB_CENTRAL_SCHEMA` in `tools/db_schema_updater.py`. Both must define the same tables (a test checks this).
-- At startup `run_full_migration()` applies the same schema to all 4 DBs and adds columns and indexes that are declared but missing in an existing DB (SQLite reads `_SCHEMA_SQL` and fills gaps automatically; MariaDB uses the column/index backfill lists in `tools/db_schema_updater.py`).
+- The schema lives in two places: SQLite `_SCHEMA_SQL` in `services/db_migration_service.py`, MariaDB `MARIADB_CENTRAL_SCHEMA` in `services/schema_mariadb.py`. Both must define the same tables (a test checks this).
+- At startup `run_full_migration()` applies the same schema to all 4 DBs and adds columns and indexes that are declared but missing in an existing DB (SQLite reads `_SCHEMA_SQL` and fills gaps automatically; MariaDB uses the `_ensure_mariadb_columns`/`_ensure_mariadb_indexes` backfill lists in `services/db_migration_service.py`).
 - Production DBs upgraded from old versions may still have leftover columns or indexes, so core and plugin queries should stay tolerant.
 - MariaDB uses `ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`; SQLite `INTEGER`/`TEXT` generally become `BIGINT`/`VARCHAR(n)` or `TEXT`.
 - Global data (settings, the scan queue and history, notifications, MCP pending changes, kosync, per-user settings) is written **only to the general DB**. `users` is copied to all 4 DBs under the same username.
@@ -427,7 +427,7 @@ Changes from MCP write tools (Tier B) that wait for admin approval instead of ap
 Column types, defaults and indexes are not copied into this document (the old copy went stale quickly). Read the source directly:
 
 - SQLite: `services/db_migration_service.py` — `_SCHEMA_SQL` (tables), `_INDEXES_SQL` (indexes)
-- MariaDB: `tools/db_schema_updater.py` — `MARIADB_CENTRAL_SCHEMA` (tables), plus the column/index backfill lists for existing DBs
+- MariaDB: `services/schema_mariadb.py` — `MARIADB_CENTRAL_SCHEMA` (tables); the column/index backfill lists for existing DBs are in `services/db_migration_service.py`
 - How to add a column (edit both sources, add it to the backfill list): [change_db_guide.md](./change_db_guide.md)
 
 ---

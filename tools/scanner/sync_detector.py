@@ -2,9 +2,7 @@
 import os
 import datetime
 
-def _is_mariadb_mode():
-    engine = os.environ.get('DB_ENGINE', os.environ.get('DBMS', 'sqlite')).lower()
-    return engine in ('mariadb', 'mysql')
+from database import is_mariadb_mode as _is_mariadb_mode
 
 def _normalize_path(path):
     if not path:
