@@ -1,3 +1,20 @@
+// UTF-16 인덱스를 유지하면서 잘라낸 양 끝이 surrogate pair 사이에 오지 않게 한다.
+function _sliceAtCodePointBoundaries(text, start, end) {
+  let safeStart = start;
+  let safeEnd = end;
+  if (safeStart > 0 && safeStart < text.length
+      && text.charCodeAt(safeStart - 1) >= 0xD800 && text.charCodeAt(safeStart - 1) <= 0xDBFF
+      && text.charCodeAt(safeStart) >= 0xDC00 && text.charCodeAt(safeStart) <= 0xDFFF) {
+    safeStart++;
+  }
+  if (safeEnd > 0 && safeEnd < text.length
+      && text.charCodeAt(safeEnd - 1) >= 0xD800 && text.charCodeAt(safeEnd - 1) <= 0xDBFF
+      && text.charCodeAt(safeEnd) >= 0xDC00 && text.charCodeAt(safeEnd) <= 0xDFFF) {
+    safeEnd--;
+  }
+  return text.slice(safeStart, Math.max(safeStart, safeEnd));
+}
+
 /**
  * startIndex 주변에서 실제 내용(비공백 5자 이상)이 포함된 30자 앵커 텍스트를 탐색.
  * 앞에서 실패하면 뒤(startIndex+1 방향)로 최대 100자까지 탐색 후 반환.
@@ -16,12 +33,12 @@ function _findMeaningfulAnchor(text, startIndex, length = 30) {
 
   // 먼저 startIndex 부근 → 앞 방향으로 탐색
   for (let i = startIndex; i <= hi; i++) {
-    const slice = text.substring(i, i + length);
+    const slice = _sliceAtCodePointBoundaries(text, i, i + length);
     if (slice.replace(/\s/g, '').length >= 5) return slice.trim();
   }
   // 그다음 startIndex 이전 방향으로 탐색
   for (let i = startIndex - 1; i >= lo; i--) {
-    const slice = text.substring(i, i + length);
+    const slice = _sliceAtCodePointBoundaries(text, i, i + length);
     if (slice.replace(/\s/g, '').length >= 5) return slice.trim();
   }
   return null;
@@ -37,14 +54,16 @@ export function getTxtAnchorInfoByMode({
   txtChunks,
   currentChunkIdx,
   stripHtml,
+  stripHtmlForAnchor,
 }) {
   if (!scrollWrapper || !contentArea) return null;
 
   const scrollMode = forcedMode || storage.getItem('viewer_scroll_mode') || 'page';
+  const htmlToAnchorText = typeof stripHtmlForAnchor === 'function' ? stripHtmlForAnchor : stripHtml;
 
   if (scrollMode === 'scroll') {
     const rawChunk = (Array.isArray(txtChunks) && txtChunks[currentChunkIdx]) ? txtChunks[currentChunkIdx] : '';
-    const cleanText = isEpub ? stripHtml(rawChunk) : (rawChunk || fullText || '').replace(/\s+/g, ' ').trim();
+    const cleanText = isEpub ? htmlToAnchorText(rawChunk) : (rawChunk || fullText || '').replace(/\s+/g, ' ').trim();
     if (cleanText.length === 0) return null;
 
     const targetChunk = contentArea.querySelector(`.txt-scroll-chunk[data-idx="${currentChunkIdx}"]`);
@@ -69,7 +88,7 @@ export function getTxtAnchorInfoByMode({
   }
 
   const rawChunk = txtChunks[currentChunkIdx] || '';
-  const cleanText = isEpub ? stripHtml(rawChunk) : rawChunk.replace(/\s+/g, ' ').trim();
+  const cleanText = isEpub ? htmlToAnchorText(rawChunk) : rawChunk.replace(/\s+/g, ' ').trim();
   if (cleanText.length === 0) return null;
 
   // 1순위: 지금 보이는 페이지의 첫 글자부터 30자 (iOS Safari scrollLeft 읽기 오류 방어).
@@ -110,10 +129,12 @@ export function restoreTxtAnchorInfoByMode({
   fullText,
   txtChunks,
   stripHtml,
+  stripHtmlForAnchor,
 }) {
   if (!anchorInfo || !anchorInfo.anchorText || !scrollWrapper || !contentArea) return false;
 
   const scrollMode = storage.getItem('viewer_scroll_mode') || 'page';
+  const htmlToAnchorText = typeof stripHtmlForAnchor === 'function' ? stripHtmlForAnchor : stripHtml;
   const query = anchorInfo.anchorText;
   const targetChunkIdx = anchorInfo.chunkIdx !== undefined ? anchorInfo.chunkIdx : currentChunkIdx;
 
@@ -170,11 +191,11 @@ export function restoreTxtAnchorInfoByMode({
   }
 
   if (scrollMode === 'scroll') {
-    const cleanText = isEpub ? stripHtml(fullText) : fullText.replace(/\s+/g, ' ').trim();
+    const cleanText = isEpub ? htmlToAnchorText(fullText) : fullText.replace(/\s+/g, ' ').trim();
 
     let charOffset = 0;
     for (let i = 0; i < targetChunkIdx; i++) {
-      const chunkText = isEpub ? stripHtml(txtChunks[i]) : txtChunks[i].replace(/\s+/g, ' ').trim();
+      const chunkText = isEpub ? htmlToAnchorText(txtChunks[i]) : txtChunks[i].replace(/\s+/g, ' ').trim();
       charOffset += chunkText.length;
     }
 
@@ -187,7 +208,7 @@ export function restoreTxtAnchorInfoByMode({
     }
   } else {
     const rawChunk = txtChunks[targetChunkIdx] || '';
-    const cleanText = isEpub ? stripHtml(rawChunk) : rawChunk.replace(/\s+/g, ' ').trim();
+    const cleanText = isEpub ? htmlToAnchorText(rawChunk) : rawChunk.replace(/\s+/g, ' ').trim();
     const matchIndex = cleanText.indexOf(query);
     if (matchIndex !== -1) {
       const ratio = matchIndex / cleanText.length;
@@ -340,8 +361,9 @@ function _anchorTextAt(contentArea, pos) {
   const blocks = _anchorBlocks(contentArea);
   for (let i = pos.blockIndex; i < Math.min(blocks.length, pos.blockIndex + 10); i++) {
     const raw = blocks[i].textContent || '';
-    const text = (i === pos.blockIndex ? raw.slice(pos.charOffset) : raw).replace(/\s+/g, ' ').trim();
-    if (text.replace(/\s/g, '').length >= 5) return text.slice(0, 30).trim();
+    const text = _sliceAtCodePointBoundaries(raw, i === pos.blockIndex ? pos.charOffset : 0, raw.length)
+      .replace(/\s+/g, ' ').trim();
+    if (text.replace(/\s/g, '').length >= 5) return _sliceAtCodePointBoundaries(text, 0, 30).trim();
   }
   return null;
 }
