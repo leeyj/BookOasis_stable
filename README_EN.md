@@ -335,6 +335,9 @@ server {
 }
 ```
 
+> [!WARNING]
+> If only domain access fails with `Invalid HTTP Header: 'HOST'`, your proxy is sending the Host header twice. The server rejects this for security reasons, so remove the duplicate Host setting from your proxy (e.g. `proxy_set_header Host $host;` in the Nginx Proxy Manager Advanced tab). See [Installation Guide §4](docs/guide_installation_en.md) for details.
+
 ---
 
 ## 🎧 Audiobook Streaming Stability Guide (Nginx / Cloudflare)

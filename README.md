@@ -347,6 +347,9 @@ server {
 }
 ```
 
+> [!WARNING]
+> 도메인 접속 시에만 `Invalid HTTP Header: 'HOST'` 오류가 난다면 프록시가 Host 헤더를 두 번 보내고 있는 것입니다. 보안상 서버에서 거부하는 동작이므로 프록시 설정에서 중복된 Host 설정(예: Nginx Proxy Manager Advanced 탭의 `proxy_set_header Host $host;`)을 지워 주세요. 자세한 내용은 [설치 가이드 4장](docs/guide_installation.md)을 참고하세요.
+
 ---
 
 ## 🎧 오디오북 스트리밍 안정화 가이드 (Nginx / Cloudflare)

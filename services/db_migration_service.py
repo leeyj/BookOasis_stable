@@ -1359,12 +1359,23 @@ def _backfill_html_entities_video_titles_sqlite(conn):
         print(f"  [WARN] SQLite video HTML entity title fix failed: {e}")
 
 
+def _connect_mariadb_db(logical_name):
+    """아래 MariaDB 보강 함수들은 DB를 'media_general'처럼 기본 접두사 이름으로 적는다.
+    실제 연결은 MARIADB_DATABASE_PREFIX를 따라야 한다 - 접두사를 바꾼 설치에서 다른 인스턴스의
+    'media_*' DB를 고치거나 보강이 조용히 빠지는 것을 막는다 (database.py 연결과 같은 규칙)."""
+    from tools.migrator_sqlite_to_mariadb import connect_mariadb
+    prefix = os.environ.get('MARIADB_DATABASE_PREFIX', 'media_')
+    name = str(logical_name)
+    if name.startswith('media_'):
+        name = prefix + name[len('media_'):]
+    return connect_mariadb(name)
+
+
 def _backfill_html_entities_video_titles_mariadb():
     """videos.title/description, video_episodes.title의 미해제 HTML 엔티티를 1회성으로 정리한다
     (SQLite 버전과 동일한 이유 — 위 _backfill_html_entities_video_titles_sqlite 참고)."""
     try:
-        from tools.migrator_sqlite_to_mariadb import connect_mariadb
-        conn = connect_mariadb('media_video')
+        conn = _connect_mariadb_db('media_video')
         cur = conn.cursor()
         changed = 0
         cur.execute("SELECT id, title, description FROM videos WHERE title LIKE '%&%;%' OR description LIKE '%&%;%'")
@@ -1395,7 +1406,6 @@ def _backfill_html_entities_video_titles_mariadb():
 def _fix_mariadb_column_collations():
     """일부 컬럼의 charset/collation을 utf8mb4/utf8mb4_bin으로 강제 보정한다
     (경로/파일명 비교가 대소문자 구분 바이너리여야 하는 컬럼들)."""
-    from tools.migrator_sqlite_to_mariadb import connect_mariadb
     col_collations = [
         ('media_general', 'books', 'file_path', 'VARCHAR(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL'),
         ('media_adult', 'books', 'file_path', 'VARCHAR(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL'),
@@ -1403,7 +1413,7 @@ def _fix_mariadb_column_collations():
     ]
     for db_name, tbl, col_name, col_def in col_collations:
         try:
-            conn = connect_mariadb(db_name)
+            conn = _connect_mariadb_db(db_name)
             cur = conn.cursor()
             cur.execute(f"ALTER TABLE `{tbl}` MODIFY COLUMN `{col_name}` {col_def}")
             conn.commit()
@@ -1414,11 +1424,10 @@ def _fix_mariadb_column_collations():
 
 def _ensure_mariadb_columns():
     """기존 MariaDB 데이터베이스의 테이블에 누락된 필수 컬럼 자동 ALTER TABLE 보강"""
-    from tools.migrator_sqlite_to_mariadb import connect_mariadb
 
     # 구형 tracks 테이블 RENAME 처리
     try:
-        conn = connect_mariadb('media_audiobook')
+        conn = _connect_mariadb_db('media_audiobook')
         cur = conn.cursor()
         cur.execute("SHOW TABLES LIKE 'tracks'")
         has_old = bool(cur.fetchone())
@@ -1520,7 +1529,7 @@ def _ensure_mariadb_columns():
 
     for db_name, tbl, col_name, col_def in required_columns:
         try:
-            conn = connect_mariadb(db_name)
+            conn = _connect_mariadb_db(db_name)
             cur = conn.cursor()
             cur.execute(f"SHOW COLUMNS FROM `{tbl}` WHERE Field = %s", (col_name,))
             if not cur.fetchone():
@@ -1540,7 +1549,7 @@ def _ensure_mariadb_columns():
     ]
     for db_name, tbl, col_name, new_col_def in legacy_column_relaxations:
         try:
-            conn = connect_mariadb(db_name)
+            conn = _connect_mariadb_db(db_name)
             cur = conn.cursor()
             cur.execute(f"SHOW COLUMNS FROM `{tbl}` WHERE Field = %s", (col_name,))
             row = cur.fetchone()
@@ -1554,7 +1563,6 @@ def _ensure_mariadb_columns():
 
 
 def _ensure_mariadb_indexes():
-    from tools.migrator_sqlite_to_mariadb import connect_mariadb
 
     required_indexes = [
         ('media_general', 'books', 'idx_books_lib_del_series', 'CREATE INDEX idx_books_lib_del_series ON books (library_id, is_deleted, series_name(255), id)'),
@@ -1583,7 +1591,7 @@ def _ensure_mariadb_indexes():
 
     for db_name, tbl, idx_name, idx_sql in required_indexes:
         try:
-            conn = connect_mariadb(db_name)
+            conn = _connect_mariadb_db(db_name)
             cur = conn.cursor()
             cur.execute(f"SHOW INDEX FROM `{tbl}` WHERE Key_name = %s", (idx_name,))
             if not cur.fetchone():

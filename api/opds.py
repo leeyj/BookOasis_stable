@@ -289,8 +289,8 @@ def opds_series_books(series_name: str, lib_id: str = 'all'):
     if not auth_user:
         return _unauthorized()
 
-    from urllib.parse import unquote
-    resolved_series_name = '' if series_name == '__empty_series__' else unquote(series_name)
+    # Flask가 경로를 이미 한 번 디코딩한다 - 다시 unquote하면 '100%AB' 같은 이름이 깨진다.
+    resolved_series_name = '' if series_name == '__empty_series__' else series_name
     page, page_size, offset = _get_page_params()
     cache_key = f'opds_series:general:{lib_id}:{resolved_series_name}:{page}:{page_size}'
     cached_xml = _get_cached_opds_response(cache_key)
@@ -331,8 +331,8 @@ def opds_adult_series_books(series_name: str, lib_id: str = 'all'):
     if not _check_auth(is_adult=True):
         return _unauthorized()
 
-    from urllib.parse import unquote
-    resolved_series_name = '' if series_name == '__empty_series__' else unquote(series_name)
+    # Flask가 경로를 이미 한 번 디코딩한다 - 다시 unquote하면 '100%AB' 같은 이름이 깨진다.
+    resolved_series_name = '' if series_name == '__empty_series__' else series_name
     page, page_size, offset = _get_page_params()
     cache_key = f'opds_series:adult:{lib_id}:{resolved_series_name}:{page}:{page_size}'
     cached_xml = _get_cached_opds_response(cache_key)

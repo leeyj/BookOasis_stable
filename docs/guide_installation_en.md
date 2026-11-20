@@ -408,12 +408,25 @@ server {
         proxy_send_timeout 300;
     }
 }
-        proxy_send_timeout 300;
-    }
-}
 ```
 
 After changing the Nginx configuration, verify it with `sudo nginx -t` and apply the settings using `sudo systemctl reload nginx`.
+
+### ⚠️ Send the Host header only once
+
+If direct IP access works but access through your domain (via the proxy) shows the page below, your proxy is sending the `Host` header **twice**.
+
+```
+Bad Request
+Invalid HTTP Header: 'HOST'
+```
+
+Gunicorn, which BookOasis uses, rejects requests with more than one Host header with a 400, as required by the HTTP spec (RFC 9112 §3.2). This protects against the proxy and backend reading different Host values (cache poisoning, virtual-host bypass, etc.), so the server will not relax it. **Fix the proxy configuration instead.**
+
+* **Nginx Proxy Manager**: it already sets Host. If you added `proxy_set_header Host $host;` in the Advanced tab (Custom Nginx Configuration), remove it.
+* **Plain Nginx**: make sure `proxy_set_header Host` isn't set twice in the same block, or again through an included file such as `proxy_params`.
+* **Synology reverse proxy**: don't add `Host` under "Custom Header".
+* **Traefik / Caddy**: don't add Host via a custom header middleware or `header_up`; the defaults are enough.
 
 ### Caddy Setup Example (`/etc/caddy/Caddyfile`)
 

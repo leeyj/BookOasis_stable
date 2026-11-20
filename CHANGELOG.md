@@ -1,4 +1,8 @@
 # CHANGELOG
+## v3.1.7
+- (fix) OPDS 시리즈 이름에 `%` 뒤로 영문·숫자가 붙으면(예: `100%AB`) 시리즈를 열어도 책 목록이 비던 문제 수정 | fix OPDS series feeds coming up empty when the series name has `%` followed by letters or digits (e.g. `100%AB`)
+- (fix) MariaDB DB 이름 접두사(`MARIADB_DATABASE_PREFIX`)를 바꾼 설치에서 시작 시 컬럼·인덱스 보강이 기본 이름(`media_*`) DB에 적용되던 문제 수정 | fix MariaDB installs with a custom `MARIADB_DATABASE_PREFIX` having startup column/index fixes applied to the default `media_*` databases instead
+
 ## v3.1.6
 - (fix) TXT/EPUB 두 쪽 보기에서 화면 폭에 따라 왼쪽 쪽 글자가 넘길수록 조금씩 잘리던 문제 수정 | fix the left page's text getting cut off a little more with each page turn in TXT/EPUB two-page view on some screen widths
 

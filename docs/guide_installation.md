@@ -410,12 +410,25 @@ server {
         proxy_send_timeout 300;
     }
 }
-        proxy_send_timeout 300;
-    }
-}
 ```
 
 Nginx 설정 변경 후에는 `sudo nginx -t`로 검증하고 `sudo systemctl reload nginx`를 통해 설정을 적용하십시오.
+
+### ⚠️ Host 헤더는 한 번만 전달하세요
+
+IP로 직접 접속하면 되는데 도메인(프록시 경유)으로 접속할 때만 아래 화면이 나온다면, 프록시가 `Host` 헤더를 **두 번** 보내고 있는 것입니다.
+
+```
+Bad Request
+Invalid HTTP Header: 'HOST'
+```
+
+BookOasis가 쓰는 Gunicorn은 HTTP 규격(RFC 9112 §3.2)에 따라 Host 헤더가 2개 이상인 요청을 400으로 거부합니다. 프록시와 백엔드가 서로 다른 Host 값을 읽어 생기는 위험(캐시 오염, 가상 호스트 우회 등)을 막기 위한 동작이므로, 서버 쪽에서 완화하지 않고 **프록시 설정을 고치는 것**을 권장합니다.
+
+* **Nginx Proxy Manager**: Host 헤더를 기본으로 넣어 줍니다. Advanced 탭(Custom Nginx Configuration)에 `proxy_set_header Host $host;`를 따로 적었다면 지우세요.
+* **Nginx 직접 설정**: 같은 블록 안에서, 또는 include한 `proxy_params` 등과 겹쳐 `proxy_set_header Host`가 두 번 들어가지 않았는지 확인하세요.
+* **시놀로지 역방향 프록시**: "사용자 지정 머리글"에 `Host`를 직접 추가하지 마세요.
+* **Traefik / Caddy**: 커스텀 헤더 미들웨어나 `header_up`으로 Host를 추가하지 마세요(기본 동작으로 충분합니다).
 
 ### Caddy 설정 예시 (`/etc/caddy/Caddyfile`)
 
