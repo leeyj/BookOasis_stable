@@ -1,4 +1,9 @@
 # CHANGELOG
+## v3.2.0
+- (feat) e-paper 리더 전용 OPDS 피드 `/opds-epaper/v1` — EPUB/TXT만, 40개씩 페이지 나눔, 받으면 기기에 맞춘 변환본(그림 2색 디더링, CSS·폰트 정리, TXT는 EPUB으로)을 보냄. 표준 `/opds`는 그대로 원본 | e-paper reader OPDS feed `/opds-epaper/v1` — EPUB/TXT only, 40 per page, downloads are device-optimized copies (2-color dithered images, trimmed CSS/fonts, TXT as EPUB); the standard `/opds` still serves originals
+- (feat) KOReader 동기화: 같은 EPUB의 원본과 변환본 중 더 최근 위치를 서로 이어 받음 | KOReader sync: the original and the converted copy of the same EPUB now share the latest position
+- (feat) 로컬 EPUB 업로드·변환 API와 기기 API 명세 `docs/device-api.md`, 캐시 관리 MCP 도구(`epaper_cache_status`, `clear_epaper_cache`) | local EPUB upload/convert API, device API spec `docs/device-api.md`, cache MCP tools (`epaper_cache_status`, `clear_epaper_cache`)
+
 ## v3.1.7
 - (fix) OPDS 시리즈 이름에 `%` 뒤로 영문·숫자가 붙으면(예: `100%AB`) 시리즈를 열어도 책 목록이 비던 문제 수정 | fix OPDS series feeds coming up empty when the series name has `%` followed by letters or digits (e.g. `100%AB`)
 - (fix) MariaDB DB 이름 접두사(`MARIADB_DATABASE_PREFIX`)를 바꾼 설치에서 시작 시 컬럼·인덱스 보강이 기본 이름(`media_*`) DB에 적용되던 문제 수정 | fix MariaDB installs with a custom `MARIADB_DATABASE_PREFIX` having startup column/index fixes applied to the default `media_*` databases instead

@@ -18,6 +18,7 @@ if DBMS in ("mariadb", "mysql"):
         category_repository,
         collection_repository,
         db_tuning_repository,
+        epaper_feed_repository,
         gdrive_book_copy_repository,
         kosync_repository,
         mcp_pending_changes_repository,
@@ -47,6 +48,7 @@ else:
         category_repository,
         collection_repository,
         db_tuning_repository,
+        epaper_feed_repository,
         gdrive_book_copy_repository,
         kosync_repository,
         mcp_pending_changes_repository,
@@ -76,6 +78,7 @@ sys.modules['repositories.book_scan_repository'] = book_scan_repository
 sys.modules['repositories.category_repository'] = category_repository
 sys.modules['repositories.collection_repository'] = collection_repository
 sys.modules['repositories.db_tuning_repository'] = db_tuning_repository
+sys.modules['repositories.epaper_feed_repository'] = epaper_feed_repository
 sys.modules['repositories.gdrive_book_copy_repository'] = gdrive_book_copy_repository
 sys.modules['repositories.kosync_repository'] = kosync_repository
 sys.modules['repositories.mcp_pending_changes_repository'] = mcp_pending_changes_repository
@@ -104,6 +107,7 @@ BookScanRepository = book_scan_repository.BookScanRepository
 CategoryRepository = category_repository.CategoryRepository
 CollectionRepository = collection_repository.CollectionRepository
 DbTuningRepository = db_tuning_repository.DbTuningRepository
+EpaperFeedRepository = epaper_feed_repository.EpaperFeedRepository
 GdriveBookCopyRepository = gdrive_book_copy_repository.GdriveBookCopyRepository
 McpPendingChangesRepository = mcp_pending_changes_repository.McpPendingChangesRepository
 MetadataRepository = metadata_repository.MetadataRepository

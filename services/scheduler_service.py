@@ -127,6 +127,24 @@ class SchedulerService:
             )
             print("[Scheduler] Gdrive view-copy TTL cleanup job registered successfully (interval: 1h)")
 
+        # ── [e-paper 변환본 캐시 정리 (30일·2GB, 설정값)] ──
+        if not scheduler.get_job('epaper_cache_cleanup_job'):
+            def _run_epaper_cache_cleanup():
+                try:
+                    from services.epaper_service import cleanup
+                    cleanup()
+                except Exception as cleanup_err:
+                    print(f"[Scheduler ERROR] e-paper cache cleanup failed: {cleanup_err}")
+
+            scheduler.add_job(
+                _run_epaper_cache_cleanup,
+                'interval',
+                hours=6,
+                id='epaper_cache_cleanup_job',
+                max_instances=1
+            )
+            print("[Scheduler] e-paper cache cleanup job registered successfully (interval: 6h)")
+
         # ── [음악 앨범 외부 정보 조회 (album.yaml이 없을 때 플러그인 폴백)] ──
         if not scheduler.get_job('music_lookup_job'):
             def _run_music_lookup():

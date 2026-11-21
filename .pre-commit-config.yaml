@@ -1,0 +1,7 @@
+# 커밋 전 시크릿 스캔. 처음 한 번: pip install pre-commit && pre-commit install
+# 공개 저장소다 - 토큰·비밀번호·키가 커밋에 섞이면 여기서 막는다. 규칙은 .gitleaks.toml.
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks

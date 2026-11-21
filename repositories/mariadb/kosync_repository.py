@@ -90,3 +90,18 @@ class KosyncRepository:
             except Exception:
                 conn.rollback()
                 raise
+
+    @staticmethod
+    def get_latest_progress_for_book(user_id, db_type, book_id, exclude_document):
+        """같은 책에 묶인 다른 문서(원본·최적화본·옛 프로필 등) 중 이 사용자의 가장 최근 기록 (없으면 None)."""
+        with database.connection(_DB) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT p.document, p.progress, p.percentage, p.device, p.device_id, p.timestamp "
+                "FROM kosync_progress p JOIN kosync_documents d ON d.document = p.document "
+                "WHERE p.user_id = %s AND d.db_type = %s AND d.book_id = %s AND p.document <> %s "
+                "ORDER BY p.timestamp DESC LIMIT 1",
+                (int(user_id), str(db_type), int(book_id), str(exclude_document))
+            )
+            row = cursor.fetchone()
+        return dict(row) if row else None

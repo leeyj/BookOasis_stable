@@ -183,6 +183,26 @@ def list_series_table(db_type: str = "general", library_id: int = None, missing:
 
 
 @mcp.tool()
+def epaper_cache_status() -> dict:
+    """e-paper 리더용 변환본 캐시 현황: 프로필, 캐시 위치, 책 수, 용량, 설정(보관 일수·최대 MB·변환 상한 초),
+    최근 변환 실패 목록(책, 형식, 사유). 변환은 기기 피드(/opds-epaper/v1)에서 받을 때만 일어난다."""
+    def _run():
+        from services import epaper_service
+        return epaper_service.status()
+    return _quiet(_run)
+
+
+@mcp.tool()
+def clear_epaper_cache() -> dict:
+    """[쓰기 도구] e-paper 변환본·표지 캐시를 모두 지웁니다(최근 실패 목록 포함). 다음 다운로드 때 같은 바이트로
+    다시 만들어지므로 진행 동기화(kosync)에는 영향이 없습니다. "MCP 쓰기 도구 허용"이 켜져 있어야 합니다."""
+    def _run():
+        from services.mcp_admin_tools_service import McpAdminToolsService
+        return McpAdminToolsService.clear_epaper_cache()
+    return _quiet(_run)
+
+
+@mcp.tool()
 def find_missing_offsets(db_type: str = "general", library_id: int = None,
                           limit: int = 50, offset: int = 0) -> dict:
     """zip/cbz 만화책 중 페이지 오프셋 캐시가 없어 재스캔이 필요한 도서 목록을 조회합니다.

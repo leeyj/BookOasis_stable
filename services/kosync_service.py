@@ -177,9 +177,27 @@ def pull_progress(user_id, document):
         result = {k: record.get(k) for k in ('document', 'progress', 'percentage', 'device', 'device_id', 'timestamp')}
         result['timestamp'] = int(result['timestamp'] or 0)
 
-    # 페이지 기반 형식: 웹 뷰어(또는 OPDS 페이지 스트리밍)에서 더 나중에 읽었으면 그 위치를 준다
+    # EPUB: 같은 책의 다른 문서(아이패드 원본 ↔ e-paper 최적화본, 옛 프로필)에 더 최근 기록이 있으면 그것을 준다.
+    # 최적화본은 spine·요소 구조를 원본과 똑같이 두므로 xpointer를 그대로 쓸 수 있다(docs/device-api.md).
+    # TXT 변환본은 구조가 달라 섞지 않는다.
+    book = None
     try:
         book = _book_for_document(document)
+        if book and book['format'] == 'epub':
+            other = KosyncRepository.get_latest_progress_for_book(user_id, book['db_type'], book['book_id'], document)
+            record_ts = result['timestamp'] if result else 0
+            if other and int(other.get('timestamp') or 0) > record_ts:
+                print(f"[EPAPER] kosync cross-document progress: user={user_id} book={book['db_type']}:{book['book_id']} "
+                      f"requested={document} served_from={other['document']}")
+                result = {k: other.get(k) for k in ('progress', 'percentage', 'device', 'device_id', 'timestamp')}
+                result['document'] = document
+                result['timestamp'] = int(result['timestamp'] or 0)
+    except Exception as e:
+        print(f"[Kosync] cross-document lookup failed (document={document}): {e}")
+
+    # 페이지 기반 형식: 웹 뷰어(또는 OPDS 페이지 스트리밍)에서 더 나중에 읽었으면 그 위치를 준다
+    try:
+        book = book or _book_for_document(document)
         if book and book['format'] in PAGED_FORMATS:
             from services.reading_progress_service import ReadingProgressService
             state = ReadingProgressService.get_progress_state(book['db_type'], book['book_id'], user_id=user_id)

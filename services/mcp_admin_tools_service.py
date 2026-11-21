@@ -269,6 +269,19 @@ class McpAdminToolsService:
         return {'success': True, 'affected_count': len(book_ids), 'is_favorite': bool(int(is_favorite))}
 
     @staticmethod
+    def clear_epaper_cache():
+        """e-paper 변환본·표지 캐시 비우기 (Tier A). 언제 지워도 다음 다운로드 때 같은 바이트로 다시 만든다."""
+        McpAdminToolsService._require_write_enabled()
+        from services import epaper_service
+        before = epaper_service.status()
+        removed = epaper_service.clear_cache()
+        McpAdminToolsService._write_audit_log(
+            'clear_epaper_cache', 'general', before['cache_dir'],
+            {'files': {'before': before['books'], 'after': before['books'] - removed}, 'bytes_before': before['total_bytes']},
+        )
+        return {'success': True, 'removed_files': removed}
+
+    @staticmethod
     def _require_write_enabled():
         from services.settings_service import SettingsService
         enabled = SettingsService.get('MCP_WRITE_ENABLED', '0')

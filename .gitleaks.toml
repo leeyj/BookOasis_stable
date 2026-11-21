@@ -1,0 +1,21 @@
+# gitleaks 규칙: 기본 규칙 + 이 저장소에서 흔한 것
+title = "BookOasis gitleaks config"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "jwt-token"
+description = "JWT (Home Assistant 장기 토큰 등 eyJ로 시작하는 토큰)"
+regex = '''eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}'''
+keywords = ["eyJ"]
+
+[[rules]]
+id = "basic-auth-in-url"
+description = "URL에 들어간 사용자:비밀번호"
+regex = '''https?://[^\s:/@]+:[^\s:/@]{4,}@[^\s/]+'''
+keywords = ["http"]
+
+[allowlist]
+description = "테스트·문서의 가짜 값"
+paths = ['''tests/fixtures/''', '''\.example\.''']
