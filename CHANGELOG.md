@@ -1,4 +1,16 @@
 # CHANGELOG
+## v3.2.1
+- (feat) e-paper 여러 기기 지원: 변환 프로필 6개(`v1`, `x4`, `x3`, `gray-low`, `gray-hd`, `color-hd`), 고해상도 등급은 그림을 회색·컬러 JPEG로 | e-paper multi-device: 6 conversion profiles (`v1`, `x4`, `x3`, `gray-low`, `gray-hd`, `color-hd`); high-res grades use gray/color JPEG images
+- (feat) 내 설정에 "웹 받기 기기"·"피드 기기" 선택. 피드·표지·업로드는 피드 기기를 따르고, 설정하지 않으면 지금과 같은 `v1` | "Web download device" and "Feed device" in My settings; the feed, covers and uploads follow the feed device, unchanged `v1` when not set
+- (feat) 책 메뉴 "기기용 받기": 웹 받기 기기에 맞춘 EPUB을 받음(Kindle은 Send to Kindle용). 다운로드 버튼은 그대로 원본 | Book menu "Download for device": an EPUB fitted to your web download device (Kindle via Send to Kindle); the download button still gives the original
+- (feat) MCP 도구 `epaper_devices`, `set_epaper_device` | MCP tools `epaper_devices`, `set_epaper_device`
+- (change) "기타 기기" 항목 이름에 예시 기기(크레마·리디페이퍼·Boox·교보 sam·루나 등) 표시 | "Other device" entries now name example devices (Crema, RIDIPAPER, Boox, Kyobo sam, Luna, etc.)
+- (feat) 기기용 받기: 기기 폰트에서 □로 보일 글자 수·견본과 덜 빠지는 폰트를 안내 (BookOasis 펌웨어 기기, 실제 폰트 범위 기준) | Download for device: shows how many characters will appear as □ in the device font, with samples and fonts that miss fewer (BookOasis firmware devices, based on the real font range)
+- (change) 펌웨어 기기 EPUB·TXT 변환에서 줄을 뒤집는 RLM류와 한자 이체자 선택자(IVS)를 지움 | Firmware-device EPUB and TXT conversion removes line-flipping RLM-type marks and CJK variation selectors (IVS)
+- (change) TXT 변환은 기기와 상관없이 늘 `v1` 한 벌 | TXT conversion is always the single `v1` copy, whatever the device
+- (change) MCP `epaper_cache_status`: `profile`·`books` 대신 `default_profile`, 프로필별 `profiles`, `epub_files`·`cover_files` | MCP `epaper_cache_status`: `default_profile`, per-profile `profiles`, `epub_files`/`cover_files` replace `profile`/`books`
+- (docs) 기기 추가 기여 가이드 `docs/epaper-devices.md`, 명세 `docs/device-api.md` 갱신 | contributor guide for devices `docs/epaper-devices.md`, updated spec `docs/device-api.md`
+
 ## v3.2.0
 - (feat) e-paper 리더 전용 OPDS 피드 `/opds-epaper/v1` — EPUB/TXT만, 40개씩 페이지 나눔, 받으면 기기에 맞춘 변환본(그림 2색 디더링, CSS·폰트 정리, TXT는 EPUB으로)을 보냄. 표준 `/opds`는 그대로 원본 | e-paper reader OPDS feed `/opds-epaper/v1` — EPUB/TXT only, 40 per page, downloads are device-optimized copies (2-color dithered images, trimmed CSS/fonts, TXT as EPUB); the standard `/opds` still serves originals
 - (feat) KOReader 동기화: 같은 EPUB의 원본과 변환본 중 더 최근 위치를 서로 이어 받음 | KOReader sync: the original and the converted copy of the same EPUB now share the latest position

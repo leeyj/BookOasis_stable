@@ -298,6 +298,52 @@ def toggle_author_favorite_api():
     except Exception as e:
         return error_response(e)
 
+@book_routes_bp.route('/api/media/books/<int:book_id>/epaper', methods=['GET'])
+@login_required
+def download_epaper_book(book_id):
+    """기기용 받기(컨텍스트 메뉴): 사용자의 "웹 받기 기기"(EPAPER_WEB_DEVICE) 프로필로 변환한 EPUB.
+    일반 도서관 EPUB/TXT만. 권한은 다운로드 버튼과 같다(다운로드 권한·책별 등급) + 카테고리 권한.
+    503(Retry-After) = 변환 중, 422 = 변환 불가 - 기기 피드(/opds-epaper/v1)와 같은 뜻이다."""
+    db_type = 'general'
+    if not check_download_permission():
+        return jsonify({'success': False, 'error': _t('api.err_no_download_access')}), 403
+    if not check_book_rating_permission(db_type, book_id):
+        return jsonify({'success': False, 'error': _t('api.err_no_rating_access')}), 403
+    from services import epaper_service
+    user_id = session.get('user_id')
+    profile = epaper_service.profile_for_user(user_id, 'web')
+    if profile is None:
+        return jsonify({'success': False, 'error': 'epaper_web_device_not_set'}), 409
+    from repositories.epaper_feed_repository import EpaperFeedRepository
+    book = EpaperFeedRepository.get_book(db_type, book_id, user_id, session.get('role'))
+    if not book:
+        return jsonify({'success': False, 'error': _t('api.err_book_not_found')}), 404
+    from api.opds_epaper import AUTHOR_MAX, TITLE_MAX, _send_cached, clean_name
+    from urllib.parse import quote
+    try:
+        epub_path, meta = epaper_service.get_book_epub(db_type, book, profile=profile)
+    except epaper_service.Pending as p:
+        res = jsonify({'success': False, 'error': 'converting', 'retry_after': p.retry_after})
+        res.status_code = 503
+        res.headers['Retry-After'] = str(int(p.retry_after))
+        return res
+    except epaper_service.ConversionFailed as e:
+        return jsonify({'success': False, 'error': 'conversion_failed', 'reason': str(e.reason)[:120]}), 422
+    epaper_service.mark_downloaded(epub_path, meta)
+    print(f"[EPAPER] web download book={book_id} user={session.get('username') or user_id} profile={meta.get('profile')}")
+    name = clean_name(' - '.join(x for x in (clean_name(book.get('author'), AUTHOR_MAX),
+                                              clean_name(book.get('title'), TITLE_MAX)) if x), 120) or f'book_{book_id}'
+    response = _send_cached(epub_path, f'book_{book_id}.epub',
+                            f"attachment; filename=\"book_{book_id}.epub\"; filename*=UTF-8''{quote(name + '.epub', safe='')}",
+                            meta)
+    # 기기에서 □로 보일 글자 요약 (BookOasis 펌웨어 기기만). 받기 완료 토스트에 붙는다
+    glyphs = epaper_service.glyph_summary(meta, profile)
+    if glyphs:
+        import json
+        response.headers['X-Epaper-Glyphs'] = quote(json.dumps(glyphs, ensure_ascii=False, separators=(',', ':')), safe='')
+    return response
+
+
 @book_routes_bp.route('/api/media/books/<int:book_id>/download', methods=['GET'])
 @login_required
 def download_book(book_id):

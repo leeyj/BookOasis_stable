@@ -84,3 +84,6 @@ docs/user_guide/
 
 # 스캐너 임시 진행 기록(db/{카테고리}_{시각}.jsonl)·로그·측정 결과 — 어디서 생기든 올리지 않는다
 *.jsonl
+
+# Claude Code 개인 설정 (샘플은 .claude/settings.example.json)
+.claude/settings.local.json

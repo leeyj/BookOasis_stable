@@ -2,6 +2,7 @@
 export const state = {
   // 라이브러리/타입
   currentLibraryType: 'general',
+  epaperWebDevice: '', // 내 설정 "웹 받기 기기"(모델 id). 있으면 책 메뉴에 "기기용 받기"
   currentLibraryId: 'home', // 기본값: 홈 화면 (Kavita 대시보드)
   currentLibraryHideCovers: false,
   currentLibraryAspectRatio: '4:3',

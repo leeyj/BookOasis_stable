@@ -32,6 +32,7 @@ SETTING_VALUE_LIMITS = {
 # 민감한 키(RCLONE_RC_URL, WEBHOOK_TOKEN, DB 풀 크기 등)는 절대 포함하지 않는다 -
 # 그런 값은 /api/media/settings(관리자 전용)로만 제공된다.
 PUBLIC_UI_SETTING_KEYS = (
+    'EPAPER_WEB_DEVICE',  # 사용자 값만, 표에 있는 id일 때만 내려간다(컨텍스트 메뉴 "기기용 받기" 표시 조건)
     'BOOK_THUMBNAIL_WIDTH',
     'PAGE_LIMIT',
     'HIDE_COMPLETED_IN_HISTORY',
@@ -78,7 +79,12 @@ USER_OVERRIDABLE_SETTING_KEYS = (
     'HOME_DASHBOARD_PLUGIN_MODE',
     'HOME_WIDGET_LAYOUT',
     'BOOK_COMPLETE_PERCENT',
+    'EPAPER_WEB_DEVICE',
+    'EPAPER_FEED_DEVICE',
 )
+
+# 사용자 값만 쓰는 키: 전역값으로 넘어가지 않는다(관리자 스위치 없음). 조회 API에도 전역값을 섞지 않는다.
+USER_ONLY_SETTING_KEYS = ('EPAPER_WEB_DEVICE', 'EPAPER_FEED_DEVICE')
 
 @settings_bp.route('/api/media/settings', methods=['GET'])
 @admin_required
@@ -113,7 +119,12 @@ def get_public_ui_settings():
         # override 값이 있어도 응답에서 통째로 누락됐다. PUBLIC_UI_SETTING_KEYS를
         # 기준으로 순회해야 그런 키의 override도 정상적으로 내려간다.
         for k in PUBLIC_UI_SETTING_KEYS:
-            if k in USER_OVERRIDABLE_SETTING_KEYS:
+            if k in USER_ONLY_SETTING_KEYS:
+                from services import epaper_service
+                kind = 'web' if k == 'EPAPER_WEB_DEVICE' else 'feed'
+                device = epaper_service.user_device(user_id, kind)
+                public_settings[k] = device['model_id'] if device['model'] else ''
+            elif k in USER_OVERRIDABLE_SETTING_KEYS:
                 effective = SettingsService.get_effective(k, user_id=user_id, default=all_settings.get(k))
                 if effective is not None:
                     public_settings[k] = effective
@@ -179,6 +190,22 @@ def update_system_setting():
     except Exception as e:
         return error_response(e)
 
+def _epaper_device_info(user_id):
+    """설정 화면용: 고를 수 있는 기기 목록(쓰는 곳별)과 사용자의 두 설정 상태(찾을 수 없는 id 포함)."""
+    from services import epaper_service
+    from services.epaper import PROFILES, devices
+
+    def _model(m):
+        return {'id': m.id, 'name': m.name, 'name_en': m.name_en, 'profile': m.profile,
+                'verified': bool(m.verified and PROFILES[m.profile].device_verified)}
+
+    info = {'models': {kind: [_model(m) for m in devices.models_for(kind)] for kind in ('web', 'feed')}}
+    for kind in ('web', 'feed'):
+        d = epaper_service.user_device(user_id, kind)
+        info[kind] = {'model_id': d['model_id'], 'missing': d['missing']}
+    return info
+
+
 @settings_bp.route('/api/media/settings/user', methods=['GET'])
 @login_required
 def get_user_settings():
@@ -191,9 +218,10 @@ def get_user_settings():
         for k in USER_OVERRIDABLE_SETTING_KEYS:
             if k in user_overrides:
                 effective[k] = user_overrides[k]
-            elif k in globals_:
+            elif k in globals_ and k not in USER_ONLY_SETTING_KEYS:
                 effective[k] = globals_[k]
-        return jsonify({'success': True, 'settings': effective, 'overrides': user_overrides})
+        return jsonify({'success': True, 'settings': effective, 'overrides': user_overrides,
+                        'epaper': _epaper_device_info(user_id)})
     except Exception as e:
         return error_response(e)
 
@@ -213,6 +241,20 @@ def update_user_setting():
         from services.reading_progress_service import parse_book_complete_percent, invalidate_book_complete_percent
         if parse_book_complete_percent(value) is None:
             return jsonify({'success': False, 'error': _t('api.err_book_complete_percent_range')}), 400
+    if key in USER_ONLY_SETTING_KEYS:
+        # 기기 모델 id: 빈 값(없음) 또는 표에 있고 쓰는 곳이 맞는 id만. 저장 실패는 화면에 알린다.
+        from services.epaper import devices
+        kind = 'web' if key == 'EPAPER_WEB_DEVICE' else 'feed'
+        if value and not devices.usable_for(devices.get_model(value), kind):
+            return jsonify({'success': False, 'error': 'epaper_device_not_allowed'}), 400
+        try:
+            from repositories.settings_repository import SettingsRepository
+            SettingsRepository.set_user_value(user_id, key, value)
+        except Exception as e:
+            print(f"[EPAPER] device setting save failed user={user_id} key={key}: {e}")
+            return jsonify({'success': False, 'error': 'save_failed'}), 500
+        return jsonify({'success': True, 'message': _t('api.msg_setting_saved', key=key),
+                        'epaper': _epaper_device_info(user_id)})
     try:
         SettingsService.set_user_value(user_id, key, value)
         if key == 'BOOK_COMPLETE_PERCENT':

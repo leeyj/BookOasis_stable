@@ -184,11 +184,34 @@ def list_series_table(db_type: str = "general", library_id: int = None, missing:
 
 @mcp.tool()
 def epaper_cache_status() -> dict:
-    """e-paper 리더용 변환본 캐시 현황: 프로필, 캐시 위치, 책 수, 용량, 설정(보관 일수·최대 MB·변환 상한 초),
-    최근 변환 실패 목록(책, 형식, 사유). 변환은 기기 피드(/opds-epaper/v1)에서 받을 때만 일어난다."""
+    """e-paper 리더용 변환본 캐시 현황: 기본 프로필, 프로필별 변환본 수·크기(profiles), 캐시 위치, 변환본·표지 파일 수,
+    용량, 설정(보관 일수·최대 MB·변환 상한 초), 최근 변환 실패 목록(책, 형식, 사유).
+    변환은 기기 피드(/opds-epaper/v1)와 웹 메뉴 "기기용 받기"에서 받을 때만 일어난다."""
     def _run():
         from services import epaper_service
         return epaper_service.status()
+    return _quiet(_run)
+
+
+@mcp.tool()
+def epaper_devices(username: str = "") -> dict:
+    """e-paper 변환 프로필(화면 등급)과 기기 모델 목록(모델 id, 이름, 프로필, 쓰는 곳 web/feed/both, 실기기 확인, 사양 출처).
+    username을 주면 그 사용자의 "웹 받기 기기"·"피드 기기" 설정과 실제로 쓰이는 프로필(설정한 id를 찾을 수 없으면 not_found)."""
+    def _run():
+        from services.mcp_admin_tools_service import McpAdminToolsService
+        return McpAdminToolsService.epaper_devices(username)
+    return _quiet(_run)
+
+
+@mcp.tool()
+def set_epaper_device(username: str, device_kind: str, model: str = "") -> dict:
+    """[쓰기 도구] 사용자의 e-paper 기기를 정합니다. device_kind: 'web'(웹 메뉴 기기용 받기) | 'feed'(기기 피드).
+    model: 모델 id 또는 이름 일부, 빈 값이면 "없음". 이름이 여러 모델에 맞으면 고르지 않고 candidates를 돌려주니
+    사용자에게 물어 모델 id로 다시 부르세요("킨들 10세대"처럼 모호한 이름은 추측하지 말 것).
+    username은 필수입니다. "MCP 쓰기 도구 허용"이 켜져 있어야 하고 감사 로그에 남습니다."""
+    def _run():
+        from services.mcp_admin_tools_service import McpAdminToolsService
+        return McpAdminToolsService.set_epaper_device(username, device_kind, model)
     return _quiet(_run)
 
 

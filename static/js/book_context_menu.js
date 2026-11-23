@@ -7,6 +7,7 @@ import * as api from './api.js';
 import { hideFloatingMenu, isFloatingMenuOpen, positionMenuAtPoint } from './context_menu_manager.js';
 import { clearBookSelection, getSelectedBookTargets, isBookCardSelected } from './book_selection.js';
 import { computeBookMenuState } from './book_menu/menu_rules.js';
+import { canDownloadFiles } from './library_type_toggle.js';
 import { BOOK_MENU_ACTIONS, canDiagnoseFromCurrentBookMenu, canRunLazyScanFromCurrentBookMenu } from './book_menu/actions.js';
 import {
   cancelPluginContextMenuLoad,
@@ -149,6 +150,9 @@ export function showBookContextMenu(x, y, bookId, bookTitle, isVolumeDetail = fa
     ttsPregenEnabled: !!state.ttsPregenEnabled,
     isVideoLibrary: state.currentLibraryType === 'video',
     metaSearchAvailable: hasActiveSearchPlugin(),
+    epaperWebDevice: state.epaperWebDevice || '',
+    libraryType: state.currentLibraryType || 'general',
+    downloadAllowed: canDownloadFiles(),
   }));
 
   // 메타정보 검색 메뉴: 검색 플러그인 목록을 아직 모르면 비동기로 받아 표시 여부를 정한다
@@ -330,6 +334,9 @@ function dismissBookMenuOutside(event, suppressMs = 350) {
 }
 
 function blockUnderlyingBookCardInteraction(event) {
+  // 메뉴 동작이 만든 다운로드 링크(기기용 받기의 Blob 링크)는 막지 않는다. 캐시에서 바로 받으면
+  // 이 보호 시간(700ms) 안에 링크를 누르게 되어, 막으면 토스트만 뜨고 파일이 저장되지 않는다.
+  if (event?.target?.closest?.('a[download]')) return false;
   if (Date.now() < dismissPointerGuardUntil) {
     if (event) {
       event.preventDefault();

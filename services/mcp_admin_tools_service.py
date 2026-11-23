@@ -277,9 +277,80 @@ class McpAdminToolsService:
         removed = epaper_service.clear_cache()
         McpAdminToolsService._write_audit_log(
             'clear_epaper_cache', 'general', before['cache_dir'],
-            {'files': {'before': before['books'], 'after': before['books'] - removed}, 'bytes_before': before['total_bytes']},
+            {'files': {'before': before['epub_files'] + before['cover_files'],
+                       'after': before['epub_files'] + before['cover_files'] - removed}, 'bytes_before': before['total_bytes']},
         )
         return {'success': True, 'removed_files': removed}
+
+    @staticmethod
+    def epaper_devices(username=''):
+        """e-paper 프로필·모델 목록(쓰는 곳 포함)과, username을 주면 그 사용자의 두 기기 설정 (읽기)."""
+        from services import epaper_service
+        from services.epaper import PROFILES, devices
+        result = {
+            'profiles': [{'id': p.id, 'screen': f'{p.screen_long}x{p.screen_short}', 'image_format': p.image_format,
+                          'gray_levels': len(p.gray_levels) or None, 'revision': p.revision,
+                          'device_verified': p.device_verified} for p in PROFILES.values()],
+            'models': [{'id': m.id, 'name': m.name, 'name_en': m.name_en, 'profile': m.profile, 'use': m.use,
+                        'verified': m.verified, 'source': m.source} for m in devices.MODELS],
+            'rule': 'color screen -> color-hd; Kindle entry is web-only; else short side <= 758px -> gray-low, '
+                    'larger -> gray-hd. Ask the user for the exact model when a name like "Kindle 10th gen" is ambiguous.',
+        }
+        if username:
+            user = McpAdminToolsService._epaper_user(username)
+            result['user'] = {'username': user['username']}
+            for kind in ('web', 'feed'):
+                d = epaper_service.user_device(int(user['id']), kind)
+                prof = epaper_service.profile_for_user(int(user['id']), kind)
+                result['user'][kind] = {'model_id': d['model_id'], 'not_found': d['missing'],
+                                        'profile': prof.id if prof else None}
+        return result
+
+    @staticmethod
+    def _epaper_user(username):
+        from repositories.user_repository import UserRepository
+        name = str(username or '').strip()
+        if not name:
+            raise ValueError('username이 필요합니다(대상 사용자를 반드시 지정).')
+        user = UserRepository.find_by_username('general', name)
+        if not user:
+            raise ValueError(f'사용자를 찾을 수 없습니다: {name}')
+        return dict(user)
+
+    @staticmethod
+    def set_epaper_device(username, device_kind, model=''):
+        """사용자의 "웹 받기 기기"(device_kind='web') 또는 "피드 기기"('feed')를 정한다 (Tier A 쓰기).
+        model: 모델 id 또는 이름 일부. 빈 값 = 없음. 이름이 여러 모델에 맞으면 고르지 않고 후보를 돌려준다."""
+        McpAdminToolsService._require_write_enabled()
+        from services import epaper_service
+        from services.epaper import devices
+        if device_kind not in ('web', 'feed'):
+            raise ValueError("device_kind는 'web' 또는 'feed'여야 합니다.")
+        user = McpAdminToolsService._epaper_user(username)
+        query = str(model or '').strip()
+        chosen = None
+        if query:
+            usable = devices.models_for(device_kind)
+            chosen = next((m for m in usable if m.id == query), None)
+            if chosen is None:
+                q = query.lower()
+                matches = [m for m in usable if q in m.name.lower() or q in m.name_en.lower() or q in m.id]
+                if len(matches) != 1:
+                    return {'success': False, 'needs_choice': bool(matches),
+                            'candidates': [{'id': m.id, 'name': m.name, 'profile': m.profile} for m in matches],
+                            'message': '여러 모델이 맞습니다. 사용자에게 물어 모델 id로 다시 부르세요.' if matches
+                            else f'{device_kind}에 쓸 수 있는 모델이 없습니다. epaper_devices로 목록을 보세요.'}
+                chosen = matches[0]
+        key = epaper_service.DEVICE_SETTING_KEYS[device_kind]
+        before = epaper_service.user_device(int(user['id']), device_kind)['model_id']
+        from repositories.settings_repository import SettingsRepository
+        SettingsRepository.set_user_value(int(user['id']), key, chosen.id if chosen else '')
+        McpAdminToolsService._write_audit_log(
+            'set_epaper_device', 'general', f"user:{user['username']}",
+            {key: {'before': before, 'after': chosen.id if chosen else ''}},
+        )
+        return {'success': True, 'username': user['username'], 'device_kind': device_kind,
+                'model_id': chosen.id if chosen else '', 'profile': chosen.profile if chosen else None}
 
     @staticmethod
     def _require_write_enabled():

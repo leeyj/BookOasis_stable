@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-"""TXT → EPUB3 (프로필 v1). 인코딩을 감지해 UTF-8로 바꾸고 챕터를 나눈다.
+"""TXT → EPUB3 (기기 프로필과 무관, 표식은 늘 v1). 인코딩을 감지해 UTF-8로 바꾸고 챕터를 나눈다.
 
 챕터: '제1장', '1화', 'Chapter 1', '프롤로그' 같은 짧은 줄을 제목으로 본다.
 - 본문 앞 목차처럼 제목끼리 TXT_HEADING_MIN_GAP 글자보다 가까우면 제목으로 쓰지 않는다.
 - 번호가 있는 제목은 번호가 앞 제목보다 커야 한다(본문 중간의 '1화' 오탐 방지).
-- 제목을 2개 미만 찾았거나 한 챕터가 너무 길면 TXT_SECTION_CHARS 안팎에서 문단 경계로 나눈다.
+- 제목을 2개 미만 찾았거나 한 챕터가 너무 길면 공통 조각 길이(profile.TXT_SECTION_CHARS) 안팎에서 문단 경계로 나눈다.
 결정적: 식별자는 원본 SHA-256에서 만들고 시각·UUID를 쓰지 않는다.
 """
 import hashlib
@@ -93,8 +93,9 @@ def _chunk(paragraphs, limit):
     return chunks
 
 
-def split_sections(body, title):
-    """본문 → [(제목, [문단])]."""
+def split_sections(body, title, section_chars=None):
+    """본문 → [(제목, [문단])]. section_chars를 안 주면 공통 값(TXT_SECTION_CHARS)."""
+    section_chars = section_chars or profile.TXT_SECTION_CHARS
     lines = body.split('\n')
     heads = _find_headings(lines)
     sections = []
@@ -106,12 +107,12 @@ def split_sections(body, title):
         for k, start in enumerate(heads):
             paras = [l.strip() for l in lines[start + 1:bounds[k + 1]] if l.strip()]
             label = lines[start].strip()
-            parts = _chunk(paras, profile.TXT_SECTION_CHARS) or [[]]
+            parts = _chunk(paras, section_chars) or [[]]
             for n, part in enumerate(parts):
                 sections.append((label if n == 0 else f'{label} ({n + 1})', part))
     else:
         paras = [l.strip() for l in lines if l.strip()]
-        parts = _chunk(paras, profile.TXT_SECTION_CHARS) or [[]]
+        parts = _chunk(paras, section_chars) or [[]]
         for n, part in enumerate(parts, 1):
             sections.append((title if len(parts) == 1 else f'{title} ({n})', part))
     return sections, len(heads) >= 2
@@ -130,13 +131,16 @@ def _xhtml(label, paras, show_heading):
 
 
 def convert_txt(src_path, dst_path, title, author=''):
+    """TXT → EPUB. 기기 프로필과 무관하게 늘 같은 바이트(조각 길이 TXT_SECTION_CHARS, 표식 TXT_PROFILE_ID)."""
     with open(src_path, 'rb') as f:
         data = f.read()
     body, encoding = text.decode_text(data)
     body = text.strip_xml_invalid(body.replace('\r\n', '\n').replace('\r', '\n'))
+    # 프로필 공통 결과라 모든 기기에 적용된다. 줄 뒤집힘(RLM류)·이체자 선택자(IVS)는 다른 리더에서 지워도 잃는 것이 거의 없다
+    body, invisible_removed = text.strip_invisible_lines(body)
     title = ' '.join(str(title or 'Untitled').split())[:200]
     author = ' '.join(str(author or '').split())[:200]
-    sections, detected = split_sections(body, title)
+    sections, detected = split_sections(body, title, profile.TXT_SECTION_CHARS)
 
     identifier = 'urn:sha256:' + hashlib.sha256(data).hexdigest()
     entries = {
@@ -164,7 +168,7 @@ def convert_txt(src_path, dst_path, title, author=''):
         f'<dc:identifier id="bookid">{escape(identifier)}</dc:identifier>'
         f'<dc:title>{escape(title)}</dc:title>{creator}<dc:language>ko</dc:language>'
         f'<meta property="dcterms:modified">{profile.FIXED_MODIFIED}</meta>'
-        f'<meta name="{profile.PROFILE_META_NAME}" content="{profile.PROFILE_VERSION}"/>'
+        f'<meta name="{profile.PROFILE_META_NAME}" content="{escape(profile.TXT_PROFILE_ID)}"/>'
         '</metadata>\n<manifest>'
         '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>'
         '<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>'
@@ -175,9 +179,11 @@ def convert_txt(src_path, dst_path, title, author=''):
     zipio.write_epub(dst_path, entries)
 
     report = {
-        'profile': profile.PROFILE_VERSION, 'source_format': 'txt', 'encoding': encoding,
+        'profile': profile.TXT_PROFILE_ID, 'source_format': 'txt', 'encoding': encoding,
         'chapters_detected': detected, 'spine_count': len(sections), 'warnings': [],
-        'glyphs': text.glyph_report(p for _, paras in sections for p in paras),
+        'invisible_removed': invisible_removed,
+        # TXT는 한 벌을 모든 기기가 받으므로 늘 낸다(BookOasis 펌웨어 폰트 기준). 보여 줄지는 받는 기기를 아는 쪽이 정한다
+        'glyphs': text.glyph_report((label, p) for label, paras in sections for p in paras),
     }
     if encoding == 'cp949-replace':
         report['warnings'].append('text had undecodable bytes (replaced)')

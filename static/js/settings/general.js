@@ -11,6 +11,7 @@ import { startCoverStorageMigration } from './cover_storage_settings.js';
 import { getTempShortcut, setTempShortcut, initShortcutRecorderEvents } from './shortcut_recorder.js';
 import { runVaapiCheck, triggerLazyScanNow } from './system_actions.js';
 import { loadHomeDashboardLayout } from '../dashboard.js?v=20260917-home-widget-plugin-ui-v1';
+import { collectEpaperDeviceSettings, renderEpaperDeviceSettings } from './epaper_devices.js';
 
 function initGeneralDelegation() {
   if (window.__generalDelegationBound) return;
@@ -188,6 +189,9 @@ export function applySettingsToUI(settings) {
   }
   if (settings.HOME_DASHBOARD_PLUGIN_MODE !== undefined) {
     state.homeDashboardPluginMode = (settings.HOME_DASHBOARD_PLUGIN_MODE === '1');
+  }
+  if (settings.EPAPER_WEB_DEVICE !== undefined) {
+    state.epaperWebDevice = String(settings.EPAPER_WEB_DEVICE || '');
   }
   ['general', 'adult', 'audiobook', 'video'].forEach((sessionKey) => {
     const settingKey = `DETAIL_VIEW_PROVIDER_${sessionKey.toUpperCase()}`;
@@ -609,6 +613,8 @@ export async function loadMySettings() {
     // 하드웨어 키 방향 반전 - 서버 설정이 아닌 이 기기의 localStorage에서만 로드
     const reverseHwNavKeysEl = document.getElementById('my-setting-reverse-hw-nav-keys');
     if (reverseHwNavKeysEl) reverseHwNavKeysEl.checked = (localStorage.getItem('viewer_reverse_hw_nav_keys') === '1');
+
+    renderEpaperDeviceSettings(res.epaper);
   } catch (err) {
     console.error('[Settings] 내 설정 로드 에러:', err);
   }
@@ -637,6 +643,7 @@ export async function submitMySettings(event) {
   const smartRecommendEnabled = document.getElementById('my-setting-smart-recommend-enabled')?.checked ? '1' : '0';
   const bookRecommendEnabled = document.getElementById('my-setting-book-recommend-enabled')?.checked ? '1' : '0';
   const homeDashboardPluginMode = document.getElementById('my-setting-home-dashboard-plugin-mode')?.checked ? '1' : '0';
+  const epaperDevices = collectEpaperDeviceSettings();
 
   try {
     // 테마/대시보드 표시는 로컬스토리지에도 즉시 반영 (change 핸들러와 별개로 폼 제출 시에도 보장)
@@ -662,7 +669,8 @@ export async function submitMySettings(event) {
       api.updateUserSetting('SHOW_TXT_NO_COVER_INFO_BANNER', showTxtNoCoverInfoBanner),
       api.updateUserSetting('SMART_RECOMMEND_ENABLED', smartRecommendEnabled),
       api.updateUserSetting('BOOK_RECOMMEND_ENABLED', bookRecommendEnabled),
-      api.updateUserSetting('HOME_DASHBOARD_PLUGIN_MODE', homeDashboardPluginMode)
+      api.updateUserSetting('HOME_DASHBOARD_PLUGIN_MODE', homeDashboardPluginMode),
+      ...epaperDevices.map(([key, value]) => api.updateUserSetting(key, value))
     ]);
     const failed = results.find(r => !r.success);
 
@@ -687,7 +695,8 @@ export async function submitMySettings(event) {
         SHOW_TXT_NO_COVER_INFO_BANNER: showTxtNoCoverInfoBanner,
         SMART_RECOMMEND_ENABLED: smartRecommendEnabled,
         BOOK_RECOMMEND_ENABLED: bookRecommendEnabled,
-        HOME_DASHBOARD_PLUGIN_MODE: homeDashboardPluginMode
+        HOME_DASHBOARD_PLUGIN_MODE: homeDashboardPluginMode,
+        ...Object.fromEntries(epaperDevices.filter(([key]) => key === 'EPAPER_WEB_DEVICE'))
       });
       loadMySettings();
       if (typeof window.loadLibraries === 'function') {

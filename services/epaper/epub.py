@@ -126,14 +126,17 @@ def element_signature(tree):
 
 # ---- 본체 ----
 
-def optimize_epub(src_path, dst_path):
-    """src EPUB → dst EPUB. 보고서 dict를 돌려준다."""
+def optimize_epub(src_path, dst_path, prof=None):
+    """src EPUB → dst EPUB. 보고서 dict를 돌려준다. prof를 안 주면 기본 프로필."""
+    prof = prof or profile.DEFAULT_PROFILE
     entries = zipio.read_entries(src_path)
     report = {
-        'profile': profile.PROFILE_VERSION, 'source_format': 'epub', 'spine_count': 0,
+        'profile': prof.id, 'source_format': 'epub', 'spine_count': 0,
         'images_converted': 0, 'images_kept': 0, 'fonts_removed': 0, 'css_filtered': 0,
         'repaired_documents': [], 'generated_toc': [], 'warnings': [],
     }
+    if prof.bookoasis_firmware:
+        report['invisible_removed'] = 0
     _check_drm(entries)
     entries.pop('META-INF/encryption.xml', None)
 
@@ -184,25 +187,26 @@ def optimize_epub(src_path, dst_path):
         if data is None:
             continue
         try:
-            png, _size = images.to_epaper_png(data)
+            converted, _size, ext, out_type = images.to_epaper_image(data, prof)
         except Exception as e:
             report['images_kept'] += 1
             report['warnings'].append(f'image kept as-is: {path} ({type(e).__name__})')
             continue
         new_path = path
-        if not path.lower().endswith('.png'):
+        keep_exts = ('.jpg', '.jpeg') if ext == '.jpg' else (ext,)
+        if not path.lower().endswith(keep_exts):
             stem = posixpath.splitext(path)[0]
-            new_path = stem + '.png'
+            new_path = stem + ext
             n = 1
             while new_path in taken and new_path != path:
-                new_path = f'{stem}_{n}.png'
+                new_path = f'{stem}_{n}{ext}'
                 n += 1
             taken.add(new_path)
             del entries[path]
             renames[path] = new_path
             item.set('href', _relative(opf_dir, new_path))
-        entries[new_path] = png
-        item.set('media-type', 'image/png')
+        entries[new_path] = converted
+        item.set('media-type', out_type)
         report['images_converted'] += 1
 
     # 3) CSS
@@ -229,8 +233,10 @@ def optimize_epub(src_path, dst_path):
         if repaired:
             report['repaired_documents'].append(path)
         _rewrite_document(tree, posixpath.dirname(path), renames)
+        if prof.bookoasis_firmware:
+            report['invisible_removed'] += strip_invisible_text(tree)
         if item_id in spine_set:
-            glyph_texts.append(_body_text(tree))
+            glyph_texts.append((_relative(opf_dir, path), _body_text(tree)))
         entries[path] = serialize(tree)
 
     # 5) 목차: 없으면 만든다
@@ -252,21 +258,27 @@ def optimize_epub(src_path, dst_path):
         report['generated_toc'].append('nav')
 
     # 6) OPF 표식 + modified
-    _mark_profile(metadata, version)
+    _mark_profile(metadata, version, prof.id)
     entries[opf_path] = serialize(opf_tree)
 
-    report['glyphs'] = text.glyph_report(glyph_texts)
-    _glyph_warning(report)
+    if prof.bookoasis_firmware:  # 기기 폰트 범위는 BookOasis 펌웨어 기준이라 다른 기기에는 내지 않는다
+        report['glyphs'] = text.glyph_report(glyph_texts)
+        _glyph_warning(report)
     zipio.write_epub(dst_path, entries)
     return report
 
 
 def _glyph_warning(report):
-    g = report['glyphs']
+    g = report.get('glyphs')
+    if not g:
+        return
     if g['total_chars'] and (g['missing_chars'] / g['total_chars'] > profile.MISSING_GLYPH_RATIO_WARN
                              or g['missing_distinct'] >= profile.MISSING_GLYPH_DISTINCT_WARN):
         report['warnings'].append(
-            f"glyphs missing from device font: {g['missing_chars']} chars, {g['missing_distinct']} kinds ({g['missing_sample']})")
+            f"glyphs missing from device font {g['default_font']}: {g['missing_chars']} chars, "
+            f"{g['missing_distinct']} kinds ({g['missing_sample']}); "
+            + ', '.join(f"{name} {f['missing_chars']}" for name, f in g['fonts'].items() if name != g['default_font'])
+            + ''.join(f"; at {loc['where']}: {loc['text']}" for loc in g['locations'][:3]))
 
 
 def _check_drm(entries):
@@ -341,6 +353,52 @@ def _rewrite_document(tree, doc_dir, renames):
                 if target in renames:
                     frag = '#' + value.split('#', 1)[1] if '#' in value else ''
                     el.set(attr, _relative(doc_dir, renames[target]) + frag)
+
+
+# 문단으로 보는 요소: 오른쪽→왼쪽 글자가 있는지는 텍스트가 속한 가장 가까운 이 요소 단위로 본다
+_BLOCK_TAGS = frozenset(('p', 'div', 'li', 'dt', 'dd', 'td', 'th', 'caption', 'figcaption', 'blockquote', 'pre',
+                         'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'section', 'article', 'aside', 'header', 'footer',
+                         'nav', 'body', 'title'))
+
+
+def _own_block_text(el):
+    """el에 바로 속한 글자(하위 블록 요소의 글자는 빼고, 그 뒤 tail은 넣는다). 주석 내용은 넣지 않는다."""
+    if el.text and isinstance(el.tag, str):
+        yield el.text
+    for child in el:
+        if isinstance(child.tag, str) and _local(child.tag) not in _BLOCK_TAGS:
+            yield from _own_block_text(child)
+        if child.tail:
+            yield child.tail
+
+
+def strip_invisible_text(tree):
+    """텍스트 노드에서 RLM·RLE·RLO·RLI와 IVS를 지운다(text.strip_invisible). 요소는 그대로다(§5.1).
+    오른쪽→왼쪽 글자가 있는 문단의 방향 문자는 남긴다. 지운 글자 수를 돌려준다."""
+    rtl_cache = {}
+
+    def keep_bidi(el):
+        block = el
+        while block is not None and _local(block.tag) not in _BLOCK_TAGS:
+            block = block.getparent()
+        if block is None:
+            block = el.getroottree().getroot()
+        key = id(block)
+        if key not in rtl_cache:
+            rtl_cache[key] = (block, text.has_rtl_letters(''.join(_own_block_text(block))))
+        return rtl_cache[key][1]
+
+    removed = 0
+    for el in tree.getroot().iter():
+        if isinstance(el.tag, str) and text.has_invisible(el.text):  # 주석·처리 지시는 text가 없지만 tail(뒤 본문)은 있다
+            new, n = text.strip_invisible(el.text, keep_bidi=keep_bidi(el))
+            if n:
+                el.text, removed = new, removed + n
+        if text.has_invisible(el.tail) and el.getparent() is not None:
+            new, n = text.strip_invisible(el.tail, keep_bidi=keep_bidi(el.getparent()))
+            if n:
+                el.tail, removed = new, removed + n
+    return removed
 
 
 def _body_text(tree):
@@ -520,14 +578,14 @@ def _build_nav(toc, title, base_dir):
     return b'<?xml version="1.0" encoding="utf-8"?>\n<!DOCTYPE html>\n' + etree.tostring(root, encoding='utf-8', pretty_print=True)
 
 
-def _mark_profile(metadata, version):
+def _mark_profile(metadata, version, profile_id):
     nsmap_opf = f'{{{NS_OPF}}}'
     for el in list(metadata):
         if _local(el.tag) == 'meta' and el.get('name') == profile.PROFILE_META_NAME:
             metadata.remove(el)
     meta = etree.SubElement(metadata, f'{nsmap_opf}meta')
     meta.set('name', profile.PROFILE_META_NAME)
-    meta.set('content', profile.PROFILE_VERSION)
+    meta.set('content', profile_id)
     if version.startswith('3'):
         has_modified = any(_local(el.tag) == 'meta' and el.get('property') == 'dcterms:modified' for el in metadata)
         if not has_modified:

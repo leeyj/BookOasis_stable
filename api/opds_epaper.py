@@ -3,7 +3,8 @@
 opds_epaper.py – e-paper 리더 전용 OPDS 피드 /opds-epaper/v1 (명세: docs/device-api.md)
 
 표준 /opds 와 분리된 갈래다. 표준 피드(아이패드 KOReader 등)는 원본을 그대로 보내고, 이 피드만 변환본을 보낸다.
-- 일반(general) 도서관의 EPUB/TXT만 보인다. 받기 링크는 모두 application/epub+zip(변환본 프로필 v1).
+- 일반(general) 도서관의 EPUB/TXT만 보인다. 받기 링크는 모두 application/epub+zip.
+- 변환 프로필은 로그인한 사용자의 "피드 기기" 설정(EPAPER_FEED_DEVICE, 없으면 v1)을 따른다. 주소의 v1은 피드 API 버전이다.
 - 모든 목록은 한 페이지 PAGE_SIZE개, 다음 페이지는 rel="next". 기기는 한 페이지에 62항목까지만 담는다.
 - 표지는 그레이스케일 JPEG(긴 변 480px 이하). 설명은 짧게, 제목·저자는 FAT32 파일명에 쓸 수 있게 다듬는다.
 - 인증: Basic(표준 OPDS와 같은 계정·5분 캐시). 다운로드는 피드가 붙인 서명 토큰으로도 받을 수 있다.
@@ -57,6 +58,11 @@ def _user():
     user = _get_authenticated_user(is_adult=False)
     g.epaper_user = (user or {}).get('username')
     return user
+
+
+def _feed_profile(user):
+    from services import epaper_service
+    return epaper_service.profile_for_user((user or {}).get('id'), 'feed')
 
 
 def _unauthorized():
@@ -361,7 +367,7 @@ def epaper_download(book_id):
         return _text_error(404, '책을 찾을 수 없습니다.')
     from services import epaper_service
     try:
-        epub_path, meta = epaper_service.get_book_epub(DB_TYPE, book)
+        epub_path, meta = epaper_service.get_book_epub(DB_TYPE, book, profile=_feed_profile(user))
     except epaper_service.Pending as p:
         return _text_error(503, '변환 중입니다. 잠시 후 다시 받아 주세요.', retry_after=p.retry_after)
     except epaper_service.ConversionFailed as e:
@@ -384,7 +390,7 @@ def epaper_cover(book_id):
         return _text_error(404, 'not found')
     from services import epaper_service
     try:
-        path = epaper_service.feed_cover(DB_TYPE, book)
+        path = epaper_service.feed_cover(DB_TYPE, book, _feed_profile(user))
     except Exception as e:
         print(f"[EPAPER] cover failed book={book_id}: {type(e).__name__}: {e}")
         path = None
@@ -420,14 +426,14 @@ def _upload_user():
     return user, None
 
 
-def _upload_state(sha):
+def _upload_state(sha, prof):
     from services import epaper_service
-    found = epaper_service.find_upload(sha)
+    found = epaper_service.find_upload(sha, prof)
     if found:
         _path, meta = found
         return _json(200, state='done', sha256=sha, profile=meta.get('profile'), digest=meta.get('digest'),
                      size=meta.get('size'), download=_url(f'/uploads/{sha}.epub'))
-    state = epaper_service.upload_job_state(sha)
+    state = epaper_service.upload_job_state(sha, prof)
     if state['state'] == 'converting':
         return _json(202, state='converting', sha256=sha, status_url=_url(f'/uploads/{sha}'))
     if state['state'] == 'failed':
@@ -437,13 +443,13 @@ def _upload_state(sha):
 
 @opds_epaper_bp.route(PREFIX + '/uploads/<string:sha>', methods=['GET'])
 def epaper_upload_status(sha):
-    _user_row, error = _upload_user()
+    user_row, error = _upload_user()
     if error:
         return error
     sha = sha.lower()
     if not _SHA256.match(sha):
         return _json(400, error='bad_sha256')
-    return _upload_state(sha)
+    return _upload_state(sha, _feed_profile(user_row))
 
 
 @opds_epaper_bp.route(PREFIX + '/uploads', methods=['POST'])
@@ -451,9 +457,10 @@ def epaper_upload():
     import hashlib
     import os
     import tempfile
-    _user_row, error = _upload_user()
+    user_row, error = _upload_user()
     if error:
         return error
+    prof = _feed_profile(user_row)  # POST 시점에 정한다 - 변환 스레드에는 요청 맥락이 없다
     claimed = (request.headers.get('X-Content-SHA256') or '').strip().lower()
     if claimed and not _SHA256.match(claimed):
         return _json(400, error='bad_sha256')
@@ -463,8 +470,8 @@ def epaper_upload():
         return _json(413, error='too_large', limit=UPLOAD_MAX_BYTES)
     if claimed:
         from services import epaper_service
-        if epaper_service.find_upload(claimed) or epaper_service.upload_job_state(claimed)['state'] == 'converting':
-            return _upload_state(claimed)
+        if epaper_service.find_upload(claimed, prof) or epaper_service.upload_job_state(claimed, prof)['state'] == 'converting':
+            return _upload_state(claimed, prof)
 
     from services import epaper_service
     staging = tempfile.mkdtemp(prefix='up-', dir=epaper_service.upload_staging_dir())
@@ -502,28 +509,29 @@ def epaper_upload():
         shutil.rmtree(staging, ignore_errors=True)
         print(f"[EPAPER] upload refused user={g.epaper_user} reason={reason} size={size}")
         return _json(400, error=reason)
-    if epaper_service.find_upload(sha) or epaper_service.upload_job_state(sha)['state'] == 'converting':
+    if epaper_service.find_upload(sha, prof) or epaper_service.upload_job_state(sha, prof)['state'] == 'converting':
         import shutil
         shutil.rmtree(staging, ignore_errors=True)
-        return _upload_state(sha)
+        return _upload_state(sha, prof)
     title = clean_name(request.headers.get('X-Title', ''), TITLE_MAX)
-    print(f"[EPAPER] upload accepted user={g.epaper_user} sha256={sha} size={size}")
-    epaper_service.start_upload_conversion(sha, src, title=title)
+    print(f"[EPAPER] upload accepted user={g.epaper_user} sha256={sha} size={size} profile={prof.id}")
+    epaper_service.start_upload_conversion(sha, src, prof, title=title)
     return _json(202, state='converting', sha256=sha, status_url=_url(f'/uploads/{sha}'))
 
 
 @opds_epaper_bp.route(PREFIX + '/uploads/<string:sha>.epub', methods=['GET'])
 def epaper_upload_download(sha):
-    _user_row, error = _upload_user()
+    user_row, error = _upload_user()
     if error:
         return error
     sha = sha.lower()
     if not _SHA256.match(sha):
         return _json(400, error='bad_sha256')
     from services import epaper_service
-    found = epaper_service.find_upload(sha)
+    prof = _feed_profile(user_row)
+    found = epaper_service.find_upload(sha, prof)
     if not found:
-        return _upload_state(sha)
+        return _upload_state(sha, prof)
     path, meta = found
     epaper_service.mark_downloaded(path, meta)
     return _send_cached(path, f'{sha[:16]}.epub', f'attachment; filename="{sha[:16]}.epub"', meta)

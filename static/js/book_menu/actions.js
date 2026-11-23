@@ -358,6 +358,84 @@ function coverAlign(target, ui) {
   return window.showVolumeCoverAlignContextMenu?.(x, y, bookId, align, bulkBookIds);
 }
 
+// [기기용 받기]: "웹 받기 기기" 프로필로 변환한 EPUB을 받는다(/api/media/books/<id>/epaper).
+// 변환을 기다리는 동안 화면을 막지 않고 토스트만 띄운다. 503 = 변환 중(서버가 이어서 하므로 다시 누르면 된다), 422 = 변환 불가.
+const epaperInFlight = new Set();
+
+function filenameFromDisposition(header, fallback) {
+  const star = /filename\*=UTF-8''([^;]+)/i.exec(header || '');
+  if (star) {
+    try { return decodeURIComponent(star[1].trim()); } catch (_) { /* 아래 대체 이름 */ }
+  }
+  const plain = /filename="([^"]+)"/i.exec(header || '');
+  return plain ? plain[1] : fallback;
+}
+
+// X-Epaper-Glyphs(BookOasis 펌웨어 기기만): 기기 기본 폰트에서 □로 보일 글자 수와 견본, 덜 빠지는 폰트.
+// 받기 완료 토스트 하나에 담는다(읽는 화면이 아니라 받는 순간이라 방해하지 않는다).
+export function epaperGlyphsMessage(header) {
+  if (!header) return '';
+  let g;
+  try { g = JSON.parse(decodeURIComponent(header)); } catch (_) { return ''; }
+  if (!g || !(Number(g.missing) > 0)) return '';
+  const parts = [i18n.t('context_menu.epaper_done_glyphs', { count: Number(g.missing), sample: String(g.sample || '') })];
+  for (const [font, count] of Array.isArray(g.better) ? g.better : []) {
+    parts.push(Number(count) > 0
+      ? i18n.t('context_menu.epaper_glyphs_better', { font: String(font), count: Number(count) })
+      : i18n.t('context_menu.epaper_glyphs_better_all', { font: String(font) }));
+  }
+  return parts.join(' · ');
+}
+
+async function epaperDownload(target, ui) {
+  if (!target || !target.id) return;
+  ui.close();
+  const bookId = Number(target.id);
+  const vm = await import('../view_manager.js');
+  if (epaperInFlight.has(bookId)) {
+    vm.showToast(i18n.t('context_menu.epaper_converting'), 'info');
+    return;
+  }
+  epaperInFlight.add(bookId);
+  vm.showToast(i18n.t('context_menu.epaper_converting'), 'info', { duration: 60000 });
+  try {
+    const res = await fetch(`/api/media/books/${bookId}/epaper`);
+    if (res.status === 503) {
+      vm.showToast(i18n.t('context_menu.epaper_retry_later'), 'info', { duration: 6000 });
+      return;
+    }
+    if (res.status === 422) {
+      vm.showToast(i18n.t('context_menu.epaper_failed'), 'error', { duration: 6000 });
+      return;
+    }
+    if (!res.ok) {
+      let error = '';
+      try { error = (await res.json())?.error || ''; } catch (_) { /* 본문 없음 */ }
+      vm.showToast(i18n.t('context_menu.epaper_error', { error: error || res.status }), 'error');
+      return;
+    }
+    const blob = await res.blob();
+    const name = filenameFromDisposition(res.headers.get('Content-Disposition'), `book_${bookId}.epub`);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);  // iOS Safari는 받기를 늦게 시작한다
+    const glyphs = epaperGlyphsMessage(res.headers.get('X-Epaper-Glyphs'));
+    if (glyphs) vm.showToast(glyphs, 'info', { duration: 12000 });
+    else vm.showToast(i18n.t('context_menu.epaper_done'), 'success');
+  } catch (err) {
+    console.error('[EPAPER] web download failed:', err);
+    vm.showToast(i18n.t('detail.server_comm_error'), 'error');
+  } finally {
+    epaperInFlight.delete(bookId);
+  }
+}
+
 // context_menus.html의 data-action 값 → 액션
 export const BOOK_MENU_ACTIONS = {
   'scan': scan,
@@ -372,4 +450,5 @@ export const BOOK_MENU_ACTIONS = {
   'mark-read': markRead,
   'cover-align': coverAlign,
   'diagnose': diagnose,
+  'epaper-download': epaperDownload,
 };

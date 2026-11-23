@@ -36,7 +36,8 @@ export function isLazyScanAllowed(user, libraryType) {
 /**
  * 메뉴 대상(target)과 환경(env)으로 항목별 표시 상태를 계산한다.
  * target: { isVolumeDetail, selectedBooks, seriesName, markUnreadScope, libraryId, fileFormat, bookCount, hasProgress }
- * env: { lazyScanAllowed, diagnoseAllowed, listenable, ttsPregenEnabled, isVideoLibrary, metaSearchAvailable(true|false|null) }
+ * env: { lazyScanAllowed, diagnoseAllowed, listenable, ttsPregenEnabled, isVideoLibrary, metaSearchAvailable(true|false|null),
+ *        epaperWebDevice(모델 id 또는 ''), libraryType, downloadAllowed }
  * 반환: { title, items: { [elementId]: { visible?, action?, iconClass?, iconColor?, labelKey?, labelFallback?, labelText?, setI18n? } } }
  *   visible이 undefined면 표시 상태를 건드리지 않는다. labelKey가 있으면 i18n(labelKey) || labelFallback || 현재 문구.
  */
@@ -67,6 +68,12 @@ export function computeBookMenuState(target, env = {}) {
   // [진단]: 도서 1권 단위라 시리즈 집계 카드(여러 권)와 다중 선택에서는 숨긴다
   const singleBook = !!target?.isVolumeDetail || (Number(target?.bookCount) || 1) <= 1;
   items['ctx-diagnose-book'] = { visible: !isMulti && !!env.diagnoseAllowed && singleBook };
+
+  // [기기용 받기]: ① "웹 받기 기기" 설정됨 ② EPUB·TXT ③ 한 권(시리즈 카드·다중 선택 제외) ④ 일반 도서관 ⑤ 다운로드 권한
+  items['ctx-epaper-book'] = {
+    visible: !isMulti && singleBook && !!env.epaperWebDevice && ['epub', 'txt', 'text'].includes(fmt)
+      && String(env.libraryType || '').toLowerCase() === 'general' && !!env.downloadAllowed,
+  };
 
   // "페이지 넘김으로 보기(실험적)"는 이미지 기반 만화(zip/cbz)에서만 의미가 있음
   items['ctx-page-turn-book'] = { visible: !isMulti && (fmt === 'zip' || fmt === 'cbz') };

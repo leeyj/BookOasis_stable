@@ -128,6 +128,33 @@
                                 </div>
                             </div>
 
+                            <!-- e-paper 리더: 웹 받기 기기 / 피드 기기 (static/js/settings/epaper_devices.js, 모델 표 services/epaper/devices.py) -->
+                            <div style="background: rgba(var(--app-panel-rgb), 0.4); border: 1px solid color-mix(in srgb, var(--app-accent) 20%, transparent); border-radius: 8px; padding: 1.25rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.2rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.6rem;">
+                                    <i class="lc lc-book-open" style="color: var(--app-accent); font-size: 1.1rem;"></i>
+                                    <h4 style="margin: 0; color: var(--app-text-primary); font-size: 1rem; font-weight: 700;" data-i18n="settings.epaper_section">e-paper 리더</h4>
+                                </div>
+                                <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+                                    <div class="library-form-group">
+                                        <label for="my-setting-epaper-web-device" style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                            <span data-i18n="settings.epaper_web_device_label">웹 받기 기기</span>
+                                        </label>
+                                        <select id="my-setting-epaper-web-device" name="EPAPER_WEB_DEVICE" style="width: 100%; max-width: 480px; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;"></select>
+                                        <p id="my-setting-epaper-web-missing" hidden style="font-size: 0.78rem; color: #f87171; margin: 0.4rem 0 0 0;" data-i18n="settings.epaper_device_missing">설정한 기기를 찾을 수 없습니다. 기기를 다시 골라 주세요(지금은 "없음"으로 동작합니다).</p>
+                                        <p style="font-size: 0.78rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0;" data-i18n="settings.epaper_web_device_desc">고르면 일반 도서관 EPUB·TXT 책의 메뉴(우클릭·길게 누르기)에 "기기용 받기"가 생깁니다. 기기 화면에 맞게 정리한 EPUB을 받아 USB·Send to Kindle 등으로 옮겨 넣을 때 씁니다. 기존 다운로드 버튼은 늘 원본입니다.</p>
+                                        <p style="font-size: 0.78rem; color: var(--app-text-muted); margin: 0.3rem 0 0 0;" data-i18n="settings.epaper_kindle_desc">Kindle: Send to Kindle 메일·앱은 50MB까지입니다. 넘으면 Amazon 웹 업로드(200MB)를 쓰세요. 압축을 푼 크기가 512MB를 넘는 책은 변환할 수 없습니다.</p>
+                                    </div>
+                                    <div class="library-form-group">
+                                        <label for="my-setting-epaper-feed-device" style="font-weight: 700; color: var(--app-text-primary); font-size: 0.9rem; margin-bottom: 0.4rem; display: block;">
+                                            <span data-i18n="settings.epaper_feed_device_label">피드 기기</span>
+                                        </label>
+                                        <select id="my-setting-epaper-feed-device" name="EPAPER_FEED_DEVICE" style="width: 100%; max-width: 480px; background: rgba(var(--app-panel-rgb), 0.6); border: 1px solid rgba(var(--app-panel-border-rgb), 0.1); color: var(--app-text-primary); padding: 0.6rem 0.8rem; border-radius: 6px; outline: none;"></select>
+                                        <p id="my-setting-epaper-feed-missing" hidden style="font-size: 0.78rem; color: #f87171; margin: 0.4rem 0 0 0;" data-i18n="settings.epaper_device_missing">설정한 기기를 찾을 수 없습니다. 기기를 다시 골라 주세요(지금은 "없음"으로 동작합니다).</p>
+                                        <p style="font-size: 0.78rem; color: var(--app-text-muted); margin: 0.4rem 0 0 0;" data-i18n="settings.epaper_feed_device_desc">이 계정으로 e-paper 피드(/opds-epaper/v1)에 접속하는 기기입니다. 피드 목록·표지·업로드 변환이 이 기기에 맞춰집니다. 피드 기기를 두 대 이상 쓰면 기기마다 전용 계정을 만들어 각각 설정하세요. KOReader를 쓰는 Kindle이나 목록에 없는 기기는 "기타 기기"를 고르세요(화면 짧은 변 758px 기준).</p>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div style="margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 1rem; display: flex; justify-content: flex-end;">
                                 <button type="submit" class="btn-submit" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.7rem 1.8rem; font-size: 0.95rem; font-weight: 700; border-radius: 6px; background: linear-gradient(135deg, var(--app-accent) 0%, color-mix(in srgb, var(--app-accent) 70%, black) 100%); color: var(--app-accent-contrast); border: none; cursor: pointer;">
                                     <i class="lc lc-save"></i> <span data-i18n="settings.btn_save_config">설정 저장</span>
