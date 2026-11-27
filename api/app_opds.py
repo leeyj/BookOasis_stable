@@ -190,6 +190,19 @@ def _redirect_cover_compat(filename: str):
     return redirect(target_path, code=307)
 
 
+def _content_refused(db_type, book_id, current_user):
+    """Content rating check like the web viewer (category is applied by the viewer service query).
+    Returns an error response or None."""
+    from api.opds_common.permissions import refusal
+    refused = refusal(db_type, book_id, current_user, need_download=False, check_category=False)
+    if not refused:
+        return None
+    print(f"[APP-OPDS] content refused book={db_type}/{book_id} user_id={current_user.get('id')} reason={refused[0]}")
+    if refused[0] == 'not_found':
+        return jsonify({'error': _t('api.err_book_not_found')}), 404
+    return jsonify({'error': _t('api.err_no_rating_access')}), 403
+
+
 def _require_app_opds_auth(db_type: str = None):
     is_adult_prefix = request.path.startswith('/app-opds-adult/')
     if not _check_auth_cached(is_adult=is_adult_prefix):
@@ -286,6 +299,9 @@ def app_opds_stream_compat():
     except (ValueError, TypeError):
         return jsonify({'error': _t('api.err_book_id_required')}), 400
 
+    refused = _content_refused(db_type, book_id, current_user)
+    if refused:
+        return refused
     result = viewer_get_stream_page(db_type, book_id, page_idx, user_id=user_id, role=role)
     if result['status'] == 'book_not_found':
         return jsonify({'error': _t('api.err_book_not_found')}), 404
@@ -293,7 +309,7 @@ def app_opds_stream_compat():
         return jsonify({'error': _t('api.err_extract_page')}), 400
 
     res = Response(result['img_data'], mimetype=result['mime_type'])
-    res.headers['Cache-Control'] = 'public, max-age=31536000'
+    res.headers['Cache-Control'] = 'private, max-age=31536000'  # login-only page images: never in shared caches
     return res
 
 
@@ -313,6 +329,9 @@ def app_opds_txt_compat():
     if not book_id:
         return jsonify({'error': _t('api.err_book_id_required')}), 400
 
+    refused = _content_refused(db_type, book_id, current_user)
+    if refused:
+        return refused
     result = viewer_get_txt_content(db_type, book_id, user_id=user_id, role=role)
     if result['status'] == 'book_not_found':
         return jsonify({'error': _t('api.err_book_not_found')}), 404
@@ -339,6 +358,9 @@ def app_opds_pdf_compat():
     if not book_id:
         return jsonify({'error': _t('api.err_book_id_required')}), 400
 
+    refused = _content_refused(db_type, book_id, current_user)
+    if refused:
+        return refused
     source = viewer_get_pdf_source(db_type, book_id, user_id=user_id, role=role)
     if source['status'] == 'book_not_found':
         return jsonify({'error': _t('api.err_book_not_found')}), 404

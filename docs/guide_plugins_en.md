@@ -1074,6 +1074,10 @@ Gateway methods:
 - `transaction()`
 - `get_setting(key, default=None)` / `set_setting(key, value)`
 
+`db_type` must be one of `general`, `adult`, `audiobook`, `video` (empty or `None` means `general`). Since BookOasis 3.2.2 any other value (including a different case or a typo) raises `database.InvalidDbTypeError` (a `ValueError` subclass) when you query. SQLite used to treat unknown values as the general DB silently; MariaDB always failed. Passing on the `db_type` the core gives your hook is unaffected.
+
+> **Error messages (3.2.2+)**: when a core plugin route (search, apply, widgets, context menus, etc.) catches an exception from a plugin, only a `ValueError`'s message is shown as is; other exceptions become a generic message ("The server could not process the request…"). The original stays in the server log on an `[API-ERROR]` line. Raise `ValueError("...")` or return `{'success': False, 'error': '...'}` for text meant for users.
+
 Example:
 
 ```python

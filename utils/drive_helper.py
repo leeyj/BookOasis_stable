@@ -482,11 +482,13 @@ def refresh_gdrive_meta_mirror(remote_name, folder_id, mirror_root, g_files):
     return len(changed) - failed, failed, 'per-file copyid'
 
 
-def fetch_gdrive_folder_files_via_rclone(remote_name, folder_id_or_url):
+def fetch_gdrive_folder_files_via_rclone(remote_name, folder_id_or_url, extensions=None):
     """카테고리에 연결된 로그인 리모트로 공유 폴더 전체를 한 번에 나열해, fetch_gdrive_folder_files()와
     같은 항목 형태({id, name, size, modifiedTime, rel_folder})로 돌려준다. 이미지 파일도 포함하며(이미지
     폴더 책), 각 항목의 folder_id에 그 파일이 든 폴더의 Drive ID를 넣는다. 실패하면 예외를 그대로 올린다
-    (부분 목록으로 삭제 동기화가 돌면 안 되므로 호출자가 순회 오류로 처리)."""
+    (부분 목록으로 삭제 동기화가 돌면 안 되므로 호출자가 순회 오류로 처리).
+    extensions: 남길 확장자(기본은 도서용 SUPPORTED_EXTENSIONS + 이미지, 영상 스캐너는 영상·메타·이미지)."""
+    keep_extensions = tuple(extensions) if extensions else SUPPORTED_EXTENSIONS + GDRIVE_IMAGE_EXTENSIONS
     folder_id = extract_gdrive_folder_id(folder_id_or_url)
     if not folder_id:
         raise ValueError(f'Could not extract a valid folder ID: {folder_id_or_url}')
@@ -504,7 +506,7 @@ def fetch_gdrive_folder_files_via_rclone(remote_name, folder_id_or_url):
             continue
         path = e.get('Path') or ''
         name = e.get('Name') or os.path.basename(path)
-        if not name.lower().endswith(SUPPORTED_EXTENSIONS + GDRIVE_IMAGE_EXTENSIONS):
+        if not name.lower().endswith(keep_extensions):
             continue
         prev = by_path.get(path)
         if prev and (prev.get('ModTime') or '') >= (e.get('ModTime') or ''):

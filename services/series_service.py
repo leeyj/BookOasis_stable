@@ -68,6 +68,13 @@ def _normalize_library_id(library_id):
     return library_id
 
 
+def _folder_name_only(path):
+    """Last folder name of a server path. The list API used to send the absolute path (e.g. /home/<account>/...),
+    while the UI (static/js/ui.js) only ever reads the last segment for a single-volume title."""
+    parts = [p for p in str(path or '').replace('\\', '/').split('/') if p]
+    return parts[-1] if parts else ''
+
+
 def _build_series_entries(db_type, rows, search_query=''):
     from services.content_rating_service import ContentRatingService
     from repositories.series_search_query import parse_series_search_query
@@ -178,7 +185,7 @@ def _build_series_entries(db_type, rows, search_query=''):
             'content_rating_level': ContentRatingService.compute_effective_level(books_lv, genre, tags, adult_keywords) if db_type in ('general', 'adult') else 0,
             'publication_status': publication_status,
             'publication_status_label': {'0': '연재', '1': '휴재', '2': '완결'}.get(publication_status, '알 수 없음'),
-            'anchor_dir': comp_dir,
+            'anchor_dir': _folder_name_only(comp_dir),
         }
         if match_info:
             entry['match_info'] = match_info

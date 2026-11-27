@@ -9,8 +9,9 @@ gdrive_view_copy_service.py – gdrive 공유 카테고리 책을 "열 때" 그 
 공유 폴더에서 Google 403으로 차단되는 바로 그 경로였다. 지금은 Drive에 아무것도 쓰지 않고
 마운트도 거치지 않는다 (20MB 회차 1개 약 5초, 다음 권은 뷰어가 미리 받아둔다).
 
-파일 하나가 처음 열릴 때만 다운로드가 발생하고, 그 사이 같은 책에 대한 동시 요청은 전부
-같은 락에서 대기했다가 결과를 그대로 재사용한다 (책 1권당 다운로드 최대 1번).
+파일 하나가 처음 열릴 때만 다운로드가 발생하고, 그 사이 같은 책에 대한 동시 요청은
+같은 락에서 대기했다가 결과를 그대로 재사용한다 (책 1권당 다운로드 최대 1번). 단 대기는
+다운로드 시작 후 VIEW_COPY_LOCK_WAIT_SECONDS까지만 — 넘으면 그 요청은 원본 스트리밍으로 간다.
 """
 import os
 import shutil
@@ -27,7 +28,14 @@ VIEW_COPY_TTL_HOURS = 24
 # 뷰캐시 전체 상한(GB). TTL 정리 후에도 넘으면 오래된 파일부터 지운다 (웹툰 1화 ~20MB).
 VIEW_CACHE_MAX_BYTES = int(float(os.getenv('GDRIVE_VIEW_CACHE_MAX_GB', '5') or '5') * 1024 ** 3)
 
+# 같은 책을 받는 중일 때 다른 요청이 기다리는 최대 시간(초, 그 다운로드 시작 시각 기준).
+# 넘으면 기다리지 않고 원본 스트리밍으로 넘어간다. 다운로드 하나가 멈추면(2026-11-25 .20: rclone
+# copyid 300초 정체) 그 책의 페이지 요청이 전부 락에서 기다려 gunicorn 스레드가 바닥나고 서버
+# 전체가 멈췄다. 기준을 요청별이 아니라 다운로드 시작 시각으로 잡아, 마감 뒤 요청은 즉시 넘어간다.
+VIEW_COPY_LOCK_WAIT_SECONDS = 20
+
 _book_copy_locks = {}
+_book_copy_started = {}  # (db_type, book_id) -> 락을 잡은 쪽이 다운로드를 시작한 시각
 _book_copy_locks_mutex = threading.Lock()
 
 
@@ -37,6 +45,26 @@ def _get_book_copy_lock(db_type, book_id):
         if key not in _book_copy_locks:
             _book_copy_locks[key] = threading.Lock()
         return _book_copy_locks[key]
+
+
+def _acquire_book_copy_lock(lock, key):
+    """다운로드 중인 책이면 그 다운로드 시작 후 VIEW_COPY_LOCK_WAIT_SECONDS까지만 기다린다."""
+    with _book_copy_locks_mutex:
+        started = _book_copy_started.get(key)
+    wait = VIEW_COPY_LOCK_WAIT_SECONDS
+    if started is not None:
+        wait -= time.time() - started
+    if wait <= 0:
+        return lock.acquire(blocking=False)
+    return lock.acquire(timeout=wait)
+
+
+def _mark_download_started(key, started):
+    with _book_copy_locks_mutex:
+        if started is None:
+            _book_copy_started.pop(key, None)
+        else:
+            _book_copy_started[key] = started
 
 
 def view_cache_root(db_type=None, library_id=None):
@@ -103,8 +131,15 @@ def resolve_viewable_path(db_type, book_id, file_path, library):
         _fill_cover_from_local_copy(db_type, book_id, file_path, resolved, library.get('id'))
         return resolved
 
+    key = (db_type, book_id)
     lock = _get_book_copy_lock(db_type, book_id)
-    with lock:
+    if not _acquire_book_copy_lock(lock, key):
+        # 다른 요청이 이 책을 받는 중인데 오래 걸린다 — 스레드를 붙잡지 않고 이번 요청만 원본으로.
+        # 받는 쪽은 계속 진행하고, 성공하면 다음 요청부터 로컬 사본을 쓴다.
+        print(f"[GdriveViewCopy] Download still running; streaming the original for this request (book_id={book_id})")
+        beta_log('view.lock_wait_timeout', db=db_type, lib=library.get('id'), book=book_id)
+        return file_path
+    try:
         # 락 대기 중 다른 요청이 먼저 끝냈을 수 있으므로 재확인
         resolved = _resolve_existing(GdriveBookCopyRepository.get_by_book_id(db_type, book_id))
         if resolved:
@@ -118,6 +153,7 @@ def resolve_viewable_path(db_type, book_id, file_path, library):
         # 이미지 폴더 책은 source_file_id가 폴더 ID이고, 그 폴더 이미지를 <폴더ID>/ 아래로 통째 받는다.
         kind = 'imgdir' if _is_imgdir(base_path) else (os.path.splitext(base_path)[1].lower().lstrip('.') or 'file')
         t0 = time.time()
+        _mark_download_started(key, t0)
         try:
             if _is_imgdir(base_path):
                 from utils.drive_helper import GDRIVE_IMAGE_EXTENSIONS
@@ -144,6 +180,9 @@ def resolve_viewable_path(db_type, book_id, file_path, library):
                  took=time.time() - t0)
         _fill_cover_from_local_copy(db_type, book_id, file_path, local_path, library.get('id'))
         return local_path
+    finally:
+        _mark_download_started(key, None)
+        lock.release()
 
 
 def _fill_cover_from_local_copy(db_type, book_id, file_path, local_path, library_id):

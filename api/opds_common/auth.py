@@ -18,10 +18,17 @@ def authenticate_basic_auth_user(username: str, password: str, require_admin: bo
     if not username or not password:
         return None
 
+    from flask import has_request_context
+    from utils import auth_throttle
+    in_request = has_request_context()
+    if in_request:
+        auth_throttle.abort_if_blocked('basic')  # 429 before the password is even checked
+
     user = get_basic_auth_user(username)
-    if not user:
-        return None
-    if not check_password_hash(user['password_hash'], password):
+    ok = bool(user) and check_password_hash(user['password_hash'], password)
+    if in_request:
+        auth_throttle.note_result(ok, 'basic')
+    if not ok:
         return None
     if require_admin and user['role'] != 'admin':
         return None

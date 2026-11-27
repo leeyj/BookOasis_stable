@@ -676,7 +676,23 @@ class MariaDBConnectionPool:
 
 _mariadb_pools = {'general': None, 'adult': None, 'audiobook': None, 'video': None}
 
+# The only databases this app has. db_type often comes straight from a query string, so anything else is
+# refused here: MariaDB would otherwise open a new pool per value and try to connect to media_<value>,
+# and the DB error (user@host, database name) used to reach the HTTP response.
+VALID_DB_TYPES = ('general', 'adult', 'audiobook', 'video')
+
+
+class InvalidDbTypeError(ValueError):
+    pass
+
+
+def _check_db_type(db_type):
+    if db_type not in VALID_DB_TYPES:
+        raise InvalidDbTypeError(f"unknown db_type: {str(db_type)[:40]!r}")
+
+
 def get_mariadb_connection(db_type='general'):
+    _check_db_type(db_type)
     pool_size = _get_pool_size_raw()
     global _mariadb_pools
     with _pools_lock:
@@ -690,6 +706,7 @@ def get_mariadb_connection(db_type='general'):
 
 def get_connection(db_type='general', wait_timeout=30.0):
     """데이터베이스 연결 반환 (SQLite 커넥션 풀 또는 MariaDB 커넥션 풀 지원)"""
+    _check_db_type(db_type)
     if _is_mariadb_engine():
         return get_mariadb_connection(db_type)
 

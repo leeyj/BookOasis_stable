@@ -1,4 +1,25 @@
 # CHANGELOG
+## v3.2.2
+- (perf) PDF 페이지 모드: 다음 쪽을 미리 그려 두고 방금 본 쪽을 남겨 두어, 넘길 때 기다림이 약 50~300ms에서 거의 없어짐 | PDF page mode: the next page is pre-rendered and the previous one kept, so turning no longer waits (was ~50–300 ms)
+- (fix) PDF 스크롤 모드: 넘길 때마다 전체를 다시 그려 쪽이 안 넘어가거나 앞쪽으로 돌아가던 문제(Safari는 아예 안 넘어감), 이어 볼 쪽이 화면 밖에 열리던 문제(Safari), 폭을 바꾸면 다른 쪽으로 가던 문제 | PDF scroll mode: turning redrew everything so pages often didn't advance or jumped back (never advanced on Safari), resume opened off-screen (Safari), and changing the width moved to another page
+- (fix) 영상 강좌 포스터: 폴더의 `poster.jpg` 등을 먼저 쓰고, 다음 `show.yaml` 포스터, `metadata.json` `cover_url` 순 (기존 강좌는 강제 재스캔 때 반영) | Video course posters: folder `poster.jpg` etc. first, then the `show.yaml` poster, then `metadata.json` `cover_url` (existing courses update on a forced rescan)
+- (fix) 영상 `show.yaml`의 포스터가 목록이거나 파일 이름일 때 표시되지 않던 문제 | Video `show.yaml` posters given as a list or a file name were not shown
+- (fix) 영상 회차 제목에 `S01E01 - ` 접두어가 남던 문제, `show.yaml`이 없으면 `metadata.json` 회차 제목 사용 | `S01E01 - ` prefix left in video episode titles; `metadata.json` clip titles are used when there is no `show.yaml`
+- (fix) 구글 드라이브 링크 책을 받는 중 다운로드가 멈추면 서버 전체가 응답하지 않던 문제: 같은 책 요청은 20초까지만 기다리고 원본으로 읽음 | Server stopped responding when a Google Drive link book's download stalled: requests for that book now wait at most 20 s, then read the original
+- (fix) 카테고리를 삭제해도 표지 파일이 남던 문제: 오디오북·영상은 포스터 폴더째, 도서는 다른 데서 쓰지 않는 표지만 지움 | Deleting a category left its cover files behind: audiobook/video poster folders are removed, and for books only covers nothing else uses
+- (security) 오디오북·영상 포스터 URL(`metadata.json`·`show.yaml`)을 받을 때 내부망 주소 차단, 리다이렉트마다 재검사, 10MB 제한 | Audiobook/video poster URLs (`metadata.json`, `show.yaml`): internal addresses blocked, every redirect re-checked, 10 MB cap
+- (security) e-paper 피드 받기에 웹과 같은 다운로드 권한·열람 등급 검사(없으면 `403`, 목록은 그대로) | e-paper feed downloads now check download permission and content rating like the web (`403` otherwise; lists unchanged)
+- (security) OPDS·e-paper 피드·KOReader 동기화 인증을 같은 IP에서 5분 안에 10번 틀리면 5분간 `429` | OPDS, e-paper feed and KOReader sync: 10 failed logins from one IP within 5 minutes get `429` for 5 minutes
+- (security) `/opds` 받기가 카테고리 권한 없이 책 번호만으로 받아지던 문제: 웹과 같은 카테고리·다운로드 권한·열람 등급 검사, 받기 토큰은 발급받은 사용자의 권한으로 검사(OPDS-PSE 포함) | `/opds` downloads worked by book number regardless of category permission: now the same category, download and content-rating checks as the web, and download tokens use the issuing user's permissions (OPDS-PSE too)
+- (security) 타치요미/미혼(`/app-opds`) 페이지·TXT·PDF 보기에 웹과 같은 열람 등급 검사 | Tachiyomi/Mihon (`/app-opds`) page, TXT and PDF views now check content rating like the web
+- (security) 웹·`/app-opds` 만화 페이지 이미지를 공유 캐시(CDN·프록시)에 남기지 않음(`Cache-Control: private`) | Web and `/app-opds` comic page images are no longer stored in shared caches (CDN/proxy) (`Cache-Control: private`)
+- (security) 휴지통 목록·복구·영구 삭제를 관리자가 아닌 로그인 사용자도 할 수 있던 문제 | Non-admin logged-in users could list, restore and permanently delete trashed books
+- (security) API 오류 응답에 DB 계정·DB 이름 같은 서버 정보가 나가던 문제: 원문은 서버 로그에만 남기고, 잘못된 라이브러리 종류(`type`/`db_type`)는 `400` | API error responses leaked server details such as the DB user and database name: details now go to the server log only, and an invalid library type (`type`/`db_type`) gets `400`
+- (security) 도서 목록 응답에 서버의 폴더 절대 경로가 들어가던 문제: 폴더 이름만 보냄 | Book list responses included the server's absolute folder path: only the folder name is sent now
+- (security) 권한 화면의 사용자·카테고리 이름 이스케이프 | Escape user and category names in the permissions screen
+- (docs) 플러그인 가이드: `db_type`은 4종만 허용(그 밖의 값은 오류), 사용자에게 보이는 오류 문구는 `ValueError`로 | Plugin guide: only the 4 `db_type` values are accepted (others raise), use `ValueError` for user-facing error text
+- (change) 새 성인 도서 카테고리 번호를 9000부터 매김(일반 도서와 표지 폴더가 겹치지 않게, 기존 번호는 그대로) | New adult categories are numbered from 9000 so their cover folders don't overlap with general ones; existing numbers are kept
+
 ## v3.2.1
 - (feat) e-paper 여러 기기 지원: 변환 프로필 6개(`v1`, `x4`, `x3`, `gray-low`, `gray-hd`, `color-hd`), 고해상도 등급은 그림을 회색·컬러 JPEG로 | e-paper multi-device: 6 conversion profiles (`v1`, `x4`, `x3`, `gray-low`, `gray-hd`, `color-hd`); high-res grades use gray/color JPEG images
 - (feat) 내 설정에 "웹 받기 기기"·"피드 기기" 선택. 피드·표지·업로드는 피드 기기를 따르고, 설정하지 않으면 지금과 같은 `v1` | "Web download device" and "Feed device" in My settings; the feed, covers and uploads follow the feed device, unchanged `v1` when not set
@@ -9,7 +30,7 @@
 - (change) 펌웨어 기기 EPUB·TXT 변환에서 줄을 뒤집는 RLM류와 한자 이체자 선택자(IVS)를 지움 | Firmware-device EPUB and TXT conversion removes line-flipping RLM-type marks and CJK variation selectors (IVS)
 - (change) TXT 변환은 기기와 상관없이 늘 `v1` 한 벌 | TXT conversion is always the single `v1` copy, whatever the device
 - (change) MCP `epaper_cache_status`: `profile`·`books` 대신 `default_profile`, 프로필별 `profiles`, `epub_files`·`cover_files` | MCP `epaper_cache_status`: `default_profile`, per-profile `profiles`, `epub_files`/`cover_files` replace `profile`/`books`
-- (docs) 기기 추가 기여 가이드 `docs/epaper-devices.md`, 명세 `docs/device-api.md` 갱신 | contributor guide for devices `docs/epaper-devices.md`, updated spec `docs/device-api.md`
+- (docs) 기기 추가 기여 가이드 `docs/epaper-devices.md`, 명세 `docs/device-api.md`·OPDS 가이드(e-paper 피드, 기기 설정) 갱신 | contributor guide for devices `docs/epaper-devices.md`, updated spec `docs/device-api.md` and OPDS guide (e-paper feed, device settings)
 
 ## v3.2.0
 - (feat) e-paper 리더 전용 OPDS 피드 `/opds-epaper/v1` — EPUB/TXT만, 40개씩 페이지 나눔, 받으면 기기에 맞춘 변환본(그림 2색 디더링, CSS·폰트 정리, TXT는 EPUB으로)을 보냄. 표준 `/opds`는 그대로 원본 | e-paper reader OPDS feed `/opds-epaper/v1` — EPUB/TXT only, 40 per page, downloads are device-optimized copies (2-color dithered images, trimmed CSS/fonts, TXT as EPUB); the standard `/opds` still serves originals

@@ -18,10 +18,12 @@ When attempting to connect, Basic Authentication using the **ID and password use
 ### 🌐 General OPDS Catalog Address
 > `http://<SERVER_IP_OR_DOMAIN>:5930/opds`
 * **Access Permission**: Accessible with any general user account registered in BookOasis.
+* **Download and page-view permission** (since 3.2.2): same as the web. Books outside the account's category permission cannot be downloaded (404); accounts without download permission, or books rated above the account's content rating, are refused (403). Comic page viewing (OPDS-PSE) checks category and rating only.
 * **Provided Categories**:
   * Browse series by library
   * Recently Added books
   * Recently Read books
+  * Favorites
   * Integrated search features (supports title, series, author search)
 
 ### 🔞 Adult OPDS Catalog Address
@@ -111,3 +113,30 @@ For comics (ZIP/CBZ/image folders) you can choose **Stream** (view page by page 
 | EPUB, TXT | Between KOReader devices only (the web viewer uses a different position format, so it is never overwritten) |
 
 * Only **books downloaded over OPDS** are synced (the server cannot recognize files copied to the device some other way).
+* The **original (`/opds`) and the e-paper converted copy (section 6)** of the same EPUB count as the same book. For example, you can pick up on an e-paper device's converted copy where you left off in the original on iPad KOReader (both devices must use the same account).
+
+## 6. e-paper reader feed (`/opds-epaper/v1`, since 3.2.0)
+
+A feed for small, low-powered e-paper devices. Downloads are **cleaned-up EPUBs (converted copies)** fitted to the device. The standard `/opds` still sends the original files.
+
+* **Address**: `http://<server>:5930/opds-epaper/v1` (Basic auth, BookOasis account)
+* **Books shown**: EPUB and TXT in general libraries only. Comics, PDF and the adult library are not listed. Lists are split into pages of 40.
+* **Download permission** (since 3.2.2): same as web downloads. Accounts without download permission, or books rated above the account's content rating, cannot be downloaded (they still appear in the list).
+* **What conversion does**: images are shrunk to the device screen (2-color dithered PNG or gray/color JPEG depending on the device), embedded fonts and complex CSS are cleaned up, and TXT becomes an EPUB split into chapters. Conversion happens on the first download, so a large book may take a moment. Converted copies are cached on the server.
+
+### Choosing a device (since 3.2.1)
+Conversion follows the device chosen per account, in the web app under **Settings → My settings → e-paper reader**.
+
+| Setting | Used by |
+| :--- | :--- |
+| **Feed device** | The device that connects to `/opds-epaper/v1` with this account. The feed list, covers and conversion follow it. If not set, reTerminal (`v1`) is used. |
+| **Web download device** | **"Download for device"** in the web book menu (right-click / long-press). Use it to get a converted copy for USB or Send to Kindle. If not set, the menu item is hidden. |
+
+* The list includes Seeed reTerminal, Xteink X4/X3, several Kobo models and Kindle (Send to Kindle, web download only). For devices not listed (Crema, RIDIPAPER, Boox, etc.) or a Kindle running KOReader, pick an **"Other device"** entry by the screen's short side (758px).
+* If you use more than one feed device, create **a separate account per device** and set each one. With a device-only account, sign in to the web app with that account to choose its feed device.
+* The web download button always sends the original. TXT conversion is the same for every device.
+
+### Characters on BookOasis firmware devices
+The BookOasis firmware for reTerminal and Xteink draws text with fonts stored on the device. Characters missing from that font (rare hanja, simplified Chinese, emoji, etc.) appear as □. "Download for device" tells you how many characters will appear as □ and how many it would be with another device font.
+
+The device developer spec (feed structure, conversion rules, upload API) is in [`device-api.md`](device-api.md) (Korean), and how to add a device is in [`epaper-devices.md`](epaper-devices.md) (Korean).

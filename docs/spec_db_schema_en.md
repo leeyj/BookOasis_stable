@@ -72,7 +72,7 @@ List of category type values (manga / book / magazine, ...). One table per sessi
 
 Library roots and scan/runtime options.
 
-- PK: `id`
+- PK: `id`. The general and adult DBs number ids separately but share the cover folder `covers/<id>/`, so new adult categories are numbered from 9000 (`_ensure_adult_library_id_floor` at startup; existing ids are kept)
 - Main FK: `group_id -> library_groups.id`
 - Columns: `name`, `physical_path`, `cron_schedule`, `schedule_enabled`, `last_scanned_at`, `scan_status`, `is_remote`, `vfs_refresh_before_scan`, `rclone_rc_url`, `icon`, `color`, `hide_cover`, `hide_title`, `cover_aspect_ratio`, `content_kind`, `group_id`, `sort_order`, `gdrive_copy_remote`, `gdrive_view_local_mirror_path`, `pending_delete`, `transfer_target_id`
 - `schedule_enabled`: turns the scheduled scan on/off. `cron_schedule` is kept when off

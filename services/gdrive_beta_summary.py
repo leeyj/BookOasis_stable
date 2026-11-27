@@ -166,6 +166,8 @@ def summarize(hours=24, library_id=None, logs_dir=LOGS_DIR, include_live=True):
             'recent_failures': [_short(r, 'lib', 'book', 'kind', 'took', 'err') for r in failures][-5:],
             'prefetch': {'ok': sum(1 for r in prefetch if r.get('ok') == 'True'),
                          'failed': sum(1 for r in prefetch if r.get('ok') != 'True')},
+            # 다른 요청이 받는 중이라 기다리다 마감을 넘겨 원본으로 간 요청 수 (다운로드 정체 신호)
+            'lock_wait_timeouts': len(by_event.get('view.lock_wait_timeout', [])),
             'covers_made_on_open': len(by_event.get('view.cover_on_open', [])),
             'cover_on_open_failed': len(by_event.get('view.cover_on_open_failed', [])),
         },

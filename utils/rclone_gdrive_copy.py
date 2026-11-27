@@ -141,6 +141,58 @@ def list_writable_drive_remotes():
     return remotes
 
 
+LINK_CATEGORY_SCOPES = ('drive', 'drive.readonly')
+
+
+def list_link_category_remotes():
+    """구글 링크 카테고리에 연결할 수 있는 리모트. 링크 카테고리는 목록·메타·포스터·열람 모두 읽기만 하므로
+    (서버 로컬로 받기, 2026-10-22~) 읽기 전용 스코프(drive.readonly)도 허용한다. 공유받은 커뮤니티 계정을
+    최소 권한으로 연결할 수 있게 하기 위함(2026-11-25). 쓰기가 필요한 "Drive에서 복사해오기"는
+    list_writable_drive_remotes()를 그대로 쓴다.
+    root_folder_id를 무시하는 백엔드(wiserain 모드의 gds_* 설정)는 링크 폴더 대신 자기 루트 전체를 보여 주므로
+    사유와 함께 사용 불가로 표시한다. 민감정보는 반환하지 않는다."""
+    dump = _rclone_config_dump()
+    if not dump:
+        return []
+
+    remotes = []
+    for name, cfg in dump.items():
+        if not isinstance(cfg, dict) or cfg.get('type') != 'drive' or not cfg.get('token'):
+            continue
+        scopes = {s.strip() for s in (cfg.get('scope') or '').split(',') if s.strip()}
+        if scopes and not scopes & set(LINK_CATEGORY_SCOPES):
+            continue  # drive.file 등: 공유받은 폴더를 읽지 못한다
+        reason = None
+        if any(str(k).startswith('gds_') for k in cfg):
+            reason = '이 리모트는 폴더 링크 지정(root_folder_id)을 무시하고 자기 드라이브 전체를 보여 주므로 링크 카테고리에 쓸 수 없습니다.'
+        elif not (cfg.get('client_id') and cfg.get('client_secret')):
+            reason = '커스텀 client_id/client_secret이 설정되지 않아(rclone 기본 앱 사용) 지원 대상에서 제외됩니다.'
+        remotes.append({'name': name, 'usable': reason is None, 'reason': reason})
+    return remotes
+
+
+# root_folder_id 존중 여부를 확인할 때 쓰는, 형식만 맞고 존재하지 않는 폴더 ID.
+_PROBE_MISSING_FOLDER_ID = '1' + 'A' * 32
+
+
+def remote_ignores_root_folder_id(remote_name, timeout=60):
+    """없는 폴더 ID를 root_folder_id로 줘서 나열해 본다. 항목이 나오면 이 리모트는 root_folder_id를 무시하고
+    자기 루트를 보여 주는 것이다(그대로 쓰면 링크 폴더 대신 드라이브 전체가 스캔된다). 정상 리모트는
+    빈 목록이나 오류를 낸다. 확인 자체가 실패하면(rclone 없음·시간 초과) False로 보고 저장을 막지 않는다."""
+    try:
+        code, out, _ = _run_rclone(['lsjson', _shared_folder_source(remote_name, _PROBE_MISSING_FOLDER_ID),
+                                    '--max-depth', '1', '--no-mimetype'], timeout=timeout)
+    except ValueError as e:
+        print(f'[RcloneGdriveCopy] root_folder_id probe skipped for {remote_name!r}: {e}')
+        return False
+    if code != 0:
+        return False
+    try:
+        return bool(json.loads(out.decode('utf-8', 'replace') or '[]'))
+    except ValueError:
+        return False
+
+
 def _extract_credentials(remote_cfg):
     token_raw = remote_cfg.get('token')
     if not token_raw:

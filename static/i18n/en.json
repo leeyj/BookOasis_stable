@@ -1248,6 +1248,8 @@
     "go_back": "Back to List"
   },
   "api": {
+    "err_internal": "The server could not process the request. Details are in the server log.",
+    "err_invalid_db_type": "Invalid library type.",
     "user_not_found": "User not found.",
     "delete_last_admin_error": "The last admin account cannot be deleted.",
     "current_password_required": "Enter your current password.",

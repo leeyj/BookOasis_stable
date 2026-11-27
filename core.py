@@ -444,6 +444,17 @@ if not IS_WORKER:
             return jsonify({'success': False, 'error': 'Request payload too large'}), 413
         return 'Request payload too large', 413
 
+    from database import InvalidDbTypeError
+
+    @app.errorhandler(InvalidDbTypeError)
+    def handle_invalid_db_type(error):
+        # Routes that do not catch it would otherwise answer a generic 500 page for a bad ?type=/db_type=.
+        from utils.i18n import _t
+        print(f"[API-ERROR] {request.method} {request.path} -> 400: InvalidDbTypeError: {error}")
+        if request.path.startswith('/api/'):
+            return jsonify({'success': False, 'error': _t('api.err_invalid_db_type')}), 400
+        return 'Bad request', 400
+
     @app.route('/api/security/csp-report', methods=['POST'])
     def csp_report_receiver():
         """CSP 위반 리포트를 수집합니다. (Report-Only 단계 관측용)"""

@@ -1226,6 +1226,10 @@ class MyWidgetMetadataProvider(BaseMetadataProvider):
 - `transaction()`
 - `get_setting(key, default=None)` / `set_setting(key, value)`
 
+`db_type`은 `general`, `adult`, `audiobook`, `video` 넷 중 하나여야 합니다(빈 값·`None`은 `general`). BookOasis 3.2.2부터 그 밖의 값(대소문자 다름, 오타 포함)은 쿼리할 때 `database.InvalidDbTypeError`(`ValueError` 하위)가 납니다. 예전 SQLite는 모르는 값을 조용히 일반 DB로 처리했지만 MariaDB에서는 원래 실패했습니다. 코어가 훅에 넘기는 `db_type`을 그대로 쓰면 영향이 없습니다.
+
+> **오류 문구 (3.2.2+)**: 코어 플러그인 라우트(검색·적용·위젯·컨텍스트 메뉴 등)가 플러그인 예외를 받으면, `ValueError`의 문구만 화면에 그대로 보여 주고 나머지 예외는 일반 문구("서버에서 요청을 처리하지 못했습니다…")로 바꿉니다. 원문은 서버 로그의 `[API-ERROR]` 줄에 남습니다. 사용자에게 보여 줄 안내는 `ValueError("...")`로 던지거나 `{'success': False, 'error': '...'}`로 돌려주세요.
+
 예시:
 
 ```python

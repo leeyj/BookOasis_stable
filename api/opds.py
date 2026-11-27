@@ -475,7 +475,21 @@ def opds_pse_page(db_type: str, book_id: int, page: int):
         user_id = _download_token_user_id(db_type, book_id, request.args.get('token', ''))
         if user_id is None:
             return _unauthorized()
-        role = 'admin'  # 다운로드 토큰과 같은 규칙: 피드를 볼 수 있던 사용자에게만 발급된다
+        # The token only proves who it was issued to - check that user's current permissions.
+        from api.opds_common.permissions import load_user
+        token_user = load_user(user_id)
+        if not token_user:
+            return _unauthorized()
+        role = token_user.get('role')
+
+    # Page streaming is viewing, not downloading: category + rating like the web viewer, no download permission.
+    from api.opds_common.permissions import refusal
+    refused = refusal(db_type, book_id, {'id': user_id, 'role': role}, need_download=False, check_category=False)
+    if refused:
+        print(f"[OPDS] pse refused book={db_type}/{book_id} user_id={user_id} reason={refused[0]}")
+        if refused[0] == 'not_found':
+            return jsonify({'error': _t('api.err_book_not_found')}), 404
+        return jsonify({'error': _t('api.err_no_rating_access')}), 403
 
     from services.app_opds_viewer_service import get_stream_page
     result = get_stream_page(db_type, book_id, max(0, int(page)), user_id=user_id, role=role)
@@ -501,14 +515,26 @@ def opds_download_book(db_type: str, book_id: int):
     if not auth_user:
         # Basic Auth/세션 실패 시 → Signed URL 토큰으로 2차 검증
         # (Moon+ Reader가 다운로드 확인 후 재요청 시 인증 정보 없이 보내는 문제 해결)
-        dl_token = request.args.get('token', '')
-        if dl_token and _verify_download_token(db_type, book_id, dl_token):
-            print(f"[OPDS-Debug] 🔑 Token authenticated - db_type={db_type}, book_id={book_id}")
-            auth_user = {'id': 0, 'username': 'token_auth', 'role': 'admin'}
+        token_uid = _download_token_user_id(db_type, book_id, request.args.get('token', ''))
+        from api.opds_common.permissions import load_user
+        token_user = load_user(token_uid) if token_uid is not None else None
+        if token_user:
+            print(f"[OPDS-Debug] 🔑 Token authenticated - db_type={db_type}, book_id={book_id}, user_id={token_uid}")
+            auth_user = {'id': token_user['id'], 'username': token_user.get('username'), 'role': token_user.get('role')}
         else:
             print(f"[OPDS-Debug] ❌ Authentication failed (returning 401) - db_type={db_type}, book_id={book_id}")
             return _unauthorized()
 
+    # Same rules as the web download: category permission, download permission, content rating.
+    from api.opds_common.permissions import refusal
+    refused = refusal(db_type, book_id, auth_user, need_download=True, check_category=True)
+    if refused:
+        print(f"[OPDS] download refused book={db_type}/{book_id} user={auth_user.get('username')} reason={refused[0]}")
+        if refused[0] == 'not_found':
+            return jsonify({'error': _t('api.err_book_not_found')}), 404
+        if refused[0] == 'no_download_access':
+            return jsonify({'error': _t('api.err_no_download_access')}), 403
+        return jsonify({'error': _t('api.err_no_rating_access')}), 403
 
     try:
         from repositories.book_repository import BookRepository

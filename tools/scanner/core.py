@@ -187,9 +187,13 @@ def scan_library(db_path, library_id, physical_path, force=False, skip_vfs_refre
 
     if db_type == 'video':
         print(f"[Scanner-Video] 🎬 Triggering video dedicated scanner pipeline for library_id={library_id}...")
-        from services.video_scanner import scan_video_library
+        from services.video_scanner import scan_video_library, scan_video_library_gdrive
         for target_p in target_paths:
-            scan_video_library(target_p, library_id=library_id, force=force)
+            if is_gdrive_url(target_p):
+                # 구글 드라이브 공유 링크 줄(GDRIVE_LINK_BETA): 카테고리 리모트로 목록·메타·포스터만 받아 등록
+                scan_video_library_gdrive(target_p, library_id=library_id, force=force)
+            else:
+                scan_video_library(target_p, library_id=library_id, force=force)
         print(f"[Scanner-Video] 🎬 Video scan completed for library_id={library_id}")
         return
 

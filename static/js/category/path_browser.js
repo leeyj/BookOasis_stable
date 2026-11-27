@@ -59,7 +59,8 @@ export async function loadGdriveCopyRemotes(selectedRemote = '') {
   if (!selectEl) return;
 
   try {
-    const res = await fetch('/api/gdrive-copy/remotes');
+    // 링크 카테고리 연결 계정: 읽기만 하므로 읽기 전용 리모트도 나온다(서버가 쓸 수 없는 리모트는 usable=false로 거른다)
+    const res = await fetch('/api/gdrive-copy/remotes?purpose=link');
     const data = await res.json();
     const remotes = (data && data.success && Array.isArray(data.remotes)) ? data.remotes.filter(r => r.usable) : [];
 

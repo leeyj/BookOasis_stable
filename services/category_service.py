@@ -17,6 +17,48 @@ def _remove_tts_audio_dirs(db_type, rel_dirs):
         print(f"[CategoryService ERROR] TTS audio folder cleanup failed ({db_type}): {e}")
 
 
+# Book DBs whose covers share covers/<library_id>/ (ids are numbered per DB, so the same id can exist in both).
+BOOK_COVER_DB_TYPES = ('general', 'adult')
+
+
+def _remove_unused_book_covers(db_type, library_id, started_at):
+    """After a book category is deleted, remove the files in covers/<library_id>/ that no row still uses.
+    The folder is not removed wholesale: the other book DB may have a category with the same id, and moved
+    categories keep their old paths. Files newer than started_at are kept (a scan may be writing them now).
+    If either DB can't be checked, nothing is removed. Returns (removed, kept)."""
+    import os
+    if db_type not in BOOK_COVER_DB_TYPES:
+        return 0, 0
+    from services.cover_storage_service import get_covers_dir
+    folder = os.path.join(get_covers_dir(), str(int(library_id)))
+    if not os.path.isdir(folder):
+        return 0, 0
+    prefix = f'{int(library_id)}/'
+    in_use = set()
+    for other in BOOK_COVER_DB_TYPES:
+        in_use |= {p[len(prefix):] for p in CategoryRepository.get_cover_paths_with_prefix(other, prefix)}
+    removed = kept = 0
+    for entry in os.scandir(folder):
+        if not entry.is_file(follow_symlinks=False):
+            kept += 1
+            continue
+        if entry.name in in_use or entry.stat(follow_symlinks=False).st_mtime >= started_at:
+            kept += 1
+            continue
+        try:
+            os.remove(entry.path)
+            removed += 1
+        except OSError as e:
+            kept += 1
+            print(f"[CategoryService] cover file cleanup failed ({entry.path}): {e}")
+    if not kept:
+        try:
+            os.rmdir(folder)
+        except OSError:
+            pass
+    return removed, kept
+
+
 def apply_running_scan_status(libraries, db_type, queue_status):
     """큐에서 실행 중인 스캔을 라이브러리 상태 목록에 우선 반영한다."""
     running = (queue_status or {}).get('running')
@@ -316,6 +358,23 @@ class CategoryService:
         return value if value in COVER_ASPECT_RATIOS else '4:3'
 
     @staticmethod
+    def _validate_link_remote(remote_name):
+        """링크 카테고리 연결 계정 검증(화면 목록과 같은 기준을 서버에서도 적용 - API로 이름을 직접 넣는 경우 대비).
+        읽기 전용 리모트도 허용하지만, root_folder_id를 무시하는 리모트는 링크 폴더 대신 드라이브 전체를 스캔하게
+        되므로 막는다. rclone 설정을 읽지 못하면(바이너리 없음 등) 검증을 건너뛴다 - 스캔 때 목록 실패로 드러난다."""
+        from utils.rclone_gdrive_copy import list_link_category_remotes, remote_ignores_root_folder_id
+        remotes = {r['name']: r for r in list_link_category_remotes()}
+        if not remotes:
+            return
+        info = remotes.get(remote_name)
+        if not info:
+            raise ValueError(f"연결할 리모트 '{remote_name}'를 찾을 수 없거나 구글 드라이브 읽기 권한(drive, drive.readonly)이 없습니다.")
+        if not info.get('usable'):
+            raise ValueError(f"리모트 '{remote_name}'는 링크 카테고리에 쓸 수 없습니다: {info.get('reason')}")
+        if remote_ignores_root_folder_id(remote_name):
+            raise ValueError(f"리모트 '{remote_name}'는 폴더 링크 지정(root_folder_id)을 무시하고 드라이브 전체를 보여 주므로 링크 카테고리에 쓸 수 없습니다.")
+
+    @staticmethod
     def _validate_gdrive_requirements(physical_path, gdrive_copy_remote, gdrive_view_local_mirror_path):
         """공유 링크가 포함된 카테고리는 책을 열 때마다 그 1권만 개인 드라이브로
         복사해 보여주는 뷰어 전용 용도로만 쓰인다 — 폴더 전체를 미리 복사해두는
@@ -332,6 +391,7 @@ class CategoryService:
             raise ValueError('구글 드라이브 공유 링크 카테고리는 클로즈 베타 기능입니다. 서버 .env에 GDRIVE_LINK_BETA=true를 설정해야 사용할 수 있습니다.')
         if not gdrive_copy_remote:
             raise ValueError('구글 드라이브 공유 링크가 포함된 카테고리는 연결할 리모트를 반드시 선택해야 합니다. 개인 rclone Drive 리모트 없이는 사용할 수 없습니다.')
+        CategoryService._validate_link_remote(gdrive_copy_remote)
         # 로컬 마운트 루트는 더 이상 필수가 아니다 — 뷰어 사본은 리모트로 서버 로컬 캐시에 직접 받는다
         # (gdrive_view_copy_service.py). 입력된 값은 그대로 저장만 한다.
 
@@ -471,6 +531,7 @@ class CategoryService:
             raise ValueError(f"카테고리 {library_id}는 삭제 대기 상태가 아닙니다.")
 
         t_start = time.perf_counter()
+        started_at = time.time()
         deleted = 0
         chunks = 0
         while True:
@@ -486,14 +547,25 @@ class CategoryService:
 
         CategoryRepository.delete_library_finalize(db_type, library_id)
         try:
-            # gdrive 링크 카테고리의 메타데이터 미러(스캔 캐시)와 뷰어 사본도 같이 치운다 — 원본 Drive와 무관한 로컬 캐시.
+            # gdrive 링크 카테고리의 메타데이터 미러(스캔 캐시)와 뷰어 사본, 포스터 썸네일도 같이 치운다 — 원본과 무관한 로컬 캐시.
             import shutil
             from utils.drive_helper import gdrive_meta_mirror_dir
             shutil.rmtree(gdrive_meta_mirror_dir(db_type, library_id), ignore_errors=True)
             from services.gdrive_view_copy_service import view_cache_root
             shutil.rmtree(view_cache_root(db_type, library_id), ignore_errors=True)
+            # Poster thumbnails (covers/audio|video/<library_id>) are derived from the category's sources too.
+            from utils.cover_helper import poster_cache_library_dir
+            poster_dir = poster_cache_library_dir(db_type, library_id)
+            if poster_dir:
+                shutil.rmtree(poster_dir, ignore_errors=True)
         except Exception as e:
             print(f"[CategoryService] gdrive metadata mirror cleanup failed (lib={library_id}): {e}")
+        try:
+            removed, kept = _remove_unused_book_covers(db_type, library_id, started_at)
+            if removed or kept:
+                print(f"[CategoryService] book cover cleanup (type={db_type}, lib={library_id}): removed={removed} kept={kept}")
+        except Exception as e:
+            print(f"[CategoryService] book cover cleanup skipped (type={db_type}, lib={library_id}): {e}")
         from services.problem_service import ProblemService
         ProblemService.on_library_deleted(db_type, library_id)
         try:

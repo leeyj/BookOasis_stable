@@ -1,10 +1,12 @@
 from flask import Blueprint, request, jsonify
+from api.auth import admin_required
 from api.helpers.route_helpers import error_response
 from services.trash_service import TrashService
 
 trash_bp = Blueprint('admin_trash', __name__)
 
 @trash_bp.route('/api/admin/trash', methods=['GET'])
+@admin_required
 def get_trash_books():
     """휴지통 목록 조회 (일반/성인 통합 또는 분리 조회 가능)"""
     try:
@@ -23,6 +25,7 @@ def get_trash_books():
         return error_response(e)
 
 @trash_bp.route('/api/admin/trash/restore', methods=['POST'])
+@admin_required
 def restore_trash_books():
     """휴지통 내부 선택 도서 복구"""
     data = request.get_json() or {}
@@ -42,6 +45,7 @@ def restore_trash_books():
         return error_response(e)
 
 @trash_bp.route('/api/admin/trash/empty', methods=['POST'])
+@admin_required
 def empty_trash_books():
     """휴지통 비우기 (일괄 또는 선택 영구 삭제)"""
     data = request.get_json() or {}

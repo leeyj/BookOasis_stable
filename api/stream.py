@@ -177,7 +177,7 @@ def stream_comic_page():
     img_data, mime_type = result
 
     res = Response(img_data, mimetype=mime_type)
-    res.headers['Cache-Control'] = 'public, max-age=31536000'
+    res.headers['Cache-Control'] = 'private, max-age=31536000'  # login-only page images: never in shared caches
     return res
 
 @stream_bp.route('/api/media/txt', methods=['GET'])

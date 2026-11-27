@@ -1,4 +1,5 @@
 // static/js/settings/permissions.js – 권한 관리 탭 모듈
+import { escapeHtml } from '../utils/html.js';
 let permissionSessionData = null;
 let activePermissionSession = 'general';
 
@@ -106,7 +107,7 @@ function openCopyPermissionPanel(triggerBtn) {
   const listHTML = users.map(u => `
     <label style="display:flex; align-items:center; gap:0.4rem; padding:0.2rem 0; color: var(--app-text-primary); font-size:0.85rem; cursor:pointer;">
       <input type="checkbox" class="permission-copy-target" value="${u.id}">
-      <span>${u.username}</span>
+      <span>${escapeHtml(u.username)}</span>
     </label>
   `).join('');
 
@@ -278,9 +279,9 @@ export async function loadPermissionsMatrix() {
     const data = await res.json();
 
     if (!data.success) {
-      generalHeaderRow.innerHTML = `<th style="padding:1rem; color:#ef4444;">${tError}: ${data.error}</th>`;
-      audiobookHeaderRow.innerHTML = `<th style="padding:1rem; color:#ef4444;">${tError}: ${data.error}</th>`;
-      videoHeaderRow.innerHTML = `<th style="padding:1rem; color:#ef4444;">${tError}: ${data.error}</th>`;
+      generalHeaderRow.innerHTML = `<th style="padding:1rem; color:#ef4444;">${tError}: ${escapeHtml(data.error)}</th>`;
+      audiobookHeaderRow.innerHTML = `<th style="padding:1rem; color:#ef4444;">${tError}: ${escapeHtml(data.error)}</th>`;
+      videoHeaderRow.innerHTML = `<th style="padding:1rem; color:#ef4444;">${tError}: ${escapeHtml(data.error)}</th>`;
       return;
     }
 
@@ -331,9 +332,9 @@ function renderMatrixHeader(headerRow, users) {
   users.forEach(user => {
     const isAdmin = user.username === 'admin';
     headerHTML += `
-      <th data-username="${user.username}" style="padding:1rem; text-align:center; min-width:100px;">
-        <div style="font-weight:700; color: var(--app-text-primary);">${user.username}</div>
-        <div style="font-size:0.75rem; color: var(--app-text-muted); margin-bottom:${isAdmin ? '0' : '0.4rem'};">(${user.role})</div>
+      <th data-username="${escapeHtml(user.username)}" style="padding:1rem; text-align:center; min-width:100px;">
+        <div style="font-weight:700; color: var(--app-text-primary);">${escapeHtml(user.username)}</div>
+        <div style="font-size:0.75rem; color: var(--app-text-muted); margin-bottom:${isAdmin ? '0' : '0.4rem'};">(${escapeHtml(user.role)})</div>
         ${isAdmin ? '' : `
         <div style="display:flex; gap:0.3rem; justify-content:center; flex-wrap:wrap;">
           <button type="button" class="permission-col-toggle-all" data-user-id="${user.id}"
@@ -353,9 +354,9 @@ function renderMatrixHeader(headerRow, users) {
 function renderMatrixBody(users, categories, permissions, targetDb) {
   return (categories || []).map(cat => {
     let rowHTML = `
-      <tr style="border-bottom:1px solid rgba(255,255,255,0.05);" data-category-name="${cat.name}">
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.05);" data-category-name="${escapeHtml(cat.name)}">
         <td style="padding:1rem; color: var(--app-text-primary);">
-          <i class="lc lc-folder" style="color: var(--app-text-muted); margin-right:0.5rem;"></i>${cat.name}
+          <i class="lc lc-folder" style="color: var(--app-text-muted); margin-right:0.5rem;"></i>${escapeHtml(cat.name)}
           <button type="button" class="permission-row-toggle-all" data-library-id="${cat.id}" data-db-type="${cat.db_type || targetDb}"
                   style="margin-left:0.5rem; font-size:0.65rem; padding:0.1rem 0.4rem; border-radius:4px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.05); color: var(--app-text-muted); cursor:pointer;">${i18n.t('settings.perm_toggle_all')}</button>
         </td>
@@ -371,7 +372,7 @@ function renderMatrixBody(users, categories, permissions, targetDb) {
       const accentColor = targetDb === 'audiobook' ? '#10b981' : '#10b981';
 
       rowHTML += `
-        <td data-username="${user.username}" style="padding:1rem; text-align:center;">
+        <td data-username="${escapeHtml(user.username)}" style="padding:1rem; text-align:center;">
           <input type="checkbox" class="permission-chk-category"
                  data-user-id="${user.id}" data-library-id="${cat.id}" data-db-type="${permissionTargetDb}"
                  ${hasPerm ? 'checked' : ''} ${isDisabled}
@@ -391,8 +392,8 @@ function renderAdultBody(users) {
     const isDisabled = user.username === 'admin' ? 'disabled' : '';
     return `
       <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-        <td style="padding:0.9rem 1rem; color: var(--app-text-primary); font-weight:700;">${user.username}</td>
-        <td style="padding:0.9rem 1rem; text-align:center; color: var(--app-text-muted);">${user.role}</td>
+        <td style="padding:0.9rem 1rem; color: var(--app-text-primary); font-weight:700;">${escapeHtml(user.username)}</td>
+        <td style="padding:0.9rem 1rem; text-align:center; color: var(--app-text-muted);">${escapeHtml(user.role)}</td>
         <td style="padding:0.9rem 1rem; text-align:center;">
           <label style="display:inline-flex; align-items:center; gap:0.5rem; color:var(--app-accent-hover); font-weight:700;">
             <input type="checkbox" class="permission-chk-adult" data-user-id="${user.id}" ${isChecked} ${isDisabled}
@@ -412,8 +413,8 @@ function renderMenuAccessBody(users, field, kind, labelKey) {
     const isDisabled = user.role === 'admin' ? 'disabled' : '';
     return `
       <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-        <td style="padding:0.9rem 1rem; color: var(--app-text-primary); font-weight:700;">${user.username}</td>
-        <td style="padding:0.9rem 1rem; text-align:center; color: var(--app-text-muted);">${user.role}</td>
+        <td style="padding:0.9rem 1rem; color: var(--app-text-primary); font-weight:700;">${escapeHtml(user.username)}</td>
+        <td style="padding:0.9rem 1rem; text-align:center; color: var(--app-text-muted);">${escapeHtml(user.role)}</td>
         <td style="padding:0.9rem 1rem; text-align:center;">
           <label style="display:inline-flex; align-items:center; gap:0.5rem; color:var(--app-accent-hover); font-weight:700;">
             <input type="checkbox" class="permission-chk-menu-access" data-kind="${kind}" data-user-id="${user.id}" ${isChecked} ${isDisabled}
@@ -432,8 +433,8 @@ function renderDownloadBody(users) {
     const isDisabled = user.username === 'admin' ? 'disabled' : '';
     return `
       <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-        <td style="padding:0.9rem 1rem; color: var(--app-text-primary); font-weight:700;">${user.username}</td>
-        <td style="padding:0.9rem 1rem; text-align:center; color: var(--app-text-muted);">${user.role}</td>
+        <td style="padding:0.9rem 1rem; color: var(--app-text-primary); font-weight:700;">${escapeHtml(user.username)}</td>
+        <td style="padding:0.9rem 1rem; text-align:center; color: var(--app-text-muted);">${escapeHtml(user.role)}</td>
         <td style="padding:0.9rem 1rem; text-align:center;">
           <label style="display:inline-flex; align-items:center; gap:0.5rem; color:var(--app-accent-hover); font-weight:700;">
             <input type="checkbox" class="permission-chk-download" data-user-id="${user.id}" ${isChecked} ${isDisabled}
@@ -455,8 +456,8 @@ function renderContentRatingBody(users) {
       : Number(user.content_rating_max !== undefined && user.content_rating_max !== null ? user.content_rating_max : 18);
     return `
       <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-        <td style="padding:0.9rem 1rem; color: var(--app-text-primary); font-weight:700;">${user.username}</td>
-        <td style="padding:0.9rem 1rem; text-align:center; color: var(--app-text-muted);">${user.role}</td>
+        <td style="padding:0.9rem 1rem; color: var(--app-text-primary); font-weight:700;">${escapeHtml(user.username)}</td>
+        <td style="padding:0.9rem 1rem; text-align:center; color: var(--app-text-muted);">${escapeHtml(user.role)}</td>
         <td style="padding:0.9rem 1rem; text-align:center;">
           <select class="permission-select-content-rating" data-user-id="${user.id}" ${isDisabled}
                   style="cursor:pointer; padding:0.4rem 0.7rem; border-radius:6px; border:1px solid rgba(255,255,255,0.15); background: rgba(var(--app-panel-rgb), 0.6); color: var(--app-text-primary); font-weight:700;">

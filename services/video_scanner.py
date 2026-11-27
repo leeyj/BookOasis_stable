@@ -60,8 +60,15 @@ def _find_sidecar_subtitle(file_path):
 # S01E01 형식의 시즌/에피소드 번호 (Plex/Kodi TV쇼 명명 규칙)
 EPISODE_CODE_RE = re.compile(r'S(\d+)E(\d+)', re.IGNORECASE)
 
-# 파일명 앞의 "S01E02." 접두어를 제거하기 위한 정규식 (show.yaml 매칭 실패 시 title fallback용)
-EPISODE_PREFIX_RE = re.compile(r'^\s*S\d+E\d+\.\s*', re.IGNORECASE)
+# 파일명 앞의 "S01E02." / "S01E02 - " 접두어를 제거하기 위한 정규식 (show.yaml 매칭 실패 시 title fallback용)
+EPISODE_PREFIX_RE = re.compile(r'^\s*S\d+E\d+\s*(?:[.\-–_:]\s*)?', re.IGNORECASE)
+
+# 강좌 폴더 안 대표 이미지 이름(우선순위 순). 없으면 폴더의 첫 이미지 파일을 쓴다(오디오북과 같은 규칙).
+FOLDER_POSTER_NAMES = (
+    'poster.jpg', 'cover.jpg', 'folder.jpg', 'poster.png', 'cover.png', 'folder.png',
+    'poster.jpeg', 'cover.jpeg', 'folder.jpeg', 'poster.webp', 'cover.webp', 'folder.webp',
+)
+
 
 # 브라우저가 별도 트랜스코딩 없이 <video> 태그로 직접 재생 가능한 컨테이너/코덱 조합.
 # mkv는 Chrome/Edge 계열에서 h264+aac 조합이면 대체로 잘 재생되지만, Safari는 MKV
@@ -91,6 +98,89 @@ CONTAINER_FORMAT_NAME_HINTS = {
     'webm': ('webm', 'matroska'),
     'mkv': ('matroska',),
 }
+
+
+def _first_str(value):
+    """YAML 값이 목록이면 첫 문자열, 문자열이면 그대로(공백 제거), 그 밖에는 ''."""
+    if isinstance(value, list):
+        value = next((v for v in value if isinstance(v, str) and v.strip()), '')
+    return value.strip() if isinstance(value, str) else ''
+
+
+def _pick_folder_poster_name(file_names):
+    """강좌 폴더(최상위) 파일 이름 목록에서 대표 이미지 이름. 없으면 ''."""
+    by_lower = {name.lower(): name for name in file_names}
+    for cand in FOLDER_POSTER_NAMES:
+        if cand in by_lower:
+            return by_lower[cand]
+    for name in sorted(file_names, key=natural_sort_key):
+        if name.lower().endswith(_media_types.IMAGE_EXTENSIONS):
+            return name
+    return ''
+
+
+def _pick_course_poster(top_level_names, course_meta, metadata_cover_url, has_file):
+    """포스터 우선순위: 폴더 이미지(poster.jpg 등) → show.yaml art/posters(URL 또는 강좌 폴더 기준 상대 파일명)
+    → metadata.json cover_url. 폴더 이미지를 먼저 쓰는 이유: 외부 이미지 주소가 바뀌거나 막혀도 그대로 보이고,
+    사용자가 바꾼 그림이 바로 반영된다.
+    반환: ('file', 강좌 폴더 기준 상대 경로) / ('url', 주소) / (None, ''). has_file(rel)로 상대 파일 존재를 확인한다
+    (로컬은 파일 시스템, 구글 링크는 목록)."""
+    folder_poster = _pick_folder_poster_name(top_level_names)
+    if folder_poster:
+        return 'file', folder_poster
+    for key in ('art', 'posters'):
+        value = (course_meta or {}).get(key) or ''
+        if not value:
+            continue
+        if value.startswith(('http://', 'https://')):
+            return 'url', value
+        rel = value.replace('\\', '/').lstrip('/')
+        if rel and '..' not in rel.split('/') and has_file(rel):
+            return 'file', rel
+    if metadata_cover_url:
+        return 'url', metadata_cover_url
+    return None, ''
+
+
+def _load_course_metadata_json(folder_path, file_names):
+    """윌라 영상 강좌 metadata.json(web_id/cid/title/cover_url/clips[num,title,duration])에서
+    포스터 URL과 회차 제목만 꺼낸다: (cover_url, {num: title}). 없거나 형식이 다르면 ('', {})."""
+    if 'metadata.json' not in {n.lower() for n in file_names}:
+        return '', {}
+    from services.audiobook_scanner import load_json_any_encoding
+    try:
+        data, _ = load_json_any_encoding(os.path.join(folder_path, 'metadata.json'))
+    except Exception as err:
+        print(f"[VideoScanner Warning] metadata.json read error in {folder_path}: {err}")
+        return '', {}
+    if not isinstance(data, dict):
+        return '', {}
+    cover_url = _first_str(data.get('cover_url'))
+    if not cover_url.startswith(('http://', 'https://')):
+        cover_url = ''
+    clip_titles = {}
+    clips = data.get('clips')
+    if isinstance(clips, list):
+        for clip in clips:
+            if not isinstance(clip, dict):
+                continue
+            try:
+                num = int(clip.get('num'))
+            except (TypeError, ValueError):
+                continue
+            title = html.unescape(_first_str(clip.get('title')))
+            if title:
+                clip_titles[num] = title
+    return cover_url, clip_titles
+
+
+def _resolve_course_poster(folder_path, file_names, course_meta, metadata_cover_url):
+    """로컬 강좌 폴더의 포스터 소스(로컬 경로 또는 URL). 우선순위는 _pick_course_poster()."""
+    kind, value = _pick_course_poster(file_names, course_meta, metadata_cover_url,
+                                      lambda rel: os.path.isfile(os.path.join(folder_path, rel)))
+    if kind == 'file':
+        return os.path.normpath(os.path.join(folder_path, value))
+    return value
 
 
 def is_browser_compatible(file_path, vcodec, acodec, container_format_name=None):
@@ -184,8 +274,8 @@ def _load_show_yaml(folder_path):
         'title': html.unescape(str(data.get('title', '')).strip()),
         'genres': ", ".join(genres) if isinstance(genres, list) else str(genres or ''),
         'summary': html.unescape(str(data.get('summary', '')).strip()),
-        'art': str(data.get('art', '')).strip(),
-        'posters': str(data.get('posters', '')).strip(),
+        'art': _first_str(data.get('art')),
+        'posters': _first_str(data.get('posters')),
         'code': str(data.get('code', '')).strip(),
     }
 
@@ -208,9 +298,42 @@ def _load_show_yaml(folder_path):
                 }
         # 시즌 자체의 art가 있으면 최상위 art보다 우선
         if not course_meta['art']:
-            course_meta['art'] = str(season0.get('art', '')).strip()
+            course_meta['art'] = _first_str(season0.get('art'))
 
     return course_meta, episode_by_index
+
+
+def _episode_code_and_title(fname, idx, episode_by_index, clip_titles):
+    """회차 코드와 제목: (episode_code, title, premiered). 제목은 show.yaml → metadata.json clips → 파일명 순.
+    번호는 파일명의 SxxExx(없으면 정렬 순서 idx)로 show.yaml/clips와 연결한다."""
+    m = EPISODE_CODE_RE.search(fname)
+    if m:
+        ep_num = int(m.group(2))
+        episode_code = f"S{int(m.group(1)):02d}E{ep_num:02d}"
+    else:
+        ep_num = idx
+        episode_code = ''
+    ep_meta = episode_by_index.get(ep_num, {})
+    title = ep_meta.get('title', '') or clip_titles.get(ep_num, '')
+    if not title:
+        stripped = EPISODE_PREFIX_RE.sub('', fname)
+        title = os.path.splitext(stripped)[0].strip() or fname
+    return episode_code, title, ep_meta.get('originally_available_at', '')
+
+
+def _course_meta_dict(course_meta, folder_name, folder_path, poster):
+    return {
+        'title': (course_meta or {}).get('title') or folder_name,
+        'sort_title': '',
+        'web_id': (course_meta or {}).get('code', ''),
+        'genres': (course_meta or {}).get('genres', ''),
+        'poster': poster,
+        'backdrop': (course_meta or {}).get('art', ''),
+        'premiered': '',
+        'description': (course_meta or {}).get('summary', ''),
+        'folder_name': folder_name,
+        'folder_path': folder_path,
+    }
 
 
 def parse_video_folder(folder_path, existing_episode_cache=None):
@@ -236,19 +359,14 @@ def parse_video_folder(folder_path, existing_episode_cache=None):
     video_files.sort(key=lambda p: natural_sort_key(os.path.basename(p)))
 
     course_meta, episode_by_index = _load_show_yaml(folder_path)
+    try:
+        top_level_files = [n for n in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, n))]
+    except OSError:
+        top_level_files = []
+    metadata_cover_url, clip_titles = _load_course_metadata_json(folder_path, top_level_files)
 
-    meta = {
-        'title': (course_meta or {}).get('title') or folder_name,
-        'sort_title': '',
-        'web_id': (course_meta or {}).get('code', ''),
-        'genres': (course_meta or {}).get('genres', ''),
-        'poster': (course_meta or {}).get('art') or (course_meta or {}).get('posters', ''),
-        'backdrop': (course_meta or {}).get('art', ''),
-        'premiered': '',
-        'description': (course_meta or {}).get('summary', ''),
-        'folder_name': folder_name,
-        'folder_path': os.path.normpath(folder_path),
-    }
+    meta = _course_meta_dict(course_meta, folder_name, os.path.normpath(folder_path),
+                             _resolve_course_poster(folder_path, top_level_files, course_meta, metadata_cover_url))
 
     episodes = []
     total_duration = 0.0
@@ -268,21 +386,7 @@ def parse_video_folder(folder_path, existing_episode_cache=None):
             file_size = 0
             file_mtime = 0.0
 
-        m = EPISODE_CODE_RE.search(fname)
-        if m:
-            season_num = int(m.group(1))
-            ep_num = int(m.group(2))
-            episode_code = f"S{season_num:02d}E{ep_num:02d}"
-        else:
-            ep_num = idx
-            episode_code = ''
-
-        ep_meta = episode_by_index.get(ep_num, {})
-        title = ep_meta.get('title', '')
-        if not title:
-            stripped = EPISODE_PREFIX_RE.sub('', fname)
-            title = os.path.splitext(stripped)[0].strip() or fname
-        premiered = ep_meta.get('originally_available_at', '')
+        episode_code, title, premiered = _episode_code_and_title(fname, idx, episode_by_index, clip_titles)
 
         # duration/width/height는 여기서 ffprobe로 동기 추출하지 않는다 (원격 드라이브에서 파일당
         # 수 초씩 걸려 스캔 전체가 매우 느려짐 - Plex/Jellyfin처럼 "발견"과 "분석"을 분리).
@@ -485,4 +589,263 @@ def scan_video_library(library_path, library_id=None, force=False):
         f"elapsed_ms={library_elapsed_ms} "
         f"library_path={library_path}"
     )
+    return count
+
+
+
+# ── 구글 드라이브 공유 링크 카테고리 (GDRIVE_LINK_BETA) ─────────────────────────────────────────────
+# 1단계: 등록만 한다(목록·메타·포스터). 회차 파일은 읽지 않고 길이 0으로 두며, 재생은 아직 지원하지 않는다.
+# 회차 file_path는 도서와 같은 가상 경로(gdrive:/<공유 폴더 ID>/<상대 경로>?gid=<파일 ID>)이고,
+# lazy_scanner의 ffprobe·컨테이너 재검사 대상에서 빠진다(원격 영상을 받지 않음).
+
+GDRIVE_VIDEO_LIST_EXTENSIONS = VIDEO_EXTENSIONS + _media_types.METADATA_EXTENSIONS + _media_types.IMAGE_EXTENSIONS
+
+
+def _gdrive_course_path(folder_id, rel_folder):
+    return f"gdrive:/{folder_id}/{rel_folder}" if rel_folder else f"gdrive:/{folder_id}"
+
+
+def _group_gdrive_courses(g_files):
+    """목록을 강좌별로 묶는다: {강좌 상대 폴더: [항목...]}. 로컬 규칙과 같게 영상 파일이 직접 든 폴더 중
+    가장 위의 것이 강좌이고, 그 아래 하위 폴더의 파일(회차·이미지·메타)은 그 강좌에 합친다."""
+    video_dirs = {(it.get('rel_folder') or '') for it in g_files
+                  if (it.get('name') or '').lower().endswith(VIDEO_EXTENSIONS)}
+
+    def course_of(rel_folder):
+        parts = [p for p in (rel_folder or '').split('/') if p]
+        for i in range(len(parts) + 1):
+            cand = '/'.join(parts[:i])
+            if cand in video_dirs:
+                return cand
+        return None
+
+    courses = {}
+    for it in g_files:
+        course = course_of(it.get('rel_folder') or '')
+        if course is not None:
+            courses.setdefault(course, []).append(it)
+    return courses
+
+
+def _rel_in_course(course_rel, item):
+    rel_folder = item.get('rel_folder') or ''
+    sub = rel_folder[len(course_rel):].lstrip('/') if course_rel else rel_folder
+    return f"{sub}/{item['name']}" if sub else item['name']
+
+
+def _gdrive_episode_path(course_path, course_rel, item):
+    from utils.drive_helper import encode_gdrive_file_id
+    return encode_gdrive_file_id(f"{course_path}/{_rel_in_course(course_rel, item)}", item.get('id'))
+
+
+def _gdrive_episode_signature(course_path, paths_and_sizes):
+    """VideoRepository.get_episode_signatures()와 같은 방식으로 계산한 회차 서명."""
+    base = os.path.normpath(course_path)
+    return {(os.path.relpath(os.path.normpath(p), base), int(size or 0)) for p, size in paths_and_sizes}
+
+
+def _download_gdrive_poster(remote, item, dest_path):
+    """포스터 이미지 하나를 받는다(목록의 수정 시각과 같으면 다시 받지 않음). 성공하면 dest_path, 실패하면 ''."""
+    from utils.drive_helper import drive_modtime_epoch
+    from utils.rclone_gdrive_copy import rclone_download_file_by_id
+    remote_mtime = drive_modtime_epoch(item.get('modifiedTime'))
+    try:
+        if remote_mtime is not None and abs(os.path.getmtime(dest_path) - remote_mtime) < 2:
+            return dest_path
+    except OSError:
+        pass
+    try:
+        rclone_download_file_by_id(remote, item['id'], dest_path)
+        if remote_mtime is not None:
+            os.utime(dest_path, (remote_mtime, remote_mtime))
+        return dest_path
+    except Exception as err:
+        print(f"[VideoScanner Warning] gdrive poster download failed: {dest_path} - {err}")
+        return ''
+
+
+def parse_gdrive_video_course(folder_id, course_rel, items, meta_mirror_root, poster_root, remote):
+    """링크 공유 폴더의 강좌 하나를 로컬 parse_video_folder()와 같은 형태로 만든다. 영상 파일은 읽지 않는다."""
+    from utils.drive_helper import drive_modtime_epoch
+    course_path = _gdrive_course_path(folder_id, course_rel)
+    folder_name = course_rel.rsplit('/', 1)[-1] if course_rel else folder_id
+    by_rel = {_rel_in_course(course_rel, it): it for it in items if it.get('name')}
+
+    mirror_dir = os.path.join(meta_mirror_root, *course_rel.split('/')) if course_rel else meta_mirror_root
+    course_meta, episode_by_index = _load_show_yaml(mirror_dir) if os.path.isdir(mirror_dir) else (None, {})
+    try:
+        mirror_names = [n for n in os.listdir(mirror_dir) if os.path.isfile(os.path.join(mirror_dir, n))]
+    except OSError:
+        mirror_names = []
+    metadata_cover_url, clip_titles = _load_course_metadata_json(mirror_dir, mirror_names)
+
+    top_level_names = [rel for rel in by_rel if '/' not in rel]
+    kind, value = _pick_course_poster(top_level_names, course_meta, metadata_cover_url, lambda rel: rel in by_rel)
+    poster = ''
+    if kind == 'url':
+        poster = value
+    elif kind == 'file':
+        poster_root_real = os.path.realpath(poster_root)
+        dest = os.path.normpath(os.path.join(poster_root, *course_rel.split('/'), *value.split('/')))
+        # 공유 폴더의 이름은 남이 정한다 - 포스터 폴더 밖에 쓰지 않게 막는다
+        if os.path.commonpath([poster_root_real, os.path.realpath(dest)]) == poster_root_real:
+            poster = _download_gdrive_poster(remote, by_rel[value], dest)
+        if not poster and metadata_cover_url:
+            poster = metadata_cover_url
+
+    videos = sorted((rel for rel in by_rel if rel.lower().endswith(VIDEO_EXTENSIONS)),
+                    key=lambda rel: natural_sort_key(rel.rsplit('/', 1)[-1]))
+    episodes = []
+    for idx, rel in enumerate(videos, start=1):
+        it = by_rel[rel]
+        fname = it['name']
+        episode_code, title, premiered = _episode_code_and_title(fname, idx, episode_by_index, clip_titles)
+        episodes.append({
+            'episode_number': idx,
+            'episode_code': episode_code,
+            'title': title,
+            'filename': fname,
+            'file_path': _gdrive_episode_path(course_path, course_rel, it),
+            'file_mtime': float(drive_modtime_epoch(it.get('modifiedTime')) or 0.0),
+            'file_size': int(it.get('size') or 0),
+            'duration': 0.0,
+            'width': 0,
+            'height': 0,
+            'premiered': premiered,
+            'format': os.path.splitext(fname)[1].lstrip('.').lower(),
+            'subtitle_path': '',
+        })
+
+    meta = _course_meta_dict(course_meta, folder_name, course_path, poster)
+    meta['total_duration'] = 0.0
+    meta['total_episodes'] = len(episodes)
+    return {'meta': meta, 'episodes': episodes}
+
+
+def _poster_kind(poster):
+    if not poster:
+        return 'none'
+    return 'url' if poster.startswith(('http://', 'https://')) else 'file'
+
+
+def scan_video_library_gdrive(share_url, library_id=None, force=False):
+    """구글 드라이브 공유 링크 영상 카테고리 스캔(등록만). 카테고리의 rclone 리모트로 목록을 한 번 받고,
+    show.yaml/metadata.json은 메타 미러로, 포스터 이미지는 강좌마다 한 장만 받는다. 반환: 처리한 강좌 수."""
+    from utils.drive_helper import (extract_gdrive_folder_id, fetch_gdrive_folder_files_via_rclone,
+                                    gdrive_meta_mirror_dir, refresh_gdrive_meta_mirror, GDRIVE_META_EXTENSIONS)
+    from utils.gdrive_beta_log import beta_log
+    from services.system_health_service import SystemHealthService
+    from repositories.category_repository import CategoryRepository
+    from repositories.video_repository import VideoRepository
+    from services.audiobook_scanner import _touch_if_poster_replaced
+
+    started = time.perf_counter()
+    folder_id = extract_gdrive_folder_id(share_url)
+    library = CategoryRepository.get_library_by_id('video', library_id) if library_id is not None else None
+    remote = (library or {}).get('gdrive_copy_remote')
+    if not folder_id or not remote:
+        print(f"[VideoScanner Error] gdrive link category needs a folder link and a connected rclone remote: "
+              f"library_id={library_id} remote={remote!r} link={share_url}")
+        return 0
+
+    print(f"[VideoScanner][LIBRARY_SCAN_START] library_id={library_id} force={force} gdrive=1 folder_id={folder_id}")
+    listing_health = (f'gdrive_listing:video:{library_id}', f'구글 링크 목록 조회 (video 카테고리 {library_id})')
+    t_list = time.time()
+    try:
+        g_files = fetch_gdrive_folder_files_via_rclone(remote, share_url, extensions=GDRIVE_VIDEO_LIST_EXTENSIONS)
+    except Exception as err:
+        # 부분 목록으로 숨김 처리를 하면 안 되므로 이번 스캔은 아무것도 바꾸지 않는다.
+        print(f"[VideoScanner Error] gdrive listing failed: library_id={library_id} - {err}")
+        beta_log('scan.listing_failed', db='video', lib=library_id, remote=remote, took=time.time() - t_list, err=err)
+        SystemHealthService.record_failure(*listing_health, err)
+        return 0
+    beta_log('scan.listing', db='video', lib=library_id, via='rclone', files=len(g_files), errors=0,
+             took=time.time() - t_list)
+    SystemHealthService.record_success(listing_health[0])
+
+    courses = _group_gdrive_courses(g_files)
+    base_dir = gdrive_meta_mirror_dir('video', library_id)
+    meta_mirror_root = os.path.join(base_dir, folder_id)
+    poster_root = os.path.join(base_dir, '_posters', folder_id)
+
+    # 메타 파일은 강좌 폴더 최상위의 것만 받는다(공유 폴더의 다른 yaml/json까지 받지 않게).
+    meta_items = [it for course_rel, items in courses.items() for it in items
+                  if (it.get('rel_folder') or '') == course_rel
+                  and (it.get('name') or '').lower().endswith(GDRIVE_META_EXTENSIONS)]
+    if meta_items:
+        meta_health = (f'gdrive_meta:video:{library_id}', f'구글 링크 메타데이터 받기 (video 카테고리 {library_id})')
+        t_meta = time.time()
+        try:
+            fetched, failed, mode = refresh_gdrive_meta_mirror(remote, folder_id, meta_mirror_root, meta_items)
+            beta_log('scan.meta_mirror', db='video', lib=library_id, mode=mode, fetched=fetched, failed=failed,
+                     took=time.time() - t_meta)
+            if failed:
+                SystemHealthService.record_failure(*meta_health, f'{failed}개 메타데이터 파일을 받지 못함 ({mode})')
+            else:
+                SystemHealthService.record_success(meta_health[0])
+        except Exception as err:
+            # 미러가 없어도 강좌 등록은 진행한다(폴더 이름·파일명으로) - 다음 스캔에서 다시 받는다.
+            print(f"[VideoScanner Warning] gdrive metadata mirror failed: {err}")
+            beta_log('scan.meta_mirror_failed', db='video', lib=library_id, took=time.time() - t_meta, err=err)
+            SystemHealthService.record_failure(*meta_health, err)
+
+    prefix = os.path.normpath(_gdrive_course_path(folder_id, ''))
+    folder_rows = [r for r in VideoRepository.get_folder_rows(library_id)
+                   if os.path.normpath(str(r['folder_path'])) == prefix
+                   or os.path.normpath(str(r['folder_path'])).startswith(prefix + os.sep)]
+    existing = {os.path.normpath(str(r['folder_path'])) for r in folder_rows if not r.get('is_deleted')}
+    signatures = VideoRepository.get_episode_signatures(library_id) if not force else {}
+
+    count = skipped = changed = errors = 0
+    found = set()
+    for course_rel in sorted(courses, key=natural_sort_key):
+        items = courses[course_rel]
+        course_path = _gdrive_course_path(folder_id, course_rel)
+        key = os.path.normpath(course_path)
+        found.add(key)
+        if not force and key in existing:
+            current = _gdrive_episode_signature(course_path, [
+                (_gdrive_episode_path(course_path, course_rel, it), it.get('size'))
+                for it in items if (it.get('name') or '').lower().endswith(VIDEO_EXTENSIONS)])
+            if current == signatures.get(key, set()):
+                skipped += 1
+                continue
+            changed += 1
+            print(f"[VideoScanner][CHANGED] library_id={library_id} reason=file_list_changed folder_path={course_path}")
+        try:
+            result = parse_gdrive_video_course(folder_id, course_rel, items, meta_mirror_root, poster_root, remote)
+            row = VideoRepository.get_by_folder_path(course_path)
+            if row and int(row.get('is_deleted') or 0):
+                VideoRepository.set_deleted(row['id'], False)
+                print(f"[VideoScanner][RESTORED] video_id={row['id']} folder_path={course_path}")
+            saved = VideoRepository.save_video_scan(course_path, library_id, result['meta'], result['episodes'])
+            poster = result['meta'].get('poster') or ''
+            _touch_if_poster_replaced(VideoRepository, saved['video_id'], poster, 'video', library_id)
+            count += 1
+            print(f"[VideoScanner][COURSE_PROCESSED] video_id={saved['video_id']} title={result['meta']['title']} "
+                  f"episodes={len(result['episodes'])} poster={_poster_kind(poster)} gdrive=1 folder_path={course_path}")
+        except Exception as err:
+            errors += 1
+            print(f"[VideoScanner ERROR] Failed to save gdrive video course {course_path}: {err}")
+
+    # 목록에서 사라진 강좌는 숨긴다(목록을 정상으로 받았을 때만, 한 번에 많이 사라지면 보류).
+    missing = [r for r in folder_rows
+               if not r.get('is_deleted') and os.path.normpath(str(r['folder_path'])) not in found]
+    hidden = 0
+    if missing:
+        from services.scan_problem_service import is_mass_missing
+        if is_mass_missing('video', library_id, len(missing), len(folder_rows)):
+            print(f"[VideoScanner][MISSING_HELD] library_id={library_id} reason=mass_missing "
+                  f"missing={len(missing)} total={len(folder_rows)} gdrive=1")
+        else:
+            for r in missing:
+                if VideoRepository.set_deleted(r['id'], True):
+                    hidden += 1
+                    print(f"[VideoScanner][MISSING_HIDDEN] video_id={r['id']} folder_path={r['folder_path']}")
+
+    elapsed_ms = int((time.perf_counter() - started) * 1000)
+    beta_log('scan.summary', db='video', lib=library_id, courses=len(courses), processed=count, skipped=skipped,
+             hidden=hidden, errors=errors, took=elapsed_ms / 1000)
+    print(f"[VideoScanner][LIBRARY_SCAN_DONE] library_id={library_id} processed={count} skipped={skipped} "
+          f"changed={changed} moved=0 hidden={hidden} errors={errors} force={force} gdrive=1 elapsed_ms={elapsed_ms}")
     return count

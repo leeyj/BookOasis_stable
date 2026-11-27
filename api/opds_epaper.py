@@ -357,6 +357,13 @@ def _send_cached(path, download_name, disposition, meta):
     return response
 
 
+def _download_refusal(user, book_id):
+    """Same rules as the web download (check_download_permission + check_book_rating_permission).
+    Category permission is already applied by the feed repository (get_book), so it is not re-checked here."""
+    from api.opds_common.permissions import refusal
+    return refusal(DB_TYPE, book_id, user, need_download=True, check_category=False)
+
+
 @opds_epaper_bp.route(PREFIX + '/book/<int:book_id>.epub', methods=['GET'])
 def epaper_download(book_id):
     user = _download_user(book_id)
@@ -365,6 +372,12 @@ def epaper_download(book_id):
     book = _repo().get_book(DB_TYPE, book_id, user.get('id'), user.get('role'))
     if not book:
         return _text_error(404, '책을 찾을 수 없습니다.')
+    refusal = _download_refusal(user, book_id)
+    if refusal:
+        print(f"[EPAPER] download refused book={book_id} user={user.get('username')} reason={refusal[0]}")
+        if refusal[0] == 'not_found':
+            return _text_error(404, '책을 찾을 수 없습니다.')
+        return _text_error(403, refusal[1])
     from services import epaper_service
     try:
         epub_path, meta = epaper_service.get_book_epub(DB_TYPE, book, profile=_feed_profile(user))

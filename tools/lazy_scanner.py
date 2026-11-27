@@ -972,6 +972,11 @@ def get_series_cover_fallback_single(series_name, parent_dir, filename, file_pat
     return (None, None, [])
 
 
+# 구글 링크 영상 회차(gdrive:/... 가상 경로)는 로컬 파일이 없어 ffprobe할 수 없다. 조회에서 빼지 않으면
+# 길이 분석은 매번 앞쪽 후보를 차지해 로컬 회차가 밀리고, 컨테이너 재검사는 "파일 없음"으로 검증 완료 처리해 버린다.
+GDRIVE_EPISODE_LIKE = 'gdrive:%'
+
+
 def run_lazy_video_duration_backfill():
     """
     영상 강좌 스캔 시 duration=0(미분석)으로 남겨둔 에피소드를 백그라운드에서 ffprobe로 채웁니다.
@@ -1014,9 +1019,10 @@ def run_lazy_video_duration_backfill():
             SELECT id, video_id, file_path
             FROM video_episodes
             WHERE COALESCE(duration, 0) <= 0
+              AND file_path NOT LIKE ?
             ORDER BY id ASC
             LIMIT ?
-        """, (MAX_EPISODES_PER_RUN,))
+        """, (GDRIVE_EPISODE_LIKE, MAX_EPISODES_PER_RUN))
         candidates = cursor.fetchall()
 
         if not candidates:
@@ -1155,9 +1161,10 @@ def run_lazy_video_container_revalidation():
             WHERE format IN ('mp4', 'webm')
               AND COALESCE(needs_transcode, 0) = 0
               AND COALESCE(container_verified, 0) = 0
+              AND file_path NOT LIKE ?
             ORDER BY id ASC
             LIMIT ?
-        """, (MAX_EPISODES_PER_RUN,))
+        """, (GDRIVE_EPISODE_LIKE, MAX_EPISODES_PER_RUN))
         candidates = cursor.fetchall()
 
         if not candidates:

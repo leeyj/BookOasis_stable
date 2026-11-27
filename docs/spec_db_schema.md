@@ -72,7 +72,7 @@ BookOasis는 **SQLite(기본값)** 와 **MariaDB/MySQL** 두 엔진을 지원하
 
 라이브러리 루트 및 스캔 설정.
 
-- PK: `id`
+- PK: `id`. 일반·성인 DB는 id를 따로 매기지만 표지 폴더 `covers/<id>/`를 같이 쓰므로, 새 성인 카테고리는 9000번부터 매긴다(시작 시 `_ensure_adult_library_id_floor`, 기존 id는 그대로)
 - 주요 FK: `group_id -> library_groups.id`
 - 컬럼: `name`, `physical_path`, `cron_schedule`, `schedule_enabled`, `last_scanned_at`, `scan_status`, `is_remote`, `vfs_refresh_before_scan`, `rclone_rc_url`, `icon`, `color`, `hide_cover`, `hide_title`, `cover_aspect_ratio`, `content_kind`, `group_id`, `sort_order`, `gdrive_copy_remote`, `gdrive_view_local_mirror_path`, `pending_delete`, `transfer_target_id`
 - `schedule_enabled`: 예약 스캔 켬/끔. 꺼도 `cron_schedule`은 남는다

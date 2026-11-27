@@ -476,6 +476,8 @@ server {
 ### ② Rate Limiting for Login Endpoint
 Set a request limit on the login route to block Brute Force hacking attempts on admin accounts.
 
+> Do not put this request limit on OPDS (`/opds`, `/app-opds`, `/opds-epaper`) or KOReader sync (`/kosync`): those clients send credentials with every request. Since 3.2.2 the app protects these paths itself: 10 wrong attempts from one IP within 5 minutes get `429` for 5 minutes (successful requests are not counted). Behind a reverse proxy every request shows the proxy IP, so during an attack other users' new logins may be refused for a while.
+
 `nginx.conf` (Inside `http` block):
 ```nginx
 # Limit to 1 request per second per IP and create a 10MB memory zone

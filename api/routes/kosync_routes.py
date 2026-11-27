@@ -27,7 +27,14 @@ def _reply(body, status=200):
 
 
 def _kosync_user():
-    return kosync_service.authenticate(request.headers.get('x-auth-user'), request.headers.get('x-auth-key'))
+    username, auth_key = request.headers.get('x-auth-user'), request.headers.get('x-auth-key')
+    if not username or not auth_key:
+        return None
+    from utils import auth_throttle
+    auth_throttle.abort_if_blocked('kosync')
+    user = kosync_service.authenticate(username, auth_key)
+    auth_throttle.note_result(bool(user), 'kosync')
+    return user
 
 
 @kosync_bp.route('/kosync/users/create', methods=['POST'])

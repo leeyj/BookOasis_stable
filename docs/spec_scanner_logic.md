@@ -331,7 +331,10 @@ graph TD
 ### ㉖ 탐색과 회차 등록
 * **감지 단위**: `os.walk`로 돌며 영상 확장자(`VIDEO_EXTENSIONS = .mp4, .mkv, .avi, .webm, .mov, .m4v, .ts`) 파일이 있는 폴더를 강좌로 보고, 그 아래로는 더 내려가지 않습니다(`dirs.clear()`). 회차는 하위 폴더까지 모아 자연 정렬합니다.
 * **스킵 정책**: 오디오북과 같습니다. 등록된 강좌는 건너뛰되, 파일 목록 서명(상대 경로 + 크기)이 DB 회차(`VideoRepository.get_episode_signatures`)와 다르면 다시 처리해 새 회차를 등록합니다(`[VideoScanner][CHANGED]`).
-* **메타데이터**: 강좌 폴더의 `show.yaml`(Plex TV 쇼 스타일)이 있으면 강좌·회차 정보를 읽습니다(시즌은 첫 시즌만). 없으면 폴더 이름을 제목으로 씁니다.
+* **메타데이터**: 강좌 폴더의 `show.yaml`(Plex TV 쇼 스타일)이 있으면 강좌·회차 정보를 읽습니다(시즌은 첫 시즌만). 없으면 폴더 이름을 제목으로 씁니다. 윌라 영상 `metadata.json`이 있으면 `cover_url`과 `clips[].title`만 씁니다(회차 길이는 쓰지 않습니다. 길이가 채워지면 코덱 분석이 건너뛰어지기 때문입니다).
+* **포스터**: 폴더 이미지(`poster/cover/folder` + `.jpg/.png/.jpeg/.webp`, 없으면 첫 이미지 파일) → `show.yaml` `art`/`posters`(URL 또는 강좌 폴더 기준 파일명, 목록이면 첫 값) → `metadata.json` `cover_url` 순입니다(`_resolve_course_poster`).
+* **회차 제목**: `show.yaml` 회차 제목 → `metadata.json` `clips[].title`(번호로 연결) → 파일명(`S01E02.`·`S01E02 - ` 접두어 제거) 순입니다.
+* **구글 드라이브 공유 링크 줄(클로즈 베타 `GDRIVE_LINK_BETA`)**: `scan_video_library_gdrive`가 카테고리 리모트로 목록을 한 번 받아(`rclone lsjson`) 같은 규칙으로 강좌를 묶습니다. 강좌 폴더 최상위의 `show.yaml`·`metadata.json`은 메타 미러(`cache/gdrive_meta/video_lib_<id>/<폴더 ID>/`)로, 포스터 이미지는 강좌마다 한 장만 `.../_posters/`로 받습니다. 영상 파일은 읽지 않습니다. 회차 경로는 `gdrive:/<폴더 ID>/<상대 경로>?gid=<파일 ID>`이고 길이는 0이며, 길이·코덱 분석(㉗)과 컨테이너 재검사 대상에서 빠집니다. 목록에서 사라진 강좌는 숨기고(대량이면 보류), 이동 인식과 자막은 아직 없습니다. 재생은 아직 지원하지 않습니다.
 * **자막**: 같은 이름의 `.srt`/`.smi`/`.vtt` 사이드카를 찾습니다. 언어 태그(`Movie.ko.srt`)를 인식하고, 부분 자막(`forced`)은 빼며, 한국어와 `srt`를 우선합니다(`_find_sidecar_subtitle`).
 * **폴더 이동·사라진 강좌**: 오디오북([㉑](#㉑-폴더-단위-탐색과-스킵-정책))과 같은 코드(`_MovedAudiobookFinder`, `_hide_unmatched_missing`)를 씁니다. 새로 발견한 폴더의 회차(상대 경로+크기)가 폴더가 사라진 기존 강좌의 회차를 모두 포함하고 그런 강좌가 하나뿐이면 경로만 고칩니다(`VideoRepository.relocate_video`, id와 이어 보기 기록 유지, `[VideoScanner][MOVED]`). 짝이 없는 사라진 강좌는 스캔 끝에 숨기고(`is_deleted`), 카테고리 폴더에 접근할 수 없거나 대량으로 사라지면 보류합니다(`[VideoScanner][MISSING_HELD]`). 숨긴 강좌의 폴더가 다시 나타나면 처리하면서 복원합니다(`[VideoScanner][RESTORED]`). 강좌 안에서 사라진 회차 파일은 저장 때 지워집니다.
 

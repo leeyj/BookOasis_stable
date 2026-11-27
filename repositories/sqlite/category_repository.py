@@ -333,6 +333,21 @@ class CategoryRepository:
         return [int(row['id']) for row in rows]
 
     @staticmethod
+    def get_cover_paths_with_prefix(db_type, prefix):
+        """Stored cover/banner paths starting with prefix (e.g. '5/'), from any category of this DB.
+        Moved categories keep their old 'id/...' paths, so a folder can be shared across categories and DBs."""
+        like = prefix + '%'
+        with database.connection(db_type) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT cover_image AS p FROM books WHERE cover_image LIKE ? "
+                "UNION SELECT banner_image FROM books WHERE banner_image LIKE ? "
+                "UNION SELECT cover_image FROM collections WHERE cover_image LIKE ?",
+                (like, like, like))
+            rows = cursor.fetchall()
+        return {row['p'] for row in rows if row['p']}
+
+    @staticmethod
     def delete_library_chunk(db_type, library_id, batch_size=900):
         """2단계: 도서·오디오북·영상을 batch_size개씩 종속 데이터와 함께 지우고 커밋한다.
         (지운 항목 수, 지울 TTS 음성 폴더 rel_dir 목록, 지운 도서 id 목록)을 돌려주며 수가 0이면 남은 게 없다.

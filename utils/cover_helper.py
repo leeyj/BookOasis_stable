@@ -3,6 +3,20 @@ import os
 import hashlib
 
 
+# Poster cache folder name per db_type. Only these keep per-library poster caches (covers/<name>/<library_id>).
+POSTER_CACHE_CATEGORY_BY_DB_TYPE = {'audiobook': 'audio', 'video': 'video'}
+
+
+def poster_cache_library_dir(db_type, library_id):
+    """Per-library poster cache folder, or None when this db_type has none.
+    Removed together with the category on delete."""
+    category = POSTER_CACHE_CATEGORY_BY_DB_TYPE.get(db_type)
+    if not category or library_id is None:
+        return None
+    from services.cover_storage_service import get_covers_dir
+    return os.path.join(get_covers_dir(), category, str(int(library_id)))
+
+
 def _poster_cache_paths(poster_source, category, library_id):
     from services.cover_storage_service import get_covers_dir
     covers_dir = get_covers_dir()
@@ -86,15 +100,10 @@ def get_or_cache_remote_poster_webp(poster_source, category, library_id=None, ti
 
     img_data = None
     if is_remote:
-        try:
-            import requests
-        except Exception:
-            return None
-        try:
-            resp = requests.get(poster_source, timeout=timeout)
-            if resp.ok and resp.content:
-                img_data = resp.content
-        except Exception:
+        # The URL can come from a shared Drive folder or a downloaded metadata.json (not only the admin),
+        # so it goes through the same SSRF guard and size cap as plugin image URLs.
+        img_data = _fetch_public_image(poster_source, REMOTE_POSTER_MAX_BYTES, timeout, 'Remote poster')
+        if not img_data:
             return None
     else:
         if signature is None:
@@ -185,11 +194,44 @@ def cache_poster_at_scan(poster_source, category, library_id=None, preloaded_byt
         print(f"[Cover-Cache] scan-time poster cache failed ({poster_source}): {e}")
         return 'failed'
 
+REMOTE_POSTER_MAX_BYTES = 10 * 1024 * 1024
+
+
+def _fetch_public_image(url, max_bytes, timeout, label):
+    """Download an image URL through services/ssrf_guard (private/loopback IPs blocked, every redirect
+    re-checked) with a size cap. Returns bytes, or None on block/failure/non-2xx (reason logged)."""
+    from services.ssrf_guard import (
+        SSRFBlockedError,
+        fetch_public_url_with_redirect_revalidation,
+        read_capped,
+    )
+    try:
+        response = fetch_public_url_with_redirect_revalidation(url, method='GET', timeout=timeout)
+    except SSRFBlockedError as e:
+        print(f"[Cover-Cache] {label} blocked ({url}): {e.reason}")
+        return None
+    except Exception as e:
+        print(f"[Cover-Cache] {label} fetch failed ({url}): {e}")
+        return None
+    try:
+        if not response.ok:
+            print(f"[Cover-Cache] {label} fetch failed ({url}): HTTP {response.status_code}")
+            return None
+        return read_capped(response, max_bytes) or None
+    except SSRFBlockedError as e:
+        print(f"[Cover-Cache] {label} too large ({url}): {e.reason}")
+        return None
+    except Exception as e:
+        print(f"[Cover-Cache] {label} fetch failed ({url}): {e}")
+        return None
+    finally:
+        response.close()
+
+
 def get_or_cache_external_image_webp(url, category, max_bytes=2 * 1024 * 1024, timeout=5):
     """플러그인이 클라이언트 요청마다 넘기는 임의의 외부 이미지 URL(방송사 로고 등)을
-    안전하게 받아와 WebP로 로컬 캐싱한다. get_or_cache_remote_poster_webp()와 달리
-    - 대상 URL이 (관리자가 스캔 시점에 등록한 값이 아니라) 매 요청마다 클라이언트가 보내는
-      임의 문자열이라 services/ssrf_guard.py로 사설/루프백 IP 여부를 검증하고,
+    안전하게 받아와 WebP로 로컬 캐싱한다. get_or_cache_remote_poster_webp()와 같이
+    - services/ssrf_guard.py로 사설/루프백 IP 여부를 검증하고(_fetch_public_image),
     - 응답 크기를 max_bytes로 캡해 과도한 다운로드를 막는다.
     다만 이 리소스들은 도메인이 소스마다 제각각이라(방송사/채널별 CDN) 사용자 화이트리스트
     등록까지 요구하면 실사용이 불가능해, 도메인 제한 없이 사설 IP만 차단한다(SSRF 최소 방어).
@@ -208,29 +250,7 @@ def get_or_cache_external_image_webp(url, category, max_bytes=2 * 1024 * 1024, t
     if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
         return cache_path
 
-    from services.ssrf_guard import (
-        SSRFBlockedError,
-        fetch_public_url_with_redirect_revalidation,
-        read_capped,
-    )
-
-    try:
-        response = fetch_public_url_with_redirect_revalidation(url, method='GET', timeout=timeout)
-    except SSRFBlockedError as e:
-        print(f"[Cover-Cache] External image blocked ({url}): {e.reason}")
-        return None
-    except Exception as e:
-        print(f"[Cover-Cache] External image fetch failed ({url}): {e}")
-        return None
-
-    try:
-        img_data = read_capped(response, max_bytes)
-    except SSRFBlockedError as e:
-        print(f"[Cover-Cache] External image too large ({url}): {e.reason}")
-        return None
-    finally:
-        response.close()
-
+    img_data = _fetch_public_image(url, max_bytes, timeout, 'External image')
     if not img_data:
         return None
 

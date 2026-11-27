@@ -1176,6 +1176,48 @@ def _backfill_library_group_default_color(conn, cursor):
         print(f"[DB-Migration ERROR] library_groups default color backfill failed: {color_backfill_err}")
 
 
+# Adult categories are numbered from here so their ids don't collide with general ones: both DBs number
+# categories separately but share covers/<library_id>/ (2026-11-27). Existing ids are left as they are.
+ADULT_LIBRARY_ID_START = 9000
+
+
+def _ensure_adult_library_id_floor(conn, cursor, db_type):
+    """Make the next adult category id at least ADULT_LIBRARY_ID_START. Only raises the counter; safe to repeat."""
+    if db_type != 'adult':
+        return
+    import database
+    try:
+        if database.is_mariadb_mode():
+            cursor.execute(
+                "SELECT AUTO_INCREMENT AS next_id FROM information_schema.TABLES "
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'libraries'")
+            row = cursor.fetchone()
+            next_id = None
+            if row:
+                next_id = row['next_id'] if isinstance(row, dict) else row[0]
+            if next_id is None or int(next_id) < ADULT_LIBRARY_ID_START:
+                # InnoDB keeps max(id)+1 if that is higher, so this never lowers the counter.
+                cursor.execute(f"ALTER TABLE libraries AUTO_INCREMENT = {int(ADULT_LIBRARY_ID_START)}")
+                conn.commit()
+                print(f"[DB-Migration] adult libraries: new category ids start at {ADULT_LIBRARY_ID_START}")
+            return
+        floor = ADULT_LIBRARY_ID_START - 1  # sqlite_sequence holds the last used id
+        cursor.execute("SELECT seq FROM sqlite_sequence WHERE name = 'libraries'")
+        row = cursor.fetchone()
+        if row is None:
+            cursor.execute("SELECT COALESCE(MAX(id), 0) FROM libraries")
+            current = int(cursor.fetchone()[0])
+            cursor.execute("INSERT INTO sqlite_sequence (name, seq) VALUES ('libraries', ?)", (max(current, floor),))
+        elif int(row[0]) < floor:
+            cursor.execute("UPDATE sqlite_sequence SET seq = ? WHERE name = 'libraries'", (floor,))
+        else:
+            return
+        conn.commit()
+        print(f"[DB-Migration] adult libraries: new category ids start at {ADULT_LIBRARY_ID_START}")
+    except Exception as e:
+        print(f"[DB-Migration ERROR] adult library id floor failed: {e}")
+
+
 def _backfill_books_created_at(conn, cursor, db_type):
     """books.created_at(추가일)이 비어 있는 행을 커버 저장 시각(없으면 현재 시각)으로 채운다.
 
@@ -1628,6 +1670,7 @@ def run_full_migration():
             _seed_library_kinds(conn, cursor, db_type)
             _backfill_audiobook_last_listened_at(conn, cursor, db_type)
             _backfill_library_group_default_color(conn, cursor)
+            _ensure_adult_library_id_floor(conn, cursor, db_type)
             if db_type == 'video' and not database.is_mariadb_mode():
                 _backfill_html_entities_video_titles_sqlite(conn)
             _backfill_books_created_at(conn, cursor, db_type)

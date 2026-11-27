@@ -9,7 +9,7 @@ import os
 from flask import Blueprint, request, jsonify
 from api.helpers.route_helpers import error_response
 from api.auth import admin_required
-from utils.rclone_gdrive_copy import list_writable_drive_remotes, validate_remote_access
+from utils.rclone_gdrive_copy import list_writable_drive_remotes, list_link_category_remotes, validate_remote_access
 from services.gdrive_copy_service import GdriveCopyService
 
 gdrive_copy_bp = Blueprint('gdrive_copy', __name__)
@@ -26,7 +26,11 @@ def get_gdrive_copy_remotes():
     if not _develop_mode_enabled():
         return jsonify({'success': False, 'error': '지원하지 않는 기능입니다.'}), 404
     try:
-        remotes = list_writable_drive_remotes()
+        # purpose=link: 구글 링크 카테고리 연결 계정(읽기만 하므로 읽기 전용 리모트 허용). 기본은 쓰기 가능 리모트(복사해오기).
+        if request.args.get('purpose') == 'link':
+            remotes = list_link_category_remotes()
+        else:
+            remotes = list_writable_drive_remotes()
         return jsonify({'success': True, 'remotes': remotes})
     except Exception as e:
         return error_response(e)
